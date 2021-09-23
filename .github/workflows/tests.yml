@@ -18,7 +18,7 @@ jobs:
         run: make test
 
   build-stable:
-    name: Test on 1.46.0
+    name: Test on 1.41.0
     runs-on: ubuntu-latest
 
     steps:

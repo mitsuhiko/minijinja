@@ -15,7 +15,7 @@ fn find_marker(a: &str) -> Option<usize> {
     let mut offset = 0;
     loop {
         let idx = memchr(&bytes[offset..], b'{')?;
-        if let Some(b'{' | b'%' | b'#') = bytes.get(offset + idx + 1).copied() {
+        if let Some(b'{') | Some(b'%') | Some(b'#') = bytes.get(offset + idx + 1).copied() {
             return Some(offset + idx);
         }
         offset += idx + 1;
@@ -99,7 +99,7 @@ fn tokenize_raw(
                         has_escapes = true;
                         true
                     }
-                    (_, $delim | b'\r' | b'\n') => false,
+                    (_, $delim) | (_, b'\r') | (_, b'\n') => false,
                     _ => true,
                 })
                 .count();
@@ -208,7 +208,7 @@ fn tokenize_raw(
                 };
                 return Some(Ok((Token::TemplateData(lead), span!(old_loc))));
             }
-            Some(&LexerState::InBlock | &LexerState::InVariable) => {
+            Some(&LexerState::InBlock) | Some(&LexerState::InVariable) => {
                 // in blocks whitespace is generally ignored, skip it.
                 match rest
                     .as_bytes()
@@ -347,16 +347,14 @@ fn whitespace_filter<'a, I: Iterator<Item = Result<(Token<'a>, Span), Error>>>(
             }
             if matches!(
                 iter.peek(),
-                Some(Ok((
-                    Token::VariableStart(true) | Token::BlockStart(true),
-                    _
-                )))
+                Some(Ok((Token::VariableStart(true), _))) | Some(Ok((Token::BlockStart(true), _)))
             ) {
                 data = data.trim_end();
             }
             Some(Ok((Token::TemplateData(data), span)))
         }
-        rv @ Some(Ok((Token::VariableEnd(true) | Token::BlockStart(true), _))) => {
+        rv @ Some(Ok((Token::VariableEnd(true), _)))
+        | rv @ Some(Ok((Token::BlockStart(true), _))) => {
             remove_leading_ws = true;
             rv
         }

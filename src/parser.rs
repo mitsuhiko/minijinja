@@ -331,9 +331,9 @@ impl<'a> Parser<'a> {
         }
 
         match token {
-            Token::Ident("true" | "True") => Ok(const_val!(true)),
-            Token::Ident("false" | "False") => Ok(const_val!(false)),
-            Token::Ident("none" | "None") => Ok(const_val!(())),
+            Token::Ident("true") | Token::Ident("True") => Ok(const_val!(true)),
+            Token::Ident("false") | Token::Ident("False") => Ok(const_val!(false)),
+            Token::Ident("none") | Token::Ident("None") => Ok(const_val!(())),
             Token::Ident(name) => Ok(ast::Expr::Var(Spanned::new(ast::Var { id: name }, span))),
             Token::Str(val) => Ok(const_val!(val)),
             Token::Int(val) => Ok(const_val!(val)),
@@ -431,7 +431,7 @@ impl<'a> Parser<'a> {
         let target = self.parse_assign_target()?;
         expect_token!(self, Token::Ident("in"), "in")?;
         let iter = self.parse_expr()?;
-        expect_token!(self, Token::BlockEnd(_), "end of block")?;
+        expect_token!(self, Token::BlockEnd(..), "end of block")?;
         let body = self.subparse(|tok| matches!(tok, Token::Ident("endfor")))?;
         self.stream.next()?;
         Ok(ast::ForLoop { target, iter, body })
@@ -439,22 +439,24 @@ impl<'a> Parser<'a> {
 
     fn parse_if_cond(&mut self) -> Result<ast::IfCond<'a>, Error> {
         let expr = self.parse_expr()?;
-        expect_token!(self, Token::BlockEnd(_), "end of block")?;
-        let true_body =
-            self.subparse(|tok| matches!(tok, Token::Ident("endif" | "else" | "elif")))?;
+        expect_token!(self, Token::BlockEnd(..), "end of block")?;
+        let true_body = self.subparse(|tok| {
+            matches!(
+                tok,
+                Token::Ident("endif") | Token::Ident("else") | Token::Ident("elif")
+            )
+        })?;
         let false_body = match self.stream.next()? {
             Some((Token::Ident("else"), _)) => {
-                expect_token!(self, Token::BlockEnd(_), "end of block")?;
+                expect_token!(self, Token::BlockEnd(..), "end of block")?;
                 let rv = self.subparse(|tok| matches!(tok, Token::Ident("endif")))?;
                 self.stream.next()?;
                 rv
             }
-            Some((Token::Ident("elif"), span)) => {
-                vec![ast::Stmt::IfCond(Spanned::new(
-                    self.parse_if_cond()?,
-                    self.stream.expand_span(span),
-                ))]
-            }
+            Some((Token::Ident("elif"), span)) => vec![ast::Stmt::IfCond(Spanned::new(
+                self.parse_if_cond()?,
+                self.stream.expand_span(span),
+            ))],
             _ => Vec::new(),
         };
 
@@ -478,7 +480,7 @@ impl<'a> Parser<'a> {
             assignments.push((target, expr));
         }
 
-        expect_token!(self, Token::BlockEnd(_), "end of block")?;
+        expect_token!(self, Token::BlockEnd(..), "end of block")?;
         let body = self.subparse(|tok| matches!(tok, Token::Ident("endwith")))?;
         self.stream.next()?;
         Ok(ast::WithBlock { assignments, body })
@@ -486,7 +488,7 @@ impl<'a> Parser<'a> {
 
     fn parse_block(&mut self) -> Result<ast::Block<'a>, Error> {
         let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
-        expect_token!(self, Token::BlockEnd(_), "end of block")?;
+        expect_token!(self, Token::BlockEnd(..), "end of block")?;
         let body = self.subparse(|tok| matches!(tok, Token::Ident("endblock")))?;
         self.stream.next()?;
 
@@ -511,7 +513,7 @@ impl<'a> Parser<'a> {
 
     fn parse_auto_escape(&mut self) -> Result<ast::AutoEscape<'a>, Error> {
         let enabled = self.parse_expr()?;
-        expect_token!(self, Token::BlockEnd(_), "end of block")?;
+        expect_token!(self, Token::BlockEnd(..), "end of block")?;
         let body = self.subparse(|tok| matches!(tok, Token::Ident("endautoescape")))?;
         self.stream.next()?;
         Ok(ast::AutoEscape { enabled, body })
@@ -533,7 +535,7 @@ impl<'a> Parser<'a> {
                         ast::EmitExpr { expr },
                         self.stream.expand_span(span),
                     )));
-                    expect_token!(self, Token::VariableEnd(_), "end of variable block")?;
+                    expect_token!(self, Token::VariableEnd(..), "end of variable block")?;
                 }
                 Token::BlockStart(_) => {
                     let (tok, _span) = match self.stream.current()? {
@@ -544,7 +546,7 @@ impl<'a> Parser<'a> {
                         return Ok(rv);
                     }
                     rv.push(self.parse_stmt()?);
-                    expect_token!(self, Token::BlockEnd(_), "end of block")?;
+                    expect_token!(self, Token::BlockEnd(..), "end of block")?;
                 }
                 _ => unreachable!("lexer produced garbage"),
             }

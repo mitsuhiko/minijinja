@@ -740,7 +740,7 @@ impl Value {
             Some(Primitive::Char(x)) => x != '\x00',
             Some(Primitive::Str(x)) => !x.is_empty(),
             Some(Primitive::Bytes(x)) => !x.is_empty(),
-            Some(Primitive::None | Primitive::Undefined) => false,
+            Some(Primitive::None) | Some(Primitive::Undefined) => false,
             None => true,
         }
     }
@@ -854,7 +854,7 @@ impl Value {
     pub(crate) fn into_string(self) -> String {
         if let Repr::Shared(arc) = self.0 {
             match RcType::try_unwrap(arc) {
-                Ok(Shared::String(s) | Shared::SafeString(s)) => s,
+                Ok(Shared::String(s)) | Ok(Shared::SafeString(s)) => s,
                 Ok(other) => other.to_string(),
                 Err(arc) => arc.to_string(),
             }

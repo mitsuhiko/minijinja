@@ -1,6 +1,7 @@
 use std::char::decode_utf16;
+use std::fmt;
+use std::iter::{once, repeat};
 use std::str::Chars;
-use std::{array, fmt, iter};
 
 use crate::error::{Error, ErrorKind};
 
@@ -117,19 +118,19 @@ impl Unescaper {
     }
 
     fn parse_u16(&self, chars: &mut Chars) -> Result<u16, Error> {
-        let hexnum = chars.chain(iter::repeat('\0')).take(4).collect::<String>();
+        let hexnum = chars.chain(repeat('\0')).take(4).collect::<String>();
         u16::from_str_radix(&hexnum, 16).map_err(|_| ErrorKind::BadEscape.into())
     }
 
     fn push_u16(&mut self, c: u16) -> Result<(), Error> {
         match (self.pending_surrogate, (0xD800..=0xDFFF).contains(&c)) {
-            (0, false) => match decode_utf16(array::IntoIter::new([c])).next() {
+            (0, false) => match decode_utf16(once(c)).next() {
                 Some(Ok(c)) => self.out.push(c),
                 _ => return Err(ErrorKind::BadEscape.into()),
             },
             (_, false) => return Err(ErrorKind::BadEscape.into()),
             (0, true) => self.pending_surrogate = c,
-            (prev, true) => match decode_utf16(array::IntoIter::new([prev, c])).next() {
+            (prev, true) => match decode_utf16(once(prev).chain(once(c))).next() {
                 Some(Ok(c)) => {
                     self.out.push(c);
                     self.pending_surrogate = 0;

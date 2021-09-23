@@ -445,7 +445,9 @@ impl<'env, 'source> Vm<'env, 'source> {
                     auto_escape_stack.push(auto_escape);
                     auto_escape = match value.as_primitive() {
                         Some(Primitive::Str("html")) => AutoEscape::Html,
-                        Some(Primitive::Str("none") | Primitive::Bool(false)) => AutoEscape::None,
+                        Some(Primitive::Str("none")) | Some(Primitive::Bool(false)) => {
+                            AutoEscape::None
+                        }
                         Some(Primitive::Bool(true)) => {
                             if matches!(initial_auto_escape, AutoEscape::None) {
                                 AutoEscape::Html

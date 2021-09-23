@@ -113,7 +113,7 @@ impl<'source> fmt::Debug for Environment<'source> {
 
 fn default_auto_escape(name: &str) -> AutoEscape {
     match name.rsplit('.').next() {
-        Some("html" | "htm" | "xml") => AutoEscape::Html,
+        Some("html") | Some("htm") | Some("xml") => AutoEscape::Html,
         _ => AutoEscape::None,
     }
 }
