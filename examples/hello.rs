@@ -13,12 +13,17 @@ pub struct Context {
 
 fn main() {
     let mut env = Environment::new();
-    env.add_template("hello.txt", "Hello {{ user.name }}!").unwrap();
+    env.add_template("hello.txt", "Hello {{ user.name }}!")
+        .unwrap();
     let template = env.get_template("hello.txt").unwrap();
-    println!("{}", template.render(&Context {
-        user: User {
-            name: "John".into(),
-        },
-    }).unwrap());
+    println!(
+        "{}",
+        template
+            .render(&Context {
+                user: User {
+                    name: "John".into(),
+                },
+            })
+            .unwrap()
+    );
 }
-
