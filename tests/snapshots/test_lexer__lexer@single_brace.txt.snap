@@ -1,0 +1,9 @@
+---
+source: tests/test_lexer.rs
+expression: "&tokens"
+input_file: tests/lexer-inputs/single_brace.txt
+
+---
+[
+    TEMPLATE_DATA("{foo} foo {bar}\n"),
+]

@@ -1,0 +1,8 @@
+two: 2
+---
+even: {{ two is even }}
+odd: {{ two is odd }}
+undefined: {{ two is undefined }}
+defined: {{ two is defined }}
+undefined2: {{ ohwell is undefined }}
+defined2: {{ ohwell is defined }}

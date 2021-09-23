@@ -1,0 +1,53 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/tests.txt
+
+---
+even: true
+odd: false
+undefined: false
+defined: true
+undefined2: true
+defined2: false
+
+=====
+
+Template {
+    name: "tests.txt",
+    instructions: [
+        00000 | EMIT_RAW (string "even: ")   [<unknown>:1],
+        00001 | LOOKUP (var "two")   [<unknown>:1],
+        00002 | BUILD_LIST (0 items)   [<unknown>:1],
+        00003 | PERFORM_TEST (name "even")   [<unknown>:1],
+        00004 | EMIT   [<unknown>:1],
+        00005 | EMIT_RAW (string "\nodd: ")   [<unknown>:1],
+        00006 | LOOKUP (var "two")   [<unknown>:2],
+        00007 | BUILD_LIST (0 items)   [<unknown>:2],
+        00008 | PERFORM_TEST (name "odd")   [<unknown>:2],
+        00009 | EMIT   [<unknown>:2],
+        0000a | EMIT_RAW (string "\nundefined: ")   [<unknown>:2],
+        0000b | LOOKUP (var "two")   [<unknown>:3],
+        0000c | BUILD_LIST (0 items)   [<unknown>:3],
+        0000d | PERFORM_TEST (name "undefined")   [<unknown>:3],
+        0000e | EMIT   [<unknown>:3],
+        0000f | EMIT_RAW (string "\ndefined: ")   [<unknown>:3],
+        00010 | LOOKUP (var "two")   [<unknown>:4],
+        00011 | BUILD_LIST (0 items)   [<unknown>:4],
+        00012 | PERFORM_TEST (name "defined")   [<unknown>:4],
+        00013 | EMIT   [<unknown>:4],
+        00014 | EMIT_RAW (string "\nundefined2: ")   [<unknown>:4],
+        00015 | LOOKUP (var "ohwell")   [<unknown>:5],
+        00016 | BUILD_LIST (0 items)   [<unknown>:5],
+        00017 | PERFORM_TEST (name "undefined")   [<unknown>:5],
+        00018 | EMIT   [<unknown>:5],
+        00019 | EMIT_RAW (string "\ndefined2: ")   [<unknown>:5],
+        0001a | LOOKUP (var "ohwell")   [<unknown>:6],
+        0001b | BUILD_LIST (0 items)   [<unknown>:6],
+        0001c | PERFORM_TEST (name "defined")   [<unknown>:6],
+        0001d | EMIT   [<unknown>:6],
+        0001e | EMIT_RAW (string "\n")   [<unknown>:6],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

@@ -1,0 +1,24 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/undefined.txt
+
+---
+none
+
+
+=====
+
+Template {
+    name: "undefined.txt",
+    instructions: [
+        00000 | LOAD_CONST (value none)   [<unknown>:1],
+        00001 | EMIT   [<unknown>:1],
+        00002 | EMIT_RAW (string "\n")   [<unknown>:1],
+        00003 | LOOKUP (var "undefined")   [<unknown>:2],
+        00004 | EMIT   [<unknown>:2],
+        00005 | EMIT_RAW (string "\n")   [<unknown>:2],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

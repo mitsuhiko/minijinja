@@ -1,0 +1,32 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/extends.txt
+
+---
+<title>new title</title>
+new body
+
+=====
+
+Template {
+    name: "extends.txt",
+    instructions: [
+        00000 | LOOKUP (var "template")   [<unknown>:1],
+        00001 | LOAD_BLOCKS   [<unknown>:1],
+        00002 | EMIT_RAW (string "\n")   [<unknown>:1],
+        00003 | CALL_BLOCK (name "title")   [<unknown>:2],
+        00004 | EMIT_RAW (string "\n")   [<unknown>:2],
+        00005 | CALL_BLOCK (name "body")   [<unknown>:3],
+        00006 | EMIT_RAW (string "\n")   [<unknown>:3],
+    ],
+    blocks: {
+        "body": [
+            00000 | EMIT_RAW (string "new body")   [<unknown>:3],
+        ],
+        "title": [
+            00000 | EMIT_RAW (string "new title")   [<unknown>:2],
+        ],
+    },
+    initial_auto_escape: None,
+}

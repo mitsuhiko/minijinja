@@ -1,0 +1,6 @@
+foo: 1
+bar: 2
+---
+{% if foo > bar and bar < foo %}
+  test
+{% endif %}

@@ -1,0 +1,23 @@
+---
+source: tests/test_parser.rs
+expression: "&ast"
+input_file: tests/parser-inputs/simple.txt
+
+---
+Ok(
+    Template {
+        children: [
+            EmitRaw {
+                raw: "Hello ",
+            } @ 1:0-1:6,
+            EmitExpr {
+                expr: Var {
+                    id: "world",
+                } @ 1:9-1:14,
+            } @ 1:6-1:17,
+            EmitRaw {
+                raw: "!\n",
+            } @ 1:17-2:0,
+        ],
+    } @ 1:0-2:0,
+)

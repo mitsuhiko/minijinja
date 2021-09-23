@@ -1,0 +1,29 @@
+---
+source: tests/test_parser.rs
+expression: "&ast"
+input_file: tests/parser-inputs/map.txt
+
+---
+Ok(
+    Template {
+        children: [
+            EmitExpr {
+                expr: Map {
+                    keys: [
+                        Const {
+                            value: "foo",
+                        } @ 1:4-1:9,
+                    ],
+                    values: [
+                        Const {
+                            value: "bar",
+                        } @ 1:11-1:16,
+                    ],
+                } @ 1:3-1:20,
+            } @ 1:0-1:20,
+            EmitRaw {
+                raw: "\n",
+            } @ 1:20-2:0,
+        ],
+    } @ 1:0-2:0,
+)

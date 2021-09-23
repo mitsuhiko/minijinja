@@ -1,0 +1,13 @@
+---
+source: tests/test_lexer.rs
+expression: "&tokens"
+input_file: tests/lexer-inputs/basic.txt
+
+---
+[
+    TEMPLATE_DATA("Hello "),
+    VARIABLE_START(false),
+    IDENT(name),
+    VARIABLE_END(false),
+    TEMPLATE_DATA("!\n"),
+]

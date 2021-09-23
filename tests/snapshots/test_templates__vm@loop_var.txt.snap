@@ -1,0 +1,86 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/loop_var.txt
+
+---
+
+  a (1 of 4)
+    first=true
+    last=false
+    revindex=4
+    revindex0=3
+    cycle=odd
+
+  b (2 of 4)
+    first=false
+    last=false
+    revindex=3
+    revindex0=2
+    cycle=even
+
+  c (3 of 4)
+    first=false
+    last=false
+    revindex=2
+    revindex0=1
+    cycle=odd
+
+  d (4 of 4)
+    first=false
+    last=true
+    revindex=1
+    revindex0=0
+    cycle=even
+
+
+=====
+
+Template {
+    name: "loop_var.txt",
+    instructions: [
+        00000 | LOOKUP (var "seq")   [<unknown>:1],
+        00001 | PUSH_LOOP (assign to "item")   [<unknown>:1],
+        00002 | ITERATE (exit to 00027)   [<unknown>:1],
+        00003 | EMIT_RAW (string "\n  ")   [<unknown>:1],
+        00004 | LOOKUP (var "item")   [<unknown>:2],
+        00005 | EMIT   [<unknown>:2],
+        00006 | EMIT_RAW (string " (")   [<unknown>:2],
+        00007 | LOOKUP (var "loop")   [<unknown>:2],
+        00008 | GETATTR (key "index")   [<unknown>:2],
+        00009 | EMIT   [<unknown>:2],
+        0000a | EMIT_RAW (string " of ")   [<unknown>:2],
+        0000b | LOOKUP (var "loop")   [<unknown>:2],
+        0000c | GETATTR (key "length")   [<unknown>:2],
+        0000d | EMIT   [<unknown>:2],
+        0000e | EMIT_RAW (string ")\n    first=")   [<unknown>:2],
+        0000f | LOOKUP (var "loop")   [<unknown>:3],
+        00010 | GETATTR (key "first")   [<unknown>:3],
+        00011 | EMIT   [<unknown>:3],
+        00012 | EMIT_RAW (string "\n    last=")   [<unknown>:3],
+        00013 | LOOKUP (var "loop")   [<unknown>:4],
+        00014 | GETATTR (key "last")   [<unknown>:4],
+        00015 | EMIT   [<unknown>:4],
+        00016 | EMIT_RAW (string "\n    revindex=")   [<unknown>:4],
+        00017 | LOOKUP (var "loop")   [<unknown>:5],
+        00018 | GETATTR (key "revindex")   [<unknown>:5],
+        00019 | EMIT   [<unknown>:5],
+        0001a | EMIT_RAW (string "\n    revindex0=")   [<unknown>:5],
+        0001b | LOOKUP (var "loop")   [<unknown>:6],
+        0001c | GETATTR (key "revindex0")   [<unknown>:6],
+        0001d | EMIT   [<unknown>:6],
+        0001e | EMIT_RAW (string "\n    cycle=")   [<unknown>:6],
+        0001f | LOOKUP (var "loop")   [<unknown>:7],
+        00020 | LOAD_CONST (value "odd")   [<unknown>:7],
+        00021 | LOAD_CONST (value "even")   [<unknown>:7],
+        00022 | BUILD_LIST (2 items)   [<unknown>:7],
+        00023 | CALL_METHOD (name "cycle")   [<unknown>:7],
+        00024 | EMIT   [<unknown>:7],
+        00025 | EMIT_RAW (string "\n")   [<unknown>:7],
+        00026 | JUMP (to 00002)   [<unknown>:7],
+        00027 | POP_FRAME   [<unknown>:7],
+        00028 | EMIT_RAW (string "\n")   [<unknown>:8],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

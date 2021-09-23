@@ -1,0 +1,35 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/getitem.txt
+
+---
+first: first_item
+last: last_item
+name: Peter
+
+=====
+
+Template {
+    name: "getitem.txt",
+    instructions: [
+        00000 | EMIT_RAW (string "first: ")   [<unknown>:1],
+        00001 | LOOKUP (var "items")   [<unknown>:1],
+        00002 | LOAD_CONST (value 0)   [<unknown>:1],
+        00003 | GETITEM   [<unknown>:1],
+        00004 | EMIT   [<unknown>:1],
+        00005 | EMIT_RAW (string "\nlast: ")   [<unknown>:1],
+        00006 | LOOKUP (var "items")   [<unknown>:2],
+        00007 | LOAD_CONST (value -1)   [<unknown>:2],
+        00008 | GETITEM   [<unknown>:2],
+        00009 | EMIT   [<unknown>:2],
+        0000a | EMIT_RAW (string "\nname: ")   [<unknown>:2],
+        0000b | LOOKUP (var "user")   [<unknown>:3],
+        0000c | LOAD_CONST (value "name")   [<unknown>:3],
+        0000d | GETITEM   [<unknown>:3],
+        0000e | EMIT   [<unknown>:3],
+        0000f | EMIT_RAW (string "\n")   [<unknown>:3],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

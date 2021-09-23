@@ -1,0 +1,46 @@
+---
+source: tests/test_lexer.rs
+expression: "&tokens"
+input_file: tests/lexer-inputs/literals.txt
+
+---
+[
+    VARIABLE_START(false),
+    IDENT(true),
+    VARIABLE_END(false),
+    TEMPLATE_DATA("\n"),
+    VARIABLE_START(false),
+    IDENT(false),
+    VARIABLE_END(false),
+    TEMPLATE_DATA("\n"),
+    VARIABLE_START(false),
+    IDENT(null),
+    VARIABLE_END(false),
+    TEMPLATE_DATA("\n"),
+    VARIABLE_START(false),
+    FLOAT(1.0),
+    VARIABLE_END(false),
+    TEMPLATE_DATA("\n"),
+    VARIABLE_START(false),
+    INT(2),
+    VARIABLE_END(false),
+    TEMPLATE_DATA("\n"),
+    VARIABLE_START(false),
+    BRACKET_OPEN,
+    INT(1),
+    COMMA,
+    INT(2),
+    COMMA,
+    INT(3),
+    BRACKET_CLOSE,
+    VARIABLE_END(false),
+    TEMPLATE_DATA("\n"),
+    VARIABLE_START(false),
+    BRACE_OPEN,
+    STR("foo"),
+    COLON,
+    STR("bar"),
+    BRACE_CLOSE,
+    VARIABLE_END(false),
+    TEMPLATE_DATA("\n"),
+]

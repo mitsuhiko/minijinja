@@ -1,0 +1,22 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/filter.txt
+
+---
+FOO BAR BAZ
+
+=====
+
+Template {
+    name: "filter.txt",
+    instructions: [
+        00000 | LOOKUP (var "value")   [<unknown>:1],
+        00001 | BUILD_LIST (0 items)   [<unknown>:1],
+        00002 | APPLY_FILTER (name "upper")   [<unknown>:1],
+        00003 | EMIT   [<unknown>:1],
+        00004 | EMIT_RAW (string "\n")   [<unknown>:1],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

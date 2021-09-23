@@ -1,0 +1,23 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/if_cond.txt
+
+---
+
+  was true
+
+
+=====
+
+Template {
+    name: "if_cond.txt",
+    instructions: [
+        00000 | LOOKUP (var "value")   [<unknown>:1],
+        00001 | JUMP_IF_FALSE (to 00003)   [<unknown>:1],
+        00002 | EMIT_RAW (string "\n  was true\n")   [<unknown>:1],
+        00003 | EMIT_RAW (string "\n")   [<unknown>:3],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

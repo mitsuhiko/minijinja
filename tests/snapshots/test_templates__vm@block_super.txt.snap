@@ -1,0 +1,36 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/block_super.txt
+
+---
+<title>[default title]</title>
+new body
+
+=====
+
+Template {
+    name: "block_super.txt",
+    instructions: [
+        00000 | LOOKUP (var "template")   [<unknown>:1],
+        00001 | LOAD_BLOCKS   [<unknown>:1],
+        00002 | EMIT_RAW (string "\n")   [<unknown>:1],
+        00003 | CALL_BLOCK (name "title")   [<unknown>:2],
+        00004 | EMIT_RAW (string "\n")   [<unknown>:2],
+        00005 | CALL_BLOCK (name "body")   [<unknown>:3],
+        00006 | EMIT_RAW (string "\n")   [<unknown>:3],
+    ],
+    blocks: {
+        "body": [
+            00000 | EMIT_RAW (string "new body")   [<unknown>:3],
+        ],
+        "title": [
+            00000 | EMIT_RAW (string "[")   [<unknown>:2],
+            00001 | BUILD_LIST (0 items)   [<unknown>:2],
+            00002 | CALL_FUNCTION (name "super")   [<unknown>:2],
+            00003 | EMIT   [<unknown>:2],
+            00004 | EMIT_RAW (string "]")   [<unknown>:2],
+        ],
+    },
+    initial_auto_escape: None,
+}

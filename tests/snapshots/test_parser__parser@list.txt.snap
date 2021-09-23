@@ -1,0 +1,30 @@
+---
+source: tests/test_parser.rs
+expression: "&ast"
+input_file: tests/parser-inputs/list.txt
+
+---
+Ok(
+    Template {
+        children: [
+            EmitExpr {
+                expr: List {
+                    items: [
+                        Const {
+                            value: 1,
+                        } @ 1:4-1:5,
+                        Const {
+                            value: 2,
+                        } @ 1:7-1:8,
+                        Var {
+                            id: "foo",
+                        } @ 1:10-1:13,
+                    ],
+                } @ 1:3-1:17,
+            } @ 1:0-1:17,
+            EmitRaw {
+                raw: "\n",
+            } @ 1:17-2:0,
+        ],
+    } @ 1:0-2:0,
+)

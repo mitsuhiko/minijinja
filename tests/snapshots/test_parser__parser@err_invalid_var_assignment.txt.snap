@@ -1,0 +1,18 @@
+---
+source: tests/test_parser.rs
+expression: "&ast"
+input_file: tests/parser-inputs/err_invalid_var_assignment.txt
+
+---
+Err(
+    Error {
+        kind: SyntaxError,
+        detail: Some(
+            "cannot assign to reserved variable name loop",
+        ),
+        name: Some(
+            "err_invalid_var_assignment.txt",
+        ),
+        lineno: 1,
+    },
+)

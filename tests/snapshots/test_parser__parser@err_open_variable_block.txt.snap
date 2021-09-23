@@ -1,0 +1,18 @@
+---
+source: tests/test_parser.rs
+expression: "&ast"
+input_file: tests/parser-inputs/err_open_variable_block.txt
+
+---
+Err(
+    Error {
+        kind: SyntaxError,
+        detail: Some(
+            "unexpected end of input, expected end of variable block",
+        ),
+        name: Some(
+            "err_open_variable_block.txt",
+        ),
+        lineno: 1,
+    },
+)

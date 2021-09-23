@@ -1,0 +1,22 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/concat.txt
+
+---
+foobar
+
+=====
+
+Template {
+    name: "concat.txt",
+    instructions: [
+        00000 | LOOKUP (var "a")   [<unknown>:1],
+        00001 | LOOKUP (var "b")   [<unknown>:1],
+        00002 | STRING_CONCAT   [<unknown>:1],
+        00003 | EMIT   [<unknown>:1],
+        00004 | EMIT_RAW (string "\n")   [<unknown>:1],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

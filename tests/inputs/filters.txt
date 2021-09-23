@@ -1,0 +1,15 @@
+word: "Bird"
+list: [1, 2, 3]
+map:
+  a: b
+  c: d
+---
+lower: {{ word|lower }}
+upper: {{ word|upper }}
+replace: {{ word|replace("B", "th") }}
+escape: {{ "<"|escape }}
+double-escape: {{ "<"|escape|escape }}
+safe: {{ "<"|safe|escape }}
+list-length: {{ list|length }}
+map-length: {{ map|length }}
+string-length: {{ word|length }}

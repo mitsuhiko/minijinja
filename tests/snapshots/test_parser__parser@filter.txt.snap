@@ -1,0 +1,35 @@
+---
+source: tests/test_parser.rs
+expression: "&ast"
+input_file: tests/parser-inputs/filter.txt
+
+---
+Ok(
+    Template {
+        children: [
+            EmitExpr {
+                expr: Filter {
+                    name: "baz",
+                    expr: Filter {
+                        name: "bar",
+                        expr: Var {
+                            id: "foo",
+                        } @ 1:3-1:6,
+                        args: [
+                            Const {
+                                value: 1,
+                            } @ 1:11-1:12,
+                            Const {
+                                value: 2,
+                            } @ 1:14-1:15,
+                        ],
+                    } @ 1:7-1:17,
+                    args: [],
+                } @ 1:17-1:23,
+            } @ 1:0-1:23,
+            EmitRaw {
+                raw: "\n",
+            } @ 1:23-2:0,
+        ],
+    } @ 1:0-2:0,
+)

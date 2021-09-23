@@ -1,0 +1,18 @@
+---
+source: tests/test_parser.rs
+expression: "&ast"
+input_file: tests/parser-inputs/err_wrong_block_name.txt
+
+---
+Err(
+    Error {
+        kind: SyntaxError,
+        detail: Some(
+            "mismatching name on block. Got `bar`, expected `foo`",
+        ),
+        name: Some(
+            "err_wrong_block_name.txt",
+        ),
+        lineno: 3,
+    },
+)

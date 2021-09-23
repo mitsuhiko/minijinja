@@ -1,0 +1,25 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/list.txt
+
+---
+3
+
+=====
+
+Template {
+    name: "list.txt",
+    instructions: [
+        00000 | LOAD_CONST (value 1)   [<unknown>:1],
+        00001 | LOAD_CONST (value 2)   [<unknown>:1],
+        00002 | LOAD_CONST (value 3)   [<unknown>:1],
+        00003 | BUILD_LIST (3 items)   [<unknown>:1],
+        00004 | BUILD_LIST (0 items)   [<unknown>:1],
+        00005 | APPLY_FILTER (name "length")   [<unknown>:1],
+        00006 | EMIT   [<unknown>:1],
+        00007 | EMIT_RAW (string "\n")   [<unknown>:1],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

@@ -1,0 +1,32 @@
+---
+source: tests/test_lexer.rs
+expression: "&tokens"
+input_file: tests/lexer-inputs/things.txt
+
+---
+[
+    VARIABLE_START(false),
+    IDENT(with_int),
+    PAREN_OPEN,
+    INT(42),
+    COMMA,
+    INT(-42),
+    PAREN_CLOSE,
+    VARIABLE_END(false),
+    TEMPLATE_DATA("\n"),
+    VARIABLE_START(false),
+    IDENT(with_float),
+    PAREN_OPEN,
+    FLOAT(1.5),
+    COMMA,
+    FLOAT(-1.5),
+    PAREN_CLOSE,
+    VARIABLE_END(false),
+    TEMPLATE_DATA("\n"),
+    VARIABLE_START(false),
+    IDENT(with_string),
+    PAREN_OPEN,
+    STR("string"),
+    PAREN_CLOSE,
+    VARIABLE_END(false),
+]

@@ -1,0 +1,22 @@
+---
+source: tests/test_compiler.rs
+expression: "&c"
+
+---
+Compiler {
+    instructions: [
+        00000 | LOOKUP (var "false")   [<unknown>:0],
+        00001 | JUMP_IF_FALSE (to 00004)   [<unknown>:0],
+        00002 | EMIT_RAW (string "nope1")   [<unknown>:0],
+        00003 | JUMP (to 00009)   [<unknown>:0],
+        00004 | LOOKUP (var "nil")   [<unknown>:0],
+        00005 | JUMP_IF_FALSE (to 00008)   [<unknown>:0],
+        00006 | EMIT_RAW (string "nope1")   [<unknown>:0],
+        00007 | JUMP (to 00009)   [<unknown>:0],
+        00008 | EMIT_RAW (string "yes")   [<unknown>:0],
+    ],
+    blocks: {},
+    pending_block: [],
+    current_file: "<unknown>",
+    current_line: 0,
+}

@@ -1,0 +1,28 @@
+---
+source: tests/test_lexer.rs
+expression: "&tokens"
+input_file: tests/lexer-inputs/operators.txt
+
+---
+[
+    VARIABLE_START(false),
+    PAREN_OPEN,
+    BANG,
+    IDENT(a),
+    PLUS,
+    IDENT(b),
+    PAREN_CLOSE,
+    MUL,
+    PAREN_OPEN,
+    IDENT(c),
+    MINUS,
+    IDENT(d),
+    PAREN_CLOSE,
+    DIV,
+    IDENT(e),
+    MOD,
+    IDENT(f),
+    TILDE,
+    IDENT(g),
+    VARIABLE_END(false),
+]

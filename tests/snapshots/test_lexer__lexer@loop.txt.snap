@@ -1,0 +1,24 @@
+---
+source: tests/test_lexer.rs
+expression: "&tokens"
+input_file: tests/lexer-inputs/loop.txt
+
+---
+[
+    TEMPLATE_DATA("<ul>\n"),
+    BLOCK_END(false),
+    IDENT(for),
+    IDENT(item),
+    IDENT(in),
+    IDENT(sequence),
+    BLOCK_END(false),
+    TEMPLATE_DATA("\n    <li>"),
+    VARIABLE_START(false),
+    IDENT(item),
+    VARIABLE_END(false),
+    TEMPLATE_DATA("</li>\n"),
+    BLOCK_END(false),
+    IDENT(endfor),
+    BLOCK_END(false),
+    TEMPLATE_DATA("\n</ul>"),
+]

@@ -1,0 +1,29 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/if_cond_elif.txt
+
+---
+
+  else
+
+
+=====
+
+Template {
+    name: "if_cond_elif.txt",
+    instructions: [
+        00000 | LOOKUP (var "value")   [<unknown>:1],
+        00001 | JUMP_IF_FALSE (to 00004)   [<unknown>:1],
+        00002 | EMIT_RAW (string "\n  first branch\n")   [<unknown>:1],
+        00003 | JUMP (to 00009)   [<unknown>:1],
+        00004 | LOOKUP (var "other_value")   [<unknown>:3],
+        00005 | JUMP_IF_FALSE (to 00008)   [<unknown>:3],
+        00006 | EMIT_RAW (string "\n  second branch\n")   [<unknown>:3],
+        00007 | JUMP (to 00009)   [<unknown>:3],
+        00008 | EMIT_RAW (string "\n  else\n")   [<unknown>:5],
+        00009 | EMIT_RAW (string "\n")   [<unknown>:7],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

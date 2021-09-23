@@ -1,0 +1,21 @@
+---
+source: tests/test_compiler.rs
+expression: "&c"
+
+---
+Compiler {
+    instructions: [
+        00000 | LOOKUP (var "items")   [<unknown>:0],
+        00001 | PUSH_LOOP (assign to "x")   [<unknown>:0],
+        00002 | ITERATE (exit to 00006)   [<unknown>:0],
+        00003 | LOOKUP (var "x")   [<unknown>:0],
+        00004 | EMIT   [<unknown>:0],
+        00005 | JUMP (to 00002)   [<unknown>:0],
+        00006 | POP_FRAME   [<unknown>:0],
+        00007 | EMIT_RAW (string "!")   [<unknown>:0],
+    ],
+    blocks: {},
+    pending_block: [],
+    current_file: "<unknown>",
+    current_line: 0,
+}

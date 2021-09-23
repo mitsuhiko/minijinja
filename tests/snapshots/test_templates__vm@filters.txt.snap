@@ -1,0 +1,77 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/filters.txt
+
+---
+lower: bird
+upper: BIRD
+replace: third
+escape: &lt;
+double-escape: &lt;
+safe: <
+list-length: 3
+map-length: 2
+string-length: 4
+
+=====
+
+Template {
+    name: "filters.txt",
+    instructions: [
+        00000 | EMIT_RAW (string "lower: ")   [<unknown>:1],
+        00001 | LOOKUP (var "word")   [<unknown>:1],
+        00002 | BUILD_LIST (0 items)   [<unknown>:1],
+        00003 | APPLY_FILTER (name "lower")   [<unknown>:1],
+        00004 | EMIT   [<unknown>:1],
+        00005 | EMIT_RAW (string "\nupper: ")   [<unknown>:1],
+        00006 | LOOKUP (var "word")   [<unknown>:2],
+        00007 | BUILD_LIST (0 items)   [<unknown>:2],
+        00008 | APPLY_FILTER (name "upper")   [<unknown>:2],
+        00009 | EMIT   [<unknown>:2],
+        0000a | EMIT_RAW (string "\nreplace: ")   [<unknown>:2],
+        0000b | LOOKUP (var "word")   [<unknown>:3],
+        0000c | LOAD_CONST (value "B")   [<unknown>:3],
+        0000d | LOAD_CONST (value "th")   [<unknown>:3],
+        0000e | BUILD_LIST (2 items)   [<unknown>:3],
+        0000f | APPLY_FILTER (name "replace")   [<unknown>:3],
+        00010 | EMIT   [<unknown>:3],
+        00011 | EMIT_RAW (string "\nescape: ")   [<unknown>:3],
+        00012 | LOAD_CONST (value "<")   [<unknown>:4],
+        00013 | BUILD_LIST (0 items)   [<unknown>:4],
+        00014 | APPLY_FILTER (name "escape")   [<unknown>:4],
+        00015 | EMIT   [<unknown>:4],
+        00016 | EMIT_RAW (string "\ndouble-escape: ")   [<unknown>:4],
+        00017 | LOAD_CONST (value "<")   [<unknown>:5],
+        00018 | BUILD_LIST (0 items)   [<unknown>:5],
+        00019 | APPLY_FILTER (name "escape")   [<unknown>:5],
+        0001a | BUILD_LIST (0 items)   [<unknown>:5],
+        0001b | APPLY_FILTER (name "escape")   [<unknown>:5],
+        0001c | EMIT   [<unknown>:5],
+        0001d | EMIT_RAW (string "\nsafe: ")   [<unknown>:5],
+        0001e | LOAD_CONST (value "<")   [<unknown>:6],
+        0001f | BUILD_LIST (0 items)   [<unknown>:6],
+        00020 | APPLY_FILTER (name "safe")   [<unknown>:6],
+        00021 | BUILD_LIST (0 items)   [<unknown>:6],
+        00022 | APPLY_FILTER (name "escape")   [<unknown>:6],
+        00023 | EMIT   [<unknown>:6],
+        00024 | EMIT_RAW (string "\nlist-length: ")   [<unknown>:6],
+        00025 | LOOKUP (var "list")   [<unknown>:7],
+        00026 | BUILD_LIST (0 items)   [<unknown>:7],
+        00027 | APPLY_FILTER (name "length")   [<unknown>:7],
+        00028 | EMIT   [<unknown>:7],
+        00029 | EMIT_RAW (string "\nmap-length: ")   [<unknown>:7],
+        0002a | LOOKUP (var "map")   [<unknown>:8],
+        0002b | BUILD_LIST (0 items)   [<unknown>:8],
+        0002c | APPLY_FILTER (name "length")   [<unknown>:8],
+        0002d | EMIT   [<unknown>:8],
+        0002e | EMIT_RAW (string "\nstring-length: ")   [<unknown>:8],
+        0002f | LOOKUP (var "word")   [<unknown>:9],
+        00030 | BUILD_LIST (0 items)   [<unknown>:9],
+        00031 | APPLY_FILTER (name "length")   [<unknown>:9],
+        00032 | EMIT   [<unknown>:9],
+        00033 | EMIT_RAW (string "\n")   [<unknown>:9],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

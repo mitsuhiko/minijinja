@@ -1,0 +1,37 @@
+---
+source: tests/test_parser.rs
+expression: "&ast"
+input_file: tests/parser-inputs/for_loop.txt
+
+---
+Ok(
+    Template {
+        children: [
+            EmitRaw {
+                raw: "<ul>\n",
+            } @ 1:0-2:0,
+            ForLoop {
+                target: "item",
+                iter: Var {
+                    id: "seq",
+                } @ 2:15-2:18,
+                body: [
+                    EmitRaw {
+                        raw: "\n    <li>",
+                    } @ 2:21-3:8,
+                    EmitExpr {
+                        expr: Var {
+                            id: "item",
+                        } @ 3:11-3:15,
+                    } @ 3:8-3:18,
+                    EmitRaw {
+                        raw: "</li>\n",
+                    } @ 3:18-4:0,
+                ],
+            } @ 2:3-4:12,
+            EmitRaw {
+                raw: "\n</ul>\n",
+            } @ 4:12-6:0,
+        ],
+    } @ 1:0-6:0,
+)

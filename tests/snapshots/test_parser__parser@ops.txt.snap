@@ -1,0 +1,38 @@
+---
+source: tests/test_parser.rs
+expression: "&ast"
+input_file: tests/parser-inputs/ops.txt
+
+---
+Ok(
+    Template {
+        children: [
+            EmitExpr {
+                expr: BinOp {
+                    op: ScOr,
+                    left: BinOp {
+                        op: ScAnd,
+                        left: Var {
+                            id: "foo",
+                        } @ 1:3-1:6,
+                        right: Var {
+                            id: "bar",
+                        } @ 1:11-1:14,
+                    } @ 1:3-1:17,
+                    right: BinOp {
+                        op: Eq,
+                        left: Var {
+                            id: "baz",
+                        } @ 1:18-1:21,
+                        right: Const {
+                            value: true,
+                        } @ 1:25-1:29,
+                    } @ 1:18-1:32,
+                } @ 1:3-1:32,
+            } @ 1:0-1:32,
+            EmitRaw {
+                raw: "\n",
+            } @ 1:32-2:0,
+        ],
+    } @ 1:0-2:0,
+)

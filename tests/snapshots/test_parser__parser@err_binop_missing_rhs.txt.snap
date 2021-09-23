@@ -1,0 +1,18 @@
+---
+source: tests/test_parser.rs
+expression: "&ast"
+input_file: tests/parser-inputs/err_binop_missing_rhs.txt
+
+---
+Err(
+    Error {
+        kind: SyntaxError,
+        detail: Some(
+            "unexpected end of variable block",
+        ),
+        name: Some(
+            "err_binop_missing_rhs.txt",
+        ),
+        lineno: 1,
+    },
+)

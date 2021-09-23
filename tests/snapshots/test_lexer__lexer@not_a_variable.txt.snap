@@ -1,0 +1,9 @@
+---
+source: tests/test_lexer.rs
+expression: "&tokens"
+input_file: tests/lexer-inputs/not_a_variable.txt
+
+---
+[
+    TEMPLATE_DATA("{\"foo\":\"bar\"}\n"),
+]

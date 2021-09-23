@@ -1,0 +1,36 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/loop.txt
+
+---
+<ul>
+
+    <li>1</li>
+
+    <li>2</li>
+
+    <li>3</li>
+
+</ul>
+
+=====
+
+Template {
+    name: "loop.txt",
+    instructions: [
+        00000 | EMIT_RAW (string "<ul>\n")   [<unknown>:1],
+        00001 | LOOKUP (var "seq")   [<unknown>:2],
+        00002 | PUSH_LOOP (assign to "item")   [<unknown>:2],
+        00003 | ITERATE (exit to 00009)   [<unknown>:2],
+        00004 | EMIT_RAW (string "\n    <li>")   [<unknown>:2],
+        00005 | LOOKUP (var "item")   [<unknown>:3],
+        00006 | EMIT   [<unknown>:3],
+        00007 | EMIT_RAW (string "</li>\n")   [<unknown>:3],
+        00008 | JUMP (to 00003)   [<unknown>:3],
+        00009 | POP_FRAME   [<unknown>:3],
+        0000a | EMIT_RAW (string "\n</ul>\n")   [<unknown>:4],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

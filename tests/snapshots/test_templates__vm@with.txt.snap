@@ -1,0 +1,34 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/with.txt
+
+---
+
+  42|23
+
+
+=====
+
+Template {
+    name: "with.txt",
+    instructions: [
+        00000 | LOAD_CONST (value "a")   [<unknown>:1],
+        00001 | LOOKUP (var "foo")   [<unknown>:1],
+        00002 | LOAD_CONST (value "b")   [<unknown>:1],
+        00003 | LOOKUP (var "bar")   [<unknown>:1],
+        00004 | BUILD_MAP (2 pairs)   [<unknown>:1],
+        00005 | PUSH_CONTEXT   [<unknown>:1],
+        00006 | EMIT_RAW (string "\n  ")   [<unknown>:1],
+        00007 | LOOKUP (var "a")   [<unknown>:2],
+        00008 | EMIT   [<unknown>:2],
+        00009 | EMIT_RAW (string "|")   [<unknown>:2],
+        0000a | LOOKUP (var "b")   [<unknown>:2],
+        0000b | EMIT   [<unknown>:2],
+        0000c | EMIT_RAW (string "\n")   [<unknown>:2],
+        0000d | POP_FRAME   [<unknown>:2],
+        0000e | EMIT_RAW (string "\n")   [<unknown>:3],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}
