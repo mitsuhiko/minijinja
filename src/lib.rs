@@ -67,6 +67,15 @@
 //! - [`value`]: for information about the runtime value object.
 //! - [`Environment`]: the main API entry point.
 //! - [`Template`]: the template object API.
+//!
+//! # Optional Features
+//!
+//! There are some additional features that can be enabled:
+//!
+//! - `memchr`: enables the `memchr` dependency which provides performance improvements
+//!   for the parser.
+//! - `unstable_machinery`: provides access to the internal machinery of the engine.  This
+//!   is a forever unstable API which mainly exists to aid debugging complex issues.
 mod key;
 
 mod ast;
