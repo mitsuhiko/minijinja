@@ -27,7 +27,7 @@
 //!
 //! # Template Usage
 //!
-//! To use MiniJinja one needs to create an [`Environment`] and pupulate it with templates.
+//! To use MiniJinja one needs to create an [`Environment`] and populate it with templates.
 //! Afterwards templates can be loaded and rendered.  To pass data one can pass any serde
 //! serializable value:
 //!
