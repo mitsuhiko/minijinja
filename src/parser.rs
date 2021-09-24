@@ -411,6 +411,10 @@ impl<'a> Parser<'a> {
                 self.parse_extends()?,
                 self.stream.expand_span(span),
             ))),
+            Token::Ident("include") => Ok(ast::Stmt::Include(Spanned::new(
+                self.parse_include()?,
+                self.stream.expand_span(span),
+            ))),
             Token::Ident("autoescape") => Ok(ast::Stmt::AutoEscape(Spanned::new(
                 self.parse_auto_escape()?,
                 self.stream.expand_span(span),
@@ -509,6 +513,11 @@ impl<'a> Parser<'a> {
     fn parse_extends(&mut self) -> Result<ast::Extends<'a>, Error> {
         let name = self.parse_expr()?;
         Ok(ast::Extends { name })
+    }
+
+    fn parse_include(&mut self) -> Result<ast::Include<'a>, Error> {
+        let name = self.parse_expr()?;
+        Ok(ast::Include { name })
     }
 
     fn parse_auto_escape(&mut self) -> Result<ast::AutoEscape<'a>, Error> {

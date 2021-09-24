@@ -173,13 +173,13 @@ enum Repr {
 impl fmt::Debug for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Repr::Undefined => write!(f, ""),
+            Repr::Undefined => write!(f, "Undefined"),
             Repr::Bool(val) => fmt::Debug::fmt(val, f),
             Repr::U64(val) => fmt::Debug::fmt(val, f),
             Repr::I64(val) => fmt::Debug::fmt(val, f),
             Repr::F64(val) => fmt::Debug::fmt(val, f),
             Repr::Char(val) => fmt::Debug::fmt(val, f),
-            Repr::None => write!(f, "none"),
+            Repr::None => write!(f, "None"),
             Repr::Shared(val) => fmt::Debug::fmt(val, f),
         }
     }

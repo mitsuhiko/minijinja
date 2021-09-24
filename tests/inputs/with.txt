@@ -1,6 +1,7 @@
 foo: 42
 bar: 23
+other: 11
 ---
 {% with a=foo, b=bar %}
-  {{ a }}|{{ b }}
+  {{ a }}|{{ b }}|{{ other }}
 {% endwith %}

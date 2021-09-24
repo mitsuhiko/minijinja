@@ -80,6 +80,11 @@ impl<'env, 'source> Template<'env, 'source> {
     pub(crate) fn blocks(&self) -> &'env BTreeMap<&'source str, Instructions<'source>> {
         &self.compiled.blocks
     }
+
+    /// Returns the initial auto escape setting.
+    pub(crate) fn initial_auto_escape(&self) -> AutoEscape {
+        self.compiled.initial_auto_escape
+    }
 }
 
 /// An abstraction that holds the engine configuration.

@@ -116,6 +116,9 @@ pub enum Instruction<'source> {
     /// Loads block from a template with name on stack ("extends")
     LoadBlocks,
 
+    /// Includes another template.
+    Include,
+
     /// Sets the auto escape flag to the current value.
     PushAutoEscape,
 
@@ -178,6 +181,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
             Instruction::JumpIfTrueOrPop(t) => write!(f, "JUMP_IF_TRUE_OR_POP (to {:>05x})", t),
             Instruction::CallBlock(n) => write!(f, "CALL_BLOCK (name {:?})", n),
             Instruction::LoadBlocks => write!(f, "LOAD_BLOCKS"),
+            Instruction::Include => write!(f, "INCLUDE"),
             Instruction::PushAutoEscape => write!(f, "PUSH_AUTO_ESCAPE"),
             Instruction::PopAutoEscape => write!(f, "POP_AUTO_ESCAPE"),
             Instruction::CallFunction(n) => write!(f, "CALL_FUNCTION (name {:?})", n),

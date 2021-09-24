@@ -12,7 +12,7 @@ none
 Template {
     name: "undefined.txt",
     instructions: [
-        00000 | LOAD_CONST (value none)   [<unknown>:1],
+        00000 | LOAD_CONST (value None)   [<unknown>:1],
         00001 | EMIT   [<unknown>:1],
         00002 | EMIT_RAW (string "\n")   [<unknown>:1],
         00003 | LOOKUP (var "undefined")   [<unknown>:2],

@@ -5,7 +5,7 @@ input_file: tests/inputs/with.txt
 
 ---
 
-  42|23
+  42|23|11
 
 
 =====
@@ -25,9 +25,12 @@ Template {
         00009 | EMIT_RAW (string "|")   [<unknown>:2],
         0000a | LOOKUP (var "b")   [<unknown>:2],
         0000b | EMIT   [<unknown>:2],
-        0000c | EMIT_RAW (string "\n")   [<unknown>:2],
-        0000d | POP_FRAME   [<unknown>:2],
-        0000e | EMIT_RAW (string "\n")   [<unknown>:3],
+        0000c | EMIT_RAW (string "|")   [<unknown>:2],
+        0000d | LOOKUP (var "other")   [<unknown>:2],
+        0000e | EMIT   [<unknown>:2],
+        0000f | EMIT_RAW (string "\n")   [<unknown>:2],
+        00010 | POP_FRAME   [<unknown>:2],
+        00011 | EMIT_RAW (string "\n")   [<unknown>:3],
     ],
     blocks: {},
     initial_auto_escape: None,

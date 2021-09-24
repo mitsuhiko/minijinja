@@ -233,6 +233,11 @@ impl<'source> Compiler<'source> {
                 self.compile_expr(&extends.name)?;
                 self.add(Instruction::LoadBlocks);
             }
+            ast::Stmt::Include(include) => {
+                self.set_location_from_span(include.span());
+                self.compile_expr(&include.name)?;
+                self.add(Instruction::Include);
+            }
             ast::Stmt::AutoEscape(auto_escape) => {
                 self.set_location_from_span(auto_escape.span());
                 self.compile_expr(&auto_escape.enabled)?;

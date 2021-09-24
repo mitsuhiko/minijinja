@@ -149,8 +149,11 @@ impl<'source, 'context> Context<'source, 'context> {
 
             let rv = lookup_base.get_attr(key);
             if let Ok(rv) = rv {
-                return Some(rv);
-            } else if !cont {
+                if !rv.is_undefined() {
+                    return Some(rv);
+                }
+            }
+            if !cont {
                 break;
             }
         }
@@ -272,15 +275,18 @@ impl<'env, 'source> Vm<'env, 'source> {
 
         macro_rules! sub_eval {
             ($instructions:expr) => {{
+                sub_eval!($instructions, &blocks, block_stack, auto_escape);
+            }};
+            ($instructions:expr, $blocks:expr, $block_stack:expr, $auto_escape:expr) => {{
                 let mut sub_context = Context::default();
                 sub_context.push_frame(Frame::Chained { base: context });
                 let sub_vm = Vm::new(self.env);
                 sub_vm.eval_context(
                     $instructions,
                     &mut sub_context,
-                    &blocks,
-                    block_stack,
-                    auto_escape,
+                    $blocks,
+                    $block_stack,
+                    $auto_escape,
                     output,
                 )?;
             }};
@@ -439,6 +445,27 @@ impl<'env, 'source> Vm<'env, 'source> {
                     instructions = tmpl.instructions();
                     pc = 0;
                     continue;
+                }
+                Instruction::Include => {
+                    let name = stack.pop();
+                    let tmpl = try_ctx!(name
+                        .as_str()
+                        .and_then(|name| self.env.get_template(name))
+                        .ok_or_else(|| {
+                            Error::new(ErrorKind::TemplateNotFound, "could not find template")
+                        }));
+                    let instructions = tmpl.instructions();
+                    let mut referenced_blocks = BTreeMap::new();
+                    for (&name, instr) in tmpl.blocks().iter() {
+                        referenced_blocks.insert(name, vec![instr]);
+                    }
+                    let mut block_stack = Vec::new();
+                    sub_eval!(
+                        instructions,
+                        &referenced_blocks,
+                        &mut block_stack,
+                        tmpl.initial_auto_escape()
+                    );
                 }
                 Instruction::PushAutoEscape => {
                     let value = stack.pop();

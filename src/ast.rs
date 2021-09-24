@@ -57,6 +57,7 @@ pub enum Stmt<'a> {
     WithBlock(Spanned<WithBlock<'a>>),
     Block(Spanned<Block<'a>>),
     Extends(Spanned<Extends<'a>>),
+    Include(Spanned<Include<'a>>),
     AutoEscape(Spanned<AutoEscape<'a>>),
 }
 
@@ -71,6 +72,7 @@ impl<'a> fmt::Debug for Stmt<'a> {
             Stmt::WithBlock(s) => fmt::Debug::fmt(s, f),
             Stmt::Block(s) => fmt::Debug::fmt(s, f),
             Stmt::Extends(s) => fmt::Debug::fmt(s, f),
+            Stmt::Include(s) => fmt::Debug::fmt(s, f),
             Stmt::AutoEscape(s) => fmt::Debug::fmt(s, f),
         }
     }
@@ -149,6 +151,12 @@ pub struct Block<'a> {
 /// An extends block.
 #[derive(Debug, Clone)]
 pub struct Extends<'a> {
+    pub name: Expr<'a>,
+}
+
+/// An include block.
+#[derive(Debug, Clone)]
+pub struct Include<'a> {
     pub name: Expr<'a>,
 }
 
