@@ -24,7 +24,7 @@ fn main() {
     env.add_template(
         "index.html",
         r#"{% extends "base.html" %}
-{% block title %}{{ page.title | upper }} | {{ super() }}{% endblock %}
+{% block title %}{{ page.title|upper }} | {{ super() }}{% endblock %}
 {% block body %}{{ page.content }}{% endblock %}"#,
     )
     .unwrap();
