@@ -266,7 +266,7 @@ impl<'source> Environment<'source> {
     /// Adds a new test function.
     ///
     /// For details about tests have a look at [`tests`].
-    pub fn add_test<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
+    pub fn add_test<F, V, Args>(&mut self, name: &'source str, f: F)
     where
         V: TryFrom<Value>,
         F: tests::Test<V, Args>,

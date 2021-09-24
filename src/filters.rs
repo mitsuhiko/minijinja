@@ -18,8 +18,8 @@
 //! ```
 //! # use minijinja::{Environment, Error};
 //! # let mut env = Environment::new();
-//! fn slugify(&env: Environment, value: String) -> Result<String, Error> {
-//!     Ok(value.to_lowercase().split().join("-"))
+//! fn slugify(env: &Environment, value: String) -> Result<String, Error> {
+//!     Ok(value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-"))
 //! }
 //!
 //! env.add_filter("slugify", slugify);

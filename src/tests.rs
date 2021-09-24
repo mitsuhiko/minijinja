@@ -20,8 +20,8 @@
 //! ```
 //! # use minijinja::{Environment, Error};
 //! # let mut env = Environment::new();
-//! fn is_lowercase(&env: Environment, value: String) -> Result<bool, Error> {
-//!    Ok(value.is_lowercase())
+//! fn is_lowercase(env: &Environment, value: String) -> Result<bool, Error> {
+//!    Ok(value.chars().all(|x| x.is_lowercase()))
 //! }
 //!
 //! env.add_test("lowercase", is_lowercase);
