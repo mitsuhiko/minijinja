@@ -58,6 +58,11 @@
 //! let result = expr.eval(&()).unwrap();
 //! assert_eq!(result.is_true(), true);
 //! ```
+//!
+//! # Learn more
+//!
+//! - [`filters`]: for how to write custom filters and list of built-in filters.
+//! - [`tests`]: for how to write custom test functions and list of built-in tests.
 mod key;
 
 mod ast;

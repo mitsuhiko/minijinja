@@ -36,6 +36,12 @@
 //! let v = u64::try_from(Value::from(42)).unwrap();
 //! ```
 //!
+//! # Value Function Arguments
+//!
+//! [Filters](crate::filters) and (tests)[crate::tests] can take values as arguments
+//! but optionally also rust types directly.  This conversion for function arguments
+//! is performed by the [`ValueArgs`] trait.
+//!
 //! # Memory Management
 //!
 //! Values are immutable objects which are internally reference counted which

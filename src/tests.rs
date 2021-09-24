@@ -1,7 +1,34 @@
-//! Built in tests and test abstraction.
+//! Test functions and abstractions.
 //!
-//! This module implements the default tests which are registered in the
-//! environment automatically.
+//! Test functions in MiniJinja are like (filters)[crate::filters] but a different syntax
+//! is used to invoke them and they have to return boolean values.  For instance the
+//! expression `{% if foo is odd %}` invokes the [`is_odd`] test to check if the value
+//! is indeed an odd number.
+//!
+//! MiniJinja comes with some built-in test functions that are listed below. To
+//! create a custom test write a function that takes at least an
+//! [`&Environment`](crate::Environment) and value argument and returns a boolean
+//! result, then register it with [`add_filter`](crate::Environment::add_test).
+//!
+//! ## Custom Tests
+//!
+//! A custom test function is just a simple function which accepts inputs as
+//! parameters and then returns a bool wrapped in a result. For instance the
+//! following shows a test function which takes an input value and checks if
+//! it's lowercase:
+//!
+//! ```
+//! # use minijinja::{Environment, Error};
+//! # let mut env = Environment::new();
+//! fn is_lowercase(&env: Environment, value: String) -> Result<bool, Error> {
+//!    Ok(value.is_lowercase())
+//! }
+//!
+//! env.add_test("lowercase", is_lowercase);
+//! ```
+//!
+//! MiniJinja will perform the necessary conversions automatically via the
+//! [`ValueArgs`](crate::value::ValueArgs) trait.
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::sync::Arc;

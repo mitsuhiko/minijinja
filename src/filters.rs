@@ -1,7 +1,31 @@
-//! Built in filters and filter abstraction.
+//! Filter functions and abstractions.
 //!
-//! This module implements the default filters which are registered in the
-//! environment automatically.
+//! MiniJinja inherits from Jinja2 the concept of filter functions.  These are functions
+//! which are applied to values to modify them.  For example the expression `{{ 42|filter(23) }}`
+//! invokes the filter `filter` with the arguments `42` and `23`.
+//!
+//! MiniJinja comes with some built-in filters that are listed below.  To use a custom filter
+//! write a function that takes at least an [`&Environment`](crate::Environment) and
+//! value argument, then register it with [`add_filter`](crate::Environment::add_filter).
+//!
+//! ## Custom Filters
+//!
+//! A custom filter is just a simple function which accepts inputs as parameters and then
+//! returns a new value.  For instance the following shows a filter which takes an input
+//! value and replaces whitespace with dashes and converts it to lowercase:
+//!
+//! ```
+//! # use minijinja::{Environment, Error};
+//! # let mut env = Environment::new();
+//! fn slugify(&env: Environment, value: String) -> Result<String, Error> {
+//!     Ok(value.to_lowercase().split().join("-"))
+//! }
+//!
+//! env.add_filter("slugify", slugify);
+//! ```
+//!
+//! MiniJinja will perform the necessary conversions automatically via the
+//! [`ValueArgs`](crate::value::ValueArgs) and [`Into`] traits.
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
