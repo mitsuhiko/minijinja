@@ -11,6 +11,8 @@ is based on the syntax and behavior of the
 It's implemented on top of `serde` and only has a single dependency.  It supports
 a range of features from Jinja2 including inheritance, filters and more.
 
+## Example
+
 ```rust
 use minijinja::Environment;
 use serde::Serialize;
@@ -29,3 +31,9 @@ fn main() {
     }).unwrap());
 }
 ```
+
+## License and Links
+
+- [Documentation](https://docs.rs/minijinja/)
+- [Issue Tracker](https://github.com/mitsuhiko/minijinja/issues)
+- License: [Apache-2.0](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
