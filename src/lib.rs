@@ -47,7 +47,7 @@
 //! MiniJinja — like Jinja2 — allows to be used as expression language.  This can be
 //! useful to express logic in configuration files or similar things.  For this
 //! purpose the [`Environment::compile_expression`] method can be used.  It returns
-//! an expression object that can then be evaluate and the result is returned:
+//! an expression object that can then be evaluated, returning the result:
 //!
 //! ```
 //! use std::collections::BTreeMap;
