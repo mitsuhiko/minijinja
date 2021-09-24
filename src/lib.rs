@@ -61,8 +61,12 @@
 //!
 //! # Learn more
 //!
+//! - [`syntax`]: documentation of the template engine syntax.
 //! - [`filters`]: for how to write custom filters and list of built-in filters.
 //! - [`tests`]: for how to write custom test functions and list of built-in tests.
+//! - [`value`]: for information about the runtime value object.
+//! - [`Environment`]: the main API entry point.
+//! - [`Template`]: the template object API.
 mod key;
 
 mod ast;
@@ -77,6 +81,7 @@ mod utils;
 mod vm;
 
 pub mod filters;
+pub mod syntax;
 pub mod tests;
 pub mod value;
 

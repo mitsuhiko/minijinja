@@ -1,0 +1,300 @@
+//! Documents the syntax for templates.
+//!
+//! <details><summary><strong>Table of Contents</strong></summary>
+//!
+//! - [Synopsis](#synopsis)
+//! - [Expressions](#expressions)
+//!   - [Literals](#literals)
+//!   - [Math](#math)
+//!   - [Comparisons](#comparisons)
+//!   - [Logic](#logic)
+//!   - [Other Operators](#other-operators)
+//! - [Tags](#tags)
+//!   - [`{% for %}`](#-for-)
+//!   - [`{% if %}`](#-if-)
+//!   - [`{% extends %}`](#-extends-)
+//!   - [`{% block %}`](#-block-)
+//!   - [`{% include %}`](#-include-)
+//!   - [`{% with %}`](#-with-)
+//!   - [`{% autoescape %}`](#-autoescape-)
+//!
+//! </details>
+//!
+//! # Synopsis
+//!
+//! A MiniJinja template is simply a text file.  MiniJInja can generate any text-based
+//! format (HTML, XML, CSV, LaTeX, etc.).  A template doesn’t need to have a specific extension
+//! and in fact MiniJinja does not understand much about the file system.  However the default
+//! configuration for [auto escaping](crate::Environment::set_auto_escape_callback) uses file
+//! extensions to configure the initial behavior.
+//!
+//! A template contains [**expressions**](#expressions), which get replaced with values when a
+//! template is rendered; and [**tags**](#tags), which control the logic of the template.  The
+//! template syntax is heavily inspired by Jinja2, Django and Python.
+//!
+//! This is a minimal template that illustrates a few basics:
+//!
+//! ```plain
+//! <!doctype html>
+//! <title>{% block title %}My Website{% endblock %}</title>
+//! <ul id="navigation">
+//! {% for item in navigation %}
+//!     <li><a href="{{ item.href }}">{{ item.caption }}</a></li>
+//! {% endfor %}
+//! </ul>
+//!
+//! <h1>My Webpage</h1>
+//! {% block body %}{% endblock %}
+//!
+//! {# a comment #}
+//! ```
+//!
+//! # Expressions
+//!
+//! MiniJinja allows basic expressions everywhere. These work largely as you expect from Jinja2.
+//! Even if you have not used Jinja2 you should feel comfortable with it.  To output the result
+//! of an expression wrap it in `{{ .. }}`.
+//!
+//! ## Literals
+//!
+//! The simplest form of expressions are literals. Literals are representations for Python
+//! objects such as strings and numbers. The following literals exist:
+//!
+//! - `"Hello World"`: Everything between two double or single quotes is a string. They are
+//!   useful whenever you need a string in the template (e.g. as arguments to function calls
+//!   and filters, or just to extend or include a template).
+//! - `42`: Integers are whole numbers without a decimal part.
+//! - `42.0`: Floating point numbers can be written using a `.` as a decimal mark.
+//! - `['list', 'of', 'objects']`: Everything between two brackets is a list. Lists are useful
+//!   for storing sequential data to be iterated over.
+//! - `{'map': 'of', 'key': 'and', 'value': 'pairs'}`: A map is a structure that combines keys
+//!   and values. Keys must be unique and always have exactly one value. Maps are rarely
+//!   created in templates.
+//! - `true` / `false` / `none`: boolean values and the special `none` value which maps to the
+//!   unit type in Rust.
+//!
+//! ## Math
+//!
+//! MiniJinja allows you to calculate with values.  The following operators are supported:
+//!
+//! - ``+``: Adds two numbers up. ``{{ 1 + 1 }}`` is ``2``.
+//! - ``-``: Subtract the second number from the first one.  ``{{ 3 - 2 }}`` is ``1``.
+//! - ``/``: Divide two numbers. ``{{ 1 / 2 }}`` is ``{{ 0.5 }}``.
+//! - ``%``: Calculate the remainder of an integer division.  ``{{ 11 % 7 }}`` is ``4``.
+//! - ``*``: Multiply the left operand with the right one.  ``{{ 2 * 2 }}`` would return ``4``.
+//! - ``**``: Raise the left operand to the power of the right operand.  ``{{ 2**3 }}``
+//!   would return ``8``.
+//!
+//! ## Comparisons
+//!  
+//! - ``==``: Compares two objects for equality.
+//! - ``!=``: Compares two objects for inequality.
+//! - ``>``: ``true`` if the left hand side is greater than the right hand side.
+//! - ``>=``: ``true`` if the left hand side is greater or equal to the right hand side.
+//! - ``<``:``true`` if the left hand side is lower than the right hand side.
+//! - ``<=``: ``true`` if the left hand side is lower or equal to the right hand side.
+//!
+//! ## Logic
+//!
+//! For ``if`` statements it can be useful to combine multiple expressions:
+//!
+//! - ``and``: Return true if the left and the right operand are true.
+//! - ``or``: Return true if the left or the right operand are true.
+//! - ``not``: negate a statement (see below).
+//! - ``(expr)``: Parentheses group an expression.
+//!
+//! ## Other Operators
+//!
+//! The following operators are very useful but don't fit into any of the other
+//! two categories:
+//!
+//! - ``is``: Performs a [test](crate::tests).
+//! - ``|`` (pipe, vertical bar): Applies a [filter](crate::filters).
+//! - ``~`` (tilde): Converts all operands into strings and concatenates them.
+//!   ``{{ "Hello " ~ name ~ "!" }}`` would return (assuming `name` is set
+//!   to ``'John'``) ``Hello John!``.
+//! - ``()``: Call a callable: ``{{ super() }}``.  Inside of the parentheses you
+//!   can use positional arguments.
+//! - ``.`` / ``[]``: Get an attribute of an object.
+//!
+//!
+//! # Tags
+//!
+//! Tags control logic in templates.  The following tags exist:
+//!
+//! ## `{% for %}`
+//!
+//! The for tag loops over each item in a sequence.  For example, to display a list
+//! of users provided in a variable called `users`:
+//!
+//! ```plain
+//! <h1>Members</h1>
+//! <ul>
+//! {% for user in users %}
+//!   <li>{{ user.username }}</li>
+//! {% endfor %}
+//! </ul>
+//! ```
+//!
+//! Inside of the for block you can access some special variables:
+//!
+//! - `loop.index`: The current iteration of the loop. (1 indexed)
+//! - `loop.index0`: The current iteration of the loop. (0 indexed)
+//! - `loop.revindex`: The number of iterations from the end of the loop (1 indexed)
+//! - `loop.revindex0`: The number of iterations from the end of the loop (0 indexed)
+//! - `loop.first`: True if this is the first iteration.
+//! - `loop.last`: True if this is the last iteration.
+//! - `loop.length`: The number of items in the sequence.
+//! - `loop.cycle`: A helper function to cycle between a list of sequences. See the explanation below.
+//!
+//! Within a for-loop, it’s possible to cycle among a list of strings/variables each time through
+//! the loop by using the special loop.cycle helper:
+//!
+//! ```plain
+//! {% for row in rows %}
+//!   <li class="{{ loop.cycle('odd', 'even') }}">{{ row }}</li>
+//! {% endfor %}
+//! ```
+//!
+//! ## `{% if %}`
+//!
+//! The `if` statement is comparable with the Python if statement. In the simplest form,
+//! you can use it to test if a variable is defined, not empty and not false:
+//!
+//! ```plain
+//! {% if users %}
+//!   <ul>
+//!   {% for user in users %}
+//!     <li>{{ user.username }}</li>
+//!   {% endfor %}
+//!   </ul>
+//! {% endif %}
+//! ```
+//!
+//! For multiple branches, `elif` and `else` can be used like in Python.  You can use more
+//! complex expressions there too:
+//!
+//! ```plain
+//! {% if kenny.sick %}
+//!   Kenny is sick.
+//! {% elif kenny.dead %}
+//!   You killed Kenny!  You bastard!!!
+//! {% else %}
+//!   Kenny looks okay --- so far
+//! {% endif %}
+//! ```
+//!
+//! ## `{% extends %}`
+//!
+//! The `extends` tag can be used to extend one template from another.  You can have multiple
+//! `extends` tags in a file, but only one of them may be executed at a time.  For more
+//! information see [block](#-block-).
+//!
+//! ## `{% block %}`
+//!
+//! Blocks are used for inheritance and act as both placeholders and replacements at the
+//! same time:
+//!
+//! The most powerful part of MiniJinja is template inheritance. Template inheritance allows
+//! you to build a base "skeleton" template that contains all the common elements of your
+//! site and defines **blocks** that child templates can override.
+//!
+//! **Base Template:**
+//!
+//! This template, which we'll call ``base.html``, defines a simple HTML skeleton
+//! document that you might use for a simple two-column page. It's the job of
+//! "child" templates to fill the empty blocks with content:
+//!
+//! ```plain
+//! <!doctype html>
+//! {% block head %}
+//! <title>{% block title %}{% endblock %}</title>
+//! {% endblock %}
+//! {% block body %}{% endblock %}
+//! ```
+//!
+//! **Child Template:**
+//!
+//! ```plain
+//! {% extends "base.html" %}
+//! {% block title %}Index{% endblock %}
+//! {% block head %}
+//!   {{ super() }}
+//!   <style type="text/css">
+//!     .important { color: #336699; }
+//!   </style>
+//! {% endblock %}
+//! {% block body %}
+//!   <h1>Index</h1>
+//!   <p class="important">
+//!     Welcome to my awesome homepage.
+//!   </p>
+//! {% endblock %}
+//! ```
+//!
+//! The ``{% extends %}`` tag is the key here. It tells the template engine that
+//! this template "extends" another template.  When the template system evaluates
+//! this template, it first locates the parent.  The extends tag should be the
+//! first tag in the template.
+//!
+//! As you can see it's also possible to render the contents of the parent block by calling
+//! ``super()``.
+//!
+//! MiniJinja allows you to put the name of the block after the end tag for better
+//! readability:
+//!
+//! ```plain
+//! {% block sidebar %}
+//!     {% block inner_sidebar %}
+//!         ...
+//!     {% endblock inner_sidebar %}
+//! {% endblock sidebar %}
+//! ```
+//!
+//! However, the name after the `endblock` word must match the block name.
+//!
+//! ## `{% include #}`
+//!  
+//! The `include` tag is useful to include a template and return the rendered contents of that file
+//! into the current namespace::
+//!  
+//! ```plain
+//! {% include 'header.html' %}
+//!     Body
+//! {% include 'footer.html' %}
+//! ```
+//!  
+//! Included templates have access to the variables of the active context.
+//!
+//! ## `{% with %}`
+//!
+//! The with statement makes it possible to create a new inner scope.  Variables set within
+//! this scope are not visible outside of the scope:
+//!
+//! ```plain
+//! {% with foo = 42 %}
+//!   {{ foo }}           foo is 42 here
+//! {% endwith %}
+//! foo is not visible here any longer
+//! ```
+//!
+//! ## `{% autoescape %}`
+//!
+//! If you want you can activate and deactivate the autoescaping from within
+//! the templates.
+//!
+//! Example:
+//!
+//! ```plain
+//! {% autoescape true %}
+//!     Autoescaping is active within this block
+//! {% endautoescape %}
+//!
+//! {% autoescape false %}
+//!     Autoescaping is inactive within this block
+//! {% endautoescape %}
+//! ```
+//!
+//! After an `endautoescape` the behavior is reverted to what it was before.
+
+// this is just for docs

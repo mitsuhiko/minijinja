@@ -4,9 +4,10 @@
 //! which are applied to values to modify them.  For example the expression `{{ 42|filter(23) }}`
 //! invokes the filter `filter` with the arguments `42` and `23`.
 //!
-//! MiniJinja comes with some built-in filters that are listed below.  To use a custom filter
-//! write a function that takes at least an [`&Environment`](crate::Environment) and
-//! value argument, then register it with [`add_filter`](crate::Environment::add_filter).
+//! MiniJinja comes with some built-in filters that are listed below. To create a
+//! custom filter write a function that takes at least an
+//! [`&Environment`](crate::Environment) and value argument, then register it
+//! with [`add_filter`](crate::Environment::add_filter).
 //!
 //! ## Custom Filters
 //!
