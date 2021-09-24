@@ -200,7 +200,7 @@ enum Shared {
     // dynamic type also wants to hold on to it without having to inspect
     // into a value object.  It would be nice to be able to store this
     // adjacent to `Shared` but unfortunately a `dyn Trait` needs two
-    // pointers and that incrases the size of the value type for all
+    // pointers and that increases the size of the value type for all
     // uses.
     Dynamic(RcType<dyn DynamicObject>),
 }
