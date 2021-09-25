@@ -339,7 +339,35 @@ impl<'a> Parser<'a> {
             Token::Int(val) => Ok(const_val!(val)),
             Token::Float(val) => Ok(const_val!(val)),
             Token::ParenOpen => {
-                let expr = self.parse_expr()?;
+                // MiniJinja does not really have tuples, but it treats the tuple
+                // syntax the same as lists.
+                if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
+                    self.stream.next()?;
+                    return Ok(ast::Expr::List(Spanned::new(
+                        ast::List { items: vec![] },
+                        self.stream.expand_span(span),
+                    )));
+                }
+
+                let mut expr = self.parse_expr()?;
+                if matches!(self.stream.current()?, Some((Token::Comma, _))) {
+                    let mut items = vec![expr];
+                    loop {
+                        if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
+                            break;
+                        }
+                        expect_token!(self, Token::Comma, "`,`")?;
+                        if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
+                            break;
+                        }
+                        items.push(self.parse_expr()?);
+                    }
+                    expr = ast::Expr::List(Spanned::new(
+                        ast::List { items },
+                        self.stream.expand_span(span),
+                    ));
+                }
+
                 expect_token!(self, Token::ParenClose, "`)`")?;
                 Ok(expr)
             }
