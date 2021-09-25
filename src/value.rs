@@ -59,12 +59,13 @@
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt::{self, Write};
 use std::marker::PhantomData;
-use std::sync::atomic::{self, AtomicBool};
+use std::sync::atomic::{self, AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
 use serde::ser::{self, Serialize, Serializer};
@@ -77,11 +78,12 @@ pub(crate) type RcType<T> = Arc<T>;
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
-const SAFESTRING_MARKER: &str = "\x01__minijinja_SafeString";
-const UNDEFINED_MARKER: &str = "\x01__minijinja_Undefined";
+const VALUE_HANDLE_MARKER: &str = "\x01__minijinja_ValueHandle";
 
 thread_local! {
     static INTERNAL_SERIALIZATION: AtomicBool = AtomicBool::new(false);
+    static LAST_VALUE_HANDLE: AtomicUsize = AtomicUsize::new(0);
+    static VALUE_HANDLES: RefCell<BTreeMap<usize, Value>> = RefCell::new(BTreeMap::new());
 }
 
 fn in_internal_serialization() -> bool {
@@ -857,18 +859,6 @@ impl Value {
         ))
     }
 
-    pub(crate) fn into_string(self) -> String {
-        if let Repr::Shared(arc) = self.0 {
-            match RcType::try_unwrap(arc) {
-                Ok(Shared::String(s)) | Ok(Shared::SafeString(s)) => s,
-                Ok(other) => other.to_string(),
-                Err(arc) => arc.to_string(),
-            }
-        } else {
-            self.to_string()
-        }
-    }
-
     pub(crate) fn try_into_vec(self) -> Result<Vec<Value>, Error> {
         if let Repr::Shared(arc) = self.0 {
             match RcType::try_unwrap(arc) {
@@ -917,6 +907,16 @@ impl Serialize for Value {
     where
         S: Serializer,
     {
+        // enable round tripping of values
+        if in_internal_serialization() {
+            use serde::ser::SerializeStruct;
+            let handle = LAST_VALUE_HANDLE.with(|x| x.fetch_add(1, atomic::Ordering::Relaxed));
+            VALUE_HANDLES.with(|handles| handles.borrow_mut().insert(handle, self.clone()));
+            let mut s = serializer.serialize_struct(VALUE_HANDLE_MARKER, 1)?;
+            s.serialize_field("handle", &handle)?;
+            return s.end();
+        }
+
         match self.0 {
             Repr::Bool(b) => serializer.serialize_bool(b),
             Repr::U64(u) => serializer.serialize_u64(u),
@@ -924,28 +924,12 @@ impl Serialize for Value {
             Repr::F64(f) => serializer.serialize_f64(f),
             Repr::Char(c) => serializer.serialize_char(c),
             Repr::None => serializer.serialize_unit(),
-            Repr::Undefined => {
-                use serde::ser::SerializeStruct;
-                if in_internal_serialization() {
-                    serializer.serialize_struct(UNDEFINED_MARKER, 1)?.end()
-                } else {
-                    serializer.serialize_unit()
-                }
-            }
+            Repr::Undefined => serializer.serialize_unit(),
             Repr::Shared(ref cplx) => match **cplx {
                 Shared::U128(u) => serializer.serialize_u128(u),
                 Shared::I128(i) => serializer.serialize_i128(i),
                 Shared::String(ref s) => serializer.serialize_str(s),
-                Shared::SafeString(ref val) => {
-                    use serde::ser::SerializeStruct;
-                    if in_internal_serialization() {
-                        let mut s = serializer.serialize_struct(SAFESTRING_MARKER, 1)?;
-                        s.serialize_field("value", val)?;
-                        s.end()
-                    } else {
-                        serializer.serialize_str(val)
-                    }
-                }
+                Shared::SafeString(ref val) => serializer.serialize_str(val),
                 Shared::Bytes(ref b) => serializer.serialize_bytes(b),
                 Shared::Seq(ref elements) => elements.serialize(serializer),
                 Shared::Map(ref entries) => {
@@ -1369,10 +1353,18 @@ where
 
     fn end(self) -> Result<Value, E> {
         match self.name {
-            SAFESTRING_MARKER if self.fields.len() == 1 => Ok(Value::from_safe_string(
-                self.fields.into_iter().next().unwrap().1.into_string(),
-            )),
-            UNDEFINED_MARKER => Ok(Repr::Undefined.into()),
+            VALUE_HANDLE_MARKER => {
+                let handle_id = match self.fields.get("handle") {
+                    Some(&Value(Repr::U64(handle_id))) => handle_id as usize,
+                    _ => panic!("bad handle reference in value roundtrip"),
+                };
+                Ok(VALUE_HANDLES.with(|handles| {
+                    let mut handles = handles.borrow_mut();
+                    handles
+                        .remove(&handle_id)
+                        .expect("value handle not in registry")
+                }))
+            }
             _ => Ok(Shared::Struct(self.fields).into()),
         }
     }
@@ -1528,6 +1520,40 @@ fn test_undefined_roundtrip() {
     let v2 = Value::from_serializable(&v);
     assert!(v.is_undefined());
     assert!(v2.is_undefined());
+}
+
+#[test]
+fn test_dynamic_object_roundtrip() {
+    #[derive(Debug)]
+    struct X(AtomicUsize);
+
+    impl fmt::Display for X {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.0.load(atomic::Ordering::Relaxed))
+        }
+    }
+
+    impl DynamicObject for X {
+        fn get_attr(&self, name: &str) -> Option<Value> {
+            match name {
+                "value" => Some(Value::from(self.0.load(atomic::Ordering::Relaxed))),
+                _ => None,
+            }
+        }
+
+        fn fields(&self) -> &'static [&'static str] {
+            &["value"]
+        }
+    }
+
+    let x = RcType::new(X(Default::default()));
+    let x_value = Value::from_dynamic(x.clone());
+    x.0.fetch_add(42, atomic::Ordering::Relaxed);
+    let x_clone = Value::from_serializable(&x_value);
+    x.0.fetch_add(23, atomic::Ordering::Relaxed);
+
+    assert_eq!(x_value.to_string(), "65");
+    assert_eq!(x_clone.to_string(), "65");
 }
 
 #[test]

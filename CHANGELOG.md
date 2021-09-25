@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# Unreleased
+
+- Added the ability to roundtrip arbitrary values via the serialize interface.
+
 # 0.3.0
 
 - Added support for `{% include %}`
