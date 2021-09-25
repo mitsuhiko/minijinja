@@ -259,6 +259,13 @@ impl<'source> Compiler<'source> {
                 self.set_location_from_span(var.span());
                 self.add(Instruction::StoreLocal(var.id));
             }
+            ast::Expr::List(list) => {
+                self.set_location_from_span(list.span());
+                self.add(Instruction::UnpackList(list.items.len()));
+                for expr in &list.items {
+                    self.compile_assignment(expr)?;
+                }
+            }
             _ => panic!("bad assignment target"),
         }
         Ok(())

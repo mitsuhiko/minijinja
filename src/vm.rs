@@ -349,7 +349,6 @@ impl<'env, 'source> Vm<'env, 'source> {
                             "sequence of wrong length"
                         ));
                     }
-                    v.reverse();
                     for _ in 0..*count {
                         stack.push(v.pop().unwrap());
                     }

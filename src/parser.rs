@@ -460,7 +460,48 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_assignment(&mut self) -> Result<ast::Expr<'a>, Error> {
-        self.parse_assign_name()
+        let span = self.stream.current_span();
+        let mut items = Vec::new();
+        let mut is_tuple = false;
+
+        loop {
+            if !items.is_empty() {
+                expect_token!(self, Token::Comma, "`,`")?;
+            }
+            if matches!(
+                self.stream.current()?,
+                Some((Token::ParenClose, _))
+                    | Some((Token::VariableEnd(..), _))
+                    | Some((Token::BlockEnd(..), _))
+                    | Some((Token::Ident("in"), _))
+            ) {
+                break;
+            }
+            items.push(
+                if matches!(self.stream.current()?, Some((Token::ParenOpen, _))) {
+                    self.stream.next()?;
+                    let rv = self.parse_assignment()?;
+                    expect_token!(self, Token::ParenClose, "`)`")?;
+                    rv
+                } else {
+                    self.parse_assign_name()?
+                },
+            );
+            if matches!(self.stream.current()?, Some((Token::Comma, _))) {
+                is_tuple = true;
+            } else {
+                break;
+            }
+        }
+
+        if !is_tuple && items.len() == 1 {
+            Ok(items.into_iter().next().unwrap())
+        } else {
+            Ok(ast::Expr::List(Spanned::new(
+                ast::List { items },
+                self.stream.expand_span(span),
+            )))
+        }
     }
 
     fn parse_for_stmt(&mut self) -> Result<ast::ForLoop<'a>, Error> {

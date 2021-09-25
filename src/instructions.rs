@@ -156,7 +156,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
             Instruction::LoadConst(ref v) => write!(f, "LOAD_CONST (value {:?})", v),
             Instruction::BuildMap(n) => write!(f, "BUILD_MAP ({:?} pairs)", n),
             Instruction::BuildList(n) => write!(f, "BUILD_LIST ({:?} items)", n),
-            Instruction::UnpackList(n) => write!(f, "UNPACKS_LIST ({:?} items)", n),
+            Instruction::UnpackList(n) => write!(f, "UNPACK_LIST ({:?} items)", n),
             Instruction::Add => write!(f, "ADD"),
             Instruction::Sub => write!(f, "SUB"),
             Instruction::Mul => write!(f, "MUL"),

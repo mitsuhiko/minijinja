@@ -291,7 +291,7 @@ fn test_string_concat() {
 #[test]
 fn test_unpacking() {
     let mut c = Compiler::new();
-    c.add(Instruction::LoadConst(Value::from(vec!["foo", "bar"])));
+    c.add(Instruction::LoadConst(Value::from(vec!["bar", "foo"])));
     c.add(Instruction::UnpackList(2));
     c.add(Instruction::StringConcat);
     c.add(Instruction::Emit);
