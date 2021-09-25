@@ -244,16 +244,21 @@ impl<'env, 'source> Vm<'env, 'source> {
         let mut auto_escape = initial_auto_escape;
         let mut auto_escape_stack = vec![];
 
+        macro_rules! bail {
+            ($err:expr) => {{
+                let mut err = $err;
+                if let Some((filename, lineno)) = instructions.get_location(pc) {
+                    err.set_location(filename, lineno);
+                }
+                return Err(err);
+            }};
+        }
+
         macro_rules! try_ctx {
             ($expr:expr) => {
                 match $expr {
                     Ok(rv) => rv,
-                    Err(mut err) => {
-                        if let Some((filename, lineno)) = instructions.get_location(pc) {
-                            err.set_location(filename, lineno);
-                        }
-                        return Err(err);
-                    }
+                    Err(err) => bail!(err),
                 }
             };
         }
@@ -335,6 +340,19 @@ impl<'env, 'source> Vm<'env, 'source> {
                     }
                     v.reverse();
                     stack.push(v.into());
+                }
+                Instruction::UnpackList(count) => {
+                    let mut v = try_ctx!(stack.pop().try_into_vec());
+                    if v.len() != *count {
+                        bail!(Error::new(
+                            ErrorKind::ImpossibleOperation,
+                            "sequence of wrong length"
+                        ));
+                    }
+                    v.reverse();
+                    for _ in 0..*count {
+                        stack.push(v.pop().unwrap());
+                    }
                 }
                 Instruction::Add => func_binop!(add),
                 Instruction::Sub => func_binop!(sub),
@@ -488,7 +506,7 @@ impl<'env, 'source> Vm<'env, 'source> {
                             }
                         }
                         _ => {
-                            return Err(Error::new(
+                            bail!(Error::new(
                                 ErrorKind::ImpossibleOperation,
                                 "invalid value to autoescape tag",
                             ));
@@ -525,7 +543,7 @@ impl<'env, 'source> Vm<'env, 'source> {
                             panic!("attempted to super unreferenced block");
                         }
                     } else {
-                        return Err(Error::new(
+                        bail!(Error::new(
                             ErrorKind::ImpossibleOperation,
                             format!("unknown function {}", function_name),
                         ));
@@ -541,7 +559,7 @@ impl<'env, 'source> Vm<'env, 'source> {
                     let _obj = stack.pop();
                     // TODO: this is something that doesn't make too much sense in the
                     // engine today.
-                    return Err(Error::new(
+                    bail!(Error::new(
                         ErrorKind::ImpossibleOperation,
                         "objects cannot be called directly",
                     ));

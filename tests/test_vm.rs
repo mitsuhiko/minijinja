@@ -287,3 +287,16 @@ fn test_string_concat() {
     simple_eval(&c.finish().0, (), &mut output).unwrap();
     assert_eq!(output, "foo42");
 }
+
+#[test]
+fn test_unpacking() {
+    let mut c = Compiler::new();
+    c.add(Instruction::LoadConst(Value::from(vec!["foo", "bar"])));
+    c.add(Instruction::UnpackList(2));
+    c.add(Instruction::StringConcat);
+    c.add(Instruction::Emit);
+
+    let mut output = String::new();
+    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    assert_eq!(output, "foobar");
+}

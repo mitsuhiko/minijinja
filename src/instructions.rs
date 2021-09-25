@@ -29,6 +29,9 @@ pub enum Instruction<'source> {
     /// Builds a list of the last n pairs on the stack.
     BuildList(usize),
 
+    /// Unpacks a list into N stack items.
+    UnpackList(usize),
+
     /// Add the top two values
     Add,
 
@@ -153,6 +156,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
             Instruction::LoadConst(ref v) => write!(f, "LOAD_CONST (value {:?})", v),
             Instruction::BuildMap(n) => write!(f, "BUILD_MAP ({:?} pairs)", n),
             Instruction::BuildList(n) => write!(f, "BUILD_LIST ({:?} items)", n),
+            Instruction::UnpackList(n) => write!(f, "UNPACKS_LIST ({:?} items)", n),
             Instruction::Add => write!(f, "ADD"),
             Instruction::Sub => write!(f, "SUB"),
             Instruction::Mul => write!(f, "MUL"),

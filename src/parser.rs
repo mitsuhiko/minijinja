@@ -451,22 +451,20 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_assign_name(&mut self) -> Result<&'a str, Error> {
-        let (target, _) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
-        if RESERVED_NAMES.contains(&target) {
-            syntax_error!("cannot assign to reserved variable name {}", target);
+    fn parse_assign_name(&mut self) -> Result<ast::Expr<'a>, Error> {
+        let (id, span) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
+        if RESERVED_NAMES.contains(&id) {
+            syntax_error!("cannot assign to reserved variable name {}", id);
         }
-        Ok(target)
+        Ok(ast::Expr::Var(ast::Spanned::new(ast::Var { id }, span)))
+    }
+
+    fn parse_assignment(&mut self) -> Result<ast::Expr<'a>, Error> {
+        self.parse_assign_name()
     }
 
     fn parse_for_stmt(&mut self) -> Result<ast::ForLoop<'a>, Error> {
-        let span = self.stream.current_span();
-        let target = ast::Expr::Var(ast::Spanned::new(
-            ast::Var {
-                id: self.parse_assign_name()?,
-            },
-            span,
-        ));
+        let target = self.parse_assignment()?;
         expect_token!(self, Token::Ident("in"), "in")?;
         let iter = self.parse_expr()?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
@@ -512,7 +510,10 @@ impl<'a> Parser<'a> {
             if !assignments.is_empty() {
                 expect_token!(self, Token::Comma, "comma")?;
             }
-            let target = self.parse_assign_name()?;
+            let target = match self.parse_assign_name()? {
+                ast::Expr::Var(var) => var.id,
+                _ => panic!("unexpected node from assignment parse"),
+            };
             expect_token!(self, Token::Assign, "assignment operator")?;
             let expr = self.parse_expr()?;
             assignments.push((target, expr));
