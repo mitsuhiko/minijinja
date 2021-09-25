@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fmt;
 
 /// Represents a token in the stream.
+#[derive(PartialEq)]
 pub enum Token<'a> {
     /// Raw template data.
     TemplateData(&'a str),

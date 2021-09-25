@@ -70,8 +70,8 @@ impl<'source> Compiler<'source> {
     }
 
     /// Starts a for loop
-    pub fn start_for_loop(&mut self, target_name: &'source str) {
-        self.add(Instruction::PushLoop(target_name));
+    pub fn start_for_loop(&mut self) {
+        self.add(Instruction::PushLoop);
         let iter_instr = self.add(Instruction::Iterate(!0));
         self.pending_block.push(PendingBlock::Loop(iter_instr));
     }
@@ -180,7 +180,8 @@ impl<'source> Compiler<'source> {
             ast::Stmt::ForLoop(for_loop) => {
                 self.set_location_from_span(for_loop.span());
                 self.compile_expr(&for_loop.iter)?;
-                self.start_for_loop(for_loop.target);
+                self.start_for_loop();
+                self.compile_assignment(&for_loop.target)?;
                 for node in &for_loop.body {
                     self.compile_stmt(node)?;
                 }
@@ -247,6 +248,25 @@ impl<'source> Compiler<'source> {
                 }
                 self.add(Instruction::PopAutoEscape);
             }
+        }
+        Ok(())
+    }
+
+    /// Compiles an assignment expression.
+    pub fn compile_assignment(&mut self, expr: &ast::Expr<'source>) -> Result<(), Error> {
+        match expr {
+            ast::Expr::Var(var) => {
+                self.set_location_from_span(var.span());
+                self.add(Instruction::StoreLocal(var.id));
+            }
+            ast::Expr::List(list) => {
+                self.set_location_from_span(list.span());
+                self.add(Instruction::UnpackList(list.items.len()));
+                for expr in &list.items {
+                    self.compile_assignment(expr)?;
+                }
+            }
+            _ => panic!("bad assignment target"),
         }
         Ok(())
     }

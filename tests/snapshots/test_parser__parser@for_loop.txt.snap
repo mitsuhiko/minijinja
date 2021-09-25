@@ -11,7 +11,9 @@ Ok(
                 raw: "<ul>\n",
             } @ 1:0-2:0,
             ForLoop {
-                target: "item",
+                target: Var {
+                    id: "item",
+                } @ 2:7-2:11,
                 iter: Var {
                     id: "seq",
                 } @ 2:15-2:18,

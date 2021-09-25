@@ -12,8 +12,7 @@ fn test_loop() {
 
     let mut c = Compiler::new();
     c.add(Instruction::Lookup("items"));
-    c.start_for_loop("x");
-    c.add(Instruction::Lookup("x"));
+    c.start_for_loop();
     c.add(Instruction::Emit);
     c.end_for_loop();
     c.add(Instruction::EmitRaw("!"));
@@ -287,4 +286,17 @@ fn test_string_concat() {
     let mut output = String::new();
     simple_eval(&c.finish().0, (), &mut output).unwrap();
     assert_eq!(output, "foo42");
+}
+
+#[test]
+fn test_unpacking() {
+    let mut c = Compiler::new();
+    c.add(Instruction::LoadConst(Value::from(vec!["bar", "foo"])));
+    c.add(Instruction::UnpackList(2));
+    c.add(Instruction::StringConcat);
+    c.add(Instruction::Emit);
+
+    let mut output = String::new();
+    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    assert_eq!(output, "foobar");
 }

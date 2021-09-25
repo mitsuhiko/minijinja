@@ -1,0 +1,42 @@
+---
+source: tests/test_parser.rs
+expression: "&ast"
+input_file: tests/parser-inputs/for_loop_unpack.txt
+
+---
+Ok(
+    Template {
+        children: [
+            ForLoop {
+                target: List {
+                    items: [
+                        List {
+                            items: [
+                                Var {
+                                    id: "a",
+                                } @ 1:8-1:9,
+                                Var {
+                                    id: "b",
+                                } @ 1:11-1:12,
+                            ],
+                        } @ 1:8-1:13,
+                        Var {
+                            id: "c",
+                        } @ 1:15-1:16,
+                    ],
+                } @ 1:7-1:19,
+                iter: Var {
+                    id: "seq",
+                } @ 1:20-1:23,
+                body: [
+                    EmitRaw {
+                        raw: "...",
+                    } @ 1:26-1:29,
+                ],
+            } @ 1:3-1:41,
+            EmitRaw {
+                raw: "\n",
+            } @ 1:41-2:0,
+        ],
+    } @ 1:0-2:0,
+)

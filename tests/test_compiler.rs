@@ -6,8 +6,7 @@ use minijinja::value::Value;
 fn test_for_loop() {
     let mut c = Compiler::new();
     c.add(Instruction::Lookup("items"));
-    c.start_for_loop("x");
-    c.add(Instruction::Lookup("x"));
+    c.start_for_loop();
     c.add(Instruction::Emit);
     c.end_for_loop();
     c.add(Instruction::EmitRaw("!"));

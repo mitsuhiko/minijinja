@@ -70,8 +70,7 @@ impl fmt::Display for LoopState {
 
 #[derive(Debug)]
 pub struct Loop<'source> {
-    target_name: &'source str,
-    current_value: Value,
+    locals: BTreeMap<&'source str, Value>,
     iterator: ValueIterator,
     controller: RcType<LoopState>,
 }
@@ -123,6 +122,11 @@ pub struct Context<'source, 'context> {
 }
 
 impl<'source, 'context> Context<'source, 'context> {
+    /// Stores a variable in the context.
+    pub fn store(&mut self, key: &'source str, value: Value) {
+        self.current_loop().locals.insert(key, value);
+    }
+
     /// Looks up a variable in the context.
     pub fn lookup(&self, key: &str) -> Option<Value> {
         for ctx in self.stack.iter().rev() {
@@ -133,15 +137,12 @@ impl<'source, 'context> Context<'source, 'context> {
                 Frame::Isolate { value } => (value, false),
                 Frame::Merge { value } => (value, true),
                 Frame::Loop(Loop {
-                    target_name,
-                    current_value,
-                    controller,
-                    ..
+                    locals, controller, ..
                 }) => {
-                    if key == *target_name {
-                        return Some(current_value.clone());
-                    } else if key == "loop" {
+                    if key == "loop" {
                         return Some(Value::from_dynamic(controller.clone()));
+                    } else if let Some(value) = locals.get(key) {
+                        return Some(value.clone());
                     }
                     continue;
                 }
@@ -243,16 +244,21 @@ impl<'env, 'source> Vm<'env, 'source> {
         let mut auto_escape = initial_auto_escape;
         let mut auto_escape_stack = vec![];
 
+        macro_rules! bail {
+            ($err:expr) => {{
+                let mut err = $err;
+                if let Some((filename, lineno)) = instructions.get_location(pc) {
+                    err.set_location(filename, lineno);
+                }
+                return Err(err);
+            }};
+        }
+
         macro_rules! try_ctx {
             ($expr:expr) => {
                 match $expr {
                     Ok(rv) => rv,
-                    Err(mut err) => {
-                        if let Some((filename, lineno)) = instructions.get_location(pc) {
-                            err.set_location(filename, lineno);
-                        }
-                        return Err(err);
-                    }
+                    Err(err) => bail!(err),
                 }
             };
         }
@@ -300,6 +306,9 @@ impl<'env, 'source> Vm<'env, 'source> {
                 Instruction::Emit => {
                     try_ctx!(self.env.finalize(&stack.pop(), auto_escape, output));
                 }
+                Instruction::StoreLocal(name) => {
+                    context.store(name, stack.pop());
+                }
                 Instruction::Lookup(name) => {
                     stack.push(context.lookup(name).unwrap_or(Value::UNDEFINED));
                 }
@@ -331,6 +340,18 @@ impl<'env, 'source> Vm<'env, 'source> {
                     }
                     v.reverse();
                     stack.push(v.into());
+                }
+                Instruction::UnpackList(count) => {
+                    let mut v = try_ctx!(stack.pop().try_into_vec());
+                    if v.len() != *count {
+                        bail!(Error::new(
+                            ErrorKind::ImpossibleOperation,
+                            "sequence of wrong length"
+                        ));
+                    }
+                    for _ in 0..*count {
+                        stack.push(v.pop().unwrap());
+                    }
                 }
                 Instruction::Add => func_binop!(add),
                 Instruction::Sub => func_binop!(sub),
@@ -364,13 +385,12 @@ impl<'env, 'source> Vm<'env, 'source> {
                 Instruction::PopFrame => {
                     context.pop_frame();
                 }
-                Instruction::PushLoop(target_name) => {
+                Instruction::PushLoop => {
                     let iterable = stack.pop();
                     let iterator = iterable.iter();
                     let len = iterator.len();
                     context.push_frame(Frame::Loop(Loop {
-                        target_name,
-                        current_value: Value::UNDEFINED,
+                        locals: BTreeMap::new(),
                         iterator,
                         controller: RcType::new(LoopState {
                             idx: AtomicUsize::new(!0usize),
@@ -381,8 +401,10 @@ impl<'env, 'source> Vm<'env, 'source> {
                 Instruction::Iterate(jump_target) => {
                     let l = context.current_loop();
                     l.controller.idx.fetch_add(1, Ordering::Relaxed);
-                    l.current_value = match l.iterator.next() {
-                        Some(item) => item,
+                    match l.iterator.next() {
+                        Some(item) => {
+                            stack.push(item);
+                        }
                         None => {
                             pc = *jump_target;
                             continue;
@@ -483,7 +505,7 @@ impl<'env, 'source> Vm<'env, 'source> {
                             }
                         }
                         _ => {
-                            return Err(Error::new(
+                            bail!(Error::new(
                                 ErrorKind::ImpossibleOperation,
                                 "invalid value to autoescape tag",
                             ));
@@ -520,7 +542,7 @@ impl<'env, 'source> Vm<'env, 'source> {
                             panic!("attempted to super unreferenced block");
                         }
                     } else {
-                        return Err(Error::new(
+                        bail!(Error::new(
                             ErrorKind::ImpossibleOperation,
                             format!("unknown function {}", function_name),
                         ));
@@ -536,7 +558,7 @@ impl<'env, 'source> Vm<'env, 'source> {
                     let _obj = stack.pop();
                     // TODO: this is something that doesn't make too much sense in the
                     // engine today.
-                    return Err(Error::new(
+                    bail!(Error::new(
                         ErrorKind::ImpossibleOperation,
                         "objects cannot be called directly",
                     ));

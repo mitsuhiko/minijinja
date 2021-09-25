@@ -121,7 +121,7 @@ pub struct Template<'a> {
 /// A for loop.
 #[derive(Debug, Clone)]
 pub struct ForLoop<'a> {
-    pub target: &'a str,
+    pub target: Expr<'a>,
     pub iter: Expr<'a>,
     pub body: Vec<Stmt<'a>>,
 }

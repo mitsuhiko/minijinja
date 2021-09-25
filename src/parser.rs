@@ -339,7 +339,35 @@ impl<'a> Parser<'a> {
             Token::Int(val) => Ok(const_val!(val)),
             Token::Float(val) => Ok(const_val!(val)),
             Token::ParenOpen => {
-                let expr = self.parse_expr()?;
+                // MiniJinja does not really have tuples, but it treats the tuple
+                // syntax the same as lists.
+                if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
+                    self.stream.next()?;
+                    return Ok(ast::Expr::List(Spanned::new(
+                        ast::List { items: vec![] },
+                        self.stream.expand_span(span),
+                    )));
+                }
+
+                let mut expr = self.parse_expr()?;
+                if matches!(self.stream.current()?, Some((Token::Comma, _))) {
+                    let mut items = vec![expr];
+                    loop {
+                        if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
+                            break;
+                        }
+                        expect_token!(self, Token::Comma, "`,`")?;
+                        if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
+                            break;
+                        }
+                        items.push(self.parse_expr()?);
+                    }
+                    expr = ast::Expr::List(Spanned::new(
+                        ast::List { items },
+                        self.stream.expand_span(span),
+                    ));
+                }
+
                 expect_token!(self, Token::ParenClose, "`)`")?;
                 Ok(expr)
             }
@@ -423,16 +451,61 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_assign_target(&mut self) -> Result<&'a str, Error> {
-        let (target, _) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
-        if RESERVED_NAMES.contains(&target) {
-            syntax_error!("cannot assign to reserved variable name {}", target);
+    fn parse_assign_name(&mut self) -> Result<ast::Expr<'a>, Error> {
+        let (id, span) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
+        if RESERVED_NAMES.contains(&id) {
+            syntax_error!("cannot assign to reserved variable name {}", id);
         }
-        Ok(target)
+        Ok(ast::Expr::Var(ast::Spanned::new(ast::Var { id }, span)))
+    }
+
+    fn parse_assignment(&mut self) -> Result<ast::Expr<'a>, Error> {
+        let span = self.stream.current_span();
+        let mut items = Vec::new();
+        let mut is_tuple = false;
+
+        loop {
+            if !items.is_empty() {
+                expect_token!(self, Token::Comma, "`,`")?;
+            }
+            if matches!(
+                self.stream.current()?,
+                Some((Token::ParenClose, _))
+                    | Some((Token::VariableEnd(..), _))
+                    | Some((Token::BlockEnd(..), _))
+                    | Some((Token::Ident("in"), _))
+            ) {
+                break;
+            }
+            items.push(
+                if matches!(self.stream.current()?, Some((Token::ParenOpen, _))) {
+                    self.stream.next()?;
+                    let rv = self.parse_assignment()?;
+                    expect_token!(self, Token::ParenClose, "`)`")?;
+                    rv
+                } else {
+                    self.parse_assign_name()?
+                },
+            );
+            if matches!(self.stream.current()?, Some((Token::Comma, _))) {
+                is_tuple = true;
+            } else {
+                break;
+            }
+        }
+
+        if !is_tuple && items.len() == 1 {
+            Ok(items.into_iter().next().unwrap())
+        } else {
+            Ok(ast::Expr::List(Spanned::new(
+                ast::List { items },
+                self.stream.expand_span(span),
+            )))
+        }
     }
 
     fn parse_for_stmt(&mut self) -> Result<ast::ForLoop<'a>, Error> {
-        let target = self.parse_assign_target()?;
+        let target = self.parse_assignment()?;
         expect_token!(self, Token::Ident("in"), "in")?;
         let iter = self.parse_expr()?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
@@ -478,7 +551,10 @@ impl<'a> Parser<'a> {
             if !assignments.is_empty() {
                 expect_token!(self, Token::Comma, "comma")?;
             }
-            let target = self.parse_assign_target()?;
+            let target = match self.parse_assign_name()? {
+                ast::Expr::Var(var) => var.id,
+                _ => panic!("unexpected node from assignment parse"),
+            };
             expect_token!(self, Token::Assign, "assignment operator")?;
             let expr = self.parse_expr()?;
             assignments.push((target, expr));
