@@ -27,6 +27,7 @@
 //!
 //! MiniJinja will perform the necessary conversions automatically via the
 //! [`ValueArgs`](crate::value::ValueArgs) and [`Into`] traits.
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
@@ -146,6 +147,13 @@ pub fn escape(_env: &Environment, v: Value) -> Result<Value, Error> {
     }
 }
 
+/// Dict sorting functionality.
+pub fn dictsort(_env: &Environment, v: Value) -> Result<Value, Error> {
+    let mut pairs = v.try_into_pairs()?;
+    pairs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+    Ok(Value::from(pairs))
+}
+
 pub(crate) fn get_default_filters() -> BTreeMap<&'static str, BoxedFilter> {
     let mut rv = BTreeMap::new();
     rv.insert("lower", BoxedFilter::new(lower));
@@ -154,6 +162,7 @@ pub(crate) fn get_default_filters() -> BTreeMap<&'static str, BoxedFilter> {
     rv.insert("safe", BoxedFilter::new(safe));
     rv.insert("escape", BoxedFilter::new(escape));
     rv.insert("length", BoxedFilter::new(length));
+    rv.insert("dictsort", BoxedFilter::new(dictsort));
     rv
 }
 

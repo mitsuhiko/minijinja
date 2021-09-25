@@ -1,0 +1,39 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/loop_dictsort.txt
+
+---
+
+* 42: aha
+* bar: 2
+* baz: 100
+* foo: 1
+
+=====
+
+Template {
+    name: "loop_dictsort.txt",
+    instructions: [
+        00000 | LOOKUP (var "map")   [<unknown>:1],
+        00001 | BUILD_LIST (0 items)   [<unknown>:1],
+        00002 | APPLY_FILTER (name "dictsort")   [<unknown>:1],
+        00003 | PUSH_LOOP   [<unknown>:1],
+        00004 | ITERATE (exit to 00010)   [<unknown>:1],
+        00005 | UNPACK_LIST (2 items)   [<unknown>:1],
+        00006 | STORE_LOCAL (var "key")   [<unknown>:1],
+        00007 | STORE_LOCAL (var "value")   [<unknown>:1],
+        00008 | EMIT_RAW (string "\n* ")   [<unknown>:1],
+        00009 | LOOKUP (var "key")   [<unknown>:2],
+        0000a | EMIT   [<unknown>:2],
+        0000b | EMIT_RAW (string ": ")   [<unknown>:2],
+        0000c | LOOKUP (var "value")   [<unknown>:2],
+        0000d | EMIT   [<unknown>:2],
+        0000e | EMIT_RAW (string "")   [<unknown>:2],
+        0000f | JUMP (to 00004)   [<unknown>:2],
+        00010 | POP_FRAME   [<unknown>:2],
+        00011 | EMIT_RAW (string "\n")   [<unknown>:3],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

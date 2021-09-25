@@ -1,0 +1,9 @@
+map:
+  foo: 1
+  bar: 2
+  baz: 100
+  42: aha
+---
+{%- for key, value in map|dictsort %}
+* {{ key }}: {{ value }}
+{%- endfor %}

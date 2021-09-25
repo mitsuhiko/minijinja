@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 - Added the ability to roundtrip arbitrary values via the serialize interface.
 - Added support for tuple unpacking in lists.
+- Added dictsort filter.
 
 # 0.3.0
 

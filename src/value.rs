@@ -877,6 +877,32 @@ impl Value {
         ))
     }
 
+    pub(crate) fn try_into_pairs(self) -> Result<Vec<Value>, Error> {
+        if let Repr::Shared(arc) = self.0 {
+            match RcType::try_unwrap(arc) {
+                Ok(Shared::Map(v)) => {
+                    return Ok(v
+                        .into_iter()
+                        .map(|(k, v)| Value::from(vec![Value::from(k), v]))
+                        .collect())
+                }
+                Ok(_) => {}
+                Err(arc) => {
+                    if let Shared::Map(v) = &*arc {
+                        return Ok(v
+                            .iter()
+                            .map(|(k, v)| Value::from(vec![Value::from(k.clone()), v.clone()]))
+                            .collect());
+                    }
+                }
+            }
+        }
+        Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            "cannot convert value into pair list",
+        ))
+    }
+
     /// Iterates over the value.
     pub(crate) fn iter(&self) -> ValueIterator {
         let value = self.clone();
