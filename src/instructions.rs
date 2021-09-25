@@ -8,6 +8,9 @@ pub enum Instruction<'source> {
     /// Emits raw source
     EmitRaw(&'source str),
 
+    /// Stores a variable (only possible in for loops)
+    StoreLocal(&'source str),
+
     /// Load a variable,
     Lookup(&'source str),
 
@@ -84,7 +87,7 @@ pub enum Instruction<'source> {
     ///
     /// The argument is the variable name of the loop
     /// variable.
-    PushLoop(&'source str),
+    PushLoop,
 
     /// Pushes a value as context layer.
     PushContext,
@@ -143,6 +146,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Instruction::EmitRaw(s) => write!(f, "EMIT_RAW (string {:?})", s),
+            Instruction::StoreLocal(n) => write!(f, "STORE_LOCAL (var {:?})", n),
             Instruction::Lookup(n) => write!(f, "LOOKUP (var {:?})", n),
             Instruction::GetAttr(n) => write!(f, "GETATTR (key {:?})", n),
             Instruction::GetItem => write!(f, "GETITEM"),
@@ -171,7 +175,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
                 write!(f, "PERFORM_TEST (name {:?})", n)
             }
             Instruction::Emit => write!(f, "EMIT"),
-            Instruction::PushLoop(t) => write!(f, "PUSH_LOOP (assign to {:?})", t),
+            Instruction::PushLoop => write!(f, "PUSH_LOOP"),
             Instruction::PushContext => write!(f, "PUSH_CONTEXT"),
             Instruction::Iterate(t) => write!(f, "ITERATE (exit to {:>05x})", t),
             Instruction::PopFrame => write!(f, "POP_FRAME"),

@@ -70,8 +70,7 @@ impl fmt::Display for LoopState {
 
 #[derive(Debug)]
 pub struct Loop<'source> {
-    target_name: &'source str,
-    current_value: Value,
+    locals: BTreeMap<&'source str, Value>,
     iterator: ValueIterator,
     controller: RcType<LoopState>,
 }
@@ -123,6 +122,11 @@ pub struct Context<'source, 'context> {
 }
 
 impl<'source, 'context> Context<'source, 'context> {
+    /// Stores a variable in the context.
+    pub fn store(&mut self, key: &'source str, value: Value) {
+        self.current_loop().locals.insert(key, value);
+    }
+
     /// Looks up a variable in the context.
     pub fn lookup(&self, key: &str) -> Option<Value> {
         for ctx in self.stack.iter().rev() {
@@ -133,15 +137,12 @@ impl<'source, 'context> Context<'source, 'context> {
                 Frame::Isolate { value } => (value, false),
                 Frame::Merge { value } => (value, true),
                 Frame::Loop(Loop {
-                    target_name,
-                    current_value,
-                    controller,
-                    ..
+                    locals, controller, ..
                 }) => {
-                    if key == *target_name {
-                        return Some(current_value.clone());
-                    } else if key == "loop" {
+                    if key == "loop" {
                         return Some(Value::from_dynamic(controller.clone()));
+                    } else if let Some(value) = locals.get(key) {
+                        return Some(value.clone());
                     }
                     continue;
                 }
@@ -300,6 +301,9 @@ impl<'env, 'source> Vm<'env, 'source> {
                 Instruction::Emit => {
                     try_ctx!(self.env.finalize(&stack.pop(), auto_escape, output));
                 }
+                Instruction::StoreLocal(name) => {
+                    context.store(name, stack.pop());
+                }
                 Instruction::Lookup(name) => {
                     stack.push(context.lookup(name).unwrap_or(Value::UNDEFINED));
                 }
@@ -364,13 +368,12 @@ impl<'env, 'source> Vm<'env, 'source> {
                 Instruction::PopFrame => {
                     context.pop_frame();
                 }
-                Instruction::PushLoop(target_name) => {
+                Instruction::PushLoop => {
                     let iterable = stack.pop();
                     let iterator = iterable.iter();
                     let len = iterator.len();
                     context.push_frame(Frame::Loop(Loop {
-                        target_name,
-                        current_value: Value::UNDEFINED,
+                        locals: BTreeMap::new(),
                         iterator,
                         controller: RcType::new(LoopState {
                             idx: AtomicUsize::new(!0usize),
@@ -381,8 +384,10 @@ impl<'env, 'source> Vm<'env, 'source> {
                 Instruction::Iterate(jump_target) => {
                     let l = context.current_loop();
                     l.controller.idx.fetch_add(1, Ordering::Relaxed);
-                    l.current_value = match l.iterator.next() {
-                        Some(item) => item,
+                    match l.iterator.next() {
+                        Some(item) => {
+                            stack.push(item);
+                        }
                         None => {
                             pc = *jump_target;
                             continue;

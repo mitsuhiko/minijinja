@@ -71,8 +71,9 @@ impl<'source> Compiler<'source> {
 
     /// Starts a for loop
     pub fn start_for_loop(&mut self, target_name: &'source str) {
-        self.add(Instruction::PushLoop(target_name));
+        self.add(Instruction::PushLoop);
         let iter_instr = self.add(Instruction::Iterate(!0));
+        self.add(Instruction::StoreLocal(target_name));
         self.pending_block.push(PendingBlock::Loop(iter_instr));
     }
 
