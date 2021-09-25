@@ -66,6 +66,7 @@
 //! - `42`: Integers are whole numbers without a decimal part.
 //! - `42.0`: Floating point numbers can be written using a `.` as a decimal mark.
 //! - `['list', 'of', 'objects']`: Everything between two brackets is a list. Lists are useful
+//!   for compatibility with Jinja2 `('list', 'of', 'objects')` is also allowed.
 //!   for storing sequential data to be iterated over.
 //! - `{'map': 'of', 'key': 'and', 'value': 'pairs'}`: A map is a structure that combines keys
 //!   and values. Keys must be unique and always have exactly one value. Maps are rarely
@@ -132,6 +133,17 @@
 //! <ul>
 //! {% for user in users %}
 //!   <li>{{ user.username }}</li>
+//! {% endfor %}
+//! </ul>
+//! ```
+//!
+//! It's also possible to unpack tuples while iterating:
+//!
+//! ```plain
+//! <h1>Members</h1>
+//! <ul>
+//! {% for (key, value) in list_of_pairs %}
+//!   <li>{{ key }}: {{ value }}</li>
 //! {% endfor %}
 //! </ul>
 //! ```
