@@ -70,10 +70,9 @@ impl<'source> Compiler<'source> {
     }
 
     /// Starts a for loop
-    pub fn start_for_loop(&mut self, target_name: &'source str) {
+    pub fn start_for_loop(&mut self) {
         self.add(Instruction::PushLoop);
         let iter_instr = self.add(Instruction::Iterate(!0));
-        self.add(Instruction::StoreLocal(target_name));
         self.pending_block.push(PendingBlock::Loop(iter_instr));
     }
 
@@ -181,7 +180,8 @@ impl<'source> Compiler<'source> {
             ast::Stmt::ForLoop(for_loop) => {
                 self.set_location_from_span(for_loop.span());
                 self.compile_expr(&for_loop.iter)?;
-                self.start_for_loop(for_loop.target);
+                self.start_for_loop();
+                self.add(Instruction::StoreLocal(for_loop.target));
                 for node in &for_loop.body {
                     self.compile_stmt(node)?;
                 }
