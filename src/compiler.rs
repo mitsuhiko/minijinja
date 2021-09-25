@@ -181,7 +181,7 @@ impl<'source> Compiler<'source> {
                 self.set_location_from_span(for_loop.span());
                 self.compile_expr(&for_loop.iter)?;
                 self.start_for_loop();
-                self.add(Instruction::StoreLocal(for_loop.target));
+                self.compile_assignment(&for_loop.target)?;
                 for node in &for_loop.body {
                     self.compile_stmt(node)?;
                 }
@@ -248,6 +248,18 @@ impl<'source> Compiler<'source> {
                 }
                 self.add(Instruction::PopAutoEscape);
             }
+        }
+        Ok(())
+    }
+
+    /// Compiles an assignment expression.
+    pub fn compile_assignment(&mut self, expr: &ast::Expr<'source>) -> Result<(), Error> {
+        match expr {
+            ast::Expr::Var(var) => {
+                self.set_location_from_span(var.span());
+                self.add(Instruction::StoreLocal(var.id));
+            }
+            _ => panic!("bad assignment target"),
         }
         Ok(())
     }
