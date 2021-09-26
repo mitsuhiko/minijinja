@@ -24,6 +24,7 @@ All notable changes to MiniJinja are documented here.
 - Added `if` condition expression to for loops.
 - Fixed a bug that caused or/and not to evaluate correctly in certain situations.
 - Added `in` and `not in` expressions.
+- Added inline `if` expressions.
 
 # 0.3.0
 

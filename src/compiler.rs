@@ -356,6 +356,19 @@ impl<'source> Compiler<'source> {
                 self.compile_expr(&c.right)?;
                 self.add(instr);
             }
+            ast::Expr::IfExpr(i) => {
+                self.set_location_from_span(i.span());
+                self.compile_expr(&i.test_expr)?;
+                self.start_if();
+                self.compile_expr(&i.true_expr)?;
+                self.start_else();
+                if let Some(ref false_expr) = i.false_expr {
+                    self.compile_expr(false_expr)?;
+                } else {
+                    self.add(Instruction::LoadConst(Value::UNDEFINED));
+                }
+                self.end_if();
+            }
             ast::Expr::Filter(f) => {
                 self.set_location_from_span(f.span());
                 self.compile_expr(&f.expr)?;
