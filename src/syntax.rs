@@ -119,6 +119,22 @@
 //!   can use positional arguments.
 //! - ``.`` / ``[]``: Get an attribute of an object.
 //!
+//! ### If Expressions
+//!
+//! It is also possible to use inline _if_ expressions. These are useful in some situations.
+//! For example, you can use this to extend from one template if a variable is defined,
+//! otherwise from the default layout template:
+//!
+//! ```plain
+//! {% extends layout_template if layout_template is defined else 'default.html' %}
+//! ```
+//!
+//! The `else` part is optional. If not provided, the else block implicitly evaluates
+//! into an undefined value:
+//!
+//! ```plain
+//! {{ title|upper if title }}
+//! ```
 //!
 //! # Tags
 //!
