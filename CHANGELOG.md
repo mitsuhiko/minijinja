@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-# Unreleased
+# 0.4.0
 
 - Added the ability to roundtrip arbitrary values via the serialize interface.
 - Added support for tuple unpacking in lists.
