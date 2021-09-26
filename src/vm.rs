@@ -71,6 +71,7 @@ impl fmt::Display for LoopState {
 #[derive(Debug)]
 pub struct Loop<'source> {
     locals: BTreeMap<&'source str, Value>,
+    with_loop_var: bool,
     iterator: ValueIterator,
     controller: RcType<LoopState>,
 }
@@ -137,9 +138,12 @@ impl<'source, 'context> Context<'source, 'context> {
                 Frame::Isolate { value } => (value, false),
                 Frame::Merge { value } => (value, true),
                 Frame::Loop(Loop {
-                    locals, controller, ..
+                    locals,
+                    controller,
+                    with_loop_var,
+                    ..
                 }) => {
-                    if key == "loop" {
+                    if *with_loop_var && key == "loop" {
                         return Some(Value::from_dynamic(controller.clone()));
                     } else if let Some(value) = locals.get(key) {
                         return Some(value.clone());
@@ -385,13 +389,14 @@ impl<'env, 'source> Vm<'env, 'source> {
                 Instruction::PopFrame => {
                     context.pop_frame();
                 }
-                Instruction::PushLoop => {
+                Instruction::PushLoop(with_loop_var) => {
                     let iterable = stack.pop();
                     let iterator = iterable.iter();
                     let len = iterator.len();
                     context.push_frame(Frame::Loop(Loop {
                         locals: BTreeMap::new(),
                         iterator,
+                        with_loop_var: *with_loop_var,
                         controller: RcType::new(LoopState {
                             idx: AtomicUsize::new(!0usize),
                             len: AtomicUsize::new(len),

@@ -40,7 +40,7 @@ Template {
     name: "loop_var.txt",
     instructions: [
         00000 | LOOKUP (var "seq")   [<unknown>:1],
-        00001 | PUSH_LOOP   [<unknown>:1],
+        00001 | PUSH_LOOP (loop var: true)   [<unknown>:1],
         00002 | ITERATE (exit to 00028)   [<unknown>:1],
         00003 | STORE_LOCAL (var "item")   [<unknown>:1],
         00004 | EMIT_RAW (string "\n  ")   [<unknown>:1],

@@ -88,9 +88,9 @@ pub enum Instruction<'source> {
 
     /// Starts a loop
     ///
-    /// The argument is the variable name of the loop
-    /// variable.
-    PushLoop,
+    /// The arugment is an indicator if the `loop` variable should
+    /// be available.
+    PushLoop(bool),
 
     /// Pushes a value as context layer.
     PushContext,
@@ -179,7 +179,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
                 write!(f, "PERFORM_TEST (name {:?})", n)
             }
             Instruction::Emit => write!(f, "EMIT"),
-            Instruction::PushLoop => write!(f, "PUSH_LOOP"),
+            Instruction::PushLoop(v) => write!(f, "PUSH_LOOP (loop var: {:?})", v),
             Instruction::PushContext => write!(f, "PUSH_CONTEXT"),
             Instruction::Iterate(t) => write!(f, "ITERATE (exit to {:>05x})", t),
             Instruction::PopFrame => write!(f, "POP_FRAME"),
