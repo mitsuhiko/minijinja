@@ -186,7 +186,27 @@ impl<'source> Compiler<'source> {
             }
             ast::Stmt::ForLoop(for_loop) => {
                 self.set_location_from_span(for_loop.span());
-                self.compile_expr(&for_loop.iter)?;
+
+                if let Some(ref filter_expr) = for_loop.filter_expr {
+                    // filter expressions work like a nested for loop without
+                    // the special loop variable that append into a new list
+                    // just outside of the loop.
+                    self.add(Instruction::BuildList(0));
+                    self.compile_expr(&for_loop.iter)?;
+                    self.start_for_loop(false);
+                    self.add(Instruction::DupTop);
+                    self.compile_assignment(&for_loop.target)?;
+                    self.compile_expr(filter_expr)?;
+                    self.start_if();
+                    self.add(Instruction::ListAppend);
+                    self.start_else();
+                    self.add(Instruction::DiscardTop);
+                    self.end_if();
+                    self.end_for_loop(false);
+                } else {
+                    self.compile_expr(&for_loop.iter)?;
+                }
+
                 self.start_for_loop(true);
                 self.compile_assignment(&for_loop.target)?;
                 for node in &for_loop.body {

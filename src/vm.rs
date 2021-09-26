@@ -357,6 +357,12 @@ impl<'env, 'source> Vm<'env, 'source> {
                         stack.push(v.pop().unwrap());
                     }
                 }
+                Instruction::ListAppend => {
+                    let item = stack.pop();
+                    let mut list = try_ctx!(stack.pop().try_into_vec());
+                    list.push(item);
+                    stack.push(Value::from(list));
+                }
                 Instruction::Add => func_binop!(add),
                 Instruction::Sub => func_binop!(sub),
                 Instruction::Mul => func_binop!(mul),
@@ -430,6 +436,7 @@ impl<'env, 'source> Vm<'env, 'source> {
                 Instruction::JumpIfFalseOrPop(jump_target) => {
                     if !stack.peek().is_true() {
                         pc = *jump_target;
+                        continue;
                     } else {
                         stack.pop();
                     }
@@ -567,6 +574,12 @@ impl<'env, 'source> Vm<'env, 'source> {
                         ErrorKind::ImpossibleOperation,
                         "objects cannot be called directly",
                     ));
+                }
+                Instruction::DupTop => {
+                    stack.push(stack.peek().clone());
+                }
+                Instruction::DiscardTop => {
+                    stack.pop();
                 }
                 Instruction::Nop => {}
             }

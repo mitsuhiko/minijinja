@@ -1,0 +1,59 @@
+---
+source: tests/test_templates.rs
+expression: "&rendered"
+input_file: tests/inputs/loop_filter.txt
+
+---
+
+- 2 (1 / 5)
+- 4 (2 / 5)
+- 6 (3 / 5)
+- 8 (4 / 5)
+- 10 (5 / 5)
+
+=====
+
+Template {
+    name: "loop_filter.txt",
+    instructions: [
+        00000 | BUILD_LIST (0 items)   [<unknown>:1],
+        00001 | LOOKUP (var "seq")   [<unknown>:1],
+        00002 | PUSH_LOOP (loop var: false)   [<unknown>:1],
+        00003 | ITERATE (exit to 00012)   [<unknown>:1],
+        00004 | DUP_TOP   [<unknown>:1],
+        00005 | STORE_LOCAL (var "item")   [<unknown>:1],
+        00006 | LOOKUP (var "item")   [<unknown>:1],
+        00007 | BUILD_LIST (0 items)   [<unknown>:1],
+        00008 | PERFORM_TEST (name "even")   [<unknown>:1],
+        00009 | JUMP_IF_FALSE_OR_POP (to 0000d)   [<unknown>:1],
+        0000a | LOOKUP (var "loop")   [<unknown>:1],
+        0000b | BUILD_LIST (0 items)   [<unknown>:1],
+        0000c | PERFORM_TEST (name "undefined")   [<unknown>:1],
+        0000d | JUMP_IF_FALSE (to 00010)   [<unknown>:1],
+        0000e | LIST_APPEND   [<unknown>:1],
+        0000f | JUMP (to 00011)   [<unknown>:1],
+        00010 | DISCARD_TOP   [<unknown>:1],
+        00011 | JUMP (to 00003)   [<unknown>:1],
+        00012 | POP_FRAME   [<unknown>:1],
+        00013 | PUSH_LOOP (loop var: true)   [<unknown>:1],
+        00014 | ITERATE (exit to 00023)   [<unknown>:1],
+        00015 | STORE_LOCAL (var "item")   [<unknown>:1],
+        00016 | EMIT_RAW (string "\n- ")   [<unknown>:1],
+        00017 | LOOKUP (var "item")   [<unknown>:2],
+        00018 | EMIT   [<unknown>:2],
+        00019 | EMIT_RAW (string " (")   [<unknown>:2],
+        0001a | LOOKUP (var "loop")   [<unknown>:2],
+        0001b | GETATTR (key "index")   [<unknown>:2],
+        0001c | EMIT   [<unknown>:2],
+        0001d | EMIT_RAW (string " / ")   [<unknown>:2],
+        0001e | LOOKUP (var "loop")   [<unknown>:2],
+        0001f | GETATTR (key "length")   [<unknown>:2],
+        00020 | EMIT   [<unknown>:2],
+        00021 | EMIT_RAW (string ")")   [<unknown>:2],
+        00022 | JUMP (to 00014)   [<unknown>:2],
+        00023 | POP_FRAME   [<unknown>:2],
+        00024 | EMIT_RAW (string "\n")   [<unknown>:3],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

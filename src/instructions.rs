@@ -32,6 +32,9 @@ pub enum Instruction<'source> {
     /// Unpacks a list into N stack items.
     UnpackList(usize),
 
+    /// Appends to the list.
+    ListAppend,
+
     /// Add the top two values
     Add,
 
@@ -140,6 +143,12 @@ pub enum Instruction<'source> {
     /// Calls an object
     CallObject,
 
+    /// Duplicates the top item
+    DupTop,
+
+    /// Discards the top item
+    DiscardTop,
+
     /// A nop
     #[allow(unused)]
     Nop,
@@ -157,6 +166,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
             Instruction::BuildMap(n) => write!(f, "BUILD_MAP ({:?} pairs)", n),
             Instruction::BuildList(n) => write!(f, "BUILD_LIST ({:?} items)", n),
             Instruction::UnpackList(n) => write!(f, "UNPACK_LIST ({:?} items)", n),
+            Instruction::ListAppend => write!(f, "LIST_APPEND"),
             Instruction::Add => write!(f, "ADD"),
             Instruction::Sub => write!(f, "SUB"),
             Instruction::Mul => write!(f, "MUL"),
@@ -195,6 +205,8 @@ impl<'source> fmt::Debug for Instruction<'source> {
             Instruction::CallFunction(n) => write!(f, "CALL_FUNCTION (name {:?})", n),
             Instruction::CallMethod(n) => write!(f, "CALL_METHOD (name {:?})", n),
             Instruction::CallObject => write!(f, "CALL_OBJECT"),
+            Instruction::DupTop => write!(f, "DUP_TOP"),
+            Instruction::DiscardTop => write!(f, "DISCARD_TOP"),
             Instruction::Nop => write!(f, "NOP"),
         }
     }
