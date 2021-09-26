@@ -10,6 +10,14 @@ undefined: false
 defined: true
 undefined2: true
 defined2: false
+number-int: true
+number-float: true
+not-seq: false
+seq: true
+not-map: false
+map: true
+string: true
+not-string: false
 
 =====
 
@@ -46,7 +54,47 @@ Template {
         0001b | BUILD_LIST (0 items)   [<unknown>:6],
         0001c | PERFORM_TEST (name "defined")   [<unknown>:6],
         0001d | EMIT   [<unknown>:6],
-        0001e | EMIT_RAW (string "\n")   [<unknown>:6],
+        0001e | EMIT_RAW (string "\nnumber-int: ")   [<unknown>:6],
+        0001f | LOOKUP (var "two")   [<unknown>:7],
+        00020 | BUILD_LIST (0 items)   [<unknown>:7],
+        00021 | PERFORM_TEST (name "number")   [<unknown>:7],
+        00022 | EMIT   [<unknown>:7],
+        00023 | EMIT_RAW (string "\nnumber-float: ")   [<unknown>:7],
+        00024 | LOOKUP (var "two_dot_two")   [<unknown>:8],
+        00025 | BUILD_LIST (0 items)   [<unknown>:8],
+        00026 | PERFORM_TEST (name "number")   [<unknown>:8],
+        00027 | EMIT   [<unknown>:8],
+        00028 | EMIT_RAW (string "\nnot-seq: ")   [<unknown>:8],
+        00029 | LOOKUP (var "two")   [<unknown>:9],
+        0002a | BUILD_LIST (0 items)   [<unknown>:9],
+        0002b | PERFORM_TEST (name "sequence")   [<unknown>:9],
+        0002c | EMIT   [<unknown>:9],
+        0002d | EMIT_RAW (string "\nseq: ")   [<unknown>:9],
+        0002e | LOOKUP (var "seq")   [<unknown>:10],
+        0002f | BUILD_LIST (0 items)   [<unknown>:10],
+        00030 | PERFORM_TEST (name "sequence")   [<unknown>:10],
+        00031 | EMIT   [<unknown>:10],
+        00032 | EMIT_RAW (string "\nnot-map: ")   [<unknown>:10],
+        00033 | LOOKUP (var "two")   [<unknown>:11],
+        00034 | BUILD_LIST (0 items)   [<unknown>:11],
+        00035 | PERFORM_TEST (name "mapping")   [<unknown>:11],
+        00036 | EMIT   [<unknown>:11],
+        00037 | EMIT_RAW (string "\nmap: ")   [<unknown>:11],
+        00038 | LOOKUP (var "map")   [<unknown>:12],
+        00039 | BUILD_LIST (0 items)   [<unknown>:12],
+        0003a | PERFORM_TEST (name "mapping")   [<unknown>:12],
+        0003b | EMIT   [<unknown>:12],
+        0003c | EMIT_RAW (string "\nstring: ")   [<unknown>:12],
+        0003d | LOOKUP (var "string")   [<unknown>:13],
+        0003e | BUILD_LIST (0 items)   [<unknown>:13],
+        0003f | PERFORM_TEST (name "string")   [<unknown>:13],
+        00040 | EMIT   [<unknown>:13],
+        00041 | EMIT_RAW (string "\nnot-string: ")   [<unknown>:13],
+        00042 | LOOKUP (var "mapping")   [<unknown>:14],
+        00043 | BUILD_LIST (0 items)   [<unknown>:14],
+        00044 | PERFORM_TEST (name "string")   [<unknown>:14],
+        00045 | EMIT   [<unknown>:14],
+        00046 | EMIT_RAW (string "\n")   [<unknown>:14],
     ],
     blocks: {},
     initial_auto_escape: None,

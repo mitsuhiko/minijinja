@@ -105,6 +105,10 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<&'static str, BoxedTest> {
         rv.insert("even", BoxedTest::new(is_even));
         rv.insert("undefined", BoxedTest::new(is_undefined));
         rv.insert("defined", BoxedTest::new(is_defined));
+        rv.insert("number", BoxedTest::new(is_number));
+        rv.insert("string", BoxedTest::new(is_string));
+        rv.insert("sequence", BoxedTest::new(is_sequence));
+        rv.insert("mapping", BoxedTest::new(is_mapping));
     }
     rv
 }
@@ -112,6 +116,8 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<&'static str, BoxedTest> {
 #[cfg(feature = "builtin_tests")]
 mod builtins {
     use super::*;
+
+    use crate::value::ValueKind;
 
     /// Checks if a value is odd.
     pub fn is_odd(_env: &Environment, v: Value) -> Result<bool, Error> {
@@ -135,6 +141,26 @@ mod builtins {
     /// Checks if a value is defined.
     pub fn is_defined(_env: &Environment, v: Value) -> Result<bool, Error> {
         Ok(!v.is_undefined())
+    }
+
+    /// Checks if this value is a number.
+    pub fn is_number(_env: &Environment, v: Value) -> Result<bool, Error> {
+        Ok(matches!(v.kind(), ValueKind::Number))
+    }
+
+    /// Checks if this value is a string.
+    pub fn is_string(_env: &Environment, v: Value) -> Result<bool, Error> {
+        Ok(matches!(v.kind(), ValueKind::String))
+    }
+
+    /// Checks if this value is a sequence
+    pub fn is_sequence(_env: &Environment, v: Value) -> Result<bool, Error> {
+        Ok(matches!(v.kind(), ValueKind::Seq))
+    }
+
+    /// Checks if this value is a mapping
+    pub fn is_mapping(_env: &Environment, v: Value) -> Result<bool, Error> {
+        Ok(matches!(v.kind(), ValueKind::Map))
     }
 
     #[test]

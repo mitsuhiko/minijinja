@@ -1,4 +1,8 @@
 two: 2
+two_dot_two: 2.2
+seq: [1, 2, 3]
+map: {"foo": "bar"}
+string: "aha"
 ---
 even: {{ two is even }}
 odd: {{ two is odd }}
@@ -6,3 +10,11 @@ undefined: {{ two is undefined }}
 defined: {{ two is defined }}
 undefined2: {{ ohwell is undefined }}
 defined2: {{ ohwell is defined }}
+number-int: {{ two is number }}
+number-float: {{ two_dot_two is number }}
+not-seq: {{ two is sequence }}
+seq: {{ seq is sequence }}
+not-map: {{ two is mapping }}
+map: {{ map is mapping }}
+string: {{ string is string }}
+not-string: {{ mapping is string }}

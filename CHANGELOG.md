@@ -13,6 +13,10 @@ All notable changes to MiniJinja are documented here.
 - Added `reverse` filter.
 - Added `trim` filter.
 - Added `join` filter.
+- Added `number` test.
+- Added `string` test.
+- Added `sequence` test.
+- Added `mapping` test.
 - Added `builtin_filters` and `builtin_tests` features to disable the built-in
   filter and test functions.
 
