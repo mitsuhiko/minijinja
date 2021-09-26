@@ -19,6 +19,7 @@ All notable changes to MiniJinja are documented here.
 - Added `mapping` test.
 - Added `builtin_filters` and `builtin_tests` features to disable the built-in
   filter and test functions.
+- Added `is not` syntax for negated tests.
 
 # 0.3.0
 

@@ -283,6 +283,11 @@ impl<'a> Parser<'a> {
                 }
                 Some((Token::Ident("is"), _)) => {
                     self.stream.next()?;
+                    let mut negated = false;
+                    if matches!(self.stream.current()?, Some((Token::Ident("not"), _))) {
+                        self.stream.next()?;
+                        negated = true;
+                    }
                     let (name, span) =
                         expect_token!(self, Token::Ident(name) => name, "identifier")?;
                     let args = if matches!(self.stream.current()?, Some((Token::ParenOpen, _))) {
@@ -294,6 +299,15 @@ impl<'a> Parser<'a> {
                         ast::Test { name, expr, args },
                         self.stream.expand_span(span),
                     ));
+                    if negated {
+                        expr = ast::Expr::UnaryOp(Spanned::new(
+                            ast::UnaryOp {
+                                op: ast::UnaryOpKind::Not,
+                                expr,
+                            },
+                            self.stream.expand_span(span),
+                        ));
+                    }
                 }
                 _ => break,
             }

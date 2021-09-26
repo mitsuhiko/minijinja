@@ -19,6 +19,36 @@ Ok(
             EmitRaw {
                 raw: "\n",
             } @ 1:17-2:0,
+            EmitExpr {
+                expr: UnaryOp {
+                    op: Not,
+                    expr: Test {
+                        name: "even",
+                        expr: Var {
+                            id: "foo",
+                        } @ 2:3-2:6,
+                        args: [],
+                    } @ 2:14-2:21,
+                } @ 2:14-2:21,
+            } @ 2:0-2:21,
+            EmitRaw {
+                raw: "\n",
+            } @ 2:21-3:0,
+            EmitExpr {
+                expr: UnaryOp {
+                    op: Not,
+                    expr: Test {
+                        name: "even",
+                        expr: Var {
+                            id: "foo",
+                        } @ 3:7-3:10,
+                        args: [],
+                    } @ 3:14-3:21,
+                } @ 3:3-3:21,
+            } @ 3:0-3:21,
+            EmitRaw {
+                raw: "\n",
+            } @ 3:21-4:0,
         ],
-    } @ 1:0-2:0,
+    } @ 1:0-4:0,
 )
