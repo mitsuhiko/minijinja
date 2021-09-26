@@ -269,17 +269,17 @@ impl<'env, 'source> Vm<'env, 'source> {
 
         macro_rules! func_binop {
             ($method:ident) => {{
-                let a = stack.pop();
                 let b = stack.pop();
-                stack.push(try_ctx!(value::$method(&b, &a)));
+                let a = stack.pop();
+                stack.push(try_ctx!(value::$method(&a, &b)));
             }};
         }
 
         macro_rules! op_binop {
             ($op:tt) => {{
-                let a = stack.pop();
                 let b = stack.pop();
-                stack.push(Value::from(b $op a));
+                let a = stack.pop();
+                stack.push(Value::from(a $op b));
             }};
         }
 
@@ -434,7 +434,8 @@ impl<'env, 'source> Vm<'env, 'source> {
                     }
                 }
                 Instruction::JumpIfFalseOrPop(jump_target) => {
-                    if !stack.peek().is_true() {
+                    dbg!(stack.peek());
+                    if dbg!(!stack.peek().is_true()) {
                         pc = *jump_target;
                         continue;
                     } else {
