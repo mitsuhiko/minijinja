@@ -80,6 +80,9 @@ pub enum Instruction<'source> {
     /// String concatenation operator
     StringConcat,
 
+    /// Performs a containment check
+    In,
+
     /// Apply a filter.
     ApplyFilter(&'source str),
 
@@ -182,6 +185,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
             Instruction::Lte => write!(f, "LTE"),
             Instruction::Not => write!(f, "NOT"),
             Instruction::StringConcat => write!(f, "STRING_CONCAT"),
+            Instruction::In => write!(f, "IN"),
             Instruction::ApplyFilter(n) => {
                 write!(f, "APPLY_FILTER (name {:?})", n)
             }

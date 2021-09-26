@@ -177,6 +177,7 @@ impl<'a> Parser<'a> {
         let mut span = self.stream.current_span();
         let mut expr = self.parse_math1()?;
         loop {
+            let mut negated = false;
             let op = match self.stream.current()? {
                 Some((Token::Eq, _)) => ast::BinOpKind::Eq,
                 Some((Token::Ne, _)) => ast::BinOpKind::Ne,
@@ -184,9 +185,18 @@ impl<'a> Parser<'a> {
                 Some((Token::Lte, _)) => ast::BinOpKind::Lte,
                 Some((Token::Gt, _)) => ast::BinOpKind::Gt,
                 Some((Token::Gte, _)) => ast::BinOpKind::Gte,
+                Some((Token::Ident("in"), _)) => ast::BinOpKind::In,
+                Some((Token::Ident("not"), _)) => {
+                    self.stream.next()?;
+                    expect_token!(self, Token::Ident("in"), "in")?;
+                    negated = true;
+                    ast::BinOpKind::In
+                }
                 _ => break,
             };
-            self.stream.next()?;
+            if !negated {
+                self.stream.next()?;
+            }
             expr = ast::Expr::BinOp(Spanned::new(
                 ast::BinOp {
                     op,
@@ -195,6 +205,15 @@ impl<'a> Parser<'a> {
                 },
                 self.stream.expand_span(span),
             ));
+            if negated {
+                expr = ast::Expr::UnaryOp(Spanned::new(
+                    ast::UnaryOp {
+                        op: ast::UnaryOpKind::Not,
+                        expr,
+                    },
+                    self.stream.expand_span(span),
+                ));
+            }
             span = self.stream.current_span();
         }
         Ok(expr)

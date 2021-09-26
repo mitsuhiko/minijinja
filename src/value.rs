@@ -616,6 +616,34 @@ pub(crate) fn string_concat(left: Value, right: &Value) -> Value {
     }
 }
 
+/// Implements a containment operation on values.
+pub(crate) fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
+    if let Value(Repr::Shared(ref cplx)) = container {
+        match **cplx {
+            Shared::Seq(ref values) => return Ok(Value::from(values.contains(value))),
+            Shared::Map(ref map) => {
+                let key = match Key::try_from(value.clone()) {
+                    Ok(key) => key,
+                    Err(_) => return Ok(Value::from(false)),
+                };
+                return Ok(Value::from(map.get(&key).is_some()));
+            }
+            Shared::String(ref s) | Shared::SafeString(ref s) => {
+                return Ok(Value::from(if let Some(s2) = value.as_str() {
+                    s.contains(&s2)
+                } else {
+                    s.contains(&value.to_string())
+                }));
+            }
+            _ => {}
+        }
+    }
+    Err(Error::new(
+        ErrorKind::ImpossibleOperation,
+        "cannot perform a containment check on this value",
+    ))
+}
+
 macro_rules! primitive_try_from {
     ($ty:ident, {
         $($pat:pat => $expr:expr,)*

@@ -23,6 +23,6 @@ format-check:
 
 lint:
 	@rustup component add clippy 2> /dev/null
-	@cargo clippy
+	@cargo clippy -- -F clippy::dbg-macro
 
 .PHONY: all doc test format format-check lint
