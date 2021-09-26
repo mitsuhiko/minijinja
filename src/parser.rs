@@ -163,6 +163,35 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn parse_ifexpr(&mut self) -> Result<ast::Expr<'a>, Error> {
+        let mut span = self.stream.current_span();
+        let mut expr = self.parse_or()?;
+        loop {
+            if matches!(self.stream.current()?, Some((Token::Ident("if"), _))) {
+                self.stream.next()?;
+                let expr2 = self.parse_or()?;
+                let expr3 = if matches!(self.stream.current()?, Some((Token::Ident("else"), _))) {
+                    self.stream.next()?;
+                    Some(self.parse_ifexpr()?)
+                } else {
+                    None
+                };
+                expr = ast::Expr::IfExpr(Spanned::new(
+                    ast::IfExpr {
+                        test_expr: expr2,
+                        true_expr: expr,
+                        false_expr: expr3,
+                    },
+                    self.stream.expand_span(span),
+                ));
+                span = self.stream.current_span();
+            } else {
+                break;
+            }
+        }
+        Ok(expr)
+    }
+
     binop!(parse_or, parse_and, {
         Some((Token::Ident("or"), _)) => ast::BinOpKind::ScOr,
     });
@@ -446,6 +475,10 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_expr(&mut self) -> Result<ast::Expr<'a>, Error> {
+        self.parse_ifexpr()
+    }
+
+    pub fn parse_expr_noif(&mut self) -> Result<ast::Expr<'a>, Error> {
         self.parse_or()
     }
 
@@ -540,7 +573,7 @@ impl<'a> Parser<'a> {
     fn parse_for_stmt(&mut self) -> Result<ast::ForLoop<'a>, Error> {
         let target = self.parse_assignment()?;
         expect_token!(self, Token::Ident("in"), "in")?;
-        let iter = self.parse_expr()?;
+        let iter = self.parse_expr_noif()?;
         let filter_expr = if matches!(self.stream.current()?, Some((Token::Ident("if"), _))) {
             self.stream.next()?;
             Some(self.parse_expr()?)
@@ -568,7 +601,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_if_cond(&mut self) -> Result<ast::IfCond<'a>, Error> {
-        let expr = self.parse_expr()?;
+        let expr = self.parse_expr_noif()?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
         let true_body = self.subparse(|tok| {
             matches!(

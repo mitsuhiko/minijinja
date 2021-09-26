@@ -85,6 +85,7 @@ pub enum Expr<'a> {
     Const(Spanned<Const>),
     UnaryOp(Spanned<UnaryOp<'a>>),
     BinOp(Spanned<BinOp<'a>>),
+    IfExpr(Spanned<IfExpr<'a>>),
     Filter(Spanned<Filter<'a>>),
     Test(Spanned<Test<'a>>),
     GetAttr(Spanned<GetAttr<'a>>),
@@ -101,6 +102,7 @@ impl<'a> fmt::Debug for Expr<'a> {
             Expr::Const(s) => fmt::Debug::fmt(s, f),
             Expr::UnaryOp(s) => fmt::Debug::fmt(s, f),
             Expr::BinOp(s) => fmt::Debug::fmt(s, f),
+            Expr::IfExpr(s) => fmt::Debug::fmt(s, f),
             Expr::Filter(s) => fmt::Debug::fmt(s, f),
             Expr::Test(s) => fmt::Debug::fmt(s, f),
             Expr::GetAttr(s) => fmt::Debug::fmt(s, f),
@@ -235,6 +237,14 @@ pub struct BinOp<'a> {
     pub op: BinOpKind,
     pub left: Expr<'a>,
     pub right: Expr<'a>,
+}
+
+/// An if expression.
+#[derive(Debug, Clone)]
+pub struct IfExpr<'a> {
+    pub test_expr: Expr<'a>,
+    pub true_expr: Expr<'a>,
+    pub false_expr: Option<Expr<'a>>,
 }
 
 /// A filter expression.
