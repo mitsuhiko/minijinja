@@ -77,11 +77,18 @@ impl<'source> Compiler<'source> {
     }
 
     /// Ends the open for loop
-    pub fn end_for_loop(&mut self) {
+    pub fn end_for_loop(&mut self, push_did_iterate: bool) {
         match self.pending_block.pop() {
             Some(PendingBlock::Loop(iter_instr)) => {
                 self.add(Instruction::Jump(iter_instr));
-                let loop_end = self.add(Instruction::PopFrame);
+                let loop_end = self.next_instruction();
+                if push_did_iterate {
+                    self.add(Instruction::Lookup("loop"));
+                    self.add(Instruction::GetAttr("index0"));
+                    self.add(Instruction::LoadConst(Value::from(0)));
+                    self.add(Instruction::Eq);
+                };
+                self.add(Instruction::PopFrame);
                 if let Some(Instruction::Iterate(ref mut jump_target)) =
                     self.instructions.get_mut(iter_instr)
                 {
@@ -185,7 +192,14 @@ impl<'source> Compiler<'source> {
                 for node in &for_loop.body {
                     self.compile_stmt(node)?;
                 }
-                self.end_for_loop();
+                self.end_for_loop(!for_loop.else_body.is_empty());
+                if !for_loop.else_body.is_empty() {
+                    self.start_if();
+                    for node in &for_loop.else_body {
+                        self.compile_stmt(node)?;
+                    }
+                    self.end_if();
+                }
             }
             ast::Stmt::IfCond(if_cond) => {
                 self.set_location_from_span(if_cond.span());

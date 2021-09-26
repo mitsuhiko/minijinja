@@ -17,6 +17,7 @@ Ok(
                 iter: Var {
                     id: "seq",
                 } @ 2:15-2:18,
+                filter_expr: None,
                 body: [
                     EmitRaw {
                         raw: "\n    <li>",
@@ -30,6 +31,7 @@ Ok(
                         raw: "</li>\n",
                     } @ 3:18-4:0,
                 ],
+                else_body: [],
             } @ 2:3-4:12,
             EmitRaw {
                 raw: "\n</ul>\n",

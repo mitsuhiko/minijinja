@@ -8,7 +8,7 @@ fn test_for_loop() {
     c.add(Instruction::Lookup("items"));
     c.start_for_loop();
     c.add(Instruction::Emit);
-    c.end_for_loop();
+    c.end_for_loop(false);
     c.add(Instruction::EmitRaw("!"));
 
     insta::assert_debug_snapshot!(&c);

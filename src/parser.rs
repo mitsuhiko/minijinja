@@ -523,9 +523,23 @@ impl<'a> Parser<'a> {
         expect_token!(self, Token::Ident("in"), "in")?;
         let iter = self.parse_expr()?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
-        let body = self.subparse(|tok| matches!(tok, Token::Ident("endfor")))?;
+        let body =
+            self.subparse(|tok| matches!(tok, Token::Ident("endfor") | Token::Ident("else")))?;
+        let else_body = if matches!(self.stream.current()?, Some((Token::Ident("else"), _))) {
+            self.stream.next()?;
+            expect_token!(self, Token::BlockEnd(..), "end of block")?;
+            self.subparse(|tok| matches!(tok, Token::Ident("endfor")))?
+        } else {
+            Vec::new()
+        };
         self.stream.next()?;
-        Ok(ast::ForLoop { target, iter, body })
+        Ok(ast::ForLoop {
+            target,
+            iter,
+            filter_expr: None,
+            body,
+            else_body,
+        })
     }
 
     fn parse_if_cond(&mut self) -> Result<ast::IfCond<'a>, Error> {
