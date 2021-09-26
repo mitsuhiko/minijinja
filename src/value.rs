@@ -64,7 +64,6 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt::{self, Write};
-use std::marker::PhantomData;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
@@ -770,11 +769,10 @@ impl Value {
 
     /// Creates a value from something that can be serialized.
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
-        let serializer = ValueSerializer::<serde::de::value::Error>::new();
         INTERNAL_SERIALIZATION.with(|flag| {
             let old = flag.load(atomic::Ordering::Relaxed);
             flag.store(true, atomic::Ordering::Relaxed);
-            let rv = Serialize::serialize(value, serializer);
+            let rv = Serialize::serialize(value, ValueSerializer);
             flag.store(old, atomic::Ordering::Relaxed);
             rv.unwrap()
         })
@@ -1096,111 +1094,101 @@ impl Serialize for Value {
         }
     }
 }
-struct ValueSerializer<E> {
-    error: PhantomData<E>,
-}
 
-impl<E> ValueSerializer<E> {
-    pub fn new() -> Self {
-        ValueSerializer { error: PhantomData }
-    }
-}
+struct ValueSerializer;
 
-impl<E> Serializer for ValueSerializer<E>
-where
-    E: ser::Error,
-{
+impl Serializer for ValueSerializer {
     type Ok = Value;
-    type Error = E;
+    type Error = Error;
 
-    type SerializeSeq = SerializeSeq<E>;
-    type SerializeTuple = SerializeTuple<E>;
-    type SerializeTupleStruct = SerializeTupleStruct<E>;
-    type SerializeTupleVariant = SerializeTupleVariant<E>;
-    type SerializeMap = SerializeMap<E>;
-    type SerializeStruct = SerializeStruct<E>;
-    type SerializeStructVariant = SerializeStructVariant<E>;
+    type SerializeSeq = SerializeSeq;
+    type SerializeTuple = SerializeTuple;
+    type SerializeTupleStruct = SerializeTupleStruct;
+    type SerializeTupleVariant = SerializeTupleVariant;
+    type SerializeMap = SerializeMap;
+    type SerializeStruct = SerializeStruct;
+    type SerializeStructVariant = SerializeStructVariant;
 
-    fn serialize_bool(self, v: bool) -> Result<Value, E> {
+    fn serialize_bool(self, v: bool) -> Result<Value, Error> {
         Ok(Repr::Bool(v).into())
     }
 
-    fn serialize_i8(self, v: i8) -> Result<Value, E> {
+    fn serialize_i8(self, v: i8) -> Result<Value, Error> {
         Ok(Repr::I64(v as i64).into())
     }
 
-    fn serialize_i16(self, v: i16) -> Result<Value, E> {
+    fn serialize_i16(self, v: i16) -> Result<Value, Error> {
         Ok(Repr::I64(v as i64).into())
     }
 
-    fn serialize_i32(self, v: i32) -> Result<Value, E> {
+    fn serialize_i32(self, v: i32) -> Result<Value, Error> {
         Ok(Repr::I64(v as i64).into())
     }
 
-    fn serialize_i64(self, v: i64) -> Result<Value, E> {
+    fn serialize_i64(self, v: i64) -> Result<Value, Error> {
         Ok(Repr::I64(v).into())
     }
 
-    fn serialize_i128(self, v: i128) -> Result<Value, E> {
+    fn serialize_i128(self, v: i128) -> Result<Value, Error> {
         Ok(Shared::I128(v).into())
     }
 
-    fn serialize_u8(self, v: u8) -> Result<Value, E> {
+    fn serialize_u8(self, v: u8) -> Result<Value, Error> {
         Ok(Repr::U64(v as u64).into())
     }
 
-    fn serialize_u16(self, v: u16) -> Result<Value, E> {
+    fn serialize_u16(self, v: u16) -> Result<Value, Error> {
         Ok(Repr::U64(v as u64).into())
     }
 
-    fn serialize_u32(self, v: u32) -> Result<Value, E> {
+    fn serialize_u32(self, v: u32) -> Result<Value, Error> {
         Ok(Repr::U64(v as u64).into())
     }
 
-    fn serialize_u64(self, v: u64) -> Result<Value, E> {
+    fn serialize_u64(self, v: u64) -> Result<Value, Error> {
         Ok(Repr::U64(v).into())
     }
 
-    fn serialize_u128(self, v: u128) -> Result<Value, E> {
+    fn serialize_u128(self, v: u128) -> Result<Value, Error> {
         Ok(Shared::U128(v).into())
     }
 
-    fn serialize_f32(self, v: f32) -> Result<Value, E> {
+    fn serialize_f32(self, v: f32) -> Result<Value, Error> {
         Ok(Repr::F64(v as f64).into())
     }
 
-    fn serialize_f64(self, v: f64) -> Result<Value, E> {
+    fn serialize_f64(self, v: f64) -> Result<Value, Error> {
         Ok(Repr::F64(v).into())
     }
 
-    fn serialize_char(self, v: char) -> Result<Value, E> {
+    fn serialize_char(self, v: char) -> Result<Value, Error> {
         Ok(Repr::Char(v).into())
     }
 
-    fn serialize_str(self, value: &str) -> Result<Value, E> {
+    fn serialize_str(self, value: &str) -> Result<Value, Error> {
         Ok(Shared::String(value.to_owned()).into())
     }
 
-    fn serialize_bytes(self, value: &[u8]) -> Result<Value, E> {
+    fn serialize_bytes(self, value: &[u8]) -> Result<Value, Error> {
         Ok(Shared::Bytes(value.to_owned()).into())
     }
 
-    fn serialize_none(self) -> Result<Value, E> {
+    fn serialize_none(self) -> Result<Value, Error> {
         Ok(Repr::None.into())
     }
 
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Value, E>
+    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Value, Error>
     where
         T: Serialize,
     {
         value.serialize(self)
     }
 
-    fn serialize_unit(self) -> Result<Value, E> {
+    fn serialize_unit(self) -> Result<Value, Error> {
         Ok(Repr::None.into())
     }
 
-    fn serialize_unit_struct(self, _name: &'static str) -> Result<Value, E> {
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<Value, Error> {
         Ok(Repr::None.into())
     }
 
@@ -1209,11 +1197,15 @@ where
         _name: &'static str,
         _variant_index: u32,
         variant: &'static str,
-    ) -> Result<Value, E> {
+    ) -> Result<Value, Error> {
         Ok(Shared::String(variant.to_string()).into())
     }
 
-    fn serialize_newtype_struct<T: ?Sized>(self, _name: &'static str, value: &T) -> Result<Value, E>
+    fn serialize_newtype_struct<T: ?Sized>(
+        self,
+        _name: &'static str,
+        value: &T,
+    ) -> Result<Value, Error>
     where
         T: Serialize,
     {
@@ -1226,7 +1218,7 @@ where
         _variant_index: u32,
         variant: &'static str,
         value: &T,
-    ) -> Result<Value, E>
+    ) -> Result<Value, Error>
     where
         T: Serialize,
     {
@@ -1235,17 +1227,15 @@ where
         Ok(Shared::Map(map).into())
     }
 
-    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, E> {
+    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
         Ok(SerializeSeq {
             elements: Vec::with_capacity(len.unwrap_or(0)),
-            error: PhantomData,
         })
     }
 
-    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, E> {
+    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Error> {
         Ok(SerializeTuple {
             elements: Vec::with_capacity(len),
-            error: PhantomData,
         })
     }
 
@@ -1253,10 +1243,9 @@ where
         self,
         _name: &'static str,
         len: usize,
-    ) -> Result<Self::SerializeTupleStruct, E> {
+    ) -> Result<Self::SerializeTupleStruct, Error> {
         Ok(SerializeTupleStruct {
             fields: Vec::with_capacity(len),
-            error: PhantomData,
         })
     }
 
@@ -1266,27 +1255,28 @@ where
         _variant_index: u32,
         variant: &'static str,
         len: usize,
-    ) -> Result<Self::SerializeTupleVariant, E> {
+    ) -> Result<Self::SerializeTupleVariant, Error> {
         Ok(SerializeTupleVariant {
             name: variant,
             fields: Vec::with_capacity(len),
-            error: PhantomData,
         })
     }
 
-    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, E> {
+    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Error> {
         Ok(SerializeMap {
             entries: BTreeMap::new(),
             key: None,
-            error: PhantomData,
         })
     }
 
-    fn serialize_struct(self, name: &'static str, _len: usize) -> Result<Self::SerializeStruct, E> {
+    fn serialize_struct(
+        self,
+        name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStruct, Error> {
         Ok(SerializeStruct {
             name,
             fields: BTreeMap::new(),
-            error: PhantomData,
         })
     }
 
@@ -1296,145 +1286,124 @@ where
         _variant_index: u32,
         variant: &'static str,
         _len: usize,
-    ) -> Result<Self::SerializeStructVariant, E> {
+    ) -> Result<Self::SerializeStructVariant, Error> {
         Ok(SerializeStructVariant {
             variant,
             map: BTreeMap::new(),
-            error: PhantomData,
         })
     }
 }
 
-struct SerializeSeq<E> {
+struct SerializeSeq {
     elements: Vec<Value>,
-    error: PhantomData<E>,
 }
 
-impl<E> ser::SerializeSeq for SerializeSeq<E>
-where
-    E: ser::Error,
-{
+impl ser::SerializeSeq for SerializeSeq {
     type Ok = Value;
-    type Error = E;
+    type Error = Error;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), E>
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer::<E>::new())?;
+        let value = value.serialize(ValueSerializer)?;
         self.elements.push(value);
         Ok(())
     }
 
-    fn end(self) -> Result<Value, E> {
+    fn end(self) -> Result<Value, Error> {
         Ok(Shared::Seq(self.elements).into())
     }
 }
 
-struct SerializeTuple<E> {
+struct SerializeTuple {
     elements: Vec<Value>,
-    error: PhantomData<E>,
 }
 
-impl<E> ser::SerializeTuple for SerializeTuple<E>
-where
-    E: ser::Error,
-{
+impl ser::SerializeTuple for SerializeTuple {
     type Ok = Value;
-    type Error = E;
+    type Error = Error;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), E>
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer::<E>::new())?;
+        let value = value.serialize(ValueSerializer)?;
         self.elements.push(value);
         Ok(())
     }
 
-    fn end(self) -> Result<Value, E> {
+    fn end(self) -> Result<Value, Error> {
         Ok(Shared::Seq(self.elements).into())
     }
 }
 
-struct SerializeTupleStruct<E> {
+struct SerializeTupleStruct {
     fields: Vec<Value>,
-    error: PhantomData<E>,
 }
 
-impl<E> ser::SerializeTupleStruct for SerializeTupleStruct<E>
-where
-    E: ser::Error,
-{
+impl ser::SerializeTupleStruct for SerializeTupleStruct {
     type Ok = Value;
-    type Error = E;
+    type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), E>
+    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer::<E>::new())?;
+        let value = value.serialize(ValueSerializer)?;
         self.fields.push(value);
         Ok(())
     }
 
-    fn end(self) -> Result<Value, E> {
+    fn end(self) -> Result<Value, Error> {
         Ok(Value(Repr::Shared(RcType::new(Shared::Seq(self.fields)))))
     }
 }
 
-struct SerializeTupleVariant<E> {
+struct SerializeTupleVariant {
     name: &'static str,
     fields: Vec<Value>,
-    error: PhantomData<E>,
 }
 
-impl<E> ser::SerializeTupleVariant for SerializeTupleVariant<E>
-where
-    E: ser::Error,
-{
+impl ser::SerializeTupleVariant for SerializeTupleVariant {
     type Ok = Value;
-    type Error = E;
+    type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), E>
+    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer::<E>::new())?;
+        let value = value.serialize(ValueSerializer)?;
         self.fields.push(value);
         Ok(())
     }
 
-    fn end(self) -> Result<Value, E> {
+    fn end(self) -> Result<Value, Error> {
         let mut map = BTreeMap::new();
         map.insert(self.name, self.fields);
         Ok(map.into())
     }
 }
 
-struct SerializeMap<E> {
+struct SerializeMap {
     entries: BTreeMap<Key<'static>, Value>,
     key: Option<Key<'static>>,
-    error: PhantomData<E>,
 }
 
-impl<E> ser::SerializeMap for SerializeMap<E>
-where
-    E: ser::Error,
-{
+impl ser::SerializeMap for SerializeMap {
     type Ok = Value;
-    type Error = E;
+    type Error = Error;
 
-    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), E>
+    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Error>
     where
         T: Serialize,
     {
-        let key = key.serialize(KeySerializer::<E>::new())?;
+        let key = key.serialize(KeySerializer)?;
         self.key = Some(key);
         Ok(())
     }
 
-    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), E>
+    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
     where
         T: Serialize,
     {
@@ -1442,50 +1411,46 @@ where
             .key
             .take()
             .expect("serialize_value called before serialize_key");
-        let value = value.serialize(ValueSerializer::<E>::new())?;
+        let value = value.serialize(ValueSerializer)?;
         self.entries.insert(key, value);
         Ok(())
     }
 
-    fn end(self) -> Result<Value, E> {
+    fn end(self) -> Result<Value, Error> {
         Ok(Value(Repr::Shared(RcType::new(Shared::Map(self.entries)))))
     }
 
-    fn serialize_entry<K: ?Sized, V: ?Sized>(&mut self, key: &K, value: &V) -> Result<(), E>
+    fn serialize_entry<K: ?Sized, V: ?Sized>(&mut self, key: &K, value: &V) -> Result<(), Error>
     where
         K: Serialize,
         V: Serialize,
     {
-        let key = key.serialize(KeySerializer::<E>::new())?;
-        let value = value.serialize(ValueSerializer::<E>::new())?;
+        let key = key.serialize(KeySerializer)?;
+        let value = value.serialize(ValueSerializer)?;
         self.entries.insert(key, value);
         Ok(())
     }
 }
 
-struct SerializeStruct<E> {
+struct SerializeStruct {
     name: &'static str,
     fields: BTreeMap<&'static str, Value>,
-    error: PhantomData<E>,
 }
 
-impl<E> ser::SerializeStruct for SerializeStruct<E>
-where
-    E: ser::Error,
-{
+impl ser::SerializeStruct for SerializeStruct {
     type Ok = Value;
-    type Error = E;
+    type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, key: &'static str, value: &T) -> Result<(), E>
+    fn serialize_field<T: ?Sized>(&mut self, key: &'static str, value: &T) -> Result<(), Error>
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer::<E>::new())?;
+        let value = value.serialize(ValueSerializer)?;
         self.fields.insert(key, value);
         Ok(())
     }
 
-    fn end(self) -> Result<Value, E> {
+    fn end(self) -> Result<Value, Error> {
         match self.name {
             VALUE_HANDLE_MARKER => {
                 let handle_id = match self.fields.get("handle") {
@@ -1504,29 +1469,25 @@ where
     }
 }
 
-struct SerializeStructVariant<E> {
+struct SerializeStructVariant {
     variant: &'static str,
     map: BTreeMap<Key<'static>, Value>,
-    error: PhantomData<E>,
 }
 
-impl<E> ser::SerializeStructVariant for SerializeStructVariant<E>
-where
-    E: ser::Error,
-{
+impl ser::SerializeStructVariant for SerializeStructVariant {
     type Ok = Value;
-    type Error = E;
+    type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, key: &'static str, value: &T) -> Result<(), E>
+    fn serialize_field<T: ?Sized>(&mut self, key: &'static str, value: &T) -> Result<(), Error>
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer::<E>::new())?;
+        let value = value.serialize(ValueSerializer)?;
         self.map.insert(Key::from(key), value);
         Ok(())
     }
 
-    fn end(self) -> Result<Value, E> {
+    fn end(self) -> Result<Value, Error> {
         let mut rv = BTreeMap::new();
         rv.insert(self.variant, Value::from(Shared::Map(self.map)));
         Ok(rv.into())

@@ -32,6 +32,7 @@ pub enum ErrorKind {
     UnknownTest,
     BadEscape,
     UndefinedError,
+    BadSerialization,
 }
 
 impl ErrorKind {
@@ -48,6 +49,7 @@ impl ErrorKind {
             ErrorKind::UnknownTest => "unknown test",
             ErrorKind::BadEscape => "bad string escape",
             ErrorKind::UndefinedError => "variable or attribute undefined",
+            ErrorKind::BadSerialization => "could not serialize to internal format",
         }
     }
 }
@@ -114,5 +116,14 @@ impl From<ErrorKind> for Error {
             name: None,
             lineno: 0,
         }
+    }
+}
+
+impl serde::ser::Error for Error {
+    fn custom<T>(msg: T) -> Self
+    where
+        T: fmt::Display,
+    {
+        Error::new(ErrorKind::BadSerialization, msg.to_string())
     }
 }

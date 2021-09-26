@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::fmt;
-use std::marker::PhantomData;
 use std::num::TryFromIntError;
 
 use serde::ser::{self, Impossible, Serialize, Serializer};
@@ -178,111 +177,100 @@ impl<'a> Serialize for Key<'a> {
     }
 }
 
-pub struct KeySerializer<E> {
-    error: PhantomData<E>,
-}
+pub struct KeySerializer;
 
-impl<E> KeySerializer<E> {
-    pub fn new() -> Self {
-        KeySerializer { error: PhantomData }
-    }
-}
-
-impl<E> Serializer for KeySerializer<E>
-where
-    E: ser::Error,
-{
+impl Serializer for KeySerializer {
     type Ok = StaticKey;
-    type Error = E;
+    type Error = Error;
 
-    type SerializeSeq = Impossible<StaticKey, E>;
-    type SerializeTuple = Impossible<StaticKey, E>;
-    type SerializeTupleStruct = Impossible<StaticKey, E>;
-    type SerializeTupleVariant = Impossible<StaticKey, E>;
-    type SerializeMap = Impossible<StaticKey, E>;
-    type SerializeStruct = Impossible<StaticKey, E>;
-    type SerializeStructVariant = Impossible<StaticKey, E>;
+    type SerializeSeq = Impossible<StaticKey, Error>;
+    type SerializeTuple = Impossible<StaticKey, Error>;
+    type SerializeTupleStruct = Impossible<StaticKey, Error>;
+    type SerializeTupleVariant = Impossible<StaticKey, Error>;
+    type SerializeMap = Impossible<StaticKey, Error>;
+    type SerializeStruct = Impossible<StaticKey, Error>;
+    type SerializeStructVariant = Impossible<StaticKey, Error>;
 
-    fn serialize_bool(self, v: bool) -> Result<StaticKey, E> {
+    fn serialize_bool(self, v: bool) -> Result<StaticKey, Error> {
         Ok(Key::Bool(v))
     }
 
-    fn serialize_i8(self, v: i8) -> Result<StaticKey, E> {
+    fn serialize_i8(self, v: i8) -> Result<StaticKey, Error> {
         Ok(Key::I64(v as i64))
     }
 
-    fn serialize_i16(self, v: i16) -> Result<StaticKey, E> {
+    fn serialize_i16(self, v: i16) -> Result<StaticKey, Error> {
         Ok(Key::I64(v as i64))
     }
 
-    fn serialize_i32(self, v: i32) -> Result<StaticKey, E> {
+    fn serialize_i32(self, v: i32) -> Result<StaticKey, Error> {
         Ok(Key::I64(v as i64))
     }
 
-    fn serialize_i64(self, v: i64) -> Result<StaticKey, E> {
+    fn serialize_i64(self, v: i64) -> Result<StaticKey, Error> {
         Ok(Key::I64(v as i64))
     }
 
-    fn serialize_i128(self, _: i128) -> Result<StaticKey, E> {
+    fn serialize_i128(self, _: i128) -> Result<StaticKey, Error> {
         Err(ser::Error::custom("unsupported key type i128"))
     }
 
-    fn serialize_u8(self, v: u8) -> Result<StaticKey, E> {
+    fn serialize_u8(self, v: u8) -> Result<StaticKey, Error> {
         Ok(Key::I64(v as i64))
     }
 
-    fn serialize_u16(self, v: u16) -> Result<StaticKey, E> {
+    fn serialize_u16(self, v: u16) -> Result<StaticKey, Error> {
         Ok(Key::I64(v as i64))
     }
 
-    fn serialize_u32(self, v: u32) -> Result<StaticKey, E> {
+    fn serialize_u32(self, v: u32) -> Result<StaticKey, Error> {
         Ok(Key::I64(v as i64))
     }
 
-    fn serialize_u64(self, v: u64) -> Result<StaticKey, E> {
+    fn serialize_u64(self, v: u64) -> Result<StaticKey, Error> {
         Key::try_from(v).map_err(|_| ser::Error::custom("out of bounds for i64"))
     }
 
-    fn serialize_u128(self, _: u128) -> Result<StaticKey, E> {
+    fn serialize_u128(self, _: u128) -> Result<StaticKey, Error> {
         Err(ser::Error::custom("unsupported key type u128"))
     }
 
-    fn serialize_f32(self, _: f32) -> Result<StaticKey, E> {
+    fn serialize_f32(self, _: f32) -> Result<StaticKey, Error> {
         Err(ser::Error::custom("unsupported key type f32"))
     }
 
-    fn serialize_f64(self, _: f64) -> Result<StaticKey, E> {
+    fn serialize_f64(self, _: f64) -> Result<StaticKey, Error> {
         Err(ser::Error::custom("unsupported key type f64"))
     }
 
-    fn serialize_char(self, v: char) -> Result<StaticKey, E> {
+    fn serialize_char(self, v: char) -> Result<StaticKey, Error> {
         Ok(Key::Char(v))
     }
 
-    fn serialize_str(self, value: &str) -> Result<StaticKey, E> {
+    fn serialize_str(self, value: &str) -> Result<StaticKey, Error> {
         Ok(Key::String(value.to_string()))
     }
 
-    fn serialize_bytes(self, _value: &[u8]) -> Result<StaticKey, E> {
+    fn serialize_bytes(self, _value: &[u8]) -> Result<StaticKey, Error> {
         Err(ser::Error::custom("unsupported key type bytes"))
     }
 
-    fn serialize_none(self) -> Result<StaticKey, E> {
+    fn serialize_none(self) -> Result<StaticKey, Error> {
         Err(ser::Error::custom("unsupported key type unit"))
     }
 
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<StaticKey, E>
+    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<StaticKey, Error>
     where
         T: Serialize,
     {
         value.serialize(self)
     }
 
-    fn serialize_unit(self) -> Result<StaticKey, E> {
+    fn serialize_unit(self) -> Result<StaticKey, Error> {
         Err(ser::Error::custom("unsupported key type unit"))
     }
 
-    fn serialize_unit_struct(self, _name: &'static str) -> Result<StaticKey, E> {
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<StaticKey, Error> {
         Err(ser::Error::custom("unsupported key type unit"))
     }
 
@@ -291,7 +279,7 @@ where
         _name: &'static str,
         _variant_index: u32,
         variant: &'static str,
-    ) -> Result<StaticKey, E> {
+    ) -> Result<StaticKey, Error> {
         Ok(Key::String(variant.into()))
     }
 
@@ -299,7 +287,7 @@ where
         self,
         _name: &'static str,
         value: &T,
-    ) -> Result<StaticKey, E>
+    ) -> Result<StaticKey, Error>
     where
         T: Serialize,
     {
@@ -312,18 +300,18 @@ where
         _variant_index: u32,
         _variant: &'static str,
         value: &T,
-    ) -> Result<StaticKey, E>
+    ) -> Result<StaticKey, Error>
     where
         T: Serialize,
     {
         value.serialize(self)
     }
 
-    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, E> {
+    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
         Err(ser::Error::custom("sequences as keys are not supported"))
     }
 
-    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, E> {
+    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Error> {
         Err(ser::Error::custom("tuples as keys are not supported"))
     }
 
@@ -331,7 +319,7 @@ where
         self,
         _name: &'static str,
         _len: usize,
-    ) -> Result<Self::SerializeTupleStruct, E> {
+    ) -> Result<Self::SerializeTupleStruct, Error> {
         Err(ser::Error::custom(
             "tuple structs as keys are not supported",
         ))
@@ -343,13 +331,13 @@ where
         _variant_index: u32,
         _variant: &'static str,
         _len: usize,
-    ) -> Result<Self::SerializeTupleVariant, E> {
+    ) -> Result<Self::SerializeTupleVariant, Error> {
         Err(ser::Error::custom(
             "tuple variants as keys are not supported",
         ))
     }
 
-    fn serialize_map(self, _jlen: Option<usize>) -> Result<Self::SerializeMap, E> {
+    fn serialize_map(self, _jlen: Option<usize>) -> Result<Self::SerializeMap, Error> {
         Err(ser::Error::custom("maps as keys are not supported"))
     }
 
@@ -357,7 +345,7 @@ where
         self,
         _name: &'static str,
         _len: usize,
-    ) -> Result<Self::SerializeStruct, E> {
+    ) -> Result<Self::SerializeStruct, Error> {
         Err(ser::Error::custom("structs as keys are not supported"))
     }
 
@@ -367,7 +355,7 @@ where
         _variant_index: u32,
         _variant: &'static str,
         _len: usize,
-    ) -> Result<Self::SerializeStructVariant, E> {
+    ) -> Result<Self::SerializeStructVariant, Error> {
         Err(ser::Error::custom("structs as keys are not supported"))
     }
 }
