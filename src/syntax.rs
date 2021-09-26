@@ -168,6 +168,30 @@
 //! {% endfor %}
 //! ```
 //!
+//! Unlike in Rust or Python, it’s not possible to break or continue in a loop. You can,
+//! however, filter the sequence during iteration, which allows you to skip items.  The
+//! following example skips all the users which are hidden:
+//!
+//! ```plain
+//! {% for user in users if not user.hidden %}
+//!   <li>{{ user.username }}</li>
+//! {% endfor %}
+//! ```
+//!
+//! If no iteration took place because the sequence was empty or the filtering
+//! removed all the items from the sequence, you can render a default block by
+//! using else:
+//!
+//! ```plain
+//! <ul>
+//! {% for user in users %}
+//!   <li>{{ user.username }}</li>
+//! {% else %}
+//!   <li><em>no users found</em></li>
+//! {% endfor %}
+//! </ul>
+//! ```
+//!
 //! ## `{% if %}`
 //!
 //! The `if` statement is comparable with the Python if statement. In the simplest form,
