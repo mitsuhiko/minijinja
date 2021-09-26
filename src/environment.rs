@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 use std::fmt;
 
 use serde::Serialize;
@@ -9,7 +8,7 @@ use crate::error::{Error, ErrorKind};
 use crate::instructions::Instructions;
 use crate::parser::{parse, parse_expr};
 use crate::utils::{AutoEscape, HtmlEscape};
-use crate::value::{Value, ValueArgs};
+use crate::value::{ArgType, FunctionArgs, Value};
 use crate::vm::Vm;
 use crate::{filters, tests};
 
@@ -250,10 +249,10 @@ impl<'source> Environment<'source> {
     /// For details about filters have a look at [`filters`].
     pub fn add_filter<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
     where
-        V: TryFrom<Value>,
+        V: ArgType,
         Rv: Into<Value>,
         F: filters::Filter<V, Rv, Args>,
-        Args: ValueArgs,
+        Args: FunctionArgs,
     {
         self.filters.insert(name, filters::BoxedFilter::new(f));
     }
@@ -268,9 +267,9 @@ impl<'source> Environment<'source> {
     /// For details about tests have a look at [`tests`].
     pub fn add_test<F, V, Args>(&mut self, name: &'source str, f: F)
     where
-        V: TryFrom<Value>,
+        V: ArgType,
         F: tests::Test<V, Args>,
-        Args: ValueArgs,
+        Args: FunctionArgs,
     {
         self.tests.insert(name, tests::BoxedTest::new(f));
     }
