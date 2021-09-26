@@ -159,8 +159,8 @@ impl<'source> Environment<'source> {
     pub fn new() -> Environment<'source> {
         Environment {
             templates: BTreeMap::new(),
-            filters: filters::get_default_filters(),
-            tests: tests::get_default_tests(),
+            filters: filters::get_builtin_filters(),
+            tests: tests::get_builtin_tests(),
             default_auto_escape: Box::new(default_auto_escape),
         }
     }

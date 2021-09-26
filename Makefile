@@ -11,6 +11,7 @@ test:
 	@rustup component add rustfmt 2> /dev/null
 	@cargo test
 	@cargo test --all-features
+	@cargo check --no-default-features
 
 format:
 	@rustup component add rustfmt 2> /dev/null

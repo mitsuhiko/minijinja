@@ -11,7 +11,10 @@ keywords = ["jinja", "jinja2", "templates"]
 readme = "README.md"
 
 [features]
+default = ["builtin_filters", "builtin_tests"]
 speedups = ["memchr"]
+builtin_filters = []
+builtin_tests = []
 
 # provides access to the unstable machinery
 unstable_machinery = []

@@ -96,48 +96,60 @@ impl BoxedTest {
     }
 }
 
-/// Checks if a value is odd.
-pub fn is_odd(_env: &Environment, v: Value) -> Result<bool, Error> {
-    Ok(v.as_primitive()
-        .and_then(|x| x.as_i128())
-        .map_or(false, |x| x % 2 != 0))
-}
-
-/// Checks if a value is even.
-pub fn is_even(_env: &Environment, v: Value) -> Result<bool, Error> {
-    Ok(v.as_primitive()
-        .and_then(|x| x.as_i128())
-        .map_or(false, |x| x % 2 == 0))
-}
-
-/// Checks if a value is undefined.
-pub fn is_undefined(_env: &Environment, v: Value) -> Result<bool, Error> {
-    Ok(v.is_undefined())
-}
-
-/// Checks if a value is defined.
-pub fn is_defined(_env: &Environment, v: Value) -> Result<bool, Error> {
-    Ok(!v.is_undefined())
-}
-
-pub(crate) fn get_default_tests() -> BTreeMap<&'static str, BoxedTest> {
+pub(crate) fn get_builtin_tests() -> BTreeMap<&'static str, BoxedTest> {
+    #[allow(unused_mut)]
     let mut rv = BTreeMap::new();
-    rv.insert("odd", BoxedTest::new(is_odd));
-    rv.insert("even", BoxedTest::new(is_even));
-    rv.insert("undefined", BoxedTest::new(is_undefined));
-    rv.insert("defined", BoxedTest::new(is_defined));
+    #[cfg(feature = "builtin_tests")]
+    {
+        rv.insert("odd", BoxedTest::new(is_odd));
+        rv.insert("even", BoxedTest::new(is_even));
+        rv.insert("undefined", BoxedTest::new(is_undefined));
+        rv.insert("defined", BoxedTest::new(is_defined));
+    }
     rv
 }
 
-#[test]
-fn test_basics() {
-    fn test(_: &Environment, a: u32, b: u32) -> Result<bool, Error> {
-        Ok(a == b)
+#[cfg(feature = "builtin_tests")]
+mod builtins {
+    use super::*;
+
+    /// Checks if a value is odd.
+    pub fn is_odd(_env: &Environment, v: Value) -> Result<bool, Error> {
+        Ok(v.as_primitive()
+            .and_then(|x| x.as_i128())
+            .map_or(false, |x| x % 2 != 0))
     }
 
-    let env = Environment::new();
-    let bx = BoxedTest::new(test);
-    assert!(bx
-        .perform(&env, Value::from(23), vec![Value::from(23)])
-        .unwrap());
+    /// Checks if a value is even.
+    pub fn is_even(_env: &Environment, v: Value) -> Result<bool, Error> {
+        Ok(v.as_primitive()
+            .and_then(|x| x.as_i128())
+            .map_or(false, |x| x % 2 == 0))
+    }
+
+    /// Checks if a value is undefined.
+    pub fn is_undefined(_env: &Environment, v: Value) -> Result<bool, Error> {
+        Ok(v.is_undefined())
+    }
+
+    /// Checks if a value is defined.
+    pub fn is_defined(_env: &Environment, v: Value) -> Result<bool, Error> {
+        Ok(!v.is_undefined())
+    }
+
+    #[test]
+    fn test_basics() {
+        fn test(_: &Environment, a: u32, b: u32) -> Result<bool, Error> {
+            Ok(a == b)
+        }
+
+        let env = Environment::new();
+        let bx = BoxedTest::new(test);
+        assert!(bx
+            .perform(&env, Value::from(23), vec![Value::from(23)])
+            .unwrap());
+    }
 }
+
+#[cfg(feature = "builtin_tests")]
+pub use self::builtins::*;

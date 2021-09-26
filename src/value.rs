@@ -956,6 +956,7 @@ impl Value {
         ))
     }
 
+    #[cfg(feature = "builtin_filters")]
     pub(crate) fn try_into_pairs(self) -> Result<Vec<Value>, Error> {
         if let Repr::Shared(arc) = self.0 {
             match RcType::try_unwrap(arc) {

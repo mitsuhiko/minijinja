@@ -76,6 +76,14 @@
 //!   for the parser.
 //! - `unstable_machinery`: provides access to the internal machinery of the engine.  This
 //!   is a forever unstable API which mainly exists to aid debugging complex issues.
+//!
+//! Additionally to cut down on size of the engine some default
+//! functionality can be removed:
+//!
+//! - `builtin_filters`: if this feature is removed the default filters are
+//!   not implemented.
+//! - `builtin_tests`: if this feature is removed the default tests are
+//!   not implemented.
 mod key;
 
 mod ast;
