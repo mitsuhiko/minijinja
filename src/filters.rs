@@ -26,16 +26,15 @@
 //! ```
 //!
 //! MiniJinja will perform the necessary conversions automatically via the
-//! [`ValueArgs`](crate::value::ValueArgs) and [`Into`] traits.
+//! [`FunctionArgs`](crate::value::FunctionArgs) and [`Into`] traits.
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::utils::HtmlEscape;
-use crate::value::{Value, ValueArgs};
+use crate::value::{ArgType, FunctionArgs, Value};
 
 type FilterFunc =
     dyn Fn(&Environment, Value, Vec<Value>) -> Result<Value, Error> + Sync + Send + 'static;
@@ -74,20 +73,15 @@ impl BoxedFilter {
     pub fn new<F, V, Rv, Args>(f: F) -> BoxedFilter
     where
         F: Filter<V, Rv, Args>,
-        V: TryFrom<Value>,
+        V: ArgType,
         Rv: Into<Value>,
-        Args: ValueArgs,
+        Args: FunctionArgs,
     {
         BoxedFilter(Arc::new(move |env, value, args| -> Result<Value, Error> {
             f.apply_to(
                 env,
-                TryFrom::try_from(value).map_err(|_| {
-                    Error::new(
-                        ErrorKind::ImpossibleOperation,
-                        "imcompatible value for filter",
-                    )
-                })?,
-                ValueArgs::from_values(args)?,
+                ArgType::from_value(Some(value))?,
+                FunctionArgs::from_values(args)?,
             )
             .map(Into::into)
         }))
@@ -178,5 +172,38 @@ fn test_basics() {
         bx.apply_to(&env, Value::from(23), vec![Value::from(42)])
             .unwrap(),
         Value::from(65)
+    );
+}
+
+#[test]
+fn test_optional_args() {
+    fn add(_: &Environment, val: u32, a: u32, b: Option<u32>) -> Result<u32, Error> {
+        let mut sum = val + a;
+        if let Some(b) = b {
+            sum += b;
+        }
+        Ok(sum)
+    }
+
+    let env = Environment::new();
+    let bx = BoxedFilter::new(add);
+    assert_eq!(
+        bx.apply_to(&env, Value::from(23), vec![Value::from(42)])
+            .unwrap(),
+        Value::from(65)
+    );
+    assert_eq!(
+        bx.apply_to(
+            &env,
+            Value::from(23),
+            vec![Value::from(42), Value::UNDEFINED]
+        )
+        .unwrap(),
+        Value::from(65)
+    );
+    assert_eq!(
+        bx.apply_to(&env, Value::from(23), vec![Value::from(42), Value::from(1)])
+            .unwrap(),
+        Value::from(66)
     );
 }

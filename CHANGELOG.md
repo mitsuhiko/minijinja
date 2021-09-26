@@ -7,6 +7,9 @@ All notable changes to MiniJinja are documented here.
 - Added the ability to roundtrip arbitrary values via the serialize interface.
 - Added support for tuple unpacking in lists.
 - Added dictsort filter.
+- Introduced a new trait `ArgType` to handle argument conversions for filters
+  and tests so optonal arguments can exist.
+- Renamed `ValueArgs` trait to `FunctionArgs`.
 
 # 0.3.0
 

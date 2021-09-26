@@ -28,14 +28,13 @@
 //! ```
 //!
 //! MiniJinja will perform the necessary conversions automatically via the
-//! [`ValueArgs`](crate::value::ValueArgs) trait.
+//! [`FunctionArgs`](crate::value::FunctionArgs) trait.
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 use std::sync::Arc;
 
 use crate::environment::Environment;
-use crate::error::{Error, ErrorKind};
-use crate::value::{Value, ValueArgs};
+use crate::error::Error;
+use crate::value::{ArgType, FunctionArgs, Value};
 
 type TestFunc =
     dyn Fn(&Environment, Value, Vec<Value>) -> Result<bool, Error> + Sync + Send + 'static;
@@ -74,19 +73,14 @@ impl BoxedTest {
     pub fn new<F, V, Args>(f: F) -> BoxedTest
     where
         F: Test<V, Args>,
-        V: TryFrom<Value>,
-        Args: ValueArgs,
+        V: ArgType,
+        Args: FunctionArgs,
     {
         BoxedTest(Arc::new(move |env, value, args| -> Result<bool, Error> {
             f.perform(
                 env,
-                TryFrom::try_from(value).map_err(|_| {
-                    Error::new(
-                        ErrorKind::ImpossibleOperation,
-                        "imcompatible value for filter",
-                    )
-                })?,
-                ValueArgs::from_values(args)?,
+                ArgType::from_value(Some(value))?,
+                FunctionArgs::from_values(args)?,
             )
         }))
     }

@@ -38,9 +38,9 @@
 //!
 //! # Value Function Arguments
 //!
-//! [Filters](crate::filters) and (tests)[crate::tests] can take values as arguments
+//! [Filters](crate::filters) and [tests](crate::tests) can take values as arguments
 //! but optionally also rust types directly.  This conversion for function arguments
-//! is performed by the [`ValueArgs`] trait.
+//! is performed by the [`FunctionArgs`] trait.
 //!
 //! # Memory Management
 //!
@@ -94,34 +94,48 @@ fn in_internal_serialization() -> bool {
 ///
 /// Since it's more convenient to write filters and tests with concrete
 /// types instead of values, this helper trait exists to automatically
-/// perform this conversion.
-pub trait ValueArgs: Sized {
+/// perform this conversion.  It is implemented for functions up to an
+/// arity of 5 parameters.
+///
+/// For each argument the conversion is performed via the [`ArgType`]
+/// trait which is implemented for some primitive concrete types as well
+/// as these types wrapped in [`Option`].
+pub trait FunctionArgs: Sized {
     /// Converts to function arguments from a slice of values.
     fn from_values(values: Vec<Value>) -> Result<Self, Error>;
 }
 
+/// A trait implemented by all filter/test argument types.
+///
+/// This trait is the companion to [`FunctionArgs`].  It's passed an
+/// `Option<Value>` where `Some` means the argument was provided or
+/// `None` if it was not.  This is used to implement optional arguments
+/// to functions.
+pub trait ArgType: Sized {
+    fn from_value(value: Option<Value>) -> Result<Self, Error>;
+}
+
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<$($name: TryFrom<Value>,)*> ValueArgs for ($($name,)*) {
+        impl<$($name: ArgType,)*> FunctionArgs for ($($name,)*) {
             fn from_values(values: Vec<Value>) -> Result<Self, Error> {
-                #[allow(non_snake_case)]
-                match values.as_slice() {
-                    &[$(ref $name,)*] => Ok((
-                        $(
-                            TryFrom::try_from($name.clone()).map_err(|_| {
-                                Error::new(
-                                    ErrorKind::ImpossibleOperation,
-                                    "incompatible arguemnt type for filter",
-                                )
-                            })?,
-                        )*
-                    )),
-                    _ => {
-                        return Err(Error::new(
-                            ErrorKind::InvalidFilterArguments,
-                            "invalid argument count to filter",
-                        ))
-                    }
+                #![allow(non_snake_case, unused)]
+                let arg_count = 0 $(
+                    + { let $name = (); 1 }
+                )*;
+                if values.len() > arg_count {
+                    return Err(Error::new(
+                        ErrorKind::InvalidArguments,
+                        "received unexpected extra arguments",
+                    ));
+                }
+                {
+                    let mut idx = 0;
+                    $(
+                        let $name = ArgType::from_value(values.get(idx).cloned())?;
+                        idx += 1;
+                    )*
+                    Ok(( $($name,)* ))
                 }
             }
         }
@@ -133,8 +147,9 @@ tuple_impls! { A }
 tuple_impls! { A B }
 tuple_impls! { A B C }
 tuple_impls! { A B C D }
+tuple_impls! { A B C D E }
 
-impl ValueArgs for Vec<Value> {
+impl FunctionArgs for Vec<Value> {
     fn from_values(values: Vec<Value>) -> Result<Self, Error> {
         Ok(values)
     }
@@ -619,6 +634,30 @@ macro_rules! primitive_try_from {
                 })
             }
         }
+
+        impl ArgType for $ty {
+            fn from_value(value: Option<Value>) -> Result<Self, Error> {
+                match value {
+                    Some(value) => TryFrom::try_from(value.clone()),
+                    None => Err(Error::new(ErrorKind::UndefinedError, concat!("missing argument")))
+                }
+            }
+        }
+
+        impl ArgType for Option<$ty> {
+            fn from_value(value: Option<Value>) -> Result<Self, Error> {
+                match value {
+                    Some(value) => {
+                        if value.is_undefined() || value.is_none() {
+                            Ok(None)
+                        } else {
+                            TryFrom::try_from(value.clone()).map(Some)
+                        }
+                    }
+                    None => Ok(None),
+                }
+            }
+        }
     }
 }
 
@@ -641,6 +680,7 @@ primitive_int_try_from!(i16);
 primitive_int_try_from!(i32);
 primitive_int_try_from!(i64);
 primitive_int_try_from!(i128);
+primitive_int_try_from!(usize);
 
 primitive_try_from!(bool, {
     Primitive::Bool(val) => val,
@@ -649,6 +689,40 @@ primitive_try_from!(bool, {
 primitive_try_from!(f64, {
     Primitive::F64(val) => val,
 });
+
+macro_rules! infallible_conversion {
+    ($ty:ty) => {
+        impl ArgType for $ty {
+            fn from_value(value: Option<Value>) -> Result<Self, Error> {
+                match value {
+                    Some(value) => Ok(value.clone().into()),
+                    None => Err(Error::new(
+                        ErrorKind::UndefinedError,
+                        concat!("missing argument"),
+                    )),
+                }
+            }
+        }
+
+        impl ArgType for Option<$ty> {
+            fn from_value(value: Option<Value>) -> Result<Self, Error> {
+                match value {
+                    Some(value) => {
+                        if value.is_undefined() || value.is_none() {
+                            Ok(None)
+                        } else {
+                            Ok(Some(value.clone().into()))
+                        }
+                    }
+                    None => Ok(None),
+                }
+            }
+        }
+    };
+}
+
+infallible_conversion!(String);
+infallible_conversion!(Value);
 
 impl From<Value> for String {
     fn from(val: Value) -> Self {
@@ -761,6 +835,11 @@ impl Value {
     /// Returns `true` if this value is undefined.
     pub fn is_undefined(&self) -> bool {
         matches!(&self.0, Repr::Undefined)
+    }
+
+    /// Returns `true` if this value is none.
+    pub fn is_none(&self) -> bool {
+        matches!(&self.0, Repr::None)
     }
 
     /// Returns the length of the contained value.
