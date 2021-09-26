@@ -13,6 +13,13 @@ safe: <
 list-length: 3
 map-length: 2
 string-length: 4
+reverse-list: 3, 2, 1
+reverse-string: driB
+trim: |Spacebird|
+trim-bird: ir
+join-default: 123
+join-pipe: 1|2|3
+join_string: B-i-r-d
 
 =====
 
@@ -70,7 +77,45 @@ Template {
         00030 | BUILD_LIST (0 items)   [<unknown>:9],
         00031 | APPLY_FILTER (name "length")   [<unknown>:9],
         00032 | EMIT   [<unknown>:9],
-        00033 | EMIT_RAW (string "\n")   [<unknown>:9],
+        00033 | EMIT_RAW (string "\nreverse-list: ")   [<unknown>:9],
+        00034 | LOOKUP (var "list")   [<unknown>:10],
+        00035 | BUILD_LIST (0 items)   [<unknown>:10],
+        00036 | APPLY_FILTER (name "reverse")   [<unknown>:10],
+        00037 | EMIT   [<unknown>:10],
+        00038 | EMIT_RAW (string "\nreverse-string: ")   [<unknown>:10],
+        00039 | LOOKUP (var "word")   [<unknown>:11],
+        0003a | BUILD_LIST (0 items)   [<unknown>:11],
+        0003b | APPLY_FILTER (name "reverse")   [<unknown>:11],
+        0003c | EMIT   [<unknown>:11],
+        0003d | EMIT_RAW (string "\ntrim: |")   [<unknown>:11],
+        0003e | LOOKUP (var "word_with_spaces")   [<unknown>:12],
+        0003f | BUILD_LIST (0 items)   [<unknown>:12],
+        00040 | APPLY_FILTER (name "trim")   [<unknown>:12],
+        00041 | EMIT   [<unknown>:12],
+        00042 | EMIT_RAW (string "|\ntrim-bird: ")   [<unknown>:12],
+        00043 | LOOKUP (var "word")   [<unknown>:13],
+        00044 | LOAD_CONST (value "Bd")   [<unknown>:13],
+        00045 | BUILD_LIST (1 items)   [<unknown>:13],
+        00046 | APPLY_FILTER (name "trim")   [<unknown>:13],
+        00047 | EMIT   [<unknown>:13],
+        00048 | EMIT_RAW (string "\njoin-default: ")   [<unknown>:13],
+        00049 | LOOKUP (var "list")   [<unknown>:14],
+        0004a | BUILD_LIST (0 items)   [<unknown>:14],
+        0004b | APPLY_FILTER (name "join")   [<unknown>:14],
+        0004c | EMIT   [<unknown>:14],
+        0004d | EMIT_RAW (string "\njoin-pipe: ")   [<unknown>:14],
+        0004e | LOOKUP (var "list")   [<unknown>:15],
+        0004f | LOAD_CONST (value "|")   [<unknown>:15],
+        00050 | BUILD_LIST (1 items)   [<unknown>:15],
+        00051 | APPLY_FILTER (name "join")   [<unknown>:15],
+        00052 | EMIT   [<unknown>:15],
+        00053 | EMIT_RAW (string "\njoin_string: ")   [<unknown>:15],
+        00054 | LOOKUP (var "word")   [<unknown>:16],
+        00055 | LOAD_CONST (value "-")   [<unknown>:16],
+        00056 | BUILD_LIST (1 items)   [<unknown>:16],
+        00057 | APPLY_FILTER (name "join")   [<unknown>:16],
+        00058 | EMIT   [<unknown>:16],
+        00059 | EMIT_RAW (string "\n")   [<unknown>:16],
     ],
     blocks: {},
     initial_auto_escape: None,

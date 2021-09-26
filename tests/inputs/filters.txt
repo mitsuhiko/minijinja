@@ -1,4 +1,5 @@
 word: "Bird"
+word_with_spaces: " Spacebird\n"
 list: [1, 2, 3]
 map:
   a: b
@@ -13,3 +14,10 @@ safe: {{ "<"|safe|escape }}
 list-length: {{ list|length }}
 map-length: {{ map|length }}
 string-length: {{ word|length }}
+reverse-list: {{ list|reverse }}
+reverse-string: {{ word|reverse }}
+trim: |{{ word_with_spaces|trim }}|
+trim-bird: {{ word|trim("Bd") }}
+join-default: {{ list|join }}
+join-pipe: {{ list|join("|") }}
+join_string: {{ word|join('-') }}

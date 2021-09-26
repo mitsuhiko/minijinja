@@ -29,12 +29,13 @@
 //! [`FunctionArgs`](crate::value::FunctionArgs) and [`Into`] traits.
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::fmt::Write;
 use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::utils::HtmlEscape;
-use crate::value::{ArgType, FunctionArgs, Value};
+use crate::value::{ArgType, FunctionArgs, Primitive, Value, ValueKind};
 
 type FilterFunc =
     dyn Fn(&Environment, Value, Vec<Value>) -> Result<Value, Error> + Sync + Send + 'static;
@@ -148,6 +149,71 @@ pub fn dictsort(_env: &Environment, v: Value) -> Result<Value, Error> {
     Ok(Value::from(pairs))
 }
 
+/// Reverses a list or string
+pub fn reverse(_env: &Environment, v: Value) -> Result<Value, Error> {
+    if let Some(Primitive::Str(s)) = v.as_primitive() {
+        Ok(Value::from(s.chars().rev().collect::<String>()))
+    } else if matches!(v.kind(), ValueKind::Seq) {
+        let mut v = v.try_into_vec()?;
+        v.reverse();
+        Ok(Value::from(v))
+    } else {
+        Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            "cannot reverse this value",
+        ))
+    }
+}
+
+/// Trims a value
+pub fn trim(_env: &Environment, s: String, chars: Option<String>) -> Result<String, Error> {
+    match chars {
+        Some(chars) => {
+            let chars = chars.chars().collect::<Vec<_>>();
+            Ok(s.trim_matches(&chars[..]).to_string())
+        }
+        None => Ok(s.trim().to_string()),
+    }
+}
+
+/// Joins a sequence by a character
+pub fn join(_env: &Environment, val: Value, joiner: Option<String>) -> Result<String, Error> {
+    if val.is_undefined() || val.is_none() {
+        return Ok(String::new());
+    }
+
+    let joiner = joiner.as_ref().map_or("", |x| x.as_str());
+
+    if let Some(Primitive::Str(s)) = val.as_primitive() {
+        let mut rv = String::new();
+        for c in s.chars() {
+            if !rv.is_empty() {
+                rv.push_str(joiner);
+            }
+            rv.push(c);
+        }
+        Ok(rv)
+    } else if matches!(val.kind(), ValueKind::Seq) {
+        let mut rv = String::new();
+        for item in val.try_into_vec()? {
+            if !rv.is_empty() {
+                rv.push_str(joiner);
+            }
+            if let Some(s) = item.as_str() {
+                rv.push_str(s);
+            } else {
+                write!(rv, "{}", item).ok();
+            }
+        }
+        Ok(rv)
+    } else {
+        Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            "cannot join this value",
+        ))
+    }
+}
+
 pub(crate) fn get_default_filters() -> BTreeMap<&'static str, BoxedFilter> {
     let mut rv = BTreeMap::new();
     rv.insert("lower", BoxedFilter::new(lower));
@@ -157,6 +223,9 @@ pub(crate) fn get_default_filters() -> BTreeMap<&'static str, BoxedFilter> {
     rv.insert("escape", BoxedFilter::new(escape));
     rv.insert("length", BoxedFilter::new(length));
     rv.insert("dictsort", BoxedFilter::new(dictsort));
+    rv.insert("reverse", BoxedFilter::new(reverse));
+    rv.insert("trim", BoxedFilter::new(trim));
+    rv.insert("join", BoxedFilter::new(join));
     rv
 }
 

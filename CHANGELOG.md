@@ -10,6 +10,9 @@ All notable changes to MiniJinja are documented here.
 - Introduced a new trait `ArgType` to handle argument conversions for filters
   and tests so optonal arguments can exist.
 - Renamed `ValueArgs` trait to `FunctionArgs`.
+- Added `reverse` filter.
+- Added `trim` filter.
+- Added `join` filter.
 
 # 0.3.0
 
