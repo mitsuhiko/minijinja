@@ -349,6 +349,7 @@ impl<'source> Compiler<'source> {
                     ast::BinOpKind::Rem => Instruction::Rem,
                     ast::BinOpKind::Pow => Instruction::Pow,
                     ast::BinOpKind::Concat => Instruction::StringConcat,
+                    ast::BinOpKind::In => Instruction::In,
                 };
                 self.set_location_from_span(c.span());
                 self.compile_expr(&c.left)?;

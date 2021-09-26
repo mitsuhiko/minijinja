@@ -226,6 +226,7 @@ pub enum BinOpKind {
     Rem,
     Pow,
     Concat,
+    In,
 }
 
 /// A binary operator expression.

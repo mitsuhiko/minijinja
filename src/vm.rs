@@ -384,6 +384,11 @@ impl<'env, 'source> Vm<'env, 'source> {
                     let b = stack.pop();
                     stack.push(value::string_concat(b, &a));
                 }
+                Instruction::In => {
+                    let container = stack.pop();
+                    let value = stack.pop();
+                    stack.push(try_ctx!(value::contains(&container, &value)));
+                }
                 Instruction::Neg => {
                     let a = stack.pop();
                     stack.push(try_ctx!(value::neg(&a)));
@@ -434,8 +439,7 @@ impl<'env, 'source> Vm<'env, 'source> {
                     }
                 }
                 Instruction::JumpIfFalseOrPop(jump_target) => {
-                    dbg!(stack.peek());
-                    if dbg!(!stack.peek().is_true()) {
+                    if !stack.peek().is_true() {
                         pc = *jump_target;
                         continue;
                     } else {

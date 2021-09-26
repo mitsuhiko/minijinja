@@ -109,7 +109,8 @@
 //! The following operators are very useful but don't fit into any of the other
 //! two categories:
 //!
-//! - ``is``: Performs a [test](crate::tests).
+//! - ``is``/``is not``: Performs a [test](crate::tests).
+//! - ``in``/``not in``: Performs a containment check.
 //! - ``|`` (pipe, vertical bar): Applies a [filter](crate::filters).
 //! - ``~`` (tilde): Converts all operands into strings and concatenates them.
 //!   ``{{ "Hello " ~ name ~ "!" }}`` would return (assuming `name` is set
