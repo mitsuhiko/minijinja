@@ -20,6 +20,9 @@ All notable changes to MiniJinja are documented here.
 - Added `builtin_filters` and `builtin_tests` features to disable the built-in
   filter and test functions.
 - Added `is not` syntax for negated tests.
+- Added `else` block to for loops.
+- Added `if` condition expression to for loops.
+- Fixed a bug that caused or/and not to evaluate correctly in certain situations.
 
 # 0.3.0
 

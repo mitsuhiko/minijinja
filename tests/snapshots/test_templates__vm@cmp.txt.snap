@@ -13,12 +13,12 @@ input_file: tests/inputs/cmp.txt
 Template {
     name: "cmp.txt",
     instructions: [
-        00000 | LOOKUP (var "foo")   [<unknown>:1],
-        00001 | LOOKUP (var "bar")   [<unknown>:1],
+        00000 | LOOKUP (var "two")   [<unknown>:1],
+        00001 | LOOKUP (var "one")   [<unknown>:1],
         00002 | GT   [<unknown>:1],
         00003 | JUMP_IF_FALSE_OR_POP (to 00007)   [<unknown>:1],
-        00004 | LOOKUP (var "bar")   [<unknown>:1],
-        00005 | LOOKUP (var "foo")   [<unknown>:1],
+        00004 | LOOKUP (var "two")   [<unknown>:1],
+        00005 | LOOKUP (var "three")   [<unknown>:1],
         00006 | LT   [<unknown>:1],
         00007 | JUMP_IF_FALSE (to 00009)   [<unknown>:1],
         00008 | EMIT_RAW (string "\n  test\n")   [<unknown>:1],

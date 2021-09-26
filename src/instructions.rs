@@ -32,6 +32,9 @@ pub enum Instruction<'source> {
     /// Unpacks a list into N stack items.
     UnpackList(usize),
 
+    /// Appends to the list.
+    ListAppend,
+
     /// Add the top two values
     Add,
 
@@ -88,9 +91,9 @@ pub enum Instruction<'source> {
 
     /// Starts a loop
     ///
-    /// The argument is the variable name of the loop
-    /// variable.
-    PushLoop,
+    /// The arugment is an indicator if the `loop` variable should
+    /// be available.
+    PushLoop(bool),
 
     /// Pushes a value as context layer.
     PushContext,
@@ -140,6 +143,12 @@ pub enum Instruction<'source> {
     /// Calls an object
     CallObject,
 
+    /// Duplicates the top item
+    DupTop,
+
+    /// Discards the top item
+    DiscardTop,
+
     /// A nop
     #[allow(unused)]
     Nop,
@@ -157,6 +166,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
             Instruction::BuildMap(n) => write!(f, "BUILD_MAP ({:?} pairs)", n),
             Instruction::BuildList(n) => write!(f, "BUILD_LIST ({:?} items)", n),
             Instruction::UnpackList(n) => write!(f, "UNPACK_LIST ({:?} items)", n),
+            Instruction::ListAppend => write!(f, "LIST_APPEND"),
             Instruction::Add => write!(f, "ADD"),
             Instruction::Sub => write!(f, "SUB"),
             Instruction::Mul => write!(f, "MUL"),
@@ -179,7 +189,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
                 write!(f, "PERFORM_TEST (name {:?})", n)
             }
             Instruction::Emit => write!(f, "EMIT"),
-            Instruction::PushLoop => write!(f, "PUSH_LOOP"),
+            Instruction::PushLoop(v) => write!(f, "PUSH_LOOP (loop var: {:?})", v),
             Instruction::PushContext => write!(f, "PUSH_CONTEXT"),
             Instruction::Iterate(t) => write!(f, "ITERATE (exit to {:>05x})", t),
             Instruction::PopFrame => write!(f, "POP_FRAME"),
@@ -195,6 +205,8 @@ impl<'source> fmt::Debug for Instruction<'source> {
             Instruction::CallFunction(n) => write!(f, "CALL_FUNCTION (name {:?})", n),
             Instruction::CallMethod(n) => write!(f, "CALL_METHOD (name {:?})", n),
             Instruction::CallObject => write!(f, "CALL_OBJECT"),
+            Instruction::DupTop => write!(f, "DUP_TOP"),
+            Instruction::DiscardTop => write!(f, "DISCARD_TOP"),
             Instruction::Nop => write!(f, "NOP"),
         }
     }

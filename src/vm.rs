@@ -71,6 +71,7 @@ impl fmt::Display for LoopState {
 #[derive(Debug)]
 pub struct Loop<'source> {
     locals: BTreeMap<&'source str, Value>,
+    with_loop_var: bool,
     iterator: ValueIterator,
     controller: RcType<LoopState>,
 }
@@ -137,9 +138,12 @@ impl<'source, 'context> Context<'source, 'context> {
                 Frame::Isolate { value } => (value, false),
                 Frame::Merge { value } => (value, true),
                 Frame::Loop(Loop {
-                    locals, controller, ..
+                    locals,
+                    controller,
+                    with_loop_var,
+                    ..
                 }) => {
-                    if key == "loop" {
+                    if *with_loop_var && key == "loop" {
                         return Some(Value::from_dynamic(controller.clone()));
                     } else if let Some(value) = locals.get(key) {
                         return Some(value.clone());
@@ -265,17 +269,17 @@ impl<'env, 'source> Vm<'env, 'source> {
 
         macro_rules! func_binop {
             ($method:ident) => {{
-                let a = stack.pop();
                 let b = stack.pop();
-                stack.push(try_ctx!(value::$method(&b, &a)));
+                let a = stack.pop();
+                stack.push(try_ctx!(value::$method(&a, &b)));
             }};
         }
 
         macro_rules! op_binop {
             ($op:tt) => {{
-                let a = stack.pop();
                 let b = stack.pop();
-                stack.push(Value::from(b $op a));
+                let a = stack.pop();
+                stack.push(Value::from(a $op b));
             }};
         }
 
@@ -353,6 +357,12 @@ impl<'env, 'source> Vm<'env, 'source> {
                         stack.push(v.pop().unwrap());
                     }
                 }
+                Instruction::ListAppend => {
+                    let item = stack.pop();
+                    let mut list = try_ctx!(stack.pop().try_into_vec());
+                    list.push(item);
+                    stack.push(Value::from(list));
+                }
                 Instruction::Add => func_binop!(add),
                 Instruction::Sub => func_binop!(sub),
                 Instruction::Mul => func_binop!(mul),
@@ -385,13 +395,14 @@ impl<'env, 'source> Vm<'env, 'source> {
                 Instruction::PopFrame => {
                     context.pop_frame();
                 }
-                Instruction::PushLoop => {
+                Instruction::PushLoop(with_loop_var) => {
                     let iterable = stack.pop();
                     let iterator = iterable.iter();
                     let len = iterator.len();
                     context.push_frame(Frame::Loop(Loop {
                         locals: BTreeMap::new(),
                         iterator,
+                        with_loop_var: *with_loop_var,
                         controller: RcType::new(LoopState {
                             idx: AtomicUsize::new(!0usize),
                             len: AtomicUsize::new(len),
@@ -423,8 +434,10 @@ impl<'env, 'source> Vm<'env, 'source> {
                     }
                 }
                 Instruction::JumpIfFalseOrPop(jump_target) => {
-                    if !stack.peek().is_true() {
+                    dbg!(stack.peek());
+                    if dbg!(!stack.peek().is_true()) {
                         pc = *jump_target;
+                        continue;
                     } else {
                         stack.pop();
                     }
@@ -562,6 +575,12 @@ impl<'env, 'source> Vm<'env, 'source> {
                         ErrorKind::ImpossibleOperation,
                         "objects cannot be called directly",
                     ));
+                }
+                Instruction::DupTop => {
+                    stack.push(stack.peek().clone());
+                }
+                Instruction::DiscardTop => {
+                    stack.pop();
                 }
                 Instruction::Nop => {}
             }

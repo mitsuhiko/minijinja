@@ -18,7 +18,7 @@ Template {
         00000 | LOOKUP (var "map")   [<unknown>:1],
         00001 | BUILD_LIST (0 items)   [<unknown>:1],
         00002 | APPLY_FILTER (name "dictsort")   [<unknown>:1],
-        00003 | PUSH_LOOP   [<unknown>:1],
+        00003 | PUSH_LOOP (loop var: true)   [<unknown>:1],
         00004 | ITERATE (exit to 00010)   [<unknown>:1],
         00005 | UNPACK_LIST (2 items)   [<unknown>:1],
         00006 | STORE_LOCAL (var "key")   [<unknown>:1],

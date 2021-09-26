@@ -123,7 +123,9 @@ pub struct Template<'a> {
 pub struct ForLoop<'a> {
     pub target: Expr<'a>,
     pub iter: Expr<'a>,
+    pub filter_expr: Option<Expr<'a>>,
     pub body: Vec<Stmt<'a>>,
+    pub else_body: Vec<Stmt<'a>>,
 }
 
 /// An if/else condition.

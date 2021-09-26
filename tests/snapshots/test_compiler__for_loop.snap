@@ -6,7 +6,7 @@ expression: "&c"
 Compiler {
     instructions: [
         00000 | LOOKUP (var "items")   [<unknown>:0],
-        00001 | PUSH_LOOP   [<unknown>:0],
+        00001 | PUSH_LOOP (loop var: true)   [<unknown>:0],
         00002 | ITERATE (exit to 00005)   [<unknown>:0],
         00003 | EMIT   [<unknown>:0],
         00004 | JUMP (to 00002)   [<unknown>:0],
