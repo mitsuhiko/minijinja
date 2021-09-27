@@ -80,6 +80,7 @@ impl<'a> fmt::Debug for Stmt<'a> {
 
 /// An expression node.
 #[derive(Clone)]
+#[allow(clippy::enum_variant_names)]
 pub enum Expr<'a> {
     Var(Spanned<Var<'a>>),
     Const(Spanned<Const>),
