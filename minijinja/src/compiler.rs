@@ -4,6 +4,7 @@ use crate::ast;
 use crate::error::Error;
 use crate::instructions::{Instruction, Instructions};
 use crate::tokens::Span;
+use crate::utils::matches;
 use crate::value::Value;
 
 /// Represents an open block of code that does not yet have updated

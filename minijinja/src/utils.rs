@@ -5,6 +5,17 @@ use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
 
+// we target Rust 1.41 and that does not have this macro yet
+macro_rules! _matches {
+    ($expression:expr, $( $pattern:pat )|+ $( if $guard: expr )? $(,)?) => {
+        match $expression {
+            $( $pattern )|+ $( if $guard )? => true,
+            _ => false
+        }
+    }
+}
+pub(crate) use _matches as matches;
+
 pub fn memchr(haystack: &[u8], needle: u8) -> Option<usize> {
     #[cfg(feature = "memchr")]
     {

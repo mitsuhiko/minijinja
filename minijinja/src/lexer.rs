@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::error::{Error, ErrorKind};
 use crate::tokens::{Span, Token};
-use crate::utils::{memchr, memstr, unescape};
+use crate::utils::{matches, memchr, memstr, unescape};
 
 enum LexerState {
     Template,

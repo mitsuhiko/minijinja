@@ -120,7 +120,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::utils::HtmlEscape;
+    use crate::utils::{matches, HtmlEscape};
     use crate::value::{Primitive, ValueKind};
     use std::cmp::Ordering;
     use std::fmt::Write;

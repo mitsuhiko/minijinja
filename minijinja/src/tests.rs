@@ -117,6 +117,7 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<&'static str, BoxedTest> {
 mod builtins {
     use super::*;
 
+    use crate::utils::matches;
     use crate::value::ValueKind;
 
     /// Checks if a value is odd.

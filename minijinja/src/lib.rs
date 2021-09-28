@@ -84,6 +84,7 @@
 //!   not implemented.
 //! - `builtin_tests`: if this feature is removed the default tests are
 //!   not implemented.
+#![allow(clippy::cognitive_complexity)]
 mod key;
 
 mod ast;

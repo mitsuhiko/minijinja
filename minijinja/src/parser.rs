@@ -2,6 +2,7 @@ use crate::ast::{self, Spanned};
 use crate::error::{Error, ErrorKind};
 use crate::lexer::tokenize;
 use crate::tokens::{Span, Token};
+use crate::utils::matches;
 use crate::value::Value;
 
 const RESERVED_NAMES: [&str; 7] = ["true", "True", "false", "False", "none", "None", "loop"];
@@ -331,11 +332,13 @@ impl<'a> Parser<'a> {
                 }
                 Some((Token::Ident("is"), _)) => {
                     self.stream.next()?;
-                    let mut negated = false;
-                    if matches!(self.stream.current()?, Some((Token::Ident("not"), _))) {
-                        self.stream.next()?;
-                        negated = true;
-                    }
+                    let negated =
+                        if matches!(self.stream.current()?, Some((Token::Ident("not"), _))) {
+                            self.stream.next()?;
+                            true
+                        } else {
+                            false
+                        };
                     let (name, span) =
                         expect_token!(self, Token::Ident(name) => name, "identifier")?;
                     let args = if matches!(self.stream.current()?, Some((Token::ParenOpen, _))) {

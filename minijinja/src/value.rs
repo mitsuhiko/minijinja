@@ -71,6 +71,7 @@ use serde::ser::{self, Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, KeySerializer};
+use crate::utils::matches;
 
 // the type we want to use for refcounting
 pub(crate) type RcType<T> = Arc<T>;
@@ -763,6 +764,7 @@ impl From<usize> for Value {
     }
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl Value {
     /// The undefined value
     pub const UNDEFINED: Value = Value(Repr::Undefined);
@@ -869,7 +871,6 @@ impl Value {
     }
 
     /// Returns the length of the contained value.
-    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> Option<usize> {
         if let Repr::Shared(ref cplx) = self.0 {
             match **cplx {
