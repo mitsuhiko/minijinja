@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-# 0.5.0
+# Unreleased
 
 - Added support for rustc 1.41.0
 - Added `v_htmlescape` feature to turn on a faster HTML escaping.
