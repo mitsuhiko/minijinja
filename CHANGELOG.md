@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Added support for rustc 1.41.0
 - Added `v_htmlescape` feature to turn on a faster HTML escaping.
 - Export `HtmlEscape` helper.
+- Also escape `/` in HTML escaping like `v_htmlescape` does.
 
 # 0.4.0
 

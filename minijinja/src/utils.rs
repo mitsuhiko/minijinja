@@ -83,6 +83,7 @@ impl<'a> fmt::Display for HtmlEscape<'a> {
                         b'&' => escaping_body!("&amp;"),
                         b'"' => escaping_body!("&quot;"),
                         b'\'' => escaping_body!("&#x27;"),
+                        b'/' => escaping_body!("&#x2f;"),
                         _ => (),
                     }
                 }
@@ -178,9 +179,9 @@ pub fn unescape(s: &str) -> Result<String, Error> {
 
 #[test]
 fn test_html_escape() {
-    let input = "<>&\"'";
+    let input = "<>&\"'/";
     let output = HtmlEscape(input).to_string();
-    assert_eq!(output, "&lt;&gt;&amp;&quot;&#x27;");
+    assert_eq!(output, "&lt;&gt;&amp;&quot;&#x27;&#x2f;");
 }
 
 #[test]
