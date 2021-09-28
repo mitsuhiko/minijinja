@@ -2,6 +2,12 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.5.0
+
+- Added support for rustc 1.41.0
+- Added `v_htmlescape` feature to turn on a faster HTML escaping.
+- Export `HtmlEscape` helper.
+
 # 0.4.0
 
 - Added the ability to roundtrip arbitrary values via the serialize interface.

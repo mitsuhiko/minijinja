@@ -1,3 +1,5 @@
+TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters
+
 all: test
 
 build:
@@ -7,10 +9,16 @@ doc:
 	@cargo doc --all
 
 test:
-	@echo "CARGO TESTS"
 	@rustup component add rustfmt 2> /dev/null
+	@echo "CARGO TESTS"
 	@cd minijinja; cargo test
+	@echo "CARGO TEST ALL FEATURES"
 	@cd minijinja; cargo test --all-features
+	@echo "CARGO TEST MEMCHR"
+	@cd minijinja; cargo test --no-default-features --features=memchr,$(TEST_FEATURES)
+	@echo "CARGO TEST V_HTMLESCAPE"
+	@cd minijinja; cargo test --no-default-features --features=v_htmlescape,$(TEST_FEATURES)
+	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
 	@cd minijinja; cargo check --no-default-features
 
 format:

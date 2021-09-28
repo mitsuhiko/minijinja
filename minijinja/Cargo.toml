@@ -12,7 +12,7 @@ readme = "README.md"
 
 [features]
 default = ["builtin_filters", "builtin_tests"]
-speedups = ["memchr"]
+speedups = ["memchr", "v_htmlescape"]
 builtin_filters = []
 builtin_tests = []
 
@@ -22,6 +22,7 @@ unstable_machinery = []
 [dependencies]
 serde = "1.0.130"
 memchr = { version = "2.4.1", optional = true }
+v_htmlescape = { version = "0.13.1", optional = true }
 
 [dev-dependencies]
 insta = { version = "1.7.2", features = ["glob"] }

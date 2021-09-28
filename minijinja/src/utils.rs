@@ -54,36 +54,45 @@ pub struct HtmlEscape<'a>(pub &'a str);
 
 impl<'a> fmt::Display for HtmlEscape<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[cfg(feature = "v_htmlescape")]
+        {
+            fmt::Display::fmt(&v_htmlescape::escape(self.0), f)
+        }
         // this is taken from askama-escape
-        let bytes = self.0.as_bytes();
-        let mut start = 0;
+        #[cfg(not(feature = "v_htmlescape"))]
+        {
+            let bytes = self.0.as_bytes();
+            let mut start = 0;
 
-        for (i, b) in bytes.iter().enumerate() {
-            macro_rules! escaping_body {
-                ($quote:expr) => {{
-                    if start < i {
-                        f.write_str(unsafe { std::str::from_utf8_unchecked(&bytes[start..i]) })?;
+            for (i, b) in bytes.iter().enumerate() {
+                macro_rules! escaping_body {
+                    ($quote:expr) => {{
+                        if start < i {
+                            f.write_str(unsafe {
+                                std::str::from_utf8_unchecked(&bytes[start..i])
+                            })?;
+                        }
+                        f.write_str($quote)?;
+                        start = i + 1;
+                    }};
+                }
+                if b.wrapping_sub(b'"') <= b'>' - b'"' {
+                    match *b {
+                        b'<' => escaping_body!("&lt;"),
+                        b'>' => escaping_body!("&gt;"),
+                        b'&' => escaping_body!("&amp;"),
+                        b'"' => escaping_body!("&quot;"),
+                        b'\'' => escaping_body!("&#x27;"),
+                        _ => (),
                     }
-                    f.write_str($quote)?;
-                    start = i + 1;
-                }};
-            }
-            if b.wrapping_sub(b'"') <= b'>' - b'"' {
-                match *b {
-                    b'<' => escaping_body!("&lt;"),
-                    b'>' => escaping_body!("&gt;"),
-                    b'&' => escaping_body!("&amp;"),
-                    b'"' => escaping_body!("&quot;"),
-                    b'\'' => escaping_body!("&#x27;"),
-                    _ => (),
                 }
             }
-        }
 
-        if start < bytes.len() {
-            f.write_str(unsafe { std::str::from_utf8_unchecked(&bytes[start..]) })
-        } else {
-            Ok(())
+            if start < bytes.len() {
+                f.write_str(unsafe { std::str::from_utf8_unchecked(&bytes[start..]) })
+            } else {
+                Ok(())
+            }
         }
     }
 }

@@ -74,6 +74,8 @@
 //!
 //! - `memchr`: enables the `memchr` dependency which provides performance improvements
 //!   for the parser.
+//! - `v_htmlescape`: enables the `v_htmlescap` dependency which implements a faster HTML
+//!   escaping algorithm.
 //! - `unstable_machinery`: provides access to the internal machinery of the engine.  This
 //!   is a forever unstable API which mainly exists to aid debugging complex issues.
 //!
@@ -105,7 +107,7 @@ pub mod value;
 
 pub use self::environment::{Environment, Expression, Template};
 pub use self::error::{Error, ErrorKind};
-pub use self::utils::AutoEscape;
+pub use self::utils::{AutoEscape, HtmlEscape};
 
 /// This module gives access to the low level machinery.
 ///
