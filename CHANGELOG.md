@@ -8,6 +8,8 @@ All notable changes to MiniJinja are documented here.
 - Added `v_htmlescape` feature to turn on a faster HTML escaping.
 - Export `HtmlEscape` helper.
 - Also escape `/` in HTML escaping like `v_htmlescape` does.
+- Changed return value type of `get_template` to be a result rather than an
+  option.
 
 # 0.4.0
 

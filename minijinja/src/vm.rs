@@ -468,10 +468,13 @@ impl<'env, 'source> Vm<'env, 'source> {
                     let name = stack.pop();
                     let tmpl = try_ctx!(name
                         .as_str()
-                        .and_then(|name| self.env.get_template(name))
                         .ok_or_else(|| {
-                            Error::new(ErrorKind::TemplateNotFound, "could not find template")
-                        }));
+                            Error::new(
+                                ErrorKind::ImpossibleOperation,
+                                "template name was not a string",
+                            )
+                        })
+                        .and_then(|name| self.env.get_template(name)));
 
                     // first load the blocks
                     for (name, instr) in tmpl.blocks().iter() {
@@ -490,10 +493,13 @@ impl<'env, 'source> Vm<'env, 'source> {
                     let name = stack.pop();
                     let tmpl = try_ctx!(name
                         .as_str()
-                        .and_then(|name| self.env.get_template(name))
                         .ok_or_else(|| {
-                            Error::new(ErrorKind::TemplateNotFound, "could not find template")
-                        }));
+                            Error::new(
+                                ErrorKind::ImpossibleOperation,
+                                "template name was not a string",
+                            )
+                        })
+                        .and_then(|name| self.env.get_template(name)));
                     let instructions = tmpl.instructions();
                     let mut referenced_blocks = BTreeMap::new();
                     for (&name, instr) in tmpl.blocks().iter() {

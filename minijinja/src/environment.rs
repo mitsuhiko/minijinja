@@ -220,12 +220,20 @@ impl<'source> Environment<'source> {
     ///
     /// This requires that the template has been loaded with
     /// [`add_template`](Environment::add_template) beforehand.  If the template was
-    /// not loaded `None` is returned.
-    pub fn get_template(&self, name: &str) -> Option<Template<'_, 'source>> {
-        self.templates.get(name).map(|compiled| Template {
-            env: self,
-            compiled,
-        })
+    /// not loaded an error of kind `TemplateNotFound` is returned.
+    pub fn get_template(&self, name: &str) -> Result<Template<'_, 'source>, Error> {
+        self.templates
+            .get(name)
+            .map(|compiled| Template {
+                env: self,
+                compiled,
+            })
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::TemplateNotFound,
+                    format!("template name {:?}", name),
+                )
+            })
     }
 
     /// Compiles an expression.
