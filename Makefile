@@ -21,6 +21,12 @@ test:
 	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
 	@cd minijinja; cargo check --no-default-features
 
+check:
+	@echo "check no default features:"
+	@cd minijinja; cargo check --no-default-features
+	@echo "check all features:"
+	@cd minijinja; cargo check --all-features
+
 format:
 	@rustup component add rustfmt 2> /dev/null
 	@cargo fmt --all
@@ -33,4 +39,4 @@ lint:
 	@rustup component add clippy 2> /dev/null
 	@cargo clippy --all -- -F clippy::dbg-macro
 
-.PHONY: all doc test format format-check lint
+.PHONY: all doc test format format-check lint check
