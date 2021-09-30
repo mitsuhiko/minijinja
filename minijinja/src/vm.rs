@@ -20,7 +20,7 @@ pub struct LoopState {
 }
 
 impl DynamicObject for LoopState {
-    fn fields(&self) -> &'static [&'static str] {
+    fn fields(&self) -> &[&str] {
         &[
             "index0",
             "index",
@@ -230,19 +230,15 @@ impl<'env, 'source> Vm<'env, 'source> {
     }
 
     /// This is the actual evaluation loop that works with a specific context.
-    fn eval_context<'context, W: Write>(
+    fn eval_context<W: Write>(
         &self,
         mut instructions: &'env Instructions<'source>,
-        context: &'context mut Context<'source, 'context>,
+        context: &mut Context<'source, '_>,
         blocks: &BTreeMap<&'source str, Vec<&'env Instructions<'source>>>,
         block_stack: &mut Vec<&'source str>,
         initial_auto_escape: AutoEscape,
         output: &mut W,
-    ) -> Result<Option<Value>, Error>
-    where
-        'source: 'context,
-        'env: 'context,
-    {
+    ) -> Result<Option<Value>, Error> {
         let mut pc = 0;
         let mut stack = Stack::default();
         let mut blocks = blocks.clone();

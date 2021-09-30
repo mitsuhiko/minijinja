@@ -20,7 +20,7 @@ use crate::{filters, tests};
 /// pointers.  To render the [`render`](Template::render) method can be used.
 #[derive(Copy, Clone)]
 pub struct Template<'env, 'source> {
-    env: &'env Environment<'env>,
+    env: &'env Environment<'source>,
     compiled: &'env CompiledTemplate<'source>,
 }
 

@@ -157,7 +157,7 @@ impl FunctionArgs for Vec<Value> {
 
 pub(crate) trait DynamicObject: fmt::Display + fmt::Debug + Sync + Send {
     fn get_attr(&self, name: &str) -> Option<Value>;
-    fn fields(&self) -> &'static [&'static str];
+    fn fields(&self) -> &[&str];
     fn call_method(&self, name: &str, _args: Vec<Value>) -> Result<Value, Error> {
         Err(Error::new(
             ErrorKind::ImpossibleOperation,
