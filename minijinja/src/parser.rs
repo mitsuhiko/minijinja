@@ -106,7 +106,6 @@ impl<'a> TokenStream<'a> {
 }
 
 struct Parser<'a> {
-    filename: &'a str,
     stream: TokenStream<'a>,
 }
 
@@ -157,9 +156,8 @@ macro_rules! unaryop {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(source: &'a str, filename: &'a str, in_expr: bool) -> Parser<'a> {
+    pub fn new(source: &'a str, in_expr: bool) -> Parser<'a> {
         Parser {
-            filename,
             stream: TokenStream::new(source, in_expr),
         }
     }
@@ -742,11 +740,14 @@ impl<'a> Parser<'a> {
 }
 
 /// Parses a template
-pub fn parse<'a>(source: &'a str, filename: &'a str) -> Result<ast::Stmt<'a>, Error> {
-    let mut parser = Parser::new(source, filename, false);
+pub fn parse<'source, 'name>(
+    source: &'source str,
+    filename: &'name str,
+) -> Result<ast::Stmt<'source>, Error> {
+    let mut parser = Parser::new(source, false);
     parser.parse().map_err(|mut err| {
         if err.line().is_none() {
-            err.set_location(parser.filename, parser.stream.current_span().start_line)
+            err.set_location(filename, parser.stream.current_span().start_line)
         }
         err
     })
@@ -754,10 +755,10 @@ pub fn parse<'a>(source: &'a str, filename: &'a str) -> Result<ast::Stmt<'a>, Er
 
 /// Parses an expression
 pub fn parse_expr(source: &str) -> Result<ast::Expr<'_>, Error> {
-    let mut parser = Parser::new(source, "<expression>", true);
+    let mut parser = Parser::new(source, true);
     parser.parse_expr().map_err(|mut err| {
         if err.line().is_none() {
-            err.set_location(parser.filename, parser.stream.current_span().start_line)
+            err.set_location("<expression>", parser.stream.current_span().start_line)
         }
         err
     })

@@ -19,15 +19,16 @@ use crate::{filters, tests};
 /// this handle.  Such a template can be cheaply copied as it only holds two
 /// pointers.  To render the [`render`](Template::render) method can be used.
 #[derive(Copy, Clone)]
-pub struct Template<'env, 'source> {
-    env: &'env Environment<'source>,
-    compiled: &'env CompiledTemplate<'source>,
+pub struct Template<'env> {
+    env: &'env Environment<'env>,
+    compiled: &'env CompiledTemplate<'env>,
+    name: &'env str,
 }
 
-impl<'env, 'source> fmt::Debug for Template<'env, 'source> {
+impl<'env> fmt::Debug for Template<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Template")
-            .field("name", &self.compiled.name)
+            .field("name", &self.name)
             .field("instructions", &self.compiled.instructions)
             .field("blocks", &self.compiled.blocks)
             .field("initial_auto_escape", &self.compiled.initial_auto_escape)
@@ -38,16 +39,15 @@ impl<'env, 'source> fmt::Debug for Template<'env, 'source> {
 /// Represents a compiled template in memory.
 #[derive(Debug)]
 pub struct CompiledTemplate<'source> {
-    name: &'source str,
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,
     initial_auto_escape: AutoEscape,
 }
 
-impl<'env, 'source> Template<'env, 'source> {
+impl<'env> Template<'env> {
     /// Returns the name of the template.
     pub fn name(&self) -> &str {
-        self.compiled.name
+        self.name
     }
 
     /// Renders the template into a string.
@@ -71,12 +71,12 @@ impl<'env, 'source> Template<'env, 'source> {
     }
 
     /// Returns the root instructions.
-    pub(crate) fn instructions(&self) -> &'env Instructions<'source> {
+    pub(crate) fn instructions(&self) -> &'env Instructions<'env> {
         &self.compiled.instructions
     }
 
     /// Returns the blocks.
-    pub(crate) fn blocks(&self) -> &'env BTreeMap<&'source str, Instructions<'source>> {
+    pub(crate) fn blocks(&self) -> &'env BTreeMap<&'env str, Instructions<'env>> {
         &self.compiled.blocks
     }
 
@@ -95,9 +95,9 @@ impl<'env, 'source> Template<'env, 'source> {
 /// overriding the auto escape callback will no longer have effects to an already
 /// loaded template.
 pub struct Environment<'source> {
-    templates: BTreeMap<&'source str, CompiledTemplate<'source>>,
-    filters: BTreeMap<&'source str, filters::BoxedFilter>,
-    tests: BTreeMap<&'source str, tests::BoxedTest>,
+    templates: BTreeMap<String, CompiledTemplate<'source>>,
+    filters: BTreeMap<&'static str, filters::BoxedFilter>,
+    tests: BTreeMap<&'static str, tests::BoxedTest>,
     default_auto_escape: Box<dyn Fn(&str) -> AutoEscape>,
 }
 
@@ -194,15 +194,14 @@ impl<'source> Environment<'source> {
     /// The `name` parameter defines the name of the template which identifies
     /// it.  To look up a loaded template use the [`get_template`](Self::get_template)
     /// method.
-    pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
+    pub fn add_template(&mut self, name: &str, source: &'source str) -> Result<(), Error> {
         let ast = parse(source, name)?;
         let mut compiler = Compiler::new();
         compiler.compile_stmt(&ast)?;
         let (instructions, blocks) = compiler.finish();
         self.templates.insert(
-            name,
+            name.to_owned(),
             CompiledTemplate {
-                name,
                 blocks,
                 instructions,
                 initial_auto_escape: (self.default_auto_escape)(name),
@@ -221,12 +220,13 @@ impl<'source> Environment<'source> {
     /// This requires that the template has been loaded with
     /// [`add_template`](Environment::add_template) beforehand.  If the template was
     /// not loaded an error of kind `TemplateNotFound` is returned.
-    pub fn get_template(&self, name: &str) -> Result<Template<'_, 'source>, Error> {
+    pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
         self.templates
-            .get(name)
-            .map(|compiled| Template {
+            .get_key_value(name)
+            .map(|(name, compiled)| Template {
                 env: self,
                 compiled,
+                name,
             })
             .ok_or_else(|| {
                 Error::new(
@@ -255,7 +255,7 @@ impl<'source> Environment<'source> {
     /// Adds a new filter function.
     ///
     /// For details about filters have a look at [`filters`].
-    pub fn add_filter<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
+    pub fn add_filter<F, V, Rv, Args>(&mut self, name: &'static str, f: F)
     where
         V: ArgType,
         Rv: Into<Value>,
@@ -273,7 +273,7 @@ impl<'source> Environment<'source> {
     /// Adds a new test function.
     ///
     /// For details about tests have a look at [`tests`].
-    pub fn add_test<F, V, Args>(&mut self, name: &'source str, f: F)
+    pub fn add_test<F, V, Args>(&mut self, name: &'static str, f: F)
     where
         V: ArgType,
         F: tests::Test<V, Args>,
