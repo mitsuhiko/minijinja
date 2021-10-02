@@ -169,6 +169,25 @@ fn no_auto_escape(_: &str) -> AutoEscape {
 }
 
 /// A handle to a compiled expression.
+///
+/// An expression is created via the
+/// [`compile_expression`](Environment::compile_expression) method.  It provides
+/// a method to evaluate the expression and return the result as value object.
+/// This for instance can be used to evaluate simple expressions from user
+/// provided input to implement features such as dynamic filtering.
+///
+/// This is usually best paired with [`Single`](crate::value::Single) to pass
+/// a single value to it.
+///
+/// # Example
+///
+/// ```rust
+/// # use minijinja::{Environment, value::Single};
+/// let env = Environment::new();
+/// let expr = env.compile_expression("number > 10 and number < 20").unwrap();
+/// let rv = expr.eval(Single("number", 15)).unwrap();
+/// assert!(rv.is_true());
+/// ```
 #[derive(Debug)]
 pub struct Expression<'env, 'source> {
     env: &'env Environment<'source>,
@@ -176,6 +195,9 @@ pub struct Expression<'env, 'source> {
 }
 
 impl<'env, 'source> Expression<'env, 'source> {
+    /// Evaluates the expression with some context.
+    ///
+    /// The result of the expression is returned as [`Value`].
     pub fn eval<S: Serialize>(&self, ctx: S) -> Result<Value, Error> {
         let mut output = String::new();
         let vm = Vm::new(self.env);
@@ -316,7 +338,8 @@ impl<'source> Environment<'source> {
     ///
     /// This lets one compile an expression in the template language and
     /// receive the output.  This lets one use the expressions of the language
-    /// be used as a minimal scripting language.
+    /// be used as a minimal scripting language.  For more information and an
+    /// example see [`Expression`].
     pub fn compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
         let ast = parse_expr(expr)?;
         let mut compiler = Compiler::new();

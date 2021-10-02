@@ -37,14 +37,17 @@
 //! serializable value:
 //!
 //! ```
-//! use std::collections::BTreeMap;
 //! use minijinja::Environment;
+//! use minijinja::value::Single;
 //!
 //! let mut env = Environment::new();
 //! env.add_template("hello", "Hello {{ name }}!").unwrap();
-//! let mut ctx = BTreeMap::new();
-//! ctx.insert("name", "John");
-//! println!("{}", env.get_template("hello").unwrap().render(&ctx).unwrap());
+//! let tmpl = env.get_template("hello").unwrap();
+//! println!("{}", tmpl.render(Single("name", "John")).unwrap());
+//! ```
+//!
+//! ```plain
+//! Hello John!
 //! ```
 //!
 //! # Expression Usage
@@ -59,8 +62,8 @@
 //! use minijinja::Environment;
 //!
 //! let env = Environment::new();
-//! let expr = env.compile_expression("23 < 42").unwrap();
-//! let result = expr.eval(&()).unwrap();
+//! let expr = env.compile_expression("number < 42").unwrap();
+//! let result = expr.eval(Single("number", 23)).unwrap();
 //! assert_eq!(result.is_true(), true);
 //! ```
 //!
