@@ -11,7 +11,7 @@ fn test_vm() {
         let entry = entry.unwrap();
         let filename = entry.file_name();
         let filename = filename.to_str().unwrap();
-        if !filename.ends_with(".txt") {
+        if !filename.ends_with(".txt") && !filename.ends_with(".html") {
             continue;
         }
         let source = fs::read_to_string(entry.path()).unwrap();

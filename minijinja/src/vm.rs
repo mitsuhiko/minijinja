@@ -287,6 +287,23 @@ impl<'env> Vm<'env> {
             };
         }
 
+        macro_rules! begin_capture {
+            () => {
+                output_stack.push(String::new());
+            };
+        }
+
+        macro_rules! end_capture {
+            () => {{
+                let output = output_stack.pop().unwrap();
+                stack.push(if !matches!(auto_escape, AutoEscape::None) {
+                    Value::from_safe_string(output)
+                } else {
+                    Value::from(output)
+                });
+            }};
+        }
+
         macro_rules! sub_eval {
             ($instructions:expr) => {{
                 sub_eval!($instructions, &blocks, block_stack, auto_escape);
@@ -546,10 +563,10 @@ impl<'env> Vm<'env> {
                     auto_escape = auto_escape_stack.pop().unwrap();
                 }
                 Instruction::BeginCapture => {
-                    output_stack.push(String::new());
+                    begin_capture!();
                 }
                 Instruction::EndCapture => {
-                    stack.push(Value::from(output_stack.pop().unwrap()));
+                    end_capture!();
                 }
                 Instruction::ApplyFilter(name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
@@ -573,9 +590,9 @@ impl<'env> Vm<'env> {
                         if let Some(layers) = inner_blocks.get_mut(name) {
                             layers.remove(0);
                             let instructions = layers.first().unwrap();
-                            output_stack.push(String::new());
+                            begin_capture!();
                             sub_eval!(instructions);
-                            stack.push(Value::from(output_stack.pop().unwrap()));
+                            end_capture!();
                         } else {
                             panic!("attempted to super unreferenced block");
                         }

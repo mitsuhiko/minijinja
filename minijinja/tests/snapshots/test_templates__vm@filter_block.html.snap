@@ -1,0 +1,27 @@
+---
+source: minijinja/tests/test_templates.rs
+expression: "&rendered"
+input_file: minijinja/tests/inputs/filter_block.html
+
+---
+<p>foo &lt; bar</p>
+
+=====
+
+Template {
+    name: "filter_block.html",
+    instructions: [
+        00000 | BEGIN_CAPTURE   [<unknown>:1],
+        00001 | EMIT_RAW (string "<p>")   [<unknown>:1],
+        00002 | LOOKUP (var "value")   [<unknown>:1],
+        00003 | EMIT   [<unknown>:1],
+        00004 | EMIT_RAW (string "</p>")   [<unknown>:1],
+        00005 | END_CAPTURE   [<unknown>:1],
+        00006 | BUILD_LIST (0 items)   [<unknown>:1],
+        00007 | APPLY_FILTER (name "escape")   [<unknown>:1],
+        00008 | EMIT   [<unknown>:1],
+        00009 | EMIT_RAW (string "\n")   [<unknown>:1],
+    ],
+    blocks: {},
+    initial_auto_escape: Html,
+}
