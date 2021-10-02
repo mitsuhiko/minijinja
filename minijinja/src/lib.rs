@@ -1,3 +1,8 @@
+//! <div align=center>
+//!   <img src="https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo.png" alt="" width=320>
+//!   <p><strong>MiniJinja: a powerful template engine for Rust with minimal dependencies</strong></p>
+//! </div>
+//!
 //! MiniJinja is a simple [Jinja2](https://jinja.palletsprojects.com/) inspired
 //! template engine based on [serde](https://serde.rs/). It's light in features
 //! and on dependencies but implements a pretty sizable feature set from Jinja2.
