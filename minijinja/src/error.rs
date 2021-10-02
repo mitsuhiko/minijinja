@@ -94,6 +94,7 @@ impl Error {
         self.lineno = lineno;
     }
 
+    #[allow(unused)]
     pub(crate) fn with_source<E: std::error::Error + 'static>(mut self, source: E) -> Self {
         self.source = Some(Box::new(source));
         self

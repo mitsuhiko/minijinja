@@ -24,7 +24,7 @@ use crate::utils::RcType;
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,ignore
 /// lazy_static! {
 ///     static ref ENV: Environment<'static> = create_env();
 /// }
