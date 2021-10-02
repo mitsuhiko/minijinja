@@ -24,11 +24,8 @@ use crate::utils::RcType;
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// lazy_static! {
-///     static ref ENV: Environment<'static> = create_env();
-/// }
-///
+/// ```rust
+/// # use minijinja::{Source, Environment};
 /// fn create_env() -> Environment<'static> {
 ///     let mut env = Environment::new();
 ///     let mut source = Source::new();
@@ -69,6 +66,10 @@ impl Source {
     }
 
     /// Adds a new template into the source.
+    ///
+    /// This is similar to the method of the same name on the environment but
+    /// the source is held within the [`Source`] object for you.  This means
+    /// that lifetimes are not a concern.
     pub fn add_template<N: Into<String>, S: Into<String>>(
         &mut self,
         name: N,
@@ -83,7 +84,7 @@ impl Source {
         Ok(())
     }
 
-    /// Removes a template from the source.
+    /// Removes an already loaded template from the source.
     pub fn remove_template(&mut self, name: &str) {
         self.templates.remove(name);
     }
