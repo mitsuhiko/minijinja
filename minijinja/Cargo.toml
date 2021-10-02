@@ -10,6 +10,9 @@ repository = "https://github.com/mitsuhiko/minijinja"
 keywords = ["jinja", "jinja2", "templates"]
 readme = "README.md"
 
+[package.metadata.docs.rs]
+features = ["source"]
+
 [features]
 default = ["builtin_filters", "builtin_tests"]
 speedups = ["memchr", "v_htmlescape"]
