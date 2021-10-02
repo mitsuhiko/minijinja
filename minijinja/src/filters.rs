@@ -37,6 +37,7 @@ use crate::value::{ArgType, FunctionArgs, Value};
 type FilterFunc =
     dyn Fn(&Environment, Value, Vec<Value>) -> Result<Value, Error> + Sync + Send + 'static;
 
+#[derive(Clone)]
 pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 
 /// A utility trait that represents filters.

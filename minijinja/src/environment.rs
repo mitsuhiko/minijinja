@@ -7,7 +7,7 @@ use crate::compiler::Compiler;
 use crate::error::{Error, ErrorKind};
 use crate::instructions::Instructions;
 use crate::parser::{parse, parse_expr};
-use crate::utils::{AutoEscape, HtmlEscape};
+use crate::utils::{AutoEscape, HtmlEscape, RcType};
 use crate::value::{ArgType, FunctionArgs, Value};
 use crate::vm::Vm;
 use crate::{filters, tests};
@@ -37,7 +37,7 @@ impl<'env> fmt::Debug for Template<'env> {
 }
 
 /// Represents a compiled template in memory.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompiledTemplate<'source> {
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,
@@ -94,11 +94,14 @@ impl<'env> Template<'env> {
 /// loaded will lead to surprising effects and undefined behavior.  For instance
 /// overriding the auto escape callback will no longer have effects to an already
 /// loaded template.
+///
+/// The environment supports relatively cheap copy on write.
+#[derive(Clone)]
 pub struct Environment<'source> {
-    templates: BTreeMap<String, CompiledTemplate<'source>>,
-    filters: BTreeMap<&'static str, filters::BoxedFilter>,
-    tests: BTreeMap<&'static str, tests::BoxedTest>,
-    default_auto_escape: Box<dyn Fn(&str) -> AutoEscape>,
+    templates: RcType<BTreeMap<&'source str, CompiledTemplate<'source>>>,
+    filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
+    tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
+    default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape>,
 }
 
 impl<'source> Default for Environment<'source> {
@@ -158,10 +161,10 @@ impl<'source> Environment<'source> {
     /// can use the alternative [`empty`](Environment::empty) method.
     pub fn new() -> Environment<'source> {
         Environment {
-            templates: BTreeMap::new(),
-            filters: filters::get_builtin_filters(),
-            tests: tests::get_builtin_tests(),
-            default_auto_escape: Box::new(default_auto_escape),
+            templates: RcType::default(),
+            filters: RcType::new(filters::get_builtin_filters()),
+            tests: RcType::new(tests::get_builtin_tests()),
+            default_auto_escape: RcType::new(default_auto_escape),
         }
     }
 
@@ -171,10 +174,10 @@ impl<'source> Environment<'source> {
     /// auto escaping configured.
     pub fn empty() -> Environment<'source> {
         Environment {
-            templates: BTreeMap::new(),
-            filters: BTreeMap::new(),
-            tests: BTreeMap::new(),
-            default_auto_escape: Box::new(no_auto_escape),
+            templates: RcType::default(),
+            filters: RcType::default(),
+            tests: RcType::default(),
+            default_auto_escape: RcType::new(no_auto_escape),
         }
     }
 
@@ -186,7 +189,7 @@ impl<'source> Environment<'source> {
     /// escaping decision based on that.  The default implementation is to
     /// turn on escaping for templates ending with `.html`, `.htm` and `.xml`.
     pub fn set_auto_escape_callback<F: Fn(&str) -> AutoEscape + 'static>(&mut self, f: F) {
-        self.default_auto_escape = Box::new(f);
+        self.default_auto_escape = RcType::new(f);
     }
 
     /// Loads a template from a string.
@@ -194,13 +197,13 @@ impl<'source> Environment<'source> {
     /// The `name` parameter defines the name of the template which identifies
     /// it.  To look up a loaded template use the [`get_template`](Self::get_template)
     /// method.
-    pub fn add_template(&mut self, name: &str, source: &'source str) -> Result<(), Error> {
+    pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
         let ast = parse(source, name)?;
         let mut compiler = Compiler::new();
         compiler.compile_stmt(&ast)?;
         let (instructions, blocks) = compiler.finish();
-        self.templates.insert(
-            name.to_owned(),
+        RcType::make_mut(&mut self.templates).insert(
+            name,
             CompiledTemplate {
                 blocks,
                 instructions,
@@ -212,7 +215,7 @@ impl<'source> Environment<'source> {
 
     /// Removes a template by name.
     pub fn remove_template(&mut self, name: &str) {
-        self.templates.remove(name);
+        RcType::make_mut(&mut self.templates).remove(name);
     }
 
     /// Fetches a template by name.
@@ -255,36 +258,36 @@ impl<'source> Environment<'source> {
     /// Adds a new filter function.
     ///
     /// For details about filters have a look at [`filters`].
-    pub fn add_filter<F, V, Rv, Args>(&mut self, name: &'static str, f: F)
+    pub fn add_filter<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
     where
         V: ArgType,
         Rv: Into<Value>,
         F: filters::Filter<V, Rv, Args>,
         Args: FunctionArgs,
     {
-        self.filters.insert(name, filters::BoxedFilter::new(f));
+        RcType::make_mut(&mut self.filters).insert(name, filters::BoxedFilter::new(f));
     }
 
     /// Removes a filter by name.
     pub fn remove_filter(&mut self, name: &str) {
-        self.filters.remove(name);
+        RcType::make_mut(&mut self.filters).remove(name);
     }
 
     /// Adds a new test function.
     ///
     /// For details about tests have a look at [`tests`].
-    pub fn add_test<F, V, Args>(&mut self, name: &'static str, f: F)
+    pub fn add_test<F, V, Args>(&mut self, name: &'source str, f: F)
     where
         V: ArgType,
         F: tests::Test<V, Args>,
         Args: FunctionArgs,
     {
-        self.tests.insert(name, tests::BoxedTest::new(f));
+        RcType::make_mut(&mut self.tests).insert(name, tests::BoxedTest::new(f));
     }
 
     /// Removes a test by name.
     pub fn remove_test(&mut self, name: &str) {
-        self.tests.remove(name);
+        RcType::make_mut(&mut self.tests).remove(name);
     }
 
     /// Applies a filter with arguments to a value.

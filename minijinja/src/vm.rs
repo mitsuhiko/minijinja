@@ -9,8 +9,8 @@ use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::instructions::{Instruction, Instructions};
 use crate::key::Key;
-use crate::utils::matches;
-use crate::value::{self, DynamicObject, Primitive, RcType, Value, ValueIterator};
+use crate::utils::{matches, RcType};
+use crate::value::{self, DynamicObject, Primitive, Value, ValueIterator};
 use crate::AutoEscape;
 
 #[derive(Debug)]

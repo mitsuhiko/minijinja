@@ -216,6 +216,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 struct Loc {
     first_instruction: u32,
     file_index: u16,
@@ -223,7 +224,7 @@ struct Loc {
 }
 
 /// Wrapper around instructions to help with location management.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Instructions<'source> {
     pub(crate) instructions: Vec<Instruction<'source>>,
     locations: Vec<Loc>,
