@@ -224,7 +224,7 @@ impl<'source> Environment<'source> {
 
     /// Sets a new function to select the default auto escaping.
     ///
-    /// This function is invoked when templates are added to the environment
+    /// This function is invoked when templates are loaded from the environment
     /// to determine the default auto escaping behavior.  The function is
     /// invoked with the name of the template and can make an initial auto
     /// escaping decision based on that.  The default implementation is to
