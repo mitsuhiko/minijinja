@@ -302,6 +302,7 @@ pub struct Map<'a> {
 pub enum CallType<'ast, 'source> {
     Function(&'source str),
     Method(&'ast Expr<'source>, &'source str),
+    Block(&'source str),
     Object(&'ast Expr<'source>),
 }
 
@@ -314,7 +315,14 @@ impl<'a> Call<'a> {
     pub fn identify_call(&self) -> CallType<'_, 'a> {
         match self.expr {
             Expr::Var(ref var) => CallType::Function(var.id),
-            Expr::GetAttr(ref attr) => CallType::Method(&attr.expr, attr.name),
+            Expr::GetAttr(ref attr) => {
+                if let Expr::Var(ref var) = attr.expr {
+                    if var.id == "self" {
+                        return CallType::Block(attr.name);
+                    }
+                }
+                CallType::Method(&attr.expr, attr.name)
+            }
             _ => CallType::Object(&self.expr),
         }
     }

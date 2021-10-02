@@ -409,6 +409,11 @@ impl<'source> Compiler<'source> {
                         self.add(Instruction::BuildList(c.args.len()));
                         self.add(Instruction::CallFunction(name));
                     }
+                    ast::CallType::Block(name) => {
+                        self.add(Instruction::BeginCapture);
+                        self.add(Instruction::CallBlock(name));
+                        self.add(Instruction::EndCapture);
+                    }
                     ast::CallType::Method(expr, name) => {
                         self.compile_expr(expr)?;
                         for arg in &c.args {

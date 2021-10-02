@@ -1,2 +1,3 @@
 {{ super() }}
 {{ loop.cycle(1, 2) }}
+{{ self.foo() }}

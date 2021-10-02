@@ -137,6 +137,12 @@ pub enum Instruction<'source> {
     /// Resets the auto escape flag to the previous value.
     PopAutoEscape,
 
+    /// Begins capturing of output.
+    BeginCapture,
+
+    /// Ends capturing of output.
+    EndCapture,
+
     /// Calls a global function
     CallFunction(&'source str),
 
@@ -206,6 +212,8 @@ impl<'source> fmt::Debug for Instruction<'source> {
             Instruction::Include => write!(f, "INCLUDE"),
             Instruction::PushAutoEscape => write!(f, "PUSH_AUTO_ESCAPE"),
             Instruction::PopAutoEscape => write!(f, "POP_AUTO_ESCAPE"),
+            Instruction::BeginCapture => write!(f, "BEGIN_CAPTURE"),
+            Instruction::EndCapture => write!(f, "END_CAPTURE"),
             Instruction::CallFunction(n) => write!(f, "CALL_FUNCTION (name {:?})", n),
             Instruction::CallMethod(n) => write!(f, "CALL_METHOD (name {:?})", n),
             Instruction::CallObject => write!(f, "CALL_OBJECT"),

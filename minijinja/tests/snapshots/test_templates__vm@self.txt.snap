@@ -1,0 +1,31 @@
+---
+source: minijinja/tests/test_templates.rs
+expression: "&rendered"
+input_file: minijinja/tests/inputs/self.txt
+
+---
+1:[foobar]
+2:(foobar)
+
+=====
+
+Template {
+    name: "self.txt",
+    instructions: [
+        00000 | EMIT_RAW (string "1:[")   [<unknown>:1],
+        00001 | CALL_BLOCK (name "title")   [<unknown>:1],
+        00002 | EMIT_RAW (string "]\n2:(")   [<unknown>:1],
+        00003 | BEGIN_CAPTURE   [<unknown>:2],
+        00004 | CALL_BLOCK (name "title")   [<unknown>:2],
+        00005 | END_CAPTURE   [<unknown>:2],
+        00006 | EMIT   [<unknown>:2],
+        00007 | EMIT_RAW (string ")\n")   [<unknown>:2],
+    ],
+    blocks: {
+        "title": [
+            00000 | LOOKUP (var "var")   [<unknown>:1],
+            00001 | EMIT   [<unknown>:1],
+        ],
+    },
+    initial_auto_escape: None,
+}

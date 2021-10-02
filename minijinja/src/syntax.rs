@@ -291,7 +291,21 @@
 //! first tag in the template.
 //!
 //! As you can see it's also possible to render the contents of the parent block by calling
-//! ``super()``.
+//! ``super()``. You can’t define multiple ``{% block %}`` tags with the same name in
+//! the same template. This limitation exists because a block tag works in “both”
+//! directions. That is, a block tag doesn’t just provide a placeholder to fill -
+//! it also defines the content that fills the placeholder in the parent. If
+//! there were two similarly-named ``{% block %}`` tags in a template, that
+//! template’s parent wouldn’t know which one of the blocks’ content to use.
+//!
+//! If you want to print a block multiple times, you can, however, use the
+//! special self variable and call the block with that name:
+//!
+//! ```plain
+//! <title>{% block title %}{% endblock %}</title>
+//! <h1>{{ self.title() }}</h1>
+//! {% block body %}{% endblock %}
+//! ```
 //!
 //! MiniJinja allows you to put the name of the block after the end tag for better
 //! readability:

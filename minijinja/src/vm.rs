@@ -203,13 +203,13 @@ impl<'env> Vm<'env> {
     }
 
     /// Evaluates the given inputs
-    pub fn eval<W: Write, S: Serialize>(
+    pub fn eval<S: Serialize>(
         &self,
         instructions: &Instructions<'env>,
         root: S,
         blocks: &BTreeMap<&'env str, Instructions<'env>>,
         initial_auto_escape: AutoEscape,
-        output: &mut W,
+        output: &mut String,
     ) -> Result<Option<Value>, Error> {
         let mut context = Context::default();
         let root = Value::from_serializable(&root);
@@ -230,20 +230,21 @@ impl<'env> Vm<'env> {
     }
 
     /// This is the actual evaluation loop that works with a specific context.
-    fn eval_context<W: Write>(
+    fn eval_context(
         &self,
         mut instructions: &'env Instructions<'env>,
         context: &mut Context<'env, '_>,
         blocks: &BTreeMap<&'env str, Vec<&'env Instructions<'env>>>,
         block_stack: &mut Vec<&'env str>,
         initial_auto_escape: AutoEscape,
-        output: &mut W,
+        output: &mut String,
     ) -> Result<Option<Value>, Error> {
         let mut pc = 0;
         let mut stack = Stack::default();
         let mut blocks = blocks.clone();
         let mut auto_escape = initial_auto_escape;
         let mut auto_escape_stack = vec![];
+        let mut output_stack = vec![];
 
         macro_rules! bail {
             ($err:expr) => {{
@@ -280,6 +281,12 @@ impl<'env> Vm<'env> {
             }};
         }
 
+        macro_rules! out {
+            () => {
+                output_stack.last_mut().unwrap_or(output)
+            };
+        }
+
         macro_rules! sub_eval {
             ($instructions:expr) => {{
                 sub_eval!($instructions, &blocks, block_stack, auto_escape);
@@ -294,7 +301,7 @@ impl<'env> Vm<'env> {
                     $blocks,
                     $block_stack,
                     $auto_escape,
-                    output,
+                    out!(),
                 )?;
             }};
         }
@@ -302,10 +309,10 @@ impl<'env> Vm<'env> {
         while let Some(instr) = instructions.get(pc) {
             match instr {
                 Instruction::EmitRaw(val) => {
-                    write!(output, "{}", val).unwrap();
+                    write!(out!(), "{}", val).unwrap();
                 }
                 Instruction::Emit => {
-                    try_ctx!(self.env.finalize(&stack.pop(), auto_escape, output));
+                    try_ctx!(self.env.finalize(&stack.pop(), auto_escape, out!()));
                 }
                 Instruction::StoreLocal(name) => {
                     context.store(name, stack.pop());
@@ -456,7 +463,10 @@ impl<'env> Vm<'env> {
                         let instructions = layers.first().unwrap();
                         sub_eval!(instructions);
                     } else {
-                        panic!("attempted to evaluate unreferenced block");
+                        bail!(Error::new(
+                            ErrorKind::ImpossibleOperation,
+                            "tried to invoke unknown block"
+                        ));
                     }
                     block_stack.pop();
                 }
@@ -535,6 +545,12 @@ impl<'env> Vm<'env> {
                 Instruction::PopAutoEscape => {
                     auto_escape = auto_escape_stack.pop().unwrap();
                 }
+                Instruction::BeginCapture => {
+                    output_stack.push(String::new());
+                }
+                Instruction::EndCapture => {
+                    stack.push(Value::from(output_stack.pop().unwrap()));
+                }
                 Instruction::ApplyFilter(name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     let value = stack.pop();
@@ -600,10 +616,10 @@ impl<'env> Vm<'env> {
 
 /// Simple version of eval without environment or vm.
 #[cfg(feature = "unstable_machinery")]
-pub fn simple_eval<W: Write, S: Serialize>(
+pub fn simple_eval<S: Serialize>(
     instructions: &Instructions<'_>,
     root: S,
-    output: &mut W,
+    output: &mut String,
 ) -> Result<Option<Value>, Error> {
     let env = Environment::new();
     let empty_blocks = BTreeMap::new();

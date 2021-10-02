@@ -5,7 +5,9 @@ use crate::tokens::{Span, Token};
 use crate::utils::matches;
 use crate::value::Value;
 
-const RESERVED_NAMES: [&str; 7] = ["true", "True", "false", "False", "none", "None", "loop"];
+const RESERVED_NAMES: [&str; 8] = [
+    "true", "True", "false", "False", "none", "None", "loop", "self",
+];
 
 macro_rules! syntax_error {
     ($msg:expr) => {{

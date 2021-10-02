@@ -18,6 +18,7 @@ All notable changes to MiniJinja are documented here.
 - Added `sync` feature that can be disabled to disable the ability to send
   objects to other threads where that comes at a cost.
 - `safe` and `escape` are now always provided as filters.
+- Added support for `self.block_name()`.
 
 # 0.4.0
 

@@ -1,7 +1,7 @@
 ---
-source: tests/test_parser.rs
+source: minijinja/tests/test_parser.rs
 expression: "&ast"
-input_file: tests/parser-inputs/call.txt
+input_file: minijinja/tests/parser-inputs/call.txt
 
 ---
 Ok(
@@ -39,6 +39,20 @@ Ok(
             EmitRaw {
                 raw: "\n",
             } @ 2:22-3:0,
+            EmitExpr {
+                expr: Call {
+                    expr: GetAttr {
+                        expr: Var {
+                            id: "self",
+                        } @ 3:3-3:7,
+                        name: "foo",
+                    } @ 3:7-3:12,
+                    args: [],
+                } @ 3:11-3:16,
+            } @ 3:0-3:16,
+            EmitRaw {
+                raw: "\n",
+            } @ 3:16-4:0,
         ],
-    } @ 1:0-3:0,
+    } @ 1:0-4:0,
 )
