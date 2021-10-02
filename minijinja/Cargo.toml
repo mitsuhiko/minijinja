@@ -12,6 +12,7 @@ readme = "README.md"
 
 [package.metadata.docs.rs]
 features = ["source"]
+rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["builtin_filters", "builtin_tests"]

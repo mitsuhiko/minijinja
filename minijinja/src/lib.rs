@@ -75,7 +75,7 @@
 //! - `source`: enables the [`Source`] type which helps with dynamic loading of templates.
 //! - `memchr`: enables the `memchr` dependency which provides performance improvements
 //!   for the parser.
-//! - `v_htmlescape`: enables the `v_htmlescap` dependency which implements a faster HTML
+//! - `v_htmlescape`: enables the `v_htmlescape` dependency which implements a faster HTML
 //!   escaping algorithm.
 //! - `unstable_machinery`: provides access to the internal machinery of the engine.  This
 //!   is a forever unstable API which mainly exists to aid debugging complex issues.
@@ -88,6 +88,7 @@
 //! - `builtin_tests`: if this feature is removed the default tests are
 //!   not implemented.
 #![allow(clippy::cognitive_complexity)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 mod key;
 
 mod ast;
@@ -122,6 +123,7 @@ pub use self::source::Source;
 /// have a stable interface.  It mostly exists for internal testing purposes and
 /// for debugging.
 #[cfg(feature = "unstable_machinery")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable_machinery")))]
 pub mod machinery {
     /// The AST nodes.
     pub mod ast {

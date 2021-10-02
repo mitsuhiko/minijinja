@@ -122,6 +122,7 @@ mod builtins {
     use crate::value::ValueKind;
 
     /// Checks if a value is odd.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
     pub fn is_odd(_env: &Environment, v: Value) -> Result<bool, Error> {
         Ok(v.as_primitive()
             .and_then(|x| x.as_i128())
@@ -129,6 +130,7 @@ mod builtins {
     }
 
     /// Checks if a value is even.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
     pub fn is_even(_env: &Environment, v: Value) -> Result<bool, Error> {
         Ok(v.as_primitive()
             .and_then(|x| x.as_i128())
@@ -136,31 +138,37 @@ mod builtins {
     }
 
     /// Checks if a value is undefined.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
     pub fn is_undefined(_env: &Environment, v: Value) -> Result<bool, Error> {
         Ok(v.is_undefined())
     }
 
     /// Checks if a value is defined.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
     pub fn is_defined(_env: &Environment, v: Value) -> Result<bool, Error> {
         Ok(!v.is_undefined())
     }
 
     /// Checks if this value is a number.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
     pub fn is_number(_env: &Environment, v: Value) -> Result<bool, Error> {
         Ok(matches!(v.kind(), ValueKind::Number))
     }
 
     /// Checks if this value is a string.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
     pub fn is_string(_env: &Environment, v: Value) -> Result<bool, Error> {
         Ok(matches!(v.kind(), ValueKind::String))
     }
 
     /// Checks if this value is a sequence
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
     pub fn is_sequence(_env: &Environment, v: Value) -> Result<bool, Error> {
         Ok(matches!(v.kind(), ValueKind::Seq))
     }
 
     /// Checks if this value is a mapping
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
     pub fn is_mapping(_env: &Environment, v: Value) -> Result<bool, Error> {
         Ok(matches!(v.kind(), ValueKind::Map))
     }

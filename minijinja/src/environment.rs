@@ -241,17 +241,15 @@ impl<'source> Environment<'source> {
     ///
     /// Already loaded templates in the environment are discarded and replaced
     /// with the templates from the source.
-    ///
-    /// This method requires the `source` feature.
     #[cfg(feature = "source")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
     pub fn set_source(&mut self, source: crate::source::Source) {
         self.templates = Source::Owned(RcType::new(source));
     }
 
     /// Returns the currently set source.
-    ///
-    /// This method requires the `source` feature.
     #[cfg(feature = "source")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
     pub fn get_source(&self) -> Option<&crate::source::Source> {
         match self.templates {
             Source::Borrowed(_) => None,

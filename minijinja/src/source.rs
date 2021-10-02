@@ -20,8 +20,6 @@ use crate::utils::RcType;
 /// [`Environment::add_template`](crate::Environment::add_template) must no
 /// longer be used as otherwise the same lifetime concern arises.
 ///
-/// This type requires the `source` feature.
-///
 /// # Example
 ///
 /// ```rust
@@ -35,6 +33,7 @@ use crate::utils::RcType;
 /// }
 /// ```
 #[derive(Clone, Default)]
+#[cfg_attr(docsrs, doc(cfg(feature = "source")))]
 pub struct Source {
     templates: BTreeMap<String, RcType<LoadedTemplate>>,
 }

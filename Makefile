@@ -1,4 +1,5 @@
-TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters
+DOC_FEATURES=source
+TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters,source
 
 all: test
 
@@ -6,7 +7,7 @@ build:
 	@cargo build --all
 
 doc:
-	@cargo doc --all
+	@RUSTDOCFLAGS=--cfg=docsrs cargo +nightly doc --no-deps --all --features=$(DOC_FEATURES)
 
 test:
 	@rustup component add rustfmt 2> /dev/null

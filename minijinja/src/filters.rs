@@ -127,16 +127,19 @@ mod builtins {
     use std::fmt::Write;
 
     /// Converts a value to uppercase.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn upper(_env: &Environment, v: String) -> Result<String, Error> {
         Ok(v.to_uppercase())
     }
 
     /// Converts a value to lowercase.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn lower(_env: &Environment, v: String) -> Result<String, Error> {
         Ok(v.to_lowercase())
     }
 
     /// Does a string replace.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn replace(
         _env: &Environment,
         v: String,
@@ -147,6 +150,7 @@ mod builtins {
     }
 
     /// Returns the "length" of the value
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn length(_env: &Environment, v: Value) -> Result<Value, Error> {
         v.len().map(Value::from).ok_or_else(|| {
             Error::new(
@@ -157,12 +161,14 @@ mod builtins {
     }
 
     /// Marks a value as safe.  This converts it into a string.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn safe(_env: &Environment, v: String) -> Result<Value, Error> {
         // TODO: this ideally understands which type of escaping is in use
         Ok(Value::from_safe_string(v))
     }
 
     /// HTML escapes a string.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn escape(_env: &Environment, v: Value) -> Result<Value, Error> {
         // TODO: this ideally understands which type of escaping is in use
         if v.is_safe() {
@@ -175,6 +181,7 @@ mod builtins {
     }
 
     /// Dict sorting functionality.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn dictsort(_env: &Environment, v: Value) -> Result<Value, Error> {
         let mut pairs = v.try_into_pairs()?;
         pairs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
@@ -182,6 +189,7 @@ mod builtins {
     }
 
     /// Reverses a list or string
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn reverse(_env: &Environment, v: Value) -> Result<Value, Error> {
         if let Some(Primitive::Str(s)) = v.as_primitive() {
             Ok(Value::from(s.chars().rev().collect::<String>()))
@@ -198,6 +206,7 @@ mod builtins {
     }
 
     /// Trims a value
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn trim(_env: &Environment, s: String, chars: Option<String>) -> Result<String, Error> {
         match chars {
             Some(chars) => {
@@ -209,6 +218,7 @@ mod builtins {
     }
 
     /// Joins a sequence by a character
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn join(_env: &Environment, val: Value, joiner: Option<String>) -> Result<String, Error> {
         if val.is_undefined() || val.is_none() {
             return Ok(String::new());
