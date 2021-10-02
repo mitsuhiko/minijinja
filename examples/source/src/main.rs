@@ -1,6 +1,6 @@
-use std::collections::BTreeMap;
-use minijinja::{Environment, Source};
 use lazy_static::lazy_static;
+use minijinja::{Environment, Source};
+use std::collections::BTreeMap;
 
 lazy_static! {
     static ref ENV: Environment<'static> = create_env();
