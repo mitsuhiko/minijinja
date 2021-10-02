@@ -1,8 +1,12 @@
-# MiniJinja
+<div align="center">
+  <img src="artwork/logo.png" alt="" width=320>
+  <p><strong>MiniJinja: a powerful template engine for Rust with minimal dependencies</strong></p>
 
 [![Build Status](https://github.com/mitsuhiko/minijinja/workflows/Tests/badge.svg?branch=main)](https://github.com/mitsuhiko/minijinja/actions?query=workflow%3ATests)
 [![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
 [![Documentation](https://docs.rs/minijinja/badge.svg)](https://docs.rs/minijinja)
+
+</div>
 
 MiniJinja is a powerful but minimal dependency template engine for Rust which
 is based on the syntax and behavior of the
