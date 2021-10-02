@@ -92,6 +92,10 @@
 //!   not implemented.
 //! - `builtin_tests`: if this feature is removed the default tests are
 //!   not implemented.
+//! - `sync`: this feature makes MiniJinja's type `Send` and `Sync`.  If this feature
+//!   is disabled sending types across threads is often not possible.  Thread bounds
+//!   of things like callbacks however are not changing which means code that uses
+//!   MiniJinja still needs to be threadsafe.
 #![allow(clippy::cognitive_complexity)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 mod key;

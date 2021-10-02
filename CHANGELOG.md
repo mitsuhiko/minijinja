@@ -15,6 +15,8 @@ All notable changes to MiniJinja are documented here.
 - Initial auto escaping decision is now made when the template is loaded from
   the environment and not when they are added.
 - The environment can now be cloned.
+- Added `sync` feature that can be disabled to disable the ability to send
+  objects to other threads where that comes at a cost.
 
 # 0.4.0
 
