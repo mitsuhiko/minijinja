@@ -102,21 +102,21 @@ impl<'env> Template<'env> {
     }
 }
 
-type TemplateMap<'source> = BTreeMap<&'source str, CompiledTemplate<'source>>;
+type TemplateMap<'source> = BTreeMap<&'source str, RcType<CompiledTemplate<'source>>>;
 
 #[derive(Clone)]
-enum TemplatesRepr<'source> {
-    Referenced(RcType<TemplateMap<'source>>),
+enum Source<'source> {
+    Borrowed(RcType<TemplateMap<'source>>),
     #[cfg(feature = "source")]
-    Source(RcType<crate::source::Source>),
+    Owned(RcType<crate::source::Source>),
 }
 
-impl<'source> fmt::Debug for TemplatesRepr<'source> {
+impl<'source> fmt::Debug for Source<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Referenced(arg0) => fmt::Debug::fmt(arg0, f),
+            Self::Borrowed(arg0) => fmt::Debug::fmt(arg0, f),
             #[cfg(feature = "source")]
-            Self::Source(arg0) => fmt::Debug::fmt(arg0, f),
+            Self::Owned(arg0) => fmt::Debug::fmt(arg0, f),
         }
     }
 }
@@ -129,9 +129,17 @@ impl<'source> fmt::Debug for TemplatesRepr<'source> {
 /// loaded will lead to surprising effects and undefined behavior.  For instance
 /// overriding the auto escape callback will no longer have effects to an already
 /// loaded template.
+///
+/// Environments can be somewhat cheaply cloned as the internals are all clone-on-write.
+///
+/// The environment holds references to the source the templates were created from.
+/// This makes it very inconvenient to pass around unless the templates are static
+/// strings.  For situations where you want to load dynamic templates and share the
+/// environment it's recommended to turn on the `source` feature and to use the
+/// [`Source`](crate::source::Source) type with the environment.
 #[derive(Clone)]
 pub struct Environment<'source> {
-    templates: TemplatesRepr<'source>,
+    templates: Source<'source>,
     filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
     tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
     default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
@@ -194,7 +202,7 @@ impl<'source> Environment<'source> {
     /// can use the alternative [`empty`](Environment::empty) method.
     pub fn new() -> Environment<'source> {
         Environment {
-            templates: TemplatesRepr::Referenced(Default::default()),
+            templates: Source::Borrowed(Default::default()),
             filters: RcType::new(filters::get_builtin_filters()),
             tests: RcType::new(tests::get_builtin_tests()),
             default_auto_escape: RcType::new(default_auto_escape),
@@ -207,7 +215,7 @@ impl<'source> Environment<'source> {
     /// auto escaping configured.
     pub fn empty() -> Environment<'source> {
         Environment {
-            templates: TemplatesRepr::Referenced(Default::default()),
+            templates: Source::Borrowed(Default::default()),
             filters: RcType::default(),
             tests: RcType::default(),
             default_auto_escape: RcType::new(no_auto_escape),
@@ -230,14 +238,27 @@ impl<'source> Environment<'source> {
 
     /// Sets the template source for the environment.
     ///
+    /// This helps when working with dynamically loaded templates.  For more
+    /// information see [`Source`](crate::source::Source).
+    ///
     /// Already loaded templates in the environment are discarded and replaced
     /// with the templates from the source.
     ///
-    /// This helps when working with dynamically loaded templates.  For more
-    /// information see [`Source`](crate::source::Source).
+    /// This method requires the `source` feature.
     #[cfg(feature = "source")]
     pub fn set_source(&mut self, source: crate::source::Source) {
-        self.templates = TemplatesRepr::Source(RcType::new(source));
+        self.templates = Source::Owned(RcType::new(source));
+    }
+
+    /// Returns the currently set source.
+    ///
+    /// This method requires the `source` feature.
+    #[cfg(feature = "source")]
+    pub fn get_source(&self) -> Option<&crate::source::Source> {
+        match self.templates {
+            Source::Borrowed(_) => None,
+            Source::Owned(ref source) => Some(source),
+        }
     }
 
     /// Loads a template from a string.
@@ -247,24 +268,24 @@ impl<'source> Environment<'source> {
     /// method.
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
         match self.templates {
-            TemplatesRepr::Referenced(ref mut map) => {
+            Source::Borrowed(ref mut map) => {
                 let compiled_template = CompiledTemplate::from_name_and_source(name, source)?;
-                RcType::make_mut(map).insert(name, compiled_template);
+                RcType::make_mut(map).insert(name, RcType::new(compiled_template));
                 Ok(())
             }
             #[cfg(feature = "source")]
-            TemplatesRepr::Source(ref mut src) => RcType::make_mut(src).add_template(name, source),
+            Source::Owned(ref mut src) => RcType::make_mut(src).add_template(name, source),
         }
     }
 
     /// Removes a template by name.
     pub fn remove_template(&mut self, name: &str) {
         match self.templates {
-            TemplatesRepr::Referenced(ref mut map) => {
+            Source::Borrowed(ref mut map) => {
                 RcType::make_mut(map).remove(name);
             }
             #[cfg(feature = "source")]
-            TemplatesRepr::Source(ref mut source) => {
+            Source::Owned(ref mut source) => {
                 RcType::make_mut(source).remove_template(name);
             }
         }
@@ -277,9 +298,9 @@ impl<'source> Environment<'source> {
     /// not loaded an error of kind `TemplateNotFound` is returned.
     pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
         let rv = match &self.templates {
-            TemplatesRepr::Referenced(ref map) => map.get_key_value(name).map(|(&k, v)| (k, v)),
+            Source::Borrowed(ref map) => map.get_key_value(name).map(|(&k, v)| (k, &**v)),
             #[cfg(feature = "source")]
-            TemplatesRepr::Source(source) => source.get_compiled_template(name),
+            Source::Owned(source) => source.get_compiled_template(name),
         };
         rv.map(|(name, compiled)| Template {
             env: self,
