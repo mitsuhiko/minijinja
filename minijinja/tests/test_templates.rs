@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::fs;
 
+use minijinja::value::Single;
 use minijinja::{Environment, Error};
 
 #[test]
@@ -61,4 +62,13 @@ fn test_custom_filter() {
     let tmpl = env.get_template("test").unwrap();
     let rv = tmpl.render(&ctx).unwrap();
     assert_eq!(rv, "[42]");
+}
+
+#[test]
+fn test_single() {
+    let mut env = Environment::new();
+    env.add_template("simple", "Hello {{ name }}!").unwrap();
+    let tmpl = env.get_template("simple").unwrap();
+    let rv = tmpl.render(Single("name", "Peter")).unwrap();
+    assert_eq!(rv, "Hello Peter!");
 }

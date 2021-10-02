@@ -21,6 +21,7 @@ All notable changes to MiniJinja are documented here.
 - Added support for `self.block_name()`.
 - Fixed incorrect behavior where `super()` did not allow filters.
 - Added `{% filter %}` blocks.
+- Added `value::Single` type to render simple templates with a single value passed.
 
 # 0.4.0
 
