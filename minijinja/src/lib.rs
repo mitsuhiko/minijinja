@@ -58,8 +58,7 @@
 //! an expression object that can then be evaluated, returning the result:
 //!
 //! ```
-//! use std::collections::BTreeMap;
-//! use minijinja::Environment;
+//! use minijinja::{Environment, value::Single};
 //!
 //! let env = Environment::new();
 //! let expr = env.compile_expression("number < 42").unwrap();
