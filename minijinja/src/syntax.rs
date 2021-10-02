@@ -16,6 +16,7 @@
 //!   - [`{% block %}`](#-block-)
 //!   - [`{% include %}`](#-include-)
 //!   - [`{% with %}`](#-with-)
+//!   - [`{% filter %}`](#-filter-)
 //!   - [`{% autoescape %}`](#-autoescape-)
 //!
 //! </details>
@@ -343,6 +344,17 @@
 //!   {{ foo }}           foo is 42 here
 //! {% endwith %}
 //! foo is not visible here any longer
+//! ```
+//!
+//! ## `{% filter %}`
+//!
+//! Filter sections allow you to apply regular filters on a block of
+//! template data. Just wrap the code in the special filter block:
+//!
+//! ```plain
+//! {% filter upper %}
+//!     This text becomes uppercase
+//! {% endfilter %}
 //! ```
 //!
 //! ## `{% autoescape %}`

@@ -283,6 +283,16 @@ impl<'source> Compiler<'source> {
                 }
                 self.add(Instruction::PopAutoEscape);
             }
+            ast::Stmt::FilterBlock(filter_block) => {
+                self.set_location_from_span(filter_block.span());
+                self.add(Instruction::BeginCapture);
+                for node in &filter_block.body {
+                    self.compile_stmt(node)?;
+                }
+                self.add(Instruction::EndCapture);
+                self.compile_expr(&filter_block.filter)?;
+                self.add(Instruction::Emit);
+            }
         }
         Ok(())
     }
@@ -372,7 +382,9 @@ impl<'source> Compiler<'source> {
             }
             ast::Expr::Filter(f) => {
                 self.set_location_from_span(f.span());
-                self.compile_expr(&f.expr)?;
+                if let Some(ref expr) = f.expr {
+                    self.compile_expr(expr)?;
+                }
                 for arg in &f.args {
                     self.compile_expr(arg)?;
                 }

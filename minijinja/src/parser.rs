@@ -326,7 +326,11 @@ impl<'a> Parser<'a> {
                         Vec::new()
                     };
                     expr = ast::Expr::Filter(Spanned::new(
-                        ast::Filter { name, expr, args },
+                        ast::Filter {
+                            name,
+                            expr: Some(expr),
+                            args,
+                        },
                         self.stream.expand_span(span),
                     ));
                 }
@@ -516,6 +520,10 @@ impl<'a> Parser<'a> {
                 self.parse_auto_escape()?,
                 self.stream.expand_span(span),
             ))),
+            Token::Ident("filter") => Ok(ast::Stmt::FilterBlock(Spanned::new(
+                self.parse_filter_block()?,
+                self.stream.expand_span(span),
+            ))),
             _ => syntax_error!("unknown block"),
         }
     }
@@ -691,6 +699,38 @@ impl<'a> Parser<'a> {
         let body = self.subparse(|tok| matches!(tok, Token::Ident("endautoescape")))?;
         self.stream.next()?;
         Ok(ast::AutoEscape { enabled, body })
+    }
+
+    fn parse_filter_block(&mut self) -> Result<ast::FilterBlock<'a>, Error> {
+        let mut filter = None;
+
+        while !matches!(self.stream.current()?, Some((Token::BlockEnd(..), _))) {
+            if filter.is_some() {
+                expect_token!(self, Token::Pipe, "`|`")?;
+            }
+            let (name, span) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
+            let args = if matches!(self.stream.current()?, Some((Token::ParenOpen, _))) {
+                self.parse_args()?
+            } else {
+                Vec::new()
+            };
+            filter = Some(ast::Expr::Filter(Spanned::new(
+                ast::Filter {
+                    name,
+                    expr: filter,
+                    args,
+                },
+                self.stream.expand_span(span),
+            )));
+        }
+
+        let filter = filter
+            .ok_or_else(|| Error::new(ErrorKind::InvalidSyntax, "filter block without filter"))?;
+
+        expect_token!(self, Token::BlockEnd(..), "end of block")?;
+        let body = self.subparse(|tok| matches!(tok, Token::Ident("endfilter")))?;
+        self.stream.next()?;
+        Ok(ast::FilterBlock { filter, body })
     }
 
     fn subparse<F: FnMut(&Token) -> bool>(

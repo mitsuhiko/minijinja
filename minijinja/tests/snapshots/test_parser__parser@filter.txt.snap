@@ -1,7 +1,7 @@
 ---
-source: tests/test_parser.rs
+source: minijinja/tests/test_parser.rs
 expression: "&ast"
-input_file: tests/parser-inputs/filter.txt
+input_file: minijinja/tests/parser-inputs/filter.txt
 
 ---
 Ok(
@@ -10,20 +10,24 @@ Ok(
             EmitExpr {
                 expr: Filter {
                     name: "baz",
-                    expr: Filter {
-                        name: "bar",
-                        expr: Var {
-                            id: "foo",
-                        } @ 1:3-1:6,
-                        args: [
-                            Const {
-                                value: 1,
-                            } @ 1:11-1:12,
-                            Const {
-                                value: 2,
-                            } @ 1:14-1:15,
-                        ],
-                    } @ 1:7-1:17,
+                    expr: Some(
+                        Filter {
+                            name: "bar",
+                            expr: Some(
+                                Var {
+                                    id: "foo",
+                                } @ 1:3-1:6,
+                            ),
+                            args: [
+                                Const {
+                                    value: 1,
+                                } @ 1:11-1:12,
+                                Const {
+                                    value: 2,
+                                } @ 1:14-1:15,
+                            ],
+                        } @ 1:7-1:17,
+                    ),
                     args: [],
                 } @ 1:17-1:23,
             } @ 1:0-1:23,

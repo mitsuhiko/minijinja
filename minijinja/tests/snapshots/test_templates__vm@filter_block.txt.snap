@@ -1,0 +1,25 @@
+---
+source: minijinja/tests/test_templates.rs
+expression: "&rendered"
+input_file: minijinja/tests/inputs/filter_block.txt
+
+---
+HUMPTY DUMPTY SAT ON A WALL
+
+=====
+
+Template {
+    name: "filter_block.txt",
+    instructions: [
+        00000 | BEGIN_CAPTURE   [<unknown>:1],
+        00001 | LOOKUP (var "egg")   [<unknown>:1],
+        00002 | EMIT   [<unknown>:1],
+        00003 | END_CAPTURE   [<unknown>:1],
+        00004 | BUILD_LIST (0 items)   [<unknown>:1],
+        00005 | APPLY_FILTER (name "upper")   [<unknown>:1],
+        00006 | EMIT   [<unknown>:1],
+        00007 | EMIT_RAW (string "\n")   [<unknown>:1],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

@@ -59,6 +59,7 @@ pub enum Stmt<'a> {
     Extends(Spanned<Extends<'a>>),
     Include(Spanned<Include<'a>>),
     AutoEscape(Spanned<AutoEscape<'a>>),
+    FilterBlock(Spanned<FilterBlock<'a>>),
 }
 
 impl<'a> fmt::Debug for Stmt<'a> {
@@ -74,6 +75,7 @@ impl<'a> fmt::Debug for Stmt<'a> {
             Stmt::Extends(s) => fmt::Debug::fmt(s, f),
             Stmt::Include(s) => fmt::Debug::fmt(s, f),
             Stmt::AutoEscape(s) => fmt::Debug::fmt(s, f),
+            Stmt::FilterBlock(s) => fmt::Debug::fmt(s, f),
         }
     }
 }
@@ -172,6 +174,13 @@ pub struct AutoEscape<'a> {
     pub body: Vec<Stmt<'a>>,
 }
 
+/// Applies filters to a block.
+#[derive(Debug, Clone)]
+pub struct FilterBlock<'a> {
+    pub filter: Expr<'a>,
+    pub body: Vec<Stmt<'a>>,
+}
+
 /// Outputs the expression.
 #[derive(Debug, Clone)]
 pub struct EmitExpr<'a> {
@@ -252,7 +261,7 @@ pub struct IfExpr<'a> {
 #[derive(Debug, Clone)]
 pub struct Filter<'a> {
     pub name: &'a str,
-    pub expr: Expr<'a>,
+    pub expr: Option<Expr<'a>>,
     pub args: Vec<Expr<'a>>,
 }
 

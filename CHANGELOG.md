@@ -20,6 +20,7 @@ All notable changes to MiniJinja are documented here.
 - `safe` and `escape` are now always provided as filters.
 - Added support for `self.block_name()`.
 - Fixed incorrect behavior where `super()` did not allow filters.
+- Added `{% filter %}` blocks.
 
 # 0.4.0
 
