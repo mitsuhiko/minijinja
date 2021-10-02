@@ -10,6 +10,11 @@ All notable changes to MiniJinja are documented here.
 - Also escape `/` in HTML escaping like `v_htmlescape` does.
 - Changed return value type of `get_template` to be a result rather than an
   option.
+- Added `Source` behind the `source` feature to support loading of templates
+  at runtime without lifetime complications.
+- Initial auto escaping decision is now made when the template is loaded from
+  the environment and not when they are added.
+- The environment can now be cloned.
 
 # 0.4.0
 

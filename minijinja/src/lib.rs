@@ -72,6 +72,7 @@
 //!
 //! There are some additional features that can be enabled:
 //!
+//! - `source`: enables the [`Source`] type which helps with dynamic loading of templates.
 //! - `memchr`: enables the `memchr` dependency which provides performance improvements
 //!   for the parser.
 //! - `v_htmlescape`: enables the `v_htmlescap` dependency which implements a faster HTML
@@ -105,9 +106,15 @@ pub mod syntax;
 pub mod tests;
 pub mod value;
 
+#[cfg(feature = "source")]
+mod source;
+
 pub use self::environment::{Environment, Expression, Template};
 pub use self::error::{Error, ErrorKind};
 pub use self::utils::{AutoEscape, HtmlEscape};
+
+#[cfg(feature = "source")]
+pub use self::source::Source;
 
 /// This module gives access to the low level machinery.
 ///

@@ -8,6 +8,7 @@ pub struct Error {
     detail: Option<Cow<'static, str>>,
     name: Option<String>,
     lineno: usize,
+    source: Option<Box<dyn std::error::Error>>,
 }
 
 impl PartialEq for Error {
@@ -25,6 +26,7 @@ pub enum ErrorKind {
     NonPrimitive,
     NonKey,
     ImpossibleOperation,
+    InvalidOperation,
     SyntaxError,
     TemplateNotFound,
     InvalidArguments,
@@ -42,6 +44,7 @@ impl ErrorKind {
             ErrorKind::NonPrimitive => "not a primitive",
             ErrorKind::NonKey => "not a key type",
             ErrorKind::ImpossibleOperation => "impossible operation",
+            ErrorKind::InvalidOperation => "invalid operation",
             ErrorKind::SyntaxError => "syntax error",
             ErrorKind::TemplateNotFound => "template not found",
             ErrorKind::InvalidArguments => "invalid arguments",
@@ -82,12 +85,19 @@ impl Error {
             detail: Some(detail.into()),
             name: None,
             lineno: 0,
+            source: None,
         }
     }
 
     pub(crate) fn set_location(&mut self, filename: &str, lineno: usize) {
         self.name = Some(filename.into());
         self.lineno = lineno;
+    }
+
+    #[allow(unused)]
+    pub(crate) fn with_source<E: std::error::Error + 'static>(mut self, source: E) -> Self {
+        self.source = Some(Box::new(source));
+        self
     }
 
     /// Returns the error kind
@@ -106,7 +116,11 @@ impl Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.source.as_deref()
+    }
+}
 
 impl From<ErrorKind> for Error {
     fn from(kind: ErrorKind) -> Self {
@@ -115,6 +129,7 @@ impl From<ErrorKind> for Error {
             detail: None,
             name: None,
             lineno: 0,
+            source: None,
         }
     }
 }

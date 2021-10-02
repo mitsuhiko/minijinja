@@ -1,12 +1,12 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/err_undefined_attr.txt
+input_file: minijinja/tests/inputs/err_undefined_attr.txt
 
 ---
 !!!ERROR!!!
 
-Error { kind: UndefinedError, detail: None, name: Some("<unknown>"), lineno: 1 }
+Error { kind: UndefinedError, detail: None, name: Some("<unknown>"), lineno: 1, source: None }
 
 =====
 

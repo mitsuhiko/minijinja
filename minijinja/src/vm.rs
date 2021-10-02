@@ -9,8 +9,8 @@ use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::instructions::{Instruction, Instructions};
 use crate::key::Key;
-use crate::utils::matches;
-use crate::value::{self, DynamicObject, Primitive, RcType, Value, ValueIterator};
+use crate::utils::{matches, RcType};
+use crate::value::{self, DynamicObject, Primitive, Value, ValueIterator};
 use crate::AutoEscape;
 
 #[derive(Debug)]
@@ -70,18 +70,18 @@ impl fmt::Display for LoopState {
 }
 
 #[derive(Debug)]
-pub struct Loop<'source> {
-    locals: BTreeMap<&'source str, Value>,
+pub struct Loop<'env> {
+    locals: BTreeMap<&'env str, Value>,
     with_loop_var: bool,
     iterator: ValueIterator,
     controller: RcType<LoopState>,
 }
 
 #[derive(Debug)]
-pub enum Frame<'source, 'context> {
+pub enum Frame<'env, 'context> {
     // This layer dispatches to another context
     Chained {
-        base: &'context Context<'source, 'context>,
+        base: &'context Context<'env, 'context>,
     },
     // this layer isolates
     Isolate {
@@ -92,7 +92,7 @@ pub enum Frame<'source, 'context> {
         value: Value,
     },
     // this layer is a for loop
-    Loop(Loop<'source>),
+    Loop(Loop<'env>),
 }
 
 #[derive(Debug, Default)]
@@ -119,13 +119,13 @@ impl Stack {
 }
 
 #[derive(Default, Debug)]
-pub struct Context<'source, 'context> {
-    stack: Vec<Frame<'source, 'context>>,
+pub struct Context<'env, 'context> {
+    stack: Vec<Frame<'env, 'context>>,
 }
 
-impl<'source, 'context> Context<'source, 'context> {
+impl<'env, 'context> Context<'env, 'context> {
     /// Stores a variable in the context.
-    pub fn store(&mut self, key: &'source str, value: Value) {
+    pub fn store(&mut self, key: &'env str, value: Value) {
         self.current_loop().locals.insert(key, value);
     }
 
@@ -167,7 +167,7 @@ impl<'source, 'context> Context<'source, 'context> {
     }
 
     /// Pushes a new layer.
-    pub fn push_frame(&mut self, layer: Frame<'source, 'context>) {
+    pub fn push_frame(&mut self, layer: Frame<'env, 'context>) {
         self.stack.push(layer);
     }
 
@@ -177,7 +177,7 @@ impl<'source, 'context> Context<'source, 'context> {
     }
 
     /// Returns the current innermost loop.
-    pub fn current_loop(&mut self) -> &mut Loop<'source> {
+    pub fn current_loop(&mut self) -> &mut Loop<'env> {
         self.stack
             .iter_mut()
             .rev()
@@ -192,22 +192,22 @@ impl<'source, 'context> Context<'source, 'context> {
 
 /// Helps to evaluate something.
 #[derive(Debug)]
-pub struct Vm<'env, 'source> {
-    env: &'env Environment<'source>,
+pub struct Vm<'env> {
+    env: &'env Environment<'env>,
 }
 
-impl<'env, 'source> Vm<'env, 'source> {
+impl<'env> Vm<'env> {
     /// Creates a new VM.
-    pub fn new(env: &'env Environment<'source>) -> Vm<'env, 'source> {
+    pub fn new(env: &'env Environment<'env>) -> Vm<'env> {
         Vm { env }
     }
 
     /// Evaluates the given inputs
     pub fn eval<W: Write, S: Serialize>(
         &self,
-        instructions: &Instructions<'source>,
+        instructions: &Instructions<'env>,
         root: S,
-        blocks: &BTreeMap<&'source str, Instructions<'source>>,
+        blocks: &BTreeMap<&'env str, Instructions<'env>>,
         initial_auto_escape: AutoEscape,
         output: &mut W,
     ) -> Result<Option<Value>, Error> {
@@ -232,10 +232,10 @@ impl<'env, 'source> Vm<'env, 'source> {
     /// This is the actual evaluation loop that works with a specific context.
     fn eval_context<W: Write>(
         &self,
-        mut instructions: &'env Instructions<'source>,
-        context: &mut Context<'source, '_>,
-        blocks: &BTreeMap<&'source str, Vec<&'env Instructions<'source>>>,
-        block_stack: &mut Vec<&'source str>,
+        mut instructions: &'env Instructions<'env>,
+        context: &mut Context<'env, '_>,
+        blocks: &BTreeMap<&'env str, Vec<&'env Instructions<'env>>>,
+        block_stack: &mut Vec<&'env str>,
         initial_auto_escape: AutoEscape,
         output: &mut W,
     ) -> Result<Option<Value>, Error> {

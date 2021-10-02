@@ -39,6 +39,7 @@ use crate::value::{ArgType, FunctionArgs, Value};
 type TestFunc =
     dyn Fn(&Environment, Value, Vec<Value>) -> Result<bool, Error> + Sync + Send + 'static;
 
+#[derive(Clone)]
 pub(crate) struct BoxedTest(Arc<TestFunc>);
 
 /// A utility trait that represents filters.
