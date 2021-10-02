@@ -244,7 +244,7 @@ impl<'env> Vm<'env> {
         let mut blocks = blocks.clone();
         let mut auto_escape = initial_auto_escape;
         let mut auto_escape_stack = vec![];
-        let mut output_stack = vec![];
+        let mut capture_stack = vec![];
 
         macro_rules! bail {
             ($err:expr) => {{
@@ -283,23 +283,24 @@ impl<'env> Vm<'env> {
 
         macro_rules! out {
             () => {
-                output_stack.last_mut().unwrap_or(output)
+                capture_stack.last_mut().unwrap_or(output)
             };
         }
 
         macro_rules! begin_capture {
             () => {
-                output_stack.push(String::new());
+                capture_stack.push(String::new());
             };
         }
 
         macro_rules! end_capture {
             () => {{
-                let output = output_stack.pop().unwrap();
+                let captured = capture_stack.pop().unwrap();
+                // TODO: this should take the right auto escapine flag into account
                 stack.push(if !matches!(auto_escape, AutoEscape::None) {
-                    Value::from_safe_string(output)
+                    Value::from_safe_string(captured)
                 } else {
-                    Value::from(output)
+                    Value::from(captured)
                 });
             }};
         }
