@@ -17,6 +17,7 @@ All notable changes to MiniJinja are documented here.
 - The environment can now be cloned.
 - Added `sync` feature that can be disabled to disable the ability to send
   objects to other threads where that comes at a cost.
+- `safe` and `escape` are now always provided as filters.
 
 # 0.4.0
 

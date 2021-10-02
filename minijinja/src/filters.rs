@@ -32,6 +32,7 @@ use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::error::Error;
+use crate::utils::HtmlEscape;
 use crate::value::{ArgType, FunctionArgs, Value};
 
 type FilterFunc =
@@ -98,15 +99,14 @@ impl BoxedFilter {
 }
 
 pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
-    #[allow(unused_mut)]
     let mut rv = BTreeMap::new();
+    rv.insert("safe", BoxedFilter::new(safe));
+    rv.insert("escape", BoxedFilter::new(escape));
     #[cfg(feature = "builtin_filters")]
     {
         rv.insert("lower", BoxedFilter::new(lower));
         rv.insert("upper", BoxedFilter::new(upper));
         rv.insert("replace", BoxedFilter::new(replace));
-        rv.insert("safe", BoxedFilter::new(safe));
-        rv.insert("escape", BoxedFilter::new(escape));
         rv.insert("length", BoxedFilter::new(length));
         rv.insert("dictsort", BoxedFilter::new(dictsort));
         rv.insert("reverse", BoxedFilter::new(reverse));
@@ -116,12 +116,30 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
     rv
 }
 
+/// Marks a value as safe.  This converts it into a string.
+pub fn safe(_env: &Environment, v: String) -> Result<Value, Error> {
+    // TODO: this ideally understands which type of escaping is in use
+    Ok(Value::from_safe_string(v))
+}
+
+/// HTML escapes a string.
+pub fn escape(_env: &Environment, v: Value) -> Result<Value, Error> {
+    // TODO: this ideally understands which type of escaping is in use
+    if v.is_safe() {
+        Ok(v)
+    } else {
+        Ok(Value::from_safe_string(
+            HtmlEscape(&v.to_string()).to_string(),
+        ))
+    }
+}
+
 #[cfg(feature = "builtin_filters")]
 mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::utils::{matches, HtmlEscape};
+    use crate::utils::matches;
     use crate::value::{Primitive, ValueKind};
     use std::cmp::Ordering;
     use std::fmt::Write;
@@ -158,26 +176,6 @@ mod builtins {
                 "cannot calculate length of this value",
             )
         })
-    }
-
-    /// Marks a value as safe.  This converts it into a string.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
-    pub fn safe(_env: &Environment, v: String) -> Result<Value, Error> {
-        // TODO: this ideally understands which type of escaping is in use
-        Ok(Value::from_safe_string(v))
-    }
-
-    /// HTML escapes a string.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
-    pub fn escape(_env: &Environment, v: Value) -> Result<Value, Error> {
-        // TODO: this ideally understands which type of escaping is in use
-        if v.is_safe() {
-            Ok(v)
-        } else {
-            Ok(Value::from_safe_string(
-                HtmlEscape(&v.to_string()).to_string(),
-            ))
-        }
     }
 
     /// Dict sorting functionality.
