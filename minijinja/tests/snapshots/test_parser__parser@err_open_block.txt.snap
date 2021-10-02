@@ -1,7 +1,7 @@
 ---
-source: tests/test_parser.rs
+source: minijinja/tests/test_parser.rs
 expression: "&ast"
-input_file: tests/parser-inputs/err_open_block.txt
+input_file: minijinja/tests/parser-inputs/err_open_block.txt
 
 ---
 Err(
@@ -14,5 +14,6 @@ Err(
             "err_open_block.txt",
         ),
         lineno: 1,
+        source: None,
     },
 )
