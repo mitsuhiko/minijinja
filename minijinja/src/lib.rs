@@ -105,9 +105,15 @@ pub mod syntax;
 pub mod tests;
 pub mod value;
 
+#[cfg(feature = "source")]
+mod source;
+
 pub use self::environment::{Environment, Expression, Template};
 pub use self::error::{Error, ErrorKind};
 pub use self::utils::{AutoEscape, HtmlEscape};
+
+#[cfg(feature = "source")]
+pub use self::source::Source;
 
 /// This module gives access to the low level machinery.
 ///

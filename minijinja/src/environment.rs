@@ -23,6 +23,7 @@ pub struct Template<'env> {
     env: &'env Environment<'env>,
     compiled: &'env CompiledTemplate<'env>,
     name: &'env str,
+    initial_auto_escape: AutoEscape,
 }
 
 impl<'env> fmt::Debug for Template<'env> {
@@ -31,17 +32,32 @@ impl<'env> fmt::Debug for Template<'env> {
             .field("name", &self.name)
             .field("instructions", &self.compiled.instructions)
             .field("blocks", &self.compiled.blocks)
-            .field("initial_auto_escape", &self.compiled.initial_auto_escape)
+            .field("initial_auto_escape", &self.initial_auto_escape)
             .finish()
     }
 }
 
 /// Represents a compiled template in memory.
 #[derive(Debug, Clone)]
-pub struct CompiledTemplate<'source> {
+pub(crate) struct CompiledTemplate<'source> {
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,
-    initial_auto_escape: AutoEscape,
+}
+
+impl<'source> CompiledTemplate<'source> {
+    pub(crate) fn from_name_and_source(
+        name: &str,
+        source: &'source str,
+    ) -> Result<CompiledTemplate<'source>, Error> {
+        let ast = parse(source, name)?;
+        let mut compiler = Compiler::new();
+        compiler.compile_stmt(&ast)?;
+        let (instructions, blocks) = compiler.finish();
+        Ok(CompiledTemplate {
+            blocks,
+            instructions,
+        })
+    }
 }
 
 impl<'env> Template<'env> {
@@ -64,7 +80,7 @@ impl<'env> Template<'env> {
             &self.compiled.instructions,
             ctx,
             blocks,
-            self.compiled.initial_auto_escape,
+            self.initial_auto_escape,
             &mut output,
         )?;
         Ok(output)
@@ -82,8 +98,17 @@ impl<'env> Template<'env> {
 
     /// Returns the initial auto escape setting.
     pub(crate) fn initial_auto_escape(&self) -> AutoEscape {
-        self.compiled.initial_auto_escape
+        self.initial_auto_escape
     }
+}
+
+type TemplateMap<'source> = BTreeMap<&'source str, CompiledTemplate<'source>>;
+
+#[derive(Clone, Debug)]
+enum TemplatesRepr<'source> {
+    Referenced(RcType<TemplateMap<'source>>),
+    #[cfg(feature = "source")]
+    Source(RcType<crate::source::Source>),
 }
 
 /// An abstraction that holds the engine configuration.
@@ -94,14 +119,12 @@ impl<'env> Template<'env> {
 /// loaded will lead to surprising effects and undefined behavior.  For instance
 /// overriding the auto escape callback will no longer have effects to an already
 /// loaded template.
-///
-/// The environment supports relatively cheap copy on write.
 #[derive(Clone)]
 pub struct Environment<'source> {
-    templates: RcType<BTreeMap<&'source str, CompiledTemplate<'source>>>,
+    templates: TemplatesRepr<'source>,
     filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
     tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
-    default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape>,
+    default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
 }
 
 impl<'source> Default for Environment<'source> {
@@ -161,7 +184,7 @@ impl<'source> Environment<'source> {
     /// can use the alternative [`empty`](Environment::empty) method.
     pub fn new() -> Environment<'source> {
         Environment {
-            templates: RcType::default(),
+            templates: TemplatesRepr::Referenced(Default::default()),
             filters: RcType::new(filters::get_builtin_filters()),
             tests: RcType::new(tests::get_builtin_tests()),
             default_auto_escape: RcType::new(default_auto_escape),
@@ -174,7 +197,7 @@ impl<'source> Environment<'source> {
     /// auto escaping configured.
     pub fn empty() -> Environment<'source> {
         Environment {
-            templates: RcType::default(),
+            templates: TemplatesRepr::Referenced(Default::default()),
             filters: RcType::default(),
             tests: RcType::default(),
             default_auto_escape: RcType::new(no_auto_escape),
@@ -188,8 +211,17 @@ impl<'source> Environment<'source> {
     /// invoked with the name of the template and can make an initial auto
     /// escaping decision based on that.  The default implementation is to
     /// turn on escaping for templates ending with `.html`, `.htm` and `.xml`.
-    pub fn set_auto_escape_callback<F: Fn(&str) -> AutoEscape + 'static>(&mut self, f: F) {
+    pub fn set_auto_escape_callback<F: Fn(&str) -> AutoEscape + 'static + Sync + Send>(
+        &mut self,
+        f: F,
+    ) {
         self.default_auto_escape = RcType::new(f);
+    }
+
+    /// Sets the template source for the environment.
+    #[cfg(feature = "source")]
+    pub fn set_source(&mut self, source: crate::source::Source) {
+        self.templates = TemplatesRepr::Source(RcType::new(source));
     }
 
     /// Loads a template from a string.
@@ -198,24 +230,28 @@ impl<'source> Environment<'source> {
     /// it.  To look up a loaded template use the [`get_template`](Self::get_template)
     /// method.
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
-        let ast = parse(source, name)?;
-        let mut compiler = Compiler::new();
-        compiler.compile_stmt(&ast)?;
-        let (instructions, blocks) = compiler.finish();
-        RcType::make_mut(&mut self.templates).insert(
-            name,
-            CompiledTemplate {
-                blocks,
-                instructions,
-                initial_auto_escape: (self.default_auto_escape)(name),
-            },
-        );
+        let templates = match self.templates {
+            TemplatesRepr::Referenced(ref mut map) => map,
+            #[cfg(feature = "source")]
+            TemplatesRepr::Source(_) => {
+                return Err(Error::new(
+                    ErrorKind::ImpossibleOperation,
+                    "cannot load templates into an environment with source",
+                ))
+            }
+        };
+
+        let compiled_template = CompiledTemplate::from_name_and_source(name, source)?;
+        RcType::make_mut(templates).insert(name, compiled_template);
         Ok(())
     }
 
     /// Removes a template by name.
     pub fn remove_template(&mut self, name: &str) {
-        RcType::make_mut(&mut self.templates).remove(name);
+        #[allow(irrefutable_let_patterns)]
+        if let TemplatesRepr::Referenced(ref mut map) = self.templates {
+            RcType::make_mut(map).remove(name);
+        }
     }
 
     /// Fetches a template by name.
@@ -224,19 +260,23 @@ impl<'source> Environment<'source> {
     /// [`add_template`](Environment::add_template) beforehand.  If the template was
     /// not loaded an error of kind `TemplateNotFound` is returned.
     pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
-        self.templates
-            .get_key_value(name)
-            .map(|(name, compiled)| Template {
-                env: self,
-                compiled,
-                name,
-            })
-            .ok_or_else(|| {
-                Error::new(
-                    ErrorKind::TemplateNotFound,
-                    format!("template name {:?}", name),
-                )
-            })
+        let rv = match &self.templates {
+            TemplatesRepr::Referenced(ref map) => map.get_key_value(name).map(|(&k, v)| (k, v)),
+            #[cfg(feature = "source")]
+            TemplatesRepr::Source(source) => source.get_compiled_template(name),
+        };
+        rv.map(|(name, compiled)| Template {
+            env: self,
+            compiled,
+            name,
+            initial_auto_escape: (self.default_auto_escape)(name),
+        })
+        .ok_or_else(|| {
+            Error::new(
+                ErrorKind::TemplateNotFound,
+                format!("template name {:?}", name),
+            )
+        })
     }
 
     /// Compiles an expression.
