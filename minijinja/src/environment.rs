@@ -130,8 +130,6 @@ impl<'source> fmt::Debug for Source<'source> {
 /// overriding the auto escape callback will no longer have effects to an already
 /// loaded template.
 ///
-/// Environments can be somewhat cheaply cloned as the internals are all clone-on-write.
-///
 /// The environment holds references to the source the templates were created from.
 /// This makes it very inconvenient to pass around unless the templates are static
 /// strings.  For situations where you want to load dynamic templates and share the
@@ -463,4 +461,15 @@ fn test_expression_lifetimes() {
         let expr = env.compile_expression(&x).unwrap();
         assert_eq!(expr.eval(&()).unwrap().to_string(), "2");
     }
+}
+
+#[test]
+fn test_clone() {
+    let mut env = Environment::new();
+    env.add_template("test", "a").unwrap();
+    let mut env2 = env.clone();
+    assert_eq!(env2.get_template("test").unwrap().render(&()).unwrap(), "a");
+    env2.add_template("test", "b").unwrap();
+    assert_eq!(env2.get_template("test").unwrap().render(&()).unwrap(), "b");
+    assert_eq!(env.get_template("test").unwrap().render(&()).unwrap(), "a");
 }
