@@ -573,7 +573,9 @@ impl<'env> Vm<'env> {
                         if let Some(layers) = inner_blocks.get_mut(name) {
                             layers.remove(0);
                             let instructions = layers.first().unwrap();
+                            output_stack.push(String::new());
                             sub_eval!(instructions);
+                            stack.push(Value::from(output_stack.pop().unwrap()));
                         } else {
                             panic!("attempted to super unreferenced block");
                         }

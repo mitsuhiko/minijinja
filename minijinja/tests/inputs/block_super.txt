@@ -2,4 +2,4 @@ template: "simple_layout.txt"
 ---
 {% extends template %}
 {% block title %}[{{ super() }}]{% endblock %}
-{% block body %}new body{% endblock %}
+{% block body %}{{ super()|upper }}{% endblock %}

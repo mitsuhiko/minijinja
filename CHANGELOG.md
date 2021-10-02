@@ -19,6 +19,7 @@ All notable changes to MiniJinja are documented here.
   objects to other threads where that comes at a cost.
 - `safe` and `escape` are now always provided as filters.
 - Added support for `self.block_name()`.
+- Fixed incorrect behavior where `super()` did not allow filters.
 
 # 0.4.0
 
