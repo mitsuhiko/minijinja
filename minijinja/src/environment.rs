@@ -104,11 +104,21 @@ impl<'env> Template<'env> {
 
 type TemplateMap<'source> = BTreeMap<&'source str, CompiledTemplate<'source>>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 enum TemplatesRepr<'source> {
     Referenced(RcType<TemplateMap<'source>>),
     #[cfg(feature = "source")]
     Source(RcType<crate::source::Source>),
+}
+
+impl<'source> fmt::Debug for TemplatesRepr<'source> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Referenced(arg0) => fmt::Debug::fmt(arg0, f),
+            #[cfg(feature = "source")]
+            Self::Source(arg0) => fmt::Debug::fmt(arg0, f),
+        }
+    }
 }
 
 /// An abstraction that holds the engine configuration.
@@ -219,6 +229,12 @@ impl<'source> Environment<'source> {
     }
 
     /// Sets the template source for the environment.
+    ///
+    /// Already loaded templates in the environment are discarded and replaced
+    /// with the templates from the source.
+    ///
+    /// This helps when working with dynamically loaded templates.  For more
+    /// information see [`Source`](crate::source::Source).
     #[cfg(feature = "source")]
     pub fn set_source(&mut self, source: crate::source::Source) {
         self.templates = TemplatesRepr::Source(RcType::new(source));
@@ -230,27 +246,27 @@ impl<'source> Environment<'source> {
     /// it.  To look up a loaded template use the [`get_template`](Self::get_template)
     /// method.
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
-        let templates = match self.templates {
-            TemplatesRepr::Referenced(ref mut map) => map,
-            #[cfg(feature = "source")]
-            TemplatesRepr::Source(_) => {
-                return Err(Error::new(
-                    ErrorKind::ImpossibleOperation,
-                    "cannot load templates into an environment with source",
-                ))
+        match self.templates {
+            TemplatesRepr::Referenced(ref mut map) => {
+                let compiled_template = CompiledTemplate::from_name_and_source(name, source)?;
+                RcType::make_mut(map).insert(name, compiled_template);
+                Ok(())
             }
-        };
-
-        let compiled_template = CompiledTemplate::from_name_and_source(name, source)?;
-        RcType::make_mut(templates).insert(name, compiled_template);
-        Ok(())
+            #[cfg(feature = "source")]
+            TemplatesRepr::Source(ref mut src) => RcType::make_mut(src).add_template(name, source),
+        }
     }
 
     /// Removes a template by name.
     pub fn remove_template(&mut self, name: &str) {
-        #[allow(irrefutable_let_patterns)]
-        if let TemplatesRepr::Referenced(ref mut map) = self.templates {
-            RcType::make_mut(map).remove(name);
+        match self.templates {
+            TemplatesRepr::Referenced(ref mut map) => {
+                RcType::make_mut(map).remove(name);
+            }
+            #[cfg(feature = "source")]
+            TemplatesRepr::Source(ref mut source) => {
+                RcType::make_mut(source).remove_template(name);
+            }
         }
     }
 

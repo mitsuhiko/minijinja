@@ -18,5 +18,6 @@ fn main() {
     let mut ctx = BTreeMap::new();
     ctx.insert("name", "World");
     let tmpl = ENV.get_template("hello.txt").unwrap();
+    dbg!(&*ENV);
     println!("{}", tmpl.render(&ctx).unwrap());
 }
