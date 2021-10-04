@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 # Unreleased
 
 - Added `default` filter.
+- Added `startingwith` and `endingwith` tests.
 
 # 0.5.0
 

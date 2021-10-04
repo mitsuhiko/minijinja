@@ -1,7 +1,7 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/tests.txt
+input_file: minijinja/tests/inputs/tests.txt
 
 ---
 even: true
@@ -18,6 +18,8 @@ not-map: false
 map: true
 string: true
 not-string: false
+starts-with-a: true
+ends-with-ha: true
 
 =====
 
@@ -94,7 +96,19 @@ Template {
         00043 | BUILD_LIST (0 items)   [<unknown>:14],
         00044 | PERFORM_TEST (name "string")   [<unknown>:14],
         00045 | EMIT   [<unknown>:14],
-        00046 | EMIT_RAW (string "\n")   [<unknown>:14],
+        00046 | EMIT_RAW (string "\nstarts-with-a: ")   [<unknown>:14],
+        00047 | LOOKUP (var "string")   [<unknown>:15],
+        00048 | LOAD_CONST (value "a")   [<unknown>:15],
+        00049 | BUILD_LIST (1 items)   [<unknown>:15],
+        0004a | PERFORM_TEST (name "startingwith")   [<unknown>:15],
+        0004b | EMIT   [<unknown>:15],
+        0004c | EMIT_RAW (string "\nends-with-ha: ")   [<unknown>:15],
+        0004d | LOOKUP (var "string")   [<unknown>:16],
+        0004e | LOAD_CONST (value "ha")   [<unknown>:16],
+        0004f | BUILD_LIST (1 items)   [<unknown>:16],
+        00050 | PERFORM_TEST (name "endingwith")   [<unknown>:16],
+        00051 | EMIT   [<unknown>:16],
+        00052 | EMIT_RAW (string "\n")   [<unknown>:16],
     ],
     blocks: {},
     initial_auto_escape: None,

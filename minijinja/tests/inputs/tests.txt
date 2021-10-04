@@ -18,3 +18,5 @@ not-map: {{ two is mapping }}
 map: {{ map is mapping }}
 string: {{ string is string }}
 not-string: {{ mapping is string }}
+starts-with-a: {{ string is startingwith('a') }}
+ends-with-ha: {{ string is endingwith('ha') }}

@@ -110,6 +110,8 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<&'static str, BoxedTest> {
         rv.insert("string", BoxedTest::new(is_string));
         rv.insert("sequence", BoxedTest::new(is_sequence));
         rv.insert("mapping", BoxedTest::new(is_mapping));
+        rv.insert("startingwith", BoxedTest::new(is_startingwith));
+        rv.insert("endingwith", BoxedTest::new(is_endingwith));
     }
     rv
 }
@@ -171,6 +173,18 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
     pub fn is_mapping(_env: &Environment, v: Value) -> Result<bool, Error> {
         Ok(matches!(v.kind(), ValueKind::Map))
+    }
+
+    /// Checks if the value is starting with a string.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    pub fn is_startingwith(_env: &Environment, v: String, other: String) -> Result<bool, Error> {
+        Ok(v.starts_with(&other))
+    }
+
+    /// Checks if the value is ending with a string.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    pub fn is_endingwith(_env: &Environment, v: String, other: String) -> Result<bool, Error> {
+        Ok(v.ends_with(&other))
     }
 
     #[test]
