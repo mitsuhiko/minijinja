@@ -21,3 +21,5 @@ trim-bird: {{ word|trim("Bd") }}
 join-default: {{ list|join }}
 join-pipe: {{ list|join("|") }}
 join_string: {{ word|join('-') }}
+default: {{ undefined|default == "" }}
+default-value: {{ undefined|default(42) }}

@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# Unreleased
+
+- Added `default` filter.
+
 # 0.5.0
 
 - Added support for rustc 1.41.0

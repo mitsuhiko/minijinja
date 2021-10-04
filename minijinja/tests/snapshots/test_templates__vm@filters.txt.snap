@@ -1,7 +1,7 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/filters.txt
+input_file: minijinja/tests/inputs/filters.txt
 
 ---
 lower: bird
@@ -20,6 +20,8 @@ trim-bird: ir
 join-default: 123
 join-pipe: 1|2|3
 join_string: B-i-r-d
+default: true
+default-value: 42
 
 =====
 
@@ -115,7 +117,20 @@ Template {
         00056 | BUILD_LIST (1 items)   [<unknown>:16],
         00057 | APPLY_FILTER (name "join")   [<unknown>:16],
         00058 | EMIT   [<unknown>:16],
-        00059 | EMIT_RAW (string "\n")   [<unknown>:16],
+        00059 | EMIT_RAW (string "\ndefault: ")   [<unknown>:16],
+        0005a | LOOKUP (var "undefined")   [<unknown>:17],
+        0005b | BUILD_LIST (0 items)   [<unknown>:17],
+        0005c | APPLY_FILTER (name "default")   [<unknown>:17],
+        0005d | LOAD_CONST (value "")   [<unknown>:17],
+        0005e | EQ   [<unknown>:17],
+        0005f | EMIT   [<unknown>:17],
+        00060 | EMIT_RAW (string "\ndefault-value: ")   [<unknown>:17],
+        00061 | LOOKUP (var "undefined")   [<unknown>:18],
+        00062 | LOAD_CONST (value 42)   [<unknown>:18],
+        00063 | BUILD_LIST (1 items)   [<unknown>:18],
+        00064 | APPLY_FILTER (name "default")   [<unknown>:18],
+        00065 | EMIT   [<unknown>:18],
+        00066 | EMIT_RAW (string "\n")   [<unknown>:18],
     ],
     blocks: {},
     initial_auto_escape: None,

@@ -112,6 +112,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
         rv.insert("reverse", BoxedFilter::new(reverse));
         rv.insert("trim", BoxedFilter::new(trim));
         rv.insert("join", BoxedFilter::new(join));
+        rv.insert("default", BoxedFilter::new(default));
     }
     rv
 }
@@ -252,6 +253,16 @@ mod builtins {
                 "cannot join this value",
             ))
         }
+    }
+
+    /// Checks if a string starts with another string.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    pub fn default(_: &Environment, value: Value, other: Option<Value>) -> Result<Value, Error> {
+        Ok(if value.is_undefined() {
+            other.unwrap_or_else(|| Value::from(""))
+        } else {
+            value
+        })
     }
 
     #[test]
