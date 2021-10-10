@@ -837,8 +837,15 @@ impl Value {
             if let Shared::Dynamic(ref obj) = **cplx {
                 if (**obj).type_id() == TypeId::of::<T>() {
                     unsafe {
-                        let raw: *const (dyn Object) = RcType::as_ptr(obj);
-                        return (raw as *const u8 as *const T).as_ref();
+                        // newer versions of Furst have RcType::as_ptr but we support
+                        // rust versions down to 1.41.0 so we need to use a workaround here.
+                        let count = RcType::strong_count(obj);
+                        let clone = obj.clone();
+                        let raw: *const (dyn Object) = RcType::into_raw(clone);
+                        let rv = (raw as *const u8 as *const T).as_ref();
+                        RcType::from_raw(raw);
+                        debug_assert_eq!(count, RcType::strong_count(obj));
+                        return rv;
                     }
                 }
             }
