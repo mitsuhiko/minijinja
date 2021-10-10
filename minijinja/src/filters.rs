@@ -28,18 +28,17 @@
 //! MiniJinja will perform the necessary conversions automatically via the
 //! [`FunctionArgs`](crate::value::FunctionArgs) and [`Into`] traits.
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::error::Error;
-use crate::utils::HtmlEscape;
+use crate::utils::{HtmlEscape, RcType};
 use crate::value::{ArgType, FunctionArgs, Value};
 
 type FilterFunc =
     dyn Fn(&Environment, Value, Vec<Value>) -> Result<Value, Error> + Sync + Send + 'static;
 
 #[derive(Clone)]
-pub(crate) struct BoxedFilter(Arc<FilterFunc>);
+pub(crate) struct BoxedFilter(RcType<FilterFunc>);
 
 /// A utility trait that represents filters.
 pub trait Filter<V = Value, Rv = Value, Args = Vec<Value>>: Send + Sync + 'static {
@@ -77,14 +76,16 @@ impl BoxedFilter {
         Rv: Into<Value>,
         Args: FunctionArgs,
     {
-        BoxedFilter(Arc::new(move |env, value, args| -> Result<Value, Error> {
-            f.apply_to(
-                env,
-                ArgType::from_value(Some(value))?,
-                FunctionArgs::from_values(args)?,
-            )
-            .map(Into::into)
-        }))
+        BoxedFilter(RcType::new(
+            move |env, value, args| -> Result<Value, Error> {
+                f.apply_to(
+                    env,
+                    ArgType::from_value(Some(value))?,
+                    FunctionArgs::from_values(args)?,
+                )
+                .map(Into::into)
+            },
+        ))
     }
 
     /// Applies the filter to a value and argument.

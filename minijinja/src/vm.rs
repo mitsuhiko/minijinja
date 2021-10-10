@@ -47,7 +47,12 @@ impl DynamicObject for LoopState {
         }
     }
 
-    fn call_method(&self, name: &str, args: Vec<Value>) -> Result<Value, Error> {
+    fn call_method(
+        &self,
+        _env: &Environment,
+        name: &str,
+        args: Vec<Value>,
+    ) -> Result<Value, Error> {
         if name == "cycle" {
             let idx = self.idx.load(Ordering::Relaxed);
             match args.get(idx % args.len()) {
@@ -130,12 +135,12 @@ impl<'env, 'context> Context<'env, 'context> {
     }
 
     /// Looks up a variable in the context.
-    pub fn lookup(&self, key: &str) -> Option<Value> {
+    pub fn lookup(&self, env: &Environment, key: &str) -> Option<Value> {
         for ctx in self.stack.iter().rev() {
             let (lookup_base, cont) = match ctx {
                 // if we hit a chain frame we dispatch there and never
                 // recurse
-                Frame::Chained { base } => return base.lookup(key),
+                Frame::Chained { base } => return base.lookup(env, key),
                 Frame::Isolate { value } => (value, false),
                 Frame::Merge { value } => (value, true),
                 Frame::Loop(Loop {
@@ -160,6 +165,9 @@ impl<'env, 'context> Context<'env, 'context> {
                 }
             }
             if !cont {
+                if let Some(func) = env.get_function(key) {
+                    return Some(func.to_value());
+                }
                 break;
             }
         }
@@ -336,7 +344,7 @@ impl<'env> Vm<'env> {
                     context.store(name, stack.pop());
                 }
                 Instruction::Lookup(name) => {
-                    stack.push(context.lookup(name).unwrap_or(Value::UNDEFINED));
+                    stack.push(context.lookup(self.env, name).unwrap_or(Value::UNDEFINED));
                 }
                 Instruction::GetAttr(name) => {
                     let value = stack.pop();
@@ -582,12 +590,19 @@ impl<'env> Vm<'env> {
                         .perform_test(name, value, args))));
                 }
                 Instruction::CallFunction(function_name) => {
-                    // this is the only function we recognize today and it's
-                    // very special.  In fact it is interpreted very similar to how
-                    // the block syntax works.
+                    let args = try_ctx!(stack.pop().try_into_vec());
+                    // super is a special function reserved for super-ing into blocks.
                     if *function_name == "super" {
                         let mut inner_blocks = blocks.clone();
-                        let name = block_stack.last().expect("empty block stack");
+                        let name = match block_stack.last() {
+                            Some(name) => name,
+                            None => {
+                                bail!(Error::new(
+                                    ErrorKind::ImpossibleOperation,
+                                    "cannot super outside of block",
+                                ));
+                            }
+                        };
                         if let Some(layers) = inner_blocks.get_mut(name) {
                             layers.remove(0);
                             let instructions = layers.first().unwrap();
@@ -597,6 +612,8 @@ impl<'env> Vm<'env> {
                         } else {
                             panic!("attempted to super unreferenced block");
                         }
+                    } else if let Some(func) = context.lookup(self.env, function_name) {
+                        stack.push(try_ctx!(func.call(self.env, args)));
                     } else {
                         bail!(Error::new(
                             ErrorKind::ImpossibleOperation,
@@ -607,17 +624,12 @@ impl<'env> Vm<'env> {
                 Instruction::CallMethod(name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     let obj = stack.pop();
-                    stack.push(try_ctx!(obj.call_method(name, args)));
+                    stack.push(try_ctx!(obj.call_method(self.env, name, args)));
                 }
                 Instruction::CallObject => {
-                    let _args = try_ctx!(stack.pop().try_into_vec());
-                    let _obj = stack.pop();
-                    // TODO: this is something that doesn't make too much sense in the
-                    // engine today.
-                    bail!(Error::new(
-                        ErrorKind::ImpossibleOperation,
-                        "objects cannot be called directly",
-                    ));
+                    let args = try_ctx!(stack.pop().try_into_vec());
+                    let obj = stack.pop();
+                    stack.push(try_ctx!(obj.call(self.env, args)));
                 }
                 Instruction::DupTop => {
                     stack.push(stack.peek().clone());

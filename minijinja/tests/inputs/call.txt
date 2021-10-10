@@ -1,0 +1,3 @@
+upper: 10
+---
+{% with f = range %}{% for x in f(upper) %}[{{ x }}]{% endfor %}{% endwith %}

@@ -15,12 +15,13 @@ features = ["source"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["builtin_filters", "builtin_tests", "sync"]
+default = ["builtin_filters", "builtin_tests", "builtin_functions", "sync"]
 sync = []
 speedups = ["memchr", "v_htmlescape"]
 source = ["self_cell"]
 builtin_filters = []
 builtin_tests = []
+builtin_functions = []
 
 # provides access to the unstable machinery
 unstable_machinery = []

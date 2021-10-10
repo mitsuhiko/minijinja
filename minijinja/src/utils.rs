@@ -5,11 +5,12 @@ use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
 
-// the type we want to use for refcounting
+/// The type we want to use for refcounting (sync mode).
 #[cfg(feature = "sync")]
-pub(crate) type RcType<T> = std::sync::Arc<T>;
+pub type RcType<T> = std::sync::Arc<T>;
+/// The type we want to use for refcounting (unsync mode).
 #[cfg(not(feature = "sync"))]
-pub(crate) type RcType<T> = std::rc::Rc<T>;
+pub type RcType<T> = std::rc::Rc<T>;
 
 // we target Rust 1.41 and that does not have this macro yet
 macro_rules! _matches {
