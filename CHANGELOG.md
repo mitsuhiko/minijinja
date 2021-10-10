@@ -8,6 +8,7 @@ All notable changes to MiniJinja are documented here.
 - Added `startingwith` and `endingwith` tests.
 - Added global functions support.
 - Added `range` function.
+- Fixed panic caused by `super()` calls outside of blocks.
 
 # 0.5.0
 

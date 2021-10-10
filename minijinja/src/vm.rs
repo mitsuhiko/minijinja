@@ -591,12 +591,18 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::CallFunction(function_name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
-                    // this is the only function we recognize today and it's
-                    // very special.  In fact it is interpreted very similar to how
-                    // the block syntax works.
+                    // super is a special function reserved for super-ing into blocks.
                     if *function_name == "super" {
                         let mut inner_blocks = blocks.clone();
-                        let name = block_stack.last().expect("empty block stack");
+                        let name = match block_stack.last() {
+                            Some(name) => name,
+                            None => {
+                                bail!(Error::new(
+                                    ErrorKind::ImpossibleOperation,
+                                    "cannot super outside of block",
+                                ));
+                            }
+                        };
                         if let Some(layers) = inner_blocks.get_mut(name) {
                             layers.remove(0);
                             let instructions = layers.first().unwrap();
