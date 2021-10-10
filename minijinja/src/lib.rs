@@ -69,8 +69,9 @@
 //! # Learn more
 //!
 //! - [`syntax`]: documentation of the template engine syntax.
-//! - [`filters`]: for how to write custom filters and list of built-in filters.
-//! - [`tests`]: for how to write custom test functions and list of built-in tests.
+//! - [`filters`]: for how to write custom filters and to see the list of built-in filters.
+//! - [`tests`]: for how to write custom test functions and to see the list of built-in tests.
+//! - [`functions`]: for how to write custom functions and to see the list of built-in functions.
 //! - [`value`]: for information about the runtime value object.
 //! - [`Environment`]: the main API entry point.
 //! - [`Template`]: the template object API.
@@ -93,6 +94,8 @@
 //! - `builtin_filters`: if this feature is removed the default filters are
 //!   not implemented.
 //! - `builtin_tests`: if this feature is removed the default tests are
+//!   not implemented.
+//! - `builtin_functions`: if this feature is removed the default functions are
 //!   not implemented.
 //! - `sync`: this feature makes MiniJinja's type `Send` and `Sync`.  If this feature
 //!   is disabled sending types across threads is often not possible.  Thread bounds

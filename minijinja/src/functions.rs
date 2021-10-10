@@ -3,6 +3,28 @@
 //! This module provides the abstractions for functions that can registered as
 //! global functions to the environment via
 //! [`add_function`](crate::Environment::add_function).
+//!
+//! # Custom Functions
+//!
+//! A custom global function is just a simple rust function which accepts the
+//! environment as first argument, optionally some additional arguments and then
+//! returns a result.  Global functions are typically used to perform a data
+//! loading operation.  For instance these functions can be used to expose data
+//! to the template that hasn't been provided by the individual render invocation.
+//!
+//! ```rust
+//! # use minijinja::{Environment, Error, ErrorKind};
+//! # let mut env = Environment::new();
+//! fn include_file(env: &Environment, name: String) -> Result<String, Error> {
+//!     std::fs::read_to_string(&name)
+//!         .map_err(|e| Error::new(
+//!             ErrorKind::ImpossibleOperation,
+//!             "cannot load file"
+//!         ).with_source(e))
+//! }
+//!
+//! env.add_function("include_file", include_file);
+//! ```
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;

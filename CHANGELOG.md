@@ -9,6 +9,7 @@ All notable changes to MiniJinja are documented here.
 - Added global functions support.
 - Added `range` function.
 - Fixed panic caused by `super()` calls outside of blocks.
+- Added `Error::with_source` method.
 
 # 0.5.0
 
