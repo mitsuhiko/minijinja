@@ -64,6 +64,8 @@
 
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
+
+use std::any::{Any, TypeId};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -801,6 +803,47 @@ impl Value {
     /// Creates a value from a dynamic object.
     pub fn from_object<T: Object + 'static>(value: T) -> Value {
         Value::from_rc_object(RcType::new(value))
+    }
+
+    /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
+    ///
+    /// This is basically the "reverse" of [`from_object`](Self::from_object).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use minijinja::value::{Value, Object};
+    /// use std::fmt;
+    ///
+    /// #[derive(Debug)]
+    /// struct Thing {
+    ///     id: usize,
+    /// }
+    ///
+    /// impl fmt::Display for Thing {
+    ///     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    ///         fmt::Debug::fmt(self, f)
+    ///     }
+    /// }
+    ///
+    /// impl Object for Thing {}
+    ///
+    /// let x_value = Value::from_object(Thing { id: 42 });
+    /// let thing = x_value.downcast_object_ref::<Thing>().unwrap();
+    /// assert_eq!(thing.id, 42);
+    /// ```
+    pub fn downcast_object_ref<T: Object>(&self) -> Option<&T> {
+        if let Repr::Shared(ref cplx) = self.0 {
+            if let Shared::Dynamic(ref obj) = **cplx {
+                if (**obj).type_id() == TypeId::of::<T>() {
+                    unsafe {
+                        let raw: *const (dyn Object) = RcType::as_ptr(obj);
+                        return (raw as *const u8 as *const T).as_ref();
+                    }
+                }
+            }
+        }
+        None
     }
 
     /// Returns the value kind.
@@ -1622,7 +1665,7 @@ impl<'a> ValueIteratorImpl<'a> {
 /// Objects need to implement [`Display`](std::fmt::Display) which is used by
 /// the engine to convert the object into a string if needed.  Additionally
 /// [`Debug`](std::fmt::Debug) is required as well.
-pub trait Object: fmt::Display + fmt::Debug + Sync + Send {
+pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// Invoked by the engine to get the attribute of an object.
     ///
     /// Where possible it's a good idea for this to align with the return value
