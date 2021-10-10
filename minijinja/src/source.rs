@@ -7,7 +7,7 @@ use self_cell::self_cell;
 
 use crate::environment::CompiledTemplate;
 use crate::error::{Error, ErrorKind};
-use crate::utils::RcType;
+use crate::value::RcType;
 
 /// Utility for dynamic template loading.
 ///

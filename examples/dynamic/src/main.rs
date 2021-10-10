@@ -1,0 +1,81 @@
+use std::fmt;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use minijinja::value::{FunctionArgs, Object, Value};
+use minijinja::{Environment, Error};
+
+#[derive(Debug)]
+struct Cycler {
+    values: Vec<Value>,
+    idx: AtomicUsize,
+}
+
+impl fmt::Display for Cycler {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "cycler")
+    }
+}
+
+impl Object for Cycler {
+    fn call(&self, _env: &Environment, args: Vec<Value>) -> Result<Value, Error> {
+        let _: () = FunctionArgs::from_values(args)?;
+        let idx = self.idx.fetch_add(1, Ordering::Relaxed);
+        Ok(self.values[idx % self.values.len()].clone())
+    }
+}
+
+fn make_cycler(_env: &Environment, args: Vec<Value>) -> Result<Value, Error> {
+    Ok(Value::from_object(Cycler {
+        values: args,
+        idx: AtomicUsize::new(0),
+    }))
+}
+
+#[derive(Debug)]
+struct Magic;
+
+impl fmt::Display for Magic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "magic")
+    }
+}
+
+impl Object for Magic {
+    fn call_method(
+        &self,
+        _env: &Environment,
+        name: &str,
+        args: Vec<Value>,
+    ) -> Result<Value, Error> {
+        if name == "make_class" {
+            let (tag,): (String,) = FunctionArgs::from_values(args)?;
+            Ok(Value::from(format!("magic-{}", tag)))
+        } else {
+            Err(Error::new(
+                minijinja::ErrorKind::ImpossibleOperation,
+                format!("object has no method named {}", name),
+            ))
+        }
+    }
+}
+
+fn main() {
+    let mut env = Environment::new();
+    env.add_function("cycler", make_cycler);
+    env.add_global("magic", Value::from_object(Magic));
+    env.add_template(
+        "demo.html",
+        r#"
+{%- with next_class = cycler(["odd", "even"]) %}
+  <ul class="{{ magic.make_class("ul") }}">
+  {%- for char in ["a", "b", "c", "d"] %}
+    <li class={{ next_class() }}>{{ char }}</li>
+  {%- endfor %}
+  </ul>
+{%- endwith %}"#,
+    )
+    .unwrap();
+
+    let tmpl = env.get_template("demo.html").unwrap();
+    println!("{}", tmpl.render(&()).unwrap());
+}

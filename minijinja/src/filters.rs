@@ -31,8 +31,8 @@ use std::collections::BTreeMap;
 
 use crate::environment::Environment;
 use crate::error::Error;
-use crate::utils::{HtmlEscape, RcType};
-use crate::value::{ArgType, FunctionArgs, Value};
+use crate::utils::HtmlEscape;
+use crate::value::{ArgType, FunctionArgs, RcType, Value};
 
 type FilterFunc =
     dyn Fn(&Environment, Value, Vec<Value>) -> Result<Value, Error> + Sync + Send + 'static;

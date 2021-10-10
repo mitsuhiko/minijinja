@@ -33,8 +33,7 @@ use std::collections::BTreeMap;
 
 use crate::environment::Environment;
 use crate::error::Error;
-use crate::utils::RcType;
-use crate::value::{ArgType, FunctionArgs, Value};
+use crate::value::{ArgType, FunctionArgs, RcType, Value};
 
 type TestFunc =
     dyn Fn(&Environment, Value, Vec<Value>) -> Result<bool, Error> + Sync + Send + 'static;

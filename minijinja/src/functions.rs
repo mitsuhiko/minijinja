@@ -31,8 +31,7 @@ use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::error::Error;
-use crate::utils::RcType;
-use crate::value::{DynamicObject, FunctionArgs, Value};
+use crate::value::{FunctionArgs, Object, Value};
 
 type FuncFunc = dyn Fn(&Environment, Vec<Value>) -> Result<Value, Error> + Sync + Send + 'static;
 
@@ -88,7 +87,7 @@ impl BoxedFunction {
 
     /// Creates a value from a boxed function.
     pub fn to_value(&self) -> Value {
-        Value::from_dynamic(RcType::new(self.clone()))
+        Value::from_object(self.clone())
     }
 }
 
@@ -104,18 +103,18 @@ impl fmt::Display for BoxedFunction {
     }
 }
 
-impl DynamicObject for BoxedFunction {
+impl Object for BoxedFunction {
     fn call(&self, env: &Environment, args: Vec<Value>) -> Result<Value, Error> {
         self.invoke(env, args)
     }
 }
 
-pub(crate) fn get_builtin_functions() -> BTreeMap<&'static str, BoxedFunction> {
+pub(crate) fn get_globals() -> BTreeMap<&'static str, Value> {
     #[allow(unused_mut)]
     let mut rv = BTreeMap::new();
     #[cfg(feature = "builtin_functions")]
     {
-        rv.insert("range", BoxedFunction::new(range));
+        rv.insert("range", BoxedFunction::new(range).to_value());
     }
     rv
 }

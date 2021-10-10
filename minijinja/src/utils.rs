@@ -5,13 +5,6 @@ use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
 
-/// The type we want to use for refcounting (sync mode).
-#[cfg(feature = "sync")]
-pub type RcType<T> = std::sync::Arc<T>;
-/// The type we want to use for refcounting (unsync mode).
-#[cfg(not(feature = "sync"))]
-pub type RcType<T> = std::rc::Rc<T>;
-
 // we target Rust 1.41 and that does not have this macro yet
 macro_rules! _matches {
     ($expression:expr, $( $pattern:pat )|+ $( if $guard: expr )? $(,)?) => {

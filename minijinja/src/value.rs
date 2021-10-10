@@ -55,6 +55,12 @@
 //! prevent this behavior the [`safe`](crate::filters::safe) filter can be used
 //! in the template.  Outside of templates the [`Value::from_safe_string`] method
 //! can be used to achieve the same result.
+//!
+//! # Dynamic Objects
+//!
+//! Values can also hold "dynamic" objects.  These are objects which implement the
+//! [`Object`] trait.  These can be used to implement dynamic functionality such as
+//! stateful values and more.
 
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
@@ -71,7 +77,13 @@ use serde::ser::{self, Serialize, Serializer};
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, KeySerializer};
-use crate::utils::{matches, RcType};
+use crate::utils::matches;
+
+#[cfg(feature = "sync")]
+pub(crate) type RcType<T> = std::sync::Arc<T>;
+
+#[cfg(not(feature = "sync"))]
+pub(crate) type RcType<T> = std::rc::Rc<T>;
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
@@ -146,44 +158,6 @@ tuple_impls! { A B C }
 tuple_impls! { A B C D }
 tuple_impls! { A B C D E }
 
-impl FunctionArgs for Vec<Value> {
-    fn from_values(values: Vec<Value>) -> Result<Self, Error> {
-        Ok(values)
-    }
-}
-
-/// A utility trait that represents a dynamic object.
-///
-/// A `RcType<dyn DynamicObject>` can be encapsulated in a value type.
-pub trait DynamicObject: fmt::Display + fmt::Debug + Sync + Send {
-    fn get_attr(&self, _name: &str) -> Option<Value> {
-        None
-    }
-
-    fn fields(&self) -> &[&str] {
-        &[][..]
-    }
-
-    fn call_method(
-        &self,
-        _env: &Environment,
-        name: &str,
-        _args: Vec<Value>,
-    ) -> Result<Value, Error> {
-        Err(Error::new(
-            ErrorKind::ImpossibleOperation,
-            format!("object has no method named {}", name),
-        ))
-    }
-
-    fn call(&self, _env: &Environment, _args: Vec<Value>) -> Result<Value, Error> {
-        Err(Error::new(
-            ErrorKind::ImpossibleOperation,
-            "object is not callable",
-        ))
-    }
-}
-
 /// Describes the kind of value.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ValueKind {
@@ -243,7 +217,7 @@ enum Shared {
     // adjacent to `Shared` but unfortunately a `dyn Trait` needs two
     // pointers and that increases the size of the value type for all
     // uses.
-    Dynamic(RcType<dyn DynamicObject>),
+    Dynamic(RcType<dyn Object>),
 }
 
 impl fmt::Debug for Shared {
@@ -782,6 +756,22 @@ impl From<usize> for Value {
     }
 }
 
+impl<T: ArgType> ArgType for Vec<T> {
+    fn from_value(value: Option<Value>) -> Result<Self, Error> {
+        match value {
+            None => Ok(Vec::new()),
+            Some(values) => {
+                let values = values.try_into_vec()?;
+                let mut rv = Vec::new();
+                for value in values {
+                    rv.push(ArgType::from_value(Some(value))?);
+                }
+                Ok(rv)
+            }
+        }
+    }
+}
+
 #[allow(clippy::len_without_is_empty)]
 impl Value {
     /// The undefined value
@@ -803,9 +793,14 @@ impl Value {
         Repr::Shared(RcType::new(Shared::SafeString(value))).into()
     }
 
+    /// Creates a value from a reference counted dynamic object.
+    pub(crate) fn from_rc_object<T: Object + 'static>(value: RcType<T>) -> Value {
+        Repr::Shared(RcType::new(Shared::Dynamic(value as RcType<dyn Object>))).into()
+    }
+
     /// Creates a value from a dynamic object.
-    pub(crate) fn from_dynamic(value: RcType<dyn DynamicObject>) -> Value {
-        Repr::Shared(RcType::new(Shared::Dynamic(value))).into()
+    pub fn from_object<T: Object + 'static>(value: T) -> Value {
+        Value::from_rc_object(RcType::new(value))
     }
 
     /// Returns the value kind.
@@ -897,7 +892,7 @@ impl Value {
                 Shared::Map(ref items) => Some(items.len()),
                 Shared::Struct(ref items) => Some(items.len()),
                 Shared::Seq(ref items) => Some(items.len()),
-                Shared::Dynamic(ref dy) => Some(dy.fields().len()),
+                Shared::Dynamic(ref dy) => Some(dy.attributes().len()),
                 _ => None,
             }
         } else {
@@ -1120,7 +1115,7 @@ impl Serialize for Value {
                 }
                 Shared::Dynamic(ref n) => {
                     use serde::ser::SerializeMap;
-                    let fields = n.fields();
+                    let fields = n.attributes();
                     let mut s = serializer.serialize_map(Some(fields.len()))?;
                     for k in fields {
                         let v = n.get_attr(k).unwrap_or(Value::UNDEFINED);
@@ -1610,6 +1605,72 @@ impl<'a> ValueIteratorImpl<'a> {
     }
 }
 
+/// A utility trait that represents a dynamic object.
+///
+/// The engine uses the [`Value`] type to represent values that the engine
+/// knows about.  Most of these values are primitives such as integers, strings
+/// or maps.  However it is also possible to expose custom types without
+/// undergoing a serialization step to the engine.  For this to work a type
+/// needs to implement the [`Object`] trait and be wrapped in a value with
+/// [`Value::from_object`](crate::value::Value::from_object). The ownership of
+/// the object will then move into the value type.
+//
+/// The engine uses reference counted objects with interior mutability in the
+/// value type.  This means that all trait methods take `&self` and types like
+/// [`Mutex`](std::sync::Mutex) need to be used to enable mutability.
+//
+/// Objects need to implement [`Display`](std::fmt::Display) which is used by
+/// the engine to convert the object into a string if needed.  Additionally
+/// [`Debug`](std::fmt::Debug) is required as well.
+pub trait Object: fmt::Display + fmt::Debug + Sync + Send {
+    /// Invoked by the engine to get the attribute of an object.
+    ///
+    /// Where possible it's a good idea for this to align with the return value
+    /// of [`attributes`](Self::attributes) but it's not necessary.
+    ///
+    /// If an attribute does not exist, `None` shall be returned.
+    fn get_attr(&self, name: &str) -> Option<Value> {
+        let _name = name;
+        None
+    }
+
+    /// An enumeration of attributes that are known to exist on this object.
+    ///
+    /// The default implementation returns an empty slice.  If it's not possible
+    /// to implement this, it's fine for the implementation to be omitted.  The
+    /// enumeration here is used by the `for` loop to iterate over the attributes
+    /// on the value.
+    fn attributes(&self) -> &[&str] {
+        &[][..]
+    }
+
+    /// Called when the engine tries to call a method on the object.
+    ///
+    /// It's the responsibility of the implementer to ensure that an
+    /// error is generated if an invalid method is invoked.
+    fn call_method(&self, env: &Environment, name: &str, args: Vec<Value>) -> Result<Value, Error> {
+        let _env = env;
+        let _args = args;
+        Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            format!("object has no method named {}", name),
+        ))
+    }
+
+    /// Called when the object is invoked directly.
+    ///
+    /// The default implementation just generates an error that the object
+    /// cannot be invoked.
+    fn call(&self, env: &Environment, args: Vec<Value>) -> Result<Value, Error> {
+        let _env = env;
+        let _args = args;
+        Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            "object is not callable",
+        ))
+    }
+}
+
 /// Utility macro to create a value from a literal
 #[cfg(test)]
 macro_rules! value {
@@ -1694,7 +1755,7 @@ fn test_dynamic_object_roundtrip() {
         }
     }
 
-    impl DynamicObject for X {
+    impl Object for X {
         fn get_attr(&self, name: &str) -> Option<Value> {
             match name {
                 "value" => Some(Value::from(self.0.load(atomic::Ordering::Relaxed))),
@@ -1702,13 +1763,13 @@ fn test_dynamic_object_roundtrip() {
             }
         }
 
-        fn fields(&self) -> &'static [&'static str] {
+        fn attributes(&self) -> &'static [&'static str] {
             &["value"]
         }
     }
 
     let x = RcType::new(X(Default::default()));
-    let x_value = Value::from_dynamic(x.clone());
+    let x_value = Value::from_rc_object(x.clone());
     x.0.fetch_add(42, atomic::Ordering::Relaxed);
     let x_clone = Value::from_serializable(&x_value);
     x.0.fetch_add(23, atomic::Ordering::Relaxed);

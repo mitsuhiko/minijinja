@@ -5,11 +5,10 @@ use serde::Serialize;
 
 use crate::compiler::Compiler;
 use crate::error::{Error, ErrorKind};
-use crate::functions::BoxedFunction;
 use crate::instructions::Instructions;
 use crate::parser::{parse, parse_expr};
-use crate::utils::{AutoEscape, HtmlEscape, RcType};
-use crate::value::{ArgType, FunctionArgs, Value};
+use crate::utils::{AutoEscape, HtmlEscape};
+use crate::value::{ArgType, FunctionArgs, RcType, Value};
 use crate::vm::Vm;
 use crate::{filters, functions, tests};
 
@@ -141,7 +140,7 @@ pub struct Environment<'source> {
     templates: Source<'source>,
     filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
     tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
-    functions: RcType<BTreeMap<&'source str, functions::BoxedFunction>>,
+    globals: RcType<BTreeMap<&'source str, Value>>,
     default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
 }
 
@@ -227,7 +226,7 @@ impl<'source> Environment<'source> {
             templates: Source::Borrowed(Default::default()),
             filters: RcType::new(filters::get_builtin_filters()),
             tests: RcType::new(tests::get_builtin_tests()),
-            functions: RcType::new(functions::get_builtin_functions()),
+            globals: RcType::new(functions::get_globals()),
             default_auto_escape: RcType::new(default_auto_escape),
         }
     }
@@ -241,7 +240,7 @@ impl<'source> Environment<'source> {
             templates: Source::Borrowed(Default::default()),
             filters: RcType::default(),
             tests: RcType::default(),
-            functions: RcType::default(),
+            globals: RcType::default(),
             default_auto_escape: RcType::new(no_auto_escape),
         }
     }
@@ -392,24 +391,30 @@ impl<'source> Environment<'source> {
 
     /// Adds a new global function.
     ///
-    /// For details about functions have a look at [`functions`].
+    /// For details about functions have a look at [`functions`].  Note that
+    /// functions and other global variables share the same namespace.
     pub fn add_function<F, Rv, Args>(&mut self, name: &'source str, f: F)
     where
         Rv: Into<Value>,
         F: functions::Function<Rv, Args>,
         Args: FunctionArgs,
     {
-        RcType::make_mut(&mut self.functions).insert(name, functions::BoxedFunction::new(f));
+        self.add_global(name, functions::BoxedFunction::new(f).to_value());
     }
 
-    /// Removes a global function by name.
-    pub fn remove_function(&mut self, name: &str) {
-        RcType::make_mut(&mut self.functions).remove(name);
+    /// Adds a global variable.
+    pub fn add_global(&mut self, name: &'source str, value: Value) {
+        RcType::make_mut(&mut self.globals).insert(name, value);
+    }
+
+    /// Removes a global function or variable by name.
+    pub fn remove_global(&mut self, name: &str) {
+        RcType::make_mut(&mut self.globals).remove(name);
     }
 
     /// Looks up a function.
-    pub(crate) fn get_function(&self, name: &str) -> Option<BoxedFunction> {
-        self.functions.get(name).cloned()
+    pub(crate) fn get_global(&self, name: &str) -> Option<Value> {
+        self.globals.get(name).cloned()
     }
 
     /// Applies a filter with arguments to a value.
@@ -519,4 +524,13 @@ fn test_clone() {
     env2.add_template("test", "b").unwrap();
     assert_eq!(env2.get_template("test").unwrap().render(&()).unwrap(), "b");
     assert_eq!(env.get_template("test").unwrap().render(&()).unwrap(), "a");
+}
+
+#[test]
+fn test_globals() {
+    let mut env = Environment::new();
+    env.add_global("a", Value::from(42));
+    env.add_template("test", "{{ a }}").unwrap();
+    let tmpl = env.get_template("test").unwrap();
+    assert_eq!(tmpl.render(()).unwrap(), "42");
 }
