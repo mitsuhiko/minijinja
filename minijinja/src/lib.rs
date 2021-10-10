@@ -114,6 +114,7 @@ mod utils;
 mod vm;
 
 pub mod filters;
+pub mod functions;
 pub mod syntax;
 pub mod tests;
 pub mod value;

@@ -6,6 +6,8 @@ All notable changes to MiniJinja are documented here.
 
 - Added `default` filter.
 - Added `startingwith` and `endingwith` tests.
+- Added global functions support.
+- Added `range` function.
 
 # 0.5.0
 

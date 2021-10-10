@@ -5,12 +5,13 @@ use serde::Serialize;
 
 use crate::compiler::Compiler;
 use crate::error::{Error, ErrorKind};
+use crate::functions::BoxedFunction;
 use crate::instructions::Instructions;
 use crate::parser::{parse, parse_expr};
 use crate::utils::{AutoEscape, HtmlEscape, RcType};
 use crate::value::{ArgType, FunctionArgs, Value};
 use crate::vm::Vm;
-use crate::{filters, tests};
+use crate::{filters, functions, tests};
 
 /// Represents a handle to a template.
 ///
@@ -140,6 +141,7 @@ pub struct Environment<'source> {
     templates: Source<'source>,
     filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
     tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
+    functions: RcType<BTreeMap<&'source str, functions::BoxedFunction>>,
     default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
 }
 
@@ -225,6 +227,7 @@ impl<'source> Environment<'source> {
             templates: Source::Borrowed(Default::default()),
             filters: RcType::new(filters::get_builtin_filters()),
             tests: RcType::new(tests::get_builtin_tests()),
+            functions: RcType::new(functions::get_builtin_functions()),
             default_auto_escape: RcType::new(default_auto_escape),
         }
     }
@@ -238,6 +241,7 @@ impl<'source> Environment<'source> {
             templates: Source::Borrowed(Default::default()),
             filters: RcType::default(),
             tests: RcType::default(),
+            functions: RcType::default(),
             default_auto_escape: RcType::new(no_auto_escape),
         }
     }
@@ -384,6 +388,28 @@ impl<'source> Environment<'source> {
     /// Removes a test by name.
     pub fn remove_test(&mut self, name: &str) {
         RcType::make_mut(&mut self.tests).remove(name);
+    }
+
+    /// Adds a new global function.
+    ///
+    /// For details about functions have a look at [`functions`].
+    pub fn add_function<F, Rv, Args>(&mut self, name: &'source str, f: F)
+    where
+        Rv: Into<Value>,
+        F: functions::Function<Rv, Args>,
+        Args: FunctionArgs,
+    {
+        RcType::make_mut(&mut self.functions).insert(name, functions::BoxedFunction::new(f));
+    }
+
+    /// Removes a global function by name.
+    pub fn remove_function(&mut self, name: &str) {
+        RcType::make_mut(&mut self.functions).remove(name);
+    }
+
+    /// Looks up a function.
+    pub(crate) fn get_function(&self, name: &str) -> Option<BoxedFunction> {
+        self.functions.get(name).cloned()
     }
 
     /// Applies a filter with arguments to a value.

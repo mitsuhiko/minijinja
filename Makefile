@@ -1,5 +1,5 @@
 DOC_FEATURES=source
-TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters,source
+TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,source
 
 all: test
 

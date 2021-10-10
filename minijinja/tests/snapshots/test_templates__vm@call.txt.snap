@@ -1,0 +1,35 @@
+---
+source: minijinja/tests/test_templates.rs
+expression: "&rendered"
+input_file: minijinja/tests/inputs/call.txt
+
+---
+[0][1][2][3][4][5][6][7][8][9]
+
+=====
+
+Template {
+    name: "call.txt",
+    instructions: [
+        00000 | LOAD_CONST (value "f")   [<unknown>:1],
+        00001 | LOOKUP (var "range")   [<unknown>:1],
+        00002 | BUILD_MAP (1 pairs)   [<unknown>:1],
+        00003 | PUSH_CONTEXT   [<unknown>:1],
+        00004 | LOOKUP (var "upper")   [<unknown>:1],
+        00005 | BUILD_LIST (1 items)   [<unknown>:1],
+        00006 | CALL_FUNCTION (name "f")   [<unknown>:1],
+        00007 | PUSH_LOOP (loop var: true)   [<unknown>:1],
+        00008 | ITERATE (exit to 0000f)   [<unknown>:1],
+        00009 | STORE_LOCAL (var "x")   [<unknown>:1],
+        0000a | EMIT_RAW (string "[")   [<unknown>:1],
+        0000b | LOOKUP (var "x")   [<unknown>:1],
+        0000c | EMIT   [<unknown>:1],
+        0000d | EMIT_RAW (string "]")   [<unknown>:1],
+        0000e | JUMP (to 00008)   [<unknown>:1],
+        0000f | POP_FRAME   [<unknown>:1],
+        00010 | POP_FRAME   [<unknown>:1],
+        00011 | EMIT_RAW (string "\n")   [<unknown>:1],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

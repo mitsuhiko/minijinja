@@ -68,6 +68,7 @@ use std::sync::atomic::{self, AtomicBool, AtomicUsize};
 
 use serde::ser::{self, Serialize, Serializer};
 
+use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, KeySerializer};
 use crate::utils::{matches, RcType};
@@ -151,13 +152,34 @@ impl FunctionArgs for Vec<Value> {
     }
 }
 
-pub(crate) trait DynamicObject: fmt::Display + fmt::Debug + Sync + Send {
-    fn get_attr(&self, name: &str) -> Option<Value>;
-    fn fields(&self) -> &[&str];
-    fn call_method(&self, name: &str, _args: Vec<Value>) -> Result<Value, Error> {
+/// A utility trait that represents a dynamic object.
+///
+/// A `RcType<dyn DynamicObject>` can be encapsulated in a value type.
+pub trait DynamicObject: fmt::Display + fmt::Debug + Sync + Send {
+    fn get_attr(&self, _name: &str) -> Option<Value> {
+        None
+    }
+
+    fn fields(&self) -> &[&str] {
+        &[][..]
+    }
+
+    fn call_method(
+        &self,
+        _env: &Environment,
+        name: &str,
+        _args: Vec<Value>,
+    ) -> Result<Value, Error> {
         Err(Error::new(
             ErrorKind::ImpossibleOperation,
             format!("object has no method named {}", name),
+        ))
+    }
+
+    fn call(&self, _env: &Environment, _args: Vec<Value>) -> Result<Value, Error> {
+        Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            "object is not callable",
         ))
     }
 }
@@ -781,6 +803,7 @@ impl Value {
         Repr::Shared(RcType::new(Shared::SafeString(value))).into()
     }
 
+    /// Creates a value from a dynamic object.
     pub(crate) fn from_dynamic(value: RcType<dyn DynamicObject>) -> Value {
         Repr::Shared(RcType::new(Shared::Dynamic(value))).into()
     }
@@ -948,11 +971,29 @@ impl Value {
         None
     }
 
-    /// Calls a method on the value.
-    pub(crate) fn call_method(&self, name: &str, args: Vec<Value>) -> Result<Value, Error> {
+    /// Calls the value directly.
+    pub(crate) fn call(&self, env: &Environment, args: Vec<Value>) -> Result<Value, Error> {
         if let Repr::Shared(ref cplx) = self.0 {
             if let Shared::Dynamic(ref dy) = **cplx {
-                return dy.call_method(name, args);
+                return dy.call(env, args);
+            }
+        }
+        Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            "value is not callable",
+        ))
+    }
+
+    /// Calls a method on the value.
+    pub(crate) fn call_method(
+        &self,
+        env: &Environment,
+        name: &str,
+        args: Vec<Value>,
+    ) -> Result<Value, Error> {
+        if let Repr::Shared(ref cplx) = self.0 {
+            if let Shared::Dynamic(ref dy) = **cplx {
+                return dy.call_method(env, name, args);
             }
         }
         Err(Error::new(
