@@ -53,6 +53,42 @@ Ok(
             EmitRaw {
                 raw: "\n",
             } @ 3:16-4:0,
+            EmitExpr {
+                expr: Call {
+                    expr: Var {
+                        id: "foo",
+                    } @ 4:3-4:6,
+                    args: [
+                        Const {
+                            value: 1,
+                        } @ 4:7-4:8,
+                        Const {
+                            value: 2,
+                        } @ 4:10-4:11,
+                        Map {
+                            keys: [
+                                Const {
+                                    value: "a",
+                                } @ 4:13-4:14,
+                                Const {
+                                    value: "b",
+                                } @ 4:18-4:19,
+                            ],
+                            values: [
+                                Const {
+                                    value: 3,
+                                } @ 4:15-4:16,
+                                Const {
+                                    value: 4,
+                                } @ 4:20-4:21,
+                            ],
+                        } @ 4:13-4:22,
+                    ],
+                } @ 4:6-4:25,
+            } @ 4:0-4:25,
+            EmitRaw {
+                raw: "\n",
+            } @ 4:25-5:0,
         ],
-    } @ 1:0-4:0,
+    } @ 1:0-5:0,
 )

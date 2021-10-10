@@ -372,16 +372,59 @@ impl<'a> Parser<'a> {
 
     fn parse_args(&mut self) -> Result<Vec<ast::Expr<'a>>, Error> {
         let mut args = Vec::new();
+        let mut first_span = None;
+        let mut kwargs_keys = Vec::new();
+        let mut kwargs_values = Vec::new();
+
         expect_token!(self, Token::ParenOpen, "`(`")?;
         loop {
             if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
                 break;
             }
-            if !args.is_empty() {
+            if !args.is_empty() || !kwargs_keys.is_empty() {
                 expect_token!(self, Token::Comma, "`,`")?;
             }
-            args.push(self.parse_expr()?);
+            let expr = self.parse_expr()?;
+
+            // keyword argument
+            match expr {
+                ast::Expr::Var(ref var)
+                    if matches!(self.stream.current()?, Some((Token::Assign, _))) =>
+                {
+                    self.stream.next()?;
+                    if first_span.is_none() {
+                        first_span = Some(var.span());
+                    }
+                    kwargs_keys.push(ast::Expr::Const(Spanned::new(
+                        ast::Const {
+                            value: Value::from(var.id),
+                        },
+                        var.span(),
+                    )));
+                    kwargs_values.push(self.parse_expr_noif()?);
+                }
+                _ if !kwargs_keys.is_empty() => {
+                    return Err(Error::new(
+                        ErrorKind::SyntaxError,
+                        "non-keyword arg after keyword arg",
+                    ));
+                }
+                _ => {
+                    args.push(expr);
+                }
+            }
         }
+
+        if !kwargs_keys.is_empty() {
+            args.push(ast::Expr::Map(ast::Spanned::new(
+                ast::Map {
+                    keys: kwargs_keys,
+                    values: kwargs_values,
+                },
+                self.stream.expand_span(first_span.unwrap()),
+            )));
+        }
+
         expect_token!(self, Token::ParenClose, "`)`")?;
         Ok(args)
     }

@@ -117,7 +117,9 @@
 //!   ``{{ "Hello " ~ name ~ "!" }}`` would return (assuming `name` is set
 //!   to ``'John'``) ``Hello John!``.
 //! - ``()``: Call a callable: ``{{ super() }}``.  Inside of the parentheses you
-//!   can use positional arguments.
+//!   can use positional arguments.  Additionally keyword arguments are supported
+//!   which are treated like a dict syntax.  Eg: `foo(a=1, b=2)` is the same as
+//!   `foo({"a": 1, "b": 2})`.
 //! - ``.`` / ``[]``: Get an attribute of an object.
 //!
 //! ### If Expressions

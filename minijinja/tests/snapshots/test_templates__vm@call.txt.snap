@@ -5,6 +5,7 @@ input_file: minijinja/tests/inputs/call.txt
 
 ---
 [0][1][2][3][4][5][6][7][8][9]
+[a:1][b:2][c:3]
 
 =====
 
@@ -29,6 +30,32 @@ Template {
         0000f | POP_FRAME   [<unknown>:1],
         00010 | POP_FRAME   [<unknown>:1],
         00011 | EMIT_RAW (string "\n")   [<unknown>:1],
+        00012 | LOAD_CONST (value "a")   [<unknown>:2],
+        00013 | LOAD_CONST (value 1)   [<unknown>:2],
+        00014 | LOAD_CONST (value "b")   [<unknown>:2],
+        00015 | LOAD_CONST (value 2)   [<unknown>:2],
+        00016 | LOAD_CONST (value "c")   [<unknown>:2],
+        00017 | LOAD_CONST (value 3)   [<unknown>:2],
+        00018 | BUILD_MAP (3 pairs)   [<unknown>:2],
+        00019 | BUILD_LIST (1 items)   [<unknown>:2],
+        0001a | CALL_FUNCTION (name "dict")   [<unknown>:2],
+        0001b | BUILD_LIST (0 items)   [<unknown>:2],
+        0001c | APPLY_FILTER (name "dictsort")   [<unknown>:2],
+        0001d | PUSH_LOOP (loop var: true)   [<unknown>:2],
+        0001e | ITERATE (exit to 0002a)   [<unknown>:2],
+        0001f | UNPACK_LIST (2 items)   [<unknown>:2],
+        00020 | STORE_LOCAL (var "k")   [<unknown>:2],
+        00021 | STORE_LOCAL (var "v")   [<unknown>:2],
+        00022 | EMIT_RAW (string "[")   [<unknown>:2],
+        00023 | LOOKUP (var "k")   [<unknown>:2],
+        00024 | EMIT   [<unknown>:2],
+        00025 | EMIT_RAW (string ":")   [<unknown>:2],
+        00026 | LOOKUP (var "v")   [<unknown>:2],
+        00027 | EMIT   [<unknown>:2],
+        00028 | EMIT_RAW (string "]")   [<unknown>:2],
+        00029 | JUMP (to 0001e)   [<unknown>:2],
+        0002a | POP_FRAME   [<unknown>:2],
+        0002b | EMIT_RAW (string "\n")   [<unknown>:2],
     ],
     blocks: {},
     initial_auto_escape: None,

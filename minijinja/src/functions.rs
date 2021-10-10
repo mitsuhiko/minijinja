@@ -115,6 +115,7 @@ pub(crate) fn get_globals() -> BTreeMap<&'static str, Value> {
     #[cfg(feature = "builtin_functions")]
     {
         rv.insert("range", BoxedFunction::new(range).to_value());
+        rv.insert("dict", BoxedFunction::new(dict).to_value());
     }
     rv
 }
@@ -122,6 +123,9 @@ pub(crate) fn get_globals() -> BTreeMap<&'static str, Value> {
 #[cfg(feature = "builtin_functions")]
 mod builtins {
     use super::*;
+
+    use crate::error::ErrorKind;
+    use crate::value::ValueKind;
 
     /// Returns a range.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_functions")))]
@@ -140,6 +144,18 @@ mod builtins {
         } else {
             rng.collect()
         })
+    }
+
+    /// Creates a dictionary.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_functions")))]
+    pub fn dict(_env: &Environment, value: Value) -> Result<Value, Error> {
+        if value.is_undefined() {
+            Ok(Value::from(BTreeMap::<bool, Value>::new()))
+        } else if value.kind() != ValueKind::Map {
+            Err(Error::from(ErrorKind::ImpossibleOperation))
+        } else {
+            Ok(value)
+        }
     }
 }
 

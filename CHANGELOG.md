@@ -8,9 +8,11 @@ All notable changes to MiniJinja are documented here.
 - Added `startingwith` and `endingwith` tests.
 - Added global variables and function support.
 - Added `range` function.
+- Added `dict` function.
 - Fixed panic caused by `super()` calls outside of blocks.
 - Added `Error::with_source` method.
 - Added `object` abstraction.
+- Added keyword arguments to function and filter invocations.
 
 # 0.5.0
 
