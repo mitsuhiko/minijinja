@@ -9,11 +9,13 @@ lower: {{ word|lower }}
 upper: {{ word|upper }}
 replace: {{ word|replace("B", "th") }}
 escape: {{ "<"|escape }}
+e: {{ "<"|e }}
 double-escape: {{ "<"|escape|escape }}
 safe: {{ "<"|safe|escape }}
 list-length: {{ list|length }}
 map-length: {{ map|length }}
 string-length: {{ word|length }}
+string-count: {{ word|count }}
 reverse-list: {{ list|reverse }}
 reverse-string: {{ word|reverse }}
 trim: |{{ word_with_spaces|trim }}|
@@ -23,3 +25,4 @@ join-pipe: {{ list|join("|") }}
 join_string: {{ word|join('-') }}
 default: {{ undefined|default == "" }}
 default-value: {{ undefined|default(42) }}
+d: {{ undefined|d == "" }}

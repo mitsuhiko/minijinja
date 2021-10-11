@@ -128,6 +128,11 @@ mod builtins {
     use crate::value::ValueKind;
 
     /// Returns a range.
+    ///
+    /// Return a list containing an arithmetic progression of integers. `range(i,
+    /// j)` returns `[i, i+1, i+2, ..., j-1]`. `lower` defaults to 0. When `step` is
+    /// given, it specifies the increment (or decrement). For example, `range(4)`
+    /// and `range(0, 4, 1)` return `[0, 1, 2, 3]`. The end point is omitted.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_functions")))]
     pub fn range(
         _env: &Environment,
@@ -147,6 +152,9 @@ mod builtins {
     }
 
     /// Creates a dictionary.
+    ///
+    /// This is a convenient alternative for a dictionary literal.
+    /// `{"foo": "bar"}` is the same as `dict(foo="bar")`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_functions")))]
     pub fn dict(_env: &Environment, value: Value) -> Result<Value, Error> {
         if value.is_undefined() {

@@ -13,6 +13,7 @@ All notable changes to MiniJinja are documented here.
 - Added `Error::with_source` method.
 - Added `object` abstraction.
 - Added keyword arguments to function and filter invocations.
+- Added Jinja2 filter aliases `e`, `d` and `count`.
 
 # 0.5.0
 

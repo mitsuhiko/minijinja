@@ -103,17 +103,20 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
     let mut rv = BTreeMap::new();
     rv.insert("safe", BoxedFilter::new(safe));
     rv.insert("escape", BoxedFilter::new(escape));
+    rv.insert("e", BoxedFilter::new(escape));
     #[cfg(feature = "builtin_filters")]
     {
         rv.insert("lower", BoxedFilter::new(lower));
         rv.insert("upper", BoxedFilter::new(upper));
         rv.insert("replace", BoxedFilter::new(replace));
         rv.insert("length", BoxedFilter::new(length));
+        rv.insert("count", BoxedFilter::new(length));
         rv.insert("dictsort", BoxedFilter::new(dictsort));
         rv.insert("reverse", BoxedFilter::new(reverse));
         rv.insert("trim", BoxedFilter::new(trim));
         rv.insert("join", BoxedFilter::new(join));
         rv.insert("default", BoxedFilter::new(default));
+        rv.insert("d", BoxedFilter::new(default));
     }
     rv
 }
@@ -125,6 +128,8 @@ pub fn safe(_env: &Environment, v: String) -> Result<Value, Error> {
 }
 
 /// HTML escapes a string.
+///
+/// By default this filter is also registered under the alias `e`.
 pub fn escape(_env: &Environment, v: Value) -> Result<Value, Error> {
     // TODO: this ideally understands which type of escaping is in use
     if v.is_safe() {
@@ -170,6 +175,8 @@ mod builtins {
     }
 
     /// Returns the "length" of the value
+    ///
+    /// By default this filter is also registered under the alias `count`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn length(_env: &Environment, v: Value) -> Result<Value, Error> {
         v.len().map(Value::from).ok_or_else(|| {
@@ -257,6 +264,8 @@ mod builtins {
     }
 
     /// Checks if a string starts with another string.
+    ///
+    /// By default this filter is also registered under the alias `d`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn default(_: &Environment, value: Value, other: Option<Value>) -> Result<Value, Error> {
         Ok(if value.is_undefined() {
