@@ -376,11 +376,21 @@ impl<'env> Vm<'env> {
                     stack.push(v.into());
                 }
                 Instruction::UnpackList(count) => {
-                    let mut v = try_ctx!(stack.pop().try_into_vec());
+                    let mut v = try_ctx!(stack.pop().try_into_vec().map_err(|e| {
+                        Error::new(
+                            ErrorKind::ImpossibleOperation,
+                            "cannot unpack: not a sequence",
+                        )
+                        .with_source(e)
+                    }));
                     if v.len() != *count {
                         bail!(Error::new(
                             ErrorKind::ImpossibleOperation,
-                            "sequence of wrong length"
+                            format!(
+                                "cannot unpack: sequence of wrong length (expected {}, got {})",
+                                *count,
+                                v.len()
+                            )
                         ));
                     }
                     for _ in 0..*count {

@@ -1,0 +1,36 @@
+---
+source: minijinja/tests/test_templates.rs
+expression: "&rendered"
+input_file: minijinja/tests/inputs/loop_bad_unpacking.txt
+
+---
+!!!ERROR!!!
+
+Error { kind: ImpossibleOperation, detail: Some("cannot unpack: not a sequence"), name: Some("<unknown>"), lineno: 2, source: Some(Error { kind: ImpossibleOperation, detail: Some("cannot convert value into list"), name: None, lineno: 0, source: None }) }
+
+=====
+
+Template {
+    name: "loop_bad_unpacking.txt",
+    instructions: [
+        00000 | EMIT_RAW (string "<ul>\n")   [<unknown>:1],
+        00001 | LOOKUP (var "seq")   [<unknown>:2],
+        00002 | PUSH_LOOP (loop var: true)   [<unknown>:2],
+        00003 | ITERATE (exit to 0000f)   [<unknown>:2],
+        00004 | UNPACK_LIST (2 items)   [<unknown>:2],
+        00005 | STORE_LOCAL (var "a")   [<unknown>:2],
+        00006 | STORE_LOCAL (var "b")   [<unknown>:2],
+        00007 | EMIT_RAW (string "\n  <li>")   [<unknown>:2],
+        00008 | LOOKUP (var "a")   [<unknown>:3],
+        00009 | EMIT   [<unknown>:3],
+        0000a | EMIT_RAW (string ": ")   [<unknown>:3],
+        0000b | LOOKUP (var "b")   [<unknown>:3],
+        0000c | EMIT   [<unknown>:3],
+        0000d | EMIT_RAW (string "\n")   [<unknown>:3],
+        0000e | JUMP (to 00003)   [<unknown>:3],
+        0000f | POP_FRAME   [<unknown>:3],
+        00010 | EMIT_RAW (string "\n</ul>\n")   [<unknown>:4],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}
