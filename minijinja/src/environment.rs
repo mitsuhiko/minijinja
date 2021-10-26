@@ -177,7 +177,7 @@ fn no_auto_escape(_: &str) -> AutoEscape {
 /// This for instance can be used to evaluate simple expressions from user
 /// provided input to implement features such as dynamic filtering.
 ///
-/// This is usually best paired with [`context`](crate::context) to pass
+/// This is usually best paired with [`context`](crate::context!) to pass
 /// a single value to it.
 ///
 /// # Example
