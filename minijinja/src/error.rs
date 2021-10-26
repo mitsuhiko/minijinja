@@ -8,7 +8,7 @@ pub struct Error {
     detail: Option<Cow<'static, str>>,
     name: Option<String>,
     lineno: usize,
-    source: Option<Box<dyn std::error::Error>>,
+    source: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
 
 impl PartialEq for Error {
@@ -96,7 +96,7 @@ impl Error {
 
     /// Attaches another error as source to this error.
     #[allow(unused)]
-    pub fn with_source<E: std::error::Error + 'static>(mut self, source: E) -> Self {
+    pub fn with_source<E: std::error::Error + Send + Sync + 'static>(mut self, source: E) -> Self {
         self.source = Some(Box::new(source));
         self
     }
@@ -119,7 +119,7 @@ impl Error {
 
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.source.as_deref()
+        self.source.as_ref().map(|err| err.as_ref() as _)
     }
 }
 

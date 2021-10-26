@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.7.0
+
+- Made the `source` method on error be bound to `Send` and `Sync`.
+
 # 0.6.0
 
 - Added `default` filter.
