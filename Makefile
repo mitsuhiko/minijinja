@@ -12,6 +12,8 @@ doc:
 
 test:
 	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES)
+	@echo "CARGO TEST ALL FEATURES"
+	@cd minijinja; cargo test --all-features
 
 test-142:
 	@$(MAKE) run-tests FEATURES=$(TEST_142_FEATURES)
@@ -20,8 +22,6 @@ run-tests:
 	@rustup component add rustfmt 2> /dev/null
 	@echo "CARGO TESTS"
 	@cd minijinja; cargo test
-	@echo "CARGO TEST ALL FEATURES"
-	@cd minijinja; cargo test --all-features
 	@echo "CARGO TEST MEMCHR"
 	@cd minijinja; cargo test --no-default-features --features=memchr,$(FEATURES)
 	@echo "CARGO TEST V_HTMLESCAPE"
