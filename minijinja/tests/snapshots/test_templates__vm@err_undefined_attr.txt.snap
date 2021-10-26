@@ -6,17 +6,17 @@ input_file: minijinja/tests/inputs/err_undefined_attr.txt
 ---
 !!!ERROR!!!
 
-Error { kind: UndefinedError, detail: None, name: Some("<unknown>"), lineno: 1, source: None }
+Error { kind: UndefinedError, detail: None, name: Some("err_undefined_attr.txt"), lineno: 1, source: None }
 
 =====
 
 Template {
     name: "err_undefined_attr.txt",
     instructions: [
-        00000 | LOOKUP (var "undefined_value")   [<unknown>:1],
-        00001 | GETATTR (key "attr")   [<unknown>:1],
-        00002 | EMIT   [<unknown>:1],
-        00003 | EMIT_RAW (string "\n")   [<unknown>:1],
+        00000 | LOOKUP (var "undefined_value")   [err_undefined_attr.txt:1],
+        00001 | GETATTR (key "attr")   [err_undefined_attr.txt:1],
+        00002 | EMIT   [err_undefined_attr.txt:1],
+        00003 | EMIT_RAW (string "\n")   [err_undefined_attr.txt:1],
     ],
     blocks: {},
     initial_auto_escape: None,

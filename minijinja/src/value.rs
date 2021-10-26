@@ -175,6 +175,24 @@ pub enum ValueKind {
     Struct,
 }
 
+impl fmt::Display for ValueKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ty = match *self {
+            ValueKind::Undefined => "undefined",
+            ValueKind::None => "none",
+            ValueKind::Bool => "bool",
+            ValueKind::Number => "number",
+            ValueKind::Char => "char",
+            ValueKind::String => "string",
+            ValueKind::Bytes => "bytes",
+            ValueKind::Seq => "sequence",
+            ValueKind::Map => "map",
+            ValueKind::Struct => "struct",
+        };
+        write!(f, "{}", ty)
+    }
+}
+
 #[derive(Clone)]
 enum Repr {
     Undefined,
@@ -549,7 +567,12 @@ macro_rules! math_binop {
             do_it(lhs, rhs).ok_or_else(|| {
                 Error::new(
                     ErrorKind::ImpossibleOperation,
-                    concat!("tried to use ", stringify!($float), " operator on unsupported types")
+                    format!(
+                        "tried to use {} operator on unsupported types {} and {}",
+                        stringify!($float),
+                        lhs.kind(),
+                        rhs.kind()
+                    )
                 )
             })
         }
@@ -1738,7 +1761,7 @@ fn test_adding() {
     let err = add(&value!("a"), &value!(42)).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "impossible operation: tried to use + operator on unsupported types"
+        "impossible operation: tried to use + operator on unsupported types string and number"
     );
 
     assert_eq!(add(&value!(1), &value!(2)), Ok(value!(3)));

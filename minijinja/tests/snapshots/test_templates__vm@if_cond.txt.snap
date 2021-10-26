@@ -1,7 +1,7 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/if_cond.txt
+input_file: minijinja/tests/inputs/if_cond.txt
 
 ---
 
@@ -13,10 +13,10 @@ input_file: tests/inputs/if_cond.txt
 Template {
     name: "if_cond.txt",
     instructions: [
-        00000 | LOOKUP (var "value")   [<unknown>:1],
-        00001 | JUMP_IF_FALSE (to 00003)   [<unknown>:1],
-        00002 | EMIT_RAW (string "\n  was true\n")   [<unknown>:1],
-        00003 | EMIT_RAW (string "\n")   [<unknown>:3],
+        00000 | LOOKUP (var "value")   [if_cond.txt:1],
+        00001 | JUMP_IF_FALSE (to 00003)   [if_cond.txt:1],
+        00002 | EMIT_RAW (string "\n  was true\n")   [if_cond.txt:1],
+        00003 | EMIT_RAW (string "\n")   [if_cond.txt:3],
     ],
     blocks: {},
     initial_auto_escape: None,

@@ -1,7 +1,7 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/block.txt
+input_file: minijinja/tests/inputs/block.txt
 
 ---
 <title></title>
@@ -12,16 +12,16 @@ foo
 Template {
     name: "block.txt",
     instructions: [
-        00000 | EMIT_RAW (string "<title>")   [<unknown>:1],
-        00001 | CALL_BLOCK (name "title")   [<unknown>:1],
-        00002 | EMIT_RAW (string "</title>\n")   [<unknown>:1],
-        00003 | CALL_BLOCK (name "body")   [<unknown>:2],
-        00004 | EMIT_RAW (string "\n")   [<unknown>:2],
+        00000 | EMIT_RAW (string "<title>")   [block.txt:1],
+        00001 | CALL_BLOCK (name "title")   [block.txt:1],
+        00002 | EMIT_RAW (string "</title>\n")   [block.txt:1],
+        00003 | CALL_BLOCK (name "body")   [block.txt:2],
+        00004 | EMIT_RAW (string "\n")   [block.txt:2],
     ],
     blocks: {
         "body": [
-            00000 | LOOKUP (var "var")   [<unknown>:2],
-            00001 | EMIT   [<unknown>:2],
+            00000 | LOOKUP (var "var")   [block.txt:2],
+            00001 | EMIT   [block.txt:2],
         ],
         "title": [],
     },

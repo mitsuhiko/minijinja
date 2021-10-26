@@ -38,22 +38,34 @@ impl<'env> fmt::Debug for Template<'env> {
 }
 
 /// Represents a compiled template in memory.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct CompiledTemplate<'source> {
+    source: &'source str,
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,
 }
 
+impl<'env> fmt::Debug for CompiledTemplate<'env> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CompiledTemplate")
+            .field("instructions", &self.instructions)
+            .field("blocks", &self.blocks)
+            .finish()
+    }
+}
+
 impl<'source> CompiledTemplate<'source> {
     pub(crate) fn from_name_and_source(
-        name: &str,
+        name: &'source str,
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
         let ast = parse(source, name)?;
         let mut compiler = Compiler::new();
+        compiler.set_file(name);
         compiler.compile_stmt(&ast)?;
         let (instructions, blocks) = compiler.finish();
         Ok(CompiledTemplate {
+            source,
             blocks,
             instructions,
         })
@@ -64,6 +76,11 @@ impl<'env> Template<'env> {
     /// Returns the name of the template.
     pub fn name(&self) -> &str {
         self.name
+    }
+
+    /// Returns the source code of the template.
+    pub fn source(&self) -> &str {
+        self.compiled.source
     }
 
     /// Renders the template into a string.

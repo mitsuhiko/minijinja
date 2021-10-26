@@ -46,7 +46,7 @@ impl fmt::Debug for Source {
 
 self_cell! {
     struct LoadedTemplate {
-        owner: String,
+        owner: (String, String),
         #[covariant]
         dependent: CompiledTemplate,
     }
@@ -76,7 +76,8 @@ impl Source {
     ) -> Result<(), Error> {
         let source = source.into();
         let name = name.into();
-        let tmpl = LoadedTemplate::try_new(source, |source| -> Result<_, Error> {
+        let owner = (name.clone(), source);
+        let tmpl = LoadedTemplate::try_new(owner, |(name, source)| -> Result<_, Error> {
             CompiledTemplate::from_name_and_source(name.as_str(), source)
         })?;
         self.templates.insert(name, RcType::new(tmpl));
