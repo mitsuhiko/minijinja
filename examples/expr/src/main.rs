@@ -4,8 +4,7 @@
 use std::collections::BTreeMap;
 use std::env;
 
-use minijinja::value::Single;
-use minijinja::Environment;
+use minijinja::{context, Environment};
 
 fn main() {
     let args = env::args().collect::<Vec<_>>();
@@ -17,7 +16,7 @@ fn main() {
     let env = Environment::new();
     let expr = env.compile_expression(&args[1]).unwrap();
     let env = std::env::vars().collect::<BTreeMap<_, _>>();
-    let result = expr.eval(Single("env", env)).unwrap();
+    let result = expr.eval(context!(env)).unwrap();
     let serialized = serde_json::to_string_pretty(&result).unwrap();
     println!("{}", serialized);
 }

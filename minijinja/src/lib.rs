@@ -37,13 +37,12 @@
 //! serializable value:
 //!
 //! ```
-//! use minijinja::Environment;
-//! use minijinja::value::Single;
+//! use minijinja::{Environment, context};
 //!
 //! let mut env = Environment::new();
 //! env.add_template("hello", "Hello {{ name }}!").unwrap();
 //! let tmpl = env.get_template("hello").unwrap();
-//! println!("{}", tmpl.render(Single("name", "John")).unwrap());
+//! println!("{}", tmpl.render(context!(name => "John")).unwrap());
 //! ```
 //!
 //! ```plain
@@ -58,11 +57,11 @@
 //! an expression object that can then be evaluated, returning the result:
 //!
 //! ```
-//! use minijinja::{Environment, value::Single};
+//! use minijinja::{Environment, context};
 //!
 //! let env = Environment::new();
 //! let expr = env.compile_expression("number < 42").unwrap();
-//! let result = expr.eval(Single("number", 23)).unwrap();
+//! let result = expr.eval(context!(number => 23)).unwrap();
 //! assert_eq!(result.is_true(), true);
 //! ```
 //!
@@ -107,6 +106,7 @@ mod key;
 
 mod ast;
 mod compiler;
+mod context;
 mod environment;
 mod error;
 mod instructions;
@@ -131,6 +131,8 @@ pub use self::utils::{AutoEscape, HtmlEscape};
 
 #[cfg(feature = "source")]
 pub use self::source::Source;
+
+pub use self::context::*;
 
 /// This module gives access to the low level machinery.
 ///

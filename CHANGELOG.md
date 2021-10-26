@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.8.0
+
+- Introduce `context!` and deprecate `Single`.
+
 # 0.7.0
 
 - Made the `source` method on error be bound to `Send` and `Sync`.

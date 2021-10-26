@@ -177,16 +177,16 @@ fn no_auto_escape(_: &str) -> AutoEscape {
 /// This for instance can be used to evaluate simple expressions from user
 /// provided input to implement features such as dynamic filtering.
 ///
-/// This is usually best paired with [`Single`](crate::value::Single) to pass
+/// This is usually best paired with [`context`](crate::context) to pass
 /// a single value to it.
 ///
 /// # Example
 ///
 /// ```rust
-/// # use minijinja::{Environment, value::Single};
+/// # use minijinja::{Environment, context};
 /// let env = Environment::new();
 /// let expr = env.compile_expression("number > 10 and number < 20").unwrap();
-/// let rv = expr.eval(Single("number", 15)).unwrap();
+/// let rv = expr.eval(context!(number => 15)).unwrap();
 /// assert!(rv.is_true());
 /// ```
 #[derive(Debug)]
