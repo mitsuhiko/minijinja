@@ -9,13 +9,25 @@ use crate::error::{Error, ErrorKind};
 use crate::value::{Primitive, Value};
 
 /// Represents a key in a value's map.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Key<'a> {
     Bool(bool),
     I64(i64),
     Char(char),
     String(String),
     Str(&'a str),
+}
+
+impl<'a> fmt::Debug for Key<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Bool(val) => fmt::Debug::fmt(val, f),
+            Self::I64(val) => fmt::Debug::fmt(val, f),
+            Self::Char(val) => fmt::Debug::fmt(val, f),
+            Self::String(val) => fmt::Debug::fmt(val, f),
+            Self::Str(val) => fmt::Debug::fmt(val, f),
+        }
+    }
 }
 
 #[derive(PartialOrd, Ord, Eq, PartialEq)]
