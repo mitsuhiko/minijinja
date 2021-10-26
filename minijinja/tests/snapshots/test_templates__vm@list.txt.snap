@@ -1,7 +1,7 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/list.txt
+input_file: minijinja/tests/inputs/list.txt
 
 ---
 3
@@ -11,14 +11,14 @@ input_file: tests/inputs/list.txt
 Template {
     name: "list.txt",
     instructions: [
-        00000 | LOAD_CONST (value 1)   [<unknown>:1],
-        00001 | LOAD_CONST (value 2)   [<unknown>:1],
-        00002 | LOAD_CONST (value 3)   [<unknown>:1],
-        00003 | BUILD_LIST (3 items)   [<unknown>:1],
-        00004 | BUILD_LIST (0 items)   [<unknown>:1],
-        00005 | APPLY_FILTER (name "length")   [<unknown>:1],
-        00006 | EMIT   [<unknown>:1],
-        00007 | EMIT_RAW (string "\n")   [<unknown>:1],
+        00000 | LOAD_CONST (value 1)   [list.txt:1],
+        00001 | LOAD_CONST (value 2)   [list.txt:1],
+        00002 | LOAD_CONST (value 3)   [list.txt:1],
+        00003 | BUILD_LIST (3 items)   [list.txt:1],
+        00004 | BUILD_LIST (0 items)   [list.txt:1],
+        00005 | APPLY_FILTER (name "length")   [list.txt:1],
+        00006 | EMIT   [list.txt:1],
+        00007 | EMIT_RAW (string "\n")   [list.txt:1],
     ],
     blocks: {},
     initial_auto_escape: None,

@@ -6,17 +6,17 @@ input_file: minijinja/tests/inputs/block_super_err.txt
 ---
 !!!ERROR!!!
 
-Error { kind: ImpossibleOperation, detail: Some("cannot super outside of block"), name: Some("<unknown>"), lineno: 1, source: None }
+Error { kind: ImpossibleOperation, detail: Some("cannot super outside of block"), name: Some("block_super_err.txt"), lineno: 1, source: None }
 
 =====
 
 Template {
     name: "block_super_err.txt",
     instructions: [
-        00000 | BUILD_LIST (0 items)   [<unknown>:1],
-        00001 | CALL_FUNCTION (name "super")   [<unknown>:1],
-        00002 | EMIT   [<unknown>:1],
-        00003 | EMIT_RAW (string "\n")   [<unknown>:1],
+        00000 | BUILD_LIST (0 items)   [block_super_err.txt:1],
+        00001 | CALL_FUNCTION (name "super")   [block_super_err.txt:1],
+        00002 | EMIT   [block_super_err.txt:1],
+        00003 | EMIT_RAW (string "\n")   [block_super_err.txt:1],
     ],
     blocks: {},
     initial_auto_escape: None,

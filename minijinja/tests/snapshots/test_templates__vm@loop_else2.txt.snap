@@ -1,7 +1,7 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/loop_else2.txt
+input_file: minijinja/tests/inputs/loop_else2.txt
 
 ---
 
@@ -14,23 +14,23 @@ input_file: tests/inputs/loop_else2.txt
 Template {
     name: "loop_else2.txt",
     instructions: [
-        00000 | LOOKUP (var "seq")   [<unknown>:1],
-        00001 | PUSH_LOOP (loop var: true)   [<unknown>:1],
-        00002 | ITERATE (exit to 00009)   [<unknown>:1],
-        00003 | STORE_LOCAL (var "item")   [<unknown>:1],
-        00004 | EMIT_RAW (string "\n  - ")   [<unknown>:1],
-        00005 | LOOKUP (var "item")   [<unknown>:2],
-        00006 | EMIT   [<unknown>:2],
-        00007 | EMIT_RAW (string "")   [<unknown>:2],
-        00008 | JUMP (to 00002)   [<unknown>:2],
-        00009 | LOOKUP (var "loop")   [<unknown>:2],
-        0000a | GETATTR (key "index0")   [<unknown>:2],
-        0000b | LOAD_CONST (value 0)   [<unknown>:2],
-        0000c | EQ   [<unknown>:2],
-        0000d | POP_FRAME   [<unknown>:2],
-        0000e | JUMP_IF_FALSE (to 00010)   [<unknown>:2],
-        0000f | EMIT_RAW (string "\n  should not happen")   [<unknown>:3],
-        00010 | EMIT_RAW (string "\n")   [<unknown>:5],
+        00000 | LOOKUP (var "seq")   [loop_else2.txt:1],
+        00001 | PUSH_LOOP (loop var: true)   [loop_else2.txt:1],
+        00002 | ITERATE (exit to 00009)   [loop_else2.txt:1],
+        00003 | STORE_LOCAL (var "item")   [loop_else2.txt:1],
+        00004 | EMIT_RAW (string "\n  - ")   [loop_else2.txt:1],
+        00005 | LOOKUP (var "item")   [loop_else2.txt:2],
+        00006 | EMIT   [loop_else2.txt:2],
+        00007 | EMIT_RAW (string "")   [loop_else2.txt:2],
+        00008 | JUMP (to 00002)   [loop_else2.txt:2],
+        00009 | LOOKUP (var "loop")   [loop_else2.txt:2],
+        0000a | GETATTR (key "index0")   [loop_else2.txt:2],
+        0000b | LOAD_CONST (value 0)   [loop_else2.txt:2],
+        0000c | EQ   [loop_else2.txt:2],
+        0000d | POP_FRAME   [loop_else2.txt:2],
+        0000e | JUMP_IF_FALSE (to 00010)   [loop_else2.txt:2],
+        0000f | EMIT_RAW (string "\n  should not happen")   [loop_else2.txt:3],
+        00010 | EMIT_RAW (string "\n")   [loop_else2.txt:5],
     ],
     blocks: {},
     initial_auto_escape: None,

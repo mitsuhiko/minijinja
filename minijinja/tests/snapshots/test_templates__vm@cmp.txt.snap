@@ -1,7 +1,7 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/cmp.txt
+input_file: minijinja/tests/inputs/cmp.txt
 
 ---
 
@@ -13,16 +13,16 @@ input_file: tests/inputs/cmp.txt
 Template {
     name: "cmp.txt",
     instructions: [
-        00000 | LOOKUP (var "two")   [<unknown>:1],
-        00001 | LOOKUP (var "one")   [<unknown>:1],
-        00002 | GT   [<unknown>:1],
-        00003 | JUMP_IF_FALSE_OR_POP (to 00007)   [<unknown>:1],
-        00004 | LOOKUP (var "two")   [<unknown>:1],
-        00005 | LOOKUP (var "three")   [<unknown>:1],
-        00006 | LT   [<unknown>:1],
-        00007 | JUMP_IF_FALSE (to 00009)   [<unknown>:1],
-        00008 | EMIT_RAW (string "\n  test\n")   [<unknown>:1],
-        00009 | EMIT_RAW (string "\n")   [<unknown>:3],
+        00000 | LOOKUP (var "two")   [cmp.txt:1],
+        00001 | LOOKUP (var "one")   [cmp.txt:1],
+        00002 | GT   [cmp.txt:1],
+        00003 | JUMP_IF_FALSE_OR_POP (to 00007)   [cmp.txt:1],
+        00004 | LOOKUP (var "two")   [cmp.txt:1],
+        00005 | LOOKUP (var "three")   [cmp.txt:1],
+        00006 | LT   [cmp.txt:1],
+        00007 | JUMP_IF_FALSE (to 00009)   [cmp.txt:1],
+        00008 | EMIT_RAW (string "\n  test\n")   [cmp.txt:1],
+        00009 | EMIT_RAW (string "\n")   [cmp.txt:3],
     ],
     blocks: {},
     initial_auto_escape: None,

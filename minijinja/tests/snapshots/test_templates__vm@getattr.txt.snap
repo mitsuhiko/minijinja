@@ -1,7 +1,7 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/getattr.txt
+input_file: minijinja/tests/inputs/getattr.txt
 
 ---
 name: Peter
@@ -12,15 +12,15 @@ active: true
 Template {
     name: "getattr.txt",
     instructions: [
-        00000 | EMIT_RAW (string "name: ")   [<unknown>:1],
-        00001 | LOOKUP (var "user")   [<unknown>:1],
-        00002 | GETATTR (key "name")   [<unknown>:1],
-        00003 | EMIT   [<unknown>:1],
-        00004 | EMIT_RAW (string "\nactive: ")   [<unknown>:1],
-        00005 | LOOKUP (var "user")   [<unknown>:2],
-        00006 | GETATTR (key "is_active")   [<unknown>:2],
-        00007 | EMIT   [<unknown>:2],
-        00008 | EMIT_RAW (string "\n")   [<unknown>:2],
+        00000 | EMIT_RAW (string "name: ")   [getattr.txt:1],
+        00001 | LOOKUP (var "user")   [getattr.txt:1],
+        00002 | GETATTR (key "name")   [getattr.txt:1],
+        00003 | EMIT   [getattr.txt:1],
+        00004 | EMIT_RAW (string "\nactive: ")   [getattr.txt:1],
+        00005 | LOOKUP (var "user")   [getattr.txt:2],
+        00006 | GETATTR (key "is_active")   [getattr.txt:2],
+        00007 | EMIT   [getattr.txt:2],
+        00008 | EMIT_RAW (string "\n")   [getattr.txt:2],
     ],
     blocks: {},
     initial_auto_escape: None,

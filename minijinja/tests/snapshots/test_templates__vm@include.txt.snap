@@ -1,7 +1,7 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/include.txt
+input_file: minijinja/tests/inputs/include.txt
 
 ---
 Before
@@ -16,17 +16,17 @@ After
 Template {
     name: "include.txt",
     instructions: [
-        00000 | EMIT_RAW (string "Before\n")   [<unknown>:1],
-        00001 | LOAD_CONST (value "variable")   [<unknown>:2],
-        00002 | LOAD_CONST (value 42)   [<unknown>:2],
-        00003 | BUILD_MAP (1 pairs)   [<unknown>:2],
-        00004 | PUSH_CONTEXT   [<unknown>:2],
-        00005 | EMIT_RAW (string "\n  ")   [<unknown>:2],
-        00006 | LOOKUP (var "template")   [<unknown>:3],
-        00007 | INCLUDE   [<unknown>:3],
-        00008 | EMIT_RAW (string "\n")   [<unknown>:3],
-        00009 | POP_FRAME   [<unknown>:3],
-        0000a | EMIT_RAW (string "\nAfter\n")   [<unknown>:4],
+        00000 | EMIT_RAW (string "Before\n")   [include.txt:1],
+        00001 | LOAD_CONST (value "variable")   [include.txt:2],
+        00002 | LOAD_CONST (value 42)   [include.txt:2],
+        00003 | BUILD_MAP (1 pairs)   [include.txt:2],
+        00004 | PUSH_CONTEXT   [include.txt:2],
+        00005 | EMIT_RAW (string "\n  ")   [include.txt:2],
+        00006 | LOOKUP (var "template")   [include.txt:3],
+        00007 | INCLUDE   [include.txt:3],
+        00008 | EMIT_RAW (string "\n")   [include.txt:3],
+        00009 | POP_FRAME   [include.txt:3],
+        0000a | EMIT_RAW (string "\nAfter\n")   [include.txt:4],
     ],
     blocks: {},
     initial_auto_escape: None,

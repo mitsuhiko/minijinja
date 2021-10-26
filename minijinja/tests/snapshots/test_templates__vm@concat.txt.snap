@@ -1,7 +1,7 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/concat.txt
+input_file: minijinja/tests/inputs/concat.txt
 
 ---
 foobar
@@ -11,11 +11,11 @@ foobar
 Template {
     name: "concat.txt",
     instructions: [
-        00000 | LOOKUP (var "a")   [<unknown>:1],
-        00001 | LOOKUP (var "b")   [<unknown>:1],
-        00002 | STRING_CONCAT   [<unknown>:1],
-        00003 | EMIT   [<unknown>:1],
-        00004 | EMIT_RAW (string "\n")   [<unknown>:1],
+        00000 | LOOKUP (var "a")   [concat.txt:1],
+        00001 | LOOKUP (var "b")   [concat.txt:1],
+        00002 | STRING_CONCAT   [concat.txt:1],
+        00003 | EMIT   [concat.txt:1],
+        00004 | EMIT_RAW (string "\n")   [concat.txt:1],
     ],
     blocks: {},
     initial_auto_escape: None,

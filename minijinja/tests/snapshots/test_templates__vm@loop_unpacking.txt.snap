@@ -1,7 +1,7 @@
 ---
-source: tests/test_templates.rs
+source: minijinja/tests/test_templates.rs
 expression: "&rendered"
-input_file: tests/inputs/loop_unpacking.txt
+input_file: minijinja/tests/inputs/loop_unpacking.txt
 
 ---
 <ul>
@@ -17,28 +17,28 @@ input_file: tests/inputs/loop_unpacking.txt
 Template {
     name: "loop_unpacking.txt",
     instructions: [
-        00000 | EMIT_RAW (string "<ul>\n")   [<unknown>:1],
-        00001 | LOOKUP (var "seq")   [<unknown>:2],
-        00002 | PUSH_LOOP (loop var: true)   [<unknown>:2],
-        00003 | ITERATE (exit to 00014)   [<unknown>:2],
-        00004 | UNPACK_LIST (2 items)   [<unknown>:2],
-        00005 | STORE_LOCAL (var "op")   [<unknown>:2],
-        00006 | UNPACK_LIST (2 items)   [<unknown>:2],
-        00007 | STORE_LOCAL (var "a")   [<unknown>:2],
-        00008 | STORE_LOCAL (var "b")   [<unknown>:2],
-        00009 | EMIT_RAW (string "\n  <li>")   [<unknown>:2],
-        0000a | LOOKUP (var "a")   [<unknown>:3],
-        0000b | EMIT   [<unknown>:3],
-        0000c | EMIT_RAW (string " ")   [<unknown>:3],
-        0000d | LOOKUP (var "op")   [<unknown>:3],
-        0000e | EMIT   [<unknown>:3],
-        0000f | EMIT_RAW (string " ")   [<unknown>:3],
-        00010 | LOOKUP (var "b")   [<unknown>:3],
-        00011 | EMIT   [<unknown>:3],
-        00012 | EMIT_RAW (string " = ?\n")   [<unknown>:3],
-        00013 | JUMP (to 00003)   [<unknown>:3],
-        00014 | POP_FRAME   [<unknown>:3],
-        00015 | EMIT_RAW (string "\n</ul>\n")   [<unknown>:4],
+        00000 | EMIT_RAW (string "<ul>\n")   [loop_unpacking.txt:1],
+        00001 | LOOKUP (var "seq")   [loop_unpacking.txt:2],
+        00002 | PUSH_LOOP (loop var: true)   [loop_unpacking.txt:2],
+        00003 | ITERATE (exit to 00014)   [loop_unpacking.txt:2],
+        00004 | UNPACK_LIST (2 items)   [loop_unpacking.txt:2],
+        00005 | STORE_LOCAL (var "op")   [loop_unpacking.txt:2],
+        00006 | UNPACK_LIST (2 items)   [loop_unpacking.txt:2],
+        00007 | STORE_LOCAL (var "a")   [loop_unpacking.txt:2],
+        00008 | STORE_LOCAL (var "b")   [loop_unpacking.txt:2],
+        00009 | EMIT_RAW (string "\n  <li>")   [loop_unpacking.txt:2],
+        0000a | LOOKUP (var "a")   [loop_unpacking.txt:3],
+        0000b | EMIT   [loop_unpacking.txt:3],
+        0000c | EMIT_RAW (string " ")   [loop_unpacking.txt:3],
+        0000d | LOOKUP (var "op")   [loop_unpacking.txt:3],
+        0000e | EMIT   [loop_unpacking.txt:3],
+        0000f | EMIT_RAW (string " ")   [loop_unpacking.txt:3],
+        00010 | LOOKUP (var "b")   [loop_unpacking.txt:3],
+        00011 | EMIT   [loop_unpacking.txt:3],
+        00012 | EMIT_RAW (string " = ?\n")   [loop_unpacking.txt:3],
+        00013 | JUMP (to 00003)   [loop_unpacking.txt:3],
+        00014 | POP_FRAME   [loop_unpacking.txt:3],
+        00015 | EMIT_RAW (string "\n</ul>\n")   [loop_unpacking.txt:4],
     ],
     blocks: {},
     initial_auto_escape: None,

@@ -6,30 +6,30 @@ input_file: minijinja/tests/inputs/loop_bad_unpacking_wrong_len.txt
 ---
 !!!ERROR!!!
 
-Error { kind: ImpossibleOperation, detail: Some("cannot unpack: sequence of wrong length (expected 2, got 3)"), name: Some("<unknown>"), lineno: 2, source: None }
+Error { kind: ImpossibleOperation, detail: Some("cannot unpack: sequence of wrong length (expected 2, got 3)"), name: Some("loop_bad_unpacking_wrong_len.txt"), lineno: 2, source: None }
 
 =====
 
 Template {
     name: "loop_bad_unpacking_wrong_len.txt",
     instructions: [
-        00000 | EMIT_RAW (string "<ul>\n")   [<unknown>:1],
-        00001 | LOOKUP (var "seq")   [<unknown>:2],
-        00002 | PUSH_LOOP (loop var: true)   [<unknown>:2],
-        00003 | ITERATE (exit to 0000f)   [<unknown>:2],
-        00004 | UNPACK_LIST (2 items)   [<unknown>:2],
-        00005 | STORE_LOCAL (var "a")   [<unknown>:2],
-        00006 | STORE_LOCAL (var "b")   [<unknown>:2],
-        00007 | EMIT_RAW (string "\n  <li>")   [<unknown>:2],
-        00008 | LOOKUP (var "a")   [<unknown>:3],
-        00009 | EMIT   [<unknown>:3],
-        0000a | EMIT_RAW (string ": ")   [<unknown>:3],
-        0000b | LOOKUP (var "b")   [<unknown>:3],
-        0000c | EMIT   [<unknown>:3],
-        0000d | EMIT_RAW (string "\n")   [<unknown>:3],
-        0000e | JUMP (to 00003)   [<unknown>:3],
-        0000f | POP_FRAME   [<unknown>:3],
-        00010 | EMIT_RAW (string "\n</ul>\n")   [<unknown>:4],
+        00000 | EMIT_RAW (string "<ul>\n")   [loop_bad_unpacking_wrong_len.txt:1],
+        00001 | LOOKUP (var "seq")   [loop_bad_unpacking_wrong_len.txt:2],
+        00002 | PUSH_LOOP (loop var: true)   [loop_bad_unpacking_wrong_len.txt:2],
+        00003 | ITERATE (exit to 0000f)   [loop_bad_unpacking_wrong_len.txt:2],
+        00004 | UNPACK_LIST (2 items)   [loop_bad_unpacking_wrong_len.txt:2],
+        00005 | STORE_LOCAL (var "a")   [loop_bad_unpacking_wrong_len.txt:2],
+        00006 | STORE_LOCAL (var "b")   [loop_bad_unpacking_wrong_len.txt:2],
+        00007 | EMIT_RAW (string "\n  <li>")   [loop_bad_unpacking_wrong_len.txt:2],
+        00008 | LOOKUP (var "a")   [loop_bad_unpacking_wrong_len.txt:3],
+        00009 | EMIT   [loop_bad_unpacking_wrong_len.txt:3],
+        0000a | EMIT_RAW (string ": ")   [loop_bad_unpacking_wrong_len.txt:3],
+        0000b | LOOKUP (var "b")   [loop_bad_unpacking_wrong_len.txt:3],
+        0000c | EMIT   [loop_bad_unpacking_wrong_len.txt:3],
+        0000d | EMIT_RAW (string "\n")   [loop_bad_unpacking_wrong_len.txt:3],
+        0000e | JUMP (to 00003)   [loop_bad_unpacking_wrong_len.txt:3],
+        0000f | POP_FRAME   [loop_bad_unpacking_wrong_len.txt:3],
+        00010 | EMIT_RAW (string "\n</ul>\n")   [loop_bad_unpacking_wrong_len.txt:4],
     ],
     blocks: {},
     initial_auto_escape: None,
