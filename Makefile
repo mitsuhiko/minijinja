@@ -1,5 +1,6 @@
 DOC_FEATURES=source
 TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,source
+TEST_142_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions
 
 all: test
 
@@ -10,15 +11,21 @@ doc:
 	@RUSTDOCFLAGS=--cfg=docsrs cargo +nightly doc --no-deps --all --features=$(DOC_FEATURES)
 
 test:
+	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES)
+
+test-142:
+	@$(MAKE) run-tests FEATURES=$(TEST_142_FEATURES)
+
+run-tests:
 	@rustup component add rustfmt 2> /dev/null
 	@echo "CARGO TESTS"
 	@cd minijinja; cargo test
 	@echo "CARGO TEST ALL FEATURES"
 	@cd minijinja; cargo test --all-features
 	@echo "CARGO TEST MEMCHR"
-	@cd minijinja; cargo test --no-default-features --features=memchr,$(TEST_FEATURES)
+	@cd minijinja; cargo test --no-default-features --features=memchr,$(FEATURES)
 	@echo "CARGO TEST V_HTMLESCAPE"
-	@cd minijinja; cargo test --no-default-features --features=v_htmlescape,$(TEST_FEATURES)
+	@cd minijinja; cargo test --no-default-features --features=v_htmlescape,$(FEATURES)
 	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
 	@cd minijinja; cargo check --no-default-features
 
@@ -40,4 +47,4 @@ lint:
 	@rustup component add clippy 2> /dev/null
 	@cargo clippy --all -- -F clippy::dbg-macro
 
-.PHONY: all doc test format format-check lint check
+.PHONY: all doc test test-142 run-tests format format-check lint check
