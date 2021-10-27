@@ -94,6 +94,7 @@ impl<'env> Template<'env> {
         let vm = Vm::new(self.env);
         let blocks = &self.compiled.blocks;
         vm.eval(
+            self.name,
             &self.compiled.instructions,
             ctx,
             blocks,
@@ -131,7 +132,9 @@ enum Source<'source> {
 impl<'source> fmt::Debug for Source<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Borrowed(arg0) => fmt::Debug::fmt(arg0, f),
+            Self::Borrowed(tmpls) => {
+                fmt::Debug::fmt(&tmpls.iter().map(|x| x.0).collect::<Vec<_>>(), f)
+            }
             #[cfg(feature = "source")]
             Self::Owned(arg0) => fmt::Debug::fmt(arg0, f),
         }
@@ -155,9 +158,9 @@ impl<'source> fmt::Debug for Source<'source> {
 #[derive(Clone)]
 pub struct Environment<'source> {
     templates: Source<'source>,
-    pub(crate) filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
-    pub(crate) tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
-    pub(crate) globals: RcType<BTreeMap<&'source str, Value>>,
+    filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
+    tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
+    globals: RcType<BTreeMap<&'source str, Value>>,
     default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
 }
 
@@ -170,6 +173,12 @@ impl<'source> Default for Environment<'source> {
 impl<'source> fmt::Debug for Environment<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Environment")
+            .field("globals", &self.globals)
+            .field("tests", &self.tests.iter().map(|x| x.0).collect::<Vec<_>>())
+            .field(
+                "filters",
+                &self.filters.iter().map(|x| x.0).collect::<Vec<_>>(),
+            )
             .field("templates", &self.templates)
             .finish()
     }
@@ -222,6 +231,7 @@ impl<'env, 'source> Expression<'env, 'source> {
         let blocks = BTreeMap::new();
         Ok(vm
             .eval(
+                "<expression>",
                 &self.instructions,
                 ctx,
                 &blocks,
@@ -363,6 +373,7 @@ impl<'source> Environment<'source> {
     pub fn compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
         let ast = parse_expr(expr)?;
         let mut compiler = Compiler::new();
+        compiler.set_file("<expression>");
         compiler.compile_expr(&ast)?;
         let (instructions, _) = compiler.finish();
         Ok(Expression {

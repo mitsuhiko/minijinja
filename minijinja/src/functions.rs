@@ -96,13 +96,21 @@ impl BoxedFunction {
 
 impl fmt::Debug for BoxedFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.1)
+        write!(
+            f,
+            "{}",
+            if self.1.is_empty() {
+                "BoxedFunction"
+            } else {
+                self.1
+            }
+        )
     }
 }
 
 impl fmt::Display for BoxedFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.1)
+        write!(f, "{:?}", self)
     }
 }
 

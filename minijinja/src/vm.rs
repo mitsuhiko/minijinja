@@ -210,6 +210,7 @@ impl<'env, 'context> Context<'env, 'context> {
 pub struct State<'vm> {
     env: &'vm Environment<'vm>,
     ctx: &'vm Context<'vm, 'vm>,
+    name: &'vm str,
     block_stack: &'vm [&'vm str],
     auto_escape: AutoEscape,
 }
@@ -217,18 +218,11 @@ pub struct State<'vm> {
 impl<'vm> fmt::Debug for State<'vm> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("State")
+            .field("name", &self.name)
             .field("ctx", &self.ctx)
             .field("block_stack", &self.block_stack)
             .field("auto_escape", &self.auto_escape)
-            .field("globals", &self.env.globals)
-            .field(
-                "tests",
-                &self.env.tests.iter().map(|x| x.0).collect::<Vec<_>>(),
-            )
-            .field(
-                "filters",
-                &self.env.filters.iter().map(|x| x.0).collect::<Vec<_>>(),
-            )
+            .field("env", &self.env)
             .finish()
     }
 }
@@ -242,6 +236,7 @@ impl<'vm> State<'vm> {
         State {
             env,
             ctx,
+            name: "<unknown>",
             block_stack: &[][..],
             auto_escape: AutoEscape::None,
         }
@@ -250,6 +245,11 @@ impl<'vm> State<'vm> {
     /// Returns access to the current environment.
     pub fn env(&self) -> &Environment {
         self.env
+    }
+
+    /// Returns the name of the current template.
+    pub fn name(&self) -> &str {
+        self.name
     }
 
     /// Returns the current state of the auto escape flag.
@@ -310,6 +310,7 @@ impl<'env> Vm<'env> {
     /// Evaluates the given inputs
     pub fn eval<S: Serialize>(
         &self,
+        name: &str,
         instructions: &Instructions<'env>,
         root: S,
         blocks: &BTreeMap<&'env str, Instructions<'env>>,
@@ -325,6 +326,7 @@ impl<'env> Vm<'env> {
         }
         let mut block_stack = vec![];
         self.eval_context(
+            name,
             instructions,
             &mut context,
             &referenced_blocks,
@@ -335,8 +337,10 @@ impl<'env> Vm<'env> {
     }
 
     /// This is the actual evaluation loop that works with a specific context.
+    #[allow(clippy::too_many_arguments)]
     fn eval_context(
         &self,
+        name: &str,
         mut instructions: &'env Instructions<'env>,
         context: &mut Context<'env, '_>,
         blocks: &BTreeMap<&'env str, Vec<&'env Instructions<'env>>>,
@@ -412,13 +416,14 @@ impl<'env> Vm<'env> {
 
         macro_rules! sub_eval {
             ($instructions:expr) => {{
-                sub_eval!($instructions, &blocks, block_stack, auto_escape);
+                sub_eval!(name, $instructions, &blocks, block_stack, auto_escape);
             }};
-            ($instructions:expr, $blocks:expr, $block_stack:expr, $auto_escape:expr) => {{
+            ($name:expr, $instructions:expr, $blocks:expr, $block_stack:expr, $auto_escape:expr) => {{
                 let mut sub_context = Context::default();
                 sub_context.push_frame(Frame::Chained { base: context });
                 let sub_vm = Vm::new(self.env);
                 sub_vm.eval_context(
+                    $name,
                     $instructions,
                     &mut sub_context,
                     $blocks,
@@ -434,6 +439,7 @@ impl<'env> Vm<'env> {
                 State {
                     env: self.env,
                     ctx: context,
+                    name,
                     block_stack: &block_stack[..],
                     auto_escape,
                 }
@@ -641,15 +647,13 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::Include => {
                     let name = stack.pop();
-                    let tmpl = try_ctx!(name
-                        .as_str()
-                        .ok_or_else(|| {
-                            Error::new(
-                                ErrorKind::ImpossibleOperation,
-                                "template name was not a string",
-                            )
-                        })
-                        .and_then(|name| self.env.get_template(name)));
+                    let name = try_ctx!(name.as_str().ok_or_else(|| {
+                        Error::new(
+                            ErrorKind::ImpossibleOperation,
+                            "template name was not a string",
+                        )
+                    }));
+                    let tmpl = try_ctx!(self.env.get_template(name));
                     let instructions = tmpl.instructions();
                     let mut referenced_blocks = BTreeMap::new();
                     for (&name, instr) in tmpl.blocks().iter() {
@@ -657,6 +661,7 @@ impl<'env> Vm<'env> {
                     }
                     let mut block_stack = Vec::new();
                     sub_eval!(
+                        name,
                         instructions,
                         &referenced_blocks,
                         &mut block_stack,
@@ -774,5 +779,16 @@ pub fn simple_eval<S: Serialize>(
     let env = Environment::new();
     let empty_blocks = BTreeMap::new();
     let vm = Vm::new(&env);
-    vm.eval(instructions, root, &empty_blocks, AutoEscape::None, output)
+    let name = instructions
+        .get_location(0)
+        .map(|x| x.0)
+        .unwrap_or("<unknown>");
+    vm.eval(
+        name,
+        instructions,
+        root,
+        &empty_blocks,
+        AutoEscape::None,
+        output,
+    )
 }

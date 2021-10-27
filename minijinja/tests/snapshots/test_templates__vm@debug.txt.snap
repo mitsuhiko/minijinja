@@ -5,6 +5,7 @@ input_file: minijinja/tests/inputs/debug.txt
 
 ---
 State {
+    name: "debug.txt",
     ctx: Context {
         stack: [
             {
@@ -20,39 +21,47 @@ State {
     },
     block_stack: [],
     auto_escape: None,
-    globals: {
-        "debug": minijinja::functions::builtins::debug,
-        "dict": minijinja::functions::builtins::dict,
-        "range": minijinja::functions::builtins::range,
+    env: Environment {
+        globals: {
+            "debug": minijinja::functions::builtins::debug,
+            "dict": minijinja::functions::builtins::dict,
+            "range": minijinja::functions::builtins::range,
+        },
+        tests: [
+            "defined",
+            "endingwith",
+            "even",
+            "mapping",
+            "number",
+            "odd",
+            "sequence",
+            "startingwith",
+            "string",
+            "undefined",
+        ],
+        filters: [
+            "count",
+            "d",
+            "default",
+            "dictsort",
+            "e",
+            "escape",
+            "join",
+            "length",
+            "lower",
+            "replace",
+            "reverse",
+            "safe",
+            "trim",
+            "upper",
+        ],
+        templates: [
+            "debug.txt",
+            "simple_include.txt",
+            "simple_layout.txt",
+            "super_with_html.html",
+        ],
     },
-    tests: [
-        "defined",
-        "endingwith",
-        "even",
-        "mapping",
-        "number",
-        "odd",
-        "sequence",
-        "startingwith",
-        "string",
-        "undefined",
-    ],
-    filters: [
-        "count",
-        "d",
-        "default",
-        "dictsort",
-        "e",
-        "escape",
-        "join",
-        "length",
-        "lower",
-        "replace",
-        "reverse",
-        "safe",
-        "trim",
-        "upper",
-    ],
 }
 
 =====

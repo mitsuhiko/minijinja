@@ -40,7 +40,7 @@ pub struct Source {
 
 impl fmt::Debug for Source {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.templates, f)
+        fmt::Debug::fmt(&self.templates.iter().map(|x| x.0).collect::<Vec<_>>(), f)
     }
 }
 
