@@ -7,7 +7,7 @@ use crate::compiler::Compiler;
 use crate::error::{Error, ErrorKind};
 use crate::instructions::Instructions;
 use crate::parser::{parse, parse_expr};
-use crate::utils::{AutoEscape, HtmlEscape};
+use crate::utils::{AutoEscape, BTreeMapKeysDebug, HtmlEscape};
 use crate::value::{ArgType, FunctionArgs, RcType, Value};
 use crate::vm::Vm;
 use crate::{filters, functions, tests};
@@ -132,9 +132,7 @@ enum Source<'source> {
 impl<'source> fmt::Debug for Source<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Borrowed(tmpls) => {
-                fmt::Debug::fmt(&tmpls.iter().map(|x| x.0).collect::<Vec<_>>(), f)
-            }
+            Self::Borrowed(tmpls) => fmt::Debug::fmt(&BTreeMapKeysDebug(tmpls), f),
             #[cfg(feature = "source")]
             Self::Owned(arg0) => fmt::Debug::fmt(arg0, f),
         }
@@ -174,11 +172,8 @@ impl<'source> fmt::Debug for Environment<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Environment")
             .field("globals", &self.globals)
-            .field("tests", &self.tests.iter().map(|x| x.0).collect::<Vec<_>>())
-            .field(
-                "filters",
-                &self.filters.iter().map(|x| x.0).collect::<Vec<_>>(),
-            )
+            .field("tests", &BTreeMapKeysDebug(&self.tests))
+            .field("filters", &BTreeMapKeysDebug(&self.filters))
             .field("templates", &self.templates)
             .finish()
     }

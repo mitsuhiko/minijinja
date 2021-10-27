@@ -1,4 +1,5 @@
 use std::char::decode_utf16;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::{once, repeat};
 use std::str::Chars;
@@ -175,6 +176,14 @@ impl Unescaper {
 /// Un-escape a string, following JSON rules.
 pub fn unescape(s: &str) -> Result<String, Error> {
     Unescaper::default().unescape(s)
+}
+
+pub struct BTreeMapKeysDebug<'a, K: fmt::Debug, V>(pub &'a BTreeMap<K, V>);
+
+impl<'a, K: fmt::Debug, V> fmt::Debug for BTreeMapKeysDebug<'a, K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.0.iter().map(|x| x.0)).finish()
+    }
 }
 
 #[test]
