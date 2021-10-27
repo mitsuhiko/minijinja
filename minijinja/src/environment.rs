@@ -155,9 +155,9 @@ impl<'source> fmt::Debug for Source<'source> {
 #[derive(Clone)]
 pub struct Environment<'source> {
     templates: Source<'source>,
-    filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
-    tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
-    globals: RcType<BTreeMap<&'source str, Value>>,
+    pub(crate) filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
+    pub(crate) tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
+    pub(crate) globals: RcType<BTreeMap<&'source str, Value>>,
     default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
 }
 

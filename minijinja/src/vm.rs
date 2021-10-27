@@ -77,7 +77,6 @@ pub struct Loop<'env> {
     controller: RcType<LoopState>,
 }
 
-#[derive(Debug)]
 pub enum Frame<'env, 'context> {
     // This layer dispatches to another context
     Chained {
@@ -93,6 +92,17 @@ pub enum Frame<'env, 'context> {
     },
     // this layer is a for loop
     Loop(Loop<'env>),
+}
+
+impl<'env, 'context> fmt::Debug for Frame<'env, 'context> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Chained { base } => fmt::Debug::fmt(base, f),
+            Self::Isolate { value } => fmt::Debug::fmt(value, f),
+            Self::Merge { value } => fmt::Debug::fmt(value, f),
+            Self::Loop(l) => fmt::Debug::fmt(&l.locals, f),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -197,12 +207,30 @@ impl<'env, 'context> Context<'env, 'context> {
 ///
 /// A read only reference is passed to filter functions and similar
 /// objects to allow limited interfacing with the engine.
-#[derive(Debug)]
 pub struct State<'vm> {
     env: &'vm Environment<'vm>,
     ctx: &'vm Context<'vm, 'vm>,
     block_stack: &'vm [&'vm str],
     auto_escape: AutoEscape,
+}
+
+impl<'vm> fmt::Debug for State<'vm> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("State")
+            .field("ctx", &self.ctx)
+            .field("block_stack", &self.block_stack)
+            .field("auto_escape", &self.auto_escape)
+            .field("globals", &self.env.globals)
+            .field(
+                "tests",
+                &self.env.tests.iter().map(|x| x.0).collect::<Vec<_>>(),
+            )
+            .field(
+                "filters",
+                &self.env.filters.iter().map(|x| x.0).collect::<Vec<_>>(),
+            )
+            .finish()
+    }
 }
 
 impl<'vm> State<'vm> {
@@ -227,6 +255,11 @@ impl<'vm> State<'vm> {
     /// Returns the current state of the auto escape flag.
     pub fn auto_escape(&self) -> AutoEscape {
         self.auto_escape
+    }
+
+    /// Returns the name of the innermost block.
+    pub fn current_block(&self) -> Option<&str> {
+        self.block_stack.last().copied()
     }
 
     pub(crate) fn apply_filter(

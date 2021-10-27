@@ -37,7 +37,7 @@ type FuncFunc = dyn Fn(&State, Vec<Value>) -> Result<Value, Error> + Sync + Send
 
 /// A boxed function.
 #[derive(Clone)]
-pub(crate) struct BoxedFunction(Arc<FuncFunc>);
+pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 
 /// A utility trait that represents global functions.
 pub trait Function<Rv = Value, Args = Vec<Value>>: Send + Sync + 'static {
@@ -74,10 +74,13 @@ impl BoxedFunction {
         Rv: Into<Value>,
         Args: FunctionArgs,
     {
-        BoxedFunction(Arc::new(move |env, args| -> Result<Value, Error> {
-            f.invoke(env, FunctionArgs::from_values(args)?)
-                .map(Into::into)
-        }))
+        BoxedFunction(
+            Arc::new(move |env, args| -> Result<Value, Error> {
+                f.invoke(env, FunctionArgs::from_values(args)?)
+                    .map(Into::into)
+            }),
+            std::any::type_name::<F>(),
+        )
     }
 
     /// Invokes the function.
@@ -93,13 +96,13 @@ impl BoxedFunction {
 
 impl fmt::Debug for BoxedFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("BoxedFunc").finish()
+        write!(f, "{}", self.1)
     }
 }
 
 impl fmt::Display for BoxedFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("BoxedFunc").finish()
+        write!(f, "{}", self.1)
     }
 }
 
@@ -116,6 +119,7 @@ pub(crate) fn get_globals() -> BTreeMap<&'static str, Value> {
     {
         rv.insert("range", BoxedFunction::new(range).to_value());
         rv.insert("dict", BoxedFunction::new(dict).to_value());
+        rv.insert("debug", BoxedFunction::new(debug).to_value());
     }
     rv
 }
@@ -164,6 +168,17 @@ mod builtins {
         } else {
             Ok(value)
         }
+    }
+
+    /// Outputs the current context stringified.
+    ///
+    /// This is a useful function to quickly figure out the state of affairs
+    /// in a template.  It emits a stringified debug dump of the current
+    /// engine state including the layers of the context, the current block
+    /// and auto escaping setting.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_functions")))]
+    pub fn debug(state: &State) -> Result<String, Error> {
+        Ok(format!("{:#?}", state))
     }
 }
 
