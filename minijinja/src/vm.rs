@@ -47,12 +47,7 @@ impl Object for LoopState {
         }
     }
 
-    fn call_method(
-        &self,
-        _env: &Environment,
-        name: &str,
-        args: Vec<Value>,
-    ) -> Result<Value, Error> {
+    fn call_method(&self, _state: &State, name: &str, args: Vec<Value>) -> Result<Value, Error> {
         if name == "cycle" {
             let idx = self.idx.load(Ordering::Relaxed);
             match args.get(idx % args.len()) {
@@ -135,12 +130,12 @@ impl<'env, 'context> Context<'env, 'context> {
     }
 
     /// Looks up a variable in the context.
-    pub fn lookup(&self, env: &Environment, key: &str) -> Option<Value> {
+    pub fn load(&self, env: &Environment, key: &str) -> Option<Value> {
         for ctx in self.stack.iter().rev() {
             let (lookup_base, cont) = match ctx {
                 // if we hit a chain frame we dispatch there and never
                 // recurse
-                Frame::Chained { base } => return base.lookup(env, key),
+                Frame::Chained { base } => return base.load(env, key),
                 Frame::Isolate { value } => (value, false),
                 Frame::Merge { value } => (value, true),
                 Frame::Loop(Loop {
@@ -195,6 +190,75 @@ impl<'env, 'context> Context<'env, 'context> {
             })
             .next()
             .expect("not inside a loop")
+    }
+}
+
+/// Provides access to the current execution state of the engine.
+///
+/// A read only reference is passed to filter functions and similar
+/// objects to allow limited interfacing with the engine.
+#[derive(Debug)]
+pub struct State<'vm> {
+    env: &'vm Environment<'vm>,
+    ctx: &'vm Context<'vm, 'vm>,
+    block_stack: &'vm [&'vm str],
+    auto_escape: AutoEscape,
+}
+
+impl<'vm> State<'vm> {
+    #[allow(unused)]
+    pub(crate) fn from_env_and_context(
+        env: &'vm Environment<'vm>,
+        ctx: &'vm Context<'vm, 'vm>,
+    ) -> State<'vm> {
+        State {
+            env,
+            ctx,
+            block_stack: &[][..],
+            auto_escape: AutoEscape::None,
+        }
+    }
+
+    /// Returns access to the current environment.
+    pub fn env(&self) -> &Environment {
+        self.env
+    }
+
+    /// Returns the current state of the auto escape flag.
+    pub fn auto_escape(&self) -> AutoEscape {
+        self.auto_escape
+    }
+
+    pub(crate) fn apply_filter(
+        &self,
+        name: &str,
+        value: Value,
+        args: Vec<Value>,
+    ) -> Result<Value, Error> {
+        if let Some(filter) = self.env().get_filter(name) {
+            filter.apply_to(self, value, args)
+        } else {
+            Err(Error::new(
+                ErrorKind::UnknownFilter,
+                format!("filter {} is unknown", name),
+            ))
+        }
+    }
+
+    pub(crate) fn perform_test(
+        &self,
+        name: &str,
+        value: Value,
+        args: Vec<Value>,
+    ) -> Result<bool, Error> {
+        if let Some(test) = self.env().get_test(name) {
+            test.perform(self, value, args)
+        } else {
+            Err(Error::new(
+                ErrorKind::UnknownTest,
+                format!("test {} is unknown", name),
+            ))
+        }
     }
 }
 
@@ -332,6 +396,17 @@ impl<'env> Vm<'env> {
             }};
         }
 
+        macro_rules! state {
+            () => {
+                State {
+                    env: self.env,
+                    ctx: context,
+                    block_stack: &block_stack[..],
+                    auto_escape,
+                }
+            };
+        }
+
         while let Some(instr) = instructions.get(pc) {
             match instr {
                 Instruction::EmitRaw(val) => {
@@ -344,7 +419,7 @@ impl<'env> Vm<'env> {
                     context.store(name, stack.pop());
                 }
                 Instruction::Lookup(name) => {
-                    stack.push(context.lookup(self.env, name).unwrap_or(Value::UNDEFINED));
+                    stack.push(context.load(self.env, name).unwrap_or(Value::UNDEFINED));
                 }
                 Instruction::GetAttr(name) => {
                     let value = stack.pop();
@@ -590,14 +665,14 @@ impl<'env> Vm<'env> {
                 Instruction::ApplyFilter(name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     let value = stack.pop();
-                    stack.push(try_ctx!(self.env.apply_filter(name, value, args)));
+                    stack.push(try_ctx!(state!().apply_filter(name, value, args)));
                 }
                 Instruction::PerformTest(name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     let value = stack.pop();
-                    stack.push(Value::from(try_ctx!(self
-                        .env
-                        .perform_test(name, value, args))));
+                    stack.push(Value::from(try_ctx!(
+                        state!().perform_test(name, value, args)
+                    )));
                 }
                 Instruction::CallFunction(function_name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
@@ -622,8 +697,8 @@ impl<'env> Vm<'env> {
                         } else {
                             panic!("attempted to super unreferenced block");
                         }
-                    } else if let Some(func) = context.lookup(self.env, function_name) {
-                        stack.push(try_ctx!(func.call(self.env, args)));
+                    } else if let Some(func) = context.load(self.env, function_name) {
+                        stack.push(try_ctx!(func.call(&state!(), args)));
                     } else {
                         bail!(Error::new(
                             ErrorKind::ImpossibleOperation,
@@ -634,12 +709,12 @@ impl<'env> Vm<'env> {
                 Instruction::CallMethod(name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     let obj = stack.pop();
-                    stack.push(try_ctx!(obj.call_method(self.env, name, args)));
+                    stack.push(try_ctx!(obj.call_method(&state!(), name, args)));
                 }
                 Instruction::CallObject => {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     let obj = stack.pop();
-                    stack.push(try_ctx!(obj.call(self.env, args)));
+                    stack.push(try_ctx!(obj.call(&state!(), args)));
                 }
                 Instruction::DupTop => {
                     stack.push(stack.peek().clone());

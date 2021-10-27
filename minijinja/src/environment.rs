@@ -434,38 +434,14 @@ impl<'source> Environment<'source> {
         self.globals.get(name).cloned()
     }
 
-    /// Applies a filter with arguments to a value.
-    pub(crate) fn apply_filter(
-        &self,
-        name: &str,
-        value: Value,
-        args: Vec<Value>,
-    ) -> Result<Value, Error> {
-        if let Some(filter) = self.filters.get(name) {
-            filter.apply_to(self, value, args)
-        } else {
-            Err(Error::new(
-                ErrorKind::UnknownFilter,
-                format!("filter {} is unknown", name),
-            ))
-        }
+    /// Looks up a filter.
+    pub(crate) fn get_filter(&self, name: &str) -> Option<&filters::BoxedFilter> {
+        self.filters.get(name)
     }
 
-    /// Performs a test.
-    pub(crate) fn perform_test(
-        &self,
-        name: &str,
-        value: Value,
-        args: Vec<Value>,
-    ) -> Result<bool, Error> {
-        if let Some(test) = self.tests.get(name) {
-            test.perform(self, value, args)
-        } else {
-            Err(Error::new(
-                ErrorKind::UnknownTest,
-                format!("test {} is unknown", name),
-            ))
-        }
+    /// Looks up a test function.
+    pub(crate) fn get_test(&self, name: &str) -> Option<&tests::BoxedTest> {
+        self.tests.get(name)
     }
 
     /// Finalizes a value.
