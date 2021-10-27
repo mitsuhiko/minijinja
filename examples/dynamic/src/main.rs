@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use minijinja::value::{FunctionArgs, Object, Value};
-use minijinja::{Environment, State, Error};
+use minijinja::{Environment, Error, State};
 
 #[derive(Debug)]
 struct Cycler {
@@ -41,12 +41,7 @@ impl fmt::Display for Magic {
 }
 
 impl Object for Magic {
-    fn call_method(
-        &self,
-        _state: &State,
-        name: &str,
-        args: Vec<Value>,
-    ) -> Result<Value, Error> {
+    fn call_method(&self, _state: &State, name: &str, args: Vec<Value>) -> Result<Value, Error> {
         if name == "make_class" {
             let (tag,): (String,) = FunctionArgs::from_values(args)?;
             Ok(Value::from(format!("magic-{}", tag)))
