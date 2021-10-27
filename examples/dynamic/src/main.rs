@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use minijinja::value::{FunctionArgs, Object, Value};
-use minijinja::{Environment, Error};
+use minijinja::{Environment, Error, State};
 
 #[derive(Debug)]
 struct Cycler {
@@ -17,14 +17,14 @@ impl fmt::Display for Cycler {
 }
 
 impl Object for Cycler {
-    fn call(&self, _env: &Environment, args: Vec<Value>) -> Result<Value, Error> {
+    fn call(&self, _state: &State, args: Vec<Value>) -> Result<Value, Error> {
         let _: () = FunctionArgs::from_values(args)?;
         let idx = self.idx.fetch_add(1, Ordering::Relaxed);
         Ok(self.values[idx % self.values.len()].clone())
     }
 }
 
-fn make_cycler(_env: &Environment, args: Vec<Value>) -> Result<Value, Error> {
+fn make_cycler(_state: &State, args: Vec<Value>) -> Result<Value, Error> {
     Ok(Value::from_object(Cycler {
         values: args,
         idx: AtomicUsize::new(0),
@@ -41,12 +41,7 @@ impl fmt::Display for Magic {
 }
 
 impl Object for Magic {
-    fn call_method(
-        &self,
-        _env: &Environment,
-        name: &str,
-        args: Vec<Value>,
-    ) -> Result<Value, Error> {
+    fn call_method(&self, _state: &State, name: &str, args: Vec<Value>) -> Result<Value, Error> {
         if name == "make_class" {
             let (tag,): (String,) = FunctionArgs::from_values(args)?;
             Ok(Value::from(format!("magic-{}", tag)))

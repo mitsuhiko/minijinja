@@ -76,10 +76,10 @@ use std::sync::atomic::{self, AtomicBool, AtomicUsize};
 
 use serde::ser::{self, Serialize, Serializer};
 
-use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, KeySerializer};
 use crate::utils::matches;
+use crate::vm::State;
 
 #[cfg(feature = "sync")]
 pub(crate) type RcType<T> = std::sync::Arc<T>;
@@ -1040,10 +1040,10 @@ impl Value {
     }
 
     /// Calls the value directly.
-    pub(crate) fn call(&self, env: &Environment, args: Vec<Value>) -> Result<Value, Error> {
+    pub(crate) fn call(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
         if let Repr::Shared(ref cplx) = self.0 {
             if let Shared::Dynamic(ref dy) = **cplx {
-                return dy.call(env, args);
+                return dy.call(state, args);
             }
         }
         Err(Error::new(
@@ -1055,13 +1055,13 @@ impl Value {
     /// Calls a method on the value.
     pub(crate) fn call_method(
         &self,
-        env: &Environment,
+        state: &State,
         name: &str,
         args: Vec<Value>,
     ) -> Result<Value, Error> {
         if let Repr::Shared(ref cplx) = self.0 {
             if let Shared::Dynamic(ref dy) = **cplx {
-                return dy.call_method(env, name, args);
+                return dy.call_method(state, name, args);
             }
         }
         Err(Error::new(
@@ -1725,8 +1725,8 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     ///
     /// It's the responsibility of the implementer to ensure that an
     /// error is generated if an invalid method is invoked.
-    fn call_method(&self, env: &Environment, name: &str, args: Vec<Value>) -> Result<Value, Error> {
-        let _env = env;
+    fn call_method(&self, state: &State, name: &str, args: Vec<Value>) -> Result<Value, Error> {
+        let _state = state;
         let _args = args;
         Err(Error::new(
             ErrorKind::ImpossibleOperation,
@@ -1738,8 +1738,8 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     ///
     /// The default implementation just generates an error that the object
     /// cannot be invoked.
-    fn call(&self, env: &Environment, args: Vec<Value>) -> Result<Value, Error> {
-        let _env = env;
+    fn call(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
+        let _state = state;
         let _args = args;
         Err(Error::new(
             ErrorKind::ImpossibleOperation,

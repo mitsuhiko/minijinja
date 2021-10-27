@@ -1,0 +1,92 @@
+---
+source: minijinja/tests/test_templates.rs
+expression: "&rendered"
+input_file: minijinja/tests/inputs/debug.txt
+
+---
+State {
+    name: "debug.txt",
+    ctx: Context {
+        stack: [
+            {
+                "upper": 1,
+            },
+            {
+                "f": minijinja::functions::builtins::range,
+            },
+            {
+                "x": 0,
+            },
+        ],
+    },
+    block_stack: [],
+    auto_escape: None,
+    env: Environment {
+        globals: {
+            "debug": minijinja::functions::builtins::debug,
+            "dict": minijinja::functions::builtins::dict,
+            "range": minijinja::functions::builtins::range,
+        },
+        tests: [
+            "defined",
+            "endingwith",
+            "even",
+            "mapping",
+            "number",
+            "odd",
+            "sequence",
+            "startingwith",
+            "string",
+            "undefined",
+        ],
+        filters: [
+            "count",
+            "d",
+            "default",
+            "dictsort",
+            "e",
+            "escape",
+            "join",
+            "length",
+            "lower",
+            "replace",
+            "reverse",
+            "safe",
+            "trim",
+            "upper",
+        ],
+        templates: [
+            "debug.txt",
+            "simple_include.txt",
+            "simple_layout.txt",
+            "super_with_html.html",
+        ],
+    },
+}
+
+=====
+
+Template {
+    name: "debug.txt",
+    instructions: [
+        00000 | LOAD_CONST (value "f")   [debug.txt:1],
+        00001 | LOOKUP (var "range")   [debug.txt:1],
+        00002 | BUILD_MAP (1 pairs)   [debug.txt:1],
+        00003 | PUSH_CONTEXT   [debug.txt:1],
+        00004 | LOOKUP (var "upper")   [debug.txt:1],
+        00005 | BUILD_LIST (1 items)   [debug.txt:1],
+        00006 | CALL_FUNCTION (name "f")   [debug.txt:1],
+        00007 | PUSH_LOOP (loop var: true)   [debug.txt:1],
+        00008 | ITERATE (exit to 0000e)   [debug.txt:1],
+        00009 | STORE_LOCAL (var "x")   [debug.txt:1],
+        0000a | BUILD_LIST (0 items)   [debug.txt:1],
+        0000b | CALL_FUNCTION (name "debug")   [debug.txt:1],
+        0000c | EMIT   [debug.txt:1],
+        0000d | JUMP (to 00008)   [debug.txt:1],
+        0000e | POP_FRAME   [debug.txt:1],
+        0000f | POP_FRAME   [debug.txt:1],
+        00010 | EMIT_RAW (string "\n")   [debug.txt:1],
+    ],
+    blocks: {},
+    initial_auto_escape: None,
+}

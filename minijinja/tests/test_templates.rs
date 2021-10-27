@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::fs;
 
-use minijinja::context;
-use minijinja::{Environment, Error};
+use minijinja::{context, Environment, Error, State};
 
 #[test]
 fn test_vm() {
@@ -49,7 +48,7 @@ fn test_vm() {
 
 #[test]
 fn test_custom_filter() {
-    fn test_filter(_: &Environment, value: String) -> Result<String, Error> {
+    fn test_filter(_: &State, value: String) -> Result<String, Error> {
         Ok(format!("[{}]", value))
     }
 

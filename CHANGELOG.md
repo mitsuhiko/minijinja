@@ -7,6 +7,9 @@ All notable changes to MiniJinja are documented here.
 - Introduce `context!` and deprecate `Single`.
 - Correctly report template file names in errors.
 - Introduced the `source` method on templates.
+- Introduced `State` type and changed parameter to functions from
+  `&Environment` to `&State`.
+- Introduced `debug` global.
 
 # 0.7.0
 

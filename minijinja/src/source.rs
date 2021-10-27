@@ -7,6 +7,7 @@ use self_cell::self_cell;
 
 use crate::environment::CompiledTemplate;
 use crate::error::{Error, ErrorKind};
+use crate::utils::BTreeMapKeysDebug;
 use crate::value::RcType;
 
 /// Utility for dynamic template loading.
@@ -40,7 +41,7 @@ pub struct Source {
 
 impl fmt::Debug for Source {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.templates, f)
+        fmt::Debug::fmt(&BTreeMapKeysDebug(&self.templates), f)
     }
 }
 

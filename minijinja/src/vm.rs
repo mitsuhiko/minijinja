@@ -47,12 +47,7 @@ impl Object for LoopState {
         }
     }
 
-    fn call_method(
-        &self,
-        _env: &Environment,
-        name: &str,
-        args: Vec<Value>,
-    ) -> Result<Value, Error> {
+    fn call_method(&self, _state: &State, name: &str, args: Vec<Value>) -> Result<Value, Error> {
         if name == "cycle" {
             let idx = self.idx.load(Ordering::Relaxed);
             match args.get(idx % args.len()) {
@@ -82,7 +77,6 @@ pub struct Loop<'env> {
     controller: RcType<LoopState>,
 }
 
-#[derive(Debug)]
 pub enum Frame<'env, 'context> {
     // This layer dispatches to another context
     Chained {
@@ -98,6 +92,17 @@ pub enum Frame<'env, 'context> {
     },
     // this layer is a for loop
     Loop(Loop<'env>),
+}
+
+impl<'env, 'context> fmt::Debug for Frame<'env, 'context> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Chained { base } => fmt::Debug::fmt(base, f),
+            Self::Isolate { value } => fmt::Debug::fmt(value, f),
+            Self::Merge { value } => fmt::Debug::fmt(value, f),
+            Self::Loop(l) => fmt::Debug::fmt(&l.locals, f),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -135,12 +140,12 @@ impl<'env, 'context> Context<'env, 'context> {
     }
 
     /// Looks up a variable in the context.
-    pub fn lookup(&self, env: &Environment, key: &str) -> Option<Value> {
+    pub fn load(&self, env: &Environment, key: &str) -> Option<Value> {
         for ctx in self.stack.iter().rev() {
             let (lookup_base, cont) = match ctx {
                 // if we hit a chain frame we dispatch there and never
                 // recurse
-                Frame::Chained { base } => return base.lookup(env, key),
+                Frame::Chained { base } => return base.load(env, key),
                 Frame::Isolate { value } => (value, false),
                 Frame::Merge { value } => (value, true),
                 Frame::Loop(Loop {
@@ -198,6 +203,98 @@ impl<'env, 'context> Context<'env, 'context> {
     }
 }
 
+/// Provides access to the current execution state of the engine.
+///
+/// A read only reference is passed to filter functions and similar
+/// objects to allow limited interfacing with the engine.
+pub struct State<'vm> {
+    env: &'vm Environment<'vm>,
+    ctx: &'vm Context<'vm, 'vm>,
+    name: &'vm str,
+    block_stack: &'vm [&'vm str],
+    auto_escape: AutoEscape,
+}
+
+impl<'vm> fmt::Debug for State<'vm> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("State")
+            .field("name", &self.name)
+            .field("ctx", &self.ctx)
+            .field("block_stack", &self.block_stack)
+            .field("auto_escape", &self.auto_escape)
+            .field("env", &self.env)
+            .finish()
+    }
+}
+
+impl<'vm> State<'vm> {
+    #[allow(unused)]
+    pub(crate) fn from_env_and_context(
+        env: &'vm Environment<'vm>,
+        ctx: &'vm Context<'vm, 'vm>,
+    ) -> State<'vm> {
+        State {
+            env,
+            ctx,
+            name: "<unknown>",
+            block_stack: &[][..],
+            auto_escape: AutoEscape::None,
+        }
+    }
+
+    /// Returns access to the current environment.
+    pub fn env(&self) -> &Environment {
+        self.env
+    }
+
+    /// Returns the name of the current template.
+    pub fn name(&self) -> &str {
+        self.name
+    }
+
+    /// Returns the current state of the auto escape flag.
+    pub fn auto_escape(&self) -> AutoEscape {
+        self.auto_escape
+    }
+
+    /// Returns the name of the innermost block.
+    pub fn current_block(&self) -> Option<&str> {
+        self.block_stack.last().copied()
+    }
+
+    pub(crate) fn apply_filter(
+        &self,
+        name: &str,
+        value: Value,
+        args: Vec<Value>,
+    ) -> Result<Value, Error> {
+        if let Some(filter) = self.env().get_filter(name) {
+            filter.apply_to(self, value, args)
+        } else {
+            Err(Error::new(
+                ErrorKind::UnknownFilter,
+                format!("filter {} is unknown", name),
+            ))
+        }
+    }
+
+    pub(crate) fn perform_test(
+        &self,
+        name: &str,
+        value: Value,
+        args: Vec<Value>,
+    ) -> Result<bool, Error> {
+        if let Some(test) = self.env().get_test(name) {
+            test.perform(self, value, args)
+        } else {
+            Err(Error::new(
+                ErrorKind::UnknownTest,
+                format!("test {} is unknown", name),
+            ))
+        }
+    }
+}
+
 /// Helps to evaluate something.
 #[derive(Debug)]
 pub struct Vm<'env> {
@@ -213,6 +310,7 @@ impl<'env> Vm<'env> {
     /// Evaluates the given inputs
     pub fn eval<S: Serialize>(
         &self,
+        name: &str,
         instructions: &Instructions<'env>,
         root: S,
         blocks: &BTreeMap<&'env str, Instructions<'env>>,
@@ -228,6 +326,7 @@ impl<'env> Vm<'env> {
         }
         let mut block_stack = vec![];
         self.eval_context(
+            name,
             instructions,
             &mut context,
             &referenced_blocks,
@@ -238,8 +337,10 @@ impl<'env> Vm<'env> {
     }
 
     /// This is the actual evaluation loop that works with a specific context.
+    #[allow(clippy::too_many_arguments)]
     fn eval_context(
         &self,
+        name: &str,
         mut instructions: &'env Instructions<'env>,
         context: &mut Context<'env, '_>,
         blocks: &BTreeMap<&'env str, Vec<&'env Instructions<'env>>>,
@@ -315,13 +416,14 @@ impl<'env> Vm<'env> {
 
         macro_rules! sub_eval {
             ($instructions:expr) => {{
-                sub_eval!($instructions, &blocks, block_stack, auto_escape);
+                sub_eval!(name, $instructions, &blocks, block_stack, auto_escape);
             }};
-            ($instructions:expr, $blocks:expr, $block_stack:expr, $auto_escape:expr) => {{
+            ($name:expr, $instructions:expr, $blocks:expr, $block_stack:expr, $auto_escape:expr) => {{
                 let mut sub_context = Context::default();
                 sub_context.push_frame(Frame::Chained { base: context });
                 let sub_vm = Vm::new(self.env);
                 sub_vm.eval_context(
+                    $name,
                     $instructions,
                     &mut sub_context,
                     $blocks,
@@ -330,6 +432,18 @@ impl<'env> Vm<'env> {
                     out!(),
                 )?;
             }};
+        }
+
+        macro_rules! state {
+            () => {
+                State {
+                    env: self.env,
+                    ctx: context,
+                    name,
+                    block_stack: &block_stack[..],
+                    auto_escape,
+                }
+            };
         }
 
         while let Some(instr) = instructions.get(pc) {
@@ -344,7 +458,7 @@ impl<'env> Vm<'env> {
                     context.store(name, stack.pop());
                 }
                 Instruction::Lookup(name) => {
-                    stack.push(context.lookup(self.env, name).unwrap_or(Value::UNDEFINED));
+                    stack.push(context.load(self.env, name).unwrap_or(Value::UNDEFINED));
                 }
                 Instruction::GetAttr(name) => {
                     let value = stack.pop();
@@ -533,15 +647,13 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::Include => {
                     let name = stack.pop();
-                    let tmpl = try_ctx!(name
-                        .as_str()
-                        .ok_or_else(|| {
-                            Error::new(
-                                ErrorKind::ImpossibleOperation,
-                                "template name was not a string",
-                            )
-                        })
-                        .and_then(|name| self.env.get_template(name)));
+                    let name = try_ctx!(name.as_str().ok_or_else(|| {
+                        Error::new(
+                            ErrorKind::ImpossibleOperation,
+                            "template name was not a string",
+                        )
+                    }));
+                    let tmpl = try_ctx!(self.env.get_template(name));
                     let instructions = tmpl.instructions();
                     let mut referenced_blocks = BTreeMap::new();
                     for (&name, instr) in tmpl.blocks().iter() {
@@ -549,6 +661,7 @@ impl<'env> Vm<'env> {
                     }
                     let mut block_stack = Vec::new();
                     sub_eval!(
+                        name,
                         instructions,
                         &referenced_blocks,
                         &mut block_stack,
@@ -590,14 +703,14 @@ impl<'env> Vm<'env> {
                 Instruction::ApplyFilter(name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     let value = stack.pop();
-                    stack.push(try_ctx!(self.env.apply_filter(name, value, args)));
+                    stack.push(try_ctx!(state!().apply_filter(name, value, args)));
                 }
                 Instruction::PerformTest(name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     let value = stack.pop();
-                    stack.push(Value::from(try_ctx!(self
-                        .env
-                        .perform_test(name, value, args))));
+                    stack.push(Value::from(try_ctx!(
+                        state!().perform_test(name, value, args)
+                    )));
                 }
                 Instruction::CallFunction(function_name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
@@ -622,8 +735,8 @@ impl<'env> Vm<'env> {
                         } else {
                             panic!("attempted to super unreferenced block");
                         }
-                    } else if let Some(func) = context.lookup(self.env, function_name) {
-                        stack.push(try_ctx!(func.call(self.env, args)));
+                    } else if let Some(func) = context.load(self.env, function_name) {
+                        stack.push(try_ctx!(func.call(&state!(), args)));
                     } else {
                         bail!(Error::new(
                             ErrorKind::ImpossibleOperation,
@@ -634,12 +747,12 @@ impl<'env> Vm<'env> {
                 Instruction::CallMethod(name) => {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     let obj = stack.pop();
-                    stack.push(try_ctx!(obj.call_method(self.env, name, args)));
+                    stack.push(try_ctx!(obj.call_method(&state!(), name, args)));
                 }
                 Instruction::CallObject => {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     let obj = stack.pop();
-                    stack.push(try_ctx!(obj.call(self.env, args)));
+                    stack.push(try_ctx!(obj.call(&state!(), args)));
                 }
                 Instruction::DupTop => {
                     stack.push(stack.peek().clone());
@@ -666,5 +779,16 @@ pub fn simple_eval<S: Serialize>(
     let env = Environment::new();
     let empty_blocks = BTreeMap::new();
     let vm = Vm::new(&env);
-    vm.eval(instructions, root, &empty_blocks, AutoEscape::None, output)
+    let name = instructions
+        .get_location(0)
+        .map(|x| x.0)
+        .unwrap_or("<unknown>");
+    vm.eval(
+        name,
+        instructions,
+        root,
+        &empty_blocks,
+        AutoEscape::None,
+        output,
+    )
 }

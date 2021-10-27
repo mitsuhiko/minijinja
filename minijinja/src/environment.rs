@@ -7,7 +7,7 @@ use crate::compiler::Compiler;
 use crate::error::{Error, ErrorKind};
 use crate::instructions::Instructions;
 use crate::parser::{parse, parse_expr};
-use crate::utils::{AutoEscape, HtmlEscape};
+use crate::utils::{AutoEscape, BTreeMapKeysDebug, HtmlEscape};
 use crate::value::{ArgType, FunctionArgs, RcType, Value};
 use crate::vm::Vm;
 use crate::{filters, functions, tests};
@@ -94,6 +94,7 @@ impl<'env> Template<'env> {
         let vm = Vm::new(self.env);
         let blocks = &self.compiled.blocks;
         vm.eval(
+            self.name,
             &self.compiled.instructions,
             ctx,
             blocks,
@@ -131,7 +132,7 @@ enum Source<'source> {
 impl<'source> fmt::Debug for Source<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Borrowed(arg0) => fmt::Debug::fmt(arg0, f),
+            Self::Borrowed(tmpls) => fmt::Debug::fmt(&BTreeMapKeysDebug(tmpls), f),
             #[cfg(feature = "source")]
             Self::Owned(arg0) => fmt::Debug::fmt(arg0, f),
         }
@@ -170,6 +171,9 @@ impl<'source> Default for Environment<'source> {
 impl<'source> fmt::Debug for Environment<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Environment")
+            .field("globals", &self.globals)
+            .field("tests", &BTreeMapKeysDebug(&self.tests))
+            .field("filters", &BTreeMapKeysDebug(&self.filters))
             .field("templates", &self.templates)
             .finish()
     }
@@ -222,6 +226,7 @@ impl<'env, 'source> Expression<'env, 'source> {
         let blocks = BTreeMap::new();
         Ok(vm
             .eval(
+                "<expression>",
                 &self.instructions,
                 ctx,
                 &blocks,
@@ -363,6 +368,7 @@ impl<'source> Environment<'source> {
     pub fn compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
         let ast = parse_expr(expr)?;
         let mut compiler = Compiler::new();
+        compiler.set_file("<expression>");
         compiler.compile_expr(&ast)?;
         let (instructions, _) = compiler.finish();
         Ok(Expression {
@@ -434,38 +440,14 @@ impl<'source> Environment<'source> {
         self.globals.get(name).cloned()
     }
 
-    /// Applies a filter with arguments to a value.
-    pub(crate) fn apply_filter(
-        &self,
-        name: &str,
-        value: Value,
-        args: Vec<Value>,
-    ) -> Result<Value, Error> {
-        if let Some(filter) = self.filters.get(name) {
-            filter.apply_to(self, value, args)
-        } else {
-            Err(Error::new(
-                ErrorKind::UnknownFilter,
-                format!("filter {} is unknown", name),
-            ))
-        }
+    /// Looks up a filter.
+    pub(crate) fn get_filter(&self, name: &str) -> Option<&filters::BoxedFilter> {
+        self.filters.get(name)
     }
 
-    /// Performs a test.
-    pub(crate) fn perform_test(
-        &self,
-        name: &str,
-        value: Value,
-        args: Vec<Value>,
-    ) -> Result<bool, Error> {
-        if let Some(test) = self.tests.get(name) {
-            test.perform(self, value, args)
-        } else {
-            Err(Error::new(
-                ErrorKind::UnknownTest,
-                format!("test {} is unknown", name),
-            ))
-        }
+    /// Looks up a test function.
+    pub(crate) fn get_test(&self, name: &str) -> Option<&tests::BoxedTest> {
+        self.tests.get(name)
     }
 
     /// Finalizes a value.

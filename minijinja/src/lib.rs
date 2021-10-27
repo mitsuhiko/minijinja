@@ -133,6 +133,7 @@ pub use self::utils::{AutoEscape, HtmlEscape};
 pub use self::source::Source;
 
 pub use self::context::*;
+pub use self::vm::State;
 
 /// This module gives access to the low level machinery.
 ///

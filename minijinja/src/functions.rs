@@ -13,9 +13,9 @@
 //! to the template that hasn't been provided by the individual render invocation.
 //!
 //! ```rust
-//! # use minijinja::{Environment, Error, ErrorKind};
+//! # use minijinja::{Environment, State, Error, ErrorKind};
 //! # let mut env = Environment::new();
-//! fn include_file(env: &Environment, name: String) -> Result<String, Error> {
+//! fn include_file(_state: &State, name: String) -> Result<String, Error> {
 //!     std::fs::read_to_string(&name)
 //!         .map_err(|e| Error::new(
 //!             ErrorKind::ImpossibleOperation,
@@ -29,32 +29,32 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
-use crate::environment::Environment;
 use crate::error::Error;
 use crate::value::{FunctionArgs, Object, Value};
+use crate::vm::State;
 
-type FuncFunc = dyn Fn(&Environment, Vec<Value>) -> Result<Value, Error> + Sync + Send + 'static;
+type FuncFunc = dyn Fn(&State, Vec<Value>) -> Result<Value, Error> + Sync + Send + 'static;
 
 /// A boxed function.
 #[derive(Clone)]
-pub(crate) struct BoxedFunction(Arc<FuncFunc>);
+pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 
 /// A utility trait that represents global functions.
 pub trait Function<Rv = Value, Args = Vec<Value>>: Send + Sync + 'static {
-    /// Calls a functionw ith the given arguments.
-    fn invoke(&self, env: &Environment, args: Args) -> Result<Rv, Error>;
+    /// Calls a function with the given arguments.
+    fn invoke(&self, env: &State, args: Args) -> Result<Rv, Error>;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
         impl<F, Rv, $($name),*> Function<Rv, ($($name,)*)> for F
         where
-            F: Fn(&Environment, $($name),*) -> Result<Rv, Error> + Send + Sync + 'static
+            F: Fn(&State, $($name),*) -> Result<Rv, Error> + Send + Sync + 'static
         {
-            fn invoke(&self, env: &Environment, args: ($($name,)*)) -> Result<Rv, Error> {
+            fn invoke(&self, state: &State, args: ($($name,)*)) -> Result<Rv, Error> {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
-                (self)(env, $($name,)*)
+                (self)(state, $($name,)*)
             }
         }
     };
@@ -74,15 +74,18 @@ impl BoxedFunction {
         Rv: Into<Value>,
         Args: FunctionArgs,
     {
-        BoxedFunction(Arc::new(move |env, args| -> Result<Value, Error> {
-            f.invoke(env, FunctionArgs::from_values(args)?)
-                .map(Into::into)
-        }))
+        BoxedFunction(
+            Arc::new(move |env, args| -> Result<Value, Error> {
+                f.invoke(env, FunctionArgs::from_values(args)?)
+                    .map(Into::into)
+            }),
+            std::any::type_name::<F>(),
+        )
     }
 
-    /// Applies the filter to a value and argument.
-    pub fn invoke(&self, env: &Environment, args: Vec<Value>) -> Result<Value, Error> {
-        (self.0)(env, args)
+    /// Invokes the function.
+    pub fn invoke(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
+        (self.0)(state, args)
     }
 
     /// Creates a value from a boxed function.
@@ -93,19 +96,27 @@ impl BoxedFunction {
 
 impl fmt::Debug for BoxedFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("BoxedFunc").finish()
+        write!(
+            f,
+            "{}",
+            if self.1.is_empty() {
+                "BoxedFunction"
+            } else {
+                self.1
+            }
+        )
     }
 }
 
 impl fmt::Display for BoxedFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("BoxedFunc").finish()
+        write!(f, "{:?}", self)
     }
 }
 
 impl Object for BoxedFunction {
-    fn call(&self, env: &Environment, args: Vec<Value>) -> Result<Value, Error> {
-        self.invoke(env, args)
+    fn call(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
+        self.invoke(state, args)
     }
 }
 
@@ -116,6 +127,7 @@ pub(crate) fn get_globals() -> BTreeMap<&'static str, Value> {
     {
         rv.insert("range", BoxedFunction::new(range).to_value());
         rv.insert("dict", BoxedFunction::new(dict).to_value());
+        rv.insert("debug", BoxedFunction::new(debug).to_value());
     }
     rv
 }
@@ -135,7 +147,7 @@ mod builtins {
     /// and `range(0, 4, 1)` return `[0, 1, 2, 3]`. The end point is omitted.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_functions")))]
     pub fn range(
-        _env: &Environment,
+        _state: &State,
         lower: u32,
         upper: Option<u32>,
         step: Option<u32>,
@@ -156,7 +168,7 @@ mod builtins {
     /// This is a convenient alternative for a dictionary literal.
     /// `{"foo": "bar"}` is the same as `dict(foo="bar")`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_functions")))]
-    pub fn dict(_env: &Environment, value: Value) -> Result<Value, Error> {
+    pub fn dict(_state: &State, value: Value) -> Result<Value, Error> {
         if value.is_undefined() {
             Ok(Value::from(BTreeMap::<bool, Value>::new()))
         } else if value.kind() != ValueKind::Map {
@@ -164,6 +176,17 @@ mod builtins {
         } else {
             Ok(value)
         }
+    }
+
+    /// Outputs the current context stringified.
+    ///
+    /// This is a useful function to quickly figure out the state of affairs
+    /// in a template.  It emits a stringified debug dump of the current
+    /// engine state including the layers of the context, the current block
+    /// and auto escaping setting.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_functions")))]
+    pub fn debug(state: &State) -> Result<String, Error> {
+        Ok(format!("{:#?}", state))
     }
 }
 
