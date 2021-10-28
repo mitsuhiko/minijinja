@@ -94,7 +94,6 @@ impl<'env> Template<'env> {
         let vm = Vm::new(self.env);
         let blocks = &self.compiled.blocks;
         vm.eval(
-            self.name,
             &self.compiled.instructions,
             ctx,
             blocks,
@@ -226,7 +225,6 @@ impl<'env, 'source> Expression<'env, 'source> {
         let blocks = BTreeMap::new();
         Ok(vm
             .eval(
-                "<expression>",
                 &self.instructions,
                 ctx,
                 &blocks,

@@ -210,7 +210,8 @@ impl<'env, 'context> Context<'env, 'context> {
 pub struct State<'vm> {
     env: &'vm Environment<'vm>,
     ctx: &'vm Context<'vm, 'vm>,
-    name: &'vm str,
+    instructions: &'vm Instructions<'vm>,
+    pc: usize,
     block_stack: &'vm [&'vm str],
     auto_escape: AutoEscape,
 }
@@ -218,7 +219,6 @@ pub struct State<'vm> {
 impl<'vm> fmt::Debug for State<'vm> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("State")
-            .field("name", &self.name)
             .field("ctx", &self.ctx)
             .field("block_stack", &self.block_stack)
             .field("auto_escape", &self.auto_escape)
@@ -228,28 +228,16 @@ impl<'vm> fmt::Debug for State<'vm> {
 }
 
 impl<'vm> State<'vm> {
-    #[allow(unused)]
-    pub(crate) fn from_env_and_context(
-        env: &'vm Environment<'vm>,
-        ctx: &'vm Context<'vm, 'vm>,
-    ) -> State<'vm> {
-        State {
-            env,
-            ctx,
-            name: "<unknown>",
-            block_stack: &[][..],
-            auto_escape: AutoEscape::None,
-        }
-    }
-
-    /// Returns access to the current environment.
-    pub fn env(&self) -> &Environment {
+    /// Returns a reference to the current environment.
+    pub fn env(&self) -> &Environment<'vm> {
         self.env
     }
 
     /// Returns the name of the current template.
     pub fn name(&self) -> &str {
-        self.name
+        self.instructions
+            .get_location(self.pc)
+            .map_or("<unknown>", |x| x.0)
     }
 
     /// Returns the current state of the auto escape flag.
@@ -310,7 +298,6 @@ impl<'env> Vm<'env> {
     /// Evaluates the given inputs
     pub fn eval<S: Serialize>(
         &self,
-        name: &str,
         instructions: &Instructions<'env>,
         root: S,
         blocks: &BTreeMap<&'env str, Instructions<'env>>,
@@ -326,7 +313,6 @@ impl<'env> Vm<'env> {
         }
         let mut block_stack = vec![];
         self.eval_context(
-            name,
             instructions,
             &mut context,
             &referenced_blocks,
@@ -340,7 +326,6 @@ impl<'env> Vm<'env> {
     #[allow(clippy::too_many_arguments)]
     fn eval_context(
         &self,
-        name: &str,
         mut instructions: &'env Instructions<'env>,
         context: &mut Context<'env, '_>,
         blocks: &BTreeMap<&'env str, Vec<&'env Instructions<'env>>>,
@@ -416,14 +401,13 @@ impl<'env> Vm<'env> {
 
         macro_rules! sub_eval {
             ($instructions:expr) => {{
-                sub_eval!(name, $instructions, &blocks, block_stack, auto_escape);
+                sub_eval!($instructions, &blocks, block_stack, auto_escape);
             }};
-            ($name:expr, $instructions:expr, $blocks:expr, $block_stack:expr, $auto_escape:expr) => {{
+            ($instructions:expr, $blocks:expr, $block_stack:expr, $auto_escape:expr) => {{
                 let mut sub_context = Context::default();
                 sub_context.push_frame(Frame::Chained { base: context });
                 let sub_vm = Vm::new(self.env);
                 sub_vm.eval_context(
-                    $name,
                     $instructions,
                     &mut sub_context,
                     $blocks,
@@ -439,7 +423,8 @@ impl<'env> Vm<'env> {
                 State {
                     env: self.env,
                     ctx: context,
-                    name,
+                    instructions,
+                    pc,
                     block_stack: &block_stack[..],
                     auto_escape,
                 }
@@ -661,7 +646,6 @@ impl<'env> Vm<'env> {
                     }
                     let mut block_stack = Vec::new();
                     sub_eval!(
-                        name,
                         instructions,
                         &referenced_blocks,
                         &mut block_stack,
@@ -779,16 +763,5 @@ pub fn simple_eval<S: Serialize>(
     let env = Environment::new();
     let empty_blocks = BTreeMap::new();
     let vm = Vm::new(&env);
-    let name = instructions
-        .get_location(0)
-        .map(|x| x.0)
-        .unwrap_or("<unknown>");
-    vm.eval(
-        name,
-        instructions,
-        root,
-        &empty_blocks,
-        AutoEscape::None,
-        output,
-    )
+    vm.eval(instructions, root, &empty_blocks, AutoEscape::None, output)
 }
