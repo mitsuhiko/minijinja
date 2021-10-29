@@ -12,12 +12,12 @@ none
 Template {
     name: "undefined.txt",
     instructions: [
-        00000 | LOAD_CONST (value None)   [undefined.txt:1],
-        00001 | EMIT   [undefined.txt:1],
-        00002 | EMIT_RAW (string "\n")   [undefined.txt:1],
-        00003 | LOOKUP (var "undefined")   [undefined.txt:2],
-        00004 | EMIT   [undefined.txt:2],
-        00005 | EMIT_RAW (string "\n")   [undefined.txt:2],
+        00000 | LOAD_CONST (value None)  [line 1],
+        00001 | EMIT,
+        00002 | EMIT_RAW (string "\n"),
+        00003 | LOOKUP (var "undefined")  [line 2],
+        00004 | EMIT,
+        00005 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

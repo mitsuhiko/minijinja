@@ -12,20 +12,20 @@ new body
 Template {
     name: "extends.txt",
     instructions: [
-        00000 | LOOKUP (var "template")   [extends.txt:1],
-        00001 | LOAD_BLOCKS   [extends.txt:1],
-        00002 | EMIT_RAW (string "\n")   [extends.txt:1],
-        00003 | CALL_BLOCK (name "title")   [extends.txt:2],
-        00004 | EMIT_RAW (string "\n")   [extends.txt:2],
-        00005 | CALL_BLOCK (name "body")   [extends.txt:3],
-        00006 | EMIT_RAW (string "\n")   [extends.txt:3],
+        00000 | LOOKUP (var "template")  [line 1],
+        00001 | LOAD_BLOCKS,
+        00002 | EMIT_RAW (string "\n"),
+        00003 | CALL_BLOCK (name "title")  [line 2],
+        00004 | EMIT_RAW (string "\n"),
+        00005 | CALL_BLOCK (name "body")  [line 3],
+        00006 | EMIT_RAW (string "\n"),
     ],
     blocks: {
         "body": [
-            00000 | EMIT_RAW (string "new body")   [extends.txt:3],
+            00000 | EMIT_RAW (string "new body")  [line 3],
         ],
         "title": [
-            00000 | EMIT_RAW (string "new title")   [extends.txt:2],
+            00000 | EMIT_RAW (string "new title")  [line 2],
         ],
     },
     initial_auto_escape: None,

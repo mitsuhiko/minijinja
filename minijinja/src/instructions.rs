@@ -314,25 +314,28 @@ impl<'source> Instructions<'source> {
 
 impl<'source> fmt::Debug for Instructions<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct InstructionWrapper<'a>(usize, &'a Instruction<'a>, &'a Instructions<'a>);
+        struct InstructionWrapper<'a>(usize, &'a Instruction<'a>, Option<usize>);
 
         impl<'a> fmt::Debug for InstructionWrapper<'a> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let line = self.2.get_line(self.0).unwrap_or(0);
-                write!(
-                    f,
-                    "{:>05x} | {:?}   [{}:{}]",
-                    self.0,
-                    self.1,
-                    self.2.name(),
-                    line
-                )
+                write!(f, "{:>05x} | {:?}", self.0, self.1,)?;
+                if let Some(line) = self.2 {
+                    write!(f, "  [line {}]", line)?;
+                }
+                Ok(())
             }
         }
 
         let mut list = f.debug_list();
+        let mut last_line = None;
         for (idx, instr) in self.instructions.iter().enumerate() {
-            list.entry(&InstructionWrapper(idx, instr, self));
+            let line = self.get_line(idx);
+            list.entry(&InstructionWrapper(
+                idx,
+                instr,
+                if line != last_line { line } else { None },
+            ));
+            last_line = line;
         }
         list.finish()
     }
