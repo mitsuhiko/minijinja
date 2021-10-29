@@ -22,31 +22,24 @@ pub struct Compiler<'source> {
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,
     pending_block: Vec<PendingBlock>,
-    current_file: &'source str,
     current_line: usize,
 }
 
 impl<'source> Default for Compiler<'source> {
     fn default() -> Self {
-        Compiler::new()
+        Compiler::new("<unknown>")
     }
 }
 
 impl<'source> Compiler<'source> {
     /// Creates an empty compiler
-    pub fn new() -> Compiler<'source> {
+    pub fn new(file: &'source str) -> Compiler<'source> {
         Compiler {
-            instructions: Instructions::default(),
+            instructions: Instructions::new(file),
             blocks: BTreeMap::new(),
             pending_block: Vec::new(),
-            current_file: "<unknown>",
             current_line: 0,
         }
-    }
-
-    /// Sets the current location's filename.
-    pub fn set_file(&mut self, filename: &'source str) {
-        self.current_file = filename;
     }
 
     /// Sets the current location's line.
@@ -62,7 +55,7 @@ impl<'source> Compiler<'source> {
     /// Add a simple instruction.
     pub fn add(&mut self, instr: Instruction<'source>) -> usize {
         self.instructions
-            .add_with_location(instr, self.current_file, self.current_line)
+            .add_with_location(instr, self.current_line)
     }
 
     /// Returns the next instruction index.
@@ -252,8 +245,7 @@ impl<'source> Compiler<'source> {
             }
             ast::Stmt::Block(block) => {
                 self.set_location_from_span(block.span());
-                let mut sub_compiler = Compiler::new();
-                sub_compiler.set_file(self.current_file);
+                let mut sub_compiler = Compiler::new(self.instructions.name());
                 sub_compiler.set_line(self.current_line);
                 for node in &block.body {
                     sub_compiler.compile_stmt(node)?;

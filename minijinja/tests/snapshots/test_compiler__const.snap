@@ -1,16 +1,15 @@
 ---
-source: tests/test_compiler.rs
+source: minijinja/tests/test_compiler.rs
 expression: "&c"
 
 ---
 Compiler {
     instructions: [
-        00000 | LOAD_CONST (value "a")   [<unknown>:0],
-        00001 | LOAD_CONST (value 42)   [<unknown>:0],
-        00002 | STRING_CONCAT   [<unknown>:0],
+        00000 | LOAD_CONST (value "a")  [line 0],
+        00001 | LOAD_CONST (value 42),
+        00002 | STRING_CONCAT,
     ],
     blocks: {},
     pending_block: [],
-    current_file: "<unknown>",
     current_line: 0,
 }

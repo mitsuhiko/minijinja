@@ -11,10 +11,10 @@ input_file: minijinja/tests/inputs/escaping.html
 Template {
     name: "escaping.html",
     instructions: [
-        00000 | EMIT_RAW (string "<h1>")   [escaping.html:1],
-        00001 | LOOKUP (var "unsafe")   [escaping.html:1],
-        00002 | EMIT   [escaping.html:1],
-        00003 | EMIT_RAW (string "</h1>\n")   [escaping.html:1],
+        00000 | EMIT_RAW (string "<h1>")  [line 1],
+        00001 | LOOKUP (var "unsafe"),
+        00002 | EMIT,
+        00003 | EMIT_RAW (string "</h1>\n"),
     ],
     blocks: {},
     initial_auto_escape: Html,

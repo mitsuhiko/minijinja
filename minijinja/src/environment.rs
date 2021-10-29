@@ -60,8 +60,7 @@ impl<'source> CompiledTemplate<'source> {
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
         let ast = parse(source, name)?;
-        let mut compiler = Compiler::new();
-        compiler.set_file(name);
+        let mut compiler = Compiler::new(name);
         compiler.compile_stmt(&ast)?;
         let (instructions, blocks) = compiler.finish();
         Ok(CompiledTemplate {
@@ -93,10 +92,10 @@ impl<'env> Template<'env> {
         let mut output = String::new();
         let vm = Vm::new(self.env);
         let blocks = &self.compiled.blocks;
+        let root = Value::from_serializable(&ctx);
         vm.eval(
-            self.name,
             &self.compiled.instructions,
-            ctx,
+            root,
             blocks,
             self.initial_auto_escape,
             &mut output,
@@ -224,11 +223,11 @@ impl<'env, 'source> Expression<'env, 'source> {
         let mut output = String::new();
         let vm = Vm::new(self.env);
         let blocks = BTreeMap::new();
+        let root = Value::from_serializable(&ctx);
         Ok(vm
             .eval(
-                "<expression>",
                 &self.instructions,
-                ctx,
+                root,
                 &blocks,
                 AutoEscape::None,
                 &mut output,
@@ -367,8 +366,7 @@ impl<'source> Environment<'source> {
     /// example see [`Expression`].
     pub fn compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
         let ast = parse_expr(expr)?;
-        let mut compiler = Compiler::new();
-        compiler.set_file("<expression>");
+        let mut compiler = Compiler::new("<expression>");
         compiler.compile_expr(&ast)?;
         let (instructions, _) = compiler.finish();
         Ok(Expression {

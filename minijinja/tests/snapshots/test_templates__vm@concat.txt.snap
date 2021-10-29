@@ -11,11 +11,11 @@ foobar
 Template {
     name: "concat.txt",
     instructions: [
-        00000 | LOOKUP (var "a")   [concat.txt:1],
-        00001 | LOOKUP (var "b")   [concat.txt:1],
-        00002 | STRING_CONCAT   [concat.txt:1],
-        00003 | EMIT   [concat.txt:1],
-        00004 | EMIT_RAW (string "\n")   [concat.txt:1],
+        00000 | LOOKUP (var "a")  [line 1],
+        00001 | LOOKUP (var "b"),
+        00002 | STRING_CONCAT,
+        00003 | EMIT,
+        00004 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

@@ -227,8 +227,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
 #[derive(Debug, Copy, Clone)]
 struct Loc {
     first_instruction: u32,
-    file_index: u16,
-    line: u16,
+    line: u32,
 }
 
 /// Wrapper around instructions to help with location management.
@@ -236,11 +235,26 @@ struct Loc {
 pub struct Instructions<'source> {
     pub(crate) instructions: Vec<Instruction<'source>>,
     locations: Vec<Loc>,
-    files: Vec<&'source str>,
+    name: &'source str,
 }
 
 impl<'source> Instructions<'source> {
+    // Creates a new instructions object.
+    pub fn new(name: &'source str) -> Instructions<'source> {
+        Instructions {
+            instructions: Vec::new(),
+            locations: Vec::new(),
+            name,
+        }
+    }
+
+    /// Returns the name of the template.
+    pub fn name(&self) -> &'source str {
+        self.name
+    }
+
     // Returns an instruction by index
+    #[inline(always)]
     pub fn get(&self, idx: usize) -> Option<&Instruction<'source>> {
         self.instructions.get(idx)
     }
@@ -258,36 +272,23 @@ impl<'source> Instructions<'source> {
     }
 
     /// Adds a new instruction with location info.
-    pub fn add_with_location(
-        &mut self,
-        instr: Instruction<'source>,
-        filename: &'source str,
-        line: usize,
-    ) -> usize {
+    pub fn add_with_location(&mut self, instr: Instruction<'source>, line: usize) -> usize {
         let rv = self.add(instr);
-        let file_index = match self.files.iter().position(|x| x == &filename) {
-            Some(idx) => idx,
-            None => {
-                let idx = self.files.len();
-                self.files.push(filename);
-                idx
-            }
-        };
-        let same_loc = self.locations.last().map_or(false, |last_loc| {
-            last_loc.file_index as usize == file_index && last_loc.line as usize == line
-        });
+        let same_loc = self
+            .locations
+            .last()
+            .map_or(false, |last_loc| last_loc.line as usize == line);
         if !same_loc {
             self.locations.push(Loc {
                 first_instruction: rv as u32,
-                file_index: file_index as u16,
-                line: line as u16,
+                line: line as u32,
             });
         }
         rv
     }
 
-    /// Looks up the location for an instruction
-    pub fn get_location(&self, idx: usize) -> Option<(&str, usize)> {
+    /// Looks up the line for an instruction
+    pub fn get_line(&self, idx: usize) -> Option<usize> {
         let loc = match self
             .locations
             .binary_search_by_key(&idx, |x| x.first_instruction as usize)
@@ -296,8 +297,7 @@ impl<'source> Instructions<'source> {
             Err(0) => return None,
             Err(idx) => &self.locations[idx as usize - 1],
         };
-        let filename = self.files[loc.file_index as usize];
-        Some((filename, loc.line as usize))
+        Some(loc.line as usize)
     }
 
     /// Returns the number of instructions
@@ -314,18 +314,28 @@ impl<'source> Instructions<'source> {
 
 impl<'source> fmt::Debug for Instructions<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct InstructionWrapper<'a>(usize, &'a Instruction<'a>, &'a Instructions<'a>);
+        struct InstructionWrapper<'a>(usize, &'a Instruction<'a>, Option<usize>);
 
         impl<'a> fmt::Debug for InstructionWrapper<'a> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let loc = self.2.get_location(self.0).unwrap_or(("<unknown>", 0));
-                write!(f, "{:>05x} | {:?}   [{}:{}]", self.0, self.1, loc.0, loc.1)
+                write!(f, "{:>05x} | {:?}", self.0, self.1,)?;
+                if let Some(line) = self.2 {
+                    write!(f, "  [line {}]", line)?;
+                }
+                Ok(())
             }
         }
 
         let mut list = f.debug_list();
+        let mut last_line = None;
         for (idx, instr) in self.instructions.iter().enumerate() {
-            list.entry(&InstructionWrapper(idx, instr, self));
+            let line = self.get_line(idx);
+            list.entry(&InstructionWrapper(
+                idx,
+                instr,
+                if line != last_line { line } else { None },
+            ));
+            last_line = line;
         }
         list.finish()
     }

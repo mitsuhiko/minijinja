@@ -5,7 +5,6 @@ input_file: minijinja/tests/inputs/debug.txt
 
 ---
 State {
-    name: "debug.txt",
     ctx: Context {
         stack: [
             {
@@ -19,7 +18,8 @@ State {
             },
         ],
     },
-    block_stack: [],
+    name: "debug.txt",
+    current_block: None,
     auto_escape: None,
     env: Environment {
         globals: {
@@ -69,23 +69,23 @@ State {
 Template {
     name: "debug.txt",
     instructions: [
-        00000 | LOAD_CONST (value "f")   [debug.txt:1],
-        00001 | LOOKUP (var "range")   [debug.txt:1],
-        00002 | BUILD_MAP (1 pairs)   [debug.txt:1],
-        00003 | PUSH_CONTEXT   [debug.txt:1],
-        00004 | LOOKUP (var "upper")   [debug.txt:1],
-        00005 | BUILD_LIST (1 items)   [debug.txt:1],
-        00006 | CALL_FUNCTION (name "f")   [debug.txt:1],
-        00007 | PUSH_LOOP (loop var: true)   [debug.txt:1],
-        00008 | ITERATE (exit to 0000e)   [debug.txt:1],
-        00009 | STORE_LOCAL (var "x")   [debug.txt:1],
-        0000a | BUILD_LIST (0 items)   [debug.txt:1],
-        0000b | CALL_FUNCTION (name "debug")   [debug.txt:1],
-        0000c | EMIT   [debug.txt:1],
-        0000d | JUMP (to 00008)   [debug.txt:1],
-        0000e | POP_FRAME   [debug.txt:1],
-        0000f | POP_FRAME   [debug.txt:1],
-        00010 | EMIT_RAW (string "\n")   [debug.txt:1],
+        00000 | LOAD_CONST (value "f")  [line 1],
+        00001 | LOOKUP (var "range"),
+        00002 | BUILD_MAP (1 pairs),
+        00003 | PUSH_CONTEXT,
+        00004 | LOOKUP (var "upper"),
+        00005 | BUILD_LIST (1 items),
+        00006 | CALL_FUNCTION (name "f"),
+        00007 | PUSH_LOOP (loop var: true),
+        00008 | ITERATE (exit to 0000e),
+        00009 | STORE_LOCAL (var "x"),
+        0000a | BUILD_LIST (0 items),
+        0000b | CALL_FUNCTION (name "debug"),
+        0000c | EMIT,
+        0000d | JUMP (to 00008),
+        0000e | POP_FRAME,
+        0000f | POP_FRAME,
+        00010 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

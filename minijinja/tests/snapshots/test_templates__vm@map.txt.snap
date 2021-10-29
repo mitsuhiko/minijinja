@@ -11,12 +11,12 @@ bar
 Template {
     name: "map.txt",
     instructions: [
-        00000 | LOAD_CONST (value "foo")   [map.txt:1],
-        00001 | LOAD_CONST (value "bar")   [map.txt:1],
-        00002 | BUILD_MAP (1 pairs)   [map.txt:1],
-        00003 | GETATTR (key "foo")   [map.txt:1],
-        00004 | EMIT   [map.txt:1],
-        00005 | EMIT_RAW (string "\n")   [map.txt:1],
+        00000 | LOAD_CONST (value "foo")  [line 1],
+        00001 | LOAD_CONST (value "bar"),
+        00002 | BUILD_MAP (1 pairs),
+        00003 | GETATTR (key "foo"),
+        00004 | EMIT,
+        00005 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

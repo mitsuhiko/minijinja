@@ -1,20 +1,19 @@
 ---
-source: tests/test_compiler.rs
+source: minijinja/tests/test_compiler.rs
 expression: "&c"
 
 ---
 Compiler {
     instructions: [
-        00000 | LOOKUP (var "items")   [<unknown>:0],
-        00001 | PUSH_LOOP (loop var: true)   [<unknown>:0],
-        00002 | ITERATE (exit to 00005)   [<unknown>:0],
-        00003 | EMIT   [<unknown>:0],
-        00004 | JUMP (to 00002)   [<unknown>:0],
-        00005 | POP_FRAME   [<unknown>:0],
-        00006 | EMIT_RAW (string "!")   [<unknown>:0],
+        00000 | LOOKUP (var "items")  [line 0],
+        00001 | PUSH_LOOP (loop var: true),
+        00002 | ITERATE (exit to 00005),
+        00003 | EMIT,
+        00004 | JUMP (to 00002),
+        00005 | POP_FRAME,
+        00006 | EMIT_RAW (string "!"),
     ],
     blocks: {},
     pending_block: [],
-    current_file: "<unknown>",
     current_line: 0,
 }

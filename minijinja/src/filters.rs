@@ -9,7 +9,7 @@
 //! [`&State`](crate::State) and value argument, then register it
 //! with [`add_filter`](crate::Environment::add_filter).
 //!
-//! ## Custom Filters
+//! # Custom Filters
 //!
 //! A custom filter is just a simple function which accepts inputs as parameters and then
 //! returns a new value.  For instance the following shows a filter which takes an input
@@ -271,8 +271,13 @@ mod builtins {
         }
 
         let env = crate::Environment::new();
-        let ctx = crate::vm::Context::default();
-        let state = State::from_env_and_context(&env, &ctx);
+        let state = State {
+            env: &env,
+            ctx: crate::vm::Context::default(),
+            auto_escape: crate::AutoEscape::None,
+            current_block: None,
+            name: "<unknown>",
+        };
         let bx = BoxedFilter::new(test);
         assert_eq!(
             bx.apply_to(&state, Value::from(23), vec![Value::from(42)])
@@ -292,8 +297,13 @@ mod builtins {
         }
 
         let env = crate::Environment::new();
-        let ctx = crate::vm::Context::default();
-        let state = State::from_env_and_context(&env, &ctx);
+        let state = State {
+            env: &env,
+            ctx: crate::vm::Context::default(),
+            auto_escape: crate::AutoEscape::None,
+            current_block: None,
+            name: "<unknown>",
+        };
         let bx = BoxedFilter::new(add);
         assert_eq!(
             bx.apply_to(&state, Value::from(23), vec![Value::from(42)])

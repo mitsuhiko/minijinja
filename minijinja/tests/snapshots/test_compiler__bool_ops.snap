@@ -1,18 +1,17 @@
 ---
-source: tests/test_compiler.rs
+source: minijinja/tests/test_compiler.rs
 expression: "&c"
 
 ---
 Compiler {
     instructions: [
-        00000 | LOOKUP (var "first")   [<unknown>:0],
-        00001 | JUMP_IF_FALSE_OR_POP (to 00005)   [<unknown>:0],
-        00002 | LOOKUP (var "second")   [<unknown>:0],
-        00003 | JUMP_IF_TRUE_OR_POP (to 00005)   [<unknown>:0],
-        00004 | LOOKUP (var "third")   [<unknown>:0],
+        00000 | LOOKUP (var "first")  [line 0],
+        00001 | JUMP_IF_FALSE_OR_POP (to 00005),
+        00002 | LOOKUP (var "second"),
+        00003 | JUMP_IF_TRUE_OR_POP (to 00005),
+        00004 | LOOKUP (var "third"),
     ],
     blocks: {},
     pending_block: [],
-    current_file: "<unknown>",
     current_line: 0,
 }

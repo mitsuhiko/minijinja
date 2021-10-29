@@ -13,10 +13,10 @@ Error { kind: ImpossibleOperation, detail: Some("cannot super outside of block")
 Template {
     name: "block_super_err.txt",
     instructions: [
-        00000 | BUILD_LIST (0 items)   [block_super_err.txt:1],
-        00001 | CALL_FUNCTION (name "super")   [block_super_err.txt:1],
-        00002 | EMIT   [block_super_err.txt:1],
-        00003 | EMIT_RAW (string "\n")   [block_super_err.txt:1],
+        00000 | BUILD_LIST (0 items)  [line 1],
+        00001 | CALL_FUNCTION (name "super"),
+        00002 | EMIT,
+        00003 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,
