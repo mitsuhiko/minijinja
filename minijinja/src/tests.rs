@@ -10,7 +10,7 @@
 //! [`&State`](crate::State) and value argument and returns a boolean
 //! result, then register it with [`add_filter`](crate::Environment::add_test).
 //!
-//! ## Custom Tests
+//! # Custom Tests
 //!
 //! A custom test function is just a simple function which accepts inputs as
 //! parameters and then returns a bool wrapped in a result. For instance the
@@ -192,10 +192,9 @@ mod builtins {
         let state = State {
             env: &env,
             ctx: crate::vm::Context::default(),
-            blocks: BTreeMap::new(),
             auto_escape: crate::AutoEscape::None,
             current_block: None,
-            file: "<unknown>",
+            name: "<unknown>",
         };
         let bx = BoxedTest::new(test);
         assert!(bx

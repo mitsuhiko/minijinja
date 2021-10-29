@@ -9,7 +9,7 @@
 //! [`&State`](crate::State) and value argument, then register it
 //! with [`add_filter`](crate::Environment::add_filter).
 //!
-//! ## Custom Filters
+//! # Custom Filters
 //!
 //! A custom filter is just a simple function which accepts inputs as parameters and then
 //! returns a new value.  For instance the following shows a filter which takes an input
@@ -274,10 +274,9 @@ mod builtins {
         let state = State {
             env: &env,
             ctx: crate::vm::Context::default(),
-            blocks: BTreeMap::new(),
             auto_escape: crate::AutoEscape::None,
             current_block: None,
-            file: "<unknown>",
+            name: "<unknown>",
         };
         let bx = BoxedFilter::new(test);
         assert_eq!(
@@ -301,10 +300,9 @@ mod builtins {
         let state = State {
             env: &env,
             ctx: crate::vm::Context::default(),
-            blocks: BTreeMap::new(),
             auto_escape: crate::AutoEscape::None,
             current_block: None,
-            file: "<unknown>",
+            name: "<unknown>",
         };
         let bx = BoxedFilter::new(add);
         assert_eq!(

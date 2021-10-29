@@ -235,22 +235,22 @@ struct Loc {
 pub struct Instructions<'source> {
     pub(crate) instructions: Vec<Instruction<'source>>,
     locations: Vec<Loc>,
-    file: &'source str,
+    name: &'source str,
 }
 
 impl<'source> Instructions<'source> {
     // Creates a new instructions object.
-    pub fn new(file: &'source str) -> Instructions<'source> {
+    pub fn new(name: &'source str) -> Instructions<'source> {
         Instructions {
             instructions: Vec::new(),
             locations: Vec::new(),
-            file,
+            name,
         }
     }
 
-    /// Returns the file.
-    pub fn file(&self) -> &'source str {
-        self.file
+    /// Returns the name of the template.
+    pub fn name(&self) -> &'source str {
+        self.name
     }
 
     // Returns an instruction by index
@@ -324,7 +324,7 @@ impl<'source> fmt::Debug for Instructions<'source> {
                     "{:>05x} | {:?}   [{}:{}]",
                     self.0,
                     self.1,
-                    self.2.file(),
+                    self.2.name(),
                     line
                 )
             }

@@ -245,7 +245,7 @@ impl<'source> Compiler<'source> {
             }
             ast::Stmt::Block(block) => {
                 self.set_location_from_span(block.span());
-                let mut sub_compiler = Compiler::new(self.instructions.file());
+                let mut sub_compiler = Compiler::new(self.instructions.name());
                 sub_compiler.set_line(self.current_line);
                 for node in &block.body {
                     sub_compiler.compile_stmt(node)?;

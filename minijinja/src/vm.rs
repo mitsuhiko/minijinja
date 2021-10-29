@@ -75,24 +75,18 @@ pub struct Loop<'env> {
     controller: RcType<LoopState>,
 }
 
-pub enum Frame<'env, 'context> {
+pub enum Frame<'env, 'vm> {
     // This layer dispatches to another context
-    Chained {
-        base: &'context Context<'env, 'context>,
-    },
+    Chained { base: &'vm Context<'env, 'vm> },
     // this layer isolates
-    Isolate {
-        value: Value,
-    },
+    Isolate { value: Value },
     // this layer shadows another one
-    Merge {
-        value: Value,
-    },
+    Merge { value: Value },
     // this layer is a for loop
     Loop(Loop<'env>),
 }
 
-impl<'env, 'context> fmt::Debug for Frame<'env, 'context> {
+impl<'env, 'vm> fmt::Debug for Frame<'env, 'vm> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Chained { base } => fmt::Debug::fmt(base, f),
@@ -127,11 +121,11 @@ impl Stack {
 }
 
 #[derive(Default, Debug)]
-pub struct Context<'env, 'context> {
-    stack: Vec<Frame<'env, 'context>>,
+pub struct Context<'env, 'vm> {
+    stack: Vec<Frame<'env, 'vm>>,
 }
 
-impl<'env, 'context> Context<'env, 'context> {
+impl<'env, 'vm> Context<'env, 'vm> {
     /// Stores a variable in the context.
     pub fn store(&mut self, key: &'env str, value: Value) {
         self.current_loop().locals.insert(key, value);
@@ -178,7 +172,7 @@ impl<'env, 'context> Context<'env, 'context> {
     }
 
     /// Pushes a new layer.
-    pub fn push_frame(&mut self, layer: Frame<'env, 'context>) {
+    pub fn push_frame(&mut self, layer: Frame<'env, 'vm>) {
         self.stack.push(layer);
     }
 
@@ -204,13 +198,11 @@ impl<'env, 'context> Context<'env, 'context> {
 /// Provides access to the current execution state of the engine.
 ///
 /// A read only reference is passed to filter functions and similar
-/// objects to allow limited interfacing with the engine.  State that
-/// is externally visible is stored on here.
+/// objects to allow limited interfacing with the engine.
 pub struct State<'vm, 'env> {
     pub(crate) env: &'env Environment<'env>,
     pub(crate) ctx: Context<'env, 'vm>,
-    pub(crate) blocks: BTreeMap<&'env str, Vec<&'vm Instructions<'env>>>,
-    pub(crate) file: &'env str,
+    pub(crate) name: &'env str,
     pub(crate) current_block: Option<&'env str>,
     pub(crate) auto_escape: AutoEscape,
 }
@@ -219,6 +211,7 @@ impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("State")
             .field("ctx", &self.ctx)
+            .field("name", &self.name)
             .field("current_block", &self.current_block)
             .field("auto_escape", &self.auto_escape)
             .field("env", &self.env)
@@ -234,10 +227,10 @@ impl<'vm, 'env> State<'vm, 'env> {
 
     /// Returns the name of the current template.
     pub fn name(&self) -> &str {
-        self.file
+        self.name
     }
 
-    /// Returns the current state of the auto escape flag.
+    /// Returns the current value of the auto escape flag.
     pub fn auto_escape(&self) -> AutoEscape {
         self.auto_escape
     }
@@ -245,6 +238,11 @@ impl<'vm, 'env> State<'vm, 'env> {
     /// Returns the name of the innermost block.
     pub fn current_block(&self) -> Option<&str> {
         self.current_block
+    }
+
+    /// Looks up a variable by name in the context.
+    pub fn lookup(&self, name: &str) -> Option<Value> {
+        self.ctx.load(self.env(), name)
     }
 
     pub(crate) fn apply_filter(
@@ -310,12 +308,11 @@ impl<'env> Vm<'env> {
         let mut state = State {
             env: self.env,
             ctx,
-            blocks: referenced_blocks,
             auto_escape: initial_auto_escape,
             current_block: None,
-            file: instructions.file(),
+            name: instructions.name(),
         };
-        self.eval_state(&mut state, instructions, output)
+        self.eval_state(&mut state, instructions, referenced_blocks, output)
     }
 
     /// This is the actual evaluation loop that works with a specific context.
@@ -323,6 +320,7 @@ impl<'env> Vm<'env> {
         &self,
         state: &mut State<'_, 'env>,
         mut instructions: &Instructions<'env>,
+        mut blocks: BTreeMap<&'env str, Vec<&'_ Instructions<'env>>>,
         output: &mut String,
     ) -> Result<Option<Value>, Error> {
         let initial_auto_escape = state.auto_escape;
@@ -336,7 +334,7 @@ impl<'env> Vm<'env> {
             ($err:expr) => {{
                 let mut err = $err;
                 if let Some(lineno) = instructions.get_line(pc) {
-                    err.set_location(instructions.file(), lineno);
+                    err.set_location(instructions.name(), lineno);
                 }
                 return Err(err);
             }};
@@ -395,7 +393,7 @@ impl<'env> Vm<'env> {
             ($instructions:expr) => {{
                 sub_eval!(
                     $instructions,
-                    state.blocks.clone(),
+                    blocks.clone(),
                     state.current_block,
                     state.auto_escape
                 );
@@ -403,16 +401,14 @@ impl<'env> Vm<'env> {
             ($instructions:expr, $blocks:expr, $current_block:expr, $auto_escape:expr) => {{
                 let mut sub_context = Context::default();
                 sub_context.push_frame(Frame::Chained { base: &state.ctx });
-                let sub_vm = Vm::new(self.env);
                 let mut sub_state = State {
                     env: self.env,
                     ctx: sub_context,
-                    blocks: $blocks,
                     auto_escape: $auto_escape,
                     current_block: $current_block,
-                    file: $instructions.file(),
+                    name: $instructions.name(),
                 };
-                sub_vm.eval_state(&mut sub_state, $instructions, out!())?;
+                self.eval_state(&mut sub_state, $instructions, $blocks, out!())?;
             }};
         }
 
@@ -580,7 +576,7 @@ impl<'env> Vm<'env> {
                 Instruction::CallBlock(name) => {
                     block_stack.push(state.current_block);
                     state.current_block = Some(name);
-                    if let Some(layers) = state.blocks.get(name) {
+                    if let Some(layers) = blocks.get(name) {
                         let instructions = layers.first().unwrap();
                         sub_eval!(instructions);
                     } else {
@@ -605,11 +601,7 @@ impl<'env> Vm<'env> {
 
                     // first load the blocks
                     for (name, instr) in tmpl.blocks().iter() {
-                        state
-                            .blocks
-                            .entry(name)
-                            .or_insert_with(Vec::new)
-                            .push(instr);
+                        blocks.entry(name).or_insert_with(Vec::new).push(instr);
                     }
 
                     // then replace the instructions and set the pc to 0 again.
@@ -617,7 +609,7 @@ impl<'env> Vm<'env> {
                     // execute the extended template's code instead.  From this
                     // there is no way back.
                     instructions = tmpl.instructions();
-                    state.file = instructions.file();
+                    state.name = instructions.name();
                     pc = 0;
                     continue;
                 }
@@ -688,7 +680,7 @@ impl<'env> Vm<'env> {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     // super is a special function reserved for super-ing into blocks.
                     if *function_name == "super" {
-                        let mut inner_blocks = state.blocks.clone();
+                        let mut inner_blocks = blocks.clone();
                         let name = match state.current_block {
                             Some(name) => name,
                             None => {

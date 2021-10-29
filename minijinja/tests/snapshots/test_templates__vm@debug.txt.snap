@@ -18,6 +18,7 @@ State {
             },
         ],
     },
+    name: "debug.txt",
     current_block: None,
     auto_escape: None,
     env: Environment {
