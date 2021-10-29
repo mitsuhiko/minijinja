@@ -5,7 +5,6 @@ input_file: minijinja/tests/inputs/debug.txt
 
 ---
 State {
-    name: "debug.txt",
     ctx: Context {
         stack: [
             {
@@ -19,7 +18,7 @@ State {
             },
         ],
     },
-    block_stack: [],
+    current_block: None,
     auto_escape: None,
     env: Environment {
         globals: {

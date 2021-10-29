@@ -189,8 +189,14 @@ mod builtins {
         }
 
         let env = crate::Environment::new();
-        let ctx = crate::vm::Context::default();
-        let state = State::from_env_and_context(&env, &ctx);
+        let state = State {
+            env: &env,
+            ctx: crate::vm::Context::default(),
+            blocks: BTreeMap::new(),
+            auto_escape: crate::AutoEscape::None,
+            current_block: None,
+            file: "<unknown>",
+        };
         let bx = BoxedTest::new(test);
         assert!(bx
             .perform(&state, Value::from(23), vec![Value::from(23)])

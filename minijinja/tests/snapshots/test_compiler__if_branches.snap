@@ -1,5 +1,5 @@
 ---
-source: tests/test_compiler.rs
+source: minijinja/tests/test_compiler.rs
 expression: "&c"
 
 ---
@@ -17,6 +17,5 @@ Compiler {
     ],
     blocks: {},
     pending_block: [],
-    current_file: "<unknown>",
     current_line: 0,
 }
