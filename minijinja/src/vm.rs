@@ -11,10 +11,19 @@ use crate::utils::matches;
 use crate::value::{self, Object, Primitive, RcType, Value, ValueIterator};
 use crate::AutoEscape;
 
-#[derive(Debug)]
 pub struct LoopState {
     len: AtomicUsize,
     idx: AtomicUsize,
+}
+
+impl fmt::Debug for LoopState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = f.debug_struct("LoopState");
+        for attr in self.attributes() {
+            s.field(attr, &self.get_attr(attr).unwrap());
+        }
+        s.finish()
+    }
 }
 
 impl Object for LoopState {
@@ -63,7 +72,12 @@ impl Object for LoopState {
 
 impl fmt::Display for LoopState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "loop")
+        write!(
+            f,
+            "<loop {}/{}>",
+            self.idx.load(Ordering::Relaxed),
+            self.len.load(Ordering::Relaxed)
+        )
     }
 }
 
@@ -92,7 +106,12 @@ impl<'env, 'vm> fmt::Debug for Frame<'env, 'vm> {
             Self::Chained { base } => fmt::Debug::fmt(base, f),
             Self::Isolate { value } => fmt::Debug::fmt(value, f),
             Self::Merge { value } => fmt::Debug::fmt(value, f),
-            Self::Loop(l) => fmt::Debug::fmt(&l.locals, f),
+            Self::Loop(l) => {
+                let mut m = f.debug_map();
+                m.entries(l.locals.iter());
+                m.entry(&"loop", &l.controller);
+                m.finish()
+            }
         }
     }
 }
@@ -197,8 +216,12 @@ impl<'env, 'vm> Context<'env, 'vm> {
 
 /// Provides access to the current execution state of the engine.
 ///
-/// A read only reference is passed to filter functions and similar
-/// objects to allow limited interfacing with the engine.
+/// A read only reference is passed to filter functions and similar objects to
+/// allow limited interfacing with the engine.  The state is useful to look up
+/// information about the engine in filter, test or global functions.  It not
+/// only provides access to the template environment but also the context
+/// variables of the engine, the current auto escaping behavior as well as the
+/// auto escape flag.
 pub struct State<'vm, 'env> {
     pub(crate) env: &'env Environment<'env>,
     pub(crate) ctx: Context<'env, 'vm>,

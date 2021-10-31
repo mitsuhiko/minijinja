@@ -7,10 +7,11 @@
 //! # Custom Functions
 //!
 //! A custom global function is just a simple rust function which accepts the
-//! [`State`] as first argument, optionally some additional arguments and then
-//! returns a result.  Global functions are typically used to perform a data
-//! loading operation.  For instance these functions can be used to expose data
-//! to the template that hasn't been provided by the individual render invocation.
+//! [`&State`](crate::State) as first argument, optionally some additional
+//! arguments and then returns a result.  Global functions are typically used to
+//! perform a data loading operation.  For instance these functions can be used
+//! to expose data to the template that hasn't been provided by the individual
+//! render invocation.
 //!
 //! ```rust
 //! # use minijinja::{Environment, State, Error, ErrorKind};
