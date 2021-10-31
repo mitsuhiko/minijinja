@@ -89,10 +89,15 @@ impl<'env> Template<'env> {
     /// Typically custom structs annotated with `#[derive(Serialize)]` would
     /// be used for this purpose.
     pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
+        // reduce total amount of code faling under mono morphization into
+        // this function, and share the rest in _eval.
+        self._render(Value::from_serializable(&ctx))
+    }
+
+    fn _render(&self, root: Value) -> Result<String, Error> {
         let mut output = String::new();
         let vm = Vm::new(self.env);
         let blocks = &self.compiled.blocks;
-        let root = Value::from_serializable(&ctx);
         vm.eval(
             &self.compiled.instructions,
             root,
@@ -220,10 +225,15 @@ impl<'env, 'source> Expression<'env, 'source> {
     ///
     /// The result of the expression is returned as [`Value`].
     pub fn eval<S: Serialize>(&self, ctx: S) -> Result<Value, Error> {
+        // reduce total amount of code faling under mono morphization into
+        // this function, and share the rest in _eval.
+        self._eval(Value::from_serializable(&ctx))
+    }
+
+    fn _eval(&self, root: Value) -> Result<Value, Error> {
         let mut output = String::new();
         let vm = Vm::new(self.env);
         let blocks = BTreeMap::new();
-        let root = Value::from_serializable(&ctx);
         Ok(vm
             .eval(
                 &self.instructions,
@@ -449,12 +459,14 @@ impl<'source> Environment<'source> {
     }
 
     /// Finalizes a value.
-    pub(crate) fn finalize<W: fmt::Write>(
+    pub(crate) fn finalize(
         &self,
         value: &Value,
         autoescape: AutoEscape,
-        out: &mut W,
+        out: &mut String,
     ) -> Result<(), Error> {
+        use std::fmt::Write;
+
         // safe values do not get escaped
         if value.is_safe() {
             write!(out, "{}", value).unwrap();
