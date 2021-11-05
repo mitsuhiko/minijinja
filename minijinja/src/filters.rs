@@ -111,6 +111,10 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
         rv.insert("join", BoxedFilter::new(join));
         rv.insert("default", BoxedFilter::new(default));
         rv.insert("d", BoxedFilter::new(default));
+        #[cfg(feature = "json")]
+        {
+            rv.insert("tojson", BoxedFilter::new(tojson));
+        }
     }
     rv
 }
@@ -261,6 +265,38 @@ mod builtins {
             other.unwrap_or_else(|| Value::from(""))
         } else {
             value
+        })
+    }
+
+    /// Dumps a value to JSON.
+    ///
+    /// This filter is only available if the `json` feature is enabled.  The resulting
+    /// value is safe to use in HTML as well as it will not contain any special HTML
+    /// characters.  The optional parameter to the filter can be set to `true` to enable
+    /// pretty printing.
+    #[cfg_attr(docsrs, doc(cfg(all(feature = "builtin_filters", feature = "json"))))]
+    #[cfg(feature = "json")]
+    pub fn tojson(_: &State, value: Value, pretty: Option<bool>) -> Result<Value, Error> {
+        if pretty.unwrap_or(false) {
+            serde_json::to_string_pretty(&value)
+        } else {
+            serde_json::to_string(&value)
+        }
+        .map_err(|err| {
+            Error::new(ErrorKind::ImpossibleOperation, "cannot serialize to JSON").with_source(err)
+        })
+        .map(|s| {
+            let mut rv = String::with_capacity(s.len());
+            for c in s.chars() {
+                match c {
+                    '<' => rv.push_str("\\u003c"),
+                    '>' => rv.push_str("\\u003e"),
+                    '&' => rv.push_str("\\u0026"),
+                    '\'' => rv.push_str("\\u0027"),
+                    _ => rv.push(c),
+                }
+            }
+            Value::from_safe_string(rv)
         })
     }
 

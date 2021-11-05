@@ -4,6 +4,7 @@ list: [1, 2, 3]
 map:
   a: b
   c: d
+scary_html: "<>&'"
 ---
 lower: {{ word|lower }}
 upper: {{ word|upper }}
@@ -26,3 +27,6 @@ join_string: {{ word|join('-') }}
 default: {{ undefined|default == "" }}
 default-value: {{ undefined|default(42) }}
 d: {{ undefined|d == "" }}
+json: {{ map|tojson }}
+json-pretty: {{ map|tojson(true) }}
+json-scary-html: {{ scary_html|tojson }}

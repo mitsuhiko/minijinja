@@ -100,6 +100,7 @@
 //!   is disabled sending types across threads is often not possible.  Thread bounds
 //!   of things like callbacks however are not changing which means code that uses
 //!   MiniJinja still needs to be threadsafe.
+//! - `json`: When enabled the `tojson` filter is added as builtin filter.
 #![allow(clippy::cognitive_complexity)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 mod key;

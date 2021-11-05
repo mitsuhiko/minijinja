@@ -15,6 +15,15 @@ State {
             },
             {
                 "x": 0,
+                "loop": LoopState {
+                    index0: 0,
+                    index: 1,
+                    length: 1,
+                    revindex: 1,
+                    revindex0: 0,
+                    first: true,
+                    last: true,
+                },
             },
         ],
     },
@@ -52,6 +61,7 @@ State {
             "replace",
             "reverse",
             "safe",
+            "tojson",
             "trim",
             "upper",
         ],

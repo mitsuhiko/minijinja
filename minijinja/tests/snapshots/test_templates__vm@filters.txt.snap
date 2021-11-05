@@ -25,6 +25,12 @@ join_string: B-i-r-d
 default: true
 default-value: 42
 d: true
+json: {"a":"b","c":"d"}
+json-pretty: {
+  "a": "b",
+  "c": "d"
+}
+json-scary-html: "\u003c\u003e\u0026\u0027"
 
 =====
 
@@ -150,7 +156,23 @@ Template {
         00074 | LOAD_CONST (value ""),
         00075 | EQ,
         00076 | EMIT,
-        00077 | EMIT_RAW (string "\n"),
+        00077 | EMIT_RAW (string "\njson: "),
+        00078 | LOOKUP (var "map")  [line 22],
+        00079 | BUILD_LIST (0 items),
+        0007a | APPLY_FILTER (name "tojson"),
+        0007b | EMIT,
+        0007c | EMIT_RAW (string "\njson-pretty: "),
+        0007d | LOOKUP (var "map")  [line 23],
+        0007e | LOAD_CONST (value true),
+        0007f | BUILD_LIST (1 items),
+        00080 | APPLY_FILTER (name "tojson"),
+        00081 | EMIT,
+        00082 | EMIT_RAW (string "\njson-scary-html: "),
+        00083 | LOOKUP (var "scary_html")  [line 24],
+        00084 | BUILD_LIST (0 items),
+        00085 | APPLY_FILTER (name "tojson"),
+        00086 | EMIT,
+        00087 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,
