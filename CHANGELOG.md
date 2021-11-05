@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.8.1
+
+- Turned on all features for the docs on docs.rs
+
 # 0.8.0
 
 - Added `context!` and deprecate `Single`.

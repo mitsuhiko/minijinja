@@ -1,6 +1,6 @@
 [package]
 name = "minijinja"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2018"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
@@ -11,7 +11,7 @@ keywords = ["jinja", "jinja2", "templates"]
 readme = "README.md"
 
 [package.metadata.docs.rs]
-features = ["source"]
+features = ["source", "json", "urlencode"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
