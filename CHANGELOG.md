@@ -11,6 +11,7 @@ All notable changes to MiniJinja are documented here.
   `&Environment` to `&State`.
 - Added `debug` global.
 - Added `tojson` filter.
+- Added `urlencode` filter.
 
 # 0.7.0
 

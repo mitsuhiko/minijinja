@@ -64,6 +64,7 @@ State {
             "tojson",
             "trim",
             "upper",
+            "urlencode",
         ],
         templates: [
             "debug.txt",

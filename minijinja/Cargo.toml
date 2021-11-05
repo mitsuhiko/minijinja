@@ -15,7 +15,7 @@ features = ["source"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
-default = ["builtin_filters", "builtin_tests", "builtin_functions", "sync", "json"]
+default = ["builtin_filters", "builtin_tests", "builtin_functions", "sync"]
 sync = []
 speedups = ["memchr", "v_htmlescape"]
 source = ["self_cell"]
@@ -23,6 +23,7 @@ builtin_filters = []
 builtin_tests = []
 builtin_functions = []
 json = ["serde_json"]
+urlencode = ["percent-encoding"]
 
 # provides access to the unstable machinery
 unstable_machinery = []
@@ -30,9 +31,10 @@ unstable_machinery = []
 [dependencies]
 serde = "1.0.130"
 memchr = { version = "2.4.1", optional = true }
-v_htmlescape = { version = "0.13.1", optional = true }
+v_htmlescape = { version = "0.14.1", optional = true }
 self_cell = { version = "0.10.0", optional = true }
 serde_json = { version = "1.0.68", optional = true }
+percent-encoding = { version = "2.1.0", optional = true }
 
 [dev-dependencies]
 insta = { version = "1.7.2", features = ["glob"] }

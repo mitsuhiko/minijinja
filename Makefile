@@ -1,6 +1,6 @@
 DOC_FEATURES=source
-TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,source
-TEST_142_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions
+TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,source,json,urlencode
+TEST_142_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,json,urlencode
 
 all: test
 
@@ -21,7 +21,7 @@ test-142:
 run-tests:
 	@rustup component add rustfmt 2> /dev/null
 	@echo "CARGO TESTS"
-	@cd minijinja; cargo test
+	@cd minijinja; cargo test --features=json,urlencode
 	@echo "CARGO TEST MEMCHR"
 	@cd minijinja; cargo test --no-default-features --features=memchr,$(FEATURES)
 	@echo "CARGO TEST V_HTMLESCAPE"

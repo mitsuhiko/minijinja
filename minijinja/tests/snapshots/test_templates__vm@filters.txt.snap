@@ -31,6 +31,8 @@ json-pretty: {
   "c": "d"
 }
 json-scary-html: "\u003c\u003e\u0026\u0027"
+urlencode: hello%20world/baz
+urlencode-kv: a=x%20y&b=2&c=3
 
 =====
 
@@ -172,7 +174,25 @@ Template {
         00084 | BUILD_LIST (0 items),
         00085 | APPLY_FILTER (name "tojson"),
         00086 | EMIT,
-        00087 | EMIT_RAW (string "\n"),
+        00087 | EMIT_RAW (string "\nurlencode: "),
+        00088 | LOAD_CONST (value "hello world/baz")  [line 25],
+        00089 | BUILD_LIST (0 items),
+        0008a | APPLY_FILTER (name "urlencode"),
+        0008b | EMIT,
+        0008c | EMIT_RAW (string "\nurlencode-kv: "),
+        0008d | LOAD_CONST (value "a")  [line 26],
+        0008e | LOAD_CONST (value "x y"),
+        0008f | LOAD_CONST (value "b"),
+        00090 | LOAD_CONST (value 2),
+        00091 | LOAD_CONST (value "c"),
+        00092 | LOAD_CONST (value 3),
+        00093 | BUILD_MAP (3 pairs),
+        00094 | BUILD_LIST (1 items),
+        00095 | CALL_FUNCTION (name "dict"),
+        00096 | BUILD_LIST (0 items),
+        00097 | APPLY_FILTER (name "urlencode"),
+        00098 | EMIT,
+        00099 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

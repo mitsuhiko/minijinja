@@ -115,6 +115,10 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
         {
             rv.insert("tojson", BoxedFilter::new(tojson));
         }
+        #[cfg(feature = "urlencode")]
+        {
+            rv.insert("urlencode", BoxedFilter::new(urlencode));
+        }
     }
     rv
 }
@@ -298,6 +302,44 @@ mod builtins {
             }
             Value::from_safe_string(rv)
         })
+    }
+
+    /// URL encodes a value.
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(feature = "builtin_filters", feature = "urlencode")))
+    )]
+    #[cfg(feature = "urlencode")]
+    pub fn urlencode(_: &State, value: Value) -> Result<String, Error> {
+        const SET: &percent_encoding::AsciiSet =
+            &percent_encoding::NON_ALPHANUMERIC.remove(b'/').add(b' ');
+        match value.kind() {
+            ValueKind::None => Ok("".into()),
+            ValueKind::Struct | ValueKind::Map => {
+                let mut rv = String::new();
+                for (idx, ref k) in value.iter().enumerate() {
+                    if idx > 0 {
+                        rv.push('&');
+                    }
+                    write!(
+                        rv,
+                        "{}",
+                        percent_encoding::utf8_percent_encode(&k.to_string(), SET)
+                    )
+                    .unwrap();
+                    if let Ok(v) = value.get_item(k) {
+                        write!(
+                            rv,
+                            "={}",
+                            percent_encoding::utf8_percent_encode(&v.to_string(), SET)
+                        )
+                        .unwrap();
+                    }
+                }
+                Ok(rv)
+            }
+            _ => Ok(percent_encoding::utf8_percent_encode(&value.to_string(), SET).to_string()),
+        }
     }
 
     #[test]
