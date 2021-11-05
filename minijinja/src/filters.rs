@@ -305,6 +305,10 @@ mod builtins {
     }
 
     /// URL encodes a value.
+    ///
+    /// If given a map it encodes the parameters into a query set, otherwise it
+    /// encodes the stringified value.  If the value is none or undefined, an
+    /// empty string is returned.
     #[cfg_attr(
         docsrs,
         doc(cfg(all(feature = "builtin_filters", feature = "urlencode")))
@@ -313,9 +317,15 @@ mod builtins {
     pub fn urlencode(_: &State, value: Value) -> Result<String, Error> {
         const SET: &percent_encoding::AsciiSet =
             &percent_encoding::NON_ALPHANUMERIC.remove(b'/').add(b' ');
-        match value.kind() {
-            ValueKind::None => Ok("".into()),
-            ValueKind::Struct | ValueKind::Map => {
+        match (value.as_primitive(), value.kind()) {
+            (Some(Primitive::None), _) | (Some(Primitive::Undefined), _) => Ok("".into()),
+            (Some(Primitive::Bytes(b)), _) => {
+                Ok(percent_encoding::percent_encode(b, SET).to_string())
+            }
+            (Some(Primitive::Str(s)), _) => {
+                Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
+            }
+            (_, ValueKind::Struct) | (_, ValueKind::Map) => {
                 let mut rv = String::new();
                 for (idx, ref k) in value.iter().enumerate() {
                     if idx > 0 {
