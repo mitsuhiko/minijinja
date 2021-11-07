@@ -1,15 +1,10 @@
-use minijinja::Environment;
+use minijinja::{Environment, context};
 use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct Page {
     title: String,
     content: String,
-}
-
-#[derive(Serialize)]
-pub struct Context {
-    page: Page,
 }
 
 fn main() {
@@ -20,11 +15,9 @@ fn main() {
         .unwrap();
 
     let template = env.get_template("index.html").unwrap();
-    let ctx = &Context {
-        page: Page {
-            title: "Some title".into(),
-            content: "Lorum Ipsum".into(),
-        },
+    let page = Page {
+        title: "Some title".into(),
+        content: "Lorum Ipsum".into(),
     };
-    println!("{}", template.render(&ctx).unwrap());
+    println!("{}", template.render(context!(page)).unwrap());
 }
