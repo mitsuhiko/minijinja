@@ -1,7 +1,7 @@
 ---
-source: tests/test_parser.rs
+source: minijinja/tests/test_parser.rs
 expression: "&ast"
-input_file: tests/parser-inputs/ifexpr.txt
+input_file: minijinja/tests/parser-inputs/ifexpr.txt
 
 ---
 Ok(
@@ -36,9 +36,6 @@ Ok(
                     false_expr: None,
                 } @ 2:3-2:12,
             } @ 2:0-2:12,
-            EmitRaw {
-                raw: "\n",
-            } @ 2:12-3:0,
         ],
-    } @ 1:0-3:0,
+    } @ 1:0-2:12,
 )

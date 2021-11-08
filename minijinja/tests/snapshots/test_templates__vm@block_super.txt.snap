@@ -6,7 +6,6 @@ input_file: minijinja/tests/inputs/block_super.txt
 ---
 <title>[default title]</title>
 DEFAULT BODY
-
 =====
 
 Template {
@@ -18,7 +17,6 @@ Template {
         00003 | CALL_BLOCK (name "title")  [line 2],
         00004 | EMIT_RAW (string "\n"),
         00005 | CALL_BLOCK (name "body")  [line 3],
-        00006 | EMIT_RAW (string "\n"),
     ],
     blocks: {
         "body": [

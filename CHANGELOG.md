@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.9.0
+
+- Remove one trailing newline to be consistent with Jinja2.
+
 # 0.8.2
 
 - Restored unconditional compatibility with 1.42.

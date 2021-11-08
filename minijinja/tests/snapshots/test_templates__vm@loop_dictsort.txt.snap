@@ -9,7 +9,6 @@ input_file: minijinja/tests/inputs/loop_dictsort.txt
 * bar: 2
 * baz: 100
 * foo: 1
-
 =====
 
 Template {
@@ -32,7 +31,6 @@ Template {
         0000e | EMIT_RAW (string ""),
         0000f | JUMP (to 00004),
         00010 | POP_FRAME,
-        00011 | EMIT_RAW (string "\n")  [line 3],
     ],
     blocks: {},
     initial_auto_escape: None,

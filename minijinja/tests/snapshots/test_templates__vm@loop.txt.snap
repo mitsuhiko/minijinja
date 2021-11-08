@@ -13,7 +13,6 @@ input_file: minijinja/tests/inputs/loop.txt
     <li>3</li>
 
 </ul>
-
 =====
 
 Template {
@@ -30,7 +29,7 @@ Template {
         00008 | EMIT_RAW (string "</li>\n"),
         00009 | JUMP (to 00003),
         0000a | POP_FRAME,
-        0000b | EMIT_RAW (string "\n</ul>\n")  [line 4],
+        0000b | EMIT_RAW (string "\n</ul>")  [line 4],
     ],
     blocks: {},
     initial_auto_escape: None,

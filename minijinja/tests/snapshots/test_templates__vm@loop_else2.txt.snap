@@ -8,7 +8,6 @@ input_file: minijinja/tests/inputs/loop_else2.txt
   - 1
   - 2
   - 3
-
 =====
 
 Template {
@@ -30,7 +29,6 @@ Template {
         0000d | POP_FRAME,
         0000e | JUMP_IF_FALSE (to 00010),
         0000f | EMIT_RAW (string "\n  should not happen")  [line 3],
-        00010 | EMIT_RAW (string "\n")  [line 5],
     ],
     blocks: {},
     initial_auto_escape: None,

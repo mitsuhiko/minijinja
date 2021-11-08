@@ -6,7 +6,6 @@ input_file: minijinja/tests/inputs/block.txt
 ---
 <title></title>
 foo
-
 =====
 
 Template {
@@ -16,7 +15,6 @@ Template {
         00001 | CALL_BLOCK (name "title"),
         00002 | EMIT_RAW (string "</title>\n"),
         00003 | CALL_BLOCK (name "body")  [line 2],
-        00004 | EMIT_RAW (string "\n"),
     ],
     blocks: {
         "body": [

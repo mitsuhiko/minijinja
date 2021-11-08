@@ -829,6 +829,18 @@ pub fn parse<'source, 'name>(
     source: &'source str,
     filename: &'name str,
 ) -> Result<ast::Stmt<'source>, Error> {
+    // we want to chop off a single newline at the end.  This means that a template
+    // by default does not end in a newline which is a useful property to allow
+    // inline templates to work.  If someone wants a trailing newline the expectation
+    // is that the user adds it themselves for achieve consistency.
+    let mut source = source;
+    if source.ends_with('\n') {
+        source = &source[..source.len() - 1];
+    }
+    if source.ends_with('\r') {
+        source = &source[..source.len() - 1];
+    }
+
     let mut parser = Parser::new(source, false);
     parser.parse().map_err(|mut err| {
         if err.line().is_none() {

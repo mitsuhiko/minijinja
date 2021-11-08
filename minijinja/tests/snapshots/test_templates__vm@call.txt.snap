@@ -6,7 +6,6 @@ input_file: minijinja/tests/inputs/call.txt
 ---
 [0][1][2][3][4][5][6][7][8][9]
 [a:1][b:2][c:3]
-
 =====
 
 Template {
@@ -55,7 +54,6 @@ Template {
         00028 | EMIT_RAW (string "]"),
         00029 | JUMP (to 0001e),
         0002a | POP_FRAME,
-        0002b | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

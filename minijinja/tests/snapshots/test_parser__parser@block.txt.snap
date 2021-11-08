@@ -1,7 +1,7 @@
 ---
-source: tests/test_parser.rs
+source: minijinja/tests/test_parser.rs
 expression: "&ast"
-input_file: tests/parser-inputs/block.txt
+input_file: minijinja/tests/parser-inputs/block.txt
 
 ---
 Ok(
@@ -25,9 +25,6 @@ Ok(
                     } @ 2:16-4:0,
                 ],
             } @ 2:3-4:19,
-            EmitRaw {
-                raw: "\n",
-            } @ 4:19-5:0,
         ],
-    } @ 1:0-5:0,
+    } @ 1:0-4:19,
 )

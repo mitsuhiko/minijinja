@@ -7,7 +7,6 @@ input_file: minijinja/tests/inputs/getitem.txt
 first: first_item
 last: last_item
 name: Peter
-
 =====
 
 Template {
@@ -28,7 +27,6 @@ Template {
         0000c | LOAD_CONST (value "name"),
         0000d | GETITEM,
         0000e | EMIT,
-        0000f | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

@@ -7,7 +7,6 @@ input_file: minijinja/tests/inputs/cmp.txt
 
   test
 
-
 =====
 
 Template {
@@ -22,7 +21,6 @@ Template {
         00006 | LT,
         00007 | JUMP_IF_FALSE (to 00009),
         00008 | EMIT_RAW (string "\n  test\n"),
-        00009 | EMIT_RAW (string "\n")  [line 3],
     ],
     blocks: {},
     initial_auto_escape: None,

@@ -6,7 +6,6 @@ input_file: minijinja/tests/inputs/self.txt
 ---
 1:[foobar]
 2:(foobar)
-
 =====
 
 Template {
@@ -19,7 +18,7 @@ Template {
         00004 | CALL_BLOCK (name "title"),
         00005 | END_CAPTURE,
         00006 | EMIT,
-        00007 | EMIT_RAW (string ")\n"),
+        00007 | EMIT_RAW (string ")"),
     ],
     blocks: {
         "title": [

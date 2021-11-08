@@ -5,7 +5,6 @@ input_file: minijinja/tests/inputs/hello.txt
 
 ---
 Hello World!
-
 =====
 
 Template {
@@ -14,7 +13,7 @@ Template {
         00000 | EMIT_RAW (string "Hello ")  [line 1],
         00001 | LOOKUP (var "name"),
         00002 | EMIT,
-        00003 | EMIT_RAW (string "!\n"),
+        00003 | EMIT_RAW (string "!"),
     ],
     blocks: {},
     initial_auto_escape: None,

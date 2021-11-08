@@ -50,6 +50,13 @@
 //! {# a comment #}
 //! ```
 //!
+//! # Trailing Newlines
+//!
+//! MiniJinja, like Jinja2, will remove one trailing newline from the end of the file automatically
+//! on parsing.  This lets templates produce a consistent output no matter if the editor adds a
+//! trailing newline or not.  If one wants a trailing newline an extra newline can be added or the
+//! code rendering it adds it manually.
+//!
 //! # Expressions
 //!
 //! MiniJinja allows basic expressions everywhere. These work largely as you expect from Jinja2.

@@ -5,7 +5,6 @@ input_file: minijinja/tests/inputs/list.txt
 
 ---
 3
-
 =====
 
 Template {
@@ -18,7 +17,6 @@ Template {
         00004 | BUILD_LIST (0 items),
         00005 | APPLY_FILTER (name "length"),
         00006 | EMIT,
-        00007 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

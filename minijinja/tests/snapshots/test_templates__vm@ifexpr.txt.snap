@@ -8,7 +8,6 @@ input_file: minijinja/tests/inputs/ifexpr.txt
 23
 
 true
-
 =====
 
 Template {
@@ -46,7 +45,6 @@ Template {
         0001d | BUILD_LIST (0 items),
         0001e | PERFORM_TEST (name "undefined"),
         0001f | EMIT,
-        00020 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

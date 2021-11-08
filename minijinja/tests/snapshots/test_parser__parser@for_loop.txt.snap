@@ -1,7 +1,7 @@
 ---
-source: tests/test_parser.rs
+source: minijinja/tests/test_parser.rs
 expression: "&ast"
-input_file: tests/parser-inputs/for_loop.txt
+input_file: minijinja/tests/parser-inputs/for_loop.txt
 
 ---
 Ok(
@@ -34,8 +34,8 @@ Ok(
                 else_body: [],
             } @ 2:3-4:12,
             EmitRaw {
-                raw: "\n</ul>\n",
-            } @ 4:12-6:0,
+                raw: "\n</ul>",
+            } @ 4:12-5:5,
         ],
-    } @ 1:0-6:0,
+    } @ 1:0-5:5,
 )

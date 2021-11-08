@@ -33,7 +33,6 @@ input_file: minijinja/tests/inputs/loop_var.txt
     revindex0=0
     cycle=even
 
-
 =====
 
 Template {
@@ -80,7 +79,6 @@ Template {
         00026 | EMIT_RAW (string "\n"),
         00027 | JUMP (to 00002),
         00028 | POP_FRAME,
-        00029 | EMIT_RAW (string "\n")  [line 8],
     ],
     blocks: {},
     initial_auto_escape: None,
