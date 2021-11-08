@@ -29,7 +29,7 @@ Template {
         0000d | EMIT_RAW (string "\n"),
         0000e | JUMP (to 00003),
         0000f | POP_FRAME,
-        00010 | EMIT_RAW (string "\n</ul>\n")  [line 4],
+        00010 | EMIT_RAW (string "\n</ul>")  [line 4],
     ],
     blocks: {},
     initial_auto_escape: None,

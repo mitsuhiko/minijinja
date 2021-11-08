@@ -10,7 +10,6 @@ true
 false
 false
 false
-
 =====
 
 Template {
@@ -48,7 +47,6 @@ Template {
         0001d | IN,
         0001e | NOT,
         0001f | EMIT,
-        00020 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

@@ -33,7 +33,6 @@ json-pretty: {
 json-scary-html: "\u003c\u003e\u0026\u0027"
 urlencode: hello%20world/baz
 urlencode-kv: a=x%20y&b=2&c=3
-
 =====
 
 Template {
@@ -192,7 +191,6 @@ Template {
         00096 | BUILD_LIST (0 items),
         00097 | APPLY_FILTER (name "urlencode"),
         00098 | EMIT,
-        00099 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

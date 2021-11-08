@@ -1,7 +1,7 @@
 ---
-source: tests/test_parser.rs
+source: minijinja/tests/test_parser.rs
 expression: "&ast"
-input_file: tests/parser-inputs/getattr.txt
+input_file: minijinja/tests/parser-inputs/getattr.txt
 
 ---
 Ok(
@@ -18,9 +18,6 @@ Ok(
                     name: "baz",
                 } @ 1:10-1:17,
             } @ 1:0-1:17,
-            EmitRaw {
-                raw: "\n",
-            } @ 1:17-2:0,
         ],
-    } @ 1:0-2:0,
+    } @ 1:0-1:17,
 )

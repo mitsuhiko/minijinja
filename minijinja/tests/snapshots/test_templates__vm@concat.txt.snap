@@ -5,7 +5,6 @@ input_file: minijinja/tests/inputs/concat.txt
 
 ---
 foobar
-
 =====
 
 Template {
@@ -15,7 +14,6 @@ Template {
         00001 | LOOKUP (var "b"),
         00002 | STRING_CONCAT,
         00003 | EMIT,
-        00004 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

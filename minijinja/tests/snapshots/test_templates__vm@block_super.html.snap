@@ -10,7 +10,6 @@ input_file: minijinja/tests/inputs/block_super.html
   <p>Default Content</p>
 
 
-
 =====
 
 Template {
@@ -20,7 +19,6 @@ Template {
         00001 | LOAD_BLOCKS,
         00002 | EMIT_RAW (string "\n"),
         00003 | CALL_BLOCK (name "body")  [line 2],
-        00004 | EMIT_RAW (string "\n")  [line 5],
     ],
     blocks: {
         "body": [

@@ -74,7 +74,6 @@ State {
         ],
     },
 }
-
 =====
 
 Template {
@@ -96,7 +95,6 @@ Template {
         0000d | JUMP (to 00008),
         0000e | POP_FRAME,
         0000f | POP_FRAME,
-        00010 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

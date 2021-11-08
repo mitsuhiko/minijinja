@@ -16,7 +16,6 @@ Template {
         00000 | LOOKUP (var "undefined_value")  [line 1],
         00001 | GETATTR (key "attr"),
         00002 | EMIT,
-        00003 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

@@ -7,7 +7,6 @@ input_file: minijinja/tests/inputs/if_cond_elif.txt
 
   else
 
-
 =====
 
 Template {
@@ -22,7 +21,6 @@ Template {
         00006 | EMIT_RAW (string "\n  second branch\n"),
         00007 | JUMP (to 00009),
         00008 | EMIT_RAW (string "\n  else\n")  [line 5],
-        00009 | EMIT_RAW (string "\n")  [line 7],
     ],
     blocks: {},
     initial_auto_escape: None,

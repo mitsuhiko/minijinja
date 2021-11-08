@@ -9,7 +9,6 @@ input_file: minijinja/tests/inputs/autoescape.txt
 <foo>
 &lt;foo&gt;
 <foo>
-
 =====
 
 Template {
@@ -41,7 +40,6 @@ Template {
         00017 | LOOKUP (var "unsafe"),
         00018 | EMIT,
         00019 | POP_AUTO_ESCAPE,
-        0001a | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

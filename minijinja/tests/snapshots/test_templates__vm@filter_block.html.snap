@@ -5,7 +5,6 @@ input_file: minijinja/tests/inputs/filter_block.html
 
 ---
 <p>foo &lt; bar</p>
-
 =====
 
 Template {
@@ -20,7 +19,6 @@ Template {
         00006 | BUILD_LIST (0 items),
         00007 | APPLY_FILTER (name "escape"),
         00008 | EMIT,
-        00009 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: Html,

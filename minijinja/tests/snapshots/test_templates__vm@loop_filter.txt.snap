@@ -10,7 +10,6 @@ input_file: minijinja/tests/inputs/loop_filter.txt
 - 6 (3 / 5)
 - 8 (4 / 5)
 - 10 (5 / 5)
-
 =====
 
 Template {
@@ -52,7 +51,6 @@ Template {
         00021 | EMIT_RAW (string ")"),
         00022 | JUMP (to 00014),
         00023 | POP_FRAME,
-        00024 | EMIT_RAW (string "\n")  [line 3],
     ],
     blocks: {},
     initial_auto_escape: None,

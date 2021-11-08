@@ -7,7 +7,6 @@ input_file: minijinja/tests/inputs/if_cond_else.txt
 
   was false
 
-
 =====
 
 Template {
@@ -18,7 +17,6 @@ Template {
         00002 | EMIT_RAW (string "\n  was true\n"),
         00003 | JUMP (to 00005),
         00004 | EMIT_RAW (string "\n  was false\n")  [line 3],
-        00005 | EMIT_RAW (string "\n")  [line 5],
     ],
     blocks: {},
     initial_auto_escape: None,

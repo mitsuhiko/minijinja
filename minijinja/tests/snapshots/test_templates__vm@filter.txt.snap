@@ -5,7 +5,6 @@ input_file: minijinja/tests/inputs/filter.txt
 
 ---
 FOO BAR BAZ
-
 =====
 
 Template {
@@ -15,7 +14,6 @@ Template {
         00001 | BUILD_LIST (0 items),
         00002 | APPLY_FILTER (name "upper"),
         00003 | EMIT,
-        00004 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

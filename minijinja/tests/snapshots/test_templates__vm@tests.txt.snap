@@ -20,7 +20,6 @@ string: true
 not-string: false
 starts-with-a: true
 ends-with-ha: true
-
 =====
 
 Template {
@@ -108,7 +107,6 @@ Template {
         0004f | BUILD_LIST (1 items),
         00050 | PERFORM_TEST (name "endingwith"),
         00051 | EMIT,
-        00052 | EMIT_RAW (string "\n"),
     ],
     blocks: {},
     initial_auto_escape: None,

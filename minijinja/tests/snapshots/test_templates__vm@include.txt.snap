@@ -8,9 +8,7 @@ Before
 
   Hello 42 from included template!
 
-
 After
-
 =====
 
 Template {
@@ -26,7 +24,7 @@ Template {
         00007 | INCLUDE,
         00008 | EMIT_RAW (string "\n"),
         00009 | POP_FRAME,
-        0000a | EMIT_RAW (string "\nAfter\n")  [line 4],
+        0000a | EMIT_RAW (string "\nAfter")  [line 4],
     ],
     blocks: {},
     initial_auto_escape: None,
