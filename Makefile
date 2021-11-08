@@ -1,6 +1,5 @@
 DOC_FEATURES=source
 TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,source,json,urlencode
-TEST_142_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,json,urlencode
 
 all: test
 
@@ -14,9 +13,6 @@ test:
 	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES)
 	@echo "CARGO TEST ALL FEATURES"
 	@cd minijinja; cargo test --all-features
-
-test-142:
-	@$(MAKE) run-tests FEATURES=$(TEST_142_FEATURES)
 
 run-tests:
 	@rustup component add rustfmt 2> /dev/null

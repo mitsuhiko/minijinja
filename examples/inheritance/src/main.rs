@@ -1,4 +1,4 @@
-use minijinja::{Environment, context};
+use minijinja::{context, Environment};
 use serde::Serialize;
 
 #[derive(Serialize)]
