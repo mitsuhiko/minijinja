@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.8.2
+
+- Restored unconditional compatibility with 1.42.
+
 # 0.8.1
 
 - Turned on all features for the docs on docs.rs
