@@ -94,6 +94,13 @@ impl<'env> Template<'env> {
         self._render(Value::from_serializable(&ctx))
     }
 
+    /// Renders the template into a string.
+    ///
+    /// As the context an arbitrary value object is used.
+    pub fn render_from_value(&self, ctx: Value) -> Result<String, Error> {
+        self._render(ctx)
+    }
+
     fn _render(&self, root: Value) -> Result<String, Error> {
         let mut output = String::new();
         let vm = Vm::new(self.env);
