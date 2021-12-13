@@ -1031,6 +1031,8 @@ impl Value {
                 Shared::Dynamic(ref dy) => {
                     if let Key::String(ref key) = key {
                         return dy.get_attr(key);
+                    } else if let Key::Str(key) = key {
+                        return dy.get_attr(key);
                     }
                 }
                 _ => {}
