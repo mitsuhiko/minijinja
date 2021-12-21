@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 # 0.9.0
 
 - Remove one trailing newline to be consistent with Jinja2.
+- Resolved a bug where borrowed keys on dynamic objects could not be looked up. (#29)
 
 # 0.8.2
 
