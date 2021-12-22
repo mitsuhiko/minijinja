@@ -1028,13 +1028,11 @@ impl Value {
                         return items.get(idx).cloned();
                     }
                 }
-                Shared::Dynamic(ref dy) => {
-                    match key {
-                        Key::String(ref key) => return dy.get_attr(key),
-                        Key::Str(ref key) => return dy.get_attr(key),
-                        _ => {}
-                    }
-                }
+                Shared::Dynamic(ref dy) => match key {
+                    Key::String(ref key) => return dy.get_attr(key),
+                    Key::Str(ref key) => return dy.get_attr(key),
+                    _ => {}
+                },
                 _ => {}
             }
         }
