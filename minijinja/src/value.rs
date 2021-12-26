@@ -378,7 +378,7 @@ impl<'a> From<Key<'a>> for Value {
             Key::Bool(val) => val.into(),
             Key::I64(val) => val.into(),
             Key::Char(val) => val.into(),
-            Key::String(val) => val.into(),
+            Key::String(val) => (*val).clone().into(),
             Key::Str(val) => val.into(),
         }
     }
@@ -1119,22 +1119,24 @@ impl Value {
     pub(crate) fn iter(&self) -> ValueIterator {
         let value = self.clone();
         let clone = value.clone();
-        let (iter_impl, len) = match &clone.0 {
+        let (iter_state, len) = match &clone.0 {
             Repr::Shared(cplx) => match **cplx {
-                Shared::Seq(ref items) => (ValueIteratorImpl::Seq(items.iter()), items.len()),
-                Shared::Map(ref items) => (ValueIteratorImpl::Map(items.iter()), items.len()),
-                Shared::Struct(ref fields) => {
-                    (ValueIteratorImpl::Struct(fields.iter()), fields.len())
-                }
-                _ => (ValueIteratorImpl::Empty, 0),
+                Shared::Seq(ref seq) => (ValueIteratorState::Seq(0), seq.len()),
+                Shared::Map(ref items) => (
+                    ValueIteratorState::Map(items.iter().next().map(|x| x.0.clone())),
+                    items.len(),
+                ),
+                Shared::Struct(ref fields) => (
+                    ValueIteratorState::Struct(fields.iter().next().map(|x| *x.0)),
+                    fields.len(),
+                ),
+                _ => (ValueIteratorState::Empty, 0),
             },
-            _ => (ValueIteratorImpl::Empty, 0),
+            _ => (ValueIteratorState::Empty, 0),
         };
-        // this is insane but i'm very lazy right now to come up
-        // with a better solution to hold on to the value
         ValueIterator {
             value,
-            iter: unsafe { std::mem::transmute(iter_impl) },
+            iter_state,
             len,
         }
     }
@@ -1603,9 +1605,8 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
 pub(crate) struct ValueIterator {
     // this is a hack that keeps a reference.  ValueIteratorImpl is highly
     // unsafe.  This needs to be fixed.
-    #[allow(unused)]
     value: Value,
-    iter: ValueIteratorImpl<'static>,
+    iter_state: ValueIteratorState,
     len: usize,
 }
 
@@ -1613,7 +1614,7 @@ impl Iterator for ValueIterator {
     type Item = Value;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|x| {
+        self.iter_state.advance_state(&self.value).map(|x| {
             self.len -= 1;
             x
         })
@@ -1664,20 +1665,60 @@ impl<'a, V: Serialize + ?Sized> Serialize for Single<'a, V> {
     }
 }
 
-enum ValueIteratorImpl<'a> {
+enum ValueIteratorState {
     Empty,
-    Seq(std::slice::Iter<'a, Value>),
-    Map(std::collections::btree_map::Iter<'a, Key<'a>, Value>),
-    Struct(std::collections::btree_map::Iter<'a, &'static str, Value>),
+    Seq(usize),
+    Map(Option<Key<'static>>),
+    Struct(Option<&'static str>),
 }
 
-impl<'a> ValueIteratorImpl<'a> {
-    fn next(&mut self) -> Option<Value> {
+impl ValueIteratorState {
+    fn advance_state(&mut self, value: &Value) -> Option<Value> {
+        macro_rules! unpack_shared {
+            ($ty:ident) => {
+                match &value.0 {
+                    Repr::Shared(cplx) => match **cplx {
+                        Shared::$ty(ref inner) => inner,
+                        _ => return None,
+                    },
+                    _ => return None,
+                }
+            };
+        }
+
         match self {
-            ValueIteratorImpl::Empty => None,
-            ValueIteratorImpl::Seq(iter) => iter.next().cloned(),
-            ValueIteratorImpl::Map(iter) => iter.next().map(|x| x.0.clone().into()),
-            ValueIteratorImpl::Struct(iter) => iter.next().map(|x| Value::from(*x.0)),
+            ValueIteratorState::Empty => None,
+            ValueIteratorState::Seq(idx) => {
+                let items = unpack_shared!(Seq);
+                items
+                    .get(*idx)
+                    .map(|x| {
+                        *idx += 1;
+                        x
+                    })
+                    .cloned()
+            }
+            ValueIteratorState::Map(ptr) => {
+                let map = unpack_shared!(Map);
+                if let Some(current) = ptr.take() {
+                    let next = map.range(&current..).nth(1).map(|x| x.0.to_static());
+                    let rv = Value::from(current);
+                    *ptr = next;
+                    Some(rv)
+                } else {
+                    None
+                }
+            }
+            ValueIteratorState::Struct(ptr) => {
+                let map = unpack_shared!(Struct);
+                if let Some(current) = ptr {
+                    let rv = Value::from(*current);
+                    *ptr = map.range(*current..).nth(1).map(|x| *x.0);
+                    Some(rv)
+                } else {
+                    None
+                }
+            }
         }
     }
 }
@@ -1858,7 +1899,7 @@ fn test_dynamic_object_roundtrip() {
 #[test]
 fn test_string_key_lookup() {
     let mut m = BTreeMap::new();
-    m.insert(Key::String("foo".into()), Value::from(42));
+    m.insert(Key::String(RcType::new("foo".into())), Value::from(42));
     let m = Value::from(m);
     assert_eq!(m.get_item(&Value::from("foo")).unwrap(), Value::from(42));
 }

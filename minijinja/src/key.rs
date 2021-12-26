@@ -6,7 +6,7 @@ use std::num::TryFromIntError;
 use serde::ser::{self, Impossible, Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Primitive, Value};
+use crate::value::{Primitive, RcType, Value};
 
 /// Represents a key in a value's map.
 #[derive(Clone)]
@@ -14,7 +14,7 @@ pub enum Key<'a> {
     Bool(bool),
     I64(i64),
     Char(char),
-    String(String),
+    String(RcType<String>),
     Str(&'a str),
 }
 
@@ -73,6 +73,16 @@ impl<'a> Key<'a> {
             }
         }
     }
+
+    pub fn to_static(&self) -> Key<'static> {
+        match *self {
+            Key::Bool(value) => Key::Bool(value),
+            Key::I64(value) => Key::I64(value),
+            Key::Char(value) => Key::Char(value),
+            Key::String(ref s) => Key::String(s.clone()),
+            Key::Str(ref s) => Key::String(RcType::new(s.to_string())),
+        }
+    }
 }
 
 impl TryFrom<Value> for Key<'static> {
@@ -96,7 +106,7 @@ impl TryFrom<Value> for Key<'static> {
                 .map_err(|_| ErrorKind::NonKey.into()),
             Primitive::F64(_) => Err(ErrorKind::NonKey.into()),
             Primitive::Char(c) => Ok(Key::Char(c)),
-            Primitive::Str(s) => Ok(Key::String(s.to_string())),
+            Primitive::Str(s) => Ok(Key::String(RcType::new(s.to_string()))),
             Primitive::Bytes(_) | Primitive::None | Primitive::Undefined => {
                 Err(ErrorKind::NonKey.into())
             }
@@ -170,7 +180,7 @@ impl TryFrom<u64> for Key<'static> {
 impl<'a> From<&'a str> for Key<'static> {
     #[inline(always)]
     fn from(value: &'a str) -> Self {
-        Key::String(value.to_string())
+        Key::String(RcType::new(value.to_string()))
     }
 }
 
@@ -260,7 +270,7 @@ impl Serializer for KeySerializer {
     }
 
     fn serialize_str(self, value: &str) -> Result<StaticKey, Error> {
-        Ok(Key::String(value.to_string()))
+        Ok(Key::String(RcType::new(value.to_string())))
     }
 
     fn serialize_bytes(self, _value: &[u8]) -> Result<StaticKey, Error> {
@@ -292,7 +302,7 @@ impl Serializer for KeySerializer {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<StaticKey, Error> {
-        Ok(Key::String(variant.into()))
+        Ok(Key::Str(variant))
     }
 
     fn serialize_newtype_struct<T: ?Sized>(
