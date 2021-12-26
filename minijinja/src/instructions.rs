@@ -344,5 +344,5 @@ impl<'source> fmt::Debug for Instructions<'source> {
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn test_sizes() {
-    assert_eq!(std::mem::size_of::<Instruction>(), 24);
+    assert_eq!(std::mem::size_of::<Instruction>(), 32);
 }
