@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.10.0
+
+- Restructured the value type internally to be simpler and not use unsafe at the
+  cost of slightly larger memory footprint. (#30)
+
 # 0.9.0
 
 - Remove one trailing newline to be consistent with Jinja2.
