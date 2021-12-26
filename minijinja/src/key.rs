@@ -73,16 +73,6 @@ impl<'a> Key<'a> {
             }
         }
     }
-
-    pub fn to_static(&self) -> Key<'static> {
-        match *self {
-            Key::Bool(value) => Key::Bool(value),
-            Key::I64(value) => Key::I64(value),
-            Key::Char(value) => Key::Char(value),
-            Key::String(ref s) => Key::String(s.clone()),
-            Key::Str(ref s) => Key::String(RcType::new(s.to_string())),
-        }
-    }
 }
 
 impl TryFrom<Value> for Key<'static> {

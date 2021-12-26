@@ -1624,7 +1624,7 @@ impl ValueIteratorState {
                 .cloned(),
             ValueIteratorState::Map(ptr, map) => {
                 if let Some(current) = ptr.take() {
-                    let next = map.range(&current..).nth(1).map(|x| x.0.to_static());
+                    let next = map.range(&current..).nth(1).map(|x| x.0.clone());
                     let rv = Value::from(current);
                     *ptr = next;
                     Some(rv)
