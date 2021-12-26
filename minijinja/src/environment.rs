@@ -169,6 +169,7 @@ pub struct Environment<'source> {
     tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
     globals: RcType<BTreeMap<&'source str, Value>>,
     default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
+    pub(crate) debug: bool,
 }
 
 impl<'source> Default for Environment<'source> {
@@ -184,6 +185,7 @@ impl<'source> fmt::Debug for Environment<'source> {
             .field("tests", &BTreeMapKeysDebug(&self.tests))
             .field("filters", &BTreeMapKeysDebug(&self.filters))
             .field("templates", &self.templates)
+            .field("debug", &self.debug)
             .finish()
     }
 }
@@ -264,6 +266,7 @@ impl<'source> Environment<'source> {
             tests: RcType::new(tests::get_builtin_tests()),
             globals: RcType::new(functions::get_globals()),
             default_auto_escape: RcType::new(default_auto_escape),
+            debug: false,
         }
     }
 
@@ -278,6 +281,7 @@ impl<'source> Environment<'source> {
             tests: RcType::default(),
             globals: RcType::default(),
             default_auto_escape: RcType::new(no_auto_escape),
+            debug: false,
         }
     }
 
@@ -293,6 +297,19 @@ impl<'source> Environment<'source> {
         f: F,
     ) {
         self.default_auto_escape = RcType::new(f);
+    }
+
+    /// Enable or disable the debug mode.
+    ///
+    /// When the debug mode is enabled the engine will dump out some of the
+    /// execution state together with the source information of the executing
+    /// template when an error is created.  The cost of this is relatively
+    /// high as the data including the template source is cloned.
+    ///
+    /// However providing this information greatly improves the debug information
+    /// that the template error provides.
+    pub fn set_debug(&mut self, enabled: bool) {
+        self.debug = enabled;
     }
 
     /// Sets the template source for the environment.

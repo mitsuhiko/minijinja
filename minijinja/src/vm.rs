@@ -4,7 +4,7 @@ use std::fmt::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::environment::Environment;
-use crate::error::{Error, ErrorKind};
+use crate::error::{DebugInfo, Error, ErrorKind};
 use crate::instructions::{Instruction, Instructions};
 use crate::key::Key;
 use crate::utils::matches;
@@ -145,6 +145,41 @@ pub struct Context<'env, 'vm> {
 }
 
 impl<'env, 'vm> Context<'env, 'vm> {
+    /// Freezes the context.
+    pub fn freeze(&self) -> BTreeMap<&str, Value> {
+        let mut rv = BTreeMap::new();
+
+        for ctx in self.stack.iter() {
+            let (lookup_base, cont) = match ctx {
+                // if we hit a chain frame we dispatch there and never
+                // recurse
+                Frame::Chained { base } => return base.freeze(),
+                Frame::Isolate { value } => (value, false),
+                Frame::Merge { value } => (value, true),
+                Frame::Loop(Loop {
+                    locals,
+                    controller,
+                    with_loop_var,
+                    ..
+                }) => {
+                    rv.extend(locals.iter().map(|(k, v)| (*k, v.clone())));
+                    if *with_loop_var {
+                        rv.insert("loop", Value::from_rc_object(controller.clone()));
+                    }
+                    continue;
+                }
+            };
+
+            if !cont {
+                rv.clear();
+            }
+
+            rv.extend(lookup_base.iter_as_str_map());
+        }
+
+        rv
+    }
+
     /// Stores a variable in the context.
     pub fn store(&mut self, key: &'env str, value: Value) {
         self.current_loop().locals.insert(key, value);
@@ -358,6 +393,16 @@ impl<'env> Vm<'env> {
                 let mut err = $err;
                 if let Some(lineno) = instructions.get_line(pc) {
                     err.set_location(instructions.name(), lineno);
+                }
+                if self.env.debug && err.debug_info.is_none() {
+                    err.debug_info = Some(DebugInfo {
+                        template_source: state
+                            .env
+                            .get_template(state.name)
+                            .ok()
+                            .map(|x| x.source().to_string()),
+                        context: Value::from(state.ctx.freeze()),
+                    });
                 }
                 return Err(err);
             }};
