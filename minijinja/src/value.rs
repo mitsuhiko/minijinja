@@ -819,7 +819,7 @@ impl Value {
         if let Repr::Dynamic(ref obj) = self.0 {
             if (**obj).type_id() == TypeId::of::<T>() {
                 unsafe {
-                    // newer versions of Furst have RcType::as_ptr but we support
+                    // newer versions of Rust have RcType::as_ptr but we support
                     // rust versions down to 1.41.0 so we need to use a workaround here.
                     let count = RcType::strong_count(obj);
                     let clone = obj.clone();
@@ -1840,7 +1840,4 @@ fn test_value_serialization() {
 #[cfg(target_pointer_width = "64")]
 fn test_sizes() {
     assert_eq!(std::mem::size_of::<Value>(), 24);
-    assert_eq!(std::mem::size_of::<RcType<u128>>(), 8);
-    assert_eq!(std::mem::size_of::<RcType<i128>>(), 8);
-    assert_eq!(std::mem::size_of::<RcType<Box<dyn Object>>>(), 8);
 }
