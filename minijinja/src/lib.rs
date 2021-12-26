@@ -79,7 +79,7 @@
 //!
 //! There are some additional features that can be enabled:
 //!
-//! - `source`: enables the [`Source`] type which helps with dynamic loading of templates.
+//! - `source`: enables the `Source` type which helps with dynamic loading of templates.
 //! - `memchr`: enables the `memchr` dependency which provides performance improvements
 //!   for the parser.
 //! - `v_htmlescape`: enables the `v_htmlescape` dependency which implements a faster HTML

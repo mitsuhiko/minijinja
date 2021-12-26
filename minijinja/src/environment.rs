@@ -154,9 +154,14 @@ impl<'source> fmt::Debug for Source<'source> {
 ///
 /// The environment holds references to the source the templates were created from.
 /// This makes it very inconvenient to pass around unless the templates are static
-/// strings.  For situations where you want to load dynamic templates and share the
-/// environment it's recommended to turn on the `source` feature and to use the
-/// [`Source`](crate::source::Source) type with the environment.
+/// strings.
+#[cfg_attr(
+    feature = "source",
+    doc = "
+For situations where you want to load dynamic templates and share the
+environment it's recommended to turn on the `source` feature and to use the
+[`Source`](crate::source::Source) type with the environment."
+)]
 #[derive(Clone)]
 pub struct Environment<'source> {
     templates: Source<'source>,

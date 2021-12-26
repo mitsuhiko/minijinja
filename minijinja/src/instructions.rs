@@ -239,7 +239,7 @@ pub struct Instructions<'source> {
 }
 
 impl<'source> Instructions<'source> {
-    // Creates a new instructions object.
+    /// Creates a new instructions object.
     pub fn new(name: &'source str) -> Instructions<'source> {
         Instructions {
             instructions: Vec::new(),
@@ -253,13 +253,13 @@ impl<'source> Instructions<'source> {
         self.name
     }
 
-    // Returns an instruction by index
+    /// Returns an instruction by index
     #[inline(always)]
     pub fn get(&self, idx: usize) -> Option<&Instruction<'source>> {
         self.instructions.get(idx)
     }
 
-    // Returns an instruction by index mutably
+    /// Returns an instruction by index mutably
     pub fn get_mut(&mut self, idx: usize) -> Option<&mut Instruction<'source>> {
         self.instructions.get_mut(idx)
     }
