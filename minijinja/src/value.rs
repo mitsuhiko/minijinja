@@ -351,7 +351,7 @@ impl<'a> From<Key<'a>> for Value {
             Key::Bool(val) => val.into(),
             Key::I64(val) => val.into(),
             Key::Char(val) => val.into(),
-            Key::String(val) => (*val).clone().into(),
+            Key::String(val) => Repr::String(val).into(),
             Key::Str(val) => val.into(),
         }
     }
@@ -987,12 +987,13 @@ impl Value {
     /// Calls the value directly.
     pub(crate) fn call(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
         if let Repr::Dynamic(ref dy) = self.0 {
-            return dy.call(state, args);
+            dy.call(state, args)
+        } else {
+            Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                "value is not callable",
+            ))
         }
-        Err(Error::new(
-            ErrorKind::ImpossibleOperation,
-            "value is not callable",
-        ))
     }
 
     /// Calls a method on the value.
@@ -1009,6 +1010,25 @@ impl Value {
                 ErrorKind::ImpossibleOperation,
                 format!("object has no method named {}", name),
             ))
+        }
+    }
+
+    pub(crate) fn try_into_key(self) -> Result<Key<'static>, Error> {
+        match self.0 {
+            Repr::Bool(val) => Ok(Key::Bool(val)),
+            Repr::U64(v) => TryFrom::try_from(v)
+                .map(Key::I64)
+                .map_err(|_| ErrorKind::NonKey.into()),
+            Repr::U128(ref v) => TryFrom::try_from(**v)
+                .map(Key::I64)
+                .map_err(|_| ErrorKind::NonKey.into()),
+            Repr::I64(v) => Ok(Key::I64(v)),
+            Repr::I128(ref v) => TryFrom::try_from(**v)
+                .map(Key::I64)
+                .map_err(|_| ErrorKind::NonKey.into()),
+            Repr::Char(c) => Ok(Key::Char(c)),
+            Repr::String(ref s) => Ok(Key::String(s.clone())),
+            _ => Err(ErrorKind::NonKey.into()),
         }
     }
 
@@ -1044,24 +1064,25 @@ impl Value {
 
     /// Iterates over the value.
     pub(crate) fn iter(&self) -> ValueIterator {
-        let value = self.clone();
         let (iter_state, len) = match self.0 {
-            Repr::Seq(ref seq) => (ValueIteratorState::Seq(0), seq.len()),
+            Repr::Seq(ref seq) => (ValueIteratorState::Seq(0, RcType::clone(seq)), seq.len()),
             Repr::Map(ref items) => (
-                ValueIteratorState::Map(items.iter().next().map(|x| x.0.clone())),
+                ValueIteratorState::Map(
+                    items.iter().next().map(|x| x.0.clone()),
+                    RcType::clone(items),
+                ),
                 items.len(),
             ),
             Repr::Struct(ref fields) => (
-                ValueIteratorState::Struct(fields.iter().next().map(|x| *x.0)),
+                ValueIteratorState::Struct(
+                    fields.iter().next().map(|x| *x.0),
+                    RcType::clone(fields),
+                ),
                 fields.len(),
             ),
             _ => (ValueIteratorState::Empty, 0),
         };
-        ValueIterator {
-            value,
-            iter_state,
-            len,
-        }
+        ValueIterator { iter_state, len }
     }
 }
 
@@ -1524,9 +1545,6 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
 }
 
 pub(crate) struct ValueIterator {
-    // this is a hack that keeps a reference.  ValueIteratorImpl is highly
-    // unsafe.  This needs to be fixed.
-    value: Value,
     iter_state: ValueIteratorState,
     len: usize,
 }
@@ -1535,7 +1553,7 @@ impl Iterator for ValueIterator {
     type Item = Value;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter_state.advance_state(&self.value).map(|x| {
+        self.iter_state.advance_state().map(|x| {
             self.len -= 1;
             x
         })
@@ -1588,36 +1606,23 @@ impl<'a, V: Serialize + ?Sized> Serialize for Single<'a, V> {
 
 enum ValueIteratorState {
     Empty,
-    Seq(usize),
-    Map(Option<Key<'static>>),
-    Struct(Option<&'static str>),
+    Seq(usize, RcType<Vec<Value>>),
+    Map(Option<Key<'static>>, RcType<BTreeMap<Key<'static>, Value>>),
+    Struct(Option<&'static str>, RcType<BTreeMap<&'static str, Value>>),
 }
 
 impl ValueIteratorState {
-    fn advance_state(&mut self, value: &Value) -> Option<Value> {
-        macro_rules! unpack_shared {
-            ($ty:ident) => {
-                match &value.0 {
-                    Repr::$ty(ref inner) => inner,
-                    _ => return None,
-                }
-            };
-        }
-
+    fn advance_state(&mut self) -> Option<Value> {
         match self {
             ValueIteratorState::Empty => None,
-            ValueIteratorState::Seq(idx) => {
-                let items = unpack_shared!(Seq);
-                items
-                    .get(*idx)
-                    .map(|x| {
-                        *idx += 1;
-                        x
-                    })
-                    .cloned()
-            }
-            ValueIteratorState::Map(ptr) => {
-                let map = unpack_shared!(Map);
+            ValueIteratorState::Seq(idx, items) => items
+                .get(*idx)
+                .map(|x| {
+                    *idx += 1;
+                    x
+                })
+                .cloned(),
+            ValueIteratorState::Map(ptr, map) => {
                 if let Some(current) = ptr.take() {
                     let next = map.range(&current..).nth(1).map(|x| x.0.to_static());
                     let rv = Value::from(current);
@@ -1627,8 +1632,7 @@ impl ValueIteratorState {
                     None
                 }
             }
-            ValueIteratorState::Struct(ptr) => {
-                let map = unpack_shared!(Struct);
+            ValueIteratorState::Struct(ptr, map) => {
                 if let Some(current) = ptr {
                     let rv = Value::from(*current);
                     *ptr = map.range(*current..).nth(1).map(|x| *x.0);

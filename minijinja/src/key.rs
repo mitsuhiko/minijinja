@@ -89,28 +89,7 @@ impl TryFrom<Value> for Key<'static> {
     type Error = Error;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value
-            .as_primitive()
-            .ok_or_else(|| Error::from(ErrorKind::NonKey))?
-        {
-            Primitive::Bool(v) => Ok(Key::Bool(v)),
-            Primitive::U64(v) => TryFrom::try_from(v)
-                .map(Key::I64)
-                .map_err(|_| ErrorKind::NonKey.into()),
-            Primitive::U128(v) => TryFrom::try_from(v)
-                .map(Key::I64)
-                .map_err(|_| ErrorKind::NonKey.into()),
-            Primitive::I64(v) => Ok(Key::I64(v)),
-            Primitive::I128(v) => TryFrom::try_from(v)
-                .map(Key::I64)
-                .map_err(|_| ErrorKind::NonKey.into()),
-            Primitive::F64(_) => Err(ErrorKind::NonKey.into()),
-            Primitive::Char(c) => Ok(Key::Char(c)),
-            Primitive::Str(s) => Ok(Key::String(RcType::new(s.to_string()))),
-            Primitive::Bytes(_) | Primitive::None | Primitive::Undefined => {
-                Err(ErrorKind::NonKey.into())
-            }
-        }
+        value.try_into_key()
     }
 }
 
