@@ -6,6 +6,9 @@ All notable changes to MiniJinja are documented here.
 
 - Restructured the value type internally to be simpler and not use unsafe at the
   cost of slightly larger memory footprint. (#30)
+- Added `debug` support.  If the debug mode is enabled, errors now carry a lot of
+  useful debug information and an alternative representation when formatted into
+  strings that show the context of the template where it went all wrong. (#31)
 
 # 0.9.0
 
