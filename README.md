@@ -23,21 +23,13 @@ with prior art to leverage an already existing ecosystem of editor integrations.
 ## Example
 
 ```rust
-use minijinja::Environment;
-use serde::Serialize;
-
-#[derive(Serialize)]
-pub struct Context {
-    name: String,
-}
+use minijinja::{Environment, context};
 
 fn main() {
     let mut env = Environment::new();
     env.add_template("hello.txt", "Hello {{ name }}!").unwrap();
     let template = env.get_template("hello.txt").unwrap();
-    println!("{}", template.render(&Context {
-        name: "World".into()
-    }).unwrap());
+    println!("{}", template.render(context! { name => "World" }).unwrap());
 }
 ```
 
