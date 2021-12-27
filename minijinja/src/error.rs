@@ -41,7 +41,21 @@ impl fmt::Debug for Error {
             .field("name", &self.name)
             .field("lineno", &self.lineno)
             .field("source", &self.source)
-            .finish()
+            .finish()?;
+
+        // so this is a bit questionablem, but because of how commonly errors are just
+        // unwrapped i think it's sensible to spit out the debug info following the
+        // error struct dump.
+        #[cfg(feature = "debug")]
+        {
+            if let Some(info) = self.debug_info() {
+                writeln!(f)?;
+                render_debug_info(f, self.line(), info)?;
+                writeln!(f)?;
+            }
+        }
+
+        Ok(())
     }
 }
 
