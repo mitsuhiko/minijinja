@@ -59,6 +59,25 @@ impl<'source> CompiledTemplate<'source> {
         name: &'source str,
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
+        match Self::_from_name_and_source_impl(name, source) {
+            Ok(rv) => Ok(rv),
+            Err(mut err) => {
+                #[cfg(feature = "debug")]
+                {
+                    err.debug_info = Some(crate::error::DebugInfo {
+                        template_source: Some(source.to_string()),
+                        ..Default::default()
+                    });
+                }
+                Err(err)
+            }
+        }
+    }
+
+    fn _from_name_and_source_impl(
+        name: &'source str,
+        source: &'source str,
+    ) -> Result<CompiledTemplate<'source>, Error> {
         let ast = parse(source, name)?;
         let mut compiler = Compiler::new(name);
         compiler.compile_stmt(&ast)?;
@@ -167,8 +186,10 @@ pub struct Environment<'source> {
     templates: Source<'source>,
     filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
     tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
-    globals: RcType<BTreeMap<&'source str, Value>>,
+    pub(crate) globals: RcType<BTreeMap<&'source str, Value>>,
     default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
+    #[cfg(feature = "debug")]
+    debug: bool,
 }
 
 impl<'source> Default for Environment<'source> {
@@ -264,6 +285,8 @@ impl<'source> Environment<'source> {
             tests: RcType::new(tests::get_builtin_tests()),
             globals: RcType::new(functions::get_globals()),
             default_auto_escape: RcType::new(default_auto_escape),
+            #[cfg(feature = "debug")]
+            debug: false,
         }
     }
 
@@ -278,6 +301,8 @@ impl<'source> Environment<'source> {
             tests: RcType::default(),
             globals: RcType::default(),
             default_auto_escape: RcType::new(no_auto_escape),
+            #[cfg(feature = "debug")]
+            debug: false,
         }
     }
 
@@ -293,6 +318,28 @@ impl<'source> Environment<'source> {
         f: F,
     ) {
         self.default_auto_escape = RcType::new(f);
+    }
+
+    /// Enable or disable the debug mode.
+    ///
+    /// When the debug mode is enabled the engine will dump out some of the
+    /// execution state together with the source information of the executing
+    /// template when an error is created.  The cost of this is relatively
+    /// high as the data including the template source is cloned.
+    ///
+    /// However providing this information greatly improves the debug information
+    /// that the template error provides.
+    ///
+    /// This requires the `debug` feature.
+    #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
+    pub fn set_debug(&mut self, enabled: bool) {
+        self.debug = enabled;
+    }
+
+    #[cfg(feature = "debug")]
+    pub(crate) fn debug(&self) -> bool {
+        self.debug
     }
 
     /// Sets the template source for the environment.

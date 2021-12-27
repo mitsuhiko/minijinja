@@ -86,6 +86,8 @@
 //!   escaping algorithm.
 //! - `unstable_machinery`: provides access to the internal machinery of the engine.  This
 //!   is a forever unstable API which mainly exists to aid debugging complex issues.
+//! - `json`: When enabled the `tojson` filter is added as builtin filter.
+//! - `urlencode`: When enabled the `urlencode` filter is added as builtin filter.
 //!
 //! Additionally to cut down on size of the engine some default
 //! functionality can be removed:
@@ -100,8 +102,8 @@
 //!   is disabled sending types across threads is often not possible.  Thread bounds
 //!   of things like callbacks however are not changing which means code that uses
 //!   MiniJinja still needs to be threadsafe.
-//! - `json`: When enabled the `tojson` filter is added as builtin filter.
-//! - `urlencode`: When enabled the `urlencode` filter is added as builtin filter.
+//! - `debug`: if this feature is removed some debug functionality of the engine is
+//!   removed as well.  This mainly affects the quality of error reporting.
 #![allow(clippy::cognitive_complexity)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 mod key;
@@ -130,6 +132,9 @@ mod source;
 pub use self::environment::{Environment, Expression, Template};
 pub use self::error::{Error, ErrorKind};
 pub use self::utils::{AutoEscape, HtmlEscape};
+
+#[cfg(feature = "debug")]
+pub use self::error::DebugInfo;
 
 #[cfg(feature = "source")]
 pub use self::source::Source;

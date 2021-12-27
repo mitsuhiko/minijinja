@@ -31,7 +31,7 @@ impl<'a> fmt::Debug for Key<'a> {
 }
 
 #[derive(PartialOrd, Ord, Eq, PartialEq)]
-pub enum InternalKeyRef<'a> {
+enum InternalKeyRef<'a> {
     Bool(bool),
     I64(i64),
     Char(char),
@@ -39,7 +39,15 @@ pub enum InternalKeyRef<'a> {
 }
 
 impl<'a> Key<'a> {
-    pub fn as_key_ref(&self) -> InternalKeyRef<'_> {
+    pub fn as_str(&self) -> Option<&str> {
+        match *self {
+            Key::String(ref x) => Some(x.as_str()),
+            Key::Str(x) => Some(x),
+            _ => None,
+        }
+    }
+
+    fn as_key_ref(&self) -> InternalKeyRef<'_> {
         match *self {
             Key::Bool(x) => InternalKeyRef::Bool(x),
             Key::I64(x) => InternalKeyRef::I64(x),

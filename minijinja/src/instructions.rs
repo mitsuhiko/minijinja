@@ -300,6 +300,27 @@ impl<'source> Instructions<'source> {
         Some(loc.line as usize)
     }
 
+    /// Returns a list of all names referenced in the current block backwards
+    /// from the given pc.
+    #[cfg(feature = "debug")]
+    pub fn get_referenced_names(&self, idx: usize) -> Vec<&'source str> {
+        let mut rv = Vec::new();
+        for instr in self.instructions[..=idx].iter().rev() {
+            match instr {
+                Instruction::Lookup(name) => rv.push(*name),
+                Instruction::StoreLocal(name) => rv.push(*name),
+                Instruction::CallFunction(name) => rv.push(*name),
+                Instruction::PushLoop(true) => {
+                    rv.push("loop");
+                    break;
+                }
+                Instruction::PushLoop(false) | Instruction::PushContext => break,
+                _ => {}
+            }
+        }
+        rv
+    }
+
     /// Returns the number of instructions
     pub fn len(&self) -> usize {
         self.instructions.len()

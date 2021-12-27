@@ -1062,6 +1062,25 @@ impl Value {
         }
     }
 
+    #[cfg(feature = "debug")]
+    pub(crate) fn iter_as_str_map(&self) -> impl Iterator<Item = (&str, Value)> {
+        match self.0 {
+            Repr::Map(ref m) => Box::new(
+                m.iter()
+                    .filter_map(|(k, v)| k.as_str().map(move |k| (k, v.clone()))),
+            ) as Box<dyn Iterator<Item = _>>,
+            Repr::Struct(ref s) => {
+                Box::new(s.iter().map(|(k, v)| (*k, v.clone()))) as Box<dyn Iterator<Item = _>>
+            }
+            Repr::Dynamic(ref obj) => Box::new(
+                obj.attributes()
+                    .iter()
+                    .filter_map(move |attr| Some((*attr, obj.get_attr(attr)?))),
+            ) as Box<dyn Iterator<Item = _>>,
+            _ => Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>,
+        }
+    }
+
     /// Iterates over the value.
     pub(crate) fn iter(&self) -> ValueIterator {
         let (iter_state, len) = match self.0 {

@@ -76,7 +76,7 @@ impl<'a> TokenStream<'a> {
     pub fn next(&mut self) -> Result<Option<(Token<'a>, Span)>, Error> {
         let rv = self.current.take();
         self.current = self.iter.next();
-        if let Some(Ok((_, span))) = self.current {
+        if let Some(Ok((_, span))) = rv {
             self.current_span = span;
         }
         rv.transpose()
