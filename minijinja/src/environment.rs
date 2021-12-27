@@ -59,6 +59,25 @@ impl<'source> CompiledTemplate<'source> {
         name: &'source str,
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
+        match Self::_from_name_and_source_impl(name, source) {
+            Ok(rv) => Ok(rv),
+            Err(mut err) => {
+                #[cfg(feature = "debug")]
+                {
+                    err.debug_info = Some(crate::error::DebugInfo {
+                        template_source: Some(source.to_string()),
+                        ..Default::default()
+                    });
+                }
+                Err(err)
+            }
+        }
+    }
+
+    fn _from_name_and_source_impl(
+        name: &'source str,
+        source: &'source str,
+    ) -> Result<CompiledTemplate<'source>, Error> {
         let ast = parse(source, name)?;
         let mut compiler = Compiler::new(name);
         compiler.compile_stmt(&ast)?;
@@ -170,7 +189,7 @@ pub struct Environment<'source> {
     pub(crate) globals: RcType<BTreeMap<&'source str, Value>>,
     default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
     #[cfg(feature = "debug")]
-    pub(crate) debug: bool,
+    debug: bool,
 }
 
 impl<'source> Default for Environment<'source> {
@@ -316,6 +335,11 @@ impl<'source> Environment<'source> {
     #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
     pub fn set_debug(&mut self, enabled: bool) {
         self.debug = enabled;
+    }
+
+    #[cfg(feature = "debug")]
+    pub(crate) fn debug(&self) -> bool {
+        self.debug
     }
 
     /// Sets the template source for the environment.

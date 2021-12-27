@@ -110,9 +110,9 @@ impl fmt::Display for Error {
             write!(f, " (in {}:{})", filename, self.lineno)?
         }
         if f.alternate() {
-            writeln!(f)?;
-            writeln!(f, "{:-^1$}", " Template Source ", 74).unwrap();
             if let Some(source) = self.template_source() {
+                writeln!(f)?;
+                writeln!(f, "{:-^1$}", " Template Source ", 74).unwrap();
                 let lines: Vec<_> = source.lines().enumerate().collect();
                 let idx = self.line().unwrap_or(1) - 1;
                 let skip = idx.saturating_sub(3);
@@ -125,13 +125,24 @@ impl fmt::Display for Error {
                 for (idx, line) in post {
                     writeln!(f, "{:>4} | {}", idx + 1, line).unwrap();
                 }
-            } else {
-                writeln!(f, "source not available. Debug mode not enabled?").unwrap();
+                write!(f, "{:-^1$}", "", 74).unwrap();
             }
-            write!(f, "{:-^1$}", "", 74).unwrap();
             if let Some(ctx) = self.template_context() {
-                writeln!(f)?;
-                writeln!(f, "Context: {:#?}", ctx).unwrap();
+                if let Some(vars) = self
+                    .debug_info
+                    .as_ref()
+                    .and_then(|x| x.referenced_names.as_ref())
+                {
+                    writeln!(f)?;
+                    writeln!(f, "Referenced variables:")?;
+                    for var in vars {
+                        write!(f, "  {:}: ", var)?;
+                        match ctx.get_attr(var) {
+                            Ok(val) => writeln!(f, "{:#?}", val)?,
+                            Err(_) => writeln!(f, "undefined")?,
+                        }
+                    }
+                }
                 write!(f, "{:-^1$}", "", 74).unwrap();
             }
         }
@@ -213,7 +224,10 @@ impl Error {
     pub fn template_context(&self) -> Option<Value> {
         #[cfg(feature = "debug")]
         {
-            self.debug_info.as_ref().map(|x| x.context.clone())
+            self.debug_info
+                .as_ref()
+                .and_then(|x| x.context.as_ref())
+                .cloned()
         }
         #[cfg(not(feature = "debug"))]
         {
@@ -252,7 +266,10 @@ impl serde::ser::Error for Error {
 }
 
 #[cfg(feature = "debug")]
+#[derive(Default)]
 pub(crate) struct DebugInfo {
     pub(crate) template_source: Option<String>,
-    pub(crate) context: Value,
+    pub(crate) context: Option<Value>,
+    // for now this is internal
+    pub(crate) referenced_names: Option<Vec<String>>,
 }

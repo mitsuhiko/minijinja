@@ -146,6 +146,10 @@ pub struct Context<'env, 'vm> {
 
 impl<'env, 'vm> Context<'env, 'vm> {
     /// Freezes the context.
+    ///
+    /// This implementation is not particularly beautiful and highly inefficient.
+    /// Since it's only used for the debug support changing this is not too
+    /// critical.
     #[cfg(feature = "debug")]
     fn freeze<'a>(&'a self, env: &'a Environment) -> BTreeMap<&'a str, Value> {
         let mut rv = BTreeMap::new();
@@ -336,6 +340,24 @@ impl<'vm, 'env> State<'vm, 'env> {
             ))
         }
     }
+
+    #[cfg(feature = "debug")]
+    fn make_debug_info(
+        &self,
+        pc: usize,
+        instructions: &Instructions<'_>,
+    ) -> crate::error::DebugInfo {
+        let referenced_names = instructions.get_referenced_names(pc);
+        crate::error::DebugInfo {
+            template_source: self
+                .env
+                .get_template(self.name)
+                .ok()
+                .map(|x| x.source().to_string()),
+            context: Some(Value::from(self.ctx.freeze(self.env))),
+            referenced_names: Some(referenced_names.iter().map(|x| x.to_string()).collect()),
+        }
+    }
 }
 
 /// Helps to evaluate something.
@@ -398,15 +420,8 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "debug")]
                 {
-                    if self.env.debug && err.debug_info.is_none() {
-                        err.debug_info = Some(crate::error::DebugInfo {
-                            template_source: state
-                                .env
-                                .get_template(state.name)
-                                .ok()
-                                .map(|x| x.source().to_string()),
-                            context: Value::from(state.ctx.freeze(state.env)),
-                        });
+                    if self.env.debug() && err.debug_info.is_none() {
+                        err.debug_info = Some(state.make_debug_info(pc, &instructions));
                     }
                 }
                 return Err(err);

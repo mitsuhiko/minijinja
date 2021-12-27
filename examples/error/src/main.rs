@@ -3,19 +3,25 @@ use minijinja::{context, Environment};
 fn main() {
     let mut env = Environment::new();
     env.set_debug(true);
-    env.add_template(
+    if let Err(err) = env.add_template(
         "hello.txt",
         r#"
         first line
         {% for item in seq %}
           {% with item_squared = item * item %}
-            Hello {{ item_squared + bar }}!
+            {% with foo = 42 %}
+              {{ range(10) }}
+              Hello {{ item_squared + bar }}!
+            {% endwith %}
           {% endwith %}
         {% endfor %}
         last line
         "#,
-    )
-    .unwrap();
+    ) {
+        eprintln!("Template Failed Parsing:");
+        eprintln!("  {:#}", err);
+        std::process::exit(1);
+    }
     let template = env.get_template("hello.txt").unwrap();
     let ctx = context! {
         seq => vec![2, 4, 8],
@@ -26,6 +32,7 @@ fn main() {
         Err(err) => {
             eprintln!("Template Failed Rendering:");
             eprintln!("  {:#}", err);
+            std::process::exit(1);
         }
     }
 }
