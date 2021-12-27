@@ -167,7 +167,7 @@ pub struct Environment<'source> {
     templates: Source<'source>,
     filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
     tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
-    globals: RcType<BTreeMap<&'source str, Value>>,
+    pub(crate) globals: RcType<BTreeMap<&'source str, Value>>,
     default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
     #[cfg(feature = "debug")]
     pub(crate) debug: bool,

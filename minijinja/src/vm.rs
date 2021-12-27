@@ -147,14 +147,14 @@ pub struct Context<'env, 'vm> {
 impl<'env, 'vm> Context<'env, 'vm> {
     /// Freezes the context.
     #[cfg(feature = "debug")]
-    fn freeze(&self) -> BTreeMap<&str, Value> {
+    fn freeze<'a>(&'a self, env: &'a Environment) -> BTreeMap<&'a str, Value> {
         let mut rv = BTreeMap::new();
 
         for ctx in self.stack.iter() {
             let (lookup_base, cont) = match ctx {
                 // if we hit a chain frame we dispatch there and never
                 // recurse
-                Frame::Chained { base } => return base.freeze(),
+                Frame::Chained { base } => return base.freeze(env),
                 Frame::Isolate { value } => (value, false),
                 Frame::Merge { value } => (value, true),
                 Frame::Loop(Loop {
@@ -173,6 +173,7 @@ impl<'env, 'vm> Context<'env, 'vm> {
 
             if !cont {
                 rv.clear();
+                rv.extend(env.globals.iter().map(|(k, v)| (*k, v.clone())));
             }
 
             rv.extend(lookup_base.iter_as_str_map());
@@ -404,7 +405,7 @@ impl<'env> Vm<'env> {
                                 .get_template(state.name)
                                 .ok()
                                 .map(|x| x.source().to_string()),
-                            context: Value::from(state.ctx.freeze()),
+                            context: Value::from(state.ctx.freeze(state.env)),
                         });
                     }
                 }
