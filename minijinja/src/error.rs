@@ -31,6 +31,7 @@ pub struct Error {
     name: Option<String>,
     lineno: usize,
     source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    #[cfg(feature = "debug")]
     pub(crate) debug_info: Option<DebugInfo>,
 }
 
@@ -147,6 +148,7 @@ impl Error {
             name: None,
             lineno: 0,
             source: None,
+            #[cfg(feature = "debug")]
             debug_info: None,
         }
     }
@@ -187,10 +189,17 @@ impl Error {
     /// in which cases it can still be missing despite the debug mode being
     /// enabled.
     pub fn template_source(&self) -> Option<&str> {
-        self.debug_info
-            .as_ref()
-            .and_then(|x| x.template_source.as_ref())
-            .map(|x| x.as_str())
+        #[cfg(feature = "debug")]
+        {
+            self.debug_info
+                .as_ref()
+                .and_then(|x| x.template_source.as_ref())
+                .map(|x| x.as_str())
+        }
+        #[cfg(not(feature = "debug"))]
+        {
+            None
+        }
     }
 
     /// Returns the frozen template context if available.
@@ -202,7 +211,14 @@ impl Error {
     /// mode is enabled on the environment
     /// ([`Environment::set_debug`](crate::Environment::set_debug)).
     pub fn template_context(&self) -> Option<Value> {
-        self.debug_info.as_ref().map(|x| x.context.clone())
+        #[cfg(feature = "debug")]
+        {
+            self.debug_info.as_ref().map(|x| x.context.clone())
+        }
+        #[cfg(not(feature = "debug"))]
+        {
+            None
+        }
     }
 }
 
@@ -220,6 +236,7 @@ impl From<ErrorKind> for Error {
             name: None,
             lineno: 0,
             source: None,
+            #[cfg(feature = "debug")]
             debug_info: None,
         }
     }
@@ -234,6 +251,7 @@ impl serde::ser::Error for Error {
     }
 }
 
+#[cfg(feature = "debug")]
 pub(crate) struct DebugInfo {
     pub(crate) template_source: Option<String>,
     pub(crate) context: Value,

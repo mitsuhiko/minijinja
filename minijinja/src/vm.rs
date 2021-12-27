@@ -4,7 +4,7 @@ use std::fmt::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::environment::Environment;
-use crate::error::{DebugInfo, Error, ErrorKind};
+use crate::error::{Error, ErrorKind};
 use crate::instructions::{Instruction, Instructions};
 use crate::key::Key;
 use crate::utils::matches;
@@ -146,7 +146,8 @@ pub struct Context<'env, 'vm> {
 
 impl<'env, 'vm> Context<'env, 'vm> {
     /// Freezes the context.
-    pub fn freeze(&self) -> BTreeMap<&str, Value> {
+    #[cfg(feature = "debug")]
+    fn freeze(&self) -> BTreeMap<&str, Value> {
         let mut rv = BTreeMap::new();
 
         for ctx in self.stack.iter() {
@@ -394,15 +395,18 @@ impl<'env> Vm<'env> {
                 if let Some(lineno) = instructions.get_line(pc) {
                     err.set_location(instructions.name(), lineno);
                 }
-                if self.env.debug && err.debug_info.is_none() {
-                    err.debug_info = Some(DebugInfo {
-                        template_source: state
-                            .env
-                            .get_template(state.name)
-                            .ok()
-                            .map(|x| x.source().to_string()),
-                        context: Value::from(state.ctx.freeze()),
-                    });
+                #[cfg(feature = "debug")]
+                {
+                    if self.env.debug && err.debug_info.is_none() {
+                        err.debug_info = Some(crate::error::DebugInfo {
+                            template_source: state
+                                .env
+                                .get_template(state.name)
+                                .ok()
+                                .map(|x| x.source().to_string()),
+                            context: Value::from(state.ctx.freeze()),
+                        });
+                    }
                 }
                 return Err(err);
             }};

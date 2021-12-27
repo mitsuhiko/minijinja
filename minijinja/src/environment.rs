@@ -169,6 +169,7 @@ pub struct Environment<'source> {
     tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
     globals: RcType<BTreeMap<&'source str, Value>>,
     default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
+    #[cfg(feature = "debug")]
     pub(crate) debug: bool,
 }
 
@@ -185,7 +186,6 @@ impl<'source> fmt::Debug for Environment<'source> {
             .field("tests", &BTreeMapKeysDebug(&self.tests))
             .field("filters", &BTreeMapKeysDebug(&self.filters))
             .field("templates", &self.templates)
-            .field("debug", &self.debug)
             .finish()
     }
 }
@@ -266,6 +266,7 @@ impl<'source> Environment<'source> {
             tests: RcType::new(tests::get_builtin_tests()),
             globals: RcType::new(functions::get_globals()),
             default_auto_escape: RcType::new(default_auto_escape),
+            #[cfg(feature = "debug")]
             debug: false,
         }
     }
@@ -281,6 +282,7 @@ impl<'source> Environment<'source> {
             tests: RcType::default(),
             globals: RcType::default(),
             default_auto_escape: RcType::new(no_auto_escape),
+            #[cfg(feature = "debug")]
             debug: false,
         }
     }
@@ -308,6 +310,10 @@ impl<'source> Environment<'source> {
     ///
     /// However providing this information greatly improves the debug information
     /// that the template error provides.
+    ///
+    /// This requires the `debug` feature.
+    #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
     pub fn set_debug(&mut self, enabled: bool) {
         self.debug = enabled;
     }

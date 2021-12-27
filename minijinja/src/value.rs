@@ -1062,6 +1062,7 @@ impl Value {
         }
     }
 
+    #[cfg(feature = "debug")]
     pub(crate) fn iter_as_str_map(&self) -> impl Iterator<Item = (&str, Value)> {
         match self.0 {
             Repr::Map(ref m) => Box::new(

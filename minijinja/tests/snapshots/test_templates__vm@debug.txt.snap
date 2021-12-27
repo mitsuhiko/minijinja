@@ -72,7 +72,6 @@ State {
             "simple_layout.txt",
             "super_with_html.html",
         ],
-        debug: false,
     },
 }
 =====
