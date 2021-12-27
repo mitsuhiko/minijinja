@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 use std::fmt;
 
-use crate::value::Value;
-
 /// Represents template errors.
 ///
 /// If debug mode is enabled a template error contains additional debug
@@ -109,41 +107,12 @@ impl fmt::Display for Error {
         if let Some(ref filename) = self.name {
             write!(f, " (in {}:{})", filename, self.lineno)?
         }
-        if f.alternate() {
-            if let Some(source) = self.template_source() {
-                writeln!(f)?;
-                writeln!(f, "{:-^1$}", " Template Source ", 74).unwrap();
-                let lines: Vec<_> = source.lines().enumerate().collect();
-                let idx = self.line().unwrap_or(1) - 1;
-                let skip = idx.saturating_sub(3);
-                let pre = lines.iter().skip(skip).take(3.min(idx)).collect::<Vec<_>>();
-                let post = lines.iter().skip(idx + 1).take(3).collect::<Vec<_>>();
-                for (idx, line) in pre {
-                    writeln!(f, "{:>4} | {}", idx + 1, line).unwrap();
+        #[cfg(feature = "debug")]
+        {
+            if f.alternate() {
+                if let Some(info) = self.debug_info() {
+                    render_debug_info(f, self.line(), info)?;
                 }
-                writeln!(f, "{:>4} > {}", idx + 1, lines[idx].1).unwrap();
-                for (idx, line) in post {
-                    writeln!(f, "{:>4} | {}", idx + 1, line).unwrap();
-                }
-                write!(f, "{:-^1$}", "", 74).unwrap();
-            }
-            if let Some(ctx) = self.template_context() {
-                if let Some(vars) = self
-                    .debug_info
-                    .as_ref()
-                    .and_then(|x| x.referenced_names.as_ref())
-                {
-                    writeln!(f)?;
-                    writeln!(f, "Referenced variables:")?;
-                    for var in vars {
-                        write!(f, "  {:}: ", var)?;
-                        match ctx.get_attr(var) {
-                            Ok(val) => writeln!(f, "{:#?}", val)?,
-                            Err(_) => writeln!(f, "undefined")?,
-                        }
-                    }
-                }
-                write!(f, "{:-^1$}", "", 74).unwrap();
             }
         }
         Ok(())
@@ -191,48 +160,15 @@ impl Error {
         self.name.as_ref().map(|_| self.lineno)
     }
 
-    /// Returns the template source if debug information is available.
+    /// Returns the template debug information is available.
     ///
-    /// The template source is only embedded into the error if the debug
-    /// mode is enabled on the environment
-    /// ([`Environment::set_debug`](crate::Environment::set_debug)).  There
-    /// are also situations where it's impossible to retrieve the source
-    /// in which cases it can still be missing despite the debug mode being
-    /// enabled.
-    pub fn template_source(&self) -> Option<&str> {
-        #[cfg(feature = "debug")]
-        {
-            self.debug_info
-                .as_ref()
-                .and_then(|x| x.template_source.as_ref())
-                .map(|x| x.as_str())
-        }
-        #[cfg(not(feature = "debug"))]
-        {
-            None
-        }
-    }
-
-    /// Returns the frozen template context if available.
-    ///
-    /// The engine will attempt to capture the context at the time when the
-    /// error happened but in some cases it might not be entirely accurate.
-    ///
-    /// The template context is only embedded into the error if the debug
+    /// The debug info snapshot is only embedded into the error if the debug
     /// mode is enabled on the environment
     /// ([`Environment::set_debug`](crate::Environment::set_debug)).
-    pub fn template_context(&self) -> Option<Value> {
-        #[cfg(feature = "debug")]
-        {
-            self.debug_info
-                .as_ref()
-                .and_then(|x| x.context.as_ref())
-                .cloned()
-        }
-        #[cfg(not(feature = "debug"))]
-        {
-            None
-        }
+    #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
+    pub fn debug_info(&self) -> Option<&DebugInfo> {
+        self.debug_info.as_ref()
     }
 }
 
@@ -266,10 +202,83 @@ impl serde::ser::Error for Error {
 }
 
 #[cfg(feature = "debug")]
-#[derive(Default)]
-pub(crate) struct DebugInfo {
-    pub(crate) template_source: Option<String>,
-    pub(crate) context: Option<Value>,
-    // for now this is internal
-    pub(crate) referenced_names: Option<Vec<String>>,
+mod debug_info {
+    use super::*;
+    use crate::value::Value;
+
+    /// This is a snapshot of the debug information.
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
+    #[derive(Default)]
+    pub struct DebugInfo {
+        pub(crate) template_source: Option<String>,
+        pub(crate) context: Option<Value>,
+        pub(crate) referenced_names: Option<Vec<String>>,
+    }
+
+    impl DebugInfo {
+        /// If available this contains a reference to the source string.
+        pub fn source(&self) -> Option<&str> {
+            self.template_source.as_deref()
+        }
+
+        /// Provides access to a snapshot of the context.
+        ///
+        /// The context is created at the time the error was created if that error
+        /// happened during template rendering.
+        pub fn context(&self) -> Option<Value> {
+            self.context.clone()
+        }
+
+        /// Returns a narrowed down set of referenced names from the context
+        /// where the error happened.
+        ///
+        /// This function is currently internal and only used for the default
+        /// error printing.  This could be exposed but it's a highly specific
+        /// API.
+        pub(crate) fn referenced_names(&self) -> Option<&[String]> {
+            self.referenced_names.as_deref()
+        }
+    }
+
+    pub(super) fn render_debug_info(
+        f: &mut fmt::Formatter,
+        line: Option<usize>,
+        info: &DebugInfo,
+    ) -> fmt::Result {
+        if let Some(source) = info.source() {
+            writeln!(f)?;
+            writeln!(f, "{:-^1$}", " Template Source ", 74).unwrap();
+            let lines: Vec<_> = source.lines().enumerate().collect();
+            let idx = line.unwrap_or(1) - 1;
+            let skip = idx.saturating_sub(3);
+            let pre = lines.iter().skip(skip).take(3.min(idx)).collect::<Vec<_>>();
+            let post = lines.iter().skip(idx + 1).take(3).collect::<Vec<_>>();
+            for (idx, line) in pre {
+                writeln!(f, "{:>4} | {}", idx + 1, line).unwrap();
+            }
+            writeln!(f, "{:>4} > {}", idx + 1, lines[idx].1).unwrap();
+            for (idx, line) in post {
+                writeln!(f, "{:>4} | {}", idx + 1, line).unwrap();
+            }
+            write!(f, "{:-^1$}", "", 74).unwrap();
+        }
+        if let Some(ctx) = info.context() {
+            if let Some(vars) = info.referenced_names() {
+                writeln!(f)?;
+                writeln!(f, "Referenced variables:")?;
+                for var in vars {
+                    write!(f, "  {:}: ", var)?;
+                    match ctx.get_attr(var) {
+                        Ok(val) => writeln!(f, "{:#?}", val)?,
+                        Err(_) => writeln!(f, "undefined")?,
+                    }
+                }
+            }
+            write!(f, "{:-^1$}", "", 74).unwrap();
+        }
+        Ok(())
+    }
 }
+
+#[cfg(feature = "debug")]
+pub use self::debug_info::*;
