@@ -59,6 +59,7 @@ impl<'source> CompiledTemplate<'source> {
         name: &'source str,
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
+        #![allow(unused_mut)]
         match Self::_from_name_and_source_impl(name, source) {
             Ok(rv) => Ok(rv),
             Err(mut err) => {

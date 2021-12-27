@@ -991,7 +991,7 @@ impl Value {
         } else {
             Err(Error::new(
                 ErrorKind::ImpossibleOperation,
-                "value is not callable",
+                format!("value of type {} is not callable", self.kind()),
             ))
         }
     }
@@ -1725,7 +1725,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
         let _args = args;
         Err(Error::new(
             ErrorKind::ImpossibleOperation,
-            "object is not callable",
+            "tried to call non callable object",
         ))
     }
 }

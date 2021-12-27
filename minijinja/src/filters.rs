@@ -179,7 +179,7 @@ mod builtins {
         v.len().map(Value::from).ok_or_else(|| {
             Error::new(
                 ErrorKind::ImpossibleOperation,
-                "cannot calculate length of this value",
+                format!("cannot calculate length of value of type {}", v.kind()),
             )
         })
     }
@@ -204,7 +204,7 @@ mod builtins {
         } else {
             Err(Error::new(
                 ErrorKind::ImpossibleOperation,
-                "cannot reverse this value",
+                format!("cannot reverse value of type {}", v.kind()),
             ))
         }
     }
@@ -255,7 +255,7 @@ mod builtins {
         } else {
             Err(Error::new(
                 ErrorKind::ImpossibleOperation,
-                "cannot join this value",
+                format!("cannot join value of type {}", val.kind()),
             ))
         }
     }
