@@ -91,6 +91,12 @@ pub(crate) type RcType<T> = std::rc::Rc<T>;
 // not ideal but unfortunately there is no better system in serde today.
 const VALUE_HANDLE_MARKER: &str = "\x01__minijinja_ValueHandle";
 
+#[cfg(feature = "preserve_order")]
+type ValueMap<K, V> = indexmap::IndexMap<K, V>;
+
+#[cfg(not(feature = "preserve_order"))]
+type ValueMap<K, V> = std::collections::BTreeMap<K, V>;
+
 thread_local! {
     static INTERNAL_SERIALIZATION: AtomicBool = AtomicBool::new(false);
     static LAST_VALUE_HANDLE: AtomicUsize = AtomicUsize::new(0);
@@ -208,8 +214,8 @@ enum Repr {
     SafeString(RcType<String>),
     Bytes(RcType<Vec<u8>>),
     Seq(RcType<Vec<Value>>),
-    Map(RcType<BTreeMap<Key<'static>, Value>>),
-    Struct(RcType<BTreeMap<&'static str, Value>>),
+    Map(RcType<ValueMap<Key<'static>, Value>>),
+    Struct(RcType<ValueMap<&'static str, Value>>),
     Dynamic(RcType<dyn Object>),
 }
 
@@ -1098,14 +1104,14 @@ impl Value {
     }
 
     #[cfg(feature = "builtin_filters")]
-    pub(crate) fn try_into_pairs(self) -> Result<Vec<Value>, Error> {
+    pub(crate) fn try_into_pairs(self) -> Result<Vec<(Value, Value)>, Error> {
         match self.0 {
             Repr::Map(v) => Ok(match RcType::try_unwrap(v) {
                 Ok(v) => v,
                 Err(rc) => (*rc).clone(),
             }
             .into_iter()
-            .map(|(k, v)| Value::from(vec![Value::from(k), v]))
+            .map(|(k, v)| (Value::from(k), v))
             .collect()),
             _ => Err(Error::new(
                 ErrorKind::ImpossibleOperation,
@@ -1137,6 +1143,12 @@ impl Value {
     pub(crate) fn iter(&self) -> ValueIterator {
         let (iter_state, len) = match self.0 {
             Repr::Seq(ref seq) => (ValueIteratorState::Seq(0, RcType::clone(seq)), seq.len()),
+            #[cfg(feature = "preserve_order")]
+            Repr::Map(ref items) => (
+                ValueIteratorState::Map(0, RcType::clone(items)),
+                items.len(),
+            ),
+            #[cfg(not(feature = "preserve_order"))]
             Repr::Map(ref items) => (
                 ValueIteratorState::Map(
                     items.iter().next().map(|x| x.0.clone()),
@@ -1144,6 +1156,12 @@ impl Value {
                 ),
                 items.len(),
             ),
+            #[cfg(feature = "preserve_order")]
+            Repr::Struct(ref fields) => (
+                ValueIteratorState::Struct(0, RcType::clone(fields)),
+                fields.len(),
+            ),
+            #[cfg(not(feature = "preserve_order"))]
             Repr::Struct(ref fields) => (
                 ValueIteratorState::Struct(
                     fields.iter().next().map(|x| *x.0),
@@ -1343,7 +1361,7 @@ impl Serializer for ValueSerializer {
     where
         T: Serialize,
     {
-        let mut map = BTreeMap::new();
+        let mut map = ValueMap::new();
         map.insert(Key::from(variant), value.serialize(self)?);
         Ok(Repr::Map(RcType::new(map)).into())
     }
@@ -1385,7 +1403,7 @@ impl Serializer for ValueSerializer {
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Error> {
         Ok(SerializeMap {
-            entries: BTreeMap::new(),
+            entries: ValueMap::new(),
             key: None,
         })
     }
@@ -1397,7 +1415,7 @@ impl Serializer for ValueSerializer {
     ) -> Result<Self::SerializeStruct, Error> {
         Ok(SerializeStruct {
             name,
-            fields: BTreeMap::new(),
+            fields: ValueMap::new(),
         })
     }
 
@@ -1410,7 +1428,7 @@ impl Serializer for ValueSerializer {
     ) -> Result<Self::SerializeStructVariant, Error> {
         Ok(SerializeStructVariant {
             variant,
-            map: BTreeMap::new(),
+            map: ValueMap::new(),
         })
     }
 }
@@ -1507,7 +1525,7 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
 }
 
 struct SerializeMap {
-    entries: BTreeMap<Key<'static>, Value>,
+    entries: ValueMap<Key<'static>, Value>,
     key: Option<Key<'static>>,
 }
 
@@ -1555,7 +1573,7 @@ impl ser::SerializeMap for SerializeMap {
 
 struct SerializeStruct {
     name: &'static str,
-    fields: BTreeMap<&'static str, Value>,
+    fields: ValueMap<&'static str, Value>,
 }
 
 impl ser::SerializeStruct for SerializeStruct {
@@ -1592,7 +1610,7 @@ impl ser::SerializeStruct for SerializeStruct {
 
 struct SerializeStructVariant {
     variant: &'static str,
-    map: BTreeMap<Key<'static>, Value>,
+    map: ValueMap<Key<'static>, Value>,
 }
 
 impl ser::SerializeStructVariant for SerializeStructVariant {
@@ -1678,8 +1696,14 @@ impl<'a, V: Serialize + ?Sized> Serialize for Single<'a, V> {
 enum ValueIteratorState {
     Empty,
     Seq(usize, RcType<Vec<Value>>),
-    Map(Option<Key<'static>>, RcType<BTreeMap<Key<'static>, Value>>),
-    Struct(Option<&'static str>, RcType<BTreeMap<&'static str, Value>>),
+    #[cfg(not(feature = "preserve_order"))]
+    Map(Option<Key<'static>>, RcType<ValueMap<Key<'static>, Value>>),
+    #[cfg(feature = "preserve_order")]
+    Map(usize, RcType<ValueMap<Key<'static>, Value>>),
+    #[cfg(not(feature = "preserve_order"))]
+    Struct(Option<&'static str>, RcType<ValueMap<&'static str, Value>>),
+    #[cfg(feature = "preserve_order")]
+    Struct(usize, RcType<ValueMap<&'static str, Value>>),
 }
 
 impl ValueIteratorState {
@@ -1693,6 +1717,12 @@ impl ValueIteratorState {
                     x
                 })
                 .cloned(),
+            #[cfg(feature = "preserve_order")]
+            ValueIteratorState::Map(idx, map) => map.get_index(*idx).map(|x| {
+                *idx += 1;
+                Value::from(x.0.clone())
+            }),
+            #[cfg(not(feature = "preserve_order"))]
             ValueIteratorState::Map(ptr, map) => {
                 if let Some(current) = ptr.take() {
                     let next = map.range(&current..).nth(1).map(|x| x.0.clone());
@@ -1703,6 +1733,12 @@ impl ValueIteratorState {
                     None
                 }
             }
+            #[cfg(feature = "preserve_order")]
+            ValueIteratorState::Struct(idx, map) => map.get_index(*idx).map(|x| {
+                *idx += 1;
+                Value::from(*x.0)
+            }),
+            #[cfg(not(feature = "preserve_order"))]
             ValueIteratorState::Struct(ptr, map) => {
                 if let Some(current) = ptr {
                     let rv = Value::from(*current);

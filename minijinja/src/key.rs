@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::num::TryFromIntError;
 
 use serde::ser::{self, Impossible, Serialize, Serializer};
@@ -30,7 +31,7 @@ impl<'a> fmt::Debug for Key<'a> {
     }
 }
 
-#[derive(PartialOrd, Ord, Eq, PartialEq)]
+#[derive(PartialOrd, Ord, Eq, PartialEq, Hash)]
 enum InternalKeyRef<'a> {
     Bool(bool),
     I64(i64),
@@ -98,6 +99,12 @@ impl<'a> PartialEq for Key<'a> {
 }
 
 impl<'a> Eq for Key<'a> {}
+
+impl<'a> Hash for Key<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_key_ref().hash(state)
+    }
+}
 
 impl<'a> PartialOrd for Key<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

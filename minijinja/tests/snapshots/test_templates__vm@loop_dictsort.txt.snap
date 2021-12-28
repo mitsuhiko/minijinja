@@ -5,9 +5,9 @@ input_file: minijinja/tests/inputs/loop_dictsort.txt
 
 ---
 
-* 42: aha
 * bar: 2
 * baz: 100
+* blafasel: aha
 * foo: 1
 =====
 
