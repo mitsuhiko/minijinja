@@ -5,10 +5,10 @@ input_file: minijinja/tests/inputs/loop_dictsort.txt
 
 ---
 
-* 42: aha
+* foo: 1
 * bar: 2
 * baz: 100
-* foo: 1
+* blafasel: aha
 =====
 
 Template {
