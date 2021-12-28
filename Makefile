@@ -11,6 +11,7 @@ doc:
 
 test:
 	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES)
+	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES),preserve_order
 	@echo "CARGO TEST ALL FEATURES"
 	@cd minijinja; cargo test --all-features
 
