@@ -188,8 +188,13 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn dictsort(_state: &State, v: Value) -> Result<Value, Error> {
         let mut pairs = v.try_into_pairs()?;
-        pairs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
-        Ok(Value::from(pairs))
+        pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
+        Ok(Value::from(
+            pairs
+                .into_iter()
+                .map(|(k, v)| vec![k, v])
+                .collect::<Vec<_>>(),
+        ))
     }
 
     /// Reverses a list or string
