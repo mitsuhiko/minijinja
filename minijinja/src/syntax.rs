@@ -129,6 +129,13 @@
 //!   `foo({"a": 1, "b": 2})`.
 //! - ``.`` / ``[]``: Get an attribute of an object.
 //!
+//! ## Built-in Methods
+//!
+//! MiniJinja implements the `keys`, `values` and `items` methods on maps and structs
+//! that return the keys, values or tuples of keys and values respectively.  This
+//! exists for compatibility with Jinja2 templates that often expect these methods
+//! to exist.
+//!
 //! ### If Expressions
 //!
 //! It is also possible to use inline _if_ expressions. These are useful in some situations.
