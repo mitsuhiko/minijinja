@@ -763,6 +763,45 @@ impl<T: ArgType> ArgType for Vec<T> {
     }
 }
 
+fn map_methods<K, V>(m: &ValueMap<K, V>, name: &str, args: Vec<Value>) -> Result<Value, Error>
+where
+    K: ToOwned,
+    V: ToOwned,
+    <K as ToOwned>::Owned: Into<Value>,
+    <V as ToOwned>::Owned: Into<Value>,
+{
+    match name {
+        "items" => {
+            let _: () = FunctionArgs::from_values(args)?;
+            Ok(Value::from(
+                m.iter()
+                    .map(|(k, v)| Value::from(vec![k.to_owned().into(), v.to_owned().into()]))
+                    .collect::<Vec<_>>(),
+            ))
+        }
+        "keys" => {
+            let _: () = FunctionArgs::from_values(args)?;
+            Ok(Value::from(
+                m.iter()
+                    .map(|(k, _)| k.to_owned().into())
+                    .collect::<Vec<_>>(),
+            ))
+        }
+        "values" => {
+            let _: () = FunctionArgs::from_values(args)?;
+            Ok(Value::from(
+                m.iter()
+                    .map(|(_, v)| v.to_owned().into())
+                    .collect::<Vec<_>>(),
+            ))
+        }
+        _ => Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            format!("map has no method named {}", name),
+        )),
+    }
+}
+
 #[allow(clippy::len_without_is_empty)]
 impl Value {
     /// The undefined value
@@ -1010,65 +1049,14 @@ impl Value {
         args: Vec<Value>,
     ) -> Result<Value, Error> {
         match self.0 {
-            Repr::Dynamic(ref dy) => return dy.call_method(state, name, args),
-            Repr::Struct(ref fields) => match name {
-                "items" => {
-                    let _: () = FunctionArgs::from_values(args)?;
-                    return Ok(Value::from(
-                        fields
-                            .iter()
-                            .map(|(k, v)| Value::from(vec![Value::from(*k), v.clone()]))
-                            .collect::<Vec<_>>(),
-                    ));
-                }
-                "keys" => {
-                    let _: () = FunctionArgs::from_values(args)?;
-                    return Ok(Value::from(
-                        fields
-                            .iter()
-                            .map(|(k, _)| Value::from(*k))
-                            .collect::<Vec<_>>(),
-                    ));
-                }
-                "values" => {
-                    let _: () = FunctionArgs::from_values(args)?;
-                    return Ok(Value::from(
-                        fields.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>(),
-                    ));
-                }
-                _ => {}
-            },
-            Repr::Map(ref map) => match name {
-                "items" => {
-                    let _: () = FunctionArgs::from_values(args)?;
-                    return Ok(Value::from(
-                        map.iter()
-                            .map(|(k, v)| Value::from(vec![Value::from(k.clone()), v.clone()]))
-                            .collect::<Vec<_>>(),
-                    ));
-                }
-                "keys" => {
-                    let _: () = FunctionArgs::from_values(args)?;
-                    return Ok(Value::from(
-                        map.iter()
-                            .map(|(k, _)| Value::from(k.clone()))
-                            .collect::<Vec<_>>(),
-                    ));
-                }
-                "values" => {
-                    let _: () = FunctionArgs::from_values(args)?;
-                    return Ok(Value::from(
-                        map.iter().map(|(_, v)| v.clone()).collect::<Vec<_>>(),
-                    ));
-                }
-                _ => {}
-            },
-            _ => {}
+            Repr::Dynamic(ref dy) => dy.call_method(state, name, args),
+            Repr::Struct(ref fields) => map_methods(fields, name, args),
+            Repr::Map(ref map) => map_methods(map, name, args),
+            _ => Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                format!("object has no method named {}", name),
+            )),
         }
-        Err(Error::new(
-            ErrorKind::ImpossibleOperation,
-            format!("object has no method named {}", name),
-        ))
     }
 
     pub(crate) fn try_into_key(self) -> Result<Key<'static>, Error> {
