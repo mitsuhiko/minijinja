@@ -88,6 +88,8 @@
 //!   is a forever unstable API which mainly exists to aid debugging complex issues.
 //! - `json`: When enabled the `tojson` filter is added as builtin filter.
 //! - `urlencode`: When enabled the `urlencode` filter is added as builtin filter.
+//! - `preserve_order`: When enable the internal value implementation uses an indexmap
+//!   which preserves the original order of maps and structs.
 //!
 //! Additionally to cut down on size of the engine some default
 //! functionality can be removed:
