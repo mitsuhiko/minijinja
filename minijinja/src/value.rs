@@ -607,7 +607,7 @@ pub(crate) fn contains(container: &Value, value: &Value) -> Result<Value, Error>
     match container.0 {
         Repr::Seq(ref values) => Ok(Value::from(values.contains(value))),
         Repr::Map(ref map) => {
-            let key = match Key::try_from(value.clone()) {
+            let key = match value.clone().try_into_key() {
                 Ok(key) => key,
                 Err(_) => return Ok(Value::from(false)),
             };

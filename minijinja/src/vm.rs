@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 use std::fmt::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -530,7 +529,7 @@ impl<'env> Vm<'env> {
                     let mut map = BTreeMap::new();
                     for _ in 0..*pair_count {
                         let value = stack.pop();
-                        let key: Key = try_ctx!(TryFrom::try_from(stack.pop()));
+                        let key: Key = try_ctx!(stack.pop().try_into_key());
                         map.insert(key, value);
                     }
                     stack.push(Value::from(map));

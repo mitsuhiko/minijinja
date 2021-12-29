@@ -84,14 +84,6 @@ impl<'a> Key<'a> {
     }
 }
 
-impl TryFrom<Value> for Key<'static> {
-    type Error = Error;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        value.try_into_key()
-    }
-}
-
 impl<'a> PartialEq for Key<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.as_key_ref().eq(&other.as_key_ref())
