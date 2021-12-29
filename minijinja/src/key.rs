@@ -426,8 +426,12 @@ pub mod key_interning {
     }
 
     pub(crate) fn try_intern(s: &str) -> RcType<String> {
-        // strings longer than 16 bytes are never interned
-        if s.len() > 16 {
+        let depth = STRING_KEY_CACHE_DEPTH.with(|depth| depth.load(Ordering::Relaxed));
+
+        // strings longer than 16 bytes are never interned or if we're at
+        // depth 0.  (serialization code outside of internal serialization)
+        // not checking for depth can cause a memory leak.
+        if depth == 0 || s.len() > 16 {
             return RcType::new(String::from(s));
         }
 
