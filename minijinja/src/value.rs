@@ -1624,38 +1624,6 @@ impl<'a> fmt::Debug for ValueIterator {
     }
 }
 
-/// Helper to pass a single value as context bound to a name.
-///
-/// The first argument is the name of the variable, the second is the
-/// value to pass.  Here a simple motivating example:
-///
-/// ```
-/// use minijinja::{Environment, context};
-///
-/// let mut env = Environment::new();
-/// env.add_template("simple", "Hello {{ name }}!").unwrap();
-/// let tmpl = env.get_template("simple").unwrap();
-/// let rv = tmpl.render(context!(name => "Peter")).unwrap();
-/// ```
-///
-/// This type is deprecated and has been replaced with the [`context`] macro.
-#[derive(Debug, Clone)]
-#[deprecated(since = "0.8.0", note = "replaced by the more generic context! macro")]
-pub struct Single<'a, V: Serialize + ?Sized>(pub &'a str, pub V);
-
-#[allow(deprecated)]
-impl<'a, V: Serialize + ?Sized> Serialize for Single<'a, V> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::SerializeMap;
-        let mut map = serializer.serialize_map(Some(1))?;
-        map.serialize_entry(self.0, &self.1)?;
-        map.end()
-    }
-}
-
 enum ValueIteratorState {
     Empty,
     Seq(usize, RcType<Vec<Value>>),

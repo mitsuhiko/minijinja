@@ -11,6 +11,7 @@ All notable changes to MiniJinja are documented here.
   strings that show the context of the template where it went all wrong. (#31)
 - Added automatic string interning of object/map keys in values. This feature can
   be disabled by removing the default `key_interning` feature. (#35)
+- Removed deprecated `Single` type.
 
 # 0.9.0
 
