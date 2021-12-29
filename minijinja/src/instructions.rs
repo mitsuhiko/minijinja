@@ -1,3 +1,4 @@
+#[cfg(feature = "internal_debug")]
 use std::fmt;
 
 use crate::value::Value;
