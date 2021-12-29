@@ -65,6 +65,13 @@
 //! assert_eq!(result.is_true(), true);
 //! ```
 //!
+//! # Debugging
+//!
+//! To better understand what's going on when a template syntax or rendering error
+//! happens you should turn on the built-in debug support.  Once enabled the errors
+//! created by the engine will include helpful error messages with information about
+//! where the error happened.  For more information see [`set_debug`](crate::Environment::set_debug).
+//!
 //! # Learn more
 //!
 //! - [`syntax`]: documentation of the template engine syntax.

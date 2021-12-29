@@ -329,7 +329,9 @@ impl<'source> Environment<'source> {
     /// high as the data including the template source is cloned.
     ///
     /// However providing this information greatly improves the debug information
-    /// that the template error provides.
+    /// that the template error provides.  When debug is enabled errors will
+    /// return a [`DebugInfo`](crate::error::DebugInfo) object from
+    /// [`Error::debug_info`](crate::error::Error::debug_info).
     ///
     /// This requires the `debug` feature.
     #[cfg(feature = "debug")]
