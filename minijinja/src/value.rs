@@ -1908,3 +1908,27 @@ fn test_value_serialization() {
 fn test_sizes() {
     assert_eq!(std::mem::size_of::<Value>(), 24);
 }
+
+#[test]
+#[cfg(feature = "key_interning")]
+fn test_key_interning() {
+    let mut m = BTreeMap::new();
+    m.insert("x", 1u32);
+
+    let v = Value::from_serializable(&vec![m.clone(), m.clone(), m.clone()]);
+
+    for value in v.iter() {
+        match value.0 {
+            Repr::Map(m) => {
+                let k = m.iter().next().unwrap().0;
+                match k {
+                    Key::String(s) => {
+                        assert_eq!(RcType::strong_count(&s), 3);
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+}
