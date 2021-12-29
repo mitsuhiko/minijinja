@@ -40,6 +40,17 @@ enum InternalKeyRef<'a> {
 }
 
 impl<'a> Key<'a> {
+    pub fn make_string_key(s: &str) -> Key<'static> {
+        #[cfg(feature = "key_interning")]
+        {
+            Key::String(key_interning::try_intern(s))
+        }
+        #[cfg(not(feature = "key_interning"))]
+        {
+            Key::String(RcType::new(String::from(s)))
+        }
+    }
+
     pub fn as_str(&self) -> Option<&str> {
         match *self {
             Key::String(ref x) => Some(x.as_str()),
@@ -156,7 +167,7 @@ impl TryFrom<u64> for Key<'static> {
 impl<'a> From<&'a str> for Key<'static> {
     #[inline(always)]
     fn from(value: &'a str) -> Self {
-        Key::String(RcType::new(value.to_string()))
+        Key::make_string_key(value)
     }
 }
 
@@ -246,7 +257,7 @@ impl Serializer for KeySerializer {
     }
 
     fn serialize_str(self, value: &str) -> Result<StaticKey, Error> {
-        Ok(Key::String(RcType::new(value.to_string())))
+        Ok(Key::make_string_key(value))
     }
 
     fn serialize_bytes(self, _value: &[u8]) -> Result<StaticKey, Error> {
@@ -355,5 +366,86 @@ impl Serializer for KeySerializer {
         _len: usize,
     ) -> Result<Self::SerializeStructVariant, Error> {
         Err(ser::Error::custom("structs as keys are not supported"))
+    }
+}
+
+#[cfg(feature = "key_interning")]
+pub mod key_interning {
+    use super::*;
+    use std::cell::RefCell;
+    use std::collections::HashSet;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use crate::utils::OnDrop;
+
+    thread_local! {
+        static STRING_KEY_CACHE: RefCell<HashSet<CachedKey<'static>>> = Default::default();
+        static STRING_KEY_CACHE_DEPTH: AtomicUsize = AtomicUsize::new(0);
+    }
+
+    enum CachedKey<'a> {
+        Ref(&'a str),
+        Stored(RcType<String>),
+    }
+
+    impl<'a> CachedKey<'a> {
+        fn as_str(&self) -> &str {
+            match self {
+                CachedKey::Ref(x) => x,
+                CachedKey::Stored(x) => x.as_str(),
+            }
+        }
+    }
+
+    impl<'a> Hash for CachedKey<'a> {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.as_str().hash(state)
+        }
+    }
+
+    impl<'a> PartialEq for CachedKey<'a> {
+        fn eq(&self, other: &Self) -> bool {
+            self.as_str().eq(other.as_str())
+        }
+    }
+
+    impl<'a> Eq for CachedKey<'a> {}
+
+    pub(crate) fn with<R, F: FnOnce() -> R>(f: F) -> R {
+        STRING_KEY_CACHE.with(|cache| {
+            STRING_KEY_CACHE_DEPTH.with(|depth| {
+                depth.fetch_add(1, Ordering::Relaxed);
+                let _on_drop = OnDrop::new(|| {
+                    if depth.fetch_sub(1, Ordering::Relaxed) == 1 {
+                        cache.borrow_mut().clear();
+                    }
+                });
+                f()
+            })
+        })
+    }
+
+    pub(crate) fn try_intern(s: &str) -> RcType<String> {
+        let depth = STRING_KEY_CACHE_DEPTH.with(|depth| depth.load(Ordering::Relaxed));
+
+        // strings longer than 16 bytes are never interned or if we're at
+        // depth 0.  (serialization code outside of internal serialization)
+        // not checking for depth can cause a memory leak.
+        if depth == 0 || s.len() > 16 {
+            return RcType::new(String::from(s));
+        }
+
+        STRING_KEY_CACHE.with(|cache| {
+            let mut set = cache.borrow_mut();
+            match set.get(&CachedKey::Ref(s)) {
+                Some(CachedKey::Stored(s)) => s.clone(),
+                None => {
+                    let rv = RcType::new(String::from(s));
+                    set.insert(CachedKey::Stored(rv.clone()));
+                    rv
+                }
+                _ => unreachable!(),
+            }
+        })
     }
 }

@@ -113,6 +113,9 @@
 //!   MiniJinja still needs to be threadsafe.
 //! - `debug`: if this feature is removed some debug functionality of the engine is
 //!   removed as well.  This mainly affects the quality of error reporting.
+//! - `key_interning`: if this feature is removed the automatic string interning in
+//!   the value type is disabled.  The default behavior can cut down on the memory
+//!   consumption of the value type by interning all string keys used in values.
 #![allow(clippy::cognitive_complexity)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(html_logo_url = "https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo-square.png")]

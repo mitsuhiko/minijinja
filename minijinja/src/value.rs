@@ -78,7 +78,7 @@ use serde::ser::{self, Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, KeySerializer};
-use crate::utils::matches;
+use crate::utils::{matches, OnDrop};
 use crate::vm::State;
 
 #[cfg(feature = "sync")]
@@ -105,6 +105,24 @@ thread_local! {
 
 fn in_internal_serialization() -> bool {
     INTERNAL_SERIALIZATION.with(|flag| flag.load(atomic::Ordering::Relaxed))
+}
+
+fn with_internal_serialization<R, F: FnOnce() -> R>(f: F) -> R {
+    INTERNAL_SERIALIZATION.with(|flag| {
+        let old = flag.load(atomic::Ordering::Relaxed);
+        flag.store(true, atomic::Ordering::Relaxed);
+        let _on_drop = OnDrop::new(|| {
+            flag.store(old, atomic::Ordering::Relaxed);
+        });
+        #[cfg(not(feature = "key_interning"))]
+        {
+            f()
+        }
+        #[cfg(feature = "key_interning")]
+        {
+            crate::key::key_interning::with(f)
+        }
+    })
 }
 
 /// Helper trait representing valid filter and test arguments.
@@ -770,13 +788,7 @@ impl Value {
 
     /// Creates a value from something that can be serialized.
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
-        INTERNAL_SERIALIZATION.with(|flag| {
-            let old = flag.load(atomic::Ordering::Relaxed);
-            flag.store(true, atomic::Ordering::Relaxed);
-            let rv = Serialize::serialize(value, ValueSerializer);
-            flag.store(old, atomic::Ordering::Relaxed);
-            rv.unwrap()
-        })
+        with_internal_serialization(|| Serialize::serialize(value, ValueSerializer).unwrap())
     }
 
     /// Creates a value from a safe string.
@@ -1895,4 +1907,28 @@ fn test_value_serialization() {
 #[cfg(target_pointer_width = "64")]
 fn test_sizes() {
     assert_eq!(std::mem::size_of::<Value>(), 24);
+}
+
+#[test]
+#[cfg(feature = "key_interning")]
+fn test_key_interning() {
+    let mut m = BTreeMap::new();
+    m.insert("x", 1u32);
+
+    let v = Value::from_serializable(&vec![m.clone(), m.clone(), m.clone()]);
+
+    for value in v.iter() {
+        match value.0 {
+            Repr::Map(m) => {
+                let k = m.iter().next().unwrap().0;
+                match k {
+                    Key::String(s) => {
+                        assert_eq!(RcType::strong_count(&s), 3);
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
 }
