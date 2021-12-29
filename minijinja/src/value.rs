@@ -670,7 +670,7 @@ macro_rules! primitive_try_from {
         impl ArgType for $ty {
             fn from_value(value: Option<Value>) -> Result<Self, Error> {
                 match value {
-                    Some(value) => TryFrom::try_from(value.clone()),
+                    Some(value) => TryFrom::try_from(value),
                     None => Err(Error::new(ErrorKind::UndefinedError, concat!("missing argument")))
                 }
             }
@@ -683,7 +683,7 @@ macro_rules! primitive_try_from {
                         if value.is_undefined() || value.is_none() {
                             Ok(None)
                         } else {
-                            TryFrom::try_from(value.clone()).map(Some)
+                            TryFrom::try_from(value).map(Some)
                         }
                     }
                     None => Ok(None),
