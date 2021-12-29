@@ -307,6 +307,7 @@ pub struct Map<'a> {
     pub values: Vec<Expr<'a>>,
 }
 
+/// Defines the specific type of call.
 #[derive(Debug)]
 pub enum CallType<'ast, 'source> {
     Function(&'source str),
