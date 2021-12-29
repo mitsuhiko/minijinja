@@ -1,5 +1,5 @@
 DOC_FEATURES=source,json,urlencode
-TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,source,json,urlencode,debug
+TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,source,json,urlencode,debug,internal_debug
 
 all: test
 
@@ -18,7 +18,7 @@ test:
 run-tests:
 	@rustup component add rustfmt 2> /dev/null
 	@echo "CARGO TESTS"
-	@cd minijinja; cargo test --features=json,urlencode
+	@cd minijinja; cargo test --features=json,urlencode,internal_debug
 	@echo "CARGO TEST MEMCHR"
 	@cd minijinja; cargo test --no-default-features --features=memchr,$(FEATURES)
 	@echo "CARGO TEST V_HTMLESCAPE"

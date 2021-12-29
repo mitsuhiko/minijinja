@@ -163,6 +163,7 @@ pub enum Instruction<'source> {
     Nop,
 }
 
+#[cfg(feature = "internal_debug")]
 impl<'source> fmt::Debug for Instruction<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
@@ -224,7 +225,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 struct Loc {
     first_instruction: u32,
     line: u32,
@@ -340,6 +341,7 @@ impl<'source> Instructions<'source> {
     }
 }
 
+#[cfg(feature = "internal_debug")]
 impl<'source> fmt::Debug for Instructions<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         struct InstructionWrapper<'a>(usize, &'a Instruction<'a>, Option<usize>);

@@ -28,8 +28,10 @@ builtin_functions = []
 json = ["serde_json"]
 urlencode = ["percent-encoding"]
 
+# enables the Debug trait for some internal types
+internal_debug = []
 # provides access to the unstable machinery
-unstable_machinery = []
+unstable_machinery = ["internal_debug"]
 
 [dependencies]
 serde = "1.0.130"

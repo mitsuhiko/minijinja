@@ -28,12 +28,15 @@ pub struct Template<'env> {
 
 impl<'env> fmt::Debug for Template<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Template")
-            .field("name", &self.name)
-            .field("instructions", &self.compiled.instructions)
-            .field("blocks", &self.compiled.blocks)
-            .field("initial_auto_escape", &self.initial_auto_escape)
-            .finish()
+        let mut ds = f.debug_struct("Template");
+        ds.field("name", &self.name);
+        #[cfg(feature = "internal_debug")]
+        {
+            ds.field("instructions", &self.compiled.instructions);
+            ds.field("blocks", &self.compiled.blocks);
+        }
+        ds.field("initial_auto_escape", &self.initial_auto_escape);
+        ds.finish()
     }
 }
 
@@ -46,10 +49,13 @@ pub(crate) struct CompiledTemplate<'source> {
 
 impl<'env> fmt::Debug for CompiledTemplate<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CompiledTemplate")
-            .field("instructions", &self.instructions)
-            .field("blocks", &self.blocks)
-            .finish()
+        let mut ds = f.debug_struct("CompiledTemplate");
+        #[cfg(feature = "internal_debug")]
+        {
+            ds.field("instructions", &self.instructions);
+            ds.field("blocks", &self.blocks);
+        }
+        ds.finish()
     }
 }
 
@@ -247,10 +253,17 @@ fn no_auto_escape(_: &str) -> AutoEscape {
 /// let rv = expr.eval(context!(number => 15)).unwrap();
 /// assert!(rv.is_true());
 /// ```
-#[derive(Debug)]
 pub struct Expression<'env, 'source> {
     env: &'env Environment<'source>,
     instructions: Instructions<'source>,
+}
+
+impl<'env, 'source> fmt::Debug for Expression<'env, 'source> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Expression")
+            .field("env", &self.env)
+            .finish()
+    }
 }
 
 impl<'env, 'source> Expression<'env, 'source> {

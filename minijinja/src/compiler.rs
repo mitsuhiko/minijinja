@@ -9,7 +9,7 @@ use crate::value::Value;
 
 /// Represents an open block of code that does not yet have updated
 /// jump targets.
-#[derive(Debug)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 enum PendingBlock {
     Branch(usize),
     Loop(usize),
@@ -17,7 +17,7 @@ enum PendingBlock {
 }
 
 /// Provides a convenient interface to creating instructions for the VM.
-#[derive(Debug)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Compiler<'source> {
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,

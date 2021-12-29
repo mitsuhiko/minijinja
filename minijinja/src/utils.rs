@@ -99,7 +99,6 @@ impl<'a> fmt::Display for HtmlEscape<'a> {
     }
 }
 
-#[derive(Default)]
 struct Unescaper {
     out: String,
     pending_surrogate: u16,
@@ -175,7 +174,11 @@ impl Unescaper {
 
 /// Un-escape a string, following JSON rules.
 pub fn unescape(s: &str) -> Result<String, Error> {
-    Unescaper::default().unescape(s)
+    Unescaper {
+        out: String::new(),
+        pending_surrogate: 0,
+    }
+    .unescape(s)
 }
 
 pub struct BTreeMapKeysDebug<'a, K: fmt::Debug, V>(pub &'a BTreeMap<K, V>);

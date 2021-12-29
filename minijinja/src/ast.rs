@@ -1,5 +1,7 @@
-use std::fmt;
 use std::ops::Deref;
+
+#[cfg(feature = "internal_debug")]
+use std::fmt;
 
 use crate::tokens::Span;
 use crate::value::Value;
@@ -10,7 +12,6 @@ use crate::value::Value;
 /// to nodes, but it also ensures the nodes is heap allocated.  The
 /// latter is useful to ensure that enum variants do not cause the enum
 /// to become too large.
-#[derive(Clone)]
 pub struct Spanned<T> {
     node: Box<T>,
     span: Span,
@@ -39,6 +40,7 @@ impl<T> Deref for Spanned<T> {
     }
 }
 
+#[cfg(feature = "internal_debug")]
 impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&self.node, f)?;
@@ -47,7 +49,6 @@ impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
 }
 
 /// A statement node.
-#[derive(Clone)]
 pub enum Stmt<'a> {
     Template(Spanned<Template<'a>>),
     EmitExpr(Spanned<EmitExpr<'a>>),
@@ -62,6 +63,7 @@ pub enum Stmt<'a> {
     FilterBlock(Spanned<FilterBlock<'a>>),
 }
 
+#[cfg(feature = "internal_debug")]
 impl<'a> fmt::Debug for Stmt<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -81,7 +83,6 @@ impl<'a> fmt::Debug for Stmt<'a> {
 }
 
 /// An expression node.
-#[derive(Clone)]
 #[allow(clippy::enum_variant_names)]
 pub enum Expr<'a> {
     Var(Spanned<Var<'a>>),
@@ -98,6 +99,7 @@ pub enum Expr<'a> {
     Map(Spanned<Map<'a>>),
 }
 
+#[cfg(feature = "internal_debug")]
 impl<'a> fmt::Debug for Expr<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -118,13 +120,13 @@ impl<'a> fmt::Debug for Expr<'a> {
 }
 
 /// Root template node.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Template<'a> {
     pub children: Vec<Stmt<'a>>,
 }
 
 /// A for loop.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct ForLoop<'a> {
     pub target: Expr<'a>,
     pub iter: Expr<'a>,
@@ -134,7 +136,7 @@ pub struct ForLoop<'a> {
 }
 
 /// An if/else condition.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct IfCond<'a> {
     pub expr: Expr<'a>,
     pub true_body: Vec<Stmt<'a>>,
@@ -142,85 +144,85 @@ pub struct IfCond<'a> {
 }
 
 /// A with block.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct WithBlock<'a> {
     pub assignments: Vec<(&'a str, Expr<'a>)>,
     pub body: Vec<Stmt<'a>>,
 }
 
 /// A block for inheritance elements.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Block<'a> {
     pub name: &'a str,
     pub body: Vec<Stmt<'a>>,
 }
 
 /// An extends block.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Extends<'a> {
     pub name: Expr<'a>,
 }
 
 /// An include block.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Include<'a> {
     pub name: Expr<'a>,
 }
 
 /// An auto escape control block.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct AutoEscape<'a> {
     pub enabled: Expr<'a>,
     pub body: Vec<Stmt<'a>>,
 }
 
 /// Applies filters to a block.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct FilterBlock<'a> {
     pub filter: Expr<'a>,
     pub body: Vec<Stmt<'a>>,
 }
 
 /// Outputs the expression.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct EmitExpr<'a> {
     pub expr: Expr<'a>,
 }
 
 /// Outputs raw template code.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct EmitRaw<'a> {
     pub raw: &'a str,
 }
 
 /// Looks up a variable.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Var<'a> {
     pub id: &'a str,
 }
 
 /// Loads a constant
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Const {
     pub value: Value,
 }
 
 /// A kind of unary operator.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub enum UnaryOpKind {
     Not,
     Neg,
 }
 
 /// An unary operator expression.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct UnaryOp<'a> {
     pub op: UnaryOpKind,
     pub expr: Expr<'a>,
 }
 
 /// A kind of binary operator.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub enum BinOpKind {
     Eq,
     Ne,
@@ -242,7 +244,7 @@ pub enum BinOpKind {
 }
 
 /// A binary operator expression.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct BinOp<'a> {
     pub op: BinOpKind,
     pub left: Expr<'a>,
@@ -250,7 +252,7 @@ pub struct BinOp<'a> {
 }
 
 /// An if expression.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct IfExpr<'a> {
     pub test_expr: Expr<'a>,
     pub true_expr: Expr<'a>,
@@ -258,7 +260,7 @@ pub struct IfExpr<'a> {
 }
 
 /// A filter expression.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Filter<'a> {
     pub name: &'a str,
     pub expr: Option<Expr<'a>>,
@@ -266,7 +268,7 @@ pub struct Filter<'a> {
 }
 
 /// A test expression.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Test<'a> {
     pub name: &'a str,
     pub expr: Expr<'a>,
@@ -274,41 +276,41 @@ pub struct Test<'a> {
 }
 
 /// An attribute lookup expression.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct GetAttr<'a> {
     pub expr: Expr<'a>,
     pub name: &'a str,
 }
 
 /// An item lookup expression.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct GetItem<'a> {
     pub expr: Expr<'a>,
     pub subscript_expr: Expr<'a>,
 }
 
 /// Calls something.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Call<'a> {
     pub expr: Expr<'a>,
     pub args: Vec<Expr<'a>>,
 }
 
 /// Creates a list of values.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct List<'a> {
     pub items: Vec<Expr<'a>>,
 }
 
 /// Creates a map of values.
-#[derive(Debug, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Map<'a> {
     pub keys: Vec<Expr<'a>>,
     pub values: Vec<Expr<'a>>,
 }
 
 /// Defines the specific type of call.
-#[derive(Debug)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub enum CallType<'ast, 'source> {
     Function(&'source str),
     Method(&'ast Expr<'source>, &'source str),

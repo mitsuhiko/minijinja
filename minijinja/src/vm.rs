@@ -80,7 +80,7 @@ impl fmt::Display for LoopState {
     }
 }
 
-#[derive(Debug)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Loop<'env> {
     locals: BTreeMap<&'env str, Value>,
     with_loop_var: bool,
@@ -99,6 +99,7 @@ pub enum Frame<'env, 'vm> {
     Loop(Loop<'env>),
 }
 
+#[cfg(feature = "internal_debug")]
 impl<'env, 'vm> fmt::Debug for Frame<'env, 'vm> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -115,7 +116,7 @@ impl<'env, 'vm> fmt::Debug for Frame<'env, 'vm> {
     }
 }
 
-#[derive(Debug, Default)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Stack {
     values: Vec<Value>,
 }
@@ -138,7 +139,8 @@ impl Stack {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Context<'env, 'vm> {
     stack: Vec<Frame<'env, 'vm>>,
 }
@@ -272,13 +274,16 @@ pub struct State<'vm, 'env> {
 
 impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("State")
-            .field("ctx", &self.ctx)
-            .field("name", &self.name)
-            .field("current_block", &self.current_block)
-            .field("auto_escape", &self.auto_escape)
-            .field("env", &self.env)
-            .finish()
+        let mut ds = f.debug_struct("State");
+        #[cfg(feature = "internal_debug")]
+        {
+            ds.field("ctx", &self.ctx);
+        }
+        ds.field("name", &self.name);
+        ds.field("current_block", &self.current_block);
+        ds.field("auto_escape", &self.auto_escape);
+        ds.field("env", &self.env);
+        ds.finish()
     }
 }
 
@@ -356,7 +361,7 @@ impl<'vm, 'env> State<'vm, 'env> {
 }
 
 /// Helps to evaluate something.
-#[derive(Debug)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Vm<'env> {
     env: &'env Environment<'env>,
 }
@@ -401,7 +406,7 @@ impl<'env> Vm<'env> {
         output: &mut String,
     ) -> Result<Option<Value>, Error> {
         let initial_auto_escape = state.auto_escape;
-        let mut stack = Stack::default();
+        let mut stack = Stack { values: Vec::new() };
         let mut auto_escape_stack = vec![];
         let mut capture_stack = vec![];
         let mut block_stack = vec![];
