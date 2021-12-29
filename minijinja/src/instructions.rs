@@ -236,21 +236,28 @@ pub struct Instructions<'source> {
     pub(crate) instructions: Vec<Instruction<'source>>,
     locations: Vec<Loc>,
     name: &'source str,
+    source: &'source str,
 }
 
 impl<'source> Instructions<'source> {
     /// Creates a new instructions object.
-    pub fn new(name: &'source str) -> Instructions<'source> {
+    pub fn new(name: &'source str, source: &'source str) -> Instructions<'source> {
         Instructions {
             instructions: Vec::new(),
             locations: Vec::new(),
             name,
+            source,
         }
     }
 
     /// Returns the name of the template.
     pub fn name(&self) -> &'source str {
         self.name
+    }
+
+    /// Returns the source reference.
+    pub fn source(&self) -> &'source str {
+        self.source
     }
 
     /// Returns an instruction by index

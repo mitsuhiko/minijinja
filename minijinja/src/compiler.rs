@@ -25,17 +25,11 @@ pub struct Compiler<'source> {
     current_line: usize,
 }
 
-impl<'source> Default for Compiler<'source> {
-    fn default() -> Self {
-        Compiler::new("<unknown>")
-    }
-}
-
 impl<'source> Compiler<'source> {
     /// Creates an empty compiler
-    pub fn new(file: &'source str) -> Compiler<'source> {
+    pub fn new(file: &'source str, source: &'source str) -> Compiler<'source> {
         Compiler {
-            instructions: Instructions::new(file),
+            instructions: Instructions::new(file, source),
             blocks: BTreeMap::new(),
             pending_block: Vec::new(),
             current_line: 0,
@@ -245,7 +239,8 @@ impl<'source> Compiler<'source> {
             }
             ast::Stmt::Block(block) => {
                 self.set_location_from_span(block.span());
-                let mut sub_compiler = Compiler::new(self.instructions.name());
+                let mut sub_compiler =
+                    Compiler::new(self.instructions.name(), self.instructions.source());
                 sub_compiler.set_line(self.current_line);
                 for node in &block.body {
                     sub_compiler.compile_stmt(node)?;

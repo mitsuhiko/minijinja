@@ -13,7 +13,8 @@ fn main() {
         std::process::exit(1);
     }
 
-    let env = Environment::new();
+    let mut env = Environment::new();
+    env.set_debug(true);
     let expr = env.compile_expression(&args[1]).unwrap();
     let env = std::env::vars().collect::<BTreeMap<_, _>>();
     let result = expr.eval(context!(env)).unwrap();

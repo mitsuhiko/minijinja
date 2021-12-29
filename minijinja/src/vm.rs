@@ -348,11 +348,7 @@ impl<'vm, 'env> State<'vm, 'env> {
     ) -> crate::error::DebugInfo {
         let referenced_names = instructions.get_referenced_names(pc);
         crate::error::DebugInfo {
-            template_source: self
-                .env
-                .get_template(self.name)
-                .ok()
-                .map(|x| x.source().to_string()),
+            template_source: Some(instructions.source().to_string()),
             context: Some(Value::from(self.ctx.freeze(self.env))),
             referenced_names: Some(referenced_names.iter().map(|x| x.to_string()).collect()),
         }

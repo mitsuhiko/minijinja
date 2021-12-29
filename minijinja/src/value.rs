@@ -659,7 +659,10 @@ macro_rules! primitive_try_from {
                     _ => None
                 };
                 opt.ok_or_else(|| {
-                    Error::new(ErrorKind::ImpossibleOperation, concat!("cannot convert to ", stringify!($ty)))
+                    Error::new(
+                        ErrorKind::ImpossibleOperation,
+                        format!("cannot convert {} to {}", value.kind(), stringify!($ty))
+                    )
                 })
             }
         }
