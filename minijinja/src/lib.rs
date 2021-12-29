@@ -84,6 +84,11 @@
 //!
 //! # Optional Features
 //!
+//! MiniJinja comes with a lot of optional features, some of which are turned on by
+//! default.  If you plan on using MiniJinja in a library, please consider turning
+//! off all default features and to opt-in explicitly into the ones you actually
+//! need.
+//!
 //! There are some additional features that can be enabled:
 //!
 //! - `source`: enables the `Source` type which helps with dynamic loading of templates.

@@ -9,6 +9,8 @@ All notable changes to MiniJinja are documented here.
 - Added `debug` support.  If the debug mode is enabled, errors now carry a lot of
   useful debug information and an alternative representation when formatted into
   strings that show the context of the template where it went all wrong. (#31)
+- Added automatic string interning of object/map keys in values. This feature can
+  be disabled by removing the default `key_interning` feature. (#35)
 
 # 0.9.0
 
