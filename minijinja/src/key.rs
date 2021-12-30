@@ -7,7 +7,7 @@ use std::num::TryFromIntError;
 use serde::ser::{self, Impossible, Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Primitive, RcType, Value};
+use crate::value::{RcType, Value, ValueRepr};
 
 /// Represents a key in a value's map.
 #[derive(Clone)]
@@ -70,27 +70,22 @@ impl<'a> Key<'a> {
     }
 
     pub fn from_borrowed_value(value: &'a Value) -> Result<Key<'a>, Error> {
-        match value
-            .as_primitive()
-            .ok_or_else(|| Error::from(ErrorKind::NonKey))?
-        {
-            Primitive::Bool(v) => Ok(Key::Bool(v)),
-            Primitive::U64(v) => TryFrom::try_from(v)
+        match value.0 {
+            ValueRepr::Bool(v) => Ok(Key::Bool(v)),
+            ValueRepr::U64(v) => TryFrom::try_from(v)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
-            Primitive::U128(v) => TryFrom::try_from(v)
+            ValueRepr::U128(ref v) => TryFrom::try_from(**v)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
-            Primitive::I64(v) => Ok(Key::I64(v)),
-            Primitive::I128(v) => TryFrom::try_from(v)
+            ValueRepr::I64(v) => Ok(Key::I64(v)),
+            ValueRepr::I128(ref v) => TryFrom::try_from(**v)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
-            Primitive::F64(_) => Err(ErrorKind::NonKey.into()),
-            Primitive::Char(c) => Ok(Key::Char(c)),
-            Primitive::Str(s) => Ok(Key::Str(s)),
-            Primitive::Bytes(_) | Primitive::None | Primitive::Undefined => {
-                Err(ErrorKind::NonKey.into())
-            }
+            ValueRepr::F64(_) => Err(ErrorKind::NonKey.into()),
+            ValueRepr::Char(c) => Ok(Key::Char(c)),
+            ValueRepr::String(ref s) => Ok(Key::Str(s)),
+            _ => Err(ErrorKind::NonKey.into()),
         }
     }
 }

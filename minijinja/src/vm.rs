@@ -7,7 +7,7 @@ use crate::error::{Error, ErrorKind};
 use crate::instructions::{Instruction, Instructions};
 use crate::key::Key;
 use crate::utils::matches;
-use crate::value::{self, Object, Primitive, RcType, Value, ValueIterator};
+use crate::value::{self, Object, RcType, Value, ValueIterator};
 use crate::AutoEscape;
 
 pub struct LoopState {
@@ -725,12 +725,10 @@ impl<'env> Vm<'env> {
                 Instruction::PushAutoEscape => {
                     let value = stack.pop();
                     auto_escape_stack.push(state.auto_escape);
-                    state.auto_escape = match value.as_primitive() {
-                        Some(Primitive::Str("html")) => AutoEscape::Html,
-                        Some(Primitive::Str("none")) | Some(Primitive::Bool(false)) => {
-                            AutoEscape::None
-                        }
-                        Some(Primitive::Bool(true)) => {
+                    state.auto_escape = match (value.as_str(), value == Value::from(true)) {
+                        (Some("html"), _) => AutoEscape::Html,
+                        (Some("none"), _) | (None, false) => AutoEscape::None,
+                        (None, true) => {
                             if matches!(initial_auto_escape, AutoEscape::None) {
                                 AutoEscape::Html
                             } else {

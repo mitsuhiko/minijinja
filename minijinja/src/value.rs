@@ -218,7 +218,7 @@ impl fmt::Display for ValueKind {
 }
 
 #[derive(Clone)]
-enum Repr {
+pub(crate) enum ValueRepr {
     Undefined,
     Bool(bool),
     U64(u64),
@@ -237,51 +237,51 @@ enum Repr {
     Dynamic(RcType<dyn Object>),
 }
 
-impl fmt::Debug for Repr {
+impl fmt::Debug for ValueRepr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Repr::Undefined => write!(f, "Undefined"),
-            Repr::Bool(val) => fmt::Debug::fmt(val, f),
-            Repr::U64(val) => fmt::Debug::fmt(val, f),
-            Repr::I64(val) => fmt::Debug::fmt(val, f),
-            Repr::F64(val) => fmt::Debug::fmt(val, f),
-            Repr::Char(val) => fmt::Debug::fmt(val, f),
-            Repr::None => write!(f, "None"),
-            Repr::U128(val) => fmt::Debug::fmt(val, f),
-            Repr::I128(val) => fmt::Debug::fmt(val, f),
-            Repr::String(val) => fmt::Debug::fmt(val, f),
-            Repr::SafeString(val) => fmt::Debug::fmt(val, f),
-            Repr::Bytes(val) => fmt::Debug::fmt(val, f),
-            Repr::Seq(val) => fmt::Debug::fmt(val, f),
-            Repr::Map(val) => fmt::Debug::fmt(val, f),
-            Repr::Struct(val) => {
+            ValueRepr::Undefined => write!(f, "Undefined"),
+            ValueRepr::Bool(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::U64(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::I64(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::F64(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Char(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::None => write!(f, "None"),
+            ValueRepr::U128(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::I128(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::String(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::SafeString(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Map(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Struct(val) => {
                 let mut s = f.debug_struct("Struct");
                 for (k, v) in val.iter() {
                     s.field(k, v);
                 }
                 s.finish()
             }
-            Repr::Dynamic(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Dynamic(val) => fmt::Debug::fmt(val, f),
         }
     }
 }
 
 /// Represents a dynamically typed value in the template engine.
 #[derive(Clone)]
-pub struct Value(Repr);
+pub struct Value(pub(crate) ValueRepr);
 
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
-        match (self.as_primitive(), other.as_primitive()) {
-            (Some(Primitive::None), Some(Primitive::None)) => true,
-            (Some(Primitive::Str(a)), Some(Primitive::Str(b))) => a == b,
-            (Some(Primitive::Bytes(a)), Some(Primitive::Bytes(b))) => a == b,
-            (Some(a), Some(b)) => match coerce(a, b) {
+        match (&self.0, &other.0) {
+            (ValueRepr::None, ValueRepr::None) => true,
+            (ValueRepr::String(a), ValueRepr::String(b))
+            | (ValueRepr::SafeString(a), ValueRepr::SafeString(b)) => a == b,
+            (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
+            _ => match coerce(self, other) {
                 Some(CoerceResult::F64(a, b)) => a == b,
                 Some(CoerceResult::I128(a, b)) => a == b,
                 None => false,
             },
-            _ => false,
         }
     }
 }
@@ -290,16 +290,16 @@ impl Eq for Value {}
 
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self.as_primitive(), other.as_primitive()) {
-            (Some(Primitive::None), Some(Primitive::None)) => Some(Ordering::Equal),
-            (Some(Primitive::Str(a)), Some(Primitive::Str(b))) => a.partial_cmp(b),
-            (Some(Primitive::Bytes(a)), Some(Primitive::Bytes(b))) => a.partial_cmp(b),
-            (Some(a), Some(b)) => match coerce(a, b) {
+        match (&self.0, &other.0) {
+            (ValueRepr::None, ValueRepr::None) => Some(Ordering::Equal),
+            (ValueRepr::String(a), ValueRepr::String(b))
+            | (ValueRepr::SafeString(a), ValueRepr::SafeString(b)) => a.partial_cmp(b),
+            (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.partial_cmp(b),
+            _ => match coerce(self, other) {
                 Some(CoerceResult::F64(a, b)) => a.partial_cmp(&b),
                 Some(CoerceResult::I128(a, b)) => a.partial_cmp(&b),
                 None => None,
             },
-            _ => None,
         }
     }
 }
@@ -310,9 +310,9 @@ impl fmt::Debug for Value {
     }
 }
 
-impl From<Repr> for Value {
+impl From<ValueRepr> for Value {
     #[inline(always)]
-    fn from(val: Repr) -> Value {
+    fn from(val: ValueRepr) -> Value {
         Value(val)
     }
 }
@@ -320,21 +320,21 @@ impl From<Repr> for Value {
 impl<'a> From<&'a [u8]> for Value {
     #[inline(always)]
     fn from(val: &'a [u8]) -> Self {
-        Repr::Bytes(RcType::new(val.into())).into()
+        ValueRepr::Bytes(RcType::new(val.into())).into()
     }
 }
 
 impl<'a> From<&'a str> for Value {
     #[inline(always)]
     fn from(val: &'a str) -> Self {
-        Repr::String(RcType::new(val.into())).into()
+        ValueRepr::String(RcType::new(val.into())).into()
     }
 }
 
 impl From<String> for Value {
     #[inline(always)]
     fn from(val: String) -> Self {
-        Repr::String(RcType::new(val)).into()
+        ValueRepr::String(RcType::new(val)).into()
     }
 }
 
@@ -351,21 +351,21 @@ impl<'a> From<Cow<'a, str>> for Value {
 impl From<()> for Value {
     #[inline(always)]
     fn from(_: ()) -> Self {
-        Repr::None.into()
+        ValueRepr::None.into()
     }
 }
 
 impl From<i128> for Value {
     #[inline(always)]
     fn from(val: i128) -> Self {
-        Repr::I128(RcType::new(val)).into()
+        ValueRepr::I128(RcType::new(val)).into()
     }
 }
 
 impl From<u128> for Value {
     #[inline(always)]
     fn from(val: u128) -> Self {
-        Repr::U128(RcType::new(val)).into()
+        ValueRepr::U128(RcType::new(val)).into()
     }
 }
 
@@ -375,7 +375,7 @@ impl<'a> From<Key<'a>> for Value {
             Key::Bool(val) => val.into(),
             Key::I64(val) => val.into(),
             Key::Char(val) => val.into(),
-            Key::String(val) => Repr::String(val).into(),
+            Key::String(val) => ValueRepr::String(val).into(),
             Key::Str(val) => val.into(),
         }
     }
@@ -383,7 +383,7 @@ impl<'a> From<Key<'a>> for Value {
 
 impl<K: Into<Key<'static>>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
     fn from(val: BTreeMap<K, V>) -> Self {
-        Repr::Map(RcType::new(
+        ValueRepr::Map(RcType::new(
             val.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
         ))
         .into()
@@ -392,7 +392,7 @@ impl<K: Into<Key<'static>>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(val: Vec<T>) -> Self {
-        Repr::Seq(RcType::new(val.into_iter().map(|x| x.into()).collect())).into()
+        ValueRepr::Seq(RcType::new(val.into_iter().map(|x| x.into()).collect())).into()
     }
 }
 
@@ -401,7 +401,7 @@ macro_rules! value_from {
         impl From<$src> for Value {
             #[inline(always)]
             fn from(val: $src) -> Self {
-                Repr::$dst(val as _).into()
+                ValueRepr::$dst(val as _).into()
             }
         }
     };
@@ -434,6 +434,7 @@ fn format_seqish<I: Iterator<Item = D>, D: fmt::Display>(
 }
 
 /// An alternative view of a value.
+#[deprecated(since = "0.11.0", note = "use as_str/is_true/TryFrom instead")]
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum Primitive<'a> {
     Undefined,
@@ -449,76 +450,68 @@ pub enum Primitive<'a> {
     Bytes(&'a [u8]),
 }
 
-impl<'a> Primitive<'a> {
-    pub fn as_f64(self) -> Option<f64> {
-        Some(match self {
-            Primitive::Bool(true) => 1.0,
-            Primitive::Bool(false) => 0.0,
-            Primitive::Char(x) => x as i64 as f64,
-            Primitive::U64(x) => x as f64,
-            Primitive::U128(x) => x as f64,
-            Primitive::I64(x) => x as f64,
-            Primitive::I128(x) => x as f64,
-            Primitive::F64(x) => x,
-            _ => return None,
-        })
-    }
-
-    pub fn as_i128(self) -> Option<i128> {
-        Some(match self {
-            Primitive::Bool(true) => 1,
-            Primitive::Bool(false) => 0,
-            Primitive::Char(x) => x as i128,
-            Primitive::U64(x) => x as i128,
-            Primitive::U128(x) => x as i128,
-            Primitive::I64(x) => x as i128,
-            Primitive::I128(x) => x as i128,
-            Primitive::F64(x) => x as i128,
-            _ => return None,
-        })
-    }
-}
-
 enum CoerceResult {
     I128(i128, i128),
     F64(f64, f64),
 }
 
-fn coerce<'a>(a: Primitive<'a>, b: Primitive<'a>) -> Option<CoerceResult> {
-    match (a, b) {
+fn as_f64(value: &Value) -> Option<f64> {
+    Some(match value.0 {
+        ValueRepr::Bool(x) => x as i64 as f64,
+        ValueRepr::U64(x) => x as f64,
+        ValueRepr::U128(ref x) => **x as f64,
+        ValueRepr::I64(x) => x as f64,
+        ValueRepr::I128(ref x) => **x as f64,
+        ValueRepr::F64(x) => x,
+        _ => return None,
+    })
+}
+
+fn is_numeric(value: &Value) -> bool {
+    matches!(value.kind(), ValueKind::Bool | ValueKind::Number)
+}
+
+fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
+    match (&a.0, &b.0) {
         // equal mappings are trivial
-        (Primitive::U64(a), Primitive::U64(b)) => Some(CoerceResult::I128(a as i128, b as i128)),
-        (Primitive::U128(a), Primitive::U128(b)) => Some(CoerceResult::I128(a as i128, b as i128)),
-        (Primitive::I64(a), Primitive::I64(b)) => Some(CoerceResult::I128(a as i128, b as i128)),
-        (Primitive::I128(a), Primitive::I128(b)) => Some(CoerceResult::I128(a, b)),
-        (Primitive::F64(a), Primitive::F64(b)) => Some(CoerceResult::F64(a, b)),
+        (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
+        (ValueRepr::U128(a), ValueRepr::U128(b)) => {
+            Some(CoerceResult::I128(**a as i128, **b as i128))
+        }
+        (ValueRepr::I64(a), ValueRepr::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
+        (ValueRepr::I128(ref a), ValueRepr::I128(ref b)) => Some(CoerceResult::I128(**a, **b)),
+        (ValueRepr::F64(a), ValueRepr::F64(b)) => Some(CoerceResult::F64(*a, *b)),
 
         // are floats involved?
-        (Primitive::F64(a), _) => Some(CoerceResult::F64(a, b.as_f64()?)),
-        (_, Primitive::F64(b)) => Some(CoerceResult::F64(a.as_f64()?, b)),
+        (ValueRepr::F64(a), _) => Some(CoerceResult::F64(*a, as_f64(b)?)),
+        (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(as_f64(a)?, *b)),
 
         // everything else goes up to i128
-        (_, _) => Some(CoerceResult::I128(a.as_i128()?, b.as_i128()?)),
+        (_, _) if is_numeric(a) && is_numeric(b) => Some(CoerceResult::I128(
+            i128::try_from(a.clone()).ok()?,
+            i128::try_from(b.clone()).ok()?,
+        )),
+        _ => None,
     }
 }
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
-            Repr::Undefined => Ok(()),
-            Repr::Bool(val) => write!(f, "{}", val),
-            Repr::U64(val) => write!(f, "{}", val),
-            Repr::I64(val) => write!(f, "{}", val),
-            Repr::F64(val) => write!(f, "{}", val),
-            Repr::Char(val) => write!(f, "{}", val),
-            Repr::None => write!(f, "none"),
-            Repr::I128(val) => write!(f, "{}", val),
-            Repr::String(val) => write!(f, "{}", val),
-            Repr::SafeString(val) => write!(f, "{}", val),
-            Repr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
-            Repr::Seq(values) => format_seqish(f, values.iter()),
-            Repr::Map(val) => format_seqish(f, val.iter().map(|x| x.0)),
-            Repr::Struct(val) => {
+            ValueRepr::Undefined => Ok(()),
+            ValueRepr::Bool(val) => write!(f, "{}", val),
+            ValueRepr::U64(val) => write!(f, "{}", val),
+            ValueRepr::I64(val) => write!(f, "{}", val),
+            ValueRepr::F64(val) => write!(f, "{}", val),
+            ValueRepr::Char(val) => write!(f, "{}", val),
+            ValueRepr::None => write!(f, "none"),
+            ValueRepr::I128(val) => write!(f, "{}", val),
+            ValueRepr::String(val) => write!(f, "{}", val),
+            ValueRepr::SafeString(val) => write!(f, "{}", val),
+            ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
+            ValueRepr::Seq(values) => format_seqish(f, values.iter()),
+            ValueRepr::Map(val) => format_seqish(f, val.iter().map(|x| x.0)),
+            ValueRepr::Struct(val) => {
                 for (idx, (key, _)) in val.iter().enumerate() {
                     if idx > 0 {
                         write!(f, ", ")?;
@@ -527,15 +520,15 @@ impl fmt::Display for Value {
                 }
                 Ok(())
             }
-            Repr::U128(val) => write!(f, "{}", val),
-            Repr::Dynamic(x) => write!(f, "{}", x),
+            ValueRepr::U128(val) => write!(f, "{}", val),
+            ValueRepr::Dynamic(x) => write!(f, "{}", x),
         }
     }
 }
 
 impl Default for Value {
     fn default() -> Value {
-        Repr::None.into()
+        ValueRepr::None.into()
     }
 }
 
@@ -551,7 +544,7 @@ macro_rules! math_binop {
     ($name:ident, $int:ident, $float:tt) => {
         pub(crate) fn $name(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
             pub fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-                match coerce(lhs.as_primitive()?, rhs.as_primitive()?)? {
+                match coerce(lhs, rhs)? {
                     CoerceResult::I128(a, b) => Some(int_as_value(a.$int(b))),
                     CoerceResult::F64(a, b) => Some((a $float b).into()),
                 }
@@ -580,7 +573,7 @@ math_binop!(rem, wrapping_rem_euclid, %);
 /// Implements a binary `pow` operation on values.
 pub(crate) fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     pub fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        match coerce(lhs.as_primitive()?, rhs.as_primitive()?)? {
+        match coerce(lhs, rhs)? {
             CoerceResult::I128(a, b) => Some(int_as_value(a.pow(TryFrom::try_from(b).ok()?))),
             CoerceResult::F64(a, b) => Some((a.powf(b)).into()),
         }
@@ -596,14 +589,22 @@ pub(crate) fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 /// Implements an unary `neg` operation on value.
 pub(crate) fn neg(val: &Value) -> Result<Value, Error> {
     fn do_it(val: &Value) -> Option<Value> {
-        let val = val.as_primitive()?;
-        match val {
-            Primitive::F64(_) => Some((-val.as_f64()?).into()),
-            _ => Some(int_as_value(-val.as_i128()?)),
+        match val.0 {
+            ValueRepr::F64(x) => return Some((-x).into()),
+            _ => {
+                if let Ok(x) = i128::try_from(val.clone()) {
+                    return Some(int_as_value(-x));
+                }
+            }
         }
+        None
     }
 
-    do_it(val).ok_or_else(|| Error::from(ErrorKind::ImpossibleOperation))
+    if val.kind() != ValueKind::Number {
+        Err(Error::from(ErrorKind::ImpossibleOperation))
+    } else {
+        do_it(val).ok_or_else(|| Error::from(ErrorKind::ImpossibleOperation))
+    }
 }
 
 /// Attempts a string concatenation.
@@ -611,7 +612,7 @@ pub(crate) fn string_concat(mut left: Value, right: &Value) -> Value {
     match left.0 {
         // if we're a string and we have a single reference to it, we can
         // directly append into ourselves and reconstruct the value
-        Repr::String(ref mut s) => {
+        ValueRepr::String(ref mut s) => {
             write!(RcType::make_mut(s), "{}", right).ok();
             left
         }
@@ -623,15 +624,15 @@ pub(crate) fn string_concat(mut left: Value, right: &Value) -> Value {
 /// Implements a containment operation on values.
 pub(crate) fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
     match container.0 {
-        Repr::Seq(ref values) => Ok(Value::from(values.contains(value))),
-        Repr::Map(ref map) => {
+        ValueRepr::Seq(ref values) => Ok(Value::from(values.contains(value))),
+        ValueRepr::Map(ref map) => {
             let key = match value.clone().try_into_key() {
                 Ok(key) => key,
                 Err(_) => return Ok(Value::from(false)),
             };
             return Ok(Value::from(map.get(&key).is_some()));
         }
-        Repr::String(ref s) | Repr::SafeString(ref s) => {
+        ValueRepr::String(ref s) | ValueRepr::SafeString(ref s) => {
             return Ok(Value::from(if let Some(s2) = value.as_str() {
                 s.contains(&s2)
             } else {
@@ -654,8 +655,8 @@ macro_rules! primitive_try_from {
             type Error = Error;
 
             fn try_from(value: Value) -> Result<Self, Self::Error> {
-                let opt = match value.as_primitive() {
-                    $(Some($pat) => TryFrom::try_from($expr).ok(),)*
+                let opt = match value.0 {
+                    $($pat => TryFrom::try_from($expr).ok(),)*
                     _ => None
                 };
                 opt.ok_or_else(|| {
@@ -696,8 +697,11 @@ macro_rules! primitive_try_from {
 macro_rules! primitive_int_try_from {
     ($ty:ident) => {
         primitive_try_from!($ty, {
-            Primitive::I64(val) => val,
-            Primitive::U64(val) => val,
+            ValueRepr::Bool(val) => val as usize,
+            ValueRepr::I64(val) => val,
+            ValueRepr::U64(val) => val,
+            ValueRepr::I128(ref val) => **val,
+            ValueRepr::U128(ref val) => **val,
         });
     }
 }
@@ -715,11 +719,11 @@ primitive_int_try_from!(i128);
 primitive_int_try_from!(usize);
 
 primitive_try_from!(bool, {
-    Primitive::Bool(val) => val,
+    ValueRepr::Bool(val) => val,
 });
 
 primitive_try_from!(f64, {
-    Primitive::F64(val) => val,
+    ValueRepr::F64(val) => val,
 });
 
 macro_rules! infallible_conversion {
@@ -787,7 +791,7 @@ impl<T: ArgType> ArgType for Vec<T> {
 #[allow(clippy::len_without_is_empty)]
 impl Value {
     /// The undefined value
-    pub const UNDEFINED: Value = Value(Repr::Undefined);
+    pub const UNDEFINED: Value = Value(ValueRepr::Undefined);
 
     /// Creates a value from something that can be serialized.
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
@@ -796,12 +800,12 @@ impl Value {
 
     /// Creates a value from a safe string.
     pub fn from_safe_string(value: String) -> Value {
-        Repr::SafeString(RcType::new(value)).into()
+        ValueRepr::SafeString(RcType::new(value)).into()
     }
 
     /// Creates a value from a reference counted dynamic object.
     pub(crate) fn from_rc_object<T: Object + 'static>(value: RcType<T>) -> Value {
-        Repr::Dynamic(value as RcType<dyn Object>).into()
+        ValueRepr::Dynamic(value as RcType<dyn Object>).into()
     }
 
     /// Creates a value from a dynamic object.
@@ -837,7 +841,7 @@ impl Value {
     /// assert_eq!(thing.id, 42);
     /// ```
     pub fn downcast_object_ref<T: Object>(&self) -> Option<&T> {
-        if let Repr::Dynamic(ref obj) = self.0 {
+        if let ValueRepr::Dynamic(ref obj) = self.0 {
             if (**obj).type_id() == TypeId::of::<T>() {
                 unsafe {
                     // newer versions of Rust have RcType::as_ptr but we support
@@ -858,88 +862,101 @@ impl Value {
     /// Returns the value kind.
     pub fn kind(&self) -> ValueKind {
         match self.0 {
-            Repr::Undefined => ValueKind::Undefined,
-            Repr::Bool(_) => ValueKind::Bool,
-            Repr::U64(_) | Repr::I64(_) | Repr::F64(_) => ValueKind::Number,
-            Repr::Char(_) => ValueKind::Char,
-            Repr::None => ValueKind::None,
-            Repr::I128(_) => ValueKind::Number,
-            Repr::String(_) | Repr::SafeString(_) => ValueKind::String,
-            Repr::Bytes(_) => ValueKind::Bytes,
-            Repr::U128(_) => ValueKind::Number,
-            Repr::Seq(_) => ValueKind::Seq,
-            Repr::Map(_) => ValueKind::Map,
-            Repr::Struct(_) | Repr::Dynamic(_) => ValueKind::Struct,
-        }
-    }
-
-    /// Returns the primitive representation of the value.
-    pub fn as_primitive(&self) -> Option<Primitive<'_>> {
-        match self.0 {
-            Repr::Undefined => Some(Primitive::Undefined),
-            Repr::Bool(val) => Some(Primitive::Bool(val)),
-            Repr::U64(val) => Some(Primitive::U64(val)),
-            Repr::I64(val) => Some(Primitive::I64(val)),
-            Repr::F64(val) => Some(Primitive::F64(val)),
-            Repr::Char(val) => Some(Primitive::Char(val)),
-            Repr::None => Some(Primitive::None),
-            Repr::I128(ref val) => Some(Primitive::I128(**val)),
-            Repr::String(ref val) => Some(Primitive::Str(val.as_str())),
-            Repr::SafeString(ref val) => Some(Primitive::Str(val.as_str())),
-            Repr::Bytes(ref val) => Some(Primitive::Bytes(&val[..])),
-            Repr::U128(ref val) => Some(Primitive::U128(**val)),
-            _ => None,
+            ValueRepr::Undefined => ValueKind::Undefined,
+            ValueRepr::Bool(_) => ValueKind::Bool,
+            ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::F64(_) => ValueKind::Number,
+            ValueRepr::Char(_) => ValueKind::Char,
+            ValueRepr::None => ValueKind::None,
+            ValueRepr::I128(_) => ValueKind::Number,
+            ValueRepr::String(_) | ValueRepr::SafeString(_) => ValueKind::String,
+            ValueRepr::Bytes(_) => ValueKind::Bytes,
+            ValueRepr::U128(_) => ValueKind::Number,
+            ValueRepr::Seq(_) => ValueKind::Seq,
+            ValueRepr::Map(_) => ValueKind::Map,
+            ValueRepr::Struct(_) | ValueRepr::Dynamic(_) => ValueKind::Struct,
         }
     }
 
     /// If the value is a string, return it.
     pub fn as_str(&self) -> Option<&str> {
-        match self.as_primitive() {
-            Some(Primitive::Str(s)) => Some(s),
+        match &self.0 {
+            ValueRepr::String(ref s) => Some(s.as_str()),
+            ValueRepr::SafeString(ref s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Return the value as f64
+    #[deprecated(since = "0.11.0", note = "use as_str/is_true/TryFrom instead")]
+    pub fn as_f64(&self) -> Option<f64> {
+        as_f64(self)
+    }
+
+    /// Deprecated alternative representation of a value.
+    #[deprecated(since = "0.11.0", note = "use as_str/is_true/TryFrom instead")]
+    #[allow(deprecated)]
+    pub fn as_primitive(&self) -> Option<Primitive<'_>> {
+        match self.0 {
+            ValueRepr::Undefined => Some(Primitive::Undefined),
+            ValueRepr::Bool(val) => Some(Primitive::Bool(val)),
+            ValueRepr::U64(val) => Some(Primitive::U64(val)),
+            ValueRepr::I64(val) => Some(Primitive::I64(val)),
+            ValueRepr::F64(val) => Some(Primitive::F64(val)),
+            ValueRepr::Char(val) => Some(Primitive::Char(val)),
+            ValueRepr::None => Some(Primitive::None),
+            ValueRepr::I128(ref val) => Some(Primitive::I128(**val)),
+            ValueRepr::String(ref val) => Some(Primitive::Str(val.as_str())),
+            ValueRepr::SafeString(ref val) => Some(Primitive::Str(val.as_str())),
+            ValueRepr::Bytes(ref val) => Some(Primitive::Bytes(&val[..])),
+            ValueRepr::U128(ref val) => Some(Primitive::U128(**val)),
             _ => None,
         }
     }
 
     /// Is this value true?
     pub fn is_true(&self) -> bool {
-        match self.as_primitive() {
-            Some(Primitive::Bool(val)) => val,
-            Some(Primitive::U64(x)) => x != 0,
-            Some(Primitive::U128(x)) => x != 0,
-            Some(Primitive::I64(x)) => x != 0,
-            Some(Primitive::I128(x)) => x != 0,
-            Some(Primitive::F64(x)) => x != 0.0,
-            Some(Primitive::Char(x)) => x != '\x00',
-            Some(Primitive::Str(x)) => !x.is_empty(),
-            Some(Primitive::Bytes(x)) => !x.is_empty(),
-            Some(Primitive::None) | Some(Primitive::Undefined) => false,
-            None => true,
+        match self.0 {
+            ValueRepr::Bool(val) => val,
+            ValueRepr::U64(x) => x != 0,
+            ValueRepr::U128(ref x) => **x != 0,
+            ValueRepr::I64(x) => x != 0,
+            ValueRepr::I128(ref x) => **x != 0,
+            ValueRepr::F64(x) => x != 0.0,
+            ValueRepr::Char(x) => x != '\x00',
+            ValueRepr::String(ref x) => !x.is_empty(),
+            ValueRepr::SafeString(ref x) => !x.is_empty(),
+            ValueRepr::Bytes(ref x) => !x.is_empty(),
+            ValueRepr::None | ValueRepr::Undefined => false,
+            ValueRepr::Seq(ref x) => !x.is_empty(),
+            ValueRepr::Map(ref x) => !x.is_empty(),
+            ValueRepr::Struct(ref x) => !x.is_empty(),
+            ValueRepr::Dynamic(_) => true,
         }
     }
 
     /// Returns `true` if this value is safe.
     pub fn is_safe(&self) -> bool {
-        matches!(&self.0, Repr::SafeString(_))
+        matches!(&self.0, ValueRepr::SafeString(_))
     }
 
     /// Returns `true` if this value is undefined.
     pub fn is_undefined(&self) -> bool {
-        matches!(&self.0, Repr::Undefined)
+        matches!(&self.0, ValueRepr::Undefined)
     }
 
     /// Returns `true` if this value is none.
     pub fn is_none(&self) -> bool {
-        matches!(&self.0, Repr::None)
+        matches!(&self.0, ValueRepr::None)
     }
 
     /// Returns the length of the contained value.
     pub fn len(&self) -> Option<usize> {
         match self.0 {
-            Repr::String(ref s) | Repr::SafeString(ref s) => Some(s.chars().count()),
-            Repr::Map(ref items) => Some(items.len()),
-            Repr::Struct(ref items) => Some(items.len()),
-            Repr::Seq(ref items) => Some(items.len()),
-            Repr::Dynamic(ref dy) => Some(dy.attributes().len()),
+            ValueRepr::String(ref s) | ValueRepr::SafeString(ref s) => Some(s.chars().count()),
+            ValueRepr::Map(ref items) => Some(items.len()),
+            ValueRepr::Struct(ref items) => Some(items.len()),
+            ValueRepr::Seq(ref items) => Some(items.len()),
+            ValueRepr::Dynamic(ref dy) => Some(dy.attributes().len()),
             _ => None,
         }
     }
@@ -947,13 +964,13 @@ impl Value {
     /// Looks up an attribute by attribute name.
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
         let value = match self.0 {
-            Repr::Map(ref items) => {
+            ValueRepr::Map(ref items) => {
                 let lookup_key = Key::Str(key);
                 items.get(&lookup_key).cloned()
             }
-            Repr::Struct(ref items) => items.get(key).cloned(),
-            Repr::Dynamic(ref dy) => dy.get_attr(key),
-            Repr::Undefined => {
+            ValueRepr::Struct(ref items) => items.get(key).cloned(),
+            ValueRepr::Dynamic(ref dy) => dy.get_attr(key),
+            ValueRepr::Undefined => {
                 return Err(Error::from(ErrorKind::UndefinedError));
             }
             _ => None,
@@ -967,7 +984,7 @@ impl Value {
     /// a string key this can be any key.  For instance this can be used to
     /// index into sequences.
     pub fn get_item(&self, key: &Value) -> Result<Value, Error> {
-        if let Repr::Undefined = self.0 {
+        if let ValueRepr::Undefined = self.0 {
             Err(Error::from(ErrorKind::UndefinedError))
         } else {
             Ok(self.get_item_opt(key).unwrap_or(Value::UNDEFINED))
@@ -978,13 +995,13 @@ impl Value {
         let key = Key::from_borrowed_value(key).ok()?;
 
         match self.0 {
-            Repr::Map(ref items) => return items.get(&key).cloned(),
-            Repr::Struct(ref items) => {
+            ValueRepr::Map(ref items) => return items.get(&key).cloned(),
+            ValueRepr::Struct(ref items) => {
                 if let Key::String(ref key) = key {
                     return items.get(key.as_str()).cloned();
                 }
             }
-            Repr::Seq(ref items) => {
+            ValueRepr::Seq(ref items) => {
                 if let Key::I64(idx) = key {
                     let idx = isize::try_from(idx).ok()?;
                     let idx = if idx < 0 {
@@ -995,7 +1012,7 @@ impl Value {
                     return items.get(idx).cloned();
                 }
             }
-            Repr::Dynamic(ref dy) => match key {
+            ValueRepr::Dynamic(ref dy) => match key {
                 Key::String(ref key) => return dy.get_attr(key),
                 Key::Str(key) => return dy.get_attr(key),
                 _ => {}
@@ -1007,7 +1024,7 @@ impl Value {
 
     /// Calls the value directly.
     pub(crate) fn call(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
-        if let Repr::Dynamic(ref dy) = self.0 {
+        if let ValueRepr::Dynamic(ref dy) = self.0 {
             dy.call(state, args)
         } else {
             Err(Error::new(
@@ -1024,7 +1041,7 @@ impl Value {
         name: &str,
         args: Vec<Value>,
     ) -> Result<Value, Error> {
-        if let Repr::Dynamic(ref dy) = self.0 {
+        if let ValueRepr::Dynamic(ref dy) = self.0 {
             dy.call_method(state, name, args)
         } else {
             Err(Error::new(
@@ -1036,26 +1053,26 @@ impl Value {
 
     pub(crate) fn try_into_key(self) -> Result<Key<'static>, Error> {
         match self.0 {
-            Repr::Bool(val) => Ok(Key::Bool(val)),
-            Repr::U64(v) => TryFrom::try_from(v)
+            ValueRepr::Bool(val) => Ok(Key::Bool(val)),
+            ValueRepr::U64(v) => TryFrom::try_from(v)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
-            Repr::U128(ref v) => TryFrom::try_from(**v)
+            ValueRepr::U128(ref v) => TryFrom::try_from(**v)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
-            Repr::I64(v) => Ok(Key::I64(v)),
-            Repr::I128(ref v) => TryFrom::try_from(**v)
+            ValueRepr::I64(v) => Ok(Key::I64(v)),
+            ValueRepr::I128(ref v) => TryFrom::try_from(**v)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
-            Repr::Char(c) => Ok(Key::Char(c)),
-            Repr::String(ref s) => Ok(Key::String(s.clone())),
+            ValueRepr::Char(c) => Ok(Key::Char(c)),
+            ValueRepr::String(ref s) => Ok(Key::String(s.clone())),
             _ => Err(ErrorKind::NonKey.into()),
         }
     }
 
     pub(crate) fn try_into_vec(self) -> Result<Vec<Value>, Error> {
         match self.0 {
-            Repr::Seq(v) => Ok(match RcType::try_unwrap(v) {
+            ValueRepr::Seq(v) => Ok(match RcType::try_unwrap(v) {
                 Ok(v) => v,
                 Err(rc) => (*rc).clone(),
             }),
@@ -1069,7 +1086,7 @@ impl Value {
     #[cfg(feature = "builtin_filters")]
     pub(crate) fn try_into_pairs(self) -> Result<Vec<(Value, Value)>, Error> {
         match self.0 {
-            Repr::Map(v) => Ok(match RcType::try_unwrap(v) {
+            ValueRepr::Map(v) => Ok(match RcType::try_unwrap(v) {
                 Ok(v) => v,
                 Err(rc) => (*rc).clone(),
             }
@@ -1086,14 +1103,14 @@ impl Value {
     #[cfg(feature = "debug")]
     pub(crate) fn iter_as_str_map(&self) -> impl Iterator<Item = (&str, Value)> {
         match self.0 {
-            Repr::Map(ref m) => Box::new(
+            ValueRepr::Map(ref m) => Box::new(
                 m.iter()
                     .filter_map(|(k, v)| k.as_str().map(move |k| (k, v.clone()))),
             ) as Box<dyn Iterator<Item = _>>,
-            Repr::Struct(ref s) => {
+            ValueRepr::Struct(ref s) => {
                 Box::new(s.iter().map(|(k, v)| (*k, v.clone()))) as Box<dyn Iterator<Item = _>>
             }
-            Repr::Dynamic(ref obj) => Box::new(
+            ValueRepr::Dynamic(ref obj) => Box::new(
                 obj.attributes()
                     .iter()
                     .filter_map(move |attr| Some((*attr, obj.get_attr(attr)?))),
@@ -1105,14 +1122,14 @@ impl Value {
     /// Iterates over the value.
     pub(crate) fn iter(&self) -> ValueIterator {
         let (iter_state, len) = match self.0 {
-            Repr::Seq(ref seq) => (ValueIteratorState::Seq(0, RcType::clone(seq)), seq.len()),
+            ValueRepr::Seq(ref seq) => (ValueIteratorState::Seq(0, RcType::clone(seq)), seq.len()),
             #[cfg(feature = "preserve_order")]
-            Repr::Map(ref items) => (
+            ValueRepr::Map(ref items) => (
                 ValueIteratorState::Map(0, RcType::clone(items)),
                 items.len(),
             ),
             #[cfg(not(feature = "preserve_order"))]
-            Repr::Map(ref items) => (
+            ValueRepr::Map(ref items) => (
                 ValueIteratorState::Map(
                     items.iter().next().map(|x| x.0.clone()),
                     RcType::clone(items),
@@ -1120,12 +1137,12 @@ impl Value {
                 items.len(),
             ),
             #[cfg(feature = "preserve_order")]
-            Repr::Struct(ref fields) => (
+            ValueRepr::Struct(ref fields) => (
                 ValueIteratorState::Struct(0, RcType::clone(fields)),
                 fields.len(),
             ),
             #[cfg(not(feature = "preserve_order"))]
-            Repr::Struct(ref fields) => (
+            ValueRepr::Struct(ref fields) => (
                 ValueIteratorState::Struct(
                     fields.iter().next().map(|x| *x.0),
                     RcType::clone(fields),
@@ -1154,20 +1171,20 @@ impl Serialize for Value {
         }
 
         match self.0 {
-            Repr::Bool(b) => serializer.serialize_bool(b),
-            Repr::U64(u) => serializer.serialize_u64(u),
-            Repr::I64(i) => serializer.serialize_i64(i),
-            Repr::F64(f) => serializer.serialize_f64(f),
-            Repr::Char(c) => serializer.serialize_char(c),
-            Repr::None => serializer.serialize_unit(),
-            Repr::Undefined => serializer.serialize_unit(),
-            Repr::U128(ref u) => serializer.serialize_u128(**u),
-            Repr::I128(ref i) => serializer.serialize_i128(**i),
-            Repr::String(ref s) => serializer.serialize_str(s),
-            Repr::SafeString(ref val) => serializer.serialize_str(val),
-            Repr::Bytes(ref b) => serializer.serialize_bytes(b),
-            Repr::Seq(ref elements) => elements.serialize(serializer),
-            Repr::Map(ref entries) => {
+            ValueRepr::Bool(b) => serializer.serialize_bool(b),
+            ValueRepr::U64(u) => serializer.serialize_u64(u),
+            ValueRepr::I64(i) => serializer.serialize_i64(i),
+            ValueRepr::F64(f) => serializer.serialize_f64(f),
+            ValueRepr::Char(c) => serializer.serialize_char(c),
+            ValueRepr::None => serializer.serialize_unit(),
+            ValueRepr::Undefined => serializer.serialize_unit(),
+            ValueRepr::U128(ref u) => serializer.serialize_u128(**u),
+            ValueRepr::I128(ref i) => serializer.serialize_i128(**i),
+            ValueRepr::String(ref s) => serializer.serialize_str(s),
+            ValueRepr::SafeString(ref val) => serializer.serialize_str(val),
+            ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
+            ValueRepr::Seq(ref elements) => elements.serialize(serializer),
+            ValueRepr::Map(ref entries) => {
                 use serde::ser::SerializeMap;
                 let mut map = serializer.serialize_map(Some(entries.len()))?;
                 for (ref k, ref v) in entries.iter() {
@@ -1175,7 +1192,7 @@ impl Serialize for Value {
                 }
                 map.end()
             }
-            Repr::Struct(ref fields) => {
+            ValueRepr::Struct(ref fields) => {
                 use serde::ser::SerializeStruct;
                 let mut s = serializer.serialize_struct("Struct", fields.len())?;
                 for (k, ref v) in fields.iter() {
@@ -1183,7 +1200,7 @@ impl Serialize for Value {
                 }
                 s.end()
             }
-            Repr::Dynamic(ref n) => {
+            ValueRepr::Dynamic(ref n) => {
                 use serde::ser::SerializeMap;
                 let fields = n.attributes();
                 let mut s = serializer.serialize_map(Some(fields.len()))?;
@@ -1212,71 +1229,71 @@ impl Serializer for ValueSerializer {
     type SerializeStructVariant = SerializeStructVariant;
 
     fn serialize_bool(self, v: bool) -> Result<Value, Error> {
-        Ok(Repr::Bool(v).into())
+        Ok(ValueRepr::Bool(v).into())
     }
 
     fn serialize_i8(self, v: i8) -> Result<Value, Error> {
-        Ok(Repr::I64(v as i64).into())
+        Ok(ValueRepr::I64(v as i64).into())
     }
 
     fn serialize_i16(self, v: i16) -> Result<Value, Error> {
-        Ok(Repr::I64(v as i64).into())
+        Ok(ValueRepr::I64(v as i64).into())
     }
 
     fn serialize_i32(self, v: i32) -> Result<Value, Error> {
-        Ok(Repr::I64(v as i64).into())
+        Ok(ValueRepr::I64(v as i64).into())
     }
 
     fn serialize_i64(self, v: i64) -> Result<Value, Error> {
-        Ok(Repr::I64(v).into())
+        Ok(ValueRepr::I64(v).into())
     }
 
     fn serialize_i128(self, v: i128) -> Result<Value, Error> {
-        Ok(Repr::I128(RcType::new(v)).into())
+        Ok(ValueRepr::I128(RcType::new(v)).into())
     }
 
     fn serialize_u8(self, v: u8) -> Result<Value, Error> {
-        Ok(Repr::U64(v as u64).into())
+        Ok(ValueRepr::U64(v as u64).into())
     }
 
     fn serialize_u16(self, v: u16) -> Result<Value, Error> {
-        Ok(Repr::U64(v as u64).into())
+        Ok(ValueRepr::U64(v as u64).into())
     }
 
     fn serialize_u32(self, v: u32) -> Result<Value, Error> {
-        Ok(Repr::U64(v as u64).into())
+        Ok(ValueRepr::U64(v as u64).into())
     }
 
     fn serialize_u64(self, v: u64) -> Result<Value, Error> {
-        Ok(Repr::U64(v).into())
+        Ok(ValueRepr::U64(v).into())
     }
 
     fn serialize_u128(self, v: u128) -> Result<Value, Error> {
-        Ok(Repr::U128(RcType::new(v)).into())
+        Ok(ValueRepr::U128(RcType::new(v)).into())
     }
 
     fn serialize_f32(self, v: f32) -> Result<Value, Error> {
-        Ok(Repr::F64(v as f64).into())
+        Ok(ValueRepr::F64(v as f64).into())
     }
 
     fn serialize_f64(self, v: f64) -> Result<Value, Error> {
-        Ok(Repr::F64(v).into())
+        Ok(ValueRepr::F64(v).into())
     }
 
     fn serialize_char(self, v: char) -> Result<Value, Error> {
-        Ok(Repr::Char(v).into())
+        Ok(ValueRepr::Char(v).into())
     }
 
     fn serialize_str(self, value: &str) -> Result<Value, Error> {
-        Ok(Repr::String(RcType::new(value.to_owned())).into())
+        Ok(ValueRepr::String(RcType::new(value.to_owned())).into())
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<Value, Error> {
-        Ok(Repr::Bytes(RcType::new(value.to_owned())).into())
+        Ok(ValueRepr::Bytes(RcType::new(value.to_owned())).into())
     }
 
     fn serialize_none(self) -> Result<Value, Error> {
-        Ok(Repr::None.into())
+        Ok(ValueRepr::None.into())
     }
 
     fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Value, Error>
@@ -1287,11 +1304,11 @@ impl Serializer for ValueSerializer {
     }
 
     fn serialize_unit(self) -> Result<Value, Error> {
-        Ok(Repr::None.into())
+        Ok(ValueRepr::None.into())
     }
 
     fn serialize_unit_struct(self, _name: &'static str) -> Result<Value, Error> {
-        Ok(Repr::None.into())
+        Ok(ValueRepr::None.into())
     }
 
     fn serialize_unit_variant(
@@ -1300,7 +1317,7 @@ impl Serializer for ValueSerializer {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<Value, Error> {
-        Ok(Repr::String(RcType::new(variant.to_string())).into())
+        Ok(ValueRepr::String(RcType::new(variant.to_string())).into())
     }
 
     fn serialize_newtype_struct<T: ?Sized>(
@@ -1326,7 +1343,7 @@ impl Serializer for ValueSerializer {
     {
         let mut map = ValueMap::new();
         map.insert(Key::from(variant), value.serialize(self)?);
-        Ok(Repr::Map(RcType::new(map)).into())
+        Ok(ValueRepr::Map(RcType::new(map)).into())
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
@@ -1414,7 +1431,7 @@ impl ser::SerializeSeq for SerializeSeq {
     }
 
     fn end(self) -> Result<Value, Error> {
-        Ok(Repr::Seq(RcType::new(self.elements)).into())
+        Ok(ValueRepr::Seq(RcType::new(self.elements)).into())
     }
 }
 
@@ -1436,7 +1453,7 @@ impl ser::SerializeTuple for SerializeTuple {
     }
 
     fn end(self) -> Result<Value, Error> {
-        Ok(Repr::Seq(RcType::new(self.elements)).into())
+        Ok(ValueRepr::Seq(RcType::new(self.elements)).into())
     }
 }
 
@@ -1458,7 +1475,7 @@ impl ser::SerializeTupleStruct for SerializeTupleStruct {
     }
 
     fn end(self) -> Result<Value, Error> {
-        Ok(Value(Repr::Seq(RcType::new(self.fields))))
+        Ok(Value(ValueRepr::Seq(RcType::new(self.fields))))
     }
 }
 
@@ -1519,7 +1536,7 @@ impl ser::SerializeMap for SerializeMap {
     }
 
     fn end(self) -> Result<Value, Error> {
-        Ok(Value(Repr::Map(RcType::new(self.entries))))
+        Ok(Value(ValueRepr::Map(RcType::new(self.entries))))
     }
 
     fn serialize_entry<K: ?Sized, V: ?Sized>(&mut self, key: &K, value: &V) -> Result<(), Error>
@@ -1556,7 +1573,7 @@ impl ser::SerializeStruct for SerializeStruct {
         match self.name {
             VALUE_HANDLE_MARKER => {
                 let handle_id = match self.fields.get("handle") {
-                    Some(&Value(Repr::U64(handle_id))) => handle_id as usize,
+                    Some(&Value(ValueRepr::U64(handle_id))) => handle_id as usize,
                     _ => panic!("bad handle reference in value roundtrip"),
                 };
                 Ok(VALUE_HANDLES.with(|handles| {
@@ -1566,7 +1583,7 @@ impl ser::SerializeStruct for SerializeStruct {
                         .expect("value handle not in registry")
                 }))
             }
-            _ => Ok(Repr::Struct(RcType::new(self.fields)).into()),
+            _ => Ok(ValueRepr::Struct(RcType::new(self.fields)).into()),
         }
     }
 }
@@ -1591,7 +1608,10 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
 
     fn end(self) -> Result<Value, Error> {
         let mut rv = BTreeMap::new();
-        rv.insert(self.variant, Value::from(Repr::Map(RcType::new(self.map))));
+        rv.insert(
+            self.variant,
+            Value::from(ValueRepr::Map(RcType::new(self.map))),
+        );
         Ok(rv.into())
     }
 }
@@ -1890,7 +1910,7 @@ fn test_key_interning() {
 
     for value in v.iter() {
         match value.0 {
-            Repr::Map(m) => {
+            ValueRepr::Map(m) => {
                 let k = m.iter().next().unwrap().0;
                 match k {
                     Key::String(s) => {
