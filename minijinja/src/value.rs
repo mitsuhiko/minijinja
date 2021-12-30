@@ -434,7 +434,7 @@ fn format_seqish<I: Iterator<Item = D>, D: fmt::Display>(
 }
 
 /// An alternative view of a value.
-#[deprecated(since = "0.11.0", note = "use as_str/as_i64/as_i128/is_true instead")]
+#[deprecated(since = "0.11.0", note = "use as_str/is_true/TryFrom instead")]
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum Primitive<'a> {
     Undefined,
@@ -455,6 +455,18 @@ enum CoerceResult {
     F64(f64, f64),
 }
 
+fn as_f64(value: &Value) -> Option<f64> {
+    Some(match value.0 {
+        ValueRepr::Char(x) => x as i64 as f64,
+        ValueRepr::U64(x) => x as f64,
+        ValueRepr::U128(ref x) => **x as f64,
+        ValueRepr::I64(x) => x as f64,
+        ValueRepr::I128(ref x) => **x as f64,
+        ValueRepr::F64(x) => x,
+        _ => return None,
+    })
+}
+
 fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
     match (&a.0, &b.0) {
         // equal mappings are trivial
@@ -467,11 +479,17 @@ fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
         (ValueRepr::F64(a), ValueRepr::F64(b)) => Some(CoerceResult::F64(*a, *b)),
 
         // are floats involved?
-        (ValueRepr::F64(a), _) => Some(CoerceResult::F64(*a, b.as_f64()?)),
-        (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(a.as_f64()?, *b)),
+        (ValueRepr::F64(a), _) => Some(CoerceResult::F64(*a, as_f64(b)?)),
+        (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(as_f64(a)?, *b)),
 
         // everything else goes up to i128
-        (_, _) => Some(CoerceResult::I128(a.as_i128()?, b.as_i128()?)),
+        (_, _) if a.kind() == ValueKind::Number && b.kind() == ValueKind::Number => {
+            Some(CoerceResult::I128(
+                i128::try_from(a.clone()).ok()?,
+                i128::try_from(b.clone()).ok()?,
+            ))
+        }
+        _ => None,
     }
 }
 
@@ -570,12 +588,21 @@ pub(crate) fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 pub(crate) fn neg(val: &Value) -> Result<Value, Error> {
     fn do_it(val: &Value) -> Option<Value> {
         match val.0 {
-            ValueRepr::F64(x) => Some((-x).into()),
-            _ => Some(int_as_value(-val.as_i128()?)),
+            ValueRepr::F64(x) => return Some((-x).into()),
+            _ => {
+                if let Ok(x) = i128::try_from(val.clone()) {
+                    return Some(int_as_value(-x));
+                }
+            }
         }
+        None
     }
 
-    do_it(val).ok_or_else(|| Error::from(ErrorKind::ImpossibleOperation))
+    if val.kind() != ValueKind::Number {
+        Err(Error::from(ErrorKind::ImpossibleOperation))
+    } else {
+        do_it(val).ok_or_else(|| Error::from(ErrorKind::ImpossibleOperation))
+    }
 }
 
 /// Attempts a string concatenation.
@@ -670,6 +697,8 @@ macro_rules! primitive_int_try_from {
         primitive_try_from!($ty, {
             ValueRepr::I64(val) => val,
             ValueRepr::U64(val) => val,
+            ValueRepr::I128(ref val) => **val,
+            ValueRepr::U128(ref val) => **val,
         });
     }
 }
@@ -854,67 +883,14 @@ impl Value {
         }
     }
 
-    /// Return the value as i64
-    pub fn as_i64(&self) -> Option<i64> {
-        Some(match self.0 {
-            ValueRepr::Bool(true) => 1,
-            ValueRepr::Bool(false) => 0,
-            ValueRepr::Char(x) => x as i64,
-            ValueRepr::U64(x) => x as i64,
-            ValueRepr::U128(ref x) => {
-                let rv = **x as i64;
-                if rv as u128 == **x {
-                    rv
-                } else {
-                    return None;
-                }
-            }
-            ValueRepr::I64(x) => x,
-            ValueRepr::I128(ref x) => {
-                let rv = **x as i64;
-                if rv as i128 == **x {
-                    rv
-                } else {
-                    return None;
-                }
-            }
-            ValueRepr::F64(x) => x as i64,
-            _ => return None,
-        })
-    }
-
-    /// Return the value as i128
-    pub fn as_i128(&self) -> Option<i128> {
-        Some(match self.0 {
-            ValueRepr::Bool(true) => 1,
-            ValueRepr::Bool(false) => 0,
-            ValueRepr::Char(x) => x as i128,
-            ValueRepr::U64(x) => x as i128,
-            ValueRepr::U128(ref x) => **x as i128,
-            ValueRepr::I64(x) => x as i128,
-            ValueRepr::I128(ref x) => **x as i128,
-            ValueRepr::F64(x) => x as i128,
-            _ => return None,
-        })
-    }
-
     /// Return the value as f64
+    #[deprecated(since = "0.11.0", note = "use as_str/is_true/TryFrom instead")]
     pub fn as_f64(&self) -> Option<f64> {
-        Some(match self.0 {
-            ValueRepr::Bool(true) => 1.0,
-            ValueRepr::Bool(false) => 0.0,
-            ValueRepr::Char(x) => x as i64 as f64,
-            ValueRepr::U64(x) => x as f64,
-            ValueRepr::U128(ref x) => **x as f64,
-            ValueRepr::I64(x) => x as f64,
-            ValueRepr::I128(ref x) => **x as f64,
-            ValueRepr::F64(x) => x,
-            _ => return None,
-        })
+        as_f64(self)
     }
 
     /// Deprecated alternative representation of a value.
-    #[deprecated(since = "0.11.0", note = "use as_str/as_i64/as_i128/is_true instead")]
+    #[deprecated(since = "0.11.0", note = "use as_str/is_true/TryFrom instead")]
     #[allow(deprecated)]
     pub fn as_primitive(&self) -> Option<Primitive<'_>> {
         match self.0 {
