@@ -457,7 +457,7 @@ enum CoerceResult {
 
 fn as_f64(value: &Value) -> Option<f64> {
     Some(match value.0 {
-        ValueRepr::Char(x) => x as i64 as f64,
+        ValueRepr::Bool(x) => x as i64 as f64,
         ValueRepr::U64(x) => x as f64,
         ValueRepr::U128(ref x) => **x as f64,
         ValueRepr::I64(x) => x as f64,
@@ -465,6 +465,10 @@ fn as_f64(value: &Value) -> Option<f64> {
         ValueRepr::F64(x) => x,
         _ => return None,
     })
+}
+
+fn is_numeric(value: &Value) -> bool {
+    matches!(value.kind(), ValueKind::Bool | ValueKind::Number)
 }
 
 fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
@@ -483,12 +487,10 @@ fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
         (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(as_f64(a)?, *b)),
 
         // everything else goes up to i128
-        (_, _) if a.kind() == ValueKind::Number && b.kind() == ValueKind::Number => {
-            Some(CoerceResult::I128(
-                i128::try_from(a.clone()).ok()?,
-                i128::try_from(b.clone()).ok()?,
-            ))
-        }
+        (_, _) if is_numeric(a) && is_numeric(b) => Some(CoerceResult::I128(
+            i128::try_from(a.clone()).ok()?,
+            i128::try_from(b.clone()).ok()?,
+        )),
         _ => None,
     }
 }
@@ -695,6 +697,7 @@ macro_rules! primitive_try_from {
 macro_rules! primitive_int_try_from {
     ($ty:ident) => {
         primitive_try_from!($ty, {
+            ValueRepr::Bool(val) => val as usize,
             ValueRepr::I64(val) => val,
             ValueRepr::U64(val) => val,
             ValueRepr::I128(ref val) => **val,
