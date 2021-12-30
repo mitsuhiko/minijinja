@@ -149,7 +149,7 @@ mod builtins {
 
     use crate::error::ErrorKind;
     use crate::utils::matches;
-    use crate::value::{Primitive, ValueKind};
+    use crate::value::ValueKind;
     use std::cmp::Ordering;
     use std::fmt::Write;
 
@@ -200,7 +200,7 @@ mod builtins {
     /// Reverses a list or string
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn reverse(_state: &State, v: Value) -> Result<Value, Error> {
-        if let Some(Primitive::Str(s)) = v.as_primitive() {
+        if let Some(s) = v.as_str() {
             Ok(Value::from(s.chars().rev().collect::<String>()))
         } else if matches!(v.kind(), ValueKind::Seq) {
             let mut v = v.try_into_vec()?;
@@ -235,7 +235,7 @@ mod builtins {
 
         let joiner = joiner.as_ref().map_or("", |x| x.as_str());
 
-        if let Some(Primitive::Str(s)) = val.as_primitive() {
+        if let Some(s) = val.as_str() {
             let mut rv = String::new();
             for c in s.chars() {
                 if !rv.is_empty() {
@@ -320,15 +320,15 @@ mod builtins {
     )]
     #[cfg(feature = "urlencode")]
     pub fn urlencode(_: &State, value: Value) -> Result<String, Error> {
+        use crate::value::ValueRepr;
+
         const SET: &percent_encoding::AsciiSet =
             &percent_encoding::NON_ALPHANUMERIC.remove(b'/').add(b' ');
-        match (value.as_primitive(), value.kind()) {
-            (Some(Primitive::None), _) | (Some(Primitive::Undefined), _) => Ok("".into()),
-            (Some(Primitive::Bytes(b)), _) => {
-                Ok(percent_encoding::percent_encode(b, SET).to_string())
-            }
-            (Some(Primitive::Str(s)), _) => {
-                Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
+        match (&value.0, value.kind()) {
+            (ValueRepr::None, _) | (ValueRepr::Undefined, _) => Ok("".into()),
+            (ValueRepr::Bytes(b), _) => Ok(percent_encoding::percent_encode(&b, SET).to_string()),
+            (ValueRepr::String(s), _) | (ValueRepr::SafeString(s), _) => {
+                Ok(percent_encoding::utf8_percent_encode(&s, SET).to_string())
             }
             (_, ValueKind::Struct) | (_, ValueKind::Map) => {
                 let mut rv = String::new();

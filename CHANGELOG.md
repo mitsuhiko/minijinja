@@ -2,6 +2,13 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.11.0
+
+- Deprecated `Primitive` and `as_primitive`.
+- Truthiness of values is now checking container length.  Previously containers
+  were always true, now they are only true if they are not empty.
+- Strings and safe strings no longer compare the same.
+
 # 0.10.0
 
 - Restructured the value type internally to be simpler and not use unsafe at the

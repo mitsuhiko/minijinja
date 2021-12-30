@@ -121,17 +121,13 @@ mod builtins {
     /// Checks if a value is odd.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
     pub fn is_odd(_state: &State, v: Value) -> Result<bool, Error> {
-        Ok(v.as_primitive()
-            .and_then(|x| x.as_i128())
-            .map_or(false, |x| x % 2 != 0))
+        Ok(v.as_i128().map_or(false, |x| x % 2 != 0))
     }
 
     /// Checks if a value is even.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
     pub fn is_even(_state: &State, v: Value) -> Result<bool, Error> {
-        Ok(v.as_primitive()
-            .and_then(|x| x.as_i128())
-            .map_or(false, |x| x % 2 == 0))
+        Ok(v.as_i128().map_or(false, |x| x % 2 == 0))
     }
 
     /// Checks if a value is undefined.
