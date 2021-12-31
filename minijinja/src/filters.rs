@@ -188,12 +188,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn dictsort(_state: &State, v: Value) -> Result<Value, Error> {
         let mut pairs = match v.0 {
-            ValueRepr::Map(v) => match RcType::try_unwrap(v) {
-                Ok(v) => v,
-                Err(rc) => (*rc).clone(),
-            }
-            .into_iter()
-            .collect::<Vec<_>>(),
+            ValueRepr::Map(ref v) => v.iter().collect::<Vec<_>>(),
             _ => {
                 return Err(Error::new(
                     ErrorKind::ImpossibleOperation,
@@ -201,11 +196,11 @@ mod builtins {
                 ))
             }
         };
-        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        pairs.sort_by(|a, b| a.0.cmp(b.0));
         Ok(Value::from(
             pairs
                 .into_iter()
-                .map(|(k, v)| vec![Value::from(k), v])
+                .map(|(k, v)| vec![Value::from(k.clone()), v.clone()])
                 .collect::<Vec<_>>(),
         ))
     }
