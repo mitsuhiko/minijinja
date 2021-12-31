@@ -196,7 +196,6 @@ pub enum ValueKind {
     Bytes,
     Seq,
     Map,
-    Struct,
 }
 
 impl fmt::Display for ValueKind {
@@ -211,7 +210,6 @@ impl fmt::Display for ValueKind {
             ValueKind::Bytes => "bytes",
             ValueKind::Seq => "sequence",
             ValueKind::Map => "map",
-            ValueKind::Struct => "struct",
         };
         write!(f, "{}", ty)
     }
@@ -233,7 +231,6 @@ pub(crate) enum ValueRepr {
     Bytes(RcType<Vec<u8>>),
     Seq(RcType<Vec<Value>>),
     Map(RcType<ValueMap<Key<'static>, Value>>),
-    Struct(RcType<ValueMap<&'static str, Value>>),
     Dynamic(RcType<dyn Object>),
 }
 
@@ -254,13 +251,6 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Map(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::Struct(val) => {
-                let mut s = f.debug_struct("Struct");
-                for (k, v) in val.iter() {
-                    s.field(k, v);
-                }
-                s.finish()
-            }
             ValueRepr::Dynamic(val) => fmt::Debug::fmt(val, f),
         }
     }
@@ -509,16 +499,6 @@ impl fmt::Display for Value {
             ValueRepr::Map(m) => {
                 write!(f, "{{")?;
                 for (idx, (key, val)) in m.iter().enumerate() {
-                    if idx > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{:?}: {:?}", key, val)?;
-                }
-                write!(f, "}}")
-            }
-            ValueRepr::Struct(fields) => {
-                write!(f, "{{")?;
-                for (idx, (key, val)) in fields.iter().enumerate() {
                     if idx > 0 {
                         write!(f, ", ")?;
                     }
@@ -878,8 +858,7 @@ impl Value {
             ValueRepr::Bytes(_) => ValueKind::Bytes,
             ValueRepr::U128(_) => ValueKind::Number,
             ValueRepr::Seq(_) => ValueKind::Seq,
-            ValueRepr::Map(_) => ValueKind::Map,
-            ValueRepr::Struct(_) | ValueRepr::Dynamic(_) => ValueKind::Struct,
+            ValueRepr::Map(_) | ValueRepr::Dynamic(_) => ValueKind::Map,
         }
     }
 
@@ -935,7 +914,6 @@ impl Value {
             ValueRepr::None | ValueRepr::Undefined => false,
             ValueRepr::Seq(ref x) => !x.is_empty(),
             ValueRepr::Map(ref x) => !x.is_empty(),
-            ValueRepr::Struct(ref x) => !x.is_empty(),
             ValueRepr::Dynamic(_) => true,
         }
     }
@@ -960,7 +938,6 @@ impl Value {
         match self.0 {
             ValueRepr::String(ref s) | ValueRepr::SafeString(ref s) => Some(s.chars().count()),
             ValueRepr::Map(ref items) => Some(items.len()),
-            ValueRepr::Struct(ref items) => Some(items.len()),
             ValueRepr::Seq(ref items) => Some(items.len()),
             ValueRepr::Dynamic(ref dy) => Some(dy.attributes().len()),
             _ => None,
@@ -974,7 +951,6 @@ impl Value {
                 let lookup_key = Key::Str(key);
                 items.get(&lookup_key).cloned()
             }
-            ValueRepr::Struct(ref items) => items.get(key).cloned(),
             ValueRepr::Dynamic(ref dy) => dy.get_attr(key),
             ValueRepr::Undefined => {
                 return Err(Error::from(ErrorKind::UndefinedError));
@@ -1002,11 +978,6 @@ impl Value {
 
         match self.0 {
             ValueRepr::Map(ref items) => return items.get(&key).cloned(),
-            ValueRepr::Struct(ref items) => {
-                if let Key::String(ref key) = key {
-                    return items.get(key.as_str()).cloned();
-                }
-            }
             ValueRepr::Seq(ref items) => {
                 if let Key::I64(idx) = key {
                     let idx = isize::try_from(idx).ok()?;
@@ -1096,9 +1067,6 @@ impl Value {
                 m.iter()
                     .filter_map(|(k, v)| k.as_str().map(move |k| (k, v.clone()))),
             ) as Box<dyn Iterator<Item = _>>,
-            ValueRepr::Struct(ref s) => {
-                Box::new(s.iter().map(|(k, v)| (*k, v.clone()))) as Box<dyn Iterator<Item = _>>
-            }
             ValueRepr::Dynamic(ref obj) => Box::new(
                 obj.attributes()
                     .iter()
@@ -1124,19 +1092,6 @@ impl Value {
                     RcType::clone(items),
                 ),
                 items.len(),
-            ),
-            #[cfg(feature = "preserve_order")]
-            ValueRepr::Struct(ref fields) => (
-                ValueIteratorState::Struct(0, RcType::clone(fields)),
-                fields.len(),
-            ),
-            #[cfg(not(feature = "preserve_order"))]
-            ValueRepr::Struct(ref fields) => (
-                ValueIteratorState::Struct(
-                    fields.iter().next().map(|x| *x.0),
-                    RcType::clone(fields),
-                ),
-                fields.len(),
             ),
             _ => (ValueIteratorState::Empty, 0),
         };
@@ -1180,14 +1135,6 @@ impl Serialize for Value {
                     map.serialize_entry(k, v)?;
                 }
                 map.end()
-            }
-            ValueRepr::Struct(ref fields) => {
-                use serde::ser::SerializeStruct;
-                let mut s = serializer.serialize_struct("Struct", fields.len())?;
-                for (k, ref v) in fields.iter() {
-                    s.serialize_field(k, v)?;
-                }
-                s.end()
             }
             ValueRepr::Dynamic(ref n) => {
                 use serde::ser::SerializeMap;
@@ -1542,7 +1489,7 @@ impl ser::SerializeMap for SerializeMap {
 
 struct SerializeStruct {
     name: &'static str,
-    fields: ValueMap<&'static str, Value>,
+    fields: ValueMap<Key<'static>, Value>,
 }
 
 impl ser::SerializeStruct for SerializeStruct {
@@ -1554,14 +1501,14 @@ impl ser::SerializeStruct for SerializeStruct {
         T: Serialize,
     {
         let value = value.serialize(ValueSerializer)?;
-        self.fields.insert(key, value);
+        self.fields.insert(Key::Str(key), value);
         Ok(())
     }
 
     fn end(self) -> Result<Value, Error> {
         match self.name {
             VALUE_HANDLE_MARKER => {
-                let handle_id = match self.fields.get("handle") {
+                let handle_id = match self.fields.get(&Key::Str("handle")) {
                     Some(&Value(ValueRepr::U64(handle_id))) => handle_id as usize,
                     _ => panic!("bad handle reference in value roundtrip"),
                 };
@@ -1572,7 +1519,7 @@ impl ser::SerializeStruct for SerializeStruct {
                         .expect("value handle not in registry")
                 }))
             }
-            _ => Ok(ValueRepr::Struct(RcType::new(self.fields)).into()),
+            _ => Ok(ValueRepr::Map(RcType::new(self.fields)).into()),
         }
     }
 }
@@ -1640,10 +1587,6 @@ enum ValueIteratorState {
     Map(Option<Key<'static>>, RcType<ValueMap<Key<'static>, Value>>),
     #[cfg(feature = "preserve_order")]
     Map(usize, RcType<ValueMap<Key<'static>, Value>>),
-    #[cfg(not(feature = "preserve_order"))]
-    Struct(Option<&'static str>, RcType<ValueMap<&'static str, Value>>),
-    #[cfg(feature = "preserve_order")]
-    Struct(usize, RcType<ValueMap<&'static str, Value>>),
 }
 
 impl ValueIteratorState {
@@ -1668,21 +1611,6 @@ impl ValueIteratorState {
                     let next = map.range(&current..).nth(1).map(|x| x.0.clone());
                     let rv = Value::from(current);
                     *ptr = next;
-                    Some(rv)
-                } else {
-                    None
-                }
-            }
-            #[cfg(feature = "preserve_order")]
-            ValueIteratorState::Struct(idx, map) => map.get_index(*idx).map(|x| {
-                *idx += 1;
-                Value::from(*x.0)
-            }),
-            #[cfg(not(feature = "preserve_order"))]
-            ValueIteratorState::Struct(ptr, map) => {
-                if let Some(current) = ptr {
-                    let rv = Value::from(*current);
-                    *ptr = map.range(*current..).nth(1).map(|x| *x.0);
                     Some(rv)
                 } else {
                     None

@@ -407,32 +407,25 @@ mod builtins {
     pub fn urlencode(_: &State, value: Value) -> Result<String, Error> {
         const SET: &percent_encoding::AsciiSet =
             &percent_encoding::NON_ALPHANUMERIC.remove(b'/').add(b' ');
-        match (&value.0, value.kind()) {
-            (ValueRepr::None, _) | (ValueRepr::Undefined, _) => Ok("".into()),
-            (ValueRepr::Bytes(b), _) => Ok(percent_encoding::percent_encode(&b, SET).to_string()),
-            (ValueRepr::String(s), _) | (ValueRepr::SafeString(s), _) => {
-                Ok(percent_encoding::utf8_percent_encode(&s, SET).to_string())
+        match &value.0 {
+            ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
+            ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
+            ValueRepr::String(s) | ValueRepr::SafeString(s) => {
+                Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
             }
-            (_, ValueKind::Struct) | (_, ValueKind::Map) => {
+            ValueRepr::Map(ref val) => {
                 let mut rv = String::new();
-                for (idx, ref k) in value.iter().enumerate() {
+                for (idx, (k, v)) in val.iter().enumerate() {
                     if idx > 0 {
                         rv.push('&');
                     }
                     write!(
                         rv,
-                        "{}",
-                        percent_encoding::utf8_percent_encode(&k.to_string(), SET)
+                        "{}={}",
+                        percent_encoding::utf8_percent_encode(&k.to_string(), SET),
+                        percent_encoding::utf8_percent_encode(&v.to_string(), SET)
                     )
                     .unwrap();
-                    if let Ok(v) = value.get_item(k) {
-                        write!(
-                            rv,
-                            "={}",
-                            percent_encoding::utf8_percent_encode(&v.to_string(), SET)
-                        )
-                        .unwrap();
-                    }
                 }
                 Ok(rv)
             }
