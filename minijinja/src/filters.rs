@@ -111,6 +111,8 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
         rv.insert("join", BoxedFilter::new(join));
         rv.insert("default", BoxedFilter::new(default));
         rv.insert("d", BoxedFilter::new(default));
+        rv.insert("batch", BoxedFilter::new(batch));
+        rv.insert("slice", BoxedFilter::new(slice));
         #[cfg(feature = "json")]
         {
             rv.insert("tojson", BoxedFilter::new(tojson));
@@ -151,6 +153,7 @@ mod builtins {
     use crate::utils::matches;
     use crate::value::{ValueKind, ValueRepr};
     use std::fmt::Write;
+    use std::mem;
 
     /// Converts a value to uppercase.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
@@ -282,6 +285,81 @@ mod builtins {
         } else {
             value
         })
+    }
+
+    /// """Slice an iterator and return a list of lists containing
+    /// those items. Useful if you want to create a div containing
+    /// three ul tags that represent columns:
+    pub fn slice(
+        _: &State,
+        value: Value,
+        count: usize,
+        fill_with: Option<Value>,
+    ) -> Result<Value, Error> {
+        let items = value.iter().collect::<Vec<_>>();
+        let len = items.len();
+        let items_per_slice = len / count;
+        let slices_with_extra = len % count;
+        let mut offset = 0;
+        let mut rv = Vec::new();
+
+        for slice in 0..count {
+            let start = offset + slice * items_per_slice;
+            if slice < slices_with_extra {
+                offset += 1;
+            }
+            let end = offset + (slice + 1) * items_per_slice;
+            let tmp = &items[start..end];
+
+            if let Some(ref filler) = fill_with {
+                if slice >= slices_with_extra {
+                    let mut tmp = tmp.to_vec();
+                    tmp.push(filler.clone());
+                    rv.push(Value::from(tmp));
+                    continue;
+                }
+            }
+
+            rv.push(Value::from(tmp.to_vec()));
+        }
+
+        Ok(Value::from(rv))
+    }
+
+    /// Batch items.
+    ///
+    /// This filter works pretty much like `slice` just the other way round. It
+    /// returns a list of lists with the given number of items. If you provide a
+    /// second parameter this is used to fill up missing items.
+    pub fn batch(
+        _: &State,
+        value: Value,
+        count: usize,
+        fill_with: Option<Value>,
+    ) -> Result<Value, Error> {
+        let mut rv = Vec::new();
+        let mut tmp = Vec::with_capacity(count);
+
+        for item in value.iter() {
+            if tmp.len() == count {
+                rv.push(Value::from(mem::replace(
+                    &mut tmp,
+                    Vec::with_capacity(count),
+                )));
+            }
+            tmp.push(item);
+        }
+
+        if !tmp.is_empty() {
+            if let Some(filler) = fill_with {
+                for _ in 0..count - tmp.len() {
+                    tmp.push(filler.clone());
+                }
+            }
+            rv.push(Value::from(tmp));
+        }
+
+        Ok(Value::from(rv))
     }
 
     /// Dumps a value to JSON.

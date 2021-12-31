@@ -32,3 +32,7 @@ json-pretty: {{ map|tojson(true) }}
 json-scary-html: {{ scary_html|tojson }}
 urlencode: {{ "hello world/baz"|urlencode }}
 urlencode-kv: {{ dict(a="x y", b=2, c=3)|urlencode }}
+batch: {{ range(10)|batch(3) }}
+batch-fill: {{ range(10)|batch(3, '-') }}
+slice: {{ range(10)|slice(3) }}
+slice-fill: {{ range(10)|slice(3, '-') }}

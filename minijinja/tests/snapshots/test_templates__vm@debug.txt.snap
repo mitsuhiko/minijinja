@@ -49,6 +49,7 @@ State {
             "undefined",
         ],
         filters: [
+            "batch",
             "count",
             "d",
             "default",
@@ -61,6 +62,7 @@ State {
             "replace",
             "reverse",
             "safe",
+            "slice",
             "tojson",
             "trim",
             "upper",

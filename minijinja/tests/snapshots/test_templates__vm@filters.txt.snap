@@ -33,6 +33,10 @@ json-pretty: {
 json-scary-html: "\u003c\u003e\u0026\u0027"
 urlencode: hello%20world/baz
 urlencode-kv: a=x%20y&b=2&c=3
+batch: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
+batch-fill: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, "-", "-"]]
+slice: [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
+slice-fill: [[0, 1, 2, 3], [4, 5, 6, "-"], [7, 8, 9, "-"]]
 =====
 
 Template {
@@ -191,6 +195,40 @@ Template {
         00096 | BUILD_LIST (0 items),
         00097 | APPLY_FILTER (name "urlencode"),
         00098 | EMIT,
+        00099 | EMIT_RAW (string "\nbatch: "),
+        0009a | LOAD_CONST (value 10)  [line 27],
+        0009b | BUILD_LIST (1 items),
+        0009c | CALL_FUNCTION (name "range"),
+        0009d | LOAD_CONST (value 3),
+        0009e | BUILD_LIST (1 items),
+        0009f | APPLY_FILTER (name "batch"),
+        000a0 | EMIT,
+        000a1 | EMIT_RAW (string "\nbatch-fill: "),
+        000a2 | LOAD_CONST (value 10)  [line 28],
+        000a3 | BUILD_LIST (1 items),
+        000a4 | CALL_FUNCTION (name "range"),
+        000a5 | LOAD_CONST (value 3),
+        000a6 | LOAD_CONST (value "-"),
+        000a7 | BUILD_LIST (2 items),
+        000a8 | APPLY_FILTER (name "batch"),
+        000a9 | EMIT,
+        000aa | EMIT_RAW (string "\nslice: "),
+        000ab | LOAD_CONST (value 10)  [line 29],
+        000ac | BUILD_LIST (1 items),
+        000ad | CALL_FUNCTION (name "range"),
+        000ae | LOAD_CONST (value 3),
+        000af | BUILD_LIST (1 items),
+        000b0 | APPLY_FILTER (name "slice"),
+        000b1 | EMIT,
+        000b2 | EMIT_RAW (string "\nslice-fill: "),
+        000b3 | LOAD_CONST (value 10)  [line 30],
+        000b4 | BUILD_LIST (1 items),
+        000b5 | CALL_FUNCTION (name "range"),
+        000b6 | LOAD_CONST (value 3),
+        000b7 | LOAD_CONST (value "-"),
+        000b8 | BUILD_LIST (2 items),
+        000b9 | APPLY_FILTER (name "slice"),
+        000ba | EMIT,
     ],
     blocks: {},
     initial_auto_escape: None,
