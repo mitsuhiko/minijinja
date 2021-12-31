@@ -37,6 +37,8 @@ batch: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
 batch-fill: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, "-", "-"]]
 slice: [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
 slice-fill: [[0, 1, 2, 3], [4, 5, 6, "-"], [7, 8, 9, "-"]]
+pairs: [["a", 1]]
+items: [["a", 1]]
 =====
 
 Template {
@@ -229,6 +231,24 @@ Template {
         000b8 | BUILD_LIST (2 items),
         000b9 | APPLY_FILTER (name "slice"),
         000ba | EMIT,
+        000bb | EMIT_RAW (string "\npairs: "),
+        000bc | LOAD_CONST (value "a")  [line 31],
+        000bd | LOAD_CONST (value 1),
+        000be | BUILD_MAP (1 pairs),
+        000bf | BUILD_LIST (1 items),
+        000c0 | CALL_FUNCTION (name "dict"),
+        000c1 | BUILD_LIST (0 items),
+        000c2 | APPLY_FILTER (name "pairs"),
+        000c3 | EMIT,
+        000c4 | EMIT_RAW (string "\nitems: "),
+        000c5 | LOAD_CONST (value "a")  [line 32],
+        000c6 | LOAD_CONST (value 1),
+        000c7 | BUILD_MAP (1 pairs),
+        000c8 | BUILD_LIST (1 items),
+        000c9 | CALL_FUNCTION (name "dict"),
+        000ca | BUILD_LIST (0 items),
+        000cb | APPLY_FILTER (name "items"),
+        000cc | EMIT,
     ],
     blocks: {},
     initial_auto_escape: None,
