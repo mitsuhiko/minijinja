@@ -28,29 +28,55 @@ pub struct Template<'env> {
 
 impl<'env> fmt::Debug for Template<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Template")
-            .field("name", &self.name)
-            .field("instructions", &self.compiled.instructions)
-            .field("blocks", &self.compiled.blocks)
-            .field("initial_auto_escape", &self.initial_auto_escape)
-            .finish()
+        let mut ds = f.debug_struct("Template");
+        ds.field("name", &self.name);
+        #[cfg(feature = "internal_debug")]
+        {
+            ds.field("instructions", &self.compiled.instructions);
+            ds.field("blocks", &self.compiled.blocks);
+        }
+        ds.field("initial_auto_escape", &self.initial_auto_escape);
+        ds.finish()
     }
 }
 
 /// Represents a compiled template in memory.
 #[derive(Clone)]
 pub(crate) struct CompiledTemplate<'source> {
-    source: &'source str,
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,
 }
 
 impl<'env> fmt::Debug for CompiledTemplate<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CompiledTemplate")
-            .field("instructions", &self.instructions)
-            .field("blocks", &self.blocks)
-            .finish()
+        let mut ds = f.debug_struct("CompiledTemplate");
+        #[cfg(feature = "internal_debug")]
+        {
+            ds.field("instructions", &self.instructions);
+            ds.field("blocks", &self.blocks);
+        }
+        ds.finish()
+    }
+}
+
+fn attach_basic_debug_info<T>(rv: Result<T, Error>, source: &str) -> Result<T, Error> {
+    #[cfg(feature = "debug")]
+    {
+        match rv {
+            Ok(rv) => Ok(rv),
+            Err(mut err) => {
+                err.debug_info = Some(crate::error::DebugInfo {
+                    template_source: Some(source.to_string()),
+                    ..Default::default()
+                });
+                Err(err)
+            }
+        }
+    }
+    #[cfg(not(feature = "debug"))]
+    {
+        let _source = source;
+        rv
     }
 }
 
@@ -59,20 +85,7 @@ impl<'source> CompiledTemplate<'source> {
         name: &'source str,
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
-        #![allow(unused_mut)]
-        match Self::_from_name_and_source_impl(name, source) {
-            Ok(rv) => Ok(rv),
-            Err(mut err) => {
-                #[cfg(feature = "debug")]
-                {
-                    err.debug_info = Some(crate::error::DebugInfo {
-                        template_source: Some(source.to_string()),
-                        ..Default::default()
-                    });
-                }
-                Err(err)
-            }
-        }
+        attach_basic_debug_info(Self::_from_name_and_source_impl(name, source), source)
     }
 
     fn _from_name_and_source_impl(
@@ -80,11 +93,10 @@ impl<'source> CompiledTemplate<'source> {
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
         let ast = parse(source, name)?;
-        let mut compiler = Compiler::new(name);
+        let mut compiler = Compiler::new(name, source);
         compiler.compile_stmt(&ast)?;
         let (instructions, blocks) = compiler.finish();
         Ok(CompiledTemplate {
-            source,
             blocks,
             instructions,
         })
@@ -99,7 +111,7 @@ impl<'env> Template<'env> {
 
     /// Returns the source code of the template.
     pub fn source(&self) -> &str {
-        self.compiled.source
+        self.compiled.instructions.source()
     }
 
     /// Renders the template into a string.
@@ -241,10 +253,17 @@ fn no_auto_escape(_: &str) -> AutoEscape {
 /// let rv = expr.eval(context!(number => 15)).unwrap();
 /// assert!(rv.is_true());
 /// ```
-#[derive(Debug)]
 pub struct Expression<'env, 'source> {
     env: &'env Environment<'source>,
     instructions: Instructions<'source>,
+}
+
+impl<'env, 'source> fmt::Debug for Expression<'env, 'source> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Expression")
+            .field("env", &self.env)
+            .finish()
+    }
 }
 
 impl<'env, 'source> Expression<'env, 'source> {
@@ -329,7 +348,9 @@ impl<'source> Environment<'source> {
     /// high as the data including the template source is cloned.
     ///
     /// However providing this information greatly improves the debug information
-    /// that the template error provides.
+    /// that the template error provides.  When debug is enabled errors will
+    /// return a [`DebugInfo`](crate::error::DebugInfo) object from
+    /// [`Error::debug_info`](crate::error::Error::debug_info).
     ///
     /// This requires the `debug` feature.
     #[cfg(feature = "debug")]
@@ -428,8 +449,15 @@ impl<'source> Environment<'source> {
     /// be used as a minimal scripting language.  For more information and an
     /// example see [`Expression`].
     pub fn compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
+        attach_basic_debug_info(self._compile_expression(expr), expr)
+    }
+
+    pub fn _compile_expression(
+        &self,
+        expr: &'source str,
+    ) -> Result<Expression<'_, 'source>, Error> {
         let ast = parse_expr(expr)?;
-        let mut compiler = Compiler::new("<expression>");
+        let mut compiler = Compiler::new("<expression>", expr);
         compiler.compile_expr(&ast)?;
         let (instructions, _) = compiler.finish();
         Ok(Expression {

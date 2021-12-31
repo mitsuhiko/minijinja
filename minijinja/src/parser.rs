@@ -146,13 +146,13 @@ macro_rules! unaryop {
                 _ => return self.$next()
             };
             self.stream.next()?;
-            return Ok(ast::Expr::UnaryOp(Spanned::new(
+            Ok(ast::Expr::UnaryOp(Spanned::new(
                 ast::UnaryOp {
                     op,
                     expr: self.$func()?,
                 },
                 self.stream.expand_span(span),
-            )));
+            )))
         }
     };
 }
@@ -636,11 +636,11 @@ impl<'a> Parser<'a> {
         };
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
         let body =
-            self.subparse(|tok| matches!(tok, Token::Ident("endfor") | Token::Ident("else")))?;
+            self.subparse(&|tok| matches!(tok, Token::Ident("endfor") | Token::Ident("else")))?;
         let else_body = if matches!(self.stream.current()?, Some((Token::Ident("else"), _))) {
             self.stream.next()?;
             expect_token!(self, Token::BlockEnd(..), "end of block")?;
-            self.subparse(|tok| matches!(tok, Token::Ident("endfor")))?
+            self.subparse(&|tok| matches!(tok, Token::Ident("endfor")))?
         } else {
             Vec::new()
         };
@@ -657,7 +657,7 @@ impl<'a> Parser<'a> {
     fn parse_if_cond(&mut self) -> Result<ast::IfCond<'a>, Error> {
         let expr = self.parse_expr_noif()?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
-        let true_body = self.subparse(|tok| {
+        let true_body = self.subparse(&|tok| {
             matches!(
                 tok,
                 Token::Ident("endif") | Token::Ident("else") | Token::Ident("elif")
@@ -666,7 +666,7 @@ impl<'a> Parser<'a> {
         let false_body = match self.stream.next()? {
             Some((Token::Ident("else"), _)) => {
                 expect_token!(self, Token::BlockEnd(..), "end of block")?;
-                let rv = self.subparse(|tok| matches!(tok, Token::Ident("endif")))?;
+                let rv = self.subparse(&|tok| matches!(tok, Token::Ident("endif")))?;
                 self.stream.next()?;
                 rv
             }
@@ -701,7 +701,7 @@ impl<'a> Parser<'a> {
         }
 
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
-        let body = self.subparse(|tok| matches!(tok, Token::Ident("endwith")))?;
+        let body = self.subparse(&|tok| matches!(tok, Token::Ident("endwith")))?;
         self.stream.next()?;
         Ok(ast::WithBlock { assignments, body })
     }
@@ -709,7 +709,7 @@ impl<'a> Parser<'a> {
     fn parse_block(&mut self) -> Result<ast::Block<'a>, Error> {
         let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
-        let body = self.subparse(|tok| matches!(tok, Token::Ident("endblock")))?;
+        let body = self.subparse(&|tok| matches!(tok, Token::Ident("endblock")))?;
         self.stream.next()?;
 
         if let Some((Token::Ident(trailing_name), _)) = self.stream.current()? {
@@ -739,7 +739,7 @@ impl<'a> Parser<'a> {
     fn parse_auto_escape(&mut self) -> Result<ast::AutoEscape<'a>, Error> {
         let enabled = self.parse_expr()?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
-        let body = self.subparse(|tok| matches!(tok, Token::Ident("endautoescape")))?;
+        let body = self.subparse(&|tok| matches!(tok, Token::Ident("endautoescape")))?;
         self.stream.next()?;
         Ok(ast::AutoEscape { enabled, body })
     }
@@ -771,14 +771,14 @@ impl<'a> Parser<'a> {
             .ok_or_else(|| Error::new(ErrorKind::InvalidSyntax, "filter block without filter"))?;
 
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
-        let body = self.subparse(|tok| matches!(tok, Token::Ident("endfilter")))?;
+        let body = self.subparse(&|tok| matches!(tok, Token::Ident("endfilter")))?;
         self.stream.next()?;
         Ok(ast::FilterBlock { filter, body })
     }
 
-    fn subparse<F: FnMut(&Token) -> bool>(
+    fn subparse(
         &mut self,
-        mut end_check: F,
+        end_check: &dyn Fn(&Token) -> bool,
     ) -> Result<Vec<ast::Stmt<'a>>, Error> {
         let mut rv = Vec::new();
         while let Some((token, span)) = self.stream.next()? {
@@ -817,7 +817,7 @@ impl<'a> Parser<'a> {
         let span = self.stream.current_span();
         Ok(ast::Stmt::Template(Spanned::new(
             ast::Template {
-                children: self.subparse(|_| false)?,
+                children: self.subparse(&|_| false)?,
             },
             self.stream.expand_span(span),
         )))

@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 use std::fmt::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -8,7 +7,7 @@ use crate::error::{Error, ErrorKind};
 use crate::instructions::{Instruction, Instructions};
 use crate::key::Key;
 use crate::utils::matches;
-use crate::value::{self, Object, Primitive, RcType, Value, ValueIterator};
+use crate::value::{self, Object, RcType, Value, ValueIterator};
 use crate::AutoEscape;
 
 pub struct LoopState {
@@ -81,7 +80,7 @@ impl fmt::Display for LoopState {
     }
 }
 
-#[derive(Debug)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Loop<'env> {
     locals: BTreeMap<&'env str, Value>,
     with_loop_var: bool,
@@ -100,6 +99,7 @@ pub enum Frame<'env, 'vm> {
     Loop(Loop<'env>),
 }
 
+#[cfg(feature = "internal_debug")]
 impl<'env, 'vm> fmt::Debug for Frame<'env, 'vm> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -116,7 +116,7 @@ impl<'env, 'vm> fmt::Debug for Frame<'env, 'vm> {
     }
 }
 
-#[derive(Debug, Default)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Stack {
     values: Vec<Value>,
 }
@@ -139,7 +139,8 @@ impl Stack {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Context<'env, 'vm> {
     stack: Vec<Frame<'env, 'vm>>,
 }
@@ -273,13 +274,16 @@ pub struct State<'vm, 'env> {
 
 impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("State")
-            .field("ctx", &self.ctx)
-            .field("name", &self.name)
-            .field("current_block", &self.current_block)
-            .field("auto_escape", &self.auto_escape)
-            .field("env", &self.env)
-            .finish()
+        let mut ds = f.debug_struct("State");
+        #[cfg(feature = "internal_debug")]
+        {
+            ds.field("ctx", &self.ctx);
+        }
+        ds.field("name", &self.name);
+        ds.field("current_block", &self.current_block);
+        ds.field("auto_escape", &self.auto_escape);
+        ds.field("env", &self.env);
+        ds.finish()
     }
 }
 
@@ -349,11 +353,7 @@ impl<'vm, 'env> State<'vm, 'env> {
     ) -> crate::error::DebugInfo {
         let referenced_names = instructions.get_referenced_names(pc);
         crate::error::DebugInfo {
-            template_source: self
-                .env
-                .get_template(self.name)
-                .ok()
-                .map(|x| x.source().to_string()),
+            template_source: Some(instructions.source().to_string()),
             context: Some(Value::from(self.ctx.freeze(self.env))),
             referenced_names: Some(referenced_names.iter().map(|x| x.to_string()).collect()),
         }
@@ -361,7 +361,7 @@ impl<'vm, 'env> State<'vm, 'env> {
 }
 
 /// Helps to evaluate something.
-#[derive(Debug)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Vm<'env> {
     env: &'env Environment<'env>,
 }
@@ -406,7 +406,7 @@ impl<'env> Vm<'env> {
         output: &mut String,
     ) -> Result<Option<Value>, Error> {
         let initial_auto_escape = state.auto_escape;
-        let mut stack = Stack::default();
+        let mut stack = Stack { values: Vec::new() };
         let mut auto_escape_stack = vec![];
         let mut capture_stack = vec![];
         let mut block_stack = vec![];
@@ -530,7 +530,7 @@ impl<'env> Vm<'env> {
                     let mut map = BTreeMap::new();
                     for _ in 0..*pair_count {
                         let value = stack.pop();
-                        let key: Key = try_ctx!(TryFrom::try_from(stack.pop()));
+                        let key: Key = try_ctx!(stack.pop().try_into_key());
                         map.insert(key, value);
                     }
                     stack.push(Value::from(map));
@@ -725,12 +725,10 @@ impl<'env> Vm<'env> {
                 Instruction::PushAutoEscape => {
                     let value = stack.pop();
                     auto_escape_stack.push(state.auto_escape);
-                    state.auto_escape = match value.as_primitive() {
-                        Some(Primitive::Str("html")) => AutoEscape::Html,
-                        Some(Primitive::Str("none")) | Some(Primitive::Bool(false)) => {
-                            AutoEscape::None
-                        }
-                        Some(Primitive::Bool(true)) => {
+                    state.auto_escape = match (value.as_str(), value == Value::from(true)) {
+                        (Some("html"), _) => AutoEscape::Html,
+                        (Some("none"), _) | (None, false) => AutoEscape::None,
+                        (None, true) => {
                             if matches!(initial_auto_escape, AutoEscape::None) {
                                 AutoEscape::Html
                             } else {

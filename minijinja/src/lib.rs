@@ -65,6 +65,13 @@
 //! assert_eq!(result.is_true(), true);
 //! ```
 //!
+//! # Debugging
+//!
+//! To better understand what's going on when a template syntax or rendering error
+//! happens you should turn on the built-in debug support.  Once enabled the errors
+//! created by the engine will include helpful error messages with information about
+//! where the error happened.  For more information see [`set_debug`](crate::Environment::set_debug).
+//!
 //! # Learn more
 //!
 //! - [`syntax`]: documentation of the template engine syntax.
@@ -76,6 +83,11 @@
 //! - [`Template`]: the template object API.
 //!
 //! # Optional Features
+//!
+//! MiniJinja comes with a lot of optional features, some of which are turned on by
+//! default.  If you plan on using MiniJinja in a library, please consider turning
+//! off all default features and to opt-in explicitly into the ones you actually
+//! need.
 //!
 //! There are some additional features that can be enabled:
 //!
@@ -106,6 +118,9 @@
 //!   MiniJinja still needs to be threadsafe.
 //! - `debug`: if this feature is removed some debug functionality of the engine is
 //!   removed as well.  This mainly affects the quality of error reporting.
+//! - `key_interning`: if this feature is removed the automatic string interning in
+//!   the value type is disabled.  The default behavior can cut down on the memory
+//!   consumption of the value type by interning all string keys used in values.
 #![allow(clippy::cognitive_complexity)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(html_logo_url = "https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo-square.png")]

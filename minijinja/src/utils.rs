@@ -99,7 +99,6 @@ impl<'a> fmt::Display for HtmlEscape<'a> {
     }
 }
 
-#[derive(Default)]
 struct Unescaper {
     out: String,
     pending_surrogate: u16,
@@ -175,7 +174,11 @@ impl Unescaper {
 
 /// Un-escape a string, following JSON rules.
 pub fn unescape(s: &str) -> Result<String, Error> {
-    Unescaper::default().unescape(s)
+    Unescaper {
+        out: String::new(),
+        pending_surrogate: 0,
+    }
+    .unescape(s)
 }
 
 pub struct BTreeMapKeysDebug<'a, K: fmt::Debug, V>(pub &'a BTreeMap<K, V>);
@@ -183,6 +186,20 @@ pub struct BTreeMapKeysDebug<'a, K: fmt::Debug, V>(pub &'a BTreeMap<K, V>);
 impl<'a, K: fmt::Debug, V> fmt::Debug for BTreeMapKeysDebug<'a, K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.0.iter().map(|x| x.0)).finish()
+    }
+}
+
+pub struct OnDrop<F: FnOnce()>(Option<F>);
+
+impl<F: FnOnce()> OnDrop<F> {
+    pub fn new(f: F) -> Self {
+        Self(Some(f))
+    }
+}
+
+impl<F: FnOnce()> Drop for OnDrop<F> {
+    fn drop(&mut self) {
+        self.0.take().unwrap()();
     }
 }
 

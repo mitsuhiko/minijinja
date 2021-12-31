@@ -111,6 +111,8 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
         rv.insert("join", BoxedFilter::new(join));
         rv.insert("default", BoxedFilter::new(default));
         rv.insert("d", BoxedFilter::new(default));
+        rv.insert("batch", BoxedFilter::new(batch));
+        rv.insert("slice", BoxedFilter::new(slice));
         #[cfg(feature = "json")]
         {
             rv.insert("tojson", BoxedFilter::new(tojson));
@@ -149,9 +151,9 @@ mod builtins {
 
     use crate::error::ErrorKind;
     use crate::utils::matches;
-    use crate::value::{Primitive, ValueKind};
-    use std::cmp::Ordering;
+    use crate::value::{ValueKind, ValueRepr};
     use std::fmt::Write;
+    use std::mem;
 
     /// Converts a value to uppercase.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
@@ -187,12 +189,20 @@ mod builtins {
     /// Dict sorting functionality.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn dictsort(_state: &State, v: Value) -> Result<Value, Error> {
-        let mut pairs = v.try_into_pairs()?;
-        pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
+        let mut pairs = match v.0 {
+            ValueRepr::Map(ref v) => v.iter().collect::<Vec<_>>(),
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::ImpossibleOperation,
+                    "cannot convert value into pair list",
+                ))
+            }
+        };
+        pairs.sort_by(|a, b| a.0.cmp(b.0));
         Ok(Value::from(
             pairs
                 .into_iter()
-                .map(|(k, v)| vec![k, v])
+                .map(|(k, v)| vec![Value::from(k.clone()), v.clone()])
                 .collect::<Vec<_>>(),
         ))
     }
@@ -200,7 +210,7 @@ mod builtins {
     /// Reverses a list or string
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn reverse(_state: &State, v: Value) -> Result<Value, Error> {
-        if let Some(Primitive::Str(s)) = v.as_primitive() {
+        if let Some(s) = v.as_str() {
             Ok(Value::from(s.chars().rev().collect::<String>()))
         } else if matches!(v.kind(), ValueKind::Seq) {
             let mut v = v.try_into_vec()?;
@@ -235,7 +245,7 @@ mod builtins {
 
         let joiner = joiner.as_ref().map_or("", |x| x.as_str());
 
-        if let Some(Primitive::Str(s)) = val.as_primitive() {
+        if let Some(s) = val.as_str() {
             let mut rv = String::new();
             for c in s.chars() {
                 if !rv.is_empty() {
@@ -275,6 +285,81 @@ mod builtins {
         } else {
             value
         })
+    }
+
+    /// """Slice an iterator and return a list of lists containing
+    /// those items. Useful if you want to create a div containing
+    /// three ul tags that represent columns:
+    pub fn slice(
+        _: &State,
+        value: Value,
+        count: usize,
+        fill_with: Option<Value>,
+    ) -> Result<Value, Error> {
+        let items = value.iter().collect::<Vec<_>>();
+        let len = items.len();
+        let items_per_slice = len / count;
+        let slices_with_extra = len % count;
+        let mut offset = 0;
+        let mut rv = Vec::new();
+
+        for slice in 0..count {
+            let start = offset + slice * items_per_slice;
+            if slice < slices_with_extra {
+                offset += 1;
+            }
+            let end = offset + (slice + 1) * items_per_slice;
+            let tmp = &items[start..end];
+
+            if let Some(ref filler) = fill_with {
+                if slice >= slices_with_extra {
+                    let mut tmp = tmp.to_vec();
+                    tmp.push(filler.clone());
+                    rv.push(Value::from(tmp));
+                    continue;
+                }
+            }
+
+            rv.push(Value::from(tmp.to_vec()));
+        }
+
+        Ok(Value::from(rv))
+    }
+
+    /// Batch items.
+    ///
+    /// This filter works pretty much like `slice` just the other way round. It
+    /// returns a list of lists with the given number of items. If you provide a
+    /// second parameter this is used to fill up missing items.
+    pub fn batch(
+        _: &State,
+        value: Value,
+        count: usize,
+        fill_with: Option<Value>,
+    ) -> Result<Value, Error> {
+        let mut rv = Vec::new();
+        let mut tmp = Vec::with_capacity(count);
+
+        for item in value.iter() {
+            if tmp.len() == count {
+                rv.push(Value::from(mem::replace(
+                    &mut tmp,
+                    Vec::with_capacity(count),
+                )));
+            }
+            tmp.push(item);
+        }
+
+        if !tmp.is_empty() {
+            if let Some(filler) = fill_with {
+                for _ in 0..count - tmp.len() {
+                    tmp.push(filler.clone());
+                }
+            }
+            rv.push(Value::from(tmp));
+        }
+
+        Ok(Value::from(rv))
     }
 
     /// Dumps a value to JSON.
@@ -322,34 +407,25 @@ mod builtins {
     pub fn urlencode(_: &State, value: Value) -> Result<String, Error> {
         const SET: &percent_encoding::AsciiSet =
             &percent_encoding::NON_ALPHANUMERIC.remove(b'/').add(b' ');
-        match (value.as_primitive(), value.kind()) {
-            (Some(Primitive::None), _) | (Some(Primitive::Undefined), _) => Ok("".into()),
-            (Some(Primitive::Bytes(b)), _) => {
-                Ok(percent_encoding::percent_encode(b, SET).to_string())
-            }
-            (Some(Primitive::Str(s)), _) => {
+        match &value.0 {
+            ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
+            ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
+            ValueRepr::String(s) | ValueRepr::SafeString(s) => {
                 Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
             }
-            (_, ValueKind::Struct) | (_, ValueKind::Map) => {
+            ValueRepr::Map(ref val) => {
                 let mut rv = String::new();
-                for (idx, ref k) in value.iter().enumerate() {
+                for (idx, (k, v)) in val.iter().enumerate() {
                     if idx > 0 {
                         rv.push('&');
                     }
                     write!(
                         rv,
-                        "{}",
-                        percent_encoding::utf8_percent_encode(&k.to_string(), SET)
+                        "{}={}",
+                        percent_encoding::utf8_percent_encode(&k.to_string(), SET),
+                        percent_encoding::utf8_percent_encode(&v.to_string(), SET)
                     )
                     .unwrap();
-                    if let Ok(v) = value.get_item(k) {
-                        write!(
-                            rv,
-                            "={}",
-                            percent_encoding::utf8_percent_encode(&v.to_string(), SET)
-                        )
-                        .unwrap();
-                    }
                 }
                 Ok(rv)
             }

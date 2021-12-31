@@ -1,3 +1,4 @@
+#[cfg(feature = "internal_debug")]
 use std::fmt;
 
 use crate::value::Value;
@@ -163,6 +164,7 @@ pub enum Instruction<'source> {
     Nop,
 }
 
+#[cfg(feature = "internal_debug")]
 impl<'source> fmt::Debug for Instruction<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
@@ -224,7 +226,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 struct Loc {
     first_instruction: u32,
     line: u32,
@@ -236,21 +238,28 @@ pub struct Instructions<'source> {
     pub(crate) instructions: Vec<Instruction<'source>>,
     locations: Vec<Loc>,
     name: &'source str,
+    source: &'source str,
 }
 
 impl<'source> Instructions<'source> {
     /// Creates a new instructions object.
-    pub fn new(name: &'source str) -> Instructions<'source> {
+    pub fn new(name: &'source str, source: &'source str) -> Instructions<'source> {
         Instructions {
             instructions: Vec::new(),
             locations: Vec::new(),
             name,
+            source,
         }
     }
 
     /// Returns the name of the template.
     pub fn name(&self) -> &'source str {
         self.name
+    }
+
+    /// Returns the source reference.
+    pub fn source(&self) -> &'source str {
+        self.source
     }
 
     /// Returns an instruction by index
@@ -333,6 +342,7 @@ impl<'source> Instructions<'source> {
     }
 }
 
+#[cfg(feature = "internal_debug")]
 impl<'source> fmt::Debug for Instructions<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         struct InstructionWrapper<'a>(usize, &'a Instruction<'a>, Option<usize>);
