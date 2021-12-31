@@ -420,19 +420,6 @@ value_from!(f32, F64);
 value_from!(f64, F64);
 value_from!(char, Char);
 
-fn format_seqish<I: Iterator<Item = D>, D: fmt::Display>(
-    f: &mut fmt::Formatter<'_>,
-    iter: I,
-) -> fmt::Result {
-    for (idx, val) in iter.enumerate() {
-        if idx > 0 {
-            write!(f, ", ")?;
-        }
-        write!(f, "{}", val)?;
-    }
-    Ok(())
-}
-
 /// An alternative view of a value.
 #[deprecated(since = "0.11.0", note = "use as_str/is_true/TryFrom instead")]
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
@@ -509,16 +496,35 @@ impl fmt::Display for Value {
             ValueRepr::String(val) => write!(f, "{}", val),
             ValueRepr::SafeString(val) => write!(f, "{}", val),
             ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
-            ValueRepr::Seq(values) => format_seqish(f, values.iter()),
-            ValueRepr::Map(val) => format_seqish(f, val.iter().map(|x| x.0)),
-            ValueRepr::Struct(val) => {
-                for (idx, (key, _)) in val.iter().enumerate() {
+            ValueRepr::Seq(values) => {
+                write!(f, "[")?;
+                for (idx, val) in values.iter().enumerate() {
                     if idx > 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "{}", key)?;
+                    write!(f, "{:?}", val)?;
                 }
-                Ok(())
+                write!(f, "]")
+            }
+            ValueRepr::Map(m) => {
+                write!(f, "{{")?;
+                for (idx, (key, val)) in m.iter().enumerate() {
+                    if idx > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{:?}: {:?}", key, val)?;
+                }
+                write!(f, "}}")
+            }
+            ValueRepr::Struct(fields) => {
+                write!(f, "{{")?;
+                for (idx, (key, val)) in fields.iter().enumerate() {
+                    if idx > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{:?}: {:?}", key, val)?;
+                }
+                write!(f, "}}")
             }
             ValueRepr::U128(val) => write!(f, "{}", val),
             ValueRepr::Dynamic(x) => write!(f, "{}", x),

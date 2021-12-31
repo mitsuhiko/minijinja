@@ -15,7 +15,7 @@ list-length: 3
 map-length: 2
 string-length: 4
 string-count: 4
-reverse-list: 3, 2, 1
+reverse-list: [3, 2, 1]
 reverse-string: driB
 trim: |Spacebird|
 trim-bird: ir

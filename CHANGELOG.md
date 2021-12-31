@@ -9,6 +9,7 @@ All notable changes to MiniJinja are documented here.
 - Truthiness of values is now checking container length.  Previously containers
   were always true, now they are only true if they are not empty.
 - Strings and safe strings no longer compare the same.
+- Changed list and map string output to have delimiters and debug printing.
 
 # 0.10.0
 
