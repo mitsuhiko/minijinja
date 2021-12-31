@@ -150,7 +150,6 @@ mod builtins {
     use crate::error::ErrorKind;
     use crate::utils::matches;
     use crate::value::{ValueKind, ValueRepr};
-    use std::cmp::Ordering;
     use std::fmt::Write;
 
     /// Converts a value to uppercase.
