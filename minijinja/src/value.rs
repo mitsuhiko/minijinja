@@ -1083,23 +1083,6 @@ impl Value {
         }
     }
 
-    #[cfg(feature = "builtin_filters")]
-    pub(crate) fn try_into_pairs(self) -> Result<Vec<(Value, Value)>, Error> {
-        match self.0 {
-            ValueRepr::Map(v) => Ok(match RcType::try_unwrap(v) {
-                Ok(v) => v,
-                Err(rc) => (*rc).clone(),
-            }
-            .into_iter()
-            .map(|(k, v)| (Value::from(k), v))
-            .collect()),
-            _ => Err(Error::new(
-                ErrorKind::ImpossibleOperation,
-                "cannot convert value into pair list",
-            )),
-        }
-    }
-
     #[cfg(feature = "debug")]
     pub(crate) fn iter_as_str_map(&self) -> impl Iterator<Item = (&str, Value)> {
         match self.0 {

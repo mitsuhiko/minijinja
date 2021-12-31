@@ -149,7 +149,7 @@ mod builtins {
 
     use crate::error::ErrorKind;
     use crate::utils::matches;
-    use crate::value::ValueKind;
+    use crate::value::{ValueKind, ValueRepr};
     use std::cmp::Ordering;
     use std::fmt::Write;
 
@@ -187,12 +187,25 @@ mod builtins {
     /// Dict sorting functionality.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn dictsort(_state: &State, v: Value) -> Result<Value, Error> {
-        let mut pairs = v.try_into_pairs()?;
-        pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
+        let mut pairs = match v.0 {
+            ValueRepr::Map(v) => match RcType::try_unwrap(v) {
+                Ok(v) => v,
+                Err(rc) => (*rc).clone(),
+            }
+            .into_iter()
+            .collect::<Vec<_>>(),
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::ImpossibleOperation,
+                    "cannot convert value into pair list",
+                ))
+            }
+        };
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(Value::from(
             pairs
                 .into_iter()
-                .map(|(k, v)| vec![k, v])
+                .map(|(k, v)| vec![Value::from(k), v])
                 .collect::<Vec<_>>(),
         ))
     }
@@ -320,8 +333,6 @@ mod builtins {
     )]
     #[cfg(feature = "urlencode")]
     pub fn urlencode(_: &State, value: Value) -> Result<String, Error> {
-        use crate::value::ValueRepr;
-
         const SET: &percent_encoding::AsciiSet =
             &percent_encoding::NON_ALPHANUMERIC.remove(b'/').add(b' ');
         match (&value.0, value.kind()) {
