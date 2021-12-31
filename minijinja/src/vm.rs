@@ -394,7 +394,9 @@ impl<'env> Vm<'env> {
             current_block: None,
             name: instructions.name(),
         };
-        self.eval_state(&mut state, instructions, referenced_blocks, output)
+        value::with_value_optimization(|| {
+            self.eval_state(&mut state, instructions, referenced_blocks, output)
+        })
     }
 
     /// This is the actual evaluation loop that works with a specific context.
