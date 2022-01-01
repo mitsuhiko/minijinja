@@ -800,14 +800,6 @@ fn map_methods<'a>(
                     .collect::<Vec<_>>(),
             ))
         }
-        "keys" => {
-            let _: () = FunctionArgs::from_values(args)?;
-            Ok(Value::from(
-                m.iter()
-                    .map(|(k, _)| Value::from(k.clone()))
-                    .collect::<Vec<_>>(),
-            ))
-        }
         "values" => {
             let _: () = FunctionArgs::from_values(args)?;
             Ok(Value::from(
