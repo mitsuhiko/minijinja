@@ -6,17 +6,4 @@ input_file: minijinja/tests/inputs/undefined.txt
 ---
 none
 
-=====
 
-Template {
-    name: "undefined.txt",
-    instructions: [
-        00000 | LOAD_CONST (value None)  [line 1],
-        00001 | EMIT,
-        00002 | EMIT_RAW (string "\n"),
-        00003 | LOOKUP (var "undefined")  [line 2],
-        00004 | EMIT,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

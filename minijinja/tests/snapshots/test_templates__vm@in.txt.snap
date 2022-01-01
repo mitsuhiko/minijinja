@@ -10,44 +10,4 @@ true
 false
 false
 false
-=====
 
-Template {
-    name: "in.txt",
-    instructions: [
-        00000 | LOOKUP (var "word")  [line 1],
-        00001 | LOOKUP (var "the_sentence"),
-        00002 | IN,
-        00003 | EMIT,
-        00004 | EMIT_RAW (string "\n"),
-        00005 | LOOKUP (var "word")  [line 2],
-        00006 | LOOKUP (var "the_words"),
-        00007 | IN,
-        00008 | EMIT,
-        00009 | EMIT_RAW (string "\n"),
-        0000a | LOOKUP (var "word")  [line 3],
-        0000b | LOOKUP (var "the_map"),
-        0000c | IN,
-        0000d | EMIT,
-        0000e | EMIT_RAW (string "\n"),
-        0000f | LOOKUP (var "word")  [line 4],
-        00010 | LOOKUP (var "the_sentence"),
-        00011 | IN,
-        00012 | NOT,
-        00013 | EMIT,
-        00014 | EMIT_RAW (string "\n"),
-        00015 | LOOKUP (var "word")  [line 5],
-        00016 | LOOKUP (var "the_words"),
-        00017 | IN,
-        00018 | NOT,
-        00019 | EMIT,
-        0001a | EMIT_RAW (string "\n"),
-        0001b | LOOKUP (var "word")  [line 6],
-        0001c | LOOKUP (var "the_map"),
-        0001d | IN,
-        0001e | NOT,
-        0001f | EMIT,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

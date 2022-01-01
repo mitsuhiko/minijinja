@@ -5,17 +5,4 @@ input_file: minijinja/tests/inputs/map.txt
 
 ---
 bar
-=====
 
-Template {
-    name: "map.txt",
-    instructions: [
-        00000 | LOAD_CONST (value "foo")  [line 1],
-        00001 | LOAD_CONST (value "bar"),
-        00002 | BUILD_MAP (1 pairs),
-        00003 | GETATTR (key "foo"),
-        00004 | EMIT,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

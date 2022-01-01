@@ -8,29 +8,4 @@ input_file: minijinja/tests/inputs/loop_bad_unpacking.txt
 
 Error { kind: ImpossibleOperation, detail: Some("cannot unpack: not a sequence"), name: Some("loop_bad_unpacking.txt"), lineno: 2, source: Some(Error { kind: ImpossibleOperation, detail: Some("cannot convert value into list"), name: None, lineno: 0, source: None }) }
 
-=====
 
-Template {
-    name: "loop_bad_unpacking.txt",
-    instructions: [
-        00000 | EMIT_RAW (string "<ul>\n")  [line 1],
-        00001 | LOOKUP (var "seq")  [line 2],
-        00002 | PUSH_LOOP (loop var: true),
-        00003 | ITERATE (exit to 0000f),
-        00004 | UNPACK_LIST (2 items),
-        00005 | STORE_LOCAL (var "a"),
-        00006 | STORE_LOCAL (var "b"),
-        00007 | EMIT_RAW (string "\n  <li>"),
-        00008 | LOOKUP (var "a")  [line 3],
-        00009 | EMIT,
-        0000a | EMIT_RAW (string ": "),
-        0000b | LOOKUP (var "b"),
-        0000c | EMIT,
-        0000d | EMIT_RAW (string "\n"),
-        0000e | JUMP (to 00003),
-        0000f | POP_FRAME,
-        00010 | EMIT_RAW (string "\n</ul>")  [line 4],
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

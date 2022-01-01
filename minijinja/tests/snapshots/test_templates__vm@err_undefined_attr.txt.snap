@@ -8,15 +8,4 @@ input_file: minijinja/tests/inputs/err_undefined_attr.txt
 
 Error { kind: UndefinedError, detail: None, name: Some("err_undefined_attr.txt"), lineno: 1, source: None }
 
-=====
 
-Template {
-    name: "err_undefined_attr.txt",
-    instructions: [
-        00000 | LOOKUP (var "undefined_value")  [line 1],
-        00001 | GETATTR (key "attr"),
-        00002 | EMIT,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

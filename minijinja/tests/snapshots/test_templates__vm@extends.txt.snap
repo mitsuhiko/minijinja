@@ -6,25 +6,4 @@ input_file: minijinja/tests/inputs/extends.txt
 ---
 <title>new title</title>
 new body
-=====
 
-Template {
-    name: "extends.txt",
-    instructions: [
-        00000 | LOOKUP (var "template")  [line 1],
-        00001 | LOAD_BLOCKS,
-        00002 | EMIT_RAW (string "\n"),
-        00003 | CALL_BLOCK (name "title")  [line 2],
-        00004 | EMIT_RAW (string "\n"),
-        00005 | CALL_BLOCK (name "body")  [line 3],
-    ],
-    blocks: {
-        "body": [
-            00000 | EMIT_RAW (string "new body")  [line 3],
-        ],
-        "title": [
-            00000 | EMIT_RAW (string "new title")  [line 2],
-        ],
-    },
-    initial_auto_escape: None,
-}

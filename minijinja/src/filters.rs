@@ -111,6 +111,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
         rv.insert("join", BoxedFilter::new(join));
         rv.insert("default", BoxedFilter::new(default));
         rv.insert("d", BoxedFilter::new(default));
+        rv.insert("list", BoxedFilter::new(list));
         rv.insert("batch", BoxedFilter::new(batch));
         rv.insert("slice", BoxedFilter::new(slice));
         #[cfg(feature = "json")]
@@ -285,6 +286,32 @@ mod builtins {
         } else {
             value
         })
+    }
+
+    /// Converts the input value into a list.
+    ///
+    /// If the value is already a list, then it's returned unchanged.
+    /// Applied to a map this returns the list of keys, applied to a
+    /// string this returns the characters.  If the value is undefined
+    /// an empty list is returned.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    pub fn list(_: &State, value: Value) -> Result<Value, Error> {
+        match &value.0 {
+            ValueRepr::Undefined => Ok(Value::from(Vec::<Value>::new())),
+            ValueRepr::String(ref s) | ValueRepr::SafeString(ref s) => {
+                Ok(Value::from(s.chars().map(Value::from).collect::<Vec<_>>()))
+            }
+            ValueRepr::Seq(_) => Ok(value.clone()),
+            ValueRepr::Map(ref m) => Ok(Value::from(
+                m.iter()
+                    .map(|x| Value::from(x.0.clone()))
+                    .collect::<Vec<_>>(),
+            )),
+            _ => Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                "cannot convert value to list",
+            )),
+        }
     }
 
     /// """Slice an iterator and return a list of lists containing

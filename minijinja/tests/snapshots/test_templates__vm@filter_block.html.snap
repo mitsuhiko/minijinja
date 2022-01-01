@@ -5,21 +5,4 @@ input_file: minijinja/tests/inputs/filter_block.html
 
 ---
 <p>foo &lt; bar</p>
-=====
 
-Template {
-    name: "filter_block.html",
-    instructions: [
-        00000 | BEGIN_CAPTURE  [line 1],
-        00001 | EMIT_RAW (string "<p>"),
-        00002 | LOOKUP (var "value"),
-        00003 | EMIT,
-        00004 | EMIT_RAW (string "</p>"),
-        00005 | END_CAPTURE,
-        00006 | BUILD_LIST (0 items),
-        00007 | APPLY_FILTER (name "escape"),
-        00008 | EMIT,
-    ],
-    blocks: {},
-    initial_auto_escape: Html,
-}

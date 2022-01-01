@@ -10,24 +10,4 @@ input_file: minijinja/tests/inputs/block_super.html
   <p>Default Content</p>
 
 
-=====
 
-Template {
-    name: "block_super.html",
-    instructions: [
-        00000 | LOAD_CONST (value "super_with_html.html")  [line 1],
-        00001 | LOAD_BLOCKS,
-        00002 | EMIT_RAW (string "\n"),
-        00003 | CALL_BLOCK (name "body")  [line 2],
-    ],
-    blocks: {
-        "body": [
-            00000 | EMIT_RAW (string "\n  <p>New Content</p>\n  ")  [line 2],
-            00001 | BUILD_LIST (0 items)  [line 4],
-            00002 | CALL_FUNCTION (name "super"),
-            00003 | EMIT,
-            00004 | EMIT_RAW (string "\n"),
-        ],
-    },
-    initial_auto_escape: Html,
-}

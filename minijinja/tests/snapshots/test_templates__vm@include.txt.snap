@@ -9,23 +9,4 @@ Before
   Hello 42 from included template!
 
 After
-=====
 
-Template {
-    name: "include.txt",
-    instructions: [
-        00000 | EMIT_RAW (string "Before\n")  [line 1],
-        00001 | LOAD_CONST (value "variable")  [line 2],
-        00002 | LOAD_CONST (value 42),
-        00003 | BUILD_MAP (1 pairs),
-        00004 | PUSH_CONTEXT,
-        00005 | EMIT_RAW (string "\n  "),
-        00006 | LOOKUP (var "template")  [line 3],
-        00007 | INCLUDE,
-        00008 | EMIT_RAW (string "\n"),
-        00009 | POP_FRAME,
-        0000a | EMIT_RAW (string "\nAfter")  [line 4],
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

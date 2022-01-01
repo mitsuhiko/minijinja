@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::fmt::Write;
 use std::fs;
 
 use minijinja::{context, Environment, Error, State};
@@ -40,8 +39,8 @@ fn test_vm() {
             Ok(rendered) => rendered,
             Err(err) => format!("!!!ERROR!!!\n\n{:?}\n", err),
         };
-        rendered.push_str("\n=====\n\n");
-        write!(&mut rendered, "{:#?}", template).unwrap();
+        rendered.push('\n');
+
         insta::assert_snapshot!(&rendered);
     });
 }
