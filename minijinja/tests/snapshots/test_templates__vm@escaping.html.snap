@@ -5,16 +5,4 @@ input_file: minijinja/tests/inputs/escaping.html
 
 ---
 <h1>&lt;foo&gt;</h1>
-=====
 
-Template {
-    name: "escaping.html",
-    instructions: [
-        00000 | EMIT_RAW (string "<h1>")  [line 1],
-        00001 | LOOKUP (var "unsafe"),
-        00002 | EMIT,
-        00003 | EMIT_RAW (string "</h1>"),
-    ],
-    blocks: {},
-    initial_auto_escape: Html,
-}

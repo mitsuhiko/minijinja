@@ -14,6 +14,10 @@ e: {{ "<"|e }}
 double-escape: {{ "<"|escape|escape }}
 safe: {{ "<"|safe|escape }}
 list-length: {{ list|length }}
+list-from-list: {{ list|list }}
+list-from-map: {{ map|list }}
+list-from-word: {{ word|list }}
+list-from-undefined: {{ undefined|list }}
 map-length: {{ map|length }}
 string-length: {{ word|length }}
 string-count: {{ word|count }}

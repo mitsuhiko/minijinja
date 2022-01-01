@@ -7,15 +7,4 @@ input_file: minijinja/tests/inputs/if_cond.txt
 
   was true
 
-=====
 
-Template {
-    name: "if_cond.txt",
-    instructions: [
-        00000 | LOOKUP (var "value")  [line 1],
-        00001 | JUMP_IF_FALSE (to 00003),
-        00002 | EMIT_RAW (string "\n  was true\n"),
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

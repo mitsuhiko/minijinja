@@ -7,27 +7,4 @@ input_file: minijinja/tests/inputs/getitem.txt
 first: first_item
 last: last_item
 name: Peter
-=====
 
-Template {
-    name: "getitem.txt",
-    instructions: [
-        00000 | EMIT_RAW (string "first: ")  [line 1],
-        00001 | LOOKUP (var "items"),
-        00002 | LOAD_CONST (value 0),
-        00003 | GETITEM,
-        00004 | EMIT,
-        00005 | EMIT_RAW (string "\nlast: "),
-        00006 | LOOKUP (var "items")  [line 2],
-        00007 | LOAD_CONST (value -1),
-        00008 | GETITEM,
-        00009 | EMIT,
-        0000a | EMIT_RAW (string "\nname: "),
-        0000b | LOOKUP (var "user")  [line 3],
-        0000c | LOAD_CONST (value "name"),
-        0000d | GETITEM,
-        0000e | EMIT,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

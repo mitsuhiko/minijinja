@@ -13,6 +13,7 @@ All notable changes to MiniJinja are documented here.
 - Added `batch` and `slice` filter.
 - Added the new `pairs` / `items` filter.
 - Removed value internal distinction between maps and structs.
+- Added `list` filter.
 
 # 0.10.0
 

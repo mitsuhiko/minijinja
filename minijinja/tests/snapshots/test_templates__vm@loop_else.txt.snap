@@ -7,25 +7,4 @@ input_file: minijinja/tests/inputs/loop_else.txt
 
   else block!
 
-=====
 
-Template {
-    name: "loop_else.txt",
-    instructions: [
-        00000 | LOOKUP (var "seq")  [line 1],
-        00001 | PUSH_LOOP (loop var: true),
-        00002 | ITERATE (exit to 00006),
-        00003 | STORE_LOCAL (var "item"),
-        00004 | EMIT_RAW (string "\n  should not happen\n"),
-        00005 | JUMP (to 00002),
-        00006 | LOOKUP (var "loop"),
-        00007 | GETATTR (key "index0"),
-        00008 | LOAD_CONST (value 0),
-        00009 | EQ,
-        0000a | POP_FRAME,
-        0000b | JUMP_IF_FALSE (to 0000d),
-        0000c | EMIT_RAW (string "\n  else block!\n")  [line 3],
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

@@ -9,29 +9,4 @@ input_file: minijinja/tests/inputs/loop_dictsort.txt
 * baz: 100
 * blafasel: aha
 * foo: 1
-=====
 
-Template {
-    name: "loop_dictsort.txt",
-    instructions: [
-        00000 | LOOKUP (var "map")  [line 1],
-        00001 | BUILD_LIST (0 items),
-        00002 | APPLY_FILTER (name "dictsort"),
-        00003 | PUSH_LOOP (loop var: true),
-        00004 | ITERATE (exit to 00010),
-        00005 | UNPACK_LIST (2 items),
-        00006 | STORE_LOCAL (var "key"),
-        00007 | STORE_LOCAL (var "value"),
-        00008 | EMIT_RAW (string "\n* "),
-        00009 | LOOKUP (var "key")  [line 2],
-        0000a | EMIT,
-        0000b | EMIT_RAW (string ": "),
-        0000c | LOOKUP (var "value"),
-        0000d | EMIT,
-        0000e | EMIT_RAW (string ""),
-        0000f | JUMP (to 00004),
-        00010 | POP_FRAME,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}
