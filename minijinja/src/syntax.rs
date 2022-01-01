@@ -131,10 +131,10 @@
 //!
 //! ## Built-in Methods
 //!
-//! MiniJinja implements the `keys`, `values` and `items` methods on maps and structs
-//! that return the keys, values or tuples of keys and values respectively.  This
-//! exists for compatibility with Jinja2 templates that often expect these methods
-//! to exist.
+//! MiniJinja implements the `items` and `values` methods on maps that return a
+//! list of key/value pairs or just the map's values respectively.  This exists
+//! for compatibility with Jinja2 templates that often expect these methods to
+//! exist.
 //!
 //! ### If Expressions
 //!

@@ -1,0 +1,6 @@
+map:
+  a: b
+  b: c
+---
+items: {{ map.items() }}
+values: {{ map.values() }}
