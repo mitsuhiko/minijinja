@@ -12,6 +12,7 @@ All notable changes to MiniJinja are documented here.
 - Changed list and map string output to have delimiters and debug printing.
 - Added `batch` and `slice` filter.
 - Removed value internal distinction between maps and structs.
+- Added `list` filter.
 
 # 0.10.0
 
