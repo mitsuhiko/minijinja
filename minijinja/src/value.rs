@@ -107,6 +107,25 @@ fn in_internal_serialization() -> bool {
     INTERNAL_SERIALIZATION.with(|flag| flag.load(atomic::Ordering::Relaxed))
 }
 
+/// Enables a temporary code section within which some value
+/// optimizations are enabled.  Currently this is exclusively
+/// used to automatically intern keys when the `key_interning`
+/// feature is enabled.
+#[inline(always)]
+pub fn with_value_optimization<R, F: FnOnce() -> R>(f: F) -> R {
+    #[cfg(not(feature = "key_interning"))]
+    {
+        f()
+    }
+    #[cfg(feature = "key_interning")]
+    {
+        crate::key::key_interning::with(f)
+    }
+}
+
+/// Executes code within the context of internal serialization
+/// which causes the value type to enable the internal round
+/// tripping serialization.
 fn with_internal_serialization<R, F: FnOnce() -> R>(f: F) -> R {
     INTERNAL_SERIALIZATION.with(|flag| {
         let old = flag.load(atomic::Ordering::Relaxed);
@@ -114,14 +133,7 @@ fn with_internal_serialization<R, F: FnOnce() -> R>(f: F) -> R {
         let _on_drop = OnDrop::new(|| {
             flag.store(old, atomic::Ordering::Relaxed);
         });
-        #[cfg(not(feature = "key_interning"))]
-        {
-            f()
-        }
-        #[cfg(feature = "key_interning")]
-        {
-            crate::key::key_interning::with(f)
-        }
+        with_value_optimization(f)
     })
 }
 
