@@ -58,6 +58,7 @@ State {
             "escape",
             "join",
             "length",
+            "list",
             "lower",
             "replace",
             "reverse",
