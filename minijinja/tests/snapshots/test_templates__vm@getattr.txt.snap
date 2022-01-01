@@ -6,20 +6,4 @@ input_file: minijinja/tests/inputs/getattr.txt
 ---
 name: Peter
 active: true
-=====
 
-Template {
-    name: "getattr.txt",
-    instructions: [
-        00000 | EMIT_RAW (string "name: ")  [line 1],
-        00001 | LOOKUP (var "user"),
-        00002 | GETATTR (key "name"),
-        00003 | EMIT,
-        00004 | EMIT_RAW (string "\nactive: "),
-        00005 | LOOKUP (var "user")  [line 2],
-        00006 | GETATTR (key "is_active"),
-        00007 | EMIT,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

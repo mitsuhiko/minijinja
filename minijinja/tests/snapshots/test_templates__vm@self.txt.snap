@@ -6,25 +6,4 @@ input_file: minijinja/tests/inputs/self.txt
 ---
 1:[foobar]
 2:(foobar)
-=====
 
-Template {
-    name: "self.txt",
-    instructions: [
-        00000 | EMIT_RAW (string "1:[")  [line 1],
-        00001 | CALL_BLOCK (name "title"),
-        00002 | EMIT_RAW (string "]\n2:("),
-        00003 | BEGIN_CAPTURE  [line 2],
-        00004 | CALL_BLOCK (name "title"),
-        00005 | END_CAPTURE,
-        00006 | EMIT,
-        00007 | EMIT_RAW (string ")"),
-    ],
-    blocks: {
-        "title": [
-            00000 | LOOKUP (var "var")  [line 1],
-            00001 | EMIT,
-        ],
-    },
-    initial_auto_escape: None,
-}

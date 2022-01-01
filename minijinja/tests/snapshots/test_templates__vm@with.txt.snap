@@ -7,29 +7,4 @@ input_file: minijinja/tests/inputs/with.txt
 
   42|23|11
 
-=====
 
-Template {
-    name: "with.txt",
-    instructions: [
-        00000 | LOAD_CONST (value "a")  [line 1],
-        00001 | LOOKUP (var "foo"),
-        00002 | LOAD_CONST (value "b"),
-        00003 | LOOKUP (var "bar"),
-        00004 | BUILD_MAP (2 pairs),
-        00005 | PUSH_CONTEXT,
-        00006 | EMIT_RAW (string "\n  "),
-        00007 | LOOKUP (var "a")  [line 2],
-        00008 | EMIT,
-        00009 | EMIT_RAW (string "|"),
-        0000a | LOOKUP (var "b"),
-        0000b | EMIT,
-        0000c | EMIT_RAW (string "|"),
-        0000d | LOOKUP (var "other"),
-        0000e | EMIT,
-        0000f | EMIT_RAW (string "\n"),
-        00010 | POP_FRAME,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

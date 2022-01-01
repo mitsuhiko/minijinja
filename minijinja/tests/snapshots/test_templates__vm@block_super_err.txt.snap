@@ -8,15 +8,4 @@ input_file: minijinja/tests/inputs/block_super_err.txt
 
 Error { kind: ImpossibleOperation, detail: Some("cannot super outside of block"), name: Some("block_super_err.txt"), lineno: 1, source: None }
 
-=====
 
-Template {
-    name: "block_super_err.txt",
-    instructions: [
-        00000 | BUILD_LIST (0 items)  [line 1],
-        00001 | CALL_FUNCTION (name "super"),
-        00002 | EMIT,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

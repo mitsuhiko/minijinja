@@ -5,19 +5,4 @@ input_file: minijinja/tests/inputs/filter_block.txt
 
 ---
 HUMPTY DUMPTY SAT ON A WALL
-=====
 
-Template {
-    name: "filter_block.txt",
-    instructions: [
-        00000 | BEGIN_CAPTURE  [line 1],
-        00001 | LOOKUP (var "egg"),
-        00002 | EMIT,
-        00003 | END_CAPTURE,
-        00004 | BUILD_LIST (0 items),
-        00005 | APPLY_FILTER (name "upper"),
-        00006 | EMIT,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

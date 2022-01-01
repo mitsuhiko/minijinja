@@ -5,19 +5,4 @@ input_file: minijinja/tests/inputs/list.txt
 
 ---
 3
-=====
 
-Template {
-    name: "list.txt",
-    instructions: [
-        00000 | LOAD_CONST (value 1)  [line 1],
-        00001 | LOAD_CONST (value 2),
-        00002 | LOAD_CONST (value 3),
-        00003 | BUILD_LIST (3 items),
-        00004 | BUILD_LIST (0 items),
-        00005 | APPLY_FILTER (name "length"),
-        00006 | EMIT,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

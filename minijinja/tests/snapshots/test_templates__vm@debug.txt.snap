@@ -77,28 +77,4 @@ State {
         ],
     },
 }
-=====
 
-Template {
-    name: "debug.txt",
-    instructions: [
-        00000 | LOAD_CONST (value "f")  [line 1],
-        00001 | LOOKUP (var "range"),
-        00002 | BUILD_MAP (1 pairs),
-        00003 | PUSH_CONTEXT,
-        00004 | LOOKUP (var "upper"),
-        00005 | BUILD_LIST (1 items),
-        00006 | CALL_FUNCTION (name "f"),
-        00007 | PUSH_LOOP (loop var: true),
-        00008 | ITERATE (exit to 0000e),
-        00009 | STORE_LOCAL (var "x"),
-        0000a | BUILD_LIST (0 items),
-        0000b | CALL_FUNCTION (name "debug"),
-        0000c | EMIT,
-        0000d | JUMP (to 00008),
-        0000e | POP_FRAME,
-        0000f | POP_FRAME,
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}

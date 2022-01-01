@@ -7,21 +7,4 @@ input_file: minijinja/tests/inputs/cmp.txt
 
   test
 
-=====
 
-Template {
-    name: "cmp.txt",
-    instructions: [
-        00000 | LOOKUP (var "two")  [line 1],
-        00001 | LOOKUP (var "one"),
-        00002 | GT,
-        00003 | JUMP_IF_FALSE_OR_POP (to 00007),
-        00004 | LOOKUP (var "two"),
-        00005 | LOOKUP (var "three"),
-        00006 | LT,
-        00007 | JUMP_IF_FALSE (to 00009),
-        00008 | EMIT_RAW (string "\n  test\n"),
-    ],
-    blocks: {},
-    initial_auto_escape: None,
-}
