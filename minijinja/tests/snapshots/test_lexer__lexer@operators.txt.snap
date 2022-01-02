@@ -1,7 +1,7 @@
 ---
-source: tests/test_lexer.rs
+source: minijinja/tests/test_lexer.rs
 expression: "&tokens"
-input_file: tests/lexer-inputs/operators.txt
+input_file: minijinja/tests/lexer-inputs/operators.txt
 
 ---
 [
@@ -22,7 +22,9 @@ input_file: tests/lexer-inputs/operators.txt
     IDENT(e),
     MOD,
     IDENT(f),
-    TILDE,
+    FLOORDIV,
     IDENT(g),
+    TILDE,
+    IDENT(h),
     VARIABLE_END(false),
 ]

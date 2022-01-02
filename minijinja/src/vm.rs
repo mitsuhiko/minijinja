@@ -577,6 +577,7 @@ impl<'env> Vm<'env> {
                 Instruction::Sub => func_binop!(sub),
                 Instruction::Mul => func_binop!(mul),
                 Instruction::Div => func_binop!(div),
+                Instruction::IntDiv => func_binop!(int_div),
                 Instruction::Rem => func_binop!(rem),
                 Instruction::Pow => func_binop!(pow),
                 Instruction::Eq => op_binop!(==),

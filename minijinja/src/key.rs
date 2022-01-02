@@ -82,7 +82,18 @@ impl<'a> Key<'a> {
             ValueRepr::I128(ref v) => TryFrom::try_from(**v)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
-            ValueRepr::F64(_) => Err(ErrorKind::NonKey.into()),
+            ValueRepr::F64(x) => {
+                // if a float is in fact looking like an integer we
+                // allow this to be used for indexing.  Why?  Because
+                // in Jinja division is always a division resuling
+                // in floating point values (4 / 2 == 2.0).
+                let intval = x as i64;
+                if intval as f64 == x {
+                    Ok(Key::I64(intval))
+                } else {
+                    Err(ErrorKind::NonKey.into())
+                }
+            }
             ValueRepr::Char(c) => Ok(Key::Char(c)),
             ValueRepr::String(ref s) => Ok(Key::Str(s)),
             _ => Err(ErrorKind::NonKey.into()),
