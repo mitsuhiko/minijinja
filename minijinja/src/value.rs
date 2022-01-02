@@ -1847,6 +1847,20 @@ fn test_string_key_lookup() {
 }
 
 #[test]
+fn test_int_key_lookup() {
+    let mut m = BTreeMap::new();
+    m.insert(Key::I64(42), Value::from(42));
+    m.insert(Key::I64(23), Value::from(23));
+    let m = Value::from(m);
+    assert_eq!(m.get_item(&Value::from(42.0f32)).unwrap(), Value::from(42));
+    assert_eq!(m.get_item(&Value::from(42u32)).unwrap(), Value::from(42));
+
+    let s = Value::from(vec![42i32, 23]);
+    assert_eq!(s.get_item(&Value::from(0.0f32)).unwrap(), Value::from(42));
+    assert_eq!(s.get_item(&Value::from(0i32)).unwrap(), Value::from(42));
+}
+
+#[test]
 fn test_value_serialization() {
     // make sure if we serialize to json we get regular values
     assert_eq!(serde_json::to_string(&Value::UNDEFINED).unwrap(), "null");
