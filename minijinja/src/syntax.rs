@@ -88,11 +88,15 @@
 //!
 //! - ``+``: Adds two numbers up. ``{{ 1 + 1 }}`` is ``2``.
 //! - ``-``: Subtract the second number from the first one.  ``{{ 3 - 2 }}`` is ``1``.
-//! - ``/``: Divide two numbers. ``{{ 1 / 2 }}`` is ``{{ 0.5 }}``.
+//! - ``/``: Divide two numbers. ``{{ 1 / 2 }}`` is ``0.5``.  See note on divisions below.
+//! - ``//``: Integer divide two numbers. ``{{ 5 // 3 }}`` is ``1``.  See note on divisons below.
 //! - ``%``: Calculate the remainder of an integer division.  ``{{ 11 % 7 }}`` is ``4``.
 //! - ``*``: Multiply the left operand with the right one.  ``{{ 2 * 2 }}`` would return ``4``.
 //! - ``**``: Raise the left operand to the power of the right operand.  ``{{ 2**3 }}``
 //!   would return ``8``.
+//!
+//! Note on divisions: divisions in Jinja2 are flooring, divisions in MiniJinja
+//! are at present using euclidean division.  They are almost the same but not quite.
 //!
 //! ## Comparisons
 //!  
