@@ -61,7 +61,6 @@ State {
             "length",
             "list",
             "lower",
-            "pairs",
             "replace",
             "reverse",
             "safe",

@@ -48,6 +48,13 @@ pub enum Instruction<'source> {
     /// Divide the top two values
     Div,
 
+    /// Integer divde the top two values as "integer".
+    ///
+    /// Note that in MiniJinja this currently uses an euclidean
+    /// division to match the rem implementation.  In Python this
+    /// instead uses a flooring division and a flooring remainder.
+    IntDiv,
+
     /// Calculate the remainder the top two values
     Rem,
 
@@ -182,6 +189,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
             Instruction::Sub => write!(f, "SUB"),
             Instruction::Mul => write!(f, "MUL"),
             Instruction::Div => write!(f, "DIV"),
+            Instruction::IntDiv => write!(f, "INT_DIV"),
             Instruction::Rem => write!(f, "REM"),
             Instruction::Pow => write!(f, "Pow"),
             Instruction::Neg => write!(f, "NEG"),

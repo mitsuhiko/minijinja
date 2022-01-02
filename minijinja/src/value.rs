@@ -456,10 +456,6 @@ fn as_f64(value: &Value) -> Option<f64> {
     })
 }
 
-fn is_numeric(value: &Value) -> bool {
-    matches!(value.kind(), ValueKind::Bool | ValueKind::Number)
-}
-
 fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
     match (&a.0, &b.0) {
         // equal mappings are trivial
@@ -476,11 +472,10 @@ fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
         (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(as_f64(a)?, *b)),
 
         // everything else goes up to i128
-        (_, _) if is_numeric(a) && is_numeric(b) => Some(CoerceResult::I128(
+        _ => Some(CoerceResult::I128(
             i128::try_from(a.clone()).ok()?,
             i128::try_from(b.clone()).ok()?,
         )),
-        _ => None,
     }
 }
 
@@ -491,7 +486,7 @@ impl fmt::Display for Value {
             ValueRepr::Bool(val) => write!(f, "{}", val),
             ValueRepr::U64(val) => write!(f, "{}", val),
             ValueRepr::I64(val) => write!(f, "{}", val),
-            ValueRepr::F64(val) => write!(f, "{}", val),
+            ValueRepr::F64(val) => write!(f, "{:.1}", val),
             ValueRepr::Char(val) => write!(f, "{}", val),
             ValueRepr::None => write!(f, "none"),
             ValueRepr::I128(val) => write!(f, "{}", val),
@@ -541,7 +536,7 @@ fn int_as_value(val: i128) -> Value {
 macro_rules! math_binop {
     ($name:ident, $int:ident, $float:tt) => {
         pub(crate) fn $name(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-            pub fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
+            fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
                 match coerce(lhs, rhs)? {
                     CoerceResult::I128(a, b) => Some(int_as_value(a.$int(b))),
                     CoerceResult::F64(a, b) => Some((a $float b).into()),
@@ -565,8 +560,44 @@ macro_rules! math_binop {
 math_binop!(add, wrapping_add, +);
 math_binop!(sub, wrapping_sub, -);
 math_binop!(mul, wrapping_mul, *);
-math_binop!(div, wrapping_div, /);
 math_binop!(rem, wrapping_rem_euclid, %);
+
+pub(crate) fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
+        let a = as_f64(lhs)?;
+        let b = as_f64(rhs)?;
+        Some((a / b).into())
+    }
+    do_it(lhs, rhs).ok_or_else(|| {
+        Error::new(
+            ErrorKind::ImpossibleOperation,
+            format!(
+                "tried to use / operator on unsupported types {} and {}",
+                lhs.kind(),
+                rhs.kind()
+            ),
+        )
+    })
+}
+
+pub(crate) fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
+        match coerce(lhs, rhs)? {
+            CoerceResult::I128(a, b) => Some(int_as_value(a.div_euclid(b))),
+            CoerceResult::F64(a, b) => Some(a.div_euclid(b).into()),
+        }
+    }
+    do_it(lhs, rhs).ok_or_else(|| {
+        Error::new(
+            ErrorKind::ImpossibleOperation,
+            format!(
+                "tried to use // operator on unsupported types {} and {}",
+                lhs.kind(),
+                rhs.kind()
+            ),
+        )
+    })
+}
 
 /// Implements a binary `pow` operation on values.
 pub(crate) fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
@@ -646,7 +677,7 @@ pub(crate) fn contains(container: &Value, value: &Value) -> Result<Value, Error>
 
 macro_rules! primitive_try_from {
     ($ty:ident, {
-        $($pat:pat => $expr:expr,)*
+        $($pat:pat $(if $if_expr:expr)? => $expr:expr,)*
     }) => {
 
         impl TryFrom<Value> for $ty {
@@ -654,7 +685,7 @@ macro_rules! primitive_try_from {
 
             fn try_from(value: Value) -> Result<Self, Self::Error> {
                 let opt = match value.0 {
-                    $($pat => TryFrom::try_from($expr).ok(),)*
+                    $($pat $(if $if_expr)? => TryFrom::try_from($expr).ok(),)*
                     _ => None
                 };
                 opt.ok_or_else(|| {
@@ -698,6 +729,8 @@ macro_rules! primitive_int_try_from {
             ValueRepr::Bool(val) => val as usize,
             ValueRepr::I64(val) => val,
             ValueRepr::U64(val) => val,
+            // for the intention here see Key::from_borrowed_value
+            ValueRepr::F64(val) if (val as i64 as f64 == val) => val as i64,
             ValueRepr::I128(ref val) => **val,
             ValueRepr::U128(ref val) => **val,
         });
@@ -1811,6 +1844,20 @@ fn test_string_key_lookup() {
     m.insert(Key::String(RcType::new("foo".into())), Value::from(42));
     let m = Value::from(m);
     assert_eq!(m.get_item(&Value::from("foo")).unwrap(), Value::from(42));
+}
+
+#[test]
+fn test_int_key_lookup() {
+    let mut m = BTreeMap::new();
+    m.insert(Key::I64(42), Value::from(42));
+    m.insert(Key::I64(23), Value::from(23));
+    let m = Value::from(m);
+    assert_eq!(m.get_item(&Value::from(42.0f32)).unwrap(), Value::from(42));
+    assert_eq!(m.get_item(&Value::from(42u32)).unwrap(), Value::from(42));
+
+    let s = Value::from(vec![42i32, 23]);
+    assert_eq!(s.get_item(&Value::from(0.0f32)).unwrap(), Value::from(42));
+    assert_eq!(s.get_item(&Value::from(0i32)).unwrap(), Value::from(42));
 }
 
 #[test]

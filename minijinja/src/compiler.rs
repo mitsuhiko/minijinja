@@ -323,6 +323,7 @@ impl<'source> Compiler<'source> {
                 });
             }
             ast::Expr::BinOp(c) => {
+                self.set_location_from_span(c.span());
                 let instr = match c.op {
                     ast::BinOpKind::Eq => Instruction::Eq,
                     ast::BinOpKind::Ne => Instruction::Ne,
@@ -342,14 +343,12 @@ impl<'source> Compiler<'source> {
                     ast::BinOpKind::Sub => Instruction::Sub,
                     ast::BinOpKind::Mul => Instruction::Mul,
                     ast::BinOpKind::Div => Instruction::Div,
-                    // TODO: floor div maps to normal div for now
-                    ast::BinOpKind::FloorDiv => Instruction::Div,
+                    ast::BinOpKind::FloorDiv => Instruction::IntDiv,
                     ast::BinOpKind::Rem => Instruction::Rem,
                     ast::BinOpKind::Pow => Instruction::Pow,
                     ast::BinOpKind::Concat => Instruction::StringConcat,
                     ast::BinOpKind::In => Instruction::In,
                 };
-                self.set_location_from_span(c.span());
                 self.compile_expr(&c.left)?;
                 self.compile_expr(&c.right)?;
                 self.add(instr);

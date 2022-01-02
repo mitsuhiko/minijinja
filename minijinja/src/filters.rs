@@ -106,8 +106,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
         rv.insert("length", BoxedFilter::new(length));
         rv.insert("count", BoxedFilter::new(length));
         rv.insert("dictsort", BoxedFilter::new(dictsort));
-        rv.insert("pairs", BoxedFilter::new(pairs));
-        rv.insert("items", BoxedFilter::new(pairs));
+        rv.insert("items", BoxedFilter::new(items));
         rv.insert("reverse", BoxedFilter::new(reverse));
         rv.insert("trim", BoxedFilter::new(trim));
         rv.insert("join", BoxedFilter::new(join));
@@ -191,7 +190,7 @@ mod builtins {
 
     /// Dict sorting functionality.
     ///
-    /// This filter works like `|pairs` but sorts the pairs by key first.
+    /// This filter works like `|items` but sorts the pairs by key first.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn dictsort(_state: &State, v: Value) -> Result<Value, Error> {
         let mut pairs = match v.0 {
@@ -212,7 +211,7 @@ mod builtins {
         ))
     }
 
-    /// Returns a list of pairs from a mapping.
+    /// Returns a list of pairs (items) from a mapping.
     ///
     /// This can be used to iterate over keys and values of a mapping
     /// at once.  Note that this will use the original order of the map
@@ -223,14 +222,14 @@ mod builtins {
     ///
     /// ```text,ignore
     /// <dl>
-    /// {% for key, value in my_dict|pairs %}
+    /// {% for key, value in my_dict|items %}
     ///   <dt>{{ key }}
     ///   <dd>{{ value }}
     /// {% endfor %}
     /// </dl>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
-    pub fn pairs(_state: &State, v: Value) -> Result<Value, Error> {
+    pub fn items(_state: &State, v: Value) -> Result<Value, Error> {
         Ok(Value::from(
             match v.0 {
                 ValueRepr::Map(ref v) => v.iter().collect::<Vec<_>>(),
