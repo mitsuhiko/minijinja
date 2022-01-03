@@ -486,7 +486,13 @@ impl fmt::Display for Value {
             ValueRepr::Bool(val) => write!(f, "{}", val),
             ValueRepr::U64(val) => write!(f, "{}", val),
             ValueRepr::I64(val) => write!(f, "{}", val),
-            ValueRepr::F64(val) => write!(f, "{:.1}", val),
+            ValueRepr::F64(val) => {
+                let mut num = val.to_string();
+                if !num.contains('.') {
+                    num.push_str(".0");
+                }
+                write!(f, "{}", num)
+            }
             ValueRepr::Char(val) => write!(f, "{}", val),
             ValueRepr::None => write!(f, "none"),
             ValueRepr::I128(val) => write!(f, "{}", val),
@@ -1898,4 +1904,10 @@ fn test_key_interning() {
             _ => unreachable!(),
         }
     }
+}
+
+#[test]
+fn test_float_to_string() {
+    assert_eq!(Value::from(42.4242f64).to_string(), "42.4242");
+    assert_eq!(Value::from(42.0f32).to_string(), "42.0");
 }

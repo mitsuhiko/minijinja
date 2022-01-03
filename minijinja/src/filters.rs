@@ -111,6 +111,8 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
         rv.insert("trim", BoxedFilter::new(trim));
         rv.insert("join", BoxedFilter::new(join));
         rv.insert("default", BoxedFilter::new(default));
+        rv.insert("round", BoxedFilter::new(round));
+        rv.insert("abs", BoxedFilter::new(abs));
         rv.insert("first", BoxedFilter::new(first));
         rv.insert("last", BoxedFilter::new(last));
         rv.insert("d", BoxedFilter::new(default));
@@ -308,6 +310,36 @@ mod builtins {
         } else {
             value
         })
+    }
+
+    /// Returns the absolute value of a number.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    pub fn abs(_: &State, value: Value) -> Result<Value, Error> {
+        match value.0 {
+            ValueRepr::I64(x) => Ok(Value::from(x.abs())),
+            ValueRepr::I128(x) => Ok(Value::from(x.abs())),
+            ValueRepr::F64(x) => Ok(Value::from(x.abs())),
+            _ => Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                "cannot round value",
+            )),
+        }
+    }
+
+    /// Round the number to a given precision.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    pub fn round(_: &State, value: Value, precision: Option<i32>) -> Result<Value, Error> {
+        match value.0 {
+            ValueRepr::I64(_) | ValueRepr::I128(_) => Ok(value),
+            ValueRepr::F64(val) => {
+                let x = 10f64.powi(precision.unwrap_or(0));
+                Ok(Value::from((x * val).round() / x))
+            }
+            _ => Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                "cannot round value",
+            )),
+        }
     }
 
     /// Returns the first item from a list.
