@@ -14,6 +14,7 @@ All notable changes to MiniJinja are documented here.
 - Removed value internal distinction between maps and structs.
 - Added `list` filter.
 - Added `first` and `last` filters.
+- Added `round` and `abs` filters.
 - Implemented integer division operator (``//``) and changed division to always
   return floats like documented and to match the Jinja2 implementation.  To
   make this more convenient whole integer floats are now handled like integers in

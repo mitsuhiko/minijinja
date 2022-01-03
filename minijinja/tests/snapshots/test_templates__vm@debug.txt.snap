@@ -49,6 +49,7 @@ State {
             "undefined",
         ],
         filters: [
+            "abs",
             "batch",
             "count",
             "d",
@@ -64,6 +65,7 @@ State {
             "lower",
             "replace",
             "reverse",
+            "round",
             "safe",
             "slice",
             "title",

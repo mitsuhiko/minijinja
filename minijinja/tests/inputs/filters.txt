@@ -48,3 +48,8 @@ batch: {{ range(10)|batch(3) }}
 batch-fill: {{ range(10)|batch(3, '-') }}
 slice: {{ range(10)|slice(3) }}
 slice-fill: {{ range(10)|slice(3, '-') }}
+int-abs: {{ -42|abs }}
+float-abs: {{ -42.5|abs }}
+int-round: {{ 42|round }}
+float-round: {{ 42.5|round }}
+float-round-prec2: {{ 42.512345|round(2) }}
