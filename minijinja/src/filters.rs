@@ -102,6 +102,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
     {
         rv.insert("lower", BoxedFilter::new(lower));
         rv.insert("upper", BoxedFilter::new(upper));
+        rv.insert("title", BoxedFilter::new(title));
         rv.insert("replace", BoxedFilter::new(replace));
         rv.insert("length", BoxedFilter::new(length));
         rv.insert("count", BoxedFilter::new(length));
@@ -110,6 +111,8 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
         rv.insert("trim", BoxedFilter::new(trim));
         rv.insert("join", BoxedFilter::new(join));
         rv.insert("default", BoxedFilter::new(default));
+        rv.insert("first", BoxedFilter::new(first));
+        rv.insert("last", BoxedFilter::new(last));
         rv.insert("d", BoxedFilter::new(default));
         rv.insert("list", BoxedFilter::new(list));
         rv.insert("batch", BoxedFilter::new(batch));
@@ -166,6 +169,25 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
     pub fn lower(_state: &State, v: String) -> Result<String, Error> {
         Ok(v.to_lowercase())
+    }
+
+    /// Converts a value to title case.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    pub fn title(_state: &State, v: String) -> Result<String, Error> {
+        let mut rv = String::new();
+        let mut capitalize = true;
+        for c in v.chars() {
+            if c.is_ascii_punctuation() || c.is_whitespace() {
+                rv.push(c);
+                capitalize = true;
+            } else if capitalize {
+                write!(rv, "{}", c.to_uppercase()).unwrap();
+                capitalize = false;
+            } else {
+                write!(rv, "{}", c.to_lowercase()).unwrap();
+            }
+        }
+        Ok(rv)
     }
 
     /// Does a string replace.
@@ -286,6 +308,36 @@ mod builtins {
         } else {
             value
         })
+    }
+
+    /// Returns the first item from a list.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    pub fn first(_: &State, value: Value) -> Result<Value, Error> {
+        match value.0 {
+            ValueRepr::String(s) | ValueRepr::SafeString(s) => {
+                Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
+            }
+            ValueRepr::Seq(ref s) => Ok(s.first().cloned().unwrap_or(Value::UNDEFINED)),
+            _ => Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                "cannot get first item from value",
+            )),
+        }
+    }
+
+    /// Returns the last item from a list.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    pub fn last(_: &State, value: Value) -> Result<Value, Error> {
+        match value.0 {
+            ValueRepr::String(s) | ValueRepr::SafeString(s) => {
+                Ok(s.chars().rev().next().map_or(Value::UNDEFINED, Value::from))
+            }
+            ValueRepr::Seq(ref s) => Ok(s.last().cloned().unwrap_or(Value::UNDEFINED)),
+            _ => Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                "cannot get last item from value",
+            )),
+        }
     }
 
     /// Converts the input value into a list.

@@ -8,6 +8,8 @@ scary_html: "<>&'"
 ---
 lower: {{ word|lower }}
 upper: {{ word|upper }}
+title: {{ word|title }}
+title-sentence: {{ "the bIrd, is The:word"|title }}
 replace: {{ word|replace("B", "th") }}
 escape: {{ "<"|escape }}
 e: {{ "<"|e }}
@@ -30,6 +32,12 @@ join-pipe: {{ list|join("|") }}
 join_string: {{ word|join('-') }}
 default: {{ undefined|default == "" }}
 default-value: {{ undefined|default(42) }}
+first-list: {{ list|first }}
+first-word: {{ word|first }}
+first-undefined: {{ []|first is undefined }}
+last-list: {{ list|last }}
+last-word: {{ word|last }}
+last-undefined: {{ []|first is undefined }}
 d: {{ undefined|d == "" }}
 json: {{ map|tojson }}
 json-pretty: {{ map|tojson(true) }}

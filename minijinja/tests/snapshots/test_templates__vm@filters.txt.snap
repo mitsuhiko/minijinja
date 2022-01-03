@@ -6,6 +6,8 @@ input_file: minijinja/tests/inputs/filters.txt
 ---
 lower: bird
 upper: BIRD
+title: Bird
+title-sentence: The Bird, Is The:Word
 replace: third
 escape: &lt;
 e: &lt;
@@ -28,6 +30,12 @@ join-pipe: 1|2|3
 join_string: B-i-r-d
 default: true
 default-value: 42
+first-list: 1
+first-word: B
+first-undefined: true
+last-list: 3
+last-word: d
+last-undefined: true
 d: true
 json: {"a":"b","c":"d"}
 json-pretty: {
