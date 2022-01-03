@@ -31,11 +31,9 @@ join_string: B-i-r-d
 default: true
 default-value: 42
 first-list: 1
-first-map: a
 first-word: B
 first-undefined: true
 last-list: 3
-last-map: c
 last-word: d
 last-undefined: true
 d: true

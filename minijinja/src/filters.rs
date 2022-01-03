@@ -318,10 +318,6 @@ mod builtins {
                 Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
             }
             ValueRepr::Seq(ref s) => Ok(s.first().cloned().unwrap_or(Value::UNDEFINED)),
-            ValueRepr::Map(ref m) => Ok(m
-                .first()
-                .map(|x| Value::from(x.0.clone()))
-                .unwrap_or(Value::UNDEFINED)),
             _ => Err(Error::new(
                 ErrorKind::ImpossibleOperation,
                 "cannot get first item from value",
@@ -337,10 +333,6 @@ mod builtins {
                 Ok(s.chars().rev().next().map_or(Value::UNDEFINED, Value::from))
             }
             ValueRepr::Seq(ref s) => Ok(s.last().cloned().unwrap_or(Value::UNDEFINED)),
-            ValueRepr::Map(ref m) => Ok(m
-                .last()
-                .map(|x| Value::from(x.0.clone()))
-                .unwrap_or(Value::UNDEFINED)),
             _ => Err(Error::new(
                 ErrorKind::ImpossibleOperation,
                 "cannot get last item from value",
