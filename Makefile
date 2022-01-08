@@ -44,4 +44,4 @@ lint:
 	@rustup component add clippy 2> /dev/null
 	@cargo clippy --all -- -F clippy::dbg-macro
 
-.PHONY: all doc test test-142 run-tests format format-check lint check
+.PHONY: all doc test run-tests format format-check lint check
