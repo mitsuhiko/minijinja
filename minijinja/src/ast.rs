@@ -131,6 +131,7 @@ pub struct ForLoop<'a> {
     pub target: Expr<'a>,
     pub iter: Expr<'a>,
     pub filter_expr: Option<Expr<'a>>,
+    pub recursive: bool,
     pub body: Vec<Stmt<'a>>,
     pub else_body: Vec<Stmt<'a>>,
 }

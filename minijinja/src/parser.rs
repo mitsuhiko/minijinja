@@ -567,7 +567,8 @@ impl<'a> Parser<'a> {
                 self.parse_filter_block()?,
                 self.stream.expand_span(span),
             ))),
-            _ => syntax_error!("unknown block"),
+            Token::Ident(name) => syntax_error!("unknown statement {}", name),
+            token => syntax_error!("unknown {}, expected statement", token),
         }
     }
 
@@ -634,6 +635,12 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
+        let recursive = if matches!(self.stream.current()?, Some((Token::Ident("recursive"), _))) {
+            self.stream.next()?;
+            true
+        } else {
+            false
+        };
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
         let body =
             self.subparse(&|tok| matches!(tok, Token::Ident("endfor") | Token::Ident("else")))?;
@@ -649,6 +656,7 @@ impl<'a> Parser<'a> {
             target,
             iter,
             filter_expr,
+            recursive,
             body,
             else_body,
         })

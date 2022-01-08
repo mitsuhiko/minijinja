@@ -1,0 +1,17 @@
+nav:
+  - link: /
+    title: Index
+  - link: /docs
+    title: Docs
+    children:
+      - link: /docs/installation
+        title: Installation
+      - link: /docs/faq
+        title: FAQ
+---
+<ul class="nav">
+{% for item in nav recursive %}
+  <li><a href={{ item.link }}">{{ item.title }}</a>{%
+    if item.children %}<ul>{{ loop(item.children) }}</ul>{% endif %}</li>
+{% endfor %}
+</ul>

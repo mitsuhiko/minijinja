@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 
 use crate::ast;
 use crate::error::Error;
-use crate::instructions::{Instruction, Instructions};
+use crate::instructions::{
+    Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR,
+};
 use crate::tokens::Span;
 use crate::utils::matches;
 use crate::value::Value;
@@ -58,8 +60,15 @@ impl<'source> Compiler<'source> {
     }
 
     /// Starts a for loop
-    pub fn start_for_loop(&mut self, with_loop_var: bool) {
-        self.add(Instruction::PushLoop(with_loop_var));
+    pub fn start_for_loop(&mut self, with_loop_var: bool, recursive: bool) {
+        let mut flags = 0;
+        if with_loop_var {
+            flags |= LOOP_FLAG_WITH_LOOP_VAR;
+        }
+        if recursive {
+            flags |= LOOP_FLAG_RECURSIVE;
+        }
+        self.add(Instruction::PushLoop(flags));
         let iter_instr = self.add(Instruction::Iterate(!0));
         self.pending_block.push(PendingBlock::Loop(iter_instr));
     }
@@ -181,7 +190,7 @@ impl<'source> Compiler<'source> {
                     // just outside of the loop.
                     self.add(Instruction::BuildList(0));
                     self.compile_expr(&for_loop.iter)?;
-                    self.start_for_loop(false);
+                    self.start_for_loop(false, false);
                     self.add(Instruction::DupTop);
                     self.compile_assignment(&for_loop.target)?;
                     self.compile_expr(filter_expr)?;
@@ -195,7 +204,7 @@ impl<'source> Compiler<'source> {
                     self.compile_expr(&for_loop.iter)?;
                 }
 
-                self.start_for_loop(true);
+                self.start_for_loop(true, for_loop.recursive);
                 self.compile_assignment(&for_loop.target)?;
                 for node in &for_loop.body {
                     self.compile_stmt(node)?;

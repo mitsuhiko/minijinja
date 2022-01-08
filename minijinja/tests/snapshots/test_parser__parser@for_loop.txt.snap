@@ -18,6 +18,7 @@ Ok(
                     id: "seq",
                 } @ 2:15-2:18,
                 filter_expr: None,
+                recursive: false,
                 body: [
                     EmitRaw {
                         raw: "\n    <li>",

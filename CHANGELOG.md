@@ -19,6 +19,7 @@ All notable changes to MiniJinja are documented here.
   return floats like documented and to match the Jinja2 implementation.  To
   make this more convenient whole integer floats are now handled like integers in
   some situations.
+- Added `recursive` support to for loops.
 
 # 0.10.0
 

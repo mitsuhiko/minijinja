@@ -23,6 +23,8 @@ State {
                     revindex0: 0,
                     first: true,
                     last: true,
+                    depth: 1,
+                    depth0: 0,
                 },
             },
         ],
