@@ -5,6 +5,7 @@
 [![Build Status](https://github.com/mitsuhiko/minijinja/workflows/Tests/badge.svg?branch=main)](https://github.com/mitsuhiko/minijinja/actions?query=workflow%3ATests)
 [![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
 [![Crates.io](https://img.shields.io/crates/d/minijinja.svg)](https://crates.io/crates/minijinja)
+[![rustc version](https://img.shields.io/badge/rust-1.42%2B-orange.svg)](https://img.shields.io/badge/rust-1.42%2B-orange.svg)
 [![Documentation](https://docs.rs/minijinja/badge.svg)](https://docs.rs/minijinja)
 
 </div>
@@ -32,6 +33,15 @@ fn main() {
     println!("{}", template.render(context! { name => "World" }).unwrap());
 }
 ```
+
+## Minimum Rust Version
+
+MiniJinja supports Rust versions down to 1.42 at the moment.  For the order
+preservation feature Rust 1.49 is required as it uses the indexmap dependency
+which no longer supports older Rust versions.
+
+Note that we currently cannot run tests against 1.42.0 due to our tests
+depending on insta which in turn also depends on indexmap.
 
 ## License and Links
 
