@@ -189,6 +189,8 @@
 //! - `loop.last`: True if this is the last iteration.
 //! - `loop.length`: The number of items in the sequence.
 //! - `loop.cycle`: A helper function to cycle between a list of sequences. See the explanation below.
+//! - `loop.depth`: Indicates how deep in a recursive loop the rendering currently is. Starts at level 1
+//! - `loop.depth0`: Indicates how deep in a recursive loop the rendering currently is. Starts at level 0
 //!
 //! Within a for-loop, it’s possible to cycle among a list of strings/variables each time through
 //! the loop by using the special loop.cycle helper:
@@ -219,6 +221,22 @@
 //!   <li>{{ user.username }}</li>
 //! {% else %}
 //!   <li><em>no users found</em></li>
+//! {% endfor %}
+//! </ul>
+//! ```
+//!
+//! It is also possible to use loops recursively. This is useful if you are
+//! dealing with recursive data such as sitemaps. To use loops recursively, you
+//! basically have to add the ``recursive`` modifier to the loop definition and
+//! call the loop variable with the new iterable where you want to recurse.
+//!
+//! ```plain
+//! <ul class="menu">
+//! {% for item in menu recursive %}
+//!   <li><a href="{{ item.href }}">{{ item.title }}</a>
+//!   {% if item.children %}
+//!     <ul class="submenu">{{ loop(item.children) }}</ul>
+//!   {% endif %}</li>
 //! {% endfor %}
 //! </ul>
 //! ```

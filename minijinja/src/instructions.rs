@@ -3,6 +3,12 @@ use std::fmt;
 
 use crate::value::Value;
 
+/// This loop has the loop var.
+pub const LOOP_FLAG_WITH_LOOP_VAR: u8 = 1;
+
+/// This loop is recursive.
+pub const LOOP_FLAG_RECURSIVE: u8 = 2;
+
 /// Represents an instruction for the VM.
 #[derive(Clone, PartialEq, Eq)]
 pub enum Instruction<'source> {
@@ -102,9 +108,8 @@ pub enum Instruction<'source> {
 
     /// Starts a loop
     ///
-    /// The arugment is an indicator if the `loop` variable should
-    /// be available.
-    PushLoop(bool),
+    /// The argument are loop flags.
+    PushLoop(u8),
 
     /// Pushes a value as context layer.
     PushContext,
@@ -209,7 +214,15 @@ impl<'source> fmt::Debug for Instruction<'source> {
                 write!(f, "PERFORM_TEST (name {:?})", n)
             }
             Instruction::Emit => write!(f, "EMIT"),
-            Instruction::PushLoop(v) => write!(f, "PUSH_LOOP (loop var: {:?})", v),
+            Instruction::PushLoop(flags) => {
+                let recursive = flags & LOOP_FLAG_RECURSIVE != 0;
+                let loop_var = flags & LOOP_FLAG_WITH_LOOP_VAR != 0;
+                write!(
+                    f,
+                    "PUSH_LOOP (loop var: {:?}, recursive: {:?})",
+                    loop_var, recursive
+                )
+            }
             Instruction::PushContext => write!(f, "PUSH_CONTEXT"),
             Instruction::Iterate(t) => write!(f, "ITERATE (exit to {:>05x})", t),
             Instruction::PopFrame => write!(f, "POP_FRAME"),
@@ -327,7 +340,7 @@ impl<'source> Instructions<'source> {
                 Instruction::Lookup(name)
                 | Instruction::StoreLocal(name)
                 | Instruction::CallFunction(name) => *name,
-                Instruction::PushLoop(with_var) if *with_var => "loop",
+                Instruction::PushLoop(flags) if flags & LOOP_FLAG_WITH_LOOP_VAR != 0 => "loop",
                 Instruction::PushLoop(_) | Instruction::PushContext => break,
                 _ => continue,
             };

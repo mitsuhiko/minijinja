@@ -4,7 +4,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::instructions::{Instruction, Instructions};
+use crate::instructions::{
+    Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR,
+};
 use crate::key::Key;
 use crate::utils::matches;
 use crate::value::{self, Object, RcType, Value, ValueIterator};
@@ -13,6 +15,7 @@ use crate::AutoEscape;
 pub struct LoopState {
     len: AtomicUsize,
     idx: AtomicUsize,
+    depth: usize,
 }
 
 impl fmt::Debug for LoopState {
@@ -35,6 +38,8 @@ impl Object for LoopState {
             "revindex0",
             "first",
             "last",
+            "depth",
+            "depth0",
         ][..]
     }
 
@@ -45,12 +50,21 @@ impl Object for LoopState {
             "index0" => Some(Value::from(idx)),
             "index" => Some(Value::from(idx + 1)),
             "length" => Some(Value::from(len)),
-            "revindex" => Some(Value::from(len - idx)),
-            "revindex0" => Some(Value::from(len - idx - 1)),
+            "revindex" => Some(Value::from(len.saturating_sub(idx))),
+            "revindex0" => Some(Value::from(len.saturating_sub(idx).saturating_sub(1))),
             "first" => Some(Value::from(idx == 0)),
-            "last" => Some(Value::from(idx == len - 1)),
+            "last" => Some(Value::from(len == 0 || idx == len - 1)),
+            "depth" => Some(Value::from(self.depth + 1)),
+            "depth0" => Some(Value::from(self.depth)),
             _ => None,
         }
+    }
+
+    fn call(&self, _state: &State, _args: Vec<Value>) -> Result<Value, Error> {
+        Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            "loop cannot be called if reassigned to different variable",
+        ))
     }
 
     fn call_method(&self, _state: &State, name: &str, args: Vec<Value>) -> Result<Value, Error> {
@@ -84,6 +98,8 @@ impl fmt::Display for LoopState {
 pub struct Loop<'env> {
     locals: BTreeMap<&'env str, Value>,
     with_loop_var: bool,
+    recurse_jump_target: Option<usize>,
+    current_recursion_jump: Option<usize>,
     iterator: ValueIterator,
     controller: RcType<LoopState>,
 }
@@ -189,7 +205,10 @@ impl<'env, 'vm> Context<'env, 'vm> {
 
     /// Stores a variable in the context.
     pub fn store(&mut self, key: &'env str, value: Value) {
-        self.current_loop().locals.insert(key, value);
+        self.current_loop()
+            .expect("can only assign to loop but not inside a loop")
+            .locals
+            .insert(key, value);
     }
 
     /// Looks up a variable in the context.
@@ -243,7 +262,7 @@ impl<'env, 'vm> Context<'env, 'vm> {
     }
 
     /// Returns the current innermost loop.
-    pub fn current_loop(&mut self) -> &mut Loop<'env> {
+    pub fn current_loop(&mut self) -> Option<&mut Loop<'env>> {
         self.stack
             .iter_mut()
             .rev()
@@ -252,7 +271,6 @@ impl<'env, 'vm> Context<'env, 'vm> {
                 _ => None,
             })
             .next()
-            .expect("not inside a loop")
     }
 }
 
@@ -412,6 +430,7 @@ impl<'env> Vm<'env> {
         let mut auto_escape_stack = vec![];
         let mut capture_stack = vec![];
         let mut block_stack = vec![];
+        let mut next_loop_recursion_jump = None;
         let mut pc = 0;
 
         macro_rules! bail {
@@ -609,24 +628,39 @@ impl<'env> Vm<'env> {
                     state.ctx.push_frame(Frame::Merge { value });
                 }
                 Instruction::PopFrame => {
-                    state.ctx.pop_frame();
+                    if let Frame::Loop(mut loop_ctx) = state.ctx.pop_frame() {
+                        if let Some(target) = loop_ctx.current_recursion_jump.take() {
+                            pc = target;
+                            end_capture!();
+                            continue;
+                        }
+                    }
                 }
-                Instruction::PushLoop(with_loop_var) => {
+                Instruction::PushLoop(flags) => {
                     let iterable = stack.pop();
                     let iterator = iterable.iter();
                     let len = iterator.len();
+                    let depth = state
+                        .ctx
+                        .current_loop()
+                        .filter(|x| x.recurse_jump_target.is_some())
+                        .map_or(0, |x| x.controller.depth + 1);
+                    let recursive = *flags & LOOP_FLAG_RECURSIVE != 0;
                     state.ctx.push_frame(Frame::Loop(Loop {
                         locals: BTreeMap::new(),
                         iterator,
-                        with_loop_var: *with_loop_var,
+                        with_loop_var: *flags & LOOP_FLAG_WITH_LOOP_VAR != 0,
+                        recurse_jump_target: if recursive { Some(pc) } else { None },
+                        current_recursion_jump: next_loop_recursion_jump.take(),
                         controller: RcType::new(LoopState {
                             idx: AtomicUsize::new(!0usize),
                             len: AtomicUsize::new(len),
+                            depth,
                         }),
                     }));
                 }
                 Instruction::Iterate(jump_target) => {
-                    let l = state.ctx.current_loop();
+                    let l = state.ctx.current_loop().expect("not inside a loop");
                     l.controller.idx.fetch_add(1, Ordering::Relaxed);
                     match l.iterator.next() {
                         Some(item) => {
@@ -769,6 +803,12 @@ impl<'env> Vm<'env> {
                     let args = try_ctx!(stack.pop().try_into_vec());
                     // super is a special function reserved for super-ing into blocks.
                     if *function_name == "super" {
+                        if !args.is_empty() {
+                            bail!(Error::new(
+                                ErrorKind::ImpossibleOperation,
+                                "super() takes no arguments",
+                            ));
+                        }
                         let mut inner_blocks = blocks.clone();
                         let name = match state.current_block {
                             Some(name) => name,
@@ -787,6 +827,37 @@ impl<'env> Vm<'env> {
                             end_capture!();
                         } else {
                             panic!("attempted to super unreferenced block");
+                        }
+                    // loop is a special name which when called recurses the current loop.
+                    } else if *function_name == "loop" {
+                        if let Some(loop_ctx) = state.ctx.current_loop() {
+                            if args.len() != 1 {
+                                bail!(Error::new(
+                                    ErrorKind::ImpossibleOperation,
+                                    format!("loop() takes one argument, got {}", args.len())
+                                ));
+                            }
+                            if let Some(recurse_jump_target) = loop_ctx.recurse_jump_target {
+                                // the way this works is that we remember the next instruction
+                                // as loop exit jump target.  Whenever a loop is pushed, it
+                                // memorizes the value in `next_loop_iteration_jump` to jump
+                                // to and also end the current capture.
+                                next_loop_recursion_jump = Some(pc + 1);
+                                stack.push(args.into_iter().next().unwrap());
+                                pc = recurse_jump_target;
+                                begin_capture!();
+                                continue;
+                            } else {
+                                bail!(Error::new(
+                                    ErrorKind::ImpossibleOperation,
+                                    "cannot recurse outside of recursive loop"
+                                ));
+                            }
+                        } else {
+                            bail!(Error::new(
+                                ErrorKind::ImpossibleOperation,
+                                "tried to recurse outside of loop"
+                            ));
                         }
                     } else if let Some(func) = state.ctx.load(self.env, function_name) {
                         stack.push(try_ctx!(func.call(state, args)));

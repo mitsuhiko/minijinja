@@ -29,6 +29,7 @@ Ok(
                     id: "seq",
                 } @ 1:20-1:23,
                 filter_expr: None,
+                recursive: false,
                 body: [
                     EmitRaw {
                         raw: "...",
