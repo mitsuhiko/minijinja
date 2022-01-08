@@ -323,16 +323,16 @@ impl<'source> Instructions<'source> {
     pub fn get_referenced_names(&self, idx: usize) -> Vec<&'source str> {
         let mut rv = Vec::new();
         for instr in self.instructions[..=idx].iter().rev() {
-            match instr {
-                Instruction::Lookup(name) => rv.push(*name),
-                Instruction::StoreLocal(name) => rv.push(*name),
-                Instruction::CallFunction(name) => rv.push(*name),
-                Instruction::PushLoop(true) => {
-                    rv.push("loop");
-                    break;
-                }
-                Instruction::PushLoop(false) | Instruction::PushContext => break,
-                _ => {}
+            let name = match instr {
+                Instruction::Lookup(name)
+                | Instruction::StoreLocal(name)
+                | Instruction::CallFunction(name) => *name,
+                Instruction::PushLoop(with_var) if *with_var => "loop",
+                Instruction::PushLoop(_) | Instruction::PushContext => break,
+                _ => continue,
+            };
+            if !rv.contains(&name) {
+                rv.push(name);
             }
         }
         rv
