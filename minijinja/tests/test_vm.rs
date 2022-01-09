@@ -12,7 +12,7 @@ fn test_loop() {
 
     let mut c = Compiler::new("<unknown>", "");
     c.add(Instruction::Lookup("items"));
-    c.start_for_loop(false);
+    c.start_for_loop(false, false);
     c.add(Instruction::Emit);
     c.end_for_loop(false);
     c.add(Instruction::EmitRaw("!"));

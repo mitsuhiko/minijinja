@@ -229,6 +229,21 @@ mod debug_info {
         pub(crate) referenced_names: Option<Vec<String>>,
     }
 
+    struct VarPrinter<'x>(Value, &'x [String]);
+
+    impl<'x> fmt::Debug for VarPrinter<'x> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let mut m = f.debug_struct("Referenced variables:");
+            for var in self.1 {
+                match self.0.get_attr(var) {
+                    Ok(val) => m.field(var, &val),
+                    Err(_) => m.field(var, &Value::UNDEFINED),
+                };
+            }
+            m.finish()
+        }
+    }
+
     impl DebugInfo {
         /// If available this contains a reference to the source string.
         pub fn source(&self) -> Option<&str> {
@@ -279,14 +294,7 @@ mod debug_info {
         if let Some(ctx) = info.context() {
             if let Some(vars) = info.referenced_names() {
                 writeln!(f)?;
-                writeln!(f, "Referenced variables:")?;
-                for var in vars {
-                    write!(f, "  {:}: ", var)?;
-                    match ctx.get_attr(var) {
-                        Ok(val) => writeln!(f, "{:#?}", val)?,
-                        Err(_) => writeln!(f, "undefined")?,
-                    }
-                }
+                writeln!(f, "{:#?}", VarPrinter(ctx, vars))?;
             }
             write!(f, "{:-^1$}", "", 74).unwrap();
         }

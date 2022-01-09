@@ -11,6 +11,7 @@ fn main() {
           {% with item_squared = item * item %}
             {% with foo = 42 %}
               {{ range(10) }}
+              {{ other_seq|join(" ") }}
               Hello {{ item_squared + bar }}!
             {% endwith %}
           {% endwith %}
@@ -25,6 +26,7 @@ fn main() {
     let template = env.get_template("hello.txt").unwrap();
     let ctx = context! {
         seq => vec![2, 4, 8],
+        other_seq => (0..20).collect::<Vec<_>>(),
         bar => "test"
     };
     match template.render(&ctx) {

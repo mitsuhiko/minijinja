@@ -1,5 +1,6 @@
 ---
 source: minijinja/tests/test_templates.rs
+assertion_line: 44
 expression: "&rendered"
 input_file: minijinja/tests/inputs/debug.txt
 
@@ -23,6 +24,8 @@ State {
                     revindex0: 0,
                     first: true,
                     last: true,
+                    depth: 1,
+                    depth0: 0,
                 },
             },
         ],
@@ -49,6 +52,7 @@ State {
             "undefined",
         ],
         filters: [
+            "abs",
             "batch",
             "count",
             "d",
@@ -56,15 +60,19 @@ State {
             "dictsort",
             "e",
             "escape",
+            "first",
             "items",
             "join",
+            "last",
             "length",
             "list",
             "lower",
             "replace",
             "reverse",
+            "round",
             "safe",
             "slice",
+            "title",
             "tojson",
             "trim",
             "upper",

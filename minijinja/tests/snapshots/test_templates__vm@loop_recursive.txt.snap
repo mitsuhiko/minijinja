@@ -1,0 +1,18 @@
+---
+source: minijinja/tests/test_templates.rs
+expression: "&rendered"
+input_file: minijinja/tests/inputs/loop_recursive.txt
+
+---
+<ul class="nav">
+
+  <li><a href=/">Index</a></li>
+
+  <li><a href=/docs">Docs</a><ul>
+  <li><a href=/docs/installation">Installation</a></li>
+
+  <li><a href=/docs/faq">FAQ</a></li>
+</ul></li>
+
+</ul>
+
