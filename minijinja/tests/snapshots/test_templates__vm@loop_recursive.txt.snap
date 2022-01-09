@@ -1,5 +1,6 @@
 ---
 source: minijinja/tests/test_templates.rs
+assertion_line: 44
 expression: "&rendered"
 input_file: minijinja/tests/inputs/loop_recursive.txt
 
@@ -12,6 +13,18 @@ input_file: minijinja/tests/inputs/loop_recursive.txt
   <li><a href=/docs/installation">Installation</a></li>
 
   <li><a href=/docs/faq">FAQ</a></li>
+</ul></li>
+
+</ul>
+
+<ul class="nav">
+
+  <li><a href=/">Index</a></li>
+
+  <li><a href=/docs">Docs</a><ul>
+  <LI><A HREF=/DOCS/INSTALLATION">INSTALLATION</A></LI>
+
+  <LI><A HREF=/DOCS/FAQ">FAQ</A></LI>
 </ul></li>
 
 </ul>

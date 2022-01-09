@@ -1,5 +1,6 @@
 ---
 source: minijinja/tests/test_templates.rs
+assertion_line: 44
 expression: "&rendered"
 input_file: minijinja/tests/inputs/block_super.html
 
@@ -8,6 +9,9 @@ input_file: minijinja/tests/inputs/block_super.html
   <p>New Content</p>
   
   <p>Default Content</p>
+
+  
+  &lt;P&gt;DEFAULT CONTENT&lt;&#x2f;P&gt;
 
 
 
