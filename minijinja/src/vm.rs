@@ -99,7 +99,10 @@ pub struct Loop<'env> {
     locals: BTreeMap<&'env str, Value>,
     with_loop_var: bool,
     recurse_jump_target: Option<usize>,
-    current_recursion_jump: Option<usize>,
+    // if we're popping the frame, do we want to jump somewhere?  The
+    // first item is the target jump instruction, the second argument
+    // tells us if we need to end capturing.
+    current_recursion_jump: Option<(usize, bool)>,
     iterator: ValueIterator,
     controller: RcType<LoopState>,
 }
@@ -521,6 +524,63 @@ impl<'env> Vm<'env> {
             }};
         }
 
+        macro_rules! super_block {
+            ($capture:expr) => {
+                let mut inner_blocks = blocks.clone();
+                let name = match state.current_block {
+                    Some(name) => name,
+                    None => {
+                        bail!(Error::new(
+                            ErrorKind::ImpossibleOperation,
+                            "cannot super outside of block",
+                        ));
+                    }
+                };
+                if let Some(layers) = inner_blocks.get_mut(name) {
+                    layers.remove(0);
+                    let instructions = layers.first().unwrap();
+                    if $capture {
+                        begin_capture!();
+                    }
+                    sub_eval!(instructions);
+                    if $capture {
+                        end_capture!();
+                    }
+                } else {
+                    panic!("attempted to super unreferenced block");
+                }
+            };
+        }
+
+        macro_rules! recurse_loop {
+            ($capture:expr) => {
+                if let Some(loop_ctx) = state.ctx.current_loop() {
+                    if let Some(recurse_jump_target) = loop_ctx.recurse_jump_target {
+                        // the way this works is that we remember the next instruction
+                        // as loop exit jump target.  Whenever a loop is pushed, it
+                        // memorizes the value in `next_loop_iteration_jump` to jump
+                        // to.
+                        next_loop_recursion_jump = Some((pc + 1, $capture));
+                        if $capture {
+                            begin_capture!();
+                        }
+                        pc = recurse_jump_target;
+                        continue;
+                    } else {
+                        bail!(Error::new(
+                            ErrorKind::ImpossibleOperation,
+                            "cannot recurse outside of recursive loop"
+                        ));
+                    }
+                } else {
+                    bail!(Error::new(
+                        ErrorKind::ImpossibleOperation,
+                        "cannot recurse outside of loop"
+                    ));
+                }
+            };
+        }
+
         while let Some(instr) = instructions.get(pc) {
             match instr {
                 Instruction::EmitRaw(val) => {
@@ -629,9 +689,12 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::PopFrame => {
                     if let Frame::Loop(mut loop_ctx) = state.ctx.pop_frame() {
-                        if let Some(target) = loop_ctx.current_recursion_jump.take() {
+                        if let Some((target, end_capture)) = loop_ctx.current_recursion_jump.take()
+                        {
                             pc = target;
-                            end_capture!();
+                            if end_capture {
+                                end_capture!();
+                            }
                             continue;
                         }
                     }
@@ -809,56 +872,17 @@ impl<'env> Vm<'env> {
                                 "super() takes no arguments",
                             ));
                         }
-                        let mut inner_blocks = blocks.clone();
-                        let name = match state.current_block {
-                            Some(name) => name,
-                            None => {
-                                bail!(Error::new(
-                                    ErrorKind::ImpossibleOperation,
-                                    "cannot super outside of block",
-                                ));
-                            }
-                        };
-                        if let Some(layers) = inner_blocks.get_mut(name) {
-                            layers.remove(0);
-                            let instructions = layers.first().unwrap();
-                            begin_capture!();
-                            sub_eval!(instructions);
-                            end_capture!();
-                        } else {
-                            panic!("attempted to super unreferenced block");
-                        }
+                        super_block!(true);
                     // loop is a special name which when called recurses the current loop.
                     } else if *function_name == "loop" {
-                        if let Some(loop_ctx) = state.ctx.current_loop() {
-                            if args.len() != 1 {
-                                bail!(Error::new(
-                                    ErrorKind::ImpossibleOperation,
-                                    format!("loop() takes one argument, got {}", args.len())
-                                ));
-                            }
-                            if let Some(recurse_jump_target) = loop_ctx.recurse_jump_target {
-                                // the way this works is that we remember the next instruction
-                                // as loop exit jump target.  Whenever a loop is pushed, it
-                                // memorizes the value in `next_loop_iteration_jump` to jump
-                                // to and also end the current capture.
-                                next_loop_recursion_jump = Some(pc + 1);
-                                stack.push(args.into_iter().next().unwrap());
-                                pc = recurse_jump_target;
-                                begin_capture!();
-                                continue;
-                            } else {
-                                bail!(Error::new(
-                                    ErrorKind::ImpossibleOperation,
-                                    "cannot recurse outside of recursive loop"
-                                ));
-                            }
-                        } else {
+                        if args.len() != 1 {
                             bail!(Error::new(
                                 ErrorKind::ImpossibleOperation,
-                                "tried to recurse outside of loop"
+                                format!("loop() takes one argument, got {}", args.len())
                             ));
                         }
+                        stack.push(args.into_iter().next().unwrap());
+                        recurse_loop!(true);
                     } else if let Some(func) = state.ctx.load(self.env, function_name) {
                         stack.push(try_ctx!(func.call(state, args)));
                     } else {
@@ -883,6 +907,12 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::DiscardTop => {
                     stack.pop();
+                }
+                Instruction::FastSuper => {
+                    super_block!(false);
+                }
+                Instruction::FastRecurse => {
+                    recurse_loop!(false);
                 }
                 Instruction::Nop => {}
             }
