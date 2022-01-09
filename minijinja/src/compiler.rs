@@ -174,6 +174,22 @@ impl<'source> Compiler<'source> {
             }
             ast::Stmt::EmitExpr(expr) => {
                 self.set_location_from_span(expr.span());
+
+                // detect {{ super() }} and {{ loop() }} as special instructions
+                if let ast::Expr::Call(call) = &expr.expr {
+                    if let ast::Expr::Var(var) = &call.expr {
+                        if var.id == "super" && call.args.is_empty() {
+                            self.add(Instruction::FastSuper);
+                            return Ok(());
+                        }
+                        if var.id == "loop" && call.args.len() == 1 {
+                            self.compile_expr(&call.args[0])?;
+                            self.add(Instruction::FastRecurse);
+                            return Ok(());
+                        }
+                    }
+                }
+
                 self.compile_expr(&expr.expr)?;
                 self.add(Instruction::Emit);
             }

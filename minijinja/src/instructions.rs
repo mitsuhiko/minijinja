@@ -171,6 +171,12 @@ pub enum Instruction<'source> {
     /// Discards the top item
     DiscardTop,
 
+    /// A fast super instruction without intermediate capturing.
+    FastSuper,
+
+    /// A fast loop recurse instruction without intermediate capturing.
+    FastRecurse,
+
     /// A nop
     #[allow(unused)]
     Nop,
@@ -242,6 +248,8 @@ impl<'source> fmt::Debug for Instruction<'source> {
             Instruction::CallObject => write!(f, "CALL_OBJECT"),
             Instruction::DupTop => write!(f, "DUP_TOP"),
             Instruction::DiscardTop => write!(f, "DISCARD_TOP"),
+            Instruction::FastSuper => write!(f, "FAST_SUPER"),
+            Instruction::FastRecurse => write!(f, "FAST_RECURSE"),
             Instruction::Nop => write!(f, "NOP"),
         }
     }
