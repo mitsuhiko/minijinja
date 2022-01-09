@@ -95,7 +95,7 @@ impl BoxedTest {
 pub(crate) fn get_builtin_tests() -> BTreeMap<&'static str, BoxedTest> {
     #[allow(unused_mut)]
     let mut rv = BTreeMap::new();
-    #[cfg(feature = "builtin_tests")]
+    #[cfg(feature = "builtins")]
     {
         rv.insert("odd", BoxedTest::new(is_odd));
         rv.insert("even", BoxedTest::new(is_even));
@@ -111,7 +111,7 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<&'static str, BoxedTest> {
     rv
 }
 
-#[cfg(feature = "builtin_tests")]
+#[cfg(feature = "builtins")]
 mod builtins {
     use super::*;
 
@@ -121,61 +121,61 @@ mod builtins {
     use crate::value::ValueKind;
 
     /// Checks if a value is odd.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_odd(_state: &State, v: Value) -> Result<bool, Error> {
         Ok(i128::try_from(v).ok().map_or(false, |x| x % 2 != 0))
     }
 
     /// Checks if a value is even.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_even(_state: &State, v: Value) -> Result<bool, Error> {
         Ok(i128::try_from(v).ok().map_or(false, |x| x % 2 == 0))
     }
 
     /// Checks if a value is undefined.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_undefined(_state: &State, v: Value) -> Result<bool, Error> {
         Ok(v.is_undefined())
     }
 
     /// Checks if a value is defined.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_defined(_state: &State, v: Value) -> Result<bool, Error> {
         Ok(!v.is_undefined())
     }
 
     /// Checks if this value is a number.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_number(_state: &State, v: Value) -> Result<bool, Error> {
         Ok(matches!(v.kind(), ValueKind::Number))
     }
 
     /// Checks if this value is a string.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_string(_state: &State, v: Value) -> Result<bool, Error> {
         Ok(matches!(v.kind(), ValueKind::String))
     }
 
     /// Checks if this value is a sequence
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_sequence(_state: &State, v: Value) -> Result<bool, Error> {
         Ok(matches!(v.kind(), ValueKind::Seq))
     }
 
     /// Checks if this value is a mapping
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_mapping(_state: &State, v: Value) -> Result<bool, Error> {
         Ok(matches!(v.kind(), ValueKind::Map))
     }
 
     /// Checks if the value is starting with a string.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_startingwith(_state: &State, v: String, other: String) -> Result<bool, Error> {
         Ok(v.starts_with(&other))
     }
 
     /// Checks if the value is ending with a string.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_tests")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_endingwith(_state: &State, v: String, other: String) -> Result<bool, Error> {
         Ok(v.ends_with(&other))
     }
@@ -201,5 +201,5 @@ mod builtins {
     }
 }
 
-#[cfg(feature = "builtin_tests")]
+#[cfg(feature = "builtins")]
 pub use self::builtins::*;

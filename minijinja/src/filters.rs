@@ -98,7 +98,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
     rv.insert("safe", BoxedFilter::new(safe));
     rv.insert("escape", BoxedFilter::new(escape));
     rv.insert("e", BoxedFilter::new(escape));
-    #[cfg(feature = "builtin_filters")]
+    #[cfg(feature = "builtins")]
     {
         rv.insert("lower", BoxedFilter::new(lower));
         rv.insert("upper", BoxedFilter::new(upper));
@@ -151,7 +151,7 @@ pub fn escape(_state: &State, v: Value) -> Result<Value, Error> {
     }
 }
 
-#[cfg(feature = "builtin_filters")]
+#[cfg(feature = "builtins")]
 mod builtins {
     use super::*;
 
@@ -162,19 +162,19 @@ mod builtins {
     use std::mem;
 
     /// Converts a value to uppercase.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn upper(_state: &State, v: String) -> Result<String, Error> {
         Ok(v.to_uppercase())
     }
 
     /// Converts a value to lowercase.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn lower(_state: &State, v: String) -> Result<String, Error> {
         Ok(v.to_lowercase())
     }
 
     /// Converts a value to title case.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn title(_state: &State, v: String) -> Result<String, Error> {
         let mut rv = String::new();
         let mut capitalize = true;
@@ -193,7 +193,7 @@ mod builtins {
     }
 
     /// Does a string replace.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn replace(_state: &State, v: String, from: String, to: String) -> Result<String, Error> {
         Ok(v.replace(&from, &to))
     }
@@ -201,7 +201,7 @@ mod builtins {
     /// Returns the "length" of the value
     ///
     /// By default this filter is also registered under the alias `count`.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn length(_state: &State, v: Value) -> Result<Value, Error> {
         v.len().map(Value::from).ok_or_else(|| {
             Error::new(
@@ -212,7 +212,7 @@ mod builtins {
     }
 
     /// Dict sorting functionality.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn dictsort(_state: &State, v: Value) -> Result<Value, Error> {
         let mut pairs = match v.0 {
             ValueRepr::Map(ref v) => v.iter().collect::<Vec<_>>(),
@@ -233,7 +233,7 @@ mod builtins {
     }
 
     /// Reverses a list or string
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn reverse(_state: &State, v: Value) -> Result<Value, Error> {
         if let Some(s) = v.as_str() {
             Ok(Value::from(s.chars().rev().collect::<String>()))
@@ -250,7 +250,7 @@ mod builtins {
     }
 
     /// Trims a value
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn trim(_state: &State, s: String, chars: Option<String>) -> Result<String, Error> {
         match chars {
             Some(chars) => {
@@ -262,7 +262,7 @@ mod builtins {
     }
 
     /// Joins a sequence by a character
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn join(_state: &State, val: Value, joiner: Option<String>) -> Result<String, Error> {
         if val.is_undefined() || val.is_none() {
             return Ok(String::new());
@@ -303,7 +303,7 @@ mod builtins {
     /// Checks if a string starts with another string.
     ///
     /// By default this filter is also registered under the alias `d`.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn default(_: &State, value: Value, other: Option<Value>) -> Result<Value, Error> {
         Ok(if value.is_undefined() {
             other.unwrap_or_else(|| Value::from(""))
@@ -313,7 +313,7 @@ mod builtins {
     }
 
     /// Returns the absolute value of a number.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn abs(_: &State, value: Value) -> Result<Value, Error> {
         match value.0 {
             ValueRepr::I64(x) => Ok(Value::from(x.abs())),
@@ -327,7 +327,7 @@ mod builtins {
     }
 
     /// Round the number to a given precision.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn round(_: &State, value: Value, precision: Option<i32>) -> Result<Value, Error> {
         match value.0 {
             ValueRepr::I64(_) | ValueRepr::I128(_) => Ok(value),
@@ -343,7 +343,7 @@ mod builtins {
     }
 
     /// Returns the first item from a list.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn first(_: &State, value: Value) -> Result<Value, Error> {
         match value.0 {
             ValueRepr::String(s) | ValueRepr::SafeString(s) => {
@@ -358,7 +358,7 @@ mod builtins {
     }
 
     /// Returns the last item from a list.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn last(_: &State, value: Value) -> Result<Value, Error> {
         match value.0 {
             ValueRepr::String(s) | ValueRepr::SafeString(s) => {
@@ -378,7 +378,7 @@ mod builtins {
     /// Applied to a map this returns the list of keys, applied to a
     /// string this returns the characters.  If the value is undefined
     /// an empty list is returned.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_filters")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn list(_: &State, value: Value) -> Result<Value, Error> {
         match &value.0 {
             ValueRepr::Undefined => Ok(Value::from(Vec::<Value>::new())),
@@ -479,7 +479,7 @@ mod builtins {
     /// value is safe to use in HTML as well as it will not contain any special HTML
     /// characters.  The optional parameter to the filter can be set to `true` to enable
     /// pretty printing.
-    #[cfg_attr(docsrs, doc(cfg(all(feature = "builtin_filters", feature = "json"))))]
+    #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "json"))))]
     #[cfg(feature = "json")]
     pub fn tojson(_: &State, value: Value, pretty: Option<bool>) -> Result<Value, Error> {
         if pretty.unwrap_or(false) {
@@ -510,10 +510,7 @@ mod builtins {
     /// If given a map it encodes the parameters into a query set, otherwise it
     /// encodes the stringified value.  If the value is none or undefined, an
     /// empty string is returned.
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(feature = "builtin_filters", feature = "urlencode")))
-    )]
+    #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "urlencode"))))]
     #[cfg(feature = "urlencode")]
     pub fn urlencode(_: &State, value: Value) -> Result<String, Error> {
         const SET: &percent_encoding::AsciiSet =
@@ -611,5 +608,5 @@ mod builtins {
     }
 }
 
-#[cfg(feature = "builtin_filters")]
+#[cfg(feature = "builtins")]
 pub use self::builtins::*;

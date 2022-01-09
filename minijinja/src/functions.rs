@@ -124,7 +124,7 @@ impl Object for BoxedFunction {
 pub(crate) fn get_globals() -> BTreeMap<&'static str, Value> {
     #[allow(unused_mut)]
     let mut rv = BTreeMap::new();
-    #[cfg(feature = "builtin_functions")]
+    #[cfg(feature = "builtins")]
     {
         rv.insert("range", BoxedFunction::new(range).to_value());
         rv.insert("dict", BoxedFunction::new(dict).to_value());
@@ -133,7 +133,7 @@ pub(crate) fn get_globals() -> BTreeMap<&'static str, Value> {
     rv
 }
 
-#[cfg(feature = "builtin_functions")]
+#[cfg(feature = "builtins")]
 mod builtins {
     use super::*;
 
@@ -146,7 +146,7 @@ mod builtins {
     /// j)` returns `[i, i+1, i+2, ..., j-1]`. `lower` defaults to 0. When `step` is
     /// given, it specifies the increment (or decrement). For example, `range(4)`
     /// and `range(0, 4, 1)` return `[0, 1, 2, 3]`. The end point is omitted.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_functions")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn range(
         _state: &State,
         lower: u32,
@@ -168,7 +168,7 @@ mod builtins {
     ///
     /// This is a convenient alternative for a dictionary literal.
     /// `{"foo": "bar"}` is the same as `dict(foo="bar")`.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_functions")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn dict(_state: &State, value: Value) -> Result<Value, Error> {
         if value.is_undefined() {
             Ok(Value::from(BTreeMap::<bool, Value>::new()))
@@ -185,11 +185,11 @@ mod builtins {
     /// in a template.  It emits a stringified debug dump of the current
     /// engine state including the layers of the context, the current block
     /// and auto escaping setting.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtin_functions")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn debug(state: &State) -> Result<String, Error> {
         Ok(format!("{:#?}", state))
     }
 }
 
-#[cfg(feature = "builtin_functions")]
+#[cfg(feature = "builtins")]
 pub use self::builtins::*;

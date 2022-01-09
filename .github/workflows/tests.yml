@@ -28,7 +28,7 @@ jobs:
           profile: minimal
           override: true
       - name: Build
-        run: cargo build --features=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,source,json,urlencode,debug,internal_debug
+        run: cargo build --features=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug
         working-directory: ./minijinja
 
   build-stable:

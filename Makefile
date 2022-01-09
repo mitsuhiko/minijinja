@@ -1,5 +1,5 @@
 DOC_FEATURES=source,json,urlencode
-TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,source,json,urlencode,debug,internal_debug
+TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug
 
 all: test
 

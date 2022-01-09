@@ -96,6 +96,7 @@
 //!   for the parser.
 //! - `v_htmlescape`: enables the `v_htmlescape` dependency which implements a faster HTML
 //!   escaping algorithm.
+//! - `speedups`: enables all speedups (currently `memchr` and `v_htmlescape`)
 //! - `unstable_machinery`: provides access to the internal machinery of the engine.  This
 //!   is a forever unstable API which mainly exists to aid debugging complex issues.
 //! - `json`: When enabled the `tojson` filter is added as builtin filter.
@@ -106,12 +107,8 @@
 //! Additionally to cut down on size of the engine some default
 //! functionality can be removed:
 //!
-//! - `builtin_filters`: if this feature is removed the default filters are
-//!   not implemented.
-//! - `builtin_tests`: if this feature is removed the default tests are
-//!   not implemented.
-//! - `builtin_functions`: if this feature is removed the default functions are
-//!   not implemented.
+//! - `builtins`: if this feature is removed the default filters, tests and
+//!   functions are not implemented.
 //! - `sync`: this feature makes MiniJinja's type `Send` and `Sync`.  If this feature
 //!   is disabled sending types across threads is often not possible.  Thread bounds
 //!   of things like callbacks however are not changing which means code that uses

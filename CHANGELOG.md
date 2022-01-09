@@ -20,6 +20,8 @@ All notable changes to MiniJinja are documented here.
   make this more convenient whole integer floats are now handled like integers in
   some situations.
 - Added `recursive` support to for loops.
+- Merged `builtin_filters`, `builtin_tests` and `builtin_functions` features
+  into `builtins`.
 
 # 0.10.0
 
