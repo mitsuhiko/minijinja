@@ -103,7 +103,23 @@ thread_local! {
     static VALUE_HANDLES: RefCell<BTreeMap<usize, Value>> = RefCell::new(BTreeMap::new());
 }
 
-fn in_internal_serialization() -> bool {
+/// Function that returns true when serialization for [`Value`] is taking place.
+///
+/// MiniJinja internally creates [`Value`] objects from all values passed to the
+/// engine.  It does this by going through the regular serde serialization trait.
+/// In some cases users might want to customize the serialization specifically for
+/// MiniJinja because they want to tune the object for the template engine
+/// independently of what is normally serialized to disk.
+///
+/// This function returns `true` when MiniJinja is serializing to [`Value`] and
+/// `false` otherwise.  You can call this within your own [`Serialize`]
+/// implementation to change the output format.
+///
+/// This is particularly useful as serialization for MiniJinja does not need to
+/// support deserialization.  So it becomes possible to completely change what
+/// gets sent there, even at the cost of serializing something that cannot be
+/// deserialized.
+pub fn serializing_for_value() -> bool {
     INTERNAL_SERIALIZATION.with(|flag| flag.load(atomic::Ordering::Relaxed))
 }
 
@@ -112,7 +128,7 @@ fn in_internal_serialization() -> bool {
 /// used to automatically intern keys when the `key_interning`
 /// feature is enabled.
 #[inline(always)]
-pub fn with_value_optimization<R, F: FnOnce() -> R>(f: F) -> R {
+pub(crate) fn with_value_optimization<R, F: FnOnce() -> R>(f: F) -> R {
     #[cfg(not(feature = "key_interning"))]
     {
         f()
@@ -831,6 +847,10 @@ impl Value {
     pub const UNDEFINED: Value = Value(ValueRepr::Undefined);
 
     /// Creates a value from something that can be serialized.
+    ///
+    /// During serialization of the value, [`serializing_for_value`] will return
+    /// `true` which makes it possible to customize serialization for MiniJinja.
+    /// For more information see [`serializing_for_value`].
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
         with_internal_serialization(|| Serialize::serialize(value, ValueSerializer).unwrap())
     }
@@ -1156,7 +1176,7 @@ impl Serialize for Value {
         S: Serializer,
     {
         // enable round tripping of values
-        if in_internal_serialization() {
+        if serializing_for_value() {
             use serde::ser::SerializeStruct;
             let handle = LAST_VALUE_HANDLE.with(|x| x.fetch_add(1, atomic::Ordering::Relaxed));
             VALUE_HANDLES.with(|handles| handles.borrow_mut().insert(handle, self.clone()));

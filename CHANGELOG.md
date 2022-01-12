@@ -22,6 +22,8 @@ All notable changes to MiniJinja are documented here.
 - Added `recursive` support to for loops.
 - Merged `builtin_filters`, `builtin_tests` and `builtin_functions` features
   into `builtins`.
+- Added `value::serializing_for_value` to check if serialization is taking place
+  for MiniJinja.
 
 # 0.10.0
 
