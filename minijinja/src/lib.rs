@@ -118,6 +118,8 @@
 //! - `key_interning`: if this feature is removed the automatic string interning in
 //!   the value type is disabled.  The default behavior can cut down on the memory
 //!   consumption of the value type by interning all string keys used in values.
+//! - `deserialization`: when removed this disables deserialization support for
+//!   the [`Value`](crate::value::Value) type.
 #![allow(clippy::cognitive_complexity)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(html_logo_url = "https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo-square.png")]
@@ -140,6 +142,9 @@ pub mod functions;
 pub mod syntax;
 pub mod tests;
 pub mod value;
+
+#[cfg(feature = "deserialization")]
+mod deserialize;
 
 #[cfg(feature = "source")]
 mod source;

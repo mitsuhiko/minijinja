@@ -92,10 +92,10 @@ pub(crate) type RcType<T> = std::rc::Rc<T>;
 const VALUE_HANDLE_MARKER: &str = "\x01__minijinja_ValueHandle";
 
 #[cfg(feature = "preserve_order")]
-type ValueMap<K, V> = indexmap::IndexMap<K, V>;
+pub(crate) type ValueMap<K, V> = indexmap::IndexMap<K, V>;
 
 #[cfg(not(feature = "preserve_order"))]
-type ValueMap<K, V> = std::collections::BTreeMap<K, V>;
+pub(crate) type ValueMap<K, V> = std::collections::BTreeMap<K, V>;
 
 thread_local! {
     static INTERNAL_SERIALIZATION: AtomicBool = AtomicBool::new(false);

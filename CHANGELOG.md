@@ -24,6 +24,8 @@ All notable changes to MiniJinja are documented here.
   into `builtins`.
 - Added `value::serializing_for_value` to check if serialization is taking place
   for MiniJinja.
+- The `Value` type now supports deserialization.  This feature can be disabled
+  by removing the default `deserialization` feature.
 
 # 0.10.0
 
