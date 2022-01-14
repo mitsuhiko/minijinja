@@ -1,0 +1,17 @@
+[package]
+name = "benchmarks"
+version = "0.1.0"
+edition = "2018"
+
+[features]
+speedups = ["minijinja/speedups"]
+
+[dependencies]
+minijinja = { path = "../minijinja", features = ["unstable_machinery"] }
+
+[dev-dependencies]
+criterion = { version = "0.3.5", features = ["html_reports"] }
+
+[[bench]]
+name = "templates"
+harness = false
