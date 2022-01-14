@@ -25,10 +25,8 @@ run-tests:
 	@rustup component add rustfmt 2> /dev/null
 	@echo "CARGO TESTS"
 	@cd minijinja; cargo test --features=json,urlencode,internal_debug
-	@echo "CARGO TEST MEMCHR"
-	@cd minijinja; cargo test --no-default-features --features=memchr,$(FEATURES)
-	@echo "CARGO TEST V_HTMLESCAPE"
-	@cd minijinja; cargo test --no-default-features --features=v_htmlescape,$(FEATURES)
+	@echo "CARGO TEST SPEEDUPS"
+	@cd minijinja; cargo test --no-default-features --features=speedups,$(FEATURES)
 	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
 	@cd minijinja; cargo check --no-default-features
 

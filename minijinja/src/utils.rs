@@ -18,27 +18,13 @@ macro_rules! _matches {
 pub(crate) use _matches as matches;
 
 pub fn memchr(haystack: &[u8], needle: u8) -> Option<usize> {
-    #[cfg(feature = "memchr")]
-    {
-        memchr::memchr(needle, haystack)
-    }
-    #[cfg(not(feature = "memchr"))]
-    {
-        haystack.iter().position(|&x| x == needle)
-    }
+    haystack.iter().position(|&x| x == needle)
 }
 
 pub fn memstr(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    #[cfg(feature = "memchr")]
-    {
-        memchr::memmem::find(haystack, needle)
-    }
-    #[cfg(not(feature = "memchr"))]
-    {
-        haystack
-            .windows(needle.len())
-            .position(|window| window == needle)
-    }
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
 }
 
 /// Controls the autoescaping behavior.

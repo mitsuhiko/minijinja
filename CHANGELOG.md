@@ -26,6 +26,7 @@ All notable changes to MiniJinja are documented here.
   for MiniJinja.
 - The `Value` type now supports deserialization.  This feature can be disabled
   by removing the default `deserialization` feature.
+- Removed optional `memchr` dependency as it does not appear to be useful.
 
 # 0.10.0
 

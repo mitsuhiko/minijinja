@@ -92,11 +92,9 @@
 //! There are some additional features that can be enabled:
 //!
 //! - `source`: enables the `Source` type which helps with dynamic loading of templates.
-//! - `memchr`: enables the `memchr` dependency which provides performance improvements
-//!   for the parser.
 //! - `v_htmlescape`: enables the `v_htmlescape` dependency which implements a faster HTML
 //!   escaping algorithm.
-//! - `speedups`: enables all speedups (currently `memchr` and `v_htmlescape`)
+//! - `speedups`: enables all speedups (currently `v_htmlescape`)
 //! - `unstable_machinery`: provides access to the internal machinery of the engine.  This
 //!   is a forever unstable API which mainly exists to aid debugging complex issues.
 //! - `json`: When enabled the `tojson` filter is added as builtin filter.

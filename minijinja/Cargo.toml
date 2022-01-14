@@ -21,7 +21,7 @@ deserialization = []
 key_interning = ["sync"]
 preserve_order = ["indexmap"]
 debug = ["sync"]
-speedups = ["memchr", "v_htmlescape"]
+speedups = ["v_htmlescape"]
 source = ["self_cell"]
 builtins = []
 json = ["serde_json"]
@@ -34,7 +34,6 @@ unstable_machinery = ["internal_debug"]
 
 [dependencies]
 serde = "1.0.130"
-memchr = { version = "2.4.1", optional = true }
 v_htmlescape = { version = "0.14.1", optional = true }
 self_cell = { version = "0.10.1", optional = true, features = ["old_rust"] }
 serde_json = { version = "1.0.68", optional = true }
