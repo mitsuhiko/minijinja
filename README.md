@@ -21,7 +21,16 @@ programs without the fear of pulling in complex dependencies for a small
 problem.  Additionally it tries not to re-invent something but stay in line
 with prior art to leverage an already existing ecosystem of editor integrations.
 
-## Example
+## Example Template
+
+```jinja
+{% extends "layout.html" %}
+{% block body %}
+  <p>Hello {{ name }}!</p>
+{% endblock %}
+```
+
+## API
 
 ```rust
 use minijinja::{Environment, context};
