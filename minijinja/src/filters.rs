@@ -163,18 +163,30 @@ mod builtins {
     use std::mem;
 
     /// Converts a value to uppercase.
+    ///
+    /// ```jinja
+    /// <h1>{{ chapter.title|upper }}</h1>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn upper(_state: &State, v: String) -> Result<String, Error> {
         Ok(v.to_uppercase())
     }
 
     /// Converts a value to lowercase.
+    ///
+    /// ```jinja
+    /// <h1>{{ chapter.title|lower }}</h1>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn lower(_state: &State, v: String) -> Result<String, Error> {
         Ok(v.to_lowercase())
     }
 
     /// Converts a value to title case.
+    ///
+    /// ```jinja
+    /// <h1>{{ chapter.title|title }}</h1>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn title(_state: &State, v: String) -> Result<String, Error> {
         let mut rv = String::new();
@@ -194,6 +206,13 @@ mod builtins {
     }
 
     /// Does a string replace.
+    ///
+    /// It replaces all ocurrences of the first parameter with the second.
+    ///
+    /// ```jinja
+    /// {{ "Hello World"|replace("Hello", "Goodbye") }}
+    ///   -> Goodbye World
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn replace(_state: &State, v: String, from: String, to: String) -> Result<String, Error> {
         Ok(v.replace(&from, &to))
@@ -202,6 +221,10 @@ mod builtins {
     /// Returns the "length" of the value
     ///
     /// By default this filter is also registered under the alias `count`.
+    ///
+    /// ```jinja
+    /// <p>Search results: {{ results|length }}
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn length(_state: &State, v: Value) -> Result<Value, Error> {
         v.len().map(Value::from).ok_or_else(|| {
@@ -244,7 +267,7 @@ mod builtins {
     /// It's generally better to use `|dictsort` which sorts the map by
     /// key before iterating.
     ///
-    /// ```text,ignore
+    /// ```jinja
     /// <dl>
     /// {% for key, value in my_dict|items %}
     ///   <dt>{{ key }}
@@ -271,6 +294,12 @@ mod builtins {
     }
 
     /// Reverses a list or string
+    ///
+    /// ```jinja
+    /// {% for user in users|reverse %}
+    ///   <li>{{ user.name }}
+    /// {% endfor %}
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn reverse(_state: &State, v: Value) -> Result<Value, Error> {
         if let Some(s) = v.as_str() {
@@ -340,7 +369,12 @@ mod builtins {
 
     /// Checks if a string starts with another string.
     ///
-    /// By default this filter is also registered under the alias `d`.
+    /// If the value is undefined it will return the passed default value,
+    /// otherwise the value of the variable:
+    ///
+    /// ```jinja
+    /// <p>{{ my_variable|default("my_variable was not defined") }}</p>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn default(_: &State, value: Value, other: Option<Value>) -> Result<Value, Error> {
         Ok(if value.is_undefined() {
@@ -351,6 +385,11 @@ mod builtins {
     }
 
     /// Returns the absolute value of a number.
+    ///
+    /// ```jinja
+    /// |a - b| = {{ (a - b)|abs }}
+    ///   -> |2 - 4| = 2
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn abs(_: &State, value: Value) -> Result<Value, Error> {
         match value.0 {
@@ -365,6 +404,14 @@ mod builtins {
     }
 
     /// Round the number to a given precision.
+    ///
+    /// Round the number to a given precision. The first parameter specifies the
+    /// precision (default is 0).
+    ///
+    /// ```jinja
+    /// {{ 42.55|round }}
+    ///   -> 43.0
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn round(_: &State, value: Value, precision: Option<i32>) -> Result<Value, Error> {
         match value.0 {
@@ -381,6 +428,15 @@ mod builtins {
     }
 
     /// Returns the first item from a list.
+    ///
+    /// If the list is empty `undefined` is returned.
+    ///
+    /// ```jinja
+    /// <dl>
+    ///   <dt>primary email
+    ///   <dd>{{ user.email_addresses|first|default('no user') }}
+    /// </dl>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn first(_: &State, value: Value) -> Result<Value, Error> {
         match value.0 {
@@ -396,6 +452,20 @@ mod builtins {
     }
 
     /// Returns the last item from a list.
+    ///
+    /// If the list is empty `undefined` is returned.
+    ///
+    /// ```jinja
+    /// <h2>Most Recent Update</h2>
+    /// {% with update = updates|last %}
+    ///   <dl>
+    ///     <dt>Location
+    ///     <dd>{{ update.location }}
+    ///     <dt>Status
+    ///     <dd>{{ update.status }}
+    ///   </dl>
+    /// {% endwith %}
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn last(_: &State, value: Value) -> Result<Value, Error> {
         match value.0 {
@@ -436,9 +506,26 @@ mod builtins {
         }
     }
 
-    /// """Slice an iterator and return a list of lists containing
-    /// those items. Useful if you want to create a div containing
-    /// three ul tags that represent columns:
+    /// Slice an iterable and return a list of lists containing
+    /// those items.
+    ///
+    /// Useful if you want to create a div containing three ul tags that
+    /// represent columns:
+    ///
+    /// ```jinja
+    /// <div class="columnwrapper">
+    /// {% for column in items|slice(3) %}
+    ///   <ul class="column-{{ loop.index }}">
+    ///   {% for item in column %}
+    ///     <li>{{ item }}</li>
+    ///   {% endfor %}
+    ///   </ul>
+    /// {% endfor %}
+    /// </div>
+    /// ```
+    ///
+    /// If you pass it a second argument it’s used to fill missing values on the
+    /// last iteration.
     pub fn slice(
         _: &State,
         value: Value,
@@ -480,6 +567,18 @@ mod builtins {
     /// This filter works pretty much like `slice` just the other way round. It
     /// returns a list of lists with the given number of items. If you provide a
     /// second parameter this is used to fill up missing items.
+    ///
+    /// ```jinja
+    /// <table>
+    ///   {% for row in items|batch(3, '&nbsp;') %}
+    ///   <tr>
+    ///   {% for column in row %}
+    ///     <td>{{ column }}</td>
+    ///   {% endfor %}
+    ///   </tr>
+    ///   {% endfor %}
+    /// </table>
+    /// ```
     pub fn batch(
         _: &State,
         value: Value,
@@ -516,7 +615,16 @@ mod builtins {
     /// This filter is only available if the `json` feature is enabled.  The resulting
     /// value is safe to use in HTML as well as it will not contain any special HTML
     /// characters.  The optional parameter to the filter can be set to `true` to enable
-    /// pretty printing.
+    /// pretty printing.  Not that the `"` character is left unchanged as it's the
+    /// JSON string delimiter.  If you want to pass JSON serialized this way into an
+    /// HTTP attribute use single quoted HTML attributes:
+    ///
+    /// ```jinja
+    /// <script>
+    ///   const GLOBAL_CONFIG = {{ global_config|tojson }};
+    /// </script>
+    /// <a href="#" data-info='{{ json_object|tojson }}'>...</a>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "json"))))]
     #[cfg(feature = "json")]
     pub fn tojson(_: &State, value: Value, pretty: Option<bool>) -> Result<Value, Error> {
@@ -548,6 +656,10 @@ mod builtins {
     /// If given a map it encodes the parameters into a query set, otherwise it
     /// encodes the stringified value.  If the value is none or undefined, an
     /// empty string is returned.
+    ///
+    /// ```jinja
+    /// <a href="/search?{{ {"q": "my search", "lang": "fr"}|urlencode }}">Search</a>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "urlencode"))))]
     #[cfg(feature = "urlencode")]
     pub fn urlencode(_: &State, value: Value) -> Result<String, Error> {

@@ -146,6 +146,14 @@ mod builtins {
     /// j)` returns `[i, i+1, i+2, ..., j-1]`. `lower` defaults to 0. When `step` is
     /// given, it specifies the increment (or decrement). For example, `range(4)`
     /// and `range(0, 4, 1)` return `[0, 1, 2, 3]`. The end point is omitted.
+    ///
+    /// ```jinja
+    /// <ul>
+    /// {% for num in range(1, 11) %}
+    ///   <li>{{ num }}
+    /// {% endfor %}
+    /// </ul>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn range(
         _state: &State,
@@ -168,6 +176,13 @@ mod builtins {
     ///
     /// This is a convenient alternative for a dictionary literal.
     /// `{"foo": "bar"}` is the same as `dict(foo="bar")`.
+    ///
+    /// ```jinja
+    /// <script>const CONFIG = {{ dict(
+    ///   DEBUG: true,
+    ///   API_URL_PREFIX: "/api"
+    /// )|tojson }};</script>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn dict(_state: &State, value: Value) -> Result<Value, Error> {
         if value.is_undefined() {
@@ -185,6 +200,10 @@ mod builtins {
     /// in a template.  It emits a stringified debug dump of the current
     /// engine state including the layers of the context, the current block
     /// and auto escaping setting.
+    ///
+    /// ```jinja
+    /// <pre>{{ debug() }}</pre>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn debug(state: &State) -> Result<String, Error> {
         Ok(format!("{:#?}", state))
