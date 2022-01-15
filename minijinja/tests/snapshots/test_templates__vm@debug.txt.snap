@@ -1,5 +1,6 @@
 ---
 source: minijinja/tests/test_templates.rs
+assertion_line: 44
 expression: "&rendered"
 input_file: minijinja/tests/inputs/debug.txt
 
@@ -60,6 +61,7 @@ State {
             "e",
             "escape",
             "first",
+            "items",
             "join",
             "last",
             "length",

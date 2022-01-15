@@ -11,6 +11,7 @@ All notable changes to MiniJinja are documented here.
 - Strings and safe strings no longer compare the same.
 - Changed list and map string output to have delimiters and debug printing.
 - Added `batch` and `slice` filter.
+- Added the new `items` filter.
 - Removed value internal distinction between maps and structs.
 - Added `list` filter.
 - Added `first` and `last` filters.
