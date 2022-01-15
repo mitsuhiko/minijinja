@@ -52,6 +52,11 @@ which no longer supports older Rust versions.
 Note that we currently cannot run tests against 1.42.0 due to our tests
 depending on insta which in turn also depends on indexmap.
 
+## Sponsor
+
+If you like the project and find it useful you can [become a
+sponsor](https://github.com/sponsors/mitsuhiko).
+
 ## License and Links
 
 - [Documentation](https://docs.rs/minijinja/)
