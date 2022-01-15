@@ -9,6 +9,23 @@
 //! [`&State`](crate::State) and value argument, then register it
 //! with [`add_filter`](crate::Environment::add_filter).
 //!
+//! # Using Filters
+//!
+//! Using filters in templates is possible in all places an expression is permitted.
+//! This means they are not just used for printing but also are useful for iteration
+//! or similar situations.
+//!
+//! Motivating example:
+//!
+//! ```jinja
+//! <dl>
+//! {% for key, value in config|items %}
+//!   <dt>{{ key }}
+//!   <dd><pre>{{ value|tojson }}</pre>
+//! {% endfor %}
+//! </dl>
+//! ```
+//!
 //! # Custom Filters
 //!
 //! A custom filter is just a simple function which accepts inputs as parameters and then

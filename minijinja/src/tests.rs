@@ -10,6 +10,22 @@
 //! [`&State`](crate::State) and value argument and returns a boolean
 //! result, then register it with [`add_filter`](crate::Environment::add_test).
 //!
+//! # Using Tests
+//!
+//! Tests are useful to "test" a value in a specific way.  For instance if
+//! you want to assign different classes to alternating rows one way is
+//! using the `odd` test:
+//!
+//! ```jinja
+//! {% if seq is defined %}
+//!   <ul>
+//!   {% for item in seq %}
+//!     <li class="{{ 'even' if loop.index is even else 'odd' }}">{{ item }}</li>
+//!   {% endfor %}
+//!   </ul>
+//! {% endif %}
+//! ```
+//!
 //! # Custom Tests
 //!
 //! A custom test function is just a simple function which accepts inputs as

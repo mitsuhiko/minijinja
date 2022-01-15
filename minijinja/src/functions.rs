@@ -4,6 +4,18 @@
 //! global functions to the environment via
 //! [`add_function`](crate::Environment::add_function).
 //!
+//! # Using Functions
+//!
+//! Functions can be called in any place where an expression is valid.  They
+//! are useful to retrieve data.  Some functions are special and provided
+//! by the engine (like `super`) within certain context, others are global.
+//!
+//! The following is a motivating example:
+//!
+//! ```jinja
+//! <pre>{{ debug() }}</pre>
+//! ```
+//!
 //! # Custom Functions
 //!
 //! A custom global function is just a simple rust function which accepts the

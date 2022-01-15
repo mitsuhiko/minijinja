@@ -379,8 +379,8 @@
 //!
 //! ## `{% filter %}`
 //!
-//! Filter sections allow you to apply regular filters on a block of
-//! template data. Just wrap the code in the special filter block:
+//! Filter sections allow you to apply regular [filters](crate::filters) on a
+//! block of template data. Just wrap the code in the special filter block:
 //!
 //! ```jinja
 //! {% filter upper %}
