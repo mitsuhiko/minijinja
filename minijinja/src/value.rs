@@ -438,23 +438,6 @@ value_from!(f32, F64);
 value_from!(f64, F64);
 value_from!(char, Char);
 
-/// An alternative view of a value.
-#[deprecated(since = "0.11.0", note = "use as_str/is_true/TryFrom instead")]
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
-pub enum Primitive<'a> {
-    Undefined,
-    None,
-    Bool(bool),
-    U64(u64),
-    U128(u128),
-    I64(i64),
-    I128(i128),
-    F64(f64),
-    Char(char),
-    Str(&'a str),
-    Bytes(&'a [u8]),
-}
-
 enum CoerceResult {
     I128(i128, i128),
     F64(f64, f64),
@@ -938,33 +921,6 @@ impl Value {
         match &self.0 {
             ValueRepr::String(ref s) => Some(s.as_str()),
             ValueRepr::SafeString(ref s) => Some(s.as_str()),
-            _ => None,
-        }
-    }
-
-    /// Return the value as f64
-    #[deprecated(since = "0.11.0", note = "use as_str/is_true/TryFrom instead")]
-    pub fn as_f64(&self) -> Option<f64> {
-        as_f64(self)
-    }
-
-    /// Deprecated alternative representation of a value.
-    #[deprecated(since = "0.11.0", note = "use as_str/is_true/TryFrom instead")]
-    #[allow(deprecated)]
-    pub fn as_primitive(&self) -> Option<Primitive<'_>> {
-        match self.0 {
-            ValueRepr::Undefined => Some(Primitive::Undefined),
-            ValueRepr::Bool(val) => Some(Primitive::Bool(val)),
-            ValueRepr::U64(val) => Some(Primitive::U64(val)),
-            ValueRepr::I64(val) => Some(Primitive::I64(val)),
-            ValueRepr::F64(val) => Some(Primitive::F64(val)),
-            ValueRepr::Char(val) => Some(Primitive::Char(val)),
-            ValueRepr::None => Some(Primitive::None),
-            ValueRepr::I128(ref val) => Some(Primitive::I128(**val)),
-            ValueRepr::String(ref val) => Some(Primitive::Str(val.as_str())),
-            ValueRepr::SafeString(ref val) => Some(Primitive::Str(val.as_str())),
-            ValueRepr::Bytes(ref val) => Some(Primitive::Bytes(&val[..])),
-            ValueRepr::U128(ref val) => Some(Primitive::U128(**val)),
             _ => None,
         }
     }

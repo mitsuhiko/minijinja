@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.13.0
+
+- Removed deprecated functionality.
+
 # 0.12.0
 
 - Deprecated `Primitive` and `as_primitive`.
