@@ -18,6 +18,20 @@
 /// ```
 ///
 /// The return value is a [`Value`](crate::value::Value).
+///
+/// Note that [`context!`] can also be used recursively if you need to
+/// create nested objects:
+///
+/// ```rust
+/// # use minijinja::context;
+/// let ctx = context! {
+///     nav => vec![
+///         context!(path => "/", title => "Index"),
+///         context!(path => "/downloads", title => "Downloads"),
+///         context!(path => "/faq", title => "FAQ"),
+///     ]
+/// };
+/// ```
 #[macro_export]
 macro_rules! context {
     (
