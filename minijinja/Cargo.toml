@@ -12,7 +12,7 @@ readme = "README.md"
 
 [package.metadata.docs.rs]
 features = ["source", "json", "urlencode"]
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [features]
 default = ["builtins", "sync", "debug", "key_interning", "deserialization"]

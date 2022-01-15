@@ -7,7 +7,7 @@ build:
 	@cargo build --all
 
 doc:
-	@RUSTDOCFLAGS=--cfg=docsrs cargo +nightly doc --no-deps --all --features=$(DOC_FEATURES)
+	@RUSTDOCFLAGS="--cfg=docsrs --html-in-header doc-header.html" cargo +nightly doc --no-deps --all --features=$(DOC_FEATURES)
 
 test:
 	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES)
