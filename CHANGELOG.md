@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-# 0.11.0
+# 0.12.0
 
 - Deprecated `Primitive` and `as_primitive`.
 - Deprecated `as_f64`.
@@ -28,6 +28,10 @@ All notable changes to MiniJinja are documented here.
 - The `Value` type now supports deserialization.  This feature can be disabled
   by removing the default `deserialization` feature.
 - Removed optional `memchr` dependency as it does not appear to be useful.
+
+# 0.11.0
+
+*Yanked* — this was a release from the wrong branch
 
 # 0.10.0
 
