@@ -1,2 +1,2 @@
 [workspace]
-members = ["minijinja", "examples/*"]
+members = ["minijinja", "examples/*", "benchmarks"]

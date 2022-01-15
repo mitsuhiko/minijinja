@@ -12,19 +12,18 @@ readme = "README.md"
 
 [package.metadata.docs.rs]
 features = ["source", "json", "urlencode"]
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [features]
-default = ["builtin_filters", "builtin_tests", "builtin_functions", "sync", "debug", "key_interning"]
+default = ["builtins", "sync", "debug", "key_interning", "deserialization"]
 sync = []
+deserialization = []
 key_interning = ["sync"]
 preserve_order = ["indexmap"]
 debug = ["sync"]
-speedups = ["memchr", "v_htmlescape"]
+speedups = ["v_htmlescape"]
 source = ["self_cell"]
-builtin_filters = []
-builtin_tests = []
-builtin_functions = []
+builtins = []
 json = ["serde_json"]
 urlencode = ["percent-encoding"]
 
@@ -35,7 +34,6 @@ unstable_machinery = ["internal_debug"]
 
 [dependencies]
 serde = "1.0.130"
-memchr = { version = "2.4.1", optional = true }
 v_htmlescape = { version = "0.14.1", optional = true }
 self_cell = { version = "0.10.1", optional = true, features = ["old_rust"] }
 serde_json = { version = "1.0.68", optional = true }

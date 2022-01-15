@@ -15,3 +15,10 @@ nav:
     if item.children %}<ul>{{ loop(item.children) }}</ul>{% endif %}</li>
 {% endfor %}
 </ul>
+
+<ul class="nav">
+{% for item in nav recursive %}
+  <li><a href={{ item.link }}">{{ item.title }}</a>{%
+    if item.children %}<ul>{{ loop(item.children)|upper }}</ul>{% endif %}</li>
+{% endfor %}
+</ul>

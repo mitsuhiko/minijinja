@@ -35,7 +35,7 @@
 //!
 //! This is a minimal template that illustrates a few basics:
 //!
-//! ```plain
+//! ```jinja
 //! <!doctype html>
 //! <title>{% block title %}My Website{% endblock %}</title>
 //! <ul id="navigation">
@@ -139,14 +139,14 @@
 //! For example, you can use this to extend from one template if a variable is defined,
 //! otherwise from the default layout template:
 //!
-//! ```plain
+//! ```jinja
 //! {% extends layout_template if layout_template is defined else 'default.html' %}
 //! ```
 //!
 //! The `else` part is optional. If not provided, the else block implicitly evaluates
 //! into an undefined value:
 //!
-//! ```plain
+//! ```jinja
 //! {{ title|upper if title }}
 //! ```
 //!
@@ -159,7 +159,7 @@
 //! The for tag loops over each item in a sequence.  For example, to display a list
 //! of users provided in a variable called `users`:
 //!
-//! ```plain
+//! ```jinja
 //! <h1>Members</h1>
 //! <ul>
 //! {% for user in users %}
@@ -170,7 +170,7 @@
 //!
 //! It's also possible to unpack tuples while iterating:
 //!
-//! ```plain
+//! ```jinja
 //! <h1>Members</h1>
 //! <ul>
 //! {% for (key, value) in list_of_pairs %}
@@ -195,7 +195,7 @@
 //! Within a for-loop, it’s possible to cycle among a list of strings/variables each time through
 //! the loop by using the special loop.cycle helper:
 //!
-//! ```plain
+//! ```jinja
 //! {% for row in rows %}
 //!   <li class="{{ loop.cycle('odd', 'even') }}">{{ row }}</li>
 //! {% endfor %}
@@ -205,7 +205,7 @@
 //! however, filter the sequence during iteration, which allows you to skip items.  The
 //! following example skips all the users which are hidden:
 //!
-//! ```plain
+//! ```jinja
 //! {% for user in users if not user.hidden %}
 //!   <li>{{ user.username }}</li>
 //! {% endfor %}
@@ -215,7 +215,7 @@
 //! removed all the items from the sequence, you can render a default block by
 //! using else:
 //!
-//! ```plain
+//! ```jinja
 //! <ul>
 //! {% for user in users %}
 //!   <li>{{ user.username }}</li>
@@ -230,7 +230,7 @@
 //! basically have to add the ``recursive`` modifier to the loop definition and
 //! call the loop variable with the new iterable where you want to recurse.
 //!
-//! ```plain
+//! ```jinja
 //! <ul class="menu">
 //! {% for item in menu recursive %}
 //!   <li><a href="{{ item.href }}">{{ item.title }}</a>
@@ -246,7 +246,7 @@
 //! The `if` statement is comparable with the Python if statement. In the simplest form,
 //! you can use it to test if a variable is defined, not empty and not false:
 //!
-//! ```plain
+//! ```jinja
 //! {% if users %}
 //!   <ul>
 //!   {% for user in users %}
@@ -259,7 +259,7 @@
 //! For multiple branches, `elif` and `else` can be used like in Python.  You can use more
 //! complex expressions there too:
 //!
-//! ```plain
+//! ```jinja
 //! {% if kenny.sick %}
 //!   Kenny is sick.
 //! {% elif kenny.dead %}
@@ -290,7 +290,7 @@
 //! document that you might use for a simple two-column page. It's the job of
 //! "child" templates to fill the empty blocks with content:
 //!
-//! ```plain
+//! ```jinja
 //! <!doctype html>
 //! {% block head %}
 //! <title>{% block title %}{% endblock %}</title>
@@ -300,7 +300,7 @@
 //!
 //! **Child Template:**
 //!
-//! ```plain
+//! ```jinja
 //! {% extends "base.html" %}
 //! {% block title %}Index{% endblock %}
 //! {% block head %}
@@ -333,7 +333,7 @@
 //! If you want to print a block multiple times, you can, however, use the
 //! special self variable and call the block with that name:
 //!
-//! ```plain
+//! ```jinja
 //! <title>{% block title %}{% endblock %}</title>
 //! <h1>{{ self.title() }}</h1>
 //! {% block body %}{% endblock %}
@@ -342,11 +342,11 @@
 //! MiniJinja allows you to put the name of the block after the end tag for better
 //! readability:
 //!
-//! ```plain
+//! ```jinja
 //! {% block sidebar %}
-//!     {% block inner_sidebar %}
-//!         ...
-//!     {% endblock inner_sidebar %}
+//!   {% block inner_sidebar %}
+//!     ...
+//!   {% endblock inner_sidebar %}
 //! {% endblock sidebar %}
 //! ```
 //!
@@ -357,9 +357,9 @@
 //! The `include` tag is useful to include a template and return the rendered contents of that file
 //! into the current namespace::
 //!  
-//! ```plain
+//! ```jinja
 //! {% include 'header.html' %}
-//!     Body
+//!   Body
 //! {% include 'footer.html' %}
 //! ```
 //!  
@@ -370,7 +370,7 @@
 //! The with statement makes it possible to create a new inner scope.  Variables set within
 //! this scope are not visible outside of the scope:
 //!
-//! ```plain
+//! ```jinja
 //! {% with foo = 42 %}
 //!   {{ foo }}           foo is 42 here
 //! {% endwith %}
@@ -382,9 +382,9 @@
 //! Filter sections allow you to apply regular filters on a block of
 //! template data. Just wrap the code in the special filter block:
 //!
-//! ```plain
+//! ```jinja
 //! {% filter upper %}
-//!     This text becomes uppercase
+//!   This text becomes uppercase
 //! {% endfilter %}
 //! ```
 //!
@@ -395,13 +395,13 @@
 //!
 //! Example:
 //!
-//! ```plain
+//! ```jinja
 //! {% autoescape true %}
-//!     Autoescaping is active within this block
+//!   Autoescaping is active within this block
 //! {% endautoescape %}
 //!
 //! {% autoescape false %}
-//!     Autoescaping is inactive within this block
+//!   Autoescaping is inactive within this block
 //! {% endautoescape %}
 //! ```
 //!

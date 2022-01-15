@@ -92,10 +92,9 @@
 //! There are some additional features that can be enabled:
 //!
 //! - `source`: enables the `Source` type which helps with dynamic loading of templates.
-//! - `memchr`: enables the `memchr` dependency which provides performance improvements
-//!   for the parser.
 //! - `v_htmlescape`: enables the `v_htmlescape` dependency which implements a faster HTML
 //!   escaping algorithm.
+//! - `speedups`: enables all speedups (currently `v_htmlescape`)
 //! - `unstable_machinery`: provides access to the internal machinery of the engine.  This
 //!   is a forever unstable API which mainly exists to aid debugging complex issues.
 //! - `json`: When enabled the `tojson` filter is added as builtin filter.
@@ -106,12 +105,8 @@
 //! Additionally to cut down on size of the engine some default
 //! functionality can be removed:
 //!
-//! - `builtin_filters`: if this feature is removed the default filters are
-//!   not implemented.
-//! - `builtin_tests`: if this feature is removed the default tests are
-//!   not implemented.
-//! - `builtin_functions`: if this feature is removed the default functions are
-//!   not implemented.
+//! - `builtins`: if this feature is removed the default filters, tests and
+//!   functions are not implemented.
 //! - `sync`: this feature makes MiniJinja's type `Send` and `Sync`.  If this feature
 //!   is disabled sending types across threads is often not possible.  Thread bounds
 //!   of things like callbacks however are not changing which means code that uses
@@ -121,6 +116,8 @@
 //! - `key_interning`: if this feature is removed the automatic string interning in
 //!   the value type is disabled.  The default behavior can cut down on the memory
 //!   consumption of the value type by interning all string keys used in values.
+//! - `deserialization`: when removed this disables deserialization support for
+//!   the [`Value`](crate::value::Value) type.
 #![allow(clippy::cognitive_complexity)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(html_logo_url = "https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo-square.png")]
@@ -143,6 +140,9 @@ pub mod functions;
 pub mod syntax;
 pub mod tests;
 pub mod value;
+
+#[cfg(feature = "deserialization")]
+mod deserialize;
 
 #[cfg(feature = "source")]
 mod source;

@@ -21,6 +21,13 @@ All notable changes to MiniJinja are documented here.
   make this more convenient whole integer floats are now handled like integers in
   some situations.
 - Added `recursive` support to for loops.
+- Merged `builtin_filters`, `builtin_tests` and `builtin_functions` features
+  into `builtins`.
+- Added `value::serializing_for_value` to check if serialization is taking place
+  for MiniJinja.
+- The `Value` type now supports deserialization.  This feature can be disabled
+  by removing the default `deserialization` feature.
+- Removed optional `memchr` dependency as it does not appear to be useful.
 
 # 0.10.0
 

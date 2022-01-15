@@ -1,5 +1,5 @@
 DOC_FEATURES=source,json,urlencode
-TEST_FEATURES=unstable_machinery,builtin_tests,builtin_filters,builtin_functions,source,json,urlencode,debug,internal_debug
+TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug
 
 all: test
 
@@ -7,7 +7,7 @@ build:
 	@cargo build --all
 
 doc:
-	@RUSTDOCFLAGS=--cfg=docsrs cargo +nightly doc --no-deps --all --features=$(DOC_FEATURES)
+	@RUSTDOCFLAGS="--cfg=docsrs --html-in-header doc-header.html" cargo +nightly doc --no-deps --all --features=$(DOC_FEATURES)
 
 test:
 	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES)
@@ -25,10 +25,8 @@ run-tests:
 	@rustup component add rustfmt 2> /dev/null
 	@echo "CARGO TESTS"
 	@cd minijinja; cargo test --features=json,urlencode,internal_debug
-	@echo "CARGO TEST MEMCHR"
-	@cd minijinja; cargo test --no-default-features --features=memchr,$(FEATURES)
-	@echo "CARGO TEST V_HTMLESCAPE"
-	@cd minijinja; cargo test --no-default-features --features=v_htmlescape,$(FEATURES)
+	@echo "CARGO TEST SPEEDUPS"
+	@cd minijinja; cargo test --no-default-features --features=speedups,$(FEATURES)
 	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
 	@cd minijinja; cargo check --no-default-features
 
