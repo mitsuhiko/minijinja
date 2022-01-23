@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 # 0.13.0
 
 - Removed deprecated functionality.
+- Fix an panic in debug error printing. (#49)
 
 # 0.12.0
 
