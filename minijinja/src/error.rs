@@ -278,7 +278,7 @@ mod debug_info {
             writeln!(f)?;
             writeln!(f, "{:-^1$}", " Template Source ", 74).unwrap();
             let lines: Vec<_> = source.lines().enumerate().collect();
-            let idx = line.unwrap_or(1) - 1;
+            let idx = line.unwrap_or(1).saturating_sub(1);
             let skip = idx.saturating_sub(3);
             let pre = lines.iter().skip(skip).take(3.min(idx)).collect::<Vec<_>>();
             let post = lines.iter().skip(idx + 1).take(3).collect::<Vec<_>>();
