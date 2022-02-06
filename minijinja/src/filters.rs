@@ -135,6 +135,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
         rv.insert("last", BoxedFilter::new(last));
         rv.insert("d", BoxedFilter::new(default));
         rv.insert("list", BoxedFilter::new(list));
+        rv.insert("bool", BoxedFilter::new(bool));
         rv.insert("batch", BoxedFilter::new(batch));
         rv.insert("slice", BoxedFilter::new(slice));
         #[cfg(feature = "json")]
@@ -519,6 +520,15 @@ mod builtins {
                 "cannot convert value to list",
             )),
         }
+    }
+
+    /// Converts the value into a boolean value.
+    ///
+    /// This behaves the same as the if statement does with regards to
+    /// handling of boolean values.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn bool(_: &State, value: Value) -> Result<bool, Error> {
+        Ok(value.is_true())
     }
 
     /// Slice an iterable and return a list of lists containing

@@ -54,6 +54,7 @@ State {
         filters: [
             "abs",
             "batch",
+            "bool",
             "count",
             "d",
             "default",

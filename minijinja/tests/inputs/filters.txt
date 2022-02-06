@@ -20,6 +20,11 @@ list-from-list: {{ list|list }}
 list-from-map: {{ map|list }}
 list-from-word: {{ word|list }}
 list-from-undefined: {{ undefined|list }}
+bool-empty-string: {{ ""|bool }}
+bool-non-empty-string: {{ "hello"|bool }}
+bool-empty-list: {{ []|bool }}
+bool-non-empty-list: {{ [42]|bool }}
+bool-undefined: {{ undefined|bool }}
 map-length: {{ map|length }}
 string-length: {{ word|length }}
 string-count: {{ word|count }}
