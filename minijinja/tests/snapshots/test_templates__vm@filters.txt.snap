@@ -19,6 +19,11 @@ list-from-list: [1, 2, 3]
 list-from-map: ["a", "c"]
 list-from-word: ['B', 'i', 'r', 'd']
 list-from-undefined: []
+bool-empty-string: false
+bool-non-empty-string: true
+bool-empty-list: false
+bool-non-empty-list: true
+bool-undefined: false
 map-length: 2
 string-length: 4
 string-count: 4

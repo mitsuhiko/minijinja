@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.14.0
+
+- Added `bool` filter.
+
 # 0.13.0
 
 - Removed deprecated functionality.
