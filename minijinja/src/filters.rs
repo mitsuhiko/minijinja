@@ -384,8 +384,6 @@ mod builtins {
         }
     }
 
-    /// Checks if a string starts with another string.
-    ///
     /// If the value is undefined it will return the passed default value,
     /// otherwise the value of the variable:
     ///
