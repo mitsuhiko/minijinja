@@ -741,7 +741,18 @@ impl<'a> Parser<'a> {
 
     fn parse_include(&mut self) -> Result<ast::Include<'a>, Error> {
         let name = self.parse_expr()?;
-        Ok(ast::Include { name })
+        let ignore_missing = if matches!(self.stream.current()?, Some((Token::Ident("ignore"), _)))
+        {
+            self.stream.next()?;
+            expect_token!(self, Token::Ident("missing"), "missing keyword")?;
+            true
+        } else {
+            false
+        };
+        Ok(ast::Include {
+            name,
+            ignore_missing,
+        })
     }
 
     fn parse_auto_escape(&mut self) -> Result<ast::AutoEscape<'a>, Error> {

@@ -364,6 +364,13 @@
 //!   Body
 //! {% include 'footer.html' %}
 //! ```
+//!
+//! Optionally `ignore missing` can be added in which case non existing templates
+//! are silently ignored.
+//!
+//! ```jinja
+//! {% include 'customization.html' ignore missing %}
+//! ```
 //!  
 //! Included templates have access to the variables of the active context.
 //!

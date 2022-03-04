@@ -437,7 +437,7 @@ impl<'source> Environment<'source> {
         .ok_or_else(|| {
             Error::new(
                 ErrorKind::TemplateNotFound,
-                format!("template name {:?}", name),
+                format!("template {:?} does not exist", name),
             )
         })
     }

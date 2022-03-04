@@ -801,7 +801,7 @@ impl<'env> Vm<'env> {
                     pc = 0;
                     continue;
                 }
-                Instruction::Include => {
+                Instruction::Include(ignore_missing) => {
                     let name = stack.pop();
                     let name = try_ctx!(name.as_str().ok_or_else(|| {
                         Error::new(
@@ -809,7 +809,17 @@ impl<'env> Vm<'env> {
                             "template name was not a string",
                         )
                     }));
-                    let tmpl = try_ctx!(self.env.get_template(name));
+                    let tmpl = match self.env.get_template(name) {
+                        Ok(tmpl) => tmpl,
+                        Err(err) => {
+                            if *ignore_missing {
+                                pc += 1;
+                                continue;
+                            } else {
+                                bail!(err);
+                            }
+                        }
+                    };
                     let instructions = tmpl.instructions();
                     let mut referenced_blocks = BTreeMap::new();
                     for (&name, instr) in tmpl.blocks().iter() {

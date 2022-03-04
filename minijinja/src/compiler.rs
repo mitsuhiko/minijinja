@@ -284,7 +284,7 @@ impl<'source> Compiler<'source> {
             ast::Stmt::Include(include) => {
                 self.set_location_from_span(include.span());
                 self.compile_expr(&include.name)?;
-                self.add(Instruction::Include);
+                self.add(Instruction::Include(include.ignore_missing));
             }
             ast::Stmt::AutoEscape(auto_escape) => {
                 self.set_location_from_span(auto_escape.span());

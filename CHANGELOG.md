@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 - Added `bool` filter.
 - Added `meta` API. (#55)
+- Added support for `ignore missing` in include tags. (#56)
 
 # 0.13.0
 
