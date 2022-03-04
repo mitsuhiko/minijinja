@@ -371,6 +371,16 @@
 //! ```jinja
 //! {% include 'customization.html' ignore missing %}
 //! ```
+//!
+//! You can also provide a list of templates that are checked for existence
+//! before inclusion. The first template that exists will be included. If `ignore
+//! missing` is set, it will fall back to rendering nothing if none of the
+//! templates exist, otherwise it will fail with an error.
+//!
+//! ```jinja
+//! {% include ['page_detailed.html', 'page.html'] %}
+//! {% include ['special_sidebar.html', 'sidebar.html'] ignore missing %}
+//! ```
 //!  
 //! Included templates have access to the variables of the active context.
 //!

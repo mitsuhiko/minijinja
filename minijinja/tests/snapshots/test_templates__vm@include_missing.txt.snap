@@ -1,0 +1,12 @@
+---
+source: minijinja/tests/test_templates.rs
+assertion_line: 44
+expression: "&rendered"
+input_file: minijinja/tests/inputs/include_missing.txt
+
+---
+!!!ERROR!!!
+
+Error { kind: TemplateNotFound, detail: Some("tried to include non-existing template \"missing_template.txt\""), name: Some("include_missing.txt"), lineno: 2, source: None }
+
+

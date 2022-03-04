@@ -9,7 +9,7 @@ use crate::instructions::{
 };
 use crate::key::Key;
 use crate::utils::matches;
-use crate::value::{self, Object, RcType, Value, ValueIterator};
+use crate::value::{self, Object, RcType, Value, ValueIterator, ValueRepr};
 use crate::AutoEscape;
 
 pub struct LoopState {
@@ -803,34 +803,64 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::Include(ignore_missing) => {
                     let name = stack.pop();
-                    let name = try_ctx!(name.as_str().ok_or_else(|| {
-                        Error::new(
-                            ErrorKind::ImpossibleOperation,
-                            "template name was not a string",
-                        )
-                    }));
-                    let tmpl = match self.env.get_template(name) {
-                        Ok(tmpl) => tmpl,
-                        Err(err) => {
-                            if *ignore_missing {
-                                pc += 1;
-                                continue;
-                            } else {
-                                bail!(err);
-                            }
-                        }
+                    let choices = if let ValueRepr::Seq(ref choices) = name.0 {
+                        &choices[..]
+                    } else {
+                        std::slice::from_ref(&name)
                     };
-                    let instructions = tmpl.instructions();
-                    let mut referenced_blocks = BTreeMap::new();
-                    for (&name, instr) in tmpl.blocks().iter() {
-                        referenced_blocks.insert(name, vec![instr]);
+                    let mut templates_tried = vec![];
+                    for name in choices {
+                        let name = try_ctx!(name.as_str().ok_or_else(|| {
+                            Error::new(
+                                ErrorKind::ImpossibleOperation,
+                                "template name was not a string",
+                            )
+                        }));
+                        let tmpl = match self.env.get_template(name) {
+                            Ok(tmpl) => tmpl,
+                            Err(err) => {
+                                if err.kind() == ErrorKind::TemplateNotFound {
+                                    templates_tried.push(name);
+                                } else {
+                                    bail!(err);
+                                }
+                                continue;
+                            }
+                        };
+                        let instructions = tmpl.instructions();
+                        let mut referenced_blocks = BTreeMap::new();
+                        for (&name, instr) in tmpl.blocks().iter() {
+                            referenced_blocks.insert(name, vec![instr]);
+                        }
+                        sub_eval!(
+                            instructions,
+                            referenced_blocks,
+                            None,
+                            tmpl.initial_auto_escape()
+                        );
+                        templates_tried.clear();
+                        break;
                     }
-                    sub_eval!(
-                        instructions,
-                        referenced_blocks,
-                        None,
-                        tmpl.initial_auto_escape()
-                    );
+
+                    if !templates_tried.is_empty() && !*ignore_missing {
+                        if templates_tried.len() == 1 {
+                            bail!(Error::new(
+                                ErrorKind::TemplateNotFound,
+                                format!(
+                                    "tried to include non-existing template {:?}",
+                                    templates_tried[0]
+                                )
+                            ));
+                        } else {
+                            bail!(Error::new(
+                                ErrorKind::TemplateNotFound,
+                                format!(
+                                    "tried to include one of multiple templates, none of which existed {:?}",
+                                    templates_tried
+                                )
+                            ));
+                        }
+                    }
                 }
                 Instruction::PushAutoEscape => {
                     let value = stack.pop();

@@ -1,0 +1,5 @@
+template: "missing_template.txt"
+---
+Before
+{% include template ignore missing %}
+After
