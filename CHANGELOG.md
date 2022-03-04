@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 # 0.14.0
 
 - Added `bool` filter.
+- Added `meta` API. (#55)
 
 # 0.13.0
 
