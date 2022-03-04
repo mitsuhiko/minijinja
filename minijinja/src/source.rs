@@ -138,7 +138,7 @@ impl Source {
                             .unwrap()
                             .display()
                             .to_string()
-                            .replace("\\", "/");
+                            .replace('\\', "/");
                         source.add_template(
                             name,
                             fs::read_to_string(path).map_err(|err| {
