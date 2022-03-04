@@ -168,6 +168,7 @@ pub struct Extends<'a> {
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Include<'a> {
     pub name: Expr<'a>,
+    pub ignore_missing: bool,
 }
 
 /// An auto escape control block.
