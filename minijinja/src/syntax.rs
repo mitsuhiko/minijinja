@@ -1,14 +1,16 @@
 //! Documents the syntax for templates.
 //!
-//! <details><summary><strong>Table of Contents</strong></summary>
+//! <details><summary><strong style="cursor: pointer">Table of Contents</strong></summary>
 //!
 //! - [Synopsis](#synopsis)
+//! - [Trailing Newlines](#trailing-newlines)
 //! - [Expressions](#expressions)
 //!   - [Literals](#literals)
 //!   - [Math](#math)
 //!   - [Comparisons](#comparisons)
 //!   - [Logic](#logic)
 //!   - [Other Operators](#other-operators)
+//!   - [If Expressions](#if-expressions)
 //! - [Tags](#tags)
 //!   - [`{% for %}`](#-for-)
 //!   - [`{% if %}`](#-if-)
