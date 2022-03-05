@@ -25,7 +25,7 @@
 //!
 //! # Synopsis
 //!
-//! A MiniJinja template is simply a text file.  MiniJInja can generate any text-based
+//! A MiniJinja template is simply a text file.  MiniJinja can generate any text-based
 //! format (HTML, XML, CSV, LaTeX, etc.).  A template doesn’t need to have a specific extension
 //! and in fact MiniJinja does not understand much about the file system.  However the default
 //! configuration for [auto escaping](crate::Environment::set_auto_escape_callback) uses file
