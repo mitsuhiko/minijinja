@@ -1,0 +1,11 @@
+---
+source: minijinja/tests/test_templates.rs
+assertion_line: 44
+expression: "&rendered"
+input_file: minijinja/tests/inputs/or.txt
+
+---
+42
+23
+23
+

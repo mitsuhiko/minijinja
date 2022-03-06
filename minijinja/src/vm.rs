@@ -757,6 +757,7 @@ impl<'env> Vm<'env> {
                 Instruction::JumpIfTrueOrPop(jump_target) => {
                     if stack.peek().is_true() {
                         pc = *jump_target;
+                        continue;
                     } else {
                         stack.pop();
                     }

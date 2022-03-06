@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.14.1
+
+- Fixed `or` expressions not working properly.
+
 # 0.14.0
 
 - Added `bool` filter.
