@@ -1872,7 +1872,7 @@ fn test_key_interning() {
                 let k = m.iter().next().unwrap().0;
                 match k {
                     Key::String(s) => {
-                        assert_eq!(RcType::strong_count(&s), 3);
+                        assert_eq!(RcType::strong_count(s), 3);
                     }
                     _ => unreachable!(),
                 }
