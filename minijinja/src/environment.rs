@@ -22,14 +22,13 @@ use crate::{filters, functions, tests};
 pub struct Template<'env> {
     env: &'env Environment<'env>,
     compiled: &'env CompiledTemplate<'env>,
-    name: &'env str,
     initial_auto_escape: AutoEscape,
 }
 
 impl<'env> fmt::Debug for Template<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("Template");
-        ds.field("name", &self.name);
+        ds.field("name", &self.name());
         #[cfg(feature = "internal_debug")]
         {
             ds.field("instructions", &self.compiled.instructions);
@@ -106,7 +105,7 @@ impl<'source> CompiledTemplate<'source> {
 impl<'env> Template<'env> {
     /// Returns the name of the template.
     pub fn name(&self) -> &str {
-        self.name
+        self.compiled.instructions.name()
     }
 
     /// Returns the source code of the template.
@@ -404,19 +403,6 @@ impl<'source> Environment<'source> {
         }
     }
 
-    /// Removes a template by name.
-    pub fn remove_template(&mut self, name: &str) {
-        match self.templates {
-            Source::Borrowed(ref mut map) => {
-                RcType::make_mut(map).remove(name);
-            }
-            #[cfg(feature = "source")]
-            Source::Owned(ref mut source) => {
-                RcType::make_mut(source).remove_template(name);
-            }
-        }
-    }
-
     /// Fetches a template by name.
     ///
     /// This requires that the template has been loaded with
@@ -424,14 +410,13 @@ impl<'source> Environment<'source> {
     /// not loaded an error of kind `TemplateNotFound` is returned.
     pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
         let rv = match &self.templates {
-            Source::Borrowed(ref map) => map.get_key_value(name).map(|(&k, v)| (k, &**v)),
+            Source::Borrowed(ref map) => map.get(name).map(|v| &**v),
             #[cfg(feature = "source")]
             Source::Owned(source) => source.get_compiled_template(name),
         };
-        rv.map(|(name, compiled)| Template {
+        rv.map(|compiled| Template {
             env: self,
             compiled,
-            name,
             initial_auto_escape: (self.default_auto_escape)(name),
         })
         .ok_or_else(|| {
@@ -452,10 +437,7 @@ impl<'source> Environment<'source> {
         attach_basic_debug_info(self._compile_expression(expr), expr)
     }
 
-    pub fn _compile_expression(
-        &self,
-        expr: &'source str,
-    ) -> Result<Expression<'_, 'source>, Error> {
+    fn _compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
         let ast = parse_expr(expr)?;
         let mut compiler = Compiler::new("<expression>", expr);
         compiler.compile_expr(&ast)?;
