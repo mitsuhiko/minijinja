@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 # 0.15.0
 
 - Removed the functionality to unload templates from an environment. (#60)
+- Bumped minimum version requirement to 1.43.
 
 # 0.14.1
 

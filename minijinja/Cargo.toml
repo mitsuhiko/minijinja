@@ -9,6 +9,7 @@ homepage = "https://github.com/mitsuhiko/minijinja"
 repository = "https://github.com/mitsuhiko/minijinja"
 keywords = ["jinja", "jinja2", "templates"]
 readme = "README.md"
+rust-version = "1.43"
 
 [package.metadata.docs.rs]
 features = ["source", "json", "urlencode"]

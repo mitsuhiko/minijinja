@@ -10,7 +10,7 @@ use crate::environment::CompiledTemplate;
 use crate::error::{Error, ErrorKind};
 use crate::value::RcType;
 
-type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<String, Error>;
+type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<String, Error> + Send + Sync;
 
 /// Utility for dynamic template loading.
 ///
@@ -97,7 +97,7 @@ impl Source {
     /// otherwise `Ok(None)`.  It's also possible to signal out other errors.
     pub fn set_loader<F>(&mut self, f: F)
     where
-        F: Fn(&str) -> Result<Option<String>, Error> + 'static,
+        F: Fn(&str) -> Result<Option<String>, Error> + Send + Sync + 'static,
     {
         self.loader = Some(Arc::new(move |name| match f(name)? {
             Some(rv) => Ok(rv),
