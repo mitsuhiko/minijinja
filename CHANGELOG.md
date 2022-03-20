@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.15.0
+
+- Removed the functionality to unload templates from an environment. (#60)
+
 # 0.14.1
 
 - Fixed `or` expressions not working properly.

@@ -85,11 +85,6 @@ impl Source {
         Ok(())
     }
 
-    /// Removes an already loaded template from the source.
-    pub fn remove_template(&mut self, name: &str) {
-        self.templates.remove(name);
-    }
-
     /// Loads templates from a path.
     ///
     /// This function takes two arguments: `path` which is the path to where the templates are
@@ -159,12 +154,9 @@ impl Source {
     }
 
     /// Gets a compiled template from the source.
-    pub(crate) fn get_compiled_template(
-        &self,
-        name: &str,
-    ) -> Option<(&str, &CompiledTemplate<'_>)> {
+    pub(crate) fn get_compiled_template(&self, name: &str) -> Option<&CompiledTemplate<'_>> {
         self.templates
-            .get_key_value(name)
-            .map(|(key, value)| (key.as_str(), value.borrow_dependent()))
+            .get(name)
+            .map(|value| value.borrow_dependent())
     }
 }
