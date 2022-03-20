@@ -1,14 +1,17 @@
-use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
+use std::hash::Hash;
 use std::path::Path;
+use std::sync::Arc;
 
+use memo_map::MemoMap;
 use self_cell::self_cell;
 
 use crate::environment::CompiledTemplate;
 use crate::error::{Error, ErrorKind};
-use crate::utils::BTreeMapKeysDebug;
 use crate::value::RcType;
+
+type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<String, Error>;
 
 /// Utility for dynamic template loading.
 ///
@@ -36,12 +39,20 @@ use crate::value::RcType;
 #[derive(Clone, Default)]
 #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
 pub struct Source {
-    templates: BTreeMap<String, RcType<LoadedTemplate>>,
+    templates: MemoMap<String, RcType<LoadedTemplate>>,
+    loader: Option<Arc<LoadFunc>>,
 }
 
 impl fmt::Debug for Source {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&BTreeMapKeysDebug(&self.templates), f)
+        pub struct KeysDebug<'a, K: fmt::Debug, V>(pub &'a MemoMap<K, V>);
+
+        impl<'a, K: Hash + Eq + fmt::Debug, V> fmt::Debug for KeysDebug<'a, K, V> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_list().entries(self.0.iter().map(|x| x.0)).finish()
+            }
+        }
+        fmt::Debug::fmt(&KeysDebug(&self.templates), f)
     }
 }
 
@@ -65,6 +76,22 @@ impl Source {
         Source::default()
     }
 
+    /// Sets a dynamic loader function.
+    ///
+    /// When a loader is set the source gains the ability to dynamically
+    /// load templates.  The loader is invoked with the name of the template.
+    /// If this template exists `Ok(Some(template_source))` has to be returned,
+    /// otherwise `Ok(None)`.  It's also possible to signal out other errors.
+    pub fn set_loader<F>(&mut self, f: F)
+    where
+        F: Fn(&str) -> Result<Option<String>, Error> + 'static,
+    {
+        self.loader = Some(Arc::new(move |name| match f(name)? {
+            Some(rv) => Ok(rv),
+            None => Err(Error::new_not_found(name)),
+        }));
+    }
+
     /// Adds a new template into the source.
     ///
     /// This is similar to the method of the same name on the environment but
@@ -83,11 +110,6 @@ impl Source {
         })?;
         self.templates.insert(name, RcType::new(tmpl));
         Ok(())
-    }
-
-    /// Removes an already loaded template from the source.
-    pub fn remove_template(&mut self, name: &str) {
-        self.templates.remove(name);
     }
 
     /// Loads templates from a path.
@@ -159,12 +181,25 @@ impl Source {
     }
 
     /// Gets a compiled template from the source.
-    pub(crate) fn get_compiled_template(
-        &self,
-        name: &str,
-    ) -> Option<(&str, &CompiledTemplate<'_>)> {
-        self.templates
-            .get_key_value(name)
-            .map(|(key, value)| (key.as_str(), value.borrow_dependent()))
+    pub(crate) fn get_compiled_template(&self, name: &str) -> Result<&CompiledTemplate<'_>, Error> {
+        if let Some(ref loader) = self.loader {
+            Ok(self
+                .templates
+                .get_or_try_insert(name, || -> Result<_, Error> {
+                    let source = loader(name)?;
+                    let owner = (name.to_owned(), source);
+                    let tmpl =
+                        LoadedTemplate::try_new(owner, |(name, source)| -> Result<_, Error> {
+                            CompiledTemplate::from_name_and_source(name.as_str(), source)
+                        })?;
+                    Ok(RcType::new(tmpl))
+                })?
+                .borrow_dependent())
+        } else {
+            self.templates
+                .get(name)
+                .map(|value| value.borrow_dependent())
+                .ok_or_else(|| Error::new_not_found(name))
+        }
     }
 }

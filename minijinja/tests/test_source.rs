@@ -17,10 +17,3 @@ fn test_basic() {
     let t = env.get_template("hello").unwrap();
     assert_eq!(t.render(&()).unwrap(), "Hello World!");
 }
-
-#[test]
-fn test_removal() {
-    let mut env = create_env();
-    env.remove_template("hello");
-    assert!(env.get_template("hello").is_err());
-}

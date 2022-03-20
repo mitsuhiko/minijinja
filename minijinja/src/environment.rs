@@ -4,7 +4,7 @@ use std::fmt;
 use serde::Serialize;
 
 use crate::compiler::Compiler;
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
 use crate::instructions::Instructions;
 use crate::parser::{parse, parse_expr};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, HtmlEscape};
@@ -22,14 +22,13 @@ use crate::{filters, functions, tests};
 pub struct Template<'env> {
     env: &'env Environment<'env>,
     compiled: &'env CompiledTemplate<'env>,
-    name: &'env str,
     initial_auto_escape: AutoEscape,
 }
 
 impl<'env> fmt::Debug for Template<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("Template");
-        ds.field("name", &self.name);
+        ds.field("name", &self.compiled.instructions.name());
         #[cfg(feature = "internal_debug")]
         {
             ds.field("instructions", &self.compiled.instructions);
@@ -106,7 +105,7 @@ impl<'source> CompiledTemplate<'source> {
 impl<'env> Template<'env> {
     /// Returns the name of the template.
     pub fn name(&self) -> &str {
-        self.name
+        self.compiled.instructions.name()
     }
 
     /// Returns the source code of the template.
@@ -404,41 +403,24 @@ impl<'source> Environment<'source> {
         }
     }
 
-    /// Removes a template by name.
-    pub fn remove_template(&mut self, name: &str) {
-        match self.templates {
-            Source::Borrowed(ref mut map) => {
-                RcType::make_mut(map).remove(name);
-            }
-            #[cfg(feature = "source")]
-            Source::Owned(ref mut source) => {
-                RcType::make_mut(source).remove_template(name);
-            }
-        }
-    }
-
     /// Fetches a template by name.
     ///
     /// This requires that the template has been loaded with
     /// [`add_template`](Environment::add_template) beforehand.  If the template was
     /// not loaded an error of kind `TemplateNotFound` is returned.
     pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
-        let rv = match &self.templates {
-            Source::Borrowed(ref map) => map.get_key_value(name).map(|(&k, v)| (k, &**v)),
+        let compiled = match &self.templates {
+            Source::Borrowed(ref map) => map
+                .get(name)
+                .map(|v| &**v)
+                .ok_or_else(|| Error::new_not_found(name))?,
             #[cfg(feature = "source")]
-            Source::Owned(source) => source.get_compiled_template(name),
+            Source::Owned(source) => source.get_compiled_template(name)?,
         };
-        rv.map(|(name, compiled)| Template {
+        Ok(Template {
             env: self,
             compiled,
-            name,
             initial_auto_escape: (self.default_auto_escape)(name),
-        })
-        .ok_or_else(|| {
-            Error::new(
-                ErrorKind::TemplateNotFound,
-                format!("template {:?} does not exist", name),
-            )
         })
     }
 
