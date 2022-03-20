@@ -1,0 +1,12 @@
+---
+source: minijinja/tests/test_templates.rs
+assertion_line: 44
+expression: "&rendered"
+input_file: minijinja/tests/inputs/inexpr.txt
+
+---
+true
+false
+false
+true
+
