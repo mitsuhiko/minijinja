@@ -23,7 +23,7 @@ type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<String, Error>;
 /// [`Environment::add_template`](crate::Environment::add_template) must no
 /// longer be used as otherwise the same lifetime concern arises.
 ///
-/// # Example
+/// # Static Example
 ///
 /// ```rust
 /// # use minijinja::{Source, Environment};
@@ -31,6 +31,25 @@ type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<String, Error>;
 ///     let mut env = Environment::new();
 ///     let mut source = Source::new();
 ///     source.load_from_path("templates", &["html"]).unwrap();
+///     env.set_source(source);
+///     env
+/// }
+/// ```
+///
+/// # Fully Dynamic Example
+///
+/// ```rust
+/// # use minijinja::{Source, Environment};
+/// fn create_env() -> Environment<'static> {
+///     let mut env = Environment::new();
+///     let mut source = Source::new();
+///     source.set_loader(|name| {
+///         if name == "layout.html" {
+///             Ok(Some("...".into()))
+///         } else {
+///             Ok(None)
+///         }
+///     });
 ///     env.set_source(source);
 ///     env
 /// }
