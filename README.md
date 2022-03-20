@@ -45,11 +45,11 @@ fn main() {
 
 ## Minimum Rust Version
 
-MiniJinja supports Rust versions down to 1.42 at the moment.  For the order
+MiniJinja supports Rust versions down to 1.43 at the moment.  For the order
 preservation feature Rust 1.49 is required as it uses the indexmap dependency
 which no longer supports older Rust versions.
 
-Note that we currently cannot run tests against 1.42.0 due to our tests
+Note that we currently cannot run tests against 1.43.0 due to our tests
 depending on insta which in turn also depends on indexmap.
 
 ## Sponsor
@@ -60,5 +60,6 @@ sponsor](https://github.com/sponsors/mitsuhiko).
 ## License and Links
 
 - [Documentation](https://docs.rs/minijinja/)
+- [Examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
 - [Issue Tracker](https://github.com/mitsuhiko/minijinja/issues)
 - License: [Apache-2.0](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
