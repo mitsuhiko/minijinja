@@ -85,6 +85,11 @@ impl Source {
         Ok(())
     }
 
+    /// Removes an already loaded template from the source.
+    pub fn remove_template(&mut self, name: &str) {
+        self.templates.remove(name);
+    }
+
     /// Loads templates from a path.
     ///
     /// This function takes two arguments: `path` which is the path to where the templates are

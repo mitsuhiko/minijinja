@@ -4,7 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 # 0.15.0
 
-- Removed the functionality to unload templates from an environment. (#60)
+- Internal refactorings.
 
 # 0.14.1
 

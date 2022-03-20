@@ -403,6 +403,19 @@ impl<'source> Environment<'source> {
         }
     }
 
+    /// Removes a template by name.
+    pub fn remove_template(&mut self, name: &str) {
+        match self.templates {
+            Source::Borrowed(ref mut map) => {
+                RcType::make_mut(map).remove(name);
+            }
+            #[cfg(feature = "source")]
+            Source::Owned(ref mut source) => {
+                RcType::make_mut(source).remove_template(name);
+            }
+        }
+    }
+
     /// Fetches a template by name.
     ///
     /// This requires that the template has been loaded with
@@ -605,4 +618,12 @@ fn test_globals() {
     env.add_template("test", "{{ a }}").unwrap();
     let tmpl = env.get_template("test").unwrap();
     assert_eq!(tmpl.render(()).unwrap(), "42");
+}
+
+#[test]
+fn test_template_removal() {
+    let mut env = Environment::new();
+    env.add_template("test", "{{ a }}").unwrap();
+    env.remove_template("test");
+    assert!(env.get_template("test").is_err());
 }
