@@ -9,6 +9,7 @@ homepage = "https://github.com/mitsuhiko/minijinja"
 repository = "https://github.com/mitsuhiko/minijinja"
 keywords = ["jinja", "jinja2", "templates"]
 readme = "README.md"
+rust-version = "1.43"
 
 [package.metadata.docs.rs]
 features = ["source", "json", "urlencode"]
@@ -22,7 +23,7 @@ key_interning = ["sync"]
 preserve_order = ["indexmap"]
 debug = ["sync"]
 speedups = ["v_htmlescape"]
-source = ["self_cell"]
+source = ["self_cell", "memo-map"]
 builtins = []
 json = ["serde_json"]
 urlencode = ["percent-encoding"]
@@ -39,6 +40,7 @@ self_cell = { version = "0.10.1", optional = true, features = ["old_rust"] }
 serde_json = { version = "1.0.68", optional = true }
 percent-encoding = { version = "2.1.0", optional = true }
 indexmap = { version = "1.7.0", optional = true }
+memo-map = { version = "0.3.0", optional = true }
 
 [dev-dependencies]
 insta = { version = "1.7.2", features = ["glob"] }

@@ -4,7 +4,7 @@ use std::fmt;
 use serde::Serialize;
 
 use crate::compiler::Compiler;
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
 use crate::instructions::Instructions;
 use crate::parser::{parse, parse_expr};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, HtmlEscape};
@@ -422,21 +422,18 @@ impl<'source> Environment<'source> {
     /// [`add_template`](Environment::add_template) beforehand.  If the template was
     /// not loaded an error of kind `TemplateNotFound` is returned.
     pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
-        let rv = match &self.templates {
-            Source::Borrowed(ref map) => map.get(name).map(|v| &**v),
+        let compiled = match &self.templates {
+            Source::Borrowed(ref map) => map
+                .get(name)
+                .map(|v| &**v)
+                .ok_or_else(|| Error::new_not_found(name))?,
             #[cfg(feature = "source")]
-            Source::Owned(source) => source.get_compiled_template(name),
+            Source::Owned(source) => source.get_compiled_template(name)?,
         };
-        rv.map(|compiled| Template {
+        Ok(Template {
             env: self,
             compiled,
             initial_auto_escape: (self.default_auto_escape)(name),
-        })
-        .ok_or_else(|| {
-            Error::new(
-                ErrorKind::TemplateNotFound,
-                format!("template {:?} does not exist", name),
-            )
         })
     }
 

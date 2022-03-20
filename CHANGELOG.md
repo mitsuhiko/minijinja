@@ -4,7 +4,9 @@ All notable changes to MiniJinja are documented here.
 
 # 0.15.0
 
+- Bumped minimum version requirement to 1.43.
 - Internal refactorings.
+- Added support for fully dynamic loading via `Source::with_loader`.
 
 # 0.14.1
 

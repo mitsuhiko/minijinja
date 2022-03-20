@@ -152,6 +152,13 @@ impl Error {
         self.lineno = lineno;
     }
 
+    pub(crate) fn new_not_found(name: &str) -> Error {
+        Error::new(
+            ErrorKind::TemplateNotFound,
+            format!("template {:?} does not exist", name),
+        )
+    }
+
     /// Attaches another error as source to this error.
     #[allow(unused)]
     pub fn with_source<E: std::error::Error + Send + Sync + 'static>(mut self, source: E) -> Self {
