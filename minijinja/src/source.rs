@@ -156,8 +156,10 @@ impl Source {
         })?;
 
         match self.backing {
-            SourceBacking::Dynamic { ref templates, .. } => {
-                templates.insert(name, RcType::new(tmpl));
+            SourceBacking::Dynamic {
+                ref mut templates, ..
+            } => {
+                templates.replace(name, RcType::new(tmpl));
             }
             SourceBacking::Static { ref mut templates } => {
                 templates.insert(name, RcType::new(tmpl));
@@ -266,4 +268,26 @@ impl Source {
                 .ok_or_else(|| Error::new_not_found(name)),
         }
     }
+}
+
+#[test]
+fn test_source_replace_static() {
+    let mut source = Source::new();
+    source.add_template("a", "1").unwrap();
+    source.add_template("a", "2").unwrap();
+    let mut env = crate::Environment::new();
+    env.set_source(source);
+    let rv = env.get_template("a").unwrap().render(()).unwrap();
+    assert_eq!(rv, "2");
+}
+
+#[test]
+fn test_source_replace_dynamic() {
+    let mut source = Source::with_loader(|_| Ok(None));
+    source.add_template("a", "1").unwrap();
+    source.add_template("a", "2").unwrap();
+    let mut env = crate::Environment::new();
+    env.set_source(source);
+    let rv = env.get_template("a").unwrap().render(()).unwrap();
+    assert_eq!(rv, "2");
 }
