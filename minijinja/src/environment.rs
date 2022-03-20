@@ -365,11 +365,16 @@ impl<'source> Environment<'source> {
 
     /// Sets the template source for the environment.
     ///
-    /// This helps when working with dynamically loaded templates.  For more
-    /// information see [`Source`](crate::source::Source).
+    /// This helps when working with dynamically loaded templates.  The
+    /// [`Source`](crate::source::Source) is consulted by the environment to
+    /// look up templates that are requested.  The source has the capabilities
+    /// to load templates with fewer lifetime restrictions and can also
+    /// load templates dynamically at runtime as requested.
     ///
-    /// Already loaded templates in the environment are discarded and replaced
-    /// with the templates from the source.
+    /// When a source is set already loaded templates in the environment are
+    /// discarded and replaced with the templates from the source.
+    ///
+    /// For more information see [`Source`](crate::source::Source).
     #[cfg(feature = "source")]
     #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
     pub fn set_source(&mut self, source: crate::source::Source) {
@@ -379,7 +384,7 @@ impl<'source> Environment<'source> {
     /// Returns the currently set source.
     #[cfg(feature = "source")]
     #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
-    pub fn get_source(&self) -> Option<&crate::source::Source> {
+    pub fn source(&self) -> Option<&crate::source::Source> {
         match self.templates {
             Source::Borrowed(_) => None,
             Source::Owned(ref source) => Some(source),
@@ -391,6 +396,11 @@ impl<'source> Environment<'source> {
     /// The `name` parameter defines the name of the template which identifies
     /// it.  To look up a loaded template use the [`get_template`](Self::get_template)
     /// method.
+    ///
+    /// Note that there are situations where the interface of this method is
+    /// too restrictive.  For instance the environment itself does not permit
+    /// any form of sensible dynamic template loading.  To address this
+    /// restriction use [`set_source`](Self::set_source).
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
         match self.templates {
             Source::Borrowed(ref mut map) => {

@@ -27,36 +27,6 @@ type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<String, Error> + Send + Sync;
 /// Alternatively sources can also be used to implement completely dynamic template
 /// lookups by using [`with_loader`](Source::with_loader) in which case templates
 /// are loaded on first use.
-///
-/// # Static Example
-///
-/// ```rust
-/// # use minijinja::{Source, Environment};
-/// fn create_env() -> Environment<'static> {
-///     let mut env = Environment::new();
-///     let mut source = Source::new();
-///     source.load_from_path("templates", &["html"]).unwrap();
-///     env.set_source(source);
-///     env
-/// }
-/// ```
-///
-/// # Fully Dynamic Example
-///
-/// ```rust
-/// # use minijinja::{Source, Environment};
-/// fn create_env() -> Environment<'static> {
-///     let mut env = Environment::new();
-///     env.set_source(Source::with_loader(|name| {
-///         if name == "layout.html" {
-///             Ok(Some("...".into()))
-///         } else {
-///             Ok(None)
-///         }
-///     }));
-///     env
-/// }
-/// ```
 #[derive(Clone)]
 #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
 pub struct Source {
@@ -111,6 +81,17 @@ impl fmt::Debug for LoadedTemplate {
 
 impl Source {
     /// Creates an empty source.
+    ///
+    /// ```rust
+    /// # use minijinja::{Source, Environment};
+    /// fn create_env() -> Environment<'static> {
+    ///     let mut env = Environment::new();
+    ///     let mut source = Source::new();
+    ///     source.load_from_path("templates", &["html"]).unwrap();
+    ///     env.set_source(source);
+    ///     env
+    /// }
+    /// ```
     pub fn new() -> Source {
         Source {
             backing: SourceBacking::Static {
@@ -119,12 +100,29 @@ impl Source {
         }
     }
 
-    /// Sets a dynamic loader function.
+    /// Creates a source with a dynamic loader.
     ///
-    /// When a loader is set the source gains the ability to dynamically
-    /// load templates.  The loader is invoked with the name of the template.
-    /// If this template exists `Ok(Some(template_source))` has to be returned,
-    /// otherwise `Ok(None)`.  It's also possible to signal out other errors.
+    /// When a source was created with the loader, the source gains the ability
+    /// to dynamically load templates.  The loader is invoked with the name of
+    /// the template.  If this template exists `Ok(Some(template_source))` has
+    /// to be returned, otherwise `Ok(None)`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use minijinja::{Source, Environment};
+    /// fn create_env() -> Environment<'static> {
+    ///     let mut env = Environment::new();
+    ///     env.set_source(Source::with_loader(|name| {
+    ///         if name == "layout.html" {
+    ///             Ok(Some("...".into()))
+    ///         } else {
+    ///             Ok(None)
+    ///         }
+    ///     }));
+    ///     env
+    /// }
+    /// ```
     pub fn with_loader<F>(f: F) -> Source
     where
         F: Fn(&str) -> Result<Option<String>, Error> + Send + Sync + 'static,

@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Bumped minimum version requirement to 1.43.
 - Internal refactorings.
 - Added support for fully dynamic loading via `Source::with_loader`.
+- Renamed `get_source` to `source`.
 
 # 0.14.1
 
