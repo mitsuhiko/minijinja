@@ -1,6 +1,5 @@
 use std::fmt;
 use std::fs;
-use std::hash::Hash;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -45,14 +44,9 @@ pub struct Source {
 
 impl fmt::Debug for Source {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        pub struct KeysDebug<'a, K: fmt::Debug, V>(pub &'a MemoMap<K, V>);
-
-        impl<'a, K: Hash + Eq + fmt::Debug, V> fmt::Debug for KeysDebug<'a, K, V> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_list().entries(self.0.iter().map(|x| x.0)).finish()
-            }
-        }
-        fmt::Debug::fmt(&KeysDebug(&self.templates), f)
+        f.debug_list()
+            .entries(self.templates.iter().map(|x| x.0))
+            .finish()
     }
 }
 

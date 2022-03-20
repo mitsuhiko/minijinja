@@ -28,7 +28,7 @@ pub struct Template<'env> {
 impl<'env> fmt::Debug for Template<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("Template");
-        ds.field("name", &self.compiled.instructions.name());
+        ds.field("name", &self.name());
         #[cfg(feature = "internal_debug")]
         {
             ds.field("instructions", &self.compiled.instructions);
@@ -434,10 +434,7 @@ impl<'source> Environment<'source> {
         attach_basic_debug_info(self._compile_expression(expr), expr)
     }
 
-    pub fn _compile_expression(
-        &self,
-        expr: &'source str,
-    ) -> Result<Expression<'_, 'source>, Error> {
+    fn _compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
         let ast = parse_expr(expr)?;
         let mut compiler = Compiler::new("<expression>", expr);
         compiler.compile_expr(&ast)?;
