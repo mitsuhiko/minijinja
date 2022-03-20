@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 use std::path::Path;
@@ -23,6 +24,10 @@ type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<String, Error> + Send + Sync;
 /// [`Environment::add_template`](crate::Environment::add_template) must no
 /// longer be used as otherwise the same lifetime concern arises.
 ///
+/// Alternatively sources can also be used to implement completely dynamic template
+/// lookups by using [`with_loader`](Source::with_loader) in which case templates
+/// are loaded on first use.
+///
 /// # Static Example
 ///
 /// ```rust
@@ -42,30 +47,51 @@ type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<String, Error> + Send + Sync;
 /// # use minijinja::{Source, Environment};
 /// fn create_env() -> Environment<'static> {
 ///     let mut env = Environment::new();
-///     let mut source = Source::new();
-///     source.set_loader(|name| {
+///     env.set_source(Source::with_loader(|name| {
 ///         if name == "layout.html" {
 ///             Ok(Some("...".into()))
 ///         } else {
 ///             Ok(None)
 ///         }
-///     });
-///     env.set_source(source);
+///     }));
 ///     env
 /// }
 /// ```
-#[derive(Clone, Default)]
+#[derive(Clone)]
 #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
 pub struct Source {
-    templates: MemoMap<String, RcType<LoadedTemplate>>,
-    loader: Option<Arc<LoadFunc>>,
+    backing: SourceBacking,
+}
+
+#[derive(Clone)]
+enum SourceBacking {
+    Dynamic {
+        templates: MemoMap<String, RcType<LoadedTemplate>>,
+        loader: Arc<LoadFunc>,
+    },
+    Static {
+        templates: HashMap<String, RcType<LoadedTemplate>>,
+    },
+}
+
+impl Default for Source {
+    fn default() -> Source {
+        Source::new()
+    }
 }
 
 impl fmt::Debug for Source {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list()
-            .entries(self.templates.iter().map(|x| x.0))
-            .finish()
+        match &self.backing {
+            SourceBacking::Dynamic { templates, .. } => f
+                .debug_list()
+                .entries(templates.iter().map(|x| x.0))
+                .finish(),
+            SourceBacking::Static { templates } => f
+                .debug_list()
+                .entries(templates.iter().map(|x| x.0))
+                .finish(),
+        }
     }
 }
 
@@ -86,7 +112,11 @@ impl fmt::Debug for LoadedTemplate {
 impl Source {
     /// Creates an empty source.
     pub fn new() -> Source {
-        Source::default()
+        Source {
+            backing: SourceBacking::Static {
+                templates: HashMap::new(),
+            },
+        }
     }
 
     /// Sets a dynamic loader function.
@@ -95,14 +125,19 @@ impl Source {
     /// load templates.  The loader is invoked with the name of the template.
     /// If this template exists `Ok(Some(template_source))` has to be returned,
     /// otherwise `Ok(None)`.  It's also possible to signal out other errors.
-    pub fn set_loader<F>(&mut self, f: F)
+    pub fn with_loader<F>(f: F) -> Source
     where
         F: Fn(&str) -> Result<Option<String>, Error> + Send + Sync + 'static,
     {
-        self.loader = Some(Arc::new(move |name| match f(name)? {
-            Some(rv) => Ok(rv),
-            None => Err(Error::new_not_found(name)),
-        }));
+        Source {
+            backing: SourceBacking::Dynamic {
+                templates: MemoMap::new(),
+                loader: Arc::new(move |name| match f(name)? {
+                    Some(rv) => Ok(rv),
+                    None => Err(Error::new_not_found(name)),
+                }),
+            },
+        }
     }
 
     /// Adds a new template into the source.
@@ -121,13 +156,28 @@ impl Source {
         let tmpl = LoadedTemplate::try_new(owner, |(name, source)| -> Result<_, Error> {
             CompiledTemplate::from_name_and_source(name.as_str(), source)
         })?;
-        self.templates.insert(name, RcType::new(tmpl));
+
+        match self.backing {
+            SourceBacking::Dynamic { ref templates, .. } => {
+                templates.insert(name, RcType::new(tmpl));
+            }
+            SourceBacking::Static { ref mut templates } => {
+                templates.insert(name, RcType::new(tmpl));
+            }
+        }
         Ok(())
     }
 
     /// Removes an already loaded template from the source.
     pub fn remove_template(&mut self, name: &str) {
-        self.templates.remove(name);
+        match &mut self.backing {
+            SourceBacking::Dynamic { templates, .. } => {
+                templates.remove(name);
+            }
+            SourceBacking::Static { templates } => {
+                templates.remove(name);
+            }
+        }
     }
 
     /// Loads templates from a path.
@@ -200,9 +250,8 @@ impl Source {
 
     /// Gets a compiled template from the source.
     pub(crate) fn get_compiled_template(&self, name: &str) -> Result<&CompiledTemplate<'_>, Error> {
-        if let Some(ref loader) = self.loader {
-            Ok(self
-                .templates
+        match &self.backing {
+            SourceBacking::Dynamic { templates, loader } => Ok(templates
                 .get_or_try_insert(name, || -> Result<_, Error> {
                     let source = loader(name)?;
                     let owner = (name.to_owned(), source);
@@ -212,12 +261,11 @@ impl Source {
                         })?;
                     Ok(RcType::new(tmpl))
                 })?
-                .borrow_dependent())
-        } else {
-            self.templates
+                .borrow_dependent()),
+            SourceBacking::Static { templates } => templates
                 .get(name)
                 .map(|value| value.borrow_dependent())
-                .ok_or_else(|| Error::new_not_found(name))
+                .ok_or_else(|| Error::new_not_found(name)),
         }
     }
 }
