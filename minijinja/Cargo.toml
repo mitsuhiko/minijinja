@@ -34,7 +34,7 @@ internal_debug = []
 unstable_machinery = ["internal_debug"]
 
 [dependencies]
-serde = "1.0.130"
+serde = { version = "1.0.130", default-features = false }
 v_htmlescape = { version = "0.14.1", optional = true }
 self_cell = { version = "0.10.1", optional = true, features = ["old_rust"] }
 serde_json = { version = "1.0.68", optional = true }
