@@ -111,8 +111,8 @@ pub enum Instruction<'source> {
     /// The argument are loop flags.
     PushLoop(u8),
 
-    /// Pushes a value as context layer.
-    PushContext,
+    /// Starts a with block.
+    PushWith,
 
     /// Does a single loop iteration
     ///
@@ -229,7 +229,7 @@ impl<'source> fmt::Debug for Instruction<'source> {
                     loop_var, recursive
                 )
             }
-            Instruction::PushContext => write!(f, "PUSH_CONTEXT"),
+            Instruction::PushWith => write!(f, "PUSH_WITH"),
             Instruction::Iterate(t) => write!(f, "ITERATE (exit to {:>05x})", t),
             Instruction::PopFrame => write!(f, "POP_FRAME"),
             Instruction::Jump(t) => write!(f, "JUMP (to {:>05x})", t),
@@ -349,7 +349,7 @@ impl<'source> Instructions<'source> {
                 | Instruction::StoreLocal(name)
                 | Instruction::CallFunction(name) => *name,
                 Instruction::PushLoop(flags) if flags & LOOP_FLAG_WITH_LOOP_VAR != 0 => "loop",
-                Instruction::PushLoop(_) | Instruction::PushContext => break,
+                Instruction::PushLoop(_) | Instruction::PushWith => break,
                 _ => continue,
             };
             if !rv.contains(&name) {

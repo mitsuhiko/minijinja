@@ -699,7 +699,14 @@ impl<'a> Parser<'a> {
             if !assignments.is_empty() {
                 expect_token!(self, Token::Comma, "comma")?;
             }
-            let target = self.parse_assign_name()?;
+            let target = if matches!(self.stream.current()?, Some((Token::ParenOpen, _))) {
+                self.stream.next()?;
+                let assign = self.parse_assignment()?;
+                expect_token!(self, Token::ParenClose, "`)`")?;
+                assign
+            } else {
+                self.parse_assign_name()?
+            };
             expect_token!(self, Token::Assign, "assignment operator")?;
             let expr = self.parse_expr()?;
             assignments.push((target, expr));
