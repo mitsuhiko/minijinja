@@ -147,7 +147,7 @@ pub struct IfCond<'a> {
 /// A with block.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct WithBlock<'a> {
-    pub assignments: Vec<(&'a str, Expr<'a>)>,
+    pub assignments: Vec<(Expr<'a>, Expr<'a>)>,
     pub body: Vec<Stmt<'a>>,
 }
 

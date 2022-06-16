@@ -699,10 +699,7 @@ impl<'a> Parser<'a> {
             if !assignments.is_empty() {
                 expect_token!(self, Token::Comma, "comma")?;
             }
-            let target = match self.parse_assign_name()? {
-                ast::Expr::Var(var) => var.id,
-                _ => panic!("unexpected node from assignment parse"),
-            };
+            let target = self.parse_assign_name()?;
             expect_token!(self, Token::Assign, "assignment operator")?;
             let expr = self.parse_expr()?;
             assignments.push((target, expr));

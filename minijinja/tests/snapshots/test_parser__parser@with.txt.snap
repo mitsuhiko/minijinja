@@ -2,7 +2,6 @@
 source: minijinja/tests/test_parser.rs
 expression: "&ast"
 input_file: minijinja/tests/parser-inputs/with.txt
-
 ---
 Ok(
     Template {
@@ -10,13 +9,17 @@ Ok(
             WithBlock {
                 assignments: [
                     (
-                        "a",
+                        Var {
+                            id: "a",
+                        } @ 1:8-1:9,
                         Var {
                             id: "foo",
                         } @ 1:10-1:13,
                     ),
                     (
-                        "b",
+                        Var {
+                            id: "b",
+                        } @ 1:15-1:16,
                         Var {
                             id: "bar",
                         } @ 1:17-1:20,
@@ -50,7 +53,9 @@ Ok(
             WithBlock {
                 assignments: [
                     (
-                        "a",
+                        Var {
+                            id: "a",
+                        } @ 5:8-5:9,
                         Var {
                             id: "foo",
                         } @ 5:10-5:13,

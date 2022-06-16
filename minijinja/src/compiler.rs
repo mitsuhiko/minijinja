@@ -252,7 +252,7 @@ impl<'source> Compiler<'source> {
             ast::Stmt::WithBlock(with_block) => {
                 self.set_location_from_span(with_block.span());
                 for (target, expr) in &with_block.assignments {
-                    self.add(Instruction::LoadConst(Value::from(*target)));
+                    self.compile_unpack(target)?;
                     self.compile_expr(expr)?;
                 }
                 self.add(Instruction::BuildMap(with_block.assignments.len()));
@@ -321,6 +321,25 @@ impl<'source> Compiler<'source> {
                 self.add(Instruction::UnpackList(list.items.len()));
                 for expr in &list.items {
                     self.compile_assignment(expr)?;
+                }
+            }
+            _ => panic!("bad assignment target"),
+        }
+        Ok(())
+    }
+
+    /// Compiles an unpack expression.
+    pub fn compile_unpack(&mut self, expr: &ast::Expr<'source>) -> Result<(), Error> {
+        match expr {
+            ast::Expr::Var(var) => {
+                self.set_location_from_span(var.span());
+                self.add(Instruction::LoadConst(Value::from(var.id)));
+            }
+            ast::Expr::List(list) => {
+                self.set_location_from_span(list.span());
+                self.add(Instruction::UnpackList(list.items.len()));
+                for expr in &list.items {
+                    self.compile_unpack(expr)?;
                 }
             }
             _ => panic!("bad assignment target"),
