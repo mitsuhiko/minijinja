@@ -396,6 +396,14 @@
 //! foo is not visible here any longer
 //! ```
 //!
+//! Multiple variables can be set at once and unpacking is supported:
+//!
+//! ```jinja
+//! {% with a = 1, (b, c) = [2, 3] %}
+//!   {{ a }}, {{ b }}, {{ c }}  (outputs 1, 2, 3)
+//! {% endwith %}
+//! ```
+//!
 //! ## `{% filter %}`
 //!
 //! Filter sections allow you to apply regular [filters](crate::filters) on a

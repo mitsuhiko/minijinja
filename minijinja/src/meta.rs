@@ -165,8 +165,8 @@ pub fn find_undeclared_variables(source: &str) -> Result<HashSet<String>, Error>
             }
             ast::Stmt::WithBlock(stmt) => {
                 state.push();
-                for (name, expr) in &stmt.assignments {
-                    state.assign(name);
+                for (target, expr) in &stmt.assignments {
+                    assign_nested(target, state);
                     visit_expr(expr, state);
                 }
                 stmt.body.iter().for_each(|x| walk(x, state));

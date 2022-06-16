@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.16.0
+
+- Added support for unpacking in `with` blocks. (#65)
+
 # 0.15.0
 
 - Bumped minimum version requirement to 1.43.

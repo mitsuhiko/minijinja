@@ -251,12 +251,11 @@ impl<'source> Compiler<'source> {
             }
             ast::Stmt::WithBlock(with_block) => {
                 self.set_location_from_span(with_block.span());
+                self.add(Instruction::PushWith);
                 for (target, expr) in &with_block.assignments {
-                    self.add(Instruction::LoadConst(Value::from(*target)));
                     self.compile_expr(expr)?;
+                    self.compile_assignment(target)?;
                 }
-                self.add(Instruction::BuildMap(with_block.assignments.len()));
-                self.add(Instruction::PushContext);
                 for node in &with_block.body {
                     self.compile_stmt(node)?;
                 }

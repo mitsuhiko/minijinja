@@ -94,9 +94,11 @@ impl fmt::Display for LoopState {
     }
 }
 
+type Locals<'env> = BTreeMap<&'env str, Value>;
+
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Loop<'env> {
-    locals: BTreeMap<&'env str, Value>,
+    locals: Locals<'env>,
     with_loop_var: bool,
     recurse_jump_target: Option<usize>,
     // if we're popping the frame, do we want to jump somewhere?  The
@@ -107,13 +109,18 @@ pub struct Loop<'env> {
     controller: RcType<LoopState>,
 }
 
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+pub struct With<'env> {
+    locals: Locals<'env>,
+}
+
 pub enum Frame<'env, 'vm> {
     // This layer dispatches to another context
     Chained { base: &'vm Context<'env, 'vm> },
     // this layer isolates
     Isolate { value: Value },
-    // this layer shadows another one
-    Merge { value: Value },
+    // this layer is a with statement.
+    With(With<'env>),
     // this layer is a for loop
     Loop(Loop<'env>),
 }
@@ -124,7 +131,11 @@ impl<'env, 'vm> fmt::Debug for Frame<'env, 'vm> {
         match self {
             Self::Chained { base } => fmt::Debug::fmt(base, f),
             Self::Isolate { value } => fmt::Debug::fmt(value, f),
-            Self::Merge { value } => fmt::Debug::fmt(value, f),
+            Self::With(w) => {
+                let mut m = f.debug_map();
+                m.entries(w.locals.iter());
+                m.finish()
+            }
             Self::Loop(l) => {
                 let mut m = f.debug_map();
                 m.entries(l.locals.iter());
@@ -180,7 +191,10 @@ impl<'env, 'vm> Context<'env, 'vm> {
                 // recurse
                 Frame::Chained { base } => return base.freeze(env),
                 Frame::Isolate { value } => (value, false),
-                Frame::Merge { value } => (value, true),
+                Frame::With(With { locals }) => {
+                    rv.extend(locals.iter().map(|(k, v)| (*k, v.clone())));
+                    continue;
+                }
                 Frame::Loop(Loop {
                     locals,
                     controller,
@@ -208,21 +222,40 @@ impl<'env, 'vm> Context<'env, 'vm> {
 
     /// Stores a variable in the context.
     pub fn store(&mut self, key: &'env str, value: Value) {
-        self.current_loop()
-            .expect("can only assign to loop but not inside a loop")
-            .locals
-            .insert(key, value);
+        if let Frame::Loop(Loop { locals, .. }) | Frame::With(With { locals }) =
+            self.stack.last_mut().expect("cannot store on empty stack")
+        {
+            locals.insert(key, value);
+        } else {
+            panic!("can only assign to a loop or with statement")
+        }
     }
 
     /// Looks up a variable in the context.
     pub fn load(&self, env: &Environment, key: &str) -> Option<Value> {
         for ctx in self.stack.iter().rev() {
-            let (lookup_base, cont) = match ctx {
+            match ctx {
                 // if we hit a chain frame we dispatch there and never
                 // recurse
                 Frame::Chained { base } => return base.load(env, key),
-                Frame::Isolate { value } => (value, false),
-                Frame::Merge { value } => (value, true),
+                Frame::Isolate { value } => {
+                    let rv = value.get_attr(key);
+                    if let Ok(rv) = rv {
+                        if !rv.is_undefined() {
+                            return Some(rv);
+                        }
+                    }
+                    if let Some(value) = env.get_global(key) {
+                        return Some(value);
+                    }
+                    break;
+                }
+                Frame::With(With { locals }) => {
+                    if let Some(value) = locals.get(key) {
+                        return Some(value.clone());
+                    }
+                    continue;
+                }
                 Frame::Loop(Loop {
                     locals,
                     controller,
@@ -237,19 +270,6 @@ impl<'env, 'vm> Context<'env, 'vm> {
                     continue;
                 }
             };
-
-            let rv = lookup_base.get_attr(key);
-            if let Ok(rv) = rv {
-                if !rv.is_undefined() {
-                    return Some(rv);
-                }
-            }
-            if !cont {
-                if let Some(value) = env.get_global(key) {
-                    return Some(value);
-                }
-                break;
-            }
         }
         None
     }
@@ -683,9 +703,10 @@ impl<'env> Vm<'env> {
                     let a = stack.pop();
                     stack.push(try_ctx!(value::neg(&a)));
                 }
-                Instruction::PushContext => {
-                    let value = stack.pop();
-                    state.ctx.push_frame(Frame::Merge { value });
+                Instruction::PushWith => {
+                    state.ctx.push_frame(Frame::With(With {
+                        locals: Locals::new(),
+                    }));
                 }
                 Instruction::PopFrame => {
                     if let Frame::Loop(mut loop_ctx) = state.ctx.pop_frame() {
@@ -710,7 +731,7 @@ impl<'env> Vm<'env> {
                         .map_or(0, |x| x.controller.depth + 1);
                     let recursive = *flags & LOOP_FLAG_RECURSIVE != 0;
                     state.ctx.push_frame(Frame::Loop(Loop {
-                        locals: BTreeMap::new(),
+                        locals: Locals::new(),
                         iterator,
                         with_loop_var: *flags & LOOP_FLAG_WITH_LOOP_VAR != 0,
                         recurse_jump_target: if recursive { Some(pc) } else { None },

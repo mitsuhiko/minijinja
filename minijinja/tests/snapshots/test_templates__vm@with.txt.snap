@@ -2,9 +2,16 @@
 source: minijinja/tests/test_templates.rs
 expression: "&rendered"
 input_file: minijinja/tests/inputs/with.txt
-
 ---
 
   42|23|11
+
+
+
+  1|2|3
+
+
+
+  1|2|3
 
 
