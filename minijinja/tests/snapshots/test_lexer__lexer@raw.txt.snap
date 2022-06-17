@@ -1,0 +1,14 @@
+---
+source: minijinja/tests/test_lexer.rs
+expression: "&tokens"
+input_file: minijinja/tests/lexer-inputs/raw.txt
+---
+[
+    TEMPLATE_DATA("before "),
+    TEMPLATE_DATA("{% raw %} this is a {{ raw }} {% block %} {% endraw %}"),
+    TEMPLATE_DATA(" after\n\nbefore "),
+    TEMPLATE_DATA("{%- raw %} this is a {{ raw }} {% block %} {% endraw -%}"),
+    TEMPLATE_DATA(" after\n\nbefore "),
+    TEMPLATE_DATA("{%- raw -%} this is a {{ raw }} {% block %} {%- endraw -%}"),
+    TEMPLATE_DATA(" after"),
+]

@@ -22,6 +22,29 @@ fn find_marker(a: &str) -> Option<usize> {
     }
 }
 
+fn skip_basic_tag(block_str: &str, name: &str) -> Option<usize> {
+    let mut ptr = block_str;
+
+    if let Some(rest) = ptr.strip_prefix('-') {
+        ptr = rest;
+    }
+    while let Some(rest) = ptr.strip_prefix(|x: char| x.is_ascii_whitespace()) {
+        ptr = rest;
+    }
+
+    ptr = ptr.strip_prefix(name)?;
+
+    while let Some(rest) = ptr.strip_prefix(|x: char| x.is_ascii_whitespace()) {
+        ptr = rest;
+    }
+    if let Some(rest) = ptr.strip_prefix('-') {
+        ptr = rest;
+    }
+    ptr = ptr.strip_prefix("%}")?;
+
+    Some(block_str.len() - ptr.len())
+}
+
 /// Tokenizes without whitespace handling.
 fn tokenize_raw(
     input: &str,
@@ -182,6 +205,22 @@ fn tokenize_raw(
                         return Some(Ok((Token::VariableStart(ws), span!(old_loc))));
                     }
                     Some("{%") => {
+                        // raw blocks require some special handling.  If we are at the beginning of a raw
+                        // block we want to skip everything until {% endraw %} completely ignoring iterior
+                        // syntax and emit the entire raw block as TemplateData.
+                        if let Some(mut ptr) = skip_basic_tag(&rest[2..], "raw") {
+                            ptr += 2;
+                            while let Some(block) = memstr(&rest.as_bytes()[ptr..], b"{%") {
+                                ptr += block + 2;
+                                if let Some(endraw) = skip_basic_tag(&rest[ptr..], "endraw") {
+                                    let result = &rest[..ptr + endraw];
+                                    advance!(ptr + endraw);
+                                    return Some(Ok((Token::TemplateData(result), span!(old_loc))));
+                                }
+                            }
+                            syntax_error!("unexpected end of raw block");
+                        }
+
                         let ws = if rest.as_bytes().get(2) == Some(&b'-') {
                             advance!(3);
                             true
@@ -189,6 +228,7 @@ fn tokenize_raw(
                             advance!(2);
                             false
                         };
+
                         stack.push(LexerState::InBlock);
                         return Some(Ok((Token::BlockStart(ws), span!(old_loc))));
                     }
@@ -399,4 +439,12 @@ fn test_find_marker() {
     assert!(find_marker("foo").is_none());
     assert!(find_marker("foo {").is_none());
     assert_eq!(find_marker("foo {{"), Some(4));
+}
+
+#[test]
+fn test_is_basic_tag() {
+    assert_eq!(skip_basic_tag(" raw %}", "raw"), Some(7));
+    assert_eq!(skip_basic_tag(" raw %}", "endraw"), None);
+    assert_eq!(skip_basic_tag("  raw  %}", "raw"), Some(9));
+    assert_eq!(skip_basic_tag("-  raw  -%}", "raw"), Some(11));
 }

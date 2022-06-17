@@ -15,12 +15,6 @@ test:
 	@echo "CARGO TEST ALL FEATURES"
 	@cd minijinja; cargo test --all-features
 
-test-142:
-	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES)
-	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES),key_interning
-	@echo "CARGO TEST ALL FEATURES"
-	@cd minijinja; cargo test --all-features
-
 run-tests:
 	@rustup component add rustfmt 2> /dev/null
 	@echo "CARGO TESTS"

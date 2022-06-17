@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.17.0
+
+- Added support for `{% raw %}`. (#67)
+- Minimum Rust version moved up to 1.45.
+
 # 0.16.0
 
 - Added support for unpacking in `with` blocks. (#65)

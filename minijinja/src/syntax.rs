@@ -20,6 +20,7 @@
 //!   - [`{% with %}`](#-with-)
 //!   - [`{% filter %}`](#-filter-)
 //!   - [`{% autoescape %}`](#-autoescape-)
+//!   - [`{% raw %}`](#-raw-)
 //!
 //! </details>
 //!
@@ -433,5 +434,23 @@
 //! ```
 //!
 //! After an `endautoescape` the behavior is reverted to what it was before.
+//!
+//! ## `{% raw %}`
+//!
+//! A raw block is a special construct that lets you ignore the embedded template
+//! syntax.  This is particularly useful if a segment of template code would
+//! otherwise require constant escaping with things like `{{ "{{" }}`:
+//!
+//! Example:
+//!
+//! ```jinja
+//! {% raw %}
+//! <ul>
+//! {% for item in seq %}
+//!     <li>{{ item }}</li>
+//! {% endfor %}
+//! </ul>
+//! {% endraw %}
+//! ```
 
 // this is just for docs
