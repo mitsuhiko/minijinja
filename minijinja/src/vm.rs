@@ -97,8 +97,7 @@ impl fmt::Display for LoopState {
 type Locals<'env> = BTreeMap<&'env str, Value>;
 
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
-pub struct Loop<'env> {
-    locals: Locals<'env>,
+pub struct Loop {
     with_loop_var: bool,
     recurse_jump_target: Option<usize>,
     // if we're popping the frame, do we want to jump somewhere?  The
@@ -110,39 +109,46 @@ pub struct Loop<'env> {
 }
 
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
-pub struct With<'env> {
-    locals: Locals<'env>,
+pub enum FrameBase<'env, 'vm> {
+    None,
+    Context(&'vm Context<'env, 'vm>),
+    Value(Value),
 }
 
-pub enum Frame<'env, 'vm> {
-    // This layer dispatches to another context
-    Chained { base: &'vm Context<'env, 'vm> },
-    // this layer isolates
-    Isolate { value: Value },
-    // this layer is a with statement.
-    With(With<'env>),
-    // this layer is a for loop
-    Loop(Loop<'env>),
+pub struct Frame<'env, 'vm> {
+    locals: Locals<'env>,
+    base: FrameBase<'env, 'vm>,
+    current_loop: Option<Loop>,
+}
+
+impl<'env, 'vm> Default for Frame<'env, 'vm> {
+    fn default() -> Frame<'env, 'vm> {
+        Frame::new(FrameBase::None)
+    }
+}
+
+impl<'env, 'vm> Frame<'env, 'vm> {
+    pub fn new(base: FrameBase<'env, 'vm>) -> Frame<'env, 'vm> {
+        Frame {
+            locals: Locals::new(),
+            base,
+            current_loop: None,
+        }
+    }
 }
 
 #[cfg(feature = "internal_debug")]
 impl<'env, 'vm> fmt::Debug for Frame<'env, 'vm> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Chained { base } => fmt::Debug::fmt(base, f),
-            Self::Isolate { value } => fmt::Debug::fmt(value, f),
-            Self::With(w) => {
-                let mut m = f.debug_map();
-                m.entries(w.locals.iter());
-                m.finish()
-            }
-            Self::Loop(l) => {
-                let mut m = f.debug_map();
-                m.entries(l.locals.iter());
-                m.entry(&"loop", &l.controller);
-                m.finish()
-            }
+        let mut m = f.debug_map();
+        m.entries(self.locals.iter());
+        if let Some(Loop { ref controller, .. }) = self.current_loop {
+            m.entry(&"loop", controller);
         }
+        if let FrameBase::Value(ref value) = self.base {
+            m.entries(value.iter_as_str_map());
+        }
+        m.finish()
     }
 }
 
@@ -182,39 +188,31 @@ impl<'env, 'vm> Context<'env, 'vm> {
     /// Since it's only used for the debug support changing this is not too
     /// critical.
     #[cfg(feature = "debug")]
-    fn freeze<'a>(&'a self, env: &'a Environment) -> BTreeMap<&'a str, Value> {
-        let mut rv = BTreeMap::new();
+    fn freeze<'a>(&'a self, env: &'a Environment) -> Locals {
+        let mut rv = Locals::new();
 
-        for ctx in self.stack.iter() {
-            let (lookup_base, cont) = match ctx {
-                // if we hit a chain frame we dispatch there and never
-                // recurse
-                Frame::Chained { base } => return base.freeze(env),
-                Frame::Isolate { value } => (value, false),
-                Frame::With(With { locals }) => {
-                    rv.extend(locals.iter().map(|(k, v)| (*k, v.clone())));
-                    continue;
-                }
-                Frame::Loop(Loop {
-                    locals,
-                    controller,
-                    with_loop_var,
-                    ..
-                }) => {
-                    rv.extend(locals.iter().map(|(k, v)| (*k, v.clone())));
-                    if *with_loop_var {
-                        rv.insert("loop", Value::from_rc_object(controller.clone()));
-                    }
-                    continue;
-                }
-            };
+        rv.extend(env.globals.iter().map(|(k, v)| (*k, v.clone())));
 
-            if !cont {
-                rv.clear();
-                rv.extend(env.globals.iter().map(|(k, v)| (*k, v.clone())));
+        for frame in self.stack.iter().rev() {
+            // look at locals first
+            rv.extend(frame.locals.iter().map(|(k, v)| (*k, v.clone())));
+
+            // if we are a loop, check if we are looking up the special loop var.
+            if let Some(ref l) = frame.current_loop {
+                if l.with_loop_var {
+                    rv.insert("loop", Value::from_rc_object(l.controller.clone()));
+                }
             }
 
-            rv.extend(lookup_base.iter_as_str_map());
+            match frame.base {
+                FrameBase::Context(ctx) => {
+                    rv.extend(ctx.freeze(env));
+                }
+                FrameBase::Value(ref value) => {
+                    rv.extend(value.iter_as_str_map());
+                }
+                FrameBase::None => continue,
+            }
         }
 
         rv
@@ -222,23 +220,33 @@ impl<'env, 'vm> Context<'env, 'vm> {
 
     /// Stores a variable in the context.
     pub fn store(&mut self, key: &'env str, value: Value) {
-        if let Frame::Loop(Loop { locals, .. }) | Frame::With(With { locals }) =
-            self.stack.last_mut().expect("cannot store on empty stack")
-        {
-            locals.insert(key, value);
-        } else {
-            panic!("can only assign to a loop or with statement")
-        }
+        self.stack
+            .last_mut()
+            .expect("cannot store on empty stack")
+            .locals
+            .insert(key, value);
     }
 
     /// Looks up a variable in the context.
     pub fn load(&self, env: &Environment, key: &str) -> Option<Value> {
-        for ctx in self.stack.iter().rev() {
-            match ctx {
-                // if we hit a chain frame we dispatch there and never
-                // recurse
-                Frame::Chained { base } => return base.load(env, key),
-                Frame::Isolate { value } => {
+        for frame in self.stack.iter().rev() {
+            // look at locals first
+            if let Some(value) = frame.locals.get(key) {
+                if !value.is_undefined() {
+                    return Some(value.clone());
+                }
+            }
+
+            // if we are a loop, check if we are looking up the special loop var.
+            if let Some(ref l) = frame.current_loop {
+                if l.with_loop_var && key == "loop" {
+                    return Some(Value::from_rc_object(l.controller.clone()));
+                }
+            }
+
+            match frame.base {
+                FrameBase::Context(ctx) => return ctx.load(env, key),
+                FrameBase::Value(ref value) => {
                     let rv = value.get_attr(key);
                     if let Ok(rv) = rv {
                         if !rv.is_undefined() {
@@ -248,28 +256,9 @@ impl<'env, 'vm> Context<'env, 'vm> {
                     if let Some(value) = env.get_global(key) {
                         return Some(value);
                     }
-                    break;
                 }
-                Frame::With(With { locals }) => {
-                    if let Some(value) = locals.get(key) {
-                        return Some(value.clone());
-                    }
-                    continue;
-                }
-                Frame::Loop(Loop {
-                    locals,
-                    controller,
-                    with_loop_var,
-                    ..
-                }) => {
-                    if *with_loop_var && key == "loop" {
-                        return Some(Value::from_rc_object(controller.clone()));
-                    } else if let Some(value) = locals.get(key) {
-                        return Some(value.clone());
-                    }
-                    continue;
-                }
-            };
+                FrameBase::None => continue,
+            }
         }
         None
     }
@@ -285,14 +274,11 @@ impl<'env, 'vm> Context<'env, 'vm> {
     }
 
     /// Returns the current innermost loop.
-    pub fn current_loop(&mut self) -> Option<&mut Loop<'env>> {
+    pub fn current_loop(&mut self) -> Option<&mut Loop> {
         self.stack
             .iter_mut()
             .rev()
-            .filter_map(|x| match *x {
-                Frame::Loop(ref mut x) => Some(x),
-                _ => None,
-            })
+            .filter_map(|x| x.current_loop.as_mut())
             .next()
     }
 }
@@ -423,7 +409,7 @@ impl<'env> Vm<'env> {
         output: &mut String,
     ) -> Result<Option<Value>, Error> {
         let mut ctx = Context::default();
-        ctx.push_frame(Frame::Isolate { value: root });
+        ctx.push_frame(Frame::new(FrameBase::Value(root)));
         let mut referenced_blocks = BTreeMap::new();
         for (&name, instr) in blocks.iter() {
             referenced_blocks.insert(name, vec![instr]);
@@ -532,7 +518,7 @@ impl<'env> Vm<'env> {
             }};
             ($instructions:expr, $blocks:expr, $current_block:expr, $auto_escape:expr) => {{
                 let mut sub_context = Context::default();
-                sub_context.push_frame(Frame::Chained { base: &state.ctx });
+                sub_context.push_frame(Frame::new(FrameBase::Context(&state.ctx)));
                 let mut sub_state = State {
                     env: self.env,
                     ctx: sub_context,
@@ -704,12 +690,10 @@ impl<'env> Vm<'env> {
                     stack.push(try_ctx!(value::neg(&a)));
                 }
                 Instruction::PushWith => {
-                    state.ctx.push_frame(Frame::With(With {
-                        locals: Locals::new(),
-                    }));
+                    state.ctx.push_frame(Frame::new(FrameBase::None));
                 }
                 Instruction::PopFrame => {
-                    if let Frame::Loop(mut loop_ctx) = state.ctx.pop_frame() {
+                    if let Some(mut loop_ctx) = state.ctx.pop_frame().current_loop {
                         if let Some((target, end_capture)) = loop_ctx.current_recursion_jump.take()
                         {
                             pc = target;
@@ -730,18 +714,20 @@ impl<'env> Vm<'env> {
                         .filter(|x| x.recurse_jump_target.is_some())
                         .map_or(0, |x| x.controller.depth + 1);
                     let recursive = *flags & LOOP_FLAG_RECURSIVE != 0;
-                    state.ctx.push_frame(Frame::Loop(Loop {
-                        locals: Locals::new(),
-                        iterator,
-                        with_loop_var: *flags & LOOP_FLAG_WITH_LOOP_VAR != 0,
-                        recurse_jump_target: if recursive { Some(pc) } else { None },
-                        current_recursion_jump: next_loop_recursion_jump.take(),
-                        controller: RcType::new(LoopState {
-                            idx: AtomicUsize::new(!0usize),
-                            len: AtomicUsize::new(len),
-                            depth,
+                    state.ctx.push_frame(Frame {
+                        current_loop: Some(Loop {
+                            iterator,
+                            with_loop_var: *flags & LOOP_FLAG_WITH_LOOP_VAR != 0,
+                            recurse_jump_target: if recursive { Some(pc) } else { None },
+                            current_recursion_jump: next_loop_recursion_jump.take(),
+                            controller: RcType::new(LoopState {
+                                idx: AtomicUsize::new(!0usize),
+                                len: AtomicUsize::new(len),
+                                depth,
+                            }),
                         }),
-                    }));
+                        ..Frame::default()
+                    });
                 }
                 Instruction::Iterate(jump_target) => {
                     let l = state.ctx.current_loop().expect("not inside a loop");

@@ -18,6 +18,7 @@
 //!   - [`{% block %}`](#-block-)
 //!   - [`{% include %}`](#-include-)
 //!   - [`{% with %}`](#-with-)
+//!   - [`{% set %}`](#-set-)
 //!   - [`{% filter %}`](#-filter-)
 //!   - [`{% autoescape %}`](#-autoescape-)
 //!   - [`{% raw %}`](#-raw-)
@@ -404,6 +405,19 @@
 //!   {{ a }}, {{ b }}, {{ c }}  (outputs 1, 2, 3)
 //! {% endwith %}
 //! ```
+//!
+//! ## `{% set %}`
+//!
+//! The `set` statement can be used to assign to variables on the same scope.  This is
+//! similar to how `with` works but it won't introduce a new scope.
+//!
+//! ```jinja
+//! {% set navigation = [('index.html', 'Index'), ('about.html', 'About')] %}
+//! ```
+//!
+//! Please keep in mind that it is not possible to set variables inside a block
+//! and have them show up outside of it.  This also applies to loops.  The only
+//! exception to that rule are if statements which do not introduce a scope.
 //!
 //! ## `{% filter %}`
 //!

@@ -261,6 +261,11 @@ impl<'source> Compiler<'source> {
                 }
                 self.add(Instruction::PopFrame);
             }
+            ast::Stmt::Set(set) => {
+                self.set_location_from_span(set.span());
+                self.compile_expr(&set.expr)?;
+                self.compile_assignment(&set.target)?;
+            }
             ast::Stmt::Block(block) => {
                 self.set_location_from_span(block.span());
                 let mut sub_compiler =

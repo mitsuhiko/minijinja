@@ -547,6 +547,10 @@ impl<'a> Parser<'a> {
                 self.parse_with_block()?,
                 self.stream.expand_span(span),
             ))),
+            Token::Ident("set") => Ok(ast::Stmt::Set(Spanned::new(
+                self.parse_set()?,
+                self.stream.expand_span(span),
+            ))),
             Token::Ident("block") => Ok(ast::Stmt::Block(Spanned::new(
                 self.parse_block()?,
                 self.stream.expand_span(span),
@@ -716,6 +720,21 @@ impl<'a> Parser<'a> {
         let body = self.subparse(&|tok| matches!(tok, Token::Ident("endwith")))?;
         self.stream.next()?;
         Ok(ast::WithBlock { assignments, body })
+    }
+
+    fn parse_set(&mut self) -> Result<ast::Set<'a>, Error> {
+        let target = if matches!(self.stream.current()?, Some((Token::ParenOpen, _))) {
+            self.stream.next()?;
+            let assign = self.parse_assignment()?;
+            expect_token!(self, Token::ParenClose, "`)`")?;
+            assign
+        } else {
+            self.parse_assign_name()?
+        };
+        expect_token!(self, Token::Assign, "assignment operator")?;
+        let expr = self.parse_expr()?;
+
+        Ok(ast::Set { target, expr })
     }
 
     fn parse_block(&mut self) -> Result<ast::Block<'a>, Error> {

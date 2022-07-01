@@ -1,0 +1,22 @@
+foo: "root value"
+---
+Basic:
+{{ foo }}
+{% set foo = "new value" %}
+{{ foo }}
+{% with %}
+  {% set foo = "new value 2" %}
+  {{ foo }}
+{% endwith %}
+{{ foo }}
+
+Into Loop:
+{% for item in [1, 2, 3] %}
+  {{ item }}
+  {% set item = item * 2 %}
+  {{ item }}
+{% endfor %}
+
+Conditional:
+{% if true %}{% set foo = "was true" %}{% endif %}
+{{ foo }}

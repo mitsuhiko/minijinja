@@ -56,6 +56,7 @@ pub enum Stmt<'a> {
     ForLoop(Spanned<ForLoop<'a>>),
     IfCond(Spanned<IfCond<'a>>),
     WithBlock(Spanned<WithBlock<'a>>),
+    Set(Spanned<Set<'a>>),
     Block(Spanned<Block<'a>>),
     Extends(Spanned<Extends<'a>>),
     Include(Spanned<Include<'a>>),
@@ -73,6 +74,7 @@ impl<'a> fmt::Debug for Stmt<'a> {
             Stmt::ForLoop(s) => fmt::Debug::fmt(s, f),
             Stmt::IfCond(s) => fmt::Debug::fmt(s, f),
             Stmt::WithBlock(s) => fmt::Debug::fmt(s, f),
+            Stmt::Set(s) => fmt::Debug::fmt(s, f),
             Stmt::Block(s) => fmt::Debug::fmt(s, f),
             Stmt::Extends(s) => fmt::Debug::fmt(s, f),
             Stmt::Include(s) => fmt::Debug::fmt(s, f),
@@ -149,6 +151,13 @@ pub struct IfCond<'a> {
 pub struct WithBlock<'a> {
     pub assignments: Vec<(Expr<'a>, Expr<'a>)>,
     pub body: Vec<Stmt<'a>>,
+}
+
+/// A set statement.
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+pub struct Set<'a> {
+    pub target: Expr<'a>,
+    pub expr: Expr<'a>,
 }
 
 /// A block for inheritance elements.
