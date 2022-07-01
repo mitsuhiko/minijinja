@@ -411,7 +411,7 @@
 //! The `set` statement can be used to assign to variables on the same scope.  This is
 //! similar to how `with` works but it won't introduce a new scope.
 //!
-//! ```
+//! ```jinja
 //! {% set navigation = [('index.html', 'Index'), ('about.html', 'About')] %}
 //! ```
 //!
