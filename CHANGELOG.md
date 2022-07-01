@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 - Added support for `{% raw %}`. (#67)
 - Minimum Rust version moved up to 1.45.
+- Added support for `{% set %}`. (#70)
 
 # 0.16.0
 
