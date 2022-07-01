@@ -1,0 +1,2 @@
+{% set variable = value %}
+{% set (a, b) = (1, 2) %}

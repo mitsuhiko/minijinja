@@ -1601,7 +1601,7 @@ impl Iterator for ValueIterator {
 
 impl ExactSizeIterator for ValueIterator {}
 
-impl<'a> fmt::Debug for ValueIterator {
+impl fmt::Debug for ValueIterator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ValueIterator").finish()
     }

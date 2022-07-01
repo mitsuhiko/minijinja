@@ -108,17 +108,33 @@ pub struct Loop {
     controller: RcType<LoopState>,
 }
 
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+pub enum FrameBase<'env, 'vm> {
+    None,
+    Context(&'vm Context<'env, 'vm>),
+    Value(Value),
+}
+
 pub struct Frame<'env, 'vm> {
     locals: Locals<'env>,
     base: FrameBase<'env, 'vm>,
     current_loop: Option<Loop>,
 }
 
-#[cfg_attr(feature = "internal_debug", derive(Debug))]
-pub enum FrameBase<'env, 'vm> {
-    None,
-    Context(&'vm Context<'env, 'vm>),
-    Value(Value),
+impl<'env, 'vm> Default for Frame<'env, 'vm> {
+    fn default() -> Frame<'env, 'vm> {
+        Frame::new(FrameBase::None)
+    }
+}
+
+impl<'env, 'vm> Frame<'env, 'vm> {
+    pub fn new(base: FrameBase<'env, 'vm>) -> Frame<'env, 'vm> {
+        Frame {
+            locals: Locals::new(),
+            base,
+            current_loop: None,
+        }
+    }
 }
 
 #[cfg(feature = "internal_debug")]
@@ -393,11 +409,7 @@ impl<'env> Vm<'env> {
         output: &mut String,
     ) -> Result<Option<Value>, Error> {
         let mut ctx = Context::default();
-        ctx.push_frame(Frame {
-            locals: Locals::new(),
-            base: FrameBase::Value(root),
-            current_loop: None,
-        });
+        ctx.push_frame(Frame::new(FrameBase::Value(root)));
         let mut referenced_blocks = BTreeMap::new();
         for (&name, instr) in blocks.iter() {
             referenced_blocks.insert(name, vec![instr]);
@@ -506,11 +518,7 @@ impl<'env> Vm<'env> {
             }};
             ($instructions:expr, $blocks:expr, $current_block:expr, $auto_escape:expr) => {{
                 let mut sub_context = Context::default();
-                sub_context.push_frame(Frame {
-                    locals: Locals::new(),
-                    base: FrameBase::Context(&state.ctx),
-                    current_loop: None,
-                });
+                sub_context.push_frame(Frame::new(FrameBase::Context(&state.ctx)));
                 let mut sub_state = State {
                     env: self.env,
                     ctx: sub_context,
@@ -682,11 +690,7 @@ impl<'env> Vm<'env> {
                     stack.push(try_ctx!(value::neg(&a)));
                 }
                 Instruction::PushWith => {
-                    state.ctx.push_frame(Frame {
-                        locals: Locals::new(),
-                        base: FrameBase::None,
-                        current_loop: None,
-                    });
+                    state.ctx.push_frame(Frame::new(FrameBase::None));
                 }
                 Instruction::PopFrame => {
                     if let Some(mut loop_ctx) = state.ctx.pop_frame().current_loop {
@@ -711,7 +715,6 @@ impl<'env> Vm<'env> {
                         .map_or(0, |x| x.controller.depth + 1);
                     let recursive = *flags & LOOP_FLAG_RECURSIVE != 0;
                     state.ctx.push_frame(Frame {
-                        locals: Locals::new(),
                         current_loop: Some(Loop {
                             iterator,
                             with_loop_var: *flags & LOOP_FLAG_WITH_LOOP_VAR != 0,
@@ -723,7 +726,7 @@ impl<'env> Vm<'env> {
                                 depth,
                             }),
                         }),
-                        base: FrameBase::None,
+                        ..Frame::default()
                     });
                 }
                 Instruction::Iterate(jump_target) => {
