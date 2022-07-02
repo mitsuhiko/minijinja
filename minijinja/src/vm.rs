@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -176,9 +176,55 @@ impl Stack {
 }
 
 #[derive(Default)]
-#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Context<'env, 'vm> {
     stack: Vec<Frame<'env, 'vm>>,
+}
+
+impl<'env, 'vm> fmt::Debug for Context<'env, 'vm> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fn dump<'a>(
+            m: &mut std::fmt::DebugMap,
+            seen: &mut HashSet<&'a str>,
+            ctx: &'a Context<'a, 'a>,
+        ) -> fmt::Result {
+            for frame in ctx.stack.iter().rev() {
+                for (key, value) in frame.locals.iter() {
+                    if !seen.contains(key) {
+                        seen.insert(*key);
+                        m.entry(key, value);
+                    }
+                }
+
+                if let Some(ref l) = frame.current_loop {
+                    if l.with_loop_var && !seen.contains(&"loop") {
+                        seen.insert("loop");
+                        m.entry(&"loop", &l.controller);
+                    }
+                }
+
+                match frame.base {
+                    FrameBase::Context(ctx) => {
+                        dump(m, seen, ctx)?;
+                    }
+                    FrameBase::Value(ref value) => {
+                        for (key, value) in value.iter_as_str_map() {
+                            if !seen.contains(key) {
+                                seen.insert(key);
+                                m.entry(&key, &value);
+                            }
+                        }
+                    }
+                    FrameBase::None => continue,
+                }
+            }
+            Ok(())
+        }
+
+        let mut m = f.debug_map();
+        let mut seen = HashSet::new();
+        dump(&mut m, &mut seen, self)?;
+        m.finish()
+    }
 }
 
 impl<'env, 'vm> Context<'env, 'vm> {
@@ -302,13 +348,10 @@ pub struct State<'vm, 'env> {
 impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("State");
-        #[cfg(feature = "internal_debug")]
-        {
-            ds.field("ctx", &self.ctx);
-        }
         ds.field("name", &self.name);
         ds.field("current_block", &self.current_block);
         ds.field("auto_escape", &self.auto_escape);
+        ds.field("ctx", &self.ctx);
         ds.field("env", &self.env);
         ds.finish()
     }

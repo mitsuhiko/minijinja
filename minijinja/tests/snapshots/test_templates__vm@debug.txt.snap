@@ -1,38 +1,28 @@
 ---
 source: minijinja/tests/test_templates.rs
-assertion_line: 44
 expression: "&rendered"
 input_file: minijinja/tests/inputs/debug.txt
-
 ---
 State {
-    ctx: Context {
-        stack: [
-            {
-                "upper": 1,
-            },
-            {
-                "f": minijinja::functions::builtins::range,
-            },
-            {
-                "x": 0,
-                "loop": LoopState {
-                    index0: 0,
-                    index: 1,
-                    length: 1,
-                    revindex: 1,
-                    revindex0: 0,
-                    first: true,
-                    last: true,
-                    depth: 1,
-                    depth0: 0,
-                },
-            },
-        ],
-    },
     name: "debug.txt",
     current_block: None,
     auto_escape: None,
+    ctx: {
+        "x": 0,
+        "loop": LoopState {
+            index0: 0,
+            index: 1,
+            length: 1,
+            revindex: 1,
+            revindex0: 0,
+            first: true,
+            last: true,
+            depth: 1,
+            depth0: 0,
+        },
+        "f": minijinja::functions::builtins::range,
+        "upper": 1,
+    },
     env: Environment {
         globals: {
             "debug": minijinja::functions::builtins::debug,

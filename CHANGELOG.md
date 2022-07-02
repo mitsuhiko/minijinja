@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.18.0
+
+- Improved debug printing of context.
+
 # 0.17.0
 
 - Added support for `{% raw %}`. (#67)
