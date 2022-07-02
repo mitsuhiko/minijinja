@@ -191,8 +191,8 @@ mod builtins {
     ///
     /// ```jinja
     /// <script>const CONFIG = {{ dict(
-    ///   DEBUG: true,
-    ///   API_URL_PREFIX: "/api"
+    ///   DEBUG=true,
+    ///   API_URL_PREFIX="/api"
     /// )|tojson }};</script>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
