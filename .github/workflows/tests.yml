@@ -32,6 +32,7 @@ jobs:
         working-directory: ./minijinja
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: "1"
+          CARGO_HTTP_MULTIPLEXING: "false"
 
   test-stable:
     name: Test on 1.56.1
