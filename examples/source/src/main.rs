@@ -1,6 +1,5 @@
-use minijinja::{Environment, Source};
+use minijinja::{context, Environment, Source};
 use once_cell::sync::Lazy;
-use std::collections::BTreeMap;
 
 static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
     let mut env = Environment::new();
@@ -11,8 +10,7 @@ static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
 });
 
 fn main() {
-    let mut ctx = BTreeMap::new();
-    ctx.insert("name", "World");
     let tmpl = ENV.get_template("hello.txt").unwrap();
-    println!("{}", tmpl.render(&ctx).unwrap());
+    let ctx = context!(name => "World");
+    println!("{}", tmpl.render(ctx).unwrap());
 }
