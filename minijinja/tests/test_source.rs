@@ -2,6 +2,8 @@
 
 use minijinja::{Environment, Source};
 
+use similar_asserts::assert_eq;
+
 fn create_env() -> Environment<'static> {
     let mut source = Source::new();
     let template = String::from("Hello World!");

@@ -6,6 +6,9 @@ use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
 
+#[cfg(test)]
+use similar_asserts::assert_eq;
+
 // we target Rust 1.41 and that does not have this macro yet
 macro_rules! _matches {
     ($expression:expr, $( $pattern:pat )|+ $( if $guard: expr )? $(,)?) => {

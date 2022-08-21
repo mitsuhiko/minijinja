@@ -4,6 +4,9 @@ use crate::error::{Error, ErrorKind};
 use crate::tokens::{Span, Token};
 use crate::utils::{matches, memchr, memstr, unescape};
 
+#[cfg(test)]
+use similar_asserts::assert_eq;
+
 enum LexerState {
     Template,
     InVariable,

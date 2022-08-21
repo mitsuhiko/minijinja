@@ -12,6 +12,9 @@ use crate::value::{ArgType, FunctionArgs, RcType, Value};
 use crate::vm::Vm;
 use crate::{filters, functions, tests};
 
+#[cfg(test)]
+use similar_asserts::assert_eq;
+
 /// Represents a handle to a template.
 ///
 /// Templates are stored in the [`Environment`] as bytecode instructions.  With the

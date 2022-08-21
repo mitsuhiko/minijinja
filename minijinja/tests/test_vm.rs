@@ -2,6 +2,8 @@
 use minijinja::machinery::{simple_eval, Compiler, Instruction, Instructions};
 use minijinja::value::Value;
 
+use similar_asserts::assert_eq;
+
 #[test]
 fn test_loop() {
     let mut ctx = std::collections::BTreeMap::new();

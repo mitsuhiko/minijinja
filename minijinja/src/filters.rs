@@ -180,6 +180,9 @@ mod builtins {
     use std::fmt::Write;
     use std::mem;
 
+    #[cfg(test)]
+    use similar_asserts::assert_eq;
+
     /// Converts a value to uppercase.
     ///
     /// ```jinja

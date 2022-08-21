@@ -9,6 +9,9 @@ use crate::tokens::Span;
 use crate::utils::matches;
 use crate::value::Value;
 
+#[cfg(test)]
+use similar_asserts::assert_eq;
+
 /// Represents an open block of code that does not yet have updated
 /// jump targets.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]

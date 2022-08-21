@@ -1,6 +1,9 @@
 #[cfg(feature = "internal_debug")]
 use std::fmt;
 
+#[cfg(test)]
+use similar_asserts::assert_eq;
+
 use crate::value::Value;
 
 /// This loop has the loop var.

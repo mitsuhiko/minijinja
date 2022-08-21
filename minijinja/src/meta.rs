@@ -12,6 +12,9 @@ use crate::ast;
 use crate::error::Error;
 use crate::parser::parse;
 
+#[cfg(test)]
+use similar_asserts::assert_eq;
+
 /// Given a template source returns a set of undeclared variables.
 ///
 /// Returns a set of all variables in the template that will be looked up from
