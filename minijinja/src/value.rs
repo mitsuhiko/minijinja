@@ -81,6 +81,9 @@ use crate::key::{Key, KeySerializer};
 use crate::utils::{matches, OnDrop};
 use crate::vm::State;
 
+#[cfg(test)]
+use similar_asserts::assert_eq;
+
 #[cfg(feature = "sync")]
 pub(crate) type RcType<T> = std::sync::Arc<T>;
 

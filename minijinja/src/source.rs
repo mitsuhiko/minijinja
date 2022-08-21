@@ -11,6 +11,9 @@ use crate::environment::CompiledTemplate;
 use crate::error::{Error, ErrorKind};
 use crate::value::RcType;
 
+#[cfg(test)]
+use similar_asserts::assert_eq;
+
 type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<String, Error> + Send + Sync;
 
 /// Utility for dynamic template loading.

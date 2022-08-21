@@ -1,3 +1,6 @@
+#[cfg(test)]
+use similar_asserts::assert_eq;
+
 /// Creates a template context with keys and values.
 ///
 /// ```rust

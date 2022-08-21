@@ -3,6 +3,8 @@ use std::fs;
 
 use minijinja::{context, Environment, Error, State};
 
+use similar_asserts::assert_eq;
+
 #[test]
 fn test_vm() {
     let mut refs = Vec::new();
