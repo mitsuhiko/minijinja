@@ -2,7 +2,6 @@
 source: minijinja/tests/test_templates.rs
 expression: "&rendered"
 input_file: minijinja/tests/inputs/call.txt
-
 ---
 [0][1][2][3][4][5][6][7][8][9]
 [a:1][b:2][c:3]

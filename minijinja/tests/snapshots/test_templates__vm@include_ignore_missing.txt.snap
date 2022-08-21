@@ -1,9 +1,7 @@
 ---
 source: minijinja/tests/test_templates.rs
-assertion_line: 44
 expression: "&rendered"
 input_file: minijinja/tests/inputs/include_ignore_missing.txt
-
 ---
 Before
 

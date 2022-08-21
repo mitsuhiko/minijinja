@@ -2,7 +2,6 @@
 source: minijinja/tests/test_templates.rs
 expression: "&rendered"
 input_file: minijinja/tests/inputs/math.txt
-
 ---
 should be -2.5: -2.5
 should be -3.0: -3.0

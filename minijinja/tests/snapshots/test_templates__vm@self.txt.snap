@@ -2,7 +2,6 @@
 source: minijinja/tests/test_templates.rs
 expression: "&rendered"
 input_file: minijinja/tests/inputs/self.txt
-
 ---
 1:[foobar]
 2:(foobar)

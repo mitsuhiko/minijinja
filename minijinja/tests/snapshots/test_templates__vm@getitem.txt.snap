@@ -2,7 +2,6 @@
 source: minijinja/tests/test_templates.rs
 expression: "&rendered"
 input_file: minijinja/tests/inputs/getitem.txt
-
 ---
 first: first_item
 last: last_item

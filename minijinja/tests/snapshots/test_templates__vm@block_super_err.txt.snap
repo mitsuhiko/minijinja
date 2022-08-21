@@ -2,7 +2,6 @@
 source: minijinja/tests/test_templates.rs
 expression: "&rendered"
 input_file: minijinja/tests/inputs/block_super_err.txt
-
 ---
 !!!ERROR!!!
 

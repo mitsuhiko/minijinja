@@ -2,7 +2,6 @@
 source: minijinja/tests/test_parser.rs
 expression: "&ast"
 input_file: minijinja/tests/parser-inputs/ifexpr.txt
-
 ---
 Ok(
     Template {

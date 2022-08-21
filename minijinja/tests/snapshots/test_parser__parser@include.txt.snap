@@ -1,9 +1,7 @@
 ---
 source: minijinja/tests/test_parser.rs
-assertion_line: 10
 expression: "&ast"
 input_file: minijinja/tests/parser-inputs/include.txt
-
 ---
 Ok(
     Template {

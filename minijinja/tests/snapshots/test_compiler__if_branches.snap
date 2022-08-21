@@ -1,7 +1,6 @@
 ---
 source: minijinja/tests/test_compiler.rs
 expression: "&c"
-
 ---
 Compiler {
     instructions: [

@@ -2,7 +2,6 @@
 source: minijinja/tests/test_lexer.rs
 expression: "&tokens"
 input_file: minijinja/tests/lexer-inputs/operators.txt
-
 ---
 [
     VARIABLE_START(false),
