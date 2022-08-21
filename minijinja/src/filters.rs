@@ -688,8 +688,12 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "urlencode"))))]
     #[cfg(feature = "urlencode")]
     pub fn urlencode(_: &State, value: Value) -> Result<String, Error> {
-        const SET: &percent_encoding::AsciiSet =
-            &percent_encoding::NON_ALPHANUMERIC.remove(b'/').add(b' ');
+        const SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
+            .remove(b'/')
+            .remove(b'.')
+            .remove(b'-')
+            .remove(b'_')
+            .add(b' ');
         match &value.0 {
             ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
             ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),

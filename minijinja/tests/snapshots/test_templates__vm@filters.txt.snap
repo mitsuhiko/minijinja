@@ -1,9 +1,7 @@
 ---
 source: minijinja/tests/test_templates.rs
-assertion_line: 44
 expression: "&rendered"
 input_file: minijinja/tests/inputs/filters.txt
-
 ---
 lower: bird
 upper: BIRD
@@ -49,7 +47,7 @@ json-pretty: {
   "c": "d"
 }
 json-scary-html: "\u003c\u003e\u0026\u0027"
-urlencode: hello%20world/baz
+urlencode: hello%20world/foo-bar_baz.txt
 urlencode-kv: a=x%20y&b=2&c=3
 batch: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
 batch-fill: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, "-", "-"]]
