@@ -30,6 +30,8 @@ jobs:
       - name: Build
         run: cargo build --features=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug
         working-directory: ./minijinja
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "1"
 
   test-stable:
     name: Test on 1.56.1
