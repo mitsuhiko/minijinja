@@ -1,8 +1,16 @@
-two: 2
-two_dot_two: 2.2
-seq: [1, 2, 3]
-map: {"foo": "bar"}
-string: "aha"
+{
+  "two": 2,
+  "two_dot_two": 2.2,
+  "seq": [
+    1,
+    2,
+    3
+  ],
+  "map": {
+    "foo": "bar"
+  },
+  "string": "aha"
+}
 ---
 even: {{ two is even }}
 odd: {{ two is odd }}

@@ -1,4 +1,11 @@
-seq: ["a", "b", "c", "d"]
+{
+  "seq": [
+    "a",
+    "b",
+    "c",
+    "d"
+  ]
+}
 ---
 {% for item in seq %}
   {{ item }} ({{ loop.index }} of {{ loop.length }})

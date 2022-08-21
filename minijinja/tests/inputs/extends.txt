@@ -1,4 +1,6 @@
-template: "simple_layout.txt"
+{
+  "template": "simple_layout.txt"
+}
 ---
 {% extends template %}
 {% block title %}new title{% endblock %}

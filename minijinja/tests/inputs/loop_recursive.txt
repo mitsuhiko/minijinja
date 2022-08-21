@@ -1,13 +1,25 @@
-nav:
-  - link: /
-    title: Index
-  - link: /docs
-    title: Docs
-    children:
-      - link: /docs/installation
-        title: Installation
-      - link: /docs/faq
-        title: FAQ
+{
+  "nav": [
+    {
+      "link": "/",
+      "title": "Index"
+    },
+    {
+      "link": "/docs",
+      "title": "Docs",
+      "children": [
+        {
+          "link": "/docs/installation",
+          "title": "Installation"
+        },
+        {
+          "link": "/docs/faq",
+          "title": "FAQ"
+        }
+      ]
+    }
+  ]
+}
 ---
 <ul class="nav">
 {% for item in nav recursive %}

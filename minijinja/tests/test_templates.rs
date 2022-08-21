@@ -25,7 +25,7 @@ fn test_vm() {
         let contents = std::fs::read_to_string(path).unwrap();
         let mut iter = contents.splitn(2, "\n---\n");
         let mut env = Environment::new();
-        let ctx: serde_yaml::Value = serde_yaml::from_str(iter.next().unwrap()).unwrap();
+        let ctx: serde_json::Value = serde_json::from_str(iter.next().unwrap()).unwrap();
 
         for (path, source) in &refs {
             let ref_filename = path.file_name().unwrap().to_str().unwrap();

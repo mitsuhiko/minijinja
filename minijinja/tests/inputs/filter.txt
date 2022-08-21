@@ -1,4 +1,5 @@
-value:
-  "foo bar baz"
+{
+  "value": "foo bar baz"
+}
 ---
 {{ value|upper }}

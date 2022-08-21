@@ -1,3 +1,5 @@
-upper: 1
+{
+  "upper": 1
+}
 ---
 {% with f = range %}{% for x in f(upper) %}{{ debug() }}{% endfor %}{% endwith %}

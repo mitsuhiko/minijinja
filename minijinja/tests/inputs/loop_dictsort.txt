@@ -1,8 +1,11 @@
-map:
-  foo: 1
-  bar: 2
-  baz: 100
-  blafasel: aha
+{
+  "map": {
+    "foo": 1,
+    "bar": 2,
+    "baz": 100,
+    "blafasel": "aha"
+  }
+}
 ---
 {%- for key, value in map|dictsort %}
 * {{ key }}: {{ value }}

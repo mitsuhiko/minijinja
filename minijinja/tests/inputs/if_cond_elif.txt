@@ -1,5 +1,7 @@
-value: false
-other_value: false
+{
+  "value": false,
+  "other_value": false
+}
 ---
 {% if value %}
   first branch

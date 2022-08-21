@@ -1,4 +1,6 @@
-template: "simple_include.txt"
+{
+  "template": "simple_include.txt"
+}
 ---
 Before
 {% with variable=42 %}

@@ -1,4 +1,6 @@
-foo: "root value"
+{
+  "foo": "root value"
+}
 ---
 Basic:
 {{ foo }}

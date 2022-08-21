@@ -1,3 +1,5 @@
-name: World
+{
+  "name": "World"
+}
 ---
 Hello {{ name }}!

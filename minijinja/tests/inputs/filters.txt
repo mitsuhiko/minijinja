@@ -1,10 +1,17 @@
-word: "Bird"
-word_with_spaces: " Spacebird\n"
-list: [1, 2, 3]
-map:
-  a: b
-  c: d
-scary_html: "<>&'"
+{
+  "word": "Bird",
+  "word_with_spaces": " Spacebird\n",
+  "list": [
+    1,
+    2,
+    3
+  ],
+  "map": {
+    "a": "b",
+    "c": "d"
+  },
+  "scary_html": "<>&'"
+}
 ---
 lower: {{ word|lower }}
 upper: {{ word|upper }}

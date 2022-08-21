@@ -1,4 +1,6 @@
-something_true: true
+{
+  "something_true": true
+}
 ---
 {{ 42 if something_true else 23 }}
 {{ 42 if not something_true else 23 }}

@@ -1,4 +1,6 @@
-value: false
+{
+  "value": false
+}
 ---
 {% if value %}
   was true

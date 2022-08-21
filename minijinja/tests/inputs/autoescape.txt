@@ -1,4 +1,6 @@
-unsafe: "<foo>"
+{
+  "unsafe": "<foo>"
+}
 ---
 {{ unsafe }}
 {% autoescape true %}{{ unsafe }}{% endautoescape %}

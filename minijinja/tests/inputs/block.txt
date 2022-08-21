@@ -1,4 +1,6 @@
-var: foo
+{
+  "var": "foo"
+}
 ---
 <title>{% block title %}{% endblock %}</title>
 {% block body %}{{ var }}{% endblock body %}
