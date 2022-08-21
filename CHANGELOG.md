@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 - Improved debug printing of context.
 - Added `-`, `_` and `.` to set of unescaped characters in `urlencode`. (#72)
+- Bumped `v_htmlescape` dependency. (#74)
 
 # 0.17.0
 
