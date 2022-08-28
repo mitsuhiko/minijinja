@@ -14,6 +14,7 @@ pub const LOOP_FLAG_RECURSIVE: u8 = 2;
 
 /// Represents an instruction for the VM.
 #[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub enum Instruction<'source> {
     /// Emits raw source
     EmitRaw(&'source str),
@@ -183,79 +184,6 @@ pub enum Instruction<'source> {
     /// A nop
     #[allow(unused)]
     Nop,
-}
-
-#[cfg(feature = "internal_debug")]
-impl<'source> fmt::Debug for Instruction<'source> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            Instruction::EmitRaw(s) => write!(f, "EMIT_RAW (string {:?})", s),
-            Instruction::StoreLocal(n) => write!(f, "STORE_LOCAL (var {:?})", n),
-            Instruction::Lookup(n) => write!(f, "LOOKUP (var {:?})", n),
-            Instruction::GetAttr(n) => write!(f, "GETATTR (key {:?})", n),
-            Instruction::GetItem => write!(f, "GETITEM"),
-            Instruction::LoadConst(ref v) => write!(f, "LOAD_CONST (value {:?})", v),
-            Instruction::BuildMap(n) => write!(f, "BUILD_MAP ({:?} pairs)", n),
-            Instruction::BuildList(n) => write!(f, "BUILD_LIST ({:?} items)", n),
-            Instruction::UnpackList(n) => write!(f, "UNPACK_LIST ({:?} items)", n),
-            Instruction::ListAppend => write!(f, "LIST_APPEND"),
-            Instruction::Add => write!(f, "ADD"),
-            Instruction::Sub => write!(f, "SUB"),
-            Instruction::Mul => write!(f, "MUL"),
-            Instruction::Div => write!(f, "DIV"),
-            Instruction::IntDiv => write!(f, "INT_DIV"),
-            Instruction::Rem => write!(f, "REM"),
-            Instruction::Pow => write!(f, "Pow"),
-            Instruction::Neg => write!(f, "NEG"),
-            Instruction::Eq => write!(f, "EQ"),
-            Instruction::Ne => write!(f, "NE"),
-            Instruction::Gt => write!(f, "GT"),
-            Instruction::Gte => write!(f, "GTE"),
-            Instruction::Lt => write!(f, "LT"),
-            Instruction::Lte => write!(f, "LTE"),
-            Instruction::Not => write!(f, "NOT"),
-            Instruction::StringConcat => write!(f, "STRING_CONCAT"),
-            Instruction::In => write!(f, "IN"),
-            Instruction::ApplyFilter(n) => {
-                write!(f, "APPLY_FILTER (name {:?})", n)
-            }
-            Instruction::PerformTest(n) => {
-                write!(f, "PERFORM_TEST (name {:?})", n)
-            }
-            Instruction::Emit => write!(f, "EMIT"),
-            Instruction::PushLoop(flags) => {
-                let recursive = flags & LOOP_FLAG_RECURSIVE != 0;
-                let loop_var = flags & LOOP_FLAG_WITH_LOOP_VAR != 0;
-                write!(
-                    f,
-                    "PUSH_LOOP (loop var: {:?}, recursive: {:?})",
-                    loop_var, recursive
-                )
-            }
-            Instruction::PushWith => write!(f, "PUSH_WITH"),
-            Instruction::Iterate(t) => write!(f, "ITERATE (exit to {:>05x})", t),
-            Instruction::PopFrame => write!(f, "POP_FRAME"),
-            Instruction::Jump(t) => write!(f, "JUMP (to {:>05x})", t),
-            Instruction::JumpIfFalse(t) => write!(f, "JUMP_IF_FALSE (to {:>05x})", t),
-            Instruction::JumpIfFalseOrPop(t) => write!(f, "JUMP_IF_FALSE_OR_POP (to {:>05x})", t),
-            Instruction::JumpIfTrueOrPop(t) => write!(f, "JUMP_IF_TRUE_OR_POP (to {:>05x})", t),
-            Instruction::CallBlock(n) => write!(f, "CALL_BLOCK (name {:?})", n),
-            Instruction::LoadBlocks => write!(f, "LOAD_BLOCKS"),
-            Instruction::Include(b) => write!(f, "INCLUDE (ignore missing {:?})", b),
-            Instruction::PushAutoEscape => write!(f, "PUSH_AUTO_ESCAPE"),
-            Instruction::PopAutoEscape => write!(f, "POP_AUTO_ESCAPE"),
-            Instruction::BeginCapture => write!(f, "BEGIN_CAPTURE"),
-            Instruction::EndCapture => write!(f, "END_CAPTURE"),
-            Instruction::CallFunction(n) => write!(f, "CALL_FUNCTION (name {:?})", n),
-            Instruction::CallMethod(n) => write!(f, "CALL_METHOD (name {:?})", n),
-            Instruction::CallObject => write!(f, "CALL_OBJECT"),
-            Instruction::DupTop => write!(f, "DUP_TOP"),
-            Instruction::DiscardTop => write!(f, "DISCARD_TOP"),
-            Instruction::FastSuper => write!(f, "FAST_SUPER"),
-            Instruction::FastRecurse => write!(f, "FAST_RECURSE"),
-            Instruction::Nop => write!(f, "NOP"),
-        }
-    }
 }
 
 #[derive(Copy, Clone)]

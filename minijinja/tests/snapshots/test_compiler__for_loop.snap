@@ -4,13 +4,13 @@ expression: "&c"
 ---
 Compiler {
     instructions: [
-        00000 | LOOKUP (var "items")  [line 0],
-        00001 | PUSH_LOOP (loop var: true, recursive: false),
-        00002 | ITERATE (exit to 00005),
-        00003 | EMIT,
-        00004 | JUMP (to 00002),
-        00005 | POP_FRAME,
-        00006 | EMIT_RAW (string "!"),
+        00000 | Lookup("items")  [line 0],
+        00001 | PushLoop(1),
+        00002 | Iterate(5),
+        00003 | Emit,
+        00004 | Jump(2),
+        00005 | PopFrame,
+        00006 | EmitRaw("!"),
     ],
     blocks: {},
     pending_block: [],

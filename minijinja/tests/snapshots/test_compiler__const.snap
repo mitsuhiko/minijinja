@@ -4,9 +4,9 @@ expression: "&c"
 ---
 Compiler {
     instructions: [
-        00000 | LOAD_CONST (value "a")  [line 0],
-        00001 | LOAD_CONST (value 42),
-        00002 | STRING_CONCAT,
+        00000 | LoadConst("a")  [line 0],
+        00001 | LoadConst(42),
+        00002 | StringConcat,
     ],
     blocks: {},
     pending_block: [],
