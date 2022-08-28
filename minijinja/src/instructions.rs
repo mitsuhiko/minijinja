@@ -212,29 +212,6 @@ impl<'source> Instructions<'source> {
         }
     }
 
-    pub fn dump(&self, w: &mut dyn fmt::Write) -> fmt::Result {
-        write!(w, "Instructions {{")?;
-        write!(w, "    instructions: vec![")?;
-        for instr in &self.instructions {
-            write!(w, "        Instruction::{:?}", instr)?;
-            write!(w, ",")?;
-        }
-        write!(w, "    ],")?;
-        write!(w, "    name: {:?},", self.name)?;
-        write!(w, "    locations: vec![")?;
-        for loc in &self.locations {
-            write!(
-                w,
-                "        Loc {{ first_instruction: {}, line: {} }},",
-                loc.first_instruction, loc.line
-            )?;
-        }
-        write!(w, "    ],")?;
-        write!(w, "    source: {:?},", self.source)?;
-        write!(w, "}}")?;
-        Ok(())
-    }
-
     /// Returns the name of the template.
     pub fn name(&self) -> &'source str {
         self.name
