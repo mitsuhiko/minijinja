@@ -1,6 +1,28 @@
 #[cfg(test)]
 use similar_asserts::assert_eq;
 
+/// Hidden utility module for the [`context!`] macro.
+#[doc(hidden)]
+pub mod __context {
+    use crate::key::Key;
+    use crate::value::{RcType, Value, ValueMap, ValueRepr};
+
+    #[inline(always)]
+    pub fn make() -> ValueMap {
+        ValueMap::default()
+    }
+
+    #[inline(always)]
+    pub fn add(ctx: &mut ValueMap, key: &'static str, value: Value) {
+        ctx.insert(Key::Str(key), value);
+    }
+
+    #[inline(always)]
+    pub fn build(ctx: ValueMap) -> Value {
+        ValueRepr::Map(RcType::new(ctx)).into()
+    }
+}
+
 /// Creates a template context with keys and values.
 ///
 /// ```rust
@@ -37,25 +59,29 @@ use similar_asserts::assert_eq;
 /// ```
 #[macro_export]
 macro_rules! context {
+    () => {
+        $crate::__context::build($crate::__context::make())
+    };
     (
         $($key:ident $(=> $value:expr)?),* $(,)?
     ) => {{
-        let mut ctx = std::collections::BTreeMap::default();
+        let mut ctx = $crate::__context::make();
         $(
-            $crate::__pair!(ctx, $key $(, $value)?);
+            $crate::__context_pair!(ctx, $key $(, $value)?);
         )*
-        $crate::value::Value::from(ctx)
+        $crate::__context::build(ctx)
     }}
 }
 
 #[macro_export]
 #[doc(hidden)]
-macro_rules! __pair {
+macro_rules! __context_pair {
     ($ctx:ident, $key:ident) => {{
-        $crate::__pair!($ctx, $key, $key);
+        $crate::__context_pair!($ctx, $key, $key);
     }};
     ($ctx:ident, $key:ident, $value:expr) => {
-        $ctx.insert(
+        $crate::__context::add(
+            &mut $ctx,
             stringify!($key),
             $crate::value::Value::from_serializable(&$value),
         );
