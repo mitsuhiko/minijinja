@@ -13,7 +13,8 @@ pub const LOOP_FLAG_WITH_LOOP_VAR: u8 = 1;
 pub const LOOP_FLAG_RECURSIVE: u8 = 2;
 
 /// Represents an instruction for the VM.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub enum Instruction<'source> {
     /// Emits raw source
     EmitRaw(&'source str),
