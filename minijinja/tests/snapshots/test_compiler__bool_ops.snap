@@ -4,11 +4,11 @@ expression: "&c"
 ---
 Compiler {
     instructions: [
-        00000 | LOOKUP (var "first")  [line 0],
-        00001 | JUMP_IF_FALSE_OR_POP (to 00005),
-        00002 | LOOKUP (var "second"),
-        00003 | JUMP_IF_TRUE_OR_POP (to 00005),
-        00004 | LOOKUP (var "third"),
+        00000 | Lookup("first")  [line 0],
+        00001 | JumpIfFalseOrPop(5),
+        00002 | Lookup("second"),
+        00003 | JumpIfTrueOrPop(5),
+        00004 | Lookup("third"),
     ],
     blocks: {},
     pending_block: [],
