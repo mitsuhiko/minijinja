@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.19.0
+
+- Small internal improvements to context creation. (#79)
+
 # 0.18.0
 
 - Improved debug printing of context.
