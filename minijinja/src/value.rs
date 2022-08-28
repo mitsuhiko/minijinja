@@ -95,10 +95,10 @@ pub(crate) type RcType<T> = std::rc::Rc<T>;
 const VALUE_HANDLE_MARKER: &str = "\x01__minijinja_ValueHandle";
 
 #[cfg(feature = "preserve_order")]
-pub(crate) type ValueMap<K, V> = indexmap::IndexMap<K, V>;
+pub(crate) type ValueMap = indexmap::IndexMap<Key<'static>, Value>;
 
 #[cfg(not(feature = "preserve_order"))]
-pub(crate) type ValueMap<K, V> = std::collections::BTreeMap<K, V>;
+pub(crate) type ValueMap = std::collections::BTreeMap<Key<'static>, Value>;
 
 thread_local! {
     static INTERNAL_SERIALIZATION: AtomicBool = AtomicBool::new(false);
@@ -261,7 +261,7 @@ pub(crate) enum ValueRepr {
     SafeString(RcType<String>),
     Bytes(RcType<Vec<u8>>),
     Seq(RcType<Vec<Value>>),
-    Map(RcType<ValueMap<Key<'static>, Value>>),
+    Map(RcType<ValueMap>),
     Dynamic(RcType<dyn Object>),
 }
 
@@ -1470,7 +1470,7 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
 }
 
 struct SerializeMap {
-    entries: ValueMap<Key<'static>, Value>,
+    entries: ValueMap,
     key: Option<Key<'static>>,
 }
 
@@ -1518,7 +1518,7 @@ impl ser::SerializeMap for SerializeMap {
 
 struct SerializeStruct {
     name: &'static str,
-    fields: ValueMap<Key<'static>, Value>,
+    fields: ValueMap,
 }
 
 impl ser::SerializeStruct for SerializeStruct {
@@ -1555,7 +1555,7 @@ impl ser::SerializeStruct for SerializeStruct {
 
 struct SerializeStructVariant {
     variant: &'static str,
-    map: ValueMap<Key<'static>, Value>,
+    map: ValueMap,
 }
 
 impl ser::SerializeStructVariant for SerializeStructVariant {
@@ -1613,9 +1613,9 @@ enum ValueIteratorState {
     Empty,
     Seq(usize, RcType<Vec<Value>>),
     #[cfg(not(feature = "preserve_order"))]
-    Map(Option<Key<'static>>, RcType<ValueMap<Key<'static>, Value>>),
+    Map(Option<Key<'static>>, RcType<ValueMap>),
     #[cfg(feature = "preserve_order")]
-    Map(usize, RcType<ValueMap<Key<'static>, Value>>),
+    Map(usize, RcType<ValueMap>),
 }
 
 impl ValueIteratorState {

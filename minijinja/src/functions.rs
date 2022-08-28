@@ -174,8 +174,8 @@ mod builtins {
         step: Option<u32>,
     ) -> Result<Vec<u32>, Error> {
         let rng = match upper {
-            Some(upper) => (lower..upper),
-            None => (0..lower),
+            Some(upper) => lower..upper,
+            None => 0..lower,
         };
         Ok(if let Some(step) = step {
             rng.step_by(step as usize).collect()
