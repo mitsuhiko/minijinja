@@ -105,7 +105,6 @@ fn tokenize_raw(
         }};
     }
 
-    // TODO: this needs to learn how to unescape
     macro_rules! eat_string {
         ($delim:expr) => {{
             let old_loc = loc!();
