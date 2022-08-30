@@ -1,0 +1,44 @@
+---
+source: minijinja/tests/test_parser.rs
+expression: "&ast"
+input_file: minijinja/tests/parser-inputs/escape.txt
+---
+Ok(
+    Template {
+        children: [
+            EmitExpr {
+                expr: BinOp {
+                    op: Concat,
+                    left: Const {
+                        value: "'",
+                    } @ 1:2-1:6,
+                    right: Const {
+                        value: "foo",
+                    } @ 1:9-1:14,
+                } @ 1:0-1:14,
+            } @ 1:0-1:14,
+            EmitRaw {
+                raw: "\n",
+            } @ 1:16-2:0,
+            EmitExpr {
+                expr: BinOp {
+                    op: Concat,
+                    left: Const {
+                        value: "'",
+                    } @ 2:2-2:6,
+                    right: Const {
+                        value: "foo",
+                    } @ 2:9-2:14,
+                } @ 2:0-2:14,
+            } @ 2:0-2:14,
+            EmitRaw {
+                raw: "\n",
+            } @ 2:16-3:0,
+            EmitExpr {
+                expr: Const {
+                    value: "'",
+                } @ 3:2-3:6,
+            } @ 3:0-3:6,
+        ],
+    } @ 0:0-3:8,
+)
