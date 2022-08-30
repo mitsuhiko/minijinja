@@ -1,11 +1,9 @@
-# expr
+# generate-yaml
 
-This demonstrates how MiniJinja can be used to evaluate expressions.  It accepts a single
-argument which is an expression that should be evaluated and the result is printed in JSON
-format to stdout.  A single variable is provided to the script (`env`) which contains the
-environment variables.
+This demonstrates how MiniJinja can be used to generate YAML files with automatic escaping.
+It renders a YAML template and fills in some values which are automatically formatted to
+be valid JSON and YAML syntax.
 
 ```console
-$ cargo run -- 'env.HOME ~ "/.bashrc"'
-"/Users/mitsuhiko/.bashrc"
+$ cargo run
 ```
