@@ -6,11 +6,16 @@ use minijinja::{context, Environment};
 
 fn main() {
     let mut env = Environment::new();
-    env.add_template("template.yml", include_str!("template.yaml")).unwrap();
+    env.add_template("template.yml", include_str!("template.yaml"))
+        .unwrap();
     let tmpl = env.get_template("template.yml").unwrap();
-    println!("{}", tmpl.render(context!{
-        env => env::vars().collect::<BTreeMap<_, _>>(),
-        title => "Hello World!",
-        yaml => "[1, 2, 3]",
-    }).unwrap());
+    println!(
+        "{}",
+        tmpl.render(context! {
+            env => env::vars().collect::<BTreeMap<_, _>>(),
+            title => "Hello World!",
+            yaml => "[1, 2, 3]",
+        })
+        .unwrap()
+    );
 }
