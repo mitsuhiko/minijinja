@@ -1,8 +1,8 @@
 # MiniJinja Examples
 
 This directory contains a lot of different examples that use the MiniJinja
-engine.  You can run them by running `cargo run` within one of the example
-directories.
+engine.  Each example is in one directory from where you can run them with
+the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 
 ## List of Examples
 
