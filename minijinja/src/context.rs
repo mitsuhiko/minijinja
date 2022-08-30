@@ -1,7 +1,7 @@
 #[cfg(test)]
 use similar_asserts::assert_eq;
 
-/// Hidden utility module for the [`context!`] macro.
+/// Hidden utility module for the [`context!`](crate::context!) macro.
 #[doc(hidden)]
 pub mod __context {
     use crate::key::Key;
@@ -44,7 +44,7 @@ pub mod __context {
 ///
 /// The return value is a [`Value`](crate::value::Value).
 ///
-/// Note that [`context!`] can also be used recursively if you need to
+/// Note that [`context!`](crate::context!) can also be used recursively if you need to
 /// create nested objects:
 ///
 /// ```rust

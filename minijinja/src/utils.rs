@@ -31,12 +31,27 @@ pub fn memstr(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 }
 
 /// Controls the autoescaping behavior.
+///
+/// For more information see
+/// [`set_auto_escape_callback`](crate::Environment::set_auto_escape_callback).
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AutoEscape {
-    /// Do not apply auto escaping
+    /// Do not apply auto escaping.
     None,
-    /// Use HTML auto escaping rules
+    /// Use HTML auto escaping rules.
+    ///
+    /// Any value will be converted into a string and the following characters
+    /// will be escaped in ways compatible to XML and HTML: `<`, `>`, `&`, `"`,
+    /// `'`, and `/`.
     Html,
+    /// Use escaping rules suitable for JSON/JavaScript or YAML.
+    ///
+    /// Any value effectively ends up being serialized to JSON upon printing.  The
+    /// serialized values will be compatible with JavaScript and YAML as well.
+    #[cfg(feature = "json")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
+    Json,
 }
 
 /// Helper to HTML escape a string.
