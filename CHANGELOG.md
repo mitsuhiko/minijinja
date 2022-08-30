@@ -5,6 +5,8 @@ All notable changes to MiniJinja are documented here.
 # 0.19.0
 
 - Small internal improvements to context creation. (#79)
+- Add support for JSON/YAML/JavaScript Escaping.  (#82)
+- Add missing escape support for single quotes (`'`).  (#81) 
 
 # 0.18.1
 
