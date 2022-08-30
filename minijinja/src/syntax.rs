@@ -449,6 +449,9 @@
 //!
 //! After an `endautoescape` the behavior is reverted to what it was before.
 //!
+//! The exact auto escaping behavior is determined by the value of
+//! [`AutoEscape`](crate::AutoEscape) set to the template.
+//!
 //! ## `{% raw %}`
 //!
 //! A raw block is a special construct that lets you ignore the embedded template

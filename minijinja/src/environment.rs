@@ -336,10 +336,14 @@ impl<'source> Environment<'source> {
     /// to determine the default auto escaping behavior.  The function is
     /// invoked with the name of the template and can make an initial auto
     /// escaping decision based on that.  The default implementation is to
-    /// turn on escaping for templates ending with `.html`, `.htm` and `.xml`.
+    /// turn on escaping depending on the file extension:
     ///
-    /// When the `json` feature is enabled, then auto escaping is also enabled in
-    /// JSON more for files ending with `.js`, `.json`, `.yml` and `.yaml`.
+    /// * [`Html`](AutoEscape::Html): `.html`, `.htm`, `.xml`
+    #[cfg_attr(
+        feature = "json",
+        doc = r" * [`Json`](AutoEscape::Json): `.json`, `.js`, `.yml`"
+    )]
+    /// * [`None`](AutoEscape::None): _all others_
     pub fn set_auto_escape_callback<F: Fn(&str) -> AutoEscape + 'static + Sync + Send>(
         &mut self,
         f: F,
