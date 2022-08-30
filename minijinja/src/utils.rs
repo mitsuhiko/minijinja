@@ -102,7 +102,7 @@ impl Unescaper {
                 match char_iter.next() {
                     None => return Err(ErrorKind::BadEscape.into()),
                     Some(d) => match d {
-                        '"' | '\\' | '/' => self.push_char(d)?,
+                        '"' | '\\' | '/' | '\'' => self.push_char(d)?,
                         'b' => self.push_char('\x08')?,
                         'f' => self.push_char('\x0C')?,
                         'n' => self.push_char('\n')?,

@@ -1,0 +1,10 @@
+---
+source: minijinja/tests/test_templates.rs
+expression: "&rendered"
+input_file: minijinja/tests/inputs/escape.txt
+---
+'foo
+'hello'
+'hello'
+'hello'
+
