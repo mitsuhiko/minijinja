@@ -227,6 +227,8 @@ impl<'source> fmt::Debug for Environment<'source> {
 fn default_auto_escape(name: &str) -> AutoEscape {
     match name.rsplit('.').next() {
         Some("html") | Some("htm") | Some("xml") => AutoEscape::Html,
+        #[cfg(feature = "json")]
+        Some("json") | Some("js") | Some("yaml") | Some("yml") => AutoEscape::Json,
         _ => AutoEscape::None,
     }
 }
@@ -335,6 +337,9 @@ impl<'source> Environment<'source> {
     /// invoked with the name of the template and can make an initial auto
     /// escaping decision based on that.  The default implementation is to
     /// turn on escaping for templates ending with `.html`, `.htm` and `.xml`.
+    ///
+    /// When the `json` feature is enabled, then auto escaping is also enabled in
+    /// JSON more for files ending with `.js`, `.json`, `.yml` and `.yaml`.
     pub fn set_auto_escape_callback<F: Fn(&str) -> AutoEscape + 'static + Sync + Send>(
         &mut self,
         f: F,
@@ -446,7 +451,7 @@ impl<'source> Environment<'source> {
         Ok(Template {
             env: self,
             compiled,
-            initial_auto_escape: (self.default_auto_escape)(name),
+            initial_auto_escape: self.get_initial_auto_escape(name),
         })
     }
 
@@ -544,8 +549,11 @@ impl<'source> Environment<'source> {
         self.tests.get(name)
     }
 
-    /// Finalizes a value.
-    pub(crate) fn finalize(
+    pub(crate) fn get_initial_auto_escape(&self, name: &str) -> AutoEscape {
+        (self.default_auto_escape)(name)
+    }
+
+    pub(crate) fn escape(
         &self,
         value: &Value,
         autoescape: AutoEscape,
@@ -569,8 +577,29 @@ impl<'source> Environment<'source> {
                     write!(out, "{}", HtmlEscape(&value.to_string())).unwrap()
                 }
             }
+            #[cfg(feature = "json")]
+            AutoEscape::Json => {
+                let value = serde_json::to_string(&value).map_err(|err| {
+                    Error::new(
+                        crate::ErrorKind::BadSerialization,
+                        "unable to format to JSON",
+                    )
+                    .with_source(err)
+                })?;
+                write!(out, "{}", value).unwrap()
+            }
         }
         Ok(())
+    }
+
+    /// Finalizes a value.
+    pub(crate) fn finalize(
+        &self,
+        value: &Value,
+        autoescape: AutoEscape,
+        out: &mut String,
+    ) -> Result<(), Error> {
+        self.escape(value, autoescape, out)
     }
 }
 

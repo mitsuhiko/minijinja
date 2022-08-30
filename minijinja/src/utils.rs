@@ -37,6 +37,10 @@ pub enum AutoEscape {
     None,
     /// Use HTML auto escaping rules
     Html,
+    /// Escape for JSON/JavaScript or YAML.
+    #[cfg(feature = "json")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
+    Json,
 }
 
 /// Helper to HTML escape a string.

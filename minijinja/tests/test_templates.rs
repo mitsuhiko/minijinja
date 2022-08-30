@@ -73,3 +73,37 @@ fn test_single() {
     let rv = tmpl.render(context!(name => "Peter")).unwrap();
     assert_eq!(rv, "Hello Peter!");
 }
+
+#[test]
+fn test_auto_escaping() {
+    let mut env = Environment::new();
+    env.add_template("index.html", "{{ var }}").unwrap();
+    #[cfg(feature = "json")]
+    {
+        env.add_template("index.js", "{{ var }}").unwrap();
+    }
+    env.add_template("index.txt", "{{ var }}").unwrap();
+
+    // html
+    let tmpl = env.get_template("index.html").unwrap();
+    let rv = tmpl.render(context!(var => "<script>")).unwrap();
+    insta::assert_snapshot!(rv, @"&lt;script&gt;");
+
+    // JSON
+    #[cfg(feature = "json")]
+    {
+        use minijinja::value::Value;
+        let tmpl = env.get_template("index.js").unwrap();
+        let rv = tmpl.render(context!(var => "foo\"bar'baz")).unwrap();
+        insta::assert_snapshot!(rv, @r###""foo\"bar'baz""###);
+        let rv = tmpl
+            .render(context!(var => [Value::from(true), Value::from("<foo>"), Value::from(())]))
+            .unwrap();
+        insta::assert_snapshot!(rv, @r###"[true,"<foo>",null]"###);
+    }
+
+    // Text
+    let tmpl = env.get_template("index.txt").unwrap();
+    let rv = tmpl.render(context!(var => "foo\"bar'baz")).unwrap();
+    insta::assert_snapshot!(rv, @r###"foo"bar'baz"###);
+}

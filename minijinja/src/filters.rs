@@ -47,9 +47,9 @@
 use std::collections::BTreeMap;
 
 use crate::error::Error;
-use crate::utils::HtmlEscape;
 use crate::value::{ArgType, FunctionArgs, RcType, Value};
 use crate::vm::State;
+use crate::AutoEscape;
 
 type FilterFunc = dyn Fn(&State, Value, Vec<Value>) -> Result<Value, Error> + Sync + Send + 'static;
 
@@ -159,15 +159,24 @@ pub fn safe(_state: &State, v: String) -> Result<Value, Error> {
 /// HTML escapes a string.
 ///
 /// By default this filter is also registered under the alias `e`.
-pub fn escape(_state: &State, v: Value) -> Result<Value, Error> {
-    // TODO: this ideally understands which type of escaping is in use
+pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
     if v.is_safe() {
-        Ok(v)
-    } else {
-        Ok(Value::from_safe_string(
-            HtmlEscape(&v.to_string()).to_string(),
-        ))
+        return Ok(v);
     }
+
+    // this tries to use the escaping flag of the current scope, then
+    // of the initial state and if that is also not set it falls back
+    // to HTML.
+    let auto_escape = match state.auto_escape() {
+        AutoEscape::None => match state.env().get_initial_auto_escape(state.name()) {
+            AutoEscape::None => AutoEscape::Html,
+            other => other,
+        },
+        other => other,
+    };
+    let mut out = String::new();
+    state.env().escape(&v, auto_escape, &mut out)?;
+    Ok(Value::from_safe_string(out))
 }
 
 #[cfg(feature = "builtins")]
@@ -665,6 +674,7 @@ mod builtins {
             Error::new(ErrorKind::ImpossibleOperation, "cannot serialize to JSON").with_source(err)
         })
         .map(|s| {
+            // When this filter is used the return value is safe for both HTML and JSON
             let mut rv = String::with_capacity(s.len());
             for c in s.chars() {
                 match c {

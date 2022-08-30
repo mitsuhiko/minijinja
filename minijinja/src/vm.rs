@@ -918,6 +918,8 @@ impl<'env> Vm<'env> {
                     auto_escape_stack.push(state.auto_escape);
                     state.auto_escape = match (value.as_str(), value == Value::from(true)) {
                         (Some("html"), _) => AutoEscape::Html,
+                        #[cfg(feature = "json")]
+                        (Some("json"), _) => AutoEscape::Json,
                         (Some("none"), _) | (None, false) => AutoEscape::None,
                         (None, true) => {
                             if matches!(initial_auto_escape, AutoEscape::None) {
