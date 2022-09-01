@@ -8,3 +8,7 @@ input_file: minijinja/tests/inputs/escape.txt
 'hello'
 'hello'
 
+hello world
+hello
+world
+

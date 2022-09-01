@@ -124,7 +124,7 @@ fn tokenize_raw(
                         has_escapes = true;
                         true
                     }
-                    (_, $delim) | (_, b'\r') | (_, b'\n') => false,
+                    (_, $delim) => false,
                     _ => true,
                 })
                 .count();

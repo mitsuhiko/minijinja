@@ -22,3 +22,14 @@ Into Loop:
 Conditional:
 {% if true %}{% set foo = "was true" %}{% endif %}
 {{ foo }}
+
+Multiline:
+{% set multiline = "
+hello
+world" %}
+{{ multiline }}
+
+Multiline:
+{% set multiline = "hello
+world" %}
+{{ multiline }}
