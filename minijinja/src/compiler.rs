@@ -269,6 +269,18 @@ impl<'source> Compiler<'source> {
                 self.compile_expr(&set.expr)?;
                 self.compile_assignment(&set.target)?;
             }
+            ast::Stmt::SetBlock(set_block) => {
+                self.set_location_from_span(set_block.span());
+                self.add(Instruction::BeginCapture);
+                for node in &set_block.body {
+                    self.compile_stmt(node)?;
+                }
+                self.add(Instruction::EndCapture);
+                if let Some(ref filter) = set_block.filter {
+                    self.compile_expr(filter)?;
+                }
+                self.compile_assignment(&set_block.target)?;
+            }
             ast::Stmt::Block(block) => {
                 self.set_location_from_span(block.span());
                 let mut sub_compiler =

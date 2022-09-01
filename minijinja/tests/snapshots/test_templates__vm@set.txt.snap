@@ -43,3 +43,11 @@ Multiline:
 hello
 world
 
+Block:
+
+[This is a was true]
+
+Filter block
+
+[THIS IS A WAS TRUE]
+

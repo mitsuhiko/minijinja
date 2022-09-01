@@ -56,6 +56,11 @@ macro_rules! expect_token {
     }};
 }
 
+enum SetParseResult<'a> {
+    Set(ast::Set<'a>),
+    SetBlock(ast::SetBlock<'a>),
+}
+
 struct TokenStream<'a> {
     iter: Box<dyn Iterator<Item = Result<(Token<'a>, Span), Error>> + 'a>,
     current: Option<Result<(Token<'a>, Span), Error>>,
@@ -547,10 +552,14 @@ impl<'a> Parser<'a> {
                 self.parse_with_block()?,
                 self.stream.expand_span(span),
             ))),
-            Token::Ident("set") => Ok(ast::Stmt::Set(Spanned::new(
-                self.parse_set()?,
-                self.stream.expand_span(span),
-            ))),
+            Token::Ident("set") => Ok(match self.parse_set()? {
+                SetParseResult::Set(rv) => {
+                    ast::Stmt::Set(Spanned::new(rv, self.stream.expand_span(span)))
+                }
+                SetParseResult::SetBlock(rv) => {
+                    ast::Stmt::SetBlock(Spanned::new(rv, self.stream.expand_span(span)))
+                }
+            }),
             Token::Ident("block") => Ok(ast::Stmt::Block(Spanned::new(
                 self.parse_block()?,
                 self.stream.expand_span(span),
@@ -722,19 +731,41 @@ impl<'a> Parser<'a> {
         Ok(ast::WithBlock { assignments, body })
     }
 
-    fn parse_set(&mut self) -> Result<ast::Set<'a>, Error> {
-        let target = if matches!(self.stream.current()?, Some((Token::ParenOpen, _))) {
+    fn parse_set(&mut self) -> Result<SetParseResult<'a>, Error> {
+        let (target, in_paren) = if matches!(self.stream.current()?, Some((Token::ParenOpen, _))) {
             self.stream.next()?;
             let assign = self.parse_assignment()?;
             expect_token!(self, Token::ParenClose, "`)`")?;
-            assign
+            (assign, true)
         } else {
-            self.parse_assign_name()?
+            (self.parse_assign_name()?, false)
         };
-        expect_token!(self, Token::Assign, "assignment operator")?;
-        let expr = self.parse_expr()?;
 
-        Ok(ast::Set { target, expr })
+        if !in_paren
+            && matches!(
+                self.stream.current()?,
+                Some((Token::BlockEnd(..), _)) | Some((Token::Pipe, _))
+            )
+        {
+            let filter = if matches!(self.stream.current()?, Some((Token::Pipe, _))) {
+                self.stream.next()?;
+                Some(self.parse_filter_chain()?)
+            } else {
+                None
+            };
+            expect_token!(self, Token::BlockEnd(..), "end of block")?;
+            let body = self.subparse(&|tok| matches!(tok, Token::Ident("endset")))?;
+            self.stream.next()?;
+            Ok(SetParseResult::SetBlock(ast::SetBlock {
+                target,
+                filter,
+                body,
+            }))
+        } else {
+            expect_token!(self, Token::Assign, "assignment operator")?;
+            let expr = self.parse_expr()?;
+            Ok(SetParseResult::Set(ast::Set { target, expr }))
+        }
     }
 
     fn parse_block(&mut self) -> Result<ast::Block<'a>, Error> {
@@ -786,7 +817,7 @@ impl<'a> Parser<'a> {
         Ok(ast::AutoEscape { enabled, body })
     }
 
-    fn parse_filter_block(&mut self) -> Result<ast::FilterBlock<'a>, Error> {
+    fn parse_filter_chain(&mut self) -> Result<ast::Expr<'a>, Error> {
         let mut filter = None;
 
         while !matches!(self.stream.current()?, Some((Token::BlockEnd(..), _))) {
@@ -809,9 +840,11 @@ impl<'a> Parser<'a> {
             )));
         }
 
-        let filter = filter
-            .ok_or_else(|| Error::new(ErrorKind::InvalidSyntax, "filter block without filter"))?;
+        filter.ok_or_else(|| Error::new(ErrorKind::InvalidSyntax, "expected a filter"))
+    }
 
+    fn parse_filter_block(&mut self) -> Result<ast::FilterBlock<'a>, Error> {
+        let filter = self.parse_filter_chain()?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
         let body = self.subparse(&|tok| matches!(tok, Token::Ident("endfilter")))?;
         self.stream.next()?;

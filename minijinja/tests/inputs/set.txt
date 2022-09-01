@@ -33,3 +33,11 @@ Multiline:
 {% set multiline = "hello
 world" %}
 {{ multiline }}
+
+Block:
+{% set var %}This is a {{ foo }}{% endset %}
+[{{ var }}]
+
+Filter block
+{% set upper_var | upper %}This is a {{ foo }}{% endset %}
+[{{ upper_var }}]
