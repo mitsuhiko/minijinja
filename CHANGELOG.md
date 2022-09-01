@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Small internal improvements to context creation. (#79)
 - Add support for JSON/YAML/JavaScript Escaping.  (#82)
 - Add missing escape support for single quotes (`'`).  (#81) 
+- Added support for newlines in string literals.  (#85)
 
 # 0.18.1
 
