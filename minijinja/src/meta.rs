@@ -179,6 +179,12 @@ pub fn find_undeclared_variables(source: &str) -> Result<HashSet<String>, Error>
                 assign_nested(&stmt.target, state);
                 visit_expr(&stmt.expr, state);
             }
+            ast::Stmt::SetBlock(stmt) => {
+                assign_nested(&stmt.target, state);
+                state.push();
+                stmt.body.iter().for_each(|x| walk(x, state));
+                state.pop();
+            }
             ast::Stmt::Block(stmt) => {
                 state.push();
                 state.assign("super");
@@ -241,6 +247,7 @@ pub fn find_referenced_templates(source: &str) -> Result<HashSet<String>, Error>
         match node {
             ast::Stmt::Template(stmt) => stmt.children.iter().for_each(|x| walk(x, out)),
             ast::Stmt::EmitExpr(_) | ast::Stmt::EmitRaw(_) | ast::Stmt::Set(_) => {}
+            ast::Stmt::SetBlock(stmt) => stmt.body.iter().for_each(|x| walk(x, out)),
             ast::Stmt::ForLoop(stmt) => stmt
                 .body
                 .iter()

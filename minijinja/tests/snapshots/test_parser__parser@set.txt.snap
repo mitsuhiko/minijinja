@@ -39,6 +39,56 @@ Ok(
                     ],
                 } @ 2:16-2:21,
             } @ 2:3-2:22,
+            EmitRaw {
+                raw: "\n",
+            } @ 2:25-3:0,
+            SetBlock {
+                target: Var {
+                    id: "variable2",
+                } @ 3:7-3:16,
+                filter: None,
+                body: [
+                    EmitRaw {
+                        raw: "\n    this is the ",
+                    } @ 3:19-4:16,
+                    EmitExpr {
+                        expr: Var {
+                            id: "body",
+                        } @ 4:19-4:23,
+                    } @ 4:16-4:23,
+                    EmitRaw {
+                        raw: "\n",
+                    } @ 4:26-5:0,
+                ],
+            } @ 3:3-5:9,
+            EmitRaw {
+                raw: "\n",
+            } @ 5:12-6:0,
+            SetBlock {
+                target: Var {
+                    id: "variable3",
+                } @ 6:7-6:16,
+                filter: Some(
+                    Filter {
+                        name: "upper",
+                        expr: None,
+                        args: [],
+                    } @ 6:19-6:24,
+                ),
+                body: [
+                    EmitRaw {
+                        raw: "\n    this is the ",
+                    } @ 6:27-7:16,
+                    EmitExpr {
+                        expr: Var {
+                            id: "body",
+                        } @ 7:19-7:23,
+                    } @ 7:16-7:23,
+                    EmitRaw {
+                        raw: " with filter\n",
+                    } @ 7:26-8:0,
+                ],
+            } @ 6:3-8:9,
         ],
-    } @ 0:0-2:25,
+    } @ 0:0-8:12,
 )

@@ -419,6 +419,26 @@
 //! and have them show up outside of it.  This also applies to loops.  The only
 //! exception to that rule are if statements which do not introduce a scope.
 //!
+//! It's also possible to capture blocks of template code into a variable by using
+//! the `set` statement as a block.   In that case, instead of using an equals sign
+//! and a value, you just write the variable name and then everything until
+//! `{% endset %}` is captured.
+//!
+//! ```jinja
+//! {% set navigation %}
+//! <li><a href="/">Index</a>
+//! <li><a href="/downloads">Downloads</a>
+//! {% endset %}
+//! ```
+//!
+//! The `navigation` variable then contains the navigation HTML source.
+//!
+//! This can also be combined with applying a filter:
+//!
+//! ```jinja
+//! {% set title | upper %}Title of the page{% endset %}
+//! ```
+//!
 //! ## `{% filter %}`
 //!
 //! Filter sections allow you to apply regular [filters](crate::filters) on a
