@@ -21,6 +21,27 @@ Into Loop:
 
 Conditional:
 {% if true %}{% set foo = "was true" %}{% endif %}
-String set:
-{% set foo = "foo" + "bar" %}
 {{ foo }}
+
+Multiline:
+{% set multiline = "
+hello
+world" %}
+{{ multiline }}
+
+Multiline:
+{% set multiline = "hello
+world" %}
+{{ multiline }}
+
+Block:
+{% set var %}This is a {{ foo }}{% endset %}
+[{{ var }}]
+
+Filter block
+{% set upper_var | upper %}This is a {{ foo }}{% endset %}
+[{{ upper_var }}]
+
+Set with +
+{% set set_plus = "hello" + "world" %}
+{{ set_plus }}

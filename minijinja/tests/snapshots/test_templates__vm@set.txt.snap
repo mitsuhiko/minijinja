@@ -30,7 +30,28 @@ Into Loop:
 
 Conditional:
 
-String set:
+was true
 
-foobar
+Multiline:
+
+
+hello
+world
+
+Multiline:
+
+hello
+world
+
+Block:
+
+[This is a was true]
+
+Filter block
+
+[THIS IS A WAS TRUE]
+
+Set with +
+
+helloworld
 

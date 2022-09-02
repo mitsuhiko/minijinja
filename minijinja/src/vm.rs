@@ -13,7 +13,7 @@ use crate::value::{self, Object, RcType, Value, ValueIterator, ValueRepr};
 use crate::AutoEscape;
 
 pub struct LoopState {
-    len: AtomicUsize,
+    len: usize,
     idx: AtomicUsize,
     depth: usize,
 }
@@ -45,7 +45,7 @@ impl Object for LoopState {
 
     fn get_attr(&self, name: &str) -> Option<Value> {
         let idx = self.idx.load(Ordering::Relaxed) as u64;
-        let len = self.len.load(Ordering::Relaxed) as u64;
+        let len = self.len as u64;
         match name {
             "index0" => Some(Value::from(idx)),
             "index" => Some(Value::from(idx + 1)),
@@ -89,7 +89,7 @@ impl fmt::Display for LoopState {
             f,
             "<loop {}/{}>",
             self.idx.load(Ordering::Relaxed),
-            self.len.load(Ordering::Relaxed)
+            self.len
         )
     }
 }
@@ -765,7 +765,7 @@ impl<'env> Vm<'env> {
                             current_recursion_jump: next_loop_recursion_jump.take(),
                             controller: RcType::new(LoopState {
                                 idx: AtomicUsize::new(!0usize),
-                                len: AtomicUsize::new(len),
+                                len,
                                 depth,
                             }),
                         }),
