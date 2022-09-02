@@ -21,4 +21,6 @@ Into Loop:
 
 Conditional:
 {% if true %}{% set foo = "was true" %}{% endif %}
+String set:
+{% set foo = "foo" + "bar" %}
 {{ foo }}
