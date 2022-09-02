@@ -13,6 +13,7 @@ All notable changes to MiniJinja are documented here.
 - Enable debug mode by default in debug builds.  (#88)
 - Added `render!` macro and `render_str`.  (#89)
 - Fixed an issue where trailing whitespace removal did not work on blocks.  (#90)
+- Added `loop.changed()` method.  (#91)
 
 # 0.18.1
 
