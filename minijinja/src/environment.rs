@@ -299,9 +299,10 @@ impl<'env, 'source> Expression<'env, 'source> {
 impl<'source> Environment<'source> {
     /// Creates a new environment with sensible defaults.
     ///
-    /// This environment does not yet contain any templates but it will have all the
-    /// default filters loaded.  If you do not want any default configuration you
-    /// can use the alternative [`empty`](Environment::empty) method.
+    /// This environment does not yet contain any templates but it will have all
+    /// the default filters, tests and globals loaded.  If you do not want any
+    /// default configuration you can use the alternative
+    /// [`empty`](Environment::empty) method.
     pub fn new() -> Environment<'source> {
         Environment {
             templates: Source::Borrowed(Default::default()),
@@ -310,14 +311,14 @@ impl<'source> Environment<'source> {
             globals: RcType::new(functions::get_globals()),
             default_auto_escape: RcType::new(default_auto_escape),
             #[cfg(feature = "debug")]
-            debug: false,
+            debug: cfg!(debug_assertions),
         }
     }
 
     /// Creates a completely empty environment.
     ///
-    /// This environment has no filters, no templates and no default logic for
-    /// auto escaping configured.
+    /// This environment has no filters, no templates, no globals and no default
+    /// logic for auto escaping configured.
     pub fn empty() -> Environment<'source> {
         Environment {
             templates: Source::Borrowed(Default::default()),
@@ -326,7 +327,7 @@ impl<'source> Environment<'source> {
             globals: RcType::default(),
             default_auto_escape: RcType::new(no_auto_escape),
             #[cfg(feature = "debug")]
-            debug: false,
+            debug: cfg!(debug_assertions),
         }
     }
 
@@ -363,7 +364,8 @@ impl<'source> Environment<'source> {
     /// return a [`DebugInfo`](crate::error::DebugInfo) object from
     /// [`Error::debug_info`](crate::error::Error::debug_info).
     ///
-    /// This requires the `debug` feature.
+    /// This requires the `debug` feature.  This is enabled by default if
+    /// debug assertions are enabled and false otherwise.
     #[cfg(feature = "debug")]
     #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
     pub fn set_debug(&mut self, enabled: bool) {
