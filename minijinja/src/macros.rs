@@ -108,7 +108,7 @@ macro_rules! __context_pair {
 /// source and context variables, the extended form also lets you provide
 /// a custom environment that should be used rather than a default one.
 /// The context variables are passed the same way as with the
-/// [`context!](crate::context) macro.
+/// [`context!`](crate::context) macro.
 ///
 /// # Example
 ///
