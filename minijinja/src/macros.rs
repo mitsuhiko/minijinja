@@ -146,7 +146,7 @@ macro_rules! render {
         $tmpl:expr
         $(, $key:ident $(=> $value:expr)?)* $(,)?
     ) => {
-        ($env).render_str($tmpl, context! { $($key $(=> $value)? ,)* })
+        ($env).render_str($tmpl, $crate::context! { $($key $(=> $value)? ,)* })
             .expect("failed to render expression")
     };
     (

@@ -445,6 +445,14 @@ impl<'source> Environment<'source> {
     /// This requires that the template has been loaded with
     /// [`add_template`](Environment::add_template) beforehand.  If the template was
     /// not loaded an error of kind `TemplateNotFound` is returned.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// let mut env = Environment::new();
+    /// env.add_template("hello.txt", "Hello {{ name }}!").unwrap();
+    /// let tmpl = env.get_template("hello.txt").unwrap();
+    /// println!("{}", tmpl.render(context!{ name => "World" }).unwrap());
+    /// ```
     pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
         let compiled = match &self.templates {
             Source::Borrowed(ref map) => map
