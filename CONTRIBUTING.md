@@ -32,7 +32,8 @@ make test
 MiniJinja tests use the [Insta](https://insta.rs) testing framework. While not
 required, it is recommended to use
 the [`cargo insta review`](https://insta.rs/docs/cli/#review) command to review
-and verify changes to the test results.
+and verify changes to the test results.  This can be automated by using
+`make snapshot-tests`.
 
 ## Formatting the Code
 

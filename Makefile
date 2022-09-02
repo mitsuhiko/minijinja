@@ -15,6 +15,9 @@ test:
 	@echo "CARGO TEST ALL FEATURES"
 	@cd minijinja; cargo test --all-features
 
+snapshot-tests:
+	@cd minijinja; cargo insta test --all-features --review
+
 run-tests:
 	@rustup component add rustfmt 2> /dev/null
 	@echo "CARGO TESTS"
@@ -42,4 +45,4 @@ lint:
 	@rustup component add clippy 2> /dev/null
 	@cargo clippy --all -- -F clippy::dbg-macro
 
-.PHONY: all doc test run-tests format format-check lint check
+.PHONY: all doc test run-tests format format-check lint check snapshot-tests
