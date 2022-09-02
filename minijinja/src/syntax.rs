@@ -195,6 +195,8 @@
 //! - `loop.cycle`: A helper function to cycle between a list of sequences. See the explanation below.
 //! - `loop.depth`: Indicates how deep in a recursive loop the rendering currently is. Starts at level 1
 //! - `loop.depth0`: Indicates how deep in a recursive loop the rendering currently is. Starts at level 0
+//! - `loop.changed(...args)`: Returns true if the passed values have changed since the last time it was called with the same arguments.
+//! - `loop.cycle(...args)`: Returns a value from the passed sequence in a cycle.
 //!
 //! Within a for-loop, it’s possible to cycle among a list of strings/variables each time through
 //! the loop by using the special `loop.cycle` helper:
