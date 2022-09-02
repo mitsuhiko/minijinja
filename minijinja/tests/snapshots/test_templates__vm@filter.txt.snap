@@ -2,8 +2,7 @@
 source: minijinja/tests/test_templates.rs
 description: "{{ value|upper }}"
 info:
-  ctx:
-    value: foo bar baz
+  value: foo bar baz
 input_file: minijinja/tests/inputs/filter.txt
 ---
 FOO BAR BAZ

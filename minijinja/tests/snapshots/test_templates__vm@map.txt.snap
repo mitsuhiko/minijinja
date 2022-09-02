@@ -1,8 +1,7 @@
 ---
 source: minijinja/tests/test_templates.rs
 description: "{{ {\"foo\":\"bar\"}.foo }}"
-info:
-  ctx: {}
+info: {}
 input_file: minijinja/tests/inputs/map.txt
 ---
 bar

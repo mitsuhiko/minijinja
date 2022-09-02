@@ -2,8 +2,7 @@
 source: minijinja/tests/test_templates.rs
 description: "{{'\\'' ~ 'foo'}}\n{{'\\'' ~ x ~ '\\''}}\n{{\"\\'\" ~ x ~ '\\''}}\n{{\"\\'\" ~ x ~ '\\''}}\n{{\"\nhello world\"}}\n{{\"hello\nworld\"}}"
 info:
-  ctx:
-    x: hello
+  x: hello
 input_file: minijinja/tests/inputs/escape.txt
 ---
 'foo

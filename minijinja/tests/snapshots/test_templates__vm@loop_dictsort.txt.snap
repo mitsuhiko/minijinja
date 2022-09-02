@@ -2,12 +2,11 @@
 source: minijinja/tests/test_templates.rs
 description: "{%- for key, value in map|dictsort %}\n* {{ key }}: {{ value }}\n{%- endfor %}"
 info:
-  ctx:
-    map:
-      bar: 2
-      baz: 100
-      blafasel: aha
-      foo: 1
+  map:
+    bar: 2
+    baz: 100
+    blafasel: aha
+    foo: 1
 input_file: minijinja/tests/inputs/loop_dictsort.txt
 ---
 

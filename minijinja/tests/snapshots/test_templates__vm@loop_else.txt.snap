@@ -2,8 +2,7 @@
 source: minijinja/tests/test_templates.rs
 description: "{% for item in seq %}\n  should not happen\n{% else %}\n  else block!\n{% endfor %}"
 info:
-  ctx:
-    seq: []
+  seq: []
 input_file: minijinja/tests/inputs/loop_else.txt
 ---
 

@@ -50,7 +50,7 @@ fn test_vm() {
         rendered.push('\n');
 
         insta::with_settings!({
-            info => &context! { ctx },
+            info => &ctx,
             description => content.trim_end(),
             omit_expression => true
         }, {

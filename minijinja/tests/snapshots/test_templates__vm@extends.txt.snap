@@ -2,8 +2,7 @@
 source: minijinja/tests/test_templates.rs
 description: "{% extends template %}\n{% block title %}new title{% endblock %}\n{% block body %}new body{% endblock %}"
 info:
-  ctx:
-    template: simple_layout.txt
+  template: simple_layout.txt
 input_file: minijinja/tests/inputs/extends.txt
 ---
 <title>new title</title>

@@ -2,8 +2,7 @@
 source: minijinja/tests/test_templates.rs
 description: "should be -2.5: {{ 1.5 * 2.5 * 2 / 3 - var }}\nshould be -3.0: {{ 1.5 * 2.5 * 2 // 3 - var }}\nshould be 2.0: {{ 4 / 2 }}\nshould be 2: {{ 4 // 2 }}"
 info:
-  ctx:
-    var: 5
+  var: 5
 input_file: minijinja/tests/inputs/math.txt
 ---
 should be -2.5: -2.5

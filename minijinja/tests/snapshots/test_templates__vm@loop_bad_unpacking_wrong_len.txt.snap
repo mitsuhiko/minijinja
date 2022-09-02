@@ -2,17 +2,16 @@
 source: minijinja/tests/test_templates.rs
 description: "<ul>\n{% for a, b in seq %}\n  <li>{{ a }}: {{ b }}\n{% endfor %}\n</ul>"
 info:
-  ctx:
-    seq:
-      - - 1
-        - 2
-        - 3
-      - - 2
-        - 3
-        - 4
-      - - 3
-        - 4
-        - 5
+  seq:
+    - - 1
+      - 2
+      - 3
+    - - 2
+      - 3
+      - 4
+    - - 3
+      - 4
+      - 5
 input_file: minijinja/tests/inputs/loop_bad_unpacking_wrong_len.txt
 ---
 !!!ERROR!!!

@@ -2,11 +2,10 @@
 source: minijinja/tests/test_templates.rs
 description: "{%- for item in seq %}\n  - {{ item }}\n{%- else %}\n  should not happen\n{%- endfor %}"
 info:
-  ctx:
-    seq:
-      - 1
-      - 2
-      - 3
+  seq:
+    - 1
+    - 2
+    - 3
 input_file: minijinja/tests/inputs/loop_else2.txt
 ---
 
