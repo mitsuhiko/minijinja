@@ -9,6 +9,7 @@ All notable changes to MiniJinja are documented here.
 - Add missing escape support for single quotes (`'`).  (#81) 
 - Added support for newlines in string literals.  (#85)
 - Added support for block assignment syntax.  (#86)
+- Enable debug mode by default in debug builds.  (#88)
 
 # 0.18.1
 
