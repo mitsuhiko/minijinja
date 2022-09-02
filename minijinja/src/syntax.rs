@@ -195,13 +195,28 @@
 //! - `loop.cycle`: A helper function to cycle between a list of sequences. See the explanation below.
 //! - `loop.depth`: Indicates how deep in a recursive loop the rendering currently is. Starts at level 1
 //! - `loop.depth0`: Indicates how deep in a recursive loop the rendering currently is. Starts at level 0
+//! - `loop.changed(...args)`: Returns true if the passed values have changed since the last time it was called with the same arguments.
+//! - `loop.cycle(...args)`: Returns a value from the passed sequence in a cycle.
 //!
 //! Within a for-loop, it’s possible to cycle among a list of strings/variables each time through
-//! the loop by using the special loop.cycle helper:
+//! the loop by using the special `loop.cycle` helper:
 //!
 //! ```jinja
 //! {% for row in rows %}
 //!   <li class="{{ loop.cycle('odd', 'even') }}">{{ row }}</li>
+//! {% endfor %}
+//! ```
+//!
+//! If the `sync` feature is not disabled, the `loop.changed` helper is also available
+//! which can be used to detect when a value changes between the last iteration and the
+//! current one.  The method takes one or more arguments that are all compared.
+//!
+//! ```jinja
+//! {% for entry in entries %}
+//!   {% if loop.changed(entry.category) %}
+//!     <h2>{{ entry.category }}</h2>
+//!   {% endif %}
+//!   <p>{{ entry.message }}</p>
 //! {% endfor %}
 //! ```
 //!

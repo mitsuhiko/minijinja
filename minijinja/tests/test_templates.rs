@@ -118,3 +118,17 @@ fn test_auto_escaping() {
     let rv = tmpl.render(context!(var => "foo\"bar'baz")).unwrap();
     insta::assert_snapshot!(rv, @r###"foo"bar'baz"###);
 }
+
+#[cfg(feature = "sync")]
+#[test]
+fn test_loop_changed() {
+    let rv = minijinja::render!(
+        r#"
+        {%- for i in items -%}
+          {% if loop.changed(i) %}{{ i }}{% endif %}
+        {%- endfor -%}
+        "#,
+        items => vec![1, 1, 1, 2, 3, 4, 4, 5],
+    );
+    assert_eq!(rv, "12345");
+}
