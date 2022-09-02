@@ -17,7 +17,6 @@ rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [features]
 default = ["builtins", "sync", "debug", "key_interning", "deserialization"]
-sync = []
 deserialization = []
 key_interning = ["sync"]
 preserve_order = ["indexmap"]
