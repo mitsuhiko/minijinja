@@ -41,3 +41,7 @@ Block:
 Filter block
 {% set upper_var | upper %}This is a {{ foo }}{% endset %}
 [{{ upper_var }}]
+
+Set with +
+{% set set_plus = "hello" + "world" %}
+{{ set_plus }}

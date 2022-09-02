@@ -301,6 +301,7 @@ impl PartialEq for Value {
             _ => match coerce(self, other) {
                 Some(CoerceResult::F64(a, b)) => a == b,
                 Some(CoerceResult::I128(a, b)) => a == b,
+                Some(CoerceResult::String(a, b)) => a == b,
                 None => false,
             },
         }
@@ -319,6 +320,7 @@ impl PartialOrd for Value {
             _ => match coerce(self, other) {
                 Some(CoerceResult::F64(a, b)) => a.partial_cmp(&b),
                 Some(CoerceResult::I128(a, b)) => a.partial_cmp(&b),
+                Some(CoerceResult::String(a, b)) => a.partial_cmp(&b),
                 None => None,
             },
         }
@@ -444,6 +446,7 @@ value_from!(char, Char);
 enum CoerceResult {
     I128(i128, i128),
     F64(f64, f64),
+    String(String, String),
 }
 
 fn as_f64(value: &Value) -> Option<f64> {
@@ -464,6 +467,9 @@ fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
         (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
         (ValueRepr::U128(a), ValueRepr::U128(b)) => {
             Some(CoerceResult::I128(**a as i128, **b as i128))
+        }
+        (ValueRepr::String(a), ValueRepr::String(b)) => {
+            Some(CoerceResult::String(a.to_string(), b.to_string()))
         }
         (ValueRepr::I64(a), ValueRepr::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
         (ValueRepr::I128(ref a), ValueRepr::I128(ref b)) => Some(CoerceResult::I128(**a, **b)),
@@ -541,6 +547,18 @@ fn int_as_value(val: i128) -> Value {
     }
 }
 
+fn impossible_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
+    Error::new(
+        ErrorKind::ImpossibleOperation,
+        format!(
+            "tried to use {} operator on unsupported types {} and {}",
+            op,
+            lhs.kind(),
+            rhs.kind()
+        ),
+    )
+}
+
 macro_rules! math_binop {
     ($name:ident, $int:ident, $float:tt) => {
         pub(crate) fn $name(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
@@ -548,24 +566,27 @@ macro_rules! math_binop {
                 match coerce(lhs, rhs)? {
                     CoerceResult::I128(a, b) => Some(int_as_value(a.$int(b))),
                     CoerceResult::F64(a, b) => Some((a $float b).into()),
+                    _ => None
                 }
             }
             do_it(lhs, rhs).ok_or_else(|| {
-                Error::new(
-                    ErrorKind::ImpossibleOperation,
-                    format!(
-                        "tried to use {} operator on unsupported types {} and {}",
-                        stringify!($float),
-                        lhs.kind(),
-                        rhs.kind()
-                    )
-                )
+                impossible_op(stringify!($float), lhs, rhs)
             })
         }
     }
 }
 
-math_binop!(add, wrapping_add, +);
+pub(crate) fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
+        match coerce(lhs, rhs)? {
+            CoerceResult::I128(a, b) => Some(int_as_value(a.wrapping_add(b))),
+            CoerceResult::F64(a, b) => Some((a + b).into()),
+            CoerceResult::String(a, b) => Some(Value::from([a, b].concat())),
+        }
+    }
+    do_it(lhs, rhs).ok_or_else(|| impossible_op("+", lhs, rhs))
+}
+
 math_binop!(sub, wrapping_sub, -);
 math_binop!(mul, wrapping_mul, *);
 math_binop!(rem, wrapping_rem_euclid, %);
@@ -576,16 +597,7 @@ pub(crate) fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
         let b = as_f64(rhs)?;
         Some((a / b).into())
     }
-    do_it(lhs, rhs).ok_or_else(|| {
-        Error::new(
-            ErrorKind::ImpossibleOperation,
-            format!(
-                "tried to use / operator on unsupported types {} and {}",
-                lhs.kind(),
-                rhs.kind()
-            ),
-        )
-    })
+    do_it(lhs, rhs).ok_or_else(|| impossible_op("/", lhs, rhs))
 }
 
 pub(crate) fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
@@ -593,18 +605,10 @@ pub(crate) fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
         match coerce(lhs, rhs)? {
             CoerceResult::I128(a, b) => Some(int_as_value(a.div_euclid(b))),
             CoerceResult::F64(a, b) => Some(a.div_euclid(b).into()),
+            CoerceResult::String(_, _) => None,
         }
     }
-    do_it(lhs, rhs).ok_or_else(|| {
-        Error::new(
-            ErrorKind::ImpossibleOperation,
-            format!(
-                "tried to use // operator on unsupported types {} and {}",
-                lhs.kind(),
-                rhs.kind()
-            ),
-        )
-    })
+    do_it(lhs, rhs).ok_or_else(|| impossible_op("//", lhs, rhs))
 }
 
 /// Implements a binary `pow` operation on values.
@@ -613,14 +617,10 @@ pub(crate) fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
         match coerce(lhs, rhs)? {
             CoerceResult::I128(a, b) => Some(int_as_value(a.pow(TryFrom::try_from(b).ok()?))),
             CoerceResult::F64(a, b) => Some((a.powf(b)).into()),
+            CoerceResult::String(_, _) => None,
         }
     }
-    do_it(lhs, rhs).ok_or_else(|| {
-        Error::new(
-            ErrorKind::ImpossibleOperation,
-            concat!("could not calculate the power"),
-        )
-    })
+    do_it(lhs, rhs).ok_or_else(|| impossible_op("**", lhs, rhs))
 }
 
 /// Implements an unary `neg` operation on value.
@@ -1732,6 +1732,41 @@ fn test_adding() {
     );
 
     assert_eq!(add(&value!(1), &value!(2)), Ok(value!(3)));
+    assert_eq!(add(&value!("foo"), &value!("bar")), Ok(value!("foobar")));
+}
+
+#[test]
+fn test_subtracting() {
+    let err = sub(&value!("a"), &value!(42)).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "impossible operation: tried to use - operator on unsupported types string and number"
+    );
+
+    let err = sub(&value!("foo"), &value!("bar")).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "impossible operation: tried to use - operator on unsupported types string and string"
+    );
+
+    assert_eq!(sub(&value!(2), &value!(1)), Ok(value!(1)));
+}
+
+#[test]
+fn test_dividing() {
+    let err = div(&value!("a"), &value!(42)).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "impossible operation: tried to use / operator on unsupported types string and number"
+    );
+
+    let err = div(&value!("foo"), &value!("bar")).unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "impossible operation: tried to use / operator on unsupported types string and string"
+    );
+
+    assert_eq!(div(&value!(100), &value!(2)), Ok(value!(50.0)));
 }
 
 #[test]
