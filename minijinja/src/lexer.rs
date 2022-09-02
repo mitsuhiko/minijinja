@@ -381,29 +381,37 @@ fn whitespace_filter<'a, I: Iterator<Item = Result<(Token<'a>, Span), Error>>>(
     let mut iter = iter.peekable();
     let mut remove_leading_ws = false;
     // TODO: this does not update spans
-    std::iter::from_fn(move || match iter.next() {
-        Some(Ok((Token::TemplateData(mut data), span))) => {
-            if remove_leading_ws {
+    std::iter::from_fn(move || loop {
+        return match iter.next() {
+            Some(Ok((Token::TemplateData(mut data), span))) => {
+                if remove_leading_ws {
+                    remove_leading_ws = false;
+                    data = data.trim_start();
+                }
+                if matches!(
+                    iter.peek(),
+                    Some(Ok((Token::VariableStart(true), _)))
+                        | Some(Ok((Token::BlockStart(true), _)))
+                ) {
+                    data = data.trim_end();
+                }
+                // if we trim down template data completely, skip to the
+                // next token
+                if data.is_empty() {
+                    continue;
+                }
+                Some(Ok((Token::TemplateData(data), span)))
+            }
+            rv @ Some(Ok((Token::VariableEnd(true), _)))
+            | rv @ Some(Ok((Token::BlockEnd(true), _))) => {
+                remove_leading_ws = true;
+                rv
+            }
+            other => {
                 remove_leading_ws = false;
-                data = data.trim_start();
+                other
             }
-            if matches!(
-                iter.peek(),
-                Some(Ok((Token::VariableStart(true), _))) | Some(Ok((Token::BlockStart(true), _)))
-            ) {
-                data = data.trim_end();
-            }
-            Some(Ok((Token::TemplateData(data), span)))
-        }
-        rv @ Some(Ok((Token::VariableEnd(true), _)))
-        | rv @ Some(Ok((Token::BlockStart(true), _))) => {
-            remove_leading_ws = true;
-            rv
-        }
-        other => {
-            remove_leading_ws = false;
-            other
-        }
+        };
     })
 }
 
@@ -431,6 +439,29 @@ fn test_whitespace_filter() {
         IDENT(blah),
         VARIABLE_END(false),
         TEMPLATE_DATA(" blub"),
+    ]
+    "###);
+}
+
+#[test]
+fn test_block_filter() {
+    let input = "{% for item in seq -%}\n  {{ item }}{% endfor %}";
+    let tokens: Result<Vec<_>, _> = tokenize(input, false).collect();
+    let tokens = tokens.unwrap().into_iter().map(|x| x.0).collect::<Vec<_>>();
+    insta::assert_debug_snapshot!(&tokens, @r###"
+    [
+        BLOCK_END(false),
+        IDENT(for),
+        IDENT(item),
+        IDENT(in),
+        IDENT(seq),
+        BLOCK_END(true),
+        VARIABLE_START(false),
+        IDENT(item),
+        VARIABLE_END(false),
+        BLOCK_END(false),
+        IDENT(endfor),
+        BLOCK_END(false),
     ]
     "###);
 }
