@@ -1,3 +1,4 @@
+#![allow(clippy::let_unit_value)]
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
