@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{% for loop in seq %}\n  ...\n{% endfor %}"
 input_file: minijinja/tests/parser-inputs/err_invalid_var_assignment.txt
 ---
 Err(

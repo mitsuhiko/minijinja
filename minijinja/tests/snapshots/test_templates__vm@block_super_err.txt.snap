@@ -1,6 +1,8 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "{{ super() }}"
+info:
+  ctx: {}
 input_file: minijinja/tests/inputs/block_super_err.txt
 ---
 !!!ERROR!!!

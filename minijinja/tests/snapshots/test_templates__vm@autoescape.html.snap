@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "{{ unsafe }}\n{% autoescape true %}{{ unsafe }}{% endautoescape %}\n{% autoescape false %}{{ unsafe }}{% endautoescape %}\n{% autoescape \"html\" %}{{ unsafe }}{% endautoescape %}\n{% autoescape \"none\" %}{{ unsafe }}{% endautoescape %}"
+info:
+  ctx:
+    unsafe: "<foo>"
 input_file: minijinja/tests/inputs/autoescape.html
 ---
 &lt;foo&gt;

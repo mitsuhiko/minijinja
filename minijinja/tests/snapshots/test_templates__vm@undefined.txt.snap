@@ -1,6 +1,8 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "{{ none }}\n{{ undefined }}"
+info:
+  ctx: {}
 input_file: minijinja/tests/inputs/undefined.txt
 ---
 none

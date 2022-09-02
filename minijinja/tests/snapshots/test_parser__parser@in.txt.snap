@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{{ value in sequence }}\n{{ value not in sequence }}\n{{ not value in sequence }}"
 input_file: minijinja/tests/parser-inputs/in.txt
 ---
 Ok(

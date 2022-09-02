@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "Hello {{ world"
 input_file: minijinja/tests/parser-inputs/err_open_variable_block.txt
 ---
 Err(

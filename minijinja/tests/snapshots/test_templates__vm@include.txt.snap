@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "Before\n{% with variable=42 %}\n  {% include template %}\n{% endwith %}\nAfter"
+info:
+  ctx:
+    template: simple_include.txt
 input_file: minijinja/tests/inputs/include.txt
 ---
 Before

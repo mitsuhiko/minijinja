@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{% for (a, b), c in seq %}...{% endfor %}"
 input_file: minijinja/tests/parser-inputs/for_loop_unpack.txt
 ---
 Ok(

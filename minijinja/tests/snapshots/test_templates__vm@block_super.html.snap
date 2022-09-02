@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "{% extends \"super_with_html.html\" %}\n{% block body %}\n  <p>New Content</p>\n  {{ super() }}\n  {{ super()|upper }}\n{% endblock %}"
+info:
+  ctx:
+    var: foo
 input_file: minijinja/tests/inputs/block_super.html
 ---
 

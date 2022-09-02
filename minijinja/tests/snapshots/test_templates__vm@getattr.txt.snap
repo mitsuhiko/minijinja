@@ -1,6 +1,11 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "name: {{ user.name }}\nactive: {{ user.is_active }}"
+info:
+  ctx:
+    user:
+      is_active: true
+      name: Peter
 input_file: minijinja/tests/inputs/getattr.txt
 ---
 name: Peter

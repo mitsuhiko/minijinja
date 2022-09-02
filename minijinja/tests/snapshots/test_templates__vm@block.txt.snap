@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "<title>{% block title %}{% endblock %}</title>\n{% block body %}{{ var }}{% endblock body %}"
+info:
+  ctx:
+    var: foo
 input_file: minijinja/tests/inputs/block.txt
 ---
 <title></title>

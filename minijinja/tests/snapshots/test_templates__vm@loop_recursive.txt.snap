@@ -1,6 +1,18 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "<ul class=\"nav\">\n{% for item in nav recursive %}\n  <li><a href={{ item.link }}\">{{ item.title }}</a>{%\n    if item.children %}<ul>{{ loop(item.children) }}</ul>{% endif %}</li>\n{% endfor %}\n</ul>\n\n<ul class=\"nav\">\n{% for item in nav recursive %}\n  <li><a href={{ item.link }}\">{{ item.title }}</a>{%\n    if item.children %}<ul>{{ loop(item.children)|upper }}</ul>{% endif %}</li>\n{% endfor %}\n</ul>"
+info:
+  ctx:
+    nav:
+      - link: /
+        title: Index
+      - children:
+          - link: /docs/installation
+            title: Installation
+          - link: /docs/faq
+            title: FAQ
+        link: /docs
+        title: Docs
 input_file: minijinja/tests/inputs/loop_recursive.txt
 ---
 <ul class="nav">

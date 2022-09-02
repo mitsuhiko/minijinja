@@ -1,6 +1,8 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "{{ {\"foo\":\"bar\"}.foo }}"
+info:
+  ctx: {}
 input_file: minijinja/tests/inputs/map.txt
 ---
 bar

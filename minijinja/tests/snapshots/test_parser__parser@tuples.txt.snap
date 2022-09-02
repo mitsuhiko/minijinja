@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{{ [1, 2, 3] }}\n{{ (1, 2, 3) }}\n{{ (1,) }}\n{{ () }}"
 input_file: minijinja/tests/parser-inputs/tuples.txt
 ---
 Ok(

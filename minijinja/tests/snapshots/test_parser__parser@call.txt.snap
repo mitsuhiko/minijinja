@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{{ super() }}\n{{ loop.cycle(1, 2) }}\n{{ self.foo() }}\n{{ foo(1, 2, a=3, b=4) }}"
 input_file: minijinja/tests/parser-inputs/call.txt
 ---
 Ok(

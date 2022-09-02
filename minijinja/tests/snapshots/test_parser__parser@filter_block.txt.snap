@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{% filter foo|bar(1, 2)|baz %}...{% endfilter %}"
 input_file: minijinja/tests/parser-inputs/filter_block.txt
 ---
 Ok(

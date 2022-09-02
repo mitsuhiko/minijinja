@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_lexer.rs
-expression: "&tokens"
+description: "{{ with_int(42, -42) }}\n{{ with_float(1.5, -1.5) }}\n{{ with_string(\"string\") }}"
 input_file: minijinja/tests/lexer-inputs/things.txt
 ---
 [

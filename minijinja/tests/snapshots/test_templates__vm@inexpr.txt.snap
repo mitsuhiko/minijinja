@@ -1,6 +1,12 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "{{ 1 in seq }}\n{{ \"missing\" in seq }}\n{{ 1 not in seq }}\n{{ \"missing\" not in seq }}"
+info:
+  ctx:
+    seq:
+      - 1
+      - 2
+      - 3
 input_file: minijinja/tests/inputs/inexpr.txt
 ---
 true

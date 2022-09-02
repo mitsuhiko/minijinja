@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "{% with f = range %}{% for x in f(upper) %}{{ debug() }}{% endfor %}{% endwith %}"
+info:
+  ctx:
+    upper: 1
 input_file: minijinja/tests/inputs/debug.txt
 ---
 State {

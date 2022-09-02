@@ -1,6 +1,8 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "Before\n{% include [\"missing_template1.txt\", \"missing_template2.txt\"] %}\nAfter"
+info:
+  ctx: {}
 input_file: minijinja/tests/inputs/include_choice_none.txt
 ---
 !!!ERROR!!!

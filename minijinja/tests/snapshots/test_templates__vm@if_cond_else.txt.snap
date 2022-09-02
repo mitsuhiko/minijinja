@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "{% if value %}\n  was true\n{% else %}\n  was false\n{% endif %}"
+info:
+  ctx:
+    value: false
 input_file: minijinja/tests/inputs/if_cond_else.txt
 ---
 

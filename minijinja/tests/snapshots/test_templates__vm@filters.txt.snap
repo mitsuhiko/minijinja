@@ -1,6 +1,18 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "lower: {{ word|lower }}\nupper: {{ word|upper }}\ntitle: {{ word|title }}\ntitle-sentence: {{ \"the bIrd, is The:word\"|title }}\nreplace: {{ word|replace(\"B\", \"th\") }}\nescape: {{ \"<\"|escape }}\ne: {{ \"<\"|e }}\ndouble-escape: {{ \"<\"|escape|escape }}\nsafe: {{ \"<\"|safe|escape }}\nlist-length: {{ list|length }}\nlist-from-list: {{ list|list }}\nlist-from-map: {{ map|list }}\nlist-from-word: {{ word|list }}\nlist-from-undefined: {{ undefined|list }}\nbool-empty-string: {{ \"\"|bool }}\nbool-non-empty-string: {{ \"hello\"|bool }}\nbool-empty-list: {{ []|bool }}\nbool-non-empty-list: {{ [42]|bool }}\nbool-undefined: {{ undefined|bool }}\nmap-length: {{ map|length }}\nstring-length: {{ word|length }}\nstring-count: {{ word|count }}\nreverse-list: {{ list|reverse }}\nreverse-string: {{ word|reverse }}\ntrim: |{{ word_with_spaces|trim }}|\ntrim-bird: {{ word|trim(\"Bd\") }}\njoin-default: {{ list|join }}\njoin-pipe: {{ list|join(\"|\") }}\njoin_string: {{ word|join('-') }}\ndefault: {{ undefined|default == \"\" }}\ndefault-value: {{ undefined|default(42) }}\nfirst-list: {{ list|first }}\nfirst-word: {{ word|first }}\nfirst-undefined: {{ []|first is undefined }}\nlast-list: {{ list|last }}\nlast-word: {{ word|last }}\nlast-undefined: {{ []|first is undefined }}\nd: {{ undefined|d == \"\" }}\njson: {{ map|tojson }}\njson-pretty: {{ map|tojson(true) }}\njson-scary-html: {{ scary_html|tojson }}\nurlencode: {{ \"hello world/foo-bar_baz.txt\"|urlencode }}\nurlencode-kv: {{ dict(a=\"x y\", b=2, c=3)|urlencode }}\nbatch: {{ range(10)|batch(3) }}\nbatch-fill: {{ range(10)|batch(3, '-') }}\nslice: {{ range(10)|slice(3) }}\nslice-fill: {{ range(10)|slice(3, '-') }}\nitems: {{ dict(a=1)|items }}\nint-abs: {{ -42|abs }}\nfloat-abs: {{ -42.5|abs }}\nint-round: {{ 42|round }}\nfloat-round: {{ 42.5|round }}\nfloat-round-prec2: {{ 42.512345|round(2) }}"
+info:
+  ctx:
+    list:
+      - 1
+      - 2
+      - 3
+    map:
+      a: b
+      c: d
+    scary_html: "<>&'"
+    word: Bird
+    word_with_spaces: " Spacebird\n"
 input_file: minijinja/tests/inputs/filters.txt
 ---
 lower: bird

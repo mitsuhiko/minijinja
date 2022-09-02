@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "<title>{% block title %}{% endblock %}</title>\n{% block body %}\n    foo\n{% endblock body %}"
 input_file: minijinja/tests/parser-inputs/block.txt
 ---
 Ok(

@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "{% if value %}\n  was true\n{% endif %}"
+info:
+  ctx:
+    value: 42
 input_file: minijinja/tests/inputs/if_cond.txt
 ---
 

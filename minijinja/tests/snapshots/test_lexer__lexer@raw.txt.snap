@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_lexer.rs
-expression: "&tokens"
+description: "before {% raw %} this is a {{ raw }} {% block %} {% endraw %} after\n\nbefore {%- raw %} this is a {{ raw }} {% block %} {% endraw -%} after\n\nbefore {%- raw -%} this is a {{ raw }} {% block %} {%- endraw -%} after"
 input_file: minijinja/tests/lexer-inputs/raw.txt
 ---
 [

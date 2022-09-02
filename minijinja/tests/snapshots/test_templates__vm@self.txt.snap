@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "1:[{% block title %}{{ var }}{% endblock %}]\n2:({{ self.title() }})"
+info:
+  ctx:
+    var: foobar
 input_file: minijinja/tests/inputs/self.txt
 ---
 1:[foobar]

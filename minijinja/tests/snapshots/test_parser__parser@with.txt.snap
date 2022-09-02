@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{% with a=foo, b=bar %}\n  {{ a }}|{{ b }}\n{% endwith %}\n\n{% with a=foo %}\n  {{ a }}\n{% endwith %}"
 input_file: minijinja/tests/parser-inputs/with.txt
 ---
 Ok(

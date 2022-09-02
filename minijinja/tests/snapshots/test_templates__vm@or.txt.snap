@@ -1,6 +1,8 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "{{ 42 or 23 }}\n{{ 0 or 23 }}\n{{ none or 23 }}"
+info:
+  ctx: {}
 input_file: minijinja/tests/inputs/or.txt
 ---
 42

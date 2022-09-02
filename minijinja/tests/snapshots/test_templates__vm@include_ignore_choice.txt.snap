@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "Before\n{% include [\"missing_template.txt\", template] %}\nAfter"
+info:
+  ctx:
+    template: simple_include.txt
 input_file: minijinja/tests/inputs/include_ignore_choice.txt
 ---
 Before

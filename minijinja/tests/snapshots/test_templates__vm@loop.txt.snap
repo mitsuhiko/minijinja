@@ -1,6 +1,12 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "<ul>\n{% for item in seq %}\n    <li>{{ item }}</li>\n{% endfor %}\n</ul>"
+info:
+  ctx:
+    seq:
+      - 1
+      - 2
+      - 3
 input_file: minijinja/tests/inputs/loop.txt
 ---
 <ul>

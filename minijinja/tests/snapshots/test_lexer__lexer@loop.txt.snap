@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_lexer.rs
-expression: "&tokens"
+description: "<ul>\n{% for item in sequence %}\n    <li>{{ item }}</li>\n{% endfor %}\n</ul>"
 input_file: minijinja/tests/lexer-inputs/loop.txt
 ---
 [

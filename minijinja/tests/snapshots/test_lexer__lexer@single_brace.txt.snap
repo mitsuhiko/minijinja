@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_lexer.rs
-expression: "&tokens"
+description: "{foo} foo {bar}"
 input_file: minijinja/tests/lexer-inputs/single_brace.txt
 ---
 [

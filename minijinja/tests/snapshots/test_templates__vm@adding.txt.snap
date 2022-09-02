@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "Strings:\n{{ 'to' + name + 'you' }}!\n{{ 'to' + 'you' }}!\n\nAdding:\n{{ 1 + 2 }}\n\nMinus:\n{{ 2 + 1 }}\n\nDivide:\n{{ 100 / 2 }}"
+info:
+  ctx:
+    name: World
 input_file: minijinja/tests/inputs/adding.txt
 ---
 Strings:

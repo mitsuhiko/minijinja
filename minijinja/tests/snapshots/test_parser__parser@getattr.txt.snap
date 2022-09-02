@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{{ foo.bar.baz }}"
 input_file: minijinja/tests/parser-inputs/getattr.txt
 ---
 Ok(

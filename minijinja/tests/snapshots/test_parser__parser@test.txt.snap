@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{{ foo is even }}\n{{ foo is not even }}\n{{ not foo is even }}"
 input_file: minijinja/tests/parser-inputs/test.txt
 ---
 Ok(

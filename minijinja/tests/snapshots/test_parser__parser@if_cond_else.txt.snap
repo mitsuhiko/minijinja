@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{% if expr1 %}\n    branch 1\n{% else %}\n    else\n{% endif %}"
 input_file: minijinja/tests/parser-inputs/if_cond_else.txt
 ---
 Ok(

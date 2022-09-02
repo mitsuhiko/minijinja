@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{{ \"foo\\u2603bar\" }}"
 input_file: minijinja/tests/parser-inputs/string_unescape.txt
 ---
 Ok(

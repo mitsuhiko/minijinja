@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "Before\n{% include template %}\nAfter"
+info:
+  ctx:
+    template: missing_template.txt
 input_file: minijinja/tests/inputs/include_missing.txt
 ---
 !!!ERROR!!!

@@ -1,6 +1,8 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "{{ undefined_value.attr }}"
+info:
+  ctx: {}
 input_file: minijinja/tests/inputs/err_undefined_attr.txt
 ---
 !!!ERROR!!!

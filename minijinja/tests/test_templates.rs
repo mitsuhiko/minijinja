@@ -38,17 +38,24 @@ fn test_vm() {
             env.add_template(ref_filename, source).unwrap();
         }
 
-        env.add_template(filename, iter.next().unwrap()).unwrap();
+        let content = iter.next().unwrap();
+        env.add_template(filename, content).unwrap();
         let template = env.get_template(filename).unwrap();
         dbg!(&template);
 
-        let mut rendered = match template.render(ctx) {
+        let mut rendered = match template.render(&ctx) {
             Ok(rendered) => rendered,
             Err(err) => format!("!!!ERROR!!!\n\n{:?}\n", err),
         };
         rendered.push('\n');
 
-        insta::assert_snapshot!(&rendered);
+        insta::with_settings!({
+            info => &context! { ctx },
+            description => content.trim_end(),
+            omit_expression => true
+        }, {
+            insta::assert_snapshot!(&rendered);
+        });
     });
 }
 

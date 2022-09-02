@@ -7,6 +7,11 @@ fn test_parser() {
         let contents = std::fs::read_to_string(path).unwrap();
         let filename = path.file_name().unwrap().to_str().unwrap();
         let ast = parse(&contents, filename);
-        insta::assert_debug_snapshot!(&ast);
+        insta::with_settings!({
+            description => contents.trim_end(),
+            omit_expression => true,
+        }, {
+            insta::assert_debug_snapshot!(&ast);
+        });
     });
 }

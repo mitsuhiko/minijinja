@@ -1,6 +1,9 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "Hello {{ name }}!"
+info:
+  ctx:
+    name: World
 input_file: minijinja/tests/inputs/hello.txt
 ---
 Hello World!

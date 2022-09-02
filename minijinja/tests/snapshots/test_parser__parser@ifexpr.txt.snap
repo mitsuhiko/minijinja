@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{{ a if b else c }}\n{{ a if b }}"
 input_file: minijinja/tests/parser-inputs/ifexpr.txt
 ---
 Ok(

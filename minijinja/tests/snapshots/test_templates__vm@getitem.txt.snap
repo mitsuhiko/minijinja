@@ -1,6 +1,14 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "first: {{ items[0] }}\nlast: {{ items[-1] }}\nname: {{ user[\"name\"] }}"
+info:
+  ctx:
+    items:
+      - first_item
+      - middle_item
+      - last_item
+    user:
+      name: Peter
 input_file: minijinja/tests/inputs/getitem.txt
 ---
 first: first_item

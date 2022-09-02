@@ -1,6 +1,17 @@
 ---
 source: minijinja/tests/test_templates.rs
-expression: "&rendered"
+description: "even: {{ two is even }}\nodd: {{ two is odd }}\nundefined: {{ two is undefined }}\ndefined: {{ two is defined }}\nundefined2: {{ ohwell is undefined }}\ndefined2: {{ ohwell is defined }}\nnumber-int: {{ two is number }}\nnumber-float: {{ two_dot_two is number }}\nnot-seq: {{ two is sequence }}\nseq: {{ seq is sequence }}\nnot-map: {{ two is mapping }}\nmap: {{ map is mapping }}\nstring: {{ string is string }}\nnot-string: {{ mapping is string }}\nstarts-with-a: {{ string is startingwith('a') }}\nends-with-ha: {{ string is endingwith('ha') }}"
+info:
+  ctx:
+    map:
+      foo: bar
+    seq:
+      - 1
+      - 2
+      - 3
+    string: aha
+    two: 2
+    two_dot_two: 2.2
 input_file: minijinja/tests/inputs/tests.txt
 ---
 even: true

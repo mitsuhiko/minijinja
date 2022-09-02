@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{{ foo and bar or baz == true }}"
 input_file: minijinja/tests/parser-inputs/ops.txt
 ---
 Ok(

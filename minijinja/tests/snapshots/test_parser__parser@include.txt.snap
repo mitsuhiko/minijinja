@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{% include \"foo.txt\" %}"
 input_file: minijinja/tests/parser-inputs/include.txt
 ---
 Ok(

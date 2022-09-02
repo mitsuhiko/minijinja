@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-expression: "&ast"
+description: "{% set variable = value %}\n{% set (a, b) = (1, 2) %}\n{% set variable2 %}\n    this is the {{ body }}\n{% endset %}\n{% set variable3 | upper %}\n    this is the {{ body }} with filter\n{% endset %}"
 input_file: minijinja/tests/parser-inputs/set.txt
 ---
 Ok(
