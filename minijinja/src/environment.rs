@@ -445,6 +445,14 @@ impl<'source> Environment<'source> {
     /// This requires that the template has been loaded with
     /// [`add_template`](Environment::add_template) beforehand.  If the template was
     /// not loaded an error of kind `TemplateNotFound` is returned.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// let mut env = Environment::new();
+    /// env.add_template("hello.txt", "Hello {{ name }}!").unwrap();
+    /// let tmpl = env.get_template("hello.txt").unwrap();
+    /// println!("{}", tmpl.render(context!{ name => "World" }).unwrap());
+    /// ```
     pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
         let compiled = match &self.templates {
             Source::Borrowed(ref map) => map
@@ -459,6 +467,40 @@ impl<'source> Environment<'source> {
             compiled,
             initial_auto_escape: self.get_initial_auto_escape(name),
         })
+    }
+
+    /// Parses and renders a template from a string in one go.
+    ///
+    /// In some cases you really only need a template to be rendered once from
+    /// a string and returned.  The internal name of the template is `<string>`.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// let env = Environment::new();
+    /// let rv = env.render_str("Hello {{ name }}", context! { name => "World" });
+    /// println!("{}", rv.unwrap());
+    /// ```
+    pub fn render_str<S: Serialize>(&self, source: &str, ctx: S) -> Result<String, Error> {
+        // reduce total amount of code faling under mono morphization into
+        // this function, and share the rest in _eval.
+        self._render_str(source, Value::from_serializable(&ctx))
+    }
+
+    fn _render_str(&self, source: &str, root: Value) -> Result<String, Error> {
+        let name = "<string>";
+        let compiled = CompiledTemplate::from_name_and_source(name, source)?;
+        let mut output = String::new();
+        let vm = Vm::new(self);
+        let blocks = &compiled.blocks;
+        let initial_auto_escape = self.get_initial_auto_escape(name);
+        vm.eval(
+            &compiled.instructions,
+            root,
+            blocks,
+            initial_auto_escape,
+            &mut output,
+        )?;
+        Ok(output)
     }
 
     /// Compiles an expression.

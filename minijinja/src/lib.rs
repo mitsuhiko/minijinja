@@ -126,11 +126,11 @@ mod key;
 
 mod ast;
 mod compiler;
-mod context;
 mod environment;
 mod error;
 mod instructions;
 mod lexer;
+mod macros;
 mod parser;
 mod tokens;
 mod utils;
@@ -159,7 +159,7 @@ pub use self::error::DebugInfo;
 #[cfg(feature = "source")]
 pub use self::source::Source;
 
-pub use self::context::*;
+pub use self::macros::__context;
 pub use self::vm::State;
 
 /// This module gives access to the low level machinery.

@@ -16,5 +16,6 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [loader](loader): shows how to load templates dynamically at runtime.
 * [minimal](minimal): a Hello World example without default features.
 * [recursive-for](recursive-for): demonstrates the recursive for loop.
+* [render-macro](render-macro): minimal Hello World example using the `render!` macro.
 * [render-template](render-template): CLI app that renders templates from string.
 * [source](source): Demonstrates how to load templates from disk with the `source` feature.
