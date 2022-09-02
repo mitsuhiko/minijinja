@@ -12,6 +12,7 @@ All notable changes to MiniJinja are documented here.
 - Added string concatenatino with `+` for Jinja compat.  (#87)
 - Enable debug mode by default in debug builds.  (#88)
 - Added `render!` macro and `render_str`.  (#89)
+- Fixed an issue where trailing whitespace removal did not work on blocks.  (#90)
 
 # 0.18.1
 
