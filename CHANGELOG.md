@@ -11,6 +11,7 @@ All notable changes to MiniJinja are documented here.
 - Added support for block assignment syntax.  (#86)
 - Added string concatenatino with `+` for Jinja compat.  (#87)
 - Enable debug mode by default in debug builds.  (#88)
+- Added `render!` macro and `render_str`.  (#89)
 
 # 0.18.1
 
