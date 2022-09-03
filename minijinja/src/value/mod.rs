@@ -95,11 +95,7 @@ mod serialize;
 #[cfg(test)]
 use similar_asserts::assert_eq;
 
-#[cfg(feature = "sync")]
 pub(crate) type RcType<T> = std::sync::Arc<T>;
-
-#[cfg(not(feature = "sync"))]
-pub(crate) type RcType<T> = std::rc::Rc<T>;
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.

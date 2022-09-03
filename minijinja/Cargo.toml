@@ -16,18 +16,19 @@ features = ["source", "json", "urlencode"]
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [features]
-default = ["builtins", "sync", "debug", "key_interning", "deserialization"]
-sync = []
+default = ["builtins", "debug", "key_interning", "deserialization"]
 deserialization = []
-key_interning = ["sync"]
+key_interning = []
 preserve_order = ["indexmap"]
-debug = ["sync"]
+debug = []
 speedups = ["v_htmlescape"]
 source = ["self_cell", "memo-map"]
 builtins = []
 json = ["serde_json"]
 urlencode = ["percent-encoding"]
 
+# this feature no longer has any effect
+sync = []
 # enables the Debug trait for some internal types
 internal_debug = []
 # provides access to the unstable machinery

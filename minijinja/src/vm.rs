@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
-#[cfg(feature = "sync")]
 use std::sync::Mutex;
 
 use crate::environment::Environment;
@@ -17,7 +16,6 @@ pub struct LoopState {
     len: usize,
     idx: AtomicUsize,
     depth: usize,
-    #[cfg(feature = "sync")]
     last_changed_value: Mutex<Option<Vec<Value>>>,
 }
 
@@ -71,21 +69,17 @@ impl Object for LoopState {
     }
 
     fn call_method(&self, _state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
-        #[cfg(feature = "sync")]
-        {
-            if name == "changed" {
-                let mut last_changed_value = self.last_changed_value.lock().unwrap();
-                let value = args.to_owned();
-                let changed = last_changed_value.as_ref() != Some(&value);
-                if changed {
-                    *last_changed_value = Some(value);
-                    return Ok(Value::from(true));
-                }
-                return Ok(Value::from(false));
+        if name == "changed" {
+            let mut last_changed_value = self.last_changed_value.lock().unwrap();
+            let value = args.to_owned();
+            let changed = last_changed_value.as_ref() != Some(&value);
+            if changed {
+                *last_changed_value = Some(value);
+                Ok(Value::from(true))
+            } else {
+                Ok(Value::from(false))
             }
-        }
-
-        if name == "cycle" {
+        } else if name == "cycle" {
             let idx = self.idx.load(Ordering::Relaxed);
             match args.get(idx % args.len()) {
                 Some(arg) => Ok(arg.clone()),
@@ -791,7 +785,6 @@ impl<'env> Vm<'env> {
                                 idx: AtomicUsize::new(!0usize),
                                 len,
                                 depth,
-                                #[cfg(feature = "sync")]
                                 last_changed_value: Mutex::default(),
                             }),
                         }),

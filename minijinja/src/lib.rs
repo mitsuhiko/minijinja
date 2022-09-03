@@ -112,11 +112,6 @@
 //!
 //! - `builtins`: if this feature is removed the default filters, tests and
 //!   functions are not implemented.
-//! - `sync`: this feature makes MiniJinja's type `Send` and `Sync`.  If this feature
-//!   is disabled sending types across threads is often not possible.  Thread bounds
-//!   of things like callbacks however are not changing which means code that uses
-//!   MiniJinja still needs to be threadsafe.  This also disables some features that
-//!   require synchronization such as the `loop.changed` feature.
 //! - `debug`: if this feature is removed some debug functionality of the engine is
 //!   removed as well.  This mainly affects the quality of error reporting.
 //! - `key_interning`: if this feature is removed the automatic string interning in
