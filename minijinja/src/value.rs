@@ -78,7 +78,7 @@ use serde::ser::{self, Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, KeySerializer};
-use crate::utils::{matches, OnDrop};
+use crate::utils::OnDrop;
 use crate::vm::State;
 
 #[cfg(test)]

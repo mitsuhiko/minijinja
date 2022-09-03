@@ -6,7 +6,6 @@ use crate::instructions::{
     Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR,
 };
 use crate::tokens::Span;
-use crate::utils::matches;
 use crate::value::Value;
 
 #[cfg(test)]

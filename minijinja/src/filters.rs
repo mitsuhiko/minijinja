@@ -190,7 +190,6 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::utils::matches;
     use crate::value::{ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::fmt::Write;
