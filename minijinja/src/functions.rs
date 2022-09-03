@@ -53,7 +53,7 @@ type FuncFunc = dyn Fn(&State, Vec<Value>) -> Result<Value, Error> + Sync + Send
 pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 
 /// A utility trait that represents global functions.
-pub trait Function<Rv = Value, Args = Vec<Value>>: Send + Sync + 'static {
+pub trait Function<Rv, Args>: Send + Sync + 'static {
     /// Calls a function with the given arguments.
     fn invoke(&self, env: &State, args: Args) -> Result<Rv, Error>;
 }

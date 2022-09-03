@@ -57,7 +57,7 @@ type FilterFunc = dyn Fn(&State, Value, Vec<Value>) -> Result<Value, Error> + Sy
 pub(crate) struct BoxedFilter(RcType<FilterFunc>);
 
 /// A utility trait that represents filters.
-pub trait Filter<V = Value, Rv = Value, Args = Vec<Value>>: Send + Sync + 'static {
+pub trait Filter<V, Rv, Args>: Send + Sync + 'static {
     /// Applies a filter to value with the given arguments.
     fn apply_to(&self, state: &State, value: V, args: Args) -> Result<Rv, Error>;
 }

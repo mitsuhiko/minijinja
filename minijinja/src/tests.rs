@@ -57,7 +57,7 @@ type TestFunc = dyn Fn(&State, Value, Vec<Value>) -> Result<bool, Error> + Sync 
 pub(crate) struct BoxedTest(RcType<TestFunc>);
 
 /// A utility trait that represents filters.
-pub trait Test<V = Value, Args = Vec<Value>>: Send + Sync + 'static {
+pub trait Test<V, Args>: Send + Sync + 'static {
     /// Performs a test to value with the given arguments.
     fn perform(&self, state: &State, value: V, args: Args) -> Result<bool, Error>;
 }
