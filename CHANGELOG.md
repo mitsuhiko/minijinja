@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.19.1
+
+- Fixed binary subtraction operator requiring a space. (#94)
+- Fixed trailing commas not working in functino calls. (#95)
+
 # 0.19.0
 
 - Small internal improvements to context creation. (#79)
