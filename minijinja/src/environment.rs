@@ -199,9 +199,9 @@ environment it's recommended to turn on the `source` feature and to use the
 #[derive(Clone)]
 pub struct Environment<'source> {
     templates: Source<'source>,
-    filters: RcType<BTreeMap<&'source str, filters::BoxedFilter>>,
-    tests: RcType<BTreeMap<&'source str, tests::BoxedTest>>,
-    pub(crate) globals: RcType<BTreeMap<&'source str, Value>>,
+    filters: BTreeMap<&'source str, filters::BoxedFilter>,
+    tests: BTreeMap<&'source str, tests::BoxedTest>,
+    pub(crate) globals: BTreeMap<&'source str, Value>,
     default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
     #[cfg(feature = "debug")]
     debug: bool,
@@ -306,9 +306,9 @@ impl<'source> Environment<'source> {
     pub fn new() -> Environment<'source> {
         Environment {
             templates: Source::Borrowed(Default::default()),
-            filters: RcType::new(filters::get_builtin_filters()),
-            tests: RcType::new(tests::get_builtin_tests()),
-            globals: RcType::new(functions::get_globals()),
+            filters: filters::get_builtin_filters(),
+            tests: tests::get_builtin_tests(),
+            globals: functions::get_globals(),
             default_auto_escape: RcType::new(default_auto_escape),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
@@ -322,9 +322,9 @@ impl<'source> Environment<'source> {
     pub fn empty() -> Environment<'source> {
         Environment {
             templates: Source::Borrowed(Default::default()),
-            filters: RcType::default(),
-            tests: RcType::default(),
-            globals: RcType::default(),
+            filters: Default::default(),
+            tests: Default::default(),
+            globals: Default::default(),
             default_auto_escape: RcType::new(no_auto_escape),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
@@ -534,12 +534,12 @@ impl<'source> Environment<'source> {
         F: filters::Filter<V, Rv, Args>,
         Args: FunctionArgs,
     {
-        RcType::make_mut(&mut self.filters).insert(name, filters::BoxedFilter::new(f));
+        self.filters.insert(name, filters::BoxedFilter::new(f));
     }
 
     /// Removes a filter by name.
     pub fn remove_filter(&mut self, name: &str) {
-        RcType::make_mut(&mut self.filters).remove(name);
+        self.filters.remove(name);
     }
 
     /// Adds a new test function.
@@ -551,12 +551,12 @@ impl<'source> Environment<'source> {
         F: tests::Test<V, Args>,
         Args: FunctionArgs,
     {
-        RcType::make_mut(&mut self.tests).insert(name, tests::BoxedTest::new(f));
+        self.tests.insert(name, tests::BoxedTest::new(f));
     }
 
     /// Removes a test by name.
     pub fn remove_test(&mut self, name: &str) {
-        RcType::make_mut(&mut self.tests).remove(name);
+        self.tests.remove(name);
     }
 
     /// Adds a new global function.
@@ -574,12 +574,12 @@ impl<'source> Environment<'source> {
 
     /// Adds a global variable.
     pub fn add_global(&mut self, name: &'source str, value: Value) {
-        RcType::make_mut(&mut self.globals).insert(name, value);
+        self.globals.insert(name, value);
     }
 
     /// Removes a global function or variable by name.
     pub fn remove_global(&mut self, name: &str) {
-        RcType::make_mut(&mut self.globals).remove(name);
+        self.globals.remove(name);
     }
 
     /// Looks up a function.
