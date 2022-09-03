@@ -389,6 +389,9 @@ impl<'a> Parser<'a> {
             if !args.is_empty() || !kwargs_keys.is_empty() {
                 expect_token!(self, Token::Comma, "`,`")?;
             }
+            if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
+                break;
+            }
             let expr = self.parse_expr()?;
 
             // keyword argument
