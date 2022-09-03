@@ -96,8 +96,8 @@ impl BoxedFilter {
             move |state, value, args| -> Result<Value, Error> {
                 f.apply_to(
                     state,
-                    ArgType::from_value(Some(unsafe { std::mem::transmute::<_, _>(value) }))?,
-                    FunctionArgs::from_values(unsafe { std::mem::transmute::<_, _>(args) })?,
+                    ArgType::from_value(Some(value))?,
+                    FunctionArgs::from_values(args)?,
                 )
                 .map(Into::into)
             },

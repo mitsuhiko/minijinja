@@ -765,39 +765,59 @@ primitive_try_from!(f64, {
     ValueRepr::F64(val) => val,
 });
 
-macro_rules! infallible_conversion {
-    ($ty:ty) => {
-        impl<'a> ArgType<'a> for $ty {
-            fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-                match value {
-                    Some(value) => Ok(value.into()),
-                    None => Err(Error::new(
-                        ErrorKind::UndefinedError,
-                        concat!("missing argument"),
-                    )),
-                }
-            }
+impl<'a> ArgType<'a> for Value {
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            Some(value) => Ok(value.clone()),
+            None => Err(Error::new(
+                ErrorKind::UndefinedError,
+                concat!("missing argument"),
+            )),
         }
-
-        impl<'a> ArgType<'a> for Option<$ty> {
-            fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-                match value {
-                    Some(value) => {
-                        if value.is_undefined() || value.is_none() {
-                            Ok(None)
-                        } else {
-                            Ok(Some(value.clone().into()))
-                        }
-                    }
-                    None => Ok(None),
-                }
-            }
-        }
-    };
+    }
 }
 
-infallible_conversion!(String);
-infallible_conversion!(Value);
+impl<'a> ArgType<'a> for Option<Value> {
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            Some(value) => {
+                if value.is_undefined() || value.is_none() {
+                    Ok(None)
+                } else {
+                    Ok(Some(value.clone()))
+                }
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for String {
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            Some(value) => Ok(value.to_string()),
+            None => Err(Error::new(
+                ErrorKind::UndefinedError,
+                concat!("missing argument"),
+            )),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for Option<String> {
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            Some(value) => {
+                if value.is_undefined() || value.is_none() {
+                    Ok(None)
+                } else {
+                    Ok(Some(value.to_string()))
+                }
+            }
+            None => Ok(None),
+        }
+    }
+}
 
 impl From<Value> for String {
     fn from(val: Value) -> Self {

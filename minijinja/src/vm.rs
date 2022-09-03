@@ -684,12 +684,12 @@ impl<'env> Vm<'env> {
                     stack.push(Value::from(map));
                 }
                 Instruction::BuildList(count) => {
-                    let mut v = Vec::new();
+                    let mut v = Vec::with_capacity(*count);
                     for _ in 0..*count {
                         v.push(stack.pop());
                     }
                     v.reverse();
-                    stack.push(v.into());
+                    stack.push(Value(ValueRepr::Seq(RcType::new(v))));
                 }
                 Instruction::UnpackList(count) => {
                     let top = stack.pop();
