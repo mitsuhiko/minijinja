@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# Unreleased
+
+- Remove internal refcounts from environment.
+
 # 0.19.1
 
 - Fixed binary subtraction operator requiring a space. (#94)
