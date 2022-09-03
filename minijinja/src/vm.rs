@@ -404,7 +404,7 @@ impl<'vm, 'env> State<'vm, 'env> {
     pub(crate) fn apply_filter(
         &self,
         name: &str,
-        value: Value,
+        value: &Value,
         args: &[Value],
     ) -> Result<Value, Error> {
         if let Some(filter) = self.env().get_filter(name) {
@@ -420,7 +420,7 @@ impl<'vm, 'env> State<'vm, 'env> {
     pub(crate) fn perform_test(
         &self,
         name: &str,
-        value: Value,
+        value: &Value,
         args: &[Value],
     ) -> Result<bool, Error> {
         if let Some(test) = self.env().get_test(name) {
@@ -976,13 +976,15 @@ impl<'env> Vm<'env> {
                     let top = stack.pop();
                     let args = try_ctx!(top.as_slice());
                     let value = stack.pop();
-                    stack.push(try_ctx!(state.apply_filter(name, value, args)));
+                    stack.push(try_ctx!(state.apply_filter(name, &value, args)));
                 }
                 Instruction::PerformTest(name) => {
                     let top = stack.pop();
                     let args = try_ctx!(top.as_slice());
                     let value = stack.pop();
-                    stack.push(Value::from(try_ctx!(state.perform_test(name, value, args))));
+                    stack.push(Value::from(
+                        try_ctx!(state.perform_test(name, &value, args)),
+                    ));
                 }
                 Instruction::CallFunction(function_name) => {
                     let top = stack.pop();

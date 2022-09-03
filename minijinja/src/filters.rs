@@ -51,7 +51,7 @@ use crate::value::{ArgType, FunctionArgs, RcType, Value};
 use crate::vm::State;
 use crate::AutoEscape;
 
-type FilterFunc = dyn Fn(&State, Value, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
+type FilterFunc = dyn Fn(&State, &Value, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
 
 #[derive(Clone)]
 pub(crate) struct BoxedFilter(RcType<FilterFunc>);
@@ -88,16 +88,16 @@ impl BoxedFilter {
     pub fn new<F, V, Rv, Args>(f: F) -> BoxedFilter
     where
         F: Filter<V, Rv, Args>,
-        V: ArgType,
+        V: for<'a> ArgType<'a>,
         Rv: Into<Value>,
-        Args: FunctionArgs,
+        Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFilter(RcType::new(
             move |state, value, args| -> Result<Value, Error> {
                 f.apply_to(
                     state,
-                    ArgType::from_value(Some(value))?,
-                    FunctionArgs::from_values(args)?,
+                    ArgType::from_value(Some(unsafe { std::mem::transmute::<_, _>(value) }))?,
+                    FunctionArgs::from_values(unsafe { std::mem::transmute::<_, _>(args) })?,
                 )
                 .map(Into::into)
             },
@@ -105,7 +105,7 @@ impl BoxedFilter {
     }
 
     /// Applies the filter to a value and argument.
-    pub fn apply_to(&self, state: &State, value: Value, args: &[Value]) -> Result<Value, Error> {
+    pub fn apply_to(&self, state: &State, value: &Value, args: &[Value]) -> Result<Value, Error> {
         (self.0)(state, value, args)
     }
 }
@@ -758,7 +758,7 @@ mod builtins {
         };
         let bx = BoxedFilter::new(test);
         assert_eq!(
-            bx.apply_to(&state, Value::from(23), &[Value::from(42)][..])
+            bx.apply_to(&state, &Value::from(23), &[Value::from(42)][..])
                 .unwrap(),
             Value::from(65)
         );
@@ -784,14 +784,14 @@ mod builtins {
         };
         let bx = BoxedFilter::new(add);
         assert_eq!(
-            bx.apply_to(&state, Value::from(23), &[Value::from(42)][..])
+            bx.apply_to(&state, &Value::from(23), &[Value::from(42)][..])
                 .unwrap(),
             Value::from(65)
         );
         assert_eq!(
             bx.apply_to(
                 &state,
-                Value::from(23),
+                &Value::from(23),
                 &[Value::from(42), Value::UNDEFINED][..]
             )
             .unwrap(),
@@ -800,7 +800,7 @@ mod builtins {
         assert_eq!(
             bx.apply_to(
                 &state,
-                Value::from(23),
+                &Value::from(23),
                 &[Value::from(42), Value::from(1)][..]
             )
             .unwrap(),

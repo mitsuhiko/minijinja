@@ -85,7 +85,7 @@ impl BoxedFunction {
     where
         F: Function<Rv, Args>,
         Rv: Into<Value>,
-        Args: FunctionArgs,
+        Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFunction(
             Arc::new(move |env, args| -> Result<Value, Error> {
