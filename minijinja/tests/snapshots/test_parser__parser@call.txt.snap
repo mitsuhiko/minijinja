@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-description: "{{ super() }}\n{{ loop.cycle(1, 2) }}\n{{ self.foo() }}\n{{ foo(1, 2, a=3, b=4) }}"
+description: "{{ super() }}\n{{ loop.cycle(1, 2) }}\n{{ self.foo() }}\n{{ foo(1, 2, a=3, b=4) }}\n{{ trailing(1, 2,) }}\n{{ trailing_kwarg(1, 2, a=3,) }}"
 input_file: minijinja/tests/parser-inputs/call.txt
 ---
 Ok(
@@ -85,6 +85,54 @@ Ok(
                     ],
                 } @ 4:6-4:22,
             } @ 4:0-4:22,
+            EmitRaw {
+                raw: "\n",
+            } @ 4:25-5:0,
+            EmitExpr {
+                expr: Call {
+                    expr: Var {
+                        id: "trailing",
+                    } @ 5:3-5:11,
+                    args: [
+                        Const {
+                            value: 1,
+                        } @ 5:12-5:13,
+                        Const {
+                            value: 2,
+                        } @ 5:15-5:16,
+                    ],
+                } @ 5:11-5:18,
+            } @ 5:0-5:18,
+            EmitRaw {
+                raw: "\n",
+            } @ 5:21-6:0,
+            EmitExpr {
+                expr: Call {
+                    expr: Var {
+                        id: "trailing_kwarg",
+                    } @ 6:3-6:17,
+                    args: [
+                        Const {
+                            value: 1,
+                        } @ 6:18-6:19,
+                        Const {
+                            value: 2,
+                        } @ 6:21-6:22,
+                        Map {
+                            keys: [
+                                Const {
+                                    value: "a",
+                                } @ 6:24-6:25,
+                            ],
+                            values: [
+                                Const {
+                                    value: 3,
+                                } @ 6:26-6:27,
+                            ],
+                        } @ 6:24-6:28,
+                    ],
+                } @ 6:17-6:29,
+            } @ 6:0-6:29,
         ],
-    } @ 0:0-4:25,
+    } @ 0:0-6:32,
 )
