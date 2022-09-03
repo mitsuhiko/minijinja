@@ -149,9 +149,6 @@ pub mod syntax;
 pub mod tests;
 pub mod value;
 
-#[cfg(feature = "deserialization")]
-mod deserialize;
-
 #[cfg(feature = "source")]
 mod source;
 

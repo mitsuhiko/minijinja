@@ -10,7 +10,7 @@ use crate::instructions::{
     Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR,
 };
 use crate::key::Key;
-use crate::value::{self, Object, RcType, Value, ValueIterator, ValueRepr};
+use crate::value::{self, ops, Object, RcType, Value, ValueIterator, ValueRepr};
 use crate::AutoEscape;
 
 pub struct LoopState {
@@ -531,7 +531,7 @@ impl<'env> Vm<'env> {
             ($method:ident) => {{
                 let b = stack.pop();
                 let a = stack.pop();
-                stack.push(try_ctx!(value::$method(&a, &b)));
+                stack.push(try_ctx!(ops::$method(&a, &b)));
             }};
         }
 
@@ -745,16 +745,16 @@ impl<'env> Vm<'env> {
                 Instruction::StringConcat => {
                     let a = stack.pop();
                     let b = stack.pop();
-                    stack.push(value::string_concat(b, &a));
+                    stack.push(ops::string_concat(b, &a));
                 }
                 Instruction::In => {
                     let container = stack.pop();
                     let value = stack.pop();
-                    stack.push(try_ctx!(value::contains(&container, &value)));
+                    stack.push(try_ctx!(ops::contains(&container, &value)));
                 }
                 Instruction::Neg => {
                     let a = stack.pop();
-                    stack.push(try_ctx!(value::neg(&a)));
+                    stack.push(try_ctx!(ops::neg(&a)));
                 }
                 Instruction::PushWith => {
                     state.ctx.push_frame(Frame::new(FrameBase::None));
