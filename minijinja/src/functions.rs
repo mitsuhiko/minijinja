@@ -55,6 +55,7 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 /// A utility trait that represents global functions.
 pub trait Function<Rv, Args>: Send + Sync + 'static {
     /// Calls a function with the given arguments.
+    #[doc(hidden)]
     fn invoke(&self, env: &State, args: Args) -> Result<Rv, Error>;
 }
 

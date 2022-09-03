@@ -178,6 +178,7 @@ pub trait FunctionArgs<'a>: Sized {
 /// `None` if it was not.  This is used to implement optional arguments
 /// to functions.
 pub trait ArgType<'a>: Sized {
+    #[doc(hidden)]
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error>;
 }
 
