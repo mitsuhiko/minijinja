@@ -51,7 +51,7 @@ use crate::value::{ArgType, FunctionArgs, RcType, Value};
 use crate::vm::State;
 use crate::AutoEscape;
 
-type FilterFunc = dyn Fn(&State, Value, Vec<Value>) -> Result<Value, Error> + Sync + Send + 'static;
+type FilterFunc = dyn Fn(&State, Value, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
 
 #[derive(Clone)]
 pub(crate) struct BoxedFilter(RcType<FilterFunc>);
@@ -105,7 +105,7 @@ impl BoxedFilter {
     }
 
     /// Applies the filter to a value and argument.
-    pub fn apply_to(&self, state: &State, value: Value, args: Vec<Value>) -> Result<Value, Error> {
+    pub fn apply_to(&self, state: &State, value: Value, args: &[Value]) -> Result<Value, Error> {
         (self.0)(state, value, args)
     }
 }
@@ -758,7 +758,7 @@ mod builtins {
         };
         let bx = BoxedFilter::new(test);
         assert_eq!(
-            bx.apply_to(&state, Value::from(23), vec![Value::from(42)])
+            bx.apply_to(&state, Value::from(23), &[Value::from(42)][..])
                 .unwrap(),
             Value::from(65)
         );
@@ -784,7 +784,7 @@ mod builtins {
         };
         let bx = BoxedFilter::new(add);
         assert_eq!(
-            bx.apply_to(&state, Value::from(23), vec![Value::from(42)])
+            bx.apply_to(&state, Value::from(23), &[Value::from(42)][..])
                 .unwrap(),
             Value::from(65)
         );
@@ -792,7 +792,7 @@ mod builtins {
             bx.apply_to(
                 &state,
                 Value::from(23),
-                vec![Value::from(42), Value::UNDEFINED]
+                &[Value::from(42), Value::UNDEFINED][..]
             )
             .unwrap(),
             Value::from(65)
@@ -801,7 +801,7 @@ mod builtins {
             bx.apply_to(
                 &state,
                 Value::from(23),
-                vec![Value::from(42), Value::from(1)]
+                &[Value::from(42), Value::from(1)][..]
             )
             .unwrap(),
             Value::from(66)

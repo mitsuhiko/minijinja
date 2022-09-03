@@ -168,7 +168,7 @@ fn with_internal_serialization<R, F: FnOnce() -> R>(f: F) -> R {
 /// as these types wrapped in [`Option`].
 pub trait FunctionArgs: Sized {
     /// Converts to function arguments from a slice of values.
-    fn from_values(values: Vec<Value>) -> Result<Self, Error>;
+    fn from_values(values: &[Value]) -> Result<Self, Error>;
 }
 
 /// A trait implemented by all filter/test argument types.
@@ -184,7 +184,7 @@ pub trait ArgType: Sized {
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
         impl<$($name: ArgType,)*> FunctionArgs for ($($name,)*) {
-            fn from_values(values: Vec<Value>) -> Result<Self, Error> {
+            fn from_values(values: &[Value]) -> Result<Self, Error> {
                 #![allow(non_snake_case, unused)]
                 let arg_count = 0 $(
                     + { let $name = (); 1 }
@@ -1039,7 +1039,7 @@ impl Value {
     }
 
     /// Calls the value directly.
-    pub(crate) fn call(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
+    pub(crate) fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         if let ValueRepr::Dynamic(ref dy) = self.0 {
             dy.call(state, args)
         } else {
@@ -1055,7 +1055,7 @@ impl Value {
         &self,
         state: &State,
         name: &str,
-        args: Vec<Value>,
+        args: &[Value],
     ) -> Result<Value, Error> {
         if let ValueRepr::Dynamic(ref dy) = self.0 {
             dy.call_method(state, name, args)
@@ -1092,19 +1092,6 @@ impl Value {
             _ => Err(Error::new(
                 ErrorKind::ImpossibleOperation,
                 "value is not a list",
-            )),
-        }
-    }
-
-    pub(crate) fn try_into_vec(self) -> Result<Vec<Value>, Error> {
-        match self.0 {
-            ValueRepr::Seq(v) => Ok(match RcType::try_unwrap(v) {
-                Ok(v) => v,
-                Err(rc) => (*rc).clone(),
-            }),
-            _ => Err(Error::new(
-                ErrorKind::ImpossibleOperation,
-                "cannot convert value into list",
             )),
         }
     }
@@ -1711,7 +1698,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     ///
     /// It's the responsibility of the implementer to ensure that an
     /// error is generated if an invalid method is invoked.
-    fn call_method(&self, state: &State, name: &str, args: Vec<Value>) -> Result<Value, Error> {
+    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         let _state = state;
         let _args = args;
         Err(Error::new(
@@ -1724,7 +1711,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     ///
     /// The default implementation just generates an error that the object
     /// cannot be invoked.
-    fn call(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
+    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         let _state = state;
         let _args = args;
         Err(Error::new(

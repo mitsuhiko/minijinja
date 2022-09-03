@@ -18,7 +18,7 @@ impl fmt::Display for Cycler {
 }
 
 impl Object for Cycler {
-    fn call(&self, _state: &State, args: Vec<Value>) -> Result<Value, Error> {
+    fn call(&self, _state: &State, args: &[Value]) -> Result<Value, Error> {
         let _: () = FunctionArgs::from_values(args)?;
         let idx = self.idx.fetch_add(1, Ordering::Relaxed);
         Ok(self.values[idx % self.values.len()].clone())
@@ -42,7 +42,7 @@ impl fmt::Display for Magic {
 }
 
 impl Object for Magic {
-    fn call_method(&self, _state: &State, name: &str, args: Vec<Value>) -> Result<Value, Error> {
+    fn call_method(&self, _state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         if name == "make_class" {
             let (tag,): (String,) = FunctionArgs::from_values(args)?;
             Ok(Value::from(format!("magic-{}", tag)))
