@@ -134,7 +134,6 @@ mod builtins {
 
     use std::convert::TryFrom;
 
-    use crate::utils::matches;
     use crate::value::ValueKind;
 
     /// Checks if a value is odd.

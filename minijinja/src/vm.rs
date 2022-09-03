@@ -10,7 +10,6 @@ use crate::instructions::{
     Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR,
 };
 use crate::key::Key;
-use crate::utils::matches;
 use crate::value::{self, Object, RcType, Value, ValueIterator, ValueRepr};
 use crate::AutoEscape;
 

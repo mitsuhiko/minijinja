@@ -2,7 +2,6 @@ use crate::ast::{self, Spanned};
 use crate::error::{Error, ErrorKind};
 use crate::lexer::tokenize;
 use crate::tokens::{Span, Token};
-use crate::utils::matches;
 use crate::value::Value;
 
 const RESERVED_NAMES: [&str; 8] = [
