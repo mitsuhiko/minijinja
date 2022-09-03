@@ -65,21 +65,32 @@
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
 
-use std::any::{Any, TypeId};
+use std::any::TypeId;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
-use std::fmt::{self, Write};
+use std::fmt;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize};
 
-use serde::ser::{self, Serialize, Serializer};
+use serde::ser::{Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind};
-use crate::key::{Key, KeySerializer};
+use crate::key::{Key, StaticKey};
 use crate::utils::OnDrop;
+use crate::value::serialize::ValueSerializer;
 use crate::vm::State;
+
+pub use crate::value::argtypes::{ArgType, FunctionArgs};
+pub use crate::value::object::Object;
+
+mod argtypes;
+#[cfg(feature = "deserialization")]
+mod deserialize;
+mod object;
+pub(crate) mod ops;
+mod serialize;
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -95,10 +106,10 @@ pub(crate) type RcType<T> = std::rc::Rc<T>;
 const VALUE_HANDLE_MARKER: &str = "\x01__minijinja_ValueHandle";
 
 #[cfg(feature = "preserve_order")]
-pub(crate) type ValueMap = indexmap::IndexMap<Key<'static>, Value>;
+pub(crate) type ValueMap = indexmap::IndexMap<StaticKey, Value>;
 
 #[cfg(not(feature = "preserve_order"))]
-pub(crate) type ValueMap = std::collections::BTreeMap<Key<'static>, Value>;
+pub(crate) type ValueMap = std::collections::BTreeMap<StaticKey, Value>;
 
 thread_local! {
     static INTERNAL_SERIALIZATION: AtomicBool = AtomicBool::new(false);
@@ -155,66 +166,6 @@ fn with_internal_serialization<R, F: FnOnce() -> R>(f: F) -> R {
         with_value_optimization(f)
     })
 }
-
-/// Helper trait representing valid filter and test arguments.
-///
-/// Since it's more convenient to write filters and tests with concrete
-/// types instead of values, this helper trait exists to automatically
-/// perform this conversion.  It is implemented for functions up to an
-/// arity of 5 parameters.
-///
-/// For each argument the conversion is performed via the [`ArgType`]
-/// trait which is implemented for some primitive concrete types as well
-/// as these types wrapped in [`Option`].
-pub trait FunctionArgs<'a>: Sized {
-    /// Converts to function arguments from a slice of values.
-    fn from_values(values: &'a [Value]) -> Result<Self, Error>;
-}
-
-/// A trait implemented by all filter/test argument types.
-///
-/// This trait is the companion to [`FunctionArgs`].  It's passed an
-/// `Option<Value>` where `Some` means the argument was provided or
-/// `None` if it was not.  This is used to implement optional arguments
-/// to functions.
-pub trait ArgType<'a>: Sized {
-    #[doc(hidden)]
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error>;
-}
-
-macro_rules! tuple_impls {
-    ( $( $name:ident )* ) => {
-        impl<'a, $($name: ArgType<'a>,)*> FunctionArgs<'a> for ($($name,)*) {
-            fn from_values(values: &'a [Value]) -> Result<Self, Error> {
-                #![allow(non_snake_case, unused)]
-                let arg_count = 0 $(
-                    + { let $name = (); 1 }
-                )*;
-                if values.len() > arg_count {
-                    return Err(Error::new(
-                        ErrorKind::InvalidArguments,
-                        "received unexpected extra arguments",
-                    ));
-                }
-                {
-                    let mut idx = 0;
-                    $(
-                        let $name = ArgType::from_value(values.get(idx))?;
-                        idx += 1;
-                    )*
-                    Ok(( $($name,)* ))
-                }
-            }
-        }
-    };
-}
-
-tuple_impls! {}
-tuple_impls! { A }
-tuple_impls! { A B }
-tuple_impls! { A B C }
-tuple_impls! { A B C D }
-tuple_impls! { A B C D E }
 
 /// Describes the kind of value.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -299,10 +250,10 @@ impl PartialEq for Value {
             (ValueRepr::String(a), ValueRepr::String(b))
             | (ValueRepr::SafeString(a), ValueRepr::SafeString(b)) => a == b,
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
-            _ => match coerce(self, other) {
-                Some(CoerceResult::F64(a, b)) => a == b,
-                Some(CoerceResult::I128(a, b)) => a == b,
-                Some(CoerceResult::String(a, b)) => a == b,
+            _ => match ops::coerce(self, other) {
+                Some(ops::CoerceResult::F64(a, b)) => a == b,
+                Some(ops::CoerceResult::I128(a, b)) => a == b,
+                Some(ops::CoerceResult::String(a, b)) => a == b,
                 None => false,
             },
         }
@@ -318,10 +269,10 @@ impl PartialOrd for Value {
             (ValueRepr::String(a), ValueRepr::String(b))
             | (ValueRepr::SafeString(a), ValueRepr::SafeString(b)) => a.partial_cmp(b),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.partial_cmp(b),
-            _ => match coerce(self, other) {
-                Some(CoerceResult::F64(a, b)) => a.partial_cmp(&b),
-                Some(CoerceResult::I128(a, b)) => a.partial_cmp(&b),
-                Some(CoerceResult::String(a, b)) => a.partial_cmp(&b),
+            _ => match ops::coerce(self, other) {
+                Some(ops::CoerceResult::F64(a, b)) => a.partial_cmp(&b),
+                Some(ops::CoerceResult::I128(a, b)) => a.partial_cmp(&b),
+                Some(ops::CoerceResult::String(a, b)) => a.partial_cmp(&b),
                 None => None,
             },
         }
@@ -331,160 +282,6 @@ impl PartialOrd for Value {
 impl fmt::Debug for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         fmt::Debug::fmt(&self.0, f)
-    }
-}
-
-impl From<ValueRepr> for Value {
-    #[inline(always)]
-    fn from(val: ValueRepr) -> Value {
-        Value(val)
-    }
-}
-
-impl<'a> From<&'a [u8]> for Value {
-    #[inline(always)]
-    fn from(val: &'a [u8]) -> Self {
-        ValueRepr::Bytes(RcType::new(val.into())).into()
-    }
-}
-
-impl<'a> From<&'a str> for Value {
-    #[inline(always)]
-    fn from(val: &'a str) -> Self {
-        ValueRepr::String(RcType::new(val.into())).into()
-    }
-}
-
-impl From<String> for Value {
-    #[inline(always)]
-    fn from(val: String) -> Self {
-        ValueRepr::String(RcType::new(val)).into()
-    }
-}
-
-impl<'a> From<Cow<'a, str>> for Value {
-    #[inline(always)]
-    fn from(val: Cow<'a, str>) -> Self {
-        match val {
-            Cow::Borrowed(x) => x.into(),
-            Cow::Owned(x) => x.into(),
-        }
-    }
-}
-
-impl From<()> for Value {
-    #[inline(always)]
-    fn from(_: ()) -> Self {
-        ValueRepr::None.into()
-    }
-}
-
-impl From<i128> for Value {
-    #[inline(always)]
-    fn from(val: i128) -> Self {
-        ValueRepr::I128(RcType::new(val)).into()
-    }
-}
-
-impl From<u128> for Value {
-    #[inline(always)]
-    fn from(val: u128) -> Self {
-        ValueRepr::U128(RcType::new(val)).into()
-    }
-}
-
-impl<'a> From<Key<'a>> for Value {
-    fn from(val: Key) -> Self {
-        match val {
-            Key::Bool(val) => val.into(),
-            Key::I64(val) => val.into(),
-            Key::Char(val) => val.into(),
-            Key::String(val) => ValueRepr::String(val).into(),
-            Key::Str(val) => val.into(),
-        }
-    }
-}
-
-impl<K: Into<Key<'static>>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
-    fn from(val: BTreeMap<K, V>) -> Self {
-        ValueRepr::Map(RcType::new(
-            val.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
-        ))
-        .into()
-    }
-}
-
-impl<T: Into<Value>> From<Vec<T>> for Value {
-    fn from(val: Vec<T>) -> Self {
-        ValueRepr::Seq(RcType::new(val.into_iter().map(|x| x.into()).collect())).into()
-    }
-}
-
-macro_rules! value_from {
-    ($src:ty, $dst:ident) => {
-        impl From<$src> for Value {
-            #[inline(always)]
-            fn from(val: $src) -> Self {
-                ValueRepr::$dst(val as _).into()
-            }
-        }
-    };
-}
-
-value_from!(bool, Bool);
-value_from!(u8, U64);
-value_from!(u16, U64);
-value_from!(u32, U64);
-value_from!(u64, U64);
-value_from!(i8, I64);
-value_from!(i16, I64);
-value_from!(i32, I64);
-value_from!(i64, I64);
-value_from!(f32, F64);
-value_from!(f64, F64);
-value_from!(char, Char);
-
-enum CoerceResult {
-    I128(i128, i128),
-    F64(f64, f64),
-    String(String, String),
-}
-
-fn as_f64(value: &Value) -> Option<f64> {
-    Some(match value.0 {
-        ValueRepr::Bool(x) => x as i64 as f64,
-        ValueRepr::U64(x) => x as f64,
-        ValueRepr::U128(ref x) => **x as f64,
-        ValueRepr::I64(x) => x as f64,
-        ValueRepr::I128(ref x) => **x as f64,
-        ValueRepr::F64(x) => x,
-        _ => return None,
-    })
-}
-
-fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
-    match (&a.0, &b.0) {
-        // equal mappings are trivial
-        (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
-        (ValueRepr::U128(a), ValueRepr::U128(b)) => {
-            Some(CoerceResult::I128(**a as i128, **b as i128))
-        }
-        (ValueRepr::String(a), ValueRepr::String(b)) => {
-            Some(CoerceResult::String(a.to_string(), b.to_string()))
-        }
-        (ValueRepr::I64(a), ValueRepr::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
-        (ValueRepr::I128(ref a), ValueRepr::I128(ref b)) => Some(CoerceResult::I128(**a, **b)),
-        (ValueRepr::F64(a), ValueRepr::F64(b)) => Some(CoerceResult::F64(*a, *b)),
-
-        // are floats involved?
-        (ValueRepr::F64(a), _) => Some(CoerceResult::F64(*a, as_f64(b)?)),
-        (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(as_f64(a)?, *b)),
-
-        // everything else goes up to i128
-        _ => Some(CoerceResult::I128(
-            i128::try_from(a.clone()).ok()?,
-            i128::try_from(b.clone()).ok()?,
-        )),
     }
 }
 
@@ -537,314 +334,6 @@ impl fmt::Display for Value {
 impl Default for Value {
     fn default() -> Value {
         ValueRepr::None.into()
-    }
-}
-
-fn int_as_value(val: i128) -> Value {
-    if val as i64 as i128 == val {
-        (val as i64).into()
-    } else {
-        val.into()
-    }
-}
-
-fn impossible_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
-    Error::new(
-        ErrorKind::ImpossibleOperation,
-        format!(
-            "tried to use {} operator on unsupported types {} and {}",
-            op,
-            lhs.kind(),
-            rhs.kind()
-        ),
-    )
-}
-
-macro_rules! math_binop {
-    ($name:ident, $int:ident, $float:tt) => {
-        pub(crate) fn $name(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-            fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-                match coerce(lhs, rhs)? {
-                    CoerceResult::I128(a, b) => Some(int_as_value(a.$int(b))),
-                    CoerceResult::F64(a, b) => Some((a $float b).into()),
-                    _ => None
-                }
-            }
-            do_it(lhs, rhs).ok_or_else(|| {
-                impossible_op(stringify!($float), lhs, rhs)
-            })
-        }
-    }
-}
-
-pub(crate) fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        match coerce(lhs, rhs)? {
-            CoerceResult::I128(a, b) => Some(int_as_value(a.wrapping_add(b))),
-            CoerceResult::F64(a, b) => Some((a + b).into()),
-            CoerceResult::String(a, b) => Some(Value::from([a, b].concat())),
-        }
-    }
-    do_it(lhs, rhs).ok_or_else(|| impossible_op("+", lhs, rhs))
-}
-
-math_binop!(sub, wrapping_sub, -);
-math_binop!(mul, wrapping_mul, *);
-math_binop!(rem, wrapping_rem_euclid, %);
-
-pub(crate) fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        let a = as_f64(lhs)?;
-        let b = as_f64(rhs)?;
-        Some((a / b).into())
-    }
-    do_it(lhs, rhs).ok_or_else(|| impossible_op("/", lhs, rhs))
-}
-
-pub(crate) fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        match coerce(lhs, rhs)? {
-            CoerceResult::I128(a, b) => Some(int_as_value(a.div_euclid(b))),
-            CoerceResult::F64(a, b) => Some(a.div_euclid(b).into()),
-            CoerceResult::String(_, _) => None,
-        }
-    }
-    do_it(lhs, rhs).ok_or_else(|| impossible_op("//", lhs, rhs))
-}
-
-/// Implements a binary `pow` operation on values.
-pub(crate) fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    pub fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        match coerce(lhs, rhs)? {
-            CoerceResult::I128(a, b) => Some(int_as_value(a.pow(TryFrom::try_from(b).ok()?))),
-            CoerceResult::F64(a, b) => Some((a.powf(b)).into()),
-            CoerceResult::String(_, _) => None,
-        }
-    }
-    do_it(lhs, rhs).ok_or_else(|| impossible_op("**", lhs, rhs))
-}
-
-/// Implements an unary `neg` operation on value.
-pub(crate) fn neg(val: &Value) -> Result<Value, Error> {
-    fn do_it(val: &Value) -> Option<Value> {
-        match val.0 {
-            ValueRepr::F64(x) => return Some((-x).into()),
-            _ => {
-                if let Ok(x) = i128::try_from(val.clone()) {
-                    return Some(int_as_value(-x));
-                }
-            }
-        }
-        None
-    }
-
-    if val.kind() != ValueKind::Number {
-        Err(Error::from(ErrorKind::ImpossibleOperation))
-    } else {
-        do_it(val).ok_or_else(|| Error::from(ErrorKind::ImpossibleOperation))
-    }
-}
-
-/// Attempts a string concatenation.
-pub(crate) fn string_concat(mut left: Value, right: &Value) -> Value {
-    match left.0 {
-        // if we're a string and we have a single reference to it, we can
-        // directly append into ourselves and reconstruct the value
-        ValueRepr::String(ref mut s) => {
-            write!(RcType::make_mut(s), "{}", right).ok();
-            left
-        }
-        // otherwise we use format! to concat the two values
-        _ => Value::from(format!("{}{}", left, right)),
-    }
-}
-
-/// Implements a containment operation on values.
-pub(crate) fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
-    match container.0 {
-        ValueRepr::Seq(ref values) => Ok(Value::from(values.contains(value))),
-        ValueRepr::Map(ref map) => {
-            let key = match value.clone().try_into_key() {
-                Ok(key) => key,
-                Err(_) => return Ok(Value::from(false)),
-            };
-            return Ok(Value::from(map.get(&key).is_some()));
-        }
-        ValueRepr::String(ref s) | ValueRepr::SafeString(ref s) => {
-            return Ok(Value::from(if let Some(s2) = value.as_str() {
-                s.contains(&s2)
-            } else {
-                s.contains(&value.to_string())
-            }));
-        }
-        _ => Err(Error::new(
-            ErrorKind::ImpossibleOperation,
-            "cannot perform a containment check on this value",
-        )),
-    }
-}
-
-macro_rules! primitive_try_from {
-    ($ty:ident, {
-        $($pat:pat $(if $if_expr:expr)? => $expr:expr,)*
-    }) => {
-
-        impl TryFrom<Value> for $ty {
-            type Error = Error;
-
-            fn try_from(value: Value) -> Result<Self, Self::Error> {
-                let opt = match value.0 {
-                    $($pat $(if $if_expr)? => TryFrom::try_from($expr).ok(),)*
-                    _ => None
-                };
-                opt.ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::ImpossibleOperation,
-                        format!("cannot convert {} to {}", value.kind(), stringify!($ty))
-                    )
-                })
-            }
-        }
-
-        impl<'a> ArgType<'a> for $ty {
-            fn from_value(value: Option<&Value>) -> Result<Self, Error> {
-                match value {
-                    Some(value) => TryFrom::try_from(value.clone()),
-                    None => Err(Error::new(ErrorKind::UndefinedError, concat!("missing argument")))
-                }
-            }
-        }
-
-        impl<'a> ArgType<'a> for Option<$ty> {
-            fn from_value(value: Option<&Value>) -> Result<Self, Error> {
-                match value {
-                    Some(value) => {
-                        if value.is_undefined() || value.is_none() {
-                            Ok(None)
-                        } else {
-                            TryFrom::try_from(value.clone()).map(Some)
-                        }
-                    }
-                    None => Ok(None),
-                }
-            }
-        }
-    }
-}
-
-macro_rules! primitive_int_try_from {
-    ($ty:ident) => {
-        primitive_try_from!($ty, {
-            ValueRepr::Bool(val) => val as usize,
-            ValueRepr::I64(val) => val,
-            ValueRepr::U64(val) => val,
-            // for the intention here see Key::from_borrowed_value
-            ValueRepr::F64(val) if (val as i64 as f64 == val) => val as i64,
-            ValueRepr::I128(ref val) => **val,
-            ValueRepr::U128(ref val) => **val,
-        });
-    }
-}
-
-primitive_int_try_from!(u8);
-primitive_int_try_from!(u16);
-primitive_int_try_from!(u32);
-primitive_int_try_from!(u64);
-primitive_int_try_from!(u128);
-primitive_int_try_from!(i8);
-primitive_int_try_from!(i16);
-primitive_int_try_from!(i32);
-primitive_int_try_from!(i64);
-primitive_int_try_from!(i128);
-primitive_int_try_from!(usize);
-
-primitive_try_from!(bool, {
-    ValueRepr::Bool(val) => val,
-});
-
-primitive_try_from!(f64, {
-    ValueRepr::F64(val) => val,
-});
-
-impl<'a> ArgType<'a> for Value {
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        match value {
-            Some(value) => Ok(value.clone()),
-            None => Err(Error::new(
-                ErrorKind::UndefinedError,
-                concat!("missing argument"),
-            )),
-        }
-    }
-}
-
-impl<'a> ArgType<'a> for Option<Value> {
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        match value {
-            Some(value) => {
-                if value.is_undefined() || value.is_none() {
-                    Ok(None)
-                } else {
-                    Ok(Some(value.clone()))
-                }
-            }
-            None => Ok(None),
-        }
-    }
-}
-
-impl<'a> ArgType<'a> for String {
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        match value {
-            Some(value) => Ok(value.to_string()),
-            None => Err(Error::new(
-                ErrorKind::UndefinedError,
-                concat!("missing argument"),
-            )),
-        }
-    }
-}
-
-impl<'a> ArgType<'a> for Option<String> {
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        match value {
-            Some(value) => {
-                if value.is_undefined() || value.is_none() {
-                    Ok(None)
-                } else {
-                    Ok(Some(value.to_string()))
-                }
-            }
-            None => Ok(None),
-        }
-    }
-}
-
-impl From<Value> for String {
-    fn from(val: Value) -> Self {
-        val.to_string()
-    }
-}
-
-impl From<usize> for Value {
-    fn from(val: usize) -> Self {
-        Value::from(val as u64)
-    }
-}
-
-impl<'a, T: ArgType<'a>> ArgType<'a> for Vec<T> {
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        match value {
-            None => Ok(Vec::new()),
-            Some(values) => {
-                let values = values.as_slice()?;
-                let mut rv = Vec::new();
-                for value in values {
-                    rv.push(ArgType::from_value(Some(value))?);
-                }
-                Ok(rv)
-            }
-        }
     }
 }
 
@@ -1088,7 +577,7 @@ impl Value {
         }
     }
 
-    pub(crate) fn try_into_key(self) -> Result<Key<'static>, Error> {
+    pub(crate) fn try_into_key(self) -> Result<StaticKey, Error> {
         match self.0 {
             ValueRepr::Bool(val) => Ok(Key::Bool(val)),
             ValueRepr::U64(v) => TryFrom::try_from(v)
@@ -1206,408 +695,6 @@ impl Serialize for Value {
     }
 }
 
-struct ValueSerializer;
-
-impl Serializer for ValueSerializer {
-    type Ok = Value;
-    type Error = Error;
-
-    type SerializeSeq = SerializeSeq;
-    type SerializeTuple = SerializeTuple;
-    type SerializeTupleStruct = SerializeTupleStruct;
-    type SerializeTupleVariant = SerializeTupleVariant;
-    type SerializeMap = SerializeMap;
-    type SerializeStruct = SerializeStruct;
-    type SerializeStructVariant = SerializeStructVariant;
-
-    fn serialize_bool(self, v: bool) -> Result<Value, Error> {
-        Ok(ValueRepr::Bool(v).into())
-    }
-
-    fn serialize_i8(self, v: i8) -> Result<Value, Error> {
-        Ok(ValueRepr::I64(v as i64).into())
-    }
-
-    fn serialize_i16(self, v: i16) -> Result<Value, Error> {
-        Ok(ValueRepr::I64(v as i64).into())
-    }
-
-    fn serialize_i32(self, v: i32) -> Result<Value, Error> {
-        Ok(ValueRepr::I64(v as i64).into())
-    }
-
-    fn serialize_i64(self, v: i64) -> Result<Value, Error> {
-        Ok(ValueRepr::I64(v).into())
-    }
-
-    fn serialize_i128(self, v: i128) -> Result<Value, Error> {
-        Ok(ValueRepr::I128(RcType::new(v)).into())
-    }
-
-    fn serialize_u8(self, v: u8) -> Result<Value, Error> {
-        Ok(ValueRepr::U64(v as u64).into())
-    }
-
-    fn serialize_u16(self, v: u16) -> Result<Value, Error> {
-        Ok(ValueRepr::U64(v as u64).into())
-    }
-
-    fn serialize_u32(self, v: u32) -> Result<Value, Error> {
-        Ok(ValueRepr::U64(v as u64).into())
-    }
-
-    fn serialize_u64(self, v: u64) -> Result<Value, Error> {
-        Ok(ValueRepr::U64(v).into())
-    }
-
-    fn serialize_u128(self, v: u128) -> Result<Value, Error> {
-        Ok(ValueRepr::U128(RcType::new(v)).into())
-    }
-
-    fn serialize_f32(self, v: f32) -> Result<Value, Error> {
-        Ok(ValueRepr::F64(v as f64).into())
-    }
-
-    fn serialize_f64(self, v: f64) -> Result<Value, Error> {
-        Ok(ValueRepr::F64(v).into())
-    }
-
-    fn serialize_char(self, v: char) -> Result<Value, Error> {
-        Ok(ValueRepr::Char(v).into())
-    }
-
-    fn serialize_str(self, value: &str) -> Result<Value, Error> {
-        Ok(ValueRepr::String(RcType::new(value.to_owned())).into())
-    }
-
-    fn serialize_bytes(self, value: &[u8]) -> Result<Value, Error> {
-        Ok(ValueRepr::Bytes(RcType::new(value.to_owned())).into())
-    }
-
-    fn serialize_none(self) -> Result<Value, Error> {
-        Ok(ValueRepr::None.into())
-    }
-
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Value, Error>
-    where
-        T: Serialize,
-    {
-        value.serialize(self)
-    }
-
-    fn serialize_unit(self) -> Result<Value, Error> {
-        Ok(ValueRepr::None.into())
-    }
-
-    fn serialize_unit_struct(self, _name: &'static str) -> Result<Value, Error> {
-        Ok(ValueRepr::None.into())
-    }
-
-    fn serialize_unit_variant(
-        self,
-        _name: &'static str,
-        _variant_index: u32,
-        variant: &'static str,
-    ) -> Result<Value, Error> {
-        Ok(ValueRepr::String(RcType::new(variant.to_string())).into())
-    }
-
-    fn serialize_newtype_struct<T: ?Sized>(
-        self,
-        _name: &'static str,
-        value: &T,
-    ) -> Result<Value, Error>
-    where
-        T: Serialize,
-    {
-        value.serialize(self)
-    }
-
-    fn serialize_newtype_variant<T: ?Sized>(
-        self,
-        _name: &'static str,
-        _variant_index: u32,
-        variant: &'static str,
-        value: &T,
-    ) -> Result<Value, Error>
-    where
-        T: Serialize,
-    {
-        let mut map = ValueMap::new();
-        map.insert(Key::from(variant), value.serialize(self)?);
-        Ok(ValueRepr::Map(RcType::new(map)).into())
-    }
-
-    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
-        Ok(SerializeSeq {
-            elements: Vec::with_capacity(len.unwrap_or(0)),
-        })
-    }
-
-    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Error> {
-        Ok(SerializeTuple {
-            elements: Vec::with_capacity(len),
-        })
-    }
-
-    fn serialize_tuple_struct(
-        self,
-        _name: &'static str,
-        len: usize,
-    ) -> Result<Self::SerializeTupleStruct, Error> {
-        Ok(SerializeTupleStruct {
-            fields: Vec::with_capacity(len),
-        })
-    }
-
-    fn serialize_tuple_variant(
-        self,
-        _name: &'static str,
-        _variant_index: u32,
-        variant: &'static str,
-        len: usize,
-    ) -> Result<Self::SerializeTupleVariant, Error> {
-        Ok(SerializeTupleVariant {
-            name: variant,
-            fields: Vec::with_capacity(len),
-        })
-    }
-
-    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Error> {
-        Ok(SerializeMap {
-            entries: ValueMap::new(),
-            key: None,
-        })
-    }
-
-    fn serialize_struct(
-        self,
-        name: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeStruct, Error> {
-        Ok(SerializeStruct {
-            name,
-            fields: ValueMap::new(),
-        })
-    }
-
-    fn serialize_struct_variant(
-        self,
-        _name: &'static str,
-        _variant_index: u32,
-        variant: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeStructVariant, Error> {
-        Ok(SerializeStructVariant {
-            variant,
-            map: ValueMap::new(),
-        })
-    }
-}
-
-struct SerializeSeq {
-    elements: Vec<Value>,
-}
-
-impl ser::SerializeSeq for SerializeSeq {
-    type Ok = Value;
-    type Error = Error;
-
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
-    where
-        T: Serialize,
-    {
-        let value = value.serialize(ValueSerializer)?;
-        self.elements.push(value);
-        Ok(())
-    }
-
-    fn end(self) -> Result<Value, Error> {
-        Ok(ValueRepr::Seq(RcType::new(self.elements)).into())
-    }
-}
-
-struct SerializeTuple {
-    elements: Vec<Value>,
-}
-
-impl ser::SerializeTuple for SerializeTuple {
-    type Ok = Value;
-    type Error = Error;
-
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
-    where
-        T: Serialize,
-    {
-        let value = value.serialize(ValueSerializer)?;
-        self.elements.push(value);
-        Ok(())
-    }
-
-    fn end(self) -> Result<Value, Error> {
-        Ok(ValueRepr::Seq(RcType::new(self.elements)).into())
-    }
-}
-
-struct SerializeTupleStruct {
-    fields: Vec<Value>,
-}
-
-impl ser::SerializeTupleStruct for SerializeTupleStruct {
-    type Ok = Value;
-    type Error = Error;
-
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
-    where
-        T: Serialize,
-    {
-        let value = value.serialize(ValueSerializer)?;
-        self.fields.push(value);
-        Ok(())
-    }
-
-    fn end(self) -> Result<Value, Error> {
-        Ok(Value(ValueRepr::Seq(RcType::new(self.fields))))
-    }
-}
-
-struct SerializeTupleVariant {
-    name: &'static str,
-    fields: Vec<Value>,
-}
-
-impl ser::SerializeTupleVariant for SerializeTupleVariant {
-    type Ok = Value;
-    type Error = Error;
-
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
-    where
-        T: Serialize,
-    {
-        let value = value.serialize(ValueSerializer)?;
-        self.fields.push(value);
-        Ok(())
-    }
-
-    fn end(self) -> Result<Value, Error> {
-        let mut map = BTreeMap::new();
-        map.insert(self.name, self.fields);
-        Ok(map.into())
-    }
-}
-
-struct SerializeMap {
-    entries: ValueMap,
-    key: Option<Key<'static>>,
-}
-
-impl ser::SerializeMap for SerializeMap {
-    type Ok = Value;
-    type Error = Error;
-
-    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Error>
-    where
-        T: Serialize,
-    {
-        let key = key.serialize(KeySerializer)?;
-        self.key = Some(key);
-        Ok(())
-    }
-
-    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
-    where
-        T: Serialize,
-    {
-        let key = self
-            .key
-            .take()
-            .expect("serialize_value called before serialize_key");
-        let value = value.serialize(ValueSerializer)?;
-        self.entries.insert(key, value);
-        Ok(())
-    }
-
-    fn end(self) -> Result<Value, Error> {
-        Ok(Value(ValueRepr::Map(RcType::new(self.entries))))
-    }
-
-    fn serialize_entry<K: ?Sized, V: ?Sized>(&mut self, key: &K, value: &V) -> Result<(), Error>
-    where
-        K: Serialize,
-        V: Serialize,
-    {
-        let key = key.serialize(KeySerializer)?;
-        let value = value.serialize(ValueSerializer)?;
-        self.entries.insert(key, value);
-        Ok(())
-    }
-}
-
-struct SerializeStruct {
-    name: &'static str,
-    fields: ValueMap,
-}
-
-impl ser::SerializeStruct for SerializeStruct {
-    type Ok = Value;
-    type Error = Error;
-
-    fn serialize_field<T: ?Sized>(&mut self, key: &'static str, value: &T) -> Result<(), Error>
-    where
-        T: Serialize,
-    {
-        let value = value.serialize(ValueSerializer)?;
-        self.fields.insert(Key::Str(key), value);
-        Ok(())
-    }
-
-    fn end(self) -> Result<Value, Error> {
-        match self.name {
-            VALUE_HANDLE_MARKER => {
-                let handle_id = match self.fields.get(&Key::Str("handle")) {
-                    Some(&Value(ValueRepr::U64(handle_id))) => handle_id as usize,
-                    _ => panic!("bad handle reference in value roundtrip"),
-                };
-                Ok(VALUE_HANDLES.with(|handles| {
-                    let mut handles = handles.borrow_mut();
-                    handles
-                        .remove(&handle_id)
-                        .expect("value handle not in registry")
-                }))
-            }
-            _ => Ok(ValueRepr::Map(RcType::new(self.fields)).into()),
-        }
-    }
-}
-
-struct SerializeStructVariant {
-    variant: &'static str,
-    map: ValueMap,
-}
-
-impl ser::SerializeStructVariant for SerializeStructVariant {
-    type Ok = Value;
-    type Error = Error;
-
-    fn serialize_field<T: ?Sized>(&mut self, key: &'static str, value: &T) -> Result<(), Error>
-    where
-        T: Serialize,
-    {
-        let value = value.serialize(ValueSerializer)?;
-        self.map.insert(Key::from(key), value);
-        Ok(())
-    }
-
-    fn end(self) -> Result<Value, Error> {
-        let mut rv = BTreeMap::new();
-        rv.insert(
-            self.variant,
-            Value::from(ValueRepr::Map(RcType::new(self.map))),
-        );
-        Ok(rv.into())
-    }
-}
-
 pub(crate) struct ValueIterator {
     iter_state: ValueIteratorState,
     len: usize,
@@ -1640,7 +727,7 @@ enum ValueIteratorState {
     Empty,
     Seq(usize, RcType<Vec<Value>>),
     #[cfg(not(feature = "preserve_order"))]
-    Map(Option<Key<'static>>, RcType<ValueMap>),
+    Map(Option<StaticKey>, RcType<ValueMap>),
     #[cfg(feature = "preserve_order")]
     Map(usize, RcType<ValueMap>),
 }
@@ -1676,72 +763,6 @@ impl ValueIteratorState {
     }
 }
 
-/// A utility trait that represents a dynamic object.
-///
-/// The engine uses the [`Value`] type to represent values that the engine
-/// knows about.  Most of these values are primitives such as integers, strings
-/// or maps.  However it is also possible to expose custom types without
-/// undergoing a serialization step to the engine.  For this to work a type
-/// needs to implement the [`Object`] trait and be wrapped in a value with
-/// [`Value::from_object`](crate::value::Value::from_object). The ownership of
-/// the object will then move into the value type.
-//
-/// The engine uses reference counted objects with interior mutability in the
-/// value type.  This means that all trait methods take `&self` and types like
-/// [`Mutex`](std::sync::Mutex) need to be used to enable mutability.
-//
-/// Objects need to implement [`Display`](std::fmt::Display) which is used by
-/// the engine to convert the object into a string if needed.  Additionally
-/// [`Debug`](std::fmt::Debug) is required as well.
-pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
-    /// Invoked by the engine to get the attribute of an object.
-    ///
-    /// Where possible it's a good idea for this to align with the return value
-    /// of [`attributes`](Self::attributes) but it's not necessary.
-    ///
-    /// If an attribute does not exist, `None` shall be returned.
-    fn get_attr(&self, name: &str) -> Option<Value> {
-        let _name = name;
-        None
-    }
-
-    /// An enumeration of attributes that are known to exist on this object.
-    ///
-    /// The default implementation returns an empty slice.  If it's not possible
-    /// to implement this, it's fine for the implementation to be omitted.  The
-    /// enumeration here is used by the `for` loop to iterate over the attributes
-    /// on the value.
-    fn attributes(&self) -> &[&str] {
-        &[][..]
-    }
-
-    /// Called when the engine tries to call a method on the object.
-    ///
-    /// It's the responsibility of the implementer to ensure that an
-    /// error is generated if an invalid method is invoked.
-    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
-        let _state = state;
-        let _args = args;
-        Err(Error::new(
-            ErrorKind::ImpossibleOperation,
-            format!("object has no method named {}", name),
-        ))
-    }
-
-    /// Called when the object is invoked directly.
-    ///
-    /// The default implementation just generates an error that the object
-    /// cannot be invoked.
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
-        let _state = state;
-        let _args = args;
-        Err(Error::new(
-            ErrorKind::ImpossibleOperation,
-            "tried to call non callable object",
-        ))
-    }
-}
-
 /// Utility macro to create a value from a literal
 #[cfg(test)]
 macro_rules! value {
@@ -1752,58 +773,61 @@ macro_rules! value {
 
 #[test]
 fn test_adding() {
-    let err = add(&value!("a"), &value!(42)).unwrap_err();
+    let err = ops::add(&value!("a"), &value!(42)).unwrap_err();
     assert_eq!(
         err.to_string(),
         "impossible operation: tried to use + operator on unsupported types string and number"
     );
 
-    assert_eq!(add(&value!(1), &value!(2)), Ok(value!(3)));
-    assert_eq!(add(&value!("foo"), &value!("bar")), Ok(value!("foobar")));
+    assert_eq!(ops::add(&value!(1), &value!(2)), Ok(value!(3)));
+    assert_eq!(
+        ops::add(&value!("foo"), &value!("bar")),
+        Ok(value!("foobar"))
+    );
 }
 
 #[test]
 fn test_subtracting() {
-    let err = sub(&value!("a"), &value!(42)).unwrap_err();
+    let err = ops::sub(&value!("a"), &value!(42)).unwrap_err();
     assert_eq!(
         err.to_string(),
         "impossible operation: tried to use - operator on unsupported types string and number"
     );
 
-    let err = sub(&value!("foo"), &value!("bar")).unwrap_err();
+    let err = ops::sub(&value!("foo"), &value!("bar")).unwrap_err();
     assert_eq!(
         err.to_string(),
         "impossible operation: tried to use - operator on unsupported types string and string"
     );
 
-    assert_eq!(sub(&value!(2), &value!(1)), Ok(value!(1)));
+    assert_eq!(ops::sub(&value!(2), &value!(1)), Ok(value!(1)));
 }
 
 #[test]
 fn test_dividing() {
-    let err = div(&value!("a"), &value!(42)).unwrap_err();
+    let err = ops::div(&value!("a"), &value!(42)).unwrap_err();
     assert_eq!(
         err.to_string(),
         "impossible operation: tried to use / operator on unsupported types string and number"
     );
 
-    let err = div(&value!("foo"), &value!("bar")).unwrap_err();
+    let err = ops::div(&value!("foo"), &value!("bar")).unwrap_err();
     assert_eq!(
         err.to_string(),
         "impossible operation: tried to use / operator on unsupported types string and string"
     );
 
-    assert_eq!(div(&value!(100), &value!(2)), Ok(value!(50.0)));
+    assert_eq!(ops::div(&value!(100), &value!(2)), Ok(value!(50.0)));
 }
 
 #[test]
 fn test_concat() {
     assert_eq!(
-        string_concat(Value::from("foo"), &Value::from(42)),
+        ops::string_concat(Value::from("foo"), &Value::from(42)),
         Value::from("foo42")
     );
     assert_eq!(
-        string_concat(Value::from(23), &Value::from(42)),
+        ops::string_concat(Value::from(23), &Value::from(42)),
         Value::from("2342")
     );
 }
