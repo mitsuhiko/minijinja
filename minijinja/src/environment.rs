@@ -158,13 +158,13 @@ impl<'env> Template<'env> {
     }
 }
 
-type TemplateMap<'source> = BTreeMap<&'source str, RcType<CompiledTemplate<'source>>>;
+type TemplateMap<'source> = BTreeMap<&'source str, CompiledTemplate<'source>>;
 
 #[derive(Clone)]
 enum Source<'source> {
-    Borrowed(RcType<TemplateMap<'source>>),
+    Borrowed(TemplateMap<'source>),
     #[cfg(feature = "source")]
-    Owned(RcType<crate::source::Source>),
+    Owned(crate::source::Source),
 }
 
 impl<'source> fmt::Debug for Source<'source> {
@@ -392,7 +392,7 @@ impl<'source> Environment<'source> {
     #[cfg(feature = "source")]
     #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
     pub fn set_source(&mut self, source: crate::source::Source) {
-        self.templates = Source::Owned(RcType::new(source));
+        self.templates = Source::Owned(source);
     }
 
     /// Returns the currently set source.
@@ -419,11 +419,11 @@ impl<'source> Environment<'source> {
         match self.templates {
             Source::Borrowed(ref mut map) => {
                 let compiled_template = CompiledTemplate::from_name_and_source(name, source)?;
-                RcType::make_mut(map).insert(name, RcType::new(compiled_template));
+                map.insert(name, compiled_template);
                 Ok(())
             }
             #[cfg(feature = "source")]
-            Source::Owned(ref mut src) => RcType::make_mut(src).add_template(name, source),
+            Source::Owned(ref mut src) => src.add_template(name, source),
         }
     }
 
@@ -431,11 +431,11 @@ impl<'source> Environment<'source> {
     pub fn remove_template(&mut self, name: &str) {
         match self.templates {
             Source::Borrowed(ref mut map) => {
-                RcType::make_mut(map).remove(name);
+                map.remove(name);
             }
             #[cfg(feature = "source")]
             Source::Owned(ref mut source) => {
-                RcType::make_mut(source).remove_template(name);
+                source.remove_template(name);
             }
         }
     }
@@ -455,10 +455,7 @@ impl<'source> Environment<'source> {
     /// ```
     pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
         let compiled = match &self.templates {
-            Source::Borrowed(ref map) => map
-                .get(name)
-                .map(|v| &**v)
-                .ok_or_else(|| Error::new_not_found(name))?,
+            Source::Borrowed(ref map) => map.get(name).ok_or_else(|| Error::new_not_found(name))?,
             #[cfg(feature = "source")]
             Source::Owned(source) => source.get_compiled_template(name)?,
         };
