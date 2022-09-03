@@ -59,6 +59,7 @@ pub(crate) struct BoxedFilter(RcType<FilterFunc>);
 /// A utility trait that represents filters.
 pub trait Filter<V, Rv, Args>: Send + Sync + 'static {
     /// Applies a filter to value with the given arguments.
+    #[doc(hidden)]
     fn apply_to(&self, state: &State, value: V, args: Args) -> Result<Rv, Error>;
 }
 
