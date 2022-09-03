@@ -166,9 +166,9 @@ fn with_internal_serialization<R, F: FnOnce() -> R>(f: F) -> R {
 /// For each argument the conversion is performed via the [`ArgType`]
 /// trait which is implemented for some primitive concrete types as well
 /// as these types wrapped in [`Option`].
-pub trait FunctionArgs: Sized {
+pub trait FunctionArgs<'a>: Sized {
     /// Converts to function arguments from a slice of values.
-    fn from_values(values: Vec<Value>) -> Result<Self, Error>;
+    fn from_values(values: &'a [Value]) -> Result<Self, Error>;
 }
 
 /// A trait implemented by all filter/test argument types.
@@ -177,15 +177,15 @@ pub trait FunctionArgs: Sized {
 /// `Option<Value>` where `Some` means the argument was provided or
 /// `None` if it was not.  This is used to implement optional arguments
 /// to functions.
-pub trait ArgType: Sized {
+pub trait ArgType<'a>: Sized {
     #[doc(hidden)]
-    fn from_value(value: Option<Value>) -> Result<Self, Error>;
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error>;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<$($name: ArgType,)*> FunctionArgs for ($($name,)*) {
-            fn from_values(values: Vec<Value>) -> Result<Self, Error> {
+        impl<'a, $($name: ArgType<'a>,)*> FunctionArgs<'a> for ($($name,)*) {
+            fn from_values(values: &'a [Value]) -> Result<Self, Error> {
                 #![allow(non_snake_case, unused)]
                 let arg_count = 0 $(
                     + { let $name = (); 1 }
@@ -199,7 +199,7 @@ macro_rules! tuple_impls {
                 {
                     let mut idx = 0;
                     $(
-                        let $name = ArgType::from_value(values.get(idx).cloned())?;
+                        let $name = ArgType::from_value(values.get(idx))?;
                         idx += 1;
                     )*
                     Ok(( $($name,)* ))
@@ -706,23 +706,23 @@ macro_rules! primitive_try_from {
             }
         }
 
-        impl ArgType for $ty {
-            fn from_value(value: Option<Value>) -> Result<Self, Error> {
+        impl<'a> ArgType<'a> for $ty {
+            fn from_value(value: Option<&Value>) -> Result<Self, Error> {
                 match value {
-                    Some(value) => TryFrom::try_from(value),
+                    Some(value) => TryFrom::try_from(value.clone()),
                     None => Err(Error::new(ErrorKind::UndefinedError, concat!("missing argument")))
                 }
             }
         }
 
-        impl ArgType for Option<$ty> {
-            fn from_value(value: Option<Value>) -> Result<Self, Error> {
+        impl<'a> ArgType<'a> for Option<$ty> {
+            fn from_value(value: Option<&Value>) -> Result<Self, Error> {
                 match value {
                     Some(value) => {
                         if value.is_undefined() || value.is_none() {
                             Ok(None)
                         } else {
-                            TryFrom::try_from(value).map(Some)
+                            TryFrom::try_from(value.clone()).map(Some)
                         }
                     }
                     None => Ok(None),
@@ -766,39 +766,59 @@ primitive_try_from!(f64, {
     ValueRepr::F64(val) => val,
 });
 
-macro_rules! infallible_conversion {
-    ($ty:ty) => {
-        impl ArgType for $ty {
-            fn from_value(value: Option<Value>) -> Result<Self, Error> {
-                match value {
-                    Some(value) => Ok(value.into()),
-                    None => Err(Error::new(
-                        ErrorKind::UndefinedError,
-                        concat!("missing argument"),
-                    )),
-                }
-            }
+impl<'a> ArgType<'a> for Value {
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            Some(value) => Ok(value.clone()),
+            None => Err(Error::new(
+                ErrorKind::UndefinedError,
+                concat!("missing argument"),
+            )),
         }
-
-        impl ArgType for Option<$ty> {
-            fn from_value(value: Option<Value>) -> Result<Self, Error> {
-                match value {
-                    Some(value) => {
-                        if value.is_undefined() || value.is_none() {
-                            Ok(None)
-                        } else {
-                            Ok(Some(value.clone().into()))
-                        }
-                    }
-                    None => Ok(None),
-                }
-            }
-        }
-    };
+    }
 }
 
-infallible_conversion!(String);
-infallible_conversion!(Value);
+impl<'a> ArgType<'a> for Option<Value> {
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            Some(value) => {
+                if value.is_undefined() || value.is_none() {
+                    Ok(None)
+                } else {
+                    Ok(Some(value.clone()))
+                }
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for String {
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            Some(value) => Ok(value.to_string()),
+            None => Err(Error::new(
+                ErrorKind::UndefinedError,
+                concat!("missing argument"),
+            )),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for Option<String> {
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            Some(value) => {
+                if value.is_undefined() || value.is_none() {
+                    Ok(None)
+                } else {
+                    Ok(Some(value.to_string()))
+                }
+            }
+            None => Ok(None),
+        }
+    }
+}
 
 impl From<Value> for String {
     fn from(val: Value) -> Self {
@@ -812,15 +832,15 @@ impl From<usize> for Value {
     }
 }
 
-impl<T: ArgType> ArgType for Vec<T> {
-    fn from_value(value: Option<Value>) -> Result<Self, Error> {
+impl<'a, T: ArgType<'a>> ArgType<'a> for Vec<T> {
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
             None => Ok(Vec::new()),
             Some(values) => {
                 let values = values.as_slice()?;
                 let mut rv = Vec::new();
                 for value in values {
-                    rv.push(ArgType::from_value(Some(value.clone()))?);
+                    rv.push(ArgType::from_value(Some(value))?);
                 }
                 Ok(rv)
             }
@@ -1040,7 +1060,7 @@ impl Value {
     }
 
     /// Calls the value directly.
-    pub(crate) fn call(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
+    pub(crate) fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         if let ValueRepr::Dynamic(ref dy) = self.0 {
             dy.call(state, args)
         } else {
@@ -1056,7 +1076,7 @@ impl Value {
         &self,
         state: &State,
         name: &str,
-        args: Vec<Value>,
+        args: &[Value],
     ) -> Result<Value, Error> {
         if let ValueRepr::Dynamic(ref dy) = self.0 {
             dy.call_method(state, name, args)
@@ -1093,19 +1113,6 @@ impl Value {
             _ => Err(Error::new(
                 ErrorKind::ImpossibleOperation,
                 "value is not a list",
-            )),
-        }
-    }
-
-    pub(crate) fn try_into_vec(self) -> Result<Vec<Value>, Error> {
-        match self.0 {
-            ValueRepr::Seq(v) => Ok(match RcType::try_unwrap(v) {
-                Ok(v) => v,
-                Err(rc) => (*rc).clone(),
-            }),
-            _ => Err(Error::new(
-                ErrorKind::ImpossibleOperation,
-                "cannot convert value into list",
             )),
         }
     }
@@ -1712,7 +1719,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     ///
     /// It's the responsibility of the implementer to ensure that an
     /// error is generated if an invalid method is invoked.
-    fn call_method(&self, state: &State, name: &str, args: Vec<Value>) -> Result<Value, Error> {
+    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         let _state = state;
         let _args = args;
         Err(Error::new(
@@ -1725,7 +1732,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     ///
     /// The default implementation just generates an error that the object
     /// cannot be invoked.
-    fn call(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
+    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         let _state = state;
         let _args = args;
         Err(Error::new(

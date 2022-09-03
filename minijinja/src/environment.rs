@@ -526,10 +526,10 @@ impl<'source> Environment<'source> {
     /// For details about filters have a look at [`filters`].
     pub fn add_filter<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
     where
-        V: ArgType,
+        V: for<'a> ArgType<'a>,
         Rv: Into<Value>,
         F: filters::Filter<V, Rv, Args>,
-        Args: FunctionArgs,
+        Args: for<'a> FunctionArgs<'a>,
     {
         self.filters.insert(name, filters::BoxedFilter::new(f));
     }
@@ -544,9 +544,9 @@ impl<'source> Environment<'source> {
     /// For details about tests have a look at [`tests`].
     pub fn add_test<F, V, Args>(&mut self, name: &'source str, f: F)
     where
-        V: ArgType,
+        V: for<'a> ArgType<'a>,
         F: tests::Test<V, Args>,
-        Args: FunctionArgs,
+        Args: for<'a> FunctionArgs<'a>,
     {
         self.tests.insert(name, tests::BoxedTest::new(f));
     }
@@ -564,7 +564,7 @@ impl<'source> Environment<'source> {
     where
         Rv: Into<Value>,
         F: functions::Function<Rv, Args>,
-        Args: FunctionArgs,
+        Args: for<'a> FunctionArgs<'a>,
     {
         self.add_global(name, functions::BoxedFunction::new(f).to_value());
     }

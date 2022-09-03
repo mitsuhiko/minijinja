@@ -46,7 +46,7 @@ use crate::error::Error;
 use crate::value::{FunctionArgs, Object, Value};
 use crate::vm::State;
 
-type FuncFunc = dyn Fn(&State, Vec<Value>) -> Result<Value, Error> + Sync + Send + 'static;
+type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
 
 /// A boxed function.
 #[derive(Clone)]
@@ -86,7 +86,7 @@ impl BoxedFunction {
     where
         F: Function<Rv, Args>,
         Rv: Into<Value>,
-        Args: FunctionArgs,
+        Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFunction(
             Arc::new(move |env, args| -> Result<Value, Error> {
@@ -98,7 +98,7 @@ impl BoxedFunction {
     }
 
     /// Invokes the function.
-    pub fn invoke(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
+    pub fn invoke(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         (self.0)(state, args)
     }
 
@@ -129,7 +129,7 @@ impl fmt::Display for BoxedFunction {
 }
 
 impl Object for BoxedFunction {
-    fn call(&self, state: &State, args: Vec<Value>) -> Result<Value, Error> {
+    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         self.invoke(state, args)
     }
 }

@@ -64,21 +64,22 @@ impl Object for LoopState {
         }
     }
 
-    fn call(&self, _state: &State, _args: Vec<Value>) -> Result<Value, Error> {
+    fn call(&self, _state: &State, _args: &[Value]) -> Result<Value, Error> {
         Err(Error::new(
             ErrorKind::ImpossibleOperation,
             "loop cannot be called if reassigned to different variable",
         ))
     }
 
-    fn call_method(&self, _state: &State, name: &str, args: Vec<Value>) -> Result<Value, Error> {
+    fn call_method(&self, _state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         #[cfg(feature = "sync")]
         {
             if name == "changed" {
                 let mut last_changed_value = self.last_changed_value.lock().unwrap();
-                let changed = last_changed_value.as_ref() != Some(&args);
+                let value = args.to_owned();
+                let changed = last_changed_value.as_ref() != Some(&value);
                 if changed {
-                    *last_changed_value = Some(args);
+                    *last_changed_value = Some(value);
                     return Ok(Value::from(true));
                 }
                 return Ok(Value::from(false));
@@ -403,8 +404,8 @@ impl<'vm, 'env> State<'vm, 'env> {
     pub(crate) fn apply_filter(
         &self,
         name: &str,
-        value: Value,
-        args: Vec<Value>,
+        value: &Value,
+        args: &[Value],
     ) -> Result<Value, Error> {
         if let Some(filter) = self.env().get_filter(name) {
             filter.apply_to(self, value, args)
@@ -419,8 +420,8 @@ impl<'vm, 'env> State<'vm, 'env> {
     pub(crate) fn perform_test(
         &self,
         name: &str,
-        value: Value,
-        args: Vec<Value>,
+        value: &Value,
+        args: &[Value],
     ) -> Result<bool, Error> {
         if let Some(test) = self.env().get_test(name) {
             test.perform(self, value, args)
@@ -683,12 +684,12 @@ impl<'env> Vm<'env> {
                     stack.push(Value::from(map));
                 }
                 Instruction::BuildList(count) => {
-                    let mut v = Vec::new();
+                    let mut v = Vec::with_capacity(*count);
                     for _ in 0..*count {
                         v.push(stack.pop());
                     }
                     v.reverse();
-                    stack.push(v.into());
+                    stack.push(Value(ValueRepr::Seq(RcType::new(v))));
                 }
                 Instruction::UnpackList(count) => {
                     let top = stack.pop();
@@ -972,17 +973,22 @@ impl<'env> Vm<'env> {
                     end_capture!();
                 }
                 Instruction::ApplyFilter(name) => {
-                    let args = try_ctx!(stack.pop().try_into_vec());
+                    let top = stack.pop();
+                    let args = try_ctx!(top.as_slice());
                     let value = stack.pop();
-                    stack.push(try_ctx!(state.apply_filter(name, value, args)));
+                    stack.push(try_ctx!(state.apply_filter(name, &value, args)));
                 }
                 Instruction::PerformTest(name) => {
-                    let args = try_ctx!(stack.pop().try_into_vec());
+                    let top = stack.pop();
+                    let args = try_ctx!(top.as_slice());
                     let value = stack.pop();
-                    stack.push(Value::from(try_ctx!(state.perform_test(name, value, args))));
+                    stack.push(Value::from(
+                        try_ctx!(state.perform_test(name, &value, args)),
+                    ));
                 }
                 Instruction::CallFunction(function_name) => {
-                    let args = try_ctx!(stack.pop().try_into_vec());
+                    let top = stack.pop();
+                    let args = try_ctx!(top.as_slice());
                     // super is a special function reserved for super-ing into blocks.
                     if *function_name == "super" {
                         if !args.is_empty() {
@@ -1000,7 +1006,7 @@ impl<'env> Vm<'env> {
                                 format!("loop() takes one argument, got {}", args.len())
                             ));
                         }
-                        stack.push(args.into_iter().next().unwrap());
+                        stack.push(args[0].clone());
                         recurse_loop!(true);
                     } else if let Some(func) = state.ctx.load(self.env, function_name) {
                         stack.push(try_ctx!(func.call(state, args)));
@@ -1012,12 +1018,14 @@ impl<'env> Vm<'env> {
                     }
                 }
                 Instruction::CallMethod(name) => {
-                    let args = try_ctx!(stack.pop().try_into_vec());
+                    let top = stack.pop();
+                    let args = try_ctx!(top.as_slice());
                     let obj = stack.pop();
                     stack.push(try_ctx!(obj.call_method(state, name, args)));
                 }
                 Instruction::CallObject => {
-                    let args = try_ctx!(stack.pop().try_into_vec());
+                    let top = stack.pop();
+                    let args = try_ctx!(top.as_slice());
                     let obj = stack.pop();
                     stack.push(try_ctx!(obj.call(state, args)));
                 }

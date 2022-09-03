@@ -51,7 +51,7 @@ use crate::error::Error;
 use crate::value::{ArgType, FunctionArgs, RcType, Value};
 use crate::vm::State;
 
-type TestFunc = dyn Fn(&State, Value, Vec<Value>) -> Result<bool, Error> + Sync + Send + 'static;
+type TestFunc = dyn Fn(&State, &Value, &[Value]) -> Result<bool, Error> + Sync + Send + 'static;
 
 #[derive(Clone)]
 pub(crate) struct BoxedTest(RcType<TestFunc>);
@@ -89,14 +89,15 @@ impl BoxedTest {
     pub fn new<F, V, Args>(f: F) -> BoxedTest
     where
         F: Test<V, Args>,
-        V: ArgType,
-        Args: FunctionArgs,
+        V: for<'a> ArgType<'a>,
+        Args: for<'a> FunctionArgs<'a>,
     {
         BoxedTest(RcType::new(
             move |state, value, args| -> Result<bool, Error> {
+                let value = Some(value);
                 f.perform(
                     state,
-                    ArgType::from_value(Some(value))?,
+                    ArgType::from_value(value)?,
                     FunctionArgs::from_values(args)?,
                 )
             },
@@ -104,7 +105,7 @@ impl BoxedTest {
     }
 
     /// Applies the filter to a value and argument.
-    pub fn perform(&self, state: &State, value: Value, args: Vec<Value>) -> Result<bool, Error> {
+    pub fn perform(&self, state: &State, value: &Value, args: &[Value]) -> Result<bool, Error> {
         (self.0)(state, value, args)
     }
 }
@@ -213,7 +214,7 @@ mod builtins {
         };
         let bx = BoxedTest::new(test);
         assert!(bx
-            .perform(&state, Value::from(23), vec![Value::from(23)])
+            .perform(&state, &Value::from(23), &[Value::from(23)][..])
             .unwrap());
     }
 }
