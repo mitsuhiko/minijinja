@@ -770,7 +770,7 @@ macro_rules! infallible_conversion {
         impl ArgType for $ty {
             fn from_value(value: Option<Value>) -> Result<Self, Error> {
                 match value {
-                    Some(value) => Ok(value.clone().into()),
+                    Some(value) => Ok(value.into()),
                     None => Err(Error::new(
                         ErrorKind::UndefinedError,
                         concat!("missing argument"),
@@ -925,6 +925,15 @@ impl Value {
             ValueRepr::String(ref s) => Some(s.as_str()),
             ValueRepr::SafeString(ref s) => Some(s.as_str()),
             _ => None,
+        }
+    }
+
+    /// Like `as_str` but always stringifies the value.
+    pub(crate) fn to_cowstr(&self) -> Cow<'_, str> {
+        match &self.0 {
+            ValueRepr::String(ref s) => Cow::Borrowed(s.as_str()),
+            ValueRepr::SafeString(ref s) => Cow::Borrowed(s.as_str()),
+            _ => Cow::Owned(self.to_string()),
         }
     }
 

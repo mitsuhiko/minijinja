@@ -191,6 +191,7 @@ mod builtins {
     use crate::error::ErrorKind;
     use crate::utils::matches;
     use crate::value::{ValueKind, ValueRepr};
+    use std::borrow::Cow;
     use std::fmt::Write;
     use std::mem;
 
@@ -203,8 +204,8 @@ mod builtins {
     /// <h1>{{ chapter.title|upper }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn upper(_state: &State, v: String) -> Result<String, Error> {
-        Ok(v.to_uppercase())
+    pub fn upper(_state: &State, v: Value) -> Result<String, Error> {
+        Ok(v.to_cowstr().to_uppercase())
     }
 
     /// Converts a value to lowercase.
@@ -213,8 +214,8 @@ mod builtins {
     /// <h1>{{ chapter.title|lower }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn lower(_state: &State, v: String) -> Result<String, Error> {
-        Ok(v.to_lowercase())
+    pub fn lower(_state: &State, v: Value) -> Result<String, Error> {
+        Ok(v.to_cowstr().to_lowercase())
     }
 
     /// Converts a value to title case.
@@ -223,10 +224,10 @@ mod builtins {
     /// <h1>{{ chapter.title|title }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn title(_state: &State, v: String) -> Result<String, Error> {
+    pub fn title(_state: &State, v: Value) -> Result<String, Error> {
         let mut rv = String::new();
         let mut capitalize = true;
-        for c in v.chars() {
+        for c in v.to_cowstr().chars() {
             if c.is_ascii_punctuation() || c.is_whitespace() {
                 rv.push(c);
                 capitalize = true;
@@ -249,8 +250,9 @@ mod builtins {
     ///   -> Goodbye World
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn replace(_state: &State, v: String, from: String, to: String) -> Result<String, Error> {
-        Ok(v.replace(&from, &to))
+    pub fn replace(_state: &State, v: Value, from: Value, to: Value) -> Result<String, Error> {
+        Ok(v.to_cowstr()
+            .replace(&from.to_cowstr() as &str, &to.to_cowstr() as &str))
     }
 
     /// Returns the "length" of the value
@@ -353,30 +355,30 @@ mod builtins {
 
     /// Trims a value
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn trim(_state: &State, s: String, chars: Option<String>) -> Result<String, Error> {
+    pub fn trim(_state: &State, s: Value, chars: Option<Value>) -> Result<String, Error> {
         match chars {
             Some(chars) => {
-                let chars = chars.chars().collect::<Vec<_>>();
-                Ok(s.trim_matches(&chars[..]).to_string())
+                let chars = chars.to_cowstr().chars().collect::<Vec<_>>();
+                Ok(s.to_cowstr().trim_matches(&chars[..]).to_string())
             }
-            None => Ok(s.trim().to_string()),
+            None => Ok(s.to_cowstr().trim().to_string()),
         }
     }
 
     /// Joins a sequence by a character
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn join(_state: &State, val: Value, joiner: Option<String>) -> Result<String, Error> {
+    pub fn join(_state: &State, val: Value, joiner: Option<Value>) -> Result<String, Error> {
         if val.is_undefined() || val.is_none() {
             return Ok(String::new());
         }
 
-        let joiner = joiner.as_ref().map_or("", |x| x.as_str());
+        let joiner = joiner.as_ref().map_or(Cow::Borrowed(""), |x| x.to_cowstr());
 
         if let Some(s) = val.as_str() {
             let mut rv = String::new();
             for c in s.chars() {
                 if !rv.is_empty() {
-                    rv.push_str(joiner);
+                    rv.push_str(&joiner);
                 }
                 rv.push(c);
             }
@@ -385,7 +387,7 @@ mod builtins {
             let mut rv = String::new();
             for item in val.as_slice()? {
                 if !rv.is_empty() {
-                    rv.push_str(joiner);
+                    rv.push_str(&joiner);
                 }
                 if let Some(s) = item.as_str() {
                     rv.push_str(s);
