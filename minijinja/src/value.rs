@@ -816,10 +816,10 @@ impl<T: ArgType> ArgType for Vec<T> {
         match value {
             None => Ok(Vec::new()),
             Some(values) => {
-                let values = values.try_into_vec()?;
+                let values = values.as_slice()?;
                 let mut rv = Vec::new();
                 for value in values {
-                    rv.push(ArgType::from_value(Some(value))?);
+                    rv.push(ArgType::from_value(Some(value.clone()))?);
                 }
                 Ok(rv)
             }
@@ -1074,6 +1074,16 @@ impl Value {
             ValueRepr::Char(c) => Ok(Key::Char(c)),
             ValueRepr::String(ref s) => Ok(Key::String(s.clone())),
             _ => Err(ErrorKind::NonKey.into()),
+        }
+    }
+
+    pub(crate) fn as_slice(&self) -> Result<&[Value], Error> {
+        match self.0 {
+            ValueRepr::Seq(ref v) => Ok(&v[..]),
+            _ => Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                "value is not a list",
+            )),
         }
     }
 

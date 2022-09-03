@@ -41,7 +41,6 @@ fn test_vm() {
         let content = iter.next().unwrap();
         env.add_template(filename, content).unwrap();
         let template = env.get_template(filename).unwrap();
-        dbg!(&template);
 
         let mut rendered = match template.render(&ctx) {
             Ok(rendered) => rendered,

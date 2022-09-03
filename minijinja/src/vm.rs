@@ -691,7 +691,8 @@ impl<'env> Vm<'env> {
                     stack.push(v.into());
                 }
                 Instruction::UnpackList(count) => {
-                    let mut v = try_ctx!(stack.pop().try_into_vec().map_err(|e| {
+                    let top = stack.pop();
+                    let v = try_ctx!(top.as_slice().map_err(|e| {
                         Error::new(
                             ErrorKind::ImpossibleOperation,
                             "cannot unpack: not a sequence",
@@ -708,15 +709,21 @@ impl<'env> Vm<'env> {
                             )
                         ));
                     }
-                    for _ in 0..*count {
-                        stack.push(v.pop().unwrap());
+                    for value in v.iter().rev() {
+                        stack.push(value.clone());
                     }
                 }
                 Instruction::ListAppend => {
                     let item = stack.pop();
-                    let mut list = try_ctx!(stack.pop().try_into_vec());
-                    list.push(item);
-                    stack.push(Value::from(list));
+                    if let ValueRepr::Seq(mut v) = stack.pop().0 {
+                        RcType::make_mut(&mut v).push(item);
+                        stack.push(Value(ValueRepr::Seq(v)))
+                    } else {
+                        bail!(Error::new(
+                            ErrorKind::ImpossibleOperation,
+                            "cannot append to non-list"
+                        ));
+                    }
                 }
                 Instruction::Add => func_binop!(add),
                 Instruction::Sub => func_binop!(sub),

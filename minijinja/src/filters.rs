@@ -340,9 +340,9 @@ mod builtins {
         if let Some(s) = v.as_str() {
             Ok(Value::from(s.chars().rev().collect::<String>()))
         } else if matches!(v.kind(), ValueKind::Seq) {
-            let mut v = v.try_into_vec()?;
-            v.reverse();
-            Ok(Value::from(v))
+            Ok(Value::from(
+                v.as_slice()?.iter().rev().cloned().collect::<Vec<_>>(),
+            ))
         } else {
             Err(Error::new(
                 ErrorKind::ImpossibleOperation,
@@ -383,7 +383,7 @@ mod builtins {
             Ok(rv)
         } else if matches!(val.kind(), ValueKind::Seq) {
             let mut rv = String::new();
-            for item in val.try_into_vec()? {
+            for item in val.as_slice()? {
                 if !rv.is_empty() {
                     rv.push_str(joiner);
                 }
