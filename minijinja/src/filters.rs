@@ -151,14 +151,19 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
 }
 
 /// Marks a value as safe.  This converts it into a string.
+///
+/// When a value is marked as safe, no further auto escaping will take place.
 pub fn safe(_state: &State, v: String) -> Result<Value, Error> {
     // TODO: this ideally understands which type of escaping is in use
     Ok(Value::from_safe_string(v))
 }
 
-/// HTML escapes a string.
+/// Escapes a string.  By default to HTML.
 ///
-/// By default this filter is also registered under the alias `e`.
+/// By default this filter is also registered under the alias `e`.  Note that
+/// this filter escapes with the format that is native to the format or HTML
+/// otherwise.  This means that if the auto escape setting is set to
+/// `Json` for instance then this filter will serialize to JSON instead.
 pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
     if v.is_safe() {
         return Ok(v);
@@ -563,6 +568,7 @@ mod builtins {
     ///
     /// If you pass it a second argument it’s used to fill missing values on the
     /// last iteration.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn slice(
         _: &State,
         value: Value,
@@ -616,6 +622,7 @@ mod builtins {
     ///   {% endfor %}
     /// </table>
     /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn batch(
         _: &State,
         value: Value,
