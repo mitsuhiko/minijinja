@@ -150,7 +150,7 @@ fn tokenize_raw(
     }
 
     macro_rules! eat_number {
-        ($neg:expr) => {{
+        () => {{
             let old_loc = loc!();
             let mut is_float = false;
             let num_len = rest
@@ -169,7 +169,7 @@ fn tokenize_raw(
             if is_float {
                 return Some(Ok((
                     Token::Float(match num.parse::<f64>() {
-                        Ok(val) => val * if $neg { -1.0 } else { 1.0 },
+                        Ok(val) => val,
                         Err(_) => syntax_error!("invalid float"),
                     }),
                     span!(old_loc),
@@ -177,7 +177,7 @@ fn tokenize_raw(
             } else {
                 return Some(Ok((
                     Token::Int(match num.parse::<i64>() {
-                        Ok(val) => val * if $neg { -1 } else { 1 },
+                        Ok(val) => val,
                         Err(_) => syntax_error!("invalid integer"),
                     }),
                     span!(old_loc),
@@ -311,13 +311,7 @@ fn tokenize_raw(
                 // single character operators (and strings)
                 let op = match rest.as_bytes().get(0) {
                     Some(b'+') => Some(Token::Plus),
-                    Some(b'-') => {
-                        if rest.as_bytes().get(1).map_or(false, |x| x.is_ascii_digit()) {
-                            advance!(1);
-                            eat_number!(true);
-                        }
-                        Some(Token::Minus)
-                    }
+                    Some(b'-') => Some(Token::Minus),
                     Some(b'*') => Some(Token::Mul),
                     Some(b'/') => Some(Token::Div),
                     Some(b'%') => Some(Token::Mod),
@@ -338,7 +332,7 @@ fn tokenize_raw(
                     Some(b'}') => Some(Token::BraceClose),
                     Some(b'\'') => eat_string!(b'\''),
                     Some(b'"') => eat_string!(b'"'),
-                    Some(c) if c.is_ascii_digit() => eat_number!(false),
+                    Some(c) if c.is_ascii_digit() => eat_number!(),
                     _ => None,
                 };
                 if let Some(op) = op {
