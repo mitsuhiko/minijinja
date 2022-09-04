@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
-use crate::value::{RcType, Value, ValueRepr};
+use crate::value::{Arc, Value, ValueRepr};
 
 /// Helper trait representing valid filter and test arguments.
 ///
@@ -76,21 +76,21 @@ impl From<ValueRepr> for Value {
 impl<'a> From<&'a [u8]> for Value {
     #[inline(always)]
     fn from(val: &'a [u8]) -> Self {
-        ValueRepr::Bytes(RcType::new(val.into())).into()
+        ValueRepr::Bytes(Arc::new(val.into())).into()
     }
 }
 
 impl<'a> From<&'a str> for Value {
     #[inline(always)]
     fn from(val: &'a str) -> Self {
-        ValueRepr::String(RcType::new(val.into())).into()
+        ValueRepr::String(Arc::new(val.into())).into()
     }
 }
 
 impl From<String> for Value {
     #[inline(always)]
     fn from(val: String) -> Self {
-        ValueRepr::String(RcType::new(val)).into()
+        ValueRepr::String(Arc::new(val)).into()
     }
 }
 
@@ -114,14 +114,14 @@ impl From<()> for Value {
 impl From<i128> for Value {
     #[inline(always)]
     fn from(val: i128) -> Self {
-        ValueRepr::I128(RcType::new(val)).into()
+        ValueRepr::I128(Arc::new(val)).into()
     }
 }
 
 impl From<u128> for Value {
     #[inline(always)]
     fn from(val: u128) -> Self {
-        ValueRepr::U128(RcType::new(val)).into()
+        ValueRepr::U128(Arc::new(val)).into()
     }
 }
 
@@ -139,7 +139,7 @@ impl<'a> From<Key<'a>> for Value {
 
 impl<K: Into<StaticKey>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
     fn from(val: BTreeMap<K, V>) -> Self {
-        ValueRepr::Map(RcType::new(
+        ValueRepr::Map(Arc::new(
             val.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
         ))
         .into()
@@ -148,7 +148,7 @@ impl<K: Into<StaticKey>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(val: Vec<T>) -> Self {
-        ValueRepr::Seq(RcType::new(val.into_iter().map(|x| x.into()).collect())).into()
+        ValueRepr::Seq(Arc::new(val.into_iter().map(|x| x.into()).collect())).into()
     }
 }
 

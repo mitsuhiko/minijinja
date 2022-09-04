@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::Arc;
 
 use serde::Serialize;
 
@@ -8,7 +9,7 @@ use crate::error::Error;
 use crate::instructions::Instructions;
 use crate::parser::{parse, parse_expr};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, HtmlEscape};
-use crate::value::{ArgType, FunctionArgs, RcType, Value};
+use crate::value::{ArgType, FunctionArgs, Value};
 use crate::vm::Vm;
 use crate::{filters, functions, tests};
 
@@ -202,7 +203,7 @@ pub struct Environment<'source> {
     filters: BTreeMap<&'source str, filters::BoxedFilter>,
     tests: BTreeMap<&'source str, tests::BoxedTest>,
     pub(crate) globals: BTreeMap<&'source str, Value>,
-    default_auto_escape: RcType<dyn Fn(&str) -> AutoEscape + Sync + Send>,
+    default_auto_escape: Arc<dyn Fn(&str) -> AutoEscape + Sync + Send>,
     #[cfg(feature = "debug")]
     debug: bool,
 }
@@ -309,7 +310,7 @@ impl<'source> Environment<'source> {
             filters: filters::get_builtin_filters(),
             tests: tests::get_builtin_tests(),
             globals: functions::get_globals(),
-            default_auto_escape: RcType::new(default_auto_escape),
+            default_auto_escape: Arc::new(default_auto_escape),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
         }
@@ -325,7 +326,7 @@ impl<'source> Environment<'source> {
             filters: Default::default(),
             tests: Default::default(),
             globals: Default::default(),
-            default_auto_escape: RcType::new(no_auto_escape),
+            default_auto_escape: Arc::new(no_auto_escape),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
         }
@@ -349,7 +350,7 @@ impl<'source> Environment<'source> {
         &mut self,
         f: F,
     ) {
-        self.default_auto_escape = RcType::new(f);
+        self.default_auto_escape = Arc::new(f);
     }
 
     /// Enable or disable the debug mode.

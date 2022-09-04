@@ -118,7 +118,6 @@ fn test_auto_escaping() {
     insta::assert_snapshot!(rv, @r###"foo"bar'baz"###);
 }
 
-#[cfg(feature = "sync")]
 #[test]
 fn test_loop_changed() {
     let rv = minijinja::render!(

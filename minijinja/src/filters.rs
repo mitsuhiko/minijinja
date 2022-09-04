@@ -45,16 +45,17 @@
 //! MiniJinja will perform the necessary conversions automatically via the
 //! [`FunctionArgs`](crate::value::FunctionArgs) and [`Into`] traits.
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use crate::error::Error;
-use crate::value::{ArgType, FunctionArgs, RcType, Value};
+use crate::value::{ArgType, FunctionArgs, Value};
 use crate::vm::State;
 use crate::AutoEscape;
 
 type FilterFunc = dyn Fn(&State, &Value, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
 
 #[derive(Clone)]
-pub(crate) struct BoxedFilter(RcType<FilterFunc>);
+pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 
 /// A utility trait that represents filters.
 pub trait Filter<V, Rv, Args>: Send + Sync + 'static {
@@ -93,7 +94,7 @@ impl BoxedFilter {
         Rv: Into<Value>,
         Args: for<'a> FunctionArgs<'a>,
     {
-        BoxedFilter(RcType::new(
+        BoxedFilter(Arc::new(
             move |state, value, args| -> Result<Value, Error> {
                 f.apply_to(
                     state,

@@ -3,9 +3,10 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::num::TryFromIntError;
+use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{RcType, Value, ValueRepr};
+use crate::value::{Value, ValueRepr};
 
 pub use crate::key::serialize::KeySerializer;
 
@@ -19,7 +20,7 @@ pub enum Key<'a> {
     Bool(bool),
     I64(i64),
     Char(char),
-    String(RcType<String>),
+    String(Arc<String>),
     Str(&'a str),
 }
 
@@ -53,7 +54,7 @@ impl<'a> Key<'a> {
         }
         #[cfg(not(feature = "key_interning"))]
         {
-            Key::String(RcType::new(String::from(s)))
+            Key::String(Arc::new(String::from(s)))
         }
     }
 
@@ -197,7 +198,7 @@ pub mod key_interning {
 
     enum CachedKey<'a> {
         Ref(&'a str),
-        Stored(RcType<String>),
+        Stored(Arc<String>),
     }
 
     impl<'a> CachedKey<'a> {
@@ -237,14 +238,14 @@ pub mod key_interning {
         })
     }
 
-    pub(crate) fn try_intern(s: &str) -> RcType<String> {
+    pub(crate) fn try_intern(s: &str) -> Arc<String> {
         let depth = STRING_KEY_CACHE_DEPTH.with(|depth| depth.load(Ordering::Relaxed));
 
         // strings longer than 16 bytes are never interned or if we're at
         // depth 0.  (serialization code outside of internal serialization)
         // not checking for depth can cause a memory leak.
         if depth == 0 || s.len() > 16 {
-            return RcType::new(String::from(s));
+            return Arc::new(String::from(s));
         }
 
         STRING_KEY_CACHE.with(|cache| {
@@ -252,7 +253,7 @@ pub mod key_interning {
             match set.get(&CachedKey::Ref(s)) {
                 Some(CachedKey::Stored(s)) => s.clone(),
                 None => {
-                    let rv = RcType::new(String::from(s));
+                    let rv = Arc::new(String::from(s));
                     set.insert(CachedKey::Stored(rv.clone()));
                     rv
                 }

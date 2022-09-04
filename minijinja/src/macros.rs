@@ -5,8 +5,9 @@ use similar_asserts::assert_eq;
 #[doc(hidden)]
 pub mod __context {
     use crate::key::Key;
-    use crate::value::{RcType, Value, ValueMap, ValueRepr};
+    use crate::value::{Value, ValueMap, ValueRepr};
     use crate::Environment;
+    use std::sync::Arc;
 
     #[inline(always)]
     pub fn make() -> ValueMap {
@@ -20,7 +21,7 @@ pub mod __context {
 
     #[inline(always)]
     pub fn build(ctx: ValueMap) -> Value {
-        ValueRepr::Map(RcType::new(ctx)).into()
+        ValueRepr::Map(Arc::new(ctx)).into()
     }
 
     pub fn thread_local_env() -> Environment<'static> {

@@ -73,6 +73,7 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize};
+use std::sync::Arc;
 
 use serde::ser::{Serialize, Serializer};
 
@@ -94,12 +95,6 @@ mod serialize;
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
-
-#[cfg(feature = "sync")]
-pub(crate) type RcType<T> = std::sync::Arc<T>;
-
-#[cfg(not(feature = "sync"))]
-pub(crate) type RcType<T> = std::rc::Rc<T>;
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
@@ -207,14 +202,14 @@ pub(crate) enum ValueRepr {
     F64(f64),
     Char(char),
     None,
-    U128(RcType<u128>),
-    I128(RcType<i128>),
-    String(RcType<String>),
-    SafeString(RcType<String>),
-    Bytes(RcType<Vec<u8>>),
-    Seq(RcType<Vec<Value>>),
-    Map(RcType<ValueMap>),
-    Dynamic(RcType<dyn Object>),
+    U128(Arc<u128>),
+    I128(Arc<i128>),
+    String(Arc<String>),
+    SafeString(Arc<String>),
+    Bytes(Arc<Vec<u8>>),
+    Seq(Arc<Vec<Value>>),
+    Map(Arc<ValueMap>),
+    Dynamic(Arc<dyn Object>),
 }
 
 impl fmt::Debug for ValueRepr {
@@ -353,17 +348,17 @@ impl Value {
 
     /// Creates a value from a safe string.
     pub fn from_safe_string(value: String) -> Value {
-        ValueRepr::SafeString(RcType::new(value)).into()
+        ValueRepr::SafeString(Arc::new(value)).into()
     }
 
     /// Creates a value from a reference counted dynamic object.
-    pub(crate) fn from_rc_object<T: Object + 'static>(value: RcType<T>) -> Value {
-        ValueRepr::Dynamic(value as RcType<dyn Object>).into()
+    pub(crate) fn from_rc_object<T: Object + 'static>(value: Arc<T>) -> Value {
+        ValueRepr::Dynamic(value as Arc<dyn Object>).into()
     }
 
     /// Creates a value from a dynamic object.
     pub fn from_object<T: Object + 'static>(value: T) -> Value {
-        Value::from_rc_object(RcType::new(value))
+        Value::from_rc_object(Arc::new(value))
     }
 
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
@@ -399,12 +394,12 @@ impl Value {
                 unsafe {
                     // newer versions of Rust have RcType::as_ptr but we support
                     // rust versions down to 1.41.0 so we need to use a workaround here.
-                    let count = RcType::strong_count(obj);
+                    let count = Arc::strong_count(obj);
                     let clone = obj.clone();
-                    let raw: *const (dyn Object) = RcType::into_raw(clone);
+                    let raw: *const (dyn Object) = Arc::into_raw(clone);
                     let rv = (raw as *const u8 as *const T).as_ref();
-                    RcType::from_raw(raw);
-                    debug_assert_eq!(count, RcType::strong_count(obj));
+                    Arc::from_raw(raw);
+                    debug_assert_eq!(count, Arc::strong_count(obj));
                     return rv;
                 }
             }
@@ -624,17 +619,16 @@ impl Value {
     /// Iterates over the value.
     pub(crate) fn iter(&self) -> ValueIterator {
         let (iter_state, len) = match self.0 {
-            ValueRepr::Seq(ref seq) => (ValueIteratorState::Seq(0, RcType::clone(seq)), seq.len()),
+            ValueRepr::Seq(ref seq) => (ValueIteratorState::Seq(0, Arc::clone(seq)), seq.len()),
             #[cfg(feature = "preserve_order")]
-            ValueRepr::Map(ref items) => (
-                ValueIteratorState::Map(0, RcType::clone(items)),
-                items.len(),
-            ),
+            ValueRepr::Map(ref items) => {
+                (ValueIteratorState::Map(0, Arc::clone(items)), items.len())
+            }
             #[cfg(not(feature = "preserve_order"))]
             ValueRepr::Map(ref items) => (
                 ValueIteratorState::Map(
                     items.iter().next().map(|x| x.0.clone()),
-                    RcType::clone(items),
+                    Arc::clone(items),
                 ),
                 items.len(),
             ),
@@ -725,11 +719,11 @@ impl fmt::Debug for ValueIterator {
 
 enum ValueIteratorState {
     Empty,
-    Seq(usize, RcType<Vec<Value>>),
+    Seq(usize, Arc<Vec<Value>>),
     #[cfg(not(feature = "preserve_order"))]
-    Map(Option<StaticKey>, RcType<ValueMap>),
+    Map(Option<StaticKey>, Arc<ValueMap>),
     #[cfg(feature = "preserve_order")]
-    Map(usize, RcType<ValueMap>),
+    Map(usize, Arc<ValueMap>),
 }
 
 impl ValueIteratorState {
@@ -898,7 +892,7 @@ fn test_dynamic_object_roundtrip() {
         }
     }
 
-    let x = RcType::new(X(Default::default()));
+    let x = Arc::new(X(Default::default()));
     let x_value = Value::from_rc_object(x.clone());
     x.0.fetch_add(42, atomic::Ordering::Relaxed);
     let x_clone = Value::from_serializable(&x_value);
@@ -911,7 +905,7 @@ fn test_dynamic_object_roundtrip() {
 #[test]
 fn test_string_key_lookup() {
     let mut m = BTreeMap::new();
-    m.insert(Key::String(RcType::new("foo".into())), Value::from(42));
+    m.insert(Key::String(Arc::new("foo".into())), Value::from(42));
     let m = Value::from(m);
     assert_eq!(m.get_item(&Value::from("foo")).unwrap(), Value::from(42));
 }
@@ -960,7 +954,7 @@ fn test_key_interning() {
                 let k = m.iter().next().unwrap().0;
                 match k {
                     Key::String(s) => {
-                        assert_eq!(RcType::strong_count(s), 3);
+                        assert_eq!(Arc::strong_count(s), 3);
                     }
                     _ => unreachable!(),
                 }

@@ -46,15 +46,16 @@
 //! MiniJinja will perform the necessary conversions automatically via the
 //! [`FunctionArgs`](crate::value::FunctionArgs) trait.
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use crate::error::Error;
-use crate::value::{ArgType, FunctionArgs, RcType, Value};
+use crate::value::{ArgType, FunctionArgs, Value};
 use crate::vm::State;
 
 type TestFunc = dyn Fn(&State, &Value, &[Value]) -> Result<bool, Error> + Sync + Send + 'static;
 
 #[derive(Clone)]
-pub(crate) struct BoxedTest(RcType<TestFunc>);
+pub(crate) struct BoxedTest(Arc<TestFunc>);
 
 /// A utility trait that represents filters.
 pub trait Test<V, Args>: Send + Sync + 'static {
@@ -92,16 +93,14 @@ impl BoxedTest {
         V: for<'a> ArgType<'a>,
         Args: for<'a> FunctionArgs<'a>,
     {
-        BoxedTest(RcType::new(
-            move |state, value, args| -> Result<bool, Error> {
-                let value = Some(value);
-                f.perform(
-                    state,
-                    ArgType::from_value(value)?,
-                    FunctionArgs::from_values(args)?,
-                )
-            },
-        ))
+        BoxedTest(Arc::new(move |state, value, args| -> Result<bool, Error> {
+            let value = Some(value);
+            f.perform(
+                state,
+                ArgType::from_value(value)?,
+                FunctionArgs::from_values(args)?,
+            )
+        }))
     }
 
     /// Applies the filter to a value and argument.
