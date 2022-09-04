@@ -341,14 +341,14 @@ impl<'env, 'vm> Context<'env, 'vm> {
     }
 }
 
-fn process_err(mut err: Error, pc: usize, state: &State, instructions: &Instructions) -> Error {
+fn process_err(mut err: Error, pc: usize, _state: &State, instructions: &Instructions) -> Error {
     if let Some(lineno) = instructions.get_line(pc) {
         err.set_location(instructions.name(), lineno);
     }
     #[cfg(feature = "debug")]
     {
-        if state.env.debug() && err.debug_info.is_none() {
-            err.debug_info = Some(state.make_debug_info(pc, instructions));
+        if _state.env.debug() && err.debug_info.is_none() {
+            err.debug_info = Some(_state.make_debug_info(pc, instructions));
         }
     }
     err
