@@ -3,10 +3,12 @@
 //!   <p><strong>MiniJinja: a powerful template engine for Rust with minimal dependencies</strong></p>
 //! </div>
 //!
-//! MiniJinja is a simple [Jinja2](https://jinja.palletsprojects.com/) inspired
-//! template engine based on [serde](https://serde.rs/). It's light in features
-//! and on dependencies but implements a pretty sizable feature set from Jinja2.
-//! It attempts to stay largely compatible in Syntax and behavior:
+//! MiniJinja is a powerful but minimal dependency template engine for Rust which
+//! is based on the syntax and behavior of the
+//! [Jinja2](https://jinja.palletsprojects.com/) template engine for Python.  It's
+//! implemented on top of [`serde`].  The goal is to be able to render a large
+//! chunk of the Jinja2 template ecosystem from Rust with a minimal engine and to
+//! leverage an alredy existing ecosystem of editor integrations.
 //!
 //! ```jinja
 //! {% for user in users %}
@@ -16,25 +18,23 @@
 //!
 //! # Why MiniJinja
 //!
-//! Rust already has quite a selection of template engines and there are in fact
-//! already a handful of engines which are inspired by Jinja2 including
-//! [Tera](https://crates.io/crates/tera) and
-//! [Askama](https://crates.io/crates/askama) but they are very heavy in terms of
-//! dependencies and usage. MiniJinja by its name does not try to become a
-//! replacement for these, but it wants to be a good default choice if you need a
-//! little bit of templating with minimal dependencies.
+//! MiniJinja by its name wants to be a good default choice if you need a little
+//! bit of templating with minimal dependencies.  It has the following goals:
 //!
-//! MiniJinja tries to juggle these three goals:
-//!
-//! 1. aim for a high level of compatibility with Jinja2 templates
-//! 2. provide template rendering and expression evaluation functionality
-//! 3. achieve above functionality with the lest amount of dependencies possible
+//! * Well documented, compact API
+//! * Minimal dependencies, reasonable compile times and decent runtime performance
+//! * Stay close as possible to Jinja2
+//! * Support for expression evaluation
+//! * Support for all `serde` compatible types
+//! * Excellent test coverage
+//! * Support for dynamic runtime objects with methods and dynamic attributes
 //!
 //! # Template Usage
 //!
-//! To use MiniJinja one needs to create an [`Environment`] and populate it with templates.
-//! Afterwards templates can be loaded and rendered.  To pass data one can pass any serde
-//! serializable value:
+//! To use MiniJinja one needs to create an [`Environment`] and populate it with
+//! templates.  Afterwards templates can be loaded and rendered.  To pass data
+//! one can pass any serde serializable value.  The [`context!`] macro can be
+//! used to quickly construct a template context:
 //!
 //! ```
 //! use minijinja::{Environment, context};
@@ -69,22 +69,20 @@
 //! assert_eq!(result.is_true(), true);
 //! ```
 //!
+//! This becomes particularly powerful when [dynamic objects](crate::value::Object) are
+//! exposed to templates.
+//!
 //! # Learn more
 //!
-//! - [`syntax`]: documentation of the template engine syntax.
-//! - [`filters`]: for how to write custom filters and to see the list of built-in filters.
-//! - [`tests`]: for how to write custom test functions and to see the list of built-in tests.
-//! - [`functions`]: for how to write custom functions and to see the list of built-in functions.
-//! - [`value`]: for information about the runtime value object.
-//! - [`Environment`]: the main API entry point.
-//! - [`Template`]: the template object API.
+//! - [`Environment`]: the main API entry point.  Teaches you how to configure the environment.
+//! - [`Template`]: the template object API.  Shows you how templates can be rendered.
+//! - [`syntax`]: provides documentation of the template engine syntax.
+//! - [`filters`]: teaches you how to write custom filters and to see the list of built-in filters.
+//! - [`tests`]: teaches you how to write custom test functions and to see the list of built-in tests.
+//! - [`functions`]: teaches how to write custom functions and to see the list of built-in functions.
 //!
-//! # Debugging
-//!
-//! To better understand what's going on when a template syntax or rendering error
-//! happens you should turn on the built-in debug support.  Once enabled the errors
-//! created by the engine will include helpful error messages with information about
-//! where the error happened.  For more information see [`set_debug`](crate::Environment::set_debug).
+//! Additionally there is an [list of examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
+//! with many different small example programs on GitHub to explore.
 //!
 //! # Optional Features
 //!

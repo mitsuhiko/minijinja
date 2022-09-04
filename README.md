@@ -31,7 +31,7 @@ minimal v0.1.0 (examples/minimal)
 
 **Goals:**
 
-* Well documented API with small surface
+* Well documented, compact API
 * Minimal dependencies, reasonable compile times and decent runtime performance
 * Stay close as possible to Jinja2
 * Support for expression evaluation

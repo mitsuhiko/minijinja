@@ -39,7 +39,7 @@
 //! use minijinja::State;
 //!
 //! fn is_lowercase(_state: &State, value: String) -> bool {
-//!    value.chars().all(|x| x.is_lowercase())
+//!     value.chars().all(|x| x.is_lowercase())
 //! }
 //!
 //! env.add_test("lowercase", is_lowercase);
@@ -117,7 +117,7 @@ impl TestResult for bool {
 /// use minijinja::State;
 ///
 /// fn is_lowercase(_state: &State, value: String) -> bool {
-///    value.chars().all(|x| x.is_lowercase())
+///     value.chars().all(|x| x.is_lowercase())
 /// }
 ///
 /// env.add_test("lowercase", is_lowercase);

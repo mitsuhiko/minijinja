@@ -339,80 +339,6 @@ impl<'source> Environment<'source> {
         }
     }
 
-    /// Sets a new function to select the default auto escaping.
-    ///
-    /// This function is invoked when templates are loaded from the environment
-    /// to determine the default auto escaping behavior.  The function is
-    /// invoked with the name of the template and can make an initial auto
-    /// escaping decision based on that.  The default implementation is to
-    /// turn on escaping depending on the file extension:
-    ///
-    /// * [`Html`](AutoEscape::Html): `.html`, `.htm`, `.xml`
-    #[cfg_attr(
-        feature = "json",
-        doc = r" * [`Json`](AutoEscape::Json): `.json`, `.js`, `.yml`"
-    )]
-    /// * [`None`](AutoEscape::None): _all others_
-    pub fn set_auto_escape_callback<F: Fn(&str) -> AutoEscape + 'static + Sync + Send>(
-        &mut self,
-        f: F,
-    ) {
-        self.default_auto_escape = Arc::new(f);
-    }
-
-    /// Enable or disable the debug mode.
-    ///
-    /// When the debug mode is enabled the engine will dump out some of the
-    /// execution state together with the source information of the executing
-    /// template when an error is created.  The cost of this is relatively
-    /// high as the data including the template source is cloned.
-    ///
-    /// However providing this information greatly improves the debug information
-    /// that the template error provides.  When debug is enabled errors will
-    /// return a [`DebugInfo`](crate::error::DebugInfo) object from
-    /// [`Error::debug_info`](crate::error::Error::debug_info).
-    ///
-    /// This requires the `debug` feature.  This is enabled by default if
-    /// debug assertions are enabled and false otherwise.
-    #[cfg(feature = "debug")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
-    pub fn set_debug(&mut self, enabled: bool) {
-        self.debug = enabled;
-    }
-
-    #[cfg(feature = "debug")]
-    pub(crate) fn debug(&self) -> bool {
-        self.debug
-    }
-
-    /// Sets the template source for the environment.
-    ///
-    /// This helps when working with dynamically loaded templates.  The
-    /// [`Source`](crate::source::Source) is consulted by the environment to
-    /// look up templates that are requested.  The source has the capabilities
-    /// to load templates with fewer lifetime restrictions and can also
-    /// load templates dynamically at runtime as requested.
-    ///
-    /// When a source is set already loaded templates in the environment are
-    /// discarded and replaced with the templates from the source.
-    ///
-    /// For more information see [`Source`](crate::source::Source).
-    #[cfg(feature = "source")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
-    pub fn set_source(&mut self, source: crate::source::Source) {
-        self.templates = Source::Owned(source);
-    }
-
-    /// Returns the currently set source.
-    #[cfg(feature = "source")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
-    pub fn source(&self) -> Option<&crate::source::Source> {
-        match self.templates {
-            Source::Borrowed(_) => None,
-            Source::Owned(ref source) => Some(source),
-        }
-    }
-
     /// Loads a template from a string.
     ///
     /// The `name` parameter defines the name of the template which identifies
@@ -492,6 +418,80 @@ impl<'source> Environment<'source> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _eval.
         self._render_str(source, Value::from_serializable(&ctx))
+    }
+
+    /// Sets a new function to select the default auto escaping.
+    ///
+    /// This function is invoked when templates are loaded from the environment
+    /// to determine the default auto escaping behavior.  The function is
+    /// invoked with the name of the template and can make an initial auto
+    /// escaping decision based on that.  The default implementation is to
+    /// turn on escaping depending on the file extension:
+    ///
+    /// * [`Html`](AutoEscape::Html): `.html`, `.htm`, `.xml`
+    #[cfg_attr(
+        feature = "json",
+        doc = r" * [`Json`](AutoEscape::Json): `.json`, `.js`, `.yml`"
+    )]
+    /// * [`None`](AutoEscape::None): _all others_
+    pub fn set_auto_escape_callback<F: Fn(&str) -> AutoEscape + 'static + Sync + Send>(
+        &mut self,
+        f: F,
+    ) {
+        self.default_auto_escape = Arc::new(f);
+    }
+
+    /// Enable or disable the debug mode.
+    ///
+    /// When the debug mode is enabled the engine will dump out some of the
+    /// execution state together with the source information of the executing
+    /// template when an error is created.  The cost of this is relatively
+    /// high as the data including the template source is cloned.
+    ///
+    /// However providing this information greatly improves the debug information
+    /// that the template error provides.  When debug is enabled errors will
+    /// return a [`DebugInfo`](crate::error::DebugInfo) object from
+    /// [`Error::debug_info`](crate::error::Error::debug_info).
+    ///
+    /// This requires the `debug` feature.  This is enabled by default if
+    /// debug assertions are enabled and false otherwise.
+    #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
+    pub fn set_debug(&mut self, enabled: bool) {
+        self.debug = enabled;
+    }
+
+    #[cfg(feature = "debug")]
+    pub(crate) fn debug(&self) -> bool {
+        self.debug
+    }
+
+    /// Sets the template source for the environment.
+    ///
+    /// This helps when working with dynamically loaded templates.  The
+    /// [`Source`](crate::source::Source) is consulted by the environment to
+    /// look up templates that are requested.  The source has the capabilities
+    /// to load templates with fewer lifetime restrictions and can also
+    /// load templates dynamically at runtime as requested.
+    ///
+    /// When a source is set already loaded templates in the environment are
+    /// discarded and replaced with the templates from the source.
+    ///
+    /// For more information see [`Source`](crate::source::Source).
+    #[cfg(feature = "source")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
+    pub fn set_source(&mut self, source: crate::source::Source) {
+        self.templates = Source::Owned(source);
+    }
+
+    /// Returns the currently set source.
+    #[cfg(feature = "source")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
+    pub fn source(&self) -> Option<&crate::source::Source> {
+        match self.templates {
+            Source::Borrowed(_) => None,
+            Source::Owned(ref source) => Some(source),
+        }
     }
 
     fn _render_str(&self, source: &str, root: Value) -> Result<String, Error> {

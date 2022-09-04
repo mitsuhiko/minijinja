@@ -40,7 +40,7 @@
 //!
 //! [Filters](crate::filters) and [tests](crate::tests) can take values as arguments
 //! but optionally also rust types directly.  This conversion for function arguments
-//! is performed by the [`FunctionArgs`] trait.
+//! is performed by the [`FunctionArgs`] and related traits ([`ArgType`], [`FunctionResult`]).
 //!
 //! # Memory Management
 //!
