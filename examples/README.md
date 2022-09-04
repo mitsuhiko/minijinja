@@ -10,6 +10,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [dynamic](dynamic): demonstrates how to use dynamic objects in templates.
 * [error](error): shows the built-in error reporting support.
 * [expr](expr): demonstrates the expression evaluation support.
+* [filters](filters): Shows how to write and use custom filters and global functions.
 * [generate-yaml](generate-yaml): renders YAML files from Jinja templates.
 * [hello](hello): minimal Hello World example.
 * [inheritance](inheritance): demonstrates how to use template inheritance.
