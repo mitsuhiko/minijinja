@@ -421,8 +421,11 @@ impl<'source> Environment<'source> {
     ///
     /// Note that there are situations where the interface of this method is
     /// too restrictive.  For instance the environment itself does not permit
-    /// any form of sensible dynamic template loading.  To address this
-    /// restriction use [`set_source`](Self::set_source).
+    /// any form of sensible dynamic template loading.
+    #[cfg_attr(
+        feature = "source",
+        doc = "To address this restriction use [`set_source`](Self::set_source)."
+    )]
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
         match self.templates {
             Source::Borrowed(ref mut map) => {
