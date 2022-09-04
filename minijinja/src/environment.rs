@@ -20,8 +20,9 @@ use similar_asserts::assert_eq;
 ///
 /// Templates are stored in the [`Environment`] as bytecode instructions.  With the
 /// [`Environment::get_template`] method that is looked up and returned in form of
-/// this handle.  Such a template can be cheaply copied as it only holds two
-/// pointers.  To render the [`render`](Template::render) method can be used.
+/// this handle.  Such a template can be cheaply copied as it only holds references.
+///
+/// To render the [`render`](Template::render) method can be used.
 #[derive(Copy, Clone)]
 pub struct Template<'env> {
     env: &'env Environment<'env>,
@@ -187,12 +188,8 @@ impl<'source> fmt::Debug for Source<'source> {
 
 /// An abstraction that holds the engine configuration.
 ///
-/// This object holds the central configuration state for templates and their
-/// configuration.  Instances of this type may be modified if no template were
-/// loaded so far.  Modifications on environments after the first template was
-/// loaded will lead to surprising effects and undefined behavior.  For instance
-/// overriding the auto escape callback will no longer have effects to an already
-/// loaded template.
+/// This object holds the central configuration state for templates.  It is also
+/// the container for all loaded templates.
 ///
 /// The environment holds references to the source the templates were created from.
 /// This makes it very inconvenient to pass around unless the templates are static
@@ -204,6 +201,13 @@ For situations where you want to load dynamic templates and share the
 environment it's recommended to turn on the `source` feature and to use the
 [`Source`](crate::source::Source) type with the environment."
 )]
+///
+/// There are generally two ways to construct an environment:
+///
+/// * [`Environment::new`] creates an environment preconfigured with sensible
+///   defaults.  It will contain all built-in filters, tests and globals as well
+///   as a callback for auto escaping based on file extension.
+/// * [`Environment::empty`] creates a completely blank environment.
 #[derive(Clone)]
 pub struct Environment<'source> {
     templates: Source<'source>,
