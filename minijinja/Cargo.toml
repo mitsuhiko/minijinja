@@ -28,8 +28,6 @@ builtins = []
 json = ["serde_json"]
 urlencode = ["percent-encoding"]
 
-# this feature no longer has any effect
-sync = []
 # enables the Debug trait for some internal types
 internal_debug = []
 # provides access to the unstable machinery
