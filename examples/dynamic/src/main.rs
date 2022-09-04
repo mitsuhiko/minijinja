@@ -59,19 +59,9 @@ fn main() {
     let mut env = Environment::new();
     env.add_function("cycler", make_cycler);
     env.add_global("magic", Value::from_object(Magic));
-    env.add_template(
-        "demo.html",
-        r#"
-{%- with next_class = cycler(["odd", "even"]) %}
-  <ul class="{{ magic.make_class("ul") }}">
-  {%- for char in ["a", "b", "c", "d"] %}
-    <li class={{ next_class() }}>{{ char }}</li>
-  {%- endfor %}
-  </ul>
-{%- endwith %}"#,
-    )
-    .unwrap();
+    env.add_template("template.html", include_str!("template.html"))
+        .unwrap();
 
-    let tmpl = env.get_template("demo.html").unwrap();
+    let tmpl = env.get_template("template.html").unwrap();
     println!("{}", tmpl.render(&()).unwrap());
 }
