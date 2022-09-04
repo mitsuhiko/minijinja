@@ -29,6 +29,16 @@ minimal v0.1.0 (examples/minimal)
     └── serde v1.0.144
 ```
 
+**Goals:**
+
+* Well documented API with small surface
+* Minimal dependencies, reasonable compile times and decent runtime performance
+* Stay close as possible to Jinja2
+* Support for expression evaluation
+* Support for all `serde` compatible types
+* Excellent test coverage
+* Support for dynamic runtime objects with methods and dynamic attributes
+
 ## Example Template
 
 ```jinja

@@ -3,6 +3,13 @@
 This document tracks the differences between Jinja2 and MiniJinja and what
 the state of compatiblity and future direction is.
 
+## Syntax Differences
+
+MiniJinja does not support line statements and the ability to customize the
+delimiters.  Both of those are currently intentional to better leverage
+the editor ecosystem which typically cannot deal with these reconfigured
+Jinja templates.
+
 ## Runtime Differences
 
 The biggest differences between MiniJinja and Jinja2 stem from the different
