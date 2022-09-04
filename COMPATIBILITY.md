@@ -1,0 +1,131 @@
+# Jinja2 Compatibility
+
+This document tracks the differences between Jinja2 and MiniJinja and what
+the state of compatiblity and future direction is.
+
+## Runtime Differences
+
+The biggest differences between MiniJinja and Jinja2 stem from the different
+runtime environments.  Jinja2 leaks out a lot of the underlying Python engine
+whereas MiniJinja implements it's own runtime data model.
+
+The most significant differents are documented here:
+
+### Python Methods
+
+MiniJinja does not implement _any_ Python methods.  In particular this means
+you cannot do `x.items()` to iterate over items.  For this particular case
+both Jinja2 and MiniJinja now support `|items` for iteration instead.  Other
+methods are rareful useful and filters should be used instead.
+
+### Tuples
+
+MiniJinja does not implement tuples.  The creation of tuples with tuple syntax
+instead create lists.
+
+### Keyword Arguments
+
+MiniJinja maps keyword arguments to the creation of dictionaries which are passed
+as last argument.  This is done as keyword arguments are not native to Rust and
+mapping them to filter functions is tricky.  This also means that some filters in
+MiniJinja do not accept the parameters with keyword arguments whereas in Jinja2
+they do.
+
+### Undefined
+
+The Jinja2 undefined type tracks the origin of creation, in MiniJinja the undefined
+type is a singleton without further information.
+
+### Context
+
+The context in Jinja2 is a data source and the runtime system pulls some pieces of
+data from the context as necessary.  This optimization is not particularly useful
+in MiniJinja and as such is not performed.  This also means that in MiniJinja the
+default behavior is to pass the current state of the context everywhere.
+
+### Escaping
+
+Jinja2 only supports HTML escaping, in MiniJinja it's intended to support other
+forms of auto escaping as well.
+
+## Blocks
+
+### `{% for %}`
+
+`for` works is at feature parity with Jinja2 with the exception of the
+missing support for `loop.previtem` and `loop.nexitem`.  Supporting this
+is possible but has not been implemented yet because it requires taking
+a mutex for each loop iteration.
+
+**Tracking issue:** [#47](https://github.com/mitsuhiko/minijinja/issues/47)
+
+### `{% if %}`
+
+`if` has feature parity with Jinja2.
+
+### `{% extends %}`
+
+`extends` has feature parity with Jinja2.
+
+### `{% block %}`
+
+`block` has feature parity with Jinja2.
+
+### `{% include %}`
+
+`include` mostly has feature parity with Jinja2 but some deliberate
+distinctions were made.  The `without context` and `with context`
+modifiers are intentionally not supported.  The context system of
+MiniJinja is different as mentioned above.
+
+### `{% import %}`
+
+This tag is currently not supported.  If support for macros is added
+this would make sense to add.
+
+### `{% macro %}`
+
+This tag is currently not supported.
+
+**Tracking issue:** [#44](https://github.com/mitsuhiko/minijinja/issues/44)
+
+### `{% with %}`
+
+`with` has feature parity with Jinja2.
+
+### `{% set %}`
+
+`set` has feature parity with Jinja2.
+
+### `{% filter %}`
+
+`filter` has feature parity with Jinja2.
+
+### `{% autoescape %}`
+
+`autoescape` has feature parity with Jinja2 with an undocumented extension.
+Currently it's possible to provide the intended form of auto escaping to
+the tag.  This is not documented because it's unclear if this behavior is
+useful.
+
+### `{% raw %}`
+
+`raw` has feature parity with Jinja2.
+
+## Expressions
+
+Most expressions are supported from Jinja2.  The main difference for expressions
+is that `foo["bar"]` and `foo.bar` have the same priority in MiniJinja whereas
+in Jinja2 they are used to disambiguate against attributes of the underlying
+Python objects.
+
+Differences with expressions mostly stem from the underlying data model.  For
+instance Jinja2 templates tend to use `{{ "string" % variable }}` to perform
+string formatting which is not supported in MiniJinja.  Likewise not all filters
+are available in MiniJinja or behave the same.
+
+## Filters
+
+MiniJinja supports many common Jinja2 filters but leaves out many which perform
+dynamic invocation.  For instance `|map` and `|select` are not supported.  Likewise
+many string formatting filters like `|xmlattr` or `|urlize` are missing.
