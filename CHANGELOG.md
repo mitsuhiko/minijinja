@@ -8,6 +8,7 @@ All notable changes to MiniJinja are documented here.
 - Changed `Object` and `FunctionArgs` interface to take
   arguments by reference. (#101)
 - `sync` mode is now always enabled. (#104)
+- Removed meta API. (#105)
 
 # 0.19.1
 
