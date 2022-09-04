@@ -139,7 +139,6 @@ mod vm;
 
 pub mod filters;
 pub mod functions;
-pub mod meta;
 pub mod syntax;
 pub mod tests;
 pub mod value;
