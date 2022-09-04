@@ -3,12 +3,11 @@ source: minijinja/tests/test_lexer.rs
 description: "before {% raw %} this is a {{ raw }} {% block %} {% endraw %} after\n\nbefore {%- raw %} this is a {{ raw }} {% block %} {% endraw -%} after\n\nbefore {%- raw -%} this is a {{ raw }} {% block %} {%- endraw -%} after"
 input_file: minijinja/tests/lexer-inputs/raw.txt
 ---
-[
-    TEMPLATE_DATA("before "),
-    TEMPLATE_DATA("{% raw %} this is a {{ raw }} {% block %} {% endraw %}"),
-    TEMPLATE_DATA(" after\n\nbefore "),
-    TEMPLATE_DATA("{%- raw %} this is a {{ raw }} {% block %} {% endraw -%}"),
-    TEMPLATE_DATA(" after\n\nbefore "),
-    TEMPLATE_DATA("{%- raw -%} this is a {{ raw }} {% block %} {%- endraw -%}"),
-    TEMPLATE_DATA(" after"),
-]
+TemplateData("before ")
+TemplateData("{% raw %} this is a {{ raw }} {% block %} {% endraw %}")
+TemplateData(" after\n\nbefore ")
+TemplateData("{%- raw %} this is a {{ raw }} {% block %} {% endraw -%}")
+TemplateData(" after\n\nbefore ")
+TemplateData("{%- raw -%} this is a {{ raw }} {% block %} {%- endraw -%}")
+TemplateData(" after")
+

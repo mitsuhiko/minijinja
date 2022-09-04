@@ -3,31 +3,30 @@ source: minijinja/tests/test_lexer.rs
 description: "{{ with_int(42, -42) }}\n{{ with_float(1.5, -1.5) }}\n{{ with_string(\"string\") }}"
 input_file: minijinja/tests/lexer-inputs/things.txt
 ---
-[
-    VARIABLE_START(false),
-    IDENT(with_int),
-    PAREN_OPEN,
-    INT(42),
-    COMMA,
-    MINUS,
-    INT(42),
-    PAREN_CLOSE,
-    VARIABLE_END(false),
-    TEMPLATE_DATA("\n"),
-    VARIABLE_START(false),
-    IDENT(with_float),
-    PAREN_OPEN,
-    FLOAT(1.5),
-    COMMA,
-    MINUS,
-    FLOAT(1.5),
-    PAREN_CLOSE,
-    VARIABLE_END(false),
-    TEMPLATE_DATA("\n"),
-    VARIABLE_START(false),
-    IDENT(with_string),
-    PAREN_OPEN,
-    STR("string"),
-    PAREN_CLOSE,
-    VARIABLE_END(false),
-]
+VariableStart(false)
+Ident("with_int")
+ParenOpen
+Int(42)
+Comma
+Minus
+Int(42)
+ParenClose
+VariableEnd(false)
+TemplateData("\n")
+VariableStart(false)
+Ident("with_float")
+ParenOpen
+Float(1.5)
+Comma
+Minus
+Float(1.5)
+ParenClose
+VariableEnd(false)
+TemplateData("\n")
+VariableStart(false)
+Ident("with_string")
+ParenOpen
+Str("string")
+ParenClose
+VariableEnd(false)
+

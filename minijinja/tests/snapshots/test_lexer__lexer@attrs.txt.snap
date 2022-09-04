@@ -3,38 +3,37 @@ source: minijinja/tests/test_lexer.rs
 description: "{# useless comment #}\n{{ foo.bar[baz].blah }}\n{{ {\"foo\": \"bar\"}.test }}\n{{ [1, 2, 3].test }}"
 input_file: minijinja/tests/lexer-inputs/attrs.txt
 ---
-[
-    TEMPLATE_DATA("\n"),
-    VARIABLE_START(false),
-    IDENT(foo),
-    DOT,
-    IDENT(bar),
-    BRACKET_OPEN,
-    IDENT(baz),
-    BRACKET_CLOSE,
-    DOT,
-    IDENT(blah),
-    VARIABLE_END(false),
-    TEMPLATE_DATA("\n"),
-    VARIABLE_START(false),
-    BRACE_OPEN,
-    STR("foo"),
-    COLON,
-    STR("bar"),
-    BRACE_CLOSE,
-    DOT,
-    IDENT(test),
-    VARIABLE_END(false),
-    TEMPLATE_DATA("\n"),
-    VARIABLE_START(false),
-    BRACKET_OPEN,
-    INT(1),
-    COMMA,
-    INT(2),
-    COMMA,
-    INT(3),
-    BRACKET_CLOSE,
-    DOT,
-    IDENT(test),
-    VARIABLE_END(false),
-]
+TemplateData("\n")
+VariableStart(false)
+Ident("foo")
+Dot
+Ident("bar")
+BracketOpen
+Ident("baz")
+BracketClose
+Dot
+Ident("blah")
+VariableEnd(false)
+TemplateData("\n")
+VariableStart(false)
+BraceOpen
+Str("foo")
+Colon
+Str("bar")
+BraceClose
+Dot
+Ident("test")
+VariableEnd(false)
+TemplateData("\n")
+VariableStart(false)
+BracketOpen
+Int(1)
+Comma
+Int(2)
+Comma
+Int(3)
+BracketClose
+Dot
+Ident("test")
+VariableEnd(false)
+

@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fmt;
 
 /// Represents a token in the stream.
+#[derive(Debug)]
 pub enum Token<'a> {
     /// Raw template data.
     TemplateData(&'a str),
@@ -73,48 +74,6 @@ pub enum Token<'a> {
     BraceOpen,
     /// Close Brace
     BraceClose,
-}
-
-impl<'a> fmt::Debug for Token<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Token::TemplateData(s) => write!(f, "TEMPLATE_DATA({:?})", s),
-            Token::VariableStart(ws) => write!(f, "VARIABLE_START({:?})", ws),
-            Token::VariableEnd(ws) => write!(f, "VARIABLE_END({:?})", ws),
-            Token::BlockStart(ws) => write!(f, "BLOCK_END({:?})", ws),
-            Token::BlockEnd(ws) => write!(f, "BLOCK_END({:?})", ws),
-            Token::Ident(i) => write!(f, "IDENT({})", i),
-            Token::Str(s) => write!(f, "STR({:?})", s),
-            Token::Int(i) => write!(f, "INT({:?})", i),
-            Token::Float(v) => write!(f, "FLOAT({:?})", v),
-            Token::Plus => write!(f, "PLUS"),
-            Token::Minus => write!(f, "MINUS"),
-            Token::Mul => write!(f, "MUL"),
-            Token::Div => write!(f, "DIV"),
-            Token::FloorDiv => write!(f, "FLOORDIV"),
-            Token::Pow => write!(f, "POW"),
-            Token::Mod => write!(f, "MOD"),
-            Token::Bang => write!(f, "BANG"),
-            Token::Dot => write!(f, "DOT"),
-            Token::Comma => write!(f, "COMMA"),
-            Token::Colon => write!(f, "COLON"),
-            Token::Tilde => write!(f, "TILDE"),
-            Token::Assign => write!(f, "ASSIGN"),
-            Token::Pipe => write!(f, "PIPE"),
-            Token::Eq => write!(f, "EQ"),
-            Token::Ne => write!(f, "NE"),
-            Token::Gt => write!(f, "GT"),
-            Token::Gte => write!(f, "GTE"),
-            Token::Lt => write!(f, "LT"),
-            Token::Lte => write!(f, "LTE"),
-            Token::BracketOpen => write!(f, "BRACKET_OPEN"),
-            Token::BracketClose => write!(f, "BRACKET_CLOSE"),
-            Token::ParenOpen => write!(f, "PAREN_OPEN"),
-            Token::ParenClose => write!(f, "PAREN_CLOSE"),
-            Token::BraceOpen => write!(f, "BRACE_OPEN"),
-            Token::BraceClose => write!(f, "BRACE_CLOSE"),
-        }
-    }
 }
 
 impl<'a> fmt::Display for Token<'a> {

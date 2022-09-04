@@ -3,10 +3,9 @@ source: minijinja/tests/test_lexer.rs
 description: "Hello {{ name }}!"
 input_file: minijinja/tests/lexer-inputs/basic.txt
 ---
-[
-    TEMPLATE_DATA("Hello "),
-    VARIABLE_START(false),
-    IDENT(name),
-    VARIABLE_END(false),
-    TEMPLATE_DATA("!\n"),
-]
+TemplateData("Hello ")
+VariableStart(false)
+Ident("name")
+VariableEnd(false)
+TemplateData("!\n")
+

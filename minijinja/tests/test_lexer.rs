@@ -1,6 +1,8 @@
 #![cfg(feature = "unstable_machinery")]
 use minijinja::machinery::tokenize;
 
+use std::fmt::Write;
+
 #[test]
 fn test_lexer() {
     insta::glob!("lexer-inputs/*.txt", |path| {
@@ -11,7 +13,11 @@ fn test_lexer() {
             description => contents.trim_end(),
             omit_expression => true
         }, {
-            insta::assert_debug_snapshot!(&tokens);
+            let mut stringified = String::new();
+            for token in tokens {
+                writeln!(stringified, "{:?}", token).unwrap();
+            }
+            insta::assert_snapshot!(&stringified);
         });
     });
 }

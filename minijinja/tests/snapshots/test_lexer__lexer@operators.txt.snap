@@ -3,27 +3,26 @@ source: minijinja/tests/test_lexer.rs
 description: "{{ (!a + b) * (c - d) / e % f // g ~ h }}"
 input_file: minijinja/tests/lexer-inputs/operators.txt
 ---
-[
-    VARIABLE_START(false),
-    PAREN_OPEN,
-    BANG,
-    IDENT(a),
-    PLUS,
-    IDENT(b),
-    PAREN_CLOSE,
-    MUL,
-    PAREN_OPEN,
-    IDENT(c),
-    MINUS,
-    IDENT(d),
-    PAREN_CLOSE,
-    DIV,
-    IDENT(e),
-    MOD,
-    IDENT(f),
-    FLOORDIV,
-    IDENT(g),
-    TILDE,
-    IDENT(h),
-    VARIABLE_END(false),
-]
+VariableStart(false)
+ParenOpen
+Bang
+Ident("a")
+Plus
+Ident("b")
+ParenClose
+Mul
+ParenOpen
+Ident("c")
+Minus
+Ident("d")
+ParenClose
+Div
+Ident("e")
+Mod
+Ident("f")
+FloorDiv
+Ident("g")
+Tilde
+Ident("h")
+VariableEnd(false)
+

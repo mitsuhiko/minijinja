@@ -1,0 +1,15 @@
+---
+source: minijinja/tests/test_lexer.rs
+description: "foo {{- bar -}} baz {{ blah }} blub"
+input_file: minijinja/tests/lexer-inputs/whitespace.txt
+---
+TemplateData("foo")
+VariableStart(true)
+Ident("bar")
+VariableEnd(true)
+TemplateData("baz ")
+VariableStart(false)
+Ident("blah")
+VariableEnd(false)
+TemplateData(" blub\n")
+

@@ -1,0 +1,19 @@
+---
+source: minijinja/tests/test_lexer.rs
+description: "{% for item in seq -%}\n  {{ item }}{% endfor %}"
+input_file: minijinja/tests/lexer-inputs/block-filter.txt
+---
+BlockStart(false)
+Ident("for")
+Ident("item")
+Ident("in")
+Ident("seq")
+BlockEnd(true)
+VariableStart(false)
+Ident("item")
+VariableEnd(false)
+BlockStart(false)
+Ident("endfor")
+BlockEnd(false)
+TemplateData("\n")
+

@@ -429,49 +429,6 @@ pub fn tokenize(
 }
 
 #[test]
-fn test_whitespace_filter() {
-    let input = "foo {{- bar -}} baz {{ blah }} blub";
-    let tokens: Result<Vec<_>, _> = tokenize(input, false).collect();
-    let tokens = tokens.unwrap().into_iter().map(|x| x.0).collect::<Vec<_>>();
-    insta::assert_debug_snapshot!(&tokens, @r###"
-    [
-        TEMPLATE_DATA("foo"),
-        VARIABLE_START(true),
-        IDENT(bar),
-        VARIABLE_END(true),
-        TEMPLATE_DATA("baz "),
-        VARIABLE_START(false),
-        IDENT(blah),
-        VARIABLE_END(false),
-        TEMPLATE_DATA(" blub"),
-    ]
-    "###);
-}
-
-#[test]
-fn test_block_filter() {
-    let input = "{% for item in seq -%}\n  {{ item }}{% endfor %}";
-    let tokens: Result<Vec<_>, _> = tokenize(input, false).collect();
-    let tokens = tokens.unwrap().into_iter().map(|x| x.0).collect::<Vec<_>>();
-    insta::assert_debug_snapshot!(&tokens, @r###"
-    [
-        BLOCK_END(false),
-        IDENT(for),
-        IDENT(item),
-        IDENT(in),
-        IDENT(seq),
-        BLOCK_END(true),
-        VARIABLE_START(false),
-        IDENT(item),
-        VARIABLE_END(false),
-        BLOCK_END(false),
-        IDENT(endfor),
-        BLOCK_END(false),
-    ]
-    "###);
-}
-
-#[test]
 fn test_find_marker() {
     assert!(find_marker("{").is_none());
     assert!(find_marker("foo").is_none());

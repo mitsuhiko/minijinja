@@ -3,43 +3,42 @@ source: minijinja/tests/test_lexer.rs
 description: "{{ true }}\n{{ false }}\n{{ null }}\n{{ 1.0 }}\n{{ 2 }}\n{{ [1, 2, 3] }}\n{{ {\"foo\": \"bar\"} }}"
 input_file: minijinja/tests/lexer-inputs/literals.txt
 ---
-[
-    VARIABLE_START(false),
-    IDENT(true),
-    VARIABLE_END(false),
-    TEMPLATE_DATA("\n"),
-    VARIABLE_START(false),
-    IDENT(false),
-    VARIABLE_END(false),
-    TEMPLATE_DATA("\n"),
-    VARIABLE_START(false),
-    IDENT(null),
-    VARIABLE_END(false),
-    TEMPLATE_DATA("\n"),
-    VARIABLE_START(false),
-    FLOAT(1.0),
-    VARIABLE_END(false),
-    TEMPLATE_DATA("\n"),
-    VARIABLE_START(false),
-    INT(2),
-    VARIABLE_END(false),
-    TEMPLATE_DATA("\n"),
-    VARIABLE_START(false),
-    BRACKET_OPEN,
-    INT(1),
-    COMMA,
-    INT(2),
-    COMMA,
-    INT(3),
-    BRACKET_CLOSE,
-    VARIABLE_END(false),
-    TEMPLATE_DATA("\n"),
-    VARIABLE_START(false),
-    BRACE_OPEN,
-    STR("foo"),
-    COLON,
-    STR("bar"),
-    BRACE_CLOSE,
-    VARIABLE_END(false),
-    TEMPLATE_DATA("\n"),
-]
+VariableStart(false)
+Ident("true")
+VariableEnd(false)
+TemplateData("\n")
+VariableStart(false)
+Ident("false")
+VariableEnd(false)
+TemplateData("\n")
+VariableStart(false)
+Ident("null")
+VariableEnd(false)
+TemplateData("\n")
+VariableStart(false)
+Float(1.0)
+VariableEnd(false)
+TemplateData("\n")
+VariableStart(false)
+Int(2)
+VariableEnd(false)
+TemplateData("\n")
+VariableStart(false)
+BracketOpen
+Int(1)
+Comma
+Int(2)
+Comma
+Int(3)
+BracketClose
+VariableEnd(false)
+TemplateData("\n")
+VariableStart(false)
+BraceOpen
+Str("foo")
+Colon
+Str("bar")
+BraceClose
+VariableEnd(false)
+TemplateData("\n")
+

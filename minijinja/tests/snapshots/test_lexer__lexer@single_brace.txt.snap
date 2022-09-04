@@ -3,6 +3,5 @@ source: minijinja/tests/test_lexer.rs
 description: "{foo} foo {bar}"
 input_file: minijinja/tests/lexer-inputs/single_brace.txt
 ---
-[
-    TEMPLATE_DATA("{foo} foo {bar}\n"),
-]
+TemplateData("{foo} foo {bar}\n")
+
