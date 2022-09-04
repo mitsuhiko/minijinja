@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Write};
+use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -454,6 +455,47 @@ impl<'vm, 'env> State<'vm, 'env> {
     }
 }
 
+struct Output<'a> {
+    output: &'a mut String,
+    capture_stack: Vec<String>,
+}
+
+impl<'a> Output<'a> {
+    pub fn new(output: &'a mut String) -> Output<'a> {
+        Output {
+            output,
+            capture_stack: Vec::new(),
+        }
+    }
+
+    pub fn begin_capture(&mut self) {
+        self.capture_stack.push(String::new());
+    }
+
+    pub fn end_capture(&mut self, auto_escape: AutoEscape) -> Value {
+        let captured = self.capture_stack.pop().unwrap();
+        if !matches!(auto_escape, AutoEscape::None) {
+            Value::from_safe_string(captured)
+        } else {
+            Value::from(captured)
+        }
+    }
+}
+
+impl<'a> Deref for Output<'a> {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        self.capture_stack.last().unwrap_or(self.output)
+    }
+}
+
+impl<'a> DerefMut for Output<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.capture_stack.last_mut().unwrap_or(self.output)
+    }
+}
+
 /// Helps to evaluate something.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Vm<'env> {
@@ -475,6 +517,7 @@ impl<'env> Vm<'env> {
         initial_auto_escape: AutoEscape,
         output: &mut String,
     ) -> Result<Option<Value>, Error> {
+        let mut output = Output::new(output);
         let mut ctx = Context::default();
         ctx.push_frame(Frame::new(FrameBase::Value(root)));
         let mut referenced_blocks = BTreeMap::new();
@@ -489,7 +532,7 @@ impl<'env> Vm<'env> {
             name: instructions.name(),
         };
         value::with_value_optimization(|| {
-            self.eval_state(&mut state, instructions, referenced_blocks, output)
+            self.eval_state(&mut state, instructions, referenced_blocks, &mut output)
         })
     }
 
@@ -499,12 +542,11 @@ impl<'env> Vm<'env> {
         state: &mut State<'_, 'env>,
         mut instructions: &Instructions<'env>,
         mut blocks: BTreeMap<&'env str, Vec<&'_ Instructions<'env>>>,
-        output: &mut String,
+        output: &mut Output,
     ) -> Result<Option<Value>, Error> {
         let initial_auto_escape = state.auto_escape;
         let mut stack = Stack { values: Vec::new() };
         let mut auto_escape_stack = vec![];
-        let mut capture_stack = vec![];
         let mut block_stack = vec![];
         let mut next_loop_recursion_jump = None;
         let mut pc = 0;
@@ -540,50 +582,16 @@ impl<'env> Vm<'env> {
             }};
         }
 
-        macro_rules! out {
-            () => {
-                capture_stack.last_mut().unwrap_or(output)
-            };
-        }
-
-        macro_rules! begin_capture {
-            () => {
-                capture_stack.push(String::new());
-            };
-        }
-
-        macro_rules! end_capture {
-            () => {{
-                let captured = capture_stack.pop().unwrap();
-                // TODO: this should take the right auto escapine flag into account
-                stack.push(if !matches!(state.auto_escape, AutoEscape::None) {
-                    Value::from_safe_string(captured)
-                } else {
-                    Value::from(captured)
-                });
-            }};
-        }
-
         macro_rules! sub_eval {
             ($instructions:expr) => {{
-                sub_eval!(
+                self.sub_eval(
+                    state,
                     $instructions,
                     blocks.clone(),
                     state.current_block,
-                    state.auto_escape
-                );
-            }};
-            ($instructions:expr, $blocks:expr, $current_block:expr, $auto_escape:expr) => {{
-                let mut sub_context = Context::default();
-                sub_context.push_frame(Frame::new(FrameBase::Context(&state.ctx)));
-                let mut sub_state = State {
-                    env: self.env,
-                    ctx: sub_context,
-                    auto_escape: $auto_escape,
-                    current_block: $current_block,
-                    name: $instructions.name(),
-                };
-                self.eval_state(&mut sub_state, $instructions, $blocks, out!())?;
+                    state.auto_escape,
+                    output,
+                )?
             }};
         }
 
@@ -603,11 +611,11 @@ impl<'env> Vm<'env> {
                     layers.remove(0);
                     let instructions = layers.first().unwrap();
                     if $capture {
-                        begin_capture!();
+                        output.begin_capture();
                     }
                     sub_eval!(instructions);
                     if $capture {
-                        end_capture!();
+                        stack.push(output.end_capture(state.auto_escape));
                     }
                 } else {
                     panic!("attempted to super unreferenced block");
@@ -625,7 +633,7 @@ impl<'env> Vm<'env> {
                         // to.
                         next_loop_recursion_jump = Some((pc + 1, $capture));
                         if $capture {
-                            begin_capture!();
+                            output.begin_capture();
                         }
                         pc = recurse_jump_target;
                         continue;
@@ -647,10 +655,10 @@ impl<'env> Vm<'env> {
         while let Some(instr) = instructions.get(pc) {
             match instr {
                 Instruction::EmitRaw(val) => {
-                    write!(out!(), "{}", val).unwrap();
+                    write!(output, "{}", val).unwrap();
                 }
                 Instruction::Emit => {
-                    try_ctx!(self.env.finalize(&stack.pop(), state.auto_escape, out!()));
+                    try_ctx!(self.env.finalize(&stack.pop(), state.auto_escape, output));
                 }
                 Instruction::StoreLocal(name) => {
                     state.ctx.store(name, stack.pop());
@@ -762,7 +770,7 @@ impl<'env> Vm<'env> {
                         {
                             pc = target;
                             if end_capture {
-                                end_capture!();
+                                stack.push(output.end_capture(state.auto_escape));
                             }
                             continue;
                         }
@@ -876,64 +884,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::Include(ignore_missing) => {
                     let name = stack.pop();
-                    let choices = if let ValueRepr::Seq(ref choices) = name.0 {
-                        &choices[..]
-                    } else {
-                        std::slice::from_ref(&name)
-                    };
-                    let mut templates_tried = vec![];
-                    for name in choices {
-                        let name = try_ctx!(name.as_str().ok_or_else(|| {
-                            Error::new(
-                                ErrorKind::ImpossibleOperation,
-                                "template name was not a string",
-                            )
-                        }));
-                        let tmpl = match self.env.get_template(name) {
-                            Ok(tmpl) => tmpl,
-                            Err(err) => {
-                                if err.kind() == ErrorKind::TemplateNotFound {
-                                    templates_tried.push(name);
-                                } else {
-                                    bail!(err);
-                                }
-                                continue;
-                            }
-                        };
-                        let instructions = tmpl.instructions();
-                        let mut referenced_blocks = BTreeMap::new();
-                        for (&name, instr) in tmpl.blocks().iter() {
-                            referenced_blocks.insert(name, vec![instr]);
-                        }
-                        sub_eval!(
-                            instructions,
-                            referenced_blocks,
-                            None,
-                            tmpl.initial_auto_escape()
-                        );
-                        templates_tried.clear();
-                        break;
-                    }
-
-                    if !templates_tried.is_empty() && !*ignore_missing {
-                        if templates_tried.len() == 1 {
-                            bail!(Error::new(
-                                ErrorKind::TemplateNotFound,
-                                format!(
-                                    "tried to include non-existing template {:?}",
-                                    templates_tried[0]
-                                )
-                            ));
-                        } else {
-                            bail!(Error::new(
-                                ErrorKind::TemplateNotFound,
-                                format!(
-                                    "tried to include one of multiple templates, none of which existed {:?}",
-                                    templates_tried
-                                )
-                            ));
-                        }
-                    }
+                    try_ctx!(self.perform_include(name, state, output, ignore_missing));
                 }
                 Instruction::PushAutoEscape => {
                     let value = stack.pop();
@@ -962,10 +913,10 @@ impl<'env> Vm<'env> {
                     state.auto_escape = auto_escape_stack.pop().unwrap();
                 }
                 Instruction::BeginCapture => {
-                    begin_capture!();
+                    output.begin_capture();
                 }
                 Instruction::EndCapture => {
-                    end_capture!();
+                    stack.push(output.end_capture(state.auto_escape));
                 }
                 Instruction::ApplyFilter(name) => {
                     let top = stack.pop();
@@ -1036,25 +987,102 @@ impl<'env> Vm<'env> {
                 Instruction::FastRecurse => {
                     recurse_loop!(false);
                 }
-                Instruction::Nop => {}
             }
             pc += 1;
         }
 
         Ok(stack.try_pop())
     }
-}
 
-/// Simple version of eval without environment or vm.
-#[cfg(feature = "unstable_machinery")]
-pub fn simple_eval<S: serde::Serialize>(
-    instructions: &Instructions<'_>,
-    ctx: S,
-    output: &mut String,
-) -> Result<Option<Value>, Error> {
-    let env = Environment::new();
-    let empty_blocks = BTreeMap::new();
-    let vm = Vm::new(&env);
-    let root = Value::from_serializable(&ctx);
-    vm.eval(instructions, root, &empty_blocks, AutoEscape::None, output)
+    fn perform_include(
+        &self,
+        name: Value,
+        state: &mut State<'_, 'env>,
+        output: &mut Output,
+        ignore_missing: &bool,
+    ) -> Result<(), Error> {
+        let choices = if let ValueRepr::Seq(ref choices) = name.0 {
+            &choices[..]
+        } else {
+            std::slice::from_ref(&name)
+        };
+        let mut templates_tried = vec![];
+        for name in choices {
+            let name = name.as_str().ok_or_else(|| {
+                Error::new(
+                    ErrorKind::ImpossibleOperation,
+                    "template name was not a string",
+                )
+            })?;
+            let tmpl = match self.env.get_template(name) {
+                Ok(tmpl) => tmpl,
+                Err(err) => {
+                    if err.kind() == ErrorKind::TemplateNotFound {
+                        templates_tried.push(name);
+                    } else {
+                        return Err(err);
+                    }
+                    continue;
+                }
+            };
+            let instructions = tmpl.instructions();
+            let mut referenced_blocks = BTreeMap::new();
+            for (&name, instr) in tmpl.blocks().iter() {
+                referenced_blocks.insert(name, vec![instr]);
+            }
+            self.sub_eval(
+                state,
+                instructions,
+                referenced_blocks,
+                None,
+                tmpl.initial_auto_escape(),
+                output,
+            )?;
+            templates_tried.clear();
+            break;
+        }
+        if !templates_tried.is_empty() && !*ignore_missing {
+            Err(if templates_tried.len() == 1 {
+                Error::new(
+                    ErrorKind::TemplateNotFound,
+                    format!(
+                        "tried to include non-existing template {:?}",
+                        templates_tried[0]
+                    ),
+                )
+            } else {
+                Error::new(
+                    ErrorKind::TemplateNotFound,
+                    format!(
+                        "tried to include one of multiple templates, none of which existed {:?}",
+                        templates_tried
+                    ),
+                )
+            })
+        } else {
+            Ok(())
+        }
+    }
+
+    fn sub_eval(
+        &self,
+        state: &mut State<'_, 'env>,
+        instructions: &Instructions<'env>,
+        blocks: BTreeMap<&'env str, Vec<&'_ Instructions<'env>>>,
+        current_block: Option<&str>,
+        auto_escape: AutoEscape,
+        output: &mut Output,
+    ) -> Result<(), Error> {
+        let mut sub_context = Context::default();
+        sub_context.push_frame(Frame::new(FrameBase::Context(&state.ctx)));
+        let mut sub_state = State {
+            env: self.env,
+            ctx: sub_context,
+            auto_escape,
+            current_block,
+            name: instructions.name(),
+        };
+        self.eval_state(&mut sub_state, instructions, blocks, output)?;
+        Ok(())
+    }
 }

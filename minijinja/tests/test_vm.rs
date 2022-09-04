@@ -1,8 +1,23 @@
 #![cfg(feature = "unstable_machinery")]
-use minijinja::machinery::{simple_eval, Compiler, Instruction, Instructions};
+use std::collections::BTreeMap;
+
+use minijinja::machinery::{Compiler, Instruction, Instructions, Vm};
 use minijinja::value::Value;
+use minijinja::{AutoEscape, Environment, Error};
 
 use similar_asserts::assert_eq;
+
+pub fn simple_eval<S: serde::Serialize>(
+    instructions: &Instructions<'_>,
+    ctx: S,
+    output: &mut String,
+) -> Result<Option<Value>, Error> {
+    let env = Environment::new();
+    let empty_blocks = BTreeMap::new();
+    let vm = Vm::new(&env);
+    let root = Value::from_serializable(&ctx);
+    vm.eval(instructions, root, &empty_blocks, AutoEscape::None, output)
+}
 
 #[test]
 fn test_loop() {

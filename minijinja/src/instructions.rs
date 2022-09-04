@@ -179,10 +179,6 @@ pub enum Instruction<'source> {
 
     /// A fast loop recurse instruction without intermediate capturing.
     FastRecurse,
-
-    /// A nop
-    #[allow(unused)]
-    Nop,
 }
 
 #[derive(Copy, Clone)]

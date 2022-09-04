@@ -180,5 +180,5 @@ pub mod machinery {
     pub use crate::lexer::tokenize;
     pub use crate::parser::parse;
     pub use crate::tokens::{Span, Token};
-    pub use crate::vm::{simple_eval, Vm};
+    pub use crate::vm::Vm;
 }
