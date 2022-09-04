@@ -7,6 +7,13 @@ use crate::key::{Key, StaticKey};
 use crate::value::{Arc, Value, ValueRepr};
 
 /// A utility trait that represents the return value of functions and filters.
+///
+/// It's implemented for the following types:
+///
+/// * `Rv` where `Rv` implements `Into<Value>`
+/// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
+///
+/// The equivalent for test functions is [`TestResult`](crate::tests::TestResult).
 pub trait FunctionResult {
     #[doc(hidden)]
     fn into_result(self) -> Result<Value, Error>;
@@ -24,16 +31,15 @@ impl<I: Into<Value>> FunctionResult for I {
     }
 }
 
-/// Helper trait representing valid filter and test arguments.
+/// Helper trait representing valid filter, test and function arguments.
 ///
 /// Since it's more convenient to write filters and tests with concrete
 /// types instead of values, this helper trait exists to automatically
 /// perform this conversion.  It is implemented for functions up to an
-/// arity of 5 parameters.
+/// arity of 4 parameters.
 ///
 /// For each argument the conversion is performed via the [`ArgType`]
-/// trait which is implemented for some primitive concrete types as well
-/// as these types wrapped in [`Option`].
+/// trait which is implemented for many common types.
 pub trait FunctionArgs<'a>: Sized {
     /// Converts to function arguments from a slice of values.
     fn from_values(values: &'a [Value]) -> Result<Self, Error>;
@@ -41,10 +47,20 @@ pub trait FunctionArgs<'a>: Sized {
 
 /// A trait implemented by all filter/test argument types.
 ///
-/// This trait is the companion to [`FunctionArgs`].  It's passed an
-/// `Option<Value>` where `Some` means the argument was provided or
-/// `None` if it was not.  This is used to implement optional arguments
-/// to functions.
+/// This trait is used by [`FunctionArgs`].  It's implemented for many common
+/// types that are typically passed to filters, tests or functions.  It's
+/// implemented for the following types:
+///
+/// * unsigned integers: [`u8`], [`u16`], [`u32`], [`u64`], [`u128`], [`usize`]
+/// * signed integers: [`i8`], [`i16`], [`i32`], [`i64`], [`i128`]
+/// * floats: [`f64`]
+/// * bool: [`bool`]
+/// * string: [`String`]
+/// * values: [`Value`]
+/// * vectors: [`Vec<T>`]
+///
+/// The type is also implemented for optional values (`Value<T>`) which is used
+/// to encode optional parameters to filters, functions or tests.
 pub trait ArgType<'a>: Sized {
     #[doc(hidden)]
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error>;

@@ -26,8 +26,10 @@
 //! render invocation.
 //!
 //! ```rust
-//! # use minijinja::{Environment, State, Error, ErrorKind};
+//! # use minijinja::Environment;
 //! # let mut env = Environment::new();
+//! use minijinja::{State, Error, ErrorKind};
+//!
 //! fn include_file(_state: &State, name: String) -> Result<String, Error> {
 //!     std::fs::read_to_string(&name)
 //!         .map_err(|e| Error::new(
@@ -38,6 +40,14 @@
 //!
 //! env.add_function("include_file", include_file);
 //! ```
+//!
+//! # Built-in Functions
+//!
+//! When the `builtins` feature is enabled a range of built-in functions are
+//! automatically added to the environment.  These are also all provided in
+//! this module.  Note though that these functions are not to be
+//! called from Rust code as their exact interface (arguments and return types)
+//! might change from one MiniJinja version to another.
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
@@ -53,6 +63,39 @@ type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send +
 pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 
 /// A utility trait that represents global functions.
+///
+/// This trait is used by the [`add_functino`](crate::Environment::add_function)
+/// method to abstract over different types of functions.
+///
+/// Functions which at the very least accept the [`State`] by reference as first
+/// parameter and additionally up to 4 further parameters.  They share much of
+/// their interface with [`filters`](crate::filters).
+///
+/// A function can return any of the following types:
+///
+/// * `Rv` where `Rv` implements `Into<Value>`
+/// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
+///
+/// The parameters can be marked optional by using `Option<T>`.  All types are
+/// supported for which [`ArgType`] is implemented.
+///
+/// ```rust
+/// # use minijinja::Environment;
+/// # let mut env = Environment::new();
+/// use minijinja::{State, Error, ErrorKind};
+///
+/// fn include_file(_state: &State, name: String) -> Result<String, Error> {
+///     std::fs::read_to_string(&name)
+///         .map_err(|e| Error::new(
+///             ErrorKind::ImpossibleOperation,
+///             "cannot load file"
+///         ).with_source(e))
+/// }
+///
+/// env.add_function("include_file", include_file);
+/// ```
+///
+/// For a list of built-in functions see [`functions`](crate::functions).
 pub trait Function<Rv, Args>: Send + Sync + 'static {
     /// Calls a function with the given arguments.
     #[doc(hidden)]

@@ -534,12 +534,14 @@ impl<'source> Environment<'source> {
 
     /// Adds a new filter function.
     ///
-    /// For details about filters have a look at [`filters`].
+    /// Filter functions are functions that can be applied to values in
+    /// templates.  For details about filters have a look at
+    /// [`Filter`](crate::filters::Filter).
     pub fn add_filter<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
     where
+        F: filters::Filter<V, Rv, Args>,
         V: for<'a> ArgType<'a>,
         Rv: FunctionResult,
-        F: filters::Filter<V, Rv, Args>,
         Args: for<'a> FunctionArgs<'a>,
     {
         self.filters.insert(name, filters::BoxedFilter::new(f));
@@ -552,7 +554,9 @@ impl<'source> Environment<'source> {
 
     /// Adds a new test function.
     ///
-    /// For details about tests have a look at [`tests`].
+    /// Test functions are similar to filters but perform a check on a value
+    /// where the return value is always true or false.  For details about tests
+    /// have a look at [`Test`](crate::tests::Test).
     pub fn add_test<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
     where
         V: for<'a> ArgType<'a>,

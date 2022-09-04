@@ -28,22 +28,33 @@
 //!
 //! # Custom Filters
 //!
-//! A custom filter is just a simple function which accepts inputs as parameters and then
-//! returns a new value.  For instance the following shows a filter which takes an input
-//! value and replaces whitespace with dashes and converts it to lowercase:
+//! A custom filter is just a simple function which accepts [`State`] and inputs
+//! as parameters and then returns a new value.  For instance the following
+//! shows a filter which takes an input value and replaces whitespace with
+//! dashes and converts it to lowercase:
 //!
 //! ```
-//! # use minijinja::{Environment, State, Error};
+//! # use minijinja::Environment;
 //! # let mut env = Environment::new();
-//! fn slugify(_state: &State, value: String) -> Result<String, Error> {
-//!     Ok(value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-"))
+//! use minijinja::State;
+//!
+//! fn slugify(_state: &State, value: String) -> String {
+//!     value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-")
 //! }
 //!
 //! env.add_filter("slugify", slugify);
 //! ```
 //!
-//! MiniJinja will perform the necessary conversions automatically via the
-//! [`FunctionArgs`](crate::value::FunctionArgs) and [`Into`] traits.
+//! MiniJinja will perform the necessary conversions automatically.  For more
+//! information see the [`Filter`] trait.
+//!
+//! # Built-in Filters
+//!
+//! When the `builtins` feature is enabled a range of built-in filters are
+//! automatically added to the environment.  These are also all provided in
+//! this module.  Note though that these functions are not to be
+//! called from Rust code as their exact interface (arguments and return types)
+//! might change from one MiniJinja version to another.
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -58,6 +69,36 @@ type FilterFunc = dyn Fn(&State, &Value, &[Value]) -> Result<Value, Error> + Syn
 pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 
 /// A utility trait that represents filters.
+///
+/// This trait is used by the [`add_filter`](crate::Environment::add_filter) method to abstract over
+/// different types of functions that implement filters.  Filters are functions
+/// which at the very least accept the [`State`] by reference as first parameter
+/// and the value that that the filter is applied to as second.  Additionally up to
+/// 4 further parameters are supported.
+///
+/// A filter can return any of the following types:
+///
+/// * `Rv` where `Rv` implements `Into<Value>`
+/// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
+///
+/// Filters accept one mandatory parameter which is the value the filter is
+/// applied to and up to 4 extra parameters.  The extra parameters can be
+/// marked optional by using `Option<T>`.  All types are supported for which
+/// [`ArgType`] is implemented.
+///
+/// ```
+/// # use minijinja::Environment;
+/// # let mut env = Environment::new();
+/// use minijinja::State;
+///
+/// fn slugify(_state: &State, value: String) -> String {
+///     value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-")
+/// }
+///
+/// env.add_filter("slugify", slugify);
+/// ```
+///
+/// For a list of built-in filters see [`filters`](crate::filters).
 pub trait Filter<V, Rv, Args>: Send + Sync + 'static {
     /// Applies a filter to value with the given arguments.
     #[doc(hidden)]

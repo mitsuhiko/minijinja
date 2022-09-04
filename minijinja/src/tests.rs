@@ -1,9 +1,9 @@
 //! Test functions and abstractions.
 //!
-//! Test functions in MiniJinja are like (filters)[crate::filters] but a different syntax
-//! is used to invoke them and they have to return boolean values.  For instance the
-//! expression `{% if foo is odd %}` invokes the [`is_odd`] test to check if the value
-//! is indeed an odd number.
+//! Test functions in MiniJinja are like [`filters`](crate::filters) but a
+//! different syntax is used to invoke them and they have to return boolean
+//! values.  For instance the expression `{% if foo is odd %}` invokes the
+//! [`is_odd`] test to check if the value is indeed an odd number.
 //!
 //! MiniJinja comes with some built-in test functions that are listed below. To
 //! create a custom test write a function that takes at least a
@@ -28,23 +28,33 @@
 //!
 //! # Custom Tests
 //!
-//! A custom test function is just a simple function which accepts inputs as
-//! parameters and then returns a bool wrapped in a result. For instance the
-//! following shows a test function which takes an input value and checks if
-//! it's lowercase:
+//! A custom test function is just a simple function which accepts [`State`] and
+//! inputs as parameters and then returns a bool. For instance the following
+//! shows a test function which takes an input value and checks if it's
+//! lowercase:
 //!
 //! ```
-//! # use minijinja::{State, Environment, Error};
+//! # use minijinja::Environment;
 //! # let mut env = Environment::new();
-//! fn is_lowercase(_state: &State, value: String) -> Result<bool, Error> {
-//!    Ok(value.chars().all(|x| x.is_lowercase()))
+//! use minijinja::State;
+//!
+//! fn is_lowercase(_state: &State, value: String) -> bool {
+//!    value.chars().all(|x| x.is_lowercase())
 //! }
 //!
 //! env.add_test("lowercase", is_lowercase);
 //! ```
 //!
-//! MiniJinja will perform the necessary conversions automatically via the
-//! [`FunctionArgs`](crate::value::FunctionArgs) trait.
+//! MiniJinja will perform the necessary conversions automatically.  For more
+//! information see the [`Test`] trait.
+//!
+//! # Built-in Tests
+//!
+//! When the `builtins` feature is enabled a range of built-in tests are
+//! automatically added to the environment.  These are also all provided in
+//! this module.  Note though that these functions are not to be
+//! called from Rust code as their exact interface (arguments and return types)
+//! might change from one MiniJinja version to another.
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -58,6 +68,13 @@ type TestFunc = dyn Fn(&State, &Value, &[Value]) -> Result<bool, Error> + Sync +
 pub(crate) struct BoxedTest(Arc<TestFunc>);
 
 /// A utility trait that represents the return value of filters.
+///
+/// It's implemented for the following types:
+///
+/// * `bool`
+/// * `Result<bool, Error>`
+///
+/// The equivalent for filters or functions is [`FunctionResult`](crate::value::FunctionResult).
 pub trait TestResult {
     #[doc(hidden)]
     fn into_result(self) -> Result<bool, Error>;
@@ -75,7 +92,38 @@ impl TestResult for bool {
     }
 }
 
-/// A utility trait that represents filters.
+/// A utility trait that represents test functions.
+///
+/// This trait is used by the [`add_test`](crate::Environment::add_test) method to abstract over
+/// different types of functions that implement tests.  Tests are similar to
+/// [`filters`](crate::filters) but they always return boolean values and use a
+/// slightly different syntax to filters.  Like filters they accept the [`State`] by
+/// reference as first parameter and the value that that the test is applied to as second.
+/// Additionally up to 4 further parameters are supported.
+///
+/// A test function can return any of the following types:
+///
+/// * `bool`
+/// * `Result<bool, Error>`
+///
+/// Tests accept one mandatory parameter which is the value the filter is
+/// applied to and up to 4 extra parameters.  The extra parameters can be
+/// marked optional by using `Option<T>`.  All types are supported for which
+/// [`ArgType`] is implemented.
+///
+/// ```
+/// # use minijinja::Environment;
+/// # let mut env = Environment::new();
+/// use minijinja::State;
+///
+/// fn is_lowercase(_state: &State, value: String) -> bool {
+///    value.chars().all(|x| x.is_lowercase())
+/// }
+///
+/// env.add_test("lowercase", is_lowercase);
+/// ```
+///
+/// For a list of built-in tests see [`tests`](crate::tests).
 pub trait Test<V, Rv, Args>: Send + Sync + 'static {
     /// Performs a test to value with the given arguments.
     #[doc(hidden)]
