@@ -13,6 +13,14 @@ enum LexerState {
     InBlock,
 }
 
+struct TokenizerState<'s> {
+    stack: Vec<LexerState>,
+    rest: &'s str,
+    failed: bool,
+    current_line: usize,
+    current_col: usize,
+}
+
 fn find_marker(a: &str) -> Option<usize> {
     let bytes = a.as_bytes();
     let mut offset = 0;
@@ -48,24 +56,119 @@ fn skip_basic_tag(block_str: &str, name: &str) -> Option<usize> {
     Some(block_str.len() - ptr.len())
 }
 
-fn advance<'s>(
-    bytes: usize,
-    rest: &mut &'s str,
-    current_line: &mut usize,
-    current_col: &mut usize,
-) -> &'s str {
-    let (skipped, new_rest) = rest.split_at(bytes);
-    for c in skipped.chars() {
-        match c {
-            '\n' => {
-                *current_line += 1;
-                *current_col = 0;
+impl<'s> TokenizerState<'s> {
+    fn advance(&mut self, bytes: usize) -> &'s str {
+        let (skipped, new_rest) = self.rest.split_at(bytes);
+        for c in skipped.chars() {
+            match c {
+                '\n' => {
+                    self.current_line += 1;
+                    self.current_col = 0;
+                }
+                _ => self.current_col += 1,
             }
-            _ => *current_col += 1,
+        }
+        self.rest = new_rest;
+        skipped
+    }
+
+    fn loc(&self) -> (usize, usize) {
+        (self.current_line, self.current_col)
+    }
+
+    fn span(&self, start: (usize, usize)) -> Span {
+        let (start_line, start_col) = start;
+        Span {
+            start_line,
+            start_col,
+            end_line: self.current_line,
+            end_col: self.current_col,
         }
     }
-    *rest = new_rest;
-    skipped
+
+    fn syntax_error(&mut self, msg: &'static str) -> Error {
+        self.failed = true;
+        Error::new(ErrorKind::SyntaxError, msg)
+    }
+
+    fn eat_number(&mut self) -> Result<(Token<'s>, Span), Error> {
+        let old_loc = self.loc();
+        let mut is_float = false;
+        let num_len = self
+            .rest
+            .as_bytes()
+            .iter()
+            .take_while(|&&c| {
+                if !is_float && c == b'.' {
+                    is_float = true;
+                    true
+                } else {
+                    c.is_ascii_digit()
+                }
+            })
+            .count();
+        let num = self.advance(num_len);
+        Ok(if is_float {
+            (
+                Token::Float(match num.parse::<f64>() {
+                    Ok(val) => val,
+                    Err(_) => return Err(self.syntax_error("invalid float")),
+                }),
+                self.span(old_loc),
+            )
+        } else {
+            (
+                Token::Int(match num.parse::<i64>() {
+                    Ok(val) => val,
+                    Err(_) => return Err(self.syntax_error("invalid integer")),
+                }),
+                self.span(old_loc),
+            )
+        })
+    }
+
+    fn eat_string(&mut self, delim: u8) -> Result<(Token<'s>, Span), Error> {
+        let old_loc = self.loc();
+        let mut escaped = false;
+        let mut has_escapes = false;
+        let str_len = self
+            .rest
+            .as_bytes()
+            .iter()
+            .skip(1)
+            .take_while(|&&c| match (escaped, c) {
+                (true, _) => {
+                    escaped = false;
+                    true
+                }
+                (_, b'\\') => {
+                    escaped = true;
+                    has_escapes = true;
+                    true
+                }
+                (_, c) if c == delim => false,
+                _ => true,
+            })
+            .count();
+        if escaped || self.rest.as_bytes().get(str_len + 1) != Some(&delim) {
+            return Err(self.syntax_error("unexpected end of string"));
+        }
+        let s = self.advance(str_len + 2);
+        Ok(if has_escapes {
+            (
+                Token::Str(Cow::Owned(match unescape(&s[1..s.len() - 1]) {
+                    Ok(unescaped) => unescaped,
+                    Err(err) => return Err(err),
+                })),
+                self.span(old_loc),
+            )
+        } else {
+            (
+                Token::Str(Cow::Borrowed(&s[1..s.len() - 1])),
+                self.span(old_loc),
+            )
+        })
+    }
 }
 
 /// Tokenizes without whitespace handling.
@@ -73,237 +176,131 @@ fn tokenize_raw(
     input: &str,
     in_expr: bool,
 ) -> impl Iterator<Item = Result<(Token<'_>, Span), Error>> {
-    let mut rest = input;
-    let mut stack = vec![if in_expr {
-        LexerState::InVariable
-    } else {
-        LexerState::Template
-    }];
-    let mut failed = false;
-    let mut current_line = 1;
-    let mut current_col = 0;
-
-    macro_rules! syntax_error {
-        ($msg:expr) => {{
-            failed = true;
-            return Some(Err(Error::new(ErrorKind::SyntaxError, $msg)));
-        }};
-    }
-
-    macro_rules! span {
-        ($start:expr) => {{
-            let (start_line, start_col) = $start;
-            Span {
-                start_line,
-                start_col,
-                end_line: current_line,
-                end_col: current_col,
-            }
-        }};
-    }
-
-    macro_rules! loc {
-        () => {
-            (current_line, current_col)
-        };
-    }
-
-    macro_rules! advance {
-        ($bytes:expr) => {
-            advance($bytes, &mut rest, &mut current_line, &mut current_col)
-        };
-    }
-
-    macro_rules! eat_string {
-        ($delim:expr) => {{
-            let old_loc = loc!();
-            let mut escaped = false;
-            let mut has_escapes = false;
-            let str_len = rest
-                .as_bytes()
-                .iter()
-                .skip(1)
-                .take_while(|&&c| match (escaped, c) {
-                    (true, _) => {
-                        escaped = false;
-                        true
-                    }
-                    (_, b'\\') => {
-                        escaped = true;
-                        has_escapes = true;
-                        true
-                    }
-                    (_, $delim) => false,
-                    _ => true,
-                })
-                .count();
-            if escaped || rest.as_bytes().get(str_len + 1) != Some(&$delim) {
-                syntax_error!("unexpected end of string");
-            }
-            let s = advance!(str_len + 2);
-            if has_escapes {
-                return Some(Ok((
-                    Token::Str(Cow::Owned(match unescape(&s[1..s.len() - 1]) {
-                        Ok(unescaped) => unescaped,
-                        Err(err) => return Some(Err(err)),
-                    })),
-                    span!(old_loc),
-                )));
-            } else {
-                return Some(Ok((
-                    Token::Str(Cow::Borrowed(&s[1..s.len() - 1])),
-                    span!(old_loc),
-                )));
-            }
-        }};
-    }
-
-    macro_rules! eat_number {
-        () => {{
-            let old_loc = loc!();
-            let mut is_float = false;
-            let num_len = rest
-                .as_bytes()
-                .iter()
-                .take_while(|&&c| {
-                    if !is_float && c == b'.' {
-                        is_float = true;
-                        true
-                    } else {
-                        c.is_ascii_digit()
-                    }
-                })
-                .count();
-            let num = advance!(num_len);
-            if is_float {
-                return Some(Ok((
-                    Token::Float(match num.parse::<f64>() {
-                        Ok(val) => val,
-                        Err(_) => syntax_error!("invalid float"),
-                    }),
-                    span!(old_loc),
-                )));
-            } else {
-                return Some(Ok((
-                    Token::Int(match num.parse::<i64>() {
-                        Ok(val) => val,
-                        Err(_) => syntax_error!("invalid integer"),
-                    }),
-                    span!(old_loc),
-                )));
-            }
-        }};
-    }
+    let mut state = TokenizerState {
+        rest: input,
+        stack: vec![if in_expr {
+            LexerState::InVariable
+        } else {
+            LexerState::Template
+        }],
+        failed: false,
+        current_line: 1,
+        current_col: 0,
+    };
 
     std::iter::from_fn(move || loop {
-        if rest.is_empty() || failed {
+        if state.rest.is_empty() || state.failed {
             return None;
         }
 
-        let old_loc = loc!();
-        match stack.last() {
+        let old_loc = state.loc();
+        match state.stack.last() {
             Some(LexerState::Template) => {
-                match rest.get(..2) {
+                match state.rest.get(..2) {
                     Some("{{") => {
-                        let ws = if rest.as_bytes().get(2) == Some(&b'-') {
-                            advance!(3);
+                        let ws = if state.rest.as_bytes().get(2) == Some(&b'-') {
+                            state.advance(3);
                             true
                         } else {
-                            advance!(2);
+                            state.advance(2);
                             false
                         };
-                        stack.push(LexerState::InVariable);
-                        return Some(Ok((Token::VariableStart(ws), span!(old_loc))));
+                        state.stack.push(LexerState::InVariable);
+                        return Some(Ok((Token::VariableStart(ws), state.span(old_loc))));
                     }
                     Some("{%") => {
                         // raw blocks require some special handling.  If we are at the beginning of a raw
                         // block we want to skip everything until {% endraw %} completely ignoring iterior
                         // syntax and emit the entire raw block as TemplateData.
-                        if let Some(mut ptr) = skip_basic_tag(&rest[2..], "raw") {
+                        if let Some(mut ptr) = skip_basic_tag(&state.rest[2..], "raw") {
                             ptr += 2;
-                            while let Some(block) = memstr(&rest.as_bytes()[ptr..], b"{%") {
+                            while let Some(block) = memstr(&state.rest.as_bytes()[ptr..], b"{%") {
                                 ptr += block + 2;
-                                if let Some(endraw) = skip_basic_tag(&rest[ptr..], "endraw") {
-                                    let result = &rest[..ptr + endraw];
-                                    advance!(ptr + endraw);
-                                    return Some(Ok((Token::TemplateData(result), span!(old_loc))));
+                                if let Some(endraw) = skip_basic_tag(&state.rest[ptr..], "endraw") {
+                                    let result = &state.rest[..ptr + endraw];
+                                    state.advance(ptr + endraw);
+                                    return Some(Ok((
+                                        Token::TemplateData(result),
+                                        state.span(old_loc),
+                                    )));
                                 }
                             }
-                            syntax_error!("unexpected end of raw block");
+                            return Some(Err(state.syntax_error("unexpected end of raw block")));
                         }
 
-                        let ws = if rest.as_bytes().get(2) == Some(&b'-') {
-                            advance!(3);
+                        let ws = if state.rest.as_bytes().get(2) == Some(&b'-') {
+                            state.advance(3);
                             true
                         } else {
-                            advance!(2);
+                            state.advance(2);
                             false
                         };
 
-                        stack.push(LexerState::InBlock);
-                        return Some(Ok((Token::BlockStart(ws), span!(old_loc))));
+                        state.stack.push(LexerState::InBlock);
+                        return Some(Ok((Token::BlockStart(ws), state.span(old_loc))));
                     }
                     Some("{#") => {
-                        if let Some(comment_end) = memstr(rest.as_bytes(), b"#}") {
-                            advance!(comment_end + 2);
+                        if let Some(comment_end) = memstr(state.rest.as_bytes(), b"#}") {
+                            state.advance(comment_end + 2);
                         } else {
-                            syntax_error!("unexpected end of comment");
+                            return Some(Err(state.syntax_error("unexpected end of comment")));
                         }
                     }
                     _ => {}
                 }
 
-                let lead = match find_marker(rest) {
-                    Some(start) => advance!(start),
-                    None => advance!(rest.len()),
+                let lead = match find_marker(state.rest) {
+                    Some(start) => state.advance(start),
+                    None => state.advance(state.rest.len()),
                 };
-                return Some(Ok((Token::TemplateData(lead), span!(old_loc))));
+                return Some(Ok((Token::TemplateData(lead), state.span(old_loc))));
             }
             Some(&LexerState::InBlock) | Some(&LexerState::InVariable) => {
                 // in blocks whitespace is generally ignored, skip it.
-                match rest
+                match state
+                    .rest
                     .as_bytes()
                     .iter()
                     .position(|&x| !x.is_ascii_whitespace())
                 {
                     Some(0) => {}
                     None => {
-                        advance!(rest.len());
+                        state.advance(state.rest.len());
                         continue;
                     }
                     Some(offset) => {
-                        advance!(offset);
+                        state.advance(offset);
                         continue;
                     }
                 }
 
                 // look out for the end of blocks
-                if let Some(&LexerState::InBlock) = stack.last() {
-                    if let Some("-%}") = rest.get(..3) {
-                        stack.pop();
-                        advance!(3);
-                        return Some(Ok((Token::BlockEnd(true), span!(old_loc))));
+                if let Some(&LexerState::InBlock) = state.stack.last() {
+                    if let Some("-%}") = state.rest.get(..3) {
+                        state.stack.pop();
+                        state.advance(3);
+                        return Some(Ok((Token::BlockEnd(true), state.span(old_loc))));
                     }
-                    if let Some("%}") = rest.get(..2) {
-                        stack.pop();
-                        advance!(2);
-                        return Some(Ok((Token::BlockEnd(false), span!(old_loc))));
+                    if let Some("%}") = state.rest.get(..2) {
+                        state.stack.pop();
+                        state.advance(2);
+                        return Some(Ok((Token::BlockEnd(false), state.span(old_loc))));
                     }
                 } else {
-                    if let Some("-}}") = rest.get(..3) {
-                        stack.pop();
-                        advance!(3);
-                        return Some(Ok((Token::VariableEnd(true), span!(old_loc))));
+                    if let Some("-}}") = state.rest.get(..3) {
+                        state.stack.pop();
+                        state.advance(3);
+                        return Some(Ok((Token::VariableEnd(true), state.span(old_loc))));
                     }
-                    if let Some("}}") = rest.get(..2) {
-                        stack.pop();
-                        advance!(2);
-                        return Some(Ok((Token::VariableEnd(false), span!(old_loc))));
+                    if let Some("}}") = state.rest.get(..2) {
+                        state.stack.pop();
+                        state.advance(2);
+                        return Some(Ok((Token::VariableEnd(false), state.span(old_loc))));
                     }
                 }
 
                 // two character operators
-                let op = match rest.as_bytes().get(..2) {
+                let op = match state.rest.as_bytes().get(..2) {
                     Some(b"//") => Some(Token::FloorDiv),
                     Some(b"**") => Some(Token::Pow),
                     Some(b"==") => Some(Token::Eq),
@@ -313,12 +310,12 @@ fn tokenize_raw(
                     _ => None,
                 };
                 if let Some(op) = op {
-                    advance!(2);
-                    return Some(Ok((op, span!(old_loc))));
+                    state.advance(2);
+                    return Some(Ok((op, state.span(old_loc))));
                 }
 
                 // single character operators (and strings)
-                let op = match rest.as_bytes().get(0) {
+                let op = match state.rest.as_bytes().get(0) {
                     Some(b'+') => Some(Token::Plus),
                     Some(b'-') => Some(Token::Minus),
                     Some(b'*') => Some(Token::Mul),
@@ -339,18 +336,23 @@ fn tokenize_raw(
                     Some(b']') => Some(Token::BracketClose),
                     Some(b'{') => Some(Token::BraceOpen),
                     Some(b'}') => Some(Token::BraceClose),
-                    Some(b'\'') => eat_string!(b'\''),
-                    Some(b'"') => eat_string!(b'"'),
-                    Some(c) if c.is_ascii_digit() => eat_number!(),
+                    Some(b'\'') => {
+                        return Some(state.eat_string(b'\''));
+                    }
+                    Some(b'"') => {
+                        return Some(state.eat_string(b'"'));
+                    }
+                    Some(c) if c.is_ascii_digit() => return Some(state.eat_number()),
                     _ => None,
                 };
                 if let Some(op) = op {
-                    advance!(1);
-                    return Some(Ok((op, span!(old_loc))));
+                    state.advance(1);
+                    return Some(Ok((op, state.span(old_loc))));
                 }
 
                 // identifiers
-                let ident_len = rest
+                let ident_len = state
+                    .rest
                     .as_bytes()
                     .iter()
                     .enumerate()
@@ -365,12 +367,12 @@ fn tokenize_raw(
                     })
                     .count();
                 if ident_len > 0 {
-                    let ident = advance!(ident_len);
-                    return Some(Ok((Token::Ident(ident), span!(old_loc))));
+                    let ident = state.advance(ident_len);
+                    return Some(Ok((Token::Ident(ident), state.span(old_loc))));
                 }
 
                 // syntax error
-                syntax_error!("unexpected character");
+                return Some(Err(state.syntax_error("unexpected character")));
             }
             None => panic!("empty lexer state"),
         }
