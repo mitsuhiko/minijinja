@@ -64,7 +64,6 @@ tuple_impls! { A }
 tuple_impls! { A B }
 tuple_impls! { A B C }
 tuple_impls! { A B C D }
-tuple_impls! { A B C D E }
 
 impl From<ValueRepr> for Value {
     #[inline(always)]
