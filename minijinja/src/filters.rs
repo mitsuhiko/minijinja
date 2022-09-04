@@ -28,27 +28,38 @@
 //!
 //! # Custom Filters
 //!
-//! A custom filter is just a simple function which accepts inputs as parameters and then
-//! returns a new value.  For instance the following shows a filter which takes an input
-//! value and replaces whitespace with dashes and converts it to lowercase:
+//! A custom filter is just a simple function which accepts [`State`] and inputs
+//! as parameters and then returns a new value.  For instance the following
+//! shows a filter which takes an input value and replaces whitespace with
+//! dashes and converts it to lowercase:
 //!
 //! ```
-//! # use minijinja::{Environment, State, Error};
+//! # use minijinja::Environment;
 //! # let mut env = Environment::new();
-//! fn slugify(_state: &State, value: String) -> Result<String, Error> {
-//!     Ok(value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-"))
+//! use minijinja::State;
+//!
+//! fn slugify(_state: &State, value: String) -> String {
+//!     value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-")
 //! }
 //!
 //! env.add_filter("slugify", slugify);
 //! ```
 //!
-//! MiniJinja will perform the necessary conversions automatically via the
-//! [`FunctionArgs`](crate::value::FunctionArgs) and [`Into`] traits.
+//! MiniJinja will perform the necessary conversions automatically.  For more
+//! information see the [`Filter`] trait.
+//!
+//! # Built-in Filters
+//!
+//! When the `builtins` feature is enabled a range of built-in filters are
+//! automatically added to the environment.  These are also all provided in
+//! this module.  Note though that these functions are not to be
+//! called from Rust code as their exact interface (arguments and return types)
+//! might change from one MiniJinja version to another.
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::error::Error;
-use crate::value::{ArgType, FunctionArgs, Value};
+use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
 use crate::vm::State;
 use crate::AutoEscape;
 
@@ -58,19 +69,52 @@ type FilterFunc = dyn Fn(&State, &Value, &[Value]) -> Result<Value, Error> + Syn
 pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 
 /// A utility trait that represents filters.
+///
+/// This trait is used by the [`add_filter`](crate::Environment::add_filter) method to abstract over
+/// different types of functions that implement filters.  Filters are functions
+/// which at the very least accept the [`State`] by reference as first parameter
+/// and the value that that the filter is applied to as second.  Additionally up to
+/// 4 further parameters are supported.
+///
+/// A filter can return any of the following types:
+///
+/// * `Rv` where `Rv` implements `Into<Value>`
+/// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
+///
+/// Filters accept one mandatory parameter which is the value the filter is
+/// applied to and up to 4 extra parameters.  The extra parameters can be
+/// marked optional by using `Option<T>`.  All types are supported for which
+/// [`ArgType`] is implemented.
+///
+/// ```
+/// # use minijinja::Environment;
+/// # let mut env = Environment::new();
+/// use minijinja::State;
+///
+/// fn slugify(_state: &State, value: String) -> String {
+///     value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-")
+/// }
+///
+/// env.add_filter("slugify", slugify);
+/// ```
+///
+/// For a list of built-in filters see [`filters`](crate::filters).
 pub trait Filter<V, Rv, Args>: Send + Sync + 'static {
     /// Applies a filter to value with the given arguments.
     #[doc(hidden)]
-    fn apply_to(&self, state: &State, value: V, args: Args) -> Result<Rv, Error>;
+    fn apply_to(&self, state: &State, value: V, args: Args) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
         impl<Func, V, Rv, $($name),*> Filter<V, Rv, ($($name,)*)> for Func
         where
-            Func: Fn(&State, V, $($name),*) -> Result<Rv, Error> + Send + Sync + 'static
+            Func: Fn(&State, V, $($name),*) -> Rv + Send + Sync + 'static,
+            V: for<'a> ArgType<'a>,
+            Rv: FunctionResult,
+            $($name: for<'a> ArgType<'a>),*
         {
-            fn apply_to(&self, state: &State, value: V, args: ($($name,)*)) -> Result<Rv, Error> {
+            fn apply_to(&self, state: &State, value: V, args: ($($name,)*)) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
                 (self)(state, value, $($name,)*)
@@ -91,7 +135,7 @@ impl BoxedFilter {
     where
         F: Filter<V, Rv, Args>,
         V: for<'a> ArgType<'a>,
-        Rv: Into<Value>,
+        Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFilter(Arc::new(
@@ -101,7 +145,7 @@ impl BoxedFilter {
                     ArgType::from_value(Some(value))?,
                     FunctionArgs::from_values(args)?,
                 )
-                .map(Into::into)
+                .into_result()
             },
         ))
     }
@@ -155,9 +199,9 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
 /// Marks a value as safe.  This converts it into a string.
 ///
 /// When a value is marked as safe, no further auto escaping will take place.
-pub fn safe(_state: &State, v: String) -> Result<Value, Error> {
+pub fn safe(_state: &State, v: String) -> Value {
     // TODO: this ideally understands which type of escaping is in use
-    Ok(Value::from_safe_string(v))
+    Value::from_safe_string(v)
 }
 
 /// Escapes a string.  By default to HTML.
@@ -205,8 +249,8 @@ mod builtins {
     /// <h1>{{ chapter.title|upper }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn upper(_state: &State, v: Value) -> Result<String, Error> {
-        Ok(v.to_cowstr().to_uppercase())
+    pub fn upper(_state: &State, v: Value) -> String {
+        v.to_cowstr().to_uppercase()
     }
 
     /// Converts a value to lowercase.
@@ -215,8 +259,8 @@ mod builtins {
     /// <h1>{{ chapter.title|lower }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn lower(_state: &State, v: Value) -> Result<String, Error> {
-        Ok(v.to_cowstr().to_lowercase())
+    pub fn lower(_state: &State, v: Value) -> String {
+        v.to_cowstr().to_lowercase()
     }
 
     /// Converts a value to title case.
@@ -225,7 +269,7 @@ mod builtins {
     /// <h1>{{ chapter.title|title }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn title(_state: &State, v: Value) -> Result<String, Error> {
+    pub fn title(_state: &State, v: Value) -> String {
         let mut rv = String::new();
         let mut capitalize = true;
         for c in v.to_cowstr().chars() {
@@ -239,7 +283,7 @@ mod builtins {
                 write!(rv, "{}", c.to_lowercase()).unwrap();
             }
         }
-        Ok(rv)
+        rv
     }
 
     /// Does a string replace.
@@ -251,9 +295,9 @@ mod builtins {
     ///   -> Goodbye World
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn replace(_state: &State, v: Value, from: Value, to: Value) -> Result<String, Error> {
-        Ok(v.to_cowstr()
-            .replace(&from.to_cowstr() as &str, &to.to_cowstr() as &str))
+    pub fn replace(_state: &State, v: Value, from: Value, to: Value) -> String {
+        v.to_cowstr()
+            .replace(&from.to_cowstr() as &str, &to.to_cowstr() as &str)
     }
 
     /// Returns the "length" of the value
@@ -264,8 +308,8 @@ mod builtins {
     /// <p>Search results: {{ results|length }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn length(_state: &State, v: Value) -> Result<Value, Error> {
-        v.len().map(Value::from).ok_or_else(|| {
+    pub fn length(_state: &State, v: Value) -> Result<usize, Error> {
+        v.len().ok_or_else(|| {
             Error::new(
                 ErrorKind::ImpossibleOperation,
                 format!("cannot calculate length of value of type {}", v.kind()),
@@ -317,7 +361,7 @@ mod builtins {
     pub fn items(_state: &State, v: Value) -> Result<Value, Error> {
         Ok(Value::from(
             match v.0 {
-                ValueRepr::Map(ref v) => v.iter().collect::<Vec<_>>(),
+                ValueRepr::Map(ref v) => v.iter(),
                 _ => {
                     return Err(Error::new(
                         ErrorKind::ImpossibleOperation,
@@ -325,7 +369,6 @@ mod builtins {
                     ))
                 }
             }
-            .into_iter()
             .map(|(k, v)| vec![Value::from(k.clone()), v.clone()])
             .collect::<Vec<_>>(),
         ))
@@ -356,13 +399,13 @@ mod builtins {
 
     /// Trims a value
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn trim(_state: &State, s: Value, chars: Option<Value>) -> Result<String, Error> {
+    pub fn trim(_state: &State, s: Value, chars: Option<Value>) -> String {
         match chars {
             Some(chars) => {
                 let chars = chars.to_cowstr().chars().collect::<Vec<_>>();
-                Ok(s.to_cowstr().trim_matches(&chars[..]).to_string())
+                s.to_cowstr().trim_matches(&chars[..]).to_string()
             }
-            None => Ok(s.to_cowstr().trim().to_string()),
+            None => s.to_cowstr().trim().to_string(),
         }
     }
 
@@ -412,12 +455,12 @@ mod builtins {
     /// <p>{{ my_variable|default("my_variable was not defined") }}</p>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn default(_: &State, value: Value, other: Option<Value>) -> Result<Value, Error> {
-        Ok(if value.is_undefined() {
+    pub fn default(_: &State, value: Value, other: Option<Value>) -> Value {
+        if value.is_undefined() {
             other.unwrap_or_else(|| Value::from(""))
         } else {
             value
-        })
+        }
     }
 
     /// Returns the absolute value of a number.
@@ -547,8 +590,8 @@ mod builtins {
     /// This behaves the same as the if statement does with regards to
     /// handling of boolean values.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn bool(_: &State, value: Value) -> Result<bool, Error> {
-        Ok(value.is_true())
+    pub fn bool(_: &State, value: Value) -> bool {
+        value.is_true()
     }
 
     /// Slice an iterable and return a list of lists containing

@@ -26,8 +26,10 @@
 //! render invocation.
 //!
 //! ```rust
-//! # use minijinja::{Environment, State, Error, ErrorKind};
+//! # use minijinja::Environment;
 //! # let mut env = Environment::new();
+//! use minijinja::{State, Error, ErrorKind};
+//!
 //! fn include_file(_state: &State, name: String) -> Result<String, Error> {
 //!     std::fs::read_to_string(&name)
 //!         .map_err(|e| Error::new(
@@ -38,12 +40,20 @@
 //!
 //! env.add_function("include_file", include_file);
 //! ```
+//!
+//! # Built-in Functions
+//!
+//! When the `builtins` feature is enabled a range of built-in functions are
+//! automatically added to the environment.  These are also all provided in
+//! this module.  Note though that these functions are not to be
+//! called from Rust code as their exact interface (arguments and return types)
+//! might change from one MiniJinja version to another.
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
 use crate::error::Error;
-use crate::value::{FunctionArgs, Object, Value};
+use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, Value};
 use crate::vm::State;
 
 type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
@@ -53,19 +63,54 @@ type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send +
 pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 
 /// A utility trait that represents global functions.
+///
+/// This trait is used by the [`add_functino`](crate::Environment::add_function)
+/// method to abstract over different types of functions.
+///
+/// Functions which at the very least accept the [`State`] by reference as first
+/// parameter and additionally up to 4 further parameters.  They share much of
+/// their interface with [`filters`](crate::filters).
+///
+/// A function can return any of the following types:
+///
+/// * `Rv` where `Rv` implements `Into<Value>`
+/// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
+///
+/// The parameters can be marked optional by using `Option<T>`.  All types are
+/// supported for which [`ArgType`] is implemented.
+///
+/// ```rust
+/// # use minijinja::Environment;
+/// # let mut env = Environment::new();
+/// use minijinja::{State, Error, ErrorKind};
+///
+/// fn include_file(_state: &State, name: String) -> Result<String, Error> {
+///     std::fs::read_to_string(&name)
+///         .map_err(|e| Error::new(
+///             ErrorKind::ImpossibleOperation,
+///             "cannot load file"
+///         ).with_source(e))
+/// }
+///
+/// env.add_function("include_file", include_file);
+/// ```
+///
+/// For a list of built-in functions see [`functions`](crate::functions).
 pub trait Function<Rv, Args>: Send + Sync + 'static {
     /// Calls a function with the given arguments.
     #[doc(hidden)]
-    fn invoke(&self, env: &State, args: Args) -> Result<Rv, Error>;
+    fn invoke(&self, env: &State, args: Args) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<F, Rv, $($name),*> Function<Rv, ($($name,)*)> for F
+        impl<Func, Rv, $($name),*> Function<Rv, ($($name,)*)> for Func
         where
-            F: Fn(&State, $($name),*) -> Result<Rv, Error> + Send + Sync + 'static
+            Func: Fn(&State, $($name),*) -> Rv + Send + Sync + 'static,
+            Rv: FunctionResult,
+            $($name: for<'a> ArgType<'a>),*
         {
-            fn invoke(&self, state: &State, args: ($($name,)*)) -> Result<Rv, Error> {
+            fn invoke(&self, state: &State, args: ($($name,)*)) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
                 (self)(state, $($name,)*)
@@ -85,13 +130,13 @@ impl BoxedFunction {
     pub fn new<F, Rv, Args>(f: F) -> BoxedFunction
     where
         F: Function<Rv, Args>,
-        Rv: Into<Value>,
+        Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFunction(
             Arc::new(move |env, args| -> Result<Value, Error> {
                 f.invoke(env, FunctionArgs::from_values(args)?)
-                    .map(Into::into)
+                    .into_result()
             }),
             std::any::type_name::<F>(),
         )
@@ -168,21 +213,16 @@ mod builtins {
     /// </ul>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn range(
-        _state: &State,
-        lower: u32,
-        upper: Option<u32>,
-        step: Option<u32>,
-    ) -> Result<Vec<u32>, Error> {
+    pub fn range(_state: &State, lower: u32, upper: Option<u32>, step: Option<u32>) -> Vec<u32> {
         let rng = match upper {
             Some(upper) => lower..upper,
             None => 0..lower,
         };
-        Ok(if let Some(step) = step {
+        if let Some(step) = step {
             rng.step_by(step as usize).collect()
         } else {
             rng.collect()
-        })
+        }
     }
 
     /// Creates a dictionary.
@@ -218,8 +258,8 @@ mod builtins {
     /// <pre>{{ debug() }}</pre>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn debug(state: &State) -> Result<String, Error> {
-        Ok(format!("{:#?}", state))
+    pub fn debug(state: &State) -> String {
+        format!("{:#?}", state)
     }
 }
 

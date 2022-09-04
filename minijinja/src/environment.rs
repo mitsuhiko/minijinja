@@ -9,7 +9,7 @@ use crate::error::Error;
 use crate::instructions::Instructions;
 use crate::parser::{parse, parse_expr};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, HtmlEscape};
-use crate::value::{ArgType, FunctionArgs, Value};
+use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
 use crate::vm::Vm;
 use crate::{filters, functions, tests};
 
@@ -534,12 +534,14 @@ impl<'source> Environment<'source> {
 
     /// Adds a new filter function.
     ///
-    /// For details about filters have a look at [`filters`].
+    /// Filter functions are functions that can be applied to values in
+    /// templates.  For details about filters have a look at
+    /// [`Filter`](crate::filters::Filter).
     pub fn add_filter<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
     where
-        V: for<'a> ArgType<'a>,
-        Rv: Into<Value>,
         F: filters::Filter<V, Rv, Args>,
+        V: for<'a> ArgType<'a>,
+        Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
         self.filters.insert(name, filters::BoxedFilter::new(f));
@@ -552,11 +554,14 @@ impl<'source> Environment<'source> {
 
     /// Adds a new test function.
     ///
-    /// For details about tests have a look at [`tests`].
-    pub fn add_test<F, V, Args>(&mut self, name: &'source str, f: F)
+    /// Test functions are similar to filters but perform a check on a value
+    /// where the return value is always true or false.  For details about tests
+    /// have a look at [`Test`](crate::tests::Test).
+    pub fn add_test<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
     where
         V: for<'a> ArgType<'a>,
-        F: tests::Test<V, Args>,
+        Rv: tests::TestResult,
+        F: tests::Test<V, Rv, Args>,
         Args: for<'a> FunctionArgs<'a>,
     {
         self.tests.insert(name, tests::BoxedTest::new(f));
@@ -573,7 +578,7 @@ impl<'source> Environment<'source> {
     /// functions and other global variables share the same namespace.
     pub fn add_function<F, Rv, Args>(&mut self, name: &'source str, f: F)
     where
-        Rv: Into<Value>,
+        Rv: FunctionResult,
         F: functions::Function<Rv, Args>,
         Args: for<'a> FunctionArgs<'a>,
     {
