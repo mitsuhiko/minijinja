@@ -778,7 +778,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::PushLoop(flags) => {
                     let iterable = stack.pop();
-                    let iterator = iterable.iter();
+                    let iterator = try_ctx!(iterable.try_iter());
                     let len = iterator.len();
                     let depth = state
                         .ctx

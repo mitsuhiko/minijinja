@@ -618,8 +618,9 @@ impl Value {
     }
 
     /// Iterates over the value.
-    pub(crate) fn iter(&self) -> ValueIterator {
+    pub(crate) fn try_iter(&self) -> Result<ValueIterator, Error> {
         let (iter_state, len) = match self.0 {
+            ValueRepr::None | ValueRepr::Undefined => (ValueIteratorState::Empty, 0),
             ValueRepr::Seq(ref seq) => (ValueIteratorState::Seq(0, Arc::clone(seq)), seq.len()),
             #[cfg(feature = "preserve_order")]
             ValueRepr::Map(ref items) => {
@@ -633,9 +634,14 @@ impl Value {
                 ),
                 items.len(),
             ),
-            _ => (ValueIteratorState::Empty, 0),
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::ImpossibleOperation,
+                    "object is not iterable",
+                ))
+            }
         };
-        ValueIterator { iter_state, len }
+        Ok(ValueIterator { iter_state, len })
     }
 }
 

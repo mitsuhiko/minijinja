@@ -269,7 +269,7 @@ pub mod key_interning {
 
         let v = Value::from_serializable(&vec![m.clone(), m.clone(), m.clone()]);
 
-        for value in v.iter() {
+        for value in v.try_iter().unwrap() {
             match value.0 {
                 ValueRepr::Map(m) => {
                     let k = m.iter().next().unwrap().0;

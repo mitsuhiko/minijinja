@@ -12,6 +12,7 @@ All notable changes to MiniJinja are documented here.
 - Error no longer implements `PartialEq`.
 - Simplified the function interface.  Filters, tests and global
   functions can now directly return values instead of results. (#107)
+- MiniJinja no longer silently iterates over non iterable values.
 
 ## Breaking Changes
 

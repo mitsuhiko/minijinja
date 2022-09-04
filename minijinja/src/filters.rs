@@ -621,7 +621,7 @@ mod builtins {
         count: usize,
         fill_with: Option<Value>,
     ) -> Result<Value, Error> {
-        let items = value.iter().collect::<Vec<_>>();
+        let items = value.try_iter()?.collect::<Vec<_>>();
         let len = items.len();
         let items_per_slice = len / count;
         let slices_with_extra = len % count;
@@ -678,7 +678,7 @@ mod builtins {
         let mut rv = Vec::new();
         let mut tmp = Vec::with_capacity(count);
 
-        for item in value.iter() {
+        for item in value.try_iter()? {
             if tmp.len() == count {
                 rv.push(Value::from(mem::replace(
                     &mut tmp,
