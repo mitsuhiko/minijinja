@@ -11,7 +11,7 @@ use crate::parser::{parse, parse_expr};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, HtmlEscape};
 use crate::value::{ArgType, FunctionArgs, FunctionResult, Value, ValueKind};
 use crate::vm::Vm;
-use crate::{filters, functions, tests, ErrorKind};
+use crate::{filters, functions, tests};
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -633,8 +633,11 @@ impl<'source> Environment<'source> {
             #[cfg(feature = "json")]
             AutoEscape::Json => {
                 let value = serde_json::to_string(&value).map_err(|err| {
-                    Error::new(ErrorKind::BadSerialization, "unable to format to JSON")
-                        .with_source(err)
+                    Error::new(
+                        crate::ErrorKind::BadSerialization,
+                        "unable to format to JSON",
+                    )
+                    .with_source(err)
                 })?;
                 write!(out, "{}", value).unwrap()
             }
