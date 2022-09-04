@@ -59,14 +59,6 @@ impl fmt::Debug for Error {
     }
 }
 
-impl PartialEq for Error {
-    fn eq(&self, other: &Self) -> bool {
-        self.kind() == other.kind()
-    }
-}
-
-impl Eq for Error {}
-
 /// An enum describing the error kind.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ErrorKind {

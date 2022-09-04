@@ -340,6 +340,19 @@ impl<'env, 'vm> Context<'env, 'vm> {
     }
 }
 
+fn process_err(mut err: Error, pc: usize, state: &State, instructions: &Instructions) -> Error {
+    if let Some(lineno) = instructions.get_line(pc) {
+        err.set_location(instructions.name(), lineno);
+    }
+    #[cfg(feature = "debug")]
+    {
+        if state.env.debug() && err.debug_info.is_none() {
+            err.debug_info = Some(state.make_debug_info(pc, instructions));
+        }
+    }
+    err
+}
+
 /// Provides access to the current execution state of the engine.
 ///
 /// A read only reference is passed to filter functions and similar objects to
@@ -498,17 +511,7 @@ impl<'env> Vm<'env> {
 
         macro_rules! bail {
             ($err:expr) => {{
-                let mut err = $err;
-                if let Some(lineno) = instructions.get_line(pc) {
-                    err.set_location(instructions.name(), lineno);
-                }
-                #[cfg(feature = "debug")]
-                {
-                    if self.env.debug() && err.debug_info.is_none() {
-                        err.debug_info = Some(state.make_debug_info(pc, &instructions));
-                    }
-                }
-                return Err(err);
+                return Err(process_err($err, pc, state, instructions));
             }};
         }
 

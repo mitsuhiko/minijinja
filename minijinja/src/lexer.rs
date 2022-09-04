@@ -48,6 +48,26 @@ fn skip_basic_tag(block_str: &str, name: &str) -> Option<usize> {
     Some(block_str.len() - ptr.len())
 }
 
+fn advance<'s>(
+    bytes: usize,
+    rest: &mut &'s str,
+    current_line: &mut usize,
+    current_col: &mut usize,
+) -> &'s str {
+    let (skipped, new_rest) = rest.split_at(bytes);
+    for c in skipped.chars() {
+        match c {
+            '\n' => {
+                *current_line += 1;
+                *current_col = 0;
+            }
+            _ => *current_col += 1,
+        }
+    }
+    *rest = new_rest;
+    skipped
+}
+
 /// Tokenizes without whitespace handling.
 fn tokenize_raw(
     input: &str,
@@ -89,20 +109,9 @@ fn tokenize_raw(
     }
 
     macro_rules! advance {
-        ($bytes:expr) => {{
-            let (skipped, new_rest) = rest.split_at($bytes);
-            for c in skipped.chars() {
-                match c {
-                    '\n' => {
-                        current_line += 1;
-                        current_col = 0;
-                    }
-                    _ => current_col += 1,
-                }
-            }
-            rest = new_rest;
-            skipped
-        }};
+        ($bytes:expr) => {
+            advance($bytes, &mut rest, &mut current_line, &mut current_col)
+        };
     }
 
     macro_rules! eat_string {

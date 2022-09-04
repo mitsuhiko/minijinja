@@ -82,7 +82,7 @@ fn test_basic() {
 
     let mut output = String::new();
 
-    let mut i = Instructions::default();
+    let mut i = Instructions::new("", "");
     i.add(Instruction::EmitRaw("Hello "));
     i.add(Instruction::Lookup("user"));
     i.add(Instruction::GetAttr("name"));

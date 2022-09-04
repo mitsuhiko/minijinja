@@ -774,10 +774,10 @@ fn test_adding() {
         "impossible operation: tried to use + operator on unsupported types string and number"
     );
 
-    assert_eq!(ops::add(&value!(1), &value!(2)), Ok(value!(3)));
+    assert_eq!(ops::add(&value!(1), &value!(2)).unwrap(), value!(3));
     assert_eq!(
-        ops::add(&value!("foo"), &value!("bar")),
-        Ok(value!("foobar"))
+        ops::add(&value!("foo"), &value!("bar")).unwrap(),
+        value!("foobar")
     );
 }
 
@@ -795,7 +795,7 @@ fn test_subtracting() {
         "impossible operation: tried to use - operator on unsupported types string and string"
     );
 
-    assert_eq!(ops::sub(&value!(2), &value!(1)), Ok(value!(1)));
+    assert_eq!(ops::sub(&value!(2), &value!(1)).unwrap(), value!(1));
 }
 
 #[test]
@@ -812,7 +812,7 @@ fn test_dividing() {
         "impossible operation: tried to use / operator on unsupported types string and string"
     );
 
-    assert_eq!(ops::div(&value!(100), &value!(2)), Ok(value!(50.0)));
+    assert_eq!(ops::div(&value!(100), &value!(2)).unwrap(), value!(50.0));
 }
 
 #[test]

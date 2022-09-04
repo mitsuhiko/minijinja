@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::ast::{self, Spanned};
 use crate::error::{Error, ErrorKind};
 use crate::lexer::tokenize;
@@ -17,40 +19,36 @@ macro_rules! syntax_error {
     }};
 }
 
+fn unexpected<D: fmt::Display>(unexpected: D, expected: &str) -> Error {
+    Error::new(
+        ErrorKind::SyntaxError,
+        format!("unexpected {}, expected {}", unexpected, expected),
+    )
+}
+
+fn unexpected_eof(expected: &str) -> Error {
+    unexpected("end of input", expected)
+}
+
 macro_rules! expect_token {
     ($parser:expr, $expectation:expr) => {{
         match $parser.stream.next()? {
             Some(rv) => Ok(rv),
-            None => Err(Error::new(
-                ErrorKind::SyntaxError,
-                format!("unexpected end of input, expected {}", $expectation),
-            )),
+            None => Err(unexpected_eof($expectation)),
         }
     }};
     ($parser:expr, $match:pat, $expectation:expr) => {{
         match $parser.stream.next()? {
             Some((token, span)) if matches!(token, $match) => Ok((token, span)),
-            Some((token, _)) => Err(Error::new(
-                ErrorKind::SyntaxError,
-                format!("unexpected {}, expected {}", token, $expectation),
-            )),
-            None => Err(Error::new(
-                ErrorKind::SyntaxError,
-                format!("unexpected end of input, expected {}", $expectation),
-            )),
+            Some((token, _)) => Err(unexpected(token, $expectation)),
+            None => Err(unexpected_eof($expectation)),
         }
     }};
     ($parser:expr, $match:pat => $target:expr, $expectation:expr) => {{
         match $parser.stream.next()? {
             Some(($match, span)) => Ok(($target, span)),
-            Some((token, _)) => Err(Error::new(
-                ErrorKind::SyntaxError,
-                format!("unexpected {}, expected {}", token, $expectation),
-            )),
-            None => Err(Error::new(
-                ErrorKind::SyntaxError,
-                format!("unexpected end of input, expected {}", $expectation),
-            )),
+            Some((token, _)) => Err(unexpected(token, $expectation)),
+            None => Err(unexpected_eof($expectation)),
         }
     }};
 }

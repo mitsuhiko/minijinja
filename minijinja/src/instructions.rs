@@ -13,7 +13,6 @@ pub const LOOP_FLAG_WITH_LOOP_VAR: u8 = 1;
 pub const LOOP_FLAG_RECURSIVE: u8 = 2;
 
 /// Represents an instruction for the VM.
-#[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub enum Instruction<'source> {
     /// Emits raw source
@@ -193,7 +192,6 @@ struct Loc {
 }
 
 /// Wrapper around instructions to help with location management.
-#[derive(Default, Clone)]
 pub struct Instructions<'source> {
     pub(crate) instructions: Vec<Instruction<'source>>,
     locations: Vec<Loc>,

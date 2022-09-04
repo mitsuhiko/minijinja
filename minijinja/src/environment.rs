@@ -44,7 +44,6 @@ impl<'env> fmt::Debug for Template<'env> {
 }
 
 /// Represents a compiled template in memory.
-#[derive(Clone)]
 pub(crate) struct CompiledTemplate<'source> {
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,
@@ -167,7 +166,7 @@ impl<'env> Template<'env> {
     }
 }
 
-type TemplateMap<'source> = BTreeMap<&'source str, CompiledTemplate<'source>>;
+type TemplateMap<'source> = BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>;
 
 #[derive(Clone)]
 enum Source<'source> {
@@ -428,7 +427,7 @@ impl<'source> Environment<'source> {
         match self.templates {
             Source::Borrowed(ref mut map) => {
                 let compiled_template = CompiledTemplate::from_name_and_source(name, source)?;
-                map.insert(name, compiled_template);
+                map.insert(name, Arc::new(compiled_template));
                 Ok(())
             }
             #[cfg(feature = "source")]
