@@ -9,6 +9,7 @@ All notable changes to MiniJinja are documented here.
   arguments by reference. (#101)
 - `sync` mode is now always enabled. (#104)
 - Removed meta API. (#105)
+- Error no longer implements `PartialEq`.
 
 ## Breaking Changes
 
@@ -17,6 +18,9 @@ All notable changes to MiniJinja are documented here.
   as `&[Value]` instead of `Vec<Value>`.
 - `Object::call_method`, `Object::call` and `FunctionArgs::from_values`
   now take the arguments as `&[Value]` instead of `Vec<Value>`.
+- The error object used to implement `PartialEq` but this was implemented
+  by comparing the error kind instead.  Explicitly use the `.kind()`
+  method of the error if you want the same behavior.
 
 # 0.19.1
 
