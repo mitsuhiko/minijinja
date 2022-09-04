@@ -261,4 +261,49 @@ pub mod key_interning {
             }
         })
     }
+
+    #[test]
+    fn test_key_interning() {
+        let mut m = std::collections::BTreeMap::new();
+        m.insert("x", 1u32);
+
+        let v = Value::from_serializable(&vec![m.clone(), m.clone(), m.clone()]);
+
+        for value in v.iter() {
+            match value.0 {
+                ValueRepr::Map(m) => {
+                    let k = m.iter().next().unwrap().0;
+                    match k {
+                        Key::String(s) => {
+                            assert_eq!(Arc::strong_count(s), 3);
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
+#[test]
+fn test_string_key_lookup() {
+    let mut m = std::collections::BTreeMap::new();
+    m.insert(Key::String(Arc::new("foo".into())), Value::from(42));
+    let m = Value::from(m);
+    assert_eq!(m.get_item(&Value::from("foo")).unwrap(), Value::from(42));
+}
+
+#[test]
+fn test_int_key_lookup() {
+    let mut m = std::collections::BTreeMap::new();
+    m.insert(Key::I64(42), Value::from(42));
+    m.insert(Key::I64(23), Value::from(23));
+    let m = Value::from(m);
+    assert_eq!(m.get_item(&Value::from(42.0f32)).unwrap(), Value::from(42));
+    assert_eq!(m.get_item(&Value::from(42u32)).unwrap(), Value::from(42));
+
+    let s = Value::from(vec![42i32, 23]);
+    assert_eq!(s.get_item(&Value::from(0.0f32)).unwrap(), Value::from(42));
+    assert_eq!(s.get_item(&Value::from(0i32)).unwrap(), Value::from(42));
 }
