@@ -10,6 +10,7 @@ repository = "https://github.com/mitsuhiko/minijinja"
 keywords = ["jinja", "jinja2", "templates"]
 readme = "README.md"
 rust-version = "1.45"
+exclude = ["tests"]
 
 [package.metadata.docs.rs]
 features = ["source", "json", "urlencode"]
