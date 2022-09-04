@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Remove internal refcounts from environment.
 - Changed `Object` and `FunctionArgs` interface to take
   arguments by reference. (#101)
+- `sync` mode is now always enabled. (#104)
 
 # 0.19.1
 
