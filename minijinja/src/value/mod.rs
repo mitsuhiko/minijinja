@@ -434,6 +434,7 @@ impl Value {
     }
 
     /// Like `as_str` but always stringifies the value.
+    #[allow(unused)]
     pub(crate) fn to_cowstr(&self) -> Cow<'_, str> {
         match &self.0 {
             ValueRepr::String(ref s) => Cow::Borrowed(s.as_str()),
