@@ -57,20 +57,41 @@ type TestFunc = dyn Fn(&State, &Value, &[Value]) -> Result<bool, Error> + Sync +
 #[derive(Clone)]
 pub(crate) struct BoxedTest(Arc<TestFunc>);
 
+/// A utility trait that represents the return value of filters.
+pub trait TestResult {
+    #[doc(hidden)]
+    fn into_result(self) -> Result<bool, Error>;
+}
+
+impl TestResult for Result<bool, Error> {
+    fn into_result(self) -> Result<bool, Error> {
+        self
+    }
+}
+
+impl TestResult for bool {
+    fn into_result(self) -> Result<bool, Error> {
+        Ok(self)
+    }
+}
+
 /// A utility trait that represents filters.
-pub trait Test<V, Args>: Send + Sync + 'static {
+pub trait Test<V, Rv, Args>: Send + Sync + 'static {
     /// Performs a test to value with the given arguments.
     #[doc(hidden)]
-    fn perform(&self, state: &State, value: V, args: Args) -> Result<bool, Error>;
+    fn perform(&self, state: &State, value: V, args: Args) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<Func, V, $($name),*> Test<V, ($($name,)*)> for Func
+        impl<Func, V, Rv, $($name),*> Test<V, Rv, ($($name,)*)> for Func
         where
-            Func: Fn(&State, V, $($name),*) -> Result<bool, Error> + Send + Sync + 'static
+            Func: Fn(&State, V, $($name),*) -> Rv + Send + Sync + 'static,
+            V: for<'a> ArgType<'a>,
+            Rv: TestResult,
+            $($name: for<'a> ArgType<'a>),*
         {
-            fn perform(&self, state: &State, value: V, args: ($($name,)*)) -> Result<bool, Error> {
+            fn perform(&self, state: &State, value: V, args: ($($name,)*)) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
                 (self)(state, value, $($name,)*)
@@ -87,10 +108,11 @@ tuple_impls! { A B C D }
 
 impl BoxedTest {
     /// Creates a new boxed filter.
-    pub fn new<F, V, Args>(f: F) -> BoxedTest
+    pub fn new<F, V, Rv, Args>(f: F) -> BoxedTest
     where
-        F: Test<V, Args>,
+        F: Test<V, Rv, Args>,
         V: for<'a> ArgType<'a>,
+        Rv: TestResult,
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedTest(Arc::new(move |state, value, args| -> Result<bool, Error> {
@@ -100,6 +122,7 @@ impl BoxedTest {
                 ArgType::from_value(value)?,
                 FunctionArgs::from_values(args)?,
             )
+            .into_result()
         }))
     }
 
@@ -138,68 +161,68 @@ mod builtins {
 
     /// Checks if a value is odd.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_odd(_state: &State, v: Value) -> Result<bool, Error> {
-        Ok(i128::try_from(v).ok().map_or(false, |x| x % 2 != 0))
+    pub fn is_odd(_state: &State, v: Value) -> bool {
+        i128::try_from(v).ok().map_or(false, |x| x % 2 != 0)
     }
 
     /// Checks if a value is even.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_even(_state: &State, v: Value) -> Result<bool, Error> {
-        Ok(i128::try_from(v).ok().map_or(false, |x| x % 2 == 0))
+    pub fn is_even(_state: &State, v: Value) -> bool {
+        i128::try_from(v).ok().map_or(false, |x| x % 2 == 0)
     }
 
     /// Checks if a value is undefined.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_undefined(_state: &State, v: Value) -> Result<bool, Error> {
-        Ok(v.is_undefined())
+    pub fn is_undefined(_state: &State, v: Value) -> bool {
+        v.is_undefined()
     }
 
     /// Checks if a value is defined.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_defined(_state: &State, v: Value) -> Result<bool, Error> {
-        Ok(!v.is_undefined())
+    pub fn is_defined(_state: &State, v: Value) -> bool {
+        !v.is_undefined()
     }
 
     /// Checks if this value is a number.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_number(_state: &State, v: Value) -> Result<bool, Error> {
-        Ok(matches!(v.kind(), ValueKind::Number))
+    pub fn is_number(_state: &State, v: Value) -> bool {
+        matches!(v.kind(), ValueKind::Number)
     }
 
     /// Checks if this value is a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_string(_state: &State, v: Value) -> Result<bool, Error> {
-        Ok(matches!(v.kind(), ValueKind::String))
+    pub fn is_string(_state: &State, v: Value) -> bool {
+        matches!(v.kind(), ValueKind::String)
     }
 
     /// Checks if this value is a sequence
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_sequence(_state: &State, v: Value) -> Result<bool, Error> {
-        Ok(matches!(v.kind(), ValueKind::Seq))
+    pub fn is_sequence(_state: &State, v: Value) -> bool {
+        matches!(v.kind(), ValueKind::Seq)
     }
 
     /// Checks if this value is a mapping
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_mapping(_state: &State, v: Value) -> Result<bool, Error> {
-        Ok(matches!(v.kind(), ValueKind::Map))
+    pub fn is_mapping(_state: &State, v: Value) -> bool {
+        matches!(v.kind(), ValueKind::Map)
     }
 
     /// Checks if the value is starting with a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_startingwith(_state: &State, v: String, other: String) -> Result<bool, Error> {
-        Ok(v.starts_with(&other))
+    pub fn is_startingwith(_state: &State, v: String, other: String) -> bool {
+        v.starts_with(&other)
     }
 
     /// Checks if the value is ending with a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_endingwith(_state: &State, v: String, other: String) -> Result<bool, Error> {
-        Ok(v.ends_with(&other))
+    pub fn is_endingwith(_state: &State, v: String, other: String) -> bool {
+        v.ends_with(&other)
     }
 
     #[test]
     fn test_basics() {
-        fn test(_: &State, a: u32, b: u32) -> Result<bool, Error> {
-            Ok(a == b)
+        fn test(_: &State, a: u32, b: u32) -> bool {
+            a == b
         }
 
         let env = crate::Environment::new();

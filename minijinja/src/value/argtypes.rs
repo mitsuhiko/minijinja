@@ -6,6 +6,24 @@ use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
 use crate::value::{Arc, Value, ValueRepr};
 
+/// A utility trait that represents the return value of functions and filters.
+pub trait FunctionResult {
+    #[doc(hidden)]
+    fn into_result(self) -> Result<Value, Error>;
+}
+
+impl<I: Into<Value>> FunctionResult for Result<I, Error> {
+    fn into_result(self) -> Result<Value, Error> {
+        self.map(Into::into)
+    }
+}
+
+impl<I: Into<Value>> FunctionResult for I {
+    fn into_result(self) -> Result<Value, Error> {
+        Ok(self.into())
+    }
+}
+
 /// Helper trait representing valid filter and test arguments.
 ///
 /// Since it's more convenient to write filters and tests with concrete
@@ -34,7 +52,9 @@ pub trait ArgType<'a>: Sized {
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<'a, $($name: ArgType<'a>,)*> FunctionArgs<'a> for ($($name,)*) {
+        impl<'a, $($name),*> FunctionArgs<'a> for ($($name,)*)
+            where $($name: ArgType<'a>,)*
+        {
             fn from_values(values: &'a [Value]) -> Result<Self, Error> {
                 #![allow(non_snake_case, unused)]
                 let arg_count = 0 $(
