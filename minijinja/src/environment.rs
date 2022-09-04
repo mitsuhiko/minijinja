@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::fmt;
+use std::fmt::{self, Write};
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -9,9 +9,9 @@ use crate::error::Error;
 use crate::instructions::Instructions;
 use crate::parser::{parse, parse_expr};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, HtmlEscape};
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
+use crate::value::{ArgType, FunctionArgs, FunctionResult, Value, ValueKind};
 use crate::vm::Vm;
-use crate::{filters, functions, tests};
+use crate::{filters, functions, tests, ErrorKind};
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -620,8 +620,6 @@ impl<'source> Environment<'source> {
         autoescape: AutoEscape,
         out: &mut String,
     ) -> Result<(), Error> {
-        use std::fmt::Write;
-
         // safe values do not get escaped
         if value.is_safe() {
             write!(out, "{}", value).unwrap();
@@ -631,21 +629,12 @@ impl<'source> Environment<'source> {
         // TODO: this should become pluggable
         match autoescape {
             AutoEscape::None => write!(out, "{}", value).unwrap(),
-            AutoEscape::Html => {
-                if let Some(s) = value.as_str() {
-                    write!(out, "{}", HtmlEscape(s)).unwrap()
-                } else {
-                    write!(out, "{}", HtmlEscape(&value.to_string())).unwrap()
-                }
-            }
+            AutoEscape::Html => html_escape_value(out, value),
             #[cfg(feature = "json")]
             AutoEscape::Json => {
                 let value = serde_json::to_string(&value).map_err(|err| {
-                    Error::new(
-                        crate::ErrorKind::BadSerialization,
-                        "unable to format to JSON",
-                    )
-                    .with_source(err)
+                    Error::new(ErrorKind::BadSerialization, "unable to format to JSON")
+                        .with_source(err)
                 })?;
                 write!(out, "{}", value).unwrap()
             }
@@ -661,6 +650,19 @@ impl<'source> Environment<'source> {
         out: &mut String,
     ) -> Result<(), Error> {
         self.escape(value, autoescape, out)
+    }
+}
+
+pub fn html_escape_value(out: &mut String, value: &Value) {
+    if matches!(
+        value.kind(),
+        ValueKind::Undefined | ValueKind::None | ValueKind::Bool | ValueKind::Number
+    ) {
+        write!(out, "{}", value).unwrap()
+    } else if let Some(s) = value.as_str() {
+        write!(out, "{}", HtmlEscape(s)).unwrap()
+    } else {
+        write!(out, "{}", HtmlEscape(&value.to_string())).unwrap()
     }
 }
 
