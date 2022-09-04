@@ -35,13 +35,21 @@ pub struct Error {
 
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Error")
-            .field("kind", &self.kind)
-            .field("detail", &self.detail)
-            .field("name", &self.name)
-            .field("lineno", &self.lineno)
-            .field("source", &self.source)
-            .finish()?;
+        let mut err = f.debug_struct("Error");
+        err.field("kind", &self.kind);
+        if let Some(ref detail) = self.detail {
+            err.field("detail", detail);
+        }
+        if let Some(ref name) = self.name {
+            err.field("name", name);
+        }
+        if self.lineno > 0 {
+            err.field("line", &self.lineno);
+        }
+        if let Some(ref source) = self.source {
+            err.field("source", source);
+        }
+        err.finish()?;
 
         // so this is a bit questionablem, but because of how commonly errors are just
         // unwrapped i think it's sensible to spit out the debug info following the

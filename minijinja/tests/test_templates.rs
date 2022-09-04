@@ -44,7 +44,7 @@ fn test_vm() {
 
         let mut rendered = match template.render(&ctx) {
             Ok(rendered) => rendered,
-            Err(err) => format!("!!!ERROR!!!\n\n{:?}\n", err),
+            Err(err) => format!("!!!ERROR!!!\n\n{:#?}\n", err),
         };
         rendered.push('\n');
 

@@ -6,13 +6,8 @@ input_file: minijinja/tests/parser-inputs/err_binop_missing_rhs.txt
 Err(
     Error {
         kind: SyntaxError,
-        detail: Some(
-            "unexpected end of variable block",
-        ),
-        name: Some(
-            "err_binop_missing_rhs.txt",
-        ),
-        lineno: 1,
-        source: None,
+        detail: "unexpected end of variable block",
+        name: "err_binop_missing_rhs.txt",
+        line: 1,
     },
 )

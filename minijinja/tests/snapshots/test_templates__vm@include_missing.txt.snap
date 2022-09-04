@@ -7,6 +7,11 @@ input_file: minijinja/tests/inputs/include_missing.txt
 ---
 !!!ERROR!!!
 
-Error { kind: TemplateNotFound, detail: Some("tried to include non-existing template \"missing_template.txt\""), name: Some("include_missing.txt"), lineno: 2, source: None }
+Error {
+    kind: TemplateNotFound,
+    detail: "tried to include non-existing template \"missing_template.txt\"",
+    name: "include_missing.txt",
+    line: 2,
+}
 
 

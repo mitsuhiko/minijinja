@@ -6,13 +6,8 @@ input_file: minijinja/tests/parser-inputs/err_invalid_var_assignment.txt
 Err(
     Error {
         kind: SyntaxError,
-        detail: Some(
-            "cannot assign to reserved variable name loop",
-        ),
-        name: Some(
-            "err_invalid_var_assignment.txt",
-        ),
-        lineno: 1,
-        source: None,
+        detail: "cannot assign to reserved variable name loop",
+        name: "err_invalid_var_assignment.txt",
+        line: 1,
     },
 )

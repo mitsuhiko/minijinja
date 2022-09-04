@@ -10,6 +10,15 @@ input_file: minijinja/tests/inputs/loop_bad_unpacking.txt
 ---
 !!!ERROR!!!
 
-Error { kind: ImpossibleOperation, detail: Some("cannot unpack: not a sequence"), name: Some("loop_bad_unpacking.txt"), lineno: 2, source: Some(Error { kind: ImpossibleOperation, detail: Some("value is not a list"), name: None, lineno: 0, source: None }) }
+Error {
+    kind: ImpossibleOperation,
+    detail: "cannot unpack: not a sequence",
+    name: "loop_bad_unpacking.txt",
+    line: 2,
+    source: Error {
+        kind: ImpossibleOperation,
+        detail: "value is not a list",
+    },
+}
 
 

@@ -6,13 +6,8 @@ input_file: minijinja/tests/parser-inputs/err_open_block.txt
 Err(
     Error {
         kind: SyntaxError,
-        detail: Some(
-            "unexpected identifier, expected end of block",
-        ),
-        name: Some(
-            "err_open_block.txt",
-        ),
-        lineno: 1,
-        source: None,
+        detail: "unexpected identifier, expected end of block",
+        name: "err_open_block.txt",
+        line: 1,
     },
 )

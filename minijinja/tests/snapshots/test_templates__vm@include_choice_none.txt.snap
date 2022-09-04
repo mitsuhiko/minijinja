@@ -6,6 +6,11 @@ input_file: minijinja/tests/inputs/include_choice_none.txt
 ---
 !!!ERROR!!!
 
-Error { kind: TemplateNotFound, detail: Some("tried to include one of multiple templates, none of which existed [\"missing_template1.txt\", \"missing_template2.txt\"]"), name: Some("include_choice_none.txt"), lineno: 2, source: None }
+Error {
+    kind: TemplateNotFound,
+    detail: "tried to include one of multiple templates, none of which existed [\"missing_template1.txt\", \"missing_template2.txt\"]",
+    name: "include_choice_none.txt",
+    line: 2,
+}
 
 

@@ -6,6 +6,11 @@ input_file: minijinja/tests/inputs/block_super_err.txt
 ---
 !!!ERROR!!!
 
-Error { kind: ImpossibleOperation, detail: Some("cannot super outside of block"), name: Some("block_super_err.txt"), lineno: 1, source: None }
+Error {
+    kind: ImpossibleOperation,
+    detail: "cannot super outside of block",
+    name: "block_super_err.txt",
+    line: 1,
+}
 
 

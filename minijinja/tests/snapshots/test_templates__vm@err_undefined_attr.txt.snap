@@ -6,6 +6,10 @@ input_file: minijinja/tests/inputs/err_undefined_attr.txt
 ---
 !!!ERROR!!!
 
-Error { kind: UndefinedError, detail: None, name: Some("err_undefined_attr.txt"), lineno: 1, source: None }
+Error {
+    kind: UndefinedError,
+    name: "err_undefined_attr.txt",
+    line: 1,
+}
 
 
