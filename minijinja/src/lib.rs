@@ -69,13 +69,6 @@
 //! assert_eq!(result.is_true(), true);
 //! ```
 //!
-//! # Debugging
-//!
-//! To better understand what's going on when a template syntax or rendering error
-//! happens you should turn on the built-in debug support.  Once enabled the errors
-//! created by the engine will include helpful error messages with information about
-//! where the error happened.  For more information see [`set_debug`](crate::Environment::set_debug).
-//!
 //! # Learn more
 //!
 //! - [`syntax`]: documentation of the template engine syntax.
@@ -86,12 +79,21 @@
 //! - [`Environment`]: the main API entry point.
 //! - [`Template`]: the template object API.
 //!
+//! # Debugging
+//!
+//! To better understand what's going on when a template syntax or rendering error
+//! happens you should turn on the built-in debug support.  Once enabled the errors
+//! created by the engine will include helpful error messages with information about
+//! where the error happened.  For more information see [`set_debug`](crate::Environment::set_debug).
+//!
 //! # Optional Features
 //!
 //! MiniJinja comes with a lot of optional features, some of which are turned on by
 //! default.  If you plan on using MiniJinja in a library, please consider turning
 //! off all default features and to opt-in explicitly into the ones you actually
 //! need.
+//!
+//! <details><summary><strong style="cursor: pointer">Configurable Features</strong></summary>
 //!
 //! There are some additional features that can be enabled:
 //!
@@ -119,6 +121,8 @@
 //!   consumption of the value type by interning all string keys used in values.
 //! - `deserialization`: when removed this disables deserialization support for
 //!   the [`Value`](crate::value::Value) type.
+//!
+//! </details>
 #![allow(clippy::cognitive_complexity)]
 #![allow(clippy::get_first)]
 #![cfg_attr(docsrs, feature(doc_cfg))]

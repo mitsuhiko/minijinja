@@ -120,9 +120,17 @@ impl<'env> Template<'env> {
     /// Renders the template into a string.
     ///
     /// The provided value is used as the initial context for the template.  It
-    /// can be any object that implements [`Serialize`](serde::Serialize).
-    /// Typically custom structs annotated with `#[derive(Serialize)]` would
-    /// be used for this purpose.
+    /// can be any object that implements [`Serialize`](serde::Serialize).  You
+    /// can eiher create your own struct and derive `Serialize` for it or the
+    /// [`context!`](crate::context) macro can be used to create an ad-hoc context.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// # let mut env = Environment::new();
+    /// # env.add_template("hello", "Hello {{ name }}!").unwrap();
+    /// let tmpl = env.get_template("hello").unwrap();
+    /// println!("{}", tmpl.render(context!(name => "John")).unwrap());
+    /// ```
     pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _eval.
