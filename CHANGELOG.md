@@ -10,6 +10,8 @@ All notable changes to MiniJinja are documented here.
 - `sync` mode is now always enabled. (#104)
 - Removed meta API. (#105)
 - Error no longer implements `PartialEq`.
+- Simplified the function interface.  Filters, tests and global
+  functions can now directly return values instead of results. (#107)
 
 ## Breaking Changes
 
