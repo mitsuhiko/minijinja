@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::fmt::Write;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{RcType, Value, ValueKind, ValueRepr};
+use crate::value::{Arc, Value, ValueKind, ValueRepr};
 
 pub enum CoerceResult {
     I128(i128, i128),
@@ -159,7 +159,7 @@ pub fn string_concat(mut left: Value, right: &Value) -> Value {
         // if we're a string and we have a single reference to it, we can
         // directly append into ourselves and reconstruct the value
         ValueRepr::String(ref mut s) => {
-            write!(RcType::make_mut(s), "{}", right).ok();
+            write!(Arc::make_mut(s), "{}", right).ok();
             left
         }
         // otherwise we use format! to concat the two values

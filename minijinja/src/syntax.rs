@@ -207,9 +207,9 @@
 //! {% endfor %}
 //! ```
 //!
-//! If the `sync` feature is not disabled, the `loop.changed` helper is also available
-//! which can be used to detect when a value changes between the last iteration and the
-//! current one.  The method takes one or more arguments that are all compared.
+//! A `loop.changed()` helper is also available which can be used to detect when
+//! a value changes between the last iteration and the current one.  The method
+//! takes one or more arguments that are all compared.
 //!
 //! ```jinja
 //! {% for entry in entries %}

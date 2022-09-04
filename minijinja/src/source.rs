@@ -9,7 +9,6 @@ use self_cell::self_cell;
 
 use crate::environment::CompiledTemplate;
 use crate::error::{Error, ErrorKind};
-use crate::value::RcType;
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -39,11 +38,11 @@ pub struct Source {
 #[derive(Clone)]
 enum SourceBacking {
     Dynamic {
-        templates: MemoMap<String, RcType<LoadedTemplate>>,
+        templates: MemoMap<String, Arc<LoadedTemplate>>,
         loader: Arc<LoadFunc>,
     },
     Static {
-        templates: HashMap<String, RcType<LoadedTemplate>>,
+        templates: HashMap<String, Arc<LoadedTemplate>>,
     },
 }
 
@@ -162,10 +161,10 @@ impl Source {
             SourceBacking::Dynamic {
                 ref mut templates, ..
             } => {
-                templates.replace(name, RcType::new(tmpl));
+                templates.replace(name, Arc::new(tmpl));
             }
             SourceBacking::Static { ref mut templates } => {
-                templates.insert(name, RcType::new(tmpl));
+                templates.insert(name, Arc::new(tmpl));
             }
         }
         Ok(())
@@ -262,7 +261,7 @@ impl Source {
                         LoadedTemplate::try_new(owner, |(name, source)| -> Result<_, Error> {
                             CompiledTemplate::from_name_and_source(name.as_str(), source)
                         })?;
-                    Ok(RcType::new(tmpl))
+                    Ok(Arc::new(tmpl))
                 })?
                 .borrow_dependent()),
             SourceBacking::Static { templates } => templates

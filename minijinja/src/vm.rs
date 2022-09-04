@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Write};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
@@ -9,7 +9,7 @@ use crate::instructions::{
     Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR,
 };
 use crate::key::Key;
-use crate::value::{self, ops, Object, RcType, Value, ValueIterator, ValueRepr};
+use crate::value::{self, ops, Object, Value, ValueIterator, ValueRepr};
 use crate::AutoEscape;
 
 pub struct LoopState {
@@ -116,7 +116,7 @@ pub struct Loop {
     // tells us if we need to end capturing.
     current_recursion_jump: Option<(usize, bool)>,
     iterator: ValueIterator,
-    controller: RcType<LoopState>,
+    controller: Arc<LoopState>,
 }
 
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
@@ -682,7 +682,7 @@ impl<'env> Vm<'env> {
                         v.push(stack.pop());
                     }
                     v.reverse();
-                    stack.push(Value(ValueRepr::Seq(RcType::new(v))));
+                    stack.push(Value(ValueRepr::Seq(Arc::new(v))));
                 }
                 Instruction::UnpackList(count) => {
                     let top = stack.pop();
@@ -710,7 +710,7 @@ impl<'env> Vm<'env> {
                 Instruction::ListAppend => {
                     let item = stack.pop();
                     if let ValueRepr::Seq(mut v) = stack.pop().0 {
-                        RcType::make_mut(&mut v).push(item);
+                        Arc::make_mut(&mut v).push(item);
                         stack.push(Value(ValueRepr::Seq(v)))
                     } else {
                         bail!(Error::new(
@@ -781,7 +781,7 @@ impl<'env> Vm<'env> {
                             with_loop_var: *flags & LOOP_FLAG_WITH_LOOP_VAR != 0,
                             recurse_jump_target: if recursive { Some(pc) } else { None },
                             current_recursion_jump: next_loop_recursion_jump.take(),
-                            controller: RcType::new(LoopState {
+                            controller: Arc::new(LoopState {
                                 idx: AtomicUsize::new(!0usize),
                                 len,
                                 depth,
