@@ -10,14 +10,15 @@ use similar_asserts::assert_eq;
 pub fn simple_eval<S: serde::Serialize>(
     instructions: &Instructions<'_>,
     ctx: S,
-    output: &mut String,
-) -> Result<Option<Value>, Error> {
+) -> Result<String, Error> {
     let env = Environment::new();
     let empty_blocks = BTreeMap::new();
     let vm = Vm::new(&env);
     let root = Value::from_serializable(&ctx);
-    let mut formatter = make_string_formatter(output, AutoEscape::None);
-    vm.eval(instructions, root, &empty_blocks, &mut formatter)
+    let mut rv = String::new();
+    let mut output = make_string_formatter(&mut rv, AutoEscape::None);
+    vm.eval(instructions, root, &empty_blocks, &mut output)?;
+    Ok(rv)
 }
 
 #[test]
@@ -35,8 +36,7 @@ fn test_loop() {
     c.end_for_loop(false);
     c.add(Instruction::EmitRaw("!"));
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, ctx, &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ctx).unwrap();
 
     assert_eq!(output, "123456789!");
 }
@@ -55,8 +55,7 @@ fn test_if() {
         c.add(Instruction::EmitRaw("false"));
         c.end_if();
 
-        let mut output = String::new();
-        simple_eval(&c.finish().0, ctx, &mut output).unwrap();
+        let output = simple_eval(&c.finish().0, ctx).unwrap();
 
         assert_eq!(output, expectation);
     }
@@ -81,8 +80,7 @@ fn test_if_branches() {
     c.end_if();
     c.end_if();
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, ctx, &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ctx).unwrap();
 
     assert_eq!(output, "yes");
 }
@@ -96,8 +94,6 @@ fn test_basic() {
     ctx.insert("a", Value::from(42));
     ctx.insert("b", Value::from(23));
 
-    let mut output = String::new();
-
     let mut i = Instructions::new("", "");
     i.add(Instruction::EmitRaw("Hello "));
     i.add(Instruction::Lookup("user"));
@@ -109,8 +105,7 @@ fn test_basic() {
     i.add(Instruction::Neg);
     i.add(Instruction::Emit);
 
-    simple_eval(&i, ctx, &mut output).unwrap();
-
+    let output = simple_eval(&i, ctx).unwrap();
     assert_eq!(output, "Hello Peter-65");
 }
 
@@ -128,7 +123,7 @@ fn test_error_info() {
     ctx.insert("a_string", Value::from("foo"));
     ctx.insert("an_int", Value::from(42));
 
-    let err = simple_eval(&c.finish().0, ctx, &mut String::new()).unwrap_err();
+    let err = simple_eval(&c.finish().0, ctx).unwrap_err();
     assert_eq!(err.name(), Some("hello.html"));
     assert_eq!(err.line(), Some(2));
 }
@@ -141,8 +136,7 @@ fn test_op_eq() {
     c.add(Instruction::Eq);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "true");
 
     let mut c = Compiler::new("hello.html", "");
@@ -151,8 +145,7 @@ fn test_op_eq() {
     c.add(Instruction::Eq);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "false");
 }
 
@@ -164,8 +157,7 @@ fn test_op_ne() {
     c.add(Instruction::Ne);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "true");
 
     let mut c = Compiler::new("<unkown>", "");
@@ -174,8 +166,7 @@ fn test_op_ne() {
     c.add(Instruction::Ne);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "false");
 }
 
@@ -187,8 +178,7 @@ fn test_op_lt() {
     c.add(Instruction::Lt);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "true");
 
     let mut c = Compiler::new("<unkown>", "");
@@ -197,8 +187,7 @@ fn test_op_lt() {
     c.add(Instruction::Lt);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "false");
 }
 
@@ -210,8 +199,7 @@ fn test_op_gt() {
     c.add(Instruction::Gt);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "false");
 
     let mut c = Compiler::new("<unkown>", "");
@@ -220,8 +208,7 @@ fn test_op_gt() {
     c.add(Instruction::Gt);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "true");
 }
 
@@ -233,8 +220,7 @@ fn test_op_lte() {
     c.add(Instruction::Lte);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "true");
 
     let mut c = Compiler::new("<unkown>", "");
@@ -243,8 +229,7 @@ fn test_op_lte() {
     c.add(Instruction::Lte);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "false");
 }
 
@@ -256,8 +241,7 @@ fn test_op_gte() {
     c.add(Instruction::Gte);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "false");
 
     let mut c = Compiler::new("<unkown>", "");
@@ -266,8 +250,7 @@ fn test_op_gte() {
     c.add(Instruction::Gte);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "true");
 }
 
@@ -278,8 +261,7 @@ fn test_op_not() {
     c.add(Instruction::Not);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "true");
 
     let mut c = Compiler::new("<unkown>", "");
@@ -287,8 +269,7 @@ fn test_op_not() {
     c.add(Instruction::Not);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "false");
 }
 
@@ -300,8 +281,7 @@ fn test_string_concat() {
     c.add(Instruction::StringConcat);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "foo42");
 }
 
@@ -313,7 +293,6 @@ fn test_unpacking() {
     c.add(Instruction::StringConcat);
     c.add(Instruction::Emit);
 
-    let mut output = String::new();
-    simple_eval(&c.finish().0, (), &mut output).unwrap();
+    let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "foobar");
 }

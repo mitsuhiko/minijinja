@@ -55,10 +55,9 @@
 //! this module.  Note though that these functions are not to be
 //! called from Rust code as their exact interface (arguments and return types)
 //! might change from one MiniJinja version to another.
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::environment::escape_formatter;
+use crate::defaults::escape_formatter;
 use crate::error::Error;
 use crate::output::Output;
 use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
@@ -158,46 +157,6 @@ impl BoxedFilter {
     }
 }
 
-pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
-    let mut rv = BTreeMap::new();
-    rv.insert("safe", BoxedFilter::new(safe));
-    rv.insert("escape", BoxedFilter::new(escape));
-    rv.insert("e", BoxedFilter::new(escape));
-    #[cfg(feature = "builtins")]
-    {
-        rv.insert("lower", BoxedFilter::new(lower));
-        rv.insert("upper", BoxedFilter::new(upper));
-        rv.insert("title", BoxedFilter::new(title));
-        rv.insert("replace", BoxedFilter::new(replace));
-        rv.insert("length", BoxedFilter::new(length));
-        rv.insert("count", BoxedFilter::new(length));
-        rv.insert("dictsort", BoxedFilter::new(dictsort));
-        rv.insert("items", BoxedFilter::new(items));
-        rv.insert("reverse", BoxedFilter::new(reverse));
-        rv.insert("trim", BoxedFilter::new(trim));
-        rv.insert("join", BoxedFilter::new(join));
-        rv.insert("default", BoxedFilter::new(default));
-        rv.insert("round", BoxedFilter::new(round));
-        rv.insert("abs", BoxedFilter::new(abs));
-        rv.insert("first", BoxedFilter::new(first));
-        rv.insert("last", BoxedFilter::new(last));
-        rv.insert("d", BoxedFilter::new(default));
-        rv.insert("list", BoxedFilter::new(list));
-        rv.insert("bool", BoxedFilter::new(bool));
-        rv.insert("batch", BoxedFilter::new(batch));
-        rv.insert("slice", BoxedFilter::new(slice));
-        #[cfg(feature = "json")]
-        {
-            rv.insert("tojson", BoxedFilter::new(tojson));
-        }
-        #[cfg(feature = "urlencode")]
-        {
-            rv.insert("urlencode", BoxedFilter::new(urlencode));
-        }
-    }
-    rv
-}
-
 /// Marks a value as safe.  This converts it into a string.
 ///
 /// When a value is marked as safe, no further auto escaping will take place.
@@ -227,7 +186,7 @@ pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
         other => other,
     };
     let mut out = String::new();
-    let mut formatter = Output::string(&mut out, auto_escape);
+    let mut formatter = Output::with_string(&mut out, auto_escape);
     escape_formatter(&mut formatter, &v)?;
     Ok(Value::from_safe_string(out))
 }
@@ -795,19 +754,14 @@ mod builtins {
         }
 
         let env = crate::Environment::new();
-        let state = State {
-            env: &env,
-            ctx: crate::vm::Context::default(),
-            current_block: None,
-            name: "<unknown>",
-            out: &mut Output::null(),
-        };
-        let bx = BoxedFilter::new(test);
-        assert_eq!(
-            bx.apply_to(&state, &Value::from(23), &[Value::from(42)][..])
-                .unwrap(),
-            Value::from(65)
-        );
+        State::with_dummy(&env, |state| {
+            let bx = BoxedFilter::new(test);
+            assert_eq!(
+                bx.apply_to(state, &Value::from(23), &[Value::from(42)][..])
+                    .unwrap(),
+                Value::from(65)
+            );
+        });
     }
 
     #[test]
@@ -821,38 +775,32 @@ mod builtins {
         }
 
         let env = crate::Environment::new();
-        let mut out = Output::null();
-        let state = State {
-            env: &env,
-            ctx: crate::vm::Context::default(),
-            current_block: None,
-            name: "<unknown>",
-            out: &mut out,
-        };
-        let bx = BoxedFilter::new(add);
-        assert_eq!(
-            bx.apply_to(&state, &Value::from(23), &[Value::from(42)][..])
+        State::with_dummy(&env, |state| {
+            let bx = BoxedFilter::new(add);
+            assert_eq!(
+                bx.apply_to(state, &Value::from(23), &[Value::from(42)][..])
+                    .unwrap(),
+                Value::from(65)
+            );
+            assert_eq!(
+                bx.apply_to(
+                    state,
+                    &Value::from(23),
+                    &[Value::from(42), Value::UNDEFINED][..]
+                )
                 .unwrap(),
-            Value::from(65)
-        );
-        assert_eq!(
-            bx.apply_to(
-                &state,
-                &Value::from(23),
-                &[Value::from(42), Value::UNDEFINED][..]
-            )
-            .unwrap(),
-            Value::from(65)
-        );
-        assert_eq!(
-            bx.apply_to(
-                &state,
-                &Value::from(23),
-                &[Value::from(42), Value::from(1)][..]
-            )
-            .unwrap(),
-            Value::from(66)
-        );
+                Value::from(65)
+            );
+            assert_eq!(
+                bx.apply_to(
+                    state,
+                    &Value::from(23),
+                    &[Value::from(42), Value::from(1)][..]
+                )
+                .unwrap(),
+                Value::from(66)
+            );
+        });
     }
 }
 

@@ -175,81 +175,17 @@ impl<'source> Compiler<'source> {
                 }
             }
             ast::Stmt::EmitExpr(expr) => {
-                self.set_location_from_span(expr.span());
-
-                // detect {{ super() }} and {{ loop() }} as special instructions
-                if let ast::Expr::Call(call) = &expr.expr {
-                    if let ast::Expr::Var(var) = &call.expr {
-                        if var.id == "super" && call.args.is_empty() {
-                            self.add(Instruction::FastSuper);
-                            return Ok(());
-                        }
-                        if var.id == "loop" && call.args.len() == 1 {
-                            self.compile_expr(&call.args[0])?;
-                            self.add(Instruction::FastRecurse);
-                            return Ok(());
-                        }
-                    }
-                }
-
-                self.compile_expr(&expr.expr)?;
-                self.add(Instruction::Emit);
+                self.compile_emit_expr(expr)?;
             }
             ast::Stmt::EmitRaw(raw) => {
                 self.set_location_from_span(raw.span());
                 self.add(Instruction::EmitRaw(raw.raw));
             }
             ast::Stmt::ForLoop(for_loop) => {
-                self.set_location_from_span(for_loop.span());
-
-                if let Some(ref filter_expr) = for_loop.filter_expr {
-                    // filter expressions work like a nested for loop without
-                    // the special loop variable that append into a new list
-                    // just outside of the loop.
-                    self.add(Instruction::BuildList(0));
-                    self.compile_expr(&for_loop.iter)?;
-                    self.start_for_loop(false, false);
-                    self.add(Instruction::DupTop);
-                    self.compile_assignment(&for_loop.target)?;
-                    self.compile_expr(filter_expr)?;
-                    self.start_if();
-                    self.add(Instruction::ListAppend);
-                    self.start_else();
-                    self.add(Instruction::DiscardTop);
-                    self.end_if();
-                    self.end_for_loop(false);
-                } else {
-                    self.compile_expr(&for_loop.iter)?;
-                }
-
-                self.start_for_loop(true, for_loop.recursive);
-                self.compile_assignment(&for_loop.target)?;
-                for node in &for_loop.body {
-                    self.compile_stmt(node)?;
-                }
-                self.end_for_loop(!for_loop.else_body.is_empty());
-                if !for_loop.else_body.is_empty() {
-                    self.start_if();
-                    for node in &for_loop.else_body {
-                        self.compile_stmt(node)?;
-                    }
-                    self.end_if();
-                }
+                self.compile_for_loop(for_loop)?;
             }
             ast::Stmt::IfCond(if_cond) => {
-                self.set_location_from_span(if_cond.span());
-                self.compile_expr(&if_cond.expr)?;
-                self.start_if();
-                for node in &if_cond.true_body {
-                    self.compile_stmt(node)?;
-                }
-                if !if_cond.false_body.is_empty() {
-                    self.start_else();
-                    for node in &if_cond.false_body {
-                        self.compile_stmt(node)?;
-                    }
-                }
-                self.end_if();
+                self.compile_if_stmt(if_cond)?;
             }
             ast::Stmt::WithBlock(with_block) => {
                 self.set_location_from_span(with_block.span());
@@ -281,18 +217,7 @@ impl<'source> Compiler<'source> {
                 self.compile_assignment(&set_block.target)?;
             }
             ast::Stmt::Block(block) => {
-                self.set_location_from_span(block.span());
-                let mut sub_compiler =
-                    Compiler::new(self.instructions.name(), self.instructions.source());
-                sub_compiler.set_line(self.current_line);
-                for node in &block.body {
-                    sub_compiler.compile_stmt(node)?;
-                }
-
-                let (instructions, blocks) = sub_compiler.finish();
-                self.blocks.extend(blocks.into_iter());
-                self.blocks.insert(block.name, instructions);
-                self.add(Instruction::CallBlock(block.name));
+                self.compile_block(block)?;
             }
             ast::Stmt::Extends(extends) => {
                 self.set_location_from_span(extends.span());
@@ -324,6 +249,103 @@ impl<'source> Compiler<'source> {
                 self.add(Instruction::Emit);
             }
         }
+        Ok(())
+    }
+
+    fn compile_block(&mut self, block: &ast::Spanned<ast::Block<'source>>) -> Result<(), Error> {
+        self.set_location_from_span(block.span());
+        let mut sub_compiler = Compiler::new(self.instructions.name(), self.instructions.source());
+        sub_compiler.set_line(self.current_line);
+        for node in &block.body {
+            sub_compiler.compile_stmt(node)?;
+        }
+        let (instructions, blocks) = sub_compiler.finish();
+        self.blocks.extend(blocks.into_iter());
+        self.blocks.insert(block.name, instructions);
+        self.add(Instruction::CallBlock(block.name));
+        Ok(())
+    }
+
+    fn compile_if_stmt(
+        &mut self,
+        if_cond: &ast::Spanned<ast::IfCond<'source>>,
+    ) -> Result<(), Error> {
+        self.set_location_from_span(if_cond.span());
+        self.compile_expr(&if_cond.expr)?;
+        self.start_if();
+        for node in &if_cond.true_body {
+            self.compile_stmt(node)?;
+        }
+        if !if_cond.false_body.is_empty() {
+            self.start_else();
+            for node in &if_cond.false_body {
+                self.compile_stmt(node)?;
+            }
+        }
+        self.end_if();
+        Ok(())
+    }
+
+    fn compile_emit_expr(
+        &mut self,
+        expr: &ast::Spanned<ast::EmitExpr<'source>>,
+    ) -> Result<(), Error> {
+        self.set_location_from_span(expr.span());
+        if let ast::Expr::Call(call) = &expr.expr {
+            if let ast::Expr::Var(var) = &call.expr {
+                if var.id == "super" && call.args.is_empty() {
+                    self.add(Instruction::FastSuper);
+                    return Ok(());
+                }
+                if var.id == "loop" && call.args.len() == 1 {
+                    self.compile_expr(&call.args[0])?;
+                    self.add(Instruction::FastRecurse);
+                    return Ok(());
+                }
+            }
+        }
+        self.compile_expr(&expr.expr)?;
+        self.add(Instruction::Emit);
+        Ok(())
+    }
+
+    fn compile_for_loop(
+        &mut self,
+        for_loop: &ast::Spanned<ast::ForLoop<'source>>,
+    ) -> Result<(), Error> {
+        self.set_location_from_span(for_loop.span());
+        if let Some(ref filter_expr) = for_loop.filter_expr {
+            // filter expressions work like a nested for loop without
+            // the special loop variable that append into a new list
+            // just outside of the loop.
+            self.add(Instruction::BuildList(0));
+            self.compile_expr(&for_loop.iter)?;
+            self.start_for_loop(false, false);
+            self.add(Instruction::DupTop);
+            self.compile_assignment(&for_loop.target)?;
+            self.compile_expr(filter_expr)?;
+            self.start_if();
+            self.add(Instruction::ListAppend);
+            self.start_else();
+            self.add(Instruction::DiscardTop);
+            self.end_if();
+            self.end_for_loop(false);
+        } else {
+            self.compile_expr(&for_loop.iter)?;
+        }
+        self.start_for_loop(true, for_loop.recursive);
+        self.compile_assignment(&for_loop.target)?;
+        for node in &for_loop.body {
+            self.compile_stmt(node)?;
+        }
+        self.end_for_loop(!for_loop.else_body.is_empty());
+        if !for_loop.else_body.is_empty() {
+            self.start_if();
+            for node in &for_loop.else_body {
+                self.compile_stmt(node)?;
+            }
+            self.end_if();
+        };
         Ok(())
     }
 
@@ -366,35 +388,7 @@ impl<'source> Compiler<'source> {
                 });
             }
             ast::Expr::BinOp(c) => {
-                self.set_location_from_span(c.span());
-                let instr = match c.op {
-                    ast::BinOpKind::Eq => Instruction::Eq,
-                    ast::BinOpKind::Ne => Instruction::Ne,
-                    ast::BinOpKind::Lt => Instruction::Lt,
-                    ast::BinOpKind::Lte => Instruction::Lte,
-                    ast::BinOpKind::Gt => Instruction::Gt,
-                    ast::BinOpKind::Gte => Instruction::Gte,
-                    ast::BinOpKind::ScAnd | ast::BinOpKind::ScOr => {
-                        self.start_sc_bool();
-                        self.compile_expr(&c.left)?;
-                        self.sc_bool(matches!(c.op, ast::BinOpKind::ScAnd));
-                        self.compile_expr(&c.right)?;
-                        self.end_sc_bool();
-                        return Ok(());
-                    }
-                    ast::BinOpKind::Add => Instruction::Add,
-                    ast::BinOpKind::Sub => Instruction::Sub,
-                    ast::BinOpKind::Mul => Instruction::Mul,
-                    ast::BinOpKind::Div => Instruction::Div,
-                    ast::BinOpKind::FloorDiv => Instruction::IntDiv,
-                    ast::BinOpKind::Rem => Instruction::Rem,
-                    ast::BinOpKind::Pow => Instruction::Pow,
-                    ast::BinOpKind::Concat => Instruction::StringConcat,
-                    ast::BinOpKind::In => Instruction::In,
-                };
-                self.compile_expr(&c.left)?;
-                self.compile_expr(&c.right)?;
-                self.add(instr);
+                self.compile_bin_op(c)?;
             }
             ast::Expr::IfExpr(i) => {
                 self.set_location_from_span(i.span());
@@ -441,33 +435,7 @@ impl<'source> Compiler<'source> {
                 self.add(Instruction::GetItem);
             }
             ast::Expr::Call(c) => {
-                self.set_location_from_span(c.span());
-                match c.identify_call() {
-                    ast::CallType::Function(name) => {
-                        for arg in &c.args {
-                            self.compile_expr(arg)?;
-                        }
-                        self.add(Instruction::BuildList(c.args.len()));
-                        self.add(Instruction::CallFunction(name));
-                    }
-                    ast::CallType::Block(name) => {
-                        self.add(Instruction::BeginCapture);
-                        self.add(Instruction::CallBlock(name));
-                        self.add(Instruction::EndCapture);
-                    }
-                    ast::CallType::Method(expr, name) => {
-                        self.compile_expr(expr)?;
-                        for arg in &c.args {
-                            self.compile_expr(arg)?;
-                        }
-                        self.add(Instruction::BuildList(c.args.len()));
-                        self.add(Instruction::CallMethod(name));
-                    }
-                    ast::CallType::Object(expr) => {
-                        self.compile_expr(expr)?;
-                        self.add(Instruction::CallObject);
-                    }
-                }
+                self.compile_call(c)?;
             }
             ast::Expr::List(l) => {
                 self.set_location_from_span(l.span());
@@ -486,6 +454,70 @@ impl<'source> Compiler<'source> {
                 self.add(Instruction::BuildMap(m.keys.len()));
             }
         }
+        Ok(())
+    }
+
+    fn compile_call(&mut self, c: &ast::Spanned<ast::Call<'source>>) -> Result<(), Error> {
+        self.set_location_from_span(c.span());
+        match c.identify_call() {
+            ast::CallType::Function(name) => {
+                for arg in &c.args {
+                    self.compile_expr(arg)?;
+                }
+                self.add(Instruction::BuildList(c.args.len()));
+                self.add(Instruction::CallFunction(name));
+            }
+            ast::CallType::Block(name) => {
+                self.add(Instruction::BeginCapture);
+                self.add(Instruction::CallBlock(name));
+                self.add(Instruction::EndCapture);
+            }
+            ast::CallType::Method(expr, name) => {
+                self.compile_expr(expr)?;
+                for arg in &c.args {
+                    self.compile_expr(arg)?;
+                }
+                self.add(Instruction::BuildList(c.args.len()));
+                self.add(Instruction::CallMethod(name));
+            }
+            ast::CallType::Object(expr) => {
+                self.compile_expr(expr)?;
+                self.add(Instruction::CallObject);
+            }
+        };
+        Ok(())
+    }
+
+    fn compile_bin_op(&mut self, c: &ast::Spanned<ast::BinOp<'source>>) -> Result<(), Error> {
+        self.set_location_from_span(c.span());
+        let instr = match c.op {
+            ast::BinOpKind::Eq => Instruction::Eq,
+            ast::BinOpKind::Ne => Instruction::Ne,
+            ast::BinOpKind::Lt => Instruction::Lt,
+            ast::BinOpKind::Lte => Instruction::Lte,
+            ast::BinOpKind::Gt => Instruction::Gt,
+            ast::BinOpKind::Gte => Instruction::Gte,
+            ast::BinOpKind::ScAnd | ast::BinOpKind::ScOr => {
+                self.start_sc_bool();
+                self.compile_expr(&c.left)?;
+                self.sc_bool(matches!(c.op, ast::BinOpKind::ScAnd));
+                self.compile_expr(&c.right)?;
+                self.end_sc_bool();
+                return Ok(());
+            }
+            ast::BinOpKind::Add => Instruction::Add,
+            ast::BinOpKind::Sub => Instruction::Sub,
+            ast::BinOpKind::Mul => Instruction::Mul,
+            ast::BinOpKind::Div => Instruction::Div,
+            ast::BinOpKind::FloorDiv => Instruction::IntDiv,
+            ast::BinOpKind::Rem => Instruction::Rem,
+            ast::BinOpKind::Pow => Instruction::Pow,
+            ast::BinOpKind::Concat => Instruction::StringConcat,
+            ast::BinOpKind::In => Instruction::In,
+        };
+        self.compile_expr(&c.left)?;
+        self.compile_expr(&c.right)?;
+        self.add(instr);
         Ok(())
     }
 

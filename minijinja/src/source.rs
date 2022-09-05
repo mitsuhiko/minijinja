@@ -7,8 +7,8 @@ use std::sync::Arc;
 use memo_map::MemoMap;
 use self_cell::self_cell;
 
-use crate::environment::CompiledTemplate;
 use crate::error::{Error, ErrorKind};
+use crate::template::CompiledTemplate;
 
 #[cfg(test)]
 use similar_asserts::assert_eq;

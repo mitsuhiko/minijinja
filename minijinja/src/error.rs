@@ -317,5 +317,26 @@ mod debug_info {
     }
 }
 
+pub fn attach_basic_debug_info<T>(rv: Result<T, Error>, source: &str) -> Result<T, Error> {
+    #[cfg(feature = "debug")]
+    {
+        match rv {
+            Ok(rv) => Ok(rv),
+            Err(mut err) => {
+                err.debug_info = Some(crate::error::DebugInfo {
+                    template_source: Some(source.to_string()),
+                    ..Default::default()
+                });
+                Err(err)
+            }
+        }
+    }
+    #[cfg(not(feature = "debug"))]
+    {
+        let _source = source;
+        rv
+    }
+}
+
 #[cfg(feature = "debug")]
 pub(crate) use self::debug_info::*;
