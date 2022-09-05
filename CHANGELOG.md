@@ -2,6 +2,12 @@
 
 All notable changes to MiniJinja are documented here.
 
+# Unreleased
+
+- Added custom autoescape settings.
+- Added custom formatters.
+- Restructured engine internals for greater clarity.
+
 # 0.20.0
 
 - Remove internal refcounts from environment.
