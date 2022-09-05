@@ -31,7 +31,5 @@ fn main() {
         year => 2022
     };
 
-    for _ in 0..50000 {
-        template.render(&context).unwrap();
-    }
+    println!("{}", template.render(&context).unwrap());
 }
