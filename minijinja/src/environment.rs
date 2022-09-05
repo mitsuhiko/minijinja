@@ -210,9 +210,14 @@ impl<'source> Environment<'source> {
         let name = "<string>";
         let compiled = CompiledTemplate::from_name_and_source(name, source)?;
         let mut rv = String::new();
-        let mut out = Output::with_string(&mut rv, self.get_initial_auto_escape(name));
-        Vm::new(self).eval(&compiled.instructions, root, &compiled.blocks, &mut out)?;
-        Ok(rv)
+        Vm::new(self)
+            .eval(
+                &compiled.instructions,
+                root,
+                &compiled.blocks,
+                &mut Output::with_string(&mut rv, self.get_initial_auto_escape(name)),
+            )
+            .map(|_| rv)
     }
 
     /// Sets a new function to select the default auto escaping.
