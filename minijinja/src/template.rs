@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::fmt;
+use std::{fmt, io};
 
 use serde::Serialize;
 
@@ -7,8 +7,8 @@ use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
 use crate::compiler::parser::parse;
 use crate::environment::Environment;
-use crate::error::{attach_basic_debug_info, Error};
-use crate::output::Output;
+use crate::error::{attach_basic_debug_info, Error, ErrorKind};
+use crate::output::{Output, WriteWrapper};
 use crate::utils::AutoEscape;
 use crate::value::Value;
 use crate::vm::Vm;
@@ -86,14 +86,54 @@ impl<'env> Template<'env> {
 
     fn _render(&self, root: Value) -> Result<String, Error> {
         let mut rv = String::new();
-        let mut out = Output::with_string(&mut rv, self.initial_auto_escape);
-        Vm::new(self.env).eval(
-            &self.compiled.instructions,
+        self._eval(
             root,
-            &self.compiled.blocks,
-            &mut out,
-        )?;
-        Ok(rv)
+            &mut Output::with_string(&mut rv, self.initial_auto_escape),
+        )
+        .map(|_| rv)
+    }
+
+    /// Renders the template into a [`io::Write`].
+    ///
+    /// This works exactly like [`render`](Self::render) but instead writes the template
+    /// as it's evaluating into a [`io::Write`].
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// # let mut env = Environment::new();
+    /// # env.add_template("hello", "Hello {{ name }}!").unwrap();
+    /// use std::io::stdout;
+    ///
+    /// let tmpl = env.get_template("hello").unwrap();
+    /// tmpl.render_to_write(context!(name => "John"), &mut stdout()).unwrap();
+    /// ```
+    pub fn render_to_write<S: Serialize, W: io::Write>(&self, ctx: S, w: W) -> Result<(), Error> {
+        let mut wrapper = WriteWrapper { w, err: None };
+        self._eval(
+            Value::from_serializable(&ctx),
+            &mut Output::with_write(&mut wrapper, self.initial_auto_escape),
+        )
+        .map_err(|err| {
+            wrapper
+                .err
+                .take()
+                .map(|io_err| {
+                    Error::new(ErrorKind::WriteFailure, "I/O error during rendering")
+                        .with_source(io_err)
+                })
+                .unwrap_or(err)
+        })
+    }
+
+    fn _eval(&self, root: Value, out: &mut Output) -> Result<(), Error> {
+        Vm::new(self.env)
+            .eval(
+                &self.compiled.instructions,
+                root,
+                &self.compiled.blocks,
+                out,
+            )
+            .map(|_| ())
     }
 
     /// Returns the root instructions.

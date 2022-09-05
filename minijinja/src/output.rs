@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, io};
 
 use crate::utils::AutoEscape;
 use crate::value::Value;
@@ -24,13 +24,19 @@ pub struct Output<'a> {
     pub(crate) auto_escape: AutoEscape,
 }
 
-pub struct NullWriter;
-
 impl<'a> Output<'a> {
     /// Creates an output writing to a string.
     pub(crate) fn with_string(buf: &'a mut String, auto_escape: AutoEscape) -> Self {
         Self {
             w: buf,
+            capture_stack: Vec::new(),
+            auto_escape,
+        }
+    }
+
+    pub(crate) fn with_write(w: &'a mut (dyn fmt::Write + 'a), auto_escape: AutoEscape) -> Self {
+        Self {
+            w,
             capture_stack: Vec::new(),
             auto_escape,
         }
@@ -105,6 +111,8 @@ impl fmt::Write for Output<'_> {
     }
 }
 
+pub struct NullWriter;
+
 impl fmt::Write for NullWriter {
     #[inline]
     fn write_str(&mut self, _s: &str) -> fmt::Result {
@@ -114,5 +122,30 @@ impl fmt::Write for NullWriter {
     #[inline]
     fn write_char(&mut self, _c: char) -> fmt::Result {
         Ok(())
+    }
+}
+
+pub struct WriteWrapper<W> {
+    pub w: W,
+    pub err: Option<io::Error>,
+}
+
+impl<W: io::Write> fmt::Write for WriteWrapper<W> {
+    #[inline]
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.w.write_all(s.as_bytes()).map_err(|e| {
+            self.err = Some(e);
+            fmt::Error
+        })
+    }
+
+    #[inline]
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.w
+            .write_all(c.encode_utf8(&mut [0; 4]).as_bytes())
+            .map_err(|e| {
+                self.err = Some(e);
+                fmt::Error
+            })
     }
 }
