@@ -424,6 +424,23 @@ impl<'source> Environment<'source> {
         self._render_str(source, Value::from_serializable(&ctx))
     }
 
+    fn _render_str(&self, source: &str, root: Value) -> Result<String, Error> {
+        let name = "<string>";
+        let compiled = CompiledTemplate::from_name_and_source(name, source)?;
+        let mut output = String::new();
+        let vm = Vm::new(self);
+        let blocks = &compiled.blocks;
+        let initial_auto_escape = self.get_initial_auto_escape(name);
+        vm.eval(
+            &compiled.instructions,
+            root,
+            blocks,
+            initial_auto_escape,
+            &mut output,
+        )?;
+        Ok(output)
+    }
+
     /// Sets a new function to select the default auto escaping.
     ///
     /// This function is invoked when templates are loaded from the environment
@@ -496,23 +513,6 @@ impl<'source> Environment<'source> {
             Source::Borrowed(_) => None,
             Source::Owned(ref source) => Some(source),
         }
-    }
-
-    fn _render_str(&self, source: &str, root: Value) -> Result<String, Error> {
-        let name = "<string>";
-        let compiled = CompiledTemplate::from_name_and_source(name, source)?;
-        let mut output = String::new();
-        let vm = Vm::new(self);
-        let blocks = &compiled.blocks;
-        let initial_auto_escape = self.get_initial_auto_escape(name);
-        vm.eval(
-            &compiled.instructions,
-            root,
-            blocks,
-            initial_auto_escape,
-            &mut output,
-        )?;
-        Ok(output)
     }
 
     /// Compiles an expression.
