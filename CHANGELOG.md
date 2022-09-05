@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-# Unreleased
+# 0.20.0
 
 - Remove internal refcounts from environment.
 - Changed `Object` and `FunctionArgs` interface to take
