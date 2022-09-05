@@ -46,7 +46,3 @@ memo-map = { version = "0.3.1", optional = true }
 insta = { version = "1.19.0", features = ["glob", "serde"] }
 serde_json = "1.0.68"
 similar-asserts = "1.4.2"
-
-[[test]]
-name = "test_templates"
-required-features = ["unstable_machinery", "internal_debug"]
