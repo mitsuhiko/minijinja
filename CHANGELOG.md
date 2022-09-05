@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Added custom autoescape settings.
 - Added custom formatters.
 - Restructured engine internals for greater clarity.
+- Added support for rendering to `io::Write`.  (#111)
 
 # 0.20.0
 
