@@ -127,19 +127,14 @@
 #![doc(html_logo_url = "https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo-square.png")]
 mod key;
 
-mod ast;
 mod compiler;
 mod defaults;
 mod environment;
 mod error;
 mod expression;
-mod instructions;
-mod lexer;
 mod macros;
 mod output;
-mod parser;
 mod template;
-mod tokens;
 mod utils;
 mod vm;
 
@@ -174,19 +169,17 @@ pub use self::vm::State;
 #[cfg(feature = "unstable_machinery")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable_machinery")))]
 pub mod machinery {
-    /// The AST nodes.
-    pub mod ast {
-        pub use crate::ast::*;
-    }
-    pub use crate::compiler::Compiler;
-    pub use crate::instructions::{Instruction, Instructions};
-    pub use crate::lexer::tokenize;
-    pub use crate::parser::parse;
-    pub use crate::tokens::{Span, Token};
+    pub use crate::compiler::ast;
+    pub use crate::compiler::codegen::CodeGenerator;
+    pub use crate::compiler::instructions::{Instruction, Instructions};
+    pub use crate::compiler::lexer::tokenize;
+    pub use crate::compiler::parser::parse;
+    pub use crate::compiler::tokens::{Span, Token};
     pub use crate::vm::Vm;
+
     use crate::{AutoEscape, Output};
 
-    pub fn make_string_formatter(s: &mut String, auto_escape: AutoEscape) -> Output<'_> {
+    pub fn make_string_output(s: &mut String, auto_escape: AutoEscape) -> Output<'_> {
         Output::with_string(s, auto_escape)
     }
 }

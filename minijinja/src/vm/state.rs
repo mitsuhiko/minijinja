@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
+use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::instructions::Instructions;
 use crate::output::Output;
 use crate::value::Value;
 use crate::vm::context::Context;

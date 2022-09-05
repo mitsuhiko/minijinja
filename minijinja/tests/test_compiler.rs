@@ -1,10 +1,10 @@
 #![cfg(feature = "unstable_machinery")]
-use minijinja::machinery::{Compiler, Instruction};
+use minijinja::machinery::{CodeGenerator, Instruction};
 use minijinja::value::Value;
 
 #[test]
 fn test_for_loop() {
-    let mut c = Compiler::new("<unknown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::Lookup("items"));
     c.start_for_loop(true, false);
     c.add(Instruction::Emit);
@@ -16,7 +16,7 @@ fn test_for_loop() {
 
 #[test]
 fn test_if_branches() {
-    let mut c = Compiler::new("<unknown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::Lookup("false"));
     c.start_if();
     c.add(Instruction::EmitRaw("nope1"));
@@ -34,7 +34,7 @@ fn test_if_branches() {
 
 #[test]
 fn test_bool_ops() {
-    let mut c = Compiler::new("<unknown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
 
     c.start_sc_bool();
     c.add(Instruction::Lookup("first"));
@@ -49,7 +49,7 @@ fn test_bool_ops() {
 
 #[test]
 fn test_const() {
-    let mut c = Compiler::new("<unknown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
 
     c.add(Instruction::LoadConst(Value::from("a")));
     c.add(Instruction::LoadConst(Value::from(42)));

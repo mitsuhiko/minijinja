@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
+use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
-use crate::tokens::{Span, Token};
 use crate::utils::{memchr, memstr, unescape};
 
 #[cfg(test)]

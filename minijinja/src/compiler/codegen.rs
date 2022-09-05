@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 
-use crate::ast;
-use crate::error::Error;
-use crate::instructions::{
+use crate::compiler::ast;
+use crate::compiler::instructions::{
     Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR,
 };
-use crate::tokens::Span;
+use crate::compiler::tokens::Span;
+use crate::error::Error;
 use crate::value::Value;
 
 #[cfg(test)]
@@ -22,17 +22,17 @@ enum PendingBlock {
 
 /// Provides a convenient interface to creating instructions for the VM.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
-pub struct Compiler<'source> {
+pub struct CodeGenerator<'source> {
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,
     pending_block: Vec<PendingBlock>,
     current_line: usize,
 }
 
-impl<'source> Compiler<'source> {
-    /// Creates an empty compiler
-    pub fn new(file: &'source str, source: &'source str) -> Compiler<'source> {
-        Compiler {
+impl<'source> CodeGenerator<'source> {
+    /// Creates a new code generator.
+    pub fn new(file: &'source str, source: &'source str) -> CodeGenerator<'source> {
+        CodeGenerator {
             instructions: Instructions::new(file, source),
             blocks: BTreeMap::new(),
             pending_block: Vec::new(),
@@ -254,7 +254,8 @@ impl<'source> Compiler<'source> {
 
     fn compile_block(&mut self, block: &ast::Spanned<ast::Block<'source>>) -> Result<(), Error> {
         self.set_location_from_span(block.span());
-        let mut sub_compiler = Compiler::new(self.instructions.name(), self.instructions.source());
+        let mut sub_compiler =
+            CodeGenerator::new(self.instructions.name(), self.instructions.source());
         sub_compiler.set_line(self.current_line);
         for node in &block.body {
             sub_compiler.compile_stmt(node)?;

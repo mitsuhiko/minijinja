@@ -3,9 +3,9 @@ use std::fmt;
 
 use serde::Serialize;
 
+use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
 use crate::error::Error;
-use crate::instructions::Instructions;
 use crate::output::Output;
 use crate::value::Value;
 use crate::vm::Vm;

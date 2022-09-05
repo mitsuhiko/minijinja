@@ -2,11 +2,11 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use crate::environment::Environment;
-use crate::error::{Error, ErrorKind};
-use crate::instructions::{
+use crate::compiler::instructions::{
     Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR,
 };
+use crate::environment::Environment;
+use crate::error::{Error, ErrorKind};
 use crate::key::Key;
 use crate::output::Output;
 use crate::utils::AutoEscape;

@@ -2,7 +2,7 @@
 source: minijinja/tests/test_compiler.rs
 expression: "&c"
 ---
-Compiler {
+CodeGenerator {
     instructions: [
         00000 | Lookup("false")  [line 0],
         00001 | JumpIfFalse(4),

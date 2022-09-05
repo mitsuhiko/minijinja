@@ -4,11 +4,11 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
-use crate::compiler::Compiler;
+use crate::compiler::codegen::CodeGenerator;
+use crate::compiler::parser::parse_expr;
 use crate::error::{attach_basic_debug_info, Error};
 use crate::expression::Expression;
 use crate::output::Output;
-use crate::parser::parse_expr;
 use crate::template::{CompiledTemplate, Template};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug};
 use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
@@ -345,7 +345,7 @@ impl<'source> Environment<'source> {
 
     fn _compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
         let ast = parse_expr(expr)?;
-        let mut compiler = Compiler::new("<expression>", expr);
+        let mut compiler = CodeGenerator::new("<expression>", expr);
         compiler.compile_expr(&ast)?;
         let (instructions, _) = compiler.finish();
         Ok(Expression::new(self, instructions))

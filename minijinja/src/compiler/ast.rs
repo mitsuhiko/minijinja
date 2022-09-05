@@ -3,7 +3,7 @@ use std::ops::Deref;
 #[cfg(feature = "internal_debug")]
 use std::fmt;
 
-use crate::tokens::Span;
+use crate::compiler::tokens::Span;
 use crate::value::Value;
 
 /// Container for nodes with location info.

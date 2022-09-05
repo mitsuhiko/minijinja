@@ -3,12 +3,12 @@ use std::fmt;
 
 use serde::Serialize;
 
-use crate::compiler::Compiler;
+use crate::compiler::codegen::CodeGenerator;
+use crate::compiler::instructions::Instructions;
+use crate::compiler::parser::parse;
 use crate::environment::Environment;
 use crate::error::{attach_basic_debug_info, Error};
-use crate::instructions::Instructions;
 use crate::output::Output;
-use crate::parser::parse;
 use crate::utils::AutoEscape;
 use crate::value::Value;
 use crate::vm::Vm;
@@ -143,7 +143,7 @@ impl<'source> CompiledTemplate<'source> {
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
         let ast = parse(source, name)?;
-        let mut compiler = Compiler::new(name, source);
+        let mut compiler = CodeGenerator::new(name, source);
         compiler.compile_stmt(&ast)?;
         let (instructions, blocks) = compiler.finish();
         Ok(CompiledTemplate {
