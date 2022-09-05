@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::fmt::{self, Write};
+use std::fmt;
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -7,11 +7,12 @@ use serde::Serialize;
 use crate::compiler::Compiler;
 use crate::error::Error;
 use crate::instructions::Instructions;
+use crate::output::Output;
 use crate::parser::{parse, parse_expr};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, HtmlEscape};
 use crate::value::{ArgType, FunctionArgs, FunctionResult, Value, ValueKind};
 use crate::vm::Vm;
-use crate::{filters, functions, tests};
+use crate::{filters, functions, tests, ErrorKind};
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -48,6 +49,19 @@ impl<'env> fmt::Debug for Template<'env> {
 pub(crate) struct CompiledTemplate<'source> {
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,
+}
+
+impl<'source> CompiledTemplate<'source> {
+    fn eval(
+        &self,
+        env: &Environment,
+        root: Value,
+        out: &mut Output,
+    ) -> Result<Option<Value>, Error> {
+        let vm = Vm::new(env);
+        let blocks = &self.blocks;
+        vm.eval(&self.instructions, root, blocks, out)
+    }
 }
 
 impl<'env> fmt::Debug for CompiledTemplate<'env> {
@@ -139,15 +153,8 @@ impl<'env> Template<'env> {
 
     fn _render(&self, root: Value) -> Result<String, Error> {
         let mut output = String::new();
-        let vm = Vm::new(self.env);
-        let blocks = &self.compiled.blocks;
-        vm.eval(
-            &self.compiled.instructions,
-            root,
-            blocks,
-            self.initial_auto_escape,
-            &mut output,
-        )?;
+        let mut formatter = Output::string(&mut output, self.initial_auto_escape);
+        self.compiled.eval(self.env, root, &mut formatter)?;
         Ok(output)
     }
 
@@ -186,6 +193,9 @@ impl<'source> fmt::Debug for Source<'source> {
     }
 }
 
+type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
+type FormatterFunc = dyn Fn(&mut Output, &Value) -> Result<(), Error> + Sync + Send;
+
 /// An abstraction that holds the engine configuration.
 ///
 /// This object holds the central configuration state for templates.  It is also
@@ -214,7 +224,8 @@ pub struct Environment<'source> {
     filters: BTreeMap<&'source str, filters::BoxedFilter>,
     tests: BTreeMap<&'source str, tests::BoxedTest>,
     pub(crate) globals: BTreeMap<&'source str, Value>,
-    default_auto_escape: Arc<dyn Fn(&str) -> AutoEscape + Sync + Send>,
+    default_auto_escape: Arc<AutoEscapeFunc>,
+    formatter: Arc<FormatterFunc>,
     #[cfg(feature = "debug")]
     debug: bool,
 }
@@ -234,19 +245,6 @@ impl<'source> fmt::Debug for Environment<'source> {
             .field("templates", &self.templates)
             .finish()
     }
-}
-
-fn default_auto_escape(name: &str) -> AutoEscape {
-    match name.rsplit('.').next() {
-        Some("html") | Some("htm") | Some("xml") => AutoEscape::Html,
-        #[cfg(feature = "json")]
-        Some("json") | Some("js") | Some("yaml") | Some("yml") => AutoEscape::Json,
-        _ => AutoEscape::None,
-    }
-}
-
-fn no_auto_escape(_: &str) -> AutoEscape {
-    AutoEscape::None
 }
 
 /// A handle to a compiled expression.
@@ -293,16 +291,12 @@ impl<'env, 'source> Expression<'env, 'source> {
     }
 
     fn _eval(&self, root: Value) -> Result<Value, Error> {
-        let mut output = String::new();
-        let vm = Vm::new(self.env);
-        let blocks = BTreeMap::new();
-        Ok(vm
+        Ok(Vm::new(self.env)
             .eval(
                 &self.instructions,
                 root,
-                &blocks,
-                AutoEscape::None,
-                &mut output,
+                &BTreeMap::new(),
+                &mut Output::null(),
             )?
             .unwrap())
     }
@@ -321,7 +315,8 @@ impl<'source> Environment<'source> {
             filters: filters::get_builtin_filters(),
             tests: tests::get_builtin_tests(),
             globals: functions::get_globals(),
-            default_auto_escape: Arc::new(default_auto_escape),
+            default_auto_escape: Arc::new(default_auto_escape_callback),
+            formatter: Arc::new(escape_formatter),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
         }
@@ -338,6 +333,7 @@ impl<'source> Environment<'source> {
             tests: Default::default(),
             globals: Default::default(),
             default_auto_escape: Arc::new(no_auto_escape),
+            formatter: Arc::new(escape_formatter),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
         }
@@ -428,16 +424,8 @@ impl<'source> Environment<'source> {
         let name = "<string>";
         let compiled = CompiledTemplate::from_name_and_source(name, source)?;
         let mut output = String::new();
-        let vm = Vm::new(self);
-        let blocks = &compiled.blocks;
-        let initial_auto_escape = self.get_initial_auto_escape(name);
-        vm.eval(
-            &compiled.instructions,
-            root,
-            blocks,
-            initial_auto_escape,
-            &mut output,
-        )?;
+        let mut formatter = Output::string(&mut output, self.get_initial_auto_escape(name));
+        compiled.eval(self, root, &mut formatter)?;
         Ok(output)
     }
 
@@ -446,20 +434,65 @@ impl<'source> Environment<'source> {
     /// This function is invoked when templates are loaded from the environment
     /// to determine the default auto escaping behavior.  The function is
     /// invoked with the name of the template and can make an initial auto
-    /// escaping decision based on that.  The default implementation is to
-    /// turn on escaping depending on the file extension:
+    /// escaping decision based on that.  The default implementation
+    /// ([`default_auto_escape_callback`]) turn on escaping depending on the file
+    /// extension.
     ///
-    /// * [`Html`](AutoEscape::Html): `.html`, `.htm`, `.xml`
-    #[cfg_attr(
-        feature = "json",
-        doc = r" * [`Json`](AutoEscape::Json): `.json`, `.js`, `.yml`"
-    )]
-    /// * [`None`](AutoEscape::None): _all others_
-    pub fn set_auto_escape_callback<F: Fn(&str) -> AutoEscape + 'static + Sync + Send>(
-        &mut self,
-        f: F,
-    ) {
+    /// ```
+    /// # use minijinja::{Environment, AutoEscape};
+    /// # let mut env = Environment::new();
+    /// env.set_auto_escape_callback(|name| {
+    ///     if matches!(name.rsplit('.').next().unwrap_or(""), "html" | "htm" | "aspx") {
+    ///         AutoEscape::Html
+    ///     } else {
+    ///         AutoEscape::None
+    ///     }
+    /// });
+    /// ```
+    pub fn set_auto_escape_callback<F>(&mut self, f: F)
+    where
+        F: Fn(&str) -> AutoEscape + 'static + Sync + Send,
+    {
         self.default_auto_escape = Arc::new(f);
+    }
+
+    /// Sets a different formatter function.
+    ///
+    /// The formatter is invoked to format the given value into the provided
+    /// [`Output`].  The default implementation is the [`escape_formatter`].
+    ///
+    /// When implementing a custom formatter it depends on if auto escaping
+    /// should be supported or not.  If auto escaping should be supported then
+    /// it's easiest to just wrap the default [`escape_formatter`].  The
+    /// following example swaps out `None` values before rendering for
+    /// `Undefined` which renders as an empty string instead.
+    ///
+    /// The current value of the auto escape flag can be retrieved directly
+    /// from the output with [`Output::auto_escape`].
+    ///
+    /// ```
+    /// # use minijinja::Environment;
+    /// # let mut env = Environment::new();
+    /// use minijinja::escape_formatter;
+    /// use minijinja::value::Value;
+    ///
+    /// env.set_formatter(|out, value| {
+    ///     escape_formatter(
+    ///         out,
+    ///         if value.is_none() {
+    ///             &Value::UNDEFINED
+    ///         } else {
+    ///             value
+    ///         },
+    ///     )
+    ///});
+    /// # assert_eq!(env.render_str("{{ none }}", ()).unwrap(), "");
+    /// ```
+    pub fn set_formatter<F>(&mut self, f: F)
+    where
+        F: Fn(&mut Output, &Value) -> Result<(), Error> + 'static + Sync + Send,
+    {
+        self.formatter = Arc::new(f);
     }
 
     /// Enable or disable the debug mode.
@@ -616,59 +649,87 @@ impl<'source> Environment<'source> {
         (self.default_auto_escape)(name)
     }
 
-    pub(crate) fn escape(
-        &self,
-        value: &Value,
-        autoescape: AutoEscape,
-        out: &mut String,
-    ) -> Result<(), Error> {
-        // safe values do not get escaped
-        if value.is_safe() {
-            write!(out, "{}", value).unwrap();
-            return Ok(());
-        }
-
-        // TODO: this should become pluggable
-        match autoescape {
-            AutoEscape::None => write!(out, "{}", value).unwrap(),
-            AutoEscape::Html => html_escape_value(out, value),
-            #[cfg(feature = "json")]
-            AutoEscape::Json => {
-                let value = serde_json::to_string(&value).map_err(|err| {
-                    Error::new(
-                        crate::ErrorKind::BadSerialization,
-                        "unable to format to JSON",
-                    )
-                    .with_source(err)
-                })?;
-                write!(out, "{}", value).unwrap()
-            }
-        }
-        Ok(())
-    }
-
-    /// Finalizes a value.
-    pub(crate) fn finalize(
-        &self,
-        value: &Value,
-        autoescape: AutoEscape,
-        out: &mut String,
-    ) -> Result<(), Error> {
-        self.escape(value, autoescape, out)
+    /// Formats a value into the final format.
+    ///
+    /// This step is called finalization in Jinja2 but since we are writing into
+    /// the output stream rather than converting values, it's renamed to format
+    /// here.
+    pub(crate) fn format(&self, value: &Value, out: &mut Output) -> Result<(), Error> {
+        (self.formatter)(out, value)
     }
 }
 
-pub fn html_escape_value(out: &mut String, value: &Value) {
+pub fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
     if matches!(
         value.kind(),
         ValueKind::Undefined | ValueKind::None | ValueKind::Bool | ValueKind::Number
     ) {
-        write!(out, "{}", value).unwrap()
+        write!(out, "{}", value)
     } else if let Some(s) = value.as_str() {
-        write!(out, "{}", HtmlEscape(s)).unwrap()
+        write!(out, "{}", HtmlEscape(s))
     } else {
-        write!(out, "{}", HtmlEscape(&value.to_string())).unwrap()
+        write!(out, "{}", HtmlEscape(&value.to_string()))
     }
+}
+
+fn no_auto_escape(_: &str) -> AutoEscape {
+    AutoEscape::None
+}
+
+/// The default logic for auto escaping based on file extension.
+///
+/// * [`Html`](AutoEscape::Html): `.html`, `.htm`, `.xml`
+#[cfg_attr(
+    feature = "json",
+    doc = r" * [`Json`](AutoEscape::Json): `.json`, `.js`, `.yml`"
+)]
+/// * [`None`](AutoEscape::None): _all others_
+pub fn default_auto_escape_callback(name: &str) -> AutoEscape {
+    match name.rsplit('.').next() {
+        Some("html") | Some("htm") | Some("xml") => AutoEscape::Html,
+        #[cfg(feature = "json")]
+        Some("json") | Some("js") | Some("yaml") | Some("yml") => AutoEscape::Json,
+        _ => AutoEscape::None,
+    }
+}
+
+/// The default formatter.
+///
+/// This formatter takes a value and directly writes it into the output format
+/// while honoring the requested auto escape format of the output.  If the
+/// value is already marked as safe, it's handled as if no auto escaping
+/// was requested.
+///
+/// * [`Html`](AutoEscape::Html): performs HTML escaping
+#[cfg_attr(
+    feature = "json",
+    doc = r" * [`Json`](AutoEscape::Json): serializes values to JSON"
+)]
+/// * [`None`](AutoEscape::None): no escaping
+/// * [`Custom(..)`](AutoEscape::Custom): results in an error
+pub fn escape_formatter(out: &mut Output, value: &Value) -> Result<(), Error> {
+    match (value.is_safe(), out.auto_escape()) {
+        // safe values do not get escaped
+        (true, _) | (_, AutoEscape::None) => write!(out, "{}", value)?,
+        (false, AutoEscape::Html) => write_with_html_escaping(out, value)?,
+        #[cfg(feature = "json")]
+        (false, AutoEscape::Json) => {
+            let value = serde_json::to_string(&value).map_err(|err| {
+                Error::new(ErrorKind::BadSerialization, "unable to format to JSON").with_source(err)
+            })?;
+            write!(out, "{}", value)?
+        }
+        (false, AutoEscape::Custom(name)) => {
+            return Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                format!(
+                    "Default formatter does not know how to format to custom format '{}'",
+                    name
+                ),
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[test]

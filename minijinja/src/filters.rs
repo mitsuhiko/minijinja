@@ -58,7 +58,9 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::environment::escape_formatter;
 use crate::error::Error;
+use crate::output::Output;
 use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
 use crate::vm::State;
 use crate::AutoEscape;
@@ -200,7 +202,6 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, BoxedFilter> {
 ///
 /// When a value is marked as safe, no further auto escaping will take place.
 pub fn safe(_state: &State, v: String) -> Value {
-    // TODO: this ideally understands which type of escaping is in use
     Value::from_safe_string(v)
 }
 
@@ -226,7 +227,8 @@ pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
         other => other,
     };
     let mut out = String::new();
-    state.env().escape(&v, auto_escape, &mut out)?;
+    let mut formatter = Output::string(&mut out, auto_escape);
+    escape_formatter(&mut formatter, &v)?;
     Ok(Value::from_safe_string(out))
 }
 
@@ -796,9 +798,9 @@ mod builtins {
         let state = State {
             env: &env,
             ctx: crate::vm::Context::default(),
-            auto_escape: crate::AutoEscape::None,
             current_block: None,
             name: "<unknown>",
+            out: &mut Output::null(),
         };
         let bx = BoxedFilter::new(test);
         assert_eq!(
@@ -819,12 +821,13 @@ mod builtins {
         }
 
         let env = crate::Environment::new();
+        let mut out = Output::null();
         let state = State {
             env: &env,
             ctx: crate::vm::Context::default(),
-            auto_escape: crate::AutoEscape::None,
             current_block: None,
             name: "<unknown>",
+            out: &mut out,
         };
         let bx = BoxedFilter::new(add);
         assert_eq!(
