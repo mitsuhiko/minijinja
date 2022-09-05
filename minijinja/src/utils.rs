@@ -41,6 +41,12 @@ pub enum AutoEscape {
     #[cfg(feature = "json")]
     #[cfg_attr(docsrs, doc(cfg(feature = "json")))]
     Json,
+    /// A custom auto escape format.
+    ///
+    /// The default formatter does not know how to deal with a custom escaping
+    /// format and would error.  The use of these requires a custom formatter.
+    /// See [`set_formatter`](crate::Environment::set_formatter).
+    Custom(&'static str),
 }
 
 /// Helper to HTML escape a string.

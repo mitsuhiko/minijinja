@@ -83,6 +83,7 @@ pub enum ErrorKind {
     BadEscape,
     UndefinedError,
     BadSerialization,
+    WriteFailure,
 }
 
 impl ErrorKind {
@@ -101,6 +102,7 @@ impl ErrorKind {
             ErrorKind::BadEscape => "bad string escape",
             ErrorKind::UndefinedError => "variable or attribute undefined",
             ErrorKind::BadSerialization => "could not serialize to internal format",
+            ErrorKind::WriteFailure => "failed to write output",
         }
     }
 }
@@ -210,6 +212,12 @@ impl From<ErrorKind> for Error {
             #[cfg(feature = "debug")]
             debug_info: None,
         }
+    }
+}
+
+impl From<fmt::Error> for Error {
+    fn from(_: fmt::Error) -> Self {
+        Error::new(ErrorKind::WriteFailure, "formatting failed")
     }
 }
 

@@ -277,9 +277,9 @@ mod builtins {
         let state = State {
             env: &env,
             ctx: crate::vm::Context::default(),
-            auto_escape: crate::AutoEscape::None,
             current_block: None,
             name: "<unknown>",
+            out: &mut crate::Output::null(),
         };
         let bx = BoxedTest::new(test);
         assert!(bx

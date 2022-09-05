@@ -1,7 +1,7 @@
 #![cfg(feature = "unstable_machinery")]
 use std::collections::BTreeMap;
 
-use minijinja::machinery::{Compiler, Instruction, Instructions, Vm};
+use minijinja::machinery::{make_string_formatter, Compiler, Instruction, Instructions, Vm};
 use minijinja::value::Value;
 use minijinja::{AutoEscape, Environment, Error};
 
@@ -16,7 +16,8 @@ pub fn simple_eval<S: serde::Serialize>(
     let empty_blocks = BTreeMap::new();
     let vm = Vm::new(&env);
     let root = Value::from_serializable(&ctx);
-    vm.eval(instructions, root, &empty_blocks, AutoEscape::None, output)
+    let mut formatter = make_string_formatter(output, AutoEscape::None);
+    vm.eval(instructions, root, &empty_blocks, &mut formatter)
 }
 
 #[test]
