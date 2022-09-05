@@ -55,7 +55,6 @@
 //! this module.  Note though that these functions are not to be
 //! called from Rust code as their exact interface (arguments and return types)
 //! might change from one MiniJinja version to another.
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::error::Error;
@@ -180,25 +179,6 @@ impl BoxedTest {
     }
 }
 
-pub(crate) fn get_builtin_tests() -> BTreeMap<&'static str, BoxedTest> {
-    #[allow(unused_mut)]
-    let mut rv = BTreeMap::new();
-    #[cfg(feature = "builtins")]
-    {
-        rv.insert("odd", BoxedTest::new(is_odd));
-        rv.insert("even", BoxedTest::new(is_even));
-        rv.insert("undefined", BoxedTest::new(is_undefined));
-        rv.insert("defined", BoxedTest::new(is_defined));
-        rv.insert("number", BoxedTest::new(is_number));
-        rv.insert("string", BoxedTest::new(is_string));
-        rv.insert("sequence", BoxedTest::new(is_sequence));
-        rv.insert("mapping", BoxedTest::new(is_mapping));
-        rv.insert("startingwith", BoxedTest::new(is_startingwith));
-        rv.insert("endingwith", BoxedTest::new(is_endingwith));
-    }
-    rv
-}
-
 #[cfg(feature = "builtins")]
 mod builtins {
     use super::*;
@@ -274,17 +254,12 @@ mod builtins {
         }
 
         let env = crate::Environment::new();
-        let state = State {
-            env: &env,
-            ctx: crate::vm::Context::default(),
-            current_block: None,
-            name: "<unknown>",
-            out: &mut crate::Output::null(),
-        };
-        let bx = BoxedTest::new(test);
-        assert!(bx
-            .perform(&state, &Value::from(23), &[Value::from(23)][..])
-            .unwrap());
+        State::with_dummy(&env, |state| {
+            let bx = BoxedTest::new(test);
+            assert!(bx
+                .perform(state, &Value::from(23), &[Value::from(23)][..])
+                .unwrap());
+        });
     }
 }
 

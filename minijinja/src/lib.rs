@@ -129,13 +129,16 @@ mod key;
 
 mod ast;
 mod compiler;
+mod defaults;
 mod environment;
 mod error;
+mod expression;
 mod instructions;
 mod lexer;
 mod macros;
 mod output;
 mod parser;
+mod template;
 mod tokens;
 mod utils;
 mod vm;
@@ -149,11 +152,12 @@ pub mod value;
 #[cfg(feature = "source")]
 mod source;
 
-pub use self::environment::{
-    default_auto_escape_callback, escape_formatter, Environment, Expression, Template,
-};
+pub use self::defaults::{default_auto_escape_callback, escape_formatter};
+pub use self::environment::Environment;
 pub use self::error::{Error, ErrorKind};
+pub use self::expression::Expression;
 pub use self::output::Output;
+pub use self::template::Template;
 pub use self::utils::{AutoEscape, HtmlEscape};
 
 #[cfg(feature = "source")]
@@ -183,6 +187,6 @@ pub mod machinery {
     use crate::{AutoEscape, Output};
 
     pub fn make_string_formatter(s: &mut String, auto_escape: AutoEscape) -> Output<'_> {
-        Output::string(s, auto_escape)
+        Output::with_string(s, auto_escape)
     }
 }

@@ -1,4 +1,4 @@
-use std::fmt::{self, Arguments};
+use std::fmt;
 
 use crate::utils::AutoEscape;
 use crate::value::Value;
@@ -14,6 +14,11 @@ use crate::value::Value;
 /// escaping request.  The output itself however does not have functionality to
 /// escape by itself.
 pub struct Output<'a> {
+    // Note on type design: this type partially exists so that in the future non
+    // string outputs can be implemented.  Right now only the null writer exists
+    // as alternative which is also infallible.  If writing to io::Write should
+    // be added, then errors would need to be collected out of bounds as
+    // fmt::Error has no support for carrying actual IO errors.
     w: &'a mut (dyn fmt::Write + 'a),
     capture_stack: Vec<String>,
     pub(crate) auto_escape: AutoEscape,
@@ -22,7 +27,8 @@ pub struct Output<'a> {
 pub struct NullWriter;
 
 impl<'a> Output<'a> {
-    pub(crate) fn string(buf: &'a mut String, auto_escape: AutoEscape) -> Self {
+    /// Creates an output writing to a string.
+    pub(crate) fn with_string(buf: &'a mut String, auto_escape: AutoEscape) -> Self {
         Self {
             w: buf,
             capture_stack: Vec::new(),
@@ -30,6 +36,7 @@ impl<'a> Output<'a> {
         }
     }
 
+    /// Creates a null output that writes nowhere.
     pub(crate) fn null() -> Self {
         static mut NULL_WRITER: NullWriter = NullWriter;
         Self {
@@ -40,10 +47,12 @@ impl<'a> Output<'a> {
         }
     }
 
+    /// Begins capturing into a string.
     pub(crate) fn begin_capture(&mut self) {
         self.capture_stack.push(String::new());
     }
 
+    /// Ends capturing and returns the captured string as value.
     pub(crate) fn end_capture(&mut self) -> Value {
         let captured = self.capture_stack.pop().unwrap();
         if !matches!(self.auto_escape, AutoEscape::None) {
@@ -74,7 +83,7 @@ impl<'a> Output<'a> {
 
     /// Writes some formatted information into this instance.
     #[inline]
-    pub fn write_fmt(&mut self, a: Arguments<'_>) -> fmt::Result {
+    pub fn write_fmt(&mut self, a: fmt::Arguments<'_>) -> fmt::Result {
         self.target().write_fmt(a)
     }
 }

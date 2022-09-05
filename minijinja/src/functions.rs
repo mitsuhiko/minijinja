@@ -48,7 +48,6 @@
 //! this module.  Note though that these functions are not to be
 //! called from Rust code as their exact interface (arguments and return types)
 //! might change from one MiniJinja version to another.
-use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
@@ -179,21 +178,11 @@ impl Object for BoxedFunction {
     }
 }
 
-pub(crate) fn get_globals() -> BTreeMap<&'static str, Value> {
-    #[allow(unused_mut)]
-    let mut rv = BTreeMap::new();
-    #[cfg(feature = "builtins")]
-    {
-        rv.insert("range", BoxedFunction::new(range).to_value());
-        rv.insert("dict", BoxedFunction::new(dict).to_value());
-        rv.insert("debug", BoxedFunction::new(debug).to_value());
-    }
-    rv
-}
-
 #[cfg(feature = "builtins")]
 mod builtins {
     use super::*;
+
+    use std::collections::BTreeMap;
 
     use crate::error::ErrorKind;
     use crate::value::ValueKind;

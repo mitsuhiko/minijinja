@@ -5,174 +5,15 @@ use std::sync::Arc;
 use serde::Serialize;
 
 use crate::compiler::Compiler;
-use crate::error::Error;
-use crate::instructions::Instructions;
+use crate::error::{attach_basic_debug_info, Error};
+use crate::expression::Expression;
 use crate::output::Output;
-use crate::parser::{parse, parse_expr};
-use crate::utils::{AutoEscape, BTreeMapKeysDebug, HtmlEscape};
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Value, ValueKind};
+use crate::parser::parse_expr;
+use crate::template::{CompiledTemplate, Template};
+use crate::utils::{AutoEscape, BTreeMapKeysDebug};
+use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
 use crate::vm::Vm;
-use crate::{filters, functions, tests, ErrorKind};
-
-#[cfg(test)]
-use similar_asserts::assert_eq;
-
-/// Represents a handle to a template.
-///
-/// Templates are stored in the [`Environment`] as bytecode instructions.  With the
-/// [`Environment::get_template`] method that is looked up and returned in form of
-/// this handle.  Such a template can be cheaply copied as it only holds references.
-///
-/// To render the [`render`](Template::render) method can be used.
-#[derive(Copy, Clone)]
-pub struct Template<'env> {
-    env: &'env Environment<'env>,
-    compiled: &'env CompiledTemplate<'env>,
-    initial_auto_escape: AutoEscape,
-}
-
-impl<'env> fmt::Debug for Template<'env> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut ds = f.debug_struct("Template");
-        ds.field("name", &self.name());
-        #[cfg(feature = "internal_debug")]
-        {
-            ds.field("instructions", &self.compiled.instructions);
-            ds.field("blocks", &self.compiled.blocks);
-        }
-        ds.field("initial_auto_escape", &self.initial_auto_escape);
-        ds.finish()
-    }
-}
-
-/// Represents a compiled template in memory.
-pub(crate) struct CompiledTemplate<'source> {
-    instructions: Instructions<'source>,
-    blocks: BTreeMap<&'source str, Instructions<'source>>,
-}
-
-impl<'source> CompiledTemplate<'source> {
-    fn eval(
-        &self,
-        env: &Environment,
-        root: Value,
-        out: &mut Output,
-    ) -> Result<Option<Value>, Error> {
-        let vm = Vm::new(env);
-        let blocks = &self.blocks;
-        vm.eval(&self.instructions, root, blocks, out)
-    }
-}
-
-impl<'env> fmt::Debug for CompiledTemplate<'env> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut ds = f.debug_struct("CompiledTemplate");
-        #[cfg(feature = "internal_debug")]
-        {
-            ds.field("instructions", &self.instructions);
-            ds.field("blocks", &self.blocks);
-        }
-        ds.finish()
-    }
-}
-
-fn attach_basic_debug_info<T>(rv: Result<T, Error>, source: &str) -> Result<T, Error> {
-    #[cfg(feature = "debug")]
-    {
-        match rv {
-            Ok(rv) => Ok(rv),
-            Err(mut err) => {
-                err.debug_info = Some(crate::error::DebugInfo {
-                    template_source: Some(source.to_string()),
-                    ..Default::default()
-                });
-                Err(err)
-            }
-        }
-    }
-    #[cfg(not(feature = "debug"))]
-    {
-        let _source = source;
-        rv
-    }
-}
-
-impl<'source> CompiledTemplate<'source> {
-    pub(crate) fn from_name_and_source(
-        name: &'source str,
-        source: &'source str,
-    ) -> Result<CompiledTemplate<'source>, Error> {
-        attach_basic_debug_info(Self::_from_name_and_source_impl(name, source), source)
-    }
-
-    fn _from_name_and_source_impl(
-        name: &'source str,
-        source: &'source str,
-    ) -> Result<CompiledTemplate<'source>, Error> {
-        let ast = parse(source, name)?;
-        let mut compiler = Compiler::new(name, source);
-        compiler.compile_stmt(&ast)?;
-        let (instructions, blocks) = compiler.finish();
-        Ok(CompiledTemplate {
-            blocks,
-            instructions,
-        })
-    }
-}
-
-impl<'env> Template<'env> {
-    /// Returns the name of the template.
-    pub fn name(&self) -> &str {
-        self.compiled.instructions.name()
-    }
-
-    /// Returns the source code of the template.
-    pub fn source(&self) -> &str {
-        self.compiled.instructions.source()
-    }
-
-    /// Renders the template into a string.
-    ///
-    /// The provided value is used as the initial context for the template.  It
-    /// can be any object that implements [`Serialize`](serde::Serialize).  You
-    /// can eiher create your own struct and derive `Serialize` for it or the
-    /// [`context!`](crate::context) macro can be used to create an ad-hoc context.
-    ///
-    /// ```
-    /// # use minijinja::{Environment, context};
-    /// # let mut env = Environment::new();
-    /// # env.add_template("hello", "Hello {{ name }}!").unwrap();
-    /// let tmpl = env.get_template("hello").unwrap();
-    /// println!("{}", tmpl.render(context!(name => "John")).unwrap());
-    /// ```
-    pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
-        // reduce total amount of code faling under mono morphization into
-        // this function, and share the rest in _eval.
-        self._render(Value::from_serializable(&ctx))
-    }
-
-    fn _render(&self, root: Value) -> Result<String, Error> {
-        let mut output = String::new();
-        let mut formatter = Output::string(&mut output, self.initial_auto_escape);
-        self.compiled.eval(self.env, root, &mut formatter)?;
-        Ok(output)
-    }
-
-    /// Returns the root instructions.
-    pub(crate) fn instructions(&self) -> &'env Instructions<'env> {
-        &self.compiled.instructions
-    }
-
-    /// Returns the blocks.
-    pub(crate) fn blocks(&self) -> &'env BTreeMap<&'env str, Instructions<'env>> {
-        &self.compiled.blocks
-    }
-
-    /// Returns the initial auto escape setting.
-    pub(crate) fn initial_auto_escape(&self) -> AutoEscape {
-        self.initial_auto_escape
-    }
-}
+use crate::{defaults, filters, functions, tests};
 
 type TemplateMap<'source> = BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>;
 
@@ -247,61 +88,6 @@ impl<'source> fmt::Debug for Environment<'source> {
     }
 }
 
-/// A handle to a compiled expression.
-///
-/// An expression is created via the
-/// [`compile_expression`](Environment::compile_expression) method.  It provides
-/// a method to evaluate the expression and return the result as value object.
-/// This for instance can be used to evaluate simple expressions from user
-/// provided input to implement features such as dynamic filtering.
-///
-/// This is usually best paired with [`context`](crate::context!) to pass
-/// a single value to it.
-///
-/// # Example
-///
-/// ```rust
-/// # use minijinja::{Environment, context};
-/// let env = Environment::new();
-/// let expr = env.compile_expression("number > 10 and number < 20").unwrap();
-/// let rv = expr.eval(context!(number => 15)).unwrap();
-/// assert!(rv.is_true());
-/// ```
-pub struct Expression<'env, 'source> {
-    env: &'env Environment<'source>,
-    instructions: Instructions<'source>,
-}
-
-impl<'env, 'source> fmt::Debug for Expression<'env, 'source> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Expression")
-            .field("env", &self.env)
-            .finish()
-    }
-}
-
-impl<'env, 'source> Expression<'env, 'source> {
-    /// Evaluates the expression with some context.
-    ///
-    /// The result of the expression is returned as [`Value`].
-    pub fn eval<S: Serialize>(&self, ctx: S) -> Result<Value, Error> {
-        // reduce total amount of code faling under mono morphization into
-        // this function, and share the rest in _eval.
-        self._eval(Value::from_serializable(&ctx))
-    }
-
-    fn _eval(&self, root: Value) -> Result<Value, Error> {
-        Ok(Vm::new(self.env)
-            .eval(
-                &self.instructions,
-                root,
-                &BTreeMap::new(),
-                &mut Output::null(),
-            )?
-            .unwrap())
-    }
-}
-
 impl<'source> Environment<'source> {
     /// Creates a new environment with sensible defaults.
     ///
@@ -312,11 +98,11 @@ impl<'source> Environment<'source> {
     pub fn new() -> Environment<'source> {
         Environment {
             templates: Source::Borrowed(Default::default()),
-            filters: filters::get_builtin_filters(),
-            tests: tests::get_builtin_tests(),
-            globals: functions::get_globals(),
-            default_auto_escape: Arc::new(default_auto_escape_callback),
-            formatter: Arc::new(escape_formatter),
+            filters: defaults::get_builtin_filters(),
+            tests: defaults::get_builtin_tests(),
+            globals: defaults::get_globals(),
+            default_auto_escape: Arc::new(defaults::default_auto_escape_callback),
+            formatter: Arc::new(defaults::escape_formatter),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
         }
@@ -332,8 +118,8 @@ impl<'source> Environment<'source> {
             filters: Default::default(),
             tests: Default::default(),
             globals: Default::default(),
-            default_auto_escape: Arc::new(no_auto_escape),
-            formatter: Arc::new(escape_formatter),
+            default_auto_escape: Arc::new(defaults::no_auto_escape),
+            formatter: Arc::new(defaults::escape_formatter),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
         }
@@ -396,11 +182,11 @@ impl<'source> Environment<'source> {
             #[cfg(feature = "source")]
             Source::Owned(source) => source.get_compiled_template(name)?,
         };
-        Ok(Template {
-            env: self,
+        Ok(Template::new(
+            self,
             compiled,
-            initial_auto_escape: self.get_initial_auto_escape(name),
-        })
+            self.get_initial_auto_escape(name),
+        ))
     }
 
     /// Parses and renders a template from a string in one go.
@@ -423,10 +209,10 @@ impl<'source> Environment<'source> {
     fn _render_str(&self, source: &str, root: Value) -> Result<String, Error> {
         let name = "<string>";
         let compiled = CompiledTemplate::from_name_and_source(name, source)?;
-        let mut output = String::new();
-        let mut formatter = Output::string(&mut output, self.get_initial_auto_escape(name));
-        compiled.eval(self, root, &mut formatter)?;
-        Ok(output)
+        let mut rv = String::new();
+        let mut out = Output::with_string(&mut rv, self.get_initial_auto_escape(name));
+        Vm::new(self).eval(&compiled.instructions, root, &compiled.blocks, &mut out)?;
+        Ok(rv)
     }
 
     /// Sets a new function to select the default auto escaping.
@@ -435,8 +221,8 @@ impl<'source> Environment<'source> {
     /// to determine the default auto escaping behavior.  The function is
     /// invoked with the name of the template and can make an initial auto
     /// escaping decision based on that.  The default implementation
-    /// ([`default_auto_escape_callback`]) turn on escaping depending on the file
-    /// extension.
+    /// ([`default_auto_escape_callback`](defaults::default_auto_escape_callback))
+    /// turn on escaping depending on the file extension.
     ///
     /// ```
     /// # use minijinja::{Environment, AutoEscape};
@@ -459,11 +245,12 @@ impl<'source> Environment<'source> {
     /// Sets a different formatter function.
     ///
     /// The formatter is invoked to format the given value into the provided
-    /// [`Output`].  The default implementation is the [`escape_formatter`].
+    /// [`Output`].  The default implementation is
+    /// [`escape_formatter`](defaults::escape_formatter).
     ///
     /// When implementing a custom formatter it depends on if auto escaping
     /// should be supported or not.  If auto escaping should be supported then
-    /// it's easiest to just wrap the default [`escape_formatter`].  The
+    /// it's easiest to just wrap the default formatter.  The
     /// following example swaps out `None` values before rendering for
     /// `Undefined` which renders as an empty string instead.
     ///
@@ -561,10 +348,7 @@ impl<'source> Environment<'source> {
         let mut compiler = Compiler::new("<expression>", expr);
         compiler.compile_expr(&ast)?;
         let (instructions, _) = compiler.finish();
-        Ok(Expression {
-            env: self,
-            instructions,
-        })
+        Ok(Expression::new(self, instructions))
     }
 
     /// Adds a new filter function.
@@ -657,141 +441,4 @@ impl<'source> Environment<'source> {
     pub(crate) fn format(&self, value: &Value, out: &mut Output) -> Result<(), Error> {
         (self.formatter)(out, value)
     }
-}
-
-pub fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
-    if matches!(
-        value.kind(),
-        ValueKind::Undefined | ValueKind::None | ValueKind::Bool | ValueKind::Number
-    ) {
-        write!(out, "{}", value)
-    } else if let Some(s) = value.as_str() {
-        write!(out, "{}", HtmlEscape(s))
-    } else {
-        write!(out, "{}", HtmlEscape(&value.to_string()))
-    }
-}
-
-fn no_auto_escape(_: &str) -> AutoEscape {
-    AutoEscape::None
-}
-
-/// The default logic for auto escaping based on file extension.
-///
-/// * [`Html`](AutoEscape::Html): `.html`, `.htm`, `.xml`
-#[cfg_attr(
-    feature = "json",
-    doc = r" * [`Json`](AutoEscape::Json): `.json`, `.js`, `.yml`"
-)]
-/// * [`None`](AutoEscape::None): _all others_
-pub fn default_auto_escape_callback(name: &str) -> AutoEscape {
-    match name.rsplit('.').next() {
-        Some("html") | Some("htm") | Some("xml") => AutoEscape::Html,
-        #[cfg(feature = "json")]
-        Some("json") | Some("js") | Some("yaml") | Some("yml") => AutoEscape::Json,
-        _ => AutoEscape::None,
-    }
-}
-
-/// The default formatter.
-///
-/// This formatter takes a value and directly writes it into the output format
-/// while honoring the requested auto escape format of the output.  If the
-/// value is already marked as safe, it's handled as if no auto escaping
-/// was requested.
-///
-/// * [`Html`](AutoEscape::Html): performs HTML escaping
-#[cfg_attr(
-    feature = "json",
-    doc = r" * [`Json`](AutoEscape::Json): serializes values to JSON"
-)]
-/// * [`None`](AutoEscape::None): no escaping
-/// * [`Custom(..)`](AutoEscape::Custom): results in an error
-pub fn escape_formatter(out: &mut Output, value: &Value) -> Result<(), Error> {
-    match (value.is_safe(), out.auto_escape()) {
-        // safe values do not get escaped
-        (true, _) | (_, AutoEscape::None) => write!(out, "{}", value)?,
-        (false, AutoEscape::Html) => write_with_html_escaping(out, value)?,
-        #[cfg(feature = "json")]
-        (false, AutoEscape::Json) => {
-            let value = serde_json::to_string(&value).map_err(|err| {
-                Error::new(ErrorKind::BadSerialization, "unable to format to JSON").with_source(err)
-            })?;
-            write!(out, "{}", value)?
-        }
-        (false, AutoEscape::Custom(name)) => {
-            return Err(Error::new(
-                ErrorKind::ImpossibleOperation,
-                format!(
-                    "Default formatter does not know how to format to custom format '{}'",
-                    name
-                ),
-            ));
-        }
-    }
-    Ok(())
-}
-
-#[test]
-fn test_basic() {
-    use crate::value::Value;
-
-    let mut env = Environment::new();
-    env.add_template("test", "{% for x in seq %}[{{ x }}]{% endfor %}")
-        .unwrap();
-    let t = env.get_template("test").unwrap();
-    let mut ctx = BTreeMap::new();
-    ctx.insert("seq", Value::from((0..3).collect::<Vec<_>>()));
-    let rv = t.render(ctx).unwrap();
-    assert_eq!(rv, "[0][1][2]");
-}
-
-#[test]
-fn test_expression() {
-    let env = Environment::new();
-    let expr = env.compile_expression("foo + bar").unwrap();
-    let mut ctx = BTreeMap::new();
-    ctx.insert("foo", 42);
-    ctx.insert("bar", 23);
-    assert_eq!(expr.eval(&ctx).unwrap(), Value::from(65));
-}
-
-#[test]
-fn test_expression_lifetimes() {
-    let mut env = Environment::new();
-    let s = String::new();
-    env.add_template("test", &s).unwrap();
-    {
-        let x = String::from("1 + 1");
-        let expr = env.compile_expression(&x).unwrap();
-        assert_eq!(expr.eval(&()).unwrap().to_string(), "2");
-    }
-}
-
-#[test]
-fn test_clone() {
-    let mut env = Environment::new();
-    env.add_template("test", "a").unwrap();
-    let mut env2 = env.clone();
-    assert_eq!(env2.get_template("test").unwrap().render(&()).unwrap(), "a");
-    env2.add_template("test", "b").unwrap();
-    assert_eq!(env2.get_template("test").unwrap().render(&()).unwrap(), "b");
-    assert_eq!(env.get_template("test").unwrap().render(&()).unwrap(), "a");
-}
-
-#[test]
-fn test_globals() {
-    let mut env = Environment::new();
-    env.add_global("a", Value::from(42));
-    env.add_template("test", "{{ a }}").unwrap();
-    let tmpl = env.get_template("test").unwrap();
-    assert_eq!(tmpl.render(()).unwrap(), "42");
-}
-
-#[test]
-fn test_template_removal() {
-    let mut env = Environment::new();
-    env.add_template("test", "{{ a }}").unwrap();
-    env.remove_template("test");
-    assert!(env.get_template("test").is_err());
 }
