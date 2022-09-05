@@ -392,15 +392,8 @@ impl Value {
         if let ValueRepr::Dynamic(ref obj) = self.0 {
             if (**obj).type_id() == TypeId::of::<T>() {
                 unsafe {
-                    // newer versions of Rust have RcType::as_ptr but we support
-                    // rust versions down to 1.41.0 so we need to use a workaround here.
-                    let count = Arc::strong_count(obj);
-                    let clone = obj.clone();
-                    let raw: *const (dyn Object) = Arc::into_raw(clone);
-                    let rv = (raw as *const u8 as *const T).as_ref();
-                    Arc::from_raw(raw);
-                    debug_assert_eq!(count, Arc::strong_count(obj));
-                    return rv;
+                    let raw: *const (dyn Object) = Arc::as_ptr(obj);
+                    return (raw as *const u8 as *const T).as_ref();
                 }
             }
         }
