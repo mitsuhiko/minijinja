@@ -152,9 +152,6 @@ pub use self::environment::{Environment, Expression, Template};
 pub use self::error::{Error, ErrorKind};
 pub use self::utils::{AutoEscape, HtmlEscape};
 
-#[cfg(feature = "debug")]
-pub use self::error::DebugInfo;
-
 #[cfg(feature = "source")]
 pub use self::source::Source;
 

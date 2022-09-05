@@ -24,6 +24,8 @@ All notable changes to MiniJinja are documented here.
 - The error object used to implement `PartialEq` but this was implemented
   by comparing the error kind instead.  Explicitly use the `.kind()`
   method of the error if you want the same behavior.
+- `DebugInfo` is no longer exposed.  This might come back if a better
+  API can be found.
 
 # 0.19.1
 

@@ -469,10 +469,8 @@ impl<'source> Environment<'source> {
     /// template when an error is created.  The cost of this is relatively
     /// high as the data including the template source is cloned.
     ///
-    /// However providing this information greatly improves the debug information
-    /// that the template error provides.  When debug is enabled errors will
-    /// return a [`DebugInfo`](crate::error::DebugInfo) object from
-    /// [`Error::debug_info`](crate::error::Error::debug_info).
+    /// When this is enabled templates will print debug information with source
+    /// context when the error is printed.
     ///
     /// This requires the `debug` feature.  This is enabled by default if
     /// debug assertions are enabled and false otherwise.

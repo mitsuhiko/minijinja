@@ -188,7 +188,7 @@ impl Error {
     /// ([`Environment::set_debug`](crate::Environment::set_debug)).
     #[cfg(feature = "debug")]
     #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
-    pub fn debug_info(&self) -> Option<&DebugInfo> {
+    pub(crate) fn debug_info(&self) -> Option<&DebugInfo> {
         self.debug_info.as_ref()
     }
 }
@@ -230,7 +230,7 @@ mod debug_info {
     /// This is a snapshot of the debug information.
     #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
     #[derive(Default)]
-    pub struct DebugInfo {
+    pub(crate) struct DebugInfo {
         pub(crate) template_source: Option<String>,
         pub(crate) context: Option<Value>,
         pub(crate) referenced_names: Option<Vec<String>>,
@@ -310,4 +310,4 @@ mod debug_info {
 }
 
 #[cfg(feature = "debug")]
-pub use self::debug_info::*;
+pub(crate) use self::debug_info::*;
