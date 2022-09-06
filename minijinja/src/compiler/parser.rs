@@ -79,6 +79,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Advance the stream.
+    #[inline(always)]
     pub fn next(&mut self) -> Result<Option<(Token<'a>, Span)>, Error> {
         let rv = self.current.take();
         self.current = self.iter.next();
@@ -89,6 +90,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Look at the current token
+    #[inline(always)]
     pub fn current(&mut self) -> Result<Option<(&Token<'a>, Span)>, Error> {
         if self.current.is_none() {
             self.next()?;
@@ -101,6 +103,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Expands the span
+    #[inline(always)]
     pub fn expand_span(&self, mut span: Span) -> Span {
         span.end_line = self.current_span.end_line;
         span.end_col = self.current_span.end_col;
@@ -108,6 +111,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Returns the last seen span.
+    #[inline(always)]
     pub fn current_span(&self) -> Span {
         self.current_span
     }

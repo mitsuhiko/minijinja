@@ -69,10 +69,10 @@ impl<'vm, 'env, 'out, 'buf> State<'vm, 'env, 'out, 'buf> {
     }
 
     #[cfg(test)]
-    pub fn with_dummy<R, F: FnOnce(&State) -> R>(env: &'env Environment<'env>, f: F) -> R {
+    pub(crate) fn with_dummy<R, F: FnOnce(&State) -> R>(env: &'env Environment<'env>, f: F) -> R {
         f(&State {
             env,
-            ctx: crate::vm::Context::default(),
+            ctx: Context::default(),
             current_block: None,
             out: &mut Output::null(),
             instructions: &Instructions::new("<unknown>", ""),
