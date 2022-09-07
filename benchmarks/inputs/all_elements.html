@@ -16,7 +16,13 @@
     </nav>
   </header>
   <main>
-    {% block body %}{% endblock %}
+    {% block body %}
+      <ul>
+      {% for item in items %}
+        <li>{{ loop.index }}: {{ item }}</li>
+      {% endfor %}
+      </ul>
+    {% endblock %}
   </main>
   <footer>
     {% block footer %}

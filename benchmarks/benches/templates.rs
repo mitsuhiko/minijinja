@@ -29,7 +29,8 @@ fn do_render(env: &Environment) {
                 context!{url => "/doc", is_active => false, title => "Docs"},
                 context!{url => "/help", is_active => false, title => "Help"},
             ]
-        }
+        },
+        items => (0..200).skip(3).collect::<Vec<_>>(),
     })
     .unwrap();
 }
@@ -49,9 +50,9 @@ fn create_real_env() -> Environment<'static> {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("parse all_elements", |b| b.iter(|| do_parse()));
+    c.bench_function("parse all_elements", |b| b.iter(do_parse));
     c.bench_function("parse+compile all_elements", |b| {
-        b.iter(|| do_parse_and_compile())
+        b.iter(do_parse_and_compile)
     });
     c.bench_function("render all_elements", |b| {
         let env = create_real_env();
