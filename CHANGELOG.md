@@ -8,9 +8,9 @@ All notable changes to MiniJinja are documented here.
 - Added custom formatters.
 - Restructured engine internals for greater clarity.
 - Added support for rendering to `io::Write`.  (#111)
-- Make it impossible to implement `Fitler`, `Test`
-  or `Function` from outside the crate (sealed the traits).
-- Added support for remaining arguments with `Rest`.
+- Make it impossible to implement `Fitler`, `Test` or `Function`
+  from outside the crate by sealed the traits.  (#113)
+- Added support for remaining arguments with `Rest`.  (#114)
 
 # 0.20.0
 
