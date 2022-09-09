@@ -9,6 +9,9 @@ use crate::error::{Error, ErrorKind};
 #[cfg(test)]
 use similar_asserts::assert_eq;
 
+/// internal marker to seal up some trait methods
+pub struct SealedMarker;
+
 pub fn memchr(haystack: &[u8], needle: u8) -> Option<usize> {
     haystack.iter().position(|&x| x == needle)
 }

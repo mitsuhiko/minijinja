@@ -60,6 +60,7 @@ use std::sync::Arc;
 use crate::defaults::escape_formatter;
 use crate::error::Error;
 use crate::output::Output;
+use crate::utils::SealedMarker;
 use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
 use crate::vm::State;
 use crate::AutoEscape;
@@ -103,7 +104,7 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 pub trait Filter<V, Rv, Args>: Send + Sync + 'static {
     /// Applies a filter to value with the given arguments.
     #[doc(hidden)]
-    fn apply_to(&self, state: &State, value: V, args: Args) -> Rv;
+    fn apply_to(&self, state: &State, value: V, args: Args, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
@@ -115,7 +116,7 @@ macro_rules! tuple_impls {
             Rv: FunctionResult,
             $($name: for<'a> ArgType<'a>),*
         {
-            fn apply_to(&self, state: &State, value: V, args: ($($name,)*)) -> Rv {
+            fn apply_to(&self, state: &State, value: V, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
                 (self)(state, value, $($name,)*)
@@ -145,6 +146,7 @@ impl BoxedFilter {
                     state,
                     ArgType::from_value(Some(value))?,
                     FunctionArgs::from_values(args)?,
+                    SealedMarker,
                 )
                 .into_result()
             },

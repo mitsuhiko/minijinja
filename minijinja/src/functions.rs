@@ -52,6 +52,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::error::Error;
+use crate::utils::SealedMarker;
 use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, Value};
 use crate::vm::State;
 
@@ -98,7 +99,7 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 pub trait Function<Rv, Args>: Send + Sync + 'static {
     /// Calls a function with the given arguments.
     #[doc(hidden)]
-    fn invoke(&self, env: &State, args: Args) -> Rv;
+    fn invoke(&self, env: &State, args: Args, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
@@ -109,7 +110,7 @@ macro_rules! tuple_impls {
             Rv: FunctionResult,
             $($name: for<'a> ArgType<'a>),*
         {
-            fn invoke(&self, state: &State, args: ($($name,)*)) -> Rv {
+            fn invoke(&self, state: &State, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
                 (self)(state, $($name,)*)
@@ -134,7 +135,7 @@ impl BoxedFunction {
     {
         BoxedFunction(
             Arc::new(move |env, args| -> Result<Value, Error> {
-                f.invoke(env, FunctionArgs::from_values(args)?)
+                f.invoke(env, FunctionArgs::from_values(args)?, SealedMarker)
                     .into_result()
             }),
             std::any::type_name::<F>(),
