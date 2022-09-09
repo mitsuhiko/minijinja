@@ -58,6 +58,7 @@
 use std::sync::Arc;
 
 use crate::error::Error;
+use crate::utils::SealedMarker;
 use crate::value::{ArgType, FunctionArgs, Value};
 use crate::vm::State;
 
@@ -126,7 +127,7 @@ impl TestResult for bool {
 pub trait Test<V, Rv, Args>: Send + Sync + 'static {
     /// Performs a test to value with the given arguments.
     #[doc(hidden)]
-    fn perform(&self, state: &State, value: V, args: Args) -> Rv;
+    fn perform(&self, state: &State, value: V, args: Args, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
@@ -138,7 +139,7 @@ macro_rules! tuple_impls {
             Rv: TestResult,
             $($name: for<'a> ArgType<'a>),*
         {
-            fn perform(&self, state: &State, value: V, args: ($($name,)*)) -> Rv {
+            fn perform(&self, state: &State, value: V, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
                 (self)(state, value, $($name,)*)
@@ -168,6 +169,7 @@ impl BoxedTest {
                 state,
                 ArgType::from_value(value)?,
                 FunctionArgs::from_values(args)?,
+                SealedMarker,
             )
             .into_result()
         }))
