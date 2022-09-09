@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
+use std::ops::{Deref, DerefMut};
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
@@ -59,15 +60,23 @@ pub trait FunctionArgs<'a>: Sized {
 /// * values: [`Value`]
 /// * vectors: [`Vec<T>`]
 ///
-/// The type is also implemented for optional values (`Value<T>`) which is used
-/// to encode optional parameters to filters, functions or tests.
+/// The type is also implemented for optional values (`Option<T>`) which is used
+/// to encode optional parameters to filters, functions or tests.  Additionally
+/// it's implemented for [`Rest<T>`] which is used to encode the remaining arguments
+/// of a function call.
 pub trait ArgType<'a>: Sized {
     #[doc(hidden)]
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error>;
+
+    #[doc(hidden)]
+    #[inline(always)]
+    fn from_rest_values(_values: &'a [Value]) -> Result<Option<Self>, Error> {
+        Ok(None)
+    }
 }
 
 macro_rules! tuple_impls {
-    ( $( $name:ident )* ) => {
+    ( $( $name:ident )* $(; ( $($alt_name:ident)* ) $rest_name:ident)? ) => {
         impl<'a, $($name),*> FunctionArgs<'a> for ($($name,)*)
             where $($name: ArgType<'a>,)*
         {
@@ -76,6 +85,19 @@ macro_rules! tuple_impls {
                 let arg_count = 0 $(
                     + { let $name = (); 1 }
                 )*;
+
+                $(
+                    let rest_values = values.get(arg_count - 1..).unwrap_or_default();
+                    if let Some(rest) = $rest_name::from_rest_values(rest_values)? {
+                        let mut idx = 0;
+                        $(
+                            let $alt_name = ArgType::from_value(values.get(idx))?;
+                            idx += 1;
+                        )*
+                        return Ok(( $($alt_name,)* rest ,));
+                    }
+                )?
+
                 if values.len() > arg_count {
                     return Err(Error::new(
                         ErrorKind::InvalidArguments,
@@ -96,10 +118,10 @@ macro_rules! tuple_impls {
 }
 
 tuple_impls! {}
-tuple_impls! { A }
-tuple_impls! { A B }
-tuple_impls! { A B C }
-tuple_impls! { A B C D }
+tuple_impls! { A; () A }
+tuple_impls! { A B; (A) B }
+tuple_impls! { A B C; (A B) C }
+tuple_impls! { A B C D; (A B C) D }
 
 impl From<ValueRepr> for Value {
     #[inline(always)]
@@ -292,6 +314,61 @@ primitive_try_from!(bool, {
 primitive_try_from!(f64, {
     ValueRepr::F64(val) => val,
 });
+
+/// Utility type to capture remaining arguments.
+///
+/// In some cases you might want to have a variadic function.  In that case
+/// you can define the last argument to a [`Filter`](crate::filters::Filter),
+/// [`Test`](crate::tests::Test) or [`Function`](crate::functions::Function)
+/// this way.  The `Rest<T>` type will collect all the remaining arguments
+/// here.  It's implemented for all [`ArgType`]s.  The type itself deref's
+/// into the inner vector.
+///
+/// ```
+/// # use minijinja::Environment;
+/// # let mut env = Environment::new();
+/// use minijinja::State;
+/// use minijinja::value::Rest;
+///
+/// fn sum(_state: &State, values: Rest<i64>) -> i64 {
+///     values.iter().sum()
+/// }
+/// ```
+#[derive(Debug)]
+pub struct Rest<T>(pub Vec<T>);
+
+impl<T> Deref for Rest<T> {
+    type Target = Vec<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for Rest<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<'a, T: ArgType<'a>> ArgType<'a> for Rest<T> {
+    fn from_value(_value: Option<&'a Value>) -> Result<Self, Error> {
+        Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            "cannot collect remaining arguments in this argument position",
+        ))
+    }
+
+    #[inline(always)]
+    fn from_rest_values(values: &'a [Value]) -> Result<Option<Self>, Error> {
+        Ok(Some(Rest(
+            values
+                .iter()
+                .map(|v| ArgType::from_value(Some(v)))
+                .collect::<Result<_, _>>()?,
+        )))
+    }
+}
 
 impl<'a> ArgType<'a> for Value {
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {

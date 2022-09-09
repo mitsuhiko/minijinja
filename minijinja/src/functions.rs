@@ -76,8 +76,14 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 /// * `Rv` where `Rv` implements `Into<Value>`
 /// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
 ///
-/// The parameters can be marked optional by using `Option<T>`.  All types are
-/// supported for which [`ArgType`] is implemented.
+/// The parameters can be marked optional by using `Option<T>`.  The last
+/// argument can also use [`Rest<T>`](crate::value::Rest) to capture the
+/// remaining arguments.  All types are supported for which [`ArgType`] is
+/// implemented.
+///
+/// For a list of built-in functions see [`functions`](crate::functions).
+///
+/// # Basic Example
 ///
 /// ```rust
 /// # use minijinja::Environment;
@@ -95,7 +101,28 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 /// env.add_function("include_file", include_file);
 /// ```
 ///
-/// For a list of built-in functions see [`functions`](crate::functions).
+/// ```jinja
+/// {{ include_file("filname.txt") }}
+/// ```
+///
+/// # Variadic
+///
+/// ```
+/// # use minijinja::Environment;
+/// # let mut env = Environment::new();
+/// use minijinja::State;
+/// use minijinja::value::Rest;
+///
+/// fn sum(_state: &State, values: Rest<i64>) -> i64 {
+///     values.iter().sum()
+/// }
+///
+/// env.add_function("sum", sum);
+/// ```
+///
+/// ```jinja
+/// {{ sum(1, 2, 3) }} -> 6
+/// ```
 pub trait Function<Rv, Args>: Send + Sync + 'static {
     /// Calls a function with the given arguments.
     #[doc(hidden)]
