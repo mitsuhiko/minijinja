@@ -85,8 +85,13 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 ///
 /// Filters accept one mandatory parameter which is the value the filter is
 /// applied to and up to 4 extra parameters.  The extra parameters can be
-/// marked optional by using `Option<T>`.  All types are supported for which
-/// [`ArgType`] is implemented.
+/// marked optional by using `Option<T>`.  The last argument can also use
+/// [`Rest<T>`](crate::value::Rest) to capture the remaining arguments.  All
+/// types are supported for which [`ArgType`] is implemented.
+///
+/// For a list of built-in filters see [`filters`](crate::filters).
+///
+/// # Basic Example
 ///
 /// ```
 /// # use minijinja::Environment;
@@ -100,7 +105,48 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// env.add_filter("slugify", slugify);
 /// ```
 ///
-/// For a list of built-in filters see [`filters`](crate::filters).
+/// ```jinja
+/// {{ "Foo Bar Baz"|slugify }} -> foo-bar-baz
+/// ```
+///
+/// # Arguments and Optional Arguments
+///
+/// ```
+/// # use minijinja::Environment;
+/// # let mut env = Environment::new();
+/// use minijinja::State;
+///
+/// fn substr(_state: &State, value: String, start: u32, end: Option<u32>) -> String {
+///     let end = end.unwrap_or(value.len() as _);
+///     value.get(start as usize..end as usize).unwrap_or_default().into()
+/// }
+///
+/// env.add_filter("substr", substr);
+/// ```
+///
+/// ```jinja
+/// {{ "Foo Bar Baz"|substr(4) }} -> Bar Baz
+/// {{ "Foo Bar Baz"|substr(4, 7) }} -> Bar
+/// ```
+///
+/// # Variadic
+///
+/// ```
+/// # use minijinja::Environment;
+/// # let mut env = Environment::new();
+/// use minijinja::State;
+/// use minijinja::value::Rest;
+///
+/// fn pyjoin(_state: &State, joiner: String, values: Rest<String>) -> String {
+///     values.connect(&joiner)
+/// }
+///
+/// env.add_filter("pyjoin", pyjoin);
+/// ```
+///
+/// ```jinja
+/// {{ "|".join(1, 2, 3) }} -> 1|2|3
+/// ```
 pub trait Filter<V, Rv, Args>: Send + Sync + 'static {
     /// Applies a filter to value with the given arguments.
     #[doc(hidden)]
@@ -763,6 +809,41 @@ mod builtins {
                     .unwrap(),
                 Value::from(65)
             );
+        });
+    }
+
+    #[test]
+    fn test_rest_args() {
+        fn sum(_: &State, val: u32, rest: crate::value::Rest<u32>) -> u32 {
+            rest.iter().fold(val, |a, b| a + b)
+        }
+
+        let env = crate::Environment::new();
+        State::with_dummy(&env, |state| {
+            let bx = BoxedFilter::new(sum);
+            assert_eq!(
+                bx.apply_to(
+                    state,
+                    &Value::from(1),
+                    &[Value::from(2), Value::from(3), Value::from(4)][..]
+                )
+                .unwrap(),
+                Value::from(1 + 2 + 3 + 4)
+            );
+        });
+    }
+
+    #[test]
+    #[should_panic = "cannot collect remaining arguments in this argument position"]
+    fn test_incorrect_rest_args() {
+        fn sum(_: &State, _: crate::value::Rest<u32>) -> u32 {
+            panic!("should never happen");
+        }
+
+        let env = crate::Environment::new();
+        State::with_dummy(&env, |state| {
+            let bx = BoxedFilter::new(sum);
+            bx.apply_to(state, &Value::from(1), &[]).unwrap();
         });
     }
 

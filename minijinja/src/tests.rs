@@ -108,8 +108,13 @@ impl TestResult for bool {
 ///
 /// Tests accept one mandatory parameter which is the value the filter is
 /// applied to and up to 4 extra parameters.  The extra parameters can be
-/// marked optional by using `Option<T>`.  All types are supported for which
-/// [`ArgType`] is implemented.
+/// marked optional by using `Option<T>`.  The last argument can also use
+/// [`Rest<T>`](crate::value::Rest) to capture the remaining arguments.  All
+/// types are supported for which [`ArgType`] is implemented.
+///
+/// For a list of built-in tests see [`tests`](crate::tests).
+///
+/// # Basic Example
 ///
 /// ```
 /// # use minijinja::Environment;
@@ -123,7 +128,27 @@ impl TestResult for bool {
 /// env.add_test("lowercase", is_lowercase);
 /// ```
 ///
-/// For a list of built-in tests see [`tests`](crate::tests).
+/// ```jinja
+/// {{ "foo" is lowercase }} -> true
+/// ```
+///
+/// # Arguments and Optional Arguments
+///
+/// ```
+/// # use minijinja::Environment;
+/// # let mut env = Environment::new();
+/// use minijinja::State;
+///
+/// fn is_containing(_state: &State, value: String, other: String) -> bool {
+///     value.contains(&other)
+/// }
+///
+/// env.add_test("containing", is_containing);
+/// ```
+///
+/// ```jinja
+/// {{ "foo" is containing("o") }} -> true
+/// ```
 pub trait Test<V, Rv, Args>: Send + Sync + 'static {
     /// Performs a test to value with the given arguments.
     #[doc(hidden)]
