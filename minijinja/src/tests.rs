@@ -149,7 +149,7 @@ impl TestResult for bool {
 /// ```jinja
 /// {{ "foo" is containing("o") }} -> true
 /// ```
-pub trait Test<V, Rv, Args>: Send + Sync + 'static {
+pub trait Test<Rv, V, Args>: Send + Sync + 'static {
     /// Performs a test to value with the given arguments.
     #[doc(hidden)]
     fn perform(&self, state: &State, value: V, args: Args, _: SealedMarker) -> Rv;
@@ -157,11 +157,11 @@ pub trait Test<V, Rv, Args>: Send + Sync + 'static {
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<Func, V, Rv, $($name),*> Test<V, Rv, ($($name,)*)> for Func
+        impl<Func, Rv, V, $($name),*> Test<Rv, V, ($($name,)*)> for Func
         where
             Func: Fn(&State, V, $($name),*) -> Rv + Send + Sync + 'static,
-            V: for<'a> ArgType<'a>,
             Rv: TestResult,
+            V: for<'a> ArgType<'a>,
             $($name: for<'a> ArgType<'a>),*
         {
             fn perform(&self, state: &State, value: V, args: ($($name,)*), _: SealedMarker) -> Rv {
@@ -181,12 +181,12 @@ tuple_impls! { A B C D }
 
 impl BoxedTest {
     /// Creates a new boxed filter.
-    pub fn new<F, V, Rv, Args>(f: F) -> BoxedTest
+    pub fn new<F, Rv, V, Args>(f: F) -> BoxedTest
     where
-        F: Test<V, Rv, Args>
-            + for<'a> Test<<V as ArgType<'a>>::Output, Rv, <Args as FunctionArgs<'a>>::Output>,
-        V: for<'a> ArgType<'a>,
+        F: Test<Rv, V, Args>
+            + for<'a> Test<Rv, <V as ArgType<'a>>::Output, <Args as FunctionArgs<'a>>::Output>,
         Rv: TestResult,
+        V: for<'a> ArgType<'a>,
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedTest(Arc::new(move |state, value, args| -> Result<bool, Error> {

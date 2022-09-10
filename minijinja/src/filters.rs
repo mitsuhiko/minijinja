@@ -147,7 +147,7 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// ```jinja
 /// {{ "|".join(1, 2, 3) }} -> 1|2|3
 /// ```
-pub trait Filter<V, Rv, Args>: Send + Sync + 'static {
+pub trait Filter<Rv, V, Args>: Send + Sync + 'static {
     /// Applies a filter to value with the given arguments.
     #[doc(hidden)]
     fn apply_to(&self, state: &State, value: V, args: Args, _: SealedMarker) -> Rv;
@@ -155,7 +155,7 @@ pub trait Filter<V, Rv, Args>: Send + Sync + 'static {
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<Func, V, Rv, $($name),*> Filter<V, Rv, ($($name,)*)> for Func
+        impl<Func, Rv, V, $($name),*> Filter<Rv, V, ($($name,)*)> for Func
         where
             Func: Fn(&State, V, $($name),*) -> Rv + Send + Sync + 'static,
             V: for<'a> ArgType<'a>,
@@ -178,12 +178,12 @@ tuple_impls! { A B C D }
 
 impl BoxedFilter {
     /// Creates a new boxed filter.
-    pub fn new<F, V, Rv, Args>(f: F) -> BoxedFilter
+    pub fn new<F, Rv, V, Args>(f: F) -> BoxedFilter
     where
-        F: Filter<V, Rv, Args>
-            + for<'a> Filter<<V as ArgType<'a>>::Output, Rv, <Args as FunctionArgs<'a>>::Output>,
-        V: for<'a> ArgType<'a>,
+        F: Filter<Rv, V, Args>
+            + for<'a> Filter<Rv, <V as ArgType<'a>>::Output, <Args as FunctionArgs<'a>>::Output>,
         Rv: FunctionResult,
+        V: for<'a> ArgType<'a>,
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFilter(Arc::new(
