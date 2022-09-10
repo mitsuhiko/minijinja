@@ -155,7 +155,7 @@ impl BoxedFunction {
     /// Creates a new boxed filter.
     pub fn new<F, Rv, Args>(f: F) -> BoxedFunction
     where
-        F: Function<Rv, Args> + for<'a> Function<Rv, <Args as FunctionArgs<'a>>::Output> + 'static,
+        F: Function<Rv, Args> + for<'a> Function<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {

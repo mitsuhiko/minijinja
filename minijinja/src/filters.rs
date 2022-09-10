@@ -181,8 +181,7 @@ impl BoxedFilter {
     pub fn new<F, V, Rv, Args>(f: F) -> BoxedFilter
     where
         F: Filter<V, Rv, Args>
-            + for<'a> Filter<<V as ArgType<'a>>::Output, Rv, <Args as FunctionArgs<'a>>::Output>
-            + 'static,
+            + for<'a> Filter<<V as ArgType<'a>>::Output, Rv, <Args as FunctionArgs<'a>>::Output>,
         V: for<'a> ArgType<'a>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,

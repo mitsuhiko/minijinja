@@ -368,7 +368,7 @@ impl<'source> Environment<'source> {
                 <V as ArgType<'a>>::Output,
                 Rv,
                 <Args as FunctionArgs<'a>>::Output,
-            > + 'static,
+            >,
         V: for<'a> ArgType<'a>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
@@ -389,8 +389,7 @@ impl<'source> Environment<'source> {
     pub fn add_test<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
     where
         F: tests::Test<V, Rv, Args>
-            + for<'a> tests::Test<<V as ArgType<'a>>::Output, Rv, <Args as FunctionArgs<'a>>::Output>
-            + 'static,
+            + for<'a> tests::Test<<V as ArgType<'a>>::Output, Rv, <Args as FunctionArgs<'a>>::Output>,
         V: for<'a> ArgType<'a>,
         Rv: tests::TestResult,
         Args: for<'a> FunctionArgs<'a>,
@@ -410,8 +409,7 @@ impl<'source> Environment<'source> {
     pub fn add_function<F, Rv, Args>(&mut self, name: &'source str, f: F)
     where
         F: functions::Function<Rv, Args>
-            + for<'a> functions::Function<Rv, <Args as FunctionArgs<'a>>::Output>
-            + 'static,
+            + for<'a> functions::Function<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {

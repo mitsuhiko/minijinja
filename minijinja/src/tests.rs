@@ -184,8 +184,7 @@ impl BoxedTest {
     pub fn new<F, V, Rv, Args>(f: F) -> BoxedTest
     where
         F: Test<V, Rv, Args>
-            + for<'a> Test<<V as ArgType<'a>>::Output, Rv, <Args as FunctionArgs<'a>>::Output>
-            + 'static,
+            + for<'a> Test<<V as ArgType<'a>>::Output, Rv, <Args as FunctionArgs<'a>>::Output>,
         V: for<'a> ArgType<'a>,
         Rv: TestResult,
         Args: for<'a> FunctionArgs<'a>,
