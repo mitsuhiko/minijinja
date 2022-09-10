@@ -42,10 +42,34 @@ impl<I: Into<Value>> FunctionResult for I {
 /// For each argument the conversion is performed via the [`ArgType`]
 /// trait which is implemented for many common types.
 pub trait FunctionArgs<'a> {
+    #[doc(hidden)]
     type Output;
 
     /// Converts to function arguments from a slice of values.
+    #[doc(hidden)]
     fn from_values(values: &'a [Value]) -> Result<Self::Output, Error>;
+}
+
+/// Utility function to convert a slice of values into arguments.
+///
+/// This performs the same conversion that [`Function`](crate::functions::Function)
+/// performs.  It exists so that you one can leverage the same functionality when
+/// implementing [`Object::call_method`](crate::value::Object::call_method).
+///
+/// ```
+/// use minijinja::value::parse_args;
+/// # use minijinja::value::Value;
+/// # fn foo() -> Result<(), minijinja::Error> {
+/// # let args = vec![Value::from("foo"), Value::from(42i64)]; let args = &args[..];
+/// let (string, num): (&str, i64) = parse_args(args)?;
+/// # Ok(()) } fn main() { foo().unwrap(); }
+/// ```
+#[inline(always)]
+pub fn parse_args<'a, Args>(values: &'a [Value]) -> Result<Args, Error>
+where
+    Args: FunctionArgs<'a, Output = Args>,
+{
+    Args::from_values(values)
 }
 
 /// A trait implemented by all filter/test argument types.
@@ -73,6 +97,7 @@ pub trait FunctionArgs<'a> {
 /// it's implemented for [`Rest<T>`] which is used to encode the remaining arguments
 /// of a function call.
 pub trait ArgType<'a> {
+    #[doc(hidden)]
     type Output;
 
     #[doc(hidden)]
