@@ -259,8 +259,8 @@ mod builtins {
     /// <h1>{{ chapter.title|upper }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn upper(_state: &State, v: Value) -> String {
-        v.to_cowstr().to_uppercase()
+    pub fn upper(_state: &State, v: Cow<'_, str>) -> String {
+        v.to_uppercase()
     }
 
     /// Converts a value to lowercase.
@@ -269,8 +269,8 @@ mod builtins {
     /// <h1>{{ chapter.title|lower }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn lower(_state: &State, v: Value) -> String {
-        v.to_cowstr().to_lowercase()
+    pub fn lower(_state: &State, v: Cow<'_, str>) -> String {
+        v.to_lowercase()
     }
 
     /// Converts a value to title case.
@@ -279,10 +279,10 @@ mod builtins {
     /// <h1>{{ chapter.title|title }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn title(_state: &State, v: Value) -> String {
+    pub fn title(_state: &State, v: Cow<'_, str>) -> String {
         let mut rv = String::new();
         let mut capitalize = true;
-        for c in v.to_cowstr().chars() {
+        for c in v.chars() {
             if c.is_ascii_punctuation() || c.is_whitespace() {
                 rv.push(c);
                 capitalize = true;
@@ -305,9 +305,13 @@ mod builtins {
     ///   -> Goodbye World
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn replace(_state: &State, v: Value, from: Value, to: Value) -> String {
-        v.to_cowstr()
-            .replace(&from.to_cowstr() as &str, &to.to_cowstr() as &str)
+    pub fn replace(
+        _state: &State,
+        v: Cow<'_, str>,
+        from: Cow<'_, str>,
+        to: Cow<'_, str>,
+    ) -> String {
+        v.replace(&from as &str, &to as &str)
     }
 
     /// Returns the "length" of the value
@@ -409,30 +413,30 @@ mod builtins {
 
     /// Trims a value
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn trim(_state: &State, s: Value, chars: Option<Value>) -> String {
+    pub fn trim(_state: &State, s: Cow<'_, str>, chars: Option<Cow<'_, str>>) -> String {
         match chars {
             Some(chars) => {
-                let chars = chars.to_cowstr().chars().collect::<Vec<_>>();
-                s.to_cowstr().trim_matches(&chars[..]).to_string()
+                let chars = chars.chars().collect::<Vec<_>>();
+                s.trim_matches(&chars[..]).to_string()
             }
-            None => s.to_cowstr().trim().to_string(),
+            None => s.trim().to_string(),
         }
     }
 
     /// Joins a sequence by a character
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn join(_state: &State, val: Value, joiner: Option<Value>) -> Result<String, Error> {
+    pub fn join(_state: &State, val: Value, joiner: Option<Cow<'_, str>>) -> Result<String, Error> {
         if val.is_undefined() || val.is_none() {
             return Ok(String::new());
         }
 
-        let joiner = joiner.as_ref().map_or(Cow::Borrowed(""), |x| x.to_cowstr());
+        let joiner = joiner.as_ref().unwrap_or(&Cow::Borrowed(""));
 
         if let Some(s) = val.as_str() {
             let mut rv = String::new();
             for c in s.chars() {
                 if !rv.is_empty() {
-                    rv.push_str(&joiner);
+                    rv.push_str(joiner);
                 }
                 rv.push(c);
             }
@@ -441,7 +445,7 @@ mod builtins {
             let mut rv = String::new();
             for item in val.as_slice()? {
                 if !rv.is_empty() {
-                    rv.push_str(&joiner);
+                    rv.push_str(joiner);
                 }
                 if let Some(s) = item.as_str() {
                     rv.push_str(s);

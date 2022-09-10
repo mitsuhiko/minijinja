@@ -78,8 +78,8 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 ///
 /// The parameters can be marked optional by using `Option<T>`.  The last
 /// argument can also use [`Rest<T>`](crate::value::Rest) to capture the
-/// remaining arguments.  All types are supported for which [`ArgType`] is
-/// implemented.
+/// remaining arguments.  All types are supported for which
+/// [`ArgType`](crate::value::ArgType) is implemented.
 ///
 /// For a list of built-in functions see [`functions`](crate::functions).
 ///

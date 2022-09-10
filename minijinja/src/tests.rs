@@ -212,6 +212,7 @@ impl BoxedTest {
 mod builtins {
     use super::*;
 
+    use std::borrow::Cow;
     use std::convert::TryFrom;
 
     use crate::value::ValueKind;
@@ -266,14 +267,14 @@ mod builtins {
 
     /// Checks if the value is starting with a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_startingwith(_state: &State, v: String, other: String) -> bool {
-        v.starts_with(&other)
+    pub fn is_startingwith(_state: &State, v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
+        v.starts_with(&other as &str)
     }
 
     /// Checks if the value is ending with a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_endingwith(_state: &State, v: String, other: String) -> bool {
-        v.ends_with(&other)
+    pub fn is_endingwith(_state: &State, v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
+        v.ends_with(&other as &str)
     }
 
     #[test]

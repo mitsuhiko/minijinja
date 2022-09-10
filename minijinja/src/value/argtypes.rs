@@ -58,9 +58,15 @@ pub trait FunctionArgs<'a> {
 /// * signed integers: [`i8`], [`i16`], [`i32`], [`i64`], [`i128`]
 /// * floats: [`f64`]
 /// * bool: [`bool`]
-/// * string: [`String`]
-/// * values: [`Value`]
-/// * vectors: [`Vec<T>`]
+/// * string: [`String`], [`&str`], `Cow<'_, str>`
+/// * values: [`Value`], `&Value`
+/// * vectors: [`Vec<T>`], `&[Value]`
+///
+/// Note on that there is an important difference between `String` and `&str`:
+/// the former will be valid for all values and an implicit conversion to string
+/// via [`ToString`] will take place, for the latter only values which are already
+/// strings will be passed.  A compromise between the two is `Cow<'_, str>` which
+/// will behave like `String` but borrows when possible.
 ///
 /// The type is also implemented for optional values (`Option<T>`) which is used
 /// to encode optional parameters to filters, functions or tests.  Additionally
@@ -270,22 +276,6 @@ macro_rules! primitive_try_from {
                 }
             }
         }
-
-        impl<'a> ArgType<'a> for Option<$ty> {
-            type Output = Self;
-            fn from_value(value: Option<&Value>) -> Result<Self, Error> {
-                match value {
-                    Some(value) => {
-                        if value.is_undefined() || value.is_none() {
-                            Ok(None)
-                        } else {
-                            TryFrom::try_from(value.clone()).map(Some)
-                        }
-                    }
-                    None => Ok(None),
-                }
-            }
-        }
     }
 }
 
@@ -326,11 +316,39 @@ primitive_try_from!(f64, {
 impl<'a> ArgType<'a> for &str {
     type Output = &'a str;
 
-    fn from_value(value: Option<&'a Value>) -> Result<&'a str, Error> {
+    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => value
                 .as_str()
                 .ok_or_else(|| Error::new(ErrorKind::ImpossibleOperation, "value is not a string")),
+            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+        }
+    }
+}
+
+impl<'a, T: ArgType<'a>> ArgType<'a> for Option<T> {
+    type Output = Option<T::Output>;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+        match value {
+            Some(value) => {
+                if value.is_undefined() || value.is_none() {
+                    Ok(None)
+                } else {
+                    T::from_value(Some(value)).map(Some)
+                }
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for Cow<'_, str> {
+    type Output = Cow<'a, str>;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Cow<'a, str>, Error> {
+        match value {
+            Some(value) => Ok(value.to_cowstr()),
             None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
         }
     }
@@ -342,6 +360,17 @@ impl<'a> ArgType<'a> for &Value {
     fn from_value(value: Option<&'a Value>) -> Result<&'a Value, Error> {
         match value {
             Some(value) => Ok(value),
+            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for &[Value] {
+    type Output = &'a [Value];
+
+    fn from_value(value: Option<&'a Value>) -> Result<&'a [Value], Error> {
+        match value {
+            Some(value) => Ok(value.as_slice()?),
             None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
         }
     }
@@ -415,23 +444,6 @@ impl<'a> ArgType<'a> for Value {
     }
 }
 
-impl<'a> ArgType<'a> for Option<Value> {
-    type Output = Self;
-
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        match value {
-            Some(value) => {
-                if value.is_undefined() || value.is_none() {
-                    Ok(None)
-                } else {
-                    Ok(Some(value.clone()))
-                }
-            }
-            None => Ok(None),
-        }
-    }
-}
-
 impl<'a> ArgType<'a> for String {
     type Output = Self;
 
@@ -439,23 +451,6 @@ impl<'a> ArgType<'a> for String {
         match value {
             Some(value) => Ok(value.to_string()),
             None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
-        }
-    }
-}
-
-impl<'a> ArgType<'a> for Option<String> {
-    type Output = Self;
-
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        match value {
-            Some(value) => {
-                if value.is_undefined() || value.is_none() {
-                    Ok(None)
-                } else {
-                    Ok(Some(value.to_string()))
-                }
-            }
-            None => Ok(None),
         }
     }
 }
