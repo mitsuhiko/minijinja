@@ -40,7 +40,8 @@ impl<I: Into<Value>> FunctionResult for I {
 /// arity of 4 parameters.
 ///
 /// For each argument the conversion is performed via the [`ArgType`]
-/// trait which is implemented for many common types.
+/// trait which is implemented for many common types.  For manual
+/// conversions the [`from_args`] utility should be used.
 pub trait FunctionArgs<'a> {
     type Output;
 
@@ -56,17 +57,17 @@ pub trait FunctionArgs<'a> {
 /// implementing [`Object::call_method`](crate::value::Object::call_method).
 ///
 /// ```
-/// use minijinja::value::parse_args;
+/// use minijinja::value::from_args;
 /// # use minijinja::value::Value;
 /// # fn foo() -> Result<(), minijinja::Error> {
 /// # let args = vec![Value::from("foo"), Value::from(42i64)]; let args = &args[..];
 ///
 /// // args is &[Value]
-/// let (string, num): (&str, i64) = parse_args(args)?;
+/// let (string, num): (&str, i64) = from_args(args)?;
 /// # Ok(()) } fn main() { foo().unwrap(); }
 /// ```
 #[inline(always)]
-pub fn parse_args<'a, Args>(values: &'a [Value]) -> Result<Args, Error>
+pub fn from_args<'a, Args>(values: &'a [Value]) -> Result<Args, Error>
 where
     Args: FunctionArgs<'a, Output = Args>,
 {
@@ -81,9 +82,9 @@ where
 ///
 /// * unsigned integers: [`u8`], [`u16`], [`u32`], [`u64`], [`u128`], [`usize`]
 /// * signed integers: [`i8`], [`i16`], [`i32`], [`i64`], [`i128`]
-/// * floats: [`f64`]
+/// * floats: [`f32`], [`f64`]
 /// * bool: [`bool`]
-/// * string: [`String`], [`&str`], `Cow<'_, str>`
+/// * string: [`String`], [`&str`], `Cow<'_, str>` ([`char`])
 /// * values: [`Value`], `&Value`
 /// * vectors: [`Vec<T>`], `&[Value]`
 ///
@@ -333,7 +334,12 @@ primitive_int_try_from!(usize);
 primitive_try_from!(bool, {
     ValueRepr::Bool(val) => val,
 });
-
+primitive_try_from!(char, {
+    ValueRepr::Char(val) => val,
+});
+primitive_try_from!(f32, {
+    ValueRepr::F64(val) => val as f32,
+});
 primitive_try_from!(f64, {
     ValueRepr::F64(val) => val,
 });

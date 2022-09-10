@@ -50,7 +50,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// error is generated if an invalid method is invoked.
     ///
     /// To convert the arguments into arguments use the
-    /// [`parse_args`](crate::value::parse_args) function.
+    /// [`from_args`](crate::value::from_args) function.
     fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         let _state = state;
         let _args = args;
@@ -66,7 +66,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// cannot be invoked.
     ///
     /// To convert the arguments into arguments use the
-    /// [`parse_args`](crate::value::parse_args) function.
+    /// [`from_args`](crate::value::from_args) function.
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         let _state = state;
         let _args = args;

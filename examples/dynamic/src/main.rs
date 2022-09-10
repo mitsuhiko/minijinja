@@ -2,7 +2,7 @@
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use minijinja::value::{parse_args, Object, Value};
+use minijinja::value::{from_args, Object, Value};
 use minijinja::{Environment, Error, State};
 
 #[derive(Debug)]
@@ -20,7 +20,7 @@ impl fmt::Display for Cycler {
 impl Object for Cycler {
     fn call(&self, _state: &State, args: &[Value]) -> Result<Value, Error> {
         // we don't want any args
-        parse_args(args)?;
+        from_args(args)?;
         let idx = self.idx.fetch_add(1, Ordering::Relaxed);
         Ok(self.values[idx % self.values.len()].clone())
     }
@@ -46,7 +46,7 @@ impl Object for Magic {
     fn call_method(&self, _state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         if name == "make_class" {
             // single string argument
-            let (tag,): (&str,) = parse_args(args)?;
+            let (tag,): (&str,) = from_args(args)?;
             Ok(Value::from(format!("magic-{}", tag)))
         } else {
             Err(Error::new(
