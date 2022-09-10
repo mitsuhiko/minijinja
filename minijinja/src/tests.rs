@@ -183,7 +183,9 @@ impl BoxedTest {
     /// Creates a new boxed filter.
     pub fn new<F, V, Rv, Args>(f: F) -> BoxedTest
     where
-        F: Test<V, Rv, Args>,
+        F: Test<V, Rv, Args>
+            + for<'a> Test<<V as ArgType<'a>>::Output, Rv, <Args as FunctionArgs<'a>>::Output>
+            + 'static,
         V: for<'a> ArgType<'a>,
         Rv: TestResult,
         Args: for<'a> FunctionArgs<'a>,
@@ -192,8 +194,8 @@ impl BoxedTest {
             let value = Some(value);
             f.perform(
                 state,
-                ArgType::from_value(value)?,
-                FunctionArgs::from_values(args)?,
+                V::from_value(value)?,
+                Args::from_values(args)?,
                 SealedMarker,
             )
             .into_result()

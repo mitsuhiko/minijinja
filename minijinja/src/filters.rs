@@ -160,7 +160,6 @@ macro_rules! tuple_impls {
             Func: Fn(&State, V, $($name),*) -> Rv + Send + Sync + 'static,
             V: for<'a> ArgType<'a>,
             Rv: FunctionResult,
-            $($name: for<'a> ArgType<'a>),*
         {
             fn apply_to(&self, state: &State, value: V, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
@@ -181,7 +180,9 @@ impl BoxedFilter {
     /// Creates a new boxed filter.
     pub fn new<F, V, Rv, Args>(f: F) -> BoxedFilter
     where
-        F: Filter<V, Rv, Args>,
+        F: Filter<V, Rv, Args>
+            + for<'a> Filter<<V as ArgType<'a>>::Output, Rv, <Args as FunctionArgs<'a>>::Output>
+            + 'static,
         V: for<'a> ArgType<'a>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
@@ -190,8 +191,8 @@ impl BoxedFilter {
             move |state, value, args| -> Result<Value, Error> {
                 f.apply_to(
                     state,
-                    ArgType::from_value(Some(value))?,
-                    FunctionArgs::from_values(args)?,
+                    V::from_value(Some(value))?,
+                    Args::from_values(args)?,
                     SealedMarker,
                 )
                 .into_result()

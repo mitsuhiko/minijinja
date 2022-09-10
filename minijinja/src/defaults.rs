@@ -118,6 +118,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, filters::BoxedFilt
             rv.insert("urlencode", BoxedFilter::new(filters::urlencode));
         }
     }
+
     rv
 }
 
@@ -151,5 +152,6 @@ pub(crate) fn get_globals() -> BTreeMap<&'static str, Value> {
         rv.insert("dict", BoxedFunction::new(functions::dict).to_value());
         rv.insert("debug", BoxedFunction::new(functions::debug).to_value());
     }
+
     rv
 }

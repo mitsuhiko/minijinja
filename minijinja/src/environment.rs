@@ -363,7 +363,12 @@ impl<'source> Environment<'source> {
     /// [`Filter`](crate::filters::Filter).
     pub fn add_filter<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
     where
-        F: filters::Filter<V, Rv, Args>,
+        F: filters::Filter<V, Rv, Args>
+            + for<'a> filters::Filter<
+                <V as ArgType<'a>>::Output,
+                Rv,
+                <Args as FunctionArgs<'a>>::Output,
+            > + 'static,
         V: for<'a> ArgType<'a>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
@@ -383,9 +388,11 @@ impl<'source> Environment<'source> {
     /// have a look at [`Test`](crate::tests::Test).
     pub fn add_test<F, V, Rv, Args>(&mut self, name: &'source str, f: F)
     where
+        F: tests::Test<V, Rv, Args>
+            + for<'a> tests::Test<<V as ArgType<'a>>::Output, Rv, <Args as FunctionArgs<'a>>::Output>
+            + 'static,
         V: for<'a> ArgType<'a>,
         Rv: tests::TestResult,
-        F: tests::Test<V, Rv, Args>,
         Args: for<'a> FunctionArgs<'a>,
     {
         self.tests.insert(name, tests::BoxedTest::new(f));
@@ -402,8 +409,10 @@ impl<'source> Environment<'source> {
     /// functions and other global variables share the same namespace.
     pub fn add_function<F, Rv, Args>(&mut self, name: &'source str, f: F)
     where
+        F: functions::Function<Rv, Args>
+            + for<'a> functions::Function<Rv, <Args as FunctionArgs<'a>>::Output>
+            + 'static,
         Rv: FunctionResult,
-        F: functions::Function<Rv, Args>,
         Args: for<'a> FunctionArgs<'a>,
     {
         self.add_global(name, functions::BoxedFunction::new(f).to_value());
