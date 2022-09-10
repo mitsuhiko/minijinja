@@ -42,7 +42,6 @@ impl<I: Into<Value>> FunctionResult for I {
 /// For each argument the conversion is performed via the [`ArgType`]
 /// trait which is implemented for many common types.
 pub trait FunctionArgs<'a> {
-    #[doc(hidden)]
     type Output;
 
     /// Converts to function arguments from a slice of values.
@@ -61,6 +60,8 @@ pub trait FunctionArgs<'a> {
 /// # use minijinja::value::Value;
 /// # fn foo() -> Result<(), minijinja::Error> {
 /// # let args = vec![Value::from("foo"), Value::from(42i64)]; let args = &args[..];
+///
+/// // args is &[Value]
 /// let (string, num): (&str, i64) = parse_args(args)?;
 /// # Ok(()) } fn main() { foo().unwrap(); }
 /// ```
@@ -97,7 +98,6 @@ where
 /// it's implemented for [`Rest<T>`] which is used to encode the remaining arguments
 /// of a function call.
 pub trait ArgType<'a> {
-    #[doc(hidden)]
     type Output;
 
     #[doc(hidden)]

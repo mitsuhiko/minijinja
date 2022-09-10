@@ -20,7 +20,7 @@ impl fmt::Display for Cycler {
 impl Object for Cycler {
     fn call(&self, _state: &State, args: &[Value]) -> Result<Value, Error> {
         // we don't want any args
-        parse_args::<()>(args)?;
+        parse_args(args)?;
         let idx = self.idx.fetch_add(1, Ordering::Relaxed);
         Ok(self.values[idx % self.values.len()].clone())
     }
