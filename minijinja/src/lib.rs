@@ -177,9 +177,9 @@ pub mod machinery {
     pub use crate::compiler::tokens::{Span, Token};
     pub use crate::vm::Vm;
 
-    use crate::{AutoEscape, Output};
+    use crate::Output;
 
-    pub fn make_string_output(s: &mut String, auto_escape: AutoEscape) -> Output<'_> {
-        Output::with_string(s, auto_escape)
+    pub fn make_string_output(s: &mut String) -> Output<'_> {
+        Output::with_string(s)
     }
 }

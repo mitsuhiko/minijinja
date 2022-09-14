@@ -57,10 +57,8 @@
 //! might change from one MiniJinja version to another.
 use std::sync::Arc;
 
-use crate::defaults::escape_formatter;
 use crate::error::Error;
-use crate::output::Output;
-use crate::utils::SealedMarker;
+use crate::utils::{write_escaped, SealedMarker};
 use crate::value::{FunctionArgs, FunctionResult, Value};
 use crate::vm::State;
 use crate::AutoEscape;
@@ -226,8 +224,7 @@ pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
         other => other,
     };
     let mut out = String::new();
-    let mut formatter = Output::with_string(&mut out, auto_escape);
-    escape_formatter(&mut formatter, &v)?;
+    write_escaped(&mut out, auto_escape, &v)?;
     Ok(Value::from_safe_string(out))
 }
 
