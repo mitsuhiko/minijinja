@@ -314,8 +314,7 @@ impl<'env> Vm<'env> {
                 Instruction::ApplyFilter(name) => {
                     let top = stack.pop();
                     let args = try_ctx!(top.as_slice());
-                    let value = stack.pop();
-                    stack.push(try_ctx!(state.apply_filter(name, &value, args)));
+                    stack.push(try_ctx!(state.apply_filter(name, args)));
                 }
                 Instruction::PerformTest(name) => {
                     let top = stack.pop();

@@ -61,11 +61,11 @@ use crate::defaults::escape_formatter;
 use crate::error::Error;
 use crate::output::Output;
 use crate::utils::SealedMarker;
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
+use crate::value::{FunctionArgs, FunctionResult, Value};
 use crate::vm::State;
 use crate::AutoEscape;
 
-type FilterFunc = dyn Fn(&State, &Value, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
+type FilterFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
 
 #[derive(Clone)]
 pub(crate) struct BoxedFilter(Arc<FilterFunc>);
@@ -147,24 +147,25 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// ```jinja
 /// {{ "|".join(1, 2, 3) }} -> 1|2|3
 /// ```
-pub trait Filter<Rv, V, Args>: Send + Sync + 'static {
+pub trait Filter<Rv, Args>: Send + Sync + 'static {
     /// Applies a filter to value with the given arguments.
+    ///
+    /// The value is always the first argument.
     #[doc(hidden)]
-    fn apply_to(&self, state: &State, value: V, args: Args, _: SealedMarker) -> Rv;
+    fn apply_to(&self, state: &State, args: Args, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<Func, Rv, V, $($name),*> Filter<Rv, V, ($($name,)*)> for Func
+        impl<Func, Rv, $($name),*> Filter<Rv, ($($name,)*)> for Func
         where
-            Func: Fn(&State, V, $($name),*) -> Rv + Send + Sync + 'static,
-            V: for<'a> ArgType<'a>,
+            Func: Fn(&State, $($name),*) -> Rv + Send + Sync + 'static,
             Rv: FunctionResult,
         {
-            fn apply_to(&self, state: &State, value: V, args: ($($name,)*), _: SealedMarker) -> Rv {
+            fn apply_to(&self, state: &State, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
-                (self)(state, value, $($name,)*)
+                (self)(state, $($name,)*)
             }
         }
     };
@@ -178,30 +179,21 @@ tuple_impls! { A B C D }
 
 impl BoxedFilter {
     /// Creates a new boxed filter.
-    pub fn new<F, Rv, V, Args>(f: F) -> BoxedFilter
+    pub fn new<F, Rv, Args>(f: F) -> BoxedFilter
     where
-        F: Filter<Rv, V, Args>
-            + for<'a> Filter<Rv, <V as ArgType<'a>>::Output, <Args as FunctionArgs<'a>>::Output>,
+        F: Filter<Rv, Args> + for<'a> Filter<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: FunctionResult,
-        V: for<'a> ArgType<'a>,
         Args: for<'a> FunctionArgs<'a>,
     {
-        BoxedFilter(Arc::new(
-            move |state, value, args| -> Result<Value, Error> {
-                f.apply_to(
-                    state,
-                    V::from_value(Some(value))?,
-                    Args::from_values(args)?,
-                    SealedMarker,
-                )
+        BoxedFilter(Arc::new(move |state, args| -> Result<Value, Error> {
+            f.apply_to(state, Args::from_values(args)?, SealedMarker)
                 .into_result()
-            },
-        ))
+        }))
     }
 
     /// Applies the filter to a value and argument.
-    pub fn apply_to(&self, state: &State, value: &Value, args: &[Value]) -> Result<Value, Error> {
-        (self.0)(state, value, args)
+    pub fn apply_to(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+        (self.0)(state, args)
     }
 }
 
@@ -809,7 +801,7 @@ mod builtins {
         State::with_dummy(&env, |state| {
             let bx = BoxedFilter::new(test);
             assert_eq!(
-                bx.apply_to(state, &Value::from(23), &[Value::from(42)][..])
+                bx.apply_to(state, &[Value::from(23), Value::from(42)][..])
                     .unwrap(),
                 Value::from(65)
             );
@@ -828,8 +820,12 @@ mod builtins {
             assert_eq!(
                 bx.apply_to(
                     state,
-                    &Value::from(1),
-                    &[Value::from(2), Value::from(3), Value::from(4)][..]
+                    &[
+                        Value::from(1),
+                        Value::from(2),
+                        Value::from(3),
+                        Value::from(4)
+                    ][..]
                 )
                 .unwrap(),
                 Value::from(1 + 2 + 3 + 4)
@@ -838,22 +834,10 @@ mod builtins {
     }
 
     #[test]
-    #[should_panic = "cannot collect remaining arguments in this argument position"]
-    fn test_incorrect_rest_args() {
-        fn sum(_: &State, _: crate::value::Rest<u32>) -> u32 {
-            panic!("should never happen");
-        }
-
-        let env = crate::Environment::new();
-        State::with_dummy(&env, |state| {
-            let bx = BoxedFilter::new(sum);
-            bx.apply_to(state, &Value::from(1), &[]).unwrap();
-        });
-    }
-
-    #[test]
     fn test_optional_args() {
         fn add(_: &State, val: u32, a: u32, b: Option<u32>) -> Result<u32, Error> {
+            // ensure we really get our value as first argument
+            assert_eq!(val, 23);
             let mut sum = val + a;
             if let Some(b) = b {
                 sum += b;
@@ -865,15 +849,14 @@ mod builtins {
         State::with_dummy(&env, |state| {
             let bx = BoxedFilter::new(add);
             assert_eq!(
-                bx.apply_to(state, &Value::from(23), &[Value::from(42)][..])
+                bx.apply_to(state, &[Value::from(23), Value::from(42)][..])
                     .unwrap(),
                 Value::from(65)
             );
             assert_eq!(
                 bx.apply_to(
                     state,
-                    &Value::from(23),
-                    &[Value::from(42), Value::UNDEFINED][..]
+                    &[Value::from(23), Value::from(42), Value::UNDEFINED][..]
                 )
                 .unwrap(),
                 Value::from(65)
@@ -881,8 +864,7 @@ mod builtins {
             assert_eq!(
                 bx.apply_to(
                     state,
-                    &Value::from(23),
-                    &[Value::from(42), Value::from(1)][..]
+                    &[Value::from(23), Value::from(42), Value::from(1)][..]
                 )
                 .unwrap(),
                 Value::from(66)

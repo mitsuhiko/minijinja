@@ -361,16 +361,11 @@ impl<'source> Environment<'source> {
     /// Filter functions are functions that can be applied to values in
     /// templates.  For details about filters have a look at
     /// [`Filter`](crate::filters::Filter).
-    pub fn add_filter<F, Rv, V, Args>(&mut self, name: &'source str, f: F)
+    pub fn add_filter<F, Rv, Args>(&mut self, name: &'source str, f: F)
     where
         // the crazy bounds here exist to enable borrowing in closures
-        F: filters::Filter<Rv, V, Args>
-            + for<'a> filters::Filter<
-                Rv,
-                <V as ArgType<'a>>::Output,
-                <Args as FunctionArgs<'a>>::Output,
-            >,
-        V: for<'a> ArgType<'a>,
+        F: filters::Filter<Rv, Args>
+            + for<'a> filters::Filter<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {

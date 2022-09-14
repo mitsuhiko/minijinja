@@ -446,10 +446,12 @@ impl<T> DerefMut for Rest<T> {
 impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
     type Output = Self;
 
-    fn from_value(_value: Option<&'a Value>) -> Result<Self, Error> {
-        Err(Error::new(
-            ErrorKind::ImpossibleOperation,
-            "cannot collect remaining arguments in this argument position",
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        Ok(Rest(
+            value
+                .iter()
+                .map(|v| T::from_value(Some(v)))
+                .collect::<Result<_, _>>()?,
         ))
     }
 

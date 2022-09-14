@@ -80,14 +80,9 @@ impl<'vm, 'env, 'out, 'buf> State<'vm, 'env, 'out, 'buf> {
         })
     }
 
-    pub(crate) fn apply_filter(
-        &self,
-        name: &str,
-        value: &Value,
-        args: &[Value],
-    ) -> Result<Value, Error> {
+    pub(crate) fn apply_filter(&self, name: &str, args: &[Value]) -> Result<Value, Error> {
         if let Some(filter) = self.env.get_filter(name) {
-            filter.apply_to(self, value, args)
+            filter.apply_to(self, args)
         } else {
             Err(Error::new(
                 ErrorKind::UnknownFilter,
