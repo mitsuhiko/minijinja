@@ -4,7 +4,7 @@ use std::fmt;
 use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::value::Value;
+use crate::value::{ArgType, Value};
 use crate::vm::context::Context;
 use crate::AutoEscape;
 
@@ -112,6 +112,27 @@ impl<'vm, 'env> State<'vm, 'env> {
             template_source: Some(instructions.source().to_string()),
             context: Some(Value::from(self.ctx.freeze(self.env))),
             referenced_names: Some(referenced_names.iter().map(|x| x.to_string()).collect()),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for &State<'_, '_> {
+    type Output = &'a State<'a, 'a>;
+
+    fn from_value(_value: Option<&'a Value>) -> Result<Self::Output, Error> {
+        Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            "cannot use state type in this position",
+        ))
+    }
+
+    fn from_state(state: Option<&'a State>) -> Result<Option<Self::Output>, Error> {
+        match state {
+            None => Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                "state unavailable",
+            )),
+            Some(state) => Ok(Some(state)),
         }
     }
 }

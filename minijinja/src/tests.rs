@@ -6,9 +6,9 @@
 //! [`is_odd`] test to check if the value is indeed an odd number.
 //!
 //! MiniJinja comes with some built-in test functions that are listed below. To
-//! create a custom test write a function that takes at least a
-//! [`&State`](crate::State) and value argument and returns a boolean
-//! result, then register it with [`add_filter`](crate::Environment::add_test).
+//! create a custom test write a function that takes at least a value argument
+//! that returns a boolean result, then register it with
+//! [`add_filter`](crate::Environment::add_test).
 //!
 //! # Using Tests
 //!
@@ -28,7 +28,7 @@
 //!
 //! # Custom Tests
 //!
-//! A custom test function is just a simple function which accepts [`State`] and
+//! A custom test function is just a simple function which accepts its
 //! inputs as parameters and then returns a bool. For instance the following
 //! shows a test function which takes an input value and checks if it's
 //! lowercase:
@@ -36,9 +36,7 @@
 //! ```
 //! # use minijinja::Environment;
 //! # let mut env = Environment::new();
-//! use minijinja::State;
-//!
-//! fn is_lowercase(_state: &State, value: String) -> bool {
+//! fn is_lowercase(value: String) -> bool {
 //!     value.chars().all(|x| x.is_lowercase())
 //! }
 //!
@@ -152,21 +150,21 @@ impl TestResult for bool {
 pub trait Test<Rv, Args>: Send + Sync + 'static {
     /// Performs a test to value with the given arguments.
     #[doc(hidden)]
-    fn perform(&self, state: &State, args: Args, _: SealedMarker) -> Rv;
+    fn perform(&self, args: Args, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
         impl<Func, Rv, $($name),*> Test<Rv, ($($name,)*)> for Func
         where
-            Func: Fn(&State, $($name),*) -> Rv + Send + Sync + 'static,
+            Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
             Rv: TestResult,
             $($name: for<'a> ArgType<'a>),*
         {
-            fn perform(&self, state: &State, args: ($($name,)*), _: SealedMarker) -> Rv {
+            fn perform(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
-                (self)(state, $($name,)*)
+                (self)($($name,)*)
             }
         }
     };
@@ -187,7 +185,7 @@ impl BoxedTest {
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedTest(Arc::new(move |state, args| -> Result<bool, Error> {
-            f.perform(state, Args::from_values(args)?, SealedMarker)
+            f.perform(Args::from_values(Some(state), args)?, SealedMarker)
                 .into_result()
         }))
     }

@@ -5,8 +5,7 @@
 //! invokes the filter `filter` with the arguments `42` and `23`.
 //!
 //! MiniJinja comes with some built-in filters that are listed below. To create a
-//! custom filter write a function that takes at least a
-//! [`&State`](crate::State) and value argument, then register it
+//! custom filter write a function that takes at least a value, then registers it
 //! with [`add_filter`](crate::Environment::add_filter).
 //!
 //! # Using Filters
@@ -28,7 +27,7 @@
 //!
 //! # Custom Filters
 //!
-//! A custom filter is just a simple function which accepts [`State`] and inputs
+//! A custom filter is just a simple function which accepts its inputs
 //! as parameters and then returns a new value.  For instance the following
 //! shows a filter which takes an input value and replaces whitespace with
 //! dashes and converts it to lowercase:
@@ -36,9 +35,7 @@
 //! ```
 //! # use minijinja::Environment;
 //! # let mut env = Environment::new();
-//! use minijinja::State;
-//!
-//! fn slugify(_state: &State, value: String) -> String {
+//! fn slugify(value: String) -> String {
 //!     value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-")
 //! }
 //!
@@ -47,6 +44,26 @@
 //!
 //! MiniJinja will perform the necessary conversions automatically.  For more
 //! information see the [`Filter`] trait.
+//!
+//! # Accessing State
+//!
+//! In some cases it can be necesary to access the execution [`State`].  Since a borrowed
+//! state implements [`ArgType`](crate::value::ArgType) it's possible to add a
+//! parameter that holds the state.  For instance the following filter appends
+//! the current template name to the string:
+//!
+//! ```
+//! # use minijinja::Environment;
+//! # let mut env = Environment::new();
+//! use minijinja::value::Value;
+//! use minijinja::State;
+//!
+//! fn append_template(state: &State, value: &Value) -> String {
+//!     format!("{}-{}", value, state.name())
+//! }
+//!
+//! env.add_filter("appendTemplate", append_template);
+//! ```
 //!
 //! # Built-in Filters
 //!
@@ -85,7 +102,7 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// applied to and up to 4 extra parameters.  The extra parameters can be
 /// marked optional by using `Option<T>`.  The last argument can also use
 /// [`Rest<T>`](crate::value::Rest) to capture the remaining arguments.  All
-/// types are supported for which [`ArgType`] is implemented.
+/// types are supported for which [`ArgType`](crate::value::ArgType) is implemented.
 ///
 /// For a list of built-in filters see [`filters`](crate::filters).
 ///
@@ -96,7 +113,7 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// # let mut env = Environment::new();
 /// use minijinja::State;
 ///
-/// fn slugify(_state: &State, value: String) -> String {
+/// fn slugify(value: String) -> String {
 ///     value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-")
 /// }
 ///
@@ -112,9 +129,7 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// ```
 /// # use minijinja::Environment;
 /// # let mut env = Environment::new();
-/// use minijinja::State;
-///
-/// fn substr(_state: &State, value: String, start: u32, end: Option<u32>) -> String {
+/// fn substr(value: String, start: u32, end: Option<u32>) -> String {
 ///     let end = end.unwrap_or(value.len() as _);
 ///     value.get(start as usize..end as usize).unwrap_or_default().into()
 /// }
@@ -132,10 +147,9 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// ```
 /// # use minijinja::Environment;
 /// # let mut env = Environment::new();
-/// use minijinja::State;
 /// use minijinja::value::Rest;
 ///
-/// fn pyjoin(_state: &State, joiner: String, values: Rest<String>) -> String {
+/// fn pyjoin(joiner: String, values: Rest<String>) -> String {
 ///     values.connect(&joiner)
 /// }
 ///
@@ -150,20 +164,20 @@ pub trait Filter<Rv, Args>: Send + Sync + 'static {
     ///
     /// The value is always the first argument.
     #[doc(hidden)]
-    fn apply_to(&self, state: &State, args: Args, _: SealedMarker) -> Rv;
+    fn apply_to(&self, args: Args, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
         impl<Func, Rv, $($name),*> Filter<Rv, ($($name,)*)> for Func
         where
-            Func: Fn(&State, $($name),*) -> Rv + Send + Sync + 'static,
+            Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
             Rv: FunctionResult,
         {
-            fn apply_to(&self, state: &State, args: ($($name,)*), _: SealedMarker) -> Rv {
+            fn apply_to(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
-                (self)(state, $($name,)*)
+                (self)($($name,)*)
             }
         }
     };
@@ -184,7 +198,7 @@ impl BoxedFilter {
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFilter(Arc::new(move |state, args| -> Result<Value, Error> {
-            f.apply_to(state, Args::from_values(args)?, SealedMarker)
+            f.apply_to(Args::from_values(Some(state), args)?, SealedMarker)
                 .into_result()
         }))
     }
