@@ -149,7 +149,7 @@ impl TestResult for bool {
 /// ```jinja
 /// {{ "foo" is containing("o") }} -> true
 /// ```
-pub trait Test<V, Rv, Args>: Send + Sync + 'static {
+pub trait Test<Rv, V, Args>: Send + Sync + 'static {
     /// Performs a test to value with the given arguments.
     #[doc(hidden)]
     fn perform(&self, state: &State, value: V, args: Args, _: SealedMarker) -> Rv;
@@ -157,11 +157,11 @@ pub trait Test<V, Rv, Args>: Send + Sync + 'static {
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<Func, V, Rv, $($name),*> Test<V, Rv, ($($name,)*)> for Func
+        impl<Func, Rv, V, $($name),*> Test<Rv, V, ($($name,)*)> for Func
         where
             Func: Fn(&State, V, $($name),*) -> Rv + Send + Sync + 'static,
-            V: for<'a> ArgType<'a>,
             Rv: TestResult,
+            V: for<'a> ArgType<'a>,
             $($name: for<'a> ArgType<'a>),*
         {
             fn perform(&self, state: &State, value: V, args: ($($name,)*), _: SealedMarker) -> Rv {
@@ -181,19 +181,20 @@ tuple_impls! { A B C D }
 
 impl BoxedTest {
     /// Creates a new boxed filter.
-    pub fn new<F, V, Rv, Args>(f: F) -> BoxedTest
+    pub fn new<F, Rv, V, Args>(f: F) -> BoxedTest
     where
-        F: Test<V, Rv, Args>,
-        V: for<'a> ArgType<'a>,
+        F: Test<Rv, V, Args>
+            + for<'a> Test<Rv, <V as ArgType<'a>>::Output, <Args as FunctionArgs<'a>>::Output>,
         Rv: TestResult,
+        V: for<'a> ArgType<'a>,
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedTest(Arc::new(move |state, value, args| -> Result<bool, Error> {
             let value = Some(value);
             f.perform(
                 state,
-                ArgType::from_value(value)?,
-                FunctionArgs::from_values(args)?,
+                V::from_value(value)?,
+                Args::from_values(args)?,
                 SealedMarker,
             )
             .into_result()
@@ -210,6 +211,7 @@ impl BoxedTest {
 mod builtins {
     use super::*;
 
+    use std::borrow::Cow;
     use std::convert::TryFrom;
 
     use crate::value::ValueKind;
@@ -264,14 +266,14 @@ mod builtins {
 
     /// Checks if the value is starting with a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_startingwith(_state: &State, v: String, other: String) -> bool {
-        v.starts_with(&other)
+    pub fn is_startingwith(_state: &State, v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
+        v.starts_with(&other as &str)
     }
 
     /// Checks if the value is ending with a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_endingwith(_state: &State, v: String, other: String) -> bool {
-        v.ends_with(&other)
+    pub fn is_endingwith(_state: &State, v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
+        v.ends_with(&other as &str)
     }
 
     #[test]

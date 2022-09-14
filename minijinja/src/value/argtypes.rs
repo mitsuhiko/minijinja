@@ -40,10 +40,38 @@ impl<I: Into<Value>> FunctionResult for I {
 /// arity of 4 parameters.
 ///
 /// For each argument the conversion is performed via the [`ArgType`]
-/// trait which is implemented for many common types.
-pub trait FunctionArgs<'a>: Sized {
+/// trait which is implemented for many common types.  For manual
+/// conversions the [`from_args`] utility should be used.
+pub trait FunctionArgs<'a> {
+    type Output;
+
     /// Converts to function arguments from a slice of values.
-    fn from_values(values: &'a [Value]) -> Result<Self, Error>;
+    #[doc(hidden)]
+    fn from_values(values: &'a [Value]) -> Result<Self::Output, Error>;
+}
+
+/// Utility function to convert a slice of values into arguments.
+///
+/// This performs the same conversion that [`Function`](crate::functions::Function)
+/// performs.  It exists so that you one can leverage the same functionality when
+/// implementing [`Object::call_method`](crate::value::Object::call_method).
+///
+/// ```
+/// use minijinja::value::from_args;
+/// # use minijinja::value::Value;
+/// # fn foo() -> Result<(), minijinja::Error> {
+/// # let args = vec![Value::from("foo"), Value::from(42i64)]; let args = &args[..];
+///
+/// // args is &[Value]
+/// let (string, num): (&str, i64) = from_args(args)?;
+/// # Ok(()) } fn main() { foo().unwrap(); }
+/// ```
+#[inline(always)]
+pub fn from_args<'a, Args>(values: &'a [Value]) -> Result<Args, Error>
+where
+    Args: FunctionArgs<'a, Output = Args>,
+{
+    Args::from_values(values)
 }
 
 /// A trait implemented by all filter/test argument types.
@@ -54,23 +82,31 @@ pub trait FunctionArgs<'a>: Sized {
 ///
 /// * unsigned integers: [`u8`], [`u16`], [`u32`], [`u64`], [`u128`], [`usize`]
 /// * signed integers: [`i8`], [`i16`], [`i32`], [`i64`], [`i128`]
-/// * floats: [`f64`]
+/// * floats: [`f32`], [`f64`]
 /// * bool: [`bool`]
-/// * string: [`String`]
-/// * values: [`Value`]
-/// * vectors: [`Vec<T>`]
+/// * string: [`String`], [`&str`], `Cow<'_, str>` ([`char`])
+/// * values: [`Value`], `&Value`
+/// * vectors: [`Vec<T>`], `&[Value]`
+///
+/// Note on that there is an important difference between `String` and `&str`:
+/// the former will be valid for all values and an implicit conversion to string
+/// via [`ToString`] will take place, for the latter only values which are already
+/// strings will be passed.  A compromise between the two is `Cow<'_, str>` which
+/// will behave like `String` but borrows when possible.
 ///
 /// The type is also implemented for optional values (`Option<T>`) which is used
 /// to encode optional parameters to filters, functions or tests.  Additionally
 /// it's implemented for [`Rest<T>`] which is used to encode the remaining arguments
 /// of a function call.
-pub trait ArgType<'a>: Sized {
+pub trait ArgType<'a> {
+    type Output;
+
     #[doc(hidden)]
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error>;
+    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error>;
 
     #[doc(hidden)]
     #[inline(always)]
-    fn from_rest_values(_values: &'a [Value]) -> Result<Option<Self>, Error> {
+    fn from_rest_values(_values: &'a [Value]) -> Result<Option<Self::Output>, Error> {
         Ok(None)
     }
 }
@@ -80,7 +116,9 @@ macro_rules! tuple_impls {
         impl<'a, $($name),*> FunctionArgs<'a> for ($($name,)*)
             where $($name: ArgType<'a>,)*
         {
-            fn from_values(values: &'a [Value]) -> Result<Self, Error> {
+            type Output = ($($name::Output,)*);
+
+            fn from_values(values: &'a [Value]) -> Result<Self::Output, Error> {
                 #![allow(non_snake_case, unused)]
                 let arg_count = 0 $(
                     + { let $name = (); 1 }
@@ -91,7 +129,7 @@ macro_rules! tuple_impls {
                     if let Some(rest) = $rest_name::from_rest_values(rest_values)? {
                         let mut idx = 0;
                         $(
-                            let $alt_name = ArgType::from_value(values.get(idx))?;
+                            let $alt_name = $alt_name::from_value(values.get(idx))?;
                             idx += 1;
                         )*
                         return Ok(( $($alt_name,)* rest ,));
@@ -107,7 +145,7 @@ macro_rules! tuple_impls {
                 {
                     let mut idx = 0;
                     $(
-                        let $name = ArgType::from_value(values.get(idx))?;
+                        let $name = $name::from_value(values.get(idx))?;
                         idx += 1;
                     )*
                     Ok(( $($name,)* ))
@@ -256,25 +294,11 @@ macro_rules! primitive_try_from {
         }
 
         impl<'a> ArgType<'a> for $ty {
+            type Output = Self;
             fn from_value(value: Option<&Value>) -> Result<Self, Error> {
                 match value {
                     Some(value) => TryFrom::try_from(value.clone()),
                     None => Err(Error::new(ErrorKind::UndefinedError, "missing argument"))
-                }
-            }
-        }
-
-        impl<'a> ArgType<'a> for Option<$ty> {
-            fn from_value(value: Option<&Value>) -> Result<Self, Error> {
-                match value {
-                    Some(value) => {
-                        if value.is_undefined() || value.is_none() {
-                            Ok(None)
-                        } else {
-                            TryFrom::try_from(value.clone()).map(Some)
-                        }
-                    }
-                    None => Ok(None),
                 }
             }
         }
@@ -310,10 +334,78 @@ primitive_int_try_from!(usize);
 primitive_try_from!(bool, {
     ValueRepr::Bool(val) => val,
 });
-
+primitive_try_from!(char, {
+    ValueRepr::Char(val) => val,
+});
+primitive_try_from!(f32, {
+    ValueRepr::F64(val) => val as f32,
+});
 primitive_try_from!(f64, {
     ValueRepr::F64(val) => val,
 });
+
+impl<'a> ArgType<'a> for &str {
+    type Output = &'a str;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+        match value {
+            Some(value) => value
+                .as_str()
+                .ok_or_else(|| Error::new(ErrorKind::ImpossibleOperation, "value is not a string")),
+            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+        }
+    }
+}
+
+impl<'a, T: ArgType<'a>> ArgType<'a> for Option<T> {
+    type Output = Option<T::Output>;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+        match value {
+            Some(value) => {
+                if value.is_undefined() || value.is_none() {
+                    Ok(None)
+                } else {
+                    T::from_value(Some(value)).map(Some)
+                }
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for Cow<'_, str> {
+    type Output = Cow<'a, str>;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Cow<'a, str>, Error> {
+        match value {
+            Some(value) => Ok(value.to_cowstr()),
+            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for &Value {
+    type Output = &'a Value;
+
+    fn from_value(value: Option<&'a Value>) -> Result<&'a Value, Error> {
+        match value {
+            Some(value) => Ok(value),
+            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for &[Value] {
+    type Output = &'a [Value];
+
+    fn from_value(value: Option<&'a Value>) -> Result<&'a [Value], Error> {
+        match value {
+            Some(value) => Ok(value.as_slice()?),
+            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+        }
+    }
+}
 
 /// Utility type to capture remaining arguments.
 ///
@@ -351,11 +443,15 @@ impl<T> DerefMut for Rest<T> {
     }
 }
 
-impl<'a, T: ArgType<'a>> ArgType<'a> for Rest<T> {
-    fn from_value(_value: Option<&'a Value>) -> Result<Self, Error> {
-        Err(Error::new(
-            ErrorKind::ImpossibleOperation,
-            "cannot collect remaining arguments in this argument position",
+impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
+    type Output = Self;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        Ok(Rest(
+            value
+                .iter()
+                .map(|v| T::from_value(Some(v)))
+                .collect::<Result<_, _>>()?,
         ))
     }
 
@@ -364,13 +460,15 @@ impl<'a, T: ArgType<'a>> ArgType<'a> for Rest<T> {
         Ok(Some(Rest(
             values
                 .iter()
-                .map(|v| ArgType::from_value(Some(v)))
+                .map(|v| T::from_value(Some(v)))
                 .collect::<Result<_, _>>()?,
         )))
     }
 }
 
 impl<'a> ArgType<'a> for Value {
+    type Output = Self;
+
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
             Some(value) => Ok(value.clone()),
@@ -379,41 +477,13 @@ impl<'a> ArgType<'a> for Value {
     }
 }
 
-impl<'a> ArgType<'a> for Option<Value> {
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        match value {
-            Some(value) => {
-                if value.is_undefined() || value.is_none() {
-                    Ok(None)
-                } else {
-                    Ok(Some(value.clone()))
-                }
-            }
-            None => Ok(None),
-        }
-    }
-}
-
 impl<'a> ArgType<'a> for String {
+    type Output = Self;
+
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
             Some(value) => Ok(value.to_string()),
             None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
-        }
-    }
-}
-
-impl<'a> ArgType<'a> for Option<String> {
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        match value {
-            Some(value) => {
-                if value.is_undefined() || value.is_none() {
-                    Ok(None)
-                } else {
-                    Ok(Some(value.to_string()))
-                }
-            }
-            None => Ok(None),
         }
     }
 }
@@ -430,7 +500,9 @@ impl From<usize> for Value {
     }
 }
 
-impl<'a, T: ArgType<'a>> ArgType<'a> for Vec<T> {
+impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
+    type Output = Self;
+
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
             None => Ok(Vec::new()),
@@ -438,7 +510,7 @@ impl<'a, T: ArgType<'a>> ArgType<'a> for Vec<T> {
                 let values = values.as_slice()?;
                 let mut rv = Vec::new();
                 for value in values {
-                    rv.push(ArgType::from_value(Some(value))?);
+                    rv.push(T::from_value(Some(value))?);
                 }
                 Ok(rv)
             }

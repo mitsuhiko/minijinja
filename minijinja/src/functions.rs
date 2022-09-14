@@ -53,7 +53,7 @@ use std::sync::Arc;
 
 use crate::error::Error;
 use crate::utils::SealedMarker;
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, Value};
+use crate::value::{FunctionArgs, FunctionResult, Object, Value};
 use crate::vm::State;
 
 type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
@@ -78,8 +78,8 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 ///
 /// The parameters can be marked optional by using `Option<T>`.  The last
 /// argument can also use [`Rest<T>`](crate::value::Rest) to capture the
-/// remaining arguments.  All types are supported for which [`ArgType`] is
-/// implemented.
+/// remaining arguments.  All types are supported for which
+/// [`ArgType`](crate::value::ArgType) is implemented.
 ///
 /// For a list of built-in functions see [`functions`](crate::functions).
 ///
@@ -135,7 +135,6 @@ macro_rules! tuple_impls {
         where
             Func: Fn(&State, $($name),*) -> Rv + Send + Sync + 'static,
             Rv: FunctionResult,
-            $($name: for<'a> ArgType<'a>),*
         {
             fn invoke(&self, state: &State, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
@@ -156,13 +155,13 @@ impl BoxedFunction {
     /// Creates a new boxed filter.
     pub fn new<F, Rv, Args>(f: F) -> BoxedFunction
     where
-        F: Function<Rv, Args>,
+        F: Function<Rv, Args> + for<'a> Function<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFunction(
-            Arc::new(move |env, args| -> Result<Value, Error> {
-                f.invoke(env, FunctionArgs::from_values(args)?, SealedMarker)
+            Arc::new(move |state, args| -> Result<Value, Error> {
+                f.invoke(state, Args::from_values(args)?, SealedMarker)
                     .into_result()
             }),
             std::any::type_name::<F>(),

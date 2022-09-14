@@ -83,7 +83,7 @@ use crate::utils::OnDrop;
 use crate::value::serialize::ValueSerializer;
 use crate::vm::State;
 
-pub use crate::value::argtypes::{ArgType, FunctionArgs, FunctionResult, Rest};
+pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Rest};
 pub use crate::value::object::Object;
 
 mod argtypes;

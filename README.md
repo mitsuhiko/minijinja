@@ -5,7 +5,7 @@
 [![Build Status](https://github.com/mitsuhiko/minijinja/workflows/Tests/badge.svg?branch=main)](https://github.com/mitsuhiko/minijinja/actions?query=workflow%3ATests)
 [![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
 [![Crates.io](https://img.shields.io/crates/d/minijinja.svg)](https://crates.io/crates/minijinja)
-[![rustc 1.45.0](https://img.shields.io/badge/rust-1.45%2B-orange.svg)](https://img.shields.io/badge/rust-1.45%2B-orange.svg)
+[![rustc 1.61.0](https://img.shields.io/badge/rust-1.61%2B-orange.svg)](https://img.shields.io/badge/rust-1.61%2B-orange.svg)
 [![Documentation](https://docs.rs/minijinja/badge.svg)](https://docs.rs/minijinja)
 
 </div>
@@ -63,9 +63,12 @@ fn main() {
 
 ## Minimum Rust Version
 
-MiniJinja supports Rust versions down to 1.45 at the moment.  For the order
-preservation feature Rust 1.49 is required as it uses the indexmap dependency
-which no longer supports older Rust versions.
+MiniJinja's development version requires Rust 1.61 due to limitations with
+HRTBs in older Rust versions.
+
+MiniJinja 0.20 supports Rust versions down to 1.45.  It is possible to write
+code that is compatible with both 0.20 and newer versions of MiniJinja which
+should make it possible to defer the upgrade to later.
 
 ## Sponsor
 

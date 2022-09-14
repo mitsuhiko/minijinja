@@ -61,11 +61,11 @@ use crate::defaults::escape_formatter;
 use crate::error::Error;
 use crate::output::Output;
 use crate::utils::SealedMarker;
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
+use crate::value::{FunctionArgs, FunctionResult, Value};
 use crate::vm::State;
 use crate::AutoEscape;
 
-type FilterFunc = dyn Fn(&State, &Value, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
+type FilterFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
 
 #[derive(Clone)]
 pub(crate) struct BoxedFilter(Arc<FilterFunc>);
@@ -147,25 +147,25 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// ```jinja
 /// {{ "|".join(1, 2, 3) }} -> 1|2|3
 /// ```
-pub trait Filter<V, Rv, Args>: Send + Sync + 'static {
+pub trait Filter<Rv, Args>: Send + Sync + 'static {
     /// Applies a filter to value with the given arguments.
+    ///
+    /// The value is always the first argument.
     #[doc(hidden)]
-    fn apply_to(&self, state: &State, value: V, args: Args, _: SealedMarker) -> Rv;
+    fn apply_to(&self, state: &State, args: Args, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<Func, V, Rv, $($name),*> Filter<V, Rv, ($($name,)*)> for Func
+        impl<Func, Rv, $($name),*> Filter<Rv, ($($name,)*)> for Func
         where
-            Func: Fn(&State, V, $($name),*) -> Rv + Send + Sync + 'static,
-            V: for<'a> ArgType<'a>,
+            Func: Fn(&State, $($name),*) -> Rv + Send + Sync + 'static,
             Rv: FunctionResult,
-            $($name: for<'a> ArgType<'a>),*
         {
-            fn apply_to(&self, state: &State, value: V, args: ($($name,)*), _: SealedMarker) -> Rv {
+            fn apply_to(&self, state: &State, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
-                (self)(state, value, $($name,)*)
+                (self)(state, $($name,)*)
             }
         }
     };
@@ -179,29 +179,21 @@ tuple_impls! { A B C D }
 
 impl BoxedFilter {
     /// Creates a new boxed filter.
-    pub fn new<F, V, Rv, Args>(f: F) -> BoxedFilter
+    pub fn new<F, Rv, Args>(f: F) -> BoxedFilter
     where
-        F: Filter<V, Rv, Args>,
-        V: for<'a> ArgType<'a>,
+        F: Filter<Rv, Args> + for<'a> Filter<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        BoxedFilter(Arc::new(
-            move |state, value, args| -> Result<Value, Error> {
-                f.apply_to(
-                    state,
-                    ArgType::from_value(Some(value))?,
-                    FunctionArgs::from_values(args)?,
-                    SealedMarker,
-                )
+        BoxedFilter(Arc::new(move |state, args| -> Result<Value, Error> {
+            f.apply_to(state, Args::from_values(args)?, SealedMarker)
                 .into_result()
-            },
-        ))
+        }))
     }
 
     /// Applies the filter to a value and argument.
-    pub fn apply_to(&self, state: &State, value: &Value, args: &[Value]) -> Result<Value, Error> {
-        (self.0)(state, value, args)
+    pub fn apply_to(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+        (self.0)(state, args)
     }
 }
 
@@ -258,8 +250,8 @@ mod builtins {
     /// <h1>{{ chapter.title|upper }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn upper(_state: &State, v: Value) -> String {
-        v.to_cowstr().to_uppercase()
+    pub fn upper(_state: &State, v: Cow<'_, str>) -> String {
+        v.to_uppercase()
     }
 
     /// Converts a value to lowercase.
@@ -268,8 +260,8 @@ mod builtins {
     /// <h1>{{ chapter.title|lower }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn lower(_state: &State, v: Value) -> String {
-        v.to_cowstr().to_lowercase()
+    pub fn lower(_state: &State, v: Cow<'_, str>) -> String {
+        v.to_lowercase()
     }
 
     /// Converts a value to title case.
@@ -278,10 +270,10 @@ mod builtins {
     /// <h1>{{ chapter.title|title }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn title(_state: &State, v: Value) -> String {
+    pub fn title(_state: &State, v: Cow<'_, str>) -> String {
         let mut rv = String::new();
         let mut capitalize = true;
-        for c in v.to_cowstr().chars() {
+        for c in v.chars() {
             if c.is_ascii_punctuation() || c.is_whitespace() {
                 rv.push(c);
                 capitalize = true;
@@ -304,9 +296,13 @@ mod builtins {
     ///   -> Goodbye World
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn replace(_state: &State, v: Value, from: Value, to: Value) -> String {
-        v.to_cowstr()
-            .replace(&from.to_cowstr() as &str, &to.to_cowstr() as &str)
+    pub fn replace(
+        _state: &State,
+        v: Cow<'_, str>,
+        from: Cow<'_, str>,
+        to: Cow<'_, str>,
+    ) -> String {
+        v.replace(&from as &str, &to as &str)
     }
 
     /// Returns the "length" of the value
@@ -408,30 +404,30 @@ mod builtins {
 
     /// Trims a value
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn trim(_state: &State, s: Value, chars: Option<Value>) -> String {
+    pub fn trim(_state: &State, s: Cow<'_, str>, chars: Option<Cow<'_, str>>) -> String {
         match chars {
             Some(chars) => {
-                let chars = chars.to_cowstr().chars().collect::<Vec<_>>();
-                s.to_cowstr().trim_matches(&chars[..]).to_string()
+                let chars = chars.chars().collect::<Vec<_>>();
+                s.trim_matches(&chars[..]).to_string()
             }
-            None => s.to_cowstr().trim().to_string(),
+            None => s.trim().to_string(),
         }
     }
 
     /// Joins a sequence by a character
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn join(_state: &State, val: Value, joiner: Option<Value>) -> Result<String, Error> {
+    pub fn join(_state: &State, val: Value, joiner: Option<Cow<'_, str>>) -> Result<String, Error> {
         if val.is_undefined() || val.is_none() {
             return Ok(String::new());
         }
 
-        let joiner = joiner.as_ref().map_or(Cow::Borrowed(""), |x| x.to_cowstr());
+        let joiner = joiner.as_ref().unwrap_or(&Cow::Borrowed(""));
 
         if let Some(s) = val.as_str() {
             let mut rv = String::new();
             for c in s.chars() {
                 if !rv.is_empty() {
-                    rv.push_str(&joiner);
+                    rv.push_str(joiner);
                 }
                 rv.push(c);
             }
@@ -440,7 +436,7 @@ mod builtins {
             let mut rv = String::new();
             for item in val.as_slice()? {
                 if !rv.is_empty() {
-                    rv.push_str(&joiner);
+                    rv.push_str(joiner);
                 }
                 if let Some(s) = item.as_str() {
                     rv.push_str(s);
@@ -805,7 +801,7 @@ mod builtins {
         State::with_dummy(&env, |state| {
             let bx = BoxedFilter::new(test);
             assert_eq!(
-                bx.apply_to(state, &Value::from(23), &[Value::from(42)][..])
+                bx.apply_to(state, &[Value::from(23), Value::from(42)][..])
                     .unwrap(),
                 Value::from(65)
             );
@@ -824,8 +820,12 @@ mod builtins {
             assert_eq!(
                 bx.apply_to(
                     state,
-                    &Value::from(1),
-                    &[Value::from(2), Value::from(3), Value::from(4)][..]
+                    &[
+                        Value::from(1),
+                        Value::from(2),
+                        Value::from(3),
+                        Value::from(4)
+                    ][..]
                 )
                 .unwrap(),
                 Value::from(1 + 2 + 3 + 4)
@@ -834,22 +834,10 @@ mod builtins {
     }
 
     #[test]
-    #[should_panic = "cannot collect remaining arguments in this argument position"]
-    fn test_incorrect_rest_args() {
-        fn sum(_: &State, _: crate::value::Rest<u32>) -> u32 {
-            panic!("should never happen");
-        }
-
-        let env = crate::Environment::new();
-        State::with_dummy(&env, |state| {
-            let bx = BoxedFilter::new(sum);
-            bx.apply_to(state, &Value::from(1), &[]).unwrap();
-        });
-    }
-
-    #[test]
     fn test_optional_args() {
         fn add(_: &State, val: u32, a: u32, b: Option<u32>) -> Result<u32, Error> {
+            // ensure we really get our value as first argument
+            assert_eq!(val, 23);
             let mut sum = val + a;
             if let Some(b) = b {
                 sum += b;
@@ -861,15 +849,14 @@ mod builtins {
         State::with_dummy(&env, |state| {
             let bx = BoxedFilter::new(add);
             assert_eq!(
-                bx.apply_to(state, &Value::from(23), &[Value::from(42)][..])
+                bx.apply_to(state, &[Value::from(23), Value::from(42)][..])
                     .unwrap(),
                 Value::from(65)
             );
             assert_eq!(
                 bx.apply_to(
                     state,
-                    &Value::from(23),
-                    &[Value::from(42), Value::UNDEFINED][..]
+                    &[Value::from(23), Value::from(42), Value::UNDEFINED][..]
                 )
                 .unwrap(),
                 Value::from(65)
@@ -877,8 +864,7 @@ mod builtins {
             assert_eq!(
                 bx.apply_to(
                     state,
-                    &Value::from(23),
-                    &[Value::from(42), Value::from(1)][..]
+                    &[Value::from(23), Value::from(42), Value::from(1)][..]
                 )
                 .unwrap(),
                 Value::from(66)
