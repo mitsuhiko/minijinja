@@ -91,14 +91,9 @@ impl<'vm, 'env, 'out, 'buf> State<'vm, 'env, 'out, 'buf> {
         }
     }
 
-    pub(crate) fn perform_test(
-        &self,
-        name: &str,
-        value: &Value,
-        args: &[Value],
-    ) -> Result<bool, Error> {
+    pub(crate) fn perform_test(&self, name: &str, args: &[Value]) -> Result<bool, Error> {
         if let Some(test) = self.env.get_test(name) {
-            test.perform(self, value, args)
+            test.perform(self, args)
         } else {
             Err(Error::new(
                 ErrorKind::UnknownTest,

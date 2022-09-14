@@ -62,7 +62,7 @@ use crate::utils::SealedMarker;
 use crate::value::{ArgType, FunctionArgs, Value};
 use crate::vm::State;
 
-type TestFunc = dyn Fn(&State, &Value, &[Value]) -> Result<bool, Error> + Sync + Send + 'static;
+type TestFunc = dyn Fn(&State, &[Value]) -> Result<bool, Error> + Sync + Send + 'static;
 
 #[derive(Clone)]
 pub(crate) struct BoxedTest(Arc<TestFunc>);
@@ -149,25 +149,24 @@ impl TestResult for bool {
 /// ```jinja
 /// {{ "foo" is containing("o") }} -> true
 /// ```
-pub trait Test<Rv, V, Args>: Send + Sync + 'static {
+pub trait Test<Rv, Args>: Send + Sync + 'static {
     /// Performs a test to value with the given arguments.
     #[doc(hidden)]
-    fn perform(&self, state: &State, value: V, args: Args, _: SealedMarker) -> Rv;
+    fn perform(&self, state: &State, args: Args, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<Func, Rv, V, $($name),*> Test<Rv, V, ($($name,)*)> for Func
+        impl<Func, Rv, $($name),*> Test<Rv, ($($name,)*)> for Func
         where
-            Func: Fn(&State, V, $($name),*) -> Rv + Send + Sync + 'static,
+            Func: Fn(&State, $($name),*) -> Rv + Send + Sync + 'static,
             Rv: TestResult,
-            V: for<'a> ArgType<'a>,
             $($name: for<'a> ArgType<'a>),*
         {
-            fn perform(&self, state: &State, value: V, args: ($($name,)*), _: SealedMarker) -> Rv {
+            fn perform(&self, state: &State, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
-                (self)(state, value, $($name,)*)
+                (self)(state, $($name,)*)
             }
         }
     };
@@ -181,29 +180,21 @@ tuple_impls! { A B C D }
 
 impl BoxedTest {
     /// Creates a new boxed filter.
-    pub fn new<F, Rv, V, Args>(f: F) -> BoxedTest
+    pub fn new<F, Rv, Args>(f: F) -> BoxedTest
     where
-        F: Test<Rv, V, Args>
-            + for<'a> Test<Rv, <V as ArgType<'a>>::Output, <Args as FunctionArgs<'a>>::Output>,
+        F: Test<Rv, Args> + for<'a> Test<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: TestResult,
-        V: for<'a> ArgType<'a>,
         Args: for<'a> FunctionArgs<'a>,
     {
-        BoxedTest(Arc::new(move |state, value, args| -> Result<bool, Error> {
-            let value = Some(value);
-            f.perform(
-                state,
-                V::from_value(value)?,
-                Args::from_values(args)?,
-                SealedMarker,
-            )
-            .into_result()
+        BoxedTest(Arc::new(move |state, args| -> Result<bool, Error> {
+            f.perform(state, Args::from_values(args)?, SealedMarker)
+                .into_result()
         }))
     }
 
     /// Applies the filter to a value and argument.
-    pub fn perform(&self, state: &State, value: &Value, args: &[Value]) -> Result<bool, Error> {
-        (self.0)(state, value, args)
+    pub fn perform(&self, state: &State, args: &[Value]) -> Result<bool, Error> {
+        (self.0)(state, args)
     }
 }
 
@@ -279,6 +270,7 @@ mod builtins {
     #[test]
     fn test_basics() {
         fn test(_: &State, a: u32, b: u32) -> bool {
+            assert_eq!(a, 23);
             a == b
         }
 
@@ -286,7 +278,7 @@ mod builtins {
         State::with_dummy(&env, |state| {
             let bx = BoxedTest::new(test);
             assert!(bx
-                .perform(state, &Value::from(23), &[Value::from(23)][..])
+                .perform(state, &[Value::from(23), Value::from(23)][..])
                 .unwrap());
         });
     }

@@ -421,7 +421,7 @@ impl<'source> CodeGenerator<'source> {
                 for arg in &f.args {
                     self.compile_expr(arg)?;
                 }
-                self.add(Instruction::BuildList(f.args.len()));
+                self.add(Instruction::BuildList(f.args.len() + 1));
                 self.add(Instruction::PerformTest(f.name));
             }
             ast::Expr::GetAttr(g) => {

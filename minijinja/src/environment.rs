@@ -11,7 +11,7 @@ use crate::expression::Expression;
 use crate::output::Output;
 use crate::template::{CompiledTemplate, Template};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug};
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
+use crate::value::{FunctionArgs, FunctionResult, Value};
 use crate::vm::Vm;
 use crate::{defaults, filters, functions, tests};
 
@@ -382,13 +382,11 @@ impl<'source> Environment<'source> {
     /// Test functions are similar to filters but perform a check on a value
     /// where the return value is always true or false.  For details about tests
     /// have a look at [`Test`](crate::tests::Test).
-    pub fn add_test<F, Rv, V, Args>(&mut self, name: &'source str, f: F)
+    pub fn add_test<F, Rv, Args>(&mut self, name: &'source str, f: F)
     where
         // the crazy bounds here exist to enable borrowing in closures
-        F: tests::Test<Rv, V, Args>
-            + for<'a> tests::Test<Rv, <V as ArgType<'a>>::Output, <Args as FunctionArgs<'a>>::Output>,
+        F: tests::Test<Rv, Args> + for<'a> tests::Test<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: tests::TestResult,
-        V: for<'a> ArgType<'a>,
         Args: for<'a> FunctionArgs<'a>,
     {
         self.tests.insert(name, tests::BoxedTest::new(f));

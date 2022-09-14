@@ -319,10 +319,7 @@ impl<'env> Vm<'env> {
                 Instruction::PerformTest(name) => {
                     let top = stack.pop();
                     let args = try_ctx!(top.as_slice());
-                    let value = stack.pop();
-                    stack.push(Value::from(
-                        try_ctx!(state.perform_test(name, &value, args)),
-                    ));
+                    stack.push(Value::from(try_ctx!(state.perform_test(name, args))));
                 }
                 Instruction::CallFunction(function_name) => {
                     let top = stack.pop();
