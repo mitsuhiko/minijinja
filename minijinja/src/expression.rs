@@ -44,7 +44,7 @@ impl<'env, 'source> fmt::Debug for Expression<'env, 'source> {
 }
 
 impl<'env, 'source> Expression<'env, 'source> {
-    pub fn new(
+    pub(crate) fn new(
         env: &'env Environment<'source>,
         instructions: Instructions<'source>,
     ) -> Expression<'env, 'source> {

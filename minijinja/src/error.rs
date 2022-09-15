@@ -70,30 +70,38 @@ impl fmt::Debug for Error {
 /// An enum describing the error kind.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ErrorKind {
-    InvalidSyntax,
+    /// A non primitive value was encountered where one was expected.
     NonPrimitive,
+    /// A value is not valid for a key in a map.
     NonKey,
+    /// An impossible operation was attempted.
     ImpossibleOperation,
-    InvalidOperation,
+    /// The template has a syntax error
     SyntaxError,
+    /// A template was not found.
     TemplateNotFound,
+    /// Invalid arguments to a function were passed
     InvalidArguments,
+    /// A filter is unknown
     UnknownFilter,
+    /// A test is unknown
     UnknownTest,
+    /// A bad escape sequence in a string was encountered.
     BadEscape,
+    /// An operation on an undefined value was attempted.
     UndefinedError,
+    /// Impossible to serialize this value.
     BadSerialization,
+    /// Failed writing output.
     WriteFailure,
 }
 
 impl ErrorKind {
     fn description(self) -> &'static str {
         match self {
-            ErrorKind::InvalidSyntax => "invalid syntax",
             ErrorKind::NonPrimitive => "not a primitive",
             ErrorKind::NonKey => "not a key type",
             ErrorKind::ImpossibleOperation => "impossible operation",
-            ErrorKind::InvalidOperation => "invalid operation",
             ErrorKind::SyntaxError => "syntax error",
             ErrorKind::TemplateNotFound => "template not found",
             ErrorKind::InvalidArguments => "invalid arguments",

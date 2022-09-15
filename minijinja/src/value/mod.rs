@@ -165,14 +165,23 @@ fn with_internal_serialization<R, F: FnOnce() -> R>(f: F) -> R {
 /// Describes the kind of value.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ValueKind {
+    /// The value is undefined
     Undefined,
+    /// The value is the none singleton ([`()`])
     None,
+    /// The value is a [`bool`]
     Bool,
+    /// The value is a number of a supported type.
     Number,
+    /// The value is a character.
     Char,
+    /// The value is a string.
     String,
+    /// The value is a byte array.
     Bytes,
+    /// The value is an array of other values.
     Seq,
+    /// The value is a key/value mapping.
     Map,
 }
 

@@ -44,6 +44,7 @@ impl<I: Into<Value>> FunctionResult for I {
 /// trait which is implemented for many common types.  For manual
 /// conversions the [`from_args`] utility should be used.
 pub trait FunctionArgs<'a> {
+    /// The output type of the function arguments.
     type Output;
 
     /// Converts to function arguments from a slice of values.
@@ -112,6 +113,7 @@ where
 /// a filter that takes `(&State, String)` actually only has one argument.  The
 /// state is passed implicitly.
 pub trait ArgType<'a> {
+    /// The output type of this argument.
     type Output;
 
     #[doc(hidden)]

@@ -140,6 +140,7 @@
 #![allow(clippy::cognitive_complexity)]
 #![allow(clippy::get_first)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![deny(missing_docs)]
 #![doc(html_logo_url = "https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo-square.png")]
 mod key;
 
@@ -185,6 +186,7 @@ pub use self::vm::State;
 #[cfg(feature = "unstable_machinery")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable_machinery")))]
 pub mod machinery {
+    #![allow(missing_docs)]
     pub use crate::compiler::ast;
     pub use crate::compiler::codegen::CodeGenerator;
     pub use crate::compiler::instructions::{Instruction, Instructions};

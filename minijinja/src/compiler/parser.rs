@@ -847,7 +847,7 @@ impl<'a> Parser<'a> {
             )));
         }
 
-        filter.ok_or_else(|| Error::new(ErrorKind::InvalidSyntax, "expected a filter"))
+        filter.ok_or_else(|| Error::new(ErrorKind::SyntaxError, "expected a filter"))
     }
 
     fn parse_filter_block(&mut self) -> Result<ast::FilterBlock<'a>, Error> {
