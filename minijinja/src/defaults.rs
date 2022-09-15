@@ -32,7 +32,7 @@ pub fn default_auto_escape_callback(name: &str) -> AutoEscape {
 /// The default formatter.
 ///
 /// This formatter takes a value and directly writes it into the output format
-/// while honoring the requested auto escape format of the output.  If the
+/// while honoring the requested auto escape format of the state.  If the
 /// value is already marked as safe, it's handled as if no auto escaping
 /// was requested.
 ///

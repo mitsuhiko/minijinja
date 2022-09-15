@@ -148,6 +148,7 @@ tuple_impls! { A }
 tuple_impls! { A B }
 tuple_impls! { A B C }
 tuple_impls! { A B C D }
+tuple_impls! { A B C D E }
 
 impl BoxedFunction {
     /// Creates a new boxed filter.
@@ -227,7 +228,7 @@ mod builtins {
     /// </ul>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn range(_state: &State, lower: u32, upper: Option<u32>, step: Option<u32>) -> Vec<u32> {
+    pub fn range(lower: u32, upper: Option<u32>, step: Option<u32>) -> Vec<u32> {
         let rng = match upper {
             Some(upper) => lower..upper,
             None => 0..lower,
@@ -251,7 +252,7 @@ mod builtins {
     /// )|tojson }};</script>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn dict(_state: &State, value: Value) -> Result<Value, Error> {
+    pub fn dict(value: Value) -> Result<Value, Error> {
         if value.is_undefined() {
             Ok(Value::from(BTreeMap::<bool, Value>::new()))
         } else if value.kind() != ValueKind::Map {

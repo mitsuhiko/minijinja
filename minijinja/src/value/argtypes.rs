@@ -38,7 +38,7 @@ impl<I: Into<Value>> FunctionResult for I {
 /// Since it's more convenient to write filters and tests with concrete
 /// types instead of values, this helper trait exists to automatically
 /// perform this conversion.  It is implemented for functions up to an
-/// arity of 4 parameters.
+/// arity of 5 parameters.
 ///
 /// For each argument the conversion is performed via the [`ArgType`]
 /// trait which is implemented for many common types.  For manual
@@ -67,6 +67,9 @@ pub trait FunctionArgs<'a> {
 /// let (string, num): (&str, i64) = from_args(args)?;
 /// # Ok(()) } fn main() { foo().unwrap(); }
 /// ```
+///
+/// Note that only value conversions are supported which means that `&State` is not
+/// a valid conversion type.
 #[inline(always)]
 pub fn from_args<'a, Args>(values: &'a [Value]) -> Result<Args, Error>
 where
@@ -115,72 +118,48 @@ pub trait ArgType<'a> {
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error>;
 
     #[doc(hidden)]
-    #[inline(always)]
-    fn from_rest_values(_values: &'a [Value]) -> Result<Option<Self::Output>, Error> {
-        Ok(None)
+    fn from_state_and_value(
+        _state: Option<&'a State>,
+        value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
+        Ok((Self::from_value(value)?, 1))
     }
 
     #[doc(hidden)]
-    fn from_state(_state: Option<&'a State>) -> Result<Option<Self::Output>, Error> {
-        Ok(None)
-    }
-}
-
-fn convert_value<'a, T>(
-    state: Option<&'a State>,
-    value: Option<&'a Value>,
-) -> Result<(T::Output, bool), Error>
-where
-    T: ArgType<'a>,
-{
-    if let Some(state) = T::from_state(state)? {
-        Ok((state, true))
-    } else {
-        T::from_value(value).map(|x| (x, false))
+    #[inline(always)]
+    fn from_state_and_values(
+        state: Option<&'a State>,
+        values: &'a [Value],
+        offset: usize,
+    ) -> Result<(Self::Output, usize), Error> {
+        Self::from_state_and_value(state, values.get(offset))
     }
 }
 
 macro_rules! tuple_impls {
-    ( $( $name:ident )* $(* $rest_name:ident)? ) => {
-        impl<'a, $($name,)* $($rest_name)*> FunctionArgs<'a> for ($($name,)* $($rest_name)*,)
-            where $($name: ArgType<'a>,)* $($rest_name: ArgType<'a>)*
+    ( $( $name:ident )* * $rest_name:ident ) => {
+        impl<'a, $($name,)* $rest_name> FunctionArgs<'a> for ($($name,)* $rest_name,)
+            where $($name: ArgType<'a>,)* $rest_name: ArgType<'a>
         {
-            type Output = ($($name::Output,)* $($rest_name::Output)* ,);
+            type Output = ($($name::Output,)* $rest_name::Output ,);
 
             fn from_values(state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
                 #![allow(non_snake_case, unused)]
-                let arg_count = 0 $(
-                    + { let $name = (); 1 }
-                )*;
-
                 let mut idx = 0;
                 $(
-                    let ($name, was_state) = convert_value::<$name>(state, values.get(idx))?;
-                    if !was_state {
-                        idx += 1;
-                    }
+                    let ($name, offset) = $name::from_state_and_value(state, values.get(idx))?;
+                    idx += offset;
                 )*
-                $(
-                    let rest_values = &values.get(idx..).unwrap_or_default();
-                    let $rest_name =
-                    if let Some(rest) = $rest_name::from_rest_values(rest_values)? {
-                        idx = arg_count;
-                        rest
-                    } else {
-                        let (tmp, was_state) = convert_value::<$rest_name>(state, values.get(idx))?;
-                        if !was_state {
-                            idx += 1;
-                        }
-                        tmp
-                    };
-                )*
-                if arg_count > idx {
-                    return Err(Error::new(
+                let ($rest_name, offset) = $rest_name::from_state_and_values(state, values, idx)?;
+                idx += offset;
+                if values.get(idx).is_some() {
+                    Err(Error::new(
                         ErrorKind::InvalidArguments,
                         "received unexpected extra arguments",
-                    ));
+                    ))
+                } else {
+                    Ok(( $($name,)* $rest_name,))
                 }
-                Ok(( $($name,)* $($rest_name)*,))
             }
         }
     };
@@ -205,6 +184,7 @@ tuple_impls! { *A }
 tuple_impls! { A *B }
 tuple_impls! { A B *C }
 tuple_impls! { A B C *D }
+tuple_impls! { A B C D *E }
 
 impl From<ValueRepr> for Value {
     #[inline(always)]
@@ -392,6 +372,7 @@ primitive_try_from!(f64, {
 impl<'a> ArgType<'a> for &str {
     type Output = &'a str;
 
+    #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => value
@@ -422,6 +403,7 @@ impl<'a, T: ArgType<'a>> ArgType<'a> for Option<T> {
 impl<'a> ArgType<'a> for Cow<'_, str> {
     type Output = Cow<'a, str>;
 
+    #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<Cow<'a, str>, Error> {
         match value {
             Some(value) => Ok(value.to_cowstr()),
@@ -433,6 +415,7 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
 impl<'a> ArgType<'a> for &Value {
     type Output = &'a Value;
 
+    #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<&'a Value, Error> {
         match value {
             Some(value) => Ok(value),
@@ -444,6 +427,7 @@ impl<'a> ArgType<'a> for &Value {
 impl<'a> ArgType<'a> for &[Value] {
     type Output = &'a [Value];
 
+    #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<&'a [Value], Error> {
         match value {
             Some(value) => Ok(value.as_slice()?),
@@ -501,13 +485,20 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
     }
 
     #[inline(always)]
-    fn from_rest_values(values: &'a [Value]) -> Result<Option<Self>, Error> {
-        Ok(Some(Rest(
-            values
-                .iter()
-                .map(|v| T::from_value(Some(v)))
-                .collect::<Result<_, _>>()?,
-        )))
+    fn from_state_and_values(
+        _state: Option<&'a State>,
+        values: &'a [Value],
+        offset: usize,
+    ) -> Result<(Self, usize), Error> {
+        let args = values.get(offset..).unwrap_or_default();
+        Ok((
+            Rest(
+                args.iter()
+                    .map(|v| T::from_value(Some(v)))
+                    .collect::<Result<_, _>>()?,
+            ),
+            args.len(),
+        ))
     }
 }
 

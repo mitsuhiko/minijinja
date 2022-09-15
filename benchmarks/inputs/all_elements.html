@@ -10,7 +10,7 @@
     <nav>
       <ul class="nav">
         {% for item in site.nav %}
-          <li><a href="{{ item.url }}"{% if item.is_active %} class="active"{% endif %}>{{ item.title }}</a>
+          <li><a href="{{ item.url }}"{% if item.is_active %} class="active"{% endif %}>{{ item.title|upper }}</a>
         {% endfor %}
       </ul>
     </nav>
@@ -19,7 +19,7 @@
     {% block body %}
       <ul>
       {% for item in items %}
-        <li>{{ loop.index }}: {{ item }}</li>
+        <li>{{ loop.index }}: {{ item|upper }}</li>
       {% endfor %}
       </ul>
     {% endblock %}

@@ -119,7 +119,7 @@ impl TestResult for bool {
 /// # let mut env = Environment::new();
 /// use minijinja::State;
 ///
-/// fn is_lowercase(_state: &State, value: String) -> bool {
+/// fn is_lowercase(value: String) -> bool {
 ///     value.chars().all(|x| x.is_lowercase())
 /// }
 ///
@@ -137,7 +137,7 @@ impl TestResult for bool {
 /// # let mut env = Environment::new();
 /// use minijinja::State;
 ///
-/// fn is_containing(_state: &State, value: String, other: String) -> bool {
+/// fn is_containing(value: String, other: String) -> bool {
 ///     value.contains(&other)
 /// }
 ///
@@ -175,6 +175,7 @@ tuple_impls! { A }
 tuple_impls! { A B }
 tuple_impls! { A B C }
 tuple_impls! { A B C D }
+tuple_impls! { A B C D E }
 
 impl BoxedTest {
     /// Creates a new boxed filter.
@@ -207,61 +208,61 @@ mod builtins {
 
     /// Checks if a value is odd.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_odd(_state: &State, v: Value) -> bool {
+    pub fn is_odd(v: Value) -> bool {
         i128::try_from(v).ok().map_or(false, |x| x % 2 != 0)
     }
 
     /// Checks if a value is even.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_even(_state: &State, v: Value) -> bool {
+    pub fn is_even(v: Value) -> bool {
         i128::try_from(v).ok().map_or(false, |x| x % 2 == 0)
     }
 
     /// Checks if a value is undefined.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_undefined(_state: &State, v: Value) -> bool {
+    pub fn is_undefined(v: Value) -> bool {
         v.is_undefined()
     }
 
     /// Checks if a value is defined.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_defined(_state: &State, v: Value) -> bool {
+    pub fn is_defined(v: Value) -> bool {
         !v.is_undefined()
     }
 
     /// Checks if this value is a number.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_number(_state: &State, v: Value) -> bool {
+    pub fn is_number(v: Value) -> bool {
         matches!(v.kind(), ValueKind::Number)
     }
 
     /// Checks if this value is a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_string(_state: &State, v: Value) -> bool {
+    pub fn is_string(v: Value) -> bool {
         matches!(v.kind(), ValueKind::String)
     }
 
     /// Checks if this value is a sequence
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_sequence(_state: &State, v: Value) -> bool {
+    pub fn is_sequence(v: Value) -> bool {
         matches!(v.kind(), ValueKind::Seq)
     }
 
     /// Checks if this value is a mapping
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_mapping(_state: &State, v: Value) -> bool {
+    pub fn is_mapping(v: Value) -> bool {
         matches!(v.kind(), ValueKind::Map)
     }
 
     /// Checks if the value is starting with a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_startingwith(_state: &State, v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
+    pub fn is_startingwith(v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
         v.starts_with(&other as &str)
     }
 
     /// Checks if the value is ending with a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_endingwith(_state: &State, v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
+    pub fn is_endingwith(v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
         v.ends_with(&other as &str)
     }
 

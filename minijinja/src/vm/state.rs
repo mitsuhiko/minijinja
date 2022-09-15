@@ -126,13 +126,16 @@ impl<'a> ArgType<'a> for &State<'_, '_> {
         ))
     }
 
-    fn from_state(state: Option<&'a State>) -> Result<Option<Self::Output>, Error> {
+    fn from_state_and_value(
+        state: Option<&'a State>,
+        _value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
         match state {
             None => Err(Error::new(
                 ErrorKind::ImpossibleOperation,
                 "state unavailable",
             )),
-            Some(state) => Ok(Some(state)),
+            Some(state) => Ok((state, 0)),
         }
     }
 }

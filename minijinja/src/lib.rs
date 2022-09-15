@@ -72,6 +72,22 @@
 //! This becomes particularly powerful when [dynamic objects](crate::value::Object) are
 //! exposed to templates.
 //!
+//! # Custom Filters
+//!
+//! ```
+//! use minijinja::{Environment, context};
+//!
+//! let mut env = Environment::new();
+//! env.add_filter("repeat", str::repeat);
+//! env.add_template("hello", "{{ 'Na '|repeat(3) }} {{ name }}!").unwrap();
+//! let tmpl = env.get_template("hello").unwrap();
+//! println!("{}", tmpl.render(context!(name => "Batman")).unwrap());
+//! ```
+//!
+//! ```plain
+//! Na Na Na Batman!
+//! ```
+//!
 //! # Learn more
 //!
 //! - [`Environment`]: the main API entry point.  Teaches you how to configure the environment.

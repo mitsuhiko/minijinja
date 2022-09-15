@@ -9,11 +9,6 @@ use crate::value::Value;
 /// can write into an [`std::fmt::Write`] value.  It's primarily used internally
 /// in the engine but it's also passed to the custom formatter function.
 pub struct Output<'a> {
-    // Note on type design: this type partially exists so that in the future non
-    // string outputs can be implemented.  Right now only the null writer exists
-    // as alternative which is also infallible.  If writing to io::Write should
-    // be added, then errors would need to be collected out of bounds as
-    // fmt::Error has no support for carrying actual IO errors.
     w: &'a mut (dyn fmt::Write + 'a),
     capture_stack: Vec<String>,
 }
@@ -59,6 +54,7 @@ impl<'a> Output<'a> {
         }
     }
 
+    #[inline(always)]
     fn target(&mut self) -> &mut dyn fmt::Write {
         match self.capture_stack.last_mut() {
             Some(stream) => stream as _,

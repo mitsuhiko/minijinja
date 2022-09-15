@@ -6,6 +6,7 @@ use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
 use crate::value::{Value, ValueKind};
+use crate::Output;
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -23,7 +24,7 @@ pub fn memstr(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         .position(|window| window == needle)
 }
 
-fn write_with_html_escaping(out: &mut dyn fmt::Write, value: &Value) -> fmt::Result {
+fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
     if matches!(
         value.kind(),
         ValueKind::Undefined | ValueKind::None | ValueKind::Bool | ValueKind::Number
@@ -36,8 +37,9 @@ fn write_with_html_escaping(out: &mut dyn fmt::Write, value: &Value) -> fmt::Res
     }
 }
 
+#[inline(always)]
 pub fn write_escaped(
-    out: &mut dyn fmt::Write,
+    out: &mut Output,
     auto_escape: AutoEscape,
     value: &Value,
 ) -> Result<(), Error> {

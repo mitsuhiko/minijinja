@@ -126,7 +126,7 @@ impl<'env> Vm<'env> {
                 Instruction::EmitRaw(val) => {
                     // this only produces a format error, no need to attach
                     // location information.
-                    write!(out, "{}", val)?;
+                    out.write_str(val)?;
                 }
                 Instruction::Emit => {
                     try_ctx!(self.env.format(&stack.pop(), state, out));
