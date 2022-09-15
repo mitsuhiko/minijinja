@@ -5,8 +5,7 @@
 //! invokes the filter `filter` with the arguments `42` and `23`.
 //!
 //! MiniJinja comes with some built-in filters that are listed below. To create a
-//! custom filter write a function that takes at least a
-//! [`&State`](crate::State) and value argument, then register it
+//! custom filter write a function that takes at least a value, then registers it
 //! with [`add_filter`](crate::Environment::add_filter).
 //!
 //! # Using Filters
@@ -28,7 +27,7 @@
 //!
 //! # Custom Filters
 //!
-//! A custom filter is just a simple function which accepts [`State`] and inputs
+//! A custom filter is just a simple function which accepts its inputs
 //! as parameters and then returns a new value.  For instance the following
 //! shows a filter which takes an input value and replaces whitespace with
 //! dashes and converts it to lowercase:
@@ -36,9 +35,7 @@
 //! ```
 //! # use minijinja::Environment;
 //! # let mut env = Environment::new();
-//! use minijinja::State;
-//!
-//! fn slugify(_state: &State, value: String) -> String {
+//! fn slugify(value: String) -> String {
 //!     value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-")
 //! }
 //!
@@ -47,6 +44,26 @@
 //!
 //! MiniJinja will perform the necessary conversions automatically.  For more
 //! information see the [`Filter`] trait.
+//!
+//! # Accessing State
+//!
+//! In some cases it can be necesary to access the execution [`State`].  Since a borrowed
+//! state implements [`ArgType`](crate::value::ArgType) it's possible to add a
+//! parameter that holds the state.  For instance the following filter appends
+//! the current template name to the string:
+//!
+//! ```
+//! # use minijinja::Environment;
+//! # let mut env = Environment::new();
+//! use minijinja::value::Value;
+//! use minijinja::State;
+//!
+//! fn append_template(state: &State, value: &Value) -> String {
+//!     format!("{}-{}", value, state.name())
+//! }
+//!
+//! env.add_filter("appendTemplate", append_template);
+//! ```
 //!
 //! # Built-in Filters
 //!
@@ -57,13 +74,11 @@
 //! might change from one MiniJinja version to another.
 use std::sync::Arc;
 
-use crate::defaults::escape_formatter;
 use crate::error::Error;
-use crate::output::Output;
-use crate::utils::SealedMarker;
+use crate::utils::{write_escaped, SealedMarker};
 use crate::value::{FunctionArgs, FunctionResult, Value};
 use crate::vm::State;
-use crate::AutoEscape;
+use crate::{AutoEscape, Output};
 
 type FilterFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
 
@@ -87,7 +102,7 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// applied to and up to 4 extra parameters.  The extra parameters can be
 /// marked optional by using `Option<T>`.  The last argument can also use
 /// [`Rest<T>`](crate::value::Rest) to capture the remaining arguments.  All
-/// types are supported for which [`ArgType`] is implemented.
+/// types are supported for which [`ArgType`](crate::value::ArgType) is implemented.
 ///
 /// For a list of built-in filters see [`filters`](crate::filters).
 ///
@@ -98,7 +113,7 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// # let mut env = Environment::new();
 /// use minijinja::State;
 ///
-/// fn slugify(_state: &State, value: String) -> String {
+/// fn slugify(value: String) -> String {
 ///     value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-")
 /// }
 ///
@@ -114,9 +129,7 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// ```
 /// # use minijinja::Environment;
 /// # let mut env = Environment::new();
-/// use minijinja::State;
-///
-/// fn substr(_state: &State, value: String, start: u32, end: Option<u32>) -> String {
+/// fn substr(value: String, start: u32, end: Option<u32>) -> String {
 ///     let end = end.unwrap_or(value.len() as _);
 ///     value.get(start as usize..end as usize).unwrap_or_default().into()
 /// }
@@ -134,10 +147,9 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// ```
 /// # use minijinja::Environment;
 /// # let mut env = Environment::new();
-/// use minijinja::State;
 /// use minijinja::value::Rest;
 ///
-/// fn pyjoin(_state: &State, joiner: String, values: Rest<String>) -> String {
+/// fn pyjoin(joiner: String, values: Rest<String>) -> String {
 ///     values.connect(&joiner)
 /// }
 ///
@@ -152,20 +164,20 @@ pub trait Filter<Rv, Args>: Send + Sync + 'static {
     ///
     /// The value is always the first argument.
     #[doc(hidden)]
-    fn apply_to(&self, state: &State, args: Args, _: SealedMarker) -> Rv;
+    fn apply_to(&self, args: Args, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
         impl<Func, Rv, $($name),*> Filter<Rv, ($($name,)*)> for Func
         where
-            Func: Fn(&State, $($name),*) -> Rv + Send + Sync + 'static,
+            Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
             Rv: FunctionResult,
         {
-            fn apply_to(&self, state: &State, args: ($($name,)*), _: SealedMarker) -> Rv {
+            fn apply_to(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
-                (self)(state, $($name,)*)
+                (self)($($name,)*)
             }
         }
     };
@@ -176,6 +188,7 @@ tuple_impls! { A }
 tuple_impls! { A B }
 tuple_impls! { A B C }
 tuple_impls! { A B C D }
+tuple_impls! { A B C D E }
 
 impl BoxedFilter {
     /// Creates a new boxed filter.
@@ -186,7 +199,7 @@ impl BoxedFilter {
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFilter(Arc::new(move |state, args| -> Result<Value, Error> {
-            f.apply_to(state, Args::from_values(args)?, SealedMarker)
+            f.apply_to(Args::from_values(Some(state), args)?, SealedMarker)
                 .into_result()
         }))
     }
@@ -200,7 +213,7 @@ impl BoxedFilter {
 /// Marks a value as safe.  This converts it into a string.
 ///
 /// When a value is marked as safe, no further auto escaping will take place.
-pub fn safe(_state: &State, v: String) -> Value {
+pub fn safe(v: String) -> Value {
     Value::from_safe_string(v)
 }
 
@@ -225,10 +238,10 @@ pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
         },
         other => other,
     };
-    let mut out = String::new();
-    let mut formatter = Output::with_string(&mut out, auto_escape);
-    escape_formatter(&mut formatter, &v)?;
-    Ok(Value::from_safe_string(out))
+    let mut rv = String::new();
+    let mut out = Output::with_string(&mut rv);
+    write_escaped(&mut out, auto_escape, &v)?;
+    Ok(Value::from_safe_string(rv))
 }
 
 #[cfg(feature = "builtins")]
@@ -250,7 +263,7 @@ mod builtins {
     /// <h1>{{ chapter.title|upper }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn upper(_state: &State, v: Cow<'_, str>) -> String {
+    pub fn upper(v: Cow<'_, str>) -> String {
         v.to_uppercase()
     }
 
@@ -260,7 +273,7 @@ mod builtins {
     /// <h1>{{ chapter.title|lower }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn lower(_state: &State, v: Cow<'_, str>) -> String {
+    pub fn lower(v: Cow<'_, str>) -> String {
         v.to_lowercase()
     }
 
@@ -270,7 +283,7 @@ mod builtins {
     /// <h1>{{ chapter.title|title }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn title(_state: &State, v: Cow<'_, str>) -> String {
+    pub fn title(v: Cow<'_, str>) -> String {
         let mut rv = String::new();
         let mut capitalize = true;
         for c in v.chars() {
@@ -313,7 +326,7 @@ mod builtins {
     /// <p>Search results: {{ results|length }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn length(_state: &State, v: Value) -> Result<usize, Error> {
+    pub fn length(v: Value) -> Result<usize, Error> {
         v.len().ok_or_else(|| {
             Error::new(
                 ErrorKind::ImpossibleOperation,
@@ -326,7 +339,7 @@ mod builtins {
     ///
     /// This filter works like `|items` but sorts the pairs by key first.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn dictsort(_state: &State, v: Value) -> Result<Value, Error> {
+    pub fn dictsort(v: Value) -> Result<Value, Error> {
         let mut pairs = match v.0 {
             ValueRepr::Map(ref v) => v.iter().collect::<Vec<_>>(),
             _ => {
@@ -363,7 +376,7 @@ mod builtins {
     /// </dl>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn items(_state: &State, v: Value) -> Result<Value, Error> {
+    pub fn items(v: Value) -> Result<Value, Error> {
         Ok(Value::from(
             match v.0 {
                 ValueRepr::Map(ref v) => v.iter(),
@@ -387,7 +400,7 @@ mod builtins {
     /// {% endfor %}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn reverse(_state: &State, v: Value) -> Result<Value, Error> {
+    pub fn reverse(v: Value) -> Result<Value, Error> {
         if let Some(s) = v.as_str() {
             Ok(Value::from(s.chars().rev().collect::<String>()))
         } else if matches!(v.kind(), ValueKind::Seq) {
@@ -404,7 +417,7 @@ mod builtins {
 
     /// Trims a value
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn trim(_state: &State, s: Cow<'_, str>, chars: Option<Cow<'_, str>>) -> String {
+    pub fn trim(s: Cow<'_, str>, chars: Option<Cow<'_, str>>) -> String {
         match chars {
             Some(chars) => {
                 let chars = chars.chars().collect::<Vec<_>>();
@@ -416,7 +429,7 @@ mod builtins {
 
     /// Joins a sequence by a character
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn join(_state: &State, val: Value, joiner: Option<Cow<'_, str>>) -> Result<String, Error> {
+    pub fn join(val: Value, joiner: Option<Cow<'_, str>>) -> Result<String, Error> {
         if val.is_undefined() || val.is_none() {
             return Ok(String::new());
         }
@@ -460,7 +473,7 @@ mod builtins {
     /// <p>{{ my_variable|default("my_variable was not defined") }}</p>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn default(_: &State, value: Value, other: Option<Value>) -> Value {
+    pub fn default(value: Value, other: Option<Value>) -> Value {
         if value.is_undefined() {
             other.unwrap_or_else(|| Value::from(""))
         } else {
@@ -475,7 +488,7 @@ mod builtins {
     ///   -> |2 - 4| = 2
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn abs(_: &State, value: Value) -> Result<Value, Error> {
+    pub fn abs(value: Value) -> Result<Value, Error> {
         match value.0 {
             ValueRepr::I64(x) => Ok(Value::from(x.abs())),
             ValueRepr::I128(x) => Ok(Value::from(x.abs())),
@@ -497,7 +510,7 @@ mod builtins {
     ///   -> 43.0
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn round(_: &State, value: Value, precision: Option<i32>) -> Result<Value, Error> {
+    pub fn round(value: Value, precision: Option<i32>) -> Result<Value, Error> {
         match value.0 {
             ValueRepr::I64(_) | ValueRepr::I128(_) => Ok(value),
             ValueRepr::F64(val) => {
@@ -522,7 +535,7 @@ mod builtins {
     /// </dl>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn first(_: &State, value: Value) -> Result<Value, Error> {
+    pub fn first(value: Value) -> Result<Value, Error> {
         match value.0 {
             ValueRepr::String(s) | ValueRepr::SafeString(s) => {
                 Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
@@ -551,7 +564,7 @@ mod builtins {
     /// {% endwith %}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn last(_: &State, value: Value) -> Result<Value, Error> {
+    pub fn last(value: Value) -> Result<Value, Error> {
         match value.0 {
             ValueRepr::String(s) | ValueRepr::SafeString(s) => {
                 Ok(s.chars().rev().next().map_or(Value::UNDEFINED, Value::from))
@@ -571,7 +584,7 @@ mod builtins {
     /// string this returns the characters.  If the value is undefined
     /// an empty list is returned.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn list(_: &State, value: Value) -> Result<Value, Error> {
+    pub fn list(value: Value) -> Result<Value, Error> {
         match &value.0 {
             ValueRepr::Undefined => Ok(Value::from(Vec::<Value>::new())),
             ValueRepr::String(ref s) | ValueRepr::SafeString(ref s) => {
@@ -595,7 +608,7 @@ mod builtins {
     /// This behaves the same as the if statement does with regards to
     /// handling of boolean values.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn bool(_: &State, value: Value) -> bool {
+    pub fn bool(value: Value) -> bool {
         value.is_true()
     }
 
@@ -620,12 +633,7 @@ mod builtins {
     /// If you pass it a second argument it’s used to fill missing values on the
     /// last iteration.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn slice(
-        _: &State,
-        value: Value,
-        count: usize,
-        fill_with: Option<Value>,
-    ) -> Result<Value, Error> {
+    pub fn slice(value: Value, count: usize, fill_with: Option<Value>) -> Result<Value, Error> {
         let items = value.try_iter()?.collect::<Vec<_>>();
         let len = items.len();
         let items_per_slice = len / count;
@@ -674,12 +682,7 @@ mod builtins {
     /// </table>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn batch(
-        _: &State,
-        value: Value,
-        count: usize,
-        fill_with: Option<Value>,
-    ) -> Result<Value, Error> {
+    pub fn batch(value: Value, count: usize, fill_with: Option<Value>) -> Result<Value, Error> {
         let mut rv = Vec::new();
         let mut tmp = Vec::with_capacity(count);
 
@@ -722,7 +725,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "json"))))]
     #[cfg(feature = "json")]
-    pub fn tojson(_: &State, value: Value, pretty: Option<bool>) -> Result<Value, Error> {
+    pub fn tojson(value: Value, pretty: Option<bool>) -> Result<Value, Error> {
         if pretty.unwrap_or(false) {
             serde_json::to_string_pretty(&value)
         } else {
@@ -758,7 +761,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "urlencode"))))]
     #[cfg(feature = "urlencode")]
-    pub fn urlencode(_: &State, value: Value) -> Result<String, Error> {
+    pub fn urlencode(value: Value) -> Result<String, Error> {
         const SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
             .remove(b'/')
             .remove(b'.')
@@ -793,7 +796,7 @@ mod builtins {
 
     #[test]
     fn test_basics() {
-        fn test(_: &State, a: u32, b: u32) -> Result<u32, Error> {
+        fn test(a: u32, b: u32) -> Result<u32, Error> {
             Ok(a + b)
         }
 
@@ -810,7 +813,7 @@ mod builtins {
 
     #[test]
     fn test_rest_args() {
-        fn sum(_: &State, val: u32, rest: crate::value::Rest<u32>) -> u32 {
+        fn sum(val: u32, rest: crate::value::Rest<u32>) -> u32 {
             rest.iter().fold(val, |a, b| a + b)
         }
 
@@ -835,7 +838,7 @@ mod builtins {
 
     #[test]
     fn test_optional_args() {
-        fn add(_: &State, val: u32, a: u32, b: Option<u32>) -> Result<u32, Error> {
+        fn add(val: u32, a: u32, b: Option<u32>) -> Result<u32, Error> {
             // ensure we really get our value as first argument
             assert_eq!(val, 23);
             let mut sum = val + a;

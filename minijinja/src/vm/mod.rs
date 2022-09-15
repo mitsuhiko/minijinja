@@ -39,6 +39,7 @@ impl<'env> Vm<'env> {
         root: Value,
         blocks: &BTreeMap<&'env str, Instructions<'env>>,
         out: &mut Output,
+        auto_escape: AutoEscape,
     ) -> Result<Option<Value>, Error> {
         let mut ctx = Context::default();
         ctx.push_frame(Frame::new(FrameBase::Value(root)));
@@ -47,20 +48,27 @@ impl<'env> Vm<'env> {
             referenced_blocks.insert(name, vec![instr]);
         }
         value::with_value_optimization(|| {
-            self.eval_state(&mut State {
-                env: self.env,
-                ctx,
-                current_block: None,
-                instructions,
+            self.eval_state(
+                &mut State {
+                    env: self.env,
+                    ctx,
+                    current_block: None,
+                    instructions,
+                    auto_escape,
+                    blocks: referenced_blocks,
+                },
                 out,
-                blocks: referenced_blocks,
-            })
+            )
         })
     }
 
     /// This is the actual evaluation loop that works with a specific context.
-    fn eval_state(&self, state: &mut State<'_, 'env, '_, '_>) -> Result<Option<Value>, Error> {
-        let initial_auto_escape = state.out.auto_escape;
+    fn eval_state(
+        &self,
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
+    ) -> Result<Option<Value>, Error> {
+        let initial_auto_escape = state.auto_escape;
         let mut stack = Stack::default();
         let mut auto_escape_stack = vec![];
         let mut next_loop_recursion_jump = None;
@@ -106,7 +114,7 @@ impl<'env> Vm<'env> {
                 // to.
                 next_loop_recursion_jump = Some((pc + 1, $capture));
                 if $capture {
-                    state.out.begin_capture();
+                    out.begin_capture();
                 }
                 pc = jump_target;
                 continue;
@@ -118,10 +126,10 @@ impl<'env> Vm<'env> {
                 Instruction::EmitRaw(val) => {
                     // this only produces a format error, no need to attach
                     // location information.
-                    write!(state.out, "{}", val)?;
+                    out.write_str(val)?;
                 }
                 Instruction::Emit => {
-                    try_ctx!(self.env.format(&stack.pop(), state.out));
+                    try_ctx!(self.env.format(&stack.pop(), state, out));
                 }
                 Instruction::StoreLocal(name) => {
                     state.ctx.store(name, stack.pop());
@@ -213,7 +221,7 @@ impl<'env> Vm<'env> {
                         {
                             pc = target;
                             if end_capture {
-                                stack.push(state.out.end_capture());
+                                stack.push(out.end_capture(state.auto_escape));
                             }
                             continue;
                         }
@@ -272,7 +280,7 @@ impl<'env> Vm<'env> {
                     state.current_block = Some(name);
                     if let Some(layers) = state.blocks.get(name) {
                         let instructions = layers.first().unwrap();
-                        try_ctx!(self.sub_eval(state, instructions, state.blocks.clone()));
+                        try_ctx!(self.sub_eval(state, out, instructions, state.blocks.clone()));
                     } else {
                         bail!(Error::new(
                             ErrorKind::ImpossibleOperation,
@@ -294,22 +302,22 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::Include(ignore_missing) => {
                     let name = stack.pop();
-                    try_ctx!(self.perform_include(name, state, *ignore_missing));
+                    try_ctx!(self.perform_include(name, state, out, *ignore_missing));
                 }
                 Instruction::PushAutoEscape => {
                     let value = stack.pop();
-                    auto_escape_stack.push(state.out.auto_escape);
-                    state.out.auto_escape =
+                    auto_escape_stack.push(state.auto_escape);
+                    state.auto_escape =
                         try_ctx!(self.derive_auto_escape(value, initial_auto_escape));
                 }
                 Instruction::PopAutoEscape => {
-                    state.out.auto_escape = auto_escape_stack.pop().unwrap();
+                    state.auto_escape = auto_escape_stack.pop().unwrap();
                 }
                 Instruction::BeginCapture => {
-                    state.out.begin_capture();
+                    out.begin_capture();
                 }
                 Instruction::EndCapture => {
-                    stack.push(state.out.end_capture());
+                    stack.push(out.end_capture(state.auto_escape));
                 }
                 Instruction::ApplyFilter(name) => {
                     let top = stack.pop();
@@ -332,7 +340,7 @@ impl<'env> Vm<'env> {
                                 "super() takes no arguments",
                             ));
                         }
-                        stack.push(try_ctx!(self.perform_super(state, true)));
+                        stack.push(try_ctx!(self.perform_super(state, out, true)));
                     // loop is a special name which when called recurses the current loop.
                     } else if *function_name == "loop" {
                         if args.len() != 1 {
@@ -371,7 +379,7 @@ impl<'env> Vm<'env> {
                     stack.pop();
                 }
                 Instruction::FastSuper => {
-                    try_ctx!(self.perform_super(state, false));
+                    try_ctx!(self.perform_super(state, out, false));
                 }
                 Instruction::FastRecurse => {
                     recurse_loop!(false);
@@ -386,7 +394,8 @@ impl<'env> Vm<'env> {
     fn perform_include(
         &self,
         name: Value,
-        state: &mut State<'_, 'env, '_, '_>,
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
         ignore_missing: bool,
     ) -> Result<(), Error> {
         let choices = if let ValueRepr::Seq(ref choices) = name.0 {
@@ -418,10 +427,10 @@ impl<'env> Vm<'env> {
             for (&name, instr) in tmpl.blocks().iter() {
                 referenced_blocks.insert(name, vec![instr]);
             }
-            let original_escape = state.out.auto_escape;
-            state.out.auto_escape = tmpl.initial_auto_escape();
-            self.sub_eval(state, instructions, referenced_blocks)?;
-            state.out.auto_escape = original_escape;
+            let original_escape = state.auto_escape;
+            state.auto_escape = tmpl.initial_auto_escape();
+            self.sub_eval(state, out, instructions, referenced_blocks)?;
+            state.auto_escape = original_escape;
             return Ok(());
         }
         if !templates_tried.is_empty() && !ignore_missing {
@@ -446,7 +455,8 @@ impl<'env> Vm<'env> {
 
     fn perform_super(
         &self,
-        state: &mut State<'_, 'env, '_, '_>,
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
         capture: bool,
     ) -> Result<Value, Error> {
         let mut inner_blocks = state.blocks.clone();
@@ -464,11 +474,11 @@ impl<'env> Vm<'env> {
             layers.remove(0);
             let instructions = layers.first().unwrap();
             if capture {
-                state.out.begin_capture();
+                out.begin_capture();
             }
-            self.sub_eval(state, instructions, state.blocks.clone())?;
+            self.sub_eval(state, out, instructions, state.blocks.clone())?;
             if capture {
-                Ok(state.out.end_capture())
+                Ok(out.end_capture(state.auto_escape))
             } else {
                 Ok(Value::UNDEFINED)
             }
@@ -495,7 +505,7 @@ impl<'env> Vm<'env> {
         }
     }
 
-    fn load_blocks(&self, name: Value, state: &mut State<'_, 'env, '_, '_>) -> Result<(), Error> {
+    fn load_blocks(&self, name: Value, state: &mut State<'_, 'env>) -> Result<(), Error> {
         let tmpl = name
             .as_str()
             .ok_or_else(|| {
@@ -540,7 +550,7 @@ impl<'env> Vm<'env> {
 
     fn push_loop(
         &self,
-        state: &mut State<'_, 'env, '_, '_>,
+        state: &mut State<'_, 'env>,
         iterable: Value,
         flags: u8,
         pc: usize,
@@ -599,20 +609,24 @@ impl<'env> Vm<'env> {
 
     fn sub_eval(
         &self,
-        state: &mut State<'_, 'env, '_, '_>,
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
         instructions: &Instructions<'env>,
         blocks: BTreeMap<&'env str, Vec<&'_ Instructions<'env>>>,
     ) -> Result<(), Error> {
         let mut sub_context = Context::default();
         sub_context.push_frame(Frame::new(FrameBase::Context(&state.ctx)));
-        self.eval_state(&mut State {
-            env: self.env,
-            ctx: sub_context,
-            current_block: state.current_block,
-            out: state.out,
-            instructions,
-            blocks,
-        })?;
+        self.eval_state(
+            &mut State {
+                env: self.env,
+                ctx: sub_context,
+                current_block: state.current_block,
+                auto_escape: state.auto_escape,
+                instructions,
+                blocks,
+            },
+            out,
+        )?;
         Ok(())
     }
 }

@@ -18,8 +18,7 @@
 //!
 //! # Custom Functions
 //!
-//! A custom global function is just a simple rust function which accepts the
-//! [`&State`](crate::State) as first argument, optionally some additional
+//! A custom global function is just a simple rust function which accepts optional
 //! arguments and then returns a result.  Global functions are typically used to
 //! perform a data loading operation.  For instance these functions can be used
 //! to expose data to the template that hasn't been provided by the individual
@@ -28,9 +27,9 @@
 //! ```rust
 //! # use minijinja::Environment;
 //! # let mut env = Environment::new();
-//! use minijinja::{State, Error, ErrorKind};
+//! use minijinja::{Error, ErrorKind};
 //!
-//! fn include_file(_state: &State, name: String) -> Result<String, Error> {
+//! fn include_file(name: String) -> Result<String, Error> {
 //!     std::fs::read_to_string(&name)
 //!         .map_err(|e| Error::new(
 //!             ErrorKind::ImpossibleOperation,
@@ -88,9 +87,9 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 /// ```rust
 /// # use minijinja::Environment;
 /// # let mut env = Environment::new();
-/// use minijinja::{State, Error, ErrorKind};
+/// use minijinja::{Error, ErrorKind};
 ///
-/// fn include_file(_state: &State, name: String) -> Result<String, Error> {
+/// fn include_file(name: String) -> Result<String, Error> {
 ///     std::fs::read_to_string(&name)
 ///         .map_err(|e| Error::new(
 ///             ErrorKind::ImpossibleOperation,
@@ -110,10 +109,9 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 /// ```
 /// # use minijinja::Environment;
 /// # let mut env = Environment::new();
-/// use minijinja::State;
 /// use minijinja::value::Rest;
 ///
-/// fn sum(_state: &State, values: Rest<i64>) -> i64 {
+/// fn sum(values: Rest<i64>) -> i64 {
 ///     values.iter().sum()
 /// }
 ///
@@ -126,20 +124,20 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 pub trait Function<Rv, Args>: Send + Sync + 'static {
     /// Calls a function with the given arguments.
     #[doc(hidden)]
-    fn invoke(&self, env: &State, args: Args, _: SealedMarker) -> Rv;
+    fn invoke(&self, args: Args, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
         impl<Func, Rv, $($name),*> Function<Rv, ($($name,)*)> for Func
         where
-            Func: Fn(&State, $($name),*) -> Rv + Send + Sync + 'static,
+            Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
             Rv: FunctionResult,
         {
-            fn invoke(&self, state: &State, args: ($($name,)*), _: SealedMarker) -> Rv {
+            fn invoke(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
-                (self)(state, $($name,)*)
+                (self)($($name,)*)
             }
         }
     };
@@ -150,6 +148,7 @@ tuple_impls! { A }
 tuple_impls! { A B }
 tuple_impls! { A B C }
 tuple_impls! { A B C D }
+tuple_impls! { A B C D E }
 
 impl BoxedFunction {
     /// Creates a new boxed filter.
@@ -161,7 +160,7 @@ impl BoxedFunction {
     {
         BoxedFunction(
             Arc::new(move |state, args| -> Result<Value, Error> {
-                f.invoke(state, Args::from_values(args)?, SealedMarker)
+                f.invoke(Args::from_values(Some(state), args)?, SealedMarker)
                     .into_result()
             }),
             std::any::type_name::<F>(),
@@ -229,7 +228,7 @@ mod builtins {
     /// </ul>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn range(_state: &State, lower: u32, upper: Option<u32>, step: Option<u32>) -> Vec<u32> {
+    pub fn range(lower: u32, upper: Option<u32>, step: Option<u32>) -> Vec<u32> {
         let rng = match upper {
             Some(upper) => lower..upper,
             None => 0..lower,
@@ -253,7 +252,7 @@ mod builtins {
     /// )|tojson }};</script>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn dict(_state: &State, value: Value) -> Result<Value, Error> {
+    pub fn dict(value: Value) -> Result<Value, Error> {
         if value.is_undefined() {
             Ok(Value::from(BTreeMap::<bool, Value>::new()))
         } else if value.kind() != ValueKind::Map {

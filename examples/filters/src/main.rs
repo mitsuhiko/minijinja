@@ -1,7 +1,7 @@
 use minijinja::value::Value;
-use minijinja::{context, Environment, State};
+use minijinja::{context, Environment};
 
-fn slugify(_state: &State, value: String) -> String {
+fn slugify(value: String) -> String {
     value
         .to_lowercase()
         .split_whitespace()
@@ -9,7 +9,7 @@ fn slugify(_state: &State, value: String) -> String {
         .join("-")
 }
 
-fn get_nav(_state: &State) -> Value {
+fn get_nav() -> Value {
     vec![
         context! { href => "/", title => "Index" },
         context! { href => "/downloads", title => "Downloads" },
@@ -21,6 +21,7 @@ fn get_nav(_state: &State) -> Value {
 fn main() {
     let mut env = Environment::new();
     env.add_filter("slugify", slugify);
+    env.add_filter("repeat", str::repeat);
     env.add_function("get_nav", get_nav);
     env.add_template("template.html", include_str!("template.html"))
         .unwrap();

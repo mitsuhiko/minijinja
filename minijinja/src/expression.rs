@@ -67,6 +67,7 @@ impl<'env, 'source> Expression<'env, 'source> {
                 root,
                 &BTreeMap::new(),
                 &mut Output::null(),
+                crate::AutoEscape::None,
             )?
             .expect("expression evaluation did not leave value on stack"))
     }

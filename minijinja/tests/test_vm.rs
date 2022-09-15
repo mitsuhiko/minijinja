@@ -16,8 +16,14 @@ pub fn simple_eval<S: serde::Serialize>(
     let vm = Vm::new(&env);
     let root = Value::from_serializable(&ctx);
     let mut rv = String::new();
-    let mut output = make_string_output(&mut rv, AutoEscape::None);
-    vm.eval(instructions, root, &empty_blocks, &mut output)?;
+    let mut output = make_string_output(&mut rv);
+    vm.eval(
+        instructions,
+        root,
+        &empty_blocks,
+        &mut output,
+        AutoEscape::None,
+    )?;
     Ok(rv)
 }
 

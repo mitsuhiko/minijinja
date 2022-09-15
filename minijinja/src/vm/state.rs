@@ -4,8 +4,7 @@ use std::fmt;
 use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::output::Output;
-use crate::value::Value;
+use crate::value::{ArgType, Value};
 use crate::vm::context::Context;
 use crate::AutoEscape;
 
@@ -21,28 +20,28 @@ use crate::AutoEscape;
 /// **Notes on lifetimes:** the state object exposes some of the internal
 /// lifetimes through the type.  You should always elide these lifetimes
 /// as there might be lifetimes added or removed between releases.
-pub struct State<'vm, 'env, 'out, 'buf> {
+pub struct State<'vm, 'env> {
     pub(crate) env: &'env Environment<'env>,
     pub(crate) ctx: Context<'env, 'vm>,
     pub(crate) current_block: Option<&'env str>,
-    pub(crate) out: &'out mut Output<'buf>,
+    pub(crate) auto_escape: AutoEscape,
     pub(crate) instructions: &'vm Instructions<'env>,
     pub(crate) blocks: BTreeMap<&'env str, Vec<&'vm Instructions<'env>>>,
 }
 
-impl<'vm, 'env, 'out, 'buf> fmt::Debug for State<'vm, 'env, 'out, 'buf> {
+impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("State");
         ds.field("name", &self.instructions.name());
         ds.field("current_block", &self.current_block);
-        ds.field("auto_escape", &self.out.auto_escape);
+        ds.field("auto_escape", &self.auto_escape);
         ds.field("ctx", &self.ctx);
         ds.field("env", &self.env);
         ds.finish()
     }
 }
 
-impl<'vm, 'env, 'out, 'buf> State<'vm, 'env, 'out, 'buf> {
+impl<'vm, 'env> State<'vm, 'env> {
     /// Returns a reference to the current environment.
     pub fn env(&self) -> &Environment<'_> {
         self.env
@@ -55,7 +54,7 @@ impl<'vm, 'env, 'out, 'buf> State<'vm, 'env, 'out, 'buf> {
 
     /// Returns the current value of the auto escape flag.
     pub fn auto_escape(&self) -> AutoEscape {
-        self.out.auto_escape
+        self.auto_escape
     }
 
     /// Returns the name of the innermost block.
@@ -74,7 +73,7 @@ impl<'vm, 'env, 'out, 'buf> State<'vm, 'env, 'out, 'buf> {
             env,
             ctx: Context::default(),
             current_block: None,
-            out: &mut Output::null(),
+            auto_escape: AutoEscape::None,
             instructions: &Instructions::new("<unknown>", ""),
             blocks: BTreeMap::default(),
         })
@@ -113,6 +112,30 @@ impl<'vm, 'env, 'out, 'buf> State<'vm, 'env, 'out, 'buf> {
             template_source: Some(instructions.source().to_string()),
             context: Some(Value::from(self.ctx.freeze(self.env))),
             referenced_names: Some(referenced_names.iter().map(|x| x.to_string()).collect()),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for &State<'_, '_> {
+    type Output = &'a State<'a, 'a>;
+
+    fn from_value(_value: Option<&'a Value>) -> Result<Self::Output, Error> {
+        Err(Error::new(
+            ErrorKind::ImpossibleOperation,
+            "cannot use state type in this position",
+        ))
+    }
+
+    fn from_state_and_value(
+        state: Option<&'a State>,
+        _value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
+        match state {
+            None => Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                "state unavailable",
+            )),
+            Some(state) => Ok((state, 0)),
         }
     }
 }

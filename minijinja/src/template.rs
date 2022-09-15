@@ -86,11 +86,8 @@ impl<'env> Template<'env> {
 
     fn _render(&self, root: Value) -> Result<String, Error> {
         let mut rv = String::new();
-        self._eval(
-            root,
-            &mut Output::with_string(&mut rv, self.initial_auto_escape),
-        )
-        .map(|_| rv)
+        self._eval(root, &mut Output::with_string(&mut rv))
+            .map(|_| rv)
     }
 
     /// Renders the template into a [`io::Write`].
@@ -111,7 +108,7 @@ impl<'env> Template<'env> {
         let mut wrapper = WriteWrapper { w, err: None };
         self._eval(
             Value::from_serializable(&ctx),
-            &mut Output::with_write(&mut wrapper, self.initial_auto_escape),
+            &mut Output::with_write(&mut wrapper),
         )
         .map_err(|err| {
             wrapper
@@ -132,6 +129,7 @@ impl<'env> Template<'env> {
                 root,
                 &self.compiled.blocks,
                 out,
+                self.initial_auto_escape,
             )
             .map(|_| ())
     }

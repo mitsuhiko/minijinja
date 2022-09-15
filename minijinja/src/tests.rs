@@ -6,9 +6,9 @@
 //! [`is_odd`] test to check if the value is indeed an odd number.
 //!
 //! MiniJinja comes with some built-in test functions that are listed below. To
-//! create a custom test write a function that takes at least a
-//! [`&State`](crate::State) and value argument and returns a boolean
-//! result, then register it with [`add_filter`](crate::Environment::add_test).
+//! create a custom test write a function that takes at least a value argument
+//! that returns a boolean result, then register it with
+//! [`add_filter`](crate::Environment::add_test).
 //!
 //! # Using Tests
 //!
@@ -28,7 +28,7 @@
 //!
 //! # Custom Tests
 //!
-//! A custom test function is just a simple function which accepts [`State`] and
+//! A custom test function is just a simple function which accepts its
 //! inputs as parameters and then returns a bool. For instance the following
 //! shows a test function which takes an input value and checks if it's
 //! lowercase:
@@ -36,9 +36,7 @@
 //! ```
 //! # use minijinja::Environment;
 //! # let mut env = Environment::new();
-//! use minijinja::State;
-//!
-//! fn is_lowercase(_state: &State, value: String) -> bool {
+//! fn is_lowercase(value: String) -> bool {
 //!     value.chars().all(|x| x.is_lowercase())
 //! }
 //!
@@ -121,7 +119,7 @@ impl TestResult for bool {
 /// # let mut env = Environment::new();
 /// use minijinja::State;
 ///
-/// fn is_lowercase(_state: &State, value: String) -> bool {
+/// fn is_lowercase(value: String) -> bool {
 ///     value.chars().all(|x| x.is_lowercase())
 /// }
 ///
@@ -139,7 +137,7 @@ impl TestResult for bool {
 /// # let mut env = Environment::new();
 /// use minijinja::State;
 ///
-/// fn is_containing(_state: &State, value: String, other: String) -> bool {
+/// fn is_containing(value: String, other: String) -> bool {
 ///     value.contains(&other)
 /// }
 ///
@@ -152,21 +150,21 @@ impl TestResult for bool {
 pub trait Test<Rv, Args>: Send + Sync + 'static {
     /// Performs a test to value with the given arguments.
     #[doc(hidden)]
-    fn perform(&self, state: &State, args: Args, _: SealedMarker) -> Rv;
+    fn perform(&self, args: Args, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
         impl<Func, Rv, $($name),*> Test<Rv, ($($name,)*)> for Func
         where
-            Func: Fn(&State, $($name),*) -> Rv + Send + Sync + 'static,
+            Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
             Rv: TestResult,
             $($name: for<'a> ArgType<'a>),*
         {
-            fn perform(&self, state: &State, args: ($($name,)*), _: SealedMarker) -> Rv {
+            fn perform(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
-                (self)(state, $($name,)*)
+                (self)($($name,)*)
             }
         }
     };
@@ -177,6 +175,7 @@ tuple_impls! { A }
 tuple_impls! { A B }
 tuple_impls! { A B C }
 tuple_impls! { A B C D }
+tuple_impls! { A B C D E }
 
 impl BoxedTest {
     /// Creates a new boxed filter.
@@ -187,7 +186,7 @@ impl BoxedTest {
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedTest(Arc::new(move |state, args| -> Result<bool, Error> {
-            f.perform(state, Args::from_values(args)?, SealedMarker)
+            f.perform(Args::from_values(Some(state), args)?, SealedMarker)
                 .into_result()
         }))
     }
@@ -209,61 +208,61 @@ mod builtins {
 
     /// Checks if a value is odd.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_odd(_state: &State, v: Value) -> bool {
+    pub fn is_odd(v: Value) -> bool {
         i128::try_from(v).ok().map_or(false, |x| x % 2 != 0)
     }
 
     /// Checks if a value is even.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_even(_state: &State, v: Value) -> bool {
+    pub fn is_even(v: Value) -> bool {
         i128::try_from(v).ok().map_or(false, |x| x % 2 == 0)
     }
 
     /// Checks if a value is undefined.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_undefined(_state: &State, v: Value) -> bool {
+    pub fn is_undefined(v: Value) -> bool {
         v.is_undefined()
     }
 
     /// Checks if a value is defined.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_defined(_state: &State, v: Value) -> bool {
+    pub fn is_defined(v: Value) -> bool {
         !v.is_undefined()
     }
 
     /// Checks if this value is a number.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_number(_state: &State, v: Value) -> bool {
+    pub fn is_number(v: Value) -> bool {
         matches!(v.kind(), ValueKind::Number)
     }
 
     /// Checks if this value is a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_string(_state: &State, v: Value) -> bool {
+    pub fn is_string(v: Value) -> bool {
         matches!(v.kind(), ValueKind::String)
     }
 
     /// Checks if this value is a sequence
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_sequence(_state: &State, v: Value) -> bool {
+    pub fn is_sequence(v: Value) -> bool {
         matches!(v.kind(), ValueKind::Seq)
     }
 
     /// Checks if this value is a mapping
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_mapping(_state: &State, v: Value) -> bool {
+    pub fn is_mapping(v: Value) -> bool {
         matches!(v.kind(), ValueKind::Map)
     }
 
     /// Checks if the value is starting with a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_startingwith(_state: &State, v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
+    pub fn is_startingwith(v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
         v.starts_with(&other as &str)
     }
 
     /// Checks if the value is ending with a string.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_endingwith(_state: &State, v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
+    pub fn is_endingwith(v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
         v.ends_with(&other as &str)
     }
 

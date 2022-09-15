@@ -12,7 +12,7 @@ use crate::output::Output;
 use crate::template::{CompiledTemplate, Template};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug};
 use crate::value::{FunctionArgs, FunctionResult, Value};
-use crate::vm::Vm;
+use crate::vm::{State, Vm};
 use crate::{defaults, filters, functions, tests};
 
 type TemplateMap<'source> = BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>;
@@ -35,7 +35,7 @@ impl<'source> fmt::Debug for Source<'source> {
 }
 
 type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
-type FormatterFunc = dyn Fn(&mut Output, &Value) -> Result<(), Error> + Sync + Send;
+type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + Sync + Send;
 
 /// An abstraction that holds the engine configuration.
 ///
@@ -215,7 +215,8 @@ impl<'source> Environment<'source> {
                 &compiled.instructions,
                 root,
                 &compiled.blocks,
-                &mut Output::with_string(&mut rv, self.get_initial_auto_escape(name)),
+                &mut Output::with_string(&mut rv),
+                self.get_initial_auto_escape(name),
             )
             .map(|_| rv)
     }
@@ -260,7 +261,7 @@ impl<'source> Environment<'source> {
     /// `Undefined` which renders as an empty string instead.
     ///
     /// The current value of the auto escape flag can be retrieved directly
-    /// from the output with [`Output::auto_escape`].
+    /// from the [`State`].
     ///
     /// ```
     /// # use minijinja::Environment;
@@ -268,9 +269,10 @@ impl<'source> Environment<'source> {
     /// use minijinja::escape_formatter;
     /// use minijinja::value::Value;
     ///
-    /// env.set_formatter(|out, value| {
+    /// env.set_formatter(|out, state, value| {
     ///     escape_formatter(
     ///         out,
+    ///         state,
     ///         if value.is_none() {
     ///             &Value::UNDEFINED
     ///         } else {
@@ -282,7 +284,7 @@ impl<'source> Environment<'source> {
     /// ```
     pub fn set_formatter<F>(&mut self, f: F)
     where
-        F: Fn(&mut Output, &Value) -> Result<(), Error> + 'static + Sync + Send,
+        F: Fn(&mut Output, &State, &Value) -> Result<(), Error> + 'static + Sync + Send,
     {
         self.formatter = Arc::new(f);
     }
@@ -448,7 +450,12 @@ impl<'source> Environment<'source> {
     /// This step is called finalization in Jinja2 but since we are writing into
     /// the output stream rather than converting values, it's renamed to format
     /// here.
-    pub(crate) fn format(&self, value: &Value, out: &mut Output) -> Result<(), Error> {
-        (self.formatter)(out, value)
+    pub(crate) fn format(
+        &self,
+        value: &Value,
+        state: &State,
+        out: &mut Output,
+    ) -> Result<(), Error> {
+        (self.formatter)(out, state, value)
     }
 }

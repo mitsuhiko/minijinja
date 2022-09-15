@@ -1,25 +1,12 @@
 use std::collections::BTreeMap;
-use std::fmt;
 
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
 use crate::filters::{self, BoxedFilter};
 use crate::output::Output;
 use crate::tests::BoxedTest;
-use crate::utils::{AutoEscape, HtmlEscape};
-use crate::value::{Value, ValueKind};
-
-fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
-    if matches!(
-        value.kind(),
-        ValueKind::Undefined | ValueKind::None | ValueKind::Bool | ValueKind::Number
-    ) {
-        write!(out, "{}", value)
-    } else if let Some(s) = value.as_str() {
-        write!(out, "{}", HtmlEscape(s))
-    } else {
-        write!(out, "{}", HtmlEscape(&value.to_string()))
-    }
-}
+use crate::utils::{write_escaped, AutoEscape};
+use crate::value::Value;
+use crate::vm::State;
 
 pub(crate) fn no_auto_escape(_: &str) -> AutoEscape {
     AutoEscape::None
@@ -45,7 +32,7 @@ pub fn default_auto_escape_callback(name: &str) -> AutoEscape {
 /// The default formatter.
 ///
 /// This formatter takes a value and directly writes it into the output format
-/// while honoring the requested auto escape format of the output.  If the
+/// while honoring the requested auto escape format of the state.  If the
 /// value is already marked as safe, it's handled as if no auto escaping
 /// was requested.
 ///
@@ -56,29 +43,8 @@ pub fn default_auto_escape_callback(name: &str) -> AutoEscape {
 )]
 /// * [`None`](AutoEscape::None): no escaping
 /// * [`Custom(..)`](AutoEscape::Custom): results in an error
-pub fn escape_formatter(out: &mut Output, value: &Value) -> Result<(), Error> {
-    match (value.is_safe(), out.auto_escape()) {
-        // safe values do not get escaped
-        (true, _) | (_, AutoEscape::None) => write!(out, "{}", value)?,
-        (false, AutoEscape::Html) => write_with_html_escaping(out, value)?,
-        #[cfg(feature = "json")]
-        (false, AutoEscape::Json) => {
-            let value = serde_json::to_string(&value).map_err(|err| {
-                Error::new(ErrorKind::BadSerialization, "unable to format to JSON").with_source(err)
-            })?;
-            write!(out, "{}", value)?
-        }
-        (false, AutoEscape::Custom(name)) => {
-            return Err(Error::new(
-                ErrorKind::ImpossibleOperation,
-                format!(
-                    "Default formatter does not know how to format to custom format '{}'",
-                    name
-                ),
-            ));
-        }
-    }
-    Ok(())
+pub fn escape_formatter(out: &mut Output, state: &State, value: &Value) -> Result<(), Error> {
+    write_escaped(out, state.auto_escape(), value)
 }
 
 pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, filters::BoxedFilter> {

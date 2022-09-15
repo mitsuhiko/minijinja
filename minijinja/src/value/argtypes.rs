@@ -6,6 +6,7 @@ use std::ops::{Deref, DerefMut};
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
 use crate::value::{Arc, Value, ValueRepr};
+use crate::vm::State;
 
 /// A utility trait that represents the return value of functions and filters.
 ///
@@ -37,7 +38,7 @@ impl<I: Into<Value>> FunctionResult for I {
 /// Since it's more convenient to write filters and tests with concrete
 /// types instead of values, this helper trait exists to automatically
 /// perform this conversion.  It is implemented for functions up to an
-/// arity of 4 parameters.
+/// arity of 5 parameters.
 ///
 /// For each argument the conversion is performed via the [`ArgType`]
 /// trait which is implemented for many common types.  For manual
@@ -47,7 +48,7 @@ pub trait FunctionArgs<'a> {
 
     /// Converts to function arguments from a slice of values.
     #[doc(hidden)]
-    fn from_values(values: &'a [Value]) -> Result<Self::Output, Error>;
+    fn from_values(state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error>;
 }
 
 /// Utility function to convert a slice of values into arguments.
@@ -66,12 +67,15 @@ pub trait FunctionArgs<'a> {
 /// let (string, num): (&str, i64) = from_args(args)?;
 /// # Ok(()) } fn main() { foo().unwrap(); }
 /// ```
+///
+/// Note that only value conversions are supported which means that `&State` is not
+/// a valid conversion type.
 #[inline(always)]
 pub fn from_args<'a, Args>(values: &'a [Value]) -> Result<Args, Error>
 where
     Args: FunctionArgs<'a, Output = Args>,
 {
-    Args::from_values(values)
+    Args::from_values(None, values)
 }
 
 /// A trait implemented by all filter/test argument types.
@@ -80,6 +84,7 @@ where
 /// types that are typically passed to filters, tests or functions.  It's
 /// implemented for the following types:
 ///
+/// * eval state: [`&State`](crate::State) (see below for notes)
 /// * unsigned integers: [`u8`], [`u16`], [`u32`], [`u64`], [`u128`], [`usize`]
 /// * signed integers: [`i8`], [`i16`], [`i32`], [`i64`], [`i128`]
 /// * floats: [`f32`], [`f64`]
@@ -88,16 +93,24 @@ where
 /// * values: [`Value`], `&Value`
 /// * vectors: [`Vec<T>`], `&[Value]`
 ///
+/// The type is also implemented for optional values (`Option<T>`) which is used
+/// to encode optional parameters to filters, functions or tests.  Additionally
+/// it's implemented for [`Rest<T>`] which is used to encode the remaining arguments
+/// of a function call.
+///
+/// ## Notes on Borrowing
+///
 /// Note on that there is an important difference between `String` and `&str`:
 /// the former will be valid for all values and an implicit conversion to string
 /// via [`ToString`] will take place, for the latter only values which are already
 /// strings will be passed.  A compromise between the two is `Cow<'_, str>` which
 /// will behave like `String` but borrows when possible.
 ///
-/// The type is also implemented for optional values (`Option<T>`) which is used
-/// to encode optional parameters to filters, functions or tests.  Additionally
-/// it's implemented for [`Rest<T>`] which is used to encode the remaining arguments
-/// of a function call.
+/// ## Notes on State
+///
+/// When `&State` is used, it does not consume a passed parameter.  This means that
+/// a filter that takes `(&State, String)` actually only has one argument.  The
+/// state is passed implicitly.
 pub trait ArgType<'a> {
     type Output;
 
@@ -105,61 +118,73 @@ pub trait ArgType<'a> {
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error>;
 
     #[doc(hidden)]
+    fn from_state_and_value(
+        _state: Option<&'a State>,
+        value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
+        Ok((Self::from_value(value)?, 1))
+    }
+
+    #[doc(hidden)]
     #[inline(always)]
-    fn from_rest_values(_values: &'a [Value]) -> Result<Option<Self::Output>, Error> {
-        Ok(None)
+    fn from_state_and_values(
+        state: Option<&'a State>,
+        values: &'a [Value],
+        offset: usize,
+    ) -> Result<(Self::Output, usize), Error> {
+        Self::from_state_and_value(state, values.get(offset))
     }
 }
 
 macro_rules! tuple_impls {
-    ( $( $name:ident )* $(; ( $($alt_name:ident)* ) $rest_name:ident)? ) => {
-        impl<'a, $($name),*> FunctionArgs<'a> for ($($name,)*)
-            where $($name: ArgType<'a>,)*
+    ( $( $name:ident )* * $rest_name:ident ) => {
+        impl<'a, $($name,)* $rest_name> FunctionArgs<'a> for ($($name,)* $rest_name,)
+            where $($name: ArgType<'a>,)* $rest_name: ArgType<'a>
         {
-            type Output = ($($name::Output,)*);
+            type Output = ($($name::Output,)* $rest_name::Output ,);
 
-            fn from_values(values: &'a [Value]) -> Result<Self::Output, Error> {
+            fn from_values(state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
                 #![allow(non_snake_case, unused)]
-                let arg_count = 0 $(
-                    + { let $name = (); 1 }
-                )*;
-
+                let mut idx = 0;
                 $(
-                    let rest_values = values.get(arg_count - 1..).unwrap_or_default();
-                    if let Some(rest) = $rest_name::from_rest_values(rest_values)? {
-                        let mut idx = 0;
-                        $(
-                            let $alt_name = $alt_name::from_value(values.get(idx))?;
-                            idx += 1;
-                        )*
-                        return Ok(( $($alt_name,)* rest ,));
-                    }
-                )?
-
-                if values.len() > arg_count {
-                    return Err(Error::new(
+                    let ($name, offset) = $name::from_state_and_value(state, values.get(idx))?;
+                    idx += offset;
+                )*
+                let ($rest_name, offset) = $rest_name::from_state_and_values(state, values, idx)?;
+                idx += offset;
+                if values.get(idx).is_some() {
+                    Err(Error::new(
                         ErrorKind::InvalidArguments,
                         "received unexpected extra arguments",
-                    ));
-                }
-                {
-                    let mut idx = 0;
-                    $(
-                        let $name = $name::from_value(values.get(idx))?;
-                        idx += 1;
-                    )*
-                    Ok(( $($name,)* ))
+                    ))
+                } else {
+                    Ok(( $($name,)* $rest_name,))
                 }
             }
         }
     };
 }
 
-tuple_impls! {}
-tuple_impls! { A; () A }
-tuple_impls! { A B; (A) B }
-tuple_impls! { A B C; (A B) C }
-tuple_impls! { A B C D; (A B C) D }
+impl<'a> FunctionArgs<'a> for () {
+    type Output = ();
+
+    fn from_values(_state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
+        if values.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidArguments,
+                "function takes no arguments",
+            ))
+        }
+    }
+}
+
+tuple_impls! { *A }
+tuple_impls! { A *B }
+tuple_impls! { A B *C }
+tuple_impls! { A B C *D }
+tuple_impls! { A B C D *E }
 
 impl From<ValueRepr> for Value {
     #[inline(always)]
@@ -347,6 +372,7 @@ primitive_try_from!(f64, {
 impl<'a> ArgType<'a> for &str {
     type Output = &'a str;
 
+    #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => value
@@ -377,6 +403,7 @@ impl<'a, T: ArgType<'a>> ArgType<'a> for Option<T> {
 impl<'a> ArgType<'a> for Cow<'_, str> {
     type Output = Cow<'a, str>;
 
+    #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<Cow<'a, str>, Error> {
         match value {
             Some(value) => Ok(value.to_cowstr()),
@@ -388,6 +415,7 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
 impl<'a> ArgType<'a> for &Value {
     type Output = &'a Value;
 
+    #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<&'a Value, Error> {
         match value {
             Some(value) => Ok(value),
@@ -399,6 +427,7 @@ impl<'a> ArgType<'a> for &Value {
 impl<'a> ArgType<'a> for &[Value] {
     type Output = &'a [Value];
 
+    #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<&'a [Value], Error> {
         match value {
             Some(value) => Ok(value.as_slice()?),
@@ -456,13 +485,20 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
     }
 
     #[inline(always)]
-    fn from_rest_values(values: &'a [Value]) -> Result<Option<Self>, Error> {
-        Ok(Some(Rest(
-            values
-                .iter()
-                .map(|v| T::from_value(Some(v)))
-                .collect::<Result<_, _>>()?,
-        )))
+    fn from_state_and_values(
+        _state: Option<&'a State>,
+        values: &'a [Value],
+        offset: usize,
+    ) -> Result<(Self, usize), Error> {
+        let args = values.get(offset..).unwrap_or_default();
+        Ok((
+            Rest(
+                args.iter()
+                    .map(|v| T::from_value(Some(v)))
+                    .collect::<Result<_, _>>()?,
+            ),
+            args.len(),
+        ))
     }
 }
 

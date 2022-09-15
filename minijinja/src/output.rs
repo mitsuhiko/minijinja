@@ -8,37 +8,24 @@ use crate::value::Value;
 /// This is a utility type used in the engine which can be written into like one
 /// can write into an [`std::fmt::Write`] value.  It's primarily used internally
 /// in the engine but it's also passed to the custom formatter function.
-///
-/// Additionally it keeps track of the requested auto escape format of the
-/// template so that the formatter can customize it's behavior based on the auto
-/// escaping request.  The output itself however does not have functionality to
-/// escape by itself.
 pub struct Output<'a> {
-    // Note on type design: this type partially exists so that in the future non
-    // string outputs can be implemented.  Right now only the null writer exists
-    // as alternative which is also infallible.  If writing to io::Write should
-    // be added, then errors would need to be collected out of bounds as
-    // fmt::Error has no support for carrying actual IO errors.
     w: &'a mut (dyn fmt::Write + 'a),
     capture_stack: Vec<String>,
-    pub(crate) auto_escape: AutoEscape,
 }
 
 impl<'a> Output<'a> {
     /// Creates an output writing to a string.
-    pub(crate) fn with_string(buf: &'a mut String, auto_escape: AutoEscape) -> Self {
+    pub(crate) fn with_string(buf: &'a mut String) -> Self {
         Self {
             w: buf,
             capture_stack: Vec::new(),
-            auto_escape,
         }
     }
 
-    pub(crate) fn with_write(w: &'a mut (dyn fmt::Write + 'a), auto_escape: AutoEscape) -> Self {
+    pub(crate) fn with_write(w: &'a mut (dyn fmt::Write + 'a)) -> Self {
         Self {
             w,
             capture_stack: Vec::new(),
-            auto_escape,
         }
     }
 
@@ -49,7 +36,6 @@ impl<'a> Output<'a> {
             // SAFETY: this is safe as the null writer is a ZST
             w: unsafe { &mut NULL_WRITER },
             capture_stack: Vec::new(),
-            auto_escape: AutoEscape::None,
         }
     }
 
@@ -59,26 +45,21 @@ impl<'a> Output<'a> {
     }
 
     /// Ends capturing and returns the captured string as value.
-    pub(crate) fn end_capture(&mut self) -> Value {
+    pub(crate) fn end_capture(&mut self, auto_escape: AutoEscape) -> Value {
         let captured = self.capture_stack.pop().unwrap();
-        if !matches!(self.auto_escape, AutoEscape::None) {
+        if !matches!(auto_escape, AutoEscape::None) {
             Value::from_safe_string(captured)
         } else {
             Value::from(captured)
         }
     }
 
+    #[inline(always)]
     fn target(&mut self) -> &mut dyn fmt::Write {
         match self.capture_stack.last_mut() {
             Some(stream) => stream as _,
             None => self.w,
         }
-    }
-
-    /// Returns the current auto escape setting.
-    #[inline]
-    pub fn auto_escape(&self) -> AutoEscape {
-        self.auto_escape
     }
 
     /// Writes some data to the underlying buffer contained within this output.

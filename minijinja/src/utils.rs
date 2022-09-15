@@ -5,6 +5,8 @@ use std::iter::{once, repeat};
 use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
+use crate::value::{Value, ValueKind};
+use crate::Output;
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -20,6 +22,49 @@ pub fn memstr(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack
         .windows(needle.len())
         .position(|window| window == needle)
+}
+
+fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
+    if matches!(
+        value.kind(),
+        ValueKind::Undefined | ValueKind::None | ValueKind::Bool | ValueKind::Number
+    ) {
+        write!(out, "{}", value)
+    } else if let Some(s) = value.as_str() {
+        write!(out, "{}", HtmlEscape(s))
+    } else {
+        write!(out, "{}", HtmlEscape(&value.to_string()))
+    }
+}
+
+#[inline(always)]
+pub fn write_escaped(
+    out: &mut Output,
+    auto_escape: AutoEscape,
+    value: &Value,
+) -> Result<(), Error> {
+    match (value.is_safe(), auto_escape) {
+        // safe values do not get escaped
+        (true, _) | (_, AutoEscape::None) => write!(out, "{}", value)?,
+        (false, AutoEscape::Html) => write_with_html_escaping(out, value)?,
+        #[cfg(feature = "json")]
+        (false, AutoEscape::Json) => {
+            let value = serde_json::to_string(&value).map_err(|err| {
+                Error::new(ErrorKind::BadSerialization, "unable to format to JSON").with_source(err)
+            })?;
+            write!(out, "{}", value)?
+        }
+        (false, AutoEscape::Custom(name)) => {
+            return Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                format!(
+                    "Default formatter does not know how to format to custom format '{}'",
+                    name
+                ),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Controls the autoescaping behavior.
