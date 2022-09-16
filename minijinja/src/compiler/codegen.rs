@@ -45,15 +45,14 @@ impl<'source> CodeGenerator<'source> {
         self.current_line = lineno;
     }
 
-    /// Sets location from span.
-    pub fn set_location_from_span(&mut self, span: Span) {
+    /// Sets line from span.
+    pub fn set_line_from_span(&mut self, span: Span) {
         self.set_line(span.start_line);
     }
 
     /// Add a simple instruction.
     pub fn add(&mut self, instr: Instruction<'source>) -> usize {
-        self.instructions
-            .add_with_location(instr, self.current_line)
+        self.instructions.add_with_line(instr, self.current_line)
     }
 
     /// Returns the next instruction index.
@@ -169,7 +168,7 @@ impl<'source> CodeGenerator<'source> {
     pub fn compile_stmt(&mut self, stmt: &ast::Stmt<'source>) -> Result<(), Error> {
         match stmt {
             ast::Stmt::Template(t) => {
-                self.set_location_from_span(t.span());
+                self.set_line_from_span(t.span());
                 for node in &t.children {
                     self.compile_stmt(node)?;
                 }
@@ -178,7 +177,7 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_emit_expr(expr)?;
             }
             ast::Stmt::EmitRaw(raw) => {
-                self.set_location_from_span(raw.span());
+                self.set_line_from_span(raw.span());
                 self.add(Instruction::EmitRaw(raw.raw));
             }
             ast::Stmt::ForLoop(for_loop) => {
@@ -188,7 +187,7 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_if_stmt(if_cond)?;
             }
             ast::Stmt::WithBlock(with_block) => {
-                self.set_location_from_span(with_block.span());
+                self.set_line_from_span(with_block.span());
                 self.add(Instruction::PushWith);
                 for (target, expr) in &with_block.assignments {
                     self.compile_expr(expr)?;
@@ -200,12 +199,12 @@ impl<'source> CodeGenerator<'source> {
                 self.add(Instruction::PopFrame);
             }
             ast::Stmt::Set(set) => {
-                self.set_location_from_span(set.span());
+                self.set_line_from_span(set.span());
                 self.compile_expr(&set.expr)?;
                 self.compile_assignment(&set.target)?;
             }
             ast::Stmt::SetBlock(set_block) => {
-                self.set_location_from_span(set_block.span());
+                self.set_line_from_span(set_block.span());
                 self.add(Instruction::BeginCapture);
                 for node in &set_block.body {
                     self.compile_stmt(node)?;
@@ -220,17 +219,17 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_block(block)?;
             }
             ast::Stmt::Extends(extends) => {
-                self.set_location_from_span(extends.span());
+                self.set_line_from_span(extends.span());
                 self.compile_expr(&extends.name)?;
                 self.add(Instruction::LoadBlocks);
             }
             ast::Stmt::Include(include) => {
-                self.set_location_from_span(include.span());
+                self.set_line_from_span(include.span());
                 self.compile_expr(&include.name)?;
                 self.add(Instruction::Include(include.ignore_missing));
             }
             ast::Stmt::AutoEscape(auto_escape) => {
-                self.set_location_from_span(auto_escape.span());
+                self.set_line_from_span(auto_escape.span());
                 self.compile_expr(&auto_escape.enabled)?;
                 self.add(Instruction::PushAutoEscape);
                 for node in &auto_escape.body {
@@ -239,7 +238,7 @@ impl<'source> CodeGenerator<'source> {
                 self.add(Instruction::PopAutoEscape);
             }
             ast::Stmt::FilterBlock(filter_block) => {
-                self.set_location_from_span(filter_block.span());
+                self.set_line_from_span(filter_block.span());
                 self.add(Instruction::BeginCapture);
                 for node in &filter_block.body {
                     self.compile_stmt(node)?;
@@ -253,7 +252,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     fn compile_block(&mut self, block: &ast::Spanned<ast::Block<'source>>) -> Result<(), Error> {
-        self.set_location_from_span(block.span());
+        self.set_line_from_span(block.span());
         let mut sub_compiler =
             CodeGenerator::new(self.instructions.name(), self.instructions.source());
         sub_compiler.set_line(self.current_line);
@@ -271,7 +270,7 @@ impl<'source> CodeGenerator<'source> {
         &mut self,
         if_cond: &ast::Spanned<ast::IfCond<'source>>,
     ) -> Result<(), Error> {
-        self.set_location_from_span(if_cond.span());
+        self.set_line_from_span(if_cond.span());
         self.compile_expr(&if_cond.expr)?;
         self.start_if();
         for node in &if_cond.true_body {
@@ -291,7 +290,7 @@ impl<'source> CodeGenerator<'source> {
         &mut self,
         expr: &ast::Spanned<ast::EmitExpr<'source>>,
     ) -> Result<(), Error> {
-        self.set_location_from_span(expr.span());
+        self.set_line_from_span(expr.span());
         if let ast::Expr::Call(call) = &expr.expr {
             if let ast::Expr::Var(var) = &call.expr {
                 if var.id == "super" && call.args.is_empty() {
@@ -314,7 +313,7 @@ impl<'source> CodeGenerator<'source> {
         &mut self,
         for_loop: &ast::Spanned<ast::ForLoop<'source>>,
     ) -> Result<(), Error> {
-        self.set_location_from_span(for_loop.span());
+        self.set_line_from_span(for_loop.span());
         if let Some(ref filter_expr) = for_loop.filter_expr {
             // filter expressions work like a nested for loop without
             // the special loop variable that append into a new list
@@ -354,11 +353,11 @@ impl<'source> CodeGenerator<'source> {
     pub fn compile_assignment(&mut self, expr: &ast::Expr<'source>) -> Result<(), Error> {
         match expr {
             ast::Expr::Var(var) => {
-                self.set_location_from_span(var.span());
+                self.set_line_from_span(var.span());
                 self.add(Instruction::StoreLocal(var.id));
             }
             ast::Expr::List(list) => {
-                self.set_location_from_span(list.span());
+                self.set_line_from_span(list.span());
                 self.add(Instruction::UnpackList(list.items.len()));
                 for expr in &list.items {
                     self.compile_assignment(expr)?;
@@ -373,15 +372,15 @@ impl<'source> CodeGenerator<'source> {
     pub fn compile_expr(&mut self, expr: &ast::Expr<'source>) -> Result<(), Error> {
         match expr {
             ast::Expr::Var(v) => {
-                self.set_location_from_span(v.span());
+                self.set_line_from_span(v.span());
                 self.add(Instruction::Lookup(v.id));
             }
             ast::Expr::Const(v) => {
-                self.set_location_from_span(v.span());
+                self.set_line_from_span(v.span());
                 self.add(Instruction::LoadConst(v.value.clone()));
             }
             ast::Expr::UnaryOp(c) => {
-                self.set_location_from_span(c.span());
+                self.set_line_from_span(c.span());
                 self.compile_expr(&c.expr)?;
                 self.add(match c.op {
                     ast::UnaryOpKind::Not => Instruction::Not,
@@ -392,7 +391,7 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_bin_op(c)?;
             }
             ast::Expr::IfExpr(i) => {
-                self.set_location_from_span(i.span());
+                self.set_line_from_span(i.span());
                 self.compile_expr(&i.test_expr)?;
                 self.start_if();
                 self.compile_expr(&i.true_expr)?;
@@ -405,7 +404,7 @@ impl<'source> CodeGenerator<'source> {
                 self.end_if();
             }
             ast::Expr::Filter(f) => {
-                self.set_location_from_span(f.span());
+                self.set_line_from_span(f.span());
                 if let Some(ref expr) = f.expr {
                     self.compile_expr(expr)?;
                 }
@@ -416,7 +415,7 @@ impl<'source> CodeGenerator<'source> {
                 self.add(Instruction::ApplyFilter(f.name));
             }
             ast::Expr::Test(f) => {
-                self.set_location_from_span(f.span());
+                self.set_line_from_span(f.span());
                 self.compile_expr(&f.expr)?;
                 for arg in &f.args {
                     self.compile_expr(arg)?;
@@ -425,12 +424,12 @@ impl<'source> CodeGenerator<'source> {
                 self.add(Instruction::PerformTest(f.name));
             }
             ast::Expr::GetAttr(g) => {
-                self.set_location_from_span(g.span());
+                self.set_line_from_span(g.span());
                 self.compile_expr(&g.expr)?;
                 self.add(Instruction::GetAttr(g.name));
             }
             ast::Expr::GetItem(g) => {
-                self.set_location_from_span(g.span());
+                self.set_line_from_span(g.span());
                 self.compile_expr(&g.expr)?;
                 self.compile_expr(&g.subscript_expr)?;
                 self.add(Instruction::GetItem);
@@ -439,14 +438,14 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_call(c)?;
             }
             ast::Expr::List(l) => {
-                self.set_location_from_span(l.span());
+                self.set_line_from_span(l.span());
                 for item in &l.items {
                     self.compile_expr(item)?;
                 }
                 self.add(Instruction::BuildList(l.items.len()));
             }
             ast::Expr::Map(m) => {
-                self.set_location_from_span(m.span());
+                self.set_line_from_span(m.span());
                 assert_eq!(m.keys.len(), m.values.len());
                 for (key, value) in m.keys.iter().zip(m.values.iter()) {
                     self.compile_expr(key)?;
@@ -459,7 +458,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     fn compile_call(&mut self, c: &ast::Spanned<ast::Call<'source>>) -> Result<(), Error> {
-        self.set_location_from_span(c.span());
+        self.set_line_from_span(c.span());
         match c.identify_call() {
             ast::CallType::Function(name) => {
                 for arg in &c.args {
@@ -490,7 +489,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     fn compile_bin_op(&mut self, c: &ast::Spanned<ast::BinOp<'source>>) -> Result<(), Error> {
-        self.set_location_from_span(c.span());
+        self.set_line_from_span(c.span());
         let instr = match c.op {
             ast::BinOpKind::Eq => Instruction::Eq,
             ast::BinOpKind::Ne => Instruction::Ne,

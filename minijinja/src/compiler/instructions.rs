@@ -235,7 +235,7 @@ impl<'source> Instructions<'source> {
     }
 
     /// Adds a new instruction with location info.
-    pub fn add_with_location(&mut self, instr: Instruction<'source>, line: usize) -> usize {
+    pub fn add_with_line(&mut self, instr: Instruction<'source>, line: usize) -> usize {
         let rv = self.add(instr);
         let same_loc = self
             .locations
