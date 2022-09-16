@@ -371,15 +371,15 @@ impl<'source> CodeGenerator<'source> {
     pub fn compile_assignment(&mut self, expr: &ast::Expr<'source>) -> Result<(), Error> {
         match expr {
             ast::Expr::Var(var) => {
-                self.set_line_from_span(var.span());
                 self.add(Instruction::StoreLocal(var.id));
             }
             ast::Expr::List(list) => {
-                self.set_line_from_span(list.span());
+                self.push_span(list.span());
                 self.add(Instruction::UnpackList(list.items.len()));
                 for expr in &list.items {
                     self.compile_assignment(expr)?;
                 }
+                self.pop_span();
             }
             _ => panic!("bad assignment target"),
         }
@@ -444,20 +444,20 @@ impl<'source> CodeGenerator<'source> {
                 self.pop_span();
             }
             ast::Expr::GetAttr(g) => {
-                self.set_line_from_span(g.span());
+                self.push_span(g.span());
                 self.compile_expr(&g.expr)?;
                 self.add(Instruction::GetAttr(g.name));
+                self.pop_span();
             }
             ast::Expr::GetItem(g) => {
-                self.set_line_from_span(g.span());
+                self.push_span(g.span());
                 self.compile_expr(&g.expr)?;
                 self.compile_expr(&g.subscript_expr)?;
                 self.add(Instruction::GetItem);
+                self.pop_span();
             }
             ast::Expr::Call(c) => {
-                self.push_span(c.span());
                 self.compile_call(c)?;
-                self.pop_span();
             }
             ast::Expr::List(l) => {
                 self.set_line_from_span(l.span());
@@ -480,7 +480,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     fn compile_call(&mut self, c: &ast::Spanned<ast::Call<'source>>) -> Result<(), Error> {
-        self.set_line_from_span(c.span());
+        self.push_span(c.span());
         match c.identify_call() {
             ast::CallType::Function(name) => {
                 for arg in &c.args {
@@ -507,6 +507,7 @@ impl<'source> CodeGenerator<'source> {
                 self.add(Instruction::CallObject);
             }
         };
+        self.pop_span();
         Ok(())
     }
 

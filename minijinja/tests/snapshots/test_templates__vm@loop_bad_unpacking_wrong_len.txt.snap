@@ -23,4 +23,45 @@ Error {
     line: 2,
 }
 
+---------------------------- Template Source -----------------------------
+   1 | <ul>
+   2 > {% for a, b in seq %}
+     i        ^^^^ impossible operation
+   3 |   <li>{{ a }}: {{ b }}
+   4 | {% endfor %}
+   5 | </ul>
+--------------------------------------------------------------------------
+Referenced variables: {
+    loop: LoopState {
+        index0: 0,
+        index: 1,
+        length: 3,
+        revindex: 3,
+        revindex0: 2,
+        first: true,
+        last: false,
+        depth: 1,
+        depth0: 0,
+    },
+    seq: [
+        [
+            1,
+            2,
+            3,
+        ],
+        [
+            2,
+            3,
+            4,
+        ],
+        [
+            3,
+            4,
+            5,
+        ],
+    ],
+}
+--------------------------------------------------------------------------
+
+
 

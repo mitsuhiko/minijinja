@@ -89,6 +89,8 @@ pub enum ErrorKind {
     UnknownFilter,
     /// A test is unknown
     UnknownTest,
+    /// A function is unknown
+    UnknownFunction,
     /// A bad escape sequence in a string was encountered.
     BadEscape,
     /// An operation on an undefined value was attempted.
@@ -110,9 +112,10 @@ impl ErrorKind {
             ErrorKind::TooManyArguments => "too many arguments",
             ErrorKind::MissingArgument => "missing argument",
             ErrorKind::UnknownFilter => "unknown filter",
+            ErrorKind::UnknownFunction => "unknown function",
             ErrorKind::UnknownTest => "unknown test",
             ErrorKind::BadEscape => "bad string escape",
-            ErrorKind::UndefinedError => "variable or attribute undefined",
+            ErrorKind::UndefinedError => "undefined value",
             ErrorKind::BadSerialization => "could not serialize to internal format",
             ErrorKind::WriteFailure => "failed to write output",
         }

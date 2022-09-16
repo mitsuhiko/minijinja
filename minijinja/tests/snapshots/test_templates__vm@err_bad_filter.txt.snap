@@ -1,26 +1,25 @@
 ---
 source: minijinja/tests/test_templates.rs
-description: "[{% for item in seq %}{% endfor %}]"
-info:
-  seq: 42
-input_file: minijinja/tests/inputs/loop_over_non_iterable.txt
+description: "{% for item in 42|slice(4) %}\n  - {{ item }}\n{% endfor %}"
+info: {}
+input_file: minijinja/tests/inputs/err_bad_filter.txt
 ---
 !!!ERROR!!!
 
 Error {
     kind: ImpossibleOperation,
     detail: "object is not iterable",
-    name: "loop_over_non_iterable.txt",
+    name: "err_bad_filter.txt",
     line: 1,
 }
 
 ---------------------------- Template Source -----------------------------
-   1 > [{% for item in seq %}{% endfor %}]
+   1 > {% for item in 42|slice(4) %}
+     i                   ^^^^^^^^ impossible operation
+   2 |   - {{ item }}
+   3 | {% endfor %}
 --------------------------------------------------------------------------
-Referenced variables: {
-    loop: Undefined,
-    seq: 42,
-}
+Referenced variables:
 --------------------------------------------------------------------------
 
 

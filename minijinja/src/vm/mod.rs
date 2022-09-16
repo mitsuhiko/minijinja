@@ -355,8 +355,8 @@ impl<'env> Vm<'env> {
                         stack.push(try_ctx!(func.call(state, args)));
                     } else {
                         bail!(Error::new(
-                            ErrorKind::ImpossibleOperation,
-                            format!("unknown function {}", function_name),
+                            ErrorKind::UnknownFunction,
+                            format!("{} is unknown", function_name),
                         ));
                     }
                 }
