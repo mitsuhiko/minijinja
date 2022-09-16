@@ -80,8 +80,10 @@ pub enum ErrorKind {
     SyntaxError,
     /// A template was not found.
     TemplateNotFound,
-    /// Invalid arguments to a function were passed
-    InvalidArguments,
+    /// Too many arguments were passed to a function.
+    TooManyArguments,
+    /// A expected argument was missing
+    MissingArgument,
     /// A filter is unknown
     UnknownFilter,
     /// A test is unknown
@@ -104,7 +106,8 @@ impl ErrorKind {
             ErrorKind::ImpossibleOperation => "impossible operation",
             ErrorKind::SyntaxError => "syntax error",
             ErrorKind::TemplateNotFound => "template not found",
-            ErrorKind::InvalidArguments => "invalid arguments",
+            ErrorKind::TooManyArguments => "too many arguments",
+            ErrorKind::MissingArgument => "missing argument",
             ErrorKind::UnknownFilter => "unknown filter",
             ErrorKind::UnknownTest => "unknown test",
             ErrorKind::BadEscape => "bad string escape",

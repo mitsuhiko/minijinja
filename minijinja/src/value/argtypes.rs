@@ -159,10 +159,7 @@ macro_rules! tuple_impls {
                 let ($rest_name, offset) = $rest_name::from_state_and_values(state, values, idx)?;
                 idx += offset;
                 if values.get(idx).is_some() {
-                    Err(Error::new(
-                        ErrorKind::InvalidArguments,
-                        "received unexpected extra arguments",
-                    ))
+                    Err(Error::from(ErrorKind::TooManyArguments))
                 } else {
                     Ok(( $($name,)* $rest_name,))
                 }
@@ -178,10 +175,7 @@ impl<'a> FunctionArgs<'a> for () {
         if values.is_empty() {
             Ok(())
         } else {
-            Err(Error::new(
-                ErrorKind::InvalidArguments,
-                "function takes no arguments",
-            ))
+            Err(Error::from(ErrorKind::TooManyArguments))
         }
     }
 }
@@ -329,7 +323,7 @@ macro_rules! primitive_try_from {
             fn from_value(value: Option<&Value>) -> Result<Self, Error> {
                 match value {
                     Some(value) => TryFrom::try_from(value.clone()),
-                    None => Err(Error::new(ErrorKind::UndefinedError, "missing argument"))
+                    None => Err(Error::from(ErrorKind::MissingArgument))
                 }
             }
         }
@@ -384,7 +378,7 @@ impl<'a> ArgType<'a> for &str {
             Some(value) => value
                 .as_str()
                 .ok_or_else(|| Error::new(ErrorKind::ImpossibleOperation, "value is not a string")),
-            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
 }
@@ -398,7 +392,7 @@ impl<'a> ArgType<'a> for &[u8] {
             Some(value) => value
                 .as_bytes()
                 .ok_or_else(|| Error::new(ErrorKind::ImpossibleOperation, "value is not in bytes")),
-            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
 }
@@ -427,7 +421,7 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
     fn from_value(value: Option<&'a Value>) -> Result<Cow<'a, str>, Error> {
         match value {
             Some(value) => Ok(value.to_cowstr()),
-            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
 }
@@ -439,7 +433,7 @@ impl<'a> ArgType<'a> for &Value {
     fn from_value(value: Option<&'a Value>) -> Result<&'a Value, Error> {
         match value {
             Some(value) => Ok(value),
-            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
 }
@@ -451,7 +445,7 @@ impl<'a> ArgType<'a> for &[Value] {
     fn from_value(value: Option<&'a Value>) -> Result<&'a [Value], Error> {
         match value {
             Some(value) => Ok(value.as_slice()?),
-            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
 }
@@ -528,7 +522,7 @@ impl<'a> ArgType<'a> for Value {
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
             Some(value) => Ok(value.clone()),
-            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
 }
@@ -539,7 +533,7 @@ impl<'a> ArgType<'a> for String {
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
             Some(value) => Ok(value.to_string()),
-            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
 }
