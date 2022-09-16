@@ -13,4 +13,5 @@ CodeGenerator {
     blocks: {},
     pending_block: [],
     current_line: 0,
+    span_stack: [],
 }

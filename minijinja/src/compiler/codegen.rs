@@ -27,6 +27,7 @@ pub struct CodeGenerator<'source> {
     blocks: BTreeMap<&'source str, Instructions<'source>>,
     pending_block: Vec<PendingBlock>,
     current_line: usize,
+    span_stack: Vec<Span>,
 }
 
 impl<'source> CodeGenerator<'source> {
@@ -37,6 +38,7 @@ impl<'source> CodeGenerator<'source> {
             blocks: BTreeMap::new(),
             pending_block: Vec::new(),
             current_line: 0,
+            span_stack: Vec::new(),
         }
     }
 
@@ -50,8 +52,24 @@ impl<'source> CodeGenerator<'source> {
         self.set_line(span.start_line);
     }
 
+    /// Pushes a span to the stack
+    pub fn push_span(&mut self, span: Span) {
+        self.span_stack.push(span);
+        self.set_line_from_span(span);
+    }
+
+    /// Pops a span from the stack.
+    pub fn pop_span(&mut self) {
+        self.span_stack.pop();
+    }
+
     /// Add a simple instruction.
     pub fn add(&mut self, instr: Instruction<'source>) -> usize {
+        if let Some(span) = self.span_stack.last() {
+            if span.start_line == self.current_line {
+                return self.instructions.add_with_span(instr, *span);
+            }
+        }
         self.instructions.add_with_line(instr, self.current_line)
     }
 
@@ -404,7 +422,7 @@ impl<'source> CodeGenerator<'source> {
                 self.end_if();
             }
             ast::Expr::Filter(f) => {
-                self.set_line_from_span(f.span());
+                self.push_span(f.span());
                 if let Some(ref expr) = f.expr {
                     self.compile_expr(expr)?;
                 }
@@ -413,15 +431,17 @@ impl<'source> CodeGenerator<'source> {
                 }
                 self.add(Instruction::BuildList(f.args.len() + 1));
                 self.add(Instruction::ApplyFilter(f.name));
+                self.pop_span();
             }
             ast::Expr::Test(f) => {
-                self.set_line_from_span(f.span());
+                self.push_span(f.span());
                 self.compile_expr(&f.expr)?;
                 for arg in &f.args {
                     self.compile_expr(arg)?;
                 }
                 self.add(Instruction::BuildList(f.args.len() + 1));
                 self.add(Instruction::PerformTest(f.name));
+                self.pop_span();
             }
             ast::Expr::GetAttr(g) => {
                 self.set_line_from_span(g.span());
@@ -435,7 +455,9 @@ impl<'source> CodeGenerator<'source> {
                 self.add(Instruction::GetItem);
             }
             ast::Expr::Call(c) => {
+                self.push_span(c.span());
                 self.compile_call(c)?;
+                self.pop_span();
             }
             ast::Expr::List(l) => {
                 self.set_line_from_span(l.span());
@@ -489,7 +511,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     fn compile_bin_op(&mut self, c: &ast::Spanned<ast::BinOp<'source>>) -> Result<(), Error> {
-        self.set_line_from_span(c.span());
+        self.push_span(c.span());
         let instr = match c.op {
             ast::BinOpKind::Eq => Instruction::Eq,
             ast::BinOpKind::Ne => Instruction::Ne,
@@ -518,6 +540,7 @@ impl<'source> CodeGenerator<'source> {
         self.compile_expr(&c.left)?;
         self.compile_expr(&c.right)?;
         self.add(instr);
+        self.pop_span();
         Ok(())
     }
 

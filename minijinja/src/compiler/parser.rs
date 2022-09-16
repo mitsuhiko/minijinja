@@ -124,8 +124,8 @@ struct Parser<'a> {
 macro_rules! binop {
     ($func:ident, $next:ident, { $($tok:tt)* }) => {
         fn $func(&mut self) -> Result<ast::Expr<'a>, Error> {
-            let span = self.stream.current_span();
             let mut left = self.$next()?;
+            let span = self.stream.current_span();
             loop {
                 let op = match self.stream.current()? {
                     $($tok)*
@@ -924,7 +924,7 @@ pub fn parse<'source, 'name>(
     let mut parser = Parser::new(source, false);
     parser.parse().map_err(|mut err| {
         if err.line().is_none() {
-            err.set_location(filename, parser.stream.current_span().start_line)
+            err.set_filename_and_span(filename, parser.stream.current_span())
         }
         err
     })
@@ -935,7 +935,7 @@ pub fn parse_expr(source: &str) -> Result<ast::Expr<'_>, Error> {
     let mut parser = Parser::new(source, true);
     parser.parse_expr().map_err(|mut err| {
         if err.line().is_none() {
-            err.set_location("<expression>", parser.stream.current_span().start_line)
+            err.set_filename_and_span("<expression>", parser.stream.current_span())
         }
         err
     })
