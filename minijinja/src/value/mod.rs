@@ -341,15 +341,10 @@ impl Default for Value {
     }
 }
 
-/// This function exists so that rustdoc produces something more readable for the const.
-const fn undefined() -> Value {
-    Value(ValueRepr::Undefined)
-}
-
 #[allow(clippy::len_without_is_empty)]
 impl Value {
     /// The undefined value
-    pub const UNDEFINED: Value = undefined();
+    pub const UNDEFINED: Value = Value(ValueRepr::Undefined);
 
     /// Creates a value from something that can be serialized.
     ///
