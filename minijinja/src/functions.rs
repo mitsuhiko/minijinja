@@ -52,7 +52,7 @@ use std::sync::Arc;
 
 use crate::error::Error;
 use crate::utils::SealedMarker;
-use crate::value::{FunctionArgs, FunctionResult, Object, Value};
+use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, Value};
 use crate::vm::State;
 
 type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
@@ -63,7 +63,7 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 
 /// A utility trait that represents global functions.
 ///
-/// This trait is used by the [`add_functino`](crate::Environment::add_function)
+/// This trait is used by the [`add_function`](crate::Environment::add_function)
 /// method to abstract over different types of functions.
 ///
 /// Functions which at the very least accept the [`State`] by reference as first
@@ -133,6 +133,7 @@ macro_rules! tuple_impls {
         where
             Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
             Rv: FunctionResult,
+            $($name: for<'a> ArgType<'a>,)*
         {
             fn invoke(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]

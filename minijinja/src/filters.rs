@@ -76,7 +76,7 @@ use std::sync::Arc;
 
 use crate::error::Error;
 use crate::utils::{write_escaped, SealedMarker};
-use crate::value::{FunctionArgs, FunctionResult, Value};
+use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
 use crate::vm::State;
 use crate::{AutoEscape, Output};
 
@@ -173,6 +173,7 @@ macro_rules! tuple_impls {
         where
             Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
             Rv: FunctionResult,
+            $($name: for<'a> ArgType<'a>,)*
         {
             fn apply_to(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
