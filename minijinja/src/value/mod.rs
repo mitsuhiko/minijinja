@@ -341,10 +341,15 @@ impl Default for Value {
     }
 }
 
+/// This function exists so that rustdoc produces something more readable for the const.
+const fn undefined() -> Value {
+    Value(ValueRepr::Undefined)
+}
+
 #[allow(clippy::len_without_is_empty)]
 impl Value {
     /// The undefined value
-    pub const UNDEFINED: Value = Value(ValueRepr::Undefined);
+    pub const UNDEFINED: Value = undefined();
 
     /// Creates a value from something that can be serialized.
     ///
@@ -492,6 +497,10 @@ impl Value {
     }
 
     /// Looks up an attribute by attribute name.
+    ///
+    /// This this returns [`UNDEFINED`](Self::UNDEFINED) when an invalid key is
+    /// resolved.  An error is returned when if the value does not contain an object
+    /// that has attributes.
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
         let value = match self.0 {
             ValueRepr::Map(ref items) => {
@@ -507,11 +516,19 @@ impl Value {
         Ok(value.unwrap_or(Value::UNDEFINED))
     }
 
+    /// Looks up an index of the value.
+    ///
+    /// This is a shortcut for [`get_item`](Self::get_item).
+    pub fn get_item_by_index(&self, idx: usize) -> Result<Value, Error> {
+        self.get_item(&Value(ValueRepr::U64(idx as _)))
+    }
+
     /// Looks up an item (or attribute) by key.
     ///
-    /// This is similar to [`get_attr`](Value::get_attr) but instead of using
+    /// This is similar to [`get_attr`](Self::get_attr) but instead of using
     /// a string key this can be any key.  For instance this can be used to
-    /// index into sequences.
+    /// index into sequences.  Like [`get_attr`](Self::get_attr) this returns
+    /// [`UNDEFINED`](Self::UNDEFINED) when an invalid key is looked up.
     pub fn get_item(&self, key: &Value) -> Result<Value, Error> {
         if let ValueRepr::Undefined = self.0 {
             Err(Error::from(ErrorKind::UndefinedError))
@@ -544,6 +561,18 @@ impl Value {
             _ => {}
         }
         None
+    }
+
+    /// If the value is a sequence it's returned as slice.
+    pub fn as_slice(&self) -> Result<&[Value], Error> {
+        match self.0 {
+            ValueRepr::Undefined | ValueRepr::None => Ok(&[][..]),
+            ValueRepr::Seq(ref v) => Ok(&v[..]),
+            _ => Err(Error::new(
+                ErrorKind::ImpossibleOperation,
+                "value is not a list",
+            )),
+        }
     }
 
     /// Calls the value directly.
@@ -591,16 +620,6 @@ impl Value {
             ValueRepr::Char(c) => Ok(Key::Char(c)),
             ValueRepr::String(ref s) => Ok(Key::String(s.clone())),
             _ => Err(ErrorKind::NonKey.into()),
-        }
-    }
-
-    pub(crate) fn as_slice(&self) -> Result<&[Value], Error> {
-        match self.0 {
-            ValueRepr::Seq(ref v) => Ok(&v[..]),
-            _ => Err(Error::new(
-                ErrorKind::ImpossibleOperation,
-                "value is not a list",
-            )),
         }
     }
 

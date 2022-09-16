@@ -12,6 +12,7 @@ All notable changes to MiniJinja are documented here.
   from outside the crate by sealed the traits.  (#113)
 - Added support for remaining arguments with `Rest`.  (#114)
 - Filters, tests and functions can now borrow arguments.  (#115)
+- Added `Value::as_slice` and `Value::get_get_item_by_index`.
 
 # 0.20.0
 
