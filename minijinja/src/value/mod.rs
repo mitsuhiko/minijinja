@@ -440,6 +440,16 @@ impl Value {
         }
     }
 
+    /// Returns the bytes of this value if they exist.
+    pub fn as_bytes(&self) -> Option<&[u8]> {
+        match &self.0 {
+            ValueRepr::String(ref s) => Some(s.as_bytes()),
+            ValueRepr::SafeString(ref s) => Some(s.as_bytes()),
+            ValueRepr::Bytes(ref b) => Some(&b[..]),
+            _ => None,
+        }
+    }
+
     /// Like `as_str` but always stringifies the value.
     #[allow(unused)]
     pub(crate) fn to_cowstr(&self) -> Cow<'_, str> {

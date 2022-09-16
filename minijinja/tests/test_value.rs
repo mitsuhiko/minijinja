@@ -77,6 +77,12 @@ fn test_value_as_slice() {
 }
 
 #[test]
+fn test_value_as_bytes() {
+    assert_eq!(Value::from("foo").as_bytes(), Some(&b"foo"[..]));
+    assert_eq!(Value::from(&b"foo"[..]).as_bytes(), Some(&b"foo"[..]));
+}
+
+#[test]
 fn test_value_by_index() {
     let val = Value::from(vec![1u32, 2, 3]);
     assert_eq!(val.get_item_by_index(0).unwrap(), Value::from(1));

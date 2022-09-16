@@ -91,6 +91,7 @@ where
 /// * floats: [`f32`], [`f64`]
 /// * bool: [`bool`]
 /// * string: [`String`], [`&str`], `Cow<'_, str>` ([`char`])
+/// * bytes: [`&[u8]`][`slice`]
 /// * values: [`Value`], `&Value`
 /// * vectors: [`Vec<T>`], `&[Value]`
 ///
@@ -106,6 +107,9 @@ where
 /// via [`ToString`] will take place, for the latter only values which are already
 /// strings will be passed.  A compromise between the two is `Cow<'_, str>` which
 /// will behave like `String` but borrows when possible.
+///
+/// Byte slices will borrow out of values carrying bytes or strings.  In the latter
+/// case the utf-8 bytes are returned.
 ///
 /// ## Notes on State
 ///
@@ -380,6 +384,20 @@ impl<'a> ArgType<'a> for &str {
             Some(value) => value
                 .as_str()
                 .ok_or_else(|| Error::new(ErrorKind::ImpossibleOperation, "value is not a string")),
+            None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for &[u8] {
+    type Output = &'a [u8];
+
+    #[inline(always)]
+    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+        match value {
+            Some(value) => value
+                .as_bytes()
+                .ok_or_else(|| Error::new(ErrorKind::ImpossibleOperation, "value is not in bytes")),
             None => Err(Error::new(ErrorKind::UndefinedError, "missing argument")),
         }
     }
