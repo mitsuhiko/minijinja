@@ -451,9 +451,9 @@ impl<'a> Parser<'a> {
         }
 
         match token {
-            Token::Ident("true") | Token::Ident("True") => Ok(const_val!(true)),
-            Token::Ident("false") | Token::Ident("False") => Ok(const_val!(false)),
-            Token::Ident("none") | Token::Ident("None") => Ok(const_val!(())),
+            Token::Ident("true" | "True") => Ok(const_val!(true)),
+            Token::Ident("false" | "False") => Ok(const_val!(false)),
+            Token::Ident("none" | "None") => Ok(const_val!(())),
             Token::Ident(name) => Ok(ast::Expr::Var(Spanned::new(ast::Var { id: name }, span))),
             Token::Str(val) => Ok(const_val!(val)),
             Token::Int(val) => Ok(const_val!(val)),
@@ -611,10 +611,13 @@ impl<'a> Parser<'a> {
             }
             if matches!(
                 self.stream.current()?,
-                Some((Token::ParenClose, _))
-                    | Some((Token::VariableEnd(..), _))
-                    | Some((Token::BlockEnd(..), _))
-                    | Some((Token::Ident("in"), _))
+                Some((
+                    Token::ParenClose
+                        | Token::VariableEnd(..)
+                        | Token::BlockEnd(..)
+                        | Token::Ident("in"),
+                    _
+                ))
             ) {
                 break;
             }
@@ -662,8 +665,7 @@ impl<'a> Parser<'a> {
             false
         };
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
-        let body =
-            self.subparse(&|tok| matches!(tok, Token::Ident("endfor") | Token::Ident("else")))?;
+        let body = self.subparse(&|tok| matches!(tok, Token::Ident("endfor" | "else")))?;
         let else_body = if matches!(self.stream.current()?, Some((Token::Ident("else"), _))) {
             self.stream.next()?;
             expect_token!(self, Token::BlockEnd(..), "end of block")?;
@@ -685,12 +687,8 @@ impl<'a> Parser<'a> {
     fn parse_if_cond(&mut self) -> Result<ast::IfCond<'a>, Error> {
         let expr = self.parse_expr_noif()?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
-        let true_body = self.subparse(&|tok| {
-            matches!(
-                tok,
-                Token::Ident("endif") | Token::Ident("else") | Token::Ident("elif")
-            )
-        })?;
+        let true_body =
+            self.subparse(&|tok| matches!(tok, Token::Ident("endif" | "else" | "elif")))?;
         let false_body = match self.stream.next()? {
             Some((Token::Ident("else"), _)) => {
                 expect_token!(self, Token::BlockEnd(..), "end of block")?;
@@ -751,7 +749,7 @@ impl<'a> Parser<'a> {
         if !in_paren
             && matches!(
                 self.stream.current()?,
-                Some((Token::BlockEnd(..), _)) | Some((Token::Pipe, _))
+                Some((Token::BlockEnd(..) | Token::Pipe, _))
             )
         {
             let filter = if matches!(self.stream.current()?, Some((Token::Pipe, _))) {

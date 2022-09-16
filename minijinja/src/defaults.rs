@@ -22,9 +22,9 @@ pub(crate) fn no_auto_escape(_: &str) -> AutoEscape {
 /// * [`None`](AutoEscape::None): _all others_
 pub fn default_auto_escape_callback(name: &str) -> AutoEscape {
     match name.rsplit('.').next() {
-        Some("html") | Some("htm") | Some("xml") => AutoEscape::Html,
+        Some("html" | "htm" | "xml") => AutoEscape::Html,
         #[cfg(feature = "json")]
-        Some("json") | Some("js") | Some("yaml") | Some("yml") => AutoEscape::Json,
+        Some("json" | "js" | "yaml" | "yml") => AutoEscape::Json,
         _ => AutoEscape::None,
     }
 }
