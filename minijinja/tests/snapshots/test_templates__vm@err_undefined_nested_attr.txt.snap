@@ -1,0 +1,34 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ seq.whatever }}\n{{ seq.whatever.else }}"
+info:
+  seq:
+    - 1
+    - 2
+    - 3
+input_file: minijinja/tests/inputs/err_undefined_nested_attr.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: UndefinedError,
+    name: "err_undefined_nested_attr.txt",
+    line: 2,
+}
+
+---------------------------- Template Source -----------------------------
+   1 | {{ seq.whatever }}
+   2 > {{ seq.whatever.else }}
+     i       ^^^^^^^^^^^^^^ undefined value
+--------------------------------------------------------------------------
+Referenced variables: {
+    seq: [
+        1,
+        2,
+        3,
+    ],
+}
+--------------------------------------------------------------------------
+
+
+

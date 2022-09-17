@@ -4,6 +4,7 @@ use std::fmt;
 #[cfg(test)]
 use similar_asserts::assert_eq;
 
+use crate::compiler::tokens::Span;
 use crate::value::Value;
 
 /// This loop has the loop var.
@@ -182,15 +183,23 @@ pub enum Instruction<'source> {
 }
 
 #[derive(Copy, Clone)]
-struct Loc {
+struct LineInfo {
     first_instruction: u32,
     line: u32,
+}
+
+#[derive(Copy, Clone)]
+struct SpanInfo {
+    first_instruction: u32,
+    span: Option<Span>,
 }
 
 /// Wrapper around instructions to help with location management.
 pub struct Instructions<'source> {
     pub(crate) instructions: Vec<Instruction<'source>>,
-    locations: Vec<Loc>,
+    line_infos: Vec<LineInfo>,
+    #[cfg(feature = "debug")]
+    span_infos: Vec<SpanInfo>,
     name: &'source str,
     source: &'source str,
 }
@@ -200,7 +209,9 @@ impl<'source> Instructions<'source> {
     pub fn new(name: &'source str, source: &'source str) -> Instructions<'source> {
         Instructions {
             instructions: Vec::new(),
-            locations: Vec::new(),
+            line_infos: Vec::new(),
+            #[cfg(feature = "debug")]
+            span_infos: Vec::new(),
             name,
             source,
         }
@@ -234,33 +245,77 @@ impl<'source> Instructions<'source> {
         rv
     }
 
-    /// Adds a new instruction with location info.
-    pub fn add_with_line(&mut self, instr: Instruction<'source>, line: usize) -> usize {
-        let rv = self.add(instr);
+    fn add_line_record(&mut self, instr: usize, line: usize) {
         let same_loc = self
-            .locations
+            .line_infos
             .last()
             .map_or(false, |last_loc| last_loc.line as usize == line);
         if !same_loc {
-            self.locations.push(Loc {
-                first_instruction: rv as u32,
+            self.line_infos.push(LineInfo {
+                first_instruction: instr as u32,
                 line: line as u32,
             });
         }
+    }
+
+    /// Adds a new instruction with line number.
+    pub fn add_with_line(&mut self, instr: Instruction<'source>, line: usize) -> usize {
+        let rv = self.add(instr);
+        self.add_line_record(rv, line);
+        rv
+    }
+
+    /// Adds a new instruction with span.
+    pub fn add_with_span(&mut self, instr: Instruction<'source>, span: Span) -> usize {
+        let rv = self.add(instr);
+        #[cfg(feature = "debug")]
+        {
+            let same_loc = self
+                .span_infos
+                .last()
+                .map_or(false, |last_loc| last_loc.span == Some(span));
+            if !same_loc {
+                self.span_infos.push(SpanInfo {
+                    first_instruction: rv as u32,
+                    span: Some(span),
+                });
+            }
+        }
+        self.add_line_record(rv, span.start_line);
         rv
     }
 
     /// Looks up the line for an instruction
     pub fn get_line(&self, idx: usize) -> Option<usize> {
         let loc = match self
-            .locations
+            .line_infos
             .binary_search_by_key(&idx, |x| x.first_instruction as usize)
         {
-            Ok(idx) => &self.locations[idx as usize],
+            Ok(idx) => &self.line_infos[idx as usize],
             Err(0) => return None,
-            Err(idx) => &self.locations[idx as usize - 1],
+            Err(idx) => &self.line_infos[idx as usize - 1],
         };
         Some(loc.line as usize)
+    }
+
+    /// Looks up a span for an instruction.
+    pub fn get_span(&self, idx: usize) -> Option<Span> {
+        #[cfg(feature = "debug")]
+        {
+            let loc = match self
+                .span_infos
+                .binary_search_by_key(&idx, |x| x.first_instruction as usize)
+            {
+                Ok(idx) => &self.span_infos[idx as usize],
+                Err(0) => return None,
+                Err(idx) => &self.span_infos[idx as usize - 1],
+            };
+            loc.span
+        }
+        #[cfg(not(feature = "debug"))]
+        {
+            None
+        }
     }
 
     /// Returns a list of all names referenced in the current block backwards

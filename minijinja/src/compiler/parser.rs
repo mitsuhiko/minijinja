@@ -65,7 +65,7 @@ enum SetParseResult<'a> {
 struct TokenStream<'a> {
     iter: Box<dyn Iterator<Item = Result<(Token<'a>, Span), Error>> + 'a>,
     current: Option<Result<(Token<'a>, Span), Error>>,
-    current_span: Span,
+    last_span: Span,
 }
 
 impl<'a> TokenStream<'a> {
@@ -74,7 +74,7 @@ impl<'a> TokenStream<'a> {
         TokenStream {
             iter: (Box::new(tokenize(source, in_expr)) as Box<dyn Iterator<Item = _>>),
             current: None,
-            current_span: Span::default(),
+            last_span: Span::default(),
         }
     }
 
@@ -84,7 +84,7 @@ impl<'a> TokenStream<'a> {
         let rv = self.current.take();
         self.current = self.iter.next();
         if let Some(Ok((_, span))) = rv {
-            self.current_span = span;
+            self.last_span = span;
         }
         rv.transpose()
     }
@@ -105,15 +105,25 @@ impl<'a> TokenStream<'a> {
     /// Expands the span
     #[inline(always)]
     pub fn expand_span(&self, mut span: Span) -> Span {
-        span.end_line = self.current_span.end_line;
-        span.end_col = self.current_span.end_col;
+        span.end_line = self.last_span.end_line;
+        span.end_col = self.last_span.end_col;
         span
+    }
+
+    /// Returns the current span.
+    #[inline(always)]
+    pub fn current_span(&self) -> Span {
+        if let Some(Ok((_, span))) = self.current {
+            span
+        } else {
+            self.last_span
+        }
     }
 
     /// Returns the last seen span.
     #[inline(always)]
-    pub fn current_span(&self) -> Span {
-        self.current_span
+    pub fn last_span(&self) -> Span {
+        self.last_span
     }
 }
 
@@ -175,7 +185,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_ifexpr(&mut self) -> Result<ast::Expr<'a>, Error> {
-        let mut span = self.stream.current_span();
+        let mut span = self.stream.last_span();
         let mut expr = self.parse_or()?;
         loop {
             if matches!(self.stream.current()?, Some((Token::Ident("if"), _))) {
@@ -195,7 +205,7 @@ impl<'a> Parser<'a> {
                     },
                     self.stream.expand_span(span),
                 ));
-                span = self.stream.current_span();
+                span = self.stream.last_span();
             } else {
                 break;
             }
@@ -214,7 +224,7 @@ impl<'a> Parser<'a> {
     });
 
     fn parse_compare(&mut self) -> Result<ast::Expr<'a>, Error> {
-        let mut span = self.stream.current_span();
+        let mut span = self.stream.last_span();
         let mut expr = self.parse_math1()?;
         loop {
             let mut negated = false;
@@ -254,7 +264,7 @@ impl<'a> Parser<'a> {
                     self.stream.expand_span(span),
                 ));
             }
-            span = self.stream.current_span();
+            span = self.stream.last_span();
         }
         Ok(expr)
     }
@@ -280,16 +290,22 @@ impl<'a> Parser<'a> {
     });
 
     fn parse_unary(&mut self) -> Result<ast::Expr<'a>, Error> {
+        let span = self.stream.current_span();
         let mut expr = self.parse_unary_only()?;
-        expr = self.parse_postfix(expr)?;
+        expr = self.parse_postfix(expr, span)?;
         self.parse_filter_expr(expr)
     }
 
-    fn parse_postfix(&mut self, expr: ast::Expr<'a>) -> Result<ast::Expr<'a>, Error> {
+    fn parse_postfix(
+        &mut self,
+        expr: ast::Expr<'a>,
+        mut span: Span,
+    ) -> Result<ast::Expr<'a>, Error> {
         let mut expr = expr;
         loop {
+            let next_span = self.stream.current_span();
             match self.stream.current()? {
-                Some((Token::Dot, span)) => {
+                Some((Token::Dot, _)) => {
                     self.stream.next()?;
                     let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
                     expr = ast::Expr::GetAttr(Spanned::new(
@@ -297,7 +313,7 @@ impl<'a> Parser<'a> {
                         self.stream.expand_span(span),
                     ));
                 }
-                Some((Token::BracketOpen, span)) => {
+                Some((Token::BracketOpen, _)) => {
                     self.stream.next()?;
                     let subscript_expr = self.parse_expr()?;
                     expect_token!(self, Token::BracketClose, "`]`")?;
@@ -309,7 +325,7 @@ impl<'a> Parser<'a> {
                         self.stream.expand_span(span),
                     ));
                 }
-                Some((Token::ParenOpen, span)) => {
+                Some((Token::ParenOpen, _)) => {
                     let args = self.parse_args()?;
                     expr = ast::Expr::Call(Spanned::new(
                         ast::Call { expr, args },
@@ -318,6 +334,7 @@ impl<'a> Parser<'a> {
                 }
                 _ => break,
             }
+            span = next_span;
         }
         Ok(expr)
     }
@@ -894,7 +911,7 @@ impl<'a> Parser<'a> {
     pub fn parse(&mut self) -> Result<ast::Stmt<'a>, Error> {
         // start the stream
         self.stream.next()?;
-        let span = self.stream.current_span();
+        let span = self.stream.last_span();
         Ok(ast::Stmt::Template(Spanned::new(
             ast::Template {
                 children: self.subparse(&|_| false)?,
@@ -924,7 +941,7 @@ pub fn parse<'source, 'name>(
     let mut parser = Parser::new(source, false);
     parser.parse().map_err(|mut err| {
         if err.line().is_none() {
-            err.set_location(filename, parser.stream.current_span().start_line)
+            err.set_filename_and_span(filename, parser.stream.last_span())
         }
         err
     })
@@ -935,7 +952,7 @@ pub fn parse_expr(source: &str) -> Result<ast::Expr<'_>, Error> {
     let mut parser = Parser::new(source, true);
     parser.parse_expr().map_err(|mut err| {
         if err.line().is_none() {
-            err.set_location("<expression>", parser.stream.current_span().start_line)
+            err.set_filename_and_span("<expression>", parser.stream.last_span())
         }
         err
     })

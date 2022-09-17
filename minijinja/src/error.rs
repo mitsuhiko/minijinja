@@ -28,6 +28,7 @@ pub struct Error {
     detail: Option<Cow<'static, str>>,
     name: Option<String>,
     lineno: usize,
+    span: Option<Span>,
     source: Option<Box<dyn std::error::Error + Send + Sync>>,
     #[cfg(feature = "debug")]
     pub(crate) debug_info: Option<DebugInfo>,
@@ -58,7 +59,7 @@ impl fmt::Debug for Error {
         {
             if let Some(info) = self.debug_info() {
                 writeln!(f)?;
-                render_debug_info(f, self.line(), info)?;
+                render_debug_info(f, self.kind, self.line(), self.span, info)?;
                 writeln!(f)?;
             }
         }
@@ -88,6 +89,8 @@ pub enum ErrorKind {
     UnknownFilter,
     /// A test is unknown
     UnknownTest,
+    /// A function is unknown
+    UnknownFunction,
     /// A bad escape sequence in a string was encountered.
     BadEscape,
     /// An operation on an undefined value was attempted.
@@ -109,9 +112,10 @@ impl ErrorKind {
             ErrorKind::TooManyArguments => "too many arguments",
             ErrorKind::MissingArgument => "missing argument",
             ErrorKind::UnknownFilter => "unknown filter",
+            ErrorKind::UnknownFunction => "unknown function",
             ErrorKind::UnknownTest => "unknown test",
             ErrorKind::BadEscape => "bad string escape",
-            ErrorKind::UndefinedError => "variable or attribute undefined",
+            ErrorKind::UndefinedError => "undefined value",
             ErrorKind::BadSerialization => "could not serialize to internal format",
             ErrorKind::WriteFailure => "failed to write output",
         }
@@ -138,7 +142,7 @@ impl fmt::Display for Error {
         {
             if f.alternate() {
                 if let Some(info) = self.debug_info() {
-                    render_debug_info(f, self.line(), info)?;
+                    render_debug_info(f, self.kind, self.line(), self.span, info)?;
                 }
             }
         }
@@ -154,15 +158,22 @@ impl Error {
             detail: Some(detail.into()),
             name: None,
             lineno: 0,
+            span: None,
             source: None,
             #[cfg(feature = "debug")]
             debug_info: None,
         }
     }
 
-    pub(crate) fn set_location(&mut self, filename: &str, lineno: usize) {
+    pub(crate) fn set_filename_and_line(&mut self, filename: &str, lineno: usize) {
         self.name = Some(filename.into());
         self.lineno = lineno;
+    }
+
+    pub(crate) fn set_filename_and_span(&mut self, filename: &str, span: Span) {
+        self.name = Some(filename.into());
+        self.span = Some(span);
+        self.lineno = span.start_line;
     }
 
     pub(crate) fn new_not_found(name: &str) -> Error {
@@ -219,6 +230,7 @@ impl From<ErrorKind> for Error {
             detail: None,
             name: None,
             lineno: 0,
+            span: None,
             source: None,
             #[cfg(feature = "debug")]
             debug_info: None,
@@ -297,7 +309,9 @@ mod debug_info {
 
     pub(super) fn render_debug_info(
         f: &mut fmt::Formatter,
+        kind: ErrorKind,
         line: Option<usize>,
+        span: Option<Span>,
         info: &DebugInfo,
     ) -> fmt::Result {
         if let Some(source) = info.source() {
@@ -311,7 +325,20 @@ mod debug_info {
             for (idx, line) in pre {
                 writeln!(f, "{:>4} | {}", idx + 1, line).unwrap();
             }
+
             writeln!(f, "{:>4} > {}", idx + 1, lines[idx].1).unwrap();
+            if let Some(span) = span {
+                if span.start_line == span.end_line {
+                    writeln!(
+                        f,
+                        "     i {}{} {}",
+                        " ".repeat(span.start_col),
+                        "^".repeat(span.end_col - span.start_col),
+                        kind,
+                    )?;
+                }
+            }
+
             for (idx, line) in post {
                 writeln!(f, "{:>4} | {}", idx + 1, line).unwrap();
             }
@@ -348,6 +375,8 @@ pub fn attach_basic_debug_info<T>(rv: Result<T, Error>, source: &str) -> Result<
         rv
     }
 }
+
+use crate::compiler::tokens::Span;
 
 #[cfg(feature = "debug")]
 pub(crate) use self::debug_info::*;

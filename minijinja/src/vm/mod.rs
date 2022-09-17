@@ -355,8 +355,8 @@ impl<'env> Vm<'env> {
                         stack.push(try_ctx!(func.call(state, args)));
                     } else {
                         bail!(Error::new(
-                            ErrorKind::ImpossibleOperation,
-                            format!("unknown function {}", function_name),
+                            ErrorKind::UnknownFunction,
+                            format!("{} is unknown", function_name),
                         ));
                     }
                 }
@@ -632,8 +632,10 @@ impl<'env> Vm<'env> {
 }
 
 fn process_err(mut err: Error, pc: usize, state: &State) -> Error {
-    if let Some(lineno) = state.instructions.get_line(pc) {
-        err.set_location(state.instructions.name(), lineno);
+    if let Some(span) = state.instructions.get_span(pc) {
+        err.set_filename_and_span(state.instructions.name(), span);
+    } else if let Some(lineno) = state.instructions.get_line(pc) {
+        err.set_filename_and_line(state.instructions.name(), lineno);
     }
     #[cfg(feature = "debug")]
     {

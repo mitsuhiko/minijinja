@@ -1,23 +1,24 @@
 ---
 source: minijinja/tests/test_templates.rs
-description: "{{ undefined_value.attr }}"
+description: "This is {{ an_unknown_function() }}!"
 info: {}
-input_file: minijinja/tests/inputs/err_undefined_attr.txt
+input_file: minijinja/tests/inputs/err_bad_call.txt
 ---
 !!!ERROR!!!
 
 Error {
-    kind: UndefinedError,
-    name: "err_undefined_attr.txt",
+    kind: UnknownFunction,
+    detail: "an_unknown_function is unknown",
+    name: "err_bad_call.txt",
     line: 1,
 }
 
 ---------------------------- Template Source -----------------------------
-   1 > {{ undefined_value.attr }}
-     i    ^^^^^^^^^^^^^^^^^^^^ undefined value
+   1 > This is {{ an_unknown_function() }}!
+     i            ^^^^^^^^^^^^^^^^^^^^^ unknown function
 --------------------------------------------------------------------------
 Referenced variables: {
-    undefined_value: Undefined,
+    an_unknown_function: Undefined,
 }
 --------------------------------------------------------------------------
 

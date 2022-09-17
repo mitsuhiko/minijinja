@@ -26,7 +26,7 @@ fn main() {
     let template = env.get_template("hello.txt").unwrap();
     let ctx = context! {
         seq => vec![2, 4, 8],
-        other_seq => (0..20).collect::<Vec<_>>(),
+        other_seq => (0..5).collect::<Vec<_>>(),
         bar => "test"
     };
     match template.render(&ctx) {

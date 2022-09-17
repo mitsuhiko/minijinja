@@ -25,7 +25,7 @@ run-tests:
 	@echo "CARGO TEST SPEEDUPS"
 	@cd minijinja; cargo test --no-default-features --features=speedups,$(FEATURES)
 	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
-	@cd minijinja; cargo check --no-default-features
+	@cd minijinja; cargo check --no-default-features --features=debug
 
 check:
 	@echo "check no default features:"

@@ -27,10 +27,6 @@ fn test_vm() {
         let contents = std::fs::read_to_string(path).unwrap();
         let mut iter = contents.splitn(2, "\n---\n");
         let mut env = Environment::new();
-        #[cfg(feature = "debug")]
-        {
-            env.set_debug(false);
-        }
         let ctx: serde_json::Value = serde_json::from_str(iter.next().unwrap()).unwrap();
 
         for (path, source) in &refs {
