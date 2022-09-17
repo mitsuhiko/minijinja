@@ -50,11 +50,9 @@ fn create_real_env() -> Environment<'static> {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("parse all_elements", |b| b.iter(do_parse));
-    c.bench_function("parse+compile all_elements", |b| {
-        b.iter(do_parse_and_compile)
-    });
-    c.bench_function("render all_elements", |b| {
+    c.bench_function("parse", |b| b.iter(do_parse));
+    c.bench_function("compile", |b| b.iter(do_parse_and_compile));
+    c.bench_function("render", |b| {
         let env = create_real_env();
         b.iter(|| do_render(&env));
     });
