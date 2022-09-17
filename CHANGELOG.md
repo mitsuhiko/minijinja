@@ -16,6 +16,7 @@ All notable changes to MiniJinja are documented here.
 - Added support for span error reporting. (#118)
 - Greatly improved handling of nested errors. (#119)
 - `ImpossibleOperation` is now `InvalidOperation`.
+- Added support for slice syntax. (#120)
 
 ## Breaking Changes
 
