@@ -38,6 +38,7 @@ minimal v0.1.0 (examples/minimal)
 * Support for all `serde` compatible types
 * Excellent test coverage
 * Support for dynamic runtime objects with methods and dynamic attributes
+* [Descriptive errors](examples/error)
 
 ## Example Template
 
