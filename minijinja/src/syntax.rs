@@ -137,7 +137,9 @@
 //!   `foo({"a": 1, "b": 2})`.
 //! - ``.`` / ``[]``: Get an attribute of an object.
 //! - ``[start:stop]`` / ``[start:stop:step]``: slices a list or string.  All three expressions
-//!   are optional (`start`, `stop`, `step`).
+//!   are optional (`start`, `stop`, `step`).  For instance ``"Hello World"[:5]`` will return
+//!   just `"Hello"`.  Likewise ``"Hello"[1:-1]`` will return `"ell"`.  The step component can
+//!   be used to change the step size.  `"12345"[::2]` will return `"135"`.
 //!
 //! ### If Expressions
 //!
