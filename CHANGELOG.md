@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# Unreleased
+
+- Add `defined` and `undefined` tests to always be included.
+
 # 0.21.0
 
 - Added custom autoescape settings.

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use crate::error::Error;
 use crate::filters::{self, BoxedFilter};
 use crate::output::Output;
-use crate::tests::BoxedTest;
+use crate::tests::{self, BoxedTest};
 use crate::utils::{write_escaped, AutoEscape};
 use crate::value::Value;
 use crate::vm::State;
@@ -89,15 +89,13 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<&'static str, filters::BoxedFilt
 }
 
 pub(crate) fn get_builtin_tests() -> BTreeMap<&'static str, BoxedTest> {
-    #[allow(unused_mut)]
     let mut rv = BTreeMap::new();
+    rv.insert("undefined", BoxedTest::new(tests::is_undefined));
+    rv.insert("defined", BoxedTest::new(tests::is_defined));
     #[cfg(feature = "builtins")]
     {
-        use crate::tests;
         rv.insert("odd", BoxedTest::new(tests::is_odd));
         rv.insert("even", BoxedTest::new(tests::is_even));
-        rv.insert("undefined", BoxedTest::new(tests::is_undefined));
-        rv.insert("defined", BoxedTest::new(tests::is_defined));
         rv.insert("number", BoxedTest::new(tests::is_number));
         rv.insert("string", BoxedTest::new(tests::is_string));
         rv.insert("sequence", BoxedTest::new(tests::is_sequence));

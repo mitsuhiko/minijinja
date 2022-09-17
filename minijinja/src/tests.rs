@@ -2,8 +2,8 @@
 //!
 //! Test functions in MiniJinja are like [`filters`](crate::filters) but a
 //! different syntax is used to invoke them and they have to return boolean
-//! values.  For instance the expression `{% if foo is odd %}` invokes the
-//! [`is_odd`] test to check if the value is indeed an odd number.
+//! values.  For instance the expression `{% if foo is defined %}` invokes the
+//! [`is_defined`] test to check if the value is indeed an odd number.
 //!
 //! MiniJinja comes with some built-in test functions that are listed below. To
 //! create a custom test write a function that takes at least a value argument
@@ -197,6 +197,16 @@ impl BoxedTest {
     }
 }
 
+/// Checks if a value is undefined.
+pub fn is_undefined(v: Value) -> bool {
+    v.is_undefined()
+}
+
+/// Checks if a value is defined.
+pub fn is_defined(v: Value) -> bool {
+    !v.is_undefined()
+}
+
 #[cfg(feature = "builtins")]
 mod builtins {
     use super::*;
@@ -216,18 +226,6 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_even(v: Value) -> bool {
         i128::try_from(v).ok().map_or(false, |x| x % 2 == 0)
-    }
-
-    /// Checks if a value is undefined.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_undefined(v: Value) -> bool {
-        v.is_undefined()
-    }
-
-    /// Checks if a value is defined.
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_defined(v: Value) -> bool {
-        !v.is_undefined()
     }
 
     /// Checks if this value is a number.
