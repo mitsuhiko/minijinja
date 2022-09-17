@@ -17,16 +17,17 @@ input_file: minijinja/tests/inputs/loop_bad_unpacking_wrong_len.txt
 !!!ERROR!!!
 
 Error {
-    kind: ImpossibleOperation,
-    detail: "cannot unpack: sequence of wrong length (expected 2, got 3)",
+    kind: CannotUnpack,
+    detail: "sequence of wrong length (expected 2, got 3)",
     name: "loop_bad_unpacking_wrong_len.txt",
     line: 2,
 }
 
+cannot unpack: sequence of wrong length (expected 2, got 3) (in loop_bad_unpacking_wrong_len.txt:2)
 ---------------------------- Template Source -----------------------------
    1 | <ul>
    2 > {% for a, b in seq %}
-     i        ^^^^ impossible operation
+     i        ^^^^ cannot unpack
    3 |   <li>{{ a }}: {{ b }}
    4 | {% endfor %}
    5 | </ul>
@@ -62,6 +63,4 @@ Referenced variables: {
     ],
 }
 --------------------------------------------------------------------------
-
-
 

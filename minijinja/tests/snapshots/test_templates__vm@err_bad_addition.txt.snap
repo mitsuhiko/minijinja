@@ -13,12 +13,11 @@ Error {
     line: 1,
 }
 
+impossible operation: tried to use + operator on unsupported types sequence and number (in err_bad_addition.txt:1)
 ---------------------------- Template Source -----------------------------
    1 > {{ [1, 2] + 23 }}
      i    ^^^^^^^^^^^ impossible operation
 --------------------------------------------------------------------------
 Referenced variables:
 --------------------------------------------------------------------------
-
-
 

@@ -13,6 +13,7 @@ Error {
     line: 1,
 }
 
+unknown function: an_unknown_function is unknown (in err_bad_call.txt:1)
 ---------------------------- Template Source -----------------------------
    1 > This is {{ an_unknown_function() }}!
      i            ^^^^^^^^^^^^^^^^^^^^^ unknown function
@@ -21,6 +22,4 @@ Referenced variables: {
     an_unknown_function: Undefined,
 }
 --------------------------------------------------------------------------
-
-
 

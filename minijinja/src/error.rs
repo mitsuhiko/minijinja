@@ -5,7 +5,12 @@ use std::fmt;
 ///
 /// If debug mode is enabled a template error contains additional debug
 /// information that can be displayed by formatting an error with the
-/// alternative formatting (``format!("{:#}", err)``).
+/// alternative formatting (``format!("{:#}", err)``).  That information
+/// is also shown for the [`Debug`] display where the extended information
+/// is hidden when the alternative formatting is used.
+///
+/// Since MiniJinja takes advantage of chained errors it's recommended
+/// to render the entire chain to better understand the causes.
 ///
 /// # Example
 ///
@@ -18,8 +23,14 @@ use std::fmt;
 /// match template.render(ctx) {
 ///     Ok(result) => println!("{}", result),
 ///     Err(err) => {
-///         eprintln!("Could not render template:");
-///         eprintln!("  {:#}", err);
+///         eprintln!("Could not render template: {:#}", err);
+///         // render causes as well
+///         let mut err = &err as &dyn std::error::Error;
+///         while let Some(next_err) = err.source() {
+///             eprintln!();
+///             eprintln!("caused by: {:#}", next_err);
+///             err = next_err;
+///         }
 ///     }
 /// }
 /// ```
@@ -57,10 +68,12 @@ impl fmt::Debug for Error {
         // error struct dump.
         #[cfg(feature = "debug")]
         {
-            if let Some(info) = self.debug_info() {
-                writeln!(f)?;
-                render_debug_info(f, self.kind, self.line(), self.span, info)?;
-                writeln!(f)?;
+            if !f.alternate() {
+                if let Some(info) = self.debug_info() {
+                    writeln!(f)?;
+                    render_debug_info(f, self.kind, self.line(), self.span, info)?;
+                    writeln!(f)?;
+                }
             }
         }
 
@@ -97,6 +110,12 @@ pub enum ErrorKind {
     UndefinedError,
     /// Impossible to serialize this value.
     BadSerialization,
+    /// An error happened in an include.
+    BadInclude,
+    /// An error happened in a super block.
+    EvalBlock,
+    /// Unable to unpack a value.
+    CannotUnpack,
     /// Failed writing output.
     WriteFailure,
 }
@@ -117,6 +136,9 @@ impl ErrorKind {
             ErrorKind::BadEscape => "bad string escape",
             ErrorKind::UndefinedError => "undefined value",
             ErrorKind::BadSerialization => "could not serialize to internal format",
+            ErrorKind::BadInclude => "could not render an included template",
+            ErrorKind::EvalBlock => "could not render block",
+            ErrorKind::CannotUnpack => "cannot unpack",
             ErrorKind::WriteFailure => "failed to write output",
         }
     }

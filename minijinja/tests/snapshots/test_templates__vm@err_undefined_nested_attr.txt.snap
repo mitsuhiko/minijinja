@@ -16,6 +16,7 @@ Error {
     line: 2,
 }
 
+undefined value (in err_undefined_nested_attr.txt:2)
 ---------------------------- Template Source -----------------------------
    1 | {{ seq.whatever }}
    2 > {{ seq.whatever.else }}
@@ -29,6 +30,4 @@ Referenced variables: {
     ],
 }
 --------------------------------------------------------------------------
-
-
 

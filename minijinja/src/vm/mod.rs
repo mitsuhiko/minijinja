@@ -280,7 +280,27 @@ impl<'env> Vm<'env> {
                     state.current_block = Some(name);
                     if let Some(layers) = state.blocks.get(name) {
                         let instructions = layers.first().unwrap();
-                        try_ctx!(self.sub_eval(state, out, instructions, state.blocks.clone()));
+                        let referenced_template = match instructions.name() {
+                            name if name != state.instructions.name() => Some(name),
+                            _ => None,
+                        };
+                        try_ctx!(self
+                            .sub_eval(state, out, instructions, state.blocks.clone())
+                            .map_err(|err| {
+                                Error::new(
+                                    ErrorKind::EvalBlock,
+                                    match referenced_template {
+                                        Some(template) => format!(
+                                            "happend in replaced block \"{}\" of \"{}\"",
+                                            name, template
+                                        ),
+                                        None => {
+                                            format!("happend in local block \"{}\"", name)
+                                        }
+                                    },
+                                )
+                                .with_source(err)
+                            }));
                     } else {
                         bail!(Error::new(
                             ErrorKind::ImpossibleOperation,
@@ -429,7 +449,14 @@ impl<'env> Vm<'env> {
             }
             let original_escape = state.auto_escape;
             state.auto_escape = tmpl.initial_auto_escape();
-            self.sub_eval(state, out, instructions, referenced_blocks)?;
+            self.sub_eval(state, out, instructions, referenced_blocks)
+                .map_err(|err| {
+                    Error::new(
+                        ErrorKind::BadInclude,
+                        format!("happend in \"{}\"", instructions.name()),
+                    )
+                    .with_source(err)
+                })?;
             state.auto_escape = original_escape;
             return Ok(());
         }
@@ -476,7 +503,10 @@ impl<'env> Vm<'env> {
             if capture {
                 out.begin_capture();
             }
-            self.sub_eval(state, out, instructions, state.blocks.clone())?;
+            self.sub_eval(state, out, instructions, state.blocks.clone())
+                .map_err(|err| {
+                    Error::new(ErrorKind::EvalBlock, "happend in super block").with_source(err)
+                })?;
             if capture {
                 Ok(out.end_capture(state.auto_escape))
             } else {
@@ -584,18 +614,14 @@ impl<'env> Vm<'env> {
 
     fn unpack_list(&self, stack: &mut Stack, count: &usize) -> Result<(), Error> {
         let top = stack.pop();
-        let v = top.as_slice().map_err(|e| {
-            Error::new(
-                ErrorKind::ImpossibleOperation,
-                "cannot unpack: not a sequence",
-            )
-            .with_source(e)
-        })?;
+        let v = top
+            .as_slice()
+            .map_err(|e| Error::new(ErrorKind::CannotUnpack, "not a sequence").with_source(e))?;
         if v.len() != *count {
             return Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::CannotUnpack,
                 format!(
-                    "cannot unpack: sequence of wrong length (expected {}, got {})",
+                    "sequence of wrong length (expected {}, got {})",
                     *count,
                     v.len()
                 ),
@@ -632,11 +658,15 @@ impl<'env> Vm<'env> {
 }
 
 fn process_err(mut err: Error, pc: usize, state: &State) -> Error {
-    if let Some(span) = state.instructions.get_span(pc) {
-        err.set_filename_and_span(state.instructions.name(), span);
-    } else if let Some(lineno) = state.instructions.get_line(pc) {
-        err.set_filename_and_line(state.instructions.name(), lineno);
+    // only attach line information if the error does not have line info yet.
+    if err.line().is_none() {
+        if let Some(span) = state.instructions.get_span(pc) {
+            err.set_filename_and_span(state.instructions.name(), span);
+        } else if let Some(lineno) = state.instructions.get_line(pc) {
+            err.set_filename_and_line(state.instructions.name(), lineno);
+        }
     }
+    // only attach debug info if we don't have one yet and we are in debug mode.
     #[cfg(feature = "debug")]
     {
         if state.env.debug() && err.debug_info.is_none() {

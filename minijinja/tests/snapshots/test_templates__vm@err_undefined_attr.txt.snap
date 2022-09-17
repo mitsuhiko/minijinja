@@ -12,6 +12,7 @@ Error {
     line: 1,
 }
 
+undefined value (in err_undefined_attr.txt:1)
 ---------------------------- Template Source -----------------------------
    1 > {{ undefined_value.attr }}
      i    ^^^^^^^^^^^^^^^^^^^^ undefined value
@@ -20,6 +21,4 @@ Referenced variables: {
     undefined_value: Undefined,
 }
 --------------------------------------------------------------------------
-
-
 

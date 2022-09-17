@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt::Write;
 use std::fs;
 
 use minijinja::{context, Environment, Error, State};
@@ -38,11 +39,25 @@ fn test_vm() {
         env.add_template(filename, content).unwrap();
         let template = env.get_template(filename).unwrap();
 
-        let mut rendered = match template.render(&ctx) {
-            Ok(rendered) => rendered,
-            Err(err) => format!("!!!ERROR!!!\n\n{:#?}\n", err),
+        let rendered = match template.render(&ctx) {
+            Ok(mut rendered) => {
+                rendered.push('\n');
+                rendered
+            }
+            Err(err) => {
+                let mut rendered = format!("!!!ERROR!!!\n\n{:#?}\n\n", err);
+
+                writeln!(rendered, "{:#}", err).unwrap();
+                let mut err = &err as &dyn std::error::Error;
+                while let Some(next_err) = err.source() {
+                    writeln!(rendered).unwrap();
+                    writeln!(rendered, "caused by: {:#}", next_err).unwrap();
+                    err = next_err;
+                }
+
+                rendered
+            }
         };
-        rendered.push('\n');
 
         insta::with_settings!({
             info => &ctx,

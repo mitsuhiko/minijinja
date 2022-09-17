@@ -13,11 +13,11 @@ Error {
     line: 1,
 }
 
+impossible operation: cannot super outside of block (in block_super_err.txt:1)
 ---------------------------- Template Source -----------------------------
    1 > {{ super() }}
+     i    ^^^^^^^ impossible operation
 --------------------------------------------------------------------------
 Referenced variables:
 --------------------------------------------------------------------------
-
-
 

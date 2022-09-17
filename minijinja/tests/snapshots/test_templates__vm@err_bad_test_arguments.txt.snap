@@ -16,6 +16,7 @@ Error {
     line: 2,
 }
 
+too many arguments (in err_bad_test_arguments.txt:2)
 ---------------------------- Template Source -----------------------------
    1 | {% for item in seq %}
    2 >   {% if item is even(42) %}
@@ -44,6 +45,4 @@ Referenced variables: {
     ],
 }
 --------------------------------------------------------------------------
-
-
 
