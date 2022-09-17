@@ -31,13 +31,13 @@ minimal v0.1.0 (examples/minimal)
 
 **Goals:**
 
-* Well documented, compact API
-* Minimal dependencies, reasonable compile times and decent runtime performance
-* Stay close as possible to Jinja2
-* Support for expression evaluation
-* Support for all `serde` compatible types
-* Excellent test coverage
-* Support for dynamic runtime objects with methods and dynamic attributes
+* [Well documented](https://docs.rs/minijinja), compact API
+* Minimal dependencies, reasonable compile times and [decent runtime performance](benchmarks)
+* [Stay close as possible](COMPATIBILITY.md) to Jinja2
+* Support for [expression evaluation](https://docs.rs/minijinja/latest/minijinja/struct.Expression.html)
+* Support for all [`serde`](https://serde.rs) compatible types
+* [Well tested](tests)
+* Support for [dynamic runtime objects](https://docs.rs/minijinja/latest/minijinja/value/trait.Object.html) with methods and dynamic attributes
 * [Descriptive errors](examples/error)
 
 ## Example Template
