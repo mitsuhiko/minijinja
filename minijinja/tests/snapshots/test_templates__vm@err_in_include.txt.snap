@@ -24,11 +24,11 @@ Error {
     },
 }
 
-could not evaluate an included template: happend in "a_plus_b.txt" (in err_in_include.txt:2)
+could not render an included template: happend in "a_plus_b.txt" (in err_in_include.txt:2)
 ---------------------------- Template Source -----------------------------
    1 | {% for a in seq %}
    2 >   This fails in the include: {% include "a_plus_b.txt" %}
-     i                                 ^^^^^^^^^^^^^^^^^^^^^^ could not evaluate an included template
+     i                                 ^^^^^^^^^^^^^^^^^^^^^^ could not render an included template
    3 | {% endfor %}
 --------------------------------------------------------------------------
 Referenced variables: {

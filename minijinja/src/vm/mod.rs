@@ -280,7 +280,27 @@ impl<'env> Vm<'env> {
                     state.current_block = Some(name);
                     if let Some(layers) = state.blocks.get(name) {
                         let instructions = layers.first().unwrap();
-                        try_ctx!(self.sub_eval(state, out, instructions, state.blocks.clone()));
+                        let referenced_template = match instructions.name() {
+                            name if name != state.instructions.name() => Some(name),
+                            _ => None,
+                        };
+                        try_ctx!(self
+                            .sub_eval(state, out, instructions, state.blocks.clone())
+                            .map_err(|err| {
+                                Error::new(
+                                    ErrorKind::EvalBlock,
+                                    match referenced_template {
+                                        Some(template) => format!(
+                                            "happend in replaced block \"{}\" of \"{}\"",
+                                            name, template
+                                        ),
+                                        None => {
+                                            format!("happend in local block \"{}\"", name)
+                                        }
+                                    },
+                                )
+                                .with_source(err)
+                            }));
                     } else {
                         bail!(Error::new(
                             ErrorKind::ImpossibleOperation,
@@ -483,7 +503,10 @@ impl<'env> Vm<'env> {
             if capture {
                 out.begin_capture();
             }
-            self.sub_eval(state, out, instructions, state.blocks.clone())?;
+            self.sub_eval(state, out, instructions, state.blocks.clone())
+                .map_err(|err| {
+                    Error::new(ErrorKind::EvalBlock, "happend in super block").with_source(err)
+                })?;
             if capture {
                 Ok(out.end_capture(state.auto_escape))
             } else {

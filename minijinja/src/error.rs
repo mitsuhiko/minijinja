@@ -101,6 +101,8 @@ pub enum ErrorKind {
     BadSerialization,
     /// An error happened in an include.
     BadInclude,
+    /// An error happened in a super block.
+    EvalBlock,
     /// Unable to unpack a value.
     CannotUnpack,
     /// Failed writing output.
@@ -123,7 +125,8 @@ impl ErrorKind {
             ErrorKind::BadEscape => "bad string escape",
             ErrorKind::UndefinedError => "undefined value",
             ErrorKind::BadSerialization => "could not serialize to internal format",
-            ErrorKind::BadInclude => "could not evaluate an included template",
+            ErrorKind::BadInclude => "could not render an included template",
+            ErrorKind::EvalBlock => "could not render block",
             ErrorKind::CannotUnpack => "cannot unpack",
             ErrorKind::WriteFailure => "failed to write output",
         }

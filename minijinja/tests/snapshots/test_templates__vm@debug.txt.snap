@@ -73,6 +73,7 @@ State {
         ],
         templates: [
             "a_plus_b.txt",
+            "bad_basic_block.txt",
             "debug.txt",
             "simple_include.txt",
             "simple_layout.txt",

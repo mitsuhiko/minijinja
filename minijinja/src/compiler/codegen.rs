@@ -314,7 +314,9 @@ impl<'source> CodeGenerator<'source> {
         if let ast::Expr::Call(call) = &expr.expr {
             if let ast::Expr::Var(var) = &call.expr {
                 if var.id == "super" && call.args.is_empty() {
+                    self.push_span(call.span());
                     self.add(Instruction::FastSuper);
+                    self.pop_span();
                     return Ok(());
                 }
                 if var.id == "loop" && call.args.len() == 1 {

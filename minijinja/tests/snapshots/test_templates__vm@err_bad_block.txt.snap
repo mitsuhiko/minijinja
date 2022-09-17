@@ -1,0 +1,40 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{% extends \"simple_layout.txt\" %}\n{% block title %}{{ missing_function() }}{% endblock %}"
+info: {}
+input_file: minijinja/tests/inputs/err_bad_block.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: EvalBlock,
+    detail: "happend in replaced block \"title\" of \"err_bad_block.txt\"",
+    name: "simple_layout.txt",
+    line: 1,
+    source: Error {
+        kind: UnknownFunction,
+        detail: "missing_function is unknown",
+        name: "err_bad_block.txt",
+        line: 2,
+    },
+}
+
+could not render block: happend in replaced block "title" of "err_bad_block.txt" (in simple_layout.txt:1)
+---------------------------- Template Source -----------------------------
+   1 > <title>{% block title %}default title{% endblock %}</title>
+   2 | {% block body %}default body{% endblock %}
+--------------------------------------------------------------------------
+Referenced variables:
+--------------------------------------------------------------------------
+
+caused by: unknown function: missing_function is unknown (in err_bad_block.txt:2)
+---------------------------- Template Source -----------------------------
+   1 | {% extends "simple_layout.txt" %}
+   2 > {% block title %}{{ missing_function() }}{% endblock %}
+     i                     ^^^^^^^^^^^^^^^^^^ unknown function
+--------------------------------------------------------------------------
+Referenced variables: {
+    missing_function: Undefined,
+}
+--------------------------------------------------------------------------
+
