@@ -574,7 +574,7 @@ impl Value {
             ValueRepr::Undefined | ValueRepr::None => Ok(&[][..]),
             ValueRepr::Seq(ref v) => Ok(&v[..]),
             _ => Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 format!("value of type {} is not a sequence", self.kind()),
             )),
         }
@@ -586,7 +586,7 @@ impl Value {
             dy.call(state, args)
         } else {
             Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 format!("value of type {} is not callable", self.kind()),
             ))
         }
@@ -603,7 +603,7 @@ impl Value {
             dy.call_method(state, name, args)
         } else {
             Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 format!("object has no method named {}", name),
             ))
         }
@@ -662,7 +662,7 @@ impl Value {
             ),
             _ => {
                 return Err(Error::new(
-                    ErrorKind::ImpossibleOperation,
+                    ErrorKind::InvalidOperation,
                     "object is not iterable",
                 ))
             }

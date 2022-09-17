@@ -7,15 +7,15 @@ input_file: minijinja/tests/inputs/err_bad_unary.txt
 !!!ERROR!!!
 
 Error {
-    kind: ImpossibleOperation,
+    kind: InvalidOperation,
     name: "err_bad_unary.txt",
     line: 1,
 }
 
-impossible operation (in err_bad_unary.txt:1)
+invalid operation (in err_bad_unary.txt:1)
 ---------------------------- Template Source -----------------------------
    1 > {{ foo(-[1, 2]) }}
-     i        ^^^^^^^ impossible operation
+     i        ^^^^^^^ invalid operation
 --------------------------------------------------------------------------
 Referenced variables:
 --------------------------------------------------------------------------

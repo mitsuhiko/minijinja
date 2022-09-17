@@ -176,7 +176,7 @@ impl<'env> Vm<'env> {
                         stack.push(Value(ValueRepr::Seq(v)))
                     } else {
                         bail!(Error::new(
-                            ErrorKind::ImpossibleOperation,
+                            ErrorKind::InvalidOperation,
                             "cannot append to non-list"
                         ));
                     }
@@ -291,11 +291,11 @@ impl<'env> Vm<'env> {
                                     ErrorKind::EvalBlock,
                                     match referenced_template {
                                         Some(template) => format!(
-                                            "happend in replaced block \"{}\" of \"{}\"",
+                                            "error in replaced block \"{}\" of \"{}\"",
                                             name, template
                                         ),
                                         None => {
-                                            format!("happend in local block \"{}\"", name)
+                                            format!("error in local block \"{}\"", name)
                                         }
                                     },
                                 )
@@ -303,7 +303,7 @@ impl<'env> Vm<'env> {
                             }));
                     } else {
                         bail!(Error::new(
-                            ErrorKind::ImpossibleOperation,
+                            ErrorKind::InvalidOperation,
                             "tried to invoke unknown block"
                         ));
                     }
@@ -356,7 +356,7 @@ impl<'env> Vm<'env> {
                     if *function_name == "super" {
                         if !args.is_empty() {
                             bail!(Error::new(
-                                ErrorKind::ImpossibleOperation,
+                                ErrorKind::InvalidOperation,
                                 "super() takes no arguments",
                             ));
                         }
@@ -365,7 +365,7 @@ impl<'env> Vm<'env> {
                     } else if *function_name == "loop" {
                         if args.len() != 1 {
                             bail!(Error::new(
-                                ErrorKind::ImpossibleOperation,
+                                ErrorKind::InvalidOperation,
                                 format!("loop() takes one argument, got {}", args.len())
                             ));
                         }
@@ -427,7 +427,7 @@ impl<'env> Vm<'env> {
         for name in choices {
             let name = name.as_str().ok_or_else(|| {
                 Error::new(
-                    ErrorKind::ImpossibleOperation,
+                    ErrorKind::InvalidOperation,
                     "template name was not a string",
                 )
             })?;
@@ -453,7 +453,7 @@ impl<'env> Vm<'env> {
                 .map_err(|err| {
                     Error::new(
                         ErrorKind::BadInclude,
-                        format!("happend in \"{}\"", instructions.name()),
+                        format!("error in \"{}\"", instructions.name()),
                     )
                     .with_source(err)
                 })?;
@@ -491,7 +491,7 @@ impl<'env> Vm<'env> {
             Some(name) => name,
             None => {
                 return Err(Error::new(
-                    ErrorKind::ImpossibleOperation,
+                    ErrorKind::InvalidOperation,
                     "cannot super outside of block",
                 ));
             }
@@ -505,7 +505,7 @@ impl<'env> Vm<'env> {
             }
             self.sub_eval(state, out, instructions, state.blocks.clone())
                 .map_err(|err| {
-                    Error::new(ErrorKind::EvalBlock, "happend in super block").with_source(err)
+                    Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
                 })?;
             if capture {
                 Ok(out.end_capture(state.auto_escape))
@@ -523,13 +523,13 @@ impl<'env> Vm<'env> {
                 Ok(recurse_jump_target)
             } else {
                 Err(Error::new(
-                    ErrorKind::ImpossibleOperation,
+                    ErrorKind::InvalidOperation,
                     "cannot recurse outside of recursive loop",
                 ))
             }
         } else {
             Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 "cannot recurse outside of loop",
             ))
         }
@@ -540,7 +540,7 @@ impl<'env> Vm<'env> {
             .as_str()
             .ok_or_else(|| {
                 Error::new(
-                    ErrorKind::ImpossibleOperation,
+                    ErrorKind::InvalidOperation,
                     "template name was not a string",
                 )
             })
@@ -572,7 +572,7 @@ impl<'env> Vm<'env> {
                 initial_auto_escape
             }),
             _ => Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 "invalid value to autoescape tag",
             )),
         }

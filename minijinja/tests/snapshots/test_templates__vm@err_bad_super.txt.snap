@@ -8,12 +8,12 @@ input_file: minijinja/tests/inputs/err_bad_super.txt
 
 Error {
     kind: EvalBlock,
-    detail: "happend in replaced block \"body\" of \"err_bad_super.txt\"",
+    detail: "error in replaced block \"body\" of \"err_bad_super.txt\"",
     name: "bad_basic_block.txt",
     line: 2,
     source: Error {
         kind: EvalBlock,
-        detail: "happend in super block",
+        detail: "error in super block",
         name: "err_bad_super.txt",
         line: 4,
         source: Error {
@@ -25,7 +25,7 @@ Error {
     },
 }
 
-could not render block: happend in replaced block "body" of "err_bad_super.txt" (in bad_basic_block.txt:2)
+could not render block: error in replaced block "body" of "err_bad_super.txt" (in bad_basic_block.txt:2)
 ---------------------------- Template Source -----------------------------
    1 | <title>{% block title %}default title{% endblock %}</title>
    2 > {% block body %}
@@ -35,7 +35,7 @@ could not render block: happend in replaced block "body" of "err_bad_super.txt" 
 Referenced variables:
 --------------------------------------------------------------------------
 
-caused by: could not render block: happend in super block (in err_bad_super.txt:4)
+caused by: could not render block: error in super block (in err_bad_super.txt:4)
 ---------------------------- Template Source -----------------------------
    1 | {% extends "bad_basic_block.txt" %}
    2 | {% block title %}My Title{% endblock %}

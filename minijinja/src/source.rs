@@ -193,7 +193,7 @@ impl Source {
         extensions: &[&str],
     ) -> Result<(), Error> {
         let path = fs::canonicalize(&path).map_err(|err| {
-            Error::new(ErrorKind::ImpossibleOperation, "unable to load template").with_source(err)
+            Error::new(ErrorKind::InvalidOperation, "unable to load template").with_source(err)
         })?;
 
         fn walk(
@@ -204,11 +204,11 @@ impl Source {
         ) -> Result<(), Error> {
             if dir.is_dir() {
                 for entry in fs::read_dir(dir).map_err(|err| {
-                    Error::new(ErrorKind::ImpossibleOperation, "failed to walk directory")
+                    Error::new(ErrorKind::InvalidOperation, "failed to walk directory")
                         .with_source(err)
                 })? {
                     let entry = entry.map_err(|err| {
-                        Error::new(ErrorKind::ImpossibleOperation, "failed to walk directory")
+                        Error::new(ErrorKind::InvalidOperation, "failed to walk directory")
                             .with_source(err)
                     })?;
                     let path = entry.path();

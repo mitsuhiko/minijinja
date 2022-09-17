@@ -56,7 +56,7 @@ pub fn write_escaped(
         }
         (false, AutoEscape::Custom(name)) => {
             return Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 format!(
                     "Default formatter does not know how to format to custom format '{}'",
                     name

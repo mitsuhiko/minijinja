@@ -88,8 +88,8 @@ pub enum ErrorKind {
     NonPrimitive,
     /// A value is not valid for a key in a map.
     NonKey,
-    /// An impossible operation was attempted.
-    ImpossibleOperation,
+    /// An invalid operation was attempted.
+    InvalidOperation,
     /// The template has a syntax error
     SyntaxError,
     /// A template was not found.
@@ -108,7 +108,7 @@ pub enum ErrorKind {
     BadEscape,
     /// An operation on an undefined value was attempted.
     UndefinedError,
-    /// Impossible to serialize this value.
+    /// Not able to serialize this value.
     BadSerialization,
     /// An error happened in an include.
     BadInclude,
@@ -125,7 +125,7 @@ impl ErrorKind {
         match self {
             ErrorKind::NonPrimitive => "not a primitive",
             ErrorKind::NonKey => "not a key type",
-            ErrorKind::ImpossibleOperation => "impossible operation",
+            ErrorKind::InvalidOperation => "invalid operation",
             ErrorKind::SyntaxError => "syntax error",
             ErrorKind::TemplateNotFound => "template not found",
             ErrorKind::TooManyArguments => "too many arguments",
@@ -136,7 +136,7 @@ impl ErrorKind {
             ErrorKind::BadEscape => "bad string escape",
             ErrorKind::UndefinedError => "undefined value",
             ErrorKind::BadSerialization => "could not serialize to internal format",
-            ErrorKind::BadInclude => "could not render an included template",
+            ErrorKind::BadInclude => "could not render include",
             ErrorKind::EvalBlock => "could not render block",
             ErrorKind::CannotUnpack => "cannot unpack",
             ErrorKind::WriteFailure => "failed to write output",

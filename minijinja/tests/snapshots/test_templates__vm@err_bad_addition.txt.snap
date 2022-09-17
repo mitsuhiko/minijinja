@@ -7,16 +7,16 @@ input_file: minijinja/tests/inputs/err_bad_addition.txt
 !!!ERROR!!!
 
 Error {
-    kind: ImpossibleOperation,
+    kind: InvalidOperation,
     detail: "tried to use + operator on unsupported types sequence and number",
     name: "err_bad_addition.txt",
     line: 1,
 }
 
-impossible operation: tried to use + operator on unsupported types sequence and number (in err_bad_addition.txt:1)
+invalid operation: tried to use + operator on unsupported types sequence and number (in err_bad_addition.txt:1)
 ---------------------------- Template Source -----------------------------
    1 > {{ [1, 2] + 23 }}
-     i    ^^^^^^^^^^^ impossible operation
+     i    ^^^^^^^^^^^ invalid operation
 --------------------------------------------------------------------------
 Referenced variables:
 --------------------------------------------------------------------------

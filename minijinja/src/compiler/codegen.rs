@@ -63,7 +63,7 @@ impl<'source> CodeGenerator<'source> {
         self.span_stack.pop();
     }
 
-    /// Add a simple instruction.
+    /// Add a simple instruction with the current location.
     pub fn add(&mut self, instr: Instruction<'source>) -> usize {
         if let Some(span) = self.span_stack.last() {
             if span.start_line == self.current_line {
@@ -71,6 +71,11 @@ impl<'source> CodeGenerator<'source> {
             }
         }
         self.instructions.add_with_line(instr, self.current_line)
+    }
+
+    /// Add a simple instruction with other location.
+    pub fn add_with_span(&mut self, instr: Instruction<'source>, span: Span) -> usize {
+        self.instructions.add_with_span(instr, span)
     }
 
     /// Returns the next instruction index.
@@ -244,9 +249,7 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::Include(include) => {
                 self.set_line_from_span(include.span());
                 self.compile_expr(&include.name)?;
-                self.push_span(include.span());
-                self.add(Instruction::Include(include.ignore_missing));
-                self.pop_span();
+                self.add_with_span(Instruction::Include(include.ignore_missing), include.span());
             }
             ast::Stmt::AutoEscape(auto_escape) => {
                 self.set_line_from_span(auto_escape.span());
@@ -314,9 +317,7 @@ impl<'source> CodeGenerator<'source> {
         if let ast::Expr::Call(call) = &expr.expr {
             if let ast::Expr::Var(var) = &call.expr {
                 if var.id == "super" && call.args.is_empty() {
-                    self.push_span(call.span());
-                    self.add(Instruction::FastSuper);
-                    self.pop_span();
+                    self.add_with_span(Instruction::FastSuper, call.span());
                     return Ok(());
                 }
                 if var.id == "loop" && call.args.len() == 1 {
@@ -405,15 +406,9 @@ impl<'source> CodeGenerator<'source> {
                 self.set_line_from_span(c.span());
                 self.compile_expr(&c.expr)?;
                 match c.op {
-                    ast::UnaryOpKind::Not => {
-                        self.add(Instruction::Not);
-                    }
-                    ast::UnaryOpKind::Neg => {
-                        self.push_span(c.span());
-                        self.add(Instruction::Neg);
-                        self.pop_span();
-                    }
-                }
+                    ast::UnaryOpKind::Not => self.add(Instruction::Not),
+                    ast::UnaryOpKind::Neg => self.add_with_span(Instruction::Neg, c.span()),
+                };
             }
             ast::Expr::BinOp(c) => {
                 self.compile_bin_op(c)?;

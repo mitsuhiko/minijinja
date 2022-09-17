@@ -13,22 +13,22 @@ input_file: minijinja/tests/inputs/err_in_include.txt
 
 Error {
     kind: BadInclude,
-    detail: "happend in \"a_plus_b.txt\"",
+    detail: "error in \"a_plus_b.txt\"",
     name: "err_in_include.txt",
     line: 2,
     source: Error {
-        kind: ImpossibleOperation,
+        kind: InvalidOperation,
         detail: "tried to use + operator on unsupported types number and sequence",
         name: "a_plus_b.txt",
         line: 1,
     },
 }
 
-could not render an included template: happend in "a_plus_b.txt" (in err_in_include.txt:2)
+could not render include: error in "a_plus_b.txt" (in err_in_include.txt:2)
 ---------------------------- Template Source -----------------------------
    1 | {% for a in seq %}
    2 >   This fails in the include: {% include "a_plus_b.txt" %}
-     i                                 ^^^^^^^^^^^^^^^^^^^^^^ could not render an included template
+     i                                 ^^^^^^^^^^^^^^^^^^^^^^ could not render include
    3 | {% endfor %}
 --------------------------------------------------------------------------
 Referenced variables: {
@@ -52,10 +52,10 @@ Referenced variables: {
 }
 --------------------------------------------------------------------------
 
-caused by: impossible operation: tried to use + operator on unsupported types number and sequence (in a_plus_b.txt:1)
+caused by: invalid operation: tried to use + operator on unsupported types number and sequence (in a_plus_b.txt:1)
 ---------------------------- Template Source -----------------------------
    1 > This template adds b to a: {{ a + b }}
-     i                               ^^^^^ impossible operation
+     i                               ^^^^^ invalid operation
 --------------------------------------------------------------------------
 Referenced variables: {
     b: [],

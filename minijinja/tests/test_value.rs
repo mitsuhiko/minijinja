@@ -72,7 +72,7 @@ fn test_value_as_slice() {
     assert_eq!(Value::from(()).as_slice().unwrap(), &[]);
     assert_eq!(
         Value::from("foo").as_slice().unwrap_err().kind(),
-        ErrorKind::ImpossibleOperation
+        ErrorKind::InvalidOperation
     );
 }
 

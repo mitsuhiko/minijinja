@@ -55,7 +55,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
         let _state = state;
         let _args = args;
         Err(Error::new(
-            ErrorKind::ImpossibleOperation,
+            ErrorKind::InvalidOperation,
             format!("object has no method named {}", name),
         ))
     }
@@ -71,7 +71,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
         let _state = state;
         let _args = args;
         Err(Error::new(
-            ErrorKind::ImpossibleOperation,
+            ErrorKind::InvalidOperation,
             "tried to call non callable object",
         ))
     }

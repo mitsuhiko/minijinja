@@ -57,7 +57,7 @@ impl Object for LoopState {
 
     fn call(&self, _state: &State, _args: &[Value]) -> Result<Value, Error> {
         Err(Error::new(
-            ErrorKind::ImpossibleOperation,
+            ErrorKind::InvalidOperation,
             "loop cannot be called if reassigned to different variable",
         ))
     }
@@ -81,7 +81,7 @@ impl Object for LoopState {
             }
         } else {
             Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 format!("loop object has no method named {}", name),
             ))
         }

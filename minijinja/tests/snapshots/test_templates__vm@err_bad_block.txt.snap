@@ -8,7 +8,7 @@ input_file: minijinja/tests/inputs/err_bad_block.txt
 
 Error {
     kind: EvalBlock,
-    detail: "happend in replaced block \"title\" of \"err_bad_block.txt\"",
+    detail: "error in replaced block \"title\" of \"err_bad_block.txt\"",
     name: "simple_layout.txt",
     line: 1,
     source: Error {
@@ -19,7 +19,7 @@ Error {
     },
 }
 
-could not render block: happend in replaced block "title" of "err_bad_block.txt" (in simple_layout.txt:1)
+could not render block: error in replaced block "title" of "err_bad_block.txt" (in simple_layout.txt:1)
 ---------------------------- Template Source -----------------------------
    1 > <title>{% block title %}default title{% endblock %}</title>
    2 | {% block body %}default body{% endblock %}

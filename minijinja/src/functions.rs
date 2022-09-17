@@ -32,7 +32,7 @@
 //! fn include_file(name: String) -> Result<String, Error> {
 //!     std::fs::read_to_string(&name)
 //!         .map_err(|e| Error::new(
-//!             ErrorKind::ImpossibleOperation,
+//!             ErrorKind::InvalidOperation,
 //!             "cannot load file"
 //!         ).with_source(e))
 //! }
@@ -92,7 +92,7 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
 /// fn include_file(name: String) -> Result<String, Error> {
 ///     std::fs::read_to_string(&name)
 ///         .map_err(|e| Error::new(
-///             ErrorKind::ImpossibleOperation,
+///             ErrorKind::InvalidOperation,
 ///             "cannot load file"
 ///         ).with_source(e))
 /// }
@@ -257,7 +257,7 @@ mod builtins {
         if value.is_undefined() {
             Ok(Value::from(BTreeMap::<bool, Value>::new()))
         } else if value.kind() != ValueKind::Map {
-            Err(Error::from(ErrorKind::ImpossibleOperation))
+            Err(Error::from(ErrorKind::InvalidOperation))
         } else {
             Ok(value)
         }

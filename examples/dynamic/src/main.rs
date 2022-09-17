@@ -50,7 +50,7 @@ impl Object for Magic {
             Ok(Value::from(format!("magic-{}", tag)))
         } else {
             Err(Error::new(
-                minijinja::ErrorKind::ImpossibleOperation,
+                minijinja::ErrorKind::InvalidOperation,
                 format!("object has no method named {}", name),
             ))
         }

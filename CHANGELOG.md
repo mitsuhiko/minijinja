@@ -15,6 +15,7 @@ All notable changes to MiniJinja are documented here.
 - Added `Value::as_slice` and `Value::get_get_item_by_index`.
 - Added support for span error reporting. (#118)
 - Greatly improved handling of nested errors. (#119)
+- `ImpossibleOperation` is now `InvalidOperation`.
 
 # 0.20.0
 

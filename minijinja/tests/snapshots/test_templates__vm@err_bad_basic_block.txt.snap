@@ -8,7 +8,7 @@ input_file: minijinja/tests/inputs/err_bad_basic_block.txt
 
 Error {
     kind: EvalBlock,
-    detail: "happend in local block \"body\"",
+    detail: "error in local block \"body\"",
     name: "bad_basic_block.txt",
     line: 2,
     source: Error {
@@ -19,7 +19,7 @@ Error {
     },
 }
 
-could not render block: happend in local block "body" (in bad_basic_block.txt:2)
+could not render block: error in local block "body" (in bad_basic_block.txt:2)
 ---------------------------- Template Source -----------------------------
    1 | <title>{% block title %}default title{% endblock %}</title>
    2 > {% block body %}

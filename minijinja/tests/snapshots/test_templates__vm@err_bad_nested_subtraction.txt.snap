@@ -11,17 +11,17 @@ input_file: minijinja/tests/inputs/err_bad_nested_subtraction.txt
 !!!ERROR!!!
 
 Error {
-    kind: ImpossibleOperation,
+    kind: InvalidOperation,
     detail: "tried to use - operator on unsupported types number and sequence",
     name: "err_bad_nested_subtraction.txt",
     line: 2,
 }
 
-impossible operation: tried to use - operator on unsupported types number and sequence (in err_bad_nested_subtraction.txt:2)
+invalid operation: tried to use - operator on unsupported types number and sequence (in err_bad_nested_subtraction.txt:2)
 ---------------------------- Template Source -----------------------------
    1 | {% for item in seq %}
    2 >   {{ ((item + 4) * (3 - [])) + 4 - 2 }}
-     i                     ^^^^^^ impossible operation
+     i                     ^^^^^^ invalid operation
    3 | {% endfor %}
 --------------------------------------------------------------------------
 Referenced variables: {

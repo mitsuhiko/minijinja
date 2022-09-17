@@ -311,7 +311,7 @@ macro_rules! primitive_try_from {
                 };
                 opt.ok_or_else(|| {
                     Error::new(
-                        ErrorKind::ImpossibleOperation,
+                        ErrorKind::InvalidOperation,
                         format!("cannot convert {} to {}", value.kind(), stringify!($ty))
                     )
                 })
@@ -377,7 +377,7 @@ impl<'a> ArgType<'a> for &str {
         match value {
             Some(value) => value
                 .as_str()
-                .ok_or_else(|| Error::new(ErrorKind::ImpossibleOperation, "value is not a string")),
+                .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "value is not a string")),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
@@ -391,7 +391,7 @@ impl<'a> ArgType<'a> for &[u8] {
         match value {
             Some(value) => value
                 .as_bytes()
-                .ok_or_else(|| Error::new(ErrorKind::ImpossibleOperation, "value is not in bytes")),
+                .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "value is not in bytes")),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }

@@ -330,7 +330,7 @@ mod builtins {
     pub fn length(v: Value) -> Result<usize, Error> {
         v.len().ok_or_else(|| {
             Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 format!("cannot calculate length of value of type {}", v.kind()),
             )
         })
@@ -345,7 +345,7 @@ mod builtins {
             ValueRepr::Map(ref v) => v.iter().collect::<Vec<_>>(),
             _ => {
                 return Err(Error::new(
-                    ErrorKind::ImpossibleOperation,
+                    ErrorKind::InvalidOperation,
                     "cannot convert value into pair list",
                 ))
             }
@@ -383,7 +383,7 @@ mod builtins {
                 ValueRepr::Map(ref v) => v.iter(),
                 _ => {
                     return Err(Error::new(
-                        ErrorKind::ImpossibleOperation,
+                        ErrorKind::InvalidOperation,
                         "cannot convert value into pair list",
                     ))
                 }
@@ -410,7 +410,7 @@ mod builtins {
             ))
         } else {
             Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 format!("cannot reverse value of type {}", v.kind()),
             ))
         }
@@ -461,7 +461,7 @@ mod builtins {
             Ok(rv)
         } else {
             Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 format!("cannot join value of type {}", val.kind()),
             ))
         }
@@ -495,7 +495,7 @@ mod builtins {
             ValueRepr::I128(x) => Ok(Value::from(x.abs())),
             ValueRepr::F64(x) => Ok(Value::from(x.abs())),
             _ => Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 "cannot round value",
             )),
         }
@@ -519,7 +519,7 @@ mod builtins {
                 Ok(Value::from((x * val).round() / x))
             }
             _ => Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 "cannot round value",
             )),
         }
@@ -543,7 +543,7 @@ mod builtins {
             }
             ValueRepr::Seq(ref s) => Ok(s.first().cloned().unwrap_or(Value::UNDEFINED)),
             _ => Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 "cannot get first item from value",
             )),
         }
@@ -572,7 +572,7 @@ mod builtins {
             }
             ValueRepr::Seq(ref s) => Ok(s.last().cloned().unwrap_or(Value::UNDEFINED)),
             _ => Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 "cannot get last item from value",
             )),
         }
@@ -598,7 +598,7 @@ mod builtins {
                     .collect::<Vec<_>>(),
             )),
             _ => Err(Error::new(
-                ErrorKind::ImpossibleOperation,
+                ErrorKind::InvalidOperation,
                 "cannot convert value to list",
             )),
         }
@@ -733,7 +733,7 @@ mod builtins {
             serde_json::to_string(&value)
         }
         .map_err(|err| {
-            Error::new(ErrorKind::ImpossibleOperation, "cannot serialize to JSON").with_source(err)
+            Error::new(ErrorKind::InvalidOperation, "cannot serialize to JSON").with_source(err)
         })
         .map(|s| {
             // When this filter is used the return value is safe for both HTML and JSON

@@ -7,16 +7,16 @@ input_file: minijinja/tests/inputs/block_super_err.txt
 !!!ERROR!!!
 
 Error {
-    kind: ImpossibleOperation,
+    kind: InvalidOperation,
     detail: "cannot super outside of block",
     name: "block_super_err.txt",
     line: 1,
 }
 
-impossible operation: cannot super outside of block (in block_super_err.txt:1)
+invalid operation: cannot super outside of block (in block_super_err.txt:1)
 ---------------------------- Template Source -----------------------------
    1 > {{ super() }}
-     i    ^^^^^^^ impossible operation
+     i    ^^^^^^^ invalid operation
 --------------------------------------------------------------------------
 Referenced variables:
 --------------------------------------------------------------------------

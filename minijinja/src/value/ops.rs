@@ -58,7 +58,7 @@ fn int_as_value(val: i128) -> Value {
 
 fn impossible_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
     Error::new(
-        ErrorKind::ImpossibleOperation,
+        ErrorKind::InvalidOperation,
         format!(
             "tried to use {} operator on unsupported types {} and {}",
             op,
@@ -147,9 +147,9 @@ pub fn neg(val: &Value) -> Result<Value, Error> {
     }
 
     if val.kind() != ValueKind::Number {
-        Err(Error::from(ErrorKind::ImpossibleOperation))
+        Err(Error::from(ErrorKind::InvalidOperation))
     } else {
-        do_it(val).ok_or_else(|| Error::from(ErrorKind::ImpossibleOperation))
+        do_it(val).ok_or_else(|| Error::from(ErrorKind::InvalidOperation))
     }
 }
 
@@ -186,7 +186,7 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
             }));
         }
         _ => Err(Error::new(
-            ErrorKind::ImpossibleOperation,
+            ErrorKind::InvalidOperation,
             "cannot perform a containment check on this value",
         )),
     }
@@ -197,7 +197,7 @@ fn test_adding() {
     let err = add(&Value::from("a"), &Value::from(42)).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "impossible operation: tried to use + operator on unsupported types string and number"
+        "invalid operation: tried to use + operator on unsupported types string and number"
     );
 
     assert_eq!(
@@ -215,13 +215,13 @@ fn test_subtracting() {
     let err = sub(&Value::from("a"), &Value::from(42)).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "impossible operation: tried to use - operator on unsupported types string and number"
+        "invalid operation: tried to use - operator on unsupported types string and number"
     );
 
     let err = sub(&Value::from("foo"), &Value::from("bar")).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "impossible operation: tried to use - operator on unsupported types string and string"
+        "invalid operation: tried to use - operator on unsupported types string and string"
     );
 
     assert_eq!(
@@ -235,13 +235,13 @@ fn test_dividing() {
     let err = div(&Value::from("a"), &Value::from(42)).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "impossible operation: tried to use / operator on unsupported types string and number"
+        "invalid operation: tried to use / operator on unsupported types string and number"
     );
 
     let err = div(&Value::from("foo"), &Value::from("bar")).unwrap_err();
     assert_eq!(
         err.to_string(),
-        "impossible operation: tried to use / operator on unsupported types string and string"
+        "invalid operation: tried to use / operator on unsupported types string and string"
     );
 
     assert_eq!(
