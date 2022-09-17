@@ -404,10 +404,16 @@ impl<'source> CodeGenerator<'source> {
             ast::Expr::UnaryOp(c) => {
                 self.set_line_from_span(c.span());
                 self.compile_expr(&c.expr)?;
-                self.add(match c.op {
-                    ast::UnaryOpKind::Not => Instruction::Not,
-                    ast::UnaryOpKind::Neg => Instruction::Neg,
-                });
+                match c.op {
+                    ast::UnaryOpKind::Not => {
+                        self.add(Instruction::Not);
+                    }
+                    ast::UnaryOpKind::Neg => {
+                        self.push_span(c.span());
+                        self.add(Instruction::Neg);
+                        self.pop_span();
+                    }
+                }
             }
             ast::Expr::BinOp(c) => {
                 self.compile_bin_op(c)?;

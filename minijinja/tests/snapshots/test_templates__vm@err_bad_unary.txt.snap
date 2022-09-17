@@ -1,0 +1,22 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ foo(-[1, 2]) }}"
+info: {}
+input_file: minijinja/tests/inputs/err_bad_unary.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: ImpossibleOperation,
+    name: "err_bad_unary.txt",
+    line: 1,
+}
+
+impossible operation (in err_bad_unary.txt:1)
+---------------------------- Template Source -----------------------------
+   1 > {{ foo(-[1, 2]) }}
+     i        ^^^^^^^ impossible operation
+--------------------------------------------------------------------------
+Referenced variables:
+--------------------------------------------------------------------------
+
