@@ -5,7 +5,12 @@ use std::fmt;
 ///
 /// If debug mode is enabled a template error contains additional debug
 /// information that can be displayed by formatting an error with the
-/// alternative formatting (``format!("{:#}", err)``).
+/// alternative formatting (``format!("{:#}", err)``).  That information
+/// is also shown for the [`Debug`] display where the extended information
+/// is hidden when the alternative formatting is used.
+///
+/// Since MiniJinja takes advantage of chained errors it's recommended
+/// to render the entire chain to better understand the causes.
 ///
 /// # Example
 ///
@@ -18,8 +23,14 @@ use std::fmt;
 /// match template.render(ctx) {
 ///     Ok(result) => println!("{}", result),
 ///     Err(err) => {
-///         eprintln!("Could not render template:");
-///         eprintln!("  {:#}", err);
+///         eprintln!("Could not render template: {:#}", err);
+///         // render causes as well
+///         let mut err = &err as &dyn std::error::Error;
+///         while let Some(next_err) = err.source() {
+///             eprintln!();
+///             eprintln!("caused by: {:#}", next_err);
+///             err = next_err;
+///         }
 ///     }
 /// }
 /// ```
