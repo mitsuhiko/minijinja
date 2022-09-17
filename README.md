@@ -32,13 +32,13 @@ minimal v0.1.0 (examples/minimal)
 **Goals:**
 
 * [Well documented](https://docs.rs/minijinja), compact API
-* Minimal dependencies, reasonable compile times and [decent runtime performance](benchmarks)
-* [Stay close as possible](COMPATIBILITY.md) to Jinja2
+* Minimal dependencies, reasonable compile times and [decent runtime performance](https://github.com/mitsuhiko/minijinja/tree/main/benchmarks#comparison-results)
+* [Stay close as possible](https://github.com/mitsuhiko/minijinja/blob/main/COMPATIBILITY.md) to Jinja2
 * Support for [expression evaluation](https://docs.rs/minijinja/latest/minijinja/struct.Expression.html)
 * Support for all [`serde`](https://serde.rs) compatible types
-* [Well tested](tests)
+* [Well tested](https://github.com/mitsuhiko/minijinja/tree/main/minijinja/tests)
 * Support for [dynamic runtime objects](https://docs.rs/minijinja/latest/minijinja/value/trait.Object.html) with methods and dynamic attributes
-* [Descriptive errors](examples/error)
+* [Descriptive errors](https://github.com/mitsuhiko/minijinja/tree/main/examples/error)
 
 ## Example Template
 
