@@ -191,6 +191,7 @@ struct LineInfo {
     line: u32,
 }
 
+#[cfg(feature = "debug")]
 #[derive(Copy, Clone)]
 struct SpanInfo {
     first_instruction: u32,
@@ -328,6 +329,7 @@ impl<'source> Instructions<'source> {
         }
         #[cfg(not(feature = "debug"))]
         {
+            let _ = idx;
             None
         }
     }

@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 use std::fmt;
 
+use crate::compiler::tokens::Span;
+
 /// Represents template errors.
 ///
 /// If debug mode is enabled a template error contains additional debug
@@ -253,6 +255,7 @@ impl Error {
     }
 
     /// Returns the line number where the error ocurred.
+    #[cfg(feature = "debug")]
     pub(crate) fn span(&self) -> Option<Span> {
         self.repr.span
     }
@@ -333,5 +336,3 @@ pub fn attach_basic_debug_info<T>(rv: Result<T, Error>, source: &str) -> Result<
         rv
     }
 }
-
-use crate::compiler::tokens::Span;
