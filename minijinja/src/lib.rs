@@ -92,6 +92,12 @@
 //! Na Na Na Batman!
 //! ```
 //!
+//! # Error Handling
+//!
+//! MiniJinja tries to give you good errors out of the box.  However if you use includes or
+//! template inheritance your experience will improve greatly if you ensure to render chained
+//! errors.  For more information see [`Error`] with an example.
+//!
 //! # Learn more
 //!
 //! - [`Environment`]: the main API entry point.  Teaches you how to configure the environment.
