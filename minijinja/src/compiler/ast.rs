@@ -91,6 +91,7 @@ impl<'a> fmt::Debug for Stmt<'a> {
 pub enum Expr<'a> {
     Var(Spanned<Var<'a>>),
     Const(Spanned<Const>),
+    Slice(Spanned<Slice<'a>>),
     UnaryOp(Spanned<UnaryOp<'a>>),
     BinOp(Spanned<BinOp<'a>>),
     IfExpr(Spanned<IfExpr<'a>>),
@@ -109,6 +110,7 @@ impl<'a> fmt::Debug for Expr<'a> {
         match self {
             Expr::Var(s) => fmt::Debug::fmt(s, f),
             Expr::Const(s) => fmt::Debug::fmt(s, f),
+            Expr::Slice(s) => fmt::Debug::fmt(s, f),
             Expr::UnaryOp(s) => fmt::Debug::fmt(s, f),
             Expr::BinOp(s) => fmt::Debug::fmt(s, f),
             Expr::IfExpr(s) => fmt::Debug::fmt(s, f),
@@ -226,6 +228,15 @@ pub struct Var<'a> {
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Const {
     pub value: Value,
+}
+
+/// Represents a slice.
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+pub struct Slice<'a> {
+    pub expr: Expr<'a>,
+    pub start: Option<Expr<'a>>,
+    pub stop: Option<Expr<'a>>,
+    pub step: Option<Expr<'a>>,
 }
 
 /// A kind of unary operator.

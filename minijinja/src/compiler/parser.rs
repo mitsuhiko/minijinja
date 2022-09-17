@@ -315,15 +315,54 @@ impl<'a> Parser<'a> {
                 }
                 Some((Token::BracketOpen, _)) => {
                     self.stream.next()?;
-                    let subscript_expr = self.parse_expr()?;
+
+                    let mut start = None;
+                    let mut stop = None;
+                    let mut step = None;
+                    let mut is_slice = false;
+
+                    if !matches!(self.stream.current()?, Some((Token::Colon, _))) {
+                        start = Some(self.parse_expr()?);
+                    }
+                    if matches!(self.stream.current()?, Some((Token::Colon, _))) {
+                        is_slice = true;
+                        self.stream.next()?;
+                        if !matches!(
+                            self.stream.current()?,
+                            Some((Token::BracketClose | Token::Colon, _))
+                        ) {
+                            stop = Some(self.parse_expr()?);
+                        }
+                        if matches!(self.stream.current()?, Some((Token::Colon, _))) {
+                            self.stream.next()?;
+                            if !matches!(self.stream.current()?, Some((Token::BracketClose, _))) {
+                                step = Some(self.parse_expr()?);
+                            }
+                        }
+                    }
                     expect_token!(self, Token::BracketClose, "`]`")?;
-                    expr = ast::Expr::GetItem(Spanned::new(
-                        ast::GetItem {
-                            expr,
-                            subscript_expr,
-                        },
-                        self.stream.expand_span(span),
-                    ));
+
+                    if !is_slice {
+                        expr = ast::Expr::GetItem(Spanned::new(
+                            ast::GetItem {
+                                expr,
+                                subscript_expr: start.ok_or_else(|| {
+                                    Error::new(ErrorKind::SyntaxError, "empty subscript")
+                                })?,
+                            },
+                            self.stream.expand_span(span),
+                        ));
+                    } else {
+                        expr = ast::Expr::Slice(Spanned::new(
+                            ast::Slice {
+                                expr,
+                                start,
+                                stop,
+                                step,
+                            },
+                            self.stream.expand_span(span),
+                        ));
+                    }
                 }
                 Some((Token::ParenOpen, _)) => {
                     let args = self.parse_args()?;

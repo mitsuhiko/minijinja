@@ -402,6 +402,27 @@ impl<'source> CodeGenerator<'source> {
                 self.set_line_from_span(v.span());
                 self.add(Instruction::LoadConst(v.value.clone()));
             }
+            ast::Expr::Slice(s) => {
+                self.push_span(s.span());
+                self.compile_expr(&s.expr)?;
+                if let Some(ref start) = s.start {
+                    self.compile_expr(start)?;
+                } else {
+                    self.add(Instruction::LoadConst(Value::from(0)));
+                }
+                if let Some(ref stop) = s.stop {
+                    self.compile_expr(stop)?;
+                } else {
+                    self.add(Instruction::LoadConst(Value::from(())));
+                }
+                if let Some(ref step) = s.step {
+                    self.compile_expr(step)?;
+                } else {
+                    self.add(Instruction::LoadConst(Value::from(1)));
+                }
+                self.add(Instruction::Slice);
+                self.pop_span();
+            }
             ast::Expr::UnaryOp(c) => {
                 self.set_line_from_span(c.span());
                 self.compile_expr(&c.expr)?;

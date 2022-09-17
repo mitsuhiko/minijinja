@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::fmt::Write;
 
 use crate::error::{Error, ErrorKind};
@@ -46,6 +46,73 @@ pub fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
             i128::try_from(b.clone()).ok()?,
         )),
     }
+}
+
+fn get_offset_and_len<F: FnOnce() -> usize>(
+    start: i64,
+    stop: Option<i64>,
+    end: F,
+) -> (usize, usize) {
+    if start < 0 || stop.map_or(true, |x| x < 0) {
+        let end = end();
+        let start = if start < 0 {
+            (end as i64 + start) as usize
+        } else {
+            start as usize
+        };
+        let stop = match stop {
+            None => end,
+            Some(x) if x < 0 => (end as i64 + x) as usize,
+            Some(x) => x as usize,
+        };
+        (start, stop.saturating_sub(start))
+    } else {
+        (
+            start as usize,
+            (stop.unwrap() as usize).saturating_sub(start as usize),
+        )
+    }
+}
+
+pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Value, Error> {
+    let start: i64 = if start.is_none() {
+        0
+    } else {
+        start.try_into()?
+    };
+    let stop: Option<i64> = if stop.is_none() {
+        None
+    } else {
+        Some(stop.try_into()?)
+    };
+    let step = if step.is_none() {
+        1
+    } else {
+        u64::try_from(step)? as usize
+    };
+
+    if let Some(s) = value.as_str() {
+        let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
+        return Ok(Value::from(
+            s.chars()
+                .skip(start)
+                .take(len)
+                .step_by(step)
+                .collect::<String>(),
+        ));
+    }
+
+    let slice = value.as_slice()?;
+    let (start, len) = get_offset_and_len(start, stop, || slice.len());
+    Ok(Value::from(
+        slice
+            .iter()
+            .skip(start)
+            .take(len)
+            .step_by(step)
+            .cloned()
+            .collect::<Vec<_>>(),
+    ))
 }
 
 fn int_as_value(val: i128) -> Value {

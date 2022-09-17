@@ -146,6 +146,13 @@ impl<'env> Vm<'env> {
                     let value = stack.pop();
                     stack.push(try_ctx!(value.get_item(&attr)));
                 }
+                Instruction::Slice => {
+                    let step = stack.pop();
+                    let stop = stack.pop();
+                    let start = stack.pop();
+                    let value = stack.pop();
+                    stack.push(try_ctx!(ops::slice(value, start, stop, step)));
+                }
                 Instruction::LoadConst(value) => {
                     stack.push(value.clone());
                 }
