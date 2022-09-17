@@ -13,6 +13,8 @@ All notable changes to MiniJinja are documented here.
 - Added support for remaining arguments with `Rest`.  (#114)
 - Filters, tests and functions can now borrow arguments.  (#115)
 - Added `Value::as_slice` and `Value::get_get_item_by_index`.
+- Added support for span error reporting. (#118)
+- Greatly improved handling of nested errors. (#119)
 
 # 0.20.0
 
