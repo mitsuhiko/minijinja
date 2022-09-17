@@ -72,6 +72,7 @@ State {
             "urlencode",
         ],
         templates: [
+            "a_plus_b.txt",
             "debug.txt",
             "simple_include.txt",
             "simple_layout.txt",
