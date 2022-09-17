@@ -8,7 +8,7 @@
 //! [Jinja2](https://jinja.palletsprojects.com/) template engine for Python.  It's
 //! implemented on top of [`serde`].  The goal is to be able to render a large
 //! chunk of the Jinja2 template ecosystem from Rust with a minimal engine and to
-//! leverage an alredy existing ecosystem of editor integrations.
+//! leverage an already existing ecosystem of editor integrations.
 //!
 //! ```jinja
 //! {% for user in users %}
