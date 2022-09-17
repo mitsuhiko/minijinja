@@ -14,15 +14,15 @@ Error {
     line: 2,
 }
 
+template not found: tried to include non-existing template "missing_template.txt" (in include_missing.txt:2)
 ---------------------------- Template Source -----------------------------
    1 | Before
    2 > {% include template %}
+     i    ^^^^^^^^^^^^^^^^ template not found
    3 | After
 --------------------------------------------------------------------------
 Referenced variables: {
     template: "missing_template.txt",
 }
 --------------------------------------------------------------------------
-
-
 

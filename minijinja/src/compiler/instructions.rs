@@ -262,6 +262,17 @@ impl<'source> Instructions<'source> {
     pub fn add_with_line(&mut self, instr: Instruction<'source>, line: usize) -> usize {
         let rv = self.add(instr);
         self.add_line_record(rv, line);
+
+        // if we follow up to a valid span with no more span, clear it out
+        #[cfg(feature = "debug")]
+        {
+            if self.span_infos.last().map_or(false, |x| x.span.is_some()) {
+                self.span_infos.push(SpanInfo {
+                    first_instruction: rv as u32,
+                    span: None,
+                });
+            }
+        }
         rv
     }
 

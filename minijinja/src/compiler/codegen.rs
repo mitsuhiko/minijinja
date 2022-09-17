@@ -244,7 +244,9 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::Include(include) => {
                 self.set_line_from_span(include.span());
                 self.compile_expr(&include.name)?;
+                self.push_span(include.span());
                 self.add(Instruction::Include(include.ignore_missing));
+                self.pop_span();
             }
             ast::Stmt::AutoEscape(auto_escape) => {
                 self.set_line_from_span(auto_escape.span());
@@ -526,6 +528,7 @@ impl<'source> CodeGenerator<'source> {
                 self.sc_bool(matches!(c.op, ast::BinOpKind::ScAnd));
                 self.compile_expr(&c.right)?;
                 self.end_sc_bool();
+                self.pop_span();
                 return Ok(());
             }
             ast::BinOpKind::Add => Instruction::Add,

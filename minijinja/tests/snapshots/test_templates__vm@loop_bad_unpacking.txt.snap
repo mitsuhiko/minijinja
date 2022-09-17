@@ -11,20 +11,21 @@ input_file: minijinja/tests/inputs/loop_bad_unpacking.txt
 !!!ERROR!!!
 
 Error {
-    kind: ImpossibleOperation,
-    detail: "cannot unpack: not a sequence",
+    kind: CannotUnpack,
+    detail: "not a sequence",
     name: "loop_bad_unpacking.txt",
     line: 2,
     source: Error {
         kind: ImpossibleOperation,
-        detail: "value is not a list",
+        detail: "value of type number is not a sequence",
     },
 }
 
+cannot unpack: not a sequence (in loop_bad_unpacking.txt:2)
 ---------------------------- Template Source -----------------------------
    1 | <ul>
    2 > {% for a, b in seq %}
-     i        ^^^^ impossible operation
+     i        ^^^^ cannot unpack
    3 |   <li>{{ a }}: {{ b }}
    4 | {% endfor %}
    5 | </ul>
@@ -49,5 +50,5 @@ Referenced variables: {
 }
 --------------------------------------------------------------------------
 
-
+caused by: impossible operation: value of type number is not a sequence
 

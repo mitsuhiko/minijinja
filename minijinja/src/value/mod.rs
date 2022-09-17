@@ -575,7 +575,7 @@ impl Value {
             ValueRepr::Seq(ref v) => Ok(&v[..]),
             _ => Err(Error::new(
                 ErrorKind::ImpossibleOperation,
-                "value is not a list",
+                format!("value of type {} is not a sequence", self.kind()),
             )),
         }
     }

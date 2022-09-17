@@ -16,6 +16,7 @@ Error {
     line: 1,
 }
 
+undefined value (in err_undefined_item.txt:1)
 ---------------------------- Template Source -----------------------------
    1 > {{ seq[42][23] }}
      i       ^^^^^^^^ undefined value
@@ -28,6 +29,4 @@ Referenced variables: {
     ],
 }
 --------------------------------------------------------------------------
-
-
 

@@ -17,6 +17,7 @@ Error {
     line: 2,
 }
 
+unknown test: test reallyEven is unknown (in err_bad_test.txt:2)
 ---------------------------- Template Source -----------------------------
    1 | {% for item in seq %}
    2 >   {% if item is reallyEven %}
@@ -45,6 +46,4 @@ Referenced variables: {
     ],
 }
 --------------------------------------------------------------------------
-
-
 

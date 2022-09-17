@@ -57,10 +57,12 @@ impl fmt::Debug for Error {
         // error struct dump.
         #[cfg(feature = "debug")]
         {
-            if let Some(info) = self.debug_info() {
-                writeln!(f)?;
-                render_debug_info(f, self.kind, self.line(), self.span, info)?;
-                writeln!(f)?;
+            if !f.alternate() {
+                if let Some(info) = self.debug_info() {
+                    writeln!(f)?;
+                    render_debug_info(f, self.kind, self.line(), self.span, info)?;
+                    writeln!(f)?;
+                }
             }
         }
 
@@ -97,6 +99,10 @@ pub enum ErrorKind {
     UndefinedError,
     /// Impossible to serialize this value.
     BadSerialization,
+    /// An error happened in an include.
+    BadInclude,
+    /// Unable to unpack a value.
+    CannotUnpack,
     /// Failed writing output.
     WriteFailure,
 }
@@ -117,6 +123,8 @@ impl ErrorKind {
             ErrorKind::BadEscape => "bad string escape",
             ErrorKind::UndefinedError => "undefined value",
             ErrorKind::BadSerialization => "could not serialize to internal format",
+            ErrorKind::BadInclude => "could not evaluate an included template",
+            ErrorKind::CannotUnpack => "cannot unpack",
             ErrorKind::WriteFailure => "failed to write output",
         }
     }

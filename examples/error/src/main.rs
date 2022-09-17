@@ -1,9 +1,10 @@
 use minijinja::{context, Environment};
 
-fn main() {
+fn execute() -> Result<(), minijinja::Error> {
     let mut env = Environment::new();
     env.set_debug(true);
-    if let Err(err) = env.add_template(
+    env.add_template("include.txt", "Hello {{ item_squared + bar }}!")?;
+    env.add_template(
         "hello.txt",
         r#"
         first line
@@ -12,29 +13,34 @@ fn main() {
             {% with foo = 42 %}
               {{ range(10) }}
               {{ other_seq|join(" ") }}
-              Hello {{ item_squared + bar }}!
+              {% include "include.txt" %}
             {% endwith %}
           {% endwith %}
         {% endfor %}
         last line
         "#,
-    ) {
-        eprintln!("Template Failed Parsing:");
-        eprintln!("  {:#}", err);
-        std::process::exit(1);
-    }
+    )?;
     let template = env.get_template("hello.txt").unwrap();
     let ctx = context! {
         seq => vec![2, 4, 8],
         other_seq => (0..5).collect::<Vec<_>>(),
         bar => "test"
     };
-    match template.render(&ctx) {
-        Ok(result) => println!("{}", result),
-        Err(err) => {
-            eprintln!("Template Failed Rendering:");
-            eprintln!("  {:#}", err);
-            std::process::exit(1);
+    println!("{}", template.render(&ctx)?);
+    Ok(())
+}
+
+fn main() {
+    if let Err(err) = execute() {
+        eprintln!("Error rendering template: {:#}", err);
+
+        let mut err = &err as &dyn std::error::Error;
+        while let Some(next_err) = err.source() {
+            eprintln!();
+            eprintln!("caused by: {:#}", next_err);
+            err = next_err;
         }
+
+        std::process::exit(1);
     }
 }
