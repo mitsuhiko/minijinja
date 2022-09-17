@@ -17,6 +17,13 @@ All notable changes to MiniJinja are documented here.
 - Greatly improved handling of nested errors. (#119)
 - `ImpossibleOperation` is now `InvalidOperation`.
 
+## Breaking Changes
+
+- `Filter`, `Test` and `Function` are now sealed traits.
+- `ErrorKind::ImpossibleOperation` is now `ErrorKind::InvalidOperation`.
+- Moved up MSRV to 1.61.0 due to bugs on older rust versions related to
+  HRTBs.
+
 # 0.20.0
 
 - Remove internal refcounts from environment.
