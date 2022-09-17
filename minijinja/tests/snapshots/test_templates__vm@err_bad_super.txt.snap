@@ -26,37 +26,37 @@ Error {
 }
 
 could not render block: error in replaced block "body" of "err_bad_super.txt" (in bad_basic_block.txt:2)
----------------------------- Template Source -----------------------------
+----------------------------- bad_basic_block.txt -----------------------------
    1 | <title>{% block title %}default title{% endblock %}</title>
    2 > {% block body %}
    3 |   {{ missing_function() }}
    4 | {% endblock %}
---------------------------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables:
---------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 caused by: could not render block: error in super block (in err_bad_super.txt:4)
----------------------------- Template Source -----------------------------
+------------------------------ err_bad_super.txt ------------------------------
    1 | {% extends "bad_basic_block.txt" %}
    2 | {% block title %}My Title{% endblock %}
    3 | {% block body %}
    4 >   Changed stuff goes here. {{ super() }}
      i                               ^^^^^^^ could not render block
    5 | {% endblock %}
---------------------------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables:
---------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 caused by: unknown function: missing_function is unknown (in bad_basic_block.txt:3)
----------------------------- Template Source -----------------------------
+----------------------------- bad_basic_block.txt -----------------------------
    1 | <title>{% block title %}default title{% endblock %}</title>
    2 | {% block body %}
    3 >   {{ missing_function() }}
      i      ^^^^^^^^^^^^^^^^^^ unknown function
    4 | {% endblock %}
---------------------------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
     missing_function: Undefined,
 }
---------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 

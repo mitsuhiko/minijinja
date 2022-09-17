@@ -14,12 +14,12 @@ Error {
 }
 
 template not found: tried to include one of multiple templates, none of which existed ["missing_template1.txt", "missing_template2.txt"] (in include_choice_none.txt:2)
----------------------------- Template Source -----------------------------
+--------------------------- include_choice_none.txt ---------------------------
    1 | Before
    2 > {% include ["missing_template1.txt", "missing_template2.txt"] %}
      i    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ template not found
    3 | After
---------------------------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables:
---------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 

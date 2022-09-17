@@ -15,7 +15,7 @@ pub(crate) struct LoopState {
 
 impl fmt::Debug for LoopState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = f.debug_struct("LoopState");
+        let mut s = f.debug_struct("Loop");
         for attr in self.attributes() {
             s.field(attr, &self.get_attr(attr).unwrap());
         }

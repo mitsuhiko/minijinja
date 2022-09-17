@@ -18,15 +18,15 @@ Error {
 }
 
 invalid operation: tried to use - operator on unsupported types number and sequence (in err_bad_nested_subtraction.txt:2)
----------------------------- Template Source -----------------------------
+----------------------- err_bad_nested_subtraction.txt ------------------------
    1 | {% for item in seq %}
    2 >   {{ ((item + 4) * (3 - [])) + 4 - 2 }}
      i                     ^^^^^^ invalid operation
    3 | {% endfor %}
---------------------------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
     item: 1,
-    loop: LoopState {
+    loop: Loop {
         index0: 0,
         index: 1,
         length: 3,
@@ -43,5 +43,5 @@ Referenced variables: {
         3,
     ],
 }
---------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 

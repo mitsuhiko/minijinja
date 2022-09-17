@@ -11,7 +11,7 @@ State {
     auto_escape: None,
     ctx: {
         "x": 0,
-        "loop": LoopState {
+        "loop": Loop {
             index0: 0,
             index: 1,
             length: 1,

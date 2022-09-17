@@ -24,16 +24,16 @@ Error {
 }
 
 cannot unpack: sequence of wrong length (expected 2, got 3) (in loop_bad_unpacking_wrong_len.txt:2)
----------------------------- Template Source -----------------------------
+---------------------- loop_bad_unpacking_wrong_len.txt -----------------------
    1 | <ul>
    2 > {% for a, b in seq %}
      i        ^^^^ cannot unpack
    3 |   <li>{{ a }}: {{ b }}
    4 | {% endfor %}
    5 | </ul>
---------------------------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
-    loop: LoopState {
+    loop: Loop {
         index0: 0,
         index: 1,
         length: 3,
@@ -62,5 +62,5 @@ Referenced variables: {
         ],
     ],
 }
---------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 

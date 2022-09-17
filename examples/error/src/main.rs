@@ -32,7 +32,7 @@ fn execute() -> Result<(), minijinja::Error> {
 
 fn main() {
     if let Err(err) = execute() {
-        eprintln!("Error rendering template: {:#}", err);
+        eprintln!("template error: {:#}", err);
 
         let mut err = &err as &dyn std::error::Error;
         while let Some(next_err) = err.source() {

@@ -22,16 +22,16 @@ Error {
 }
 
 cannot unpack: not a sequence (in loop_bad_unpacking.txt:2)
----------------------------- Template Source -----------------------------
+--------------------------- loop_bad_unpacking.txt ----------------------------
    1 | <ul>
    2 > {% for a, b in seq %}
      i        ^^^^ cannot unpack
    3 |   <li>{{ a }}: {{ b }}
    4 | {% endfor %}
    5 | </ul>
---------------------------------------------------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
-    loop: LoopState {
+    loop: Loop {
         index0: 0,
         index: 1,
         length: 3,
@@ -48,7 +48,7 @@ Referenced variables: {
         3,
     ],
 }
---------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 caused by: invalid operation: value of type number is not a sequence
 
