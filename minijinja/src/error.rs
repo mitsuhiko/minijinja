@@ -35,6 +35,11 @@ use std::fmt;
 /// }
 /// ```
 pub struct Error {
+    repr: Box<ErrorRepr>,
+}
+
+/// The internal error data
+struct ErrorRepr {
     kind: ErrorKind,
     detail: Option<Cow<'static, str>>,
     name: Option<String>,
@@ -42,23 +47,23 @@ pub struct Error {
     span: Option<Span>,
     source: Option<Box<dyn std::error::Error + Send + Sync>>,
     #[cfg(feature = "debug")]
-    pub(crate) debug_info: Option<crate::debug::DebugInfo>,
+    debug_info: Option<crate::debug::DebugInfo>,
 }
 
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut err = f.debug_struct("Error");
-        err.field("kind", &self.kind);
-        if let Some(ref detail) = self.detail {
+        err.field("kind", &self.kind());
+        if let Some(ref detail) = self.repr.detail {
             err.field("detail", detail);
         }
-        if let Some(ref name) = self.name {
+        if let Some(ref name) = self.name() {
             err.field("name", name);
         }
-        if self.lineno > 0 {
-            err.field("line", &self.lineno);
+        if let Some(line) = self.line() {
+            err.field("line", &line);
         }
-        if let Some(ref source) = self.source {
+        if let Some(ref source) = std::error::Error::source(self) {
             err.field("source", source);
         }
         err.finish()?;
@@ -74,9 +79,9 @@ impl fmt::Debug for Error {
                     crate::debug::render_debug_info(
                         f,
                         self.name(),
-                        self.kind,
+                        self.kind(),
                         self.line(),
-                        self.span,
+                        self.span(),
                         info,
                     )?;
                     writeln!(f)?;
@@ -159,13 +164,13 @@ impl fmt::Display for ErrorKind {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(ref detail) = self.detail {
-            write!(f, "{}: {}", self.kind, detail)?;
+        if let Some(ref detail) = self.repr.detail {
+            write!(f, "{}: {}", self.kind(), detail)?;
         } else {
-            write!(f, "{}", self.kind)?;
+            write!(f, "{}", self.kind())?;
         }
-        if let Some(ref filename) = self.name {
-            write!(f, " (in {}:{})", filename, self.lineno)?
+        if let Some(ref filename) = self.name() {
+            write!(f, " (in {}:{})", filename, self.line().unwrap_or(0))?
         }
         #[cfg(feature = "debug")]
         {
@@ -174,9 +179,9 @@ impl fmt::Display for Error {
                     crate::debug::render_debug_info(
                         f,
                         self.name(),
-                        self.kind,
+                        self.kind(),
                         self.line(),
-                        self.span,
+                        self.span(),
                         info,
                     )?;
                 }
@@ -190,26 +195,28 @@ impl Error {
     /// Creates a new error with kind and detail.
     pub fn new<D: Into<Cow<'static, str>>>(kind: ErrorKind, detail: D) -> Error {
         Error {
-            kind,
-            detail: Some(detail.into()),
-            name: None,
-            lineno: 0,
-            span: None,
-            source: None,
-            #[cfg(feature = "debug")]
-            debug_info: None,
+            repr: Box::new(ErrorRepr {
+                kind,
+                detail: Some(detail.into()),
+                name: None,
+                lineno: 0,
+                span: None,
+                source: None,
+                #[cfg(feature = "debug")]
+                debug_info: None,
+            }),
         }
     }
 
     pub(crate) fn set_filename_and_line(&mut self, filename: &str, lineno: usize) {
-        self.name = Some(filename.into());
-        self.lineno = lineno;
+        self.repr.name = Some(filename.into());
+        self.repr.lineno = lineno;
     }
 
     pub(crate) fn set_filename_and_span(&mut self, filename: &str, span: Span) {
-        self.name = Some(filename.into());
-        self.span = Some(span);
-        self.lineno = span.start_line;
+        self.repr.name = Some(filename.into());
+        self.repr.span = Some(span);
+        self.repr.lineno = span.start_line;
     }
 
     pub(crate) fn new_not_found(name: &str) -> Error {
@@ -222,23 +229,32 @@ impl Error {
     /// Attaches another error as source to this error.
     #[allow(unused)]
     pub fn with_source<E: std::error::Error + Send + Sync + 'static>(mut self, source: E) -> Self {
-        self.source = Some(Box::new(source));
+        self.repr.source = Some(Box::new(source));
         self
     }
 
     /// Returns the error kind
     pub fn kind(&self) -> ErrorKind {
-        self.kind
+        self.repr.kind
     }
 
-    /// Returns the filename.
+    /// Returns the filename of the template that caused the error.
     pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+        self.repr.name.as_deref()
     }
 
-    /// Returns the line.
+    /// Returns the line number where the error ocurred.
     pub fn line(&self) -> Option<usize> {
-        self.name.as_ref().map(|_| self.lineno)
+        if self.repr.lineno > 0 {
+            Some(self.repr.lineno)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the line number where the error ocurred.
+    pub(crate) fn span(&self) -> Option<Span> {
+        self.repr.span
     }
 
     /// Returns the template debug information is available.
@@ -249,27 +265,35 @@ impl Error {
     #[cfg(feature = "debug")]
     #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
     pub(crate) fn debug_info(&self) -> Option<&crate::debug::DebugInfo> {
-        self.debug_info.as_ref()
+        self.repr.debug_info.as_ref()
+    }
+
+    #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
+    pub(crate) fn attach_debug_info(&mut self, value: crate::debug::DebugInfo) {
+        self.repr.debug_info = Some(value);
     }
 }
 
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.source.as_ref().map(|err| err.as_ref() as _)
+        self.repr.source.as_ref().map(|err| err.as_ref() as _)
     }
 }
 
 impl From<ErrorKind> for Error {
     fn from(kind: ErrorKind) -> Self {
         Error {
-            kind,
-            detail: None,
-            name: None,
-            lineno: 0,
-            span: None,
-            source: None,
-            #[cfg(feature = "debug")]
-            debug_info: None,
+            repr: Box::new(ErrorRepr {
+                kind,
+                detail: None,
+                name: None,
+                lineno: 0,
+                span: None,
+                source: None,
+                #[cfg(feature = "debug")]
+                debug_info: None,
+            }),
         }
     }
 }
@@ -295,7 +319,7 @@ pub fn attach_basic_debug_info<T>(rv: Result<T, Error>, source: &str) -> Result<
         match rv {
             Ok(rv) => Ok(rv),
             Err(mut err) => {
-                err.debug_info = Some(crate::debug::DebugInfo {
+                err.repr.debug_info = Some(crate::debug::DebugInfo {
                     template_source: Some(source.to_string()),
                     ..Default::default()
                 });

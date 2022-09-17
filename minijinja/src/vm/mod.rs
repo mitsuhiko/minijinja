@@ -669,8 +669,8 @@ fn process_err(mut err: Error, pc: usize, state: &State) -> Error {
     // only attach debug info if we don't have one yet and we are in debug mode.
     #[cfg(feature = "debug")]
     {
-        if state.env.debug() && err.debug_info.is_none() {
-            err.debug_info = Some(state.make_debug_info(pc, state.instructions));
+        if state.env.debug() && err.debug_info().is_none() {
+            err.attach_debug_info(state.make_debug_info(pc, state.instructions));
         }
     }
     err
