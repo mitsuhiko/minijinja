@@ -136,6 +136,8 @@
 //!   which are treated like a dict syntax.  Eg: `foo(a=1, b=2)` is the same as
 //!   `foo({"a": 1, "b": 2})`.
 //! - ``.`` / ``[]``: Get an attribute of an object.
+//! - ``[start:stop]`` / ``[start:stop:step]``: slices a list or string.  All three expressions
+//!   are optional (`start`, `stop`, `step`).
 //!
 //! ### If Expressions
 //!

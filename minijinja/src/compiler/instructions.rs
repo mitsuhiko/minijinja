@@ -31,6 +31,9 @@ pub enum Instruction<'source> {
     /// Looks up an item.
     GetItem,
 
+    /// Performs a slice operation.
+    Slice,
+
     /// Loads a constant value.
     LoadConst(Value),
 
