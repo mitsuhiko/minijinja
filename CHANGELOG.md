@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-# Unreleased
+# 0.21.0
 
 - Added custom autoescape settings.
 - Added custom formatters.
