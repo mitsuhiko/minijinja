@@ -6,6 +6,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 
 ## List of Examples
 
+* [autoreload](autoreload): shows how to use auto reloading.
 * [debug](debug): contains an example showing the built-in `debug()` function.
 * [dynamic](dynamic): demonstrates how to use dynamic objects in templates.
 * [error](error): shows the built-in error reporting support.
