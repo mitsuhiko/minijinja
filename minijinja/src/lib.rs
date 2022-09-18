@@ -106,6 +106,7 @@
 //! - [`filters`]: teaches you how to write custom filters and to see the list of built-in filters.
 //! - [`tests`]: teaches you how to write custom test functions and to see the list of built-in tests.
 //! - [`functions`]: teaches how to write custom functions and to see the list of built-in functions.
+//! - For auto reloading use the [`minijinja-autoreload`](https://docs.rs/minijinja-autoreload) crate.
 //!
 //! Additionally there is an [list of examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
 //! with many different small example programs on GitHub to explore.
