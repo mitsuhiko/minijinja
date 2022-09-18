@@ -14,6 +14,9 @@
 //!
 //! ## Example
 //!
+//! This is an example that uses the `source` feature of MiniJinja to automatically
+//! load templates from the file system:
+//!
 //! ```
 //! # fn test() -> Result<(), minijinja::Error> {
 //! use minijinja_autoreload::AutoReloader;

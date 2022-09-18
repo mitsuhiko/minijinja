@@ -27,6 +27,8 @@ let env = reloader.acquire_env()?;
 let tmpl = env.get_template("index.html")?;
 ```
 
+For an example have a look at the [autoreload example](https://github.com/mitsuhiko/minijinja/tree/main/examples/autoreload).
+
 ## Sponsor
 
 If you like the project and find it useful you can [become a

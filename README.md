@@ -71,6 +71,11 @@ MiniJinja 0.20 supports Rust versions down to 1.45.  It is possible to write
 code that is compatible with both 0.20 and newer versions of MiniJinja which
 should make it possible to defer the upgrade to later.
 
+## Related Crates
+
+* [minijinja-autoreload](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-autoreload): provides
+  an auto reload helper for MiniJinja.
+
 ## Sponsor
 
 If you like the project and find it useful you can [become a
