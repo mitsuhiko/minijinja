@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.22.1
+
+- Fixed an incorrect manifest for `minijinja-autoreload`.
+
 # 0.22.0
 
 - Add `defined` and `undefined` tests to always be included.
