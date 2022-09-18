@@ -5,6 +5,12 @@ All notable changes to MiniJinja are documented here.
 # Unreleased
 
 - Add `defined` and `undefined` tests to always be included.
+- Removed `Source::load_from_path`.
+- Added `Source::from_path`.
+
+## Breaking Changes
+
+- Removed `Source::load_from_path`.  Use `Source::with_loader` instead.
 
 # 0.21.0
 

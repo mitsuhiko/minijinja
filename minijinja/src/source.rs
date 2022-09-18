@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
+use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use memo_map::MemoMap;
@@ -89,7 +91,7 @@ impl Source {
     /// fn create_env() -> Environment<'static> {
     ///     let mut env = Environment::new();
     ///     let mut source = Source::new();
-    ///     source.load_from_path("templates", &["html"]).unwrap();
+    ///     source.add_template("index.html", "...").unwrap();
     ///     env.set_source(source);
     ///     env
     /// }
@@ -140,6 +142,40 @@ impl Source {
         }
     }
 
+    /// Creates a source that loads on demand from a given directory.
+    ///
+    /// This creates a source with a dynamic loader which looks up templates in the
+    /// given directory.  Templates that start with a dot (`.`) or are contained in
+    /// a folder starting with a dot cannot be loaded.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use minijinja::{Source, Environment};
+    /// fn create_env() -> Environment<'static> {
+    ///     let mut env = Environment::new();
+    ///     env.set_source(Source::from_path("path/to/templates"));
+    ///     env
+    /// }
+    /// ```
+    pub fn from_path<P: AsRef<Path>>(dir: P) -> Source {
+        let dir = dir.as_ref().to_path_buf();
+        Source::with_loader(move |name| {
+            let path = match safe_join(&dir, name) {
+                Some(path) => path,
+                None => return Ok(None),
+            };
+            match fs::read_to_string(path) {
+                Ok(result) => Ok(Some(result)),
+                Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
+                Err(err) => Err(
+                    Error::new(ErrorKind::InvalidOperation, "could not read template")
+                        .with_source(err),
+                ),
+            }
+        })
+    }
+
     /// Adds a new template into the source.
     ///
     /// This is similar to the method of the same name on the environment but
@@ -173,81 +209,9 @@ impl Source {
     /// Removes an already loaded template from the source.
     pub fn remove_template(&mut self, name: &str) {
         match &mut self.backing {
-            SourceBacking::Dynamic { templates, .. } => {
-                templates.remove(name);
-            }
-            SourceBacking::Static { templates } => {
-                templates.remove(name);
-            }
-        }
-    }
-
-    /// Loads templates from a path.
-    ///
-    /// This function takes two arguments: `path` which is the path to where the templates are
-    /// stored and `extensions` which is a list of file extensions that should be considered to
-    /// be templates.  Hidden files are always ignored.
-    pub fn load_from_path<P: AsRef<Path>>(
-        &mut self,
-        path: P,
-        extensions: &[&str],
-    ) -> Result<(), Error> {
-        let path = fs::canonicalize(&path).map_err(|err| {
-            Error::new(ErrorKind::InvalidOperation, "unable to load template").with_source(err)
-        })?;
-
-        fn walk(
-            source: &mut Source,
-            root: &Path,
-            dir: &Path,
-            extensions: &[&str],
-        ) -> Result<(), Error> {
-            if dir.is_dir() {
-                for entry in fs::read_dir(dir).map_err(|err| {
-                    Error::new(ErrorKind::InvalidOperation, "failed to walk directory")
-                        .with_source(err)
-                })? {
-                    let entry = entry.map_err(|err| {
-                        Error::new(ErrorKind::InvalidOperation, "failed to walk directory")
-                            .with_source(err)
-                    })?;
-                    let path = entry.path();
-
-                    let filename = match path.file_name().and_then(|x| x.to_str()) {
-                        Some(filename) => filename,
-                        None => continue,
-                    };
-
-                    if filename.starts_with('.') {
-                        continue;
-                    }
-
-                    if path.is_dir() {
-                        walk(source, root, &path, extensions)?;
-                    } else if extensions.contains(&filename.rsplit('.').next().unwrap_or("")) {
-                        let name = path
-                            .strip_prefix(root)
-                            .unwrap()
-                            .display()
-                            .to_string()
-                            .replace('\\', "/");
-                        source.add_template(
-                            name,
-                            fs::read_to_string(path).map_err(|err| {
-                                Error::new(
-                                    ErrorKind::TemplateNotFound,
-                                    "unable to load template from file system",
-                                )
-                                .with_source(err)
-                            })?,
-                        )?;
-                    }
-                }
-            }
-            Ok(())
-        }
-
-        walk(self, &path, &path, extensions)
+            SourceBacking::Dynamic { templates, .. } => templates.remove(name),
+            SourceBacking::Static { templates } => templates.remove(name),
+        };
     }
 
     /// Gets a compiled template from the source.
@@ -272,6 +236,17 @@ impl Source {
     }
 }
 
+fn safe_join(base: &Path, template: &str) -> Option<PathBuf> {
+    let mut rv = base.to_path_buf();
+    for segment in template.split('/') {
+        if segment.starts_with('.') || segment.contains('\\') {
+            return None;
+        }
+        rv.push(segment);
+    }
+    Some(rv)
+}
+
 #[test]
 fn test_source_replace_static() {
     let mut source = Source::new();
@@ -292,4 +267,15 @@ fn test_source_replace_dynamic() {
     env.set_source(source);
     let rv = env.get_template("a").unwrap().render(()).unwrap();
     assert_eq!(rv, "2");
+}
+
+#[test]
+fn test_safe_join() {
+    assert_eq!(
+        safe_join(Path::new("foo"), "bar/baz"),
+        Some(PathBuf::from("foo").join("bar").join("baz"))
+    );
+    assert_eq!(safe_join(Path::new("foo"), ".bar/baz"), None);
+    assert_eq!(safe_join(Path::new("foo"), "bar/.baz"), None);
+    assert_eq!(safe_join(Path::new("foo"), "bar/../baz"), None);
 }
