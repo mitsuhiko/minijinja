@@ -132,6 +132,11 @@ impl<'env, 'vm> fmt::Debug for Context<'env, 'vm> {
 }
 
 impl<'env, 'vm> Context<'env, 'vm> {
+    /// Creates a context
+    pub fn new(frame: Frame<'env, 'vm>) -> Context<'env, 'vm> {
+        Context { stack: vec![frame] }
+    }
+
     /// Freezes the context.
     ///
     /// This implementation is not particularly beautiful and highly inefficient.

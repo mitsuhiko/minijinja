@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 - Added `Value::from_function`. (#121)
 - Fixed incorrect location information with blocks.
+- Fixed broken nested `super()` calls.
 
 # 0.22.1
 

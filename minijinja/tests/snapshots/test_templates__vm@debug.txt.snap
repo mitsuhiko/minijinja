@@ -75,6 +75,7 @@ State {
             "a_plus_b.txt",
             "bad_basic_block.txt",
             "debug.txt",
+            "simple2_layout.txt",
             "simple_include.txt",
             "simple_layout.txt",
             "super_with_html.html",

@@ -26,6 +26,16 @@ pub struct Vm<'env> {
     env: &'env Environment<'env>,
 }
 
+fn prepare_blocks<'env, 'vm>(
+    blocks: &'vm BTreeMap<&'env str, Instructions<'env>>,
+) -> BTreeMap<&'env str, Vec<&'vm Instructions<'env>>> {
+    let mut rv = BTreeMap::new();
+    for (&name, instr) in blocks {
+        rv.insert(name, vec![instr]);
+    }
+    rv
+}
+
 impl<'env> Vm<'env> {
     /// Creates a new VM.
     pub fn new(env: &'env Environment<'env>) -> Vm<'env> {
@@ -41,21 +51,15 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         auto_escape: AutoEscape,
     ) -> Result<Option<Value>, Error> {
-        let mut ctx = Context::default();
-        ctx.push_frame(Frame::new(FrameBase::Value(root)));
-        let mut referenced_blocks = BTreeMap::new();
-        for (&name, instr) in blocks.iter() {
-            referenced_blocks.insert(name, vec![instr]);
-        }
         value::with_value_optimization(|| {
             self.eval_state(
                 &mut State {
                     env: self.env,
-                    ctx,
+                    ctx: Context::new(Frame::new(FrameBase::Value(root))),
                     current_block: None,
                     instructions,
                     auto_escape,
-                    blocks: referenced_blocks,
+                    blocks: prepare_blocks(blocks),
                 },
                 out,
             )
@@ -449,14 +453,10 @@ impl<'env> Vm<'env> {
                     continue;
                 }
             };
-            let instructions = tmpl.instructions();
-            let mut referenced_blocks = BTreeMap::new();
-            for (&name, instr) in tmpl.blocks().iter() {
-                referenced_blocks.insert(name, vec![instr]);
-            }
             let original_escape = state.auto_escape;
+            let instructions = tmpl.instructions();
             state.auto_escape = tmpl.initial_auto_escape();
-            self.sub_eval(state, out, instructions, referenced_blocks)
+            self.sub_eval(state, out, instructions, prepare_blocks(tmpl.blocks()))
                 .map_err(|err| {
                     Error::new(
                         ErrorKind::BadInclude,
@@ -510,7 +510,7 @@ impl<'env> Vm<'env> {
             if capture {
                 out.begin_capture();
             }
-            self.sub_eval(state, out, instructions, state.blocks.clone())
+            self.sub_eval(state, out, instructions, inner_blocks)
                 .map_err(|err| {
                     Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
                 })?;
@@ -647,12 +647,10 @@ impl<'env> Vm<'env> {
         instructions: &Instructions<'env>,
         blocks: BTreeMap<&'env str, Vec<&'_ Instructions<'env>>>,
     ) -> Result<(), Error> {
-        let mut sub_context = Context::default();
-        sub_context.push_frame(Frame::new(FrameBase::Context(&state.ctx)));
         self.eval_state(
             &mut State {
                 env: self.env,
-                ctx: sub_context,
+                ctx: Context::new(Frame::new(FrameBase::Context(&state.ctx))),
                 current_block: state.current_block,
                 auto_escape: state.auto_escape,
                 instructions,

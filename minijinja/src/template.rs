@@ -181,12 +181,12 @@ impl<'source> CompiledTemplate<'source> {
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
         let ast = parse(source, name)?;
-        let mut compiler = CodeGenerator::new(name, source);
-        compiler.compile_stmt(&ast)?;
-        let (instructions, blocks) = compiler.finish();
+        let mut gen = CodeGenerator::new(name, source);
+        gen.compile_stmt(&ast)?;
+        let (instructions, blocks) = gen.finish();
         Ok(CompiledTemplate {
-            blocks,
             instructions,
+            blocks,
         })
     }
 }
