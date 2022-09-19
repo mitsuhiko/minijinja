@@ -78,6 +78,7 @@ use std::sync::Arc;
 use serde::ser::{Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind};
+use crate::functions;
 use crate::key::{Key, StaticKey};
 use crate::utils::OnDrop;
 use crate::value::serialize::ValueSerializer;
@@ -368,6 +369,18 @@ impl Value {
     /// Creates a value from a dynamic object.
     pub fn from_object<T: Object + 'static>(value: T) -> Value {
         Value::from_rc_object(Arc::new(value))
+    }
+
+    /// Creates a callable value from a function.
+    pub fn from_function<F, Rv, Args>(f: F) -> Value
+    where
+        // the crazy bounds here exist to enable borrowing in closures
+        F: functions::Function<Rv, Args>
+            + for<'a> functions::Function<Rv, <Args as FunctionArgs<'a>>::Output>,
+        Rv: FunctionResult,
+        Args: for<'a> FunctionArgs<'a>,
+    {
+        functions::BoxedFunction::new(f).to_value()
     }
 
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.

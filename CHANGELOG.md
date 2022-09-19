@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# Unreleased
+
+- Added `Value::from_function`.
+
 # 0.22.1
 
 - Fixed an incorrect manifest for `minijinja-autoreload`.
