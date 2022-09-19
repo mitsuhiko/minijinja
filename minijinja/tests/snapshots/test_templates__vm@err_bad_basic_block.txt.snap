@@ -7,29 +7,13 @@ input_file: minijinja/tests/inputs/err_bad_basic_block.txt
 !!!ERROR!!!
 
 Error {
-    kind: EvalBlock,
-    detail: "error in local block \"body\"",
+    kind: UnknownFunction,
+    detail: "missing_function is unknown",
     name: "bad_basic_block.txt",
     line: 3,
-    source: Error {
-        kind: UnknownFunction,
-        detail: "missing_function is unknown",
-        name: "bad_basic_block.txt",
-        line: 3,
-    },
 }
 
-could not render block: error in local block "body" (in bad_basic_block.txt:3)
------------------------------ bad_basic_block.txt -----------------------------
-   1 | <title>{% block title %}default title{% endblock %}</title>
-   2 | {% block body %}
-   3 >   {{ missing_function() }}
-   4 | {% endblock %}
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Referenced variables:
--------------------------------------------------------------------------------
-
-caused by: unknown function: missing_function is unknown (in bad_basic_block.txt:3)
+unknown function: missing_function is unknown (in bad_basic_block.txt:3)
 ----------------------------- bad_basic_block.txt -----------------------------
    1 | <title>{% block title %}default title{% endblock %}</title>
    2 | {% block body %}

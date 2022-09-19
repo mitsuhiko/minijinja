@@ -291,27 +291,7 @@ impl<'env> Vm<'env> {
                     state.current_block = Some(name);
                     if let Some(layers) = state.blocks.get(name) {
                         let instructions = layers.first().unwrap();
-                        let referenced_template = match instructions.name() {
-                            name if name != state.instructions.name() => Some(name),
-                            _ => None,
-                        };
-                        try_ctx!(self
-                            .sub_eval(state, out, instructions, state.blocks.clone())
-                            .map_err(|err| {
-                                Error::new(
-                                    ErrorKind::EvalBlock,
-                                    match referenced_template {
-                                        Some(template) => format!(
-                                            "error in replaced block \"{}\" of \"{}\"",
-                                            name, template
-                                        ),
-                                        None => {
-                                            format!("error in local block \"{}\"", name)
-                                        }
-                                    },
-                                )
-                                .with_source(err)
-                            }));
+                        try_ctx!(self.sub_eval(state, out, instructions, state.blocks.clone()));
                     } else {
                         bail!(Error::new(
                             ErrorKind::InvalidOperation,
@@ -494,19 +474,15 @@ impl<'env> Vm<'env> {
         capture: bool,
     ) -> Result<Value, Error> {
         let mut inner_blocks = state.blocks.clone();
-        let name = match state.current_block {
-            Some(name) => name,
-            None => {
-                return Err(Error::new(
-                    ErrorKind::InvalidOperation,
-                    "cannot super outside of block",
-                ));
-            }
-        };
+        let name = state.current_block.ok_or_else(|| {
+            Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
+        })?;
 
         if let Some(layers) = inner_blocks.get_mut(name) {
             layers.remove(0);
-            let instructions = layers.first().unwrap();
+            let instructions = layers
+                .first()
+                .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "no parent block exists"))?;
             if capture {
                 out.begin_capture();
             }
