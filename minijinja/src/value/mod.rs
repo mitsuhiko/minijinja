@@ -78,7 +78,7 @@ use std::sync::Arc;
 use serde::ser::{Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind};
-use crate::functions::{self, BoxedFunction};
+use crate::functions;
 use crate::key::{Key, StaticKey};
 use crate::utils::OnDrop;
 use crate::value::serialize::ValueSerializer;
