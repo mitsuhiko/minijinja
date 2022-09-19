@@ -413,7 +413,7 @@ impl<'source> Environment<'source> {
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.add_global(name, functions::BoxedFunction::new(f).to_value());
+        self.add_global(name, Value::from_function(f))
     }
 
     /// Adds a global variable.
