@@ -478,25 +478,24 @@ impl<'env> Vm<'env> {
             Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
         })?;
 
-        if let Some(layers) = inner_blocks.get_mut(name) {
-            layers.remove(0);
-            let instructions = layers
-                .first()
-                .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "no parent block exists"))?;
-            if capture {
-                out.begin_capture();
-            }
-            self.sub_eval(state, out, instructions, inner_blocks)
-                .map_err(|err| {
-                    Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
-                })?;
-            if capture {
-                Ok(out.end_capture(state.auto_escape))
-            } else {
-                Ok(Value::UNDEFINED)
-            }
+        let layers = inner_blocks
+            .get_mut(name)
+            .expect("attempted to super unreferenced block");
+        layers.remove(0);
+        let instructions = layers
+            .first()
+            .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "no parent block exists"))?;
+        if capture {
+            out.begin_capture();
+        }
+        self.sub_eval(state, out, instructions, inner_blocks)
+            .map_err(|err| {
+                Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
+            })?;
+        if capture {
+            Ok(out.end_capture(state.auto_escape))
         } else {
-            panic!("attempted to super unreferenced block");
+            Ok(Value::UNDEFINED)
         }
     }
 
