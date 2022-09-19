@@ -83,6 +83,22 @@ impl<'source> CodeGenerator<'source> {
         self.instructions.len()
     }
 
+    /// Creats a sub generator.
+    fn new_subgenerator(&self) -> CodeGenerator<'source> {
+        let mut sub = CodeGenerator::new(self.instructions.name(), self.instructions.source());
+        sub.current_line = self.current_line;
+        sub.span_stack = self.span_stack.last().copied().into_iter().collect();
+        sub
+    }
+
+    /// Finishes a sub generator and syncs it back.
+    fn finish_subgenerator(&mut self, sub: CodeGenerator<'source>) -> Instructions<'source> {
+        self.current_line = sub.current_line;
+        let (instructions, blocks) = sub.finish();
+        self.blocks.extend(blocks.into_iter());
+        instructions
+    }
+
     /// Starts a for loop
     pub fn start_for_loop(&mut self, with_loop_var: bool, recursive: bool) {
         let mut flags = 0;
@@ -276,14 +292,11 @@ impl<'source> CodeGenerator<'source> {
 
     fn compile_block(&mut self, block: &ast::Spanned<ast::Block<'source>>) -> Result<(), Error> {
         self.set_line_from_span(block.span());
-        let mut sub_compiler =
-            CodeGenerator::new(self.instructions.name(), self.instructions.source());
-        sub_compiler.set_line(self.current_line);
+        let mut sub = self.new_subgenerator();
         for node in &block.body {
-            sub_compiler.compile_stmt(node)?;
+            sub.compile_stmt(node)?;
         }
-        let (instructions, blocks) = sub_compiler.finish();
-        self.blocks.extend(blocks.into_iter());
+        let instructions = self.finish_subgenerator(sub);
         self.blocks.insert(block.name, instructions);
         self.add(Instruction::CallBlock(block.name));
         Ok(())

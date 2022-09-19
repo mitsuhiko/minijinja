@@ -10,7 +10,7 @@ Error {
     kind: EvalBlock,
     detail: "error in replaced block \"body\" of \"err_bad_super.txt\"",
     name: "bad_basic_block.txt",
-    line: 2,
+    line: 3,
     source: Error {
         kind: EvalBlock,
         detail: "error in super block",
@@ -25,11 +25,11 @@ Error {
     },
 }
 
-could not render block: error in replaced block "body" of "err_bad_super.txt" (in bad_basic_block.txt:2)
+could not render block: error in replaced block "body" of "err_bad_super.txt" (in bad_basic_block.txt:3)
 ----------------------------- bad_basic_block.txt -----------------------------
    1 | <title>{% block title %}default title{% endblock %}</title>
-   2 > {% block body %}
-   3 |   {{ missing_function() }}
+   2 | {% block body %}
+   3 >   {{ missing_function() }}
    4 | {% endblock %}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables:
