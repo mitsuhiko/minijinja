@@ -13,6 +13,12 @@ pub const LOOP_FLAG_WITH_LOOP_VAR: u8 = 1;
 /// This loop is recursive.
 pub const LOOP_FLAG_RECURSIVE: u8 = 2;
 
+/// Rust type to represent locals.
+pub type LocalId = u8;
+
+/// The maximum number of filters/tests that can be cached.
+pub const MAX_LOCALS: usize = 50;
+
 /// Represents an instruction for the VM.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub enum Instruction<'source> {
@@ -105,10 +111,10 @@ pub enum Instruction<'source> {
     In,
 
     /// Apply a filter.
-    ApplyFilter(&'source str, usize),
+    ApplyFilter(&'source str, usize, LocalId),
 
     /// Perform a filter.
-    PerformTest(&'source str, usize),
+    PerformTest(&'source str, usize, LocalId),
 
     /// Emit the stack top as output
     Emit,

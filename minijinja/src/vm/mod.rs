@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::compiler::instructions::{
-    Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR,
+    Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR, MAX_LOCALS,
 };
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
@@ -35,6 +35,23 @@ fn prepare_blocks<'env, 'vm>(
         .iter()
         .map(|(name, instr)| (*name, BlockStack::new(instr)))
         .collect()
+}
+
+#[inline(always)]
+fn get_or_lookup_local<T, F>(vec: &mut [Option<T>], local_id: u8, name: &str, f: F) -> Option<T>
+where
+    T: Copy,
+    F: FnOnce(&str) -> Option<T>,
+{
+    if local_id == !0 {
+        f(name)
+    } else if let Some(Some(rv)) = vec.get(local_id as usize) {
+        Some(*rv)
+    } else {
+        let val = f(name)?;
+        vec[local_id as usize] = Some(val);
+        Some(val)
+    }
 }
 
 impl<'env> Vm<'env> {
@@ -78,6 +95,8 @@ impl<'env> Vm<'env> {
         let mut auto_escape_stack = vec![];
         let mut next_loop_recursion_jump = None;
         let mut pc = 0;
+        let mut loaded_filters = [None; MAX_LOCALS];
+        let mut loaded_tests = [None; MAX_LOCALS];
 
         macro_rules! bail {
             ($err:expr) => {{
@@ -336,15 +355,36 @@ impl<'env> Vm<'env> {
                 Instruction::EndCapture => {
                     stack.push(out.end_capture(state.auto_escape));
                 }
-                Instruction::ApplyFilter(name, arg_count) => {
+                Instruction::ApplyFilter(name, arg_count, local_id) => {
+                    let filter = try_ctx!(get_or_lookup_local(
+                        &mut loaded_filters,
+                        *local_id,
+                        name,
+                        |name| { state.env.get_filter(name) }
+                    )
+                    .ok_or_else(|| {
+                        Error::new(
+                            ErrorKind::UnknownFilter,
+                            format!("filter {} is unknown", name),
+                        )
+                    }));
                     let args = stack.slice_top(*arg_count);
-                    let rv = try_ctx!(state.apply_filter(name, args));
+                    let rv = try_ctx!(filter.apply_to(state, args));
                     stack.drop_top(*arg_count);
                     stack.push(rv);
                 }
-                Instruction::PerformTest(name, arg_count) => {
+                Instruction::PerformTest(name, arg_count, local_id) => {
+                    let test = try_ctx!(get_or_lookup_local(
+                        &mut loaded_tests,
+                        *local_id,
+                        name,
+                        |name| { state.env.get_test(name) }
+                    )
+                    .ok_or_else(|| {
+                        Error::new(ErrorKind::UnknownTest, format!("test {} is unknown", name))
+                    }));
                     let args = stack.slice_top(*arg_count);
-                    let rv = try_ctx!(state.perform_test(name, args));
+                    let rv = try_ctx!(test.perform(state, args));
                     stack.drop_top(*arg_count);
                     stack.push(Value::from(rv));
                 }

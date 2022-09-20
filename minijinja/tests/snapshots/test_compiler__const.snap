@@ -12,4 +12,6 @@ CodeGenerator {
     pending_block: [],
     current_line: 0,
     span_stack: [],
+    filter_local_ids: {},
+    test_local_ids: {},
 }

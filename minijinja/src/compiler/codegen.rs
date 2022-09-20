@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::compiler::ast;
 use crate::compiler::instructions::{
-    Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR,
+    Instruction, Instructions, LocalId, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR, MAX_LOCALS,
 };
 use crate::compiler::tokens::Span;
 use crate::error::Error;
@@ -10,6 +10,19 @@ use crate::value::Value;
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
+
+/// For the first `MAX_LOCALS` filters/tests, an ID is returned for faster lookups from the stack.
+fn get_local_id<'source>(ids: &mut BTreeMap<&'source str, LocalId>, name: &'source str) -> LocalId {
+    if let Some(id) = ids.get(name) {
+        *id
+    } else if ids.len() >= MAX_LOCALS {
+        !0
+    } else {
+        let next_id = ids.len() as LocalId;
+        ids.insert(name, next_id);
+        next_id
+    }
+}
 
 /// Represents an open block of code that does not yet have updated
 /// jump targets.
@@ -28,6 +41,8 @@ pub struct CodeGenerator<'source> {
     pending_block: Vec<PendingBlock>,
     current_line: usize,
     span_stack: Vec<Span>,
+    filter_local_ids: BTreeMap<&'source str, LocalId>,
+    test_local_ids: BTreeMap<&'source str, LocalId>,
 }
 
 impl<'source> CodeGenerator<'source> {
@@ -39,6 +54,8 @@ impl<'source> CodeGenerator<'source> {
             pending_block: Vec::new(),
             current_line: 0,
             span_stack: Vec::new(),
+            filter_local_ids: BTreeMap::new(),
+            test_local_ids: BTreeMap::new(),
         }
     }
 
@@ -468,7 +485,8 @@ impl<'source> CodeGenerator<'source> {
                 for arg in &f.args {
                     self.compile_expr(arg)?;
                 }
-                self.add(Instruction::ApplyFilter(f.name, f.args.len() + 1));
+                let local_id = get_local_id(&mut self.filter_local_ids, f.name);
+                self.add(Instruction::ApplyFilter(f.name, f.args.len() + 1, local_id));
                 self.pop_span();
             }
             ast::Expr::Test(f) => {
@@ -477,7 +495,8 @@ impl<'source> CodeGenerator<'source> {
                 for arg in &f.args {
                     self.compile_expr(arg)?;
                 }
-                self.add(Instruction::PerformTest(f.name, f.args.len() + 1));
+                let local_id = get_local_id(&mut self.test_local_ids, f.name);
+                self.add(Instruction::PerformTest(f.name, f.args.len() + 1, local_id));
                 self.pop_span();
             }
             ast::Expr::GetAttr(g) => {

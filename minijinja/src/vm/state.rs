@@ -79,28 +79,6 @@ impl<'vm, 'env> State<'vm, 'env> {
         })
     }
 
-    pub(crate) fn apply_filter(&self, name: &str, args: &[Value]) -> Result<Value, Error> {
-        if let Some(filter) = self.env.get_filter(name) {
-            filter.apply_to(self, args)
-        } else {
-            Err(Error::new(
-                ErrorKind::UnknownFilter,
-                format!("filter {} is unknown", name),
-            ))
-        }
-    }
-
-    pub(crate) fn perform_test(&self, name: &str, args: &[Value]) -> Result<bool, Error> {
-        if let Some(test) = self.env.get_test(name) {
-            test.perform(self, args)
-        } else {
-            Err(Error::new(
-                ErrorKind::UnknownTest,
-                format!("test {} is unknown", name),
-            ))
-        }
-    }
-
     #[cfg(feature = "debug")]
     pub(crate) fn make_debug_info(
         &self,
