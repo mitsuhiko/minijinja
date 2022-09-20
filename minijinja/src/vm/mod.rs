@@ -38,17 +38,17 @@ fn prepare_blocks<'env, 'vm>(
 }
 
 #[inline(always)]
-fn get_or_lookup_local<T, F>(vec: &mut [Option<T>], local_id: u8, name: &str, f: F) -> Option<T>
+fn get_or_lookup_local<T, F>(vec: &mut [Option<T>], local_id: u8, f: F) -> Option<T>
 where
     T: Copy,
-    F: FnOnce(&str) -> Option<T>,
+    F: FnOnce() -> Option<T>,
 {
     if local_id == !0 {
-        f(name)
+        f()
     } else if let Some(Some(rv)) = vec.get(local_id as usize) {
         Some(*rv)
     } else {
-        let val = f(name)?;
+        let val = f()?;
         vec[local_id as usize] = Some(val);
         Some(val)
     }
@@ -356,30 +356,25 @@ impl<'env> Vm<'env> {
                     stack.push(out.end_capture(state.auto_escape));
                 }
                 Instruction::ApplyFilter(name, arg_count, local_id) => {
-                    let filter = try_ctx!(get_or_lookup_local(
-                        &mut loaded_filters,
-                        *local_id,
-                        name,
-                        |name| { state.env.get_filter(name) }
-                    )
-                    .ok_or_else(|| {
-                        Error::new(
-                            ErrorKind::UnknownFilter,
-                            format!("filter {} is unknown", name),
-                        )
-                    }));
+                    let filter =
+                        try_ctx!(get_or_lookup_local(&mut loaded_filters, *local_id, || {
+                            state.env.get_filter(name)
+                        })
+                        .ok_or_else(|| {
+                            Error::new(
+                                ErrorKind::UnknownFilter,
+                                format!("filter {} is unknown", name),
+                            )
+                        }));
                     let args = stack.slice_top(*arg_count);
                     let rv = try_ctx!(filter.apply_to(state, args));
                     stack.drop_top(*arg_count);
                     stack.push(rv);
                 }
                 Instruction::PerformTest(name, arg_count, local_id) => {
-                    let test = try_ctx!(get_or_lookup_local(
-                        &mut loaded_tests,
-                        *local_id,
-                        name,
-                        |name| { state.env.get_test(name) }
-                    )
+                    let test = try_ctx!(get_or_lookup_local(&mut loaded_tests, *local_id, || {
+                        state.env.get_test(name)
+                    })
                     .ok_or_else(|| {
                         Error::new(ErrorKind::UnknownTest, format!("test {} is unknown", name))
                     }));
