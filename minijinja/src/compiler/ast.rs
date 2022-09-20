@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::fmt;
 
 use crate::compiler::tokens::Span;
-use crate::value::Value;
+use crate::value::{Value, ValueMap, ValueRepr};
 
 /// Container for nodes with location info.
 ///
@@ -334,11 +334,50 @@ pub struct List<'a> {
     pub items: Vec<Expr<'a>>,
 }
 
+impl<'a> List<'a> {
+    pub fn as_const(&self) -> Option<Value> {
+        if !self.items.iter().all(|x| matches!(x, Expr::Const(_))) {
+            return None;
+        }
+
+        let mut rv = Vec::new();
+        for expr in &self.items {
+            if let Expr::Const(val) = expr {
+                rv.push(val.value.clone());
+            }
+        }
+
+        Some(Value::from(rv))
+    }
+}
+
 /// Creates a map of values.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Map<'a> {
     pub keys: Vec<Expr<'a>>,
     pub values: Vec<Expr<'a>>,
+}
+
+impl<'a> Map<'a> {
+    pub fn as_const(&self) -> Option<Value> {
+        if !self.keys.iter().all(|x| matches!(x, Expr::Const(_)))
+            || !self.values.iter().all(|x| matches!(x, Expr::Const(_)))
+        {
+            return None;
+        }
+
+        let mut rv = ValueMap::new();
+        for (key, value) in self.keys.iter().zip(self.values.iter()) {
+            if let (Expr::Const(maybe_key), Expr::Const(value)) = (key, value) {
+                rv.insert(
+                    maybe_key.value.clone().try_into_key().ok()?,
+                    value.value.clone(),
+                );
+            }
+        }
+
+        Some(Value(ValueRepr::Map(rv.into())))
+    }
 }
 
 /// Defines the specific type of call.

@@ -170,7 +170,7 @@ pub enum Instruction<'source> {
     CallMethod(&'source str, usize),
 
     /// Calls an object
-    CallObject,
+    CallObject(usize),
 
     /// Duplicates the top item
     DupTop,

@@ -497,20 +497,28 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_call(c)?;
             }
             ast::Expr::List(l) => {
-                self.set_line_from_span(l.span());
-                for item in &l.items {
-                    self.compile_expr(item)?;
+                if let Some(val) = l.as_const() {
+                    self.add(Instruction::LoadConst(val));
+                } else {
+                    self.set_line_from_span(l.span());
+                    for item in &l.items {
+                        self.compile_expr(item)?;
+                    }
+                    self.add(Instruction::BuildList(l.items.len()));
                 }
-                self.add(Instruction::BuildList(l.items.len()));
             }
             ast::Expr::Map(m) => {
-                self.set_line_from_span(m.span());
-                assert_eq!(m.keys.len(), m.values.len());
-                for (key, value) in m.keys.iter().zip(m.values.iter()) {
-                    self.compile_expr(key)?;
-                    self.compile_expr(value)?;
+                if let Some(val) = m.as_const() {
+                    self.add(Instruction::LoadConst(val));
+                } else {
+                    self.set_line_from_span(m.span());
+                    assert_eq!(m.keys.len(), m.values.len());
+                    for (key, value) in m.keys.iter().zip(m.values.iter()) {
+                        self.compile_expr(key)?;
+                        self.compile_expr(value)?;
+                    }
+                    self.add(Instruction::BuildMap(m.keys.len()));
                 }
-                self.add(Instruction::BuildMap(m.keys.len()));
             }
         }
         Ok(())
@@ -539,7 +547,10 @@ impl<'source> CodeGenerator<'source> {
             }
             ast::CallType::Object(expr) => {
                 self.compile_expr(expr)?;
-                self.add(Instruction::CallObject);
+                for arg in &c.args {
+                    self.compile_expr(arg)?;
+                }
+                self.add(Instruction::CallObject(c.args.len() + 1));
             }
         };
         self.pop_span();

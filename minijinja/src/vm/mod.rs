@@ -386,11 +386,11 @@ impl<'env> Vm<'env> {
                     stack.drop_top(*arg_count);
                     stack.push(rv);
                 }
-                Instruction::CallObject => {
-                    let top = stack.pop();
-                    let args = try_ctx!(top.as_slice());
-                    let obj = stack.pop();
-                    stack.push(try_ctx!(obj.call(state, args)));
+                Instruction::CallObject(arg_count) => {
+                    let args = stack.slice_top(*arg_count);
+                    let rv = try_ctx!(args[0].call(state, &args[1..]));
+                    stack.drop_top(*arg_count);
+                    stack.push(rv);
                 }
                 Instruction::DupTop => {
                     stack.push(stack.peek().clone());
