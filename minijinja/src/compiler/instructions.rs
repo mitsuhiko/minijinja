@@ -339,6 +339,7 @@ impl<'source> Instructions<'source> {
     #[cfg(feature = "debug")]
     pub fn get_referenced_names(&self, idx: usize) -> Vec<&'source str> {
         let mut rv = Vec::new();
+        let idx = idx.min(self.instructions.len() - 1);
         for instr in self.instructions[..=idx].iter().rev() {
             let name = match instr {
                 Instruction::Lookup(name)

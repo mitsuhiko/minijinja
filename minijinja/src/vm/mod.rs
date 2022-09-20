@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::mem;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -11,8 +12,9 @@ use crate::key::Key;
 use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{self, ops, Value, ValueRepr};
-use crate::vm::context::{Context, Frame, FrameBase, Stack};
+use crate::vm::context::{Context, Frame, Stack};
 use crate::vm::forloop::{ForLoop, LoopState};
+use crate::vm::state::BlockStack;
 
 pub use crate::vm::state::State;
 
@@ -28,12 +30,11 @@ pub struct Vm<'env> {
 
 fn prepare_blocks<'env, 'vm>(
     blocks: &'vm BTreeMap<&'env str, Instructions<'env>>,
-) -> BTreeMap<&'env str, Vec<&'vm Instructions<'env>>> {
-    let mut rv = BTreeMap::new();
-    for (&name, instr) in blocks {
-        rv.insert(name, vec![instr]);
-    }
-    rv
+) -> BTreeMap<&'env str, BlockStack<'vm, 'env>> {
+    blocks
+        .iter()
+        .map(|(name, instr)| (*name, BlockStack::new(instr)))
+        .collect()
 }
 
 impl<'env> Vm<'env> {
@@ -55,7 +56,7 @@ impl<'env> Vm<'env> {
             self.eval_state(
                 &mut State {
                     env: self.env,
-                    ctx: Context::new(Frame::new(FrameBase::Value(root))),
+                    ctx: Context::new(Frame::new(root)),
                     current_block: None,
                     instructions,
                     auto_escape,
@@ -224,7 +225,7 @@ impl<'env> Vm<'env> {
                     stack.push(try_ctx!(ops::neg(&a)));
                 }
                 Instruction::PushWith => {
-                    state.ctx.push_frame(Frame::new(FrameBase::None));
+                    state.ctx.push_frame(Frame::default());
                 }
                 Instruction::PopFrame => {
                     if let Some(mut loop_ctx) = state.ctx.pop_frame().current_loop {
@@ -289,9 +290,14 @@ impl<'env> Vm<'env> {
                 Instruction::CallBlock(name) => {
                     let old_block = state.current_block;
                     state.current_block = Some(name);
-                    if let Some(layers) = state.blocks.get(name) {
-                        let instructions = layers.first().unwrap();
-                        try_ctx!(self.sub_eval(state, out, instructions, state.blocks.clone()));
+                    if let Some(block_stack) = state.blocks.get(name) {
+                        let old_instructions =
+                            mem::replace(&mut state.instructions, block_stack.instructions());
+                        state.ctx.push_frame(Frame::default());
+                        let rv = self.eval_state(state, out);
+                        state.ctx.pop_frame();
+                        state.instructions = old_instructions;
+                        try_ctx!(rv);
                     } else {
                         bail!(Error::new(
                             ErrorKind::InvalidOperation,
@@ -433,18 +439,20 @@ impl<'env> Vm<'env> {
                     continue;
                 }
             };
-            let original_escape = state.auto_escape;
-            let instructions = tmpl.instructions();
-            state.auto_escape = tmpl.initial_auto_escape();
-            self.sub_eval(state, out, instructions, prepare_blocks(tmpl.blocks()))
-                .map_err(|err| {
-                    Error::new(
-                        ErrorKind::BadInclude,
-                        format!("error in \"{}\"", instructions.name()),
-                    )
-                    .with_source(err)
-                })?;
-            state.auto_escape = original_escape;
+            let old_escape = mem::replace(&mut state.auto_escape, tmpl.initial_auto_escape());
+            let old_instructions = mem::replace(&mut state.instructions, tmpl.instructions());
+            let old_blocks = mem::replace(&mut state.blocks, prepare_blocks(tmpl.blocks()));
+            let rv = self.eval_state(state, out);
+            state.auto_escape = old_escape;
+            state.instructions = old_instructions;
+            state.blocks = old_blocks;
+            rv.map_err(|err| {
+                Error::new(
+                    ErrorKind::BadInclude,
+                    format!("error in \"{}\"", tmpl.name()),
+                )
+                .with_source(err)
+            })?;
             return Ok(());
         }
         if !templates_tried.is_empty() && !ignore_missing {
@@ -473,25 +481,33 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         capture: bool,
     ) -> Result<Value, Error> {
-        let mut inner_blocks = state.blocks.clone();
         let name = state.current_block.ok_or_else(|| {
             Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
         })?;
 
-        let layers = inner_blocks
+        let block_stack = state
+            .blocks
             .get_mut(name)
-            .expect("attempted to super unreferenced block");
-        layers.remove(0);
-        let instructions = layers
-            .first()
-            .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "no parent block exists"))?;
+            .expect("super on unreferenced block");
+        if !block_stack.push() {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "no parent block exists",
+            ));
+        }
+
         if capture {
             out.begin_capture();
         }
-        self.sub_eval(state, out, instructions, inner_blocks)
-            .map_err(|err| {
-                Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
-            })?;
+
+        let old_instructions = mem::replace(&mut state.instructions, block_stack.instructions());
+        let rv = self.eval_state(state, out);
+        state.instructions = old_instructions;
+        state.blocks.get_mut(name).unwrap().pop();
+
+        rv.map_err(|err| {
+            Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
+        })?;
         if capture {
             Ok(out.end_capture(state.auto_escape))
         } else {
@@ -531,8 +547,8 @@ impl<'env> Vm<'env> {
             state
                 .blocks
                 .entry(name)
-                .or_insert_with(Vec::new)
-                .push(instr);
+                .or_insert_with(BlockStack::default)
+                .append_instructions(instr);
         }
         state.instructions = tmpl.instructions();
         Ok(())
@@ -612,27 +628,6 @@ impl<'env> Vm<'env> {
         for value in v.iter().rev() {
             stack.push(value.clone());
         }
-        Ok(())
-    }
-
-    fn sub_eval(
-        &self,
-        state: &mut State<'_, 'env>,
-        out: &mut Output,
-        instructions: &Instructions<'env>,
-        blocks: BTreeMap<&'env str, Vec<&'_ Instructions<'env>>>,
-    ) -> Result<(), Error> {
-        self.eval_state(
-            &mut State {
-                env: self.env,
-                ctx: Context::new(Frame::new(FrameBase::Context(&state.ctx))),
-                current_block: state.current_block,
-                auto_escape: state.auto_escape,
-                instructions,
-                blocks,
-            },
-            out,
-        )?;
         Ok(())
     }
 }
