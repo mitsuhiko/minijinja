@@ -145,7 +145,6 @@ pub(crate) struct BlockStack<'vm, 'env> {
 }
 
 impl<'vm, 'env> BlockStack<'vm, 'env> {
-    /// Creates a block stack with instructions.
     pub fn new(instructions: &'vm Instructions<'env>) -> BlockStack<'vm, 'env> {
         BlockStack {
             instructions: vec![instructions],
@@ -153,7 +152,6 @@ impl<'vm, 'env> BlockStack<'vm, 'env> {
         }
     }
 
-    /// Returns the instructions at the current depth.
     pub fn instructions(&self) -> &'vm Instructions<'env> {
         self.instructions
             .get(self.depth)
@@ -161,7 +159,6 @@ impl<'vm, 'env> BlockStack<'vm, 'env> {
             .expect("block stack overflow")
     }
 
-    /// Increases the depth if there is more.
     pub fn push(&mut self) -> bool {
         if self.depth + 1 < self.instructions.len() {
             self.depth += 1;
@@ -171,12 +168,10 @@ impl<'vm, 'env> BlockStack<'vm, 'env> {
         }
     }
 
-    /// Reduces the depth.
     pub fn pop(&mut self) {
         self.depth = self.depth.checked_sub(1).expect("block stack underflow");
     }
 
-    /// Appends new instructions to the stack.
     pub fn append_instructions(&mut self, instructions: &'vm Instructions<'env>) {
         self.instructions.push(instructions);
     }

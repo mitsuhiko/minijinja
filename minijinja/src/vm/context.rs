@@ -63,6 +63,14 @@ impl Stack {
         self.values.pop().expect("stack was empty")
     }
 
+    pub fn slice_top(&mut self, n: usize) -> &[Value] {
+        &self.values[self.values.len() - n..]
+    }
+
+    pub fn drop_top(&mut self, n: usize) {
+        self.values.truncate(self.values.len() - n);
+    }
+
     pub fn try_pop(&mut self) -> Option<Value> {
         self.values.pop()
     }

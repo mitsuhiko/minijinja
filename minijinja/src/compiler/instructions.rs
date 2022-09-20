@@ -105,10 +105,10 @@ pub enum Instruction<'source> {
     In,
 
     /// Apply a filter.
-    ApplyFilter(&'source str),
+    ApplyFilter(&'source str, usize),
 
     /// Perform a filter.
-    PerformTest(&'source str),
+    PerformTest(&'source str, usize),
 
     /// Emit the stack top as output
     Emit,
@@ -164,10 +164,10 @@ pub enum Instruction<'source> {
     EndCapture,
 
     /// Calls a global function
-    CallFunction(&'source str),
+    CallFunction(&'source str, usize),
 
     /// Calls a method
-    CallMethod(&'source str),
+    CallMethod(&'source str, usize),
 
     /// Calls an object
     CallObject,
@@ -344,7 +344,7 @@ impl<'source> Instructions<'source> {
             let name = match instr {
                 Instruction::Lookup(name)
                 | Instruction::StoreLocal(name)
-                | Instruction::CallFunction(name) => *name,
+                | Instruction::CallFunction(name, _) => *name,
                 Instruction::PushLoop(flags) if flags & LOOP_FLAG_WITH_LOOP_VAR != 0 => "loop",
                 Instruction::PushLoop(_) | Instruction::PushWith => break,
                 _ => continue,

@@ -336,22 +336,22 @@ impl<'env> Vm<'env> {
                 Instruction::EndCapture => {
                     stack.push(out.end_capture(state.auto_escape));
                 }
-                Instruction::ApplyFilter(name) => {
-                    let top = stack.pop();
-                    let args = try_ctx!(top.as_slice());
-                    stack.push(try_ctx!(state.apply_filter(name, args)));
+                Instruction::ApplyFilter(name, arg_count) => {
+                    let args = stack.slice_top(*arg_count);
+                    let rv = try_ctx!(state.apply_filter(name, args));
+                    stack.drop_top(*arg_count);
+                    stack.push(rv);
                 }
-                Instruction::PerformTest(name) => {
-                    let top = stack.pop();
-                    let args = try_ctx!(top.as_slice());
-                    stack.push(Value::from(try_ctx!(state.perform_test(name, args))));
+                Instruction::PerformTest(name, arg_count) => {
+                    let args = stack.slice_top(*arg_count);
+                    let rv = try_ctx!(state.perform_test(name, args));
+                    stack.drop_top(*arg_count);
+                    stack.push(Value::from(rv));
                 }
-                Instruction::CallFunction(function_name) => {
-                    let top = stack.pop();
-                    let args = try_ctx!(top.as_slice());
+                Instruction::CallFunction(function_name, arg_count) => {
                     // super is a special function reserved for super-ing into blocks.
                     if *function_name == "super" {
-                        if !args.is_empty() {
+                        if *arg_count != 0 {
                             bail!(Error::new(
                                 ErrorKind::InvalidOperation,
                                 "super() takes no arguments",
@@ -360,16 +360,19 @@ impl<'env> Vm<'env> {
                         stack.push(try_ctx!(self.perform_super(state, out, true)));
                     // loop is a special name which when called recurses the current loop.
                     } else if *function_name == "loop" {
-                        if args.len() != 1 {
+                        if *arg_count != 1 {
                             bail!(Error::new(
                                 ErrorKind::InvalidOperation,
-                                format!("loop() takes one argument, got {}", args.len())
+                                format!("loop() takes one argument, got {}", *arg_count)
                             ));
                         }
-                        stack.push(args[0].clone());
+                        // leave the one argument on the stack for the recursion
                         recurse_loop!(true);
                     } else if let Some(func) = state.ctx.load(self.env, function_name) {
-                        stack.push(try_ctx!(func.call(state, args)));
+                        let args = stack.slice_top(*arg_count);
+                        let rv = try_ctx!(func.call(state, args));
+                        stack.drop_top(*arg_count);
+                        stack.push(rv);
                     } else {
                         bail!(Error::new(
                             ErrorKind::UnknownFunction,
@@ -377,11 +380,11 @@ impl<'env> Vm<'env> {
                         ));
                     }
                 }
-                Instruction::CallMethod(name) => {
-                    let top = stack.pop();
-                    let args = try_ctx!(top.as_slice());
-                    let obj = stack.pop();
-                    stack.push(try_ctx!(obj.call_method(state, name, args)));
+                Instruction::CallMethod(name, arg_count) => {
+                    let args = stack.slice_top(*arg_count);
+                    let rv = try_ctx!(args[0].call_method(state, name, &args[1..]));
+                    stack.drop_top(*arg_count);
+                    stack.push(rv);
                 }
                 Instruction::CallObject => {
                     let top = stack.pop();
@@ -485,10 +488,7 @@ impl<'env> Vm<'env> {
             Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
         })?;
 
-        let block_stack = state
-            .blocks
-            .get_mut(name)
-            .expect("super on unreferenced block");
+        let block_stack = state.blocks.get_mut(name).unwrap();
         if !block_stack.push() {
             return Err(Error::new(
                 ErrorKind::InvalidOperation,
