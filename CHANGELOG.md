@@ -9,6 +9,7 @@ All notable changes to MiniJinja are documented here.
 - Fixed broken nested `super()` calls.
 - Improve error reporting for failures in blocks and trying to
   `super()` when there is no parent block.
+- Performance improvements.
 
 # 0.22.1
 
