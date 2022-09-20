@@ -7,37 +7,30 @@ use crate::vm::forloop::ForLoop;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
 
-#[cfg_attr(feature = "internal_debug", derive(Debug))]
-pub(crate) enum FrameBase<'env, 'vm> {
-    None,
-    Context(&'vm Context<'env, 'vm>),
-    Value(Value),
-}
-
-pub(crate) struct Frame<'env, 'vm> {
+pub(crate) struct Frame<'env> {
     pub(crate) locals: Locals<'env>,
-    pub(crate) base: FrameBase<'env, 'vm>,
+    pub(crate) ctx: Value,
     pub(crate) current_loop: Option<ForLoop>,
 }
 
-impl<'env, 'vm> Default for Frame<'env, 'vm> {
-    fn default() -> Frame<'env, 'vm> {
-        Frame::new(FrameBase::None)
+impl<'env> Default for Frame<'env> {
+    fn default() -> Frame<'env> {
+        Frame::new(Value::UNDEFINED)
     }
 }
 
-impl<'env, 'vm> Frame<'env, 'vm> {
-    pub fn new(base: FrameBase<'env, 'vm>) -> Frame<'env, 'vm> {
+impl<'env> Frame<'env> {
+    pub fn new(ctx: Value) -> Frame<'env> {
         Frame {
             locals: Locals::new(),
-            base,
+            ctx,
             current_loop: None,
         }
     }
 }
 
 #[cfg(feature = "internal_debug")]
-impl<'env, 'vm> fmt::Debug for Frame<'env, 'vm> {
+impl<'env> fmt::Debug for Frame<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut m = f.debug_map();
         m.entries(self.locals.iter());
@@ -48,8 +41,8 @@ impl<'env, 'vm> fmt::Debug for Frame<'env, 'vm> {
         {
             m.entry(&"loop", controller);
         }
-        if let FrameBase::Value(ref value) = self.base {
-            m.entries(value.iter_as_str_map());
+        if !self.ctx.is_undefined() {
+            m.entries(self.ctx.iter_as_str_map());
         }
         m.finish()
     }
@@ -70,6 +63,14 @@ impl Stack {
         self.values.pop().expect("stack was empty")
     }
 
+    pub fn slice_top(&mut self, n: usize) -> &[Value] {
+        &self.values[self.values.len() - n..]
+    }
+
+    pub fn drop_top(&mut self, n: usize) {
+        self.values.truncate(self.values.len() - n);
+    }
+
     pub fn try_pop(&mut self) -> Option<Value> {
         self.values.pop()
     }
@@ -80,16 +81,16 @@ impl Stack {
 }
 
 #[derive(Default)]
-pub(crate) struct Context<'env, 'vm> {
-    stack: Vec<Frame<'env, 'vm>>,
+pub(crate) struct Context<'env> {
+    stack: Vec<Frame<'env>>,
 }
 
-impl<'env, 'vm> fmt::Debug for Context<'env, 'vm> {
+impl<'env> fmt::Debug for Context<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fn dump<'a>(
             m: &mut std::fmt::DebugMap,
             seen: &mut HashSet<&'a str>,
-            ctx: &'a Context<'a, 'a>,
+            ctx: &'a Context<'a>,
         ) -> fmt::Result {
             for frame in ctx.stack.iter().rev() {
                 for (key, value) in frame.locals.iter() {
@@ -106,19 +107,11 @@ impl<'env, 'vm> fmt::Debug for Context<'env, 'vm> {
                     }
                 }
 
-                match frame.base {
-                    FrameBase::Context(ctx) => {
-                        dump(m, seen, ctx)?;
+                for (key, value) in frame.ctx.iter_as_str_map() {
+                    if !seen.contains(key) {
+                        seen.insert(key);
+                        m.entry(&key, &value);
                     }
-                    FrameBase::Value(ref value) => {
-                        for (key, value) in value.iter_as_str_map() {
-                            if !seen.contains(key) {
-                                seen.insert(key);
-                                m.entry(&key, &value);
-                            }
-                        }
-                    }
-                    FrameBase::None => continue,
                 }
             }
             Ok(())
@@ -131,9 +124,9 @@ impl<'env, 'vm> fmt::Debug for Context<'env, 'vm> {
     }
 }
 
-impl<'env, 'vm> Context<'env, 'vm> {
+impl<'env> Context<'env> {
     /// Creates a context
-    pub fn new(frame: Frame<'env, 'vm>) -> Context<'env, 'vm> {
+    pub fn new(frame: Frame<'env>) -> Context<'env> {
         Context { stack: vec![frame] }
     }
 
@@ -159,15 +152,7 @@ impl<'env, 'vm> Context<'env, 'vm> {
                 }
             }
 
-            match frame.base {
-                FrameBase::Context(ctx) => {
-                    rv.extend(ctx.freeze(env));
-                }
-                FrameBase::Value(ref value) => {
-                    rv.extend(value.iter_as_str_map());
-                }
-                FrameBase::None => continue,
-            }
+            rv.extend(frame.ctx.iter_as_str_map());
         }
 
         rv
@@ -199,27 +184,25 @@ impl<'env, 'vm> Context<'env, 'vm> {
                 }
             }
 
-            match frame.base {
-                FrameBase::Context(ctx) => return ctx.load(env, key),
-                FrameBase::Value(ref value) => {
-                    let rv = value.get_attr(key);
-                    if let Ok(rv) = rv {
-                        if !rv.is_undefined() {
-                            return Some(rv);
-                        }
-                    }
-                    if let Some(value) = env.get_global(key) {
-                        return Some(value);
+            // if the frame context is undefined, we skip the lookup
+            if !frame.ctx.is_undefined() {
+                if let Ok(rv) = frame.ctx.get_attr(key) {
+                    if !rv.is_undefined() {
+                        return Some(rv);
                     }
                 }
-                FrameBase::None => continue,
             }
         }
+
+        if let Some(value) = env.get_global(key) {
+            return Some(value);
+        }
+
         None
     }
 
     /// Pushes a new layer.
-    pub fn push_frame(&mut self, layer: Frame<'env, 'vm>) {
+    pub fn push_frame(&mut self, layer: Frame<'env>) {
         self.stack.push(layer);
     }
 

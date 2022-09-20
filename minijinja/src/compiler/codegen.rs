@@ -468,8 +468,7 @@ impl<'source> CodeGenerator<'source> {
                 for arg in &f.args {
                     self.compile_expr(arg)?;
                 }
-                self.add(Instruction::BuildList(f.args.len() + 1));
-                self.add(Instruction::ApplyFilter(f.name));
+                self.add(Instruction::ApplyFilter(f.name, f.args.len() + 1));
                 self.pop_span();
             }
             ast::Expr::Test(f) => {
@@ -478,8 +477,7 @@ impl<'source> CodeGenerator<'source> {
                 for arg in &f.args {
                     self.compile_expr(arg)?;
                 }
-                self.add(Instruction::BuildList(f.args.len() + 1));
-                self.add(Instruction::PerformTest(f.name));
+                self.add(Instruction::PerformTest(f.name, f.args.len() + 1));
                 self.pop_span();
             }
             ast::Expr::GetAttr(g) => {
@@ -499,20 +497,28 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_call(c)?;
             }
             ast::Expr::List(l) => {
-                self.set_line_from_span(l.span());
-                for item in &l.items {
-                    self.compile_expr(item)?;
+                if let Some(val) = l.as_const() {
+                    self.add(Instruction::LoadConst(val));
+                } else {
+                    self.set_line_from_span(l.span());
+                    for item in &l.items {
+                        self.compile_expr(item)?;
+                    }
+                    self.add(Instruction::BuildList(l.items.len()));
                 }
-                self.add(Instruction::BuildList(l.items.len()));
             }
             ast::Expr::Map(m) => {
-                self.set_line_from_span(m.span());
-                assert_eq!(m.keys.len(), m.values.len());
-                for (key, value) in m.keys.iter().zip(m.values.iter()) {
-                    self.compile_expr(key)?;
-                    self.compile_expr(value)?;
+                if let Some(val) = m.as_const() {
+                    self.add(Instruction::LoadConst(val));
+                } else {
+                    self.set_line_from_span(m.span());
+                    assert_eq!(m.keys.len(), m.values.len());
+                    for (key, value) in m.keys.iter().zip(m.values.iter()) {
+                        self.compile_expr(key)?;
+                        self.compile_expr(value)?;
+                    }
+                    self.add(Instruction::BuildMap(m.keys.len()));
                 }
-                self.add(Instruction::BuildMap(m.keys.len()));
             }
         }
         Ok(())
@@ -525,8 +531,7 @@ impl<'source> CodeGenerator<'source> {
                 for arg in &c.args {
                     self.compile_expr(arg)?;
                 }
-                self.add(Instruction::BuildList(c.args.len()));
-                self.add(Instruction::CallFunction(name));
+                self.add(Instruction::CallFunction(name, c.args.len()));
             }
             ast::CallType::Block(name) => {
                 self.add(Instruction::BeginCapture);
@@ -538,12 +543,14 @@ impl<'source> CodeGenerator<'source> {
                 for arg in &c.args {
                     self.compile_expr(arg)?;
                 }
-                self.add(Instruction::BuildList(c.args.len()));
-                self.add(Instruction::CallMethod(name));
+                self.add(Instruction::CallMethod(name, c.args.len() + 1));
             }
             ast::CallType::Object(expr) => {
                 self.compile_expr(expr)?;
-                self.add(Instruction::CallObject);
+                for arg in &c.args {
+                    self.compile_expr(arg)?;
+                }
+                self.add(Instruction::CallObject(c.args.len() + 1));
             }
         };
         self.pop_span();

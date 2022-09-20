@@ -22,11 +22,11 @@ use crate::AutoEscape;
 /// as there might be lifetimes added or removed between releases.
 pub struct State<'vm, 'env> {
     pub(crate) env: &'env Environment<'env>,
-    pub(crate) ctx: Context<'env, 'vm>,
+    pub(crate) ctx: Context<'env>,
     pub(crate) current_block: Option<&'env str>,
     pub(crate) auto_escape: AutoEscape,
     pub(crate) instructions: &'vm Instructions<'env>,
-    pub(crate) blocks: BTreeMap<&'env str, Vec<&'vm Instructions<'env>>>,
+    pub(crate) blocks: BTreeMap<&'env str, BlockStack<'vm, 'env>>,
 }
 
 impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
@@ -75,7 +75,7 @@ impl<'vm, 'env> State<'vm, 'env> {
             current_block: None,
             auto_escape: AutoEscape::None,
             instructions: &Instructions::new("<unknown>", ""),
-            blocks: BTreeMap::default(),
+            blocks: BTreeMap::new(),
         })
     }
 
@@ -134,5 +134,45 @@ impl<'a> ArgType<'a> for &State<'_, '_> {
             None => Err(Error::new(ErrorKind::InvalidOperation, "state unavailable")),
             Some(state) => Ok((state, 0)),
         }
+    }
+}
+
+/// Tracks a block and it's parents for super.
+#[derive(Default)]
+pub(crate) struct BlockStack<'vm, 'env> {
+    instructions: Vec<&'vm Instructions<'env>>,
+    depth: usize,
+}
+
+impl<'vm, 'env> BlockStack<'vm, 'env> {
+    pub fn new(instructions: &'vm Instructions<'env>) -> BlockStack<'vm, 'env> {
+        BlockStack {
+            instructions: vec![instructions],
+            depth: 0,
+        }
+    }
+
+    pub fn instructions(&self) -> &'vm Instructions<'env> {
+        self.instructions
+            .get(self.depth)
+            .copied()
+            .expect("block stack overflow")
+    }
+
+    pub fn push(&mut self) -> bool {
+        if self.depth + 1 < self.instructions.len() {
+            self.depth += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn pop(&mut self) {
+        self.depth = self.depth.checked_sub(1).expect("block stack underflow");
+    }
+
+    pub fn append_instructions(&mut self, instructions: &'vm Instructions<'env>) {
+        self.instructions.push(instructions);
     }
 }

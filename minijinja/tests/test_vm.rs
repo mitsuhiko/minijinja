@@ -302,3 +302,17 @@ fn test_unpacking() {
     let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "foobar");
 }
+
+#[test]
+fn test_call_object() {
+    let mut c = CodeGenerator::new("<unkown>", "");
+    c.add(Instruction::LoadConst(Value::from_function(|a: u64| {
+        42 + a
+    })));
+    c.add(Instruction::LoadConst(Value::from(23i32)));
+    c.add(Instruction::CallObject(2));
+    c.add(Instruction::Emit);
+
+    let output = simple_eval(&c.finish().0, ()).unwrap();
+    assert_eq!(output, "65");
+}
