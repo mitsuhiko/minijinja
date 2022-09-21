@@ -1,3 +1,6 @@
 [workspace]
-members = ["minijinja", "examples/*", "benchmarks", "minijinja-autoreload"]
-exclude = ["examples/README.md"]
+members = ["minijinja", "tools/*", "examples/*", "benchmarks", "minijinja-autoreload"]
+exclude = ["examples/README.md", "tools/README.md"]
+
+[profile.release]
+debug = true
