@@ -345,16 +345,22 @@ impl<'source> CodeGenerator<'source> {
     ) -> Result<(), Error> {
         self.set_line_from_span(expr.span());
         if let ast::Expr::Call(call) = &expr.expr {
-            if let ast::Expr::Var(var) = &call.expr {
-                if var.id == "super" && call.args.is_empty() {
-                    self.add_with_span(Instruction::FastSuper, call.span());
+            match call.identify_call() {
+                ast::CallType::Function(name) => {
+                    if name == "super" && call.args.is_empty() {
+                        self.add_with_span(Instruction::FastSuper, call.span());
+                        return Ok(());
+                    } else if name == "loop" && call.args.len() == 1 {
+                        self.compile_expr(&call.args[0])?;
+                        self.add(Instruction::FastRecurse);
+                        return Ok(());
+                    }
+                }
+                ast::CallType::Block(name) => {
+                    self.add(Instruction::CallBlock(name));
                     return Ok(());
                 }
-                if var.id == "loop" && call.args.len() == 1 {
-                    self.compile_expr(&call.args[0])?;
-                    self.add(Instruction::FastRecurse);
-                    return Ok(());
-                }
+                _ => {}
             }
         }
         self.compile_expr(&expr.expr)?;

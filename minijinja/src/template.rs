@@ -151,8 +151,10 @@ impl<'env> Template<'env> {
 }
 
 /// Represents a compiled template in memory.
-pub(crate) struct CompiledTemplate<'source> {
+pub struct CompiledTemplate<'source> {
+    /// The root instructions.
     pub instructions: Instructions<'source>,
+    /// Block local instructions.
     pub blocks: BTreeMap<&'source str, Instructions<'source>>,
 }
 
@@ -169,7 +171,8 @@ impl<'env> fmt::Debug for CompiledTemplate<'env> {
 }
 
 impl<'source> CompiledTemplate<'source> {
-    pub(crate) fn from_name_and_source(
+    /// Creates a compiled template from name and source.
+    pub fn from_name_and_source(
         name: &'source str,
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {

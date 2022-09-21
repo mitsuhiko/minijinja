@@ -207,6 +207,7 @@ pub mod machinery {
     pub use crate::compiler::lexer::tokenize;
     pub use crate::compiler::parser::parse;
     pub use crate::compiler::tokens::{Span, Token};
+    pub use crate::template::CompiledTemplate;
     pub use crate::vm::Vm;
 
     use crate::Output;
