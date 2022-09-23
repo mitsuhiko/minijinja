@@ -572,7 +572,9 @@ impl<'source> CodeGenerator<'source> {
                 if let Some(ref expr) = f.expr {
                     self.compile_expr(expr)?;
                 }
-                self.compile_args(&f.args)?;
+                for arg in &f.args {
+                    self.compile_expr(arg)?;
+                }
                 let local_id = get_local_id(&mut self.filter_local_ids, f.name);
                 self.add(Instruction::ApplyFilter(f.name, f.args.len() + 1, local_id));
                 self.pop_span();
@@ -580,7 +582,9 @@ impl<'source> CodeGenerator<'source> {
             ast::Expr::Test(f) => {
                 self.push_span(f.span());
                 self.compile_expr(&f.expr)?;
-                self.compile_args(&f.args)?;
+                for arg in &f.args {
+                    self.compile_expr(arg)?;
+                }
                 let local_id = get_local_id(&mut self.test_local_ids, f.name);
                 self.add(Instruction::PerformTest(f.name, f.args.len() + 1, local_id));
                 self.pop_span();
@@ -641,18 +645,13 @@ impl<'source> CodeGenerator<'source> {
         Ok(())
     }
 
-    fn compile_args(&mut self, args: &[ast::Expr<'source>]) -> Result<(), Error> {
-        for arg in args {
-            self.compile_expr(arg)?;
-        }
-        Ok(())
-    }
-
     fn compile_call(&mut self, c: &ast::Spanned<ast::Call<'source>>) -> Result<(), Error> {
         self.push_span(c.span());
         match c.identify_call() {
             ast::CallType::Function(name) => {
-                self.compile_args(&c.args)?;
+                for arg in &c.args {
+                    self.compile_expr(arg)?;
+                }
                 self.add(Instruction::CallFunction(name, c.args.len()));
             }
             ast::CallType::Block(name) => {
@@ -662,12 +661,16 @@ impl<'source> CodeGenerator<'source> {
             }
             ast::CallType::Method(expr, name) => {
                 self.compile_expr(expr)?;
-                self.compile_args(&c.args)?;
+                for arg in &c.args {
+                    self.compile_expr(arg)?;
+                }
                 self.add(Instruction::CallMethod(name, c.args.len() + 1));
             }
             ast::CallType::Object(expr) => {
                 self.compile_expr(expr)?;
-                self.compile_args(&c.args)?;
+                for arg in &c.args {
+                    self.compile_expr(arg)?;
+                }
                 self.add(Instruction::CallObject(c.args.len() + 1));
             }
         };

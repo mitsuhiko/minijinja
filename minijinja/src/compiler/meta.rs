@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use crate::compiler::ast;
+
 struct AssignmentTracker<'a> {
     out: HashSet<&'a str>,
     assigned: Vec<HashSet<&'a str>>,
