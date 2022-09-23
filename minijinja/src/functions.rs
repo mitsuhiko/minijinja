@@ -40,6 +40,22 @@
 //! env.add_function("include_file", include_file);
 //! ```
 //!
+//! # Note on Keyword Arguments
+//!
+//! MiniJinja inherits a lot of the runtime model from Jinja2.  That includes support for
+//! keyword arguments.  These however are a concept not native to Rust which makes them
+//! somewhat unconfortable to work with.  In MiniJinja keyword arguments are implemented by
+//! converting them into an extra parameter represented by a map.  That means if you call
+//! a function as `foo(1, 2, three=3, four=4)` the function gets three arguments:
+//!
+//! ```json
+//! [1, 2, {"three": 3, "four": 4}]
+//! ```
+//!
+//! If a function wants to disambiugate between a value passed as keyword argument or not,
+//! the the [`Value::is_kwargs`] can be used which returns `true` if a value represents
+//! keyword arguments as oppsed to just a map.
+//!
 //! # Built-in Functions
 //!
 //! When the `builtins` feature is enabled a range of built-in functions are

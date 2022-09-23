@@ -80,6 +80,12 @@ impl Stack {
     }
 }
 
+impl From<Vec<Value>> for Stack {
+    fn from(values: Vec<Value>) -> Stack {
+        Stack { values }
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct Context<'env> {
     stack: Vec<Frame<'env>>,
@@ -209,6 +215,11 @@ impl<'env> Context<'env> {
     /// Pops the topmost layer.
     pub fn pop_frame(&mut self) -> Frame {
         self.stack.pop().expect("pop from empty context stack")
+    }
+
+    /// Returns the current locals.
+    pub fn current_locals(&mut self) -> &mut Locals<'env> {
+        &mut self.stack.last_mut().expect("empty stack").locals
     }
 
     /// Returns the current innermost loop.

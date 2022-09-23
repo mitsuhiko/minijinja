@@ -4,5 +4,6 @@ pub mod ast;
 pub mod codegen;
 pub mod instructions;
 pub mod lexer;
+pub mod meta;
 pub mod parser;
 pub mod tokens;

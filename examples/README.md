@@ -16,6 +16,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [hello](hello): minimal Hello World example.
 * [inheritance](inheritance): demonstrates how to use template inheritance.
 * [loader](loader): shows how to load templates dynamically at runtime.
+* [macros](macros): Demonstrates how to use macros and imports.
 * [minimal](minimal): a Hello World example without default features.
 * [recursive-for](recursive-for): demonstrates the recursive for loop.
 * [render-macro](render-macro): minimal Hello World example using the `render!` macro.

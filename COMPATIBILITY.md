@@ -38,6 +38,10 @@ mapping them to filter functions is tricky.  This also means that some filters i
 MiniJinja do not accept the parameters with keyword arguments whereas in Jinja2
 they do.
 
+### Variadic Calls
+
+MiniJinja does not support the `*args` and `**kwargs` syntax for calls.
+
 ### Undefined
 
 The Jinja2 undefined type tracks the origin of creation, in MiniJinja the undefined
@@ -87,14 +91,19 @@ MiniJinja is different as mentioned above.
 
 ### `{% import %}`
 
-This tag is currently not supported.  If support for macros is added
-this would make sense to add.
+This tag is supported but the returned item is a map of the exported local
+variables.  This means that the rendered content of the template is lost.
 
 ### `{% macro %}`
 
-This tag is currently not supported.
+The macro tag works very similar to Jinja2 but with some differences.  Most
+importantly the special `caller`, `varargs` and `kwargs` arguments are not
+supported.  The external introspectable attributes `catch_kwargs`, `catch_varargs`
+and `caller` are not supported.
 
-**Tracking issue:** [#44](https://github.com/mitsuhiko/minijinja/issues/44)
+### `{% call %}`
+
+This tag is not supported.
 
 ### `{% with %}`
 

@@ -21,6 +21,7 @@ pub const MAX_LOCALS: usize = 50;
 
 /// Represents an instruction for the VM.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[derive(Clone)]
 pub enum Instruction<'source> {
     /// Emits raw source
     EmitRaw(&'source str),
@@ -45,6 +46,9 @@ pub enum Instruction<'source> {
 
     /// Builds a map of the last n pairs on the stack.
     BuildMap(usize),
+
+    /// Builds a kwargs map of the last n pairs on the stack.
+    BuildKwargs(usize),
 
     /// Builds a list of the last n pairs on the stack.
     BuildList(usize),
@@ -136,6 +140,9 @@ pub enum Instruction<'source> {
     /// Pops the topmost frame
     PopFrame,
 
+    /// True if the value is undefined
+    IsUndefined,
+
     /// Jump to a specific instruction
     Jump(usize),
 
@@ -189,6 +196,15 @@ pub enum Instruction<'source> {
 
     /// A fast loop recurse instruction without intermediate capturing.
     FastRecurse,
+
+    /// Builds a macro on the stack.
+    BuildMacro(&'source str, usize),
+
+    /// Builds a module
+    ExportLocals,
+
+    /// Breaks from the interpreter loop (exists a function)
+    Return,
 }
 
 #[derive(Copy, Clone)]

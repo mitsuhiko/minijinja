@@ -4,9 +4,10 @@ use crate::compiler::ast;
 use crate::compiler::instructions::{
     Instruction, Instructions, LocalId, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR, MAX_LOCALS,
 };
+use crate::compiler::meta::find_macro_closure;
 use crate::compiler::tokens::Span;
 use crate::error::Error;
-use crate::value::Value;
+use crate::value::{Value, ValueRepr};
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -303,6 +304,33 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_expr(&filter_block.filter)?;
                 self.add(Instruction::Emit);
             }
+            ast::Stmt::Macro(macro_decl) => {
+                self.compile_macro(macro_decl)?;
+            }
+            ast::Stmt::Import(import) => {
+                self.add(Instruction::BeginCapture);
+                self.add(Instruction::PushWith);
+                self.compile_expr(&import.expr)?;
+                self.add_with_span(Instruction::Include(false), import.span());
+                self.add(Instruction::ExportLocals);
+                self.add(Instruction::PopFrame);
+                self.compile_assignment(&import.name)?;
+                self.add(Instruction::EndCapture);
+            }
+            ast::Stmt::FromImport(from_import) => {
+                self.add(Instruction::BeginCapture);
+                self.add(Instruction::PushWith);
+                self.compile_expr(&from_import.expr)?;
+                self.add_with_span(Instruction::Include(false), from_import.span());
+                for (name, _) in &from_import.names {
+                    self.compile_expr(name)?;
+                }
+                self.add(Instruction::PopFrame);
+                for (name, alias) in from_import.names.iter().rev() {
+                    self.compile_assignment(alias.as_ref().unwrap_or(name))?;
+                }
+                self.add(Instruction::EndCapture);
+            }
         }
         Ok(())
     }
@@ -316,6 +344,62 @@ impl<'source> CodeGenerator<'source> {
         let instructions = self.finish_subgenerator(sub);
         self.blocks.insert(block.name, instructions);
         self.add(Instruction::CallBlock(block.name));
+        Ok(())
+    }
+
+    fn compile_macro(
+        &mut self,
+        macro_decl: &ast::Spanned<ast::Macro<'source>>,
+    ) -> Result<(), Error> {
+        self.set_line_from_span(macro_decl.span());
+        let instr = self.add(Instruction::Jump(!0));
+
+        let mut defaults_iter = macro_decl.defaults.iter().rev();
+        for arg in macro_decl.args.iter().rev() {
+            if let Some(default) = defaults_iter.next() {
+                self.add(Instruction::DupTop);
+                self.add(Instruction::IsUndefined);
+                self.start_if();
+                self.add(Instruction::DiscardTop);
+                self.compile_expr(default)?;
+                self.end_if();
+            }
+            self.compile_assignment(arg)?;
+        }
+
+        for node in &macro_decl.body {
+            self.compile_stmt(node)?;
+        }
+        self.add(Instruction::Return);
+
+        let undeclared = find_macro_closure(macro_decl);
+        let macro_instr = self.next_instruction();
+        for name in &undeclared {
+            self.add(Instruction::LoadConst(Value::from(*name)));
+            self.add(Instruction::Lookup(name));
+        }
+        self.add(Instruction::BuildMap(undeclared.len()));
+
+        self.add(Instruction::LoadConst(Value::from(ValueRepr::Seq(
+            macro_decl
+                .args
+                .iter()
+                .map(|x| match x {
+                    ast::Expr::Var(var) => Value::from(var.id),
+                    _ => unreachable!(),
+                })
+                .collect::<Vec<_>>()
+                .into(),
+        ))));
+
+        self.add(Instruction::BuildMacro(macro_decl.name, instr + 1));
+        self.add(Instruction::StoreLocal(macro_decl.name));
+
+        if let Some(Instruction::Jump(ref mut target)) = self.instructions.get_mut(instr) {
+            *target = macro_instr;
+        } else {
+            unreachable!();
+        }
         Ok(())
     }
 
@@ -488,9 +572,7 @@ impl<'source> CodeGenerator<'source> {
                 if let Some(ref expr) = f.expr {
                     self.compile_expr(expr)?;
                 }
-                for arg in &f.args {
-                    self.compile_expr(arg)?;
-                }
+                self.compile_args(&f.args)?;
                 let local_id = get_local_id(&mut self.filter_local_ids, f.name);
                 self.add(Instruction::ApplyFilter(f.name, f.args.len() + 1, local_id));
                 self.pop_span();
@@ -498,9 +580,7 @@ impl<'source> CodeGenerator<'source> {
             ast::Expr::Test(f) => {
                 self.push_span(f.span());
                 self.compile_expr(&f.expr)?;
-                for arg in &f.args {
-                    self.compile_expr(arg)?;
-                }
+                self.compile_args(&f.args)?;
                 let local_id = get_local_id(&mut self.test_local_ids, f.name);
                 self.add(Instruction::PerformTest(f.name, f.args.len() + 1, local_id));
                 self.pop_span();
@@ -545,6 +625,25 @@ impl<'source> CodeGenerator<'source> {
                     self.add(Instruction::BuildMap(m.keys.len()));
                 }
             }
+            ast::Expr::Kwargs(m) => {
+                if let Some(val) = m.as_const() {
+                    self.add(Instruction::LoadConst(val));
+                } else {
+                    self.set_line_from_span(m.span());
+                    for (key, value) in &m.pairs {
+                        self.add(Instruction::LoadConst(Value::from(*key)));
+                        self.compile_expr(value)?;
+                    }
+                    self.add(Instruction::BuildKwargs(m.pairs.len()));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn compile_args(&mut self, args: &[ast::Expr<'source>]) -> Result<(), Error> {
+        for arg in args {
+            self.compile_expr(arg)?;
         }
         Ok(())
     }
@@ -553,9 +652,7 @@ impl<'source> CodeGenerator<'source> {
         self.push_span(c.span());
         match c.identify_call() {
             ast::CallType::Function(name) => {
-                for arg in &c.args {
-                    self.compile_expr(arg)?;
-                }
+                self.compile_args(&c.args)?;
                 self.add(Instruction::CallFunction(name, c.args.len()));
             }
             ast::CallType::Block(name) => {
@@ -565,16 +662,12 @@ impl<'source> CodeGenerator<'source> {
             }
             ast::CallType::Method(expr, name) => {
                 self.compile_expr(expr)?;
-                for arg in &c.args {
-                    self.compile_expr(arg)?;
-                }
+                self.compile_args(&c.args)?;
                 self.add(Instruction::CallMethod(name, c.args.len() + 1));
             }
             ast::CallType::Object(expr) => {
                 self.compile_expr(expr)?;
-                for arg in &c.args {
-                    self.compile_expr(arg)?;
-                }
+                self.compile_args(&c.args)?;
                 self.add(Instruction::CallObject(c.args.len() + 1));
             }
         };
