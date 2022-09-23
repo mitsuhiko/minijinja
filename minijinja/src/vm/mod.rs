@@ -738,10 +738,10 @@ impl<'env> Vm<'env> {
                 .iter()
                 .map(|value| match &value.0 {
                     ValueRepr::String(arg) => arg.clone(),
-                    _ => panic!("invalid arg spec"),
+                    _ => unreachable!(),
                 })
                 .collect(),
-            _ => panic!("not an arg spec"),
+            _ => unreachable!(),
         };
         let closure = stack.pop();
         let macro_ref_id = state.macros.len();

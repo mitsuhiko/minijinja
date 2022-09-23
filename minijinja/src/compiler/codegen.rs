@@ -149,10 +149,10 @@ impl<'source> CodeGenerator<'source> {
                 {
                     *jump_target = loop_end;
                 } else {
-                    panic!("did not find iteration instruction");
+                    unreachable!();
                 }
             }
-            _ => panic!("not inside a loop"),
+            _ => unreachable!(),
         }
     }
 
@@ -188,7 +188,7 @@ impl<'source> CodeGenerator<'source> {
                 Instruction::JumpIfTrueOrPop(!0)
             }));
         } else {
-            panic!("tried to emit sc_bool from outside of sc_bool block");
+            unreachable!();
         }
     }
 
@@ -202,7 +202,7 @@ impl<'source> CodeGenerator<'source> {
                     | Some(Instruction::JumpIfTrueOrPop(ref mut target)) => {
                         *target = end;
                     }
-                    _ => panic!("tried to patch invalid instruction"),
+                    _ => unreachable!(),
                 }
             }
         }
@@ -217,7 +217,7 @@ impl<'source> CodeGenerator<'source> {
                 }
                 _ => {}
             },
-            _ => panic!("not inside a branch"),
+            _ => unreachable!(),
         }
     }
 
@@ -506,7 +506,7 @@ impl<'source> CodeGenerator<'source> {
                 }
                 self.pop_span();
             }
-            _ => panic!("bad assignment target"),
+            _ => unreachable!(),
         }
         Ok(())
     }
