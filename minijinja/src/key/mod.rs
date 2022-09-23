@@ -271,7 +271,7 @@ pub mod key_interning {
 
         for value in v.try_iter().unwrap() {
             match value.0 {
-                ValueRepr::Map(m) => {
+                ValueRepr::Map(m, _) => {
                     let k = m.iter().next().unwrap().0;
                     match k {
                         Key::String(s) => {

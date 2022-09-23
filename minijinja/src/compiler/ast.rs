@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::compiler::tokens::Span;
 use crate::key::Key;
-use crate::value::{Value, ValueMap, ValueRepr};
+use crate::value::{MapType, Value, ValueMap, ValueRepr};
 
 /// Container for nodes with location info.
 ///
@@ -402,7 +402,7 @@ impl<'a> Kwargs<'a> {
             }
         }
 
-        Some(Value(ValueRepr::Kwargs(rv.into())))
+        Some(Value(ValueRepr::Map(rv.into(), MapType::Kwargs)))
     }
 }
 
@@ -431,7 +431,7 @@ impl<'a> Map<'a> {
             }
         }
 
-        Some(Value(ValueRepr::Map(rv.into())))
+        Some(Value(ValueRepr::Map(rv.into(), MapType::Normal)))
     }
 }
 

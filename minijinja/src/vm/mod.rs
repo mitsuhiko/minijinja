@@ -11,7 +11,7 @@ use crate::error::{Error, ErrorKind};
 use crate::key::Key;
 use crate::output::Output;
 use crate::utils::AutoEscape;
-use crate::value::{self, ops, Value, ValueMap, ValueRepr};
+use crate::value::{self, ops, MapType, Value, ValueMap, ValueRepr};
 use crate::vm::context::{Context, Frame, Stack};
 use crate::vm::loop_object::{ForLoop, LoopState};
 use crate::vm::macro_object::Macro;
@@ -228,7 +228,7 @@ impl<'env> Vm<'env> {
                         let key = try_ctx!(stack.pop().try_into_key());
                         map.insert(key, value);
                     }
-                    stack.push(Value(ValueRepr::Map(map.into())))
+                    stack.push(Value(ValueRepr::Map(map.into(), MapType::Normal)))
                 }
                 Instruction::BuildKwargs(pair_count) => {
                     let mut map = ValueMap::new();
@@ -237,7 +237,7 @@ impl<'env> Vm<'env> {
                         let key = stack.pop().try_into_key().unwrap();
                         map.insert(key, value);
                     }
-                    stack.push(Value(ValueRepr::Kwargs(map.into())))
+                    stack.push(Value(ValueRepr::Map(map.into(), MapType::Kwargs)))
                 }
                 Instruction::BuildList(count) => {
                     let mut v = Vec::with_capacity(*count);
@@ -502,7 +502,7 @@ impl<'env> Vm<'env> {
                     for (key, value) in locals.iter() {
                         module.insert(Key::make_string_key(key), value.clone());
                     }
-                    stack.push(Value(ValueRepr::Map(module.into())));
+                    stack.push(Value(ValueRepr::Map(module.into(), MapType::Normal)));
                 }
                 Instruction::Return => break,
             }

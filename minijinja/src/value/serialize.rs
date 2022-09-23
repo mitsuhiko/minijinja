@@ -4,7 +4,7 @@ use serde::{ser, Serialize, Serializer};
 
 use crate::error::Error;
 use crate::key::{Key, KeySerializer, StaticKey};
-use crate::value::{Arc, Value, ValueMap, ValueRepr, VALUE_HANDLES, VALUE_HANDLE_MARKER};
+use crate::value::{Arc, MapType, Value, ValueMap, ValueRepr, VALUE_HANDLES, VALUE_HANDLE_MARKER};
 
 pub struct ValueSerializer;
 
@@ -135,7 +135,7 @@ impl Serializer for ValueSerializer {
     {
         let mut map = ValueMap::new();
         map.insert(Key::from(variant), value.serialize(self)?);
-        Ok(ValueRepr::Map(Arc::new(map)).into())
+        Ok(ValueRepr::Map(Arc::new(map), MapType::Normal).into())
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Error> {
@@ -328,7 +328,10 @@ impl ser::SerializeMap for SerializeMap {
     }
 
     fn end(self) -> Result<Value, Error> {
-        Ok(Value(ValueRepr::Map(Arc::new(self.entries))))
+        Ok(Value(ValueRepr::Map(
+            Arc::new(self.entries),
+            MapType::Normal,
+        )))
     }
 
     fn serialize_entry<K: ?Sized, V: ?Sized>(&mut self, key: &K, value: &V) -> Result<(), Error>
@@ -375,7 +378,7 @@ impl ser::SerializeStruct for SerializeStruct {
                         .expect("value handle not in registry")
                 }))
             }
-            _ => Ok(ValueRepr::Map(Arc::new(self.fields)).into()),
+            _ => Ok(ValueRepr::Map(Arc::new(self.fields), MapType::Normal).into()),
         }
     }
 }
@@ -402,7 +405,7 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
         let mut rv = BTreeMap::new();
         rv.insert(
             self.variant,
-            Value::from(ValueRepr::Map(Arc::new(self.map))),
+            Value::from(ValueRepr::Map(Arc::new(self.map), MapType::Normal)),
         );
         Ok(rv.into())
     }
