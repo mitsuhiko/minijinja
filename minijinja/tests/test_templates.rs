@@ -36,26 +36,31 @@ fn test_vm() {
         }
 
         let content = iter.next().unwrap();
-        env.add_template(filename, content).unwrap();
-        let template = env.get_template(filename).unwrap();
+        let rendered = if let Err(err) = env.add_template(filename, content) {
+            let mut rendered = format!("!!!SYNTAX ERROR!!!\n\n{:#?}\n\n", err);
+            writeln!(rendered, "{:#}", err).unwrap();
+            rendered
+        } else {
+            let template = env.get_template(filename).unwrap();
 
-        let rendered = match template.render(&ctx) {
-            Ok(mut rendered) => {
-                rendered.push('\n');
-                rendered
-            }
-            Err(err) => {
-                let mut rendered = format!("!!!ERROR!!!\n\n{:#?}\n\n", err);
-
-                writeln!(rendered, "{:#}", err).unwrap();
-                let mut err = &err as &dyn std::error::Error;
-                while let Some(next_err) = err.source() {
-                    writeln!(rendered).unwrap();
-                    writeln!(rendered, "caused by: {:#}", next_err).unwrap();
-                    err = next_err;
+            match template.render(&ctx) {
+                Ok(mut rendered) => {
+                    rendered.push('\n');
+                    rendered
                 }
+                Err(err) => {
+                    let mut rendered = format!("!!!ERROR!!!\n\n{:#?}\n\n", err);
 
-                rendered
+                    writeln!(rendered, "{:#}", err).unwrap();
+                    let mut err = &err as &dyn std::error::Error;
+                    while let Some(next_err) = err.source() {
+                        writeln!(rendered).unwrap();
+                        writeln!(rendered, "caused by: {:#}", next_err).unwrap();
+                        err = next_err;
+                    }
+
+                    rendered
+                }
             }
         };
 

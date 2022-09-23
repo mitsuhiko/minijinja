@@ -11,15 +11,17 @@ use crate::error::{Error, ErrorKind};
 use crate::key::Key;
 use crate::output::Output;
 use crate::utils::AutoEscape;
-use crate::value::{self, ops, Value, ValueRepr};
+use crate::value::{self, ops, MapType, Value, ValueMap, ValueRepr};
 use crate::vm::context::{Context, Frame, Stack};
-use crate::vm::forloop::{ForLoop, LoopState};
+use crate::vm::loop_object::{ForLoop, LoopState};
+use crate::vm::macro_object::Macro;
 use crate::vm::state::BlockStack;
 
 pub use crate::vm::state::State;
 
 mod context;
-mod forloop;
+mod loop_object;
+mod macro_object;
 mod state;
 
 /// Helps to evaluate something.
@@ -78,23 +80,62 @@ impl<'env> Vm<'env> {
                     instructions,
                     auto_escape,
                     blocks: prepare_blocks(blocks),
+                    macros: Arc::new(Vec::new()),
                 },
                 out,
             )
         })
     }
 
+    /// Evaluate a macro in a state.
+    #[inline(always)]
+    pub fn eval_macro(
+        &self,
+        instructions: &Instructions<'env>,
+        pc: usize,
+        root: Value,
+        out: &mut Output,
+        state: &State,
+        args: Vec<Value>,
+    ) -> Result<Option<Value>, Error> {
+        value::with_value_optimization(|| {
+            self.eval_impl(
+                &mut State {
+                    env: self.env,
+                    ctx: Context::new(Frame::new(root)),
+                    current_block: None,
+                    instructions,
+                    auto_escape: state.auto_escape(),
+                    blocks: BTreeMap::default(),
+                    macros: state.macros.clone(),
+                },
+                out,
+                Stack::from(args),
+                pc,
+            )
+        })
+    }
+
     /// This is the actual evaluation loop that works with a specific context.
+    #[inline(always)]
     fn eval_state(
         &self,
         state: &mut State<'_, 'env>,
         out: &mut Output,
     ) -> Result<Option<Value>, Error> {
+        self.eval_impl(state, out, Stack::default(), 0)
+    }
+
+    fn eval_impl(
+        &self,
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
+        mut stack: Stack,
+        mut pc: usize,
+    ) -> Result<Option<Value>, Error> {
         let initial_auto_escape = state.auto_escape;
-        let mut stack = Stack::default();
         let mut auto_escape_stack = vec![];
         let mut next_loop_recursion_jump = None;
-        let mut pc = 0;
         let mut loaded_filters = [None; MAX_LOCALS];
         let mut loaded_tests = [None; MAX_LOCALS];
 
@@ -181,13 +222,22 @@ impl<'env> Vm<'env> {
                     stack.push(value.clone());
                 }
                 Instruction::BuildMap(pair_count) => {
-                    let mut map = BTreeMap::new();
+                    let mut map = ValueMap::new();
                     for _ in 0..*pair_count {
                         let value = stack.pop();
-                        let key: Key = try_ctx!(stack.pop().try_into_key());
+                        let key = try_ctx!(stack.pop().try_into_key());
                         map.insert(key, value);
                     }
-                    stack.push(Value::from(map));
+                    stack.push(Value(ValueRepr::Map(map.into(), MapType::Normal)))
+                }
+                Instruction::BuildKwargs(pair_count) => {
+                    let mut map = ValueMap::new();
+                    for _ in 0..*pair_count {
+                        let value = stack.pop();
+                        let key = stack.pop().try_into_key().unwrap();
+                        map.insert(key, value);
+                    }
+                    stack.push(Value(ValueRepr::Map(map.into(), MapType::Kwargs)))
                 }
                 Instruction::BuildList(count) => {
                     let mut v = Vec::with_capacity(*count);
@@ -257,6 +307,10 @@ impl<'env> Vm<'env> {
                             continue;
                         }
                     }
+                }
+                Instruction::IsUndefined => {
+                    let value = stack.pop();
+                    stack.push(Value::from(value.is_undefined()));
                 }
                 Instruction::PushLoop(flags) => {
                     let iterable = stack.pop();
@@ -439,6 +493,18 @@ impl<'env> Vm<'env> {
                 Instruction::FastRecurse => {
                     recurse_loop!(false);
                 }
+                Instruction::BuildMacro(name, offset) => {
+                    self.build_macro(&mut stack, state, offset, name);
+                }
+                Instruction::ExportLocals => {
+                    let locals = state.ctx.current_locals();
+                    let mut module = ValueMap::new();
+                    for (key, value) in locals.iter() {
+                        module.insert(Key::make_string_key(key), value.clone());
+                    }
+                    stack.push(Value(ValueRepr::Map(module.into(), MapType::Normal)));
+                }
+                Instruction::Return => break,
             }
             pc += 1;
         }
@@ -664,6 +730,28 @@ impl<'env> Vm<'env> {
             stack.push(value.clone());
         }
         Ok(())
+    }
+
+    fn build_macro(&self, stack: &mut Stack, state: &mut State, offset: &usize, name: &&str) {
+        let arg_spec = match stack.pop().0 {
+            ValueRepr::Seq(args) => args
+                .iter()
+                .map(|value| match &value.0 {
+                    ValueRepr::String(arg) => arg.clone(),
+                    _ => unreachable!(),
+                })
+                .collect(),
+            _ => unreachable!(),
+        };
+        let closure = stack.pop();
+        let macro_ref_id = state.macros.len();
+        Arc::make_mut(&mut state.macros).push((state.instructions, *offset as usize));
+        stack.push(Value::from_object(Macro {
+            name: Arc::new(name.to_string()),
+            arg_spec,
+            macro_ref_id,
+            closure,
+        }));
     }
 }
 

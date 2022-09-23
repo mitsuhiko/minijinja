@@ -342,7 +342,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn dictsort(v: Value) -> Result<Value, Error> {
         let mut pairs = match v.0 {
-            ValueRepr::Map(ref v) => v.iter().collect::<Vec<_>>(),
+            ValueRepr::Map(ref v, _) => v.iter().collect::<Vec<_>>(),
             _ => {
                 return Err(Error::new(
                     ErrorKind::InvalidOperation,
@@ -380,7 +380,7 @@ mod builtins {
     pub fn items(v: Value) -> Result<Value, Error> {
         Ok(Value::from(
             match v.0 {
-                ValueRepr::Map(ref v) => v.iter(),
+                ValueRepr::Map(ref v, _) => v.iter(),
                 _ => {
                     return Err(Error::new(
                         ErrorKind::InvalidOperation,
@@ -592,7 +592,7 @@ mod builtins {
                 Ok(Value::from(s.chars().map(Value::from).collect::<Vec<_>>()))
             }
             ValueRepr::Seq(_) => Ok(value.clone()),
-            ValueRepr::Map(ref m) => Ok(Value::from(
+            ValueRepr::Map(ref m, _) => Ok(Value::from(
                 m.iter()
                     .map(|x| Value::from(x.0.clone()))
                     .collect::<Vec<_>>(),
@@ -775,7 +775,7 @@ mod builtins {
             ValueRepr::String(s) | ValueRepr::SafeString(s) => {
                 Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
             }
-            ValueRepr::Map(ref val) => {
+            ValueRepr::Map(ref val, _) => {
                 let mut rv = String::new();
                 for (idx, (k, v)) in val.iter().enumerate() {
                     if idx > 0 {

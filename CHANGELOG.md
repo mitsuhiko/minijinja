@@ -10,6 +10,12 @@ All notable changes to MiniJinja are documented here.
 - Improve error reporting for failures in blocks and trying to
   `super()` when there is no parent block.
 - Performance improvements.
+- Added support for `{% import %}` / `{% from .. import .. %}`
+  and `{% macro %}`.  (#123)
+- Added `Value::is_kwargs` which disambiugates if an object passed
+  to a function or filter is a normal object or if it represents
+  keyword arguments.
+- Added the ability to call functions stored on objects.
 
 # 0.22.1
 

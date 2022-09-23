@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::Arc;
 
 use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
@@ -27,6 +28,7 @@ pub struct State<'vm, 'env> {
     pub(crate) auto_escape: AutoEscape,
     pub(crate) instructions: &'vm Instructions<'env>,
     pub(crate) blocks: BTreeMap<&'env str, BlockStack<'vm, 'env>>,
+    pub(crate) macros: Arc<Vec<(&'vm Instructions<'env>, usize)>>,
 }
 
 impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
@@ -76,6 +78,7 @@ impl<'vm, 'env> State<'vm, 'env> {
             auto_escape: AutoEscape::None,
             instructions: &Instructions::new("<unknown>", ""),
             blocks: BTreeMap::new(),
+            macros: Arc::new(Vec::new()),
         })
     }
 

@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
-use crate::value::{Arc, Value, ValueRepr};
+use crate::value::{Arc, MapType, Value, ValueRepr};
 use crate::vm::State;
 
 /// A utility trait that represents the return value of functions and filters.
@@ -259,9 +259,10 @@ impl<'a> From<Key<'a>> for Value {
 
 impl<K: Into<StaticKey>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
     fn from(val: BTreeMap<K, V>) -> Self {
-        ValueRepr::Map(Arc::new(
-            val.into_iter().map(|(k, v)| (k.into(), v.into())).collect(),
-        ))
+        ValueRepr::Map(
+            Arc::new(val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()),
+            MapType::Normal,
+        )
         .into()
     }
 }

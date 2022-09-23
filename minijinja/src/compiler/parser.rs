@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, mem};
 
 use crate::compiler::ast::{self, Spanned};
 use crate::compiler::lexer::tokenize;
@@ -129,6 +129,7 @@ impl<'a> TokenStream<'a> {
 
 struct Parser<'a> {
     stream: TokenStream<'a>,
+    in_macro: bool,
 }
 
 macro_rules! binop {
@@ -144,11 +145,7 @@ macro_rules! binop {
                 self.stream.next()?;
                 let right = self.$next()?;
                 left = ast::Expr::BinOp(Spanned::new(
-                    ast::BinOp {
-                        op,
-                        left,
-                        right,
-                    },
+                    ast::BinOp { op, left, right, },
                     self.stream.expand_span(span),
                 ));
             }
@@ -181,6 +178,7 @@ impl<'a> Parser<'a> {
     pub fn new(source: &'a str, in_expr: bool) -> Parser<'a> {
         Parser {
             stream: TokenStream::new(source, in_expr),
+            in_macro: false,
         }
     }
 
@@ -439,15 +437,14 @@ impl<'a> Parser<'a> {
     fn parse_args(&mut self) -> Result<Vec<ast::Expr<'a>>, Error> {
         let mut args = Vec::new();
         let mut first_span = None;
-        let mut kwargs_keys = Vec::new();
-        let mut kwargs_values = Vec::new();
+        let mut kwargs = Vec::new();
 
         expect_token!(self, Token::ParenOpen, "`(`")?;
         loop {
             if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
                 break;
             }
-            if !args.is_empty() || !kwargs_keys.is_empty() {
+            if !args.is_empty() || !kwargs.is_empty() {
                 expect_token!(self, Token::Comma, "`,`")?;
             }
             if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
@@ -464,15 +461,9 @@ impl<'a> Parser<'a> {
                     if first_span.is_none() {
                         first_span = Some(var.span());
                     }
-                    kwargs_keys.push(ast::Expr::Const(Spanned::new(
-                        ast::Const {
-                            value: Value::from(var.id),
-                        },
-                        var.span(),
-                    )));
-                    kwargs_values.push(self.parse_expr_noif()?);
+                    kwargs.push((var.id, self.parse_expr_noif()?));
                 }
-                _ if !kwargs_keys.is_empty() => {
+                _ if !kwargs.is_empty() => {
                     return Err(Error::new(
                         ErrorKind::SyntaxError,
                         "non-keyword arg after keyword arg",
@@ -484,15 +475,12 @@ impl<'a> Parser<'a> {
             }
         }
 
-        if !kwargs_keys.is_empty() {
-            args.push(ast::Expr::Map(ast::Spanned::new(
-                ast::Map {
-                    keys: kwargs_keys,
-                    values: kwargs_values,
-                },
+        if !kwargs.is_empty() {
+            args.push(ast::Expr::Kwargs(ast::Spanned::new(
+                ast::Kwargs { pairs: kwargs },
                 self.stream.expand_span(first_span.unwrap()),
             )));
-        }
+        };
 
         expect_token!(self, Token::ParenClose, "`)`")?;
         Ok(args)
@@ -641,6 +629,18 @@ impl<'a> Parser<'a> {
             ))),
             Token::Ident("filter") => Ok(ast::Stmt::FilterBlock(Spanned::new(
                 self.parse_filter_block()?,
+                self.stream.expand_span(span),
+            ))),
+            Token::Ident("macro") => Ok(ast::Stmt::Macro(Spanned::new(
+                self.parse_macro()?,
+                self.stream.expand_span(span),
+            ))),
+            Token::Ident("import") => Ok(ast::Stmt::Import(Spanned::new(
+                self.parse_import()?,
+                self.stream.expand_span(span),
+            ))),
+            Token::Ident("from") => Ok(ast::Stmt::FromImport(Spanned::new(
+                self.parse_from_import()?,
                 self.stream.expand_span(span),
             ))),
             Token::Ident(name) => syntax_error!("unknown statement {}", name),
@@ -830,6 +830,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_block(&mut self) -> Result<ast::Block<'a>, Error> {
+        if self.in_macro {
+            syntax_error!("block tags in macros are not allowed");
+        }
         let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
         let body = self.subparse(&|tok| matches!(tok, Token::Ident("endblock")))?;
@@ -910,6 +913,76 @@ impl<'a> Parser<'a> {
         let body = self.subparse(&|tok| matches!(tok, Token::Ident("endfilter")))?;
         self.stream.next()?;
         Ok(ast::FilterBlock { filter, body })
+    }
+
+    fn parse_macro(&mut self) -> Result<ast::Macro<'a>, Error> {
+        let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
+        expect_token!(self, Token::ParenOpen, "`(`")?;
+        let mut args = Vec::new();
+        let mut defaults = Vec::new();
+        loop {
+            if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
+                break;
+            }
+            if !args.is_empty() {
+                expect_token!(self, Token::Comma, "`,`")?;
+            }
+            if matches!(self.stream.current()?, Some((Token::ParenClose, _))) {
+                break;
+            }
+            args.push(self.parse_assign_name()?);
+            if matches!(self.stream.current()?, Some((Token::Assign, _))) {
+                self.stream.next()?;
+                defaults.push(self.parse_expr()?);
+            } else if !defaults.is_empty() {
+                expect_token!(self, Token::Assign, "`=`")?;
+            }
+        }
+        expect_token!(self, Token::ParenClose, "`)`")?;
+        expect_token!(self, Token::BlockEnd(..), "end of block")?;
+        let old_in_macro = mem::replace(&mut self.in_macro, true);
+        let body = self.subparse(&|tok| matches!(tok, Token::Ident("endmacro")))?;
+        self.in_macro = old_in_macro;
+        self.stream.next()?;
+        Ok(ast::Macro {
+            name,
+            args,
+            defaults,
+            body,
+        })
+    }
+
+    fn parse_import(&mut self) -> Result<ast::Import<'a>, Error> {
+        let expr = self.parse_expr()?;
+        expect_token!(self, Token::Ident("as"), "as")?;
+        let name = self.parse_expr()?;
+        Ok(ast::Import { expr, name })
+    }
+
+    fn parse_from_import(&mut self) -> Result<ast::FromImport<'a>, Error> {
+        let expr = self.parse_expr()?;
+        let mut names = Vec::new();
+        expect_token!(self, Token::Ident("import"), "import")?;
+        loop {
+            if matches!(self.stream.current()?, Some((Token::BlockEnd(_), _))) {
+                break;
+            }
+            if !names.is_empty() {
+                expect_token!(self, Token::Comma, "`,`")?;
+            }
+            if matches!(self.stream.current()?, Some((Token::BlockEnd(_), _))) {
+                break;
+            }
+            let name = self.parse_assign_name()?;
+            let alias = if matches!(self.stream.current()?, Some((Token::Ident("as"), _))) {
+                self.stream.next()?;
+                Some(self.parse_assign_name()?)
+            } else {
+                None
+            };
+            names.push((name, alias));
+        }
+        Ok(ast::FromImport { expr, names })
     }
 
     fn subparse(

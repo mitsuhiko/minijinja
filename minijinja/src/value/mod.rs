@@ -60,7 +60,8 @@
 //!
 //! Values can also hold "dynamic" objects.  These are objects which implement the
 //! [`Object`] trait.  These can be used to implement dynamic functionality such as
-//! stateful values and more.
+//! stateful values and more.  Dynamic objects are internally also used to implement
+//! the special `loop` variable or macros.
 
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
@@ -203,6 +204,15 @@ impl fmt::Display for ValueKind {
     }
 }
 
+/// The type of map
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum MapType {
+    /// A regular map
+    Normal,
+    /// A map representing keyword arguments
+    Kwargs,
+}
+
 #[derive(Clone)]
 pub(crate) enum ValueRepr {
     Undefined,
@@ -218,7 +228,7 @@ pub(crate) enum ValueRepr {
     SafeString(Arc<String>),
     Bytes(Arc<Vec<u8>>),
     Seq(Arc<Vec<Value>>),
-    Map(Arc<ValueMap>),
+    Map(Arc<ValueMap>, MapType),
     Dynamic(Arc<dyn Object>),
 }
 
@@ -238,7 +248,7 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::SafeString(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::Map(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Map(val, _) => fmt::Debug::fmt(val, f),
             ValueRepr::Dynamic(val) => fmt::Debug::fmt(val, f),
         }
     }
@@ -320,7 +330,7 @@ impl fmt::Display for Value {
                 }
                 write!(f, "]")
             }
-            ValueRepr::Map(m) => {
+            ValueRepr::Map(m, _) => {
                 write!(f, "{{")?;
                 for (idx, (key, val)) in m.iter().enumerate() {
                     if idx > 0 {
@@ -435,8 +445,13 @@ impl Value {
             ValueRepr::Bytes(_) => ValueKind::Bytes,
             ValueRepr::U128(_) => ValueKind::Number,
             ValueRepr::Seq(_) => ValueKind::Seq,
-            ValueRepr::Map(_) | ValueRepr::Dynamic(_) => ValueKind::Map,
+            ValueRepr::Map(..) | ValueRepr::Dynamic(_) => ValueKind::Map,
         }
+    }
+
+    /// Returns `true` if the map represents keyword arguments.
+    pub fn is_kwargs(&self) -> bool {
+        matches!(self.0, ValueRepr::Map(_, MapType::Kwargs))
     }
 
     /// If the value is a string, return it.
@@ -483,7 +498,7 @@ impl Value {
             ValueRepr::Bytes(ref x) => !x.is_empty(),
             ValueRepr::None | ValueRepr::Undefined => false,
             ValueRepr::Seq(ref x) => !x.is_empty(),
-            ValueRepr::Map(ref x) => !x.is_empty(),
+            ValueRepr::Map(ref x, _) => !x.is_empty(),
             ValueRepr::Dynamic(_) => true,
         }
     }
@@ -507,7 +522,7 @@ impl Value {
     pub fn len(&self) -> Option<usize> {
         match self.0 {
             ValueRepr::String(ref s) | ValueRepr::SafeString(ref s) => Some(s.chars().count()),
-            ValueRepr::Map(ref items) => Some(items.len()),
+            ValueRepr::Map(ref items, _) => Some(items.len()),
             ValueRepr::Seq(ref items) => Some(items.len()),
             ValueRepr::Dynamic(ref dy) => Some(dy.attributes().len()),
             _ => None,
@@ -521,7 +536,7 @@ impl Value {
     /// that has attributes.
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
         let value = match self.0 {
-            ValueRepr::Map(ref items) => {
+            ValueRepr::Map(ref items, _) => {
                 let lookup_key = Key::Str(key);
                 items.get(&lookup_key).cloned()
             }
@@ -559,7 +574,7 @@ impl Value {
         let key = Key::from_borrowed_value(key).ok()?;
 
         match self.0 {
-            ValueRepr::Map(ref items) => return items.get(&key).cloned(),
+            ValueRepr::Map(ref items, _) => return items.get(&key).cloned(),
             ValueRepr::Seq(ref items) => {
                 if let Key::I64(idx) = key {
                     let idx = isize::try_from(idx).ok()?;
@@ -612,14 +627,19 @@ impl Value {
         name: &str,
         args: &[Value],
     ) -> Result<Value, Error> {
-        if let ValueRepr::Dynamic(ref dy) = self.0 {
-            dy.call_method(state, name, args)
-        } else {
-            Err(Error::new(
-                ErrorKind::InvalidOperation,
-                format!("object has no method named {}", name),
-            ))
+        match self.0 {
+            ValueRepr::Dynamic(ref dy) => return dy.call_method(state, name, args),
+            ValueRepr::Map(ref map, _) => {
+                if let Some(value) = map.get(&Key::Str(name)) {
+                    return value.call(state, args);
+                }
+            }
+            _ => {}
         }
+        Err(Error::new(
+            ErrorKind::InvalidOperation,
+            format!("object has no method named {}", name),
+        ))
     }
 
     pub(crate) fn try_into_key(self) -> Result<StaticKey, Error> {
@@ -643,7 +663,7 @@ impl Value {
 
     pub(crate) fn iter_as_str_map(&self) -> impl Iterator<Item = (&str, Value)> {
         match self.0 {
-            ValueRepr::Map(ref m) => Box::new(
+            ValueRepr::Map(ref m, _) => Box::new(
                 m.iter()
                     .filter_map(|(k, v)| k.as_str().map(move |k| (k, v.clone()))),
             ) as Box<dyn Iterator<Item = _>>,
@@ -662,11 +682,11 @@ impl Value {
             ValueRepr::None | ValueRepr::Undefined => (ValueIteratorState::Empty, 0),
             ValueRepr::Seq(ref seq) => (ValueIteratorState::Seq(0, Arc::clone(seq)), seq.len()),
             #[cfg(feature = "preserve_order")]
-            ValueRepr::Map(ref items) => {
+            ValueRepr::Map(ref items, _) => {
                 (ValueIteratorState::Map(0, Arc::clone(items)), items.len())
             }
             #[cfg(not(feature = "preserve_order"))]
-            ValueRepr::Map(ref items) => (
+            ValueRepr::Map(ref items, _) => (
                 ValueIteratorState::Map(
                     items.iter().next().map(|x| x.0.clone()),
                     Arc::clone(items),
@@ -713,7 +733,7 @@ impl Serialize for Value {
             ValueRepr::SafeString(ref val) => serializer.serialize_str(val),
             ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
             ValueRepr::Seq(ref elements) => elements.serialize(serializer),
-            ValueRepr::Map(ref entries) => {
+            ValueRepr::Map(ref entries, _) => {
                 use serde::ser::SerializeMap;
                 let mut map = serializer.serialize_map(Some(entries.len()))?;
                 for (ref k, ref v) in entries.iter() {

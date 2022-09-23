@@ -4,7 +4,8 @@ use std::ops::Deref;
 use std::fmt;
 
 use crate::compiler::tokens::Span;
-use crate::value::{Value, ValueMap, ValueRepr};
+use crate::key::Key;
+use crate::value::{MapType, Value, ValueMap, ValueRepr};
 
 /// Container for nodes with location info.
 ///
@@ -63,6 +64,9 @@ pub enum Stmt<'a> {
     Include(Spanned<Include<'a>>),
     AutoEscape(Spanned<AutoEscape<'a>>),
     FilterBlock(Spanned<FilterBlock<'a>>),
+    Macro(Spanned<Macro<'a>>),
+    Import(Spanned<Import<'a>>),
+    FromImport(Spanned<FromImport<'a>>),
 }
 
 #[cfg(feature = "internal_debug")]
@@ -82,6 +86,9 @@ impl<'a> fmt::Debug for Stmt<'a> {
             Stmt::Include(s) => fmt::Debug::fmt(s, f),
             Stmt::AutoEscape(s) => fmt::Debug::fmt(s, f),
             Stmt::FilterBlock(s) => fmt::Debug::fmt(s, f),
+            Stmt::Macro(s) => fmt::Debug::fmt(s, f),
+            Stmt::Import(s) => fmt::Debug::fmt(s, f),
+            Stmt::FromImport(s) => fmt::Debug::fmt(s, f),
         }
     }
 }
@@ -102,6 +109,7 @@ pub enum Expr<'a> {
     Call(Spanned<Call<'a>>),
     List(Spanned<List<'a>>),
     Map(Spanned<Map<'a>>),
+    Kwargs(Spanned<Kwargs<'a>>),
 }
 
 #[cfg(feature = "internal_debug")]
@@ -121,6 +129,7 @@ impl<'a> fmt::Debug for Expr<'a> {
             Expr::Call(s) => fmt::Debug::fmt(s, f),
             Expr::List(s) => fmt::Debug::fmt(s, f),
             Expr::Map(s) => fmt::Debug::fmt(s, f),
+            Expr::Kwargs(s) => fmt::Debug::fmt(s, f),
         }
     }
 }
@@ -204,6 +213,29 @@ pub struct AutoEscape<'a> {
 pub struct FilterBlock<'a> {
     pub filter: Expr<'a>,
     pub body: Vec<Stmt<'a>>,
+}
+
+/// Declares a macro.
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+pub struct Macro<'a> {
+    pub name: &'a str,
+    pub args: Vec<Expr<'a>>,
+    pub defaults: Vec<Expr<'a>>,
+    pub body: Vec<Stmt<'a>>,
+}
+
+/// A "from" import
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+pub struct FromImport<'a> {
+    pub expr: Expr<'a>,
+    pub names: Vec<(Expr<'a>, Option<Expr<'a>>)>,
+}
+
+/// A full module import
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+pub struct Import<'a> {
+    pub expr: Expr<'a>,
+    pub name: Expr<'a>,
 }
 
 /// Outputs the expression.
@@ -351,6 +383,29 @@ impl<'a> List<'a> {
     }
 }
 
+/// Creates a map of kwargs
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+pub struct Kwargs<'a> {
+    pub pairs: Vec<(&'a str, Expr<'a>)>,
+}
+
+impl<'a> Kwargs<'a> {
+    pub fn as_const(&self) -> Option<Value> {
+        if !self.pairs.iter().all(|x| matches!(x.1, Expr::Const(_))) {
+            return None;
+        }
+
+        let mut rv = ValueMap::new();
+        for (key, value) in &self.pairs {
+            if let Expr::Const(value) = value {
+                rv.insert(Key::make_string_key(key), value.value.clone());
+            }
+        }
+
+        Some(Value(ValueRepr::Map(rv.into(), MapType::Kwargs)))
+    }
+}
+
 /// Creates a map of values.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Map<'a> {
@@ -376,7 +431,7 @@ impl<'a> Map<'a> {
             }
         }
 
-        Some(Value(ValueRepr::Map(rv.into())))
+        Some(Value(ValueRepr::Map(rv.into(), MapType::Normal)))
     }
 }
 

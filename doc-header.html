@@ -4,7 +4,7 @@
 <script>
   document.addEventListener("DOMContentLoaded", function() {
     document.querySelectorAll("pre code").forEach(function(node) {
-      if (node.parentNode.className.match(/jinja/)) {
+      if (node.parentNode.className.match(/jinja|json/)) {
         hljs.highlightElement(node.parentNode);
       }
     });

@@ -17,9 +17,11 @@
 //!   - [`{% extends %}`](#-extends-)
 //!   - [`{% block %}`](#-block-)
 //!   - [`{% include %}`](#-include-)
+//!   - [`{% import %}`](#-import-)
 //!   - [`{% with %}`](#-with-)
 //!   - [`{% set %}`](#-set-)
 //!   - [`{% filter %}`](#-filter-)
+//!   - [`{% macro %}`](#-macro-)
 //!   - [`{% autoescape %}`](#-autoescape-)
 //!   - [`{% raw %}`](#-raw-)
 //!
@@ -405,6 +407,33 @@
 //!  
 //! Included templates have access to the variables of the active context.
 //!
+//! ## `{% import #}`
+//!
+//! MiniJinja supports the `{% import %}` and `{% from ... import ... %}`
+//! syntax.  With it variables or macros can be included from other templates:
+//!
+//! ```jinja
+//! {% from "my_template.html" import my_macro, my_variable %}
+//! ```
+//!
+//! Imports can also be aliased:
+//!
+//! ```jinja
+//! {% from "my_template.html" import my_macro as other_name %}
+//! {{ other_name() }}
+//! ```
+//!
+//! Full modules can be imported with `{% import ... as ... %}`:
+//!
+//! ```jinja
+//! {% import "my_template.html" as helpers %}
+//! {{ helpers.my_macro() }}
+//! ```
+//!
+//! Note that unlike Jinja2, exported modules do not contain any template code.  Only
+//! variables and macros that are defined can be imported.  Also imports unlike in Jinja2
+//! are not cached and they get access to the full template context.
+//!
 //! ## `{% with %}`
 //!
 //! The with statement makes it possible to create a new inner scope.  Variables set within
@@ -468,6 +497,32 @@
 //!   This text becomes uppercase
 //! {% endfilter %}
 //! ```
+//!
+//! ## `{% macro %}`
+//!
+//! MiniJinja has limited support for macros.  They allow you to write reusable
+//! template functions.  hey are useful to put often used idioms into reusable
+//! functions to not repeat yourself (“DRY”).
+//!
+//! Here’s a small example of a macro that renders a form element:
+//!
+//! ```jinja
+//! {% macro input(name, value="", type="text") -%}
+//! <input type="{{ type }}" name="{{ name }}" value="{{ value }}">
+//! {%- endmacro %}
+//! ```
+//!
+//! The macro can then be called like a function in the namespace:
+//!
+//! ```jinja
+//! <p>{{ input('username') }}</p>
+//! <p>{{ input('password', type='password') }}</p>
+//! ```
+//!
+//! The behavior of macros with regards to undefined variables is that they capture
+//! them at macro declaration time (eg: they use a closure).
+//!
+//! Macros can be imported via `{% include %}` or `{% from ... import %}`.
 //!
 //! ## `{% autoescape %}`
 //!

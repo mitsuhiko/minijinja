@@ -238,7 +238,7 @@ pub fn string_concat(mut left: Value, right: &Value) -> Value {
 pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
     match container.0 {
         ValueRepr::Seq(ref values) => Ok(Value::from(values.contains(value))),
-        ValueRepr::Map(ref map) => {
+        ValueRepr::Map(ref map, _) => {
             let key = match value.clone().try_into_key() {
                 Ok(key) => key,
                 Err(_) => return Ok(Value::from(false)),

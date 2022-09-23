@@ -3,7 +3,7 @@ use std::fmt;
 
 use crate::environment::Environment;
 use crate::value::Value;
-use crate::vm::forloop::ForLoop;
+use crate::vm::loop_object::ForLoop;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
 
@@ -77,6 +77,12 @@ impl Stack {
 
     pub fn peek(&self) -> &Value {
         self.values.last().expect("stack was empty")
+    }
+}
+
+impl From<Vec<Value>> for Stack {
+    fn from(values: Vec<Value>) -> Stack {
+        Stack { values }
     }
 }
 
@@ -209,6 +215,11 @@ impl<'env> Context<'env> {
     /// Pops the topmost layer.
     pub fn pop_frame(&mut self) -> Frame {
         self.stack.pop().expect("pop from empty context stack")
+    }
+
+    /// Returns the current locals.
+    pub fn current_locals(&mut self) -> &mut Locals<'env> {
+        &mut self.stack.last_mut().expect("empty stack").locals
     }
 
     /// Returns the current innermost loop.

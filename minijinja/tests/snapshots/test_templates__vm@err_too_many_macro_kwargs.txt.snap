@@ -1,0 +1,30 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{% macro two_args(a, b) %}\n  {{ a }} and {{ b }}\n{% endmacro %}\n{{ two_args(c=42) }}"
+info: {}
+input_file: minijinja/tests/inputs/err_too_many_macro_kwargs.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: TooManyArguments,
+    detail: "unknown keyword argument `c`",
+    name: "err_too_many_macro_kwargs.txt",
+    line: 4,
+}
+
+too many arguments: unknown keyword argument `c` (in err_too_many_macro_kwargs.txt:4)
+------------------------ err_too_many_macro_kwargs.txt ------------------------
+   1 | {% macro two_args(a, b) %}
+   2 |   {{ a }} and {{ b }}
+   3 | {% endmacro %}
+   4 > {{ two_args(c=42) }}
+     i    ^^^^^^^^^^^^^^ too many arguments
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Referenced variables: {
+    a: Undefined,
+    b: Undefined,
+    two_args: <macro two_args>,
+}
+-------------------------------------------------------------------------------
+
