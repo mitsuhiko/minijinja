@@ -10,7 +10,7 @@ use crate::environment::Environment;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::output::{Output, WriteWrapper};
 use crate::utils::AutoEscape;
-use crate::value::Value;
+use crate::value::{self, Value};
 use crate::vm::Vm;
 
 /// Represents a handle to a template.
@@ -183,13 +183,17 @@ impl<'source> CompiledTemplate<'source> {
         name: &'source str,
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
-        let ast = parse(source, name)?;
-        let mut gen = CodeGenerator::new(name, source);
-        gen.compile_stmt(&ast)?;
-        let (instructions, blocks) = gen.finish();
-        Ok(CompiledTemplate {
-            instructions,
-            blocks,
+        // the parser/compiler combination can create constants in which case
+        // we can probably benefit from the value optimization a bit.
+        value::with_value_optimization(|| {
+            let ast = parse(source, name)?;
+            let mut gen = CodeGenerator::new(name, source);
+            gen.compile_stmt(&ast)?;
+            let (instructions, blocks) = gen.finish();
+            Ok(CompiledTemplate {
+                instructions,
+                blocks,
+            })
         })
     }
 }
