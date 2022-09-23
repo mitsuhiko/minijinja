@@ -13,15 +13,15 @@ use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{self, ops, Value, ValueMap, ValueRepr};
 use crate::vm::context::{Context, Frame, Stack};
-use crate::vm::forloop::{ForLoop, LoopState};
-use crate::vm::macro_support::{Macro, MacroRef};
+use crate::vm::loop_object::{ForLoop, LoopState};
+use crate::vm::macro_object::Macro;
 use crate::vm::state::BlockStack;
 
 pub use crate::vm::state::State;
 
 mod context;
-mod forloop;
-mod macro_support;
+mod loop_object;
+mod macro_object;
 mod state;
 
 /// Helps to evaluate something.
@@ -745,10 +745,7 @@ impl<'env> Vm<'env> {
         };
         let closure = stack.pop();
         let macro_ref_id = state.macros.len();
-        Arc::make_mut(&mut state.macros).push(MacroRef {
-            instructions: state.instructions,
-            offset: *offset as usize,
-        });
+        Arc::make_mut(&mut state.macros).push((state.instructions, *offset as usize));
         stack.push(Value::from_object(Macro {
             name: Arc::new(name.to_string()),
             arg_spec,

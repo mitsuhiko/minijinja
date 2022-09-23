@@ -8,12 +8,12 @@ input_file: minijinja/tests/inputs/err_too_many_macro_kwargs.txt
 
 Error {
     kind: TooManyArguments,
-    detail: "unknown keyword argument c",
+    detail: "unknown keyword argument `c`",
     name: "err_too_many_macro_kwargs.txt",
     line: 4,
 }
 
-too many arguments: unknown keyword argument c (in err_too_many_macro_kwargs.txt:4)
+too many arguments: unknown keyword argument `c` (in err_too_many_macro_kwargs.txt:4)
 ------------------------ err_too_many_macro_kwargs.txt ------------------------
    1 | {% macro two_args(a, b) %}
    2 |   {{ a }} and {{ b }}

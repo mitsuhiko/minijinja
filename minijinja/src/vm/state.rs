@@ -7,7 +7,6 @@ use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::value::{ArgType, Value};
 use crate::vm::context::Context;
-use crate::vm::macro_support::MacroRef;
 use crate::AutoEscape;
 
 /// Provides access to the current execution state of the engine.
@@ -29,7 +28,7 @@ pub struct State<'vm, 'env> {
     pub(crate) auto_escape: AutoEscape,
     pub(crate) instructions: &'vm Instructions<'env>,
     pub(crate) blocks: BTreeMap<&'env str, BlockStack<'vm, 'env>>,
-    pub(crate) macros: Arc<Vec<MacroRef<'vm, 'env>>>,
+    pub(crate) macros: Arc<Vec<(&'vm Instructions<'env>, usize)>>,
 }
 
 impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {

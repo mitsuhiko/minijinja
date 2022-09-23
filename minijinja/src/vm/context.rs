@@ -3,7 +3,7 @@ use std::fmt;
 
 use crate::environment::Environment;
 use crate::value::Value;
-use crate::vm::forloop::ForLoop;
+use crate::vm::loop_object::ForLoop;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
 
