@@ -139,7 +139,7 @@ impl<'env> fmt::Debug for Context<'env> {
 
         let mut m = f.debug_map();
         let mut seen = HashSet::new();
-        dump(&mut m, &mut seen, self)?;
+        ok!(dump(&mut m, &mut seen, self));
         m.finish()
     }
 }
@@ -198,6 +198,7 @@ impl<'env> Context<'env> {
 
     /// Returns the current locals.
     #[track_caller]
+    #[cfg(feature = "multi-template")]
     pub fn current_locals(&mut self) -> &mut Locals<'env> {
         &mut self.stack.last_mut().unwrap().locals
     }

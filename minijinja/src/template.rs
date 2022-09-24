@@ -135,16 +135,19 @@ impl<'env> Template<'env> {
     }
 
     /// Returns the root instructions.
+    #[cfg(feature = "multi-template")]
     pub(crate) fn instructions(&self) -> &'env Instructions<'env> {
         &self.compiled.instructions
     }
 
     /// Returns the blocks.
+    #[cfg(feature = "multi-template")]
     pub(crate) fn blocks(&self) -> &'env BTreeMap<&'env str, Instructions<'env>> {
         &self.compiled.blocks
     }
 
     /// Returns the initial auto escape setting.
+    #[cfg(feature = "multi-template")]
     pub(crate) fn initial_auto_escape(&self) -> AutoEscape {
         self.initial_auto_escape
     }
@@ -186,9 +189,9 @@ impl<'source> CompiledTemplate<'source> {
         // the parser/compiler combination can create constants in which case
         // we can probably benefit from the value optimization a bit.
         value::with_value_optimization(|| {
-            let ast = parse(source, name)?;
+            let ast = ok!(parse(source, name));
             let mut gen = CodeGenerator::new(name, source);
-            gen.compile_stmt(&ast)?;
+            ok!(gen.compile_stmt(&ast));
             let (instructions, blocks) = gen.finish();
             Ok(CompiledTemplate {
                 instructions,

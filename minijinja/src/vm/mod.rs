@@ -8,19 +8,21 @@ use crate::compiler::instructions::{
 };
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::key::Key;
 use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{self, ops, MapType, Value, ValueMap, ValueRepr};
 use crate::vm::context::{Context, Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
-use crate::vm::macro_object::Macro;
 use crate::vm::state::BlockStack;
+
+#[cfg(feature = "macros")]
+use crate::vm::macro_object::Macro;
 
 pub use crate::vm::state::State;
 
 mod context;
 mod loop_object;
+#[cfg(feature = "macros")]
 mod macro_object;
 mod state;
 
@@ -50,7 +52,7 @@ where
     } else if let Some(Some(rv)) = vec.get(local_id as usize) {
         Some(*rv)
     } else {
-        let val = f()?;
+        let val = some!(f());
         vec[local_id as usize] = Some(val);
         Some(val)
     }
@@ -80,6 +82,7 @@ impl<'env> Vm<'env> {
                     instructions,
                     auto_escape,
                     blocks: prepare_blocks(blocks),
+                    #[cfg(feature = "macros")]
                     macros: Arc::new(Vec::new()),
                 },
                 out,
@@ -89,6 +92,7 @@ impl<'env> Vm<'env> {
 
     /// Evaluate a macro in a state.
     #[inline(always)]
+    #[cfg(feature = "macros")]
     pub fn eval_macro(
         &self,
         instructions: &Instructions<'env>,
@@ -107,6 +111,7 @@ impl<'env> Vm<'env> {
                     instructions,
                     auto_escape: state.auto_escape(),
                     blocks: BTreeMap::default(),
+                    #[cfg(feature = "macros")]
                     macros: state.macros.clone(),
                 },
                 out,
@@ -191,7 +196,7 @@ impl<'env> Vm<'env> {
                 Instruction::EmitRaw(val) => {
                     // this only produces a format error, no need to attach
                     // location information.
-                    out.write_str(val)?;
+                    ok!(out.write_str(val).map_err(Error::from));
                 }
                 Instruction::Emit => {
                     try_ctx!(self.env.format(&stack.pop(), state, out));
@@ -308,6 +313,7 @@ impl<'env> Vm<'env> {
                         }
                     }
                 }
+                #[cfg(feature = "macros")]
                 Instruction::IsUndefined => {
                     let value = stack.pop();
                     stack.push(Value::from(value.is_undefined()));
@@ -378,21 +384,6 @@ impl<'env> Vm<'env> {
                         ));
                     }
                     state.current_block = old_block;
-                }
-                Instruction::LoadBlocks => {
-                    let name = stack.pop();
-                    try_ctx!(self.load_blocks(name, state));
-
-                    // then replace the instructions and set the pc to 0 again.
-                    // this effectively means that the template engine will now
-                    // execute the extended template's code instead.  From this
-                    // there is no way back.
-                    pc = 0;
-                    continue;
-                }
-                Instruction::Include(ignore_missing) => {
-                    let name = stack.pop();
-                    try_ctx!(self.perform_include(name, state, out, *ignore_missing));
                 }
                 Instruction::PushAutoEscape => {
                     let value = stack.pop();
@@ -493,17 +484,37 @@ impl<'env> Vm<'env> {
                 Instruction::FastRecurse => {
                     recurse_loop!(false);
                 }
-                Instruction::BuildMacro(name, offset) => {
-                    self.build_macro(&mut stack, state, offset, name);
+                #[cfg(feature = "multi-template")]
+                Instruction::LoadBlocks => {
+                    let name = stack.pop();
+                    try_ctx!(self.load_blocks(name, state));
+
+                    // then replace the instructions and set the pc to 0 again.
+                    // this effectively means that the template engine will now
+                    // execute the extended template's code instead.  From this
+                    // there is no way back.
+                    pc = 0;
+                    continue;
                 }
+                #[cfg(feature = "multi-template")]
+                Instruction::Include(ignore_missing) => {
+                    let name = stack.pop();
+                    try_ctx!(self.perform_include(name, state, out, *ignore_missing));
+                }
+                #[cfg(feature = "multi-template")]
                 Instruction::ExportLocals => {
                     let locals = state.ctx.current_locals();
                     let mut module = ValueMap::new();
                     for (key, value) in locals.iter() {
-                        module.insert(Key::make_string_key(key), value.clone());
+                        module.insert((*key).into(), value.clone());
                     }
                     stack.push(Value(ValueRepr::Map(module.into(), MapType::Normal)));
                 }
+                #[cfg(feature = "macros")]
+                Instruction::BuildMacro(name, offset) => {
+                    self.build_macro(&mut stack, state, offset, name);
+                }
+                #[cfg(feature = "macros")]
                 Instruction::Return => break,
             }
             pc += 1;
@@ -512,6 +523,7 @@ impl<'env> Vm<'env> {
         Ok(stack.try_pop())
     }
 
+    #[cfg(feature = "multi-template")]
     fn perform_include(
         &self,
         name: Value,
@@ -526,12 +538,12 @@ impl<'env> Vm<'env> {
         };
         let mut templates_tried = vec![];
         for name in choices {
-            let name = name.as_str().ok_or_else(|| {
+            let name = ok!(name.as_str().ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
                     "template name was not a string",
                 )
-            })?;
+            }));
             let tmpl = match self.env.get_template(name) {
                 Ok(tmpl) => tmpl,
                 Err(err) => {
@@ -550,13 +562,13 @@ impl<'env> Vm<'env> {
             state.auto_escape = old_escape;
             state.instructions = old_instructions;
             state.blocks = old_blocks;
-            rv.map_err(|err| {
+            ok!(rv.map_err(|err| {
                 Error::new(
                     ErrorKind::BadInclude,
                     format!("error in \"{}\"", tmpl.name()),
                 )
                 .with_source(err)
-            })?;
+            }));
             return Ok(());
         }
         if !templates_tried.is_empty() && !ignore_missing {
@@ -585,9 +597,9 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         capture: bool,
     ) -> Result<Value, Error> {
-        let name = state.current_block.ok_or_else(|| {
+        let name = ok!(state.current_block.ok_or_else(|| {
             Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
-        })?;
+        }));
 
         let block_stack = state.blocks.get_mut(name).unwrap();
         if !block_stack.push() {
@@ -606,9 +618,9 @@ impl<'env> Vm<'env> {
         state.instructions = old_instructions;
         state.blocks.get_mut(name).unwrap().pop();
 
-        rv.map_err(|err| {
+        ok!(rv.map_err(|err| {
             Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
-        })?;
+        }));
         if capture {
             Ok(out.end_capture(state.auto_escape))
         } else {
@@ -634,8 +646,9 @@ impl<'env> Vm<'env> {
         }
     }
 
+    #[cfg(feature = "multi-template")]
     fn load_blocks(&self, name: Value, state: &mut State<'_, 'env>) -> Result<(), Error> {
-        let tmpl = name
+        let tmpl = ok!(name
             .as_str()
             .ok_or_else(|| {
                 Error::new(
@@ -643,7 +656,7 @@ impl<'env> Vm<'env> {
                     "template name was not a string",
                 )
             })
-            .and_then(|name| self.env.get_template(name))?;
+            .and_then(|name| self.env.get_template(name)));
         for (name, instr) in tmpl.blocks().iter() {
             state
                 .blocks
@@ -685,7 +698,7 @@ impl<'env> Vm<'env> {
         pc: usize,
         current_recursion_jump: Option<(usize, bool)>,
     ) -> Result<(), Error> {
-        let iterator = iterable.try_iter()?;
+        let iterator = ok!(iterable.try_iter());
         let len = iterator.len();
         let depth = state
             .ctx
@@ -714,9 +727,10 @@ impl<'env> Vm<'env> {
 
     fn unpack_list(&self, stack: &mut Stack, count: &usize) -> Result<(), Error> {
         let top = stack.pop();
-        let v = top
-            .as_slice()
-            .map_err(|e| Error::new(ErrorKind::CannotUnpack, "not a sequence").with_source(e))?;
+        let v =
+            ok!(top
+                .as_slice()
+                .map_err(|e| Error::new(ErrorKind::CannotUnpack, "not a sequence").with_source(e)));
         if v.len() != *count {
             return Err(Error::new(
                 ErrorKind::CannotUnpack,
@@ -733,6 +747,7 @@ impl<'env> Vm<'env> {
         Ok(())
     }
 
+    #[cfg(feature = "macros")]
     fn build_macro(&self, stack: &mut Stack, state: &mut State, offset: &usize, name: &&str) {
         let arg_spec = match stack.pop().0 {
             ValueRepr::Seq(args) => args

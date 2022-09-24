@@ -75,7 +75,7 @@ type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send +
 
 /// A boxed function.
 #[derive(Clone)]
-pub(crate) struct BoxedFunction(Arc<FuncFunc>, &'static str);
+pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'static str);
 
 /// A utility trait that represents global functions.
 ///
@@ -177,9 +177,10 @@ impl BoxedFunction {
     {
         BoxedFunction(
             Arc::new(move |state, args| -> Result<Value, Error> {
-                f.invoke(Args::from_values(Some(state), args)?, SealedMarker)
+                f.invoke(ok!(Args::from_values(Some(state), args)), SealedMarker)
                     .into_result()
             }),
+            #[cfg(feature = "debug")]
             std::any::type_name::<F>(),
         )
     }
@@ -197,15 +198,13 @@ impl BoxedFunction {
 
 impl fmt::Debug for BoxedFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            if self.1.is_empty() {
-                "BoxedFunction"
-            } else {
-                self.1
+        #[cfg(feature = "debug")]
+        {
+            if !self.1.is_empty() {
+                return write!(f, "{}", self.1);
             }
-        )
+        }
+        write!(f, "function")
     }
 }
 

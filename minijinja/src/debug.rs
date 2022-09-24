@@ -52,7 +52,7 @@ pub(super) fn render_debug_info(
                 .next()
                 .unwrap_or("Template Source")
         );
-        writeln!(f)?;
+        ok!(writeln!(f));
         writeln!(f, "{:-^1$}", title, 79).unwrap();
         let lines: Vec<_> = source.lines().enumerate().collect();
         let idx = line.unwrap_or(1).saturating_sub(1);
@@ -66,13 +66,13 @@ pub(super) fn render_debug_info(
         writeln!(f, "{:>4} > {}", idx + 1, lines[idx].1).unwrap();
         if let Some(span) = span {
             if span.start_line == span.end_line {
-                writeln!(
+                ok!(writeln!(
                     f,
                     "     i {}{} {}",
                     " ".repeat(span.start_col),
                     "^".repeat(span.end_col - span.start_col),
                     kind,
-                )?;
+                ));
             }
         }
 
@@ -81,8 +81,8 @@ pub(super) fn render_debug_info(
         }
         write!(f, "{:~^1$}", "", 79).unwrap();
     }
-    writeln!(f)?;
-    writeln!(f, "{:#?}", VarPrinter(&info.referenced_locals))?;
+    ok!(writeln!(f));
+    ok!(writeln!(f, "{:#?}", VarPrinter(&info.referenced_locals)));
     write!(f, "{:-^1$}", "", 79).unwrap();
     Ok(())
 }

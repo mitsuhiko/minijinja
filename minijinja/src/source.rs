@@ -134,7 +134,7 @@ impl Source {
         Source {
             backing: SourceBacking::Dynamic {
                 templates: MemoMap::new(),
-                loader: Arc::new(move |name| match f(name)? {
+                loader: Arc::new(move |name| match ok!(f(name)) {
                     Some(rv) => Ok(rv),
                     None => Err(Error::new_not_found(name)),
                 }),
@@ -189,9 +189,12 @@ impl Source {
         let source = source.into();
         let name = name.into();
         let owner = (name.clone(), source);
-        let tmpl = LoadedTemplate::try_new(owner, |(name, source)| -> Result<_, Error> {
-            CompiledTemplate::from_name_and_source(name.as_str(), source)
-        })?;
+        let tmpl = ok!(LoadedTemplate::try_new(
+            owner,
+            |(name, source)| -> Result<_, Error> {
+                CompiledTemplate::from_name_and_source(name.as_str(), source)
+            }
+        ));
 
         match self.backing {
             SourceBacking::Dynamic {
@@ -217,17 +220,21 @@ impl Source {
     /// Gets a compiled template from the source.
     pub(crate) fn get_compiled_template(&self, name: &str) -> Result<&CompiledTemplate<'_>, Error> {
         match &self.backing {
-            SourceBacking::Dynamic { templates, loader } => Ok(templates
-                .get_or_try_insert(name, || -> Result<_, Error> {
-                    let source = loader(name)?;
+            SourceBacking::Dynamic { templates, loader } => Ok(ok!(templates.get_or_try_insert(
+                name,
+                || -> Result<_, Error> {
+                    let source = ok!(loader(name));
                     let owner = (name.to_owned(), source);
-                    let tmpl =
-                        LoadedTemplate::try_new(owner, |(name, source)| -> Result<_, Error> {
+                    let tmpl = ok!(LoadedTemplate::try_new(
+                        owner,
+                        |(name, source)| -> Result<_, Error> {
                             CompiledTemplate::from_name_and_source(name.as_str(), source)
-                        })?;
+                        }
+                    ));
                     Ok(Arc::new(tmpl))
-                })?
-                .borrow_dependent()),
+                }
+            ))
+            .borrow_dependent()),
             SourceBacking::Static { templates } => templates
                 .get(name)
                 .map(|value| value.borrow_dependent())

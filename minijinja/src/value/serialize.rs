@@ -134,7 +134,7 @@ impl Serializer for ValueSerializer {
         T: Serialize,
     {
         let mut map = ValueMap::new();
-        map.insert(Key::from(variant), value.serialize(self)?);
+        map.insert(Key::from(variant), ok!(value.serialize(self)));
         Ok(ValueRepr::Map(Arc::new(map), MapType::Normal).into())
     }
 
@@ -217,7 +217,7 @@ impl ser::SerializeSeq for SerializeSeq {
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer)?;
+        let value = ok!(value.serialize(ValueSerializer));
         self.elements.push(value);
         Ok(())
     }
@@ -239,7 +239,7 @@ impl ser::SerializeTuple for SerializeTuple {
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer)?;
+        let value = ok!(value.serialize(ValueSerializer));
         self.elements.push(value);
         Ok(())
     }
@@ -261,7 +261,7 @@ impl ser::SerializeTupleStruct for SerializeTupleStruct {
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer)?;
+        let value = ok!(value.serialize(ValueSerializer));
         self.fields.push(value);
         Ok(())
     }
@@ -284,7 +284,7 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer)?;
+        let value = ok!(value.serialize(ValueSerializer));
         self.fields.push(value);
         Ok(())
     }
@@ -309,7 +309,7 @@ impl ser::SerializeMap for SerializeMap {
     where
         T: Serialize,
     {
-        let key = key.serialize(KeySerializer)?;
+        let key = ok!(key.serialize(KeySerializer));
         self.key = Some(key);
         Ok(())
     }
@@ -322,7 +322,7 @@ impl ser::SerializeMap for SerializeMap {
             .key
             .take()
             .expect("serialize_value called before serialize_key");
-        let value = value.serialize(ValueSerializer)?;
+        let value = ok!(value.serialize(ValueSerializer));
         self.entries.insert(key, value);
         Ok(())
     }
@@ -339,8 +339,8 @@ impl ser::SerializeMap for SerializeMap {
         K: Serialize,
         V: Serialize,
     {
-        let key = key.serialize(KeySerializer)?;
-        let value = value.serialize(ValueSerializer)?;
+        let key = ok!(key.serialize(KeySerializer));
+        let value = ok!(value.serialize(ValueSerializer));
         self.entries.insert(key, value);
         Ok(())
     }
@@ -359,7 +359,7 @@ impl ser::SerializeStruct for SerializeStruct {
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer)?;
+        let value = ok!(value.serialize(ValueSerializer));
         self.fields.insert(Key::Str(key), value);
         Ok(())
     }
@@ -396,7 +396,7 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
     where
         T: Serialize,
     {
-        let value = value.serialize(ValueSerializer)?;
+        let value = ok!(value.serialize(ValueSerializer));
         self.map.insert(Key::from(key), value);
         Ok(())
     }

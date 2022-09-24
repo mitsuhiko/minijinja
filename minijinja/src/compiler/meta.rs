@@ -98,7 +98,7 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
                 stmt.children.iter().for_each(|x| walk(x, state));
             }
             ast::Stmt::EmitExpr(expr) => visit_expr(&expr.expr, state),
-            ast::Stmt::EmitRaw(_) | ast::Stmt::Extends(_) | ast::Stmt::Include(_) => {}
+            ast::Stmt::EmitRaw(_) => {}
             ast::Stmt::ForLoop(stmt) => {
                 state.push();
                 state.assign("loop");
@@ -155,15 +155,20 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
                 stmt.body.iter().for_each(|x| walk(x, state));
                 state.pop();
             }
-            ast::Stmt::Macro(stmt) => {
-                state.assign(stmt.name);
-            }
+            #[cfg(feature = "multi-template")]
+            ast::Stmt::Extends(_) | ast::Stmt::Include(_) => {}
+            #[cfg(feature = "multi-template")]
             ast::Stmt::Import(stmt) => {
                 assign_nested(&stmt.name, state);
             }
+            #[cfg(feature = "multi-template")]
             ast::Stmt::FromImport(stmt) => stmt.names.iter().for_each(|(arg, alias)| {
                 assign_nested(alias.as_ref().unwrap_or(arg), state);
             }),
+            #[cfg(feature = "macros")]
+            ast::Stmt::Macro(stmt) => {
+                state.assign(stmt.name);
+            }
         }
     }
 

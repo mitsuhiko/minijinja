@@ -140,9 +140,6 @@ pub enum Instruction<'source> {
     /// Pops the topmost frame
     PopFrame,
 
-    /// True if the value is undefined
-    IsUndefined,
-
     /// Jump to a specific instruction
     Jump(usize),
 
@@ -157,12 +154,6 @@ pub enum Instruction<'source> {
 
     /// Call into a block.
     CallBlock(&'source str),
-
-    /// Loads block from a template with name on stack ("extends")
-    LoadBlocks,
-
-    /// Includes another template.
-    Include(bool),
 
     /// Sets the auto escape flag to the current value.
     PushAutoEscape,
@@ -197,14 +188,29 @@ pub enum Instruction<'source> {
     /// A fast loop recurse instruction without intermediate capturing.
     FastRecurse,
 
-    /// Builds a macro on the stack.
-    BuildMacro(&'source str, usize),
+    /// Loads block from a template with name on stack ("extends")
+    #[cfg(feature = "multi-template")]
+    LoadBlocks,
+
+    /// Includes another template.
+    #[cfg(feature = "multi-template")]
+    Include(bool),
 
     /// Builds a module
+    #[cfg(feature = "multi-template")]
     ExportLocals,
 
+    /// Builds a macro on the stack.
+    #[cfg(feature = "macros")]
+    BuildMacro(&'source str, usize),
+
     /// Breaks from the interpreter loop (exists a function)
+    #[cfg(feature = "macros")]
     Return,
+
+    /// True if the value is undefined
+    #[cfg(feature = "macros")]
+    IsUndefined,
 }
 
 #[derive(Copy, Clone)]
@@ -397,9 +403,9 @@ impl<'source> fmt::Debug for Instructions<'source> {
 
         impl<'a> fmt::Debug for InstructionWrapper<'a> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{:>05x} | {:?}", self.0, self.1,)?;
+                ok!(write!(f, "{:>05x} | {:?}", self.0, self.1,));
                 if let Some(line) = self.2 {
-                    write!(f, "  [line {}]", line)?;
+                    ok!(write!(f, "  [line {}]", line));
                 }
                 Ok(())
             }

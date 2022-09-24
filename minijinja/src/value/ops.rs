@@ -37,13 +37,13 @@ pub fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
         (ValueRepr::F64(a), ValueRepr::F64(b)) => Some(CoerceResult::F64(*a, *b)),
 
         // are floats involved?
-        (ValueRepr::F64(a), _) => Some(CoerceResult::F64(*a, as_f64(b)?)),
-        (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(as_f64(a)?, *b)),
+        (ValueRepr::F64(a), _) => Some(CoerceResult::F64(*a, some!(as_f64(b)))),
+        (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(some!(as_f64(a)), *b)),
 
         // everything else goes up to i128
         _ => Some(CoerceResult::I128(
-            i128::try_from(a.clone()).ok()?,
-            i128::try_from(b.clone()).ok()?,
+            some!(i128::try_from(a.clone()).ok()),
+            some!(i128::try_from(b.clone()).ok()),
         )),
     }
 }
@@ -78,17 +78,17 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     let start: i64 = if start.is_none() {
         0
     } else {
-        start.try_into()?
+        ok!(start.try_into())
     };
     let stop: Option<i64> = if stop.is_none() {
         None
     } else {
-        Some(stop.try_into()?)
+        Some(ok!(stop.try_into()))
     };
     let step = if step.is_none() {
         1
     } else {
-        u64::try_from(step)? as usize
+        ok!(u64::try_from(step)) as usize
     };
 
     if let Some(s) = value.as_str() {
@@ -102,7 +102,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         ));
     }
 
-    let slice = value.as_slice()?;
+    let slice = ok!(value.as_slice());
     let (start, len) = get_offset_and_len(start, stop, || slice.len());
     Ok(Value::from(
         slice
@@ -139,7 +139,7 @@ macro_rules! math_binop {
     ($name:ident, $int:ident, $float:tt) => {
         pub fn $name(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
             fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-                match coerce(lhs, rhs)? {
+                match some!(coerce(lhs, rhs)) {
                     CoerceResult::I128(a, b) => Some(int_as_value(a.$int(b))),
                     CoerceResult::F64(a, b) => Some((a $float b).into()),
                     _ => None
@@ -154,7 +154,7 @@ macro_rules! math_binop {
 
 pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        match coerce(lhs, rhs)? {
+        match some!(coerce(lhs, rhs)) {
             CoerceResult::I128(a, b) => Some(int_as_value(a.wrapping_add(b))),
             CoerceResult::F64(a, b) => Some((a + b).into()),
             CoerceResult::String(a, b) => Some(Value::from([a, b].concat())),
@@ -169,8 +169,8 @@ math_binop!(rem, wrapping_rem_euclid, %);
 
 pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        let a = as_f64(lhs)?;
-        let b = as_f64(rhs)?;
+        let a = some!(as_f64(lhs));
+        let b = some!(as_f64(rhs));
         Some((a / b).into())
     }
     do_it(lhs, rhs).ok_or_else(|| impossible_op("/", lhs, rhs))
@@ -178,7 +178,7 @@ pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 
 pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        match coerce(lhs, rhs)? {
+        match some!(coerce(lhs, rhs)) {
             CoerceResult::I128(a, b) => Some(int_as_value(a.div_euclid(b))),
             CoerceResult::F64(a, b) => Some(a.div_euclid(b).into()),
             CoerceResult::String(_, _) => None,
@@ -190,8 +190,8 @@ pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 /// Implements a binary `pow` operation on values.
 pub fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     pub fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        match coerce(lhs, rhs)? {
-            CoerceResult::I128(a, b) => Some(int_as_value(a.pow(TryFrom::try_from(b).ok()?))),
+        match some!(coerce(lhs, rhs)) {
+            CoerceResult::I128(a, b) => Some(int_as_value(a.pow(some!(TryFrom::try_from(b).ok())))),
             CoerceResult::F64(a, b) => Some((a.powf(b)).into()),
             CoerceResult::String(_, _) => None,
         }

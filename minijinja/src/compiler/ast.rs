@@ -44,7 +44,7 @@ impl<T> Deref for Spanned<T> {
 #[cfg(feature = "internal_debug")]
 impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.node, f)?;
+        ok!(fmt::Debug::fmt(&self.node, f));
         write!(f, "{:?}", self.span)
     }
 }
@@ -60,13 +60,18 @@ pub enum Stmt<'a> {
     Set(Spanned<Set<'a>>),
     SetBlock(Spanned<SetBlock<'a>>),
     Block(Spanned<Block<'a>>),
-    Extends(Spanned<Extends<'a>>),
-    Include(Spanned<Include<'a>>),
     AutoEscape(Spanned<AutoEscape<'a>>),
     FilterBlock(Spanned<FilterBlock<'a>>),
-    Macro(Spanned<Macro<'a>>),
+    #[cfg(feature = "multi-template")]
     Import(Spanned<Import<'a>>),
+    #[cfg(feature = "multi-template")]
     FromImport(Spanned<FromImport<'a>>),
+    #[cfg(feature = "multi-template")]
+    Extends(Spanned<Extends<'a>>),
+    #[cfg(feature = "multi-template")]
+    Include(Spanned<Include<'a>>),
+    #[cfg(feature = "macros")]
+    Macro(Spanned<Macro<'a>>),
 }
 
 #[cfg(feature = "internal_debug")]
@@ -82,13 +87,18 @@ impl<'a> fmt::Debug for Stmt<'a> {
             Stmt::Set(s) => fmt::Debug::fmt(s, f),
             Stmt::SetBlock(s) => fmt::Debug::fmt(s, f),
             Stmt::Block(s) => fmt::Debug::fmt(s, f),
-            Stmt::Extends(s) => fmt::Debug::fmt(s, f),
-            Stmt::Include(s) => fmt::Debug::fmt(s, f),
             Stmt::AutoEscape(s) => fmt::Debug::fmt(s, f),
             Stmt::FilterBlock(s) => fmt::Debug::fmt(s, f),
-            Stmt::Macro(s) => fmt::Debug::fmt(s, f),
+            #[cfg(feature = "multi-template")]
+            Stmt::Extends(s) => fmt::Debug::fmt(s, f),
+            #[cfg(feature = "multi-template")]
+            Stmt::Include(s) => fmt::Debug::fmt(s, f),
+            #[cfg(feature = "multi-template")]
             Stmt::Import(s) => fmt::Debug::fmt(s, f),
+            #[cfg(feature = "multi-template")]
             Stmt::FromImport(s) => fmt::Debug::fmt(s, f),
+            #[cfg(feature = "macros")]
+            Stmt::Macro(s) => fmt::Debug::fmt(s, f),
         }
     }
 }
@@ -190,12 +200,14 @@ pub struct Block<'a> {
 
 /// An extends block.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg(feature = "multi-template")]
 pub struct Extends<'a> {
     pub name: Expr<'a>,
 }
 
 /// An include block.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg(feature = "multi-template")]
 pub struct Include<'a> {
     pub name: Expr<'a>,
     pub ignore_missing: bool,
@@ -217,6 +229,7 @@ pub struct FilterBlock<'a> {
 
 /// Declares a macro.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg(feature = "macros")]
 pub struct Macro<'a> {
     pub name: &'a str,
     pub args: Vec<Expr<'a>>,
@@ -226,6 +239,7 @@ pub struct Macro<'a> {
 
 /// A "from" import
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg(feature = "multi-template")]
 pub struct FromImport<'a> {
     pub expr: Expr<'a>,
     pub names: Vec<(Expr<'a>, Option<Expr<'a>>)>,
@@ -233,6 +247,7 @@ pub struct FromImport<'a> {
 
 /// A full module import
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg(feature = "multi-template")]
 pub struct Import<'a> {
     pub expr: Expr<'a>,
     pub name: Expr<'a>,
@@ -425,7 +440,10 @@ impl<'a> Map<'a> {
         for (key, value) in self.keys.iter().zip(self.values.iter()) {
             if let (Expr::Const(maybe_key), Expr::Const(value)) = (key, value) {
                 rv.insert(
-                    maybe_key.value.clone().try_into_key().ok()?,
+                    match maybe_key.value.clone().try_into_key() {
+                        Ok(key) => key,
+                        Err(_) => return None,
+                    },
                     value.value.clone(),
                 );
             }

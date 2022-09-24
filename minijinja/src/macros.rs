@@ -1,6 +1,28 @@
 #[cfg(test)]
 use similar_asserts::assert_eq;
 
+// `ok!` and `some!` are less bloaty alternatives to the standard library's try operator (`?`).
+// Since we do not need type conversions in this crate we can fall back to much easier match
+// patterns that compile faster and produce less bloaty code.
+
+macro_rules! ok {
+    ($expr:expr) => {
+        match $expr {
+            Ok(val) => val,
+            Err(err) => return Err(err),
+        }
+    };
+}
+
+macro_rules! some {
+    ($expr:expr) => {
+        match $expr {
+            Some(val) => val,
+            None => return None,
+        }
+    };
+}
+
 /// Hidden utility module for the [`context!`](crate::context!) macro.
 #[doc(hidden)]
 pub mod __context {

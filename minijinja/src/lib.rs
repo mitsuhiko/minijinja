@@ -120,32 +120,36 @@
 //!
 //! <details><summary><strong style="cursor: pointer">Configurable Features</strong></summary>
 //!
+//! To cut down on size of the engine some default functionality can be removed:
+//!
+//! - **Engine Features:**
+//!
+//!   - `builtins`: if this feature is removed the default filters, tests and
+//!     functions are not implemented.
+//!   - `macros`: when removed the `{% macro %}` tag is not included.
+//!   - `multi-template`: when removed the templates related to imports and extends
+//!     are removed (`{% from %}`, `{% import %}`, `{% include %}`, and `{% extends %}`).
+//!
+//! - **Rust Functionality:**
+//!
+//!   - `debug`: if this feature is removed some debug functionality of the engine is
+//!     removed as well.  This mainly affects the quality of error reporting.
+//!   - `key_interning`: if this feature is removed the automatic string interning in
+//!     the value type is disabled.  The default behavior can cut down on the memory
+//!     consumption of the value type by interning all string keys used in values.
+//!   - `deserialization`: when removed this disables deserialization support for
+//!     the [`Value`](crate::value::Value) type.
+//!
 //! There are some additional features that can be enabled:
 //!
 //! - `source`: enables the `Source` type which helps with dynamic loading of templates.
-//! - `v_htmlescape`: enables the `v_htmlescape` dependency which implements a faster HTML
-//!   escaping algorithm.
-//! - `speedups`: enables all speedups (currently `v_htmlescape`)
-//! - `unstable_machinery`: provides access to the internal machinery of the engine.  This
-//!   is a forever unstable API which mainly exists to aid debugging complex issues.
+//! - `speedups`: enables all speedups, in particular it turns on the `v_htmlescape` dependency
+//!   for faster HTML escapling.
 //! - `json`: When enabled the `tojson` filter is added as builtin filter as well as
 //!   the ability to auto escape via `AutoEscape::Json`.
 //! - `urlencode`: When enabled the `urlencode` filter is added as builtin filter.
 //! - `preserve_order`: When enable the internal value implementation uses an indexmap
 //!   which preserves the original order of maps and structs.
-//!
-//! Additionally to cut down on size of the engine some default
-//! functionality can be removed:
-//!
-//! - `builtins`: if this feature is removed the default filters, tests and
-//!   functions are not implemented.
-//! - `debug`: if this feature is removed some debug functionality of the engine is
-//!   removed as well.  This mainly affects the quality of error reporting.
-//! - `key_interning`: if this feature is removed the automatic string interning in
-//!   the value type is disabled.  The default behavior can cut down on the memory
-//!   consumption of the value type by interning all string keys used in values.
-//! - `deserialization`: when removed this disables deserialization support for
-//!   the [`Value`](crate::value::Value) type.
 //!
 //! </details>
 #![allow(clippy::cognitive_complexity)]
@@ -153,14 +157,16 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 #![doc(html_logo_url = "https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo-square.png")]
-mod key;
+
+#[macro_use]
+mod macros;
 
 mod compiler;
 mod defaults;
 mod environment;
 mod error;
 mod expression;
-mod macros;
+mod key;
 mod output;
 mod template;
 mod utils;

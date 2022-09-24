@@ -200,7 +200,7 @@ impl BoxedFilter {
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFilter(Arc::new(move |state, args| -> Result<Value, Error> {
-            f.apply_to(Args::from_values(Some(state), args)?, SealedMarker)
+            f.apply_to(ok!(Args::from_values(Some(state), args)), SealedMarker)
                 .into_result()
         }))
     }
@@ -241,7 +241,7 @@ pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
     };
     let mut rv = String::new();
     let mut out = Output::with_string(&mut rv);
-    write_escaped(&mut out, auto_escape, &v)?;
+    ok!(write_escaped(&mut out, auto_escape, &v));
     Ok(Value::from_safe_string(rv))
 }
 
@@ -406,7 +406,7 @@ mod builtins {
             Ok(Value::from(s.chars().rev().collect::<String>()))
         } else if matches!(v.kind(), ValueKind::Seq) {
             Ok(Value::from(
-                v.as_slice()?.iter().rev().cloned().collect::<Vec<_>>(),
+                ok!(v.as_slice()).iter().rev().cloned().collect::<Vec<_>>(),
             ))
         } else {
             Err(Error::new(
@@ -448,7 +448,7 @@ mod builtins {
             Ok(rv)
         } else if matches!(val.kind(), ValueKind::Seq) {
             let mut rv = String::new();
-            for item in val.as_slice()? {
+            for item in ok!(val.as_slice()) {
                 if !rv.is_empty() {
                     rv.push_str(joiner);
                 }
@@ -635,7 +635,7 @@ mod builtins {
     /// last iteration.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn slice(value: Value, count: usize, fill_with: Option<Value>) -> Result<Value, Error> {
-        let items = value.try_iter()?.collect::<Vec<_>>();
+        let items = ok!(value.try_iter()).collect::<Vec<_>>();
         let len = items.len();
         let items_per_slice = len / count;
         let slices_with_extra = len % count;
@@ -687,7 +687,7 @@ mod builtins {
         let mut rv = Vec::new();
         let mut tmp = Vec::with_capacity(count);
 
-        for item in value.try_iter()? {
+        for item in ok!(value.try_iter()) {
             if tmp.len() == count {
                 rv.push(Value::from(mem::replace(
                     &mut tmp,

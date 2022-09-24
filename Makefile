@@ -1,5 +1,5 @@
 DOC_FEATURES=source,json,urlencode
-TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug
+TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug,macros,multi-template
 
 all: test
 
@@ -32,6 +32,10 @@ check:
 	@cd minijinja; cargo check --no-default-features
 	@echo "check all features:"
 	@cd minijinja; cargo check --all-features
+	@echo "check macro only:"
+	@cd minijinja; cargo check --no-default-features --features macros
+	@echo "check multi-template only:"
+	@cd minijinja; cargo check --no-default-features --features multi-template
 
 format:
 	@rustup component add rustfmt 2> /dev/null

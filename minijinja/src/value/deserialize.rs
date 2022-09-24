@@ -84,7 +84,7 @@ impl<'de> Visitor<'de> for ValueVisitor {
         A: SeqAccess<'de>,
     {
         let mut rv = Vec::<Value>::new();
-        while let Some(e) = visitor.next_element()? {
+        while let Some(e) = ok!(visitor.next_element()) {
             rv.push(e);
         }
         Ok(Value::from(rv))
@@ -95,7 +95,7 @@ impl<'de> Visitor<'de> for ValueVisitor {
         A: MapAccess<'de>,
     {
         let mut rv = ValueMap::default();
-        while let Some((k, v)) = map.next_entry()? {
+        while let Some((k, v)) = ok!(map.next_entry()) {
             rv.insert(k, v);
         }
         Ok(Value(ValueRepr::Map(rv.into(), MapType::Normal)))
