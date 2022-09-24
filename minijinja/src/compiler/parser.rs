@@ -36,45 +36,41 @@ fn make_const(value: Value, span: Span) -> ast::Expr<'static> {
 
 macro_rules! expect_token {
     ($parser:expr, $expectation:expr) => {{
-        match $parser.stream.next() {
-            Ok(Some(rv)) => Ok(rv),
-            Ok(None) => Err(unexpected_eof($expectation)),
-            Err(err) => Err(err),
+        match ok!($parser.stream.next()) {
+            Some(rv) => rv,
+            None => return Err(unexpected_eof($expectation)),
         }
     }};
     ($parser:expr, $match:pat, $expectation:expr) => {{
-        match $parser.stream.next() {
-            Ok(Some((token, span))) if matches!(token, $match) => Ok((token, span)),
-            Ok(Some((token, _))) => Err(unexpected(token, $expectation)),
-            Ok(None) => Err(unexpected_eof($expectation)),
-            Err(err) => Err(err),
+        match ok!($parser.stream.next()) {
+            Some((token, span)) if matches!(token, $match) => (token, span),
+            Some((token, _)) => return Err(unexpected(token, $expectation)),
+            None => return Err(unexpected_eof($expectation)),
         }
     }};
     ($parser:expr, $match:pat => $target:expr, $expectation:expr) => {{
-        match $parser.stream.next() {
-            Ok(Some(($match, span))) => Ok(($target, span)),
-            Ok(Some((token, _))) => Err(unexpected(token, $expectation)),
-            Ok(None) => Err(unexpected_eof($expectation)),
-            Err(err) => Err(err),
+        match ok!($parser.stream.next()) {
+            Some(($match, span)) => ($target, span),
+            Some((token, _)) => return Err(unexpected(token, $expectation)),
+            None => return Err(unexpected_eof($expectation)),
         }
     }};
 }
 
 macro_rules! matches_token {
     ($p:expr, $match:pat) => {
-        $p.stream.current().map(|x| matches!(x, Some(($match, _))))
+        matches!(ok!($p.stream.current()), Some(($match, _)))
     };
 }
 
 macro_rules! skip_token {
     ($p:expr, $match:pat) => {
-        matches_token!($p, $match).and_then(|matched| {
-            if matched {
-                $p.stream.next().map(|_| true)
-            } else {
-                Ok(false)
-            }
-        })
+        if matches_token!($p, $match) {
+            ok!($p.stream.next());
+            true
+        } else {
+            false
+        }
     };
 }
 
@@ -207,9 +203,9 @@ impl<'a> Parser<'a> {
         let mut span = self.stream.last_span();
         let mut expr = ok!(self.parse_or());
         loop {
-            if ok!(skip_token!(self, Token::Ident("if"))) {
+            if skip_token!(self, Token::Ident("if")) {
                 let expr2 = ok!(self.parse_or());
-                let expr3 = if ok!(skip_token!(self, Token::Ident("else"))) {
+                let expr3 = if skip_token!(self, Token::Ident("else")) {
                     Some(ok!(self.parse_ifexpr()))
                 } else {
                     None
@@ -255,7 +251,7 @@ impl<'a> Parser<'a> {
                 Some((Token::Ident("in"), _)) => ast::BinOpKind::In,
                 Some((Token::Ident("not"), _)) => {
                     ok!(self.stream.next());
-                    ok!(expect_token!(self, Token::Ident("in"), "in"));
+                    expect_token!(self, Token::Ident("in"), "in");
                     negated = true;
                     ast::BinOpKind::In
                 }
@@ -324,8 +320,7 @@ impl<'a> Parser<'a> {
             match ok!(self.stream.current()) {
                 Some((Token::Dot, _)) => {
                     ok!(self.stream.next());
-                    let (name, _) =
-                        ok!(expect_token!(self, Token::Ident(name) => name, "identifier"));
+                    let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier");
                     expr = ast::Expr::GetAttr(Spanned::new(
                         ast::GetAttr { name, expr },
                         self.stream.expand_span(span),
@@ -339,21 +334,21 @@ impl<'a> Parser<'a> {
                     let mut step = None;
                     let mut is_slice = false;
 
-                    if !ok!(matches_token!(self, Token::Colon)) {
+                    if !matches_token!(self, Token::Colon) {
                         start = Some(ok!(self.parse_expr()));
                     }
-                    if ok!(skip_token!(self, Token::Colon)) {
+                    if skip_token!(self, Token::Colon) {
                         is_slice = true;
-                        if !ok!(matches_token!(self, Token::BracketClose | Token::Colon)) {
+                        if !matches_token!(self, Token::BracketClose | Token::Colon) {
                             stop = Some(ok!(self.parse_expr()));
                         }
-                        if ok!(skip_token!(self, Token::Colon))
-                            && !ok!(matches_token!(self, Token::BracketClose))
+                        if skip_token!(self, Token::Colon)
+                            && !matches_token!(self, Token::BracketClose)
                         {
                             step = Some(ok!(self.parse_expr()));
                         }
                     }
-                    ok!(expect_token!(self, Token::BracketClose, "`]`"));
+                    expect_token!(self, Token::BracketClose, "`]`");
 
                     if !is_slice {
                         expr = ast::Expr::GetItem(Spanned::new(
@@ -398,8 +393,8 @@ impl<'a> Parser<'a> {
                 Some((Token::Pipe, _)) => {
                     ok!(self.stream.next());
                     let (name, span) =
-                        ok!(expect_token!(self, Token::Ident(name) => name, "identifier"));
-                    let args = if ok!(matches_token!(self, Token::ParenOpen)) {
+                        expect_token!(self, Token::Ident(name) => name, "identifier");
+                    let args = if matches_token!(self, Token::ParenOpen) {
                         ok!(self.parse_args())
                     } else {
                         Vec::new()
@@ -415,10 +410,10 @@ impl<'a> Parser<'a> {
                 }
                 Some((Token::Ident("is"), _)) => {
                     ok!(self.stream.next());
-                    let negated = ok!(skip_token!(self, Token::Ident("not")));
+                    let negated = skip_token!(self, Token::Ident("not"));
                     let (name, span) =
-                        ok!(expect_token!(self, Token::Ident(name) => name, "identifier"));
-                    let args = if ok!(matches_token!(self, Token::ParenOpen)) {
+                        expect_token!(self, Token::Ident(name) => name, "identifier");
+                    let args = if matches_token!(self, Token::ParenOpen) {
                         ok!(self.parse_args())
                     } else {
                         Vec::new()
@@ -448,22 +443,22 @@ impl<'a> Parser<'a> {
         let mut first_span = None;
         let mut kwargs = Vec::new();
 
-        ok!(expect_token!(self, Token::ParenOpen, "`(`"));
+        expect_token!(self, Token::ParenOpen, "`(`");
         loop {
-            if ok!(matches_token!(self, Token::ParenClose)) {
+            if matches_token!(self, Token::ParenClose) {
                 break;
             }
             if !args.is_empty() || !kwargs.is_empty() {
-                ok!(expect_token!(self, Token::Comma, "`,`"));
+                expect_token!(self, Token::Comma, "`,`");
             }
-            if ok!(matches_token!(self, Token::ParenClose)) {
+            if matches_token!(self, Token::ParenClose) {
                 break;
             }
             let expr = ok!(self.parse_expr());
 
             // keyword argument
             match expr {
-                ast::Expr::Var(ref var) if ok!(skip_token!(self, Token::Assign)) => {
+                ast::Expr::Var(ref var) if skip_token!(self, Token::Assign) => {
                     if first_span.is_none() {
                         first_span = Some(var.span());
                     }
@@ -488,12 +483,12 @@ impl<'a> Parser<'a> {
             )));
         };
 
-        ok!(expect_token!(self, Token::ParenClose, "`)`"));
+        expect_token!(self, Token::ParenClose, "`)`");
         Ok(args)
     }
 
     fn parse_primary(&mut self) -> Result<ast::Expr<'a>, Error> {
-        let (token, span) = ok!(expect_token!(self, "expression"));
+        let (token, span) = expect_token!(self, "expression");
         macro_rules! const_val {
             ($expr:expr) => {
                 make_const(Value::from($expr), span)
@@ -518,15 +513,15 @@ impl<'a> Parser<'a> {
     fn parse_list_expr(&mut self, span: Span) -> Result<ast::Expr<'a>, Error> {
         let mut items = Vec::new();
         loop {
-            if ok!(matches_token!(self, Token::BracketClose)) {
+            if matches_token!(self, Token::BracketClose) {
                 break;
             }
             if !items.is_empty() {
-                ok!(expect_token!(self, Token::Comma, "`,`"));
+                expect_token!(self, Token::Comma, "`,`");
             }
             items.push(ok!(self.parse_expr()));
         }
-        ok!(expect_token!(self, Token::BracketClose, "`]`"));
+        expect_token!(self, Token::BracketClose, "`]`");
         Ok(ast::Expr::List(Spanned::new(
             ast::List { items },
             self.stream.expand_span(span),
@@ -537,17 +532,17 @@ impl<'a> Parser<'a> {
         let mut keys = Vec::new();
         let mut values = Vec::new();
         loop {
-            if ok!(matches_token!(self, Token::BraceClose)) {
+            if matches_token!(self, Token::BraceClose) {
                 break;
             }
             if !keys.is_empty() {
-                ok!(expect_token!(self, Token::Comma, "`,`"));
+                expect_token!(self, Token::Comma, "`,`");
             }
             keys.push(ok!(self.parse_expr()));
-            ok!(expect_token!(self, Token::Colon, "`:`"));
+            expect_token!(self, Token::Colon, "`:`");
             values.push(ok!(self.parse_expr()));
         }
-        ok!(expect_token!(self, Token::BraceClose, "`]`"));
+        expect_token!(self, Token::BraceClose, "`]`");
         Ok(ast::Expr::Map(Spanned::new(
             ast::Map { keys, values },
             self.stream.expand_span(span),
@@ -557,21 +552,21 @@ impl<'a> Parser<'a> {
     fn parse_tuple_or_expression(&mut self, span: Span) -> Result<ast::Expr<'a>, Error> {
         // MiniJinja does not really have tuples, but it treats the tuple
         // syntax the same as lists.
-        if ok!(skip_token!(self, Token::ParenClose)) {
+        if skip_token!(self, Token::ParenClose) {
             return Ok(ast::Expr::List(Spanned::new(
                 ast::List { items: vec![] },
                 self.stream.expand_span(span),
             )));
         }
         let mut expr = ok!(self.parse_expr());
-        if ok!(matches_token!(self, Token::Comma)) {
+        if matches_token!(self, Token::Comma) {
             let mut items = vec![expr];
             loop {
-                if ok!(matches_token!(self, Token::ParenClose)) {
+                if matches_token!(self, Token::ParenClose) {
                     break;
                 }
-                ok!(expect_token!(self, Token::Comma, "`,`"));
-                if ok!(matches_token!(self, Token::ParenClose)) {
+                expect_token!(self, Token::Comma, "`,`");
+                if matches_token!(self, Token::ParenClose) {
                     break;
                 }
                 items.push(ok!(self.parse_expr()));
@@ -581,7 +576,7 @@ impl<'a> Parser<'a> {
                 self.stream.expand_span(span),
             ));
         }
-        ok!(expect_token!(self, Token::ParenClose, "`)`"));
+        expect_token!(self, Token::ParenClose, "`)`");
         Ok(expr)
     }
 
@@ -594,7 +589,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_stmt(&mut self) -> Result<ast::Stmt<'a>, Error> {
-        let (token, span) = ok!(expect_token!(self, "block keyword"));
+        let (token, span) = expect_token!(self, "block keyword");
 
         macro_rules! respan {
             ($expr:expr) => {
@@ -633,7 +628,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_assign_name(&mut self) -> Result<ast::Expr<'a>, Error> {
-        let (id, span) = ok!(expect_token!(self, Token::Ident(name) => name, "identifier"));
+        let (id, span) = expect_token!(self, Token::Ident(name) => name, "identifier");
         if RESERVED_NAMES.contains(&id) {
             syntax_error!("cannot assign to reserved variable name {}", id);
         }
@@ -647,25 +642,25 @@ impl<'a> Parser<'a> {
 
         loop {
             if !items.is_empty() {
-                ok!(expect_token!(self, Token::Comma, "`,`"));
+                expect_token!(self, Token::Comma, "`,`");
             }
-            if ok!(matches_token!(
+            if matches_token!(
                 self,
                 Token::ParenClose
                     | Token::VariableEnd(..)
                     | Token::BlockEnd(..)
                     | Token::Ident("in")
-            )) {
+            ) {
                 break;
             }
-            items.push(if ok!(skip_token!(self, Token::ParenOpen)) {
+            items.push(if skip_token!(self, Token::ParenOpen) {
                 let rv = ok!(self.parse_assignment());
-                ok!(expect_token!(self, Token::ParenClose, "`)`"));
+                expect_token!(self, Token::ParenClose, "`)`");
                 rv
             } else {
                 ok!(self.parse_assign_name())
             });
-            if ok!(matches_token!(self, Token::Comma)) {
+            if matches_token!(self, Token::Comma) {
                 is_tuple = true;
             } else {
                 break;
@@ -684,18 +679,18 @@ impl<'a> Parser<'a> {
 
     fn parse_for_stmt(&mut self) -> Result<ast::ForLoop<'a>, Error> {
         let target = ok!(self.parse_assignment());
-        ok!(expect_token!(self, Token::Ident("in"), "in"));
+        expect_token!(self, Token::Ident("in"), "in");
         let iter = ok!(self.parse_expr_noif());
-        let filter_expr = if ok!(skip_token!(self, Token::Ident("if"))) {
+        let filter_expr = if skip_token!(self, Token::Ident("if")) {
             Some(ok!(self.parse_expr()))
         } else {
             None
         };
-        let recursive = ok!(skip_token!(self, Token::Ident("recursive")));
-        ok!(expect_token!(self, Token::BlockEnd(..), "end of block"));
+        let recursive = skip_token!(self, Token::Ident("recursive"));
+        expect_token!(self, Token::BlockEnd(..), "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endfor" | "else"))));
-        let else_body = if ok!(skip_token!(self, Token::Ident("else"))) {
-            ok!(expect_token!(self, Token::BlockEnd(..), "end of block"));
+        let else_body = if skip_token!(self, Token::Ident("else")) {
+            expect_token!(self, Token::BlockEnd(..), "end of block");
             ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endfor"))))
         } else {
             Vec::new()
@@ -713,12 +708,12 @@ impl<'a> Parser<'a> {
 
     fn parse_if_cond(&mut self) -> Result<ast::IfCond<'a>, Error> {
         let expr = ok!(self.parse_expr_noif());
-        ok!(expect_token!(self, Token::BlockEnd(..), "end of block"));
+        expect_token!(self, Token::BlockEnd(..), "end of block");
         let true_body =
             ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endif" | "else" | "elif"))));
         let false_body = match ok!(self.stream.next()) {
             Some((Token::Ident("else"), _)) => {
-                ok!(expect_token!(self, Token::BlockEnd(..), "end of block"));
+                expect_token!(self, Token::BlockEnd(..), "end of block");
                 let rv = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endif"))));
                 ok!(self.stream.next());
                 rv
@@ -740,44 +735,44 @@ impl<'a> Parser<'a> {
     fn parse_with_block(&mut self) -> Result<ast::WithBlock<'a>, Error> {
         let mut assignments = Vec::new();
 
-        while !ok!(matches_token!(self, Token::BlockEnd(_))) {
+        while !matches_token!(self, Token::BlockEnd(_)) {
             if !assignments.is_empty() {
-                ok!(expect_token!(self, Token::Comma, "comma"));
+                expect_token!(self, Token::Comma, "comma");
             }
-            let target = if ok!(skip_token!(self, Token::ParenOpen)) {
+            let target = if skip_token!(self, Token::ParenOpen) {
                 let assign = ok!(self.parse_assignment());
-                ok!(expect_token!(self, Token::ParenClose, "`)`"));
+                expect_token!(self, Token::ParenClose, "`)`");
                 assign
             } else {
                 ok!(self.parse_assign_name())
             };
-            ok!(expect_token!(self, Token::Assign, "assignment operator"));
+            expect_token!(self, Token::Assign, "assignment operator");
             let expr = ok!(self.parse_expr());
             assignments.push((target, expr));
         }
 
-        ok!(expect_token!(self, Token::BlockEnd(..), "end of block"));
+        expect_token!(self, Token::BlockEnd(..), "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endwith"))));
         ok!(self.stream.next());
         Ok(ast::WithBlock { assignments, body })
     }
 
     fn parse_set(&mut self) -> Result<SetParseResult<'a>, Error> {
-        let (target, in_paren) = if ok!(skip_token!(self, Token::ParenOpen)) {
+        let (target, in_paren) = if skip_token!(self, Token::ParenOpen) {
             let assign = ok!(self.parse_assignment());
-            ok!(expect_token!(self, Token::ParenClose, "`)`"));
+            expect_token!(self, Token::ParenClose, "`)`");
             (assign, true)
         } else {
             (ok!(self.parse_assign_name()), false)
         };
 
-        if !in_paren && ok!(matches_token!(self, Token::BlockEnd(..) | Token::Pipe)) {
-            let filter = if ok!(skip_token!(self, Token::Pipe)) {
+        if !in_paren && matches_token!(self, Token::BlockEnd(..) | Token::Pipe) {
+            let filter = if skip_token!(self, Token::Pipe) {
                 Some(ok!(self.parse_filter_chain()))
             } else {
                 None
             };
-            ok!(expect_token!(self, Token::BlockEnd(..), "end of block"));
+            expect_token!(self, Token::BlockEnd(..), "end of block");
             let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endset"))));
             ok!(self.stream.next());
             Ok(SetParseResult::SetBlock(ast::SetBlock {
@@ -786,7 +781,7 @@ impl<'a> Parser<'a> {
                 body,
             }))
         } else {
-            ok!(expect_token!(self, Token::Assign, "assignment operator"));
+            expect_token!(self, Token::Assign, "assignment operator");
             let expr = ok!(self.parse_expr());
             Ok(SetParseResult::Set(ast::Set { target, expr }))
         }
@@ -796,8 +791,8 @@ impl<'a> Parser<'a> {
         if self.in_macro {
             syntax_error!("block tags in macros are not allowed");
         }
-        let (name, _) = ok!(expect_token!(self, Token::Ident(name) => name, "identifier"));
-        ok!(expect_token!(self, Token::BlockEnd(..), "end of block"));
+        let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier");
+        expect_token!(self, Token::BlockEnd(..), "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endblock"))));
         ok!(self.stream.next());
 
@@ -816,7 +811,7 @@ impl<'a> Parser<'a> {
     }
     fn parse_auto_escape(&mut self) -> Result<ast::AutoEscape<'a>, Error> {
         let enabled = ok!(self.parse_expr());
-        ok!(expect_token!(self, Token::BlockEnd(..), "end of block"));
+        expect_token!(self, Token::BlockEnd(..), "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endautoescape"))));
         ok!(self.stream.next());
         Ok(ast::AutoEscape { enabled, body })
@@ -825,12 +820,12 @@ impl<'a> Parser<'a> {
     fn parse_filter_chain(&mut self) -> Result<ast::Expr<'a>, Error> {
         let mut filter = None;
 
-        while !ok!(matches_token!(self, Token::BlockEnd(..))) {
+        while !matches_token!(self, Token::BlockEnd(..)) {
             if filter.is_some() {
-                ok!(expect_token!(self, Token::Pipe, "`|`"));
+                expect_token!(self, Token::Pipe, "`|`");
             }
-            let (name, span) = ok!(expect_token!(self, Token::Ident(name) => name, "identifier"));
-            let args = if ok!(matches_token!(self, Token::ParenOpen)) {
+            let (name, span) = expect_token!(self, Token::Ident(name) => name, "identifier");
+            let args = if matches_token!(self, Token::ParenOpen) {
                 ok!(self.parse_args())
             } else {
                 Vec::new()
@@ -850,7 +845,7 @@ impl<'a> Parser<'a> {
 
     fn parse_filter_block(&mut self) -> Result<ast::FilterBlock<'a>, Error> {
         let filter = ok!(self.parse_filter_chain());
-        ok!(expect_token!(self, Token::BlockEnd(..), "end of block"));
+        expect_token!(self, Token::BlockEnd(..), "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endfilter"))));
         ok!(self.stream.next());
         Ok(ast::FilterBlock { filter, body })
@@ -865,12 +860,8 @@ impl<'a> Parser<'a> {
     #[cfg(feature = "multi-template")]
     fn parse_include(&mut self) -> Result<ast::Include<'a>, Error> {
         let name = ok!(self.parse_expr());
-        let ignore_missing = if ok!(skip_token!(self, Token::Ident("ignore"))) {
-            ok!(expect_token!(
-                self,
-                Token::Ident("missing"),
-                "missing keyword"
-            ));
+        let ignore_missing = if skip_token!(self, Token::Ident("ignore")) {
+            expect_token!(self, Token::Ident("missing"), "missing keyword");
             true
         } else {
             false
@@ -884,7 +875,7 @@ impl<'a> Parser<'a> {
     #[cfg(feature = "multi-template")]
     fn parse_import(&mut self) -> Result<ast::Import<'a>, Error> {
         let expr = ok!(self.parse_expr());
-        ok!(expect_token!(self, Token::Ident("as"), "as"));
+        expect_token!(self, Token::Ident("as"), "as");
         let name = ok!(self.parse_expr());
         Ok(ast::Import { expr, name })
     }
@@ -893,19 +884,19 @@ impl<'a> Parser<'a> {
     fn parse_from_import(&mut self) -> Result<ast::FromImport<'a>, Error> {
         let expr = ok!(self.parse_expr());
         let mut names = Vec::new();
-        ok!(expect_token!(self, Token::Ident("import"), "import"));
+        expect_token!(self, Token::Ident("import"), "import");
         loop {
-            if ok!(matches_token!(self, Token::BlockEnd(_))) {
+            if matches_token!(self, Token::BlockEnd(_)) {
                 break;
             }
             if !names.is_empty() {
-                ok!(expect_token!(self, Token::Comma, "`,`"));
+                expect_token!(self, Token::Comma, "`,`");
             }
-            if ok!(matches_token!(self, Token::BlockEnd(_))) {
+            if matches_token!(self, Token::BlockEnd(_)) {
                 break;
             }
             let name = ok!(self.parse_assign_name());
-            let alias = if ok!(skip_token!(self, Token::Ident("as"))) {
+            let alias = if skip_token!(self, Token::Ident("as")) {
                 Some(ok!(self.parse_assign_name()))
             } else {
                 None
@@ -917,29 +908,29 @@ impl<'a> Parser<'a> {
 
     #[cfg(feature = "macros")]
     fn parse_macro(&mut self) -> Result<ast::Macro<'a>, Error> {
-        let (name, _) = ok!(expect_token!(self, Token::Ident(name) => name, "identifier"));
-        ok!(expect_token!(self, Token::ParenOpen, "`(`"));
+        let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier");
+        expect_token!(self, Token::ParenOpen, "`(`");
         let mut args = Vec::new();
         let mut defaults = Vec::new();
         loop {
-            if ok!(matches_token!(self, Token::ParenClose)) {
+            if matches_token!(self, Token::ParenClose) {
                 break;
             }
             if !args.is_empty() {
-                ok!(expect_token!(self, Token::Comma, "`,`"));
+                expect_token!(self, Token::Comma, "`,`");
             }
-            if ok!(matches_token!(self, Token::ParenClose)) {
+            if matches_token!(self, Token::ParenClose) {
                 break;
             }
             args.push(ok!(self.parse_assign_name()));
-            if ok!(skip_token!(self, Token::Assign)) {
+            if skip_token!(self, Token::Assign) {
                 defaults.push(ok!(self.parse_expr()));
             } else if !defaults.is_empty() {
-                ok!(expect_token!(self, Token::Assign, "`=`"));
+                expect_token!(self, Token::Assign, "`=`");
             }
         }
-        ok!(expect_token!(self, Token::ParenClose, "`)`"));
-        ok!(expect_token!(self, Token::BlockEnd(..), "end of block"));
+        expect_token!(self, Token::ParenClose, "`)`");
+        expect_token!(self, Token::BlockEnd(..), "end of block");
         let old_in_macro = std::mem::replace(&mut self.in_macro, true);
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endmacro"))));
         self.in_macro = old_in_macro;
@@ -968,11 +959,7 @@ impl<'a> Parser<'a> {
                         ast::EmitExpr { expr },
                         self.stream.expand_span(span),
                     )));
-                    ok!(expect_token!(
-                        self,
-                        Token::VariableEnd(..),
-                        "end of variable block"
-                    ));
+                    expect_token!(self, Token::VariableEnd(..), "end of variable block");
                 }
                 Token::BlockStart(_) => {
                     let (tok, _span) = match ok!(self.stream.current()) {
@@ -983,7 +970,7 @@ impl<'a> Parser<'a> {
                         return Ok(rv);
                     }
                     rv.push(ok!(self.parse_stmt()));
-                    ok!(expect_token!(self, Token::BlockEnd(..), "end of block"));
+                    expect_token!(self, Token::BlockEnd(..), "end of block");
                 }
                 _ => unreachable!("lexer produced garbage"),
             }
