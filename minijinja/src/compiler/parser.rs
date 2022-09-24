@@ -806,28 +806,6 @@ impl<'a> Parser<'a> {
 
         Ok(ast::Block { name, body })
     }
-
-    #[cfg(feature = "multi-template")]
-    fn parse_extends(&mut self) -> Result<ast::Extends<'a>, Error> {
-        let name = self.parse_expr()?;
-        Ok(ast::Extends { name })
-    }
-
-    #[cfg(feature = "multi-template")]
-    fn parse_include(&mut self) -> Result<ast::Include<'a>, Error> {
-        let name = self.parse_expr()?;
-        let ignore_missing = if skip_token!(self, Token::Ident("ignore"))? {
-            expect_token!(self, Token::Ident("missing"), "missing keyword")?;
-            true
-        } else {
-            false
-        };
-        Ok(ast::Include {
-            name,
-            ignore_missing,
-        })
-    }
-
     fn parse_auto_escape(&mut self) -> Result<ast::AutoEscape<'a>, Error> {
         let enabled = self.parse_expr()?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
@@ -870,40 +848,24 @@ impl<'a> Parser<'a> {
         Ok(ast::FilterBlock { filter, body })
     }
 
-    #[cfg(feature = "macros")]
-    fn parse_macro(&mut self) -> Result<ast::Macro<'a>, Error> {
-        let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
-        expect_token!(self, Token::ParenOpen, "`(`")?;
-        let mut args = Vec::new();
-        let mut defaults = Vec::new();
-        loop {
-            if matches_token!(self, Token::ParenClose)? {
-                break;
-            }
-            if !args.is_empty() {
-                expect_token!(self, Token::Comma, "`,`")?;
-            }
-            if matches_token!(self, Token::ParenClose)? {
-                break;
-            }
-            args.push(self.parse_assign_name()?);
-            if skip_token!(self, Token::Assign)? {
-                defaults.push(self.parse_expr()?);
-            } else if !defaults.is_empty() {
-                expect_token!(self, Token::Assign, "`=`")?;
-            }
-        }
-        expect_token!(self, Token::ParenClose, "`)`")?;
-        expect_token!(self, Token::BlockEnd(..), "end of block")?;
-        let old_in_macro = std::mem::replace(&mut self.in_macro, true);
-        let body = self.subparse(&|tok| matches!(tok, Token::Ident("endmacro")))?;
-        self.in_macro = old_in_macro;
-        self.stream.next()?;
-        Ok(ast::Macro {
+    #[cfg(feature = "multi-template")]
+    fn parse_extends(&mut self) -> Result<ast::Extends<'a>, Error> {
+        let name = self.parse_expr()?;
+        Ok(ast::Extends { name })
+    }
+
+    #[cfg(feature = "multi-template")]
+    fn parse_include(&mut self) -> Result<ast::Include<'a>, Error> {
+        let name = self.parse_expr()?;
+        let ignore_missing = if skip_token!(self, Token::Ident("ignore"))? {
+            expect_token!(self, Token::Ident("missing"), "missing keyword")?;
+            true
+        } else {
+            false
+        };
+        Ok(ast::Include {
             name,
-            args,
-            defaults,
-            body,
+            ignore_missing,
         })
     }
 
@@ -939,6 +901,43 @@ impl<'a> Parser<'a> {
             names.push((name, alias));
         }
         Ok(ast::FromImport { expr, names })
+    }
+
+    #[cfg(feature = "macros")]
+    fn parse_macro(&mut self) -> Result<ast::Macro<'a>, Error> {
+        let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
+        expect_token!(self, Token::ParenOpen, "`(`")?;
+        let mut args = Vec::new();
+        let mut defaults = Vec::new();
+        loop {
+            if matches_token!(self, Token::ParenClose)? {
+                break;
+            }
+            if !args.is_empty() {
+                expect_token!(self, Token::Comma, "`,`")?;
+            }
+            if matches_token!(self, Token::ParenClose)? {
+                break;
+            }
+            args.push(self.parse_assign_name()?);
+            if skip_token!(self, Token::Assign)? {
+                defaults.push(self.parse_expr()?);
+            } else if !defaults.is_empty() {
+                expect_token!(self, Token::Assign, "`=`")?;
+            }
+        }
+        expect_token!(self, Token::ParenClose, "`)`")?;
+        expect_token!(self, Token::BlockEnd(..), "end of block")?;
+        let old_in_macro = std::mem::replace(&mut self.in_macro, true);
+        let body = self.subparse(&|tok| matches!(tok, Token::Ident("endmacro")))?;
+        self.in_macro = old_in_macro;
+        self.stream.next()?;
+        Ok(ast::Macro {
+            name,
+            args,
+            defaults,
+            body,
+        })
     }
 
     fn subparse(

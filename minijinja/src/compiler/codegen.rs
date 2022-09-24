@@ -272,18 +272,6 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::Block(block) => {
                 self.compile_block(block)?;
             }
-            #[cfg(feature = "multi-template")]
-            ast::Stmt::Extends(extends) => {
-                self.set_line_from_span(extends.span());
-                self.compile_expr(&extends.name)?;
-                self.add(Instruction::LoadBlocks);
-            }
-            #[cfg(feature = "multi-template")]
-            ast::Stmt::Include(include) => {
-                self.set_line_from_span(include.span());
-                self.compile_expr(&include.name)?;
-                self.add_with_span(Instruction::Include(include.ignore_missing), include.span());
-            }
             ast::Stmt::AutoEscape(auto_escape) => {
                 self.set_line_from_span(auto_escape.span());
                 self.compile_expr(&auto_escape.enabled)?;
@@ -302,10 +290,6 @@ impl<'source> CodeGenerator<'source> {
                 self.add(Instruction::EndCapture);
                 self.compile_expr(&filter_block.filter)?;
                 self.add(Instruction::Emit);
-            }
-            #[cfg(feature = "macros")]
-            ast::Stmt::Macro(macro_decl) => {
-                self.compile_macro(macro_decl)?;
             }
             #[cfg(feature = "multi-template")]
             ast::Stmt::Import(import) => {
@@ -332,6 +316,22 @@ impl<'source> CodeGenerator<'source> {
                     self.compile_assignment(alias.as_ref().unwrap_or(name))?;
                 }
                 self.add(Instruction::EndCapture);
+            }
+            #[cfg(feature = "multi-template")]
+            ast::Stmt::Extends(extends) => {
+                self.set_line_from_span(extends.span());
+                self.compile_expr(&extends.name)?;
+                self.add(Instruction::LoadBlocks);
+            }
+            #[cfg(feature = "multi-template")]
+            ast::Stmt::Include(include) => {
+                self.set_line_from_span(include.span());
+                self.compile_expr(&include.name)?;
+                self.add_with_span(Instruction::Include(include.ignore_missing), include.span());
+            }
+            #[cfg(feature = "macros")]
+            ast::Stmt::Macro(macro_decl) => {
+                self.compile_macro(macro_decl)?;
             }
         }
         Ok(())

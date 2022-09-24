@@ -296,6 +296,8 @@
 //!
 //! ## `{% extends %}`
 //!
+//! **Feature:** `multi-template` (included by default)
+//!
 //! The `extends` tag can be used to extend one template from another.  You can have multiple
 //! `extends` tags in a file, but only one of them may be executed at a time.  For more
 //! information see [block](#-block-).
@@ -378,6 +380,8 @@
 //! However, the name after the `endblock` word must match the block name.
 //!
 //! ## `{% include #}`
+//!
+//! **Feature:** `multi-template` (included by default)
 //!  
 //! The `include` tag is useful to include a template and return the rendered contents of that file
 //! into the current namespace::
@@ -408,6 +412,8 @@
 //! Included templates have access to the variables of the active context.
 //!
 //! ## `{% import #}`
+//!
+//! **Feature:** `multi-template` (included by default)
 //!
 //! MiniJinja supports the `{% import %}` and `{% from ... import ... %}`
 //! syntax.  With it variables or macros can be included from other templates:
@@ -499,6 +505,8 @@
 //! ```
 //!
 //! ## `{% macro %}`
+//!
+//! **Feature:** `macros` (included by default)
 //!
 //! MiniJinja has limited support for macros.  They allow you to write reusable
 //! template functions.  hey are useful to put often used idioms into reusable
