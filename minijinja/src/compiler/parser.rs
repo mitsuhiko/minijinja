@@ -88,15 +88,16 @@ struct TokenStream<'a> {
 impl<'a> TokenStream<'a> {
     /// Tokenize a template
     pub fn new(source: &'a str, in_expr: bool) -> TokenStream<'a> {
+        let mut iter = Box::new(tokenize(source, in_expr)) as Box<dyn Iterator<Item = _>>;
+        let current = iter.next();
         TokenStream {
-            iter: (Box::new(tokenize(source, in_expr)) as Box<dyn Iterator<Item = _>>),
-            current: None,
+            iter,
+            current,
             last_span: Span::default(),
         }
     }
 
     /// Advance the stream.
-    #[inline(always)]
     pub fn next(&mut self) -> Result<Option<(Token<'a>, Span)>, Error> {
         let rv = self.current.take();
         self.current = self.iter.next();
@@ -107,11 +108,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Look at the current token
-    #[inline(always)]
     pub fn current(&mut self) -> Result<Option<(&Token<'a>, Span)>, Error> {
-        if self.current.is_none() {
-            ok!(self.next());
-        }
         match self.current {
             Some(Ok(ref tok)) => Ok(Some((&tok.0, tok.1))),
             Some(Err(_)) => Err(self.current.take().unwrap().unwrap_err()),
@@ -979,8 +976,6 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&mut self) -> Result<ast::Stmt<'a>, Error> {
-        // start the stream
-        ok!(self.stream.next());
         let span = self.stream.last_span();
         Ok(ast::Stmt::Template(Spanned::new(
             ast::Template {
