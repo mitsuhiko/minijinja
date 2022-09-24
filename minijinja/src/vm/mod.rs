@@ -14,13 +14,16 @@ use crate::utils::AutoEscape;
 use crate::value::{self, ops, MapType, Value, ValueMap, ValueRepr};
 use crate::vm::context::{Context, Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
-use crate::vm::macro_object::Macro;
 use crate::vm::state::BlockStack;
+
+#[cfg(feature = "macros")]
+use crate::vm::macro_object::Macro;
 
 pub use crate::vm::state::State;
 
 mod context;
 mod loop_object;
+#[cfg(feature = "macros")]
 mod macro_object;
 mod state;
 
@@ -80,6 +83,7 @@ impl<'env> Vm<'env> {
                     instructions,
                     auto_escape,
                     blocks: prepare_blocks(blocks),
+                    #[cfg(feature = "macros")]
                     macros: Arc::new(Vec::new()),
                 },
                 out,
@@ -89,6 +93,7 @@ impl<'env> Vm<'env> {
 
     /// Evaluate a macro in a state.
     #[inline(always)]
+    #[cfg(feature = "macros")]
     pub fn eval_macro(
         &self,
         instructions: &Instructions<'env>,
@@ -107,6 +112,7 @@ impl<'env> Vm<'env> {
                     instructions,
                     auto_escape: state.auto_escape(),
                     blocks: BTreeMap::default(),
+                    #[cfg(feature = "macros")]
                     macros: state.macros.clone(),
                 },
                 out,
@@ -308,6 +314,7 @@ impl<'env> Vm<'env> {
                         }
                     }
                 }
+                #[cfg(feature = "macros")]
                 Instruction::IsUndefined => {
                     let value = stack.pop();
                     stack.push(Value::from(value.is_undefined()));
@@ -493,6 +500,7 @@ impl<'env> Vm<'env> {
                 Instruction::FastRecurse => {
                     recurse_loop!(false);
                 }
+                #[cfg(feature = "macros")]
                 Instruction::BuildMacro(name, offset) => {
                     self.build_macro(&mut stack, state, offset, name);
                 }
@@ -504,6 +512,7 @@ impl<'env> Vm<'env> {
                     }
                     stack.push(Value(ValueRepr::Map(module.into(), MapType::Normal)));
                 }
+                #[cfg(feature = "macros")]
                 Instruction::Return => break,
             }
             pc += 1;
@@ -733,6 +742,7 @@ impl<'env> Vm<'env> {
         Ok(())
     }
 
+    #[cfg(feature = "macros")]
     fn build_macro(&self, stack: &mut Stack, state: &mut State, offset: &usize, name: &&str) {
         let arg_spec = match stack.pop().0 {
             ValueRepr::Seq(args) => args

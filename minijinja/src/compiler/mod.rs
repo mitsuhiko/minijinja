@@ -4,6 +4,7 @@ pub mod ast;
 pub mod codegen;
 pub mod instructions;
 pub mod lexer;
+#[cfg(feature = "macros")]
 pub mod meta;
 pub mod parser;
 pub mod tokens;

@@ -64,6 +64,7 @@ pub enum Stmt<'a> {
     Include(Spanned<Include<'a>>),
     AutoEscape(Spanned<AutoEscape<'a>>),
     FilterBlock(Spanned<FilterBlock<'a>>),
+    #[cfg(feature = "macros")]
     Macro(Spanned<Macro<'a>>),
     Import(Spanned<Import<'a>>),
     FromImport(Spanned<FromImport<'a>>),
@@ -86,6 +87,7 @@ impl<'a> fmt::Debug for Stmt<'a> {
             Stmt::Include(s) => fmt::Debug::fmt(s, f),
             Stmt::AutoEscape(s) => fmt::Debug::fmt(s, f),
             Stmt::FilterBlock(s) => fmt::Debug::fmt(s, f),
+            #[cfg(feature = "macros")]
             Stmt::Macro(s) => fmt::Debug::fmt(s, f),
             Stmt::Import(s) => fmt::Debug::fmt(s, f),
             Stmt::FromImport(s) => fmt::Debug::fmt(s, f),
@@ -217,6 +219,7 @@ pub struct FilterBlock<'a> {
 
 /// Declares a macro.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg(feature = "macros")]
 pub struct Macro<'a> {
     pub name: &'a str,
     pub args: Vec<Expr<'a>>,

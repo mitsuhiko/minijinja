@@ -1,4 +1,4 @@
-use std::{fmt, mem};
+use std::fmt;
 
 use crate::compiler::ast::{self, Spanned};
 use crate::compiler::lexer::tokenize;
@@ -611,6 +611,7 @@ impl<'a> Parser<'a> {
             Token::Ident("include") => ast::Stmt::Include(respan!(self.parse_include()?)),
             Token::Ident("autoescape") => ast::Stmt::AutoEscape(respan!(self.parse_auto_escape()?)),
             Token::Ident("filter") => ast::Stmt::FilterBlock(respan!(self.parse_filter_block()?)),
+            #[cfg(feature = "macros")]
             Token::Ident("macro") => ast::Stmt::Macro(respan!(self.parse_macro()?)),
             Token::Ident("import") => ast::Stmt::Import(respan!(self.parse_import()?)),
             Token::Ident("from") => ast::Stmt::FromImport(respan!(self.parse_from_import()?)),
@@ -863,6 +864,7 @@ impl<'a> Parser<'a> {
         Ok(ast::FilterBlock { filter, body })
     }
 
+    #[cfg(feature = "macros")]
     fn parse_macro(&mut self) -> Result<ast::Macro<'a>, Error> {
         let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier")?;
         expect_token!(self, Token::ParenOpen, "`(`")?;
@@ -887,7 +889,7 @@ impl<'a> Parser<'a> {
         }
         expect_token!(self, Token::ParenClose, "`)`")?;
         expect_token!(self, Token::BlockEnd(..), "end of block")?;
-        let old_in_macro = mem::replace(&mut self.in_macro, true);
+        let old_in_macro = std::mem::replace(&mut self.in_macro, true);
         let body = self.subparse(&|tok| matches!(tok, Token::Ident("endmacro")))?;
         self.in_macro = old_in_macro;
         self.stream.next()?;

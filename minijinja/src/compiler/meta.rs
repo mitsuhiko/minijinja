@@ -155,6 +155,7 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
                 stmt.body.iter().for_each(|x| walk(x, state));
                 state.pop();
             }
+            #[cfg(feature = "macros")]
             ast::Stmt::Macro(stmt) => {
                 state.assign(stmt.name);
             }

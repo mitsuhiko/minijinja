@@ -4,10 +4,9 @@ use crate::compiler::ast;
 use crate::compiler::instructions::{
     Instruction, Instructions, LocalId, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR, MAX_LOCALS,
 };
-use crate::compiler::meta::find_macro_closure;
 use crate::compiler::tokens::Span;
 use crate::error::Error;
-use crate::value::{Value, ValueRepr};
+use crate::value::Value;
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -302,6 +301,7 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_expr(&filter_block.filter)?;
                 self.add(Instruction::Emit);
             }
+            #[cfg(feature = "macros")]
             ast::Stmt::Macro(macro_decl) => {
                 self.compile_macro(macro_decl)?;
             }
@@ -345,10 +345,13 @@ impl<'source> CodeGenerator<'source> {
         Ok(())
     }
 
+    #[cfg(feature = "macros")]
     fn compile_macro(
         &mut self,
         macro_decl: &ast::Spanned<ast::Macro<'source>>,
     ) -> Result<(), Error> {
+        use crate::value::ValueRepr;
+
         self.set_line_from_span(macro_decl.span());
         let instr = self.add(Instruction::Jump(!0));
 
@@ -370,7 +373,7 @@ impl<'source> CodeGenerator<'source> {
         }
         self.add(Instruction::Return);
 
-        let undeclared = find_macro_closure(macro_decl);
+        let undeclared = crate::compiler::meta::find_macro_closure(macro_decl);
         let macro_instr = self.next_instruction();
         for name in &undeclared {
             self.add(Instruction::LoadConst(Value::from(*name)));

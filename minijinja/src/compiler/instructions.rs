@@ -140,9 +140,6 @@ pub enum Instruction<'source> {
     /// Pops the topmost frame
     PopFrame,
 
-    /// True if the value is undefined
-    IsUndefined,
-
     /// Jump to a specific instruction
     Jump(usize),
 
@@ -197,14 +194,20 @@ pub enum Instruction<'source> {
     /// A fast loop recurse instruction without intermediate capturing.
     FastRecurse,
 
-    /// Builds a macro on the stack.
-    BuildMacro(&'source str, usize),
-
     /// Builds a module
     ExportLocals,
 
+    /// Builds a macro on the stack.
+    #[cfg(feature = "macros")]
+    BuildMacro(&'source str, usize),
+
     /// Breaks from the interpreter loop (exists a function)
+    #[cfg(feature = "macros")]
     Return,
+
+    /// True if the value is undefined
+    #[cfg(feature = "macros")]
+    IsUndefined,
 }
 
 #[derive(Copy, Clone)]
