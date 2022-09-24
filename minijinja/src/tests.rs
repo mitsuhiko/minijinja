@@ -186,7 +186,7 @@ impl BoxedTest {
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedTest(Arc::new(move |state, args| -> Result<bool, Error> {
-            f.perform(Args::from_values(Some(state), args)?, SealedMarker)
+            f.perform(ok!(Args::from_values(Some(state), args)), SealedMarker)
                 .into_result()
         }))
     }

@@ -61,14 +61,13 @@ impl<'env, 'source> Expression<'env, 'source> {
     }
 
     fn _eval(&self, root: Value) -> Result<Value, Error> {
-        Ok(Vm::new(self.env)
-            .eval(
-                &self.instructions,
-                root,
-                &BTreeMap::new(),
-                &mut Output::null(),
-                crate::AutoEscape::None,
-            )?
-            .expect("expression evaluation did not leave value on stack"))
+        Ok(ok!(Vm::new(self.env).eval(
+            &self.instructions,
+            root,
+            &BTreeMap::new(),
+            &mut Output::null(),
+            crate::AutoEscape::None,
+        ))
+        .expect("expression evaluation did not leave value on stack"))
     }
 }

@@ -44,7 +44,7 @@ impl<T> Deref for Spanned<T> {
 #[cfg(feature = "internal_debug")]
 impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(&self.node, f)?;
+        ok!(fmt::Debug::fmt(&self.node, f));
         write!(f, "{:?}", self.span)
     }
 }
@@ -440,7 +440,10 @@ impl<'a> Map<'a> {
         for (key, value) in self.keys.iter().zip(self.values.iter()) {
             if let (Expr::Const(maybe_key), Expr::Const(value)) = (key, value) {
                 rv.insert(
-                    maybe_key.value.clone().try_into_key().ok()?,
+                    match maybe_key.value.clone().try_into_key() {
+                        Ok(key) => key,
+                        Err(_) => return None,
+                    },
                     value.value.clone(),
                 );
             }

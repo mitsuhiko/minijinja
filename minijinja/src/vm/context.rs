@@ -139,7 +139,7 @@ impl<'env> fmt::Debug for Context<'env> {
 
         let mut m = f.debug_map();
         let mut seen = HashSet::new();
-        dump(&mut m, &mut seen, self)?;
+        ok!(dump(&mut m, &mut seen, self));
         m.finish()
     }
 }

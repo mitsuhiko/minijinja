@@ -108,14 +108,14 @@ impl Object for Macro {
         // Because macros cannot return anything other than strings (most importantly they)
         // can't return other macros this is however not an issue, as modifications in the
         // macro cannot leak out.
-        vm.eval_macro(
+        ok!(vm.eval_macro(
             instructions,
             *offset,
             self.closure.clone(),
             &mut out,
             state,
             arg_values,
-        )?;
+        ));
 
         Ok(if !matches!(state.auto_escape(), AutoEscape::None) {
             Value::from_safe_string(rv)

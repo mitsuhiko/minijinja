@@ -26,7 +26,10 @@ fn find_marker(a: &str) -> Option<usize> {
     let bytes = a.as_bytes();
     let mut offset = 0;
     loop {
-        let idx = memchr(&bytes[offset..], b'{')?;
+        let idx = match memchr(&bytes[offset..], b'{') {
+            Some(idx) => idx,
+            None => return None,
+        };
         if let Some(b'{' | b'%' | b'#') = bytes.get(offset + idx + 1).copied() {
             return Some(offset + idx);
         }
@@ -44,7 +47,10 @@ fn skip_basic_tag(block_str: &str, name: &str) -> Option<usize> {
         ptr = rest;
     }
 
-    ptr = ptr.strip_prefix(name)?;
+    ptr = match ptr.strip_prefix(name) {
+        Some(ptr) => ptr,
+        None => return None,
+    };
 
     while let Some(rest) = ptr.strip_prefix(|x: char| x.is_ascii_whitespace()) {
         ptr = rest;
@@ -52,7 +58,10 @@ fn skip_basic_tag(block_str: &str, name: &str) -> Option<usize> {
     if let Some(rest) = ptr.strip_prefix('-') {
         ptr = rest;
     }
-    ptr = ptr.strip_prefix("%}")?;
+    ptr = match ptr.strip_prefix("%}") {
+        Some(ptr) => ptr,
+        None => return None,
+    };
 
     Some(block_str.len() - ptr.len())
 }

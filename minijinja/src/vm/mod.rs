@@ -52,7 +52,7 @@ where
     } else if let Some(Some(rv)) = vec.get(local_id as usize) {
         Some(*rv)
     } else {
-        let val = f()?;
+        let val = some!(f());
         vec[local_id as usize] = Some(val);
         Some(val)
     }
@@ -196,7 +196,7 @@ impl<'env> Vm<'env> {
                 Instruction::EmitRaw(val) => {
                     // this only produces a format error, no need to attach
                     // location information.
-                    out.write_str(val)?;
+                    ok!(out.write_str(val).map_err(Error::from));
                 }
                 Instruction::Emit => {
                     try_ctx!(self.env.format(&stack.pop(), state, out));
@@ -538,12 +538,12 @@ impl<'env> Vm<'env> {
         };
         let mut templates_tried = vec![];
         for name in choices {
-            let name = name.as_str().ok_or_else(|| {
+            let name = ok!(name.as_str().ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
                     "template name was not a string",
                 )
-            })?;
+            }));
             let tmpl = match self.env.get_template(name) {
                 Ok(tmpl) => tmpl,
                 Err(err) => {
@@ -562,13 +562,13 @@ impl<'env> Vm<'env> {
             state.auto_escape = old_escape;
             state.instructions = old_instructions;
             state.blocks = old_blocks;
-            rv.map_err(|err| {
+            ok!(rv.map_err(|err| {
                 Error::new(
                     ErrorKind::BadInclude,
                     format!("error in \"{}\"", tmpl.name()),
                 )
                 .with_source(err)
-            })?;
+            }));
             return Ok(());
         }
         if !templates_tried.is_empty() && !ignore_missing {
@@ -597,9 +597,9 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         capture: bool,
     ) -> Result<Value, Error> {
-        let name = state.current_block.ok_or_else(|| {
+        let name = ok!(state.current_block.ok_or_else(|| {
             Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
-        })?;
+        }));
 
         let block_stack = state.blocks.get_mut(name).unwrap();
         if !block_stack.push() {
@@ -618,9 +618,9 @@ impl<'env> Vm<'env> {
         state.instructions = old_instructions;
         state.blocks.get_mut(name).unwrap().pop();
 
-        rv.map_err(|err| {
+        ok!(rv.map_err(|err| {
             Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
-        })?;
+        }));
         if capture {
             Ok(out.end_capture(state.auto_escape))
         } else {
@@ -648,7 +648,7 @@ impl<'env> Vm<'env> {
 
     #[cfg(feature = "multi-template")]
     fn load_blocks(&self, name: Value, state: &mut State<'_, 'env>) -> Result<(), Error> {
-        let tmpl = name
+        let tmpl = ok!(name
             .as_str()
             .ok_or_else(|| {
                 Error::new(
@@ -656,7 +656,7 @@ impl<'env> Vm<'env> {
                     "template name was not a string",
                 )
             })
-            .and_then(|name| self.env.get_template(name))?;
+            .and_then(|name| self.env.get_template(name)));
         for (name, instr) in tmpl.blocks().iter() {
             state
                 .blocks
@@ -698,7 +698,7 @@ impl<'env> Vm<'env> {
         pc: usize,
         current_recursion_jump: Option<(usize, bool)>,
     ) -> Result<(), Error> {
-        let iterator = iterable.try_iter()?;
+        let iterator = ok!(iterable.try_iter());
         let len = iterator.len();
         let depth = state
             .ctx
@@ -727,9 +727,10 @@ impl<'env> Vm<'env> {
 
     fn unpack_list(&self, stack: &mut Stack, count: &usize) -> Result<(), Error> {
         let top = stack.pop();
-        let v = top
-            .as_slice()
-            .map_err(|e| Error::new(ErrorKind::CannotUnpack, "not a sequence").with_source(e))?;
+        let v =
+            ok!(top
+                .as_slice()
+                .map_err(|e| Error::new(ErrorKind::CannotUnpack, "not a sequence").with_source(e)));
         if v.len() != *count {
             return Err(Error::new(
                 ErrorKind::CannotUnpack,

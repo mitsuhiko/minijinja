@@ -321,22 +321,22 @@ impl fmt::Display for Value {
             ValueRepr::SafeString(val) => write!(f, "{}", val),
             ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
             ValueRepr::Seq(values) => {
-                write!(f, "[")?;
+                ok!(write!(f, "["));
                 for (idx, val) in values.iter().enumerate() {
                     if idx > 0 {
-                        write!(f, ", ")?;
+                        ok!(write!(f, ", "));
                     }
-                    write!(f, "{:?}", val)?;
+                    ok!(write!(f, "{:?}", val));
                 }
                 write!(f, "]")
             }
             ValueRepr::Map(m, _) => {
-                write!(f, "{{")?;
+                ok!(write!(f, "{{"));
                 for (idx, (key, val)) in m.iter().enumerate() {
                     if idx > 0 {
-                        write!(f, ", ")?;
+                        ok!(write!(f, ", "));
                     }
-                    write!(f, "{:?}: {:?}", key, val)?;
+                    ok!(write!(f, "{:?}: {:?}", key, val));
                 }
                 write!(f, "}}")
             }
@@ -571,13 +571,13 @@ impl Value {
     }
 
     fn get_item_opt(&self, key: &Value) -> Option<Value> {
-        let key = Key::from_borrowed_value(key).ok()?;
+        let key = some!(Key::from_borrowed_value(key).ok());
 
         match self.0 {
             ValueRepr::Map(ref items, _) => return items.get(&key).cloned(),
             ValueRepr::Seq(ref items) => {
                 if let Key::I64(idx) = key {
-                    let idx = isize::try_from(idx).ok()?;
+                    let idx = some!(isize::try_from(idx).ok());
                     let idx = if idx < 0 {
                         items.len() - (-idx as usize)
                     } else {
@@ -670,7 +670,7 @@ impl Value {
             ValueRepr::Dynamic(ref obj) => Box::new(
                 obj.attributes()
                     .iter()
-                    .filter_map(move |attr| Some((*attr, obj.get_attr(attr)?))),
+                    .filter_map(move |attr| Some((*attr, some!(obj.get_attr(attr))))),
             ) as Box<dyn Iterator<Item = _>>,
             _ => Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>,
         }
@@ -714,8 +714,8 @@ impl Serialize for Value {
             use serde::ser::SerializeStruct;
             let handle = LAST_VALUE_HANDLE.with(|x| x.fetch_add(1, atomic::Ordering::Relaxed));
             VALUE_HANDLES.with(|handles| handles.borrow_mut().insert(handle, self.clone()));
-            let mut s = serializer.serialize_struct(VALUE_HANDLE_MARKER, 1)?;
-            s.serialize_field("handle", &handle)?;
+            let mut s = ok!(serializer.serialize_struct(VALUE_HANDLE_MARKER, 1));
+            ok!(s.serialize_field("handle", &handle));
             return s.end();
         }
 
@@ -735,19 +735,19 @@ impl Serialize for Value {
             ValueRepr::Seq(ref elements) => elements.serialize(serializer),
             ValueRepr::Map(ref entries, _) => {
                 use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(entries.len()))?;
+                let mut map = ok!(serializer.serialize_map(Some(entries.len())));
                 for (ref k, ref v) in entries.iter() {
-                    map.serialize_entry(k, v)?;
+                    ok!(map.serialize_entry(k, v));
                 }
                 map.end()
             }
             ValueRepr::Dynamic(ref n) => {
                 use serde::ser::SerializeMap;
                 let fields = n.attributes();
-                let mut s = serializer.serialize_map(Some(fields.len()))?;
+                let mut s = ok!(serializer.serialize_map(Some(fields.len())));
                 for k in fields {
                     let v = n.get_attr(k).unwrap_or(Value::UNDEFINED);
-                    s.serialize_entry(k, &v)?;
+                    ok!(s.serialize_entry(k, &v));
                 }
                 s.end()
             }

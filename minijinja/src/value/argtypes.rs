@@ -128,7 +128,7 @@ pub trait ArgType<'a> {
         _state: Option<&'a State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
-        Ok((Self::from_value(value)?, 1))
+        Ok((ok!(Self::from_value(value)), 1))
     }
 
     #[doc(hidden)]
@@ -153,10 +153,10 @@ macro_rules! tuple_impls {
                 #![allow(non_snake_case, unused)]
                 let mut idx = 0;
                 $(
-                    let ($name, offset) = $name::from_state_and_value(state, values.get(idx))?;
+                    let ($name, offset) = ok!($name::from_state_and_value(state, values.get(idx)));
                     idx += offset;
                 )*
-                let ($rest_name, offset) = $rest_name::from_state_and_values(state, values, idx)?;
+                let ($rest_name, offset) = ok!($rest_name::from_state_and_values(state, values, idx));
                 idx += offset;
                 if values.get(idx).is_some() {
                     Err(Error::from(ErrorKind::TooManyArguments))
@@ -445,7 +445,7 @@ impl<'a> ArgType<'a> for &[Value] {
     #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<&'a [Value], Error> {
         match value {
-            Some(value) => Ok(value.as_slice()?),
+            Some(value) => Ok(ok!(value.as_slice())),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
@@ -491,12 +491,10 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
     type Output = Self;
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        Ok(Rest(
-            value
-                .iter()
-                .map(|v| T::from_value(Some(v)))
-                .collect::<Result<_, _>>()?,
-        ))
+        Ok(Rest(ok!(value
+            .iter()
+            .map(|v| T::from_value(Some(v)))
+            .collect::<Result<_, _>>())))
     }
 
     #[inline(always)]
@@ -507,11 +505,10 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
     ) -> Result<(Self, usize), Error> {
         let args = values.get(offset..).unwrap_or_default();
         Ok((
-            Rest(
-                args.iter()
-                    .map(|v| T::from_value(Some(v)))
-                    .collect::<Result<_, _>>()?,
-            ),
+            Rest(ok!(args
+                .iter()
+                .map(|v| T::from_value(Some(v)))
+                .collect::<Result<_, _>>())),
             args.len(),
         ))
     }
@@ -558,10 +555,10 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
         match value {
             None => Ok(Vec::new()),
             Some(values) => {
-                let values = values.as_slice()?;
+                let values = ok!(values.as_slice());
                 let mut rv = Vec::new();
                 for value in values {
-                    rv.push(T::from_value(Some(value))?);
+                    rv.push(ok!(T::from_value(Some(value))));
                 }
                 Ok(rv)
             }

@@ -68,7 +68,7 @@ impl fmt::Debug for Error {
         if let Some(ref source) = std::error::Error::source(self) {
             err.field("source", source);
         }
-        err.finish()?;
+        ok!(err.finish());
 
         // so this is a bit questionablem, but because of how commonly errors are just
         // unwrapped i think it's sensible to spit out the debug info following the
@@ -77,16 +77,16 @@ impl fmt::Debug for Error {
         {
             if !f.alternate() {
                 if let Some(info) = self.debug_info() {
-                    writeln!(f)?;
-                    crate::debug::render_debug_info(
+                    ok!(writeln!(f));
+                    ok!(crate::debug::render_debug_info(
                         f,
                         self.name(),
                         self.kind(),
                         self.line(),
                         self.span(),
                         info,
-                    )?;
-                    writeln!(f)?;
+                    ));
+                    ok!(writeln!(f));
                 }
             }
         }
@@ -167,25 +167,25 @@ impl fmt::Display for ErrorKind {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(ref detail) = self.repr.detail {
-            write!(f, "{}: {}", self.kind(), detail)?;
+            ok!(write!(f, "{}: {}", self.kind(), detail));
         } else {
-            write!(f, "{}", self.kind())?;
+            ok!(write!(f, "{}", self.kind()));
         }
         if let Some(ref filename) = self.name() {
-            write!(f, " (in {}:{})", filename, self.line().unwrap_or(0))?
+            ok!(write!(f, " (in {}:{})", filename, self.line().unwrap_or(0)))
         }
         #[cfg(feature = "debug")]
         {
             if f.alternate() {
                 if let Some(info) = self.debug_info() {
-                    crate::debug::render_debug_info(
+                    ok!(crate::debug::render_debug_info(
                         f,
                         self.name(),
                         self.kind(),
                         self.line(),
                         self.span(),
                         info,
-                    )?;
+                    ));
                 }
             }
         }

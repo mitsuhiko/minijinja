@@ -177,7 +177,7 @@ impl BoxedFunction {
     {
         BoxedFunction(
             Arc::new(move |state, args| -> Result<Value, Error> {
-                f.invoke(Args::from_values(Some(state), args)?, SealedMarker)
+                f.invoke(ok!(Args::from_values(Some(state), args)), SealedMarker)
                     .into_result()
             }),
             #[cfg(feature = "debug")]

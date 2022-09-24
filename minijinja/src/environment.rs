@@ -141,7 +141,7 @@ impl<'source> Environment<'source> {
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
         match self.templates {
             Source::Borrowed(ref mut map) => {
-                let compiled_template = CompiledTemplate::from_name_and_source(name, source)?;
+                let compiled_template = ok!(CompiledTemplate::from_name_and_source(name, source));
                 map.insert(name, Arc::new(compiled_template));
                 Ok(())
             }
@@ -178,9 +178,11 @@ impl<'source> Environment<'source> {
     /// ```
     pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
         let compiled = match &self.templates {
-            Source::Borrowed(ref map) => map.get(name).ok_or_else(|| Error::new_not_found(name))?,
+            Source::Borrowed(ref map) => {
+                ok!(map.get(name).ok_or_else(|| Error::new_not_found(name)))
+            }
             #[cfg(feature = "source")]
-            Source::Owned(source) => source.get_compiled_template(name)?,
+            Source::Owned(source) => ok!(source.get_compiled_template(name)),
         };
         Ok(Template::new(
             self,
@@ -208,7 +210,7 @@ impl<'source> Environment<'source> {
 
     fn _render_str(&self, source: &str, root: Value) -> Result<String, Error> {
         let name = "<string>";
-        let compiled = CompiledTemplate::from_name_and_source(name, source)?;
+        let compiled = ok!(CompiledTemplate::from_name_and_source(name, source));
         let mut rv = String::new();
         Vm::new(self)
             .eval(
@@ -351,9 +353,9 @@ impl<'source> Environment<'source> {
     }
 
     fn _compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
-        let ast = parse_expr(expr)?;
+        let ast = ok!(parse_expr(expr));
         let mut gen = CodeGenerator::new("<expression>", expr);
-        gen.compile_expr(&ast)?;
+        ok!(gen.compile_expr(&ast));
         let (instructions, _) = gen.finish();
         Ok(Expression::new(self, instructions))
     }

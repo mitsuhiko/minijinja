@@ -93,7 +93,7 @@ impl<'vm, 'env> State<'vm, 'env> {
             referenced_locals: instructions
                 .get_referenced_names(pc)
                 .into_iter()
-                .filter_map(|n| Some((n.to_string(), self.ctx.load(self.env, n)?)))
+                .filter_map(|n| Some((n.to_string(), some!(self.ctx.load(self.env, n)))))
                 .collect(),
         }
     }

@@ -157,14 +157,16 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 #![doc(html_logo_url = "https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo-square.png")]
-mod key;
+
+#[macro_use]
+mod macros;
 
 mod compiler;
 mod defaults;
 mod environment;
 mod error;
 mod expression;
-mod macros;
+mod key;
 mod output;
 mod template;
 mod utils;

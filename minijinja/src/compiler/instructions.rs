@@ -403,9 +403,9 @@ impl<'source> fmt::Debug for Instructions<'source> {
 
         impl<'a> fmt::Debug for InstructionWrapper<'a> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{:>05x} | {:?}", self.0, self.1,)?;
+                ok!(write!(f, "{:>05x} | {:?}", self.0, self.1,));
                 if let Some(line) = self.2 {
-                    write!(f, "  [line {}]", line)?;
+                    ok!(write!(f, "  [line {}]", line));
                 }
                 Ok(())
             }

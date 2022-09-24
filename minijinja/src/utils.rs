@@ -45,14 +45,18 @@ pub fn write_escaped(
 ) -> Result<(), Error> {
     match (value.is_safe(), auto_escape) {
         // safe values do not get escaped
-        (true, _) | (_, AutoEscape::None) => write!(out, "{}", value)?,
-        (false, AutoEscape::Html) => write_with_html_escaping(out, value)?,
+        (true, _) | (_, AutoEscape::None) => {
+            ok!(write!(out, "{}", value).map_err(Error::from))
+        }
+        (false, AutoEscape::Html) => {
+            ok!(write_with_html_escaping(out, value).map_err(Error::from))
+        }
         #[cfg(feature = "json")]
         (false, AutoEscape::Json) => {
-            let value = serde_json::to_string(&value).map_err(|err| {
+            let value = ok!(serde_json::to_string(&value).map_err(|err| {
                 Error::new(ErrorKind::BadSerialization, "unable to format to JSON").with_source(err)
-            })?;
-            write!(out, "{}", value)?
+            }));
+            ok!(write!(out, "{}", value).map_err(Error::from))
         }
         (false, AutoEscape::Custom(name)) => {
             return Err(Error::new(
@@ -116,11 +120,11 @@ impl<'a> fmt::Display for HtmlEscape<'a> {
                 macro_rules! escaping_body {
                     ($quote:expr) => {{
                         if start < i {
-                            f.write_str(unsafe {
+                            ok!(f.write_str(unsafe {
                                 std::str::from_utf8_unchecked(&bytes[start..i])
-                            })?;
+                            }));
                         }
-                        f.write_str($quote)?;
+                        ok!(f.write_str($quote));
                         start = i + 1;
                     }};
                 }
@@ -160,21 +164,21 @@ impl Unescaper {
                 match char_iter.next() {
                     None => return Err(ErrorKind::BadEscape.into()),
                     Some(d) => match d {
-                        '"' | '\\' | '/' | '\'' => self.push_char(d)?,
-                        'b' => self.push_char('\x08')?,
-                        'f' => self.push_char('\x0C')?,
-                        'n' => self.push_char('\n')?,
-                        'r' => self.push_char('\r')?,
-                        't' => self.push_char('\t')?,
+                        '"' | '\\' | '/' | '\'' => ok!(self.push_char(d)),
+                        'b' => ok!(self.push_char('\x08')),
+                        'f' => ok!(self.push_char('\x0C')),
+                        'n' => ok!(self.push_char('\n')),
+                        'r' => ok!(self.push_char('\r')),
+                        't' => ok!(self.push_char('\t')),
                         'u' => {
-                            let val = self.parse_u16(&mut char_iter)?;
-                            self.push_u16(val)?;
+                            let val = ok!(self.parse_u16(&mut char_iter));
+                            ok!(self.push_u16(val));
                         }
                         _ => return Err(ErrorKind::BadEscape.into()),
                     },
                 }
             } else {
-                self.push_char(c)?;
+                ok!(self.push_char(c));
             }
         }
 
