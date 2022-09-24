@@ -18,6 +18,6 @@ invalid operation: cannot super outside of block (in block_super_err.txt:1)
    1 > {{ super() }}
      i    ^^^^^^^ invalid operation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Referenced variables:
+No referenced variables
 -------------------------------------------------------------------------------
 

@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt;
 
 use crate::compiler::tokens::Span;
@@ -9,49 +10,29 @@ use crate::value::Value;
 #[derive(Default)]
 pub(crate) struct DebugInfo {
     pub(crate) template_source: Option<String>,
-    pub(crate) context: Option<Value>,
-    pub(crate) referenced_names: Option<Vec<String>>,
+    pub(crate) referenced_locals: BTreeMap<String, Value>,
 }
 
-struct VarPrinter<'x>(Value, &'x [String]);
+struct VarPrinter<'x>(&'x BTreeMap<String, Value>);
 
 impl<'x> fmt::Debug for VarPrinter<'x> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.0.is_empty() {
+            return write!(f, "No referenced variables");
+        }
         let mut m = f.debug_struct("Referenced variables:");
-        let mut vars = self.1.to_owned();
-        vars.sort();
-        for var in &vars {
-            match self.0.get_attr(var) {
-                Ok(val) => m.field(var, &val),
-                Err(_) => m.field(var, &Value::UNDEFINED),
-            };
+        let mut vars = self.0.iter().collect::<Vec<_>>();
+        vars.sort_by_key(|x| x.0);
+        for (key, value) in vars {
+            m.field(key, value);
         }
         m.finish()
     }
 }
 
 impl DebugInfo {
-    /// If available this contains a reference to the source string.
     pub fn source(&self) -> Option<&str> {
         self.template_source.as_deref()
-    }
-
-    /// Provides access to a snapshot of the context.
-    ///
-    /// The context is created at the time the error was created if that error
-    /// happened during template rendering.
-    pub fn context(&self) -> Option<Value> {
-        self.context.clone()
-    }
-
-    /// Returns a narrowed down set of referenced names from the context
-    /// where the error happened.
-    ///
-    /// This function is currently internal and only used for the default
-    /// error printing.  This could be exposed but it's a highly specific
-    /// API.
-    pub(crate) fn referenced_names(&self) -> Option<&[String]> {
-        self.referenced_names.as_deref()
     }
 }
 
@@ -100,12 +81,8 @@ pub(super) fn render_debug_info(
         }
         write!(f, "{:~^1$}", "", 79).unwrap();
     }
-    if let Some(ctx) = info.context() {
-        if let Some(vars) = info.referenced_names() {
-            writeln!(f)?;
-            writeln!(f, "{:#?}", VarPrinter(ctx, vars))?;
-        }
-        write!(f, "{:-^1$}", "", 79).unwrap();
-    }
+    writeln!(f)?;
+    writeln!(f, "{:#?}", VarPrinter(&info.referenced_locals))?;
+    write!(f, "{:-^1$}", "", 79).unwrap();
     Ok(())
 }

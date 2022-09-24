@@ -28,7 +28,7 @@ could not render block: error in super block (in err_bad_super.txt:4)
      i                               ^^^^^^^ could not render block
    5 | {% endblock %}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Referenced variables:
+No referenced variables
 -------------------------------------------------------------------------------
 
 caused by: unknown function: missing_function is unknown (in bad_basic_block.txt:3)
@@ -39,8 +39,6 @@ caused by: unknown function: missing_function is unknown (in bad_basic_block.txt
      i      ^^^^^^^^^^^^^^^^^^ unknown function
    4 | {% endblock %}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Referenced variables: {
-    missing_function: Undefined,
-}
+No referenced variables
 -------------------------------------------------------------------------------
 

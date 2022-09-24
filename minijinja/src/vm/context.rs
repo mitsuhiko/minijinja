@@ -8,7 +8,6 @@ use crate::vm::loop_object::Loop;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
 
-#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub(crate) struct LoopState {
     pub(crate) with_loop_var: bool,
     pub(crate) recurse_jump_target: Option<usize>,
@@ -149,34 +148,6 @@ impl<'env> Context<'env> {
     /// Creates a context
     pub fn new(frame: Frame<'env>) -> Context<'env> {
         Context { stack: vec![frame] }
-    }
-
-    /// Freezes the context.
-    ///
-    /// This implementation is not particularly beautiful and highly inefficient.
-    /// Since it's only used for the debug support changing this is not too
-    /// critical.
-    #[cfg(feature = "debug")]
-    pub fn freeze<'a>(&'a self, env: &'a Environment) -> Locals {
-        let mut rv = Locals::new();
-
-        rv.extend(env.globals.iter().map(|(k, v)| (*k, v.clone())));
-
-        for frame in self.stack.iter().rev() {
-            // look at locals first
-            rv.extend(frame.locals.iter().map(|(k, v)| (*k, v.clone())));
-
-            // if we are a loop, check if we are looking up the special loop var.
-            if let Some(ref l) = frame.current_loop {
-                if l.with_loop_var {
-                    rv.insert("loop", Value::from_rc_object(l.object.clone()));
-                }
-            }
-
-            rv.extend(frame.ctx.iter_as_str_map());
-        }
-
-        rv
     }
 
     /// Stores a variable in the context.

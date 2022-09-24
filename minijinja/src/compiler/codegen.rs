@@ -27,7 +27,6 @@ fn get_local_id<'source>(ids: &mut BTreeMap<&'source str, LocalId>, name: &'sour
 
 /// Represents an open block of code that does not yet have updated
 /// jump targets.
-#[cfg_attr(feature = "internal_debug", derive(Debug))]
 enum PendingBlock {
     Branch(usize),
     Loop(usize),
@@ -35,7 +34,6 @@ enum PendingBlock {
 }
 
 /// Provides a convenient interface to creating instructions for the VM.
-#[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct CodeGenerator<'source> {
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,

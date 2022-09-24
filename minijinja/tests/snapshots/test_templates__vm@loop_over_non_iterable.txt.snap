@@ -19,7 +19,6 @@ invalid operation: object is not iterable (in loop_over_non_iterable.txt:1)
    1 > [{% for item in seq %}{% endfor %}]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
-    loop: Undefined,
     seq: 42,
 }
 -------------------------------------------------------------------------------

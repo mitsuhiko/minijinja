@@ -18,6 +18,6 @@ unknown filter: filter missingFilter is unknown (in err_missing_nested_filter.tx
    1 > {{ "foo"|upper|missingFilter|lower }}
      i                ^^^^^^^^^^^^^ unknown filter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Referenced variables:
+No referenced variables
 -------------------------------------------------------------------------------
 

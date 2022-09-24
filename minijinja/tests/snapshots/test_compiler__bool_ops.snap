@@ -1,19 +1,14 @@
 ---
 source: minijinja/tests/test_compiler.rs
-expression: "&c"
+expression: "&c.finish()"
 ---
-CodeGenerator {
-    instructions: [
+(
+    [
         00000 | Lookup("first")  [line 0],
         00001 | JumpIfFalseOrPop(5),
         00002 | Lookup("second"),
         00003 | JumpIfTrueOrPop(5),
         00004 | Lookup("third"),
     ],
-    blocks: {},
-    pending_block: [],
-    current_line: 0,
-    span_stack: [],
-    filter_local_ids: {},
-    test_local_ids: {},
-}
+    {},
+)

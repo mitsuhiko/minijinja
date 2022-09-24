@@ -22,8 +22,6 @@ too many arguments: unknown keyword argument `c` (in err_too_many_macro_kwargs2.
      i    ^^^^^^^^^^^^^^^^^^^^ too many arguments
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
-    a: Undefined,
-    b: Undefined,
     two_args: <macro two_args>,
 }
 -------------------------------------------------------------------------------

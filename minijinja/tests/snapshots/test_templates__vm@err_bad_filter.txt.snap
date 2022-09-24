@@ -20,6 +20,6 @@ invalid operation: object is not iterable (in err_bad_filter.txt:1)
    2 |   - {{ item }}
    3 | {% endfor %}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Referenced variables:
+No referenced variables
 -------------------------------------------------------------------------------
 

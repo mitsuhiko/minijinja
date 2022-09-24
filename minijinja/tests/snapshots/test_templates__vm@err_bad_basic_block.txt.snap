@@ -21,8 +21,6 @@ unknown function: missing_function is unknown (in bad_basic_block.txt:3)
      i      ^^^^^^^^^^^^^^^^^^ unknown function
    4 | {% endblock %}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Referenced variables: {
-    missing_function: Undefined,
-}
+No referenced variables
 -------------------------------------------------------------------------------
 

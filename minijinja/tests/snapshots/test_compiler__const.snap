@@ -1,17 +1,12 @@
 ---
 source: minijinja/tests/test_compiler.rs
-expression: "&c"
+expression: "&c.finish()"
 ---
-CodeGenerator {
-    instructions: [
+(
+    [
         00000 | LoadConst("a")  [line 0],
         00001 | LoadConst(42),
         00002 | StringConcat,
     ],
-    blocks: {},
-    pending_block: [],
-    current_line: 0,
-    span_stack: [],
-    filter_local_ids: {},
-    test_local_ids: {},
-}
+    {},
+)

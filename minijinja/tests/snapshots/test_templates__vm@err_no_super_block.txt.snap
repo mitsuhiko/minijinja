@@ -21,6 +21,6 @@ invalid operation: no parent block exists (in err_no_super_block.txt:3)
      i      ^^^^^^^ invalid operation
    4 | {% endblock %}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Referenced variables:
+No referenced variables
 -------------------------------------------------------------------------------
 

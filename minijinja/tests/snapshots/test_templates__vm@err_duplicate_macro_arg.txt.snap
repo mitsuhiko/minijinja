@@ -22,8 +22,6 @@ too many arguments: duplicate argument `a` (in err_duplicate_macro_arg.txt:4)
      i    ^^^^^^^^^^^^^^^^ too many arguments
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
-    a: Undefined,
-    b: Undefined,
     two_args: <macro two_args>,
 }
 -------------------------------------------------------------------------------

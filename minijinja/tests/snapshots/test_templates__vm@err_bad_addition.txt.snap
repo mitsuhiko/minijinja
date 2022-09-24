@@ -18,6 +18,6 @@ invalid operation: tried to use + operator on unsupported types sequence and num
    1 > {{ [1, 2] + 23 }}
      i    ^^^^^^^^^^^ invalid operation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Referenced variables:
+No referenced variables
 -------------------------------------------------------------------------------
 

@@ -19,8 +19,6 @@ unknown function: missing_function is unknown (in err_bad_block.txt:2)
    2 > {% block title %}{{ missing_function() }}{% endblock %}
      i                     ^^^^^^^^^^^^^^^^^^ unknown function
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Referenced variables: {
-    missing_function: Undefined,
-}
+No referenced variables
 -------------------------------------------------------------------------------
 

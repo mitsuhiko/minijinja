@@ -1,9 +1,9 @@
 ---
 source: minijinja/tests/test_compiler.rs
-expression: "&c"
+expression: "&c.finish()"
 ---
-CodeGenerator {
-    instructions: [
+(
+    [
         00000 | Lookup("items")  [line 0],
         00001 | PushLoop(1),
         00002 | Iterate(5),
@@ -12,10 +12,5 @@ CodeGenerator {
         00005 | PopFrame,
         00006 | EmitRaw("!"),
     ],
-    blocks: {},
-    pending_block: [],
-    current_line: 0,
-    span_stack: [],
-    filter_local_ids: {},
-    test_local_ids: {},
-}
+    {},
+)

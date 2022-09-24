@@ -20,4 +20,6 @@ syntax error: block tags in macros are not allowed (in err_block_in_macro.txt:2)
      i      ^^^^^ syntax error
    3 | {% endmacro %}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------
 

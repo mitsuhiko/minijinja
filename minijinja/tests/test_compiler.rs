@@ -11,7 +11,7 @@ fn test_for_loop() {
     c.end_for_loop(false);
     c.add(Instruction::EmitRaw("!"));
 
-    insta::assert_debug_snapshot!(&c);
+    insta::assert_debug_snapshot!(&c.finish());
 }
 
 #[test]
@@ -29,7 +29,7 @@ fn test_if_branches() {
     c.end_if();
     c.end_if();
 
-    insta::assert_debug_snapshot!(&c);
+    insta::assert_debug_snapshot!(&c.finish());
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn test_bool_ops() {
     c.add(Instruction::Lookup("third"));
     c.end_sc_bool();
 
-    insta::assert_debug_snapshot!(&c);
+    insta::assert_debug_snapshot!(&c.finish());
 }
 
 #[test]
@@ -55,5 +55,5 @@ fn test_const() {
     c.add(Instruction::LoadConst(Value::from(42)));
     c.add(Instruction::StringConcat);
 
-    insta::assert_debug_snapshot!(&c);
+    insta::assert_debug_snapshot!(&c.finish());
 }
