@@ -3,14 +3,14 @@ use std::fmt;
 
 use crate::environment::Environment;
 use crate::value::Value;
-use crate::vm::loop_object::ForLoop;
+use crate::vm::loop_object::LoopState;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
 
 pub(crate) struct Frame<'env> {
     pub(crate) locals: Locals<'env>,
     pub(crate) ctx: Value,
-    pub(crate) current_loop: Option<ForLoop>,
+    pub(crate) current_loop: Option<LoopState>,
 }
 
 impl<'env> Default for Frame<'env> {
@@ -34,8 +34,8 @@ impl<'env> fmt::Debug for Frame<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut m = f.debug_map();
         m.entries(self.locals.iter());
-        if let Some(ForLoop {
-            state: ref controller,
+        if let Some(LoopState {
+            object: ref controller,
             ..
         }) = self.current_loop
         {
@@ -109,7 +109,7 @@ impl<'env> fmt::Debug for Context<'env> {
                 if let Some(ref l) = frame.current_loop {
                     if l.with_loop_var && !seen.contains(&"loop") {
                         seen.insert("loop");
-                        m.entry(&"loop", &l.state);
+                        m.entry(&"loop", &l.object);
                     }
                 }
 
@@ -154,7 +154,7 @@ impl<'env> Context<'env> {
             // if we are a loop, check if we are looking up the special loop var.
             if let Some(ref l) = frame.current_loop {
                 if l.with_loop_var {
-                    rv.insert("loop", Value::from_rc_object(l.state.clone()));
+                    rv.insert("loop", Value::from_rc_object(l.object.clone()));
                 }
             }
 
@@ -186,7 +186,7 @@ impl<'env> Context<'env> {
             // if we are a loop, check if we are looking up the special loop var.
             if let Some(ref l) = frame.current_loop {
                 if l.with_loop_var && key == "loop" {
-                    return Some(Value::from_rc_object(l.state.clone()));
+                    return Some(Value::from_rc_object(l.object.clone()));
                 }
             }
 
@@ -223,7 +223,7 @@ impl<'env> Context<'env> {
     }
 
     /// Returns the current innermost loop.
-    pub fn current_loop(&mut self) -> Option<&mut ForLoop> {
+    pub fn current_loop(&mut self) -> Option<&mut LoopState> {
         self.stack
             .iter_mut()
             .rev()

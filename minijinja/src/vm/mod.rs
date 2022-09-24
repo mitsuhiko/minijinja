@@ -13,7 +13,7 @@ use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{self, ops, MapType, Value, ValueMap, ValueRepr};
 use crate::vm::context::{Context, Frame, Stack};
-use crate::vm::loop_object::{ForLoop, LoopState};
+use crate::vm::loop_object::{Loop, LoopState};
 use crate::vm::macro_object::Macro;
 use crate::vm::state::BlockStack;
 
@@ -324,7 +324,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::Iterate(jump_target) => {
                     let l = state.ctx.current_loop().expect("not inside a loop");
-                    l.state.idx.fetch_add(1, Ordering::Relaxed);
+                    l.object.idx.fetch_add(1, Ordering::Relaxed);
                     match l.iterator.next() {
                         Some(item) => stack.push(item),
                         None => {
@@ -691,15 +691,15 @@ impl<'env> Vm<'env> {
             .ctx
             .current_loop()
             .filter(|x| x.recurse_jump_target.is_some())
-            .map_or(0, |x| x.state.depth + 1);
+            .map_or(0, |x| x.object.depth + 1);
         let recursive = flags & LOOP_FLAG_RECURSIVE != 0;
         state.ctx.push_frame(Frame {
-            current_loop: Some(ForLoop {
+            current_loop: Some(LoopState {
                 iterator,
                 with_loop_var: flags & LOOP_FLAG_WITH_LOOP_VAR != 0,
                 recurse_jump_target: if recursive { Some(pc) } else { None },
                 current_recursion_jump: next_loop_recursion_jump,
-                state: Arc::new(LoopState {
+                object: Arc::new(Loop {
                     idx: AtomicUsize::new(!0usize),
                     len,
                     depth,

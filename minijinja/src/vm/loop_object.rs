@@ -6,14 +6,14 @@ use crate::error::{Error, ErrorKind};
 use crate::value::{Object, Value, ValueIterator};
 use crate::vm::state::State;
 
-pub(crate) struct LoopState {
+pub(crate) struct Loop {
     pub len: usize,
     pub idx: AtomicUsize,
     pub depth: usize,
     pub last_changed_value: Mutex<Option<Vec<Value>>>,
 }
 
-impl fmt::Debug for LoopState {
+impl fmt::Debug for Loop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("Loop");
         for attr in self.attributes() {
@@ -23,7 +23,7 @@ impl fmt::Debug for LoopState {
     }
 }
 
-impl Object for LoopState {
+impl Object for Loop {
     fn attributes(&self) -> &[&str] {
         &[
             "index0",
@@ -88,7 +88,7 @@ impl Object for LoopState {
     }
 }
 
-impl fmt::Display for LoopState {
+impl fmt::Display for Loop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -100,7 +100,7 @@ impl fmt::Display for LoopState {
 }
 
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
-pub(crate) struct ForLoop {
+pub(crate) struct LoopState {
     pub(crate) with_loop_var: bool,
     pub(crate) recurse_jump_target: Option<usize>,
     // if we're popping the frame, do we want to jump somewhere?  The
@@ -108,5 +108,5 @@ pub(crate) struct ForLoop {
     // tells us if we need to end capturing.
     pub(crate) current_recursion_jump: Option<(usize, bool)>,
     pub(crate) iterator: ValueIterator,
-    pub(crate) state: Arc<LoopState>,
+    pub(crate) object: Arc<Loop>,
 }
