@@ -155,12 +155,6 @@ pub enum Instruction<'source> {
     /// Call into a block.
     CallBlock(&'source str),
 
-    /// Loads block from a template with name on stack ("extends")
-    LoadBlocks,
-
-    /// Includes another template.
-    Include(bool),
-
     /// Sets the auto escape flag to the current value.
     PushAutoEscape,
 
@@ -194,7 +188,16 @@ pub enum Instruction<'source> {
     /// A fast loop recurse instruction without intermediate capturing.
     FastRecurse,
 
+    /// Loads block from a template with name on stack ("extends")
+    #[cfg(feature = "multi-template")]
+    LoadBlocks,
+
+    /// Includes another template.
+    #[cfg(feature = "multi-template")]
+    Include(bool),
+
     /// Builds a module
+    #[cfg(feature = "multi-template")]
     ExportLocals,
 
     /// Builds a macro on the stack.

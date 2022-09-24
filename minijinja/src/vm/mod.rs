@@ -8,7 +8,6 @@ use crate::compiler::instructions::{
 };
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::key::Key;
 use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{self, ops, MapType, Value, ValueMap, ValueRepr};
@@ -386,21 +385,6 @@ impl<'env> Vm<'env> {
                     }
                     state.current_block = old_block;
                 }
-                Instruction::LoadBlocks => {
-                    let name = stack.pop();
-                    try_ctx!(self.load_blocks(name, state));
-
-                    // then replace the instructions and set the pc to 0 again.
-                    // this effectively means that the template engine will now
-                    // execute the extended template's code instead.  From this
-                    // there is no way back.
-                    pc = 0;
-                    continue;
-                }
-                Instruction::Include(ignore_missing) => {
-                    let name = stack.pop();
-                    try_ctx!(self.perform_include(name, state, out, *ignore_missing));
-                }
                 Instruction::PushAutoEscape => {
                     let value = stack.pop();
                     auto_escape_stack.push(state.auto_escape);
@@ -500,17 +484,35 @@ impl<'env> Vm<'env> {
                 Instruction::FastRecurse => {
                     recurse_loop!(false);
                 }
-                #[cfg(feature = "macros")]
-                Instruction::BuildMacro(name, offset) => {
-                    self.build_macro(&mut stack, state, offset, name);
+                #[cfg(feature = "multi-template")]
+                Instruction::LoadBlocks => {
+                    let name = stack.pop();
+                    try_ctx!(self.load_blocks(name, state));
+
+                    // then replace the instructions and set the pc to 0 again.
+                    // this effectively means that the template engine will now
+                    // execute the extended template's code instead.  From this
+                    // there is no way back.
+                    pc = 0;
+                    continue;
                 }
+                #[cfg(feature = "multi-template")]
+                Instruction::Include(ignore_missing) => {
+                    let name = stack.pop();
+                    try_ctx!(self.perform_include(name, state, out, *ignore_missing));
+                }
+                #[cfg(feature = "multi-template")]
                 Instruction::ExportLocals => {
                     let locals = state.ctx.current_locals();
                     let mut module = ValueMap::new();
                     for (key, value) in locals.iter() {
-                        module.insert(Key::make_string_key(key), value.clone());
+                        module.insert((*key).into(), value.clone());
                     }
                     stack.push(Value(ValueRepr::Map(module.into(), MapType::Normal)));
+                }
+                #[cfg(feature = "macros")]
+                Instruction::BuildMacro(name, offset) => {
+                    self.build_macro(&mut stack, state, offset, name);
                 }
                 #[cfg(feature = "macros")]
                 Instruction::Return => break,
@@ -521,6 +523,7 @@ impl<'env> Vm<'env> {
         Ok(stack.try_pop())
     }
 
+    #[cfg(feature = "multi-template")]
     fn perform_include(
         &self,
         name: Value,
@@ -643,6 +646,7 @@ impl<'env> Vm<'env> {
         }
     }
 
+    #[cfg(feature = "multi-template")]
     fn load_blocks(&self, name: Value, state: &mut State<'_, 'env>) -> Result<(), Error> {
         let tmpl = name
             .as_str()

@@ -272,11 +272,13 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::Block(block) => {
                 self.compile_block(block)?;
             }
+            #[cfg(feature = "multi-template")]
             ast::Stmt::Extends(extends) => {
                 self.set_line_from_span(extends.span());
                 self.compile_expr(&extends.name)?;
                 self.add(Instruction::LoadBlocks);
             }
+            #[cfg(feature = "multi-template")]
             ast::Stmt::Include(include) => {
                 self.set_line_from_span(include.span());
                 self.compile_expr(&include.name)?;
@@ -305,6 +307,7 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::Macro(macro_decl) => {
                 self.compile_macro(macro_decl)?;
             }
+            #[cfg(feature = "multi-template")]
             ast::Stmt::Import(import) => {
                 self.add(Instruction::BeginCapture);
                 self.add(Instruction::PushWith);
@@ -315,6 +318,7 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_assignment(&import.name)?;
                 self.add(Instruction::EndCapture);
             }
+            #[cfg(feature = "multi-template")]
             ast::Stmt::FromImport(from_import) => {
                 self.add(Instruction::BeginCapture);
                 self.add(Instruction::PushWith);
