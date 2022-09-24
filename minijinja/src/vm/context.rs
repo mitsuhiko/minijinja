@@ -72,6 +72,7 @@ impl Stack {
         self.values.push(arg);
     }
 
+    #[track_caller]
     pub fn pop(&mut self) -> Value {
         self.values.pop().unwrap()
     }
@@ -88,6 +89,7 @@ impl Stack {
         self.values.pop()
     }
 
+    #[track_caller]
     pub fn peek(&self) -> &Value {
         self.values.last().unwrap()
     }
@@ -218,11 +220,13 @@ impl<'env> Context<'env> {
     }
 
     /// Pops the topmost layer.
+    #[track_caller]
     pub fn pop_frame(&mut self) -> Frame {
         self.stack.pop().unwrap()
     }
 
     /// Returns the current locals.
+    #[track_caller]
     pub fn current_locals(&mut self) -> &mut Locals<'env> {
         &mut self.stack.last_mut().unwrap().locals
     }

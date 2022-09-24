@@ -146,6 +146,7 @@ impl<'vm, 'env> BlockStack<'vm, 'env> {
         }
     }
 
+    #[track_caller]
     pub fn pop(&mut self) {
         self.depth = self.depth.checked_sub(1).unwrap()
     }
