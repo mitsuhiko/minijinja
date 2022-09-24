@@ -1,9 +1,9 @@
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Object, Value, ValueIterator};
+use crate::value::{Object, Value};
 use crate::vm::state::State;
 
 pub(crate) struct Loop {
@@ -97,16 +97,4 @@ impl fmt::Display for Loop {
             self.len
         )
     }
-}
-
-#[cfg_attr(feature = "internal_debug", derive(Debug))]
-pub(crate) struct LoopState {
-    pub(crate) with_loop_var: bool,
-    pub(crate) recurse_jump_target: Option<usize>,
-    // if we're popping the frame, do we want to jump somewhere?  The
-    // first item is the target jump instruction, the second argument
-    // tells us if we need to end capturing.
-    pub(crate) current_recursion_jump: Option<(usize, bool)>,
-    pub(crate) iterator: ValueIterator,
-    pub(crate) object: Arc<Loop>,
 }

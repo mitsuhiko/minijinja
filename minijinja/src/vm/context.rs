@@ -1,11 +1,24 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
+use std::sync::Arc;
 
 use crate::environment::Environment;
-use crate::value::Value;
-use crate::vm::loop_object::LoopState;
+use crate::value::{Value, ValueIterator};
+use crate::vm::loop_object::Loop;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
+
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+pub(crate) struct LoopState {
+    pub(crate) with_loop_var: bool,
+    pub(crate) recurse_jump_target: Option<usize>,
+    // if we're popping the frame, do we want to jump somewhere?  The
+    // first item is the target jump instruction, the second argument
+    // tells us if we need to end capturing.
+    pub(crate) current_recursion_jump: Option<(usize, bool)>,
+    pub(crate) iterator: ValueIterator,
+    pub(crate) object: Arc<Loop>,
+}
 
 pub(crate) struct Frame<'env> {
     pub(crate) locals: Locals<'env>,
@@ -60,7 +73,7 @@ impl Stack {
     }
 
     pub fn pop(&mut self) -> Value {
-        self.values.pop().expect("stack was empty")
+        self.values.pop().unwrap()
     }
 
     pub fn slice_top(&mut self, n: usize) -> &[Value] {
@@ -76,7 +89,7 @@ impl Stack {
     }
 
     pub fn peek(&self) -> &Value {
-        self.values.last().expect("stack was empty")
+        self.values.last().unwrap()
     }
 }
 
@@ -166,11 +179,7 @@ impl<'env> Context<'env> {
 
     /// Stores a variable in the context.
     pub fn store(&mut self, key: &'env str, value: Value) {
-        self.stack
-            .last_mut()
-            .expect("cannot store on empty stack")
-            .locals
-            .insert(key, value);
+        self.stack.last_mut().unwrap().locals.insert(key, value);
     }
 
     /// Looks up a variable in the context.
@@ -200,11 +209,7 @@ impl<'env> Context<'env> {
             }
         }
 
-        if let Some(value) = env.get_global(key) {
-            return Some(value);
-        }
-
-        None
+        env.get_global(key)
     }
 
     /// Pushes a new layer.
@@ -214,12 +219,12 @@ impl<'env> Context<'env> {
 
     /// Pops the topmost layer.
     pub fn pop_frame(&mut self) -> Frame {
-        self.stack.pop().expect("pop from empty context stack")
+        self.stack.pop().unwrap()
     }
 
     /// Returns the current locals.
     pub fn current_locals(&mut self) -> &mut Locals<'env> {
-        &mut self.stack.last_mut().expect("empty stack").locals
+        &mut self.stack.last_mut().unwrap().locals
     }
 
     /// Returns the current innermost loop.

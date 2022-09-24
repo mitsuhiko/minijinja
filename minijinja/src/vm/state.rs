@@ -134,10 +134,7 @@ impl<'vm, 'env> BlockStack<'vm, 'env> {
     }
 
     pub fn instructions(&self) -> &'vm Instructions<'env> {
-        self.instructions
-            .get(self.depth)
-            .copied()
-            .expect("block stack overflow")
+        self.instructions.get(self.depth).copied().unwrap()
     }
 
     pub fn push(&mut self) -> bool {
@@ -150,7 +147,7 @@ impl<'vm, 'env> BlockStack<'vm, 'env> {
     }
 
     pub fn pop(&mut self) {
-        self.depth = self.depth.checked_sub(1).expect("block stack underflow");
+        self.depth = self.depth.checked_sub(1).unwrap()
     }
 
     pub fn append_instructions(&mut self, instructions: &'vm Instructions<'env>) {
