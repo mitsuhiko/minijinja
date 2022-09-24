@@ -27,6 +27,12 @@ impl<'a> AssignmentTracker<'a> {
 
 /// Finds all variables that need to be captured as closure for a macro.
 pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
+    fn visit_expr_opt<'a>(expr: &Option<ast::Expr<'a>>, state: &mut AssignmentTracker<'a>) {
+        if let Some(expr) = expr {
+            visit_expr(expr, state);
+        }
+    }
+
     fn visit_expr<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a>) {
         match expr {
             ast::Expr::Var(var) => {
@@ -44,77 +50,43 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
             ast::Expr::IfExpr(expr) => {
                 visit_expr(&expr.test_expr, state);
                 visit_expr(&expr.true_expr, state);
-                if let Some(ref false_expr) = expr.false_expr {
-                    visit_expr(false_expr, state);
-                }
+                visit_expr_opt(&expr.false_expr, state);
             }
             ast::Expr::Filter(expr) => {
-                if let Some(ref expr) = expr.expr {
-                    visit_expr(expr, state);
-                }
-                for arg in &expr.args {
-                    visit_expr(arg, state);
-                }
+                visit_expr_opt(&expr.expr, state);
+                expr.args.iter().for_each(|x| visit_expr(x, state));
             }
             ast::Expr::Test(expr) => {
                 visit_expr(&expr.expr, state);
-                for arg in &expr.args {
-                    visit_expr(arg, state);
-                }
+                expr.args.iter().for_each(|x| visit_expr(x, state));
             }
-            ast::Expr::GetAttr(expr) => {
-                visit_expr(&expr.expr, state);
-            }
+            ast::Expr::GetAttr(expr) => visit_expr(&expr.expr, state),
             ast::Expr::GetItem(expr) => {
                 visit_expr(&expr.expr, state);
                 visit_expr(&expr.subscript_expr, state);
             }
             ast::Expr::Slice(slice) => {
-                if let Some(ref start) = slice.start {
-                    visit_expr(start, state);
-                }
-                if let Some(ref stop) = slice.stop {
-                    visit_expr(stop, state);
-                }
-                if let Some(ref step) = slice.step {
-                    visit_expr(step, state);
-                }
+                visit_expr_opt(&slice.start, state);
+                visit_expr_opt(&slice.stop, state);
+                visit_expr_opt(&slice.step, state);
             }
             ast::Expr::Call(expr) => {
                 visit_expr(&expr.expr, state);
-                for arg in &expr.args {
-                    visit_expr(arg, state);
-                }
+                expr.args.iter().for_each(|x| visit_expr(x, state));
             }
-            ast::Expr::List(expr) => {
-                for value in &expr.items {
-                    visit_expr(value, state);
-                }
-            }
-            ast::Expr::Map(expr) => {
-                for (key, value) in expr.keys.iter().zip(expr.values.iter()) {
-                    visit_expr(key, state);
-                    visit_expr(value, state);
-                }
-            }
-            ast::Expr::Kwargs(expr) => {
-                for (_, value) in &expr.pairs {
-                    visit_expr(value, state);
-                }
-            }
+            ast::Expr::List(expr) => expr.items.iter().for_each(|x| visit_expr(x, state)),
+            ast::Expr::Map(expr) => expr.keys.iter().zip(expr.values.iter()).for_each(|(k, v)| {
+                visit_expr(k, state);
+                visit_expr(v, state);
+            }),
+            ast::Expr::Kwargs(expr) => expr.pairs.iter().for_each(|(_, v)| visit_expr(v, state)),
         }
     }
 
     fn assign_nested<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a>) {
         match expr {
-            ast::Expr::Var(var) => {
-                state.assign(var.id);
-            }
-            ast::Expr::List(list) => {
-                for expr in &list.items {
-                    assign_nested(expr, state);
-                }
-            }
+            ast::Expr::Var(var) => state.assign(var.id),
+            ast::Expr::List(list) => list.items.iter().for_each(|x| assign_nested(x, state)),
             _ => {}
         }
     }
@@ -132,9 +104,7 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
                 state.assign("loop");
                 visit_expr(&stmt.iter, state);
                 assign_nested(&stmt.target, state);
-                if let Some(ref filter_expr) = stmt.filter_expr {
-                    visit_expr(filter_expr, state);
-                }
+                visit_expr_opt(&stmt.filter_expr, state);
                 stmt.body.iter().for_each(|x| walk(x, state));
                 state.pop();
                 state.push();
@@ -191,11 +161,9 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
             ast::Stmt::Import(stmt) => {
                 assign_nested(&stmt.name, state);
             }
-            ast::Stmt::FromImport(stmt) => {
-                for (arg, alias) in &stmt.names {
-                    assign_nested(alias.as_ref().unwrap_or(arg), state);
-                }
-            }
+            ast::Stmt::FromImport(stmt) => stmt.names.iter().for_each(|(arg, alias)| {
+                assign_nested(alias.as_ref().unwrap_or(arg), state);
+            }),
         }
     }
 
@@ -204,13 +172,8 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
         assigned: vec![Default::default()],
     };
 
-    for arg in &m.args {
-        assign_nested(arg, &mut state);
-    }
-
-    for node in &m.body {
-        walk(node, &mut state);
-    }
+    m.args.iter().for_each(|arg| assign_nested(arg, &mut state));
+    m.body.iter().for_each(|node| walk(node, &mut state));
 
     state.out
 }
