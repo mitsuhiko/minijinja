@@ -18,21 +18,28 @@ rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [features]
 default = ["builtins", "debug", "key_interning", "deserialization", "macros", "multi-template"]
+
+# API features
+preserve_order = ["indexmap"]
+deserialization = []
+debug = []
+source = ["self_cell", "memo-map"]
+
+# Speedups
+key_interning = []
+speedups = ["v_htmlescape", "key_interning"]
+
+# Engine Features
+builtins = []
 macros = []
 multi-template = []
-deserialization = []
-key_interning = []
-preserve_order = ["indexmap"]
-debug = []
-speedups = ["v_htmlescape"]
-source = ["self_cell", "memo-map"]
-builtins = []
+
+# Extra Filters
 json = ["serde_json"]
 urlencode = ["percent-encoding"]
 
-# enables the Debug trait for some internal types
+# Internal Features that should not be used
 internal_debug = []
-# provides access to the unstable machinery
 unstable_machinery = ["internal_debug"]
 
 [dependencies]

@@ -98,6 +98,13 @@
 //! template inheritance your experience will improve greatly if you ensure to render chained
 //! errors.  For more information see [`Error`] with an example.
 //!
+//! # Size and Compile Times
+//!
+//! MiniJinja attempts to compile fast so it can be used as a sensible template engine choice
+//! when compile times matter.  Because of this it's internally modular so unnecessary bits and
+//! pieces can be removed.  In particular for situations like `build.rs` files all default
+//! features can be disabled.
+//!
 //! # Learn more
 //!
 //! - [`Environment`]: the main API entry point.  Teaches you how to configure the environment.
