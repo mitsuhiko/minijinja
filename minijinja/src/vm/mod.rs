@@ -150,7 +150,7 @@ impl<'env> Vm<'env> {
             }};
         }
 
-        macro_rules! try_ctx {
+        macro_rules! ctx_ok {
             ($expr:expr) => {
                 match $expr {
                     Ok(rv) => rv,
@@ -163,7 +163,7 @@ impl<'env> Vm<'env> {
             ($method:ident) => {{
                 let b = stack.pop();
                 let a = stack.pop();
-                stack.push(try_ctx!(ops::$method(&a, &b)));
+                stack.push(ctx_ok!(ops::$method(&a, &b)));
             }};
         }
 
@@ -177,7 +177,7 @@ impl<'env> Vm<'env> {
 
         macro_rules! recurse_loop {
             ($capture:expr) => {{
-                let jump_target = try_ctx!(self.prepare_loop_recursion(state));
+                let jump_target = ctx_ok!(self.prepare_loop_recursion(state));
                 // the way this works is that we remember the next instruction
                 // as loop exit jump target.  Whenever a loop is pushed, it
                 // memorizes the value in `next_loop_iteration_jump` to jump
@@ -199,7 +199,7 @@ impl<'env> Vm<'env> {
                     ok!(out.write_str(val).map_err(Error::from));
                 }
                 Instruction::Emit => {
-                    try_ctx!(self.env.format(&stack.pop(), state, out));
+                    ctx_ok!(self.env.format(&stack.pop(), state, out));
                 }
                 Instruction::StoreLocal(name) => {
                     state.ctx.store(name, stack.pop());
@@ -209,19 +209,19 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::GetAttr(name) => {
                     let value = stack.pop();
-                    stack.push(try_ctx!(value.get_attr(name)));
+                    stack.push(ctx_ok!(value.get_attr(name)));
                 }
                 Instruction::GetItem => {
                     let attr = stack.pop();
                     let value = stack.pop();
-                    stack.push(try_ctx!(value.get_item(&attr)));
+                    stack.push(ctx_ok!(value.get_item(&attr)));
                 }
                 Instruction::Slice => {
                     let step = stack.pop();
                     let stop = stack.pop();
                     let start = stack.pop();
                     let value = stack.pop();
-                    stack.push(try_ctx!(ops::slice(value, start, stop, step)));
+                    stack.push(ctx_ok!(ops::slice(value, start, stop, step)));
                 }
                 Instruction::LoadConst(value) => {
                     stack.push(value.clone());
@@ -230,7 +230,7 @@ impl<'env> Vm<'env> {
                     let mut map = ValueMap::new();
                     for _ in 0..*pair_count {
                         let value = stack.pop();
-                        let key = try_ctx!(stack.pop().try_into_key());
+                        let key = ctx_ok!(stack.pop().try_into_key());
                         map.insert(key, value);
                     }
                     stack.push(Value(ValueRepr::Map(map.into(), MapType::Normal)))
@@ -253,7 +253,7 @@ impl<'env> Vm<'env> {
                     stack.push(Value(ValueRepr::Seq(Arc::new(v))));
                 }
                 Instruction::UnpackList(count) => {
-                    try_ctx!(self.unpack_list(&mut stack, count));
+                    ctx_ok!(self.unpack_list(&mut stack, count));
                 }
                 Instruction::ListAppend => {
                     let item = stack.pop();
@@ -292,11 +292,11 @@ impl<'env> Vm<'env> {
                 Instruction::In => {
                     let container = stack.pop();
                     let value = stack.pop();
-                    stack.push(try_ctx!(ops::contains(&container, &value)));
+                    stack.push(ctx_ok!(ops::contains(&container, &value)));
                 }
                 Instruction::Neg => {
                     let a = stack.pop();
-                    stack.push(try_ctx!(ops::neg(&a)));
+                    stack.push(ctx_ok!(ops::neg(&a)));
                 }
                 Instruction::PushWith => {
                     state.ctx.push_frame(Frame::default());
@@ -320,7 +320,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::PushLoop(flags) => {
                     let iterable = stack.pop();
-                    try_ctx!(self.push_loop(
+                    ctx_ok!(self.push_loop(
                         state,
                         iterable,
                         *flags,
@@ -376,7 +376,7 @@ impl<'env> Vm<'env> {
                         let rv = self.eval_state(state, out);
                         state.ctx.pop_frame();
                         state.instructions = old_instructions;
-                        try_ctx!(rv);
+                        ctx_ok!(rv);
                     } else {
                         bail!(Error::new(
                             ErrorKind::InvalidOperation,
@@ -389,7 +389,7 @@ impl<'env> Vm<'env> {
                     let value = stack.pop();
                     auto_escape_stack.push(state.auto_escape);
                     state.auto_escape =
-                        try_ctx!(self.derive_auto_escape(value, initial_auto_escape));
+                        ctx_ok!(self.derive_auto_escape(value, initial_auto_escape));
                 }
                 Instruction::PopAutoEscape => {
                     state.auto_escape = auto_escape_stack.pop().unwrap();
@@ -402,7 +402,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::ApplyFilter(name, arg_count, local_id) => {
                     let filter =
-                        try_ctx!(get_or_lookup_local(&mut loaded_filters, *local_id, || {
+                        ctx_ok!(get_or_lookup_local(&mut loaded_filters, *local_id, || {
                             state.env.get_filter(name)
                         })
                         .ok_or_else(|| {
@@ -412,19 +412,19 @@ impl<'env> Vm<'env> {
                             )
                         }));
                     let args = stack.slice_top(*arg_count);
-                    let rv = try_ctx!(filter.apply_to(state, args));
+                    let rv = ctx_ok!(filter.apply_to(state, args));
                     stack.drop_top(*arg_count);
                     stack.push(rv);
                 }
                 Instruction::PerformTest(name, arg_count, local_id) => {
-                    let test = try_ctx!(get_or_lookup_local(&mut loaded_tests, *local_id, || {
+                    let test = ctx_ok!(get_or_lookup_local(&mut loaded_tests, *local_id, || {
                         state.env.get_test(name)
                     })
                     .ok_or_else(|| {
                         Error::new(ErrorKind::UnknownTest, format!("test {} is unknown", name))
                     }));
                     let args = stack.slice_top(*arg_count);
-                    let rv = try_ctx!(test.perform(state, args));
+                    let rv = ctx_ok!(test.perform(state, args));
                     stack.drop_top(*arg_count);
                     stack.push(Value::from(rv));
                 }
@@ -437,7 +437,7 @@ impl<'env> Vm<'env> {
                                 "super() takes no arguments",
                             ));
                         }
-                        stack.push(try_ctx!(self.perform_super(state, out, true)));
+                        stack.push(ctx_ok!(self.perform_super(state, out, true)));
                     // loop is a special name which when called recurses the current loop.
                     } else if *function_name == "loop" {
                         if *arg_count != 1 {
@@ -450,7 +450,7 @@ impl<'env> Vm<'env> {
                         recurse_loop!(true);
                     } else if let Some(func) = state.ctx.load(self.env, function_name) {
                         let args = stack.slice_top(*arg_count);
-                        let rv = try_ctx!(func.call(state, args));
+                        let rv = ctx_ok!(func.call(state, args));
                         stack.drop_top(*arg_count);
                         stack.push(rv);
                     } else {
@@ -462,13 +462,13 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::CallMethod(name, arg_count) => {
                     let args = stack.slice_top(*arg_count);
-                    let rv = try_ctx!(args[0].call_method(state, name, &args[1..]));
+                    let rv = ctx_ok!(args[0].call_method(state, name, &args[1..]));
                     stack.drop_top(*arg_count);
                     stack.push(rv);
                 }
                 Instruction::CallObject(arg_count) => {
                     let args = stack.slice_top(*arg_count);
-                    let rv = try_ctx!(args[0].call(state, &args[1..]));
+                    let rv = ctx_ok!(args[0].call(state, &args[1..]));
                     stack.drop_top(*arg_count);
                     stack.push(rv);
                 }
@@ -479,7 +479,7 @@ impl<'env> Vm<'env> {
                     stack.pop();
                 }
                 Instruction::FastSuper => {
-                    try_ctx!(self.perform_super(state, out, false));
+                    ctx_ok!(self.perform_super(state, out, false));
                 }
                 Instruction::FastRecurse => {
                     recurse_loop!(false);
@@ -487,7 +487,7 @@ impl<'env> Vm<'env> {
                 #[cfg(feature = "multi-template")]
                 Instruction::LoadBlocks => {
                     let name = stack.pop();
-                    try_ctx!(self.load_blocks(name, state));
+                    ctx_ok!(self.load_blocks(name, state));
 
                     // then replace the instructions and set the pc to 0 again.
                     // this effectively means that the template engine will now
@@ -499,7 +499,7 @@ impl<'env> Vm<'env> {
                 #[cfg(feature = "multi-template")]
                 Instruction::Include(ignore_missing) => {
                     let name = stack.pop();
-                    try_ctx!(self.perform_include(name, state, out, *ignore_missing));
+                    ctx_ok!(self.perform_include(name, state, out, *ignore_missing));
                 }
                 #[cfg(feature = "multi-template")]
                 Instruction::ExportLocals => {
