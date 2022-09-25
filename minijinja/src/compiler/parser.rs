@@ -43,7 +43,7 @@ macro_rules! expect_token {
     }};
     ($parser:expr, $match:pat, $expectation:expr) => {{
         match ok!($parser.stream.next()) {
-            Some((token, span)) if matches!(token, $match) => (token, span),
+            Some((token @ $match, span)) => (token, span),
             Some((token, _)) => return Err(unexpected(token, $expectation)),
             None => return Err(unexpected_eof($expectation)),
         }
@@ -59,14 +59,20 @@ macro_rules! expect_token {
 
 macro_rules! matches_token {
     ($p:expr, $match:pat) => {
-        matches!(ok!($p.stream.current()), Some(($match, _)))
+        match $p.stream.current() {
+            Err(err) => return Err(err),
+            Ok(Some(($match, _))) => true,
+            _ => false,
+        }
     };
 }
 
 macro_rules! skip_token {
     ($p:expr, $match:pat) => {
         if matches_token!($p, $match) {
-            ok!($p.stream.next());
+            // we can ignore the error as matches_token! would already
+            // have created it.
+            let _ = $p.stream.next();
             true
         } else {
             false

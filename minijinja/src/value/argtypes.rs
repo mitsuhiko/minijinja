@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
-use crate::value::{Arc, MapType, StringType, Value, ValueRepr};
+use crate::value::{Arc, MapType, StringType, Value, ValueKind, ValueRepr};
 use crate::vm::State;
 
 /// A utility trait that represents the return value of functions and filters.
@@ -297,25 +297,25 @@ value_from!(f32, F64);
 value_from!(f64, F64);
 value_from!(char, Char);
 
+fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {
+    Error::new(
+        ErrorKind::InvalidOperation,
+        format!("cannot convert {} to {}", kind, target),
+    )
+}
+
 macro_rules! primitive_try_from {
     ($ty:ident, {
         $($pat:pat $(if $if_expr:expr)? => $expr:expr,)*
     }) => {
-
         impl TryFrom<Value> for $ty {
             type Error = Error;
 
             fn try_from(value: Value) -> Result<Self, Self::Error> {
-                let opt = match value.0 {
+                match value.0 {
                     $($pat $(if $if_expr)? => TryFrom::try_from($expr).ok(),)*
                     _ => None
-                };
-                opt.ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidOperation,
-                        format!("cannot convert {} to {}", value.kind(), stringify!($ty))
-                    )
-                })
+                }.ok_or_else(|| unsupported_conversion(value.kind(), stringify!($ty)))
             }
         }
 
