@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
-use crate::value::{Arc, MapType, Value, ValueRepr};
+use crate::value::{Arc, MapType, StringType, Value, ValueRepr};
 use crate::vm::State;
 
 /// A utility trait that represents the return value of functions and filters.
@@ -203,14 +203,14 @@ impl<'a> From<&'a [u8]> for Value {
 impl<'a> From<&'a str> for Value {
     #[inline(always)]
     fn from(val: &'a str) -> Self {
-        ValueRepr::String(Arc::new(val.into())).into()
+        ValueRepr::String(Arc::new(val.into()), StringType::Normal).into()
     }
 }
 
 impl From<String> for Value {
     #[inline(always)]
     fn from(val: String) -> Self {
-        ValueRepr::String(Arc::new(val)).into()
+        ValueRepr::String(Arc::new(val), StringType::Normal).into()
     }
 }
 
@@ -251,7 +251,7 @@ impl<'a> From<Key<'a>> for Value {
             Key::Bool(val) => val.into(),
             Key::I64(val) => val.into(),
             Key::Char(val) => val.into(),
-            Key::String(val) => ValueRepr::String(val).into(),
+            Key::String(val) => ValueRepr::String(val, StringType::Normal).into(),
             Key::Str(val) => val.into(),
         }
     }

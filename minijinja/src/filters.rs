@@ -538,9 +538,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn first(value: Value) -> Result<Value, Error> {
         match value.0 {
-            ValueRepr::String(s) | ValueRepr::SafeString(s) => {
-                Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
-            }
+            ValueRepr::String(s, _) => Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from)),
             ValueRepr::Seq(ref s) => Ok(s.first().cloned().unwrap_or(Value::UNDEFINED)),
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -567,7 +565,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn last(value: Value) -> Result<Value, Error> {
         match value.0 {
-            ValueRepr::String(s) | ValueRepr::SafeString(s) => {
+            ValueRepr::String(s, _) => {
                 Ok(s.chars().rev().next().map_or(Value::UNDEFINED, Value::from))
             }
             ValueRepr::Seq(ref s) => Ok(s.last().cloned().unwrap_or(Value::UNDEFINED)),
@@ -588,7 +586,7 @@ mod builtins {
     pub fn list(value: Value) -> Result<Value, Error> {
         match &value.0 {
             ValueRepr::Undefined => Ok(Value::from(Vec::<Value>::new())),
-            ValueRepr::String(ref s) | ValueRepr::SafeString(ref s) => {
+            ValueRepr::String(ref s, _) => {
                 Ok(Value::from(s.chars().map(Value::from).collect::<Vec<_>>()))
             }
             ValueRepr::Seq(_) => Ok(value.clone()),
@@ -772,7 +770,7 @@ mod builtins {
         match &value.0 {
             ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
             ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
-            ValueRepr::String(s) | ValueRepr::SafeString(s) => {
+            ValueRepr::String(s, _) => {
                 Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
             }
             ValueRepr::Map(ref val, _) => {

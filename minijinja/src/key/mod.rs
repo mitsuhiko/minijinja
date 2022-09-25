@@ -102,7 +102,7 @@ impl<'a> Key<'a> {
                 }
             }
             ValueRepr::Char(c) => Ok(Key::Char(c)),
-            ValueRepr::String(ref s) => Ok(Key::Str(s)),
+            ValueRepr::String(ref s, _) => Ok(Key::Str(s)),
             _ => Err(ErrorKind::NonKey.into()),
         }
     }

@@ -213,6 +213,13 @@ pub(crate) enum MapType {
     Kwargs,
 }
 
+/// Type type of string
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum StringType {
+    Normal,
+    Safe,
+}
+
 #[derive(Clone)]
 pub(crate) enum ValueRepr {
     Undefined,
@@ -224,8 +231,7 @@ pub(crate) enum ValueRepr {
     None,
     U128(Arc<u128>),
     I128(Arc<i128>),
-    String(Arc<String>),
-    SafeString(Arc<String>),
+    String(Arc<String>, StringType),
     Bytes(Arc<Vec<u8>>),
     Seq(Arc<Vec<Value>>),
     Map(Arc<ValueMap>, MapType),
@@ -244,8 +250,7 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::None => write!(f, "None"),
             ValueRepr::U128(val) => fmt::Debug::fmt(val, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::String(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::SafeString(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
             ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Map(val, _) => fmt::Debug::fmt(val, f),
@@ -262,8 +267,7 @@ impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => true,
-            (ValueRepr::String(a), ValueRepr::String(b))
-            | (ValueRepr::SafeString(a), ValueRepr::SafeString(b)) => a == b,
+            (ValueRepr::String(a, _), ValueRepr::String(b, _)) => a == b,
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
@@ -281,8 +285,7 @@ impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => Some(Ordering::Equal),
-            (ValueRepr::String(a), ValueRepr::String(b))
-            | (ValueRepr::SafeString(a), ValueRepr::SafeString(b)) => a.partial_cmp(b),
+            (ValueRepr::String(a, _), ValueRepr::String(b, _)) => a.partial_cmp(b),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.partial_cmp(b),
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a.partial_cmp(&b),
@@ -317,8 +320,7 @@ impl fmt::Display for Value {
             ValueRepr::Char(val) => write!(f, "{}", val),
             ValueRepr::None => write!(f, "none"),
             ValueRepr::I128(val) => write!(f, "{}", val),
-            ValueRepr::String(val) => write!(f, "{}", val),
-            ValueRepr::SafeString(val) => write!(f, "{}", val),
+            ValueRepr::String(val, _) => write!(f, "{}", val),
             ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
             ValueRepr::Seq(values) => {
                 ok!(write!(f, "["));
@@ -368,7 +370,7 @@ impl Value {
 
     /// Creates a value from a safe string.
     pub fn from_safe_string(value: String) -> Value {
-        ValueRepr::SafeString(Arc::new(value)).into()
+        ValueRepr::String(Arc::new(value), StringType::Safe).into()
     }
 
     /// Creates a value from a reference counted dynamic object.
@@ -441,7 +443,7 @@ impl Value {
             ValueRepr::Char(_) => ValueKind::Char,
             ValueRepr::None => ValueKind::None,
             ValueRepr::I128(_) => ValueKind::Number,
-            ValueRepr::String(_) | ValueRepr::SafeString(_) => ValueKind::String,
+            ValueRepr::String(..) => ValueKind::String,
             ValueRepr::Bytes(_) => ValueKind::Bytes,
             ValueRepr::U128(_) => ValueKind::Number,
             ValueRepr::Seq(_) => ValueKind::Seq,
@@ -457,8 +459,7 @@ impl Value {
     /// If the value is a string, return it.
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
-            ValueRepr::String(ref s) => Some(s.as_str()),
-            ValueRepr::SafeString(ref s) => Some(s.as_str()),
+            ValueRepr::String(ref s, _) => Some(s.as_str()),
             _ => None,
         }
     }
@@ -466,8 +467,7 @@ impl Value {
     /// Returns the bytes of this value if they exist.
     pub fn as_bytes(&self) -> Option<&[u8]> {
         match &self.0 {
-            ValueRepr::String(ref s) => Some(s.as_bytes()),
-            ValueRepr::SafeString(ref s) => Some(s.as_bytes()),
+            ValueRepr::String(ref s, _) => Some(s.as_bytes()),
             ValueRepr::Bytes(ref b) => Some(&b[..]),
             _ => None,
         }
@@ -477,8 +477,7 @@ impl Value {
     #[allow(unused)]
     pub(crate) fn to_cowstr(&self) -> Cow<'_, str> {
         match &self.0 {
-            ValueRepr::String(ref s) => Cow::Borrowed(s.as_str()),
-            ValueRepr::SafeString(ref s) => Cow::Borrowed(s.as_str()),
+            ValueRepr::String(ref s, _) => Cow::Borrowed(s.as_str()),
             _ => Cow::Owned(self.to_string()),
         }
     }
@@ -493,8 +492,7 @@ impl Value {
             ValueRepr::I128(ref x) => **x != 0,
             ValueRepr::F64(x) => x != 0.0,
             ValueRepr::Char(x) => x != '\x00',
-            ValueRepr::String(ref x) => !x.is_empty(),
-            ValueRepr::SafeString(ref x) => !x.is_empty(),
+            ValueRepr::String(ref x, _) => !x.is_empty(),
             ValueRepr::Bytes(ref x) => !x.is_empty(),
             ValueRepr::None | ValueRepr::Undefined => false,
             ValueRepr::Seq(ref x) => !x.is_empty(),
@@ -505,7 +503,7 @@ impl Value {
 
     /// Returns `true` if this value is safe.
     pub fn is_safe(&self) -> bool {
-        matches!(&self.0, ValueRepr::SafeString(_))
+        matches!(&self.0, ValueRepr::String(_, StringType::Safe))
     }
 
     /// Returns `true` if this value is undefined.
@@ -521,7 +519,7 @@ impl Value {
     /// Returns the length of the contained value.
     pub fn len(&self) -> Option<usize> {
         match self.0 {
-            ValueRepr::String(ref s) | ValueRepr::SafeString(ref s) => Some(s.chars().count()),
+            ValueRepr::String(ref s, _) => Some(s.chars().count()),
             ValueRepr::Map(ref items, _) => Some(items.len()),
             ValueRepr::Seq(ref items) => Some(items.len()),
             ValueRepr::Dynamic(ref dy) => Some(dy.attributes().len()),
@@ -656,7 +654,7 @@ impl Value {
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
             ValueRepr::Char(c) => Ok(Key::Char(c)),
-            ValueRepr::String(ref s) => Ok(Key::String(s.clone())),
+            ValueRepr::String(ref s, _) => Ok(Key::String(s.clone())),
             _ => Err(ErrorKind::NonKey.into()),
         }
     }
@@ -729,8 +727,7 @@ impl Serialize for Value {
             ValueRepr::Undefined => serializer.serialize_unit(),
             ValueRepr::U128(ref u) => serializer.serialize_u128(**u),
             ValueRepr::I128(ref i) => serializer.serialize_i128(**i),
-            ValueRepr::String(ref s) => serializer.serialize_str(s),
-            ValueRepr::SafeString(ref val) => serializer.serialize_str(val),
+            ValueRepr::String(ref s, _) => serializer.serialize_str(s),
             ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
             ValueRepr::Seq(ref elements) => elements.serialize(serializer),
             ValueRepr::Map(ref entries, _) => {

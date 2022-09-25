@@ -29,7 +29,7 @@ pub fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
         (ValueRepr::U128(a), ValueRepr::U128(b)) => {
             Some(CoerceResult::I128(**a as i128, **b as i128))
         }
-        (ValueRepr::String(a), ValueRepr::String(b)) => {
+        (ValueRepr::String(a, _), ValueRepr::String(b, _)) => {
             Some(CoerceResult::String(a.to_string(), b.to_string()))
         }
         (ValueRepr::I64(a), ValueRepr::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
@@ -225,7 +225,7 @@ pub fn string_concat(mut left: Value, right: &Value) -> Value {
     match left.0 {
         // if we're a string and we have a single reference to it, we can
         // directly append into ourselves and reconstruct the value
-        ValueRepr::String(ref mut s) => {
+        ValueRepr::String(ref mut s, _) => {
             write!(Arc::make_mut(s), "{}", right).ok();
             left
         }
@@ -245,7 +245,7 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
             };
             return Ok(Value::from(map.get(&key).is_some()));
         }
-        ValueRepr::String(ref s) | ValueRepr::SafeString(ref s) => {
+        ValueRepr::String(ref s, _) => {
             return Ok(Value::from(if let Some(s2) = value.as_str() {
                 s.contains(&s2)
             } else {

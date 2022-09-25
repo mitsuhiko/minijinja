@@ -753,7 +753,7 @@ impl<'env> Vm<'env> {
             ValueRepr::Seq(args) => args
                 .iter()
                 .map(|value| match &value.0 {
-                    ValueRepr::String(arg) => arg.clone(),
+                    ValueRepr::String(arg, _) => arg.clone(),
                     _ => unreachable!(),
                 })
                 .collect(),

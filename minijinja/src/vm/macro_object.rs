@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorKind};
 use crate::key::Key;
 use crate::output::Output;
 use crate::utils::AutoEscape;
-use crate::value::{MapType, Object, Value, ValueRepr};
+use crate::value::{MapType, Object, StringType, Value, ValueRepr};
 use crate::vm::state::State;
 use crate::vm::Vm;
 
@@ -40,11 +40,14 @@ impl Object for Macro {
 
     fn get_attr(&self, name: &str) -> Option<Value> {
         match name {
-            "name" => Some(Value(ValueRepr::String(self.name.clone()))),
+            "name" => Some(Value(ValueRepr::String(
+                self.name.clone(),
+                StringType::Normal,
+            ))),
             "arguments" => Some(Value::from(
                 self.arg_spec
                     .iter()
-                    .map(|x| Value(ValueRepr::String(x.clone())))
+                    .map(|x| Value(ValueRepr::String(x.clone(), StringType::Normal)))
                     .collect::<Vec<_>>(),
             )),
             _ => None,

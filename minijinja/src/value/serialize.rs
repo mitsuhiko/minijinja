@@ -4,7 +4,9 @@ use serde::{ser, Serialize, Serializer};
 
 use crate::error::Error;
 use crate::key::{Key, KeySerializer, StaticKey};
-use crate::value::{Arc, MapType, Value, ValueMap, ValueRepr, VALUE_HANDLES, VALUE_HANDLE_MARKER};
+use crate::value::{
+    Arc, MapType, StringType, Value, ValueMap, ValueRepr, VALUE_HANDLES, VALUE_HANDLE_MARKER,
+};
 
 pub struct ValueSerializer;
 
@@ -77,7 +79,7 @@ impl Serializer for ValueSerializer {
     }
 
     fn serialize_str(self, value: &str) -> Result<Value, Error> {
-        Ok(ValueRepr::String(Arc::new(value.to_owned())).into())
+        Ok(ValueRepr::String(Arc::new(value.to_owned()), StringType::Normal).into())
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<Value, Error> {
@@ -109,7 +111,7 @@ impl Serializer for ValueSerializer {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<Value, Error> {
-        Ok(ValueRepr::String(Arc::new(variant.to_string())).into())
+        Ok(ValueRepr::String(Arc::new(variant.to_string()), StringType::Normal).into())
     }
 
     fn serialize_newtype_struct<T: ?Sized>(
