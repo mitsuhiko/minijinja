@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-# Unreleased
+# 0.23.0
 
 - Added `Value::from_function`. (#121)
 - Fixed incorrect location information with blocks.
