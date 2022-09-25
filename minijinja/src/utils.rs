@@ -5,7 +5,7 @@ use std::iter::{once, repeat};
 use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Value, ValueKind};
+use crate::value::{StringType, Value, ValueKind, ValueRepr};
 use crate::Output;
 
 #[cfg(test)]
@@ -37,38 +37,41 @@ fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
     }
 }
 
+fn invalid_autoescape(name: &str) -> Result<(), Error> {
+    Err(Error::new(
+        ErrorKind::InvalidOperation,
+        format!(
+            "Default formatter does not know how to format to custom format '{}'",
+            name
+        ),
+    ))
+}
+
 #[inline(always)]
 pub fn write_escaped(
     out: &mut Output,
     auto_escape: AutoEscape,
     value: &Value,
 ) -> Result<(), Error> {
-    match (value.is_safe(), auto_escape) {
-        // safe values do not get escaped
-        (true, _) | (_, AutoEscape::None) => {
-            ok!(write!(out, "{}", value).map_err(Error::from))
+    // common case of safe strings or strings without auto escaping
+    if let ValueRepr::String(ref s, ty) = value.0 {
+        if matches!(ty, StringType::Safe) || matches!(auto_escape, AutoEscape::None) {
+            return out.write_str(s).map_err(Error::from);
         }
-        (false, AutoEscape::Html) => {
-            ok!(write_with_html_escaping(out, value).map_err(Error::from))
-        }
+    }
+
+    match auto_escape {
+        AutoEscape::None => write!(out, "{}", value).map_err(Error::from),
+        AutoEscape::Html => write_with_html_escaping(out, value).map_err(Error::from),
         #[cfg(feature = "json")]
-        (false, AutoEscape::Json) => {
+        AutoEscape::Json => {
             let value = ok!(serde_json::to_string(&value).map_err(|err| {
                 Error::new(ErrorKind::BadSerialization, "unable to format to JSON").with_source(err)
             }));
-            ok!(write!(out, "{}", value).map_err(Error::from))
+            write!(out, "{}", value).map_err(Error::from)
         }
-        (false, AutoEscape::Custom(name)) => {
-            return Err(Error::new(
-                ErrorKind::InvalidOperation,
-                format!(
-                    "Default formatter does not know how to format to custom format '{}'",
-                    name
-                ),
-            ));
-        }
+        AutoEscape::Custom(name) => invalid_autoescape(name),
     }
-    Ok(())
 }
 
 /// Controls the autoescaping behavior.
