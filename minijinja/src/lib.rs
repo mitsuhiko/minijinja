@@ -92,19 +92,6 @@
 //! Na Na Na Batman!
 //! ```
 //!
-//! # Error Handling
-//!
-//! MiniJinja tries to give you good errors out of the box.  However if you use includes or
-//! template inheritance your experience will improve greatly if you ensure to render chained
-//! errors.  For more information see [`Error`] with an example.
-//!
-//! # Size and Compile Times
-//!
-//! MiniJinja attempts to compile fast so it can be used as a sensible template engine choice
-//! when compile times matter.  Because of this it's internally modular so unnecessary bits and
-//! pieces can be removed.  In particular for situations like `build.rs` files all default
-//! features can be disabled.
-//!
 //! # Learn more
 //!
 //! - [`Environment`]: the main API entry point.  Teaches you how to configure the environment.
@@ -117,6 +104,20 @@
 //!
 //! Additionally there is an [list of examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
 //! with many different small example programs on GitHub to explore.
+//!
+//! # Error Handling
+//!
+//! MiniJinja tries to give you good errors out of the box.  However if you use includes or
+//! template inheritance your experience will improve greatly if you ensure to render chained
+//! errors.  For more information see [`Error`] with an example.
+//!
+//! # Size and Compile Times
+//!
+//! MiniJinja attempts to compile fast so it can be used as a sensible template engine choice
+//! when compile times matter.  Because of this it's internally modular so unnecessary bits and
+//! pieces can be removed.  The default set of features tries to strike a balance but in
+//! situations where only a subset is needed (eg: `build.rs`) all default features can be
+//! be disabled.
 //!
 //! # Optional Features
 //!
@@ -151,7 +152,7 @@
 //!
 //! - `source`: enables the `Source` type which helps with dynamic loading of templates.
 //! - `speedups`: enables all speedups, in particular it turns on the `v_htmlescape` dependency
-//!   for faster HTML escapling.
+//!   for faster HTML escapling.  This also turns on `key_interning` automatically.
 //! - `json`: When enabled the `tojson` filter is added as builtin filter as well as
 //!   the ability to auto escape via `AutoEscape::Json`.
 //! - `urlencode`: When enabled the `urlencode` filter is added as builtin filter.
