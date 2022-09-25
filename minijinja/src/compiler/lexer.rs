@@ -67,7 +67,6 @@ fn skip_basic_tag(block_str: &str, name: &str) -> Option<usize> {
 }
 
 impl<'s> TokenizerState<'s> {
-    #[inline(always)]
     fn advance(&mut self, bytes: usize) -> &'s str {
         let (skipped, new_rest) = self.rest.split_at(bytes);
         for c in skipped.chars() {
@@ -88,7 +87,6 @@ impl<'s> TokenizerState<'s> {
         (self.current_line, self.current_col)
     }
 
-    #[inline(always)]
     fn span(&self, start: (usize, usize)) -> Span {
         let (start_line, start_col) = start;
         Span {
