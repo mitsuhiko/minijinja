@@ -290,9 +290,12 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
     }
 
     fn end(self) -> Result<Value, Error> {
-        let mut map = BTreeMap::new();
-        map.insert(self.name, self.fields);
-        Ok(map.into())
+        let mut map = ValueMap::new();
+        map.insert(
+            Key::from(self.name),
+            Value(ValueRepr::Seq(self.fields.into())),
+        );
+        Ok(Value(ValueRepr::Map(map.into(), MapType::Normal)))
     }
 }
 
