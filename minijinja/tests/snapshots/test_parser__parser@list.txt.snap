@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-description: "{{ [1, 2, foo] }}"
+description: "{{ [1, 2, foo] }}\n{{ [1, 2, 3,] }}"
 input_file: minijinja/tests/parser-inputs/list.txt
 ---
 Ok(
@@ -21,6 +21,24 @@ Ok(
                     ],
                 } @ 1:3-1:14,
             } @ 1:0-1:14,
+            EmitRaw {
+                raw: "\n",
+            } @ 1:17-2:0,
+            EmitExpr {
+                expr: List {
+                    items: [
+                        Const {
+                            value: 1,
+                        } @ 2:4-2:5,
+                        Const {
+                            value: 2,
+                        } @ 2:7-2:8,
+                        Const {
+                            value: 3,
+                        } @ 2:10-2:11,
+                    ],
+                } @ 2:3-2:13,
+            } @ 2:0-2:13,
         ],
-    } @ 0:0-1:17,
+    } @ 0:0-2:16,
 )
