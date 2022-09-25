@@ -1,18 +1,9 @@
 use minijinja::{context, Environment};
-use serde::Serialize;
-
-#[derive(Serialize)]
-pub struct User {
-    name: String,
-}
 
 fn main() {
     let mut env = Environment::new();
-    env.add_template("hello.txt", "Hello {{ user.name }}!")
+    env.add_template("hello.txt", "Hello {{ name }}!")
         .unwrap();
     let template = env.get_template("hello.txt").unwrap();
-    let user = User {
-        name: "John".into(),
-    };
-    println!("{}", template.render(context!(user)).unwrap());
+    println!("{}", template.render(context!(name => "John")).unwrap());
 }
