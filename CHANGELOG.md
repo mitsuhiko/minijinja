@@ -16,6 +16,9 @@ All notable changes to MiniJinja are documented here.
   to a function or filter is a normal object or if it represents
   keyword arguments.
 - Added the ability to call functions stored on objects.
+- Added `macros` and `multi-template` features to disable some of
+  the heavier pieces of MiniJinja.
+- Fixed an issue that caused trailing commas not to work in lists.
 
 # 0.22.1
 
