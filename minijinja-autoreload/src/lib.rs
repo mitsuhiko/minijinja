@@ -242,6 +242,7 @@ impl Notifier {
         inner.should_reload || inner.should_reload_callback.as_ref().map_or(false, |x| x())
     }
 
+    #[cfg(feature = "watch-fs")]
     fn with_fs_watcher<F: FnOnce(&mut notify::RecommendedWatcher)>(&self, f: F) {
         use notify::event::{EventKind, ModifyKind};
 
