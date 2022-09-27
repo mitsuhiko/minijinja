@@ -37,8 +37,10 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 use std::ops::Deref;
-use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
+
+#[cfg(feature = "watch-fs")]
+use std::path::Path;
 
 use minijinja::{Environment, Error};
 

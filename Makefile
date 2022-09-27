@@ -36,6 +36,9 @@ check:
 	@cd minijinja; cargo check --no-default-features --features macros
 	@echo "check multi-template only:"
 	@cd minijinja; cargo check --no-default-features --features multi-template
+	@echo "check minijinja-autoreload:"
+	@cd minijinja-autoreload; cargo check
+	@cd minijinja-autoreload; cargo check --no-default-features
 
 format:
 	@rustup component add rustfmt 2> /dev/null
