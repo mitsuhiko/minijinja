@@ -144,37 +144,6 @@ impl<'env> Vm<'env> {
         let mut loaded_filters = [None; MAX_LOCALS];
         let mut loaded_tests = [None; MAX_LOCALS];
 
-        macro_rules! bail {
-            ($err:expr) => {{
-                return Err(process_err($err, pc, state));
-            }};
-        }
-
-        macro_rules! ctx_ok {
-            ($expr:expr) => {
-                match $expr {
-                    Ok(rv) => rv,
-                    Err(err) => bail!(err),
-                }
-            };
-        }
-
-        macro_rules! func_binop {
-            ($method:ident) => {{
-                let b = stack.pop();
-                let a = stack.pop();
-                stack.push(ctx_ok!(ops::$method(&a, &b)));
-            }};
-        }
-
-        macro_rules! op_binop {
-            ($op:tt) => {{
-                let b = stack.pop();
-                let a = stack.pop();
-                stack.push(Value::from(a $op b));
-            }};
-        }
-
         macro_rules! recurse_loop {
             ($capture:expr) => {{
                 let jump_target = ctx_ok!(self.prepare_loop_recursion(state));
@@ -192,6 +161,47 @@ impl<'env> Vm<'env> {
         }
 
         while let Some(instr) = state.instructions.get(pc) {
+            // if we only have two arguments that we pull from the stack, we
+            // can assign them to a and b.  This slightly reduces the amount of
+            // code bloat generated here.  Do the same for a potential error
+            // that needs processing.
+            let a;
+            let b;
+            let mut err;
+
+            macro_rules! func_binop {
+                ($method:ident) => {{
+                    b = stack.pop();
+                    a = stack.pop();
+                    stack.push(ctx_ok!(ops::$method(&a, &b)));
+                }};
+            }
+
+            macro_rules! op_binop {
+                ($op:tt) => {{
+                    b = stack.pop();
+                    a = stack.pop();
+                    stack.push(Value::from(a $op b));
+                }};
+            }
+
+            macro_rules! bail {
+                ($err:expr) => {{
+                    err = $err;
+                    process_err(&mut err, pc, state);
+                    return Err(err);
+                }};
+            }
+
+            macro_rules! ctx_ok {
+                ($expr:expr) => {
+                    match $expr {
+                        Ok(rv) => rv,
+                        Err(err) => bail!(err),
+                    }
+                };
+            }
+
             match instr {
                 Instruction::EmitRaw(val) => {
                     // this only produces a format error, no need to attach
@@ -208,20 +218,20 @@ impl<'env> Vm<'env> {
                     stack.push(state.ctx.load(self.env, name).unwrap_or(Value::UNDEFINED));
                 }
                 Instruction::GetAttr(name) => {
-                    let value = stack.pop();
-                    stack.push(ctx_ok!(value.get_attr(name)));
+                    a = stack.pop();
+                    stack.push(ctx_ok!(a.get_attr(name)));
                 }
                 Instruction::GetItem => {
-                    let attr = stack.pop();
-                    let value = stack.pop();
-                    stack.push(ctx_ok!(value.get_item(&attr)));
+                    a = stack.pop();
+                    b = stack.pop();
+                    stack.push(ctx_ok!(b.get_item(&a)));
                 }
                 Instruction::Slice => {
                     let step = stack.pop();
                     let stop = stack.pop();
-                    let start = stack.pop();
-                    let value = stack.pop();
-                    stack.push(ctx_ok!(ops::slice(value, start, stop, step)));
+                    b = stack.pop();
+                    a = stack.pop();
+                    stack.push(ctx_ok!(ops::slice(a, b, stop, step)));
                 }
                 Instruction::LoadConst(value) => {
                     stack.push(value.clone());
@@ -256,9 +266,9 @@ impl<'env> Vm<'env> {
                     ctx_ok!(self.unpack_list(&mut stack, count));
                 }
                 Instruction::ListAppend => {
-                    let item = stack.pop();
+                    a = stack.pop();
                     if let ValueRepr::Seq(mut v) = stack.pop().0 {
-                        Arc::make_mut(&mut v).push(item);
+                        Arc::make_mut(&mut v).push(a);
                         stack.push(Value(ValueRepr::Seq(v)))
                     } else {
                         bail!(Error::new(
@@ -281,21 +291,21 @@ impl<'env> Vm<'env> {
                 Instruction::Lt => op_binop!(<),
                 Instruction::Lte => op_binop!(<=),
                 Instruction::Not => {
-                    let a = stack.pop();
+                    a = stack.pop();
                     stack.push(Value::from(!a.is_true()));
                 }
                 Instruction::StringConcat => {
-                    let a = stack.pop();
-                    let b = stack.pop();
+                    a = stack.pop();
+                    b = stack.pop();
                     stack.push(ops::string_concat(b, &a));
                 }
                 Instruction::In => {
-                    let container = stack.pop();
-                    let value = stack.pop();
-                    stack.push(ctx_ok!(ops::contains(&container, &value)));
+                    a = stack.pop();
+                    b = stack.pop();
+                    stack.push(ctx_ok!(ops::contains(&a, &b)));
                 }
                 Instruction::Neg => {
-                    let a = stack.pop();
+                    a = stack.pop();
                     stack.push(ctx_ok!(ops::neg(&a)));
                 }
                 Instruction::PushWith => {
@@ -315,18 +325,12 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "macros")]
                 Instruction::IsUndefined => {
-                    let value = stack.pop();
-                    stack.push(Value::from(value.is_undefined()));
+                    a = stack.pop();
+                    stack.push(Value::from(a.is_undefined()));
                 }
                 Instruction::PushLoop(flags) => {
-                    let iterable = stack.pop();
-                    ctx_ok!(self.push_loop(
-                        state,
-                        iterable,
-                        *flags,
-                        pc,
-                        next_loop_recursion_jump.take()
-                    ));
+                    a = stack.pop();
+                    ctx_ok!(self.push_loop(state, a, *flags, pc, next_loop_recursion_jump.take()));
                 }
                 Instruction::Iterate(jump_target) => {
                     let l = state.ctx.current_loop().expect("not inside a loop");
@@ -344,8 +348,8 @@ impl<'env> Vm<'env> {
                     continue;
                 }
                 Instruction::JumpIfFalse(jump_target) => {
-                    let value = stack.pop();
-                    if !value.is_true() {
+                    a = stack.pop();
+                    if !a.is_true() {
                         pc = *jump_target;
                         continue;
                     }
@@ -386,10 +390,9 @@ impl<'env> Vm<'env> {
                     state.current_block = old_block;
                 }
                 Instruction::PushAutoEscape => {
-                    let value = stack.pop();
+                    a = stack.pop();
                     auto_escape_stack.push(state.auto_escape);
-                    state.auto_escape =
-                        ctx_ok!(self.derive_auto_escape(value, initial_auto_escape));
+                    state.auto_escape = ctx_ok!(self.derive_auto_escape(a, initial_auto_escape));
                 }
                 Instruction::PopAutoEscape => {
                     state.auto_escape = auto_escape_stack.pop().unwrap();
@@ -412,9 +415,9 @@ impl<'env> Vm<'env> {
                             )
                         }));
                     let args = stack.slice_top(*arg_count);
-                    let rv = ctx_ok!(filter.apply_to(state, args));
+                    a = ctx_ok!(filter.apply_to(state, args));
                     stack.drop_top(*arg_count);
-                    stack.push(rv);
+                    stack.push(a);
                 }
                 Instruction::PerformTest(name, arg_count, local_id) => {
                     let test = ctx_ok!(get_or_lookup_local(&mut loaded_tests, *local_id, || {
@@ -450,9 +453,9 @@ impl<'env> Vm<'env> {
                         recurse_loop!(true);
                     } else if let Some(func) = state.ctx.load(self.env, function_name) {
                         let args = stack.slice_top(*arg_count);
-                        let rv = ctx_ok!(func.call(state, args));
+                        a = ctx_ok!(func.call(state, args));
                         stack.drop_top(*arg_count);
-                        stack.push(rv);
+                        stack.push(a);
                     } else {
                         bail!(Error::new(
                             ErrorKind::UnknownFunction,
@@ -462,15 +465,15 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::CallMethod(name, arg_count) => {
                     let args = stack.slice_top(*arg_count);
-                    let rv = ctx_ok!(args[0].call_method(state, name, &args[1..]));
+                    a = ctx_ok!(args[0].call_method(state, name, &args[1..]));
                     stack.drop_top(*arg_count);
-                    stack.push(rv);
+                    stack.push(a);
                 }
                 Instruction::CallObject(arg_count) => {
                     let args = stack.slice_top(*arg_count);
-                    let rv = ctx_ok!(args[0].call(state, &args[1..]));
+                    a = ctx_ok!(args[0].call(state, &args[1..]));
                     stack.drop_top(*arg_count);
-                    stack.push(rv);
+                    stack.push(a);
                 }
                 Instruction::DupTop => {
                     stack.push(stack.peek().clone());
@@ -486,8 +489,8 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "multi-template")]
                 Instruction::LoadBlocks => {
-                    let name = stack.pop();
-                    ctx_ok!(self.load_blocks(name, state));
+                    a = stack.pop();
+                    ctx_ok!(self.load_blocks(a, state));
 
                     // then replace the instructions and set the pc to 0 again.
                     // this effectively means that the template engine will now
@@ -498,8 +501,8 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "multi-template")]
                 Instruction::Include(ignore_missing) => {
-                    let name = stack.pop();
-                    ctx_ok!(self.perform_include(name, state, out, *ignore_missing));
+                    a = stack.pop();
+                    ctx_ok!(self.perform_include(a, state, out, *ignore_missing));
                 }
                 #[cfg(feature = "multi-template")]
                 Instruction::ExportLocals => {
@@ -771,7 +774,9 @@ impl<'env> Vm<'env> {
     }
 }
 
-fn process_err(mut err: Error, pc: usize, state: &State) -> Error {
+#[inline(never)]
+#[cold]
+fn process_err(err: &mut Error, pc: usize, state: &State) {
     // only attach line information if the error does not have line info yet.
     if err.line().is_none() {
         if let Some(span) = state.instructions.get_span(pc) {
@@ -787,5 +792,4 @@ fn process_err(mut err: Error, pc: usize, state: &State) -> Error {
             err.attach_debug_info(state.make_debug_info(pc, state.instructions));
         }
     }
-    err
 }
