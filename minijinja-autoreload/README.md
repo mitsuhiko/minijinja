@@ -18,7 +18,7 @@ use minijinja::{Source, Environment};
 let reloader = AutoReloader::new(|notifier| {
     let mut env = Environment::new();
     let template_path = "path/to/templates";
-    notifier.track_path(template_path, true);
+    notifier.watch_path(template_path, true);
     env.set_source(Source::from_path(template_path));
     Ok(env)
 });
