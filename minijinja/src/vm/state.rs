@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use crate::compiler::instructions::Instructions;
@@ -27,6 +27,7 @@ pub struct State<'vm, 'env> {
     pub(crate) auto_escape: AutoEscape,
     pub(crate) instructions: &'vm Instructions<'env>,
     pub(crate) blocks: BTreeMap<&'env str, BlockStack<'vm, 'env>>,
+    pub(crate) loaded_templates: BTreeSet<&'env str>,
     #[cfg(feature = "macros")]
     pub(crate) macros: std::sync::Arc<Vec<(&'vm Instructions<'env>, usize)>>,
 }
@@ -78,6 +79,7 @@ impl<'vm, 'env> State<'vm, 'env> {
             auto_escape: AutoEscape::None,
             instructions: &Instructions::new("<unknown>", ""),
             blocks: BTreeMap::new(),
+            loaded_templates: BTreeSet::new(),
             macros: Default::default(),
         })
     }

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -25,6 +25,9 @@ mod loop_object;
 #[cfg(feature = "macros")]
 mod macro_object;
 mod state;
+
+// the cost of a single include against the stack limit.
+const INCLUDE_RECURSION_COST: usize = 10;
 
 /// Helps to evaluate something.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
@@ -82,6 +85,7 @@ impl<'env> Vm<'env> {
                     instructions,
                     auto_escape,
                     blocks: prepare_blocks(blocks),
+                    loaded_templates: BTreeSet::new(),
                     #[cfg(feature = "macros")]
                     macros: Arc::new(Vec::new()),
                 },
@@ -113,6 +117,7 @@ impl<'env> Vm<'env> {
                     instructions,
                     auto_escape: state.auto_escape(),
                     blocks: BTreeMap::default(),
+                    loaded_templates: BTreeSet::new(),
                     #[cfg(feature = "macros")]
                     macros: state.macros.clone(),
                 },
@@ -563,7 +568,9 @@ impl<'env> Vm<'env> {
             let old_escape = mem::replace(&mut state.auto_escape, tmpl.initial_auto_escape());
             let old_instructions = mem::replace(&mut state.instructions, tmpl.instructions());
             let old_blocks = mem::replace(&mut state.blocks, prepare_blocks(tmpl.blocks()));
+            ok!(state.ctx.incr_depth(INCLUDE_RECURSION_COST));
             let rv = self.eval_state(state, out);
+            state.ctx.decr_depth(INCLUDE_RECURSION_COST);
             state.auto_escape = old_escape;
             state.instructions = old_instructions;
             state.blocks = old_blocks;
@@ -655,15 +662,26 @@ impl<'env> Vm<'env> {
 
     #[cfg(feature = "multi-template")]
     fn load_blocks(&self, name: Value, state: &mut State<'_, 'env>) -> Result<(), Error> {
-        let tmpl = ok!(name
-            .as_str()
-            .ok_or_else(|| {
-                Error::new(
+        let name = match name.as_str() {
+            Some(name) => name,
+            None => {
+                return Err(Error::new(
                     ErrorKind::InvalidOperation,
                     "template name was not a string",
-                )
-            })
-            .and_then(|name| self.env.get_template(name)));
+                ))
+            }
+        };
+        if state.loaded_templates.contains(&name) {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!(
+                    "cycle in template inheritance. {:?} was referenced more than once",
+                    name
+                ),
+            ));
+        }
+        let tmpl = ok!(self.env.get_template(name));
+        state.loaded_templates.insert(tmpl.instructions().name());
         for (name, instr) in tmpl.blocks().iter() {
             state
                 .blocks

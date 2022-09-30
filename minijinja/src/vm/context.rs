@@ -9,7 +9,10 @@ use crate::vm::loop_object::Loop;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
 
-/// The maximum recursion in the VM
+/// The maximum recursion in the VM.  Normally each stack frame
+/// adds one to this counter (eg: every time a frame is added).
+/// However in some situations more depth is pushed if the cost
+/// of the stack frame is higher.
 const MAX_RECURSION: usize = 500;
 
 pub(crate) struct LoopState {
@@ -232,6 +235,11 @@ impl<'env> Context<'env> {
         self.check_depth()?;
         self.outer_stack_depth += delta;
         Ok(())
+    }
+
+    /// Decrease the stack depth.
+    pub fn decr_depth(&mut self, delta: usize) {
+        self.outer_stack_depth -= delta;
     }
 
     fn check_depth(&self) -> Result<(), Error> {
