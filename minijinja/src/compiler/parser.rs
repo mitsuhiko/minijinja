@@ -6,6 +6,7 @@ use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
 use crate::value::Value;
 
+const MAX_RECURSION: usize = 150;
 const RESERVED_NAMES: [&str; 8] = [
     "true", "True", "false", "False", "none", "None", "loop", "self",
 ];
@@ -150,6 +151,7 @@ impl<'a> TokenStream<'a> {
 struct Parser<'a> {
     stream: TokenStream<'a>,
     in_macro: bool,
+    depth: usize,
 }
 
 macro_rules! binop {
@@ -194,11 +196,27 @@ macro_rules! unaryop {
     };
 }
 
+macro_rules! with_recursion_guard {
+    ($parser:expr, $expr:expr) => {{
+        $parser.depth += 1;
+        if $parser.depth > MAX_RECURSION {
+            return Err(Error::new(
+                ErrorKind::SyntaxError,
+                "template exceeds maximum recusion limits",
+            ));
+        }
+        let rv = $expr;
+        $parser.depth -= 1;
+        rv
+    }};
+}
+
 impl<'a> Parser<'a> {
     pub fn new(source: &'a str, in_expr: bool) -> Parser<'a> {
         Parser {
             stream: TokenStream::new(source, in_expr),
             in_macro: false,
+            depth: 0,
         }
     }
 
@@ -490,6 +508,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_primary(&mut self) -> Result<ast::Expr<'a>, Error> {
+        with_recursion_guard!(self, self.parse_primary_impl())
+    }
+
+    fn parse_primary_impl(&mut self) -> Result<ast::Expr<'a>, Error> {
         let (token, span) = expect_token!(self, "expression");
         macro_rules! const_val {
             ($expr:expr) => {
@@ -588,7 +610,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_expr(&mut self) -> Result<ast::Expr<'a>, Error> {
-        self.parse_ifexpr()
+        with_recursion_guard!(self, self.parse_ifexpr())
     }
 
     pub fn parse_expr_noif(&mut self) -> Result<ast::Expr<'a>, Error> {
@@ -596,6 +618,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_stmt(&mut self) -> Result<ast::Stmt<'a>, Error> {
+        with_recursion_guard!(self, self.parse_stmt_unprotected())
+    }
+
+    fn parse_stmt_unprotected(&mut self) -> Result<ast::Stmt<'a>, Error> {
         let (token, span) = expect_token!(self, "block keyword");
 
         macro_rules! respan {
