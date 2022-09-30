@@ -3,10 +3,14 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::environment::Environment;
+use crate::error::{Error, ErrorKind};
 use crate::value::{Value, ValueIterator};
 use crate::vm::loop_object::Loop;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
+
+/// The maximum recursion in the VM
+const MAX_RECURSION: usize = 500;
 
 pub(crate) struct LoopState {
     pub(crate) with_loop_var: bool,
@@ -103,6 +107,7 @@ impl From<Vec<Value>> for Stack {
 #[derive(Default)]
 pub(crate) struct Context<'env> {
     stack: Vec<Frame<'env>>,
+    outer_stack_depth: usize,
 }
 
 impl<'env> fmt::Debug for Context<'env> {
@@ -147,7 +152,10 @@ impl<'env> fmt::Debug for Context<'env> {
 impl<'env> Context<'env> {
     /// Creates a context
     pub fn new(frame: Frame<'env>) -> Context<'env> {
-        Context { stack: vec![frame] }
+        Context {
+            stack: vec![frame],
+            outer_stack_depth: 0,
+        }
     }
 
     /// Stores a variable in the context.
@@ -186,8 +194,10 @@ impl<'env> Context<'env> {
     }
 
     /// Pushes a new layer.
-    pub fn push_frame(&mut self, layer: Frame<'env>) {
+    pub fn push_frame(&mut self, layer: Frame<'env>) -> Result<(), Error> {
+        self.check_depth()?;
         self.stack.push(layer);
+        Ok(())
     }
 
     /// Pops the topmost layer.
@@ -210,5 +220,27 @@ impl<'env> Context<'env> {
             .rev()
             .filter_map(|x| x.current_loop.as_mut())
             .next()
+    }
+
+    /// The real depth of the context.
+    pub fn depth(&self) -> usize {
+        self.outer_stack_depth + self.stack.len()
+    }
+
+    /// Increase the stack depth.
+    pub fn incr_depth(&mut self, delta: usize) -> Result<(), Error> {
+        self.check_depth()?;
+        self.outer_stack_depth += delta;
+        Ok(())
+    }
+
+    fn check_depth(&self) -> Result<(), Error> {
+        if self.depth() > MAX_RECURSION {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "recursion limit exceeded",
+            ));
+        }
+        Ok(())
     }
 }

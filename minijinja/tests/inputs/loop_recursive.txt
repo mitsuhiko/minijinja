@@ -10,7 +10,17 @@
       "children": [
         {
           "link": "/docs/installation",
-          "title": "Installation"
+          "title": "Installation",
+          "children": [
+            {
+              "link": "/docs/installation/quickstart",
+              "title": "Quickstart"
+            },
+            {
+              "link": "/docs/installation/advanced",
+              "title": "Advanced"
+            }
+          ]
         },
         {
           "link": "/docs/faq",

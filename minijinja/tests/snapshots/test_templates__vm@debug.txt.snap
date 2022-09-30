@@ -82,6 +82,7 @@ State {
             "simple_include.txt",
             "simple_layout.txt",
             "super_with_html.html",
+            "var_setting_layout.txt",
         ],
     },
 }

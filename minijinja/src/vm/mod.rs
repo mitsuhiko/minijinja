@@ -103,10 +103,12 @@ impl<'env> Vm<'env> {
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
         value::with_value_optimization(|| {
+            let mut ctx = Context::new(Frame::new(root));
+            ok!(ctx.incr_depth(state.ctx.depth()));
             self.eval_impl(
                 &mut State {
                     env: self.env,
-                    ctx: Context::new(Frame::new(root)),
+                    ctx,
                     current_block: None,
                     instructions,
                     auto_escape: state.auto_escape(),
@@ -309,7 +311,7 @@ impl<'env> Vm<'env> {
                     stack.push(ctx_ok!(ops::neg(&a)));
                 }
                 Instruction::PushWith => {
-                    state.ctx.push_frame(Frame::default());
+                    ctx_ok!(state.ctx.push_frame(Frame::default()));
                 }
                 Instruction::PopFrame => {
                     if let Some(mut loop_ctx) = state.ctx.pop_frame().current_loop {
@@ -376,7 +378,7 @@ impl<'env> Vm<'env> {
                     if let Some(block_stack) = state.blocks.get(name) {
                         let old_instructions =
                             mem::replace(&mut state.instructions, block_stack.instructions());
-                        state.ctx.push_frame(Frame::default());
+                        ctx_ok!(state.ctx.push_frame(Frame::default()));
                         let rv = self.eval_state(state, out);
                         state.ctx.pop_frame();
                         state.instructions = old_instructions;
@@ -617,7 +619,9 @@ impl<'env> Vm<'env> {
         }
 
         let old_instructions = mem::replace(&mut state.instructions, block_stack.instructions());
+        ok!(state.ctx.push_frame(Frame::default()));
         let rv = self.eval_state(state, out);
+        state.ctx.pop_frame();
         state.instructions = old_instructions;
         state.blocks.get_mut(name).unwrap().pop();
 
@@ -710,7 +714,7 @@ impl<'env> Vm<'env> {
             .map_or(0, |x| x.object.depth + 1);
         let recursive = flags & LOOP_FLAG_RECURSIVE != 0;
         let with_loop_var = flags & LOOP_FLAG_WITH_LOOP_VAR != 0;
-        state.ctx.push_frame(Frame {
+        ok!(state.ctx.push_frame(Frame {
             current_loop: Some(LoopState {
                 iterator,
                 with_loop_var,
@@ -724,7 +728,7 @@ impl<'env> Vm<'env> {
                 }),
             }),
             ..Frame::default()
-        });
+        }));
         Ok(())
     }
 
