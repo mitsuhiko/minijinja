@@ -135,37 +135,40 @@ fn impossible_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
     )
 }
 
+fn failed_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
+    Error::new(
+        ErrorKind::InvalidOperation,
+        format!("unable to calculate {} {} {}", lhs, op, rhs),
+    )
+}
+
 macro_rules! math_binop {
     ($name:ident, $int:ident, $float:tt) => {
         pub fn $name(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-            fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-                match some!(coerce(lhs, rhs)) {
-                    CoerceResult::I128(a, b) => Some(int_as_value(a.$int(b))),
-                    CoerceResult::F64(a, b) => Some((a $float b).into()),
-                    _ => None
-                }
+            match coerce(lhs, rhs) {
+                Some(CoerceResult::I128(a, b)) => match a.$int(b) {
+                    Some(val) => Ok(int_as_value(val)),
+                    None => Err(failed_op(stringify!($float), lhs, rhs))
+                },
+                Some(CoerceResult::F64(a, b)) => Ok((a $float b).into()),
+                _ => Err(impossible_op(stringify!($float), lhs, rhs))
             }
-            do_it(lhs, rhs).ok_or_else(|| {
-                impossible_op(stringify!($float), lhs, rhs)
-            })
         }
     }
 }
 
 pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        match some!(coerce(lhs, rhs)) {
-            CoerceResult::I128(a, b) => Some(int_as_value(a.wrapping_add(b))),
-            CoerceResult::F64(a, b) => Some((a + b).into()),
-            CoerceResult::String(a, b) => Some(Value::from([a, b].concat())),
-        }
+    match coerce(lhs, rhs) {
+        Some(CoerceResult::I128(a, b)) => Ok(int_as_value(a.wrapping_add(b))),
+        Some(CoerceResult::F64(a, b)) => Ok((a + b).into()),
+        Some(CoerceResult::String(a, b)) => Ok(Value::from([a, b].concat())),
+        _ => Err(impossible_op("+", lhs, rhs)),
     }
-    do_it(lhs, rhs).ok_or_else(|| impossible_op("+", lhs, rhs))
 }
 
-math_binop!(sub, wrapping_sub, -);
-math_binop!(mul, wrapping_mul, *);
-math_binop!(rem, wrapping_rem_euclid, %);
+math_binop!(sub, checked_sub, -);
+math_binop!(mul, checked_mul, *);
+math_binop!(rem, checked_rem_euclid, %);
 
 pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
@@ -177,46 +180,48 @@ pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 }
 
 pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        match some!(coerce(lhs, rhs)) {
-            CoerceResult::I128(a, b) => Some(int_as_value(a.div_euclid(b))),
-            CoerceResult::F64(a, b) => Some(a.div_euclid(b).into()),
-            CoerceResult::String(_, _) => None,
+    match coerce(lhs, rhs) {
+        Some(CoerceResult::I128(a, b)) => {
+            if b != 0 {
+                Ok(int_as_value(a.div_euclid(b)))
+            } else {
+                Err(failed_op("//", lhs, rhs))
+            }
         }
+        Some(CoerceResult::F64(a, b)) => Ok(a.div_euclid(b).into()),
+        _ => Err(impossible_op("//", lhs, rhs)),
     }
-    do_it(lhs, rhs).ok_or_else(|| impossible_op("//", lhs, rhs))
 }
 
 /// Implements a binary `pow` operation on values.
 pub fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    pub fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        match some!(coerce(lhs, rhs)) {
-            CoerceResult::I128(a, b) => Some(int_as_value(a.pow(some!(TryFrom::try_from(b).ok())))),
-            CoerceResult::F64(a, b) => Some((a.powf(b)).into()),
-            CoerceResult::String(_, _) => None,
+    match coerce(lhs, rhs) {
+        Some(CoerceResult::I128(a, b)) => {
+            Ok(int_as_value(a.pow(match TryFrom::try_from(b).ok() {
+                Some(val) => val,
+                None => return Err(failed_op("**", lhs, rhs)),
+            })))
         }
+        Some(CoerceResult::F64(a, b)) => Ok((a.powf(b)).into()),
+        _ => Err(impossible_op("**", lhs, rhs)),
     }
-    do_it(lhs, rhs).ok_or_else(|| impossible_op("**", lhs, rhs))
 }
 
 /// Implements an unary `neg` operation on value.
 pub fn neg(val: &Value) -> Result<Value, Error> {
-    fn do_it(val: &Value) -> Option<Value> {
+    if val.kind() == ValueKind::Number {
         match val.0 {
-            ValueRepr::F64(x) => return Some((-x).into()),
+            ValueRepr::F64(x) => Ok((-x).into()),
             _ => {
                 if let Ok(x) = i128::try_from(val.clone()) {
-                    return Some(int_as_value(-x));
+                    Ok(int_as_value(-x))
+                } else {
+                    Err(Error::from(ErrorKind::InvalidOperation))
                 }
             }
         }
-        None
-    }
-
-    if val.kind() != ValueKind::Number {
-        Err(Error::from(ErrorKind::InvalidOperation))
     } else {
-        do_it(val).ok_or_else(|| Error::from(ErrorKind::InvalidOperation))
+        Err(Error::from(ErrorKind::InvalidOperation))
     }
 }
 

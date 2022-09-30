@@ -311,11 +311,17 @@ impl fmt::Display for Value {
             ValueRepr::U64(val) => write!(f, "{}", val),
             ValueRepr::I64(val) => write!(f, "{}", val),
             ValueRepr::F64(val) => {
-                let mut num = val.to_string();
-                if !num.contains('.') {
-                    num.push_str(".0");
+                if val.is_nan() {
+                    write!(f, "NaN")
+                } else if val.is_infinite() {
+                    write!(f, "{}inf", if val.is_sign_negative() { "-" } else { "" })
+                } else {
+                    let mut num = val.to_string();
+                    if !num.contains('.') {
+                        num.push_str(".0");
+                    }
+                    write!(f, "{}", num)
                 }
-                write!(f, "{}", num)
             }
             ValueRepr::Char(val) => write!(f, "{}", val),
             ValueRepr::None => write!(f, "none"),

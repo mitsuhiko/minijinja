@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# Unreleased
+
+- Catch divisions by zero and better print inf.
+
 # 0.23.0
 
 - Added `Value::from_function`. (#121)
