@@ -633,6 +633,9 @@ mod builtins {
     /// last iteration.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn slice(value: Value, count: usize, fill_with: Option<Value>) -> Result<Value, Error> {
+        if count == 0 {
+            return Err(Error::new(ErrorKind::InvalidOperation, "count cannot be 0"));
+        }
         let items = ok!(value.try_iter()).collect::<Vec<_>>();
         let len = items.len();
         let items_per_slice = len / count;
