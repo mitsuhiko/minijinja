@@ -90,6 +90,12 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     } else {
         ok!(u64::try_from(step)) as usize
     };
+    if step == 0 {
+        return Err(Error::new(
+            ErrorKind::InvalidOperation,
+            "cannot slice by step size of 0",
+        ));
+    }
 
     if let Some(s) = value.as_str() {
         let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
