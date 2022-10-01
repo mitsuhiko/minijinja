@@ -197,10 +197,10 @@ pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 pub fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     match coerce(lhs, rhs) {
         Some(CoerceResult::I128(a, b)) => {
-            Ok(int_as_value(a.pow(match TryFrom::try_from(b).ok() {
-                Some(val) => val,
-                None => return Err(failed_op("**", lhs, rhs)),
-            })))
+            match TryFrom::try_from(b).ok().and_then(|b| a.checked_pow(b)) {
+                Some(val) => Ok(int_as_value(val)),
+                None => Err(failed_op("**", lhs, rhs)),
+            }
         }
         Some(CoerceResult::F64(a, b)) => Ok((a.powf(b)).into()),
         _ => Err(impossible_op("**", lhs, rhs)),
