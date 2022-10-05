@@ -4,7 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 # Unreleased
 
-- Catch divisions by zero and better print inf.
+- Catch divisions by zero.
+- Correctly render `inf` floats.
 - Enforce a maximum recursion depth during parsing.
 
 # 0.23.0
