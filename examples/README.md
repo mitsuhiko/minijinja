@@ -23,3 +23,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [render-macro](render-macro): minimal Hello World example using the `render!` macro.
 * [render-template](render-template): CLI app that renders templates from string.
 * [source](source): Demonstrates how to load templates from disk with the `source` feature.
+
+## Third-party Examples
+
+* [Actix Web Integration](https://github.com/actix/examples/blob/master/templating/minijinja)
