@@ -73,6 +73,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
+use std::marker::PhantomData;
 use std::sync::atomic::{self, AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
@@ -367,29 +368,70 @@ impl Value {
 
     /// Creates a value from something that can be serialized.
     ///
+    /// This is the method that MiniJinja will generally use whenever a serializable
+    /// object is passed to one of the APIs that internally want to create a value.
+    /// For instance this is what [`context!`](crate::context) and
+    /// [`render`](crate::Template::render) will use.
+    ///
     /// During serialization of the value, [`serializing_for_value`] will return
     /// `true` which makes it possible to customize serialization for MiniJinja.
     /// For more information see [`serializing_for_value`].
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// let val = Value::from_serializable(&vec![1, 2, 3]);
+    /// ```
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
         with_internal_serialization(|| Serialize::serialize(value, ValueSerializer).unwrap())
     }
 
     /// Creates a value from a safe string.
+    ///
+    /// A safe string is one that will bypass auto escaping.  For instance if you
+    /// want to have the template engine render some HTML without the user having to
+    /// supply the `|safe` filter, you can use a value of this type instead.
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// let val = Value::from_safe_string("<em>note</em>".into());
+    /// ```
     pub fn from_safe_string(value: String) -> Value {
         ValueRepr::String(Arc::new(value), StringType::Safe).into()
     }
 
-    /// Creates a value from a reference counted dynamic object.
-    pub(crate) fn from_rc_object<T: Object + 'static>(value: Arc<T>) -> Value {
-        ValueRepr::Dynamic(value as Arc<dyn Object>).into()
-    }
-
     /// Creates a value from a dynamic object.
+    ///
+    /// For more information see [`Object`].
+    ///
+    /// ```rust
+    /// # use minijinja::value::{Value, Object};
+    /// use std::fmt;
+    ///
+    /// #[derive(Debug)]
+    /// struct Thing {
+    ///     id: usize,
+    /// }
+    ///
+    /// impl fmt::Display for Thing {
+    ///     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    ///         fmt::Debug::fmt(self, f)
+    ///     }
+    /// }
+    ///
+    /// impl Object for Thing {}
+    ///
+    /// let val = Value::from_object(Thing { id: 42 });
+    /// ```
     pub fn from_object<T: Object + 'static>(value: T) -> Value {
         Value::from_rc_object(Arc::new(value))
     }
 
     /// Creates a callable value from a function.
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// let pow = Value::from_function(|a: u32| a * a);
+    /// ```
     pub fn from_function<F, Rv, Args>(f: F) -> Value
     where
         // the crazy bounds here exist to enable borrowing in closures
@@ -399,6 +441,219 @@ impl Value {
         Args: for<'a> FunctionArgs<'a>,
     {
         functions::BoxedFunction::new(f).to_value()
+    }
+
+    /// Returns the kind of the value.
+    ///
+    /// This can be used to determine what's in the value before trying to
+    /// perform operations on it.
+    pub fn kind(&self) -> ValueKind {
+        match self.0 {
+            ValueRepr::Undefined => ValueKind::Undefined,
+            ValueRepr::Bool(_) => ValueKind::Bool,
+            ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::F64(_) => ValueKind::Number,
+            ValueRepr::Char(_) => ValueKind::Char,
+            ValueRepr::None => ValueKind::None,
+            ValueRepr::I128(_) => ValueKind::Number,
+            ValueRepr::String(..) => ValueKind::String,
+            ValueRepr::Bytes(_) => ValueKind::Bytes,
+            ValueRepr::U128(_) => ValueKind::Number,
+            ValueRepr::Seq(_) => ValueKind::Seq,
+            ValueRepr::Map(..) | ValueRepr::Dynamic(_) => ValueKind::Map,
+        }
+    }
+
+    /// Returns `true` if the map represents keyword arguments.
+    pub fn is_kwargs(&self) -> bool {
+        matches!(self.0, ValueRepr::Map(_, MapType::Kwargs))
+    }
+
+    /// Is this value true?
+    pub fn is_true(&self) -> bool {
+        match self.0 {
+            ValueRepr::Bool(val) => val,
+            ValueRepr::U64(x) => x != 0,
+            ValueRepr::U128(ref x) => **x != 0,
+            ValueRepr::I64(x) => x != 0,
+            ValueRepr::I128(ref x) => **x != 0,
+            ValueRepr::F64(x) => x != 0.0,
+            ValueRepr::Char(x) => x != '\x00',
+            ValueRepr::String(ref x, _) => !x.is_empty(),
+            ValueRepr::Bytes(ref x) => !x.is_empty(),
+            ValueRepr::None | ValueRepr::Undefined => false,
+            ValueRepr::Seq(ref x) => !x.is_empty(),
+            ValueRepr::Map(ref x, _) => !x.is_empty(),
+            ValueRepr::Dynamic(_) => true,
+        }
+    }
+
+    /// Returns `true` if this value is safe.
+    pub fn is_safe(&self) -> bool {
+        matches!(&self.0, ValueRepr::String(_, StringType::Safe))
+    }
+
+    /// Returns `true` if this value is undefined.
+    pub fn is_undefined(&self) -> bool {
+        matches!(&self.0, ValueRepr::Undefined)
+    }
+
+    /// Returns `true` if this value is none.
+    pub fn is_none(&self) -> bool {
+        matches!(&self.0, ValueRepr::None)
+    }
+
+    /// If the value is a string, return it.
+    pub fn as_str(&self) -> Option<&str> {
+        match &self.0 {
+            ValueRepr::String(ref s, _) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Returns the bytes of this value if they exist.
+    pub fn as_bytes(&self) -> Option<&[u8]> {
+        match &self.0 {
+            ValueRepr::String(ref s, _) => Some(s.as_bytes()),
+            ValueRepr::Bytes(ref b) => Some(&b[..]),
+            _ => None,
+        }
+    }
+
+    /// If the value is a sequence it's returned as slice.
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// let seq = Value::from(vec![1u32, 2, 3, 4]);
+    /// let slice = seq.as_slice().unwrap();
+    /// assert_eq!(slice.len(), 4);
+    /// ```
+    pub fn as_slice(&self) -> Result<&[Value], Error> {
+        match self.0 {
+            ValueRepr::Undefined | ValueRepr::None => Ok(&[][..]),
+            ValueRepr::Seq(ref v) => Ok(&v[..]),
+            _ => Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!("value of type {} is not a sequence", self.kind()),
+            )),
+        }
+    }
+
+    /// Returns the length of the contained value.
+    ///
+    /// Values without a length will return `None`.
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// let seq = Value::from(vec![1, 2, 3, 4]);
+    /// assert_eq!(seq.len(), Some(4));
+    /// ```
+    pub fn len(&self) -> Option<usize> {
+        match self.0 {
+            ValueRepr::String(ref s, _) => Some(s.chars().count()),
+            ValueRepr::Map(ref items, _) => Some(items.len()),
+            ValueRepr::Seq(ref items) => Some(items.len()),
+            ValueRepr::Dynamic(ref dy) => Some(dy.attributes().len()),
+            _ => None,
+        }
+    }
+
+    /// Looks up an attribute by attribute name.
+    ///
+    /// This this returns [`UNDEFINED`](Self::UNDEFINED) when an invalid key is
+    /// resolved.  An error is returned when if the value does not contain an object
+    /// that has attributes.
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// # fn test() -> Result<(), minijinja::Error> {
+    /// let ctx = minijinja::context! {
+    ///     foo => "Foo"
+    /// };
+    /// let value = ctx.get_attr("foo")?;
+    /// assert_eq!(value.to_string(), "Foo");
+    /// # Ok(()) }
+    /// ```
+    pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
+        let value = match self.0 {
+            ValueRepr::Map(ref items, _) => {
+                let lookup_key = Key::Str(key);
+                items.get(&lookup_key).cloned()
+            }
+            ValueRepr::Dynamic(ref dy) => dy.get_attr(key),
+            ValueRepr::Undefined => {
+                return Err(Error::from(ErrorKind::UndefinedError));
+            }
+            _ => None,
+        };
+        Ok(value.unwrap_or(Value::UNDEFINED))
+    }
+
+    /// Looks up an index of the value.
+    ///
+    /// This is a shortcut for [`get_item`](Self::get_item).
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// let seq = Value::from(vec![0u32, 1, 2]);
+    /// let value = seq.get_item_by_index(1).unwrap();
+    /// assert_eq!(value.try_into().ok(), Some(1));
+    /// ```
+    pub fn get_item_by_index(&self, idx: usize) -> Result<Value, Error> {
+        self.get_item(&Value(ValueRepr::U64(idx as _)))
+    }
+
+    /// Looks up an item (or attribute) by key.
+    ///
+    /// This is similar to [`get_attr`](Self::get_attr) but instead of using
+    /// a string key this can be any key.  For instance this can be used to
+    /// index into sequences.  Like [`get_attr`](Self::get_attr) this returns
+    /// [`UNDEFINED`](Self::UNDEFINED) when an invalid key is looked up.
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// let ctx = minijinja::context! {
+    ///     foo => "Foo",
+    /// };
+    /// let value = ctx.get_item(&Value::from("foo")).unwrap();
+    /// assert_eq!(value.to_string(), "Foo");
+    /// ```
+    pub fn get_item(&self, key: &Value) -> Result<Value, Error> {
+        if let ValueRepr::Undefined = self.0 {
+            Err(Error::from(ErrorKind::UndefinedError))
+        } else {
+            Ok(self.get_item_opt(key).unwrap_or(Value::UNDEFINED))
+        }
+    }
+
+    /// Iterates over the value.
+    ///
+    /// Depending on the [`kind`](Self::kind) of the value the iterator
+    /// has a different behavior.
+    ///
+    /// * [`ValueKind::Map`]: the iterator yields the keys of the map.
+    /// * [`ValueKind::Seq`]: the iterator yields the items in the sequence.
+    /// * [`ValueKind::None`] / [`ValueKind::Undefined`]: the iterator is empty.
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// # fn test() -> Result<(), minijinja::Error> {
+    /// let value = Value::from({
+    ///     let mut m = std::collections::BTreeMap::new();
+    ///     m.insert("foo", 42);
+    ///     m.insert("bar", 23);
+    ///     m
+    /// });
+    /// for key in value.try_iter()? {
+    ///     let value = value.get_item(&key)?;
+    ///     println!("{} = {}", key, value);
+    /// }
+    /// # Ok(()) }
+    /// ```
+    pub fn try_iter(&self) -> Result<Iter<'_>, Error> {
+        self.try_iter_owned().map(|inner| Iter {
+            _marker: PhantomData,
+            inner,
+        })
     }
 
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
@@ -440,140 +695,6 @@ impl Value {
         None
     }
 
-    /// Returns the value kind.
-    pub fn kind(&self) -> ValueKind {
-        match self.0 {
-            ValueRepr::Undefined => ValueKind::Undefined,
-            ValueRepr::Bool(_) => ValueKind::Bool,
-            ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::F64(_) => ValueKind::Number,
-            ValueRepr::Char(_) => ValueKind::Char,
-            ValueRepr::None => ValueKind::None,
-            ValueRepr::I128(_) => ValueKind::Number,
-            ValueRepr::String(..) => ValueKind::String,
-            ValueRepr::Bytes(_) => ValueKind::Bytes,
-            ValueRepr::U128(_) => ValueKind::Number,
-            ValueRepr::Seq(_) => ValueKind::Seq,
-            ValueRepr::Map(..) | ValueRepr::Dynamic(_) => ValueKind::Map,
-        }
-    }
-
-    /// Returns `true` if the map represents keyword arguments.
-    pub fn is_kwargs(&self) -> bool {
-        matches!(self.0, ValueRepr::Map(_, MapType::Kwargs))
-    }
-
-    /// If the value is a string, return it.
-    pub fn as_str(&self) -> Option<&str> {
-        match &self.0 {
-            ValueRepr::String(ref s, _) => Some(s.as_str()),
-            _ => None,
-        }
-    }
-
-    /// Returns the bytes of this value if they exist.
-    pub fn as_bytes(&self) -> Option<&[u8]> {
-        match &self.0 {
-            ValueRepr::String(ref s, _) => Some(s.as_bytes()),
-            ValueRepr::Bytes(ref b) => Some(&b[..]),
-            _ => None,
-        }
-    }
-
-    /// Like `as_str` but always stringifies the value.
-    #[allow(unused)]
-    pub(crate) fn to_cowstr(&self) -> Cow<'_, str> {
-        match &self.0 {
-            ValueRepr::String(ref s, _) => Cow::Borrowed(s.as_str()),
-            _ => Cow::Owned(self.to_string()),
-        }
-    }
-
-    /// Is this value true?
-    pub fn is_true(&self) -> bool {
-        match self.0 {
-            ValueRepr::Bool(val) => val,
-            ValueRepr::U64(x) => x != 0,
-            ValueRepr::U128(ref x) => **x != 0,
-            ValueRepr::I64(x) => x != 0,
-            ValueRepr::I128(ref x) => **x != 0,
-            ValueRepr::F64(x) => x != 0.0,
-            ValueRepr::Char(x) => x != '\x00',
-            ValueRepr::String(ref x, _) => !x.is_empty(),
-            ValueRepr::Bytes(ref x) => !x.is_empty(),
-            ValueRepr::None | ValueRepr::Undefined => false,
-            ValueRepr::Seq(ref x) => !x.is_empty(),
-            ValueRepr::Map(ref x, _) => !x.is_empty(),
-            ValueRepr::Dynamic(_) => true,
-        }
-    }
-
-    /// Returns `true` if this value is safe.
-    pub fn is_safe(&self) -> bool {
-        matches!(&self.0, ValueRepr::String(_, StringType::Safe))
-    }
-
-    /// Returns `true` if this value is undefined.
-    pub fn is_undefined(&self) -> bool {
-        matches!(&self.0, ValueRepr::Undefined)
-    }
-
-    /// Returns `true` if this value is none.
-    pub fn is_none(&self) -> bool {
-        matches!(&self.0, ValueRepr::None)
-    }
-
-    /// Returns the length of the contained value.
-    pub fn len(&self) -> Option<usize> {
-        match self.0 {
-            ValueRepr::String(ref s, _) => Some(s.chars().count()),
-            ValueRepr::Map(ref items, _) => Some(items.len()),
-            ValueRepr::Seq(ref items) => Some(items.len()),
-            ValueRepr::Dynamic(ref dy) => Some(dy.attributes().len()),
-            _ => None,
-        }
-    }
-
-    /// Looks up an attribute by attribute name.
-    ///
-    /// This this returns [`UNDEFINED`](Self::UNDEFINED) when an invalid key is
-    /// resolved.  An error is returned when if the value does not contain an object
-    /// that has attributes.
-    pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
-        let value = match self.0 {
-            ValueRepr::Map(ref items, _) => {
-                let lookup_key = Key::Str(key);
-                items.get(&lookup_key).cloned()
-            }
-            ValueRepr::Dynamic(ref dy) => dy.get_attr(key),
-            ValueRepr::Undefined => {
-                return Err(Error::from(ErrorKind::UndefinedError));
-            }
-            _ => None,
-        };
-        Ok(value.unwrap_or(Value::UNDEFINED))
-    }
-
-    /// Looks up an index of the value.
-    ///
-    /// This is a shortcut for [`get_item`](Self::get_item).
-    pub fn get_item_by_index(&self, idx: usize) -> Result<Value, Error> {
-        self.get_item(&Value(ValueRepr::U64(idx as _)))
-    }
-
-    /// Looks up an item (or attribute) by key.
-    ///
-    /// This is similar to [`get_attr`](Self::get_attr) but instead of using
-    /// a string key this can be any key.  For instance this can be used to
-    /// index into sequences.  Like [`get_attr`](Self::get_attr) this returns
-    /// [`UNDEFINED`](Self::UNDEFINED) when an invalid key is looked up.
-    pub fn get_item(&self, key: &Value) -> Result<Value, Error> {
-        if let ValueRepr::Undefined = self.0 {
-            Err(Error::from(ErrorKind::UndefinedError))
-        } else {
-            Ok(self.get_item_opt(key).unwrap_or(Value::UNDEFINED))
-        }
-    }
-
     fn get_item_opt(&self, key: &Value) -> Option<Value> {
         let key = some!(Key::from_borrowed_value(key).ok());
 
@@ -600,18 +721,6 @@ impl Value {
         None
     }
 
-    /// If the value is a sequence it's returned as slice.
-    pub fn as_slice(&self) -> Result<&[Value], Error> {
-        match self.0 {
-            ValueRepr::Undefined | ValueRepr::None => Ok(&[][..]),
-            ValueRepr::Seq(ref v) => Ok(&v[..]),
-            _ => Err(Error::new(
-                ErrorKind::InvalidOperation,
-                format!("value of type {} is not a sequence", self.kind()),
-            )),
-        }
-    }
-
     /// Calls the value directly.
     pub(crate) fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         if let ValueRepr::Dynamic(ref dy) = self.0 {
@@ -621,6 +730,15 @@ impl Value {
                 ErrorKind::InvalidOperation,
                 format!("value of type {} is not callable", self.kind()),
             ))
+        }
+    }
+
+    /// Like `as_str` but always stringifies the value.
+    #[allow(unused)]
+    pub(crate) fn to_cowstr(&self) -> Cow<'_, str> {
+        match &self.0 {
+            ValueRepr::String(ref s, _) => Cow::Borrowed(s.as_str()),
+            _ => Cow::Owned(self.to_string()),
         }
     }
 
@@ -644,6 +762,11 @@ impl Value {
             ErrorKind::InvalidOperation,
             format!("object has no method named {}", name),
         ))
+    }
+
+    /// Creates a value from a reference counted dynamic object.
+    pub(crate) fn from_rc_object<T: Object + 'static>(value: Arc<T>) -> Value {
+        ValueRepr::Dynamic(value as Arc<dyn Object>).into()
     }
 
     pub(crate) fn try_into_key(self) -> Result<StaticKey, Error> {
@@ -680,8 +803,8 @@ impl Value {
         }
     }
 
-    /// Iterates over the value.
-    pub(crate) fn try_iter(&self) -> Result<ValueIterator, Error> {
+    /// Iterates over the value without holding a reference.
+    pub(crate) fn try_iter_owned(&self) -> Result<OwnedValueIterator, Error> {
         let (iter_state, len) = match self.0 {
             ValueRepr::None | ValueRepr::Undefined => (ValueIteratorState::Empty, 0),
             ValueRepr::Seq(ref seq) => (ValueIteratorState::Seq(0, Arc::clone(seq)), seq.len()),
@@ -704,7 +827,7 @@ impl Value {
                 ))
             }
         };
-        Ok(ValueIterator { iter_state, len })
+        Ok(OwnedValueIterator { iter_state, len })
     }
 }
 
@@ -758,12 +881,27 @@ impl Serialize for Value {
     }
 }
 
-pub(crate) struct ValueIterator {
+/// Iterates over a value.
+pub struct Iter<'a> {
+    _marker: PhantomData<&'a Value>,
+    inner: OwnedValueIterator,
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = Value;
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+pub(crate) struct OwnedValueIterator {
     iter_state: ValueIteratorState,
     len: usize,
 }
 
-impl Iterator for ValueIterator {
+impl Iterator for OwnedValueIterator {
     type Item = Value;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -778,9 +916,9 @@ impl Iterator for ValueIterator {
     }
 }
 
-impl ExactSizeIterator for ValueIterator {}
+impl ExactSizeIterator for OwnedValueIterator {}
 
-impl fmt::Debug for ValueIterator {
+impl fmt::Debug for OwnedValueIterator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ValueIterator").finish()
     }

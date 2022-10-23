@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::value::{Value, ValueIterator};
+use crate::value::{OwnedValueIterator, Value};
 use crate::vm::loop_object::Loop;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
@@ -22,7 +22,7 @@ pub(crate) struct LoopState {
     // first item is the target jump instruction, the second argument
     // tells us if we need to end capturing.
     pub(crate) current_recursion_jump: Option<(usize, bool)>,
-    pub(crate) iterator: ValueIterator,
+    pub(crate) iterator: OwnedValueIterator,
     pub(crate) object: Arc<Loop>,
 }
 

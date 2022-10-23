@@ -723,7 +723,7 @@ impl<'env> Vm<'env> {
         pc: usize,
         current_recursion_jump: Option<(usize, bool)>,
     ) -> Result<(), Error> {
-        let iterator = ok!(iterable.try_iter());
+        let iterator = ok!(iterable.try_iter_owned());
         let len = iterator.len();
         let depth = state
             .ctx
