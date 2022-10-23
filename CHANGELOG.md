@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Catch divisions by zero.
 - Correctly render `inf` floats.
 - Enforce a maximum recursion depth during parsing.
+- Added `Value::try_iter` to iterate over maps and sequences. (#132)
 
 # 0.23.0
 
