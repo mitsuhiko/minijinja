@@ -681,7 +681,7 @@ impl Value {
     }
 
     /// Iterates over the value.
-    pub(crate) fn try_iter(&self) -> Result<ValueIterator, Error> {
+    pub(crate) fn try_iter_owned(&self) -> Result<OwnedValueIterator, Error> {
         let (iter_state, len) = match self.0 {
             ValueRepr::None | ValueRepr::Undefined => (ValueIteratorState::Empty, 0),
             ValueRepr::Seq(ref seq) => (ValueIteratorState::Seq(0, Arc::clone(seq)), seq.len()),
@@ -704,7 +704,7 @@ impl Value {
                 ))
             }
         };
-        Ok(ValueIterator { iter_state, len })
+        Ok(OwnedValueIterator { iter_state, len })
     }
 }
 
@@ -758,12 +758,12 @@ impl Serialize for Value {
     }
 }
 
-pub(crate) struct ValueIterator {
+pub(crate) struct OwnedValueIterator {
     iter_state: ValueIteratorState,
     len: usize,
 }
 
-impl Iterator for ValueIterator {
+impl Iterator for OwnedValueIterator {
     type Item = Value;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -778,9 +778,9 @@ impl Iterator for ValueIterator {
     }
 }
 
-impl ExactSizeIterator for ValueIterator {}
+impl ExactSizeIterator for OwnedValueIterator {}
 
-impl fmt::Debug for ValueIterator {
+impl fmt::Debug for OwnedValueIterator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ValueIterator").finish()
     }

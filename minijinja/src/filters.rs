@@ -636,7 +636,7 @@ mod builtins {
         if count == 0 {
             return Err(Error::new(ErrorKind::InvalidOperation, "count cannot be 0"));
         }
-        let items = ok!(value.try_iter()).collect::<Vec<_>>();
+        let items = ok!(value.try_iter_owned()).collect::<Vec<_>>();
         let len = items.len();
         let items_per_slice = len / count;
         let slices_with_extra = len % count;
@@ -688,7 +688,7 @@ mod builtins {
         let mut rv = Vec::new();
         let mut tmp = Vec::with_capacity(count);
 
-        for item in ok!(value.try_iter()) {
+        for item in ok!(value.try_iter_owned()) {
             if tmp.len() == count {
                 rv.push(Value::from(mem::replace(
                     &mut tmp,
