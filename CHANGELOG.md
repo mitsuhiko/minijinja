@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-# Unreleased
+# 0.24.0
 
 - Catch divisions by zero.
 - Correctly render `inf` floats.
