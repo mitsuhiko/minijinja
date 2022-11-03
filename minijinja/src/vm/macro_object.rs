@@ -23,6 +23,8 @@ pub(crate) struct MacroData {
 }
 
 pub(crate) struct Macro {
+    // the extra level of Arc here is necessary for recursive calls only.
+    // For more information have a look at the call() method.
     pub data: Arc<MacroData>,
 }
 
@@ -111,13 +113,16 @@ impl Object for Macro {
         let mut rv = String::new();
         let mut out = Output::with_string(&mut rv);
 
+        // If a macro is self referential we need to put a reference to ourselves
+        // there.  Unfortunately because we only have a &self reference here, we
+        // cannot bump our own refcount.  Instead we need to wrap the macro data
+        // into an extra level of Arc to avoid unnecessary clones.
         let closure = if self.data.self_reference {
             match self.data.closure.0 {
                 ValueRepr::Map(ref map, kind) => {
-                    let self_key = Key::String(self.data.name.clone());
                     let mut map = map.clone();
                     Arc::make_mut(&mut map).insert(
-                        self_key,
+                        Key::String(self.data.name.clone()),
                         Value::from_object(Macro {
                             data: self.data.clone(),
                         }),
