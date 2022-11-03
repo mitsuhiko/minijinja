@@ -182,14 +182,6 @@ impl<'a> From<&'a str> for StaticKey {
     }
 }
 
-#[doc(hidden)]
-impl From<&Arc<String>> for StaticKey {
-    #[inline(always)]
-    fn from(value: &Arc<String>) -> Self {
-        Key::String(value.clone())
-    }
-}
-
 #[cfg(feature = "key_interning")]
 pub mod key_interning {
     use super::*;

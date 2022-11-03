@@ -107,16 +107,16 @@ impl Object for Macro {
 
         let closure = match self.closure.0 {
             ValueRepr::Map(ref map, kind) => {
-                let self_key = Key::from(&self.name);
+                let self_key = Key::String(self.name.clone());
                 let map = match map.get(&self_key) {
-                    Some(v) if v.is_undefined() => {
-                        Arc::new(map.iter()
+                    Some(v) if v.is_undefined() => Arc::new(
+                        map.iter()
                             .map(|(k, v)| (k.clone(), v.clone()))
                             .chain(std::iter::once({
                                 (self_key, state.ctx.load(state.env(), &self.name).unwrap())
                             }))
-                            .collect())
-                    }
+                            .collect(),
+                    ),
                     _ => map.clone(),
                 };
 
@@ -131,14 +131,7 @@ impl Object for Macro {
         // Because macros cannot return anything other than strings (most importantly they)
         // can't return other macros this is however not an issue, as modifications in the
         // macro cannot leak out.
-        ok!(vm.eval_macro(
-            instructions,
-            *offset,
-            closure,
-            &mut out,
-            state,
-            arg_values,
-        ));
+        ok!(vm.eval_macro(instructions, *offset, closure, &mut out, state, arg_values,));
 
         Ok(if !matches!(state.auto_escape(), AutoEscape::None) {
             Value::from_safe_string(rv)
