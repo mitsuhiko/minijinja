@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# Unreleased
+
+- Added support for recursive macro invocations. (#133)
+
 # 0.24.0
 
 - Catch divisions by zero.
