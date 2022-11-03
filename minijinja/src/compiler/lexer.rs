@@ -37,6 +37,44 @@ fn find_marker(a: &str) -> Option<usize> {
     }
 }
 
+#[cfg(feature = "unicode")]
+fn lex_identifier(s: &str) -> usize {
+    s.chars()
+        .enumerate()
+        .map_while(|(idx, c)| {
+            let cont = if c == '_' {
+                true
+            } else if idx == 0 {
+                unicode_ident::is_xid_start(c)
+            } else {
+                unicode_ident::is_xid_continue(c)
+            };
+            if cont {
+                Some(c.len_utf8())
+            } else {
+                None
+            }
+        })
+        .sum::<usize>()
+}
+
+#[cfg(not(feature = "unicode"))]
+fn lex_identifier(s: &str) -> usize {
+    s.as_bytes()
+        .iter()
+        .enumerate()
+        .take_while(|&(idx, &c)| {
+            if c == b'_' {
+                true
+            } else if idx == 0 {
+                c.is_ascii_alphabetic()
+            } else {
+                c.is_ascii_alphanumeric()
+            }
+        })
+        .count()
+}
+
 fn skip_basic_tag(block_str: &str, name: &str) -> Option<usize> {
     let mut ptr = block_str;
 
@@ -136,6 +174,17 @@ impl<'s> TokenizerState<'s> {
                 self.span(old_loc),
             )
         })
+    }
+
+    fn eat_identifier(&mut self) -> Result<(Token<'s>, Span), Error> {
+        let ident_len = lex_identifier(self.rest);
+        if ident_len > 0 {
+            let old_loc = self.loc();
+            let ident = self.advance(ident_len);
+            Ok((Token::Ident(ident), self.span(old_loc)))
+        } else {
+            Err(self.syntax_error("unexpected character"))
+        }
     }
 
     fn eat_string(&mut self, delim: u8) -> Result<(Token<'s>, Span), Error> {
@@ -361,29 +410,7 @@ fn tokenize_raw(
                     return Some(Ok((op, state.span(old_loc))));
                 }
 
-                // identifiers
-                let ident_len = state
-                    .rest
-                    .as_bytes()
-                    .iter()
-                    .enumerate()
-                    .take_while(|&(idx, &c)| {
-                        if c == b'_' {
-                            true
-                        } else if idx == 0 {
-                            c.is_ascii_alphabetic()
-                        } else {
-                            c.is_ascii_alphanumeric()
-                        }
-                    })
-                    .count();
-                if ident_len > 0 {
-                    let ident = state.advance(ident_len);
-                    return Some(Ok((Token::Ident(ident), state.span(old_loc))));
-                }
-
-                // syntax error
-                return Some(Err(state.syntax_error("unexpected character")));
+                return Some(state.eat_identifier());
             }
             None => panic!("empty lexer state"),
         }
@@ -454,4 +481,48 @@ fn test_is_basic_tag() {
     assert_eq!(skip_basic_tag(" raw %}", "endraw"), None);
     assert_eq!(skip_basic_tag("  raw  %}", "raw"), Some(9));
     assert_eq!(skip_basic_tag("-  raw  -%}", "raw"), Some(11));
+}
+
+#[test]
+fn test_basic_identifiers() {
+    fn assert_ident(s: &str) {
+        match tokenize_raw(s, true).next() {
+            Some(Ok((Token::Ident(ident), _))) if ident == s => {}
+            _ => panic!("did not get a matching token result: {:?}", s),
+        }
+    }
+
+    fn assert_not_ident(s: &str) {
+        let res = tokenize_raw(s, true).collect::<Result<Vec<_>, _>>();
+        if let Ok(tokens) = res {
+            if let &[(Token::Ident(_), _)] = &tokens[..] {
+                panic!("got a single ident for {:?}", s)
+            }
+        }
+    }
+
+    assert_ident("foo_bar_baz");
+    assert_ident("_foo_bar_baz");
+    assert_ident("_42world");
+    assert_ident("_world42");
+    assert_ident("world42");
+    assert_not_ident("42world");
+
+    #[cfg(feature = "unicode")]
+    {
+        assert_ident("foo");
+        assert_ident("föö");
+        assert_ident("き");
+        assert_ident("_");
+        assert_not_ident("1a");
+        assert_not_ident("a-");
+        assert_not_ident("🐍a");
+        assert_not_ident("a🐍🐍");
+        assert_ident("ᢅ");
+        assert_ident("ᢆ");
+        assert_ident("℘");
+        assert_ident("℮");
+        assert_not_ident("·");
+        assert_ident("a·");
+    }
 }

@@ -10,6 +10,9 @@ delimiters.  Both of those are currently intentional to better leverage
 the editor ecosystem which typically cannot deal with these reconfigured
 Jinja templates.
 
+MiniJinja by default does not allow unicode identifiers.  These need to be
+turned on with the `unicode` feature to achieve parity with Jinja2.
+
 ## Runtime Differences
 
 The biggest differences between MiniJinja and Jinja2 stem from the different
