@@ -65,5 +65,5 @@ fn main() {
         .unwrap();
 
     let tmpl = env.get_template("template.html").unwrap();
-    println!("{}", tmpl.render(&()).unwrap());
+    println!("{}", tmpl.render(()).unwrap());
 }

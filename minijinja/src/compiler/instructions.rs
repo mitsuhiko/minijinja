@@ -202,7 +202,7 @@ pub enum Instruction<'source> {
 
     /// Builds a macro on the stack.
     #[cfg(feature = "macros")]
-    BuildMacro(&'source str, usize),
+    BuildMacro(&'source str, usize, bool),
 
     /// Breaks from the interpreter loop (exists a function)
     #[cfg(feature = "macros")]

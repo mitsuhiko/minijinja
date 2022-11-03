@@ -16,7 +16,7 @@ use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
-use crate::vm::macro_object::Macro;
+use crate::vm::macro_object::{Macro, MacroData};
 
 pub use crate::vm::state::State;
 
@@ -521,8 +521,8 @@ impl<'env> Vm<'env> {
                     stack.push(Value(ValueRepr::Map(module.into(), MapType::Normal)));
                 }
                 #[cfg(feature = "macros")]
-                Instruction::BuildMacro(name, offset) => {
-                    self.build_macro(&mut stack, state, offset, name);
+                Instruction::BuildMacro(name, offset, self_reference) => {
+                    self.build_macro(&mut stack, state, *offset, name, *self_reference);
                 }
                 #[cfg(feature = "macros")]
                 Instruction::Return => break,
@@ -773,7 +773,14 @@ impl<'env> Vm<'env> {
     }
 
     #[cfg(feature = "macros")]
-    fn build_macro(&self, stack: &mut Stack, state: &mut State, offset: &usize, name: &&str) {
+    fn build_macro(
+        &self,
+        stack: &mut Stack,
+        state: &mut State,
+        offset: usize,
+        name: &str,
+        self_reference: bool,
+    ) {
         let arg_spec = match stack.pop().0 {
             ValueRepr::Seq(args) => args
                 .iter()
@@ -786,12 +793,15 @@ impl<'env> Vm<'env> {
         };
         let closure = stack.pop();
         let macro_ref_id = state.macros.len();
-        Arc::make_mut(&mut state.macros).push((state.instructions, *offset as usize));
+        Arc::make_mut(&mut state.macros).push((state.instructions, offset));
         stack.push(Value::from_object(Macro {
-            name: Arc::new(name.to_string()),
-            arg_spec,
-            macro_ref_id,
-            closure,
+            data: Arc::new(MacroData {
+                name: Arc::new(name.to_string()),
+                arg_spec,
+                macro_ref_id,
+                closure,
+                self_reference,
+            }),
         }));
     }
 }

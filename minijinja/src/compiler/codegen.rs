@@ -378,6 +378,7 @@ impl<'source> CodeGenerator<'source> {
         self.add(Instruction::Return);
 
         let undeclared = crate::compiler::meta::find_macro_closure(macro_decl);
+        let self_reference = undeclared.contains(macro_decl.name);
         let macro_instr = self.next_instruction();
         for name in &undeclared {
             self.add(Instruction::LoadConst(Value::from(*name)));
@@ -397,7 +398,11 @@ impl<'source> CodeGenerator<'source> {
                 .into(),
         ))));
 
-        self.add(Instruction::BuildMacro(macro_decl.name, instr + 1));
+        self.add(Instruction::BuildMacro(
+            macro_decl.name,
+            instr + 1,
+            self_reference,
+        ));
         self.add(Instruction::StoreLocal(macro_decl.name));
 
         if let Some(Instruction::Jump(ref mut target)) = self.instructions.get_mut(instr) {
