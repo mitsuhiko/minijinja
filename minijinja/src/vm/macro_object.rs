@@ -105,6 +105,26 @@ impl Object for Macro {
         let mut rv = String::new();
         let mut out = Output::with_string(&mut rv);
 
+        let closure = match self.closure.0 {
+            ValueRepr::Map(ref map, kind) => {
+                let self_key = Key::from(&self.name);
+                let map = match map.get(&self_key) {
+                    Some(v) if v.is_undefined() => {
+                        Arc::new(map.iter()
+                            .map(|(k, v)| (k.clone(), v.clone()))
+                            .chain(std::iter::once({
+                                (self_key, state.ctx.load(state.env(), &self.name).unwrap())
+                            }))
+                            .collect())
+                    }
+                    _ => map.clone(),
+                };
+
+                ValueRepr::Map(map, kind).into()
+            }
+            _ => unreachable!(),
+        };
+
         // This requires some explanation here.  Because we get the state as &State and
         // not &mut State we are required to create a new state here.  This is unfortunate
         // but makes the calling interface more convenient for the rest of the system.
@@ -114,7 +134,7 @@ impl Object for Macro {
         ok!(vm.eval_macro(
             instructions,
             *offset,
-            self.closure.clone(),
+            closure,
             &mut out,
             state,
             arg_values,
