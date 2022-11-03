@@ -25,7 +25,7 @@ ecosystem of editor integrations.
 ```
 $ cargo tree
 minimal v0.1.0 (examples/minimal)
-└── minijinja v0.24.0 (minijinja)
+└── minijinja v0.25.0 (minijinja)
     └── serde v1.0.144
 ```
 
