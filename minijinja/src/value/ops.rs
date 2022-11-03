@@ -258,7 +258,7 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
         }
         ValueRepr::String(ref s, _) => {
             return Ok(Value::from(if let Some(s2) = value.as_str() {
-                s.contains(&s2)
+                s.contains(s2)
             } else {
                 s.contains(&value.to_string())
             }));
