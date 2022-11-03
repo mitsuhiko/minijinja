@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 # Unreleased
 
 - Added support for recursive macro invocations. (#133)
+- Added optional unicode identifier support. (#134)
 
 # 0.24.0
 
