@@ -398,7 +398,11 @@ impl<'source> CodeGenerator<'source> {
                 .into(),
         ))));
 
-        self.add(Instruction::BuildMacro(macro_decl.name, instr + 1, self_reference));
+        self.add(Instruction::BuildMacro(
+            macro_decl.name,
+            instr + 1,
+            self_reference,
+        ));
         self.add(Instruction::StoreLocal(macro_decl.name));
 
         if let Some(Instruction::Jump(ref mut target)) = self.instructions.get_mut(instr) {
