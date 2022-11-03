@@ -137,6 +137,8 @@
 //!   - `macros`: when removed the `{% macro %}` tag is not included.
 //!   - `multi-template`: when removed the templates related to imports and extends
 //!     are removed (`{% from %}`, `{% import %}`, `{% include %}`, and `{% extends %}`).
+//!   - `unicode`: when added unicode identifiers are supported.  Without this features
+//!     only ASCII identifiers can be used for variable names and attributes.
 //!
 //! - **Rust Functionality:**
 //!
