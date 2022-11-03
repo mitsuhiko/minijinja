@@ -10,7 +10,7 @@ use crate::value::{MapType, Object, StringType, Value, ValueRepr};
 use crate::vm::state::State;
 use crate::vm::Vm;
 
-pub(crate) struct Macro {
+pub(crate) struct MacroData {
     pub name: Arc<String>,
     pub arg_spec: Vec<Arc<String>>,
     // because values need to be 'static, we can't hold a reference to the
@@ -19,6 +19,11 @@ pub(crate) struct Macro {
     // state under `state.macros`.
     pub macro_ref_id: usize,
     pub closure: Value,
+    pub self_reference: bool,
+}
+
+pub(crate) struct Macro {
+    pub data: Arc<MacroData>,
 }
 
 impl fmt::Debug for Macro {
@@ -29,7 +34,7 @@ impl fmt::Debug for Macro {
 
 impl fmt::Display for Macro {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<macro {}>", self.name)
+        write!(f, "<macro {}>", self.data.name)
     }
 }
 
@@ -41,11 +46,12 @@ impl Object for Macro {
     fn get_attr(&self, name: &str) -> Option<Value> {
         match name {
             "name" => Some(Value(ValueRepr::String(
-                self.name.clone(),
+                self.data.name.clone(),
                 StringType::Normal,
             ))),
             "arguments" => Some(Value::from(
-                self.arg_spec
+                self.data
+                    .arg_spec
                     .iter()
                     .map(|x| Value(ValueRepr::String(x.clone(), StringType::Normal)))
                     .collect::<Vec<_>>(),
@@ -62,13 +68,13 @@ impl Object for Macro {
             _ => (args, None),
         };
 
-        if args.len() > self.arg_spec.len() {
+        if args.len() > self.data.arg_spec.len() {
             return Err(Error::from(ErrorKind::TooManyArguments));
         }
 
         let mut kwargs_used = BTreeSet::new();
-        let mut arg_values = Vec::with_capacity(self.arg_spec.len());
-        for (idx, name) in self.arg_spec.iter().enumerate() {
+        let mut arg_values = Vec::with_capacity(self.data.arg_spec.len());
+        for (idx, name) in self.data.arg_spec.iter().enumerate() {
             let kwarg = match kwargs {
                 Some(kwargs) => kwargs.get(&Key::Str(name)),
                 _ => None,
@@ -100,29 +106,28 @@ impl Object for Macro {
             }
         }
 
-        let (instructions, offset) = &state.macros[self.macro_ref_id];
+        let (instructions, offset) = &state.macros[self.data.macro_ref_id];
         let vm = Vm::new(state.env());
         let mut rv = String::new();
         let mut out = Output::with_string(&mut rv);
 
-        let closure = match self.closure.0 {
-            ValueRepr::Map(ref map, kind) => {
-                let self_key = Key::String(self.name.clone());
-                let map = match map.get(&self_key) {
-                    Some(v) if v.is_undefined() => Arc::new(
-                        map.iter()
-                            .map(|(k, v)| (k.clone(), v.clone()))
-                            .chain(std::iter::once({
-                                (self_key, state.ctx.load(state.env(), &self.name).unwrap())
-                            }))
-                            .collect(),
-                    ),
-                    _ => map.clone(),
-                };
-
-                ValueRepr::Map(map, kind).into()
+        let closure = if self.data.self_reference {
+            match self.data.closure.0 {
+                ValueRepr::Map(ref map, kind) => {
+                    let self_key = Key::String(self.data.name.clone());
+                    let mut map = map.clone();
+                    Arc::make_mut(&mut map).insert(
+                        self_key,
+                        Value::from_object(Macro {
+                            data: self.data.clone(),
+                        }),
+                    );
+                    ValueRepr::Map(map, kind).into()
+                }
+                _ => unreachable!(),
             }
-            _ => unreachable!(),
+        } else {
+            self.data.closure.clone()
         };
 
         // This requires some explanation here.  Because we get the state as &State and
