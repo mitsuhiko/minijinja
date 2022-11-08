@@ -3,6 +3,14 @@ use std::{fmt, io};
 use crate::utils::AutoEscape;
 use crate::value::Value;
 
+/// How should output be captured?
+#[derive(Debug, Clone, Copy)]
+pub enum CaptureMode {
+    Capture,
+    #[allow(unused)]
+    Discard,
+}
+
 /// An abstraction over [`Write`](std::fmt::Write) for the rendering.
 ///
 /// This is a utility type used in the engine which can be written into like one
@@ -10,7 +18,7 @@ use crate::value::Value;
 /// in the engine but it's also passed to the custom formatter function.
 pub struct Output<'a> {
     w: &'a mut (dyn fmt::Write + 'a),
-    capture_stack: Vec<String>,
+    capture_stack: Vec<Option<String>>,
 }
 
 impl<'a> Output<'a> {
@@ -31,33 +39,38 @@ impl<'a> Output<'a> {
 
     /// Creates a null output that writes nowhere.
     pub(crate) fn null() -> Self {
-        static mut NULL_WRITER: NullWriter = NullWriter;
         Self {
-            // SAFETY: this is safe as the null writer is a ZST
-            w: unsafe { &mut NULL_WRITER },
+            w: NullWriter::get_mut(),
             capture_stack: Vec::new(),
         }
     }
 
-    /// Begins capturing into a string.
-    pub(crate) fn begin_capture(&mut self) {
-        self.capture_stack.push(String::new());
+    /// Begins capturing into a string or discard.
+    pub(crate) fn begin_capture(&mut self, mode: CaptureMode) {
+        self.capture_stack.push(match mode {
+            CaptureMode::Capture => Some(String::new()),
+            CaptureMode::Discard => None,
+        });
     }
 
     /// Ends capturing and returns the captured string as value.
     pub(crate) fn end_capture(&mut self, auto_escape: AutoEscape) -> Value {
-        let captured = self.capture_stack.pop().unwrap();
-        if !matches!(auto_escape, AutoEscape::None) {
-            Value::from_safe_string(captured)
+        if let Some(captured) = self.capture_stack.pop().unwrap() {
+            if !matches!(auto_escape, AutoEscape::None) {
+                Value::from_safe_string(captured)
+            } else {
+                Value::from(captured)
+            }
         } else {
-            Value::from(captured)
+            Value::UNDEFINED
         }
     }
 
     #[inline(always)]
     fn target(&mut self) -> &mut dyn fmt::Write {
         match self.capture_stack.last_mut() {
-            Some(stream) => stream as _,
+            Some(Some(stream)) => stream as _,
+            Some(None) => NullWriter::get_mut(),
             None => self.w,
         }
     }
@@ -93,6 +106,15 @@ impl fmt::Write for Output<'_> {
 }
 
 pub struct NullWriter;
+
+impl NullWriter {
+    /// Returns a reference to the null writer.
+    pub fn get_mut() -> &'static mut NullWriter {
+        static mut NULL_WRITER: NullWriter = NullWriter;
+        // SAFETY: this is safe as the null writer is a ZST
+        unsafe { &mut NULL_WRITER }
+    }
+}
 
 impl fmt::Write for NullWriter {
     #[inline]
