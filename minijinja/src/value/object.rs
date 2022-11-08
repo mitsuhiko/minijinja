@@ -76,3 +76,21 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
         ))
     }
 }
+
+impl<T: Object> Object for std::sync::Arc<T> {
+    fn get_attr(&self, name: &str) -> Option<Value> {
+        T::get_attr(self, name)
+    }
+
+    fn attributes(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        T::attributes(self)
+    }
+
+    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+        T::call_method(self, state, name, args)
+    }
+
+    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+        T::call(self, state, args)
+    }
+}
