@@ -41,8 +41,8 @@ impl fmt::Display for Macro {
 }
 
 impl Object for Macro {
-    fn attributes(&self) -> &[&str] {
-        &["name", "arguments"][..]
+    fn attributes(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(["name", "arguments"].into_iter())
     }
 
     fn get_attr(&self, name: &str) -> Option<Value> {
