@@ -511,7 +511,7 @@ impl<'env> Vm<'env> {
                 // parent template is then invoked (`RenderParent`).  This has the
                 // effect that you can still set variables or declare macros and
                 // that they become visible in the blocks.
-                // 
+                //
                 // This behavior has a few downsides.  First of all what happens
                 // in the parent template overrides what happens in the child.
                 // For instance if you declare a macro named `foo` after `{%
