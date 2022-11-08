@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.26.0
+
+- Changed `Object::attributes` to being an iterator. (#138)
+
 # 0.25.0
 
 - Added support for recursive macro invocations. (#133)
