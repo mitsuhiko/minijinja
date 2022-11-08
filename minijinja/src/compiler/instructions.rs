@@ -5,6 +5,7 @@ use std::fmt;
 use similar_asserts::assert_eq;
 
 use crate::compiler::tokens::Span;
+use crate::output::CaptureMode;
 use crate::value::Value;
 
 /// This loop has the loop var.
@@ -152,17 +153,14 @@ pub enum Instruction<'source> {
     /// Jump if the stack top evaluates to true or pops the value
     JumpIfTrueOrPop(usize),
 
-    /// Call into a block.
-    CallBlock(&'source str),
-
     /// Sets the auto escape flag to the current value.
     PushAutoEscape,
 
     /// Resets the auto escape flag to the previous value.
     PopAutoEscape,
 
-    /// Begins capturing of output.
-    BeginCapture,
+    /// Begins capturing of output (false) or discard (true).
+    BeginCapture(CaptureMode),
 
     /// Ends capturing of output.
     EndCapture,
@@ -188,9 +186,17 @@ pub enum Instruction<'source> {
     /// A fast loop recurse instruction without intermediate capturing.
     FastRecurse,
 
+    /// Call into a block.
+    #[cfg(feature = "multi-template")]
+    CallBlock(&'source str),
+
     /// Loads block from a template with name on stack ("extends")
     #[cfg(feature = "multi-template")]
     LoadBlocks,
+
+    /// Renders the parent template
+    #[cfg(feature = "multi-template")]
+    RenderParent,
 
     /// Includes another template.
     #[cfg(feature = "multi-template")]

@@ -231,6 +231,7 @@ impl<'env> Context<'env> {
     }
 
     /// Increase the stack depth.
+    #[allow(unused)]
     pub fn incr_depth(&mut self, delta: usize) -> Result<(), Error> {
         self.check_depth()?;
         self.outer_stack_depth += delta;
@@ -238,6 +239,7 @@ impl<'env> Context<'env> {
     }
 
     /// Decrease the stack depth.
+    #[allow(unused)]
     pub fn decr_depth(&mut self, delta: usize) {
         self.outer_stack_depth -= delta;
     }

@@ -16,6 +16,7 @@ Error {
 invalid operation: cycle in template inheritance. "self-extends.txt" was referenced more than once (in self-extends.txt:1)
 ------------------------------ self-extends.txt -------------------------------
    1 > {% extends "self-extends.txt" %}
+     i    ^^^^^^^^^^^^^^^^^^^^^^^^^^ invalid operation
    2 | {% block wat %}{% endblock %}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 No referenced variables

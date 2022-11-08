@@ -59,9 +59,10 @@ pub enum Stmt<'a> {
     WithBlock(Spanned<WithBlock<'a>>),
     Set(Spanned<Set<'a>>),
     SetBlock(Spanned<SetBlock<'a>>),
-    Block(Spanned<Block<'a>>),
     AutoEscape(Spanned<AutoEscape<'a>>),
     FilterBlock(Spanned<FilterBlock<'a>>),
+    #[cfg(feature = "multi-template")]
+    Block(Spanned<Block<'a>>),
     #[cfg(feature = "multi-template")]
     Import(Spanned<Import<'a>>),
     #[cfg(feature = "multi-template")]
@@ -86,9 +87,10 @@ impl<'a> fmt::Debug for Stmt<'a> {
             Stmt::WithBlock(s) => fmt::Debug::fmt(s, f),
             Stmt::Set(s) => fmt::Debug::fmt(s, f),
             Stmt::SetBlock(s) => fmt::Debug::fmt(s, f),
-            Stmt::Block(s) => fmt::Debug::fmt(s, f),
             Stmt::AutoEscape(s) => fmt::Debug::fmt(s, f),
             Stmt::FilterBlock(s) => fmt::Debug::fmt(s, f),
+            #[cfg(feature = "multi-template")]
+            Stmt::Block(s) => fmt::Debug::fmt(s, f),
             #[cfg(feature = "multi-template")]
             Stmt::Extends(s) => fmt::Debug::fmt(s, f),
             #[cfg(feature = "multi-template")]
@@ -193,6 +195,7 @@ pub struct SetBlock<'a> {
 
 /// A block for inheritance elements.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg(feature = "multi-template")]
 pub struct Block<'a> {
     pub name: &'a str,
     pub body: Vec<Stmt<'a>>,
@@ -458,6 +461,7 @@ impl<'a> Map<'a> {
 pub enum CallType<'ast, 'source> {
     Function(&'source str),
     Method(&'ast Expr<'source>, &'source str),
+    #[cfg(feature = "multi-template")]
     Block(&'source str),
     Object(&'ast Expr<'source>),
 }
@@ -472,9 +476,12 @@ impl<'a> Call<'a> {
         match self.expr {
             Expr::Var(ref var) => CallType::Function(var.id),
             Expr::GetAttr(ref attr) => {
-                if let Expr::Var(ref var) = attr.expr {
-                    if var.id == "self" {
-                        return CallType::Block(attr.name);
+                #[cfg(feature = "multi-template")]
+                {
+                    if let Expr::Var(ref var) = attr.expr {
+                        if var.id == "self" {
+                            return CallType::Block(attr.name);
+                        }
                     }
                 }
                 CallType::Method(&attr.expr, attr.name)

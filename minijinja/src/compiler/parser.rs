@@ -150,6 +150,7 @@ impl<'a> TokenStream<'a> {
 
 struct Parser<'a> {
     stream: TokenStream<'a>,
+    #[allow(unused)]
     in_macro: bool,
     depth: usize,
 }
@@ -638,13 +639,14 @@ impl<'a> Parser<'a> {
                 SetParseResult::Set(rv) => ast::Stmt::Set(respan!(rv)),
                 SetParseResult::SetBlock(rv) => ast::Stmt::SetBlock(respan!(rv)),
             },
-            Token::Ident("block") => ast::Stmt::Block(respan!(ok!(self.parse_block()))),
             Token::Ident("autoescape") => {
                 ast::Stmt::AutoEscape(respan!(ok!(self.parse_auto_escape())))
             }
             Token::Ident("filter") => {
                 ast::Stmt::FilterBlock(respan!(ok!(self.parse_filter_block())))
             }
+            #[cfg(feature = "multi-template")]
+            Token::Ident("block") => ast::Stmt::Block(respan!(ok!(self.parse_block()))),
             #[cfg(feature = "multi-template")]
             Token::Ident("extends") => ast::Stmt::Extends(respan!(ok!(self.parse_extends()))),
             #[cfg(feature = "multi-template")]
@@ -820,6 +822,7 @@ impl<'a> Parser<'a> {
         }
     }
 
+    #[cfg(feature = "multi-template")]
     fn parse_block(&mut self) -> Result<ast::Block<'a>, Error> {
         if self.in_macro {
             syntax_error!("block tags in macros are not allowed");

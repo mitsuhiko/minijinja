@@ -8,7 +8,7 @@ use crate::compiler::instructions::{
 };
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::output::Output;
+use crate::output::{CaptureMode, Output};
 use crate::utils::AutoEscape;
 use crate::value::{self, ops, MapType, Value, ValueMap, ValueRepr};
 use crate::vm::context::{Context, Frame, LoopState, Stack};
@@ -27,6 +27,7 @@ mod macro_object;
 mod state;
 
 // the cost of a single include against the stack limit.
+#[cfg(feature = "multi-template")]
 const INCLUDE_RECURSION_COST: usize = 10;
 
 /// Helps to evaluate something.
@@ -151,6 +152,12 @@ impl<'env> Vm<'env> {
         let mut loaded_filters = [None; MAX_LOCALS];
         let mut loaded_tests = [None; MAX_LOCALS];
 
+        // If we are extending we are holding the instructions of the target parent
+        // template here.  This is used to detect multiple extends and the evaluation
+        // uses these instructions when RenderParent is evaluated.
+        #[cfg(feature = "multi-template")]
+        let mut parent_instructions = None;
+
         macro_rules! recurse_loop {
             ($capture:expr) => {{
                 let jump_target = ctx_ok!(self.prepare_loop_recursion(state));
@@ -160,7 +167,7 @@ impl<'env> Vm<'env> {
                 // to.
                 next_loop_recursion_jump = Some((pc + 1, $capture));
                 if $capture {
-                    out.begin_capture();
+                    out.begin_capture(CaptureMode::Capture);
                 }
                 pc = jump_target;
                 continue;
@@ -377,24 +384,27 @@ impl<'env> Vm<'env> {
                         stack.pop();
                     }
                 }
+                #[cfg(feature = "multi-template")]
                 Instruction::CallBlock(name) => {
-                    let old_block = state.current_block;
-                    state.current_block = Some(name);
-                    if let Some(block_stack) = state.blocks.get(name) {
-                        let old_instructions =
-                            mem::replace(&mut state.instructions, block_stack.instructions());
-                        ctx_ok!(state.ctx.push_frame(Frame::default()));
-                        let rv = self.eval_state(state, out);
-                        state.ctx.pop_frame();
-                        state.instructions = old_instructions;
-                        ctx_ok!(rv);
-                    } else {
-                        bail!(Error::new(
-                            ErrorKind::InvalidOperation,
-                            "tried to invoke unknown block"
-                        ));
+                    if parent_instructions.is_none() {
+                        let old_block = state.current_block;
+                        state.current_block = Some(name);
+                        if let Some(block_stack) = state.blocks.get(name) {
+                            let old_instructions =
+                                mem::replace(&mut state.instructions, block_stack.instructions());
+                            ctx_ok!(state.ctx.push_frame(Frame::default()));
+                            let rv = self.eval_state(state, out);
+                            state.ctx.pop_frame();
+                            state.instructions = old_instructions;
+                            ctx_ok!(rv);
+                        } else {
+                            bail!(Error::new(
+                                ErrorKind::InvalidOperation,
+                                "tried to invoke unknown block"
+                            ));
+                        }
+                        state.current_block = old_block;
                     }
-                    state.current_block = old_block;
                 }
                 Instruction::PushAutoEscape => {
                     a = stack.pop();
@@ -404,8 +414,8 @@ impl<'env> Vm<'env> {
                 Instruction::PopAutoEscape => {
                     state.auto_escape = auto_escape_stack.pop().unwrap();
                 }
-                Instruction::BeginCapture => {
-                    out.begin_capture();
+                Instruction::BeginCapture(mode) => {
+                    out.begin_capture(*mode);
                 }
                 Instruction::EndCapture => {
                     stack.push(out.end_capture(state.auto_escape));
@@ -494,10 +504,43 @@ impl<'env> Vm<'env> {
                 Instruction::FastRecurse => {
                     recurse_loop!(false);
                 }
+                // Explanation on the behavior of `LoadBlocks` and `RenderParent`.
+                // MiniJinja inherits the behavior from Jinja2 where extending
+                // loads the blocks (`LoadBlocks`) and the rest of the template
+                // keeps executing but with output disabled, only at the end the
+                // parent template is then invoked (`RenderParent`).  This has the
+                // effect that you can still set variables or declare macros and
+                // that they become visible in the blocks.
+                //
+                // This behavior has a few downsides.  First of all what happens
+                // in the parent template overrides what happens in the child.
+                // For instance if you declare a macro named `foo` after `{%
+                // extends %}` and then a variable with that named is also set
+                // in the parent template, then you won't be able to call that
+                // macro in the body.
+                //
+                // The reason for this is that blocks unlike macros do not have
+                // closures in Jinja2/MiniJinja.
+                //
+                // However for the common case this is convenient because it
+                // lets you put some imports there and for as long as you do not
+                // create name clashes this works fine.
                 #[cfg(feature = "multi-template")]
                 Instruction::LoadBlocks => {
                     a = stack.pop();
-                    ctx_ok!(self.load_blocks(a, state));
+                    if parent_instructions.is_some() {
+                        bail!(Error::new(
+                            ErrorKind::InvalidOperation,
+                            "tried to extend a second time in a template"
+                        ));
+                    }
+                    parent_instructions = Some(ctx_ok!(self.load_blocks(a, state)));
+                    out.begin_capture(CaptureMode::Discard);
+                }
+                #[cfg(feature = "multi-template")]
+                Instruction::RenderParent => {
+                    out.end_capture(AutoEscape::None);
+                    state.instructions = parent_instructions.take().unwrap();
 
                     // then replace the instructions and set the pc to 0 again.
                     // this effectively means that the template engine will now
@@ -622,7 +665,7 @@ impl<'env> Vm<'env> {
         }
 
         if capture {
-            out.begin_capture();
+            out.begin_capture(CaptureMode::Capture);
         }
 
         let old_instructions = mem::replace(&mut state.instructions, block_stack.instructions());
@@ -661,7 +704,11 @@ impl<'env> Vm<'env> {
     }
 
     #[cfg(feature = "multi-template")]
-    fn load_blocks(&self, name: Value, state: &mut State<'_, 'env>) -> Result<(), Error> {
+    fn load_blocks(
+        &self,
+        name: Value,
+        state: &mut State<'_, 'env>,
+    ) -> Result<&'env Instructions<'env>, Error> {
         let name = match name.as_str() {
             Some(name) => name,
             None => {
@@ -689,8 +736,7 @@ impl<'env> Vm<'env> {
                 .or_insert_with(BlockStack::default)
                 .append_instructions(instr);
         }
-        state.instructions = tmpl.instructions();
-        Ok(())
+        Ok(tmpl.instructions())
     }
 
     fn derive_auto_escape(

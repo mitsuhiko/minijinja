@@ -6,6 +6,7 @@ use crate::compiler::instructions::{
 };
 use crate::compiler::tokens::Span;
 use crate::error::Error;
+use crate::output::CaptureMode;
 use crate::value::Value;
 
 #[cfg(test)]
@@ -41,6 +42,8 @@ pub struct CodeGenerator<'source> {
     span_stack: Vec<Span>,
     filter_local_ids: BTreeMap<&'source str, LocalId>,
     test_local_ids: BTreeMap<&'source str, LocalId>,
+    #[cfg(feature = "multi-template")]
+    has_extends: bool,
 }
 
 impl<'source> CodeGenerator<'source> {
@@ -54,6 +57,8 @@ impl<'source> CodeGenerator<'source> {
             span_stack: Vec::new(),
             filter_local_ids: BTreeMap::new(),
             test_local_ids: BTreeMap::new(),
+            #[cfg(feature = "multi-template")]
+            has_extends: false,
         }
     }
 
@@ -99,6 +104,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     /// Creats a sub generator.
+    #[cfg(feature = "multi-template")]
     fn new_subgenerator(&self) -> CodeGenerator<'source> {
         let mut sub = CodeGenerator::new(self.instructions.name(), self.instructions.source());
         sub.current_line = self.current_line;
@@ -107,6 +113,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     /// Finishes a sub generator and syncs it back.
+    #[cfg(feature = "multi-template")]
     fn finish_subgenerator(&mut self, sub: CodeGenerator<'source>) -> Instructions<'source> {
         self.current_line = sub.current_line;
         let (instructions, blocks) = sub.finish();
@@ -226,6 +233,12 @@ impl<'source> CodeGenerator<'source> {
                 for node in &t.children {
                     ok!(self.compile_stmt(node));
                 }
+                #[cfg(feature = "multi-template")]
+                {
+                    if self.has_extends {
+                        self.add(Instruction::RenderParent);
+                    }
+                }
             }
             ast::Stmt::EmitExpr(expr) => {
                 ok!(self.compile_emit_expr(expr));
@@ -259,7 +272,7 @@ impl<'source> CodeGenerator<'source> {
             }
             ast::Stmt::SetBlock(set_block) => {
                 self.set_line_from_span(set_block.span());
-                self.add(Instruction::BeginCapture);
+                self.add(Instruction::BeginCapture(CaptureMode::Capture));
                 for node in &set_block.body {
                     ok!(self.compile_stmt(node));
                 }
@@ -268,9 +281,6 @@ impl<'source> CodeGenerator<'source> {
                     ok!(self.compile_expr(filter));
                 }
                 ok!(self.compile_assignment(&set_block.target));
-            }
-            ast::Stmt::Block(block) => {
-                ok!(self.compile_block(block));
             }
             ast::Stmt::AutoEscape(auto_escape) => {
                 self.set_line_from_span(auto_escape.span());
@@ -283,7 +293,7 @@ impl<'source> CodeGenerator<'source> {
             }
             ast::Stmt::FilterBlock(filter_block) => {
                 self.set_line_from_span(filter_block.span());
-                self.add(Instruction::BeginCapture);
+                self.add(Instruction::BeginCapture(CaptureMode::Capture));
                 for node in &filter_block.body {
                     ok!(self.compile_stmt(node));
                 }
@@ -292,8 +302,12 @@ impl<'source> CodeGenerator<'source> {
                 self.add(Instruction::Emit);
             }
             #[cfg(feature = "multi-template")]
+            ast::Stmt::Block(block) => {
+                ok!(self.compile_block(block));
+            }
+            #[cfg(feature = "multi-template")]
             ast::Stmt::Import(import) => {
-                self.add(Instruction::BeginCapture);
+                self.add(Instruction::BeginCapture(CaptureMode::Discard));
                 self.add(Instruction::PushWith);
                 ok!(self.compile_expr(&import.expr));
                 self.add_with_span(Instruction::Include(false), import.span());
@@ -304,7 +318,7 @@ impl<'source> CodeGenerator<'source> {
             }
             #[cfg(feature = "multi-template")]
             ast::Stmt::FromImport(from_import) => {
-                self.add(Instruction::BeginCapture);
+                self.add(Instruction::BeginCapture(CaptureMode::Discard));
                 self.add(Instruction::PushWith);
                 ok!(self.compile_expr(&from_import.expr));
                 self.add_with_span(Instruction::Include(false), from_import.span());
@@ -321,7 +335,8 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::Extends(extends) => {
                 self.set_line_from_span(extends.span());
                 ok!(self.compile_expr(&extends.name));
-                self.add(Instruction::LoadBlocks);
+                self.add_with_span(Instruction::LoadBlocks, extends.span());
+                self.has_extends = true;
             }
             #[cfg(feature = "multi-template")]
             ast::Stmt::Include(include) => {
@@ -337,6 +352,7 @@ impl<'source> CodeGenerator<'source> {
         Ok(())
     }
 
+    #[cfg(feature = "multi-template")]
     fn compile_block(&mut self, block: &ast::Spanned<ast::Block<'source>>) -> Result<(), Error> {
         self.set_line_from_span(block.span());
         let mut sub = self.new_subgenerator();
@@ -450,6 +466,7 @@ impl<'source> CodeGenerator<'source> {
                         return Ok(());
                     }
                 }
+                #[cfg(feature = "multi-template")]
                 ast::CallType::Block(name) => {
                     self.add(Instruction::CallBlock(name));
                     return Ok(());
@@ -664,8 +681,9 @@ impl<'source> CodeGenerator<'source> {
                 }
                 self.add(Instruction::CallFunction(name, c.args.len()));
             }
+            #[cfg(feature = "multi-template")]
             ast::CallType::Block(name) => {
-                self.add(Instruction::BeginCapture);
+                self.add(Instruction::BeginCapture(CaptureMode::Capture));
                 self.add(Instruction::CallBlock(name));
                 self.add(Instruction::EndCapture);
             }

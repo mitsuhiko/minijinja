@@ -133,12 +133,6 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
                 assign_nested(&stmt.target, state);
                 visit_expr(&stmt.expr, state);
             }
-            ast::Stmt::Block(stmt) => {
-                state.push();
-                state.assign("super");
-                stmt.body.iter().for_each(|x| walk(x, state));
-                state.pop();
-            }
             ast::Stmt::AutoEscape(stmt) => {
                 state.push();
                 stmt.body.iter().for_each(|x| walk(x, state));
@@ -152,6 +146,13 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
             ast::Stmt::SetBlock(stmt) => {
                 assign_nested(&stmt.target, state);
                 state.push();
+                stmt.body.iter().for_each(|x| walk(x, state));
+                state.pop();
+            }
+            #[cfg(feature = "multi-template")]
+            ast::Stmt::Block(stmt) => {
+                state.push();
+                state.assign("super");
                 stmt.body.iter().for_each(|x| walk(x, state));
                 state.pop();
             }
