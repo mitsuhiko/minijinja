@@ -5,6 +5,8 @@ All notable changes to MiniJinja are documented here.
 # 0.26.0
 
 - Changed `Object::attributes` to being an iterator. (#138)
+- `Arc<T: Object>` now implements `Object`. (#139)
+- Aligned semantics of top-level template code after `extends` with Jinja2. (#140)
 
 # 0.25.0
 
