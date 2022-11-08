@@ -36,12 +36,12 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
 
     /// An enumeration of attributes that are known to exist on this object.
     ///
-    /// The default implementation returns an empty slice.  If it's not possible
+    /// The default implementation returns an empty iterator.  If it's not possible
     /// to implement this, it's fine for the implementation to be omitted.  The
     /// enumeration here is used by the `for` loop to iterate over the attributes
     /// on the value.
-    fn attributes(&self) -> &[&str] {
-        &[][..]
+    fn attributes(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(None.into_iter())
     }
 
     /// Called when the engine tries to call a method on the object.

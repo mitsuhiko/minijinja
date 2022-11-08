@@ -552,7 +552,7 @@ impl Value {
             ValueRepr::String(ref s, _) => Some(s.chars().count()),
             ValueRepr::Map(ref items, _) => Some(items.len()),
             ValueRepr::Seq(ref items) => Some(items.len()),
-            ValueRepr::Dynamic(ref dy) => Some(dy.attributes().len()),
+            ValueRepr::Dynamic(ref dy) => Some(dy.attributes().count()),
             _ => None,
         }
     }
@@ -796,8 +796,7 @@ impl Value {
             ) as Box<dyn Iterator<Item = _>>,
             ValueRepr::Dynamic(ref obj) => Box::new(
                 obj.attributes()
-                    .iter()
-                    .filter_map(move |attr| Some((*attr, some!(obj.get_attr(attr))))),
+                    .filter_map(move |attr| Some((attr, some!(obj.get_attr(attr))))),
             ) as Box<dyn Iterator<Item = _>>,
             _ => Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>,
         }
@@ -869,11 +868,10 @@ impl Serialize for Value {
             }
             ValueRepr::Dynamic(ref n) => {
                 use serde::ser::SerializeMap;
-                let fields = n.attributes();
-                let mut s = ok!(serializer.serialize_map(Some(fields.len())));
-                for k in fields {
+                let mut s = ok!(serializer.serialize_map(None));
+                for k in n.attributes() {
                     let v = n.get_attr(k).unwrap_or(Value::UNDEFINED);
-                    ok!(s.serialize_entry(k, &v));
+                    ok!(s.serialize_entry(&k, &v));
                 }
                 s.end()
             }
@@ -983,8 +981,8 @@ fn test_dynamic_object_roundtrip() {
             }
         }
 
-        fn attributes(&self) -> &'static [&'static str] {
-            &["value"]
+        fn attributes(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+            Box::new(["value"].into_iter())
         }
     }
 

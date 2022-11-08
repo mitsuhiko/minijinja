@@ -24,18 +24,21 @@ impl fmt::Debug for Loop {
 }
 
 impl Object for Loop {
-    fn attributes(&self) -> &[&str] {
-        &[
-            "index0",
-            "index",
-            "length",
-            "revindex",
-            "revindex0",
-            "first",
-            "last",
-            "depth",
-            "depth0",
-        ][..]
+    fn attributes(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(
+            [
+                "index0",
+                "index",
+                "length",
+                "revindex",
+                "revindex0",
+                "first",
+                "last",
+                "depth",
+                "depth0",
+            ]
+            .into_iter(),
+        )
     }
 
     fn get_attr(&self, name: &str) -> Option<Value> {
