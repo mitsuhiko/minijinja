@@ -18,6 +18,17 @@
 //! let value = Value::from(42);
 //! ```
 //!
+//! Or via the [`FromIterator`] trait:
+//!
+//! ```
+//! # use minijinja::value::Value;
+//! // collection into a sequence
+//! let value: Value = (1..10).into_iter().collect();
+//!
+//! // collection into a map
+//! let value: Value = [("key", "value")].into_iter().collect();
+//! ```
+//!
 //! MiniJinja will however create values via an indirection via [`serde`] when
 //! a template is rendered or an expression is evaluated.  This can also be
 //! triggered manually by using the [`Value::from_serializable`] method:
@@ -62,6 +73,28 @@
 //! [`Object`] trait.  These can be used to implement dynamic functionality such as
 //! stateful values and more.  Dynamic objects are internally also used to implement
 //! the special `loop` variable or macros.
+//!
+//! To create a dynamic `Value` object, use [`Value::from_object()`] or the
+//! `From<Arc<T: Object>>` implementations for `Value`:
+//!
+//! ```rust
+//! # use std::sync::Arc;
+//! # use minijinja::value::{Value, Object};
+//! #[derive(Debug)]
+//! struct Foo;
+//!
+//! # impl std::fmt::Display for Foo {
+//! #     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { Ok(()) }
+//! # }
+//! #
+//! impl Object for Foo {
+//!     /* implementation */
+//! }
+//!
+//! let value = Value::from_object(Foo);
+//! let value = Value::from(Arc::new(Foo));
+//! let value = Value::from(Arc::new(Foo) as Arc<dyn Object>);
+//! ```
 
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
@@ -422,17 +455,8 @@ impl Value {
     ///
     /// let val = Value::from_object(Thing { id: 42 });
     /// ```
-    pub fn from_object<T: Object + 'static>(value: T) -> Value {
-        Value::from_arc_object(Arc::new(value))
-    }
-
-    /// Creates a value from a reference counted dynamic object.
-    ///
-    /// As values are internally holding dynamic objects in an `Arc` it can be
-    /// convenient to hold on to it so that the ownership can be shared between
-    /// the boxed value and outside.
-    pub fn from_arc_object<T: Object + 'static>(value: Arc<T>) -> Value {
-        ValueRepr::Dynamic(value as Arc<dyn Object>).into()
+    pub fn from_object<T: Object>(value: T) -> Value {
+        Value::from(Arc::new(value) as Arc<dyn Object>)
     }
 
     /// Creates a callable value from a function.
@@ -991,7 +1015,7 @@ fn test_dynamic_object_roundtrip() {
     }
 
     let x = Arc::new(X(Default::default()));
-    let x_value = Value::from_arc_object(x.clone());
+    let x_value = Value::from(x.clone());
     x.0.fetch_add(42, atomic::Ordering::Relaxed);
     let x_clone = Value::from_serializable(&x_value);
     x.0.fetch_add(23, atomic::Ordering::Relaxed);
