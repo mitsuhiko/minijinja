@@ -43,7 +43,7 @@ impl Serializer for ValueSerializer {
     }
 
     fn serialize_i128(self, v: i128) -> Result<Value, Error> {
-        Ok(ValueRepr::I128(Arc::new(v)).into())
+        Ok(ValueRepr::I128(v).into())
     }
 
     fn serialize_u8(self, v: u8) -> Result<Value, Error> {
@@ -63,7 +63,7 @@ impl Serializer for ValueSerializer {
     }
 
     fn serialize_u128(self, v: u128) -> Result<Value, Error> {
-        Ok(ValueRepr::U128(Arc::new(v)).into())
+        Ok(ValueRepr::U128(v).into())
     }
 
     fn serialize_f32(self, v: f32) -> Result<Value, Error> {

@@ -234,14 +234,14 @@ impl From<()> for Value {
 impl From<i128> for Value {
     #[inline(always)]
     fn from(val: i128) -> Self {
-        ValueRepr::I128(Arc::new(val)).into()
+        ValueRepr::I128(val).into()
     }
 }
 
 impl From<u128> for Value {
     #[inline(always)]
     fn from(val: u128) -> Self {
-        ValueRepr::U128(Arc::new(val)).into()
+        ValueRepr::U128(val).into()
     }
 }
 
@@ -339,8 +339,8 @@ macro_rules! primitive_int_try_from {
             ValueRepr::U64(val) => val,
             // for the intention here see Key::from_borrowed_value
             ValueRepr::F64(val) if (val as i64 as f64 == val) => val as i64,
-            ValueRepr::I128(ref val) => **val,
-            ValueRepr::U128(ref val) => **val,
+            ValueRepr::I128(val) => val,
+            ValueRepr::U128(val) => val,
         });
     }
 }
