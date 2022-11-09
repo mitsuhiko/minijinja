@@ -423,7 +423,16 @@ impl Value {
     /// let val = Value::from_object(Thing { id: 42 });
     /// ```
     pub fn from_object<T: Object + 'static>(value: T) -> Value {
-        Value::from_rc_object(Arc::new(value))
+        Value::from_arc_object(Arc::new(value))
+    }
+
+    /// Creates a value from a reference counted dynamic object.
+    ///
+    /// As values are internally holding dynamic objects in an `Arc` it can be
+    /// convenient to hold on to it so that the ownership can be shared between
+    /// the boxed value and outside.
+    pub fn from_arc_object<T: Object + 'static>(value: Arc<T>) -> Value {
+        ValueRepr::Dynamic(value as Arc<dyn Object>).into()
     }
 
     /// Creates a callable value from a function.
@@ -764,11 +773,6 @@ impl Value {
         ))
     }
 
-    /// Creates a value from a reference counted dynamic object.
-    pub(crate) fn from_rc_object<T: Object + 'static>(value: Arc<T>) -> Value {
-        ValueRepr::Dynamic(value as Arc<dyn Object>).into()
-    }
-
     pub(crate) fn try_into_key(self) -> Result<StaticKey, Error> {
         match self.0 {
             ValueRepr::Bool(val) => Ok(Key::Bool(val)),
@@ -987,7 +991,7 @@ fn test_dynamic_object_roundtrip() {
     }
 
     let x = Arc::new(X(Default::default()));
-    let x_value = Value::from_rc_object(x.clone());
+    let x_value = Value::from_arc_object(x.clone());
     x.0.fetch_add(42, atomic::Ordering::Relaxed);
     let x_clone = Value::from_serializable(&x_value);
     x.0.fetch_add(23, atomic::Ordering::Relaxed);
