@@ -82,11 +82,11 @@ impl<'a> Key<'a> {
             ValueRepr::U64(v) => TryFrom::try_from(v)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
-            ValueRepr::U128(v) => TryFrom::try_from(v)
+            ValueRepr::U128(v) => TryFrom::try_from(v.0)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
             ValueRepr::I64(v) => Ok(Key::I64(v)),
-            ValueRepr::I128(v) => TryFrom::try_from(v)
+            ValueRepr::I128(v) => TryFrom::try_from(v.0)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
             ValueRepr::F64(x) => {

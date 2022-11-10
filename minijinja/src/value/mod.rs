@@ -254,6 +254,18 @@ pub(crate) enum StringType {
     Safe,
 }
 
+/// An `i128` that intentionally uses packed layout to ensure
+/// that `ValueRepr` doesn't blow up in size.
+#[derive(Copy, Clone)]
+#[repr(packed)]
+pub(crate) struct MisalignedI128(pub i128);
+
+/// An `u128` that intentionally uses packed layout to ensure
+/// that `ValueRepr` doesn't blow up in size.
+#[derive(Copy, Clone)]
+#[repr(packed)]
+pub(crate) struct MisalignedU128(pub u128);
+
 #[derive(Clone)]
 pub(crate) enum ValueRepr {
     Undefined,
@@ -263,8 +275,8 @@ pub(crate) enum ValueRepr {
     F64(f64),
     Char(char),
     None,
-    U128(u128),
-    I128(i128),
+    U128(MisalignedU128),
+    I128(MisalignedI128),
     String(Arc<String>, StringType),
     Bytes(Arc<Vec<u8>>),
     Seq(Arc<Vec<Value>>),
@@ -282,8 +294,8 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::F64(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Char(val) => fmt::Debug::fmt(val, f),
             ValueRepr::None => write!(f, "None"),
-            ValueRepr::U128(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::I128(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
+            ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
             ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
@@ -359,7 +371,7 @@ impl fmt::Display for Value {
             }
             ValueRepr::Char(val) => write!(f, "{}", val),
             ValueRepr::None => write!(f, "none"),
-            ValueRepr::I128(val) => write!(f, "{}", val),
+            ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
             ValueRepr::String(val, _) => write!(f, "{}", val),
             ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
             ValueRepr::Seq(values) => {
@@ -382,7 +394,7 @@ impl fmt::Display for Value {
                 }
                 write!(f, "}}")
             }
-            ValueRepr::U128(val) => write!(f, "{}", val),
+            ValueRepr::U128(val) => write!(f, "{}", { val.0 }),
             ValueRepr::Dynamic(x) => write!(f, "{}", x),
         }
     }
@@ -523,9 +535,9 @@ impl Value {
         match self.0 {
             ValueRepr::Bool(val) => val,
             ValueRepr::U64(x) => x != 0,
-            ValueRepr::U128(x) => x != 0,
+            ValueRepr::U128(x) => x.0 != 0,
             ValueRepr::I64(x) => x != 0,
-            ValueRepr::I128(x) => x != 0,
+            ValueRepr::I128(x) => x.0 != 0,
             ValueRepr::F64(x) => x != 0.0,
             ValueRepr::Char(x) => x != '\x00',
             ValueRepr::String(ref x, _) => !x.is_empty(),
@@ -820,11 +832,11 @@ impl Value {
             ValueRepr::U64(v) => TryFrom::try_from(v)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
-            ValueRepr::U128(v) => TryFrom::try_from(v)
+            ValueRepr::U128(v) => TryFrom::try_from(v.0)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
             ValueRepr::I64(v) => Ok(Key::I64(v)),
-            ValueRepr::I128(v) => TryFrom::try_from(v)
+            ValueRepr::I128(v) => TryFrom::try_from(v.0)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
             ValueRepr::Char(c) => Ok(Key::Char(c)),
@@ -898,8 +910,8 @@ impl Serialize for Value {
             ValueRepr::Char(c) => serializer.serialize_char(c),
             ValueRepr::None => serializer.serialize_unit(),
             ValueRepr::Undefined => serializer.serialize_unit(),
-            ValueRepr::U128(u) => serializer.serialize_u128(u),
-            ValueRepr::I128(i) => serializer.serialize_i128(i),
+            ValueRepr::U128(u) => serializer.serialize_u128(u.0),
+            ValueRepr::I128(i) => serializer.serialize_i128(i.0),
             ValueRepr::String(ref s, _) => serializer.serialize_str(s),
             ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
             ValueRepr::Seq(ref elements) => elements.serialize(serializer),

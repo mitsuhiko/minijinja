@@ -492,7 +492,7 @@ mod builtins {
     pub fn abs(value: Value) -> Result<Value, Error> {
         match value.0 {
             ValueRepr::I64(x) => Ok(Value::from(x.abs())),
-            ValueRepr::I128(x) => Ok(Value::from(x.abs())),
+            ValueRepr::I128(x) => Ok(Value::from(x.0.abs())),
             ValueRepr::F64(x) => Ok(Value::from(x.abs())),
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
