@@ -5,7 +5,9 @@ use std::ops::{Deref, DerefMut};
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
-use crate::value::{Arc, MapType, Object, StringType, Value, ValueKind, ValueRepr};
+use crate::value::{
+    Arc, MapType, MisalignedI128, MisalignedU128, Object, StringType, Value, ValueKind, ValueRepr,
+};
 use crate::vm::State;
 
 /// A utility trait that represents the return value of functions and filters.
@@ -291,17 +293,29 @@ macro_rules! value_from {
     };
 }
 
+impl From<i128> for Value {
+    #[inline(always)]
+    fn from(val: i128) -> Self {
+        ValueRepr::I128(MisalignedI128(val)).into()
+    }
+}
+
+impl From<u128> for Value {
+    #[inline(always)]
+    fn from(val: u128) -> Self {
+        ValueRepr::U128(MisalignedU128(val)).into()
+    }
+}
+
 value_from!(bool, Bool);
 value_from!(u8, U64);
 value_from!(u16, U64);
 value_from!(u32, U64);
 value_from!(u64, U64);
-value_from!(u128, U128);
 value_from!(i8, I64);
 value_from!(i16, I64);
 value_from!(i32, I64);
 value_from!(i64, I64);
-value_from!(i128, I128);
 value_from!(f32, F64);
 value_from!(f64, F64);
 value_from!(char, Char);
@@ -351,8 +365,8 @@ macro_rules! primitive_int_try_from {
             ValueRepr::U64(val) => val,
             // for the intention here see Key::from_borrowed_value
             ValueRepr::F64(val) if (val as i64 as f64 == val) => val as i64,
-            ValueRepr::I128(val) => val,
-            ValueRepr::U128(val) => val,
+            ValueRepr::I128(val) => val.0,
+            ValueRepr::U128(val) => val.0,
         });
     }
 }
