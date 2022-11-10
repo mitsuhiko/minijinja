@@ -14,9 +14,9 @@ fn as_f64(value: &Value) -> Option<f64> {
     Some(match value.0 {
         ValueRepr::Bool(x) => x as i64 as f64,
         ValueRepr::U64(x) => x as f64,
-        ValueRepr::U128(ref x) => **x as f64,
+        ValueRepr::U128(x) => x as f64,
         ValueRepr::I64(x) => x as f64,
-        ValueRepr::I128(ref x) => **x as f64,
+        ValueRepr::I128(x) => x as f64,
         ValueRepr::F64(x) => x,
         _ => return None,
     })
@@ -27,13 +27,13 @@ pub fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
         // equal mappings are trivial
         (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
         (ValueRepr::U128(a), ValueRepr::U128(b)) => {
-            Some(CoerceResult::I128(**a as i128, **b as i128))
+            Some(CoerceResult::I128(*a as i128, *b as i128))
         }
         (ValueRepr::String(a, _), ValueRepr::String(b, _)) => {
             Some(CoerceResult::String(a.to_string(), b.to_string()))
         }
         (ValueRepr::I64(a), ValueRepr::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
-        (ValueRepr::I128(ref a), ValueRepr::I128(ref b)) => Some(CoerceResult::I128(**a, **b)),
+        (ValueRepr::I128(a), ValueRepr::I128(b)) => Some(CoerceResult::I128(*a, *b)),
         (ValueRepr::F64(a), ValueRepr::F64(b)) => Some(CoerceResult::F64(*a, *b)),
 
         // are floats involved?

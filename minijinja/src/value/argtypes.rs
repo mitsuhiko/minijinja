@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
-use crate::value::{Arc, MapType, StringType, Value, ValueKind, ValueRepr};
+use crate::value::{Arc, MapType, Object, StringType, Value, ValueKind, ValueRepr};
 use crate::vm::State;
 
 /// A utility trait that represents the return value of functions and filters.
@@ -231,20 +231,6 @@ impl From<()> for Value {
     }
 }
 
-impl From<i128> for Value {
-    #[inline(always)]
-    fn from(val: i128) -> Self {
-        ValueRepr::I128(Arc::new(val)).into()
-    }
-}
-
-impl From<u128> for Value {
-    #[inline(always)]
-    fn from(val: u128) -> Self {
-        ValueRepr::U128(Arc::new(val)).into()
-    }
-}
-
 impl<'a> From<Key<'a>> for Value {
     fn from(val: Key) -> Self {
         match val {
@@ -257,19 +243,40 @@ impl<'a> From<Key<'a>> for Value {
     }
 }
 
+impl<V: Into<Value>> FromIterator<V> for Value {
+    fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
+        let vec = iter.into_iter().map(|v| v.into()).collect();
+
+        ValueRepr::Seq(Arc::new(vec)).into()
+    }
+}
+
+impl<K: Into<StaticKey>, V: Into<Value>> FromIterator<(K, V)> for Value {
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        let map = iter
+            .into_iter()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect();
+
+        ValueRepr::Map(Arc::new(map), MapType::Normal).into()
+    }
+}
+
 impl<K: Into<StaticKey>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
     fn from(val: BTreeMap<K, V>) -> Self {
-        ValueRepr::Map(
-            Arc::new(val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()),
-            MapType::Normal,
-        )
-        .into()
+        val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
     }
 }
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(val: Vec<T>) -> Self {
-        ValueRepr::Seq(Arc::new(val.into_iter().map(|x| x.into()).collect())).into()
+        val.into_iter().map(|v| v.into()).collect()
+    }
+}
+
+impl<T: Object> From<Arc<T>> for Value {
+    fn from(object: Arc<T>) -> Self {
+        Value::from(object as Arc<dyn Object>)
     }
 }
 
@@ -289,13 +296,18 @@ value_from!(u8, U64);
 value_from!(u16, U64);
 value_from!(u32, U64);
 value_from!(u64, U64);
+value_from!(u128, U128);
 value_from!(i8, I64);
 value_from!(i16, I64);
 value_from!(i32, I64);
 value_from!(i64, I64);
+value_from!(i128, I128);
 value_from!(f32, F64);
 value_from!(f64, F64);
 value_from!(char, Char);
+value_from!(Arc<Vec<u8>>, Bytes);
+value_from!(Arc<Vec<Value>>, Seq);
+value_from!(Arc<dyn Object>, Dynamic);
 
 fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {
     Error::new(
@@ -339,8 +351,8 @@ macro_rules! primitive_int_try_from {
             ValueRepr::U64(val) => val,
             // for the intention here see Key::from_borrowed_value
             ValueRepr::F64(val) if (val as i64 as f64 == val) => val as i64,
-            ValueRepr::I128(ref val) => **val,
-            ValueRepr::U128(ref val) => **val,
+            ValueRepr::I128(val) => val,
+            ValueRepr::U128(val) => val,
         });
     }
 }

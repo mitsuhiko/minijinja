@@ -390,14 +390,13 @@ impl<'a> List<'a> {
             return None;
         }
 
-        let mut rv = Vec::new();
-        for expr in &self.items {
-            if let Expr::Const(val) = expr {
-                rv.push(val.value.clone());
-            }
-        }
+        let items = self.items.iter();
+        let sequence = items.filter_map(|expr| match expr {
+            Expr::Const(v) => Some(v.value.clone()),
+            _ => None,
+        });
 
-        Some(Value::from(rv))
+        Some(sequence.collect())
     }
 }
 
