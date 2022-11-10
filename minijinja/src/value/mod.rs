@@ -455,6 +455,23 @@ impl Value {
     ///
     /// let val = Value::from_object(Thing { id: 42 });
     /// ```
+    ///
+    /// Objects are internally reference counted.  If you want to hold on to the
+    /// `Arc` you can directly create the value from an arc'ed object:
+    ///
+    /// ```rust
+    /// # use minijinja::value::{Value, Object};
+    /// # #[derive(Debug)]
+    /// # struct Thing { id: usize };
+    /// # impl std::fmt::Display for Thing {
+    /// #     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    /// #         todo!();
+    /// #     }
+    /// # }
+    /// # impl Object for Thing {}
+    /// use std::sync::Arc;
+    /// let val = Value::from(Arc::new(Thing { id: 42 }));
+    /// ```
     pub fn from_object<T: Object>(value: T) -> Value {
         Value::from(Arc::new(value) as Arc<dyn Object>)
     }
