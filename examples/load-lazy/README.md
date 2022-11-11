@@ -1,11 +1,13 @@
 # load-lazy
 
-This example loads data at runtime through a function call from JSON files.
+This example loads data automatically as it's needed.  The `site` object in the
+engine is providing data whenever attributes are accessed.  This example is similar
+to the [load-resource](../load-resource) example but instead of loading data on a
+function call, the data is lazily loaded when attributes of an object are accessed.
 
 ```jinja
-{% set nav = load_data("nav.json") %}
 <ul>
-  {%- for item in nav %}
+  {%- for item in site.nav %}
     <li><a href="{{ item.href }}">{{ item.title }}</a>
   {%- endfor %}
 </ul>

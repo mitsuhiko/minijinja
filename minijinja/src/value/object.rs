@@ -29,6 +29,13 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// of [`attributes`](Self::attributes) but it's not necessary.
     ///
     /// If an attribute does not exist, `None` shall be returned.
+    ///
+    /// A note should be made here on side effects: unlike calling objects or
+    /// calling methods on objects, accessing attributes is not supposed to
+    /// have side effects.  Neither does this API get access to the interpreter
+    /// [`State`] nor is there a channel to send out failures as only an option
+    /// can be returned.  If you do plan on doing something in attribute access
+    /// that is fallible, instead use a method call.
     fn get_attr(&self, name: &str) -> Option<Value> {
         let _name = name;
         None

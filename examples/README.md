@@ -16,7 +16,8 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [generate-yaml](generate-yaml): renders YAML files from Jinja templates.
 * [hello](hello): minimal Hello World example.
 * [inheritance](inheritance): demonstrates how to use template inheritance.
-* [load-lazy](load-lazy): Demonstrates how to load files dynamically from disk within templates.
+* [load-lazy](load-lazy): Demonstrates how to load data lazy on demand.
+* [load-resource](load-resource): Demonstrates how to load files dynamically from disk within templates.
 * [loader](loader): shows how to load templates dynamically at runtime.
 * [macros](macros): Demonstrates how to use macros and imports.
 * [minimal](minimal): a Hello World example without default features.

@@ -1,5 +1,6 @@
+{% set nav = load_data("nav.json") %}
 <ul>
-  {%- for item in site.nav %}
+  {%- for item in nav %}
     <li><a href="{{ item.href }}">{{ item.title }}</a>
   {%- endfor %}
 </ul>
