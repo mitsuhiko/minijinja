@@ -11,6 +11,11 @@ All notable changes to MiniJinja are documented here.
 - Performance improvements for value conversions and object creation. (#142)
 - Align iteration behavior of dynamic objects with maps.
 
+## Breaking Changes
+
+- The `attributes` method on objects now returns iterators.  To make the
+  transition easy change `[..]` to `Box::new([..].into_iter())`.
+
 # 0.25.0
 
 - Added support for recursive macro invocations. (#133)
