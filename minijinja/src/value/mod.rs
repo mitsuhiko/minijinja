@@ -254,17 +254,19 @@ pub(crate) enum StringType {
     Safe,
 }
 
-/// An `i128` that intentionally uses packed layout to ensure
-/// that `ValueRepr` doesn't blow up in size.
-#[derive(Copy, Clone)]
+/// Wraps an internal copyable value but marks it as packed.
+///
+/// This is used for `i128`/`u128` in the value repr to avoid
+/// the excessive 16 byte alignment.
+#[derive(Copy)]
 #[repr(packed)]
-pub(crate) struct MisalignedI128(pub i128);
+pub(crate) struct Packed<T: Copy>(pub T);
 
-/// An `u128` that intentionally uses packed layout to ensure
-/// that `ValueRepr` doesn't blow up in size.
-#[derive(Copy, Clone)]
-#[repr(packed)]
-pub(crate) struct MisalignedU128(pub u128);
+impl<T: Copy> Clone for Packed<T> {
+    fn clone(&self) -> Self {
+        Self(self.0)
+    }
+}
 
 #[derive(Clone)]
 pub(crate) enum ValueRepr {
@@ -275,8 +277,8 @@ pub(crate) enum ValueRepr {
     F64(f64),
     Char(char),
     None,
-    U128(MisalignedU128),
-    I128(MisalignedI128),
+    U128(Packed<u128>),
+    I128(Packed<i128>),
     String(Arc<String>, StringType),
     Bytes(Arc<Vec<u8>>),
     Seq(Arc<Vec<Value>>),

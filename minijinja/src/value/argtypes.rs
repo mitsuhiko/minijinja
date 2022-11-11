@@ -5,9 +5,7 @@ use std::ops::{Deref, DerefMut};
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
-use crate::value::{
-    Arc, MapType, MisalignedI128, MisalignedU128, Object, StringType, Value, ValueKind, ValueRepr,
-};
+use crate::value::{Arc, MapType, Object, Packed, StringType, Value, ValueKind, ValueRepr};
 use crate::vm::State;
 
 /// A utility trait that represents the return value of functions and filters.
@@ -296,14 +294,14 @@ macro_rules! value_from {
 impl From<i128> for Value {
     #[inline(always)]
     fn from(val: i128) -> Self {
-        ValueRepr::I128(MisalignedI128(val)).into()
+        ValueRepr::I128(Packed(val)).into()
     }
 }
 
 impl From<u128> for Value {
     #[inline(always)]
     fn from(val: u128) -> Self {
-        ValueRepr::U128(MisalignedU128(val)).into()
+        ValueRepr::U128(Packed(val)).into()
     }
 }
 

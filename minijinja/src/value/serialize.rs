@@ -5,8 +5,8 @@ use serde::{ser, Serialize, Serializer};
 use crate::error::Error;
 use crate::key::{Key, KeySerializer, StaticKey};
 use crate::value::{
-    Arc, MapType, MisalignedI128, MisalignedU128, StringType, Value, ValueMap, ValueRepr,
-    VALUE_HANDLES, VALUE_HANDLE_MARKER,
+    Arc, MapType, Packed, StringType, Value, ValueMap, ValueRepr, VALUE_HANDLES,
+    VALUE_HANDLE_MARKER,
 };
 
 pub struct ValueSerializer;
@@ -44,7 +44,7 @@ impl Serializer for ValueSerializer {
     }
 
     fn serialize_i128(self, v: i128) -> Result<Value, Error> {
-        Ok(ValueRepr::I128(MisalignedI128(v)).into())
+        Ok(ValueRepr::I128(Packed(v)).into())
     }
 
     fn serialize_u8(self, v: u8) -> Result<Value, Error> {
@@ -64,7 +64,7 @@ impl Serializer for ValueSerializer {
     }
 
     fn serialize_u128(self, v: u128) -> Result<Value, Error> {
-        Ok(ValueRepr::U128(MisalignedU128(v)).into())
+        Ok(ValueRepr::U128(Packed(v)).into())
     }
 
     fn serialize_f32(self, v: f32) -> Result<Value, Error> {
