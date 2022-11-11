@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
+use std::fmt;
 
-use minijinja::value::Value;
+use insta::assert_snapshot;
+use minijinja::value::{Object, Value};
 use minijinja::ErrorKind;
 
 #[test]
@@ -87,4 +89,42 @@ fn test_value_by_index() {
     let val = Value::from(vec![1u32, 2, 3]);
     assert_eq!(val.get_item_by_index(0).unwrap(), Value::from(1));
     assert!(val.get_item_by_index(4).unwrap().is_undefined());
+}
+
+#[test]
+fn test_object_iteration() {
+    #[derive(Debug, Clone)]
+    struct Point(i32, i32, i32);
+
+    impl fmt::Display for Point {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}, {}, {}", self.0, self.1, self.2)
+        }
+    }
+
+    impl Object for Point {
+        fn get_attr(&self, name: &str) -> Option<Value> {
+            match name {
+                "x" => Some(Value::from(self.0)),
+                "y" => Some(Value::from(self.1)),
+                "z" => Some(Value::from(self.2)),
+                _ => None,
+            }
+        }
+
+        fn attributes(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+            Box::new(["x", "y", "z"].into_iter())
+        }
+    }
+
+    let point = Point(1, 2, 3);
+    let rv = minijinja::render!(
+        "{% for key in point %}{{ key }}: {{ point[key] }}\n{% endfor %}",
+        point => Value::from_object(point)
+    );
+    assert_snapshot!(rv, @r###"
+    x: 1
+    y: 2
+    z: 3
+    "###);
 }

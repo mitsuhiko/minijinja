@@ -9,6 +9,7 @@ All notable changes to MiniJinja are documented here.
 - Aligned semantics of top-level template code after `extends` with Jinja2. (#140)
 - Exposed value creation from Arcs. (#141)
 - Performance improvements for value conversions and object creation. (#142)
+- Align iteration behavior of dynamic objects with maps.
 
 # 0.25.0
 

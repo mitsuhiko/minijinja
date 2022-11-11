@@ -878,6 +878,11 @@ impl Value {
                 ),
                 items.len(),
             ),
+            ValueRepr::Dynamic(ref obj) => {
+                let attrs = obj.attributes().map(Value::from).collect::<Vec<_>>();
+                let attr_count = attrs.len();
+                (ValueIteratorState::Seq(0, Arc::new(attrs)), attr_count)
+            }
             _ => {
                 return Err(Error::new(
                     ErrorKind::InvalidOperation,
