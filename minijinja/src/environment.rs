@@ -1,7 +1,7 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
-use std::borrow::Cow;
 
 use serde::Serialize;
 
@@ -375,7 +375,8 @@ impl<'source> Environment<'source> {
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.filters.insert(name.into(), filters::BoxedFilter::new(f));
+        self.filters
+            .insert(name.into(), filters::BoxedFilter::new(f));
     }
 
     /// Removes a filter by name.
@@ -424,7 +425,8 @@ impl<'source> Environment<'source> {
 
     /// Adds a global variable.
     pub fn add_global<N>(&mut self, name: N, value: Value)
-        where N: Into<Cow<'source, str>>
+    where
+        N: Into<Cow<'source, str>>,
     {
         self.globals.insert(name.into(), value);
     }

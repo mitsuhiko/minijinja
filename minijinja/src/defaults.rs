@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 
 use crate::error::Error;
 use crate::filters::{self, BoxedFilter};
@@ -101,7 +101,10 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
         rv.insert("string".into(), BoxedTest::new(tests::is_string));
         rv.insert("sequence".into(), BoxedTest::new(tests::is_sequence));
         rv.insert("mapping".into(), BoxedTest::new(tests::is_mapping));
-        rv.insert("startingwith".into(), BoxedTest::new(tests::is_startingwith));
+        rv.insert(
+            "startingwith".into(),
+            BoxedTest::new(tests::is_startingwith),
+        );
         rv.insert("endingwith".into(), BoxedTest::new(tests::is_endingwith));
     }
     rv
@@ -113,9 +116,18 @@ pub(crate) fn get_globals() -> BTreeMap<Cow<'static, str>, Value> {
     #[cfg(feature = "builtins")]
     {
         use crate::functions::{self, BoxedFunction};
-        rv.insert("range".into(), BoxedFunction::new(functions::range).to_value());
-        rv.insert("dict".into(), BoxedFunction::new(functions::dict).to_value());
-        rv.insert("debug".into(), BoxedFunction::new(functions::debug).to_value());
+        rv.insert(
+            "range".into(),
+            BoxedFunction::new(functions::range).to_value(),
+        );
+        rv.insert(
+            "dict".into(),
+            BoxedFunction::new(functions::dict).to_value(),
+        );
+        rv.insert(
+            "debug".into(),
+            BoxedFunction::new(functions::debug).to_value(),
+        );
     }
 
     rv
