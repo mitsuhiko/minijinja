@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
@@ -62,9 +63,9 @@ environment it's recommended to turn on the `source` feature and to use the
 #[derive(Clone)]
 pub struct Environment<'source> {
     templates: Source<'source>,
-    filters: BTreeMap<&'source str, filters::BoxedFilter>,
-    tests: BTreeMap<&'source str, tests::BoxedTest>,
-    pub(crate) globals: BTreeMap<&'source str, Value>,
+    filters: BTreeMap<Cow<'source, str>, filters::BoxedFilter>,
+    tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
+    pub(crate) globals: BTreeMap<Cow<'source, str>, Value>,
     default_auto_escape: Arc<AutoEscapeFunc>,
     formatter: Arc<FormatterFunc>,
     #[cfg(feature = "debug")]
@@ -365,15 +366,17 @@ impl<'source> Environment<'source> {
     /// Filter functions are functions that can be applied to values in
     /// templates.  For details about filters have a look at
     /// [`Filter`](crate::filters::Filter).
-    pub fn add_filter<F, Rv, Args>(&mut self, name: &'source str, f: F)
+    pub fn add_filter<N, F, Rv, Args>(&mut self, name: N, f: F)
     where
+        N: Into<Cow<'source, str>>,
         // the crazy bounds here exist to enable borrowing in closures
         F: filters::Filter<Rv, Args>
             + for<'a> filters::Filter<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.filters.insert(name, filters::BoxedFilter::new(f));
+        self.filters
+            .insert(name.into(), filters::BoxedFilter::new(f));
     }
 
     /// Removes a filter by name.
@@ -386,14 +389,15 @@ impl<'source> Environment<'source> {
     /// Test functions are similar to filters but perform a check on a value
     /// where the return value is always true or false.  For details about tests
     /// have a look at [`Test`](crate::tests::Test).
-    pub fn add_test<F, Rv, Args>(&mut self, name: &'source str, f: F)
+    pub fn add_test<N, F, Rv, Args>(&mut self, name: N, f: F)
     where
+        N: Into<Cow<'source, str>>,
         // the crazy bounds here exist to enable borrowing in closures
         F: tests::Test<Rv, Args> + for<'a> tests::Test<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: tests::TestResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.tests.insert(name, tests::BoxedTest::new(f));
+        self.tests.insert(name.into(), tests::BoxedTest::new(f));
     }
 
     /// Removes a test by name.
@@ -407,20 +411,24 @@ impl<'source> Environment<'source> {
     /// functions and other global variables share the same namespace.
     /// For more details about functions have a look at
     /// [`Function`](crate::functions::Function).
-    pub fn add_function<F, Rv, Args>(&mut self, name: &'source str, f: F)
+    pub fn add_function<N, F, Rv, Args>(&mut self, name: N, f: F)
     where
+        N: Into<Cow<'source, str>>,
         // the crazy bounds here exist to enable borrowing in closures
         F: functions::Function<Rv, Args>
             + for<'a> functions::Function<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.add_global(name, Value::from_function(f))
+        self.add_global(name.into(), Value::from_function(f))
     }
 
     /// Adds a global variable.
-    pub fn add_global(&mut self, name: &'source str, value: Value) {
-        self.globals.insert(name, value);
+    pub fn add_global<N>(&mut self, name: N, value: Value)
+    where
+        N: Into<Cow<'source, str>>,
+    {
+        self.globals.insert(name.into(), value);
     }
 
     /// Removes a global function or variable by name.
