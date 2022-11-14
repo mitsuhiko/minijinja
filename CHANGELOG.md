@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.27.0
+
+- Filters, tests and other functions can now be registered with a dynamically
+  allocated name. (#146)
+
 # 0.26.0
 
 - Changed `Object::attributes` to being an iterator. (#138)
