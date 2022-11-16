@@ -111,6 +111,9 @@ where
 /// Byte slices will borrow out of values carrying bytes or strings.  In the latter
 /// case the utf-8 bytes are returned.
 ///
+/// Similarly it's not possible to borrow dynamic slices ([`AsSlice`](crate::value::AsSlice))
+/// into `&[Value]`.
+///
 /// ## Notes on State
 ///
 /// When `&State` is used, it does not consume a passed parameter.  This means that
@@ -463,13 +466,25 @@ impl<'a> ArgType<'a> for &Value {
     }
 }
 
+impl<'a> ArgType<'a> for Cow<'_, [Value]> {
+    type Output = Cow<'a, [Value]>;
+
+    #[inline(always)]
+    fn from_value(value: Option<&'a Value>) -> Result<Cow<'a, [Value]>, Error> {
+        match value {
+            Some(value) => Ok(ok!(value.as_cow_slice())),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
+        }
+    }
+}
+
 impl<'a> ArgType<'a> for &[Value] {
     type Output = &'a [Value];
 
     #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<&'a [Value], Error> {
         match value {
-            Some(value) => Ok(ok!(value.as_slice())),
+            Some(value) => value.as_slice(),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
@@ -573,12 +588,13 @@ impl From<usize> for Value {
 }
 
 impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
-    type Output = Self;
+    type Output = Vec<T>;
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
             None => Ok(Vec::new()),
             Some(values) => {
+                // TODO: can we somehow use values.as_cow_slice?
                 let values = ok!(values.as_slice());
                 let mut rv = Vec::new();
                 for value in values {

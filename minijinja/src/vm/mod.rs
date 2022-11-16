@@ -816,7 +816,7 @@ impl<'env> Vm<'env> {
         let top = stack.pop();
         let v =
             ok!(top
-                .as_slice()
+                .as_cow_slice()
                 .map_err(|e| Error::new(ErrorKind::CannotUnpack, "not a sequence").with_source(e)));
         if v.len() != *count {
             return Err(Error::new(

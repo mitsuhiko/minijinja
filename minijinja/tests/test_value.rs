@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::fmt;
 
 use insta::assert_snapshot;
-use minijinja::value::{Object, Value};
+use minijinja::value::{AsSeq, AsStruct, Object, ObjectBehavior, Value};
 use minijinja::ErrorKind;
 
 #[test]
@@ -92,7 +92,7 @@ fn test_value_by_index() {
 }
 
 #[test]
-fn test_object_iteration() {
+fn test_map_object_iteration() {
     #[derive(Debug, Clone)]
     struct Point(i32, i32, i32);
 
@@ -103,7 +103,13 @@ fn test_object_iteration() {
     }
 
     impl Object for Point {
-        fn get_attr(&self, name: &str) -> Option<Value> {
+        fn behavior(&self) -> ObjectBehavior<'_> {
+            ObjectBehavior::Struct(self)
+        }
+    }
+
+    impl AsStruct for Point {
+        fn get(&self, name: &str) -> Option<Value> {
             match name {
                 "x" => Some(Value::from(self.0)),
                 "y" => Some(Value::from(self.1)),
@@ -112,7 +118,7 @@ fn test_object_iteration() {
             }
         }
 
-        fn attributes(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
             Box::new(["x", "y", "z"].into_iter())
         }
     }
@@ -126,5 +132,49 @@ fn test_object_iteration() {
     x: 1
     y: 2
     z: 3
+    "###);
+}
+
+#[test]
+fn test_seq_object_iteration() {
+    #[derive(Debug, Clone)]
+    struct Point(i32, i32, i32);
+
+    impl fmt::Display for Point {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}, {}, {}", self.0, self.1, self.2)
+        }
+    }
+
+    impl Object for Point {
+        fn behavior(&self) -> ObjectBehavior<'_> {
+            ObjectBehavior::Seq(self)
+        }
+    }
+
+    impl AsSeq for Point {
+        fn get(&self, index: usize) -> Option<Value> {
+            match index {
+                0 => Some(Value::from(self.0)),
+                1 => Some(Value::from(self.1)),
+                2 => Some(Value::from(self.2)),
+                _ => None,
+            }
+        }
+
+        fn len(&self) -> usize {
+            3
+        }
+    }
+
+    let point = Point(1, 2, 3);
+    let rv = minijinja::render!(
+        "{% for value in point %}{{ loop.index0 }}: {{ value }}\n{% endfor %}",
+        point => Value::from_object(point)
+    );
+    assert_snapshot!(rv, @r###"
+    0: 1
+    1: 2
+    2: 3
     "###);
 }

@@ -406,7 +406,7 @@ mod builtins {
             Ok(Value::from(s.chars().rev().collect::<String>()))
         } else if matches!(v.kind(), ValueKind::Seq) {
             Ok(Value::from(
-                ok!(v.as_slice()).iter().rev().cloned().collect::<Vec<_>>(),
+                ok!(v.as_cow_slice()).iter().rev().cloned().collect::<Vec<_>>(),
             ))
         } else {
             Err(Error::new(
@@ -448,7 +448,7 @@ mod builtins {
             Ok(rv)
         } else if matches!(val.kind(), ValueKind::Seq) {
             let mut rv = String::new();
-            for item in ok!(val.as_slice()) {
+            for item in &ok!(val.as_cow_slice())[..] {
                 if !rv.is_empty() {
                     rv.push_str(joiner);
                 }

@@ -108,7 +108,9 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         ));
     }
 
-    let slice = ok!(value.as_slice());
+    // TODO: this converts the entire value into a slice before throwing away
+    // values which is wasteful.
+    let slice = ok!(value.as_cow_slice());
     let (start, len) = get_offset_and_len(start, stop, || slice.len());
     Ok(Value::from(
         slice

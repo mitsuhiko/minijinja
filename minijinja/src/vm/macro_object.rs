@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorKind};
 use crate::key::Key;
 use crate::output::Output;
 use crate::utils::AutoEscape;
-use crate::value::{MapType, Object, StringType, Value, ValueRepr};
+use crate::value::{AsStruct, MapType, Object, ObjectBehavior, StringType, Value, ValueRepr};
 use crate::vm::state::State;
 use crate::vm::Vm;
 
@@ -41,25 +41,8 @@ impl fmt::Display for Macro {
 }
 
 impl Object for Macro {
-    fn attributes(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        Box::new(["name", "arguments"].into_iter())
-    }
-
-    fn get_attr(&self, name: &str) -> Option<Value> {
-        match name {
-            "name" => Some(Value(ValueRepr::String(
-                self.data.name.clone(),
-                StringType::Normal,
-            ))),
-            "arguments" => Some(Value::from(
-                self.data
-                    .arg_spec
-                    .iter()
-                    .map(|x| Value(ValueRepr::String(x.clone(), StringType::Normal)))
-                    .collect::<Vec<_>>(),
-            )),
-            _ => None,
-        }
+    fn behavior(&self) -> ObjectBehavior<'_> {
+        ObjectBehavior::Struct(self)
     }
 
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
@@ -148,5 +131,28 @@ impl Object for Macro {
         } else {
             Value::from(rv)
         })
+    }
+}
+
+impl AsStruct for Macro {
+    fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(["name", "arguments"].into_iter())
+    }
+
+    fn get(&self, name: &str) -> Option<Value> {
+        match name {
+            "name" => Some(Value(ValueRepr::String(
+                self.data.name.clone(),
+                StringType::Normal,
+            ))),
+            "arguments" => Some(Value::from(
+                self.data
+                    .arg_spec
+                    .iter()
+                    .map(|x| Value(ValueRepr::String(x.clone(), StringType::Normal)))
+                    .collect::<Vec<_>>(),
+            )),
+            _ => None,
+        }
     }
 }
