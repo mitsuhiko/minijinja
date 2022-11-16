@@ -814,10 +814,11 @@ impl<'env> Vm<'env> {
 
     fn unpack_list(&self, stack: &mut Stack, count: &usize) -> Result<(), Error> {
         let top = stack.pop();
-        let v =
-            ok!(top
-                .as_cow_slice()
-                .map_err(|e| Error::new(ErrorKind::CannotUnpack, "not a sequence").with_source(e)));
+        let v = ok!(top.as_cow_slice().map_err(|e| Error::new(
+            ErrorKind::CannotUnpack,
+            "not a sequence"
+        )
+        .with_source(e)));
         if v.len() != *count {
             return Err(Error::new(
                 ErrorKind::CannotUnpack,
