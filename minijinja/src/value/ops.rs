@@ -2,7 +2,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt::Write;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Arc, Value, ValueKind, ValueRepr};
+use crate::value::{Arc, ObjectBehavior, Value, ValueKind, ValueRepr};
 
 pub enum CoerceResult {
     I128(i128, i128),
@@ -97,29 +97,48 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         ));
     }
 
-    if let Some(s) = value.as_str() {
-        let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
-        return Ok(Value::from(
-            s.chars()
-                .skip(start)
-                .take(len)
-                .step_by(step)
-                .collect::<String>(),
-        ));
+    match value.0 {
+        ValueRepr::String(ref s, _) => {
+            let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
+            return Ok(Value::from(
+                s.chars()
+                    .skip(start)
+                    .take(len)
+                    .step_by(step)
+                    .collect::<String>(),
+            ));
+        }
+        ValueRepr::Undefined | ValueRepr::None => return Ok(Value::from(Vec::<Value>::new())),
+        ValueRepr::Seq(ref s) => {
+            let (start, len) = get_offset_and_len(start, stop, || s.len());
+            return Ok(Value::from(
+                s.iter()
+                    .skip(start)
+                    .take(len)
+                    .step_by(step)
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            ));
+        }
+        ValueRepr::Dynamic(ref dy) => {
+            if let ObjectBehavior::Seq(s) = dy.behavior() {
+                let (start, len) = get_offset_and_len(start, stop, || s.len());
+                return Ok(Value::from(
+                    (0..s.len())
+                        .skip(start)
+                        .take(len)
+                        .step_by(step)
+                        .map(|idx| s.get(idx).unwrap_or(Value::UNDEFINED))
+                        .collect::<Vec<_>>(),
+                ));
+            }
+        }
+        _ => {}
     }
 
-    // TODO: this converts the entire value into a slice before throwing away
-    // values which is wasteful.
-    let slice = ok!(value.as_cow_slice());
-    let (start, len) = get_offset_and_len(start, stop, || slice.len());
-    Ok(Value::from(
-        slice
-            .iter()
-            .skip(start)
-            .take(len)
-            .step_by(step)
-            .cloned()
-            .collect::<Vec<_>>(),
+    Err(Error::new(
+        ErrorKind::InvalidOperation,
+        format!("value of type {} cannot be sliced", value.kind()),
     ))
 }
 
