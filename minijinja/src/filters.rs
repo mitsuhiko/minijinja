@@ -756,7 +756,7 @@ mod builtins {
     ///
     /// This filter is only available if the `indent` feature is enabled. 
     /// The optional parameter to the filter can be set to `true` to enable 
-    /// indenting with \t. 
+    /// indenting with \t (tabs). 
     /// This filter is useful, if you want to template yaml-files
     ///
     /// ```jinja
@@ -779,6 +779,13 @@ mod builtins {
             }
         }
         output
+    }
+
+    #[test]
+    #[cfg(feature="indent")]
+    fn test_indent_with_spaces() {
+        let teststring = String::from("test\ntest1\ntest2\n");
+        assert_eq!(indent(teststring, 2), String::from("  test\n  test1\n  test2\n"));
     }
 
     /// URL encodes a value.
