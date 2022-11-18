@@ -177,8 +177,8 @@ pub trait SeqObject {
 
 impl dyn SeqObject + '_ {
     /// Convenient iterator over a [`SeqObject`].
-    pub fn iter(&self) -> SeqIter<'_> {
-        SeqIter {
+    pub fn iter(&self) -> SeqObjectIter<'_> {
+        SeqObjectIter {
             seq: self,
             range: 0..self.seq_len(),
         }
@@ -210,12 +210,12 @@ impl SeqObject for Vec<Value> {
 }
 
 /// Iterates over [`SeqObject`]
-pub struct SeqIter<'a> {
+pub struct SeqObjectIter<'a> {
     seq: &'a dyn SeqObject,
     range: Range<usize>,
 }
 
-impl<'a> Iterator for SeqIter<'a> {
+impl<'a> Iterator for SeqObjectIter<'a> {
     type Item = Value;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -230,7 +230,7 @@ impl<'a> Iterator for SeqIter<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for SeqIter<'a> {
+impl<'a> DoubleEndedIterator for SeqObjectIter<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.range
             .next_back()
@@ -238,7 +238,7 @@ impl<'a> DoubleEndedIterator for SeqIter<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for SeqIter<'a> {}
+impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 
 /// Views an [`Object`] as a struct.
 ///

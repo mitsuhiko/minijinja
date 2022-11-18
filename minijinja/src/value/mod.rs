@@ -120,7 +120,7 @@ use crate::value::serialize::ValueSerializer;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Rest};
-pub use crate::value::object::{Object, ObjectKind, SeqIter, SeqObject, StructObject};
+pub use crate::value::object::{Object, ObjectKind, SeqObject, SeqObjectIter, StructObject};
 
 mod argtypes;
 #[cfg(feature = "deserialization")]
