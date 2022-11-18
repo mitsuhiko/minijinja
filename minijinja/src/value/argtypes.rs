@@ -466,18 +466,6 @@ impl<'a> ArgType<'a> for &Value {
     }
 }
 
-impl<'a> ArgType<'a> for Cow<'_, [Value]> {
-    type Output = Cow<'a, [Value]>;
-
-    #[inline(always)]
-    fn from_value(value: Option<&'a Value>) -> Result<Cow<'a, [Value]>, Error> {
-        match value {
-            Some(value) => Ok(ok!(value.as_cow_slice())),
-            None => Err(Error::from(ErrorKind::MissingArgument)),
-        }
-    }
-}
-
 impl<'a> ArgType<'a> for &[Value] {
     type Output = &'a [Value];
 

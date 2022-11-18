@@ -139,7 +139,7 @@ impl StructObject for Macro {
         Box::new(["name", "arguments"].into_iter())
     }
 
-    fn get(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, name: &str) -> Option<Value> {
         match name {
             "name" => Some(Value(ValueRepr::String(
                 self.data.name.clone(),

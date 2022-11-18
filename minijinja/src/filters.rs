@@ -250,7 +250,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::value::{ValueKind, ValueRepr};
+    use crate::value::ValueRepr;
     use std::borrow::Cow;
     use std::fmt::Write;
     use std::mem;
@@ -404,12 +404,11 @@ mod builtins {
     pub fn reverse(v: Value) -> Result<Value, Error> {
         if let Some(s) = v.as_str() {
             Ok(Value::from(s.chars().rev().collect::<String>()))
-        } else if matches!(v.kind(), ValueKind::Seq) {
+        } else if let Some(seq) = v.as_seq() {
             Ok(Value::from(
-                ok!(v.as_cow_slice())
-                    .iter()
+                (0..seq.seq_len())
                     .rev()
-                    .cloned()
+                    .map(|idx| seq.get_item(idx).unwrap_or(Value::UNDEFINED))
                     .collect::<Vec<_>>(),
             ))
         } else {
@@ -450,9 +449,10 @@ mod builtins {
                 rv.push(c);
             }
             Ok(rv)
-        } else if matches!(val.kind(), ValueKind::Seq) {
+        } else if let Some(seq) = val.as_seq() {
             let mut rv = String::new();
-            for item in &ok!(val.as_cow_slice())[..] {
+            for idx in 0..seq.seq_len() {
+                let item = seq.get_item(idx).unwrap_or(Value::UNDEFINED);
                 if !rv.is_empty() {
                     rv.push_str(joiner);
                 }
@@ -541,13 +541,15 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn first(value: Value) -> Result<Value, Error> {
-        match value.0 {
-            ValueRepr::String(s, _) => Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from)),
-            ValueRepr::Seq(ref s) => Ok(s.first().cloned().unwrap_or(Value::UNDEFINED)),
-            _ => Err(Error::new(
+        if let Some(s) = value.as_str() {
+            Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
+        } else if let Some(s) = value.as_seq() {
+            Ok(s.get_item(0).unwrap_or(Value::UNDEFINED))
+        } else {
+            Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "cannot get first item from value",
-            )),
+            ))
         }
     }
 
@@ -568,15 +570,21 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn last(value: Value) -> Result<Value, Error> {
-        match value.0 {
-            ValueRepr::String(s, _) => {
-                Ok(s.chars().rev().next().map_or(Value::UNDEFINED, Value::from))
+        if let Some(s) = value.as_str() {
+            Ok(s.chars().rev().next().map_or(Value::UNDEFINED, Value::from))
+        } else if let Some(seq) = value.as_seq() {
+            let len = seq.seq_len();
+            Ok(if len == 0 {
+                None
+            } else {
+                seq.get_item(len - 1)
             }
-            ValueRepr::Seq(ref s) => Ok(s.last().cloned().unwrap_or(Value::UNDEFINED)),
-            _ => Err(Error::new(
+            .unwrap_or(Value::UNDEFINED))
+        } else {
+            Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "cannot get last item from value",
-            )),
+            ))
         }
     }
 
@@ -588,21 +596,14 @@ mod builtins {
     /// an empty list is returned.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn list(value: Value) -> Result<Value, Error> {
-        match &value.0 {
-            ValueRepr::Undefined => Ok(Value::from(Vec::<Value>::new())),
-            ValueRepr::String(ref s, _) => {
-                Ok(Value::from(s.chars().map(Value::from).collect::<Vec<_>>()))
-            }
-            ValueRepr::Seq(_) => Ok(value.clone()),
-            ValueRepr::Map(ref m, _) => Ok(Value::from(
-                m.iter()
-                    .map(|x| Value::from(x.0.clone()))
-                    .collect::<Vec<_>>(),
-            )),
-            _ => Err(Error::new(
-                ErrorKind::InvalidOperation,
-                "cannot convert value to list",
-            )),
+        if let Some(s) = value.as_str() {
+            Ok(Value::from(s.chars().map(Value::from).collect::<Vec<_>>()))
+        } else {
+            let iter = ok!(value.try_iter().map_err(|err| {
+                Error::new(ErrorKind::InvalidOperation, "cannot convert value to list")
+                    .with_source(err)
+            }));
+            Ok(Value::from(iter.collect::<Vec<_>>()))
         }
     }
 

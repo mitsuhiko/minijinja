@@ -146,7 +146,7 @@ pub enum ObjectKind<'a> {
 /// }
 ///
 /// impl SeqObject for Point {
-///     fn get(&self, idx: usize) -> Option<Value> {
+///     fn get_item(&self, idx: usize) -> Option<Value> {
 ///         match idx {
 ///             0 => Some(Value::from(self.0)),
 ///             1 => Some(Value::from(self.1)),
@@ -155,7 +155,7 @@ pub enum ObjectKind<'a> {
 ///         }
 ///     }
 ///
-///     fn len(&self) -> usize {
+///     fn seq_len(&self) -> usize {
 ///         3
 ///     }
 /// }
@@ -165,19 +165,36 @@ pub enum ObjectKind<'a> {
 pub trait SeqObject {
     /// Looks up an item by index.
     ///
-    /// Sequences should provide a value for all items in the range of `0..len`
+    /// Sequences should provide a value for all items in the range of `0..seq_len`
     /// but the engine will assume that items within the range are `Undefined`
     /// if `None` is returned.
-    fn get(&self, idx: usize) -> Option<Value>;
+    fn get_item(&self, idx: usize) -> Option<Value>;
 
     /// Returns the number of items in the sequence.
-    fn len(&self) -> usize;
+    fn seq_len(&self) -> usize;
+}
 
-    /// Checks if the struct is empty.
-    ///
-    /// The default implementation checks if the length is 0.
-    fn is_empty(&self) -> bool {
-        self.len() == 0
+impl<'a> SeqObject for &'a [Value] {
+    #[inline(always)]
+    fn get_item(&self, idx: usize) -> Option<Value> {
+        self.get(idx).cloned().map(Into::into)
+    }
+
+    #[inline(always)]
+    fn seq_len(&self) -> usize {
+        self.len()
+    }
+}
+
+impl SeqObject for Vec<Value> {
+    #[inline(always)]
+    fn get_item(&self, idx: usize) -> Option<Value> {
+        self.get(idx).cloned().map(Into::into)
+    }
+
+    #[inline(always)]
+    fn seq_len(&self) -> usize {
+        self.len()
     }
 }
 
@@ -208,7 +225,7 @@ pub trait SeqObject {
 /// }
 ///
 /// impl StructObject for Point {
-///     fn get(&self, name: &str) -> Option<Value> {
+///     fn get_field(&self, name: &str) -> Option<Value> {
 ///         match name {
 ///             "x" => Some(Value::from(self.0)),
 ///             "y" => Some(Value::from(self.1)),
@@ -238,7 +255,7 @@ pub trait StructObject {
     /// [`State`] nor is there a channel to send out failures as only an option
     /// can be returned.  If you do plan on doing something in field access
     /// that is fallible, instead use a method call.
-    fn get(&self, idx: &str) -> Option<Value>;
+    fn get_field(&self, idx: &str) -> Option<Value>;
 
     /// Iterates over the fields.
     ///
@@ -250,14 +267,7 @@ pub trait StructObject {
     /// Returns the number of fields in the struct.
     ///
     /// The default implementation returns the number of fields.
-    fn len(&self) -> usize {
+    fn struct_size(&self) -> usize {
         self.fields().count()
-    }
-
-    /// Checks if the struct is empty.
-    ///
-    /// The default implementation checks if the length is 0.
-    fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 }

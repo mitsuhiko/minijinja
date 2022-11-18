@@ -555,8 +555,8 @@ impl Value {
             ValueRepr::Map(ref x, _) => !x.is_empty(),
             ValueRepr::Dynamic(ref x) => match x.kind() {
                 ObjectKind::Basic => true,
-                ObjectKind::Seq(s) => !s.is_empty(),
-                ObjectKind::Struct(s) => !s.is_empty(),
+                ObjectKind::Seq(s) => s.seq_len() != 0,
+                ObjectKind::Struct(s) => s.struct_size() != 0,
             },
         }
     }
@@ -593,18 +593,22 @@ impl Value {
         }
     }
 
+    /// If the value is a sequence it's returned as sequence object.
+    pub fn as_seq(&self) -> Option<&dyn SeqObject> {
+        match self.0 {
+            ValueRepr::Seq(ref v) => return Some(&**v as &dyn SeqObject),
+            ValueRepr::Dynamic(ref dy) => {
+                if let ObjectKind::Seq(seq) = dy.kind() {
+                    return Some(seq);
+                }
+            }
+            _ => {}
+        }
+        None
+    }
+
     /// If the value is a sequence it's returned as slice.
-    ///
-    /// Note that [`Object`]s can impersonate sequences but they are not
-    /// slices themselves.  As a result these will return an error.
-    ///
-    /// ```
-    /// # use minijinja::value::Value;
-    /// let seq = Value::from(vec![1u32, 2, 3, 4]);
-    /// let slice = seq.as_slice().unwrap();
-    /// assert_eq!(slice.len(), 4);
-    /// ```
-    pub fn as_slice(&self) -> Result<&[Value], Error> {
+    pub(crate) fn as_slice(&self) -> Result<&[Value], Error> {
         match self.0 {
             ValueRepr::Undefined | ValueRepr::None => return Ok(&[][..]),
             ValueRepr::Seq(ref v) => return Ok(&v[..]),
@@ -620,27 +624,6 @@ impl Value {
             ErrorKind::InvalidOperation,
             format!("value of type {} is not a sequence", self.kind()),
         ))
-    }
-
-    /// If the value is a sequence it's returned as slice.
-    ///
-    /// ```
-    /// # use minijinja::value::Value;
-    /// let seq = Value::from(vec![1u32, 2, 3, 4]);
-    /// let slice = seq.as_slice().unwrap();
-    /// assert_eq!(slice.len(), 4);
-    /// ```
-    pub(crate) fn as_cow_slice(&self) -> Result<Cow<'_, [Value]>, Error> {
-        if let ValueRepr::Dynamic(ref dy) = self.0 {
-            if let ObjectKind::Seq(seq) = dy.kind() {
-                let mut items = vec![];
-                for idx in 0..seq.len() {
-                    items.push(seq.get(idx).unwrap_or(Value::UNDEFINED));
-                }
-                return Ok(Cow::Owned(items));
-            }
-        }
-        self.as_slice().map(Cow::Borrowed)
     }
 
     /// Returns the length of the contained value.
@@ -659,8 +642,8 @@ impl Value {
             ValueRepr::Seq(ref items) => Some(items.len()),
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Basic => None,
-                ObjectKind::Seq(s) => Some(s.len()),
-                ObjectKind::Struct(s) => Some(s.len()),
+                ObjectKind::Seq(s) => Some(s.seq_len()),
+                ObjectKind::Struct(s) => Some(s.struct_size()),
             },
             _ => None,
         }
@@ -690,7 +673,7 @@ impl Value {
             }
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Basic | ObjectKind::Seq(_) => None,
-                ObjectKind::Struct(s) => s.get(key),
+                ObjectKind::Struct(s) => s.get_field(key),
             },
             ValueRepr::Undefined => {
                 return Err(Error::from(ErrorKind::UndefinedError));
@@ -810,41 +793,32 @@ impl Value {
     fn get_item_opt(&self, key: &Value) -> Option<Value> {
         let key = some!(Key::from_borrowed_value(key).ok());
 
-        match self.0 {
+        let seq = match self.0 {
             ValueRepr::Map(ref items, _) => return items.get(&key).cloned(),
-            ValueRepr::Seq(ref items) => {
-                if let Key::I64(idx) = key {
-                    let idx = some!(isize::try_from(idx).ok());
-                    let idx = if idx < 0 {
-                        some!(items.len().checked_sub(-idx as usize))
-                    } else {
-                        idx as usize
-                    };
-                    return items.get(idx).cloned();
-                }
-            }
+            ValueRepr::Seq(ref items) => &**items as &dyn SeqObject,
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Basic => {}
-                ObjectKind::Seq(s) => {
-                    if let Key::I64(idx) = key {
-                        let idx = some!(isize::try_from(idx).ok());
-                        let idx = if idx < 0 {
-                            some!(s.len().checked_sub(-idx as usize))
-                        } else {
-                            idx as usize
-                        };
-                        return s.get(idx);
-                    }
-                }
+                ObjectKind::Basic => return None,
+                ObjectKind::Seq(s) => s,
                 ObjectKind::Struct(s) => match key {
-                    Key::String(ref key) => return s.get(key),
-                    Key::Str(key) => return s.get(key),
-                    _ => {}
+                    Key::String(ref key) => return s.get_field(key),
+                    Key::Str(key) => return s.get_field(key),
+                    _ => return None,
                 },
             },
-            _ => {}
+            _ => return None,
+        };
+
+        if let Key::I64(idx) = key {
+            let idx = some!(isize::try_from(idx).ok());
+            let idx = if idx < 0 {
+                some!(seq.seq_len().checked_sub(-idx as usize))
+            } else {
+                idx as usize
+            };
+            seq.get_item(idx)
+        } else {
+            None
         }
-        None
     }
 
     /// Calls the value directly.
@@ -921,7 +895,7 @@ impl Value {
                 }
                 ObjectKind::Struct(s) => Box::new(
                     s.fields()
-                        .filter_map(move |attr| Some((attr, some!(s.get(attr))))),
+                        .filter_map(move |attr| Some((attr, some!(s.get_field(attr))))),
                 ) as Box<dyn Iterator<Item = _>>,
             },
             _ => Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>,
@@ -948,13 +922,15 @@ impl Value {
             ValueRepr::Dynamic(ref obj) => {
                 match obj.kind() {
                     ObjectKind::Basic => (ValueIteratorState::Empty, 0),
-                    ObjectKind::Seq(s) => (ValueIteratorState::DynSeq(0, Arc::clone(obj)), s.len()),
+                    ObjectKind::Seq(s) => {
+                        (ValueIteratorState::DynSeq(0, Arc::clone(obj)), s.seq_len())
+                    }
                     ObjectKind::Struct(s) => {
                         // the assumption is that structs don't have excessive field counts
                         // and that most iterations go over all fields, so creating a
                         // temporary vector here is acceptable.
                         let attrs = s.fields().map(Value::from).collect::<Vec<_>>();
-                        let attr_count = s.len();
+                        let attr_count = s.struct_size();
                         (ValueIteratorState::Seq(0, Arc::new(attrs)), attr_count)
                     }
                 }
@@ -962,7 +938,7 @@ impl Value {
             _ => {
                 return Err(Error::new(
                     ErrorKind::InvalidOperation,
-                    "object is not iterable",
+                    format!("{} is not iterable", self.kind()),
                 ))
             }
         };
@@ -1010,9 +986,9 @@ impl Serialize for Value {
                 ObjectKind::Basic => serializer.serialize_str(&dy.to_string()),
                 ObjectKind::Seq(s) => {
                     use serde::ser::SerializeSeq;
-                    let mut seq = ok!(serializer.serialize_seq(Some(s.len())));
-                    for idx in 0..s.len() {
-                        ok!(seq.serialize_element(&s.get(idx).unwrap_or(Value::UNDEFINED)));
+                    let mut seq = ok!(serializer.serialize_seq(Some(s.seq_len())));
+                    for idx in 0..s.seq_len() {
+                        ok!(seq.serialize_element(&s.get_item(idx).unwrap_or(Value::UNDEFINED)));
                     }
                     seq.end()
                 }
@@ -1020,7 +996,7 @@ impl Serialize for Value {
                     use serde::ser::SerializeMap;
                     let mut map = ok!(serializer.serialize_map(None));
                     for k in s.fields() {
-                        let v = s.get(k).unwrap_or(Value::UNDEFINED);
+                        let v = s.get_field(k).unwrap_or(Value::UNDEFINED);
                         ok!(map.serialize_entry(&k, &v));
                     }
                     map.end()
@@ -1096,7 +1072,7 @@ impl ValueIteratorState {
                 .cloned(),
             ValueIteratorState::DynSeq(idx, obj) => {
                 if let ObjectKind::Seq(seq) = obj.kind() {
-                    seq.get(*idx).map(|x| {
+                    seq.get_item(*idx).map(|x| {
                         *idx += 1;
                         x
                     })
@@ -1142,7 +1118,7 @@ fn test_dynamic_object_roundtrip() {
     }
 
     impl crate::value::object::StructObject for X {
-        fn get(&self, name: &str) -> Option<Value> {
+        fn get_field(&self, name: &str) -> Option<Value> {
             match name {
                 "value" => Some(Value::from(self.0.load(atomic::Ordering::Relaxed))),
                 _ => None,
@@ -1168,4 +1144,19 @@ fn test_dynamic_object_roundtrip() {
 #[cfg(target_pointer_width = "64")]
 fn test_sizes() {
     assert_eq!(std::mem::size_of::<Value>(), 24);
+}
+
+#[test]
+fn test_value_as_slice() {
+    let val = Value::from(vec![1u32, 2, 3]);
+    assert_eq!(
+        val.as_slice().unwrap(),
+        &[Value::from(1), Value::from(2), Value::from(3)]
+    );
+    assert_eq!(Value::UNDEFINED.as_slice().unwrap(), &[]);
+    assert_eq!(Value::from(()).as_slice().unwrap(), &[]);
+    assert_eq!(
+        Value::from("foo").as_slice().unwrap_err().kind(),
+        ErrorKind::InvalidOperation
+    );
 }

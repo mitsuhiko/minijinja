@@ -33,7 +33,7 @@ impl StructObject for Site {
     ///
     /// If that is necessary, use `call_method()` instead which is able to
     /// both access interpreter state and fail.
-    fn get(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, name: &str) -> Option<Value> {
         let mut cache = self.cache.lock().unwrap();
         if let Some(rv) = cache.get(name) {
             return Some(rv.clone());

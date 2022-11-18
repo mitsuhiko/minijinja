@@ -17,7 +17,7 @@ impl fmt::Debug for Loop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("Loop");
         for attr in self.fields() {
-            s.field(attr, &self.get(attr).unwrap());
+            s.field(attr, &self.get_field(attr).unwrap());
         }
         s.finish()
     }
@@ -79,7 +79,7 @@ impl StructObject for Loop {
         )
     }
 
-    fn get(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, name: &str) -> Option<Value> {
         let idx = self.idx.load(Ordering::Relaxed) as u64;
         let len = self.len as u64;
         match name {
