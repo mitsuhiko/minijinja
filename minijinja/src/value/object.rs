@@ -164,6 +164,10 @@ pub enum ObjectKind<'a> {
 /// ```
 pub trait SeqObject {
     /// Looks up an item by index.
+    ///
+    /// Sequences should provide a value for all items in the range of `0..len`
+    /// but the engine will assume that items within the range are `Undefined`
+    /// if `None` is returned.
     fn get(&self, idx: usize) -> Option<Value>;
 
     /// Returns the number of items in the sequence.
