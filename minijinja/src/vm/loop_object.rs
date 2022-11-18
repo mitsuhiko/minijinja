@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{AsStruct, Object, ObjectBehavior, Value};
+use crate::value::{Object, ObjectKind, StructObject, Value};
 use crate::vm::state::State;
 
 pub(crate) struct Loop {
@@ -24,8 +24,8 @@ impl fmt::Debug for Loop {
 }
 
 impl Object for Loop {
-    fn behavior(&self) -> ObjectBehavior<'_> {
-        ObjectBehavior::Struct(self)
+    fn kind(&self) -> ObjectKind<'_> {
+        ObjectKind::Struct(self)
     }
 
     fn call(&self, _state: &State, _args: &[Value]) -> Result<Value, Error> {
@@ -54,14 +54,14 @@ impl Object for Loop {
             }
         } else {
             Err(Error::new(
-                ErrorKind::InvalidOperation,
+                ErrorKind::UnknownMethod,
                 format!("loop object has no method named {}", name),
             ))
         }
     }
 }
 
-impl AsStruct for Loop {
+impl StructObject for Loop {
     fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
         Box::new(
             [

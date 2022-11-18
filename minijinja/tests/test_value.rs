@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::fmt;
 
 use insta::assert_snapshot;
-use minijinja::value::{AsSeq, AsStruct, Object, ObjectBehavior, Value};
+use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
 use minijinja::ErrorKind;
 
 #[test]
@@ -103,12 +103,12 @@ fn test_map_object_iteration() {
     }
 
     impl Object for Point {
-        fn behavior(&self) -> ObjectBehavior<'_> {
-            ObjectBehavior::Struct(self)
+        fn kind(&self) -> ObjectKind<'_> {
+            ObjectKind::Struct(self)
         }
     }
 
-    impl AsStruct for Point {
+    impl StructObject for Point {
         fn get(&self, name: &str) -> Option<Value> {
             match name {
                 "x" => Some(Value::from(self.0)),
@@ -147,12 +147,12 @@ fn test_seq_object_iteration() {
     }
 
     impl Object for Point {
-        fn behavior(&self) -> ObjectBehavior<'_> {
-            ObjectBehavior::Seq(self)
+        fn kind(&self) -> ObjectKind<'_> {
+            ObjectKind::Seq(self)
         }
     }
 
-    impl AsSeq for Point {
+    impl SeqObject for Point {
         fn get(&self, index: usize) -> Option<Value> {
             match index {
                 0 => Some(Value::from(self.0)),

@@ -23,22 +23,22 @@ use crate::vm::State;
 /// the engine to convert the object into a string if needed.  Additionally
 /// [`Debug`](std::fmt::Debug) is required as well.
 ///
-/// To customize the behavior of the object one needs to implement
-/// [`behavior`](Self::behavior).  This defines for instance if an object is a
-/// sequence or a map.
+/// The exact runtime characteristics of the object are influenced by the
+/// [`kind`](Self::kind) of the object.  By default an object can just be
+/// stringified and methods can be called.
 ///
-/// For examples of how to implement objects refer to [`AsSeq`] and
-/// [`AsStruct`].
+/// For examples of how to implement objects refer to [`SeqObject`] and
+/// [`StructObject`].
 pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
-    /// Describes the behavior of the object.
+    /// Describes the kind of an object.
     ///
-    /// If not implemented behavior for an object is [`ObjectBehavior::Basic`]
+    /// If not implemented behavior for an object is [`ObjectKind::Basic`]
     /// which just means that it's stringifyable and potentially can be
     /// called or has methods.
     ///
-    /// For more information see [`ObjectBehavior`].
-    fn behavior(&self) -> ObjectBehavior<'_> {
-        ObjectBehavior::Basic
+    /// For more information see [`ObjectKind`].
+    fn kind(&self) -> ObjectKind<'_> {
+        ObjectKind::Basic
     }
 
     /// Called when the engine tries to call a method on the object.
@@ -52,7 +52,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
         let _state = state;
         let _args = args;
         Err(Error::new(
-            ErrorKind::InvalidOperation,
+            ErrorKind::UnknownMethod,
             format!("object has no method named {}", name),
         ))
     }
@@ -75,8 +75,8 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
 }
 
 impl<T: Object> Object for std::sync::Arc<T> {
-    fn behavior(&self) -> ObjectBehavior<'_> {
-        T::behavior(self)
+    fn kind(&self) -> ObjectKind<'_> {
+        T::kind(self)
     }
 
     fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
@@ -88,29 +88,35 @@ impl<T: Object> Object for std::sync::Arc<T> {
     }
 }
 
-/// Returns the object's behavior.
+/// A kind defines the object's behavior.
 ///
-/// When the engine works with a dynamic object it will typically try to
-/// determine the behavior by invoking [`Object::behavior`].  More behaviors
-/// can be added in the future so this enum is non-exhaustive.
+/// When a dynamic [`Object`] is implemented, it can be of one of the kinds
+/// here.  The default behavior will be a [`Basic`](Self::Basic) object which
+/// doesn't do much other than that it can be printed.  For an object to turn
+/// into a [struct](Self::Struct) or [sequence](Self::Seq) the necessary kind
+/// has to be returned with a pointer to itself.
 ///
 /// Today object's can have the behavior of structs and sequences but this
 /// might expand in the future.  It does mean that not all types of values can
 /// be represented by objects.
 #[non_exhaustive]
-pub enum ObjectBehavior<'a> {
+pub enum ObjectKind<'a> {
     /// This object is a basic object.
     ///
     /// Such an object has no attributes but it might be callable and it
     /// can be stringified.  When serialized it's serialized in it's
     /// stringified form.
     Basic,
+
     /// This object is a sequence.
-    Seq(&'a dyn AsSeq),
-    /// This object is a struct.
     ///
-    /// Structs are maps with string keys.
-    Struct(&'a dyn AsStruct),
+    /// Requires that the object implements [`SeqObject`].
+    Seq(&'a dyn SeqObject),
+
+    /// This object is a struct (map with string keys).
+    ///
+    /// Requires that the object implements [`StructObject`].
+    Struct(&'a dyn StructObject),
 }
 
 /// Views an [`Object`] as sequence of values.
@@ -122,7 +128,7 @@ pub enum ObjectBehavior<'a> {
 ///
 /// ```
 /// use std::fmt;
-/// use minijinja::value::{Value, Object, ObjectBehavior, AsSeq};
+/// use minijinja::value::{Value, Object, ObjectKind, SeqObject};
 ///
 /// #[derive(Debug, Clone)]
 /// struct Point(f32, f32, f32);
@@ -134,12 +140,12 @@ pub enum ObjectBehavior<'a> {
 /// }
 ///
 /// impl Object for Point {
-///     fn behavior(&self) -> ObjectBehavior<'_> {
-///         ObjectBehavior::Seq(self)
+///     fn kind(&self) -> ObjectKind<'_> {
+///         ObjectKind::Seq(self)
 ///     }
 /// }
 ///
-/// impl AsSeq for Point {
+/// impl SeqObject for Point {
 ///     fn get(&self, idx: usize) -> Option<Value> {
 ///         match idx {
 ///             0 => Some(Value::from(self.0)),
@@ -156,7 +162,7 @@ pub enum ObjectBehavior<'a> {
 ///
 /// let value = Value::from_object(Point(1.0, 2.5, 3.0));
 /// ```
-pub trait AsSeq {
+pub trait SeqObject {
     /// Looks up an item by index.
     fn get(&self, idx: usize) -> Option<Value>;
 
@@ -180,7 +186,7 @@ pub trait AsSeq {
 ///
 /// ```
 /// use std::fmt;
-/// use minijinja::value::{Value, Object, ObjectBehavior, AsStruct};
+/// use minijinja::value::{Value, Object, ObjectKind, StructObject};
 ///
 /// #[derive(Debug, Clone)]
 /// struct Point(f32, f32, f32);
@@ -192,12 +198,12 @@ pub trait AsSeq {
 /// }
 ///
 /// impl Object for Point {
-///     fn behavior(&self) -> ObjectBehavior<'_> {
-///         ObjectBehavior::Struct(self)
+///     fn kind(&self) -> ObjectKind<'_> {
+///         ObjectKind::Struct(self)
 ///     }
 /// }
 ///
-/// impl AsStruct for Point {
+/// impl StructObject for Point {
 ///     fn get(&self, name: &str) -> Option<Value> {
 ///         match name {
 ///             "x" => Some(Value::from(self.0)),
@@ -214,7 +220,7 @@ pub trait AsSeq {
 ///
 /// let value = Value::from_object(Point(1.0, 2.5, 3.0));
 /// ```
-pub trait AsStruct {
+pub trait StructObject {
     /// Invoked by the engine to get a field of a struct.
     ///
     /// Where possible it's a good idea for this to align with the return value

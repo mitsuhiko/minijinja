@@ -120,7 +120,7 @@ use crate::value::serialize::ValueSerializer;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Rest};
-pub use crate::value::object::{AsSeq, AsStruct, Object, ObjectBehavior};
+pub use crate::value::object::{Object, ObjectKind, SeqObject, StructObject};
 
 mod argtypes;
 #[cfg(feature = "deserialization")]
@@ -524,11 +524,11 @@ impl Value {
             ValueRepr::U128(_) => ValueKind::Number,
             ValueRepr::Seq(_) => ValueKind::Seq,
             ValueRepr::Map(..) => ValueKind::Map,
-            ValueRepr::Dynamic(ref dy) => match dy.behavior() {
+            ValueRepr::Dynamic(ref dy) => match dy.kind() {
                 // XXX: basic objects should probably not report as map
-                ObjectBehavior::Basic => ValueKind::Map,
-                ObjectBehavior::Seq(_) => ValueKind::Seq,
-                ObjectBehavior::Struct(_) => ValueKind::Map,
+                ObjectKind::Basic => ValueKind::Map,
+                ObjectKind::Seq(_) => ValueKind::Seq,
+                ObjectKind::Struct(_) => ValueKind::Map,
             },
         }
     }
@@ -553,10 +553,10 @@ impl Value {
             ValueRepr::None | ValueRepr::Undefined => false,
             ValueRepr::Seq(ref x) => !x.is_empty(),
             ValueRepr::Map(ref x, _) => !x.is_empty(),
-            ValueRepr::Dynamic(ref x) => match x.behavior() {
-                ObjectBehavior::Basic => true,
-                ObjectBehavior::Seq(s) => !s.is_empty(),
-                ObjectBehavior::Struct(s) => !s.is_empty(),
+            ValueRepr::Dynamic(ref x) => match x.kind() {
+                ObjectKind::Basic => true,
+                ObjectKind::Seq(s) => !s.is_empty(),
+                ObjectKind::Struct(s) => !s.is_empty(),
             },
         }
     }
@@ -608,7 +608,7 @@ impl Value {
         match self.0 {
             ValueRepr::Undefined | ValueRepr::None => return Ok(&[][..]),
             ValueRepr::Seq(ref v) => return Ok(&v[..]),
-            ValueRepr::Dynamic(ref dy) if matches!(dy.behavior(), ObjectBehavior::Seq(_)) => {
+            ValueRepr::Dynamic(ref dy) if matches!(dy.kind(), ObjectKind::Seq(_)) => {
                 return Err(Error::new(
                     ErrorKind::InvalidOperation,
                     "dynamic sequence value cannot be borrowed as slice",
@@ -632,7 +632,7 @@ impl Value {
     /// ```
     pub(crate) fn as_cow_slice(&self) -> Result<Cow<'_, [Value]>, Error> {
         if let ValueRepr::Dynamic(ref dy) = self.0 {
-            if let ObjectBehavior::Seq(seq) = dy.behavior() {
+            if let ObjectKind::Seq(seq) = dy.kind() {
                 let mut items = vec![];
                 for idx in 0..seq.len() {
                     items.push(seq.get(idx).unwrap_or(Value::UNDEFINED));
@@ -657,10 +657,10 @@ impl Value {
             ValueRepr::String(ref s, _) => Some(s.chars().count()),
             ValueRepr::Map(ref items, _) => Some(items.len()),
             ValueRepr::Seq(ref items) => Some(items.len()),
-            ValueRepr::Dynamic(ref dy) => match dy.behavior() {
-                ObjectBehavior::Basic => None,
-                ObjectBehavior::Seq(s) => Some(s.len()),
-                ObjectBehavior::Struct(s) => Some(s.len()),
+            ValueRepr::Dynamic(ref dy) => match dy.kind() {
+                ObjectKind::Basic => None,
+                ObjectKind::Seq(s) => Some(s.len()),
+                ObjectKind::Struct(s) => Some(s.len()),
             },
             _ => None,
         }
@@ -688,9 +688,9 @@ impl Value {
                 let lookup_key = Key::Str(key);
                 items.get(&lookup_key).cloned()
             }
-            ValueRepr::Dynamic(ref dy) => match dy.behavior() {
-                ObjectBehavior::Basic | ObjectBehavior::Seq(_) => None,
-                ObjectBehavior::Struct(s) => s.get(key),
+            ValueRepr::Dynamic(ref dy) => match dy.kind() {
+                ObjectKind::Basic | ObjectKind::Seq(_) => None,
+                ObjectKind::Struct(s) => s.get(key),
             },
             ValueRepr::Undefined => {
                 return Err(Error::from(ErrorKind::UndefinedError));
@@ -823,9 +823,9 @@ impl Value {
                     return items.get(idx).cloned();
                 }
             }
-            ValueRepr::Dynamic(ref dy) => match dy.behavior() {
-                ObjectBehavior::Basic | ObjectBehavior::Seq(_) => {}
-                ObjectBehavior::Struct(s) => match key {
+            ValueRepr::Dynamic(ref dy) => match dy.kind() {
+                ObjectKind::Basic | ObjectKind::Seq(_) => {}
+                ObjectKind::Struct(s) => match key {
                     Key::String(ref key) => return s.get(key),
                     Key::Str(key) => return s.get(key),
                     _ => {}
@@ -904,11 +904,11 @@ impl Value {
                 m.iter()
                     .filter_map(|(k, v)| k.as_str().map(move |k| (k, v.clone()))),
             ) as Box<dyn Iterator<Item = _>>,
-            ValueRepr::Dynamic(ref obj) => match obj.behavior() {
-                ObjectBehavior::Basic | ObjectBehavior::Seq(_) => {
+            ValueRepr::Dynamic(ref obj) => match obj.kind() {
+                ObjectKind::Basic | ObjectKind::Seq(_) => {
                     Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>
                 }
-                ObjectBehavior::Struct(s) => Box::new(
+                ObjectKind::Struct(s) => Box::new(
                     s.fields()
                         .filter_map(move |attr| Some((attr, some!(s.get(attr))))),
                 ) as Box<dyn Iterator<Item = _>>,
@@ -935,9 +935,9 @@ impl Value {
                 items.len(),
             ),
             ValueRepr::Dynamic(ref obj) => {
-                match obj.behavior() {
-                    ObjectBehavior::Basic => (ValueIteratorState::Empty, 0),
-                    ObjectBehavior::Seq(s) => {
+                match obj.kind() {
+                    ObjectKind::Basic => (ValueIteratorState::Empty, 0),
+                    ObjectKind::Seq(s) => {
                         // TODO: lazy iteration?
                         let mut items = vec![];
                         for idx in 0..s.len() {
@@ -945,7 +945,7 @@ impl Value {
                         }
                         (ValueIteratorState::Seq(0, Arc::new(items)), s.len())
                     }
-                    ObjectBehavior::Struct(s) => {
+                    ObjectKind::Struct(s) => {
                         // TODO: lazy iteration?
                         let attrs = s.fields().map(Value::from).collect::<Vec<_>>();
                         let attr_count = s.len();
@@ -1000,9 +1000,9 @@ impl Serialize for Value {
                 }
                 map.end()
             }
-            ValueRepr::Dynamic(ref dy) => match dy.behavior() {
-                ObjectBehavior::Basic => serializer.serialize_str(&dy.to_string()),
-                ObjectBehavior::Seq(s) => {
+            ValueRepr::Dynamic(ref dy) => match dy.kind() {
+                ObjectKind::Basic => serializer.serialize_str(&dy.to_string()),
+                ObjectKind::Seq(s) => {
                     use serde::ser::SerializeSeq;
                     let mut seq = ok!(serializer.serialize_seq(Some(s.len())));
                     for idx in 0..s.len() {
@@ -1010,7 +1010,7 @@ impl Serialize for Value {
                     }
                     seq.end()
                 }
-                ObjectBehavior::Struct(s) => {
+                ObjectKind::Struct(s) => {
                     use serde::ser::SerializeMap;
                     let mut map = ok!(serializer.serialize_map(None));
                     for k in s.fields() {
@@ -1119,12 +1119,12 @@ fn test_dynamic_object_roundtrip() {
     }
 
     impl Object for X {
-        fn behavior(&self) -> ObjectBehavior<'_> {
-            ObjectBehavior::Struct(self)
+        fn kind(&self) -> ObjectKind<'_> {
+            ObjectKind::Struct(self)
         }
     }
 
-    impl crate::value::object::AsStruct for X {
+    impl crate::value::object::StructObject for X {
         fn get(&self, name: &str) -> Option<Value> {
             match name {
                 "value" => Some(Value::from(self.0.load(atomic::Ordering::Relaxed))),

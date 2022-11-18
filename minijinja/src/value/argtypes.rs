@@ -111,8 +111,8 @@ where
 /// Byte slices will borrow out of values carrying bytes or strings.  In the latter
 /// case the utf-8 bytes are returned.
 ///
-/// Similarly it's not possible to borrow dynamic slices ([`AsSlice`](crate::value::AsSlice))
-/// into `&[Value]`.
+/// Similarly it's not possible to borrow dynamic slices
+/// ([`SeqObject`](crate::value::SeqObject)) into `&[Value]`.
 ///
 /// ## Notes on State
 ///

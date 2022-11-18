@@ -4,8 +4,8 @@ use std::fmt;
 use std::fs;
 use std::sync::Mutex;
 
-use minijinja::value::AsStruct;
-use minijinja::value::ObjectBehavior;
+use minijinja::value::ObjectKind;
+use minijinja::value::StructObject;
 use minijinja::value::{Object, Value};
 use minijinja::Environment;
 
@@ -21,12 +21,12 @@ impl fmt::Display for Site {
 }
 
 impl Object for Site {
-    fn behavior(&self) -> ObjectBehavior<'_> {
-        ObjectBehavior::Struct(self)
+    fn kind(&self) -> ObjectKind<'_> {
+        ObjectKind::Struct(self)
     }
 }
 
-impl AsStruct for Site {
+impl StructObject for Site {
     /// This loads a file on attribute access.  Note that attribute access
     /// can neither access the state nor return failures as such it can at
     /// max turn into an undefined object.

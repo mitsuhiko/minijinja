@@ -2,7 +2,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt::Write;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Arc, ObjectBehavior, Value, ValueKind, ValueRepr};
+use crate::value::{Arc, ObjectKind, Value, ValueKind, ValueRepr};
 
 pub enum CoerceResult {
     I128(i128, i128),
@@ -121,7 +121,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
             ));
         }
         ValueRepr::Dynamic(ref dy) => {
-            if let ObjectBehavior::Seq(s) = dy.behavior() {
+            if let ObjectKind::Seq(s) = dy.kind() {
                 let (start, len) = get_offset_and_len(start, stop, || s.len());
                 return Ok(Value::from(
                     (0..s.len())

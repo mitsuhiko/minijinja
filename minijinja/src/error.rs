@@ -118,6 +118,8 @@ pub enum ErrorKind {
     UnknownTest,
     /// A function is unknown
     UnknownFunction,
+    /// Un unknown method was called
+    UnknownMethod,
     /// A bad escape sequence in a string was encountered.
     BadEscape,
     /// An operation on an undefined value was attempted.
@@ -147,6 +149,7 @@ impl ErrorKind {
             ErrorKind::UnknownFilter => "unknown filter",
             ErrorKind::UnknownFunction => "unknown function",
             ErrorKind::UnknownTest => "unknown test",
+            ErrorKind::UnknownMethod => "unknown method",
             ErrorKind::BadEscape => "bad string escape",
             ErrorKind::UndefinedError => "undefined value",
             ErrorKind::BadSerialization => "could not serialize to internal format",

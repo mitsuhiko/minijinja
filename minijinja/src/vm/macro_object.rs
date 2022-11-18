@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorKind};
 use crate::key::Key;
 use crate::output::Output;
 use crate::utils::AutoEscape;
-use crate::value::{AsStruct, MapType, Object, ObjectBehavior, StringType, Value, ValueRepr};
+use crate::value::{MapType, Object, ObjectKind, StringType, StructObject, Value, ValueRepr};
 use crate::vm::state::State;
 use crate::vm::Vm;
 
@@ -41,8 +41,8 @@ impl fmt::Display for Macro {
 }
 
 impl Object for Macro {
-    fn behavior(&self) -> ObjectBehavior<'_> {
-        ObjectBehavior::Struct(self)
+    fn kind(&self) -> ObjectKind<'_> {
+        ObjectKind::Struct(self)
     }
 
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
@@ -134,7 +134,7 @@ impl Object for Macro {
     }
 }
 
-impl AsStruct for Macro {
+impl StructObject for Macro {
     fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
         Box::new(["name", "arguments"].into_iter())
     }
