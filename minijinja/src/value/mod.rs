@@ -824,7 +824,18 @@ impl Value {
                 }
             }
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Basic | ObjectKind::Seq(_) => {}
+                ObjectKind::Basic => {}
+                ObjectKind::Seq(s) => {
+                    if let Key::I64(idx) = key {
+                        let idx = some!(isize::try_from(idx).ok());
+                        let idx = if idx < 0 {
+                            some!(s.len().checked_sub(-idx as usize))
+                        } else {
+                            idx as usize
+                        };
+                        return s.get(idx);
+                    }
+                }
                 ObjectKind::Struct(s) => match key {
                     Key::String(ref key) => return s.get(key),
                     Key::Str(key) => return s.get(key),
