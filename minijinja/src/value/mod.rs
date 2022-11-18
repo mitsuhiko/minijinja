@@ -593,7 +593,7 @@ impl Value {
         }
     }
 
-    /// If the value is a sequence it's returned as sequence object.
+    /// If the value is a sequence it's returned as [`SeqObject`].
     pub fn as_seq(&self) -> Option<&dyn SeqObject> {
         match self.0 {
             ValueRepr::Seq(ref v) => return Some(&**v as &dyn SeqObject),
@@ -603,6 +603,16 @@ impl Value {
                 }
             }
             _ => {}
+        }
+        None
+    }
+
+    /// If the value is a struct, return it as [`StructObject`].
+    pub fn as_struct(&self) -> Option<&dyn StructObject> {
+        if let ValueRepr::Dynamic(ref dy) = self.0 {
+            if let ObjectKind::Struct(s) = dy.kind() {
+                return Some(s);
+            }
         }
         None
     }
