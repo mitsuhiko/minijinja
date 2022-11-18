@@ -948,16 +948,11 @@ impl Value {
             ValueRepr::Dynamic(ref obj) => {
                 match obj.kind() {
                     ObjectKind::Basic => (ValueIteratorState::Empty, 0),
-                    ObjectKind::Seq(s) => {
-                        // TODO: lazy iteration?
-                        let mut items = vec![];
-                        for idx in 0..s.len() {
-                            items.push(s.get(idx).unwrap_or(Value::UNDEFINED));
-                        }
-                        (ValueIteratorState::Seq(0, Arc::new(items)), s.len())
-                    }
+                    ObjectKind::Seq(s) => (ValueIteratorState::DynSeq(0, Arc::clone(obj)), s.len()),
                     ObjectKind::Struct(s) => {
-                        // TODO: lazy iteration?
+                        // the assumption is that structs don't have excessive field counts
+                        // and that most iterations go over all fields, so creating a
+                        // temporary vector here is acceptable.
                         let attrs = s.fields().map(Value::from).collect::<Vec<_>>();
                         let attr_count = s.len();
                         (ValueIteratorState::Seq(0, Arc::new(attrs)), attr_count)
@@ -1081,6 +1076,7 @@ impl fmt::Debug for OwnedValueIterator {
 enum ValueIteratorState {
     Empty,
     Seq(usize, Arc<Vec<Value>>),
+    DynSeq(usize, Arc<dyn Object>),
     #[cfg(not(feature = "preserve_order"))]
     Map(Option<StaticKey>, Arc<ValueMap>),
     #[cfg(feature = "preserve_order")]
@@ -1098,6 +1094,16 @@ impl ValueIteratorState {
                     x
                 })
                 .cloned(),
+            ValueIteratorState::DynSeq(idx, obj) => {
+                if let ObjectKind::Seq(seq) = obj.kind() {
+                    seq.get(*idx).map(|x| {
+                        *idx += 1;
+                        x
+                    })
+                } else {
+                    unreachable!()
+                }
+            }
             #[cfg(feature = "preserve_order")]
             ValueIteratorState::Map(idx, map) => map.get_index(*idx).map(|x| {
                 *idx += 1;
