@@ -754,8 +754,8 @@ mod builtins {
 
     /// indents Value with spaces or tabs
     ///
-    /// This filter is only available if the `indent` feature is enabled.  The resulting
-    /// characters.  The optional parameter to the filter can be set to `true` to enable 
+    /// This filter is only available if the `indent` feature is enabled. 
+    /// The optional parameter to the filter can be set to `true` to enable 
     /// indenting with \t. 
     /// This filter is useful, if you want to template yaml-files
     ///
