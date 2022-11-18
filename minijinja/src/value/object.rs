@@ -218,19 +218,21 @@ pub struct SeqObjectIter<'a> {
 impl<'a> Iterator for SeqObjectIter<'a> {
     type Item = Value;
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         self.range
             .next()
             .map(|idx| self.seq.get_item(idx).unwrap_or(Value::UNDEFINED))
     }
 
+    #[inline(always)]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.seq.seq_len();
-        (len, Some(len))
+        self.range.size_hint()
     }
 }
 
 impl<'a> DoubleEndedIterator for SeqObjectIter<'a> {
+    #[inline(always)]
     fn next_back(&mut self) -> Option<Self::Item> {
         self.range
             .next_back()
