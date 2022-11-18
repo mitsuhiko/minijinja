@@ -582,7 +582,6 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
         match value {
             None => Ok(Vec::new()),
             Some(values) => {
-                // TODO: can we somehow use values.as_cow_slice?
                 let values = ok!(values.as_slice());
                 let mut rv = Vec::new();
                 for value in values {

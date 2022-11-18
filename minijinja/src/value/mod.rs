@@ -120,7 +120,7 @@ use crate::value::serialize::ValueSerializer;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Rest};
-pub use crate::value::object::{Object, ObjectKind, SeqObject, StructObject};
+pub use crate::value::object::{Object, ObjectKind, SeqIter, SeqObject, StructObject};
 
 mod argtypes;
 #[cfg(feature = "deserialization")]
@@ -997,8 +997,8 @@ impl Serialize for Value {
                 ObjectKind::Seq(s) => {
                     use serde::ser::SerializeSeq;
                     let mut seq = ok!(serializer.serialize_seq(Some(s.seq_len())));
-                    for idx in 0..s.seq_len() {
-                        ok!(seq.serialize_element(&s.get_item(idx).unwrap_or(Value::UNDEFINED)));
+                    for item in s.iter() {
+                        ok!(seq.serialize_element(&item));
                     }
                     seq.end()
                 }

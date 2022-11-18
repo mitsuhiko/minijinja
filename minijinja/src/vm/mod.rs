@@ -609,8 +609,7 @@ impl<'env> Vm<'env> {
             .unwrap_or(&single_name_slice as &dyn SeqObject);
 
         let mut templates_tried = vec![];
-        for idx in 0..choices.seq_len() {
-            let choice = choices.get_item(idx).unwrap_or(Value::UNDEFINED);
+        for choice in choices.iter() {
             let name = ok!(choice.as_str().ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
@@ -831,8 +830,8 @@ impl<'env> Vm<'env> {
                 ),
             ));
         }
-        for idx in (0..seq.seq_len()).rev() {
-            stack.push(seq.get_item(idx).unwrap_or(Value::UNDEFINED));
+        for item in seq.iter().rev() {
+            stack.push(item);
         }
         Ok(())
     }

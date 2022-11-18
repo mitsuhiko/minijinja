@@ -124,11 +124,10 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         Some(seq) => {
             let (start, len) = get_offset_and_len(start, stop, || seq.seq_len());
             Ok(Value::from(
-                (0..seq.seq_len())
+                seq.iter()
                     .skip(start)
                     .take(len)
                     .step_by(step)
-                    .map(|idx| seq.get_item(idx).unwrap_or(Value::UNDEFINED))
                     .collect::<Vec<_>>(),
             ))
         }
@@ -272,7 +271,7 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
             s.contains(&value.to_string())
         }
     } else if let Some(seq) = container.as_seq() {
-        (0..seq.seq_len()).any(|idx| seq.get_item(idx).as_ref() == Some(value))
+        seq.iter().any(|item| &item == value)
     } else if let ValueRepr::Map(ref map, _) = container.0 {
         let key = match value.clone().try_into_key() {
             Ok(key) => key,

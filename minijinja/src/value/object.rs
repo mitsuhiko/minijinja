@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::fmt;
+use std::ops::Range;
 
 use crate::error::{Error, ErrorKind};
 use crate::value::Value;
@@ -174,6 +175,16 @@ pub trait SeqObject {
     fn seq_len(&self) -> usize;
 }
 
+impl dyn SeqObject + '_ {
+    /// Convenient iterator over a [`SeqObject`].
+    pub fn iter(&self) -> SeqIter<'_> {
+        SeqIter {
+            seq: self,
+            range: 0..self.seq_len(),
+        }
+    }
+}
+
 impl<'a> SeqObject for &'a [Value] {
     #[inline(always)]
     fn get_item(&self, idx: usize) -> Option<Value> {
@@ -197,6 +208,37 @@ impl SeqObject for Vec<Value> {
         self.len()
     }
 }
+
+/// Iterates over [`SeqObject`]
+pub struct SeqIter<'a> {
+    seq: &'a dyn SeqObject,
+    range: Range<usize>,
+}
+
+impl<'a> Iterator for SeqIter<'a> {
+    type Item = Value;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.range
+            .next()
+            .map(|idx| self.seq.get_item(idx).unwrap_or(Value::UNDEFINED))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.seq.seq_len();
+        (len, Some(len))
+    }
+}
+
+impl<'a> DoubleEndedIterator for SeqIter<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.range
+            .next_back()
+            .map(|idx| self.seq.get_item(idx).unwrap_or(Value::UNDEFINED))
+    }
+}
+
+impl<'a> ExactSizeIterator for SeqIter<'a> {}
 
 /// Views an [`Object`] as a struct.
 ///

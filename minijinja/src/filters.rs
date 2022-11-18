@@ -405,12 +405,7 @@ mod builtins {
         if let Some(s) = v.as_str() {
             Ok(Value::from(s.chars().rev().collect::<String>()))
         } else if let Some(seq) = v.as_seq() {
-            Ok(Value::from(
-                (0..seq.seq_len())
-                    .rev()
-                    .map(|idx| seq.get_item(idx).unwrap_or(Value::UNDEFINED))
-                    .collect::<Vec<_>>(),
-            ))
+            Ok(Value::from(seq.iter().rev().collect::<Vec<_>>()))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -451,8 +446,7 @@ mod builtins {
             Ok(rv)
         } else if let Some(seq) = val.as_seq() {
             let mut rv = String::new();
-            for idx in 0..seq.seq_len() {
-                let item = seq.get_item(idx).unwrap_or(Value::UNDEFINED);
+            for item in seq.iter() {
                 if !rv.is_empty() {
                     rv.push_str(joiner);
                 }
@@ -573,13 +567,7 @@ mod builtins {
         if let Some(s) = value.as_str() {
             Ok(s.chars().rev().next().map_or(Value::UNDEFINED, Value::from))
         } else if let Some(seq) = value.as_seq() {
-            let len = seq.seq_len();
-            Ok(if len == 0 {
-                None
-            } else {
-                seq.get_item(len - 1)
-            }
-            .unwrap_or(Value::UNDEFINED))
+            Ok(seq.iter().last().unwrap_or(Value::UNDEFINED))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
