@@ -92,7 +92,7 @@ fn test_value_by_index() {
 }
 
 #[test]
-fn test_map_object_iteration() {
+fn test_map_object_iteration_and_indexing() {
     #[derive(Debug, Clone)]
     struct Point(i32, i32, i32);
 
@@ -123,20 +123,25 @@ fn test_map_object_iteration() {
         }
     }
 
-    let point = Point(1, 2, 3);
     let rv = minijinja::render!(
         "{% for key in point %}{{ key }}: {{ point[key] }}\n{% endfor %}",
-        point => Value::from_object(point)
+        point => Value::from_object(Point(1, 2, 3))
     );
     assert_snapshot!(rv, @r###"
     x: 1
     y: 2
     z: 3
     "###);
+
+    let rv = minijinja::render!(
+        "{{ [point.x, point.z, point.missing_attribute] }}",
+        point => Value::from_object(Point(1, 2, 3))
+    );
+    assert_snapshot!(rv, @r###"[1, 3, Undefined]"###);
 }
 
 #[test]
-fn test_seq_object_iteration() {
+fn test_seq_object_iteration_and_indexing() {
     #[derive(Debug, Clone)]
     struct Point(i32, i32, i32);
 
@@ -167,14 +172,19 @@ fn test_seq_object_iteration() {
         }
     }
 
-    let point = Point(1, 2, 3);
     let rv = minijinja::render!(
         "{% for value in point %}{{ loop.index0 }}: {{ value }}\n{% endfor %}",
-        point => Value::from_object(point)
+        point => Value::from_object(Point(1, 2, 3))
     );
     assert_snapshot!(rv, @r###"
     0: 1
     1: 2
     2: 3
     "###);
+
+    let rv = minijinja::render!(
+        "{{ [point[0], point[2], point[42]] }}",
+        point => Value::from_object(Point(1, 2, 3))
+    );
+    assert_snapshot!(rv, @r###"[1, 3, Undefined]"###);
 }
