@@ -14,6 +14,7 @@ All notable changes to MiniJinja are documented here.
 - Introduced `Value::from_seq_object` and `Value::from_struct_object`.
 - Added the ability for function arguments to be of type `&dyn SeqObject`.
 - Renamed `Iter` to `ValueIter`.
+- Added `Environment::render_named_str`. (#149)
 
 ## Breaking Changes
 
