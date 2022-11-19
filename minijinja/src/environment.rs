@@ -381,7 +381,7 @@ impl<'source> Environment<'source> {
     fn _compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
         let ast = ok!(parse_expr(expr));
         let mut gen = CodeGenerator::new("<expression>", expr);
-        ok!(gen.compile_expr(&ast));
+        gen.compile_expr(&ast);
         let (instructions, _) = gen.finish();
         Ok(Expression::new(self, instructions))
     }
