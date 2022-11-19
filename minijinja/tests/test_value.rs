@@ -151,7 +151,7 @@ fn test_seq_object_iteration_and_indexing() {
             }
         }
 
-        fn seq_len(&self) -> usize {
+        fn item_count(&self) -> usize {
             3
         }
     }

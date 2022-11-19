@@ -122,7 +122,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
 
     match maybe_seq {
         Some(seq) => {
-            let (start, len) = get_offset_and_len(start, stop, || seq.seq_len());
+            let (start, len) = get_offset_and_len(start, stop, || seq.item_count());
             Ok(Value::from(
                 seq.iter()
                     .skip(start)

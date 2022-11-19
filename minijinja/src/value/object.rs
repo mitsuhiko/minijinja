@@ -156,7 +156,7 @@ pub enum ObjectKind<'a> {
 ///         }
 ///     }
 ///
-///     fn seq_len(&self) -> usize {
+///     fn item_count(&self) -> usize {
 ///         3
 ///     }
 /// }
@@ -166,13 +166,13 @@ pub enum ObjectKind<'a> {
 pub trait SeqObject {
     /// Looks up an item by index.
     ///
-    /// Sequences should provide a value for all items in the range of `0..seq_len`
+    /// Sequences should provide a value for all items in the range of `0..item_count`
     /// but the engine will assume that items within the range are `Undefined`
     /// if `None` is returned.
     fn get_item(&self, idx: usize) -> Option<Value>;
 
     /// Returns the number of items in the sequence.
-    fn seq_len(&self) -> usize;
+    fn item_count(&self) -> usize;
 }
 
 impl dyn SeqObject + '_ {
@@ -180,7 +180,7 @@ impl dyn SeqObject + '_ {
     pub fn iter(&self) -> SeqObjectIter<'_> {
         SeqObjectIter {
             seq: self,
-            range: 0..self.seq_len(),
+            range: 0..self.item_count(),
         }
     }
 }
@@ -192,7 +192,7 @@ impl<'a> SeqObject for &'a [Value] {
     }
 
     #[inline(always)]
-    fn seq_len(&self) -> usize {
+    fn item_count(&self) -> usize {
         self.len()
     }
 }
@@ -204,7 +204,7 @@ impl SeqObject for Vec<Value> {
     }
 
     #[inline(always)]
-    fn seq_len(&self) -> usize {
+    fn item_count(&self) -> usize {
         self.len()
     }
 }
@@ -311,7 +311,7 @@ pub trait StructObject {
     /// Returns the number of fields in the struct.
     ///
     /// The default implementation returns the number of fields.
-    fn struct_size(&self) -> usize {
+    fn field_count(&self) -> usize {
         self.fields().count()
     }
 }

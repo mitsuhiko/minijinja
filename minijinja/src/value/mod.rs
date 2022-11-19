@@ -555,8 +555,8 @@ impl Value {
             ValueRepr::Map(ref x, _) => !x.is_empty(),
             ValueRepr::Dynamic(ref x) => match x.kind() {
                 ObjectKind::Basic => true,
-                ObjectKind::Seq(s) => s.seq_len() != 0,
-                ObjectKind::Struct(s) => s.struct_size() != 0,
+                ObjectKind::Seq(s) => s.item_count() != 0,
+                ObjectKind::Struct(s) => s.field_count() != 0,
             },
         }
     }
@@ -652,8 +652,8 @@ impl Value {
             ValueRepr::Seq(ref items) => Some(items.len()),
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Basic => None,
-                ObjectKind::Seq(s) => Some(s.seq_len()),
-                ObjectKind::Struct(s) => Some(s.struct_size()),
+                ObjectKind::Seq(s) => Some(s.item_count()),
+                ObjectKind::Struct(s) => Some(s.field_count()),
             },
             _ => None,
         }
@@ -821,7 +821,7 @@ impl Value {
         if let Key::I64(idx) = key {
             let idx = some!(isize::try_from(idx).ok());
             let idx = if idx < 0 {
-                some!(seq.seq_len().checked_sub(-idx as usize))
+                some!(seq.item_count().checked_sub(-idx as usize))
             } else {
                 idx as usize
             };
@@ -932,15 +932,16 @@ impl Value {
             ValueRepr::Dynamic(ref obj) => {
                 match obj.kind() {
                     ObjectKind::Basic => (ValueIteratorState::Empty, 0),
-                    ObjectKind::Seq(s) => {
-                        (ValueIteratorState::DynSeq(0, Arc::clone(obj)), s.seq_len())
-                    }
+                    ObjectKind::Seq(s) => (
+                        ValueIteratorState::DynSeq(0, Arc::clone(obj)),
+                        s.item_count(),
+                    ),
                     ObjectKind::Struct(s) => {
                         // the assumption is that structs don't have excessive field counts
                         // and that most iterations go over all fields, so creating a
                         // temporary vector here is acceptable.
                         let attrs = s.fields().map(Value::from).collect::<Vec<_>>();
-                        let attr_count = s.struct_size();
+                        let attr_count = s.field_count();
                         (ValueIteratorState::Seq(0, Arc::new(attrs)), attr_count)
                     }
                 }
@@ -996,7 +997,7 @@ impl Serialize for Value {
                 ObjectKind::Basic => serializer.serialize_str(&dy.to_string()),
                 ObjectKind::Seq(s) => {
                     use serde::ser::SerializeSeq;
-                    let mut seq = ok!(serializer.serialize_seq(Some(s.seq_len())));
+                    let mut seq = ok!(serializer.serialize_seq(Some(s.item_count())));
                     for item in s.iter() {
                         ok!(seq.serialize_element(&item));
                     }

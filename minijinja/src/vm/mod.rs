@@ -820,13 +820,13 @@ impl<'env> Vm<'env> {
         let seq = ok!(top
             .as_seq()
             .ok_or_else(|| Error::new(ErrorKind::CannotUnpack, "not a sequence")));
-        if seq.seq_len() != *count {
+        if seq.item_count() != *count {
             return Err(Error::new(
                 ErrorKind::CannotUnpack,
                 format!(
                     "sequence of wrong length (expected {}, got {})",
                     *count,
-                    seq.seq_len()
+                    seq.item_count()
                 ),
             ));
         }
