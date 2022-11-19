@@ -283,6 +283,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::ListAppend => {
                     a = stack.pop();
+                    // this intentionally only works with actual sequences
                     if let ValueRepr::Seq(mut v) = stack.pop().0 {
                         Arc::make_mut(&mut v).push(a);
                         stack.push(Value(ValueRepr::Seq(v)))
@@ -600,14 +601,16 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         ignore_missing: bool,
     ) -> Result<(), Error> {
-        let choices = if let ValueRepr::Seq(ref choices) = name.0 {
-            &choices[..]
-        } else {
-            std::slice::from_ref(&name)
-        };
+        use crate::value::SeqObject;
+
+        let single_name_slice = std::slice::from_ref(&name);
+        let choices = name
+            .as_seq()
+            .unwrap_or(&single_name_slice as &dyn SeqObject);
+
         let mut templates_tried = vec![];
-        for name in choices {
-            let name = ok!(name.as_str().ok_or_else(|| {
+        for choice in choices.iter() {
+            let name = ok!(choice.as_str().ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
                     "template name was not a string",
@@ -617,7 +620,7 @@ impl<'env> Vm<'env> {
                 Ok(tmpl) => tmpl,
                 Err(err) => {
                     if err.kind() == ErrorKind::TemplateNotFound {
-                        templates_tried.push(name);
+                        templates_tried.push(choice);
                     } else {
                         return Err(err);
                     }
@@ -652,8 +655,8 @@ impl<'env> Vm<'env> {
                     )
                 } else {
                     format!(
-                        "tried to include one of multiple templates, none of which existed {:?}",
-                        templates_tried
+                        "tried to include one of multiple templates, none of which existed {}",
+                        Value::from(templates_tried)
                     )
                 },
             ))
@@ -814,22 +817,21 @@ impl<'env> Vm<'env> {
 
     fn unpack_list(&self, stack: &mut Stack, count: &usize) -> Result<(), Error> {
         let top = stack.pop();
-        let v =
-            ok!(top
-                .as_slice()
-                .map_err(|e| Error::new(ErrorKind::CannotUnpack, "not a sequence").with_source(e)));
-        if v.len() != *count {
+        let seq = ok!(top
+            .as_seq()
+            .ok_or_else(|| Error::new(ErrorKind::CannotUnpack, "not a sequence")));
+        if seq.item_count() != *count {
             return Err(Error::new(
                 ErrorKind::CannotUnpack,
                 format!(
                     "sequence of wrong length (expected {}, got {})",
                     *count,
-                    v.len()
+                    seq.item_count()
                 ),
             ));
         }
-        for value in v.iter().rev() {
-            stack.push(value.clone());
+        for item in seq.iter().rev() {
+            stack.push(item);
         }
         Ok(())
     }

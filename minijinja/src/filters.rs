@@ -250,7 +250,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::value::{ValueKind, ValueRepr};
+    use crate::value::ValueRepr;
     use std::borrow::Cow;
     use std::fmt::Write;
     use std::mem;
@@ -404,10 +404,8 @@ mod builtins {
     pub fn reverse(v: Value) -> Result<Value, Error> {
         if let Some(s) = v.as_str() {
             Ok(Value::from(s.chars().rev().collect::<String>()))
-        } else if matches!(v.kind(), ValueKind::Seq) {
-            Ok(Value::from(
-                ok!(v.as_slice()).iter().rev().cloned().collect::<Vec<_>>(),
-            ))
+        } else if let Some(seq) = v.as_seq() {
+            Ok(Value::from(seq.iter().rev().collect::<Vec<_>>()))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -446,9 +444,9 @@ mod builtins {
                 rv.push(c);
             }
             Ok(rv)
-        } else if matches!(val.kind(), ValueKind::Seq) {
+        } else if let Some(seq) = val.as_seq() {
             let mut rv = String::new();
-            for item in ok!(val.as_slice()) {
+            for item in seq.iter() {
                 if !rv.is_empty() {
                     rv.push_str(joiner);
                 }
@@ -537,13 +535,15 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn first(value: Value) -> Result<Value, Error> {
-        match value.0 {
-            ValueRepr::String(s, _) => Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from)),
-            ValueRepr::Seq(ref s) => Ok(s.first().cloned().unwrap_or(Value::UNDEFINED)),
-            _ => Err(Error::new(
+        if let Some(s) = value.as_str() {
+            Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
+        } else if let Some(s) = value.as_seq() {
+            Ok(s.get_item(0).unwrap_or(Value::UNDEFINED))
+        } else {
+            Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "cannot get first item from value",
-            )),
+            ))
         }
     }
 
@@ -564,15 +564,15 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn last(value: Value) -> Result<Value, Error> {
-        match value.0 {
-            ValueRepr::String(s, _) => {
-                Ok(s.chars().rev().next().map_or(Value::UNDEFINED, Value::from))
-            }
-            ValueRepr::Seq(ref s) => Ok(s.last().cloned().unwrap_or(Value::UNDEFINED)),
-            _ => Err(Error::new(
+        if let Some(s) = value.as_str() {
+            Ok(s.chars().rev().next().map_or(Value::UNDEFINED, Value::from))
+        } else if let Some(seq) = value.as_seq() {
+            Ok(seq.iter().last().unwrap_or(Value::UNDEFINED))
+        } else {
+            Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "cannot get last item from value",
-            )),
+            ))
         }
     }
 
@@ -584,21 +584,14 @@ mod builtins {
     /// an empty list is returned.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn list(value: Value) -> Result<Value, Error> {
-        match &value.0 {
-            ValueRepr::Undefined => Ok(Value::from(Vec::<Value>::new())),
-            ValueRepr::String(ref s, _) => {
-                Ok(Value::from(s.chars().map(Value::from).collect::<Vec<_>>()))
-            }
-            ValueRepr::Seq(_) => Ok(value.clone()),
-            ValueRepr::Map(ref m, _) => Ok(Value::from(
-                m.iter()
-                    .map(|x| Value::from(x.0.clone()))
-                    .collect::<Vec<_>>(),
-            )),
-            _ => Err(Error::new(
-                ErrorKind::InvalidOperation,
-                "cannot convert value to list",
-            )),
+        if let Some(s) = value.as_str() {
+            Ok(Value::from(s.chars().map(Value::from).collect::<Vec<_>>()))
+        } else {
+            let iter = ok!(value.try_iter().map_err(|err| {
+                Error::new(ErrorKind::InvalidOperation, "cannot convert value to list")
+                    .with_source(err)
+            }));
+            Ok(Value::from(iter.collect::<Vec<_>>()))
         }
     }
 
@@ -873,6 +866,36 @@ mod builtins {
                 )
                 .unwrap(),
                 Value::from(66)
+            );
+        });
+    }
+
+    #[test]
+    fn test_values_in_vec() {
+        fn upper(value: &str) -> String {
+            value.to_uppercase()
+        }
+
+        fn sum(value: Vec<i64>) -> i64 {
+            value.into_iter().sum::<i64>()
+        }
+
+        let upper = BoxedFilter::new(upper);
+        let sum = BoxedFilter::new(sum);
+
+        let env = crate::Environment::new();
+        State::with_dummy(&env, |state| {
+            assert_eq!(
+                upper
+                    .apply_to(state, &[Value::from("Hello World!")])
+                    .unwrap(),
+                Value::from("HELLO WORLD!")
+            );
+
+            assert_eq!(
+                sum.apply_to(state, &[Value::from(vec![Value::from(1), Value::from(2)])])
+                    .unwrap(),
+                Value::from(3)
             );
         });
     }

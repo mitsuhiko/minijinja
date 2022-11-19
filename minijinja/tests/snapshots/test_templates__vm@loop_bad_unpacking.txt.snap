@@ -15,10 +15,6 @@ Error {
     detail: "not a sequence",
     name: "loop_bad_unpacking.txt",
     line: 2,
-    source: Error {
-        kind: InvalidOperation,
-        detail: "value of type number is not a sequence",
-    },
 }
 
 cannot unpack: not a sequence (in loop_bad_unpacking.txt:2)
@@ -49,6 +45,4 @@ Referenced variables: {
     ],
 }
 -------------------------------------------------------------------------------
-
-caused by: invalid operation: value of type number is not a sequence
 

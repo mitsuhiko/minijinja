@@ -2,8 +2,7 @@ use std::cmp::Ordering;
 use std::fmt;
 
 use insta::assert_snapshot;
-use minijinja::value::{Object, Value};
-use minijinja::ErrorKind;
+use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
 
 #[test]
 fn test_sort() {
@@ -64,21 +63,6 @@ fn test_float_to_string() {
 }
 
 #[test]
-fn test_value_as_slice() {
-    let val = Value::from(vec![1u32, 2, 3]);
-    assert_eq!(
-        val.as_slice().unwrap(),
-        &[Value::from(1), Value::from(2), Value::from(3)]
-    );
-    assert_eq!(Value::UNDEFINED.as_slice().unwrap(), &[]);
-    assert_eq!(Value::from(()).as_slice().unwrap(), &[]);
-    assert_eq!(
-        Value::from("foo").as_slice().unwrap_err().kind(),
-        ErrorKind::InvalidOperation
-    );
-}
-
-#[test]
 fn test_value_as_bytes() {
     assert_eq!(Value::from("foo").as_bytes(), Some(&b"foo"[..]));
     assert_eq!(Value::from(&b"foo"[..]).as_bytes(), Some(&b"foo"[..]));
@@ -92,7 +76,7 @@ fn test_value_by_index() {
 }
 
 #[test]
-fn test_object_iteration() {
+fn test_map_object_iteration_and_indexing() {
     #[derive(Debug, Clone)]
     struct Point(i32, i32, i32);
 
@@ -103,7 +87,13 @@ fn test_object_iteration() {
     }
 
     impl Object for Point {
-        fn get_attr(&self, name: &str) -> Option<Value> {
+        fn kind(&self) -> ObjectKind<'_> {
+            ObjectKind::Struct(self)
+        }
+    }
+
+    impl StructObject for Point {
+        fn get_field(&self, name: &str) -> Option<Value> {
             match name {
                 "x" => Some(Value::from(self.0)),
                 "y" => Some(Value::from(self.1)),
@@ -112,19 +102,73 @@ fn test_object_iteration() {
             }
         }
 
-        fn attributes(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
             Box::new(["x", "y", "z"].into_iter())
         }
     }
 
-    let point = Point(1, 2, 3);
     let rv = minijinja::render!(
         "{% for key in point %}{{ key }}: {{ point[key] }}\n{% endfor %}",
-        point => Value::from_object(point)
+        point => Value::from_object(Point(1, 2, 3))
     );
     assert_snapshot!(rv, @r###"
     x: 1
     y: 2
     z: 3
     "###);
+
+    let rv = minijinja::render!(
+        "{{ [point.x, point.z, point.missing_attribute] }}",
+        point => Value::from_object(Point(1, 2, 3))
+    );
+    assert_snapshot!(rv, @r###"[1, 3, Undefined]"###);
+}
+
+#[test]
+fn test_seq_object_iteration_and_indexing() {
+    #[derive(Debug, Clone)]
+    struct Point(i32, i32, i32);
+
+    impl fmt::Display for Point {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}, {}, {}", self.0, self.1, self.2)
+        }
+    }
+
+    impl Object for Point {
+        fn kind(&self) -> ObjectKind<'_> {
+            ObjectKind::Seq(self)
+        }
+    }
+
+    impl SeqObject for Point {
+        fn get_item(&self, index: usize) -> Option<Value> {
+            match index {
+                0 => Some(Value::from(self.0)),
+                1 => Some(Value::from(self.1)),
+                2 => Some(Value::from(self.2)),
+                _ => None,
+            }
+        }
+
+        fn item_count(&self) -> usize {
+            3
+        }
+    }
+
+    let rv = minijinja::render!(
+        "{% for value in point %}{{ loop.index0 }}: {{ value }}\n{% endfor %}",
+        point => Value::from_object(Point(1, 2, 3))
+    );
+    assert_snapshot!(rv, @r###"
+    0: 1
+    1: 2
+    2: 3
+    "###);
+
+    let rv = minijinja::render!(
+        "{{ [point[0], point[2], point[42]] }}",
+        point => Value::from_object(Point(1, 2, 3))
+    );
+    assert_snapshot!(rv, @r###"[1, 3, Undefined]"###);
 }

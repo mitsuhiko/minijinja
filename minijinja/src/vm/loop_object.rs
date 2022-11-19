@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Object, Value};
+use crate::value::{Object, ObjectKind, StructObject, Value};
 use crate::vm::state::State;
 
 pub(crate) struct Loop {
@@ -16,46 +16,16 @@ pub(crate) struct Loop {
 impl fmt::Debug for Loop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("Loop");
-        for attr in self.attributes() {
-            s.field(attr, &self.get_attr(attr).unwrap());
+        for attr in self.fields() {
+            s.field(attr, &self.get_field(attr).unwrap());
         }
         s.finish()
     }
 }
 
 impl Object for Loop {
-    fn attributes(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        Box::new(
-            [
-                "index0",
-                "index",
-                "length",
-                "revindex",
-                "revindex0",
-                "first",
-                "last",
-                "depth",
-                "depth0",
-            ]
-            .into_iter(),
-        )
-    }
-
-    fn get_attr(&self, name: &str) -> Option<Value> {
-        let idx = self.idx.load(Ordering::Relaxed) as u64;
-        let len = self.len as u64;
-        match name {
-            "index0" => Some(Value::from(idx)),
-            "index" => Some(Value::from(idx + 1)),
-            "length" => Some(Value::from(len)),
-            "revindex" => Some(Value::from(len.saturating_sub(idx))),
-            "revindex0" => Some(Value::from(len.saturating_sub(idx).saturating_sub(1))),
-            "first" => Some(Value::from(idx == 0)),
-            "last" => Some(Value::from(len == 0 || idx == len - 1)),
-            "depth" => Some(Value::from(self.depth + 1)),
-            "depth0" => Some(Value::from(self.depth)),
-            _ => None,
-        }
+    fn kind(&self) -> ObjectKind<'_> {
+        ObjectKind::Struct(self)
     }
 
     fn call(&self, _state: &State, _args: &[Value]) -> Result<Value, Error> {
@@ -84,9 +54,45 @@ impl Object for Loop {
             }
         } else {
             Err(Error::new(
-                ErrorKind::InvalidOperation,
+                ErrorKind::UnknownMethod,
                 format!("loop object has no method named {}", name),
             ))
+        }
+    }
+}
+
+impl StructObject for Loop {
+    fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(
+            [
+                "index0",
+                "index",
+                "length",
+                "revindex",
+                "revindex0",
+                "first",
+                "last",
+                "depth",
+                "depth0",
+            ]
+            .into_iter(),
+        )
+    }
+
+    fn get_field(&self, name: &str) -> Option<Value> {
+        let idx = self.idx.load(Ordering::Relaxed) as u64;
+        let len = self.len as u64;
+        match name {
+            "index0" => Some(Value::from(idx)),
+            "index" => Some(Value::from(idx + 1)),
+            "length" => Some(Value::from(len)),
+            "revindex" => Some(Value::from(len.saturating_sub(idx))),
+            "revindex0" => Some(Value::from(len.saturating_sub(idx).saturating_sub(1))),
+            "first" => Some(Value::from(idx == 0)),
+            "last" => Some(Value::from(len == 0 || idx == len - 1)),
+            "depth" => Some(Value::from(self.depth + 1)),
+            "depth0" => Some(Value::from(self.depth)),
+            _ => None,
         }
     }
 }
