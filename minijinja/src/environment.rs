@@ -209,19 +209,25 @@ impl<'source> Environment<'source> {
         self._render_str("<string>", source, Value::from_serializable(&ctx))
     }
 
-    /// Like [`render_str()`](Self::render_str()), but provide a name for the
+    /// Parses and renders a template from a string in one go with name.
+    ///
+    /// Like [`render_str`](Self::render_str), but provide a name for the
     /// template to be used instead of the default `<string>`.
     ///
     /// ```
     /// # use minijinja::{Environment, context};
     /// let env = Environment::new();
-    /// let rv = env.render_str_named("Hello {{ name }}", "template", context! { name => "World" });
+    /// let rv = env.render_named_str(
+    ///     "template_name",
+    ///     "Hello {{ name }}",
+    ///     context! { name => "World" }
+    /// );
     /// println!("{}", rv.unwrap());
     /// ```
-    pub fn render_str_named<S: Serialize>(
+    pub fn render_named_str<S: Serialize>(
         &self,
-        source: &str,
         name: &str,
+        source: &str,
         ctx: S,
     ) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
