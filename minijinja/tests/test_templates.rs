@@ -146,3 +146,104 @@ fn test_loop_changed() {
     );
     assert_eq!(rv, "12345");
 }
+
+#[test]
+fn test_current_call_state() {
+    use minijinja::value::{Object, Value};
+    use std::fmt;
+
+    #[derive(Debug)]
+    struct MethodAndFunc;
+
+    impl fmt::Display for MethodAndFunc {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{self:?}")
+        }
+    }
+
+    impl Object for MethodAndFunc {
+        fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+            assert_eq!(name, state.current_call().unwrap());
+            let args = args
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            Ok(format!("{}({args})", state.current_call().unwrap()).into())
+        }
+
+        fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+            let args = args
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            Ok(format!("{}({args})", state.current_call().unwrap()).into())
+        }
+    }
+
+    fn current_call(state: &State, value: Option<&str>) -> String {
+        format!("{}({})", state.current_call().unwrap(), value.unwrap_or(""))
+    }
+
+    fn check_test(state: &State, value: &str) -> bool {
+        state.current_call() == Some(value)
+    }
+
+    let mut env = Environment::new();
+    env.add_function("fn_call_a", current_call);
+    env.add_function("fn_call_b", current_call);
+    env.add_filter("filter_call", current_call);
+    env.add_test("my_test", check_test);
+    env.add_test("another_test", check_test);
+    env.add_global("object", Value::from_object(MethodAndFunc));
+
+    env.add_template(
+        "test",
+        r#"
+        {{ fn_call_a() }}
+        {{ "foo" | filter_call }}
+        {{ fn_call_a() | filter_call }}
+        {{ fn_call_b() | filter_call }}
+        {{ fn_call_a(fn_call_b()) }}
+        {{ fn_call_a(fn_call_b()) | filter_call }}
+
+        {{ "my_test" is my_test }}
+        {{ "another_test" is my_test }}
+        {{ "another_test" is another_test }}
+
+        {{ object.foo() }}
+        {{ object.bar() }}
+        {{ object.foo(object.bar(object.baz())) }}
+        {{ object(object.bar()) }}
+        {{ object.baz(object()) }}
+    "#,
+    )
+    .unwrap();
+
+    let tmpl = env.get_template("test").unwrap();
+    let rv = tmpl.render(context!()).unwrap();
+    assert_eq!(
+        rv,
+        r#"
+        fn_call_a()
+        filter_call(foo)
+        filter_call(fn_call_a())
+        filter_call(fn_call_b())
+        fn_call_a(fn_call_b())
+        filter_call(fn_call_a(fn_call_b()))
+
+        true
+        false
+        true
+
+        foo()
+        bar()
+        foo(bar(baz()))
+        object(bar())
+        baz(object())
+    "#
+    );
+}
