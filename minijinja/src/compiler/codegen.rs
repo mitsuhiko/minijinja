@@ -136,16 +136,13 @@ impl<'source> CodeGenerator<'source> {
     }
 
     /// Ends the open for loop
-    pub fn end_for_loop(&mut self, push_did_iterate: bool) {
+    pub fn end_for_loop(&mut self, push_did_not_iterate: bool) {
         match self.pending_block.pop() {
             Some(PendingBlock::Loop(iter_instr)) => {
                 self.add(Instruction::Jump(iter_instr));
                 let loop_end = self.next_instruction();
-                if push_did_iterate {
-                    self.add(Instruction::Lookup("loop"));
-                    self.add(Instruction::GetAttr("index0"));
-                    self.add(Instruction::LoadConst(Value::from(0)));
-                    self.add(Instruction::Eq);
+                if push_did_not_iterate {
+                    self.add(Instruction::PushDidNotIterate);
                 };
                 self.add(Instruction::PopFrame);
                 if let Some(Instruction::Iterate(ref mut jump_target)) =

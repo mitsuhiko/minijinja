@@ -138,6 +138,9 @@ pub enum Instruction<'source> {
     /// ends and must point to a `PopFrame` instruction.
     Iterate(usize),
 
+    /// Push a bool that indicates that the loop iterated.
+    PushDidNotIterate,
+
     /// Pops the topmost frame
     PopFrame,
 

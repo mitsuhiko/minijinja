@@ -350,7 +350,7 @@ impl<'env> Vm<'env> {
                     ctx_ok!(self.push_loop(state, a, *flags, pc, next_loop_recursion_jump.take()));
                 }
                 Instruction::Iterate(jump_target) => {
-                    let l = state.ctx.current_loop().expect("not inside a loop");
+                    let l = state.ctx.current_loop().unwrap();
                     l.object.idx.fetch_add(1, Ordering::Relaxed);
                     match l.iterator.next() {
                         Some(item) => stack.push(item),
@@ -359,6 +359,10 @@ impl<'env> Vm<'env> {
                             continue;
                         }
                     };
+                }
+                Instruction::PushDidNotIterate => {
+                    let l = state.ctx.current_loop().unwrap();
+                    stack.push(Value::from(l.object.idx.load(Ordering::Relaxed) == 0));
                 }
                 Instruction::Jump(jump_target) => {
                     pc = *jump_target;
