@@ -61,15 +61,11 @@ struct SimpleDynamicSeq;
 
 impl SeqObject for SimpleDynamicSeq {
     fn get_item(&self, idx: usize) -> Option<Value> {
-        if idx < 3 {
-            Some(Value::from(idx * 2))
-        } else {
-            None
-        }
+        ['a', 'b', 'c', 'd'].get(idx).copied().map(Value::from)
     }
 
     fn item_count(&self) -> usize {
-        3
+        4
     }
 }
 
