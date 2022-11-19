@@ -899,6 +899,32 @@ mod builtins {
             );
         });
     }
+
+    #[test]
+    fn test_seq_object_borrow() {
+        fn connect(values: &dyn crate::value::SeqObject) -> String {
+            let mut rv = String::new();
+            for item in values.iter() {
+                rv.push_str(&item.to_string())
+            }
+            rv
+        }
+
+        let connect = BoxedFilter::new(connect);
+
+        let env = crate::Environment::new();
+        State::with_dummy(&env, |state| {
+            assert_eq!(
+                connect
+                    .apply_to(
+                        state,
+                        &[Value::from(vec![Value::from("HELLO"), Value::from(42)])]
+                    )
+                    .unwrap(),
+                Value::from("HELLO42")
+            );
+        });
+    }
 }
 
 #[cfg(feature = "builtins")]
