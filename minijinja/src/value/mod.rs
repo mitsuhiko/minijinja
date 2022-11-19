@@ -760,8 +760,8 @@ impl Value {
     /// }
     /// # Ok(()) }
     /// ```
-    pub fn try_iter(&self) -> Result<Iter<'_>, Error> {
-        self.try_iter_owned().map(|inner| Iter {
+    pub fn try_iter(&self) -> Result<ValueIter<'_>, Error> {
+        self.try_iter_owned().map(|inner| ValueIter {
             _marker: PhantomData,
             inner,
         })
@@ -1024,12 +1024,12 @@ impl Serialize for Value {
 }
 
 /// Iterates over a value.
-pub struct Iter<'a> {
+pub struct ValueIter<'a> {
     _marker: PhantomData<&'a Value>,
     inner: OwnedValueIterator,
 }
 
-impl<'a> Iterator for Iter<'a> {
+impl<'a> Iterator for ValueIter<'a> {
     type Item = Value;
 
     #[inline(always)]

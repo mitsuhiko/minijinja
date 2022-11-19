@@ -13,13 +13,15 @@ All notable changes to MiniJinja are documented here.
 - Introduced `Value::as_seq` and `Value::as_struct`.
 - Introduced `Value::from_seq_object` and `Value::from_struct_object`.
 - Added the ability for function arguments to be of type `&dyn SeqObject`.
+- Renamed `Iter` to `ValueIter`.
 
 ## Breaking Changes
 
-The `Object` model changed signficantly in this release.  It's now possible
-for objects to have different shapes (structs or sequences today).  As a result
-`SeqObject` and `StructObject` were added to the API.  For changing your objects
-over have a look at the new documentation for `Object`.
+- The `Object` model changed signficantly in this release.  It's now possible
+  for objects to have different shapes (structs or sequences today).  As a result
+  `SeqObject` and `StructObject` were added to the API.  For changing your objects
+  over have a look at the new documentation for `Object`.
+- The `Iter` type is now called `ValueIter`.
 
 # 0.26.0
 
