@@ -6,6 +6,8 @@ All notable changes to MiniJinja are documented here.
 
 - Filters, tests and other functions can now be registered with a dynamically
   allocated name. (#146)
+- Added `State::current_call` which exposes the name of the currently called
+  item. (#150)
 
 # 0.26.0
 
