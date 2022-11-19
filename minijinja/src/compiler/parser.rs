@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::compiler::ast::{self, Spanned};
@@ -152,6 +153,7 @@ struct Parser<'a> {
     stream: TokenStream<'a>,
     #[allow(unused)]
     in_macro: bool,
+    blocks: BTreeSet<&'a str>,
     depth: usize,
 }
 
@@ -217,6 +219,7 @@ impl<'a> Parser<'a> {
         Parser {
             stream: TokenStream::new(source, in_expr),
             in_macro: false,
+            blocks: BTreeSet::new(),
             depth: 0,
         }
     }
@@ -829,6 +832,10 @@ impl<'a> Parser<'a> {
             syntax_error!("block tags in macros are not allowed");
         }
         let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier");
+        if !self.blocks.insert(name) {
+            syntax_error!("block '{}' defined twice", name);
+        }
+
         expect_token!(self, Token::BlockEnd(..), "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endblock"))));
         ok!(self.stream.next());
