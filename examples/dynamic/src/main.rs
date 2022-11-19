@@ -2,7 +2,7 @@
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use minijinja::value::{from_args, Object, Value};
+use minijinja::value::{from_args, Object, SeqObject, Value};
 use minijinja::{Environment, Error, State};
 
 #[derive(Debug)]
@@ -57,10 +57,27 @@ impl Object for Magic {
     }
 }
 
+struct SimpleDynamicSeq;
+
+impl SeqObject for SimpleDynamicSeq {
+    fn get_item(&self, idx: usize) -> Option<Value> {
+        if idx < 3 {
+            Some(Value::from(idx * 2))
+        } else {
+            None
+        }
+    }
+
+    fn item_count(&self) -> usize {
+        3
+    }
+}
+
 fn main() {
     let mut env = Environment::new();
     env.add_function("cycler", make_cycler);
     env.add_global("magic", Value::from_object(Magic));
+    env.add_global("seq", Value::from_seq_object(SimpleDynamicSeq));
     env.add_template("template.html", include_str!("template.html"))
         .unwrap();
 

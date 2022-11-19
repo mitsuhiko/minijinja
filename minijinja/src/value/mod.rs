@@ -70,12 +70,14 @@
 //! # Dynamic Objects
 //!
 //! Values can also hold "dynamic" objects.  These are objects which implement the
-//! [`Object`] trait.  These can be used to implement dynamic functionality such as
-//! stateful values and more.  Dynamic objects are internally also used to implement
-//! the special `loop` variable or macros.
+//! [`Object`] trait and optionally [`SeqObject`] or [`StructObject`]  These can
+//! be used to implement dynamic functionality such as stateful values and more.
+//! Dynamic objects are internally also used to implement the special `loop`
+//! variable or macros.
 //!
-//! To create a dynamic `Value` object, use [`Value::from_object()`] or the
-//! `From<Arc<T: Object>>` implementations for `Value`:
+//! To create a dynamic `Value` object, use [`Value::from_object`],
+//! [`Value::from_seq_object`], [`Value::from_struct_object`] or the `From<Arc<T:
+//! Object>>` implementations for `Value`:
 //!
 //! ```rust
 //! # use std::sync::Arc;
@@ -116,6 +118,7 @@ use crate::error::{Error, ErrorKind};
 use crate::functions;
 use crate::key::{Key, StaticKey};
 use crate::utils::OnDrop;
+use crate::value::object::{SimpleSeqObject, SimpleStructObject};
 use crate::value::serialize::ValueSerializer;
 use crate::vm::State;
 
@@ -490,6 +493,28 @@ impl Value {
         Value::from(Arc::new(value) as Arc<dyn Object>)
     }
 
+    /// Creates a value from an owned [`SeqObject`].
+    ///
+    /// This is a simplified API for creating dynamic sequences
+    /// without having to implement the entire [`Object`] protocol.
+    ///
+    /// **Note:** objects created this way cannot be downcasted via
+    /// [`downcast_object_ref`](Self::downcast_object_ref).
+    pub fn from_seq_object<T: SeqObject + 'static>(value: T) -> Value {
+        Value::from_object(SimpleSeqObject(value))
+    }
+
+    /// Creates a value from an owned [`StructObject`].
+    ///
+    /// This is a simplified API for creating dynamic structs
+    /// without having to implement the entire [`Object`] protocol.
+    ///
+    /// **Note:** objects created this way cannot be downcasted via
+    /// [`downcast_object_ref`](Self::downcast_object_ref).
+    pub fn from_struct_object<T: StructObject + 'static>(value: T) -> Value {
+        Value::from_object(SimpleStructObject(value))
+    }
+
     /// Creates a callable value from a function.
     ///
     /// ```
@@ -526,7 +551,7 @@ impl Value {
             ValueRepr::Map(..) => ValueKind::Map,
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
                 // XXX: basic objects should probably not report as map
-                ObjectKind::Basic => ValueKind::Map,
+                ObjectKind::Plain => ValueKind::Map,
                 ObjectKind::Seq(_) => ValueKind::Seq,
                 ObjectKind::Struct(_) => ValueKind::Map,
             },
@@ -554,7 +579,7 @@ impl Value {
             ValueRepr::Seq(ref x) => !x.is_empty(),
             ValueRepr::Map(ref x, _) => !x.is_empty(),
             ValueRepr::Dynamic(ref x) => match x.kind() {
-                ObjectKind::Basic => true,
+                ObjectKind::Plain => true,
                 ObjectKind::Seq(s) => s.item_count() != 0,
                 ObjectKind::Struct(s) => s.field_count() != 0,
             },
@@ -651,7 +676,7 @@ impl Value {
             ValueRepr::Map(ref items, _) => Some(items.len()),
             ValueRepr::Seq(ref items) => Some(items.len()),
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Basic => None,
+                ObjectKind::Plain => None,
                 ObjectKind::Seq(s) => Some(s.item_count()),
                 ObjectKind::Struct(s) => Some(s.field_count()),
             },
@@ -682,7 +707,7 @@ impl Value {
                 items.get(&lookup_key).cloned()
             }
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Basic | ObjectKind::Seq(_) => None,
+                ObjectKind::Plain | ObjectKind::Seq(_) => None,
                 ObjectKind::Struct(s) => s.get_field(key),
             },
             ValueRepr::Undefined => {
@@ -807,7 +832,7 @@ impl Value {
             ValueRepr::Map(ref items, _) => return items.get(&key).cloned(),
             ValueRepr::Seq(ref items) => &**items as &dyn SeqObject,
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Basic => return None,
+                ObjectKind::Plain => return None,
                 ObjectKind::Seq(s) => s,
                 ObjectKind::Struct(s) => match key {
                     Key::String(ref key) => return s.get_field(key),
@@ -900,7 +925,7 @@ impl Value {
                     .filter_map(|(k, v)| k.as_str().map(move |k| (k, v.clone()))),
             ) as Box<dyn Iterator<Item = _>>,
             ValueRepr::Dynamic(ref obj) => match obj.kind() {
-                ObjectKind::Basic | ObjectKind::Seq(_) => {
+                ObjectKind::Plain | ObjectKind::Seq(_) => {
                     Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>
                 }
                 ObjectKind::Struct(s) => Box::new(
@@ -931,7 +956,7 @@ impl Value {
             ),
             ValueRepr::Dynamic(ref obj) => {
                 match obj.kind() {
-                    ObjectKind::Basic => (ValueIteratorState::Empty, 0),
+                    ObjectKind::Plain => (ValueIteratorState::Empty, 0),
                     ObjectKind::Seq(s) => (
                         ValueIteratorState::DynSeq(0, Arc::clone(obj)),
                         s.item_count(),
@@ -994,7 +1019,7 @@ impl Serialize for Value {
                 map.end()
             }
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Basic => serializer.serialize_str(&dy.to_string()),
+                ObjectKind::Plain => serializer.serialize_str(&dy.to_string()),
                 ObjectKind::Seq(s) => {
                     use serde::ser::SerializeSeq;
                     let mut seq = ok!(serializer.serialize_seq(Some(s.item_count())));
