@@ -6,7 +6,7 @@ engine for custom behavior.
 ```jinja
 {%- with next_class = cycler(["odd", "even"]) %}
   <ul class="{{ magic.make_class("ul") }}">
-  {%- for char in ["a", "b", "c", "d"] %}
+  {%- for char in seq %}
     <li class={{ next_class() }}>{{ char }}</li>
   {%- endfor %}
   </ul>
