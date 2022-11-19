@@ -642,25 +642,6 @@ impl Value {
         None
     }
 
-    /// If the value is a sequence it's returned as slice.
-    pub(crate) fn as_slice(&self) -> Result<&[Value], Error> {
-        match self.0 {
-            ValueRepr::Undefined | ValueRepr::None => return Ok(&[][..]),
-            ValueRepr::Seq(ref v) => return Ok(&v[..]),
-            ValueRepr::Dynamic(ref dy) if matches!(dy.kind(), ObjectKind::Seq(_)) => {
-                return Err(Error::new(
-                    ErrorKind::InvalidOperation,
-                    "dynamic sequence value cannot be borrowed as slice",
-                ));
-            }
-            _ => {}
-        }
-        Err(Error::new(
-            ErrorKind::InvalidOperation,
-            format!("value of type {} is not a sequence", self.kind()),
-        ))
-    }
-
     /// Returns the length of the contained value.
     ///
     /// Values without a length will return `None`.
@@ -1180,19 +1161,4 @@ fn test_dynamic_object_roundtrip() {
 #[cfg(target_pointer_width = "64")]
 fn test_sizes() {
     assert_eq!(std::mem::size_of::<Value>(), 24);
-}
-
-#[test]
-fn test_value_as_slice() {
-    let val = Value::from(vec![1u32, 2, 3]);
-    assert_eq!(
-        val.as_slice().unwrap(),
-        &[Value::from(1), Value::from(2), Value::from(3)]
-    );
-    assert_eq!(Value::UNDEFINED.as_slice().unwrap(), &[]);
-    assert_eq!(Value::from(()).as_slice().unwrap(), &[]);
-    assert_eq!(
-        Value::from("foo").as_slice().unwrap_err().kind(),
-        ErrorKind::InvalidOperation
-    );
 }

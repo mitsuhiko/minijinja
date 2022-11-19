@@ -869,6 +869,36 @@ mod builtins {
             );
         });
     }
+
+    #[test]
+    fn test_values_in_vec() {
+        fn upper(value: &str) -> String {
+            value.to_uppercase()
+        }
+
+        fn sum(value: Vec<i64>) -> i64 {
+            value.into_iter().sum::<i64>()
+        }
+
+        let upper = BoxedFilter::new(upper);
+        let sum = BoxedFilter::new(sum);
+
+        let env = crate::Environment::new();
+        State::with_dummy(&env, |state| {
+            assert_eq!(
+                upper
+                    .apply_to(state, &[Value::from("Hello World!")])
+                    .unwrap(),
+                Value::from("HELLO WORLD!")
+            );
+
+            assert_eq!(
+                sum.apply_to(state, &[Value::from(vec![Value::from(1), Value::from(2)])])
+                    .unwrap(),
+                Value::from(3)
+            );
+        });
+    }
 }
 
 #[cfg(feature = "builtins")]
