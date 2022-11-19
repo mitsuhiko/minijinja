@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
 use crate::utils::{memchr, memstr, unescape};
@@ -223,17 +221,14 @@ impl<'s> TokenizerState<'s> {
         let s = self.advance(str_len + 2);
         Ok(if has_escapes {
             (
-                Token::Str(Cow::Owned(match unescape(&s[1..s.len() - 1]) {
+                Token::String(match unescape(&s[1..s.len() - 1]) {
                     Ok(unescaped) => unescaped,
                     Err(err) => return Err(err),
-                })),
+                }),
                 self.span(old_loc),
             )
         } else {
-            (
-                Token::Str(Cow::Borrowed(&s[1..s.len() - 1])),
-                self.span(old_loc),
-            )
+            (Token::Str(&s[1..s.len() - 1]), self.span(old_loc))
         })
     }
 }
