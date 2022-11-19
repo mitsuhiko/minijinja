@@ -511,9 +511,13 @@ impl<'env> Vm<'env> {
                     stack.pop();
                 }
                 Instruction::FastSuper => {
+                    // Note that we don't store 'current_call' here since it
+                    // would only be visible (and unused) internally.
                     ctx_ok!(self.perform_super(state, out, false));
                 }
                 Instruction::FastRecurse => {
+                    // Note that we don't store 'current_call' here since it
+                    // would only be visible (and unused) internally.
                     recurse_loop!(false);
                 }
                 // Explanation on the behavior of `LoadBlocks` and `RenderParent`.
