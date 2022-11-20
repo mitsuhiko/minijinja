@@ -236,7 +236,7 @@ impl<T: SeqObject> SeqObject for std::sync::Arc<T> {
     }
 }
 
-impl<'a> SeqObject for &'a [Value] {
+impl<'a, T: Into<Value> + Send + Sync + Clone> SeqObject for &'a [T] {
     #[inline(always)]
     fn get_item(&self, idx: usize) -> Option<Value> {
         self.get(idx).cloned().map(Into::into)
