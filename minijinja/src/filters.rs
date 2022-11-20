@@ -249,7 +249,6 @@ pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
 mod builtins {
     use super::*;
 
-    use crate::Environment;
     use crate::error::ErrorKind;
     use crate::value::{ValueKind, ValueRepr};
     use std::borrow::Cow;
@@ -755,7 +754,6 @@ mod builtins {
 
     /// indents Value with spaces
     ///
-    /// This filter is only available if the `indent` feature is enabled.
     /// The first optional parameter to the filter can be set to `true` to
     /// indent the first line. The parameter defaults to false.
     /// the second optional parameter to the filter can be set to `true`
@@ -767,7 +765,7 @@ mod builtins {
     ///   config:
     /// {{ global_conifg|indent(2) }} #does not indent first line
     /// {{ global_config|indent(2,true) }} #indent whole Value with two spaces
-    /// {{ global_config|indent(2,true,true)}} #indents whole multiline value
+    /// {{ global_config|indent(2,true,true)}} #indent whole Value and all Blank Lines value
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
     pub fn indent(
