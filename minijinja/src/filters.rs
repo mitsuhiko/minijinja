@@ -249,6 +249,7 @@ pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
 mod builtins {
     use super::*;
 
+    use crate::Environment;
     use crate::error::ErrorKind;
     use crate::value::{ValueKind, ValueRepr};
     use std::borrow::Cow;
@@ -768,66 +769,78 @@ mod builtins {
     /// {{ global_config|indent(2,true) }} #indent whole Value with two spaces
     /// {{ global_config|indent(2,true,true)}} #indents whole multiline value
     /// ```
-    #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "indent"))))]
-    #[cfg(feature = "indent")]
+    #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
     pub fn indent(
         value: String,
         width: usize,
         indent_first_line: Option<bool>,
         indent_blank_lines: Option<bool>,
     ) -> String {
+
+        fn strip_trailing_newline(input: String) -> String {
+            String::from(input
+                .strip_suffix("\r\n")
+                .or_else(||input.strip_suffix('\n'))
+                .unwrap_or(input.as_str()))
+        }
+
         let mut output: String = String::new();
-        for (i, line) in value.split('\n').enumerate() {
-            if line == "" {
+        let mut iterator = value.split('\n').peekable();
+        if !indent_first_line.unwrap_or(false) {
+            output.push_str(iterator.next().unwrap());
+            output.push('\n');
+        }
+        while let Some(line) = &iterator.next() {
+            if iterator.peek().is_none() {
+                break // because split creates a empty String after the last new line
+            }
+            if line.is_empty() {
                 if indent_blank_lines.unwrap_or(false) {
                     output.push_str(String::from(" ").repeat(width).as_str());
                 }
-                output.push_str("\n");
-                continue;
+            } else {
+                output.push_str(format!("{}{}", String::from(" ").repeat(width), line).as_str());
             }
-            if i == 0 && indent_first_line.unwrap_or(false) == false {
-                output.push_str(format!("{}\n", line).as_str());
-                continue;
-            }
-            output.push_str(format!("{}{}\n", String::from(" ").repeat(width), line).as_str());
+            output.push('\n');
         }
+        output = strip_trailing_newline(output); // strip last newline
         output
     }
 
     #[test]
-    #[cfg(feature = "indent")]
+    #[cfg(feature = "builtins")]
     fn test_indent() {
         let teststring = String::from("test\ntest1\n\ntest2\n");
         assert_eq!(
-            indent(teststring, 2),
-            String::from("test\n  test1\n\n  test2\n")
+            indent(teststring, 2, None, None),
+            String::from("test\n  test1\n\n  test2")
         );
     }
     #[test]
-    #[cfg(feature = "indent")]
+    #[cfg(feature = "builtins")]
     fn test_indent_with_indented_first_line() {
-        let teststring = String::from("test\ntest1\ntest2\n");
+        let teststring = String::from("test\ntest1\n\ntest2\n");
         assert_eq!(
-            indent(teststring, 2, true),
-            String::from("  test\n  test1\n  test2\n")
+            indent(teststring, 2, Some(true), None),
+            String::from("  test\n  test1\n\n  test2")
         );
     }
     #[test]
-    #[cfg(feature = "indent")]
+    #[cfg(feature = "builtins")]
     fn test_indent_with_indented_blank_line() {
-        let teststring = String::from("test\ntest1\ntest2\n");
+        let teststring = String::from("test\ntest1\n\ntest2\n");
         assert_eq!(
-            indent(teststring, 2, true),
-            String::from("test\n  test1\n  \n  test2\n")
+            indent(teststring, 2, None, Some(true)),
+            String::from("test\n  test1\n  \n  test2")
         );
     }
     #[test]
-    #[cfg(feature = "indent")]
+    #[cfg(feature = "builtins")]
     fn test_indent_with_all_indented() {
-        let teststring = String::from("test\ntest1\ntest2\n");
+        let teststring = String::from("test\ntest1\n\ntest2\n");
         assert_eq!(
-            indent(teststring, 2, true),
-            String::from("  test\n  test1\n  \n  test2\n")
+            indent(teststring, 2, Some(true), Some(true)),
+            String::from("  test\n  test1\n  \n  test2")
         );
     }
 
