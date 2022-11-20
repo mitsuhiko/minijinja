@@ -343,7 +343,7 @@ impl PartialOrd for Value {
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a.partial_cmp(&b),
                 Some(ops::CoerceResult::I128(a, b)) => a.partial_cmp(&b),
-                Some(ops::CoerceResult::Str(a, b)) => a.partial_cmp(&b),
+                Some(ops::CoerceResult::Str(a, b)) => a.partial_cmp(b),
                 None => None,
             },
         }
@@ -577,7 +577,7 @@ impl Value {
             ValueRepr::F64(x) => x != 0.0,
             ValueRepr::Char(x) => x != '\x00',
             ValueRepr::String(ref x, _) => !x.is_empty(),
-            ValueRepr::StaticStr(ref x, _) => !x.is_empty(),
+            ValueRepr::StaticStr(x, _) => !x.is_empty(),
             ValueRepr::Bytes(ref x) => !x.is_empty(),
             ValueRepr::None | ValueRepr::Undefined => false,
             ValueRepr::Seq(ref x) => !x.is_empty(),
