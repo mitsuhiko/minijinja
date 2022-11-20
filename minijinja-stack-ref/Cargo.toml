@@ -1,0 +1,9 @@
+[package]
+name = "minijinja-stack-ref"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+minijinja = { version = "0.26.0", path = "../minijinja", default-features = false }
