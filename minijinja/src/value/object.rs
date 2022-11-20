@@ -386,7 +386,7 @@ pub trait StructObject: Send + Sync {
     /// [`State`] nor is there a channel to send out failures as only an option
     /// can be returned.  If you do plan on doing something in field access
     /// that is fallible, instead use a method call.
-    fn get_field(&self, idx: &str) -> Option<Value>;
+    fn get_field(&self, name: &str) -> Option<Value>;
 
     /// Iterates over the fields.
     ///
@@ -405,8 +405,8 @@ pub trait StructObject: Send + Sync {
 
 impl<T: StructObject> StructObject for std::sync::Arc<T> {
     #[inline]
-    fn get_field(&self, idx: &str) -> Option<Value> {
-        T::get_field(self, idx)
+    fn get_field(&self, name: &str) -> Option<Value> {
+        T::get_field(self, name)
     }
 
     #[inline]
