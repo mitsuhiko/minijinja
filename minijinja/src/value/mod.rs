@@ -821,7 +821,8 @@ impl Value {
                 ObjectKind::Seq(s) => s,
                 ObjectKind::Struct(s) => match key {
                     Key::String(ref key) => return s.get_field(key),
-                    Key::Str(key) | Key::StaticStr(key) => return s.get_field(key),
+                    Key::Str(key) => return s.get_field(key),
+                    Key::StaticStr(key) => return s.get_field(key),
                     _ => return None,
                 },
             },

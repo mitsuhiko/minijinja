@@ -15,7 +15,8 @@ impl<'a> Serialize for Key<'a> {
             Key::I64(i) => serializer.serialize_i64(i),
             Key::Char(c) => serializer.serialize_char(c),
             Key::String(ref s) => serializer.serialize_str(s),
-            Key::Str(s) | Key::StaticStr(s) => serializer.serialize_str(s),
+            Key::Str(s) => serializer.serialize_str(s),
+            Key::StaticStr(s) => serializer.serialize_str(s),
         }
     }
 }

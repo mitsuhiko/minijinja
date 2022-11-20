@@ -74,7 +74,8 @@ impl<'a> Key<'a> {
             Key::I64(x) => InternalKeyRef::I64(x),
             Key::Char(x) => InternalKeyRef::Char(x),
             Key::String(ref x) => InternalKeyRef::Str(x.as_str()),
-            Key::Str(x) | Key::StaticStr(x) => InternalKeyRef::Str(x),
+            Key::Str(x) => InternalKeyRef::Str(x),
+            Key::StaticStr(x) => InternalKeyRef::Str(x),
         }
     }
 
@@ -148,7 +149,8 @@ impl<'a> fmt::Display for Key<'a> {
             Key::I64(val) => write!(f, "{}", val),
             Key::Char(val) => write!(f, "{}", val),
             Key::String(val) => write!(f, "{}", val),
-            Key::Str(val) | Key::StaticStr(val) => write!(f, "{}", val),
+            Key::Str(val) => write!(f, "{}", val),
+            Key::StaticStr(val) => write!(f, "{}", val),
         }
     }
 }
