@@ -76,14 +76,17 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
 }
 
 impl<T: Object> Object for std::sync::Arc<T> {
+    #[inline]
     fn kind(&self) -> ObjectKind<'_> {
         T::kind(self)
     }
 
+    #[inline]
     fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         T::call_method(self, state, name, args)
     }
 
+    #[inline]
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         T::call(self, state, args)
     }
@@ -218,6 +221,18 @@ impl dyn SeqObject + '_ {
             seq: self,
             range: 0..self.item_count(),
         }
+    }
+}
+
+impl<T: SeqObject> SeqObject for std::sync::Arc<T> {
+    #[inline]
+    fn get_item(&self, idx: usize) -> Option<Value> {
+        T::get_item(self, idx)
+    }
+
+    #[inline]
+    fn item_count(&self) -> usize {
+        T::item_count(self)
     }
 }
 
@@ -385,6 +400,23 @@ pub trait StructObject: Send + Sync {
     /// The default implementation returns the number of fields.
     fn field_count(&self) -> usize {
         self.fields().count()
+    }
+}
+
+impl<T: StructObject> StructObject for std::sync::Arc<T> {
+    #[inline]
+    fn get_field(&self, idx: &str) -> Option<Value> {
+        T::get_field(self, idx)
+    }
+
+    #[inline]
+    fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        T::fields(self)
+    }
+
+    #[inline]
+    fn field_count(&self) -> usize {
+        T::field_count(self)
     }
 }
 
