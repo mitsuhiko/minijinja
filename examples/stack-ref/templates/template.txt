@@ -1,2 +1,0 @@
-Hello World from iteration {{ iteration }}!
-{% include "include.txt" ignore missing %}
