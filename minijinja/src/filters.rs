@@ -752,40 +752,82 @@ mod builtins {
         })
     }
 
-    /// indents Value with spaces or tabs
+    /// indents Value with spaces
     ///
-    /// This filter is only available if the `indent` feature is enabled. 
-    /// The optional parameter to the filter can be set to `true` to enable 
-    /// indenting with \t (tabs). 
+    /// This filter is only available if the `indent` feature is enabled.
+    /// The first optional parameter to the filter can be set to `true` to
+    /// indent the first line
+    /// the second optional parameter to the filter can be set to `true`
+    /// to indent blank lines
     /// This filter is useful, if you want to template yaml-files
     ///
     /// ```jinja
     /// example:
     ///   config:
-    /// {{ global_config|indent(2,true) }}; #indent with 2 Tabs
-    /// {{ glabal_config|indent(4) }} #indent with 4 
+    /// {{ global_config|indent(2,true) }} #indent whole Value with two spaces
+    /// {{ global_conifg|indent(2,false) }} #indent
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "indent"))))]
     #[cfg(feature = "indent")]
-    pub fn indent(value: String, spaces: usize, tabs: Option<bool>) -> String {
+    pub fn indent(
+        value: String,
+        width: usize,
+        indent_first_line: Option<bool>,
+        indent_blank_lines: Option<bool>,
+    ) -> String {
         let mut output: String = String::new();
-        if tabs.unwrap_or(false) {
-            for line in value.split('\n') {
-                output.push_str(format!("{}{}\n", String::from("\t").repeat(spaces), line).as_str());
+        for (i, line) in value.split('\n').enumerate() {
+            if line == "" {
+                if indent_blank_lines.unwrap_or(false) {
+                    output.push_str(String::from(" ").repeat(width).as_str());
+                }
+                output.push_str("\n");
+                continue;
             }
-        } else {
-            for line in value.split('\n') {
-                output.push_str(format!("{}{}\n", String::from(" ").repeat(spaces), line).as_str());
+            if i == 0 && indent_first_line.unwrap_or(false) == false {
+                output.push_str(format!("{}\n", line).as_str());
+                continue;
             }
+            output.push_str(format!("{}{}\n", String::from(" ").repeat(width), line).as_str());
         }
         output
     }
 
     #[test]
-    #[cfg(feature="indent")]
-    fn test_indent_with_spaces() {
+    #[cfg(feature = "indent")]
+    fn test_indent() {
+        let teststring = String::from("test\ntest1\n\ntest2\n");
+        assert_eq!(
+            indent(teststring, 2),
+            String::from("test\n  test1\n\n  test2\n")
+        );
+    }
+    #[test]
+    #[cfg(feature = "indent")]
+    fn test_indent_with_indented_first_line() {
         let teststring = String::from("test\ntest1\ntest2\n");
-        assert_eq!(indent(teststring, 2), String::from("  test\n  test1\n  test2\n"));
+        assert_eq!(
+            indent(teststring, 2, true),
+            String::from("  test\n  test1\n  test2\n")
+        );
+    }
+    #[test]
+    #[cfg(feature = "indent")]
+    fn test_indent_with_indented_blank_line() {
+        let teststring = String::from("test\ntest1\ntest2\n");
+        assert_eq!(
+            indent(teststring, 2, true),
+            String::from("test\n  test1\n  \n  test2\n")
+        );
+    }
+    #[test]
+    #[cfg(feature = "indent")]
+    fn test_indent_with_all_indented() {
+        let teststring = String::from("test\ntest1\ntest2\n");
+        assert_eq!(
+            indent(teststring, 2, true),
+            String::from("  test\n  test1\n  \n  test2\n")
+        );
     }
 
     /// URL encodes a value.
