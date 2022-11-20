@@ -320,7 +320,6 @@ impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => true,
-            (ValueRepr::String(a, _), ValueRepr::String(b, _)) => a == b,
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
@@ -338,7 +337,6 @@ impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => Some(Ordering::Equal),
-            (ValueRepr::String(a, _), ValueRepr::String(b, _)) => a.partial_cmp(b),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.partial_cmp(b),
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a.partial_cmp(&b),
@@ -592,7 +590,10 @@ impl Value {
 
     /// Returns `true` if this value is safe.
     pub fn is_safe(&self) -> bool {
-        matches!(&self.0, ValueRepr::String(_, StringType::Safe))
+        matches!(
+            &self.0,
+            ValueRepr::String(_, StringType::Safe) | ValueRepr::StaticStr(_, StringType::Safe)
+        )
     }
 
     /// Returns `true` if this value is undefined.
@@ -862,6 +863,7 @@ impl Value {
     pub(crate) fn to_cowstr(&self) -> Cow<'_, str> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Cow::Borrowed(s.as_str()),
+            ValueRepr::StaticStr(s, _) => Cow::Borrowed(s),
             _ => Cow::Owned(self.to_string()),
         }
     }
