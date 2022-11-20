@@ -609,6 +609,7 @@ impl Value {
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Some(s.as_str()),
+            ValueRepr::StaticStr(s, _) => Some(s),
             _ => None,
         }
     }
@@ -617,6 +618,7 @@ impl Value {
     pub fn as_bytes(&self) -> Option<&[u8]> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Some(s.as_bytes()),
+            ValueRepr::StaticStr(s, _) => Some(s.as_bytes()),
             ValueRepr::Bytes(ref b) => Some(&b[..]),
             _ => None,
         }
@@ -658,6 +660,7 @@ impl Value {
     pub fn len(&self) -> Option<usize> {
         match self.0 {
             ValueRepr::String(ref s, _) => Some(s.chars().count()),
+            ValueRepr::StaticStr(s, _) => Some(s.chars().count()),
             ValueRepr::Map(ref items, _) => Some(items.len()),
             ValueRepr::Seq(ref items) => Some(items.len()),
             ValueRepr::Dynamic(ref dy) => match dy.kind() {

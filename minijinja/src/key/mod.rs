@@ -64,6 +64,7 @@ impl<'a> Key<'a> {
         match *self {
             Key::String(ref x) => Some(x.as_str()),
             Key::Str(x) => Some(x),
+            Key::StaticStr(x) => Some(x),
             _ => None,
         }
     }
