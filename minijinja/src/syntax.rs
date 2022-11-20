@@ -71,7 +71,7 @@
 //!
 //! ## Literals
 //!
-//! The simplest form of expressions are literals. Literals are representations for Python
+//! The simplest form of expressions are literals. Literals are representations for
 //! objects such as strings and numbers. The following literals exist:
 //!
 //! - `"Hello World"`: Everything between two double or single quotes is a string. They are
@@ -80,8 +80,8 @@
 //! - `42`: Integers are whole numbers without a decimal part.
 //! - `42.0`: Floating point numbers can be written using a `.` as a decimal mark.
 //! - `['list', 'of', 'objects']`: Everything between two brackets is a list. Lists are useful
-//!   for compatibility with Jinja2 `('list', 'of', 'objects')` is also allowed.
 //!   for storing sequential data to be iterated over.
+//!   for compatibility with Jinja2 `('list', 'of', 'objects')` is also allowed.
 //! - `{'map': 'of', 'key': 'and', 'value': 'pairs'}`: A map is a structure that combines keys
 //!   and values. Keys must be unique and always have exactly one value. Maps are rarely
 //!   created in templates.
@@ -110,8 +110,8 @@
 //! - ``!=``: Compares two objects for inequality.
 //! - ``>``: ``true`` if the left hand side is greater than the right hand side.
 //! - ``>=``: ``true`` if the left hand side is greater or equal to the right hand side.
-//! - ``<``:``true`` if the left hand side is lower than the right hand side.
-//! - ``<=``: ``true`` if the left hand side is lower or equal to the right hand side.
+//! - ``<``:``true`` if the left hand side is less than the right hand side.
+//! - ``<=``: ``true`` if the left hand side is less or equal to the right hand side.
 //!
 //! ## Logic
 //!
@@ -379,7 +379,7 @@
 //!
 //! However, the name after the `endblock` word must match the block name.
 //!
-//! ## `{% include #}`
+//! ## `{% include %}`
 //!
 //! **Feature:** `multi-template` (included by default)
 //!  
@@ -411,7 +411,7 @@
 //!  
 //! Included templates have access to the variables of the active context.
 //!
-//! ## `{% import #}`
+//! ## `{% import %}`
 //!
 //! **Feature:** `multi-template` (included by default)
 //!
@@ -509,8 +509,8 @@
 //! **Feature:** `macros` (included by default)
 //!
 //! MiniJinja has limited support for macros.  They allow you to write reusable
-//! template functions.  hey are useful to put often used idioms into reusable
-//! functions to not repeat yourself (“DRY”).
+//! template functions.  They are useful to put often used idioms into reusable
+//! functions so you don't repeat yourself (“DRY”).
 //!
 //! Here’s a small example of a macro that renders a form element:
 //!
@@ -530,7 +530,7 @@
 //! The behavior of macros with regards to undefined variables is that they capture
 //! them at macro declaration time (eg: they use a closure).
 //!
-//! Macros can be imported via `{% include %}` or `{% from ... import %}`.
+//! Macros can be imported via `{% import %}` or `{% from ... import %}`.
 //!
 //! ## `{% autoescape %}`
 //!
