@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -17,7 +18,7 @@ impl fmt::Debug for Loop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("Loop");
         for attr in self.fields() {
-            s.field(attr, &self.get_field(attr).unwrap());
+            s.field(&attr, &self.get_field(&attr).unwrap());
         }
         s.finish()
     }
@@ -62,18 +63,18 @@ impl Object for Loop {
 }
 
 impl StructObject for Loop {
-    fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+    fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
         Box::new(
             [
-                "index0",
-                "index",
-                "length",
-                "revindex",
-                "revindex0",
-                "first",
-                "last",
-                "depth",
-                "depth0",
+                Cow::Borrowed("index0"),
+                Cow::Borrowed("index"),
+                Cow::Borrowed("length"),
+                Cow::Borrowed("revindex"),
+                Cow::Borrowed("revindex0"),
+                Cow::Borrowed("first"),
+                Cow::Borrowed("last"),
+                Cow::Borrowed("depth"),
+                Cow::Borrowed("depth0"),
             ]
             .into_iter(),
         )

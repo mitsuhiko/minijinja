@@ -38,7 +38,7 @@ pub mod __context {
 
     #[inline(always)]
     pub fn add(ctx: &mut ValueMap, key: &'static str, value: Value) {
-        ctx.insert(Key::Str(key), value);
+        ctx.insert(Key::StaticStr(key), value);
     }
 
     #[inline(always)]

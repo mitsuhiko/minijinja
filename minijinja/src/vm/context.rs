@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
@@ -117,28 +118,28 @@ impl<'env> fmt::Debug for Context<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fn dump<'a>(
             m: &mut std::fmt::DebugMap,
-            seen: &mut HashSet<&'a str>,
+            seen: &mut HashSet<Cow<'a, str>>,
             ctx: &'a Context<'a>,
         ) -> fmt::Result {
             for frame in ctx.stack.iter().rev() {
                 for (key, value) in frame.locals.iter() {
-                    if !seen.contains(key) {
-                        seen.insert(*key);
+                    if !seen.contains(&**key) {
+                        seen.insert(Cow::Borrowed(key));
                         m.entry(key, value);
                     }
                 }
 
                 if let Some(ref l) = frame.current_loop {
-                    if l.with_loop_var && !seen.contains(&"loop") {
-                        seen.insert("loop");
+                    if l.with_loop_var && !seen.contains("loop") {
+                        seen.insert(Cow::Borrowed("loop"));
                         m.entry(&"loop", &l.object);
                     }
                 }
 
                 for (key, value) in frame.ctx.iter_as_str_map() {
-                    if !seen.contains(key) {
-                        seen.insert(key);
+                    if !seen.contains(&*key) {
                         m.entry(&key, &value);
+                        seen.insert(key);
                     }
                 }
             }

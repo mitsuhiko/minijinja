@@ -112,7 +112,7 @@ impl Serializer for ValueSerializer {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<Value, Error> {
-        Ok(ValueRepr::String(Arc::new(variant.to_string()), StringType::Normal).into())
+        Ok(ValueRepr::StaticStr(variant, StringType::Normal).into())
     }
 
     fn serialize_newtype_struct<T: ?Sized>(
@@ -137,7 +137,7 @@ impl Serializer for ValueSerializer {
         T: Serialize,
     {
         let mut map = ValueMap::new();
-        map.insert(Key::from(variant), ok!(value.serialize(self)));
+        map.insert(Key::from_static_str(variant), ok!(value.serialize(self)));
         Ok(ValueRepr::Map(Arc::new(map), MapType::Normal).into())
     }
 
@@ -295,7 +295,7 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
     fn end(self) -> Result<Value, Error> {
         let mut map = ValueMap::new();
         map.insert(
-            Key::from(self.name),
+            Key::from_static_str(self.name),
             Value(ValueRepr::Seq(self.fields.into())),
         );
         Ok(Value(ValueRepr::Map(map.into(), MapType::Normal)))
@@ -366,14 +366,14 @@ impl ser::SerializeStruct for SerializeStruct {
         T: Serialize,
     {
         let value = ok!(value.serialize(ValueSerializer));
-        self.fields.insert(Key::Str(key), value);
+        self.fields.insert(Key::StaticStr(key), value);
         Ok(())
     }
 
     fn end(self) -> Result<Value, Error> {
         match self.name {
             VALUE_HANDLE_MARKER => {
-                let handle_id = match self.fields.get(&Key::Str("handle")) {
+                let handle_id = match self.fields.get(&Key::StaticStr("handle")) {
                     Some(&Value(ValueRepr::U64(handle_id))) => handle_id as usize,
                     _ => panic!("bad handle reference in value roundtrip"),
                 };
@@ -403,7 +403,7 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
         T: Serialize,
     {
         let value = ok!(value.serialize(ValueSerializer));
-        self.map.insert(Key::from(key), value);
+        self.map.insert(Key::from_static_str(key), value);
         Ok(())
     }
 

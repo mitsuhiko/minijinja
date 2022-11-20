@@ -43,11 +43,12 @@
 //!     }).unwrap());
 //! });
 //! ```
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt;
 use std::marker::PhantomData;
-use std::ops::Deref;
+use std::mem::transmute;
 use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -62,9 +63,10 @@ thread_local! {
 
 /// A handle to an enclosed value.
 ///
-/// For as long as the [`StackScope`] is still valid this derefs
-/// automatically into the enclosed value.  Doing so after the
-/// scope is gone, this will panic on all operations.
+/// For as long as the [`StackScope`] is still valid access to the
+/// reference can be temporarily fetched via the [`with`](Self::with)
+/// method.  Doing so after the scope is gone, this will panic on all
+/// operations.
 ///
 /// To check if a handle is still valid [`is_valid`](Self::is_valid)
 /// can be used.
@@ -82,64 +84,125 @@ impl<T> StackHandle<T> {
     pub fn is_valid(handle: &StackHandle<T>) -> bool {
         STACK_SCOPE_IS_VALID.with(|valid_ids| valid_ids.borrow().contains(&handle.id))
     }
-}
 
-impl<T> Deref for StackHandle<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
+    /// Invokes a function with the resolved reference.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the handle is not valid.
+    pub fn with<F: FnOnce(&T) -> R, R>(&self, f: F) -> R {
         assert!(StackHandle::is_valid(self), "stack is gone");
-        unsafe { &*self.ptr as &T }
+        f(unsafe { &*self.ptr as &T })
     }
 }
 
 impl<T: SeqObject + Send + Sync + 'static> SeqObject for StackHandle<T> {
     fn get_item(&self, idx: usize) -> Option<Value> {
-        <T as SeqObject>::get_item(self, idx)
+        self.with(|val| val.get_item(idx))
     }
 
     fn item_count(&self) -> usize {
-        <T as SeqObject>::item_count(self)
+        self.with(|val| val.item_count())
     }
 }
 
 impl<T: StructObject + Send + Sync + 'static> StructObject for StackHandle<T> {
     fn get_field(&self, idx: &str) -> Option<Value> {
-        <T as StructObject>::get_field(self, idx)
+        self.with(|val| val.get_field(idx))
     }
 
-    fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        <T as StructObject>::fields(self)
+    fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
+        self.with(|val| {
+            // TODO: can the collection into the vector be avoided?
+            Box::new(val.fields().collect::<Vec<_>>().into_iter())
+        })
     }
 
     fn field_count(&self) -> usize {
-        <T as StructObject>::field_count(self)
+        self.with(|val| val.field_count())
     }
 }
 
 impl<T: Object> fmt::Debug for StackHandle<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Debug::fmt(self as &T, f)
+        self.with(|val| fmt::Debug::fmt(val, f))
     }
 }
 
 impl<T: Object> fmt::Display for StackHandle<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self as &T, f)
+        self.with(|val| fmt::Display::fmt(val, f))
     }
 }
 
 impl<T: Object> Object for StackHandle<T> {
     fn kind(&self) -> ObjectKind<'_> {
-        <T as Object>::kind(self)
+        self.with(|val| match val.kind() {
+            ObjectKind::Plain => ObjectKind::Plain,
+            ObjectKind::Seq(_) => {
+                ObjectKind::Seq(unsafe { transmute::<_, &StackHandleProxy<T>>(self) })
+            }
+            ObjectKind::Struct(_) => {
+                ObjectKind::Struct(unsafe { transmute::<_, &StackHandleProxy<T>>(self) })
+            }
+            _ => unimplemented!(),
+        })
     }
 
     fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
-        <T as Object>::call_method(self, state, name, args)
+        self.with(|val| val.call_method(state, name, args))
     }
 
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
-        <T as Object>::call(self, state, args)
+        self.with(|val| val.call(state, args))
+    }
+}
+
+#[repr(transparent)]
+struct StackHandleProxy<T: Object>(StackHandle<T>);
+
+macro_rules! unwrap_kind {
+    ($val:expr, $pat:path) => {
+        if let $pat(rv) = $val.kind() {
+            rv
+        } else {
+            unreachable!("object changed shape")
+        }
+    };
+}
+
+impl<T: Object> SeqObject for StackHandleProxy<T> {
+    fn get_item(&self, idx: usize) -> Option<Value> {
+        self.0
+            .with(|val| unwrap_kind!(val, ObjectKind::Seq).get_item(idx))
+    }
+
+    fn item_count(&self) -> usize {
+        self.0
+            .with(|val| unwrap_kind!(val, ObjectKind::Seq).item_count())
+    }
+}
+
+impl<T: Object> StructObject for StackHandleProxy<T> {
+    fn get_field(&self, name: &str) -> Option<Value> {
+        self.0
+            .with(|val| unwrap_kind!(val, ObjectKind::Struct).get_field(name))
+    }
+
+    fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
+        self.0.with(|val| {
+            Box::new(
+                unwrap_kind!(val, ObjectKind::Struct)
+                    .fields()
+                    .collect::<Vec<_>>()
+                    .into_iter(),
+            )
+        })
+    }
+
+    fn field_count(&self) -> usize {
+        self.0
+            .with(|val| unwrap_kind!(val, ObjectKind::Struct).field_count())
     }
 }
 
@@ -191,7 +254,7 @@ fn test_stack_handle() {
     let value = vec![1, 2, 3];
     let leaked_handle = scope(|scope| {
         let value_handle: StackHandle<Vec<i32>> = scope.handle(&value);
-        assert_eq!(value_handle.len(), 3);
+        assert_eq!(value_handle.with(|x| x.len()), 3);
         value_handle
     });
 
@@ -205,9 +268,9 @@ fn test_stack_handle_panic() {
     let value = vec![1, 2, 3];
     let leaked_handle = scope(|scope| {
         let value_handle = scope.handle(&value);
-        assert_eq!(value_handle.len(), 3);
+        assert_eq!(value_handle.with(|x| x.len()), 3);
         value_handle
     });
 
-    assert_eq!(leaked_handle.len(), 3);
+    assert_eq!(leaked_handle.with(|x| x.len()), 3);
 }

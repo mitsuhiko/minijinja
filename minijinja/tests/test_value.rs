@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
 
@@ -102,8 +103,8 @@ fn test_map_object_iteration_and_indexing() {
             }
         }
 
-        fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-            Box::new(["x", "y", "z"].into_iter())
+        fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
+            Box::new([Cow::Borrowed("x"), Cow::Borrowed("y"), Cow::Borrowed("z")].into_iter())
         }
     }
 

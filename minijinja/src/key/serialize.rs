@@ -15,7 +15,7 @@ impl<'a> Serialize for Key<'a> {
             Key::I64(i) => serializer.serialize_i64(i),
             Key::Char(c) => serializer.serialize_char(c),
             Key::String(ref s) => serializer.serialize_str(s),
-            Key::Str(s) => serializer.serialize_str(s),
+            Key::Str(s) | Key::StaticStr(s) => serializer.serialize_str(s),
         }
     }
 }
@@ -123,7 +123,7 @@ impl Serializer for KeySerializer {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<StaticKey, Error> {
-        Ok(Key::Str(variant))
+        Ok(Key::StaticStr(variant))
     }
 
     fn serialize_newtype_struct<T: ?Sized>(

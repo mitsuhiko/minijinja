@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::borrow::Cow;
 use std::fmt;
 use std::ops::Range;
 
@@ -307,6 +308,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// for stringification and debug printing.
 ///
 /// ```
+/// use std::borrow::Cow;
 /// use minijinja::value::{Value, StructObject};
 ///
 /// struct Point(f32, f32, f32);
@@ -321,8 +323,8 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///         }
 ///     }
 ///
-///     fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-///         Box::new(["x", "y", "z"].into_iter())
+///     fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
+///         Box::new(["x".into(), "y".into(), "z".into()].into_iter())
 ///     }
 /// }
 ///
@@ -338,6 +340,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// ```
 /// use std::fmt;
+/// use std::borrow::Cow;
 /// use minijinja::value::{Value, Object, ObjectKind, StructObject};
 ///
 /// #[derive(Debug, Clone)]
@@ -365,8 +368,8 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///         }
 ///     }
 ///
-///     fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-///         Box::new(["x", "y", "z"].into_iter())
+///     fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
+///         Box::new(["x".into(), "y".into(), "z".into()].into_iter())
 ///     }
 /// }
 ///
@@ -391,7 +394,7 @@ pub trait StructObject: Send + Sync {
     /// Iterates over the fields.
     ///
     /// The default implementation returns an empty iterator.
-    fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+    fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
         Box::new(None.into_iter())
     }
 
@@ -410,7 +413,7 @@ impl<T: StructObject> StructObject for std::sync::Arc<T> {
     }
 
     #[inline]
-    fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+    fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
         T::fields(self)
     }
 
@@ -460,7 +463,7 @@ impl<T: StructObject + 'static> fmt::Display for SimpleStructObject<T> {
             if idx > 0 {
                 ok!(write!(f, ", "));
             }
-            let val = self.0.get_field(field).unwrap_or(Value::UNDEFINED);
+            let val = self.0.get_field(&field).unwrap_or(Value::UNDEFINED);
             ok!(write!(f, "{:?}: {:?}", field, val));
         }
         write!(f, "]")
@@ -471,7 +474,7 @@ impl<T: StructObject + 'static> fmt::Debug for SimpleStructObject<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut m = f.debug_map();
         for field in self.0.fields() {
-            let value = self.0.get_field(field).unwrap_or(Value::UNDEFINED);
+            let value = self.0.get_field(&field).unwrap_or(Value::UNDEFINED);
             m.entry(&field, &value);
         }
         m.finish()

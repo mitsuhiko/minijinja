@@ -1,5 +1,7 @@
-use minijinja::value::{StructObject, Value};
-use minijinja::{context, Environment};
+use std::{env, fmt};
+
+use minijinja::value::{Object, StructObject, Value};
+use minijinja::{context, Environment, Error, ErrorKind, State};
 use minijinja_stack_ref::scope;
 
 struct Config {
@@ -15,25 +17,42 @@ impl StructObject for Config {
     }
 }
 
+#[derive(Debug)]
+struct Utils;
+
+impl fmt::Display for Utils {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<utils>")
+    }
+}
+
+impl Object for Utils {
+    fn call_method(&self, _state: &State, name: &str, _args: &[Value]) -> Result<Value, Error> {
+        match name {
+            "get_cwd" => Ok(Value::from(env::current_dir().unwrap().to_string_lossy())),
+            _ => Err(Error::from(ErrorKind::UnknownMethod)),
+        }
+    }
+}
+
 fn main() {
     let config = Config {
         version: env!("CARGO_PKG_VERSION"),
     };
-    let mut env = Environment::new();
-    env.add_template(
-        "test",
-        "dynamic seq: {{ seq }}\nversion: {{ config.version }}",
-    )
-    .unwrap();
-
-    let tmpl = env.get_template("test").unwrap();
-
-    let seq = &[1i32, 2, 3, 4][..];
+    let utils = Utils;
+    let env = Environment::new();
     scope(|scope| {
         let ctx = context! {
             config => Value::from_struct_object(scope.handle(&config)),
-            seq => Value::from_seq_object(scope.handle(&seq)),
+            utils => Value::from_object(scope.handle(&utils)),
         };
-        println!("{}", tmpl.render(ctx).unwrap());
+        println!(
+            "{}",
+            env.render_str(
+                "version: {{ config.version }}\ncwd: {{ utils.get_cwd() }}",
+                ctx
+            )
+            .unwrap()
+        );
     });
 }

@@ -283,6 +283,7 @@ pub(crate) enum ValueRepr {
     U128(Packed<u128>),
     I128(Packed<i128>),
     String(Arc<String>, StringType),
+    StaticStr(&'static str, StringType),
     Bytes(Arc<Vec<u8>>),
     Seq(Arc<Vec<Value>>),
     Map(Arc<ValueMap>, MapType),
@@ -302,6 +303,7 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
+            ValueRepr::StaticStr(val, _) => fmt::Debug::fmt(val, f),
             ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Map(val, _) => fmt::Debug::fmt(val, f),
@@ -323,7 +325,7 @@ impl PartialEq for Value {
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
-                Some(ops::CoerceResult::String(a, b)) => a == b,
+                Some(ops::CoerceResult::Str(a, b)) => a == b,
                 None => false,
             },
         }
@@ -341,7 +343,7 @@ impl PartialOrd for Value {
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a.partial_cmp(&b),
                 Some(ops::CoerceResult::I128(a, b)) => a.partial_cmp(&b),
-                Some(ops::CoerceResult::String(a, b)) => a.partial_cmp(&b),
+                Some(ops::CoerceResult::Str(a, b)) => a.partial_cmp(&b),
                 None => None,
             },
         }
@@ -378,6 +380,7 @@ impl fmt::Display for Value {
             ValueRepr::None => write!(f, "none"),
             ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
             ValueRepr::String(val, _) => write!(f, "{}", val),
+            ValueRepr::StaticStr(val, _) => write!(f, "{}", val),
             ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
             ValueRepr::Seq(values) => {
                 ok!(write!(f, "["));
@@ -544,7 +547,7 @@ impl Value {
             ValueRepr::Char(_) => ValueKind::Char,
             ValueRepr::None => ValueKind::None,
             ValueRepr::I128(_) => ValueKind::Number,
-            ValueRepr::String(..) => ValueKind::String,
+            ValueRepr::String(..) | ValueRepr::StaticStr(..) => ValueKind::String,
             ValueRepr::Bytes(_) => ValueKind::Bytes,
             ValueRepr::U128(_) => ValueKind::Number,
             ValueRepr::Seq(_) => ValueKind::Seq,
@@ -574,6 +577,7 @@ impl Value {
             ValueRepr::F64(x) => x != 0.0,
             ValueRepr::Char(x) => x != '\x00',
             ValueRepr::String(ref x, _) => !x.is_empty(),
+            ValueRepr::StaticStr(ref x, _) => !x.is_empty(),
             ValueRepr::Bytes(ref x) => !x.is_empty(),
             ValueRepr::None | ValueRepr::Undefined => false,
             ValueRepr::Seq(ref x) => !x.is_empty(),
@@ -817,7 +821,7 @@ impl Value {
                 ObjectKind::Seq(s) => s,
                 ObjectKind::Struct(s) => match key {
                     Key::String(ref key) => return s.get_field(key),
-                    Key::Str(key) => return s.get_field(key),
+                    Key::Str(key) | Key::StaticStr(key) => return s.get_field(key),
                     _ => return None,
                 },
             },
@@ -895,24 +899,25 @@ impl Value {
                 .map_err(|_| ErrorKind::NonKey.into()),
             ValueRepr::Char(c) => Ok(Key::Char(c)),
             ValueRepr::String(ref s, _) => Ok(Key::String(s.clone())),
+            ValueRepr::StaticStr(s, _) => Ok(Key::StaticStr(s)),
             _ => Err(ErrorKind::NonKey.into()),
         }
     }
 
-    pub(crate) fn iter_as_str_map(&self) -> impl Iterator<Item = (&str, Value)> {
+    pub(crate) fn iter_as_str_map(&self) -> impl Iterator<Item = (Cow<'_, str>, Value)> {
         match self.0 {
             ValueRepr::Map(ref m, _) => Box::new(
                 m.iter()
-                    .filter_map(|(k, v)| k.as_str().map(move |k| (k, v.clone()))),
+                    .filter_map(|(k, v)| k.as_str().map(move |k| (Cow::Borrowed(k), v.clone()))),
             ) as Box<dyn Iterator<Item = _>>,
             ValueRepr::Dynamic(ref obj) => match obj.kind() {
                 ObjectKind::Plain | ObjectKind::Seq(_) => {
                     Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>
                 }
-                ObjectKind::Struct(s) => Box::new(
-                    s.fields()
-                        .filter_map(move |attr| Some((attr, some!(s.get_field(attr))))),
-                ) as Box<dyn Iterator<Item = _>>,
+                ObjectKind::Struct(s) => Box::new(s.fields().filter_map(move |attr| {
+                    let val = some!(s.get_field(&attr));
+                    Some((attr, val))
+                })) as Box<dyn Iterator<Item = _>>,
             },
             _ => Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>,
         }
@@ -989,6 +994,7 @@ impl Serialize for Value {
             ValueRepr::U128(u) => serializer.serialize_u128(u.0),
             ValueRepr::I128(i) => serializer.serialize_i128(i.0),
             ValueRepr::String(ref s, _) => serializer.serialize_str(s),
+            ValueRepr::StaticStr(s, _) => serializer.serialize_str(s),
             ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
             ValueRepr::Seq(ref elements) => elements.serialize(serializer),
             ValueRepr::Map(ref entries, _) => {
@@ -1013,7 +1019,7 @@ impl Serialize for Value {
                     use serde::ser::SerializeMap;
                     let mut map = ok!(serializer.serialize_map(None));
                     for k in s.fields() {
-                        let v = s.get_field(k).unwrap_or(Value::UNDEFINED);
+                        let v = s.get_field(&k).unwrap_or(Value::UNDEFINED);
                         ok!(map.serialize_entry(&k, &v));
                     }
                     map.end()
@@ -1142,8 +1148,8 @@ fn test_dynamic_object_roundtrip() {
             }
         }
 
-        fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-            Box::new(["value"].into_iter())
+        fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
+            Box::new([Cow::Borrowed("value")].into_iter())
         }
     }
 
