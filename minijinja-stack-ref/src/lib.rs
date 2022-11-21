@@ -9,7 +9,7 @@
 //! ```
 //! use minijinja::value::{StructObject, Value};
 //! use minijinja::{context, Environment};
-//! use minijinja_stack_ref::scope;
+//! use minijinja_stack_ref::stack_token;
 //!
 //! struct State {
 //!     version: &'static str,
@@ -35,13 +35,15 @@
 //! let state = State {
 //!     version: env!("CARGO_PKG_VERSION"),
 //! };
-//! scope(|s| {
-//!     println!("{}", tmpl.render(context! {
-//!         // note how it's possible to create a handle to the struct
-//!         // object by reference, and how it can be wrapped in a value.
-//!         config => Value::from_struct_object(s.handle(&state)),
-//!     }).unwrap());
-//! });
+//!
+//! // a stack token is created with the stack_token! macro.  After the
+//! // creation of it, the utility methods on it can be used to get
+//! // references enclosed in values to it.
+//! stack_token!(scope);
+//!
+//! println!("{}", tmpl.render(context! {
+//!     state => scope.struct_object_ref(&state),
+//! }).unwrap());
 //! ```
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -49,7 +51,6 @@ use std::collections::HashSet;
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem::transmute;
-use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
@@ -63,13 +64,16 @@ thread_local! {
 
 /// A handle to an enclosed value.
 ///
-/// For as long as the [`StackScope`] is still valid access to the
+/// For as long as the [`StackToken`] is still valid access to the
 /// reference can be temporarily fetched via the [`with`](Self::with)
 /// method.  Doing so after the scope is gone, this will panic on all
 /// operations.
 ///
 /// To check if a handle is still valid [`is_valid`](Self::is_valid)
 /// can be used.
+///
+/// A stack handle implements the underlying object protocols from
+/// MiniJinja.
 pub struct StackHandle<T> {
     ptr: *const T,
     id: u64,
@@ -206,57 +210,90 @@ impl<T: Object> StructObject for StackHandleProxy<T> {
     }
 }
 
-/// A scope to enclose references to stack values.
-///
-/// See [`scope`] for details.
-pub struct StackScope<'scope, 'env: 'scope> {
-    scope: PhantomData<&'scope mut &'scope ()>,
-    env: PhantomData<&'env mut &'env ()>,
+/// A token on the stack for convenient temporary borrowing.
+pub struct StackToken {
     id: u64,
+    unset: bool,
+    _marker: PhantomData<*const ()>,
 }
 
-impl<'scope, 'env: 'scope> StackScope<'scope, 'env> {
+impl StackToken {
+    /// Creates a stack token.
+    ///
+    /// # Safety
+    ///
+    /// This must never be called directly, the only permissible caller is the
+    /// [`stack_token`] macro which places it on the stack and immediately creates
+    /// a reference to it.  Because of how the value is constructed the dtor is
+    /// guaranteed to run and can clean up the reference in the TLS.
+    #[doc(hidden)]
+    pub unsafe fn __private_new() -> StackToken {
+        let id = STACK_SCOPE_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let unset = STACK_SCOPE_IS_VALID.with(|valid_ids| valid_ids.borrow_mut().insert(id));
+        StackToken {
+            id,
+            unset,
+            _marker: PhantomData,
+        }
+    }
+
     /// Creates a [`StackHandle`] to a value with at least the scope's lifetime.
-    pub fn handle<T: 'env>(&self, value: &'env T) -> StackHandle<T> {
+    pub fn handle<'env, T: 'env>(&'env self, value: &'env T) -> StackHandle<T> {
         StackHandle {
             ptr: value as *const T,
             id: self.id,
         }
     }
+
+    /// Creates a [`Value`] from a borrowed [`Object`].
+    ///
+    /// This is equivalent to `Value::from_object(self.handle(value))`.
+    pub fn object_ref<'env, T: Object>(&'env self, value: &'env T) -> Value {
+        Value::from_object(self.handle(value))
+    }
+
+    /// Creates a [`Value`] from a borrowed [`SeqObject`].
+    ///
+    /// This is equivalent to `Value::from_seq_object(self.handle(value))`.
+    pub fn seq_object_ref<'env, T: SeqObject + 'static>(&'env self, value: &'env T) -> Value {
+        Value::from_seq_object(self.handle(value))
+    }
+
+    /// Creates a [`Value`] from a borrowed [`StructObject`].
+    ///
+    /// This is equivalent to `Value::from_struct_object(self.handle(value))`.
+    pub fn struct_object_ref<'env, T: StructObject + 'static>(&'env self, value: &'env T) -> Value {
+        Value::from_struct_object(self.handle(value))
+    }
 }
 
-/// Run a function in the context of a stack scope.
-pub fn scope<'env, F, T>(f: F) -> T
-where
-    F: for<'scope> FnOnce(&'scope StackScope<'scope, 'env>) -> T,
-{
-    let scope = StackScope {
-        env: PhantomData,
-        scope: PhantomData,
-        id: STACK_SCOPE_COUNTER.fetch_add(1, Ordering::SeqCst),
-    };
+impl Drop for StackToken {
+    fn drop(&mut self) {
+        if self.unset {
+            STACK_SCOPE_IS_VALID.with(|valid_ids| valid_ids.borrow_mut().remove(&self.id));
+        }
+    }
+}
 
-    STACK_SCOPE_IS_VALID.with(|valid_ids| {
-        let marked_scope_valid = valid_ids.borrow_mut().insert(scope.id);
-        let rv = catch_unwind(AssertUnwindSafe(|| f(&scope)));
-        if marked_scope_valid {
-            valid_ids.borrow_mut().remove(&scope.id);
-        }
-        match rv {
-            Err(e) => resume_unwind(e),
-            Ok(result) => result,
-        }
-    })
+/// Creates a [`StackToken`].
+#[macro_export]
+macro_rules! stack_token {
+    ($name:ident) => {
+        #[allow(unsafe_code)]
+        let $name = &unsafe { $crate::StackToken::__private_new() };
+    };
 }
 
 #[test]
 fn test_stack_handle() {
     let value = vec![1, 2, 3];
-    let leaked_handle = scope(|scope| {
+
+    let leaked_handle = {
+        stack_token!(scope);
         let value_handle: StackHandle<Vec<i32>> = scope.handle(&value);
         assert_eq!(value_handle.with(|x| x.len()), 3);
         value_handle
-    });
+    };
 
     assert_eq!(value.len(), 3);
     assert!(!StackHandle::is_valid(&leaked_handle));
@@ -266,11 +303,12 @@ fn test_stack_handle() {
 #[should_panic = "stack is gone"]
 fn test_stack_handle_panic() {
     let value = vec![1, 2, 3];
-    let leaked_handle = scope(|scope| {
-        let value_handle = scope.handle(&value);
+    let leaked_handle = {
+        stack_token!(scope);
+        let value_handle: StackHandle<Vec<i32>> = scope.handle(&value);
         assert_eq!(value_handle.with(|x| x.len()), 3);
         value_handle
-    });
+    };
 
     assert_eq!(leaked_handle.with(|x| x.len()), 3);
 }
