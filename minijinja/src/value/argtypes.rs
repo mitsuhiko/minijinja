@@ -254,7 +254,7 @@ impl<'a> From<Key<'a>> for Value {
             Key::Char(val) => val.into(),
             Key::String(val) => ValueRepr::String(val, StringType::Normal).into(),
             Key::Str(val) => val.into(),
-            Key::StaticStr(val) => ValueRepr::StaticStr(val, StringType::Normal).into(),
+            Key::StaticStr(val) => ValueRepr::StaticStr(val).into(),
         }
     }
 }

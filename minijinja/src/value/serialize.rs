@@ -112,7 +112,7 @@ impl Serializer for ValueSerializer {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<Value, Error> {
-        Ok(ValueRepr::StaticStr(variant, StringType::Normal).into())
+        Ok(ValueRepr::StaticStr(variant).into())
     }
 
     fn serialize_newtype_struct<T: ?Sized>(

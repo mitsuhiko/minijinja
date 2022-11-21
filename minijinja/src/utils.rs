@@ -55,12 +55,12 @@ pub fn write_escaped(
 ) -> Result<(), Error> {
     // common case of safe strings or strings without auto escaping
     let str_info = match value.0 {
-        ValueRepr::String(ref s, ty) => Some((s.as_str(), ty)),
-        ValueRepr::StaticStr(s, ty) => Some((s, ty)),
+        ValueRepr::String(ref s, ty) => Some((s.as_str(), matches!(ty, StringType::Safe))),
+        ValueRepr::StaticStr(s) => Some((s, false)),
         _ => None,
     };
-    if let Some((s, ty)) = str_info {
-        if matches!(ty, StringType::Safe) || matches!(auto_escape, AutoEscape::None) {
+    if let Some((s, safe)) = str_info {
+        if safe || matches!(auto_escape, AutoEscape::None) {
             return out.write_str(s).map_err(Error::from);
         }
     }

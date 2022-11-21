@@ -111,7 +111,7 @@ impl<'a> Key<'a> {
             }
             ValueRepr::Char(c) => Ok(Key::Char(c)),
             ValueRepr::String(ref s, _) => Ok(Key::Str(s)),
-            ValueRepr::StaticStr(s, _) => Ok(Key::StaticStr(s)),
+            ValueRepr::StaticStr(s) => Ok(Key::StaticStr(s)),
             _ => Err(ErrorKind::NonKey.into()),
         }
     }
