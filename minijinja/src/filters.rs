@@ -782,16 +782,18 @@ mod builtins {
                 .unwrap_or(input.as_str()))
         }
 
+        let value = strip_trailing_newline(value);
+
         let mut output: String = String::new();
-        let mut iterator = value.split('\n').peekable();
+        let mut iterator = value.split('\n');
         if !indent_first_line.unwrap_or(false) {
             output.push_str(iterator.next().unwrap());
             output.push('\n');
         }
-        while let Some(line) = &iterator.next() {
-            if iterator.peek().is_none() {
-                break // because split creates a empty String after the last new line
-            }
+        for line in iterator {
+            // if iterator.peek().is_none() {
+            //     break // because split creates a empty String after the last new line
+            // }
             if line.is_empty() {
                 if indent_blank_lines.unwrap_or(false) {
                     output.push_str(String::from(" ").repeat(width).as_str());
@@ -805,6 +807,24 @@ mod builtins {
         output
     }
 
+    #[test]
+    #[cfg(feature = "builtins")]
+    fn test_indent_one_empty_line() {
+        let teststring = String::from("\n");
+        assert_eq!(
+            indent(teststring, 2, None, None),
+            String::from("")
+        );
+    }
+    #[test]
+    #[cfg(feature = "builtins")]
+    fn test_indent_one_line() {
+        let teststring = String::from("test\n");
+        assert_eq!(
+            indent(teststring, 2, None, None),
+            String::from("test")
+        );
+    }
     #[test]
     #[cfg(feature = "builtins")]
     fn test_indent() {
