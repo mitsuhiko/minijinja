@@ -30,9 +30,6 @@ pub fn coerce<'x>(a: &'x Value, b: &'x Value) -> Option<CoerceResult<'x>> {
             Some(CoerceResult::I128(a.0 as i128, b.0 as i128))
         }
         (ValueRepr::String(a, _), ValueRepr::String(b, _)) => Some(CoerceResult::Str(a, b)),
-        (ValueRepr::StaticStr(a), ValueRepr::StaticStr(b)) => Some(CoerceResult::Str(a, b)),
-        (ValueRepr::String(a, _), ValueRepr::StaticStr(b)) => Some(CoerceResult::Str(a, b)),
-        (ValueRepr::StaticStr(a), ValueRepr::String(b, _)) => Some(CoerceResult::Str(a, b)),
         (ValueRepr::I64(a), ValueRepr::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
         (ValueRepr::I128(a), ValueRepr::I128(b)) => Some(CoerceResult::I128(a.0, b.0)),
         (ValueRepr::F64(a), ValueRepr::F64(b)) => Some(CoerceResult::F64(*a, *b)),
@@ -99,7 +96,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     }
 
     let maybe_seq = match value.0 {
-        ValueRepr::String(..) | ValueRepr::StaticStr(..) => {
+        ValueRepr::String(..) => {
             let s = value.as_str().unwrap();
             let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
             return Ok(Value::from(

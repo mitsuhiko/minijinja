@@ -854,7 +854,6 @@ impl<'env> Vm<'env> {
                 .iter()
                 .map(|value| match &value.0 {
                     ValueRepr::String(arg, _) => arg.clone(),
-                    ValueRepr::StaticStr(arg) => Arc::new(arg.to_string()),
                     _ => unreachable!(),
                 })
                 .collect(),

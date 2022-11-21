@@ -283,7 +283,6 @@ pub(crate) enum ValueRepr {
     U128(Packed<u128>),
     I128(Packed<i128>),
     String(Arc<String>, StringType),
-    StaticStr(&'static str),
     Bytes(Arc<Vec<u8>>),
     Seq(Arc<Vec<Value>>),
     Map(Arc<ValueMap>, MapType),
@@ -303,7 +302,6 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
-            ValueRepr::StaticStr(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Map(val, _) => fmt::Debug::fmt(val, f),
@@ -378,7 +376,6 @@ impl fmt::Display for Value {
             ValueRepr::None => write!(f, "none"),
             ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
             ValueRepr::String(val, _) => write!(f, "{}", val),
-            ValueRepr::StaticStr(val) => write!(f, "{}", val),
             ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
             ValueRepr::Seq(values) => {
                 ok!(write!(f, "["));
@@ -545,7 +542,7 @@ impl Value {
             ValueRepr::Char(_) => ValueKind::Char,
             ValueRepr::None => ValueKind::None,
             ValueRepr::I128(_) => ValueKind::Number,
-            ValueRepr::String(..) | ValueRepr::StaticStr(..) => ValueKind::String,
+            ValueRepr::String(..) => ValueKind::String,
             ValueRepr::Bytes(_) => ValueKind::Bytes,
             ValueRepr::U128(_) => ValueKind::Number,
             ValueRepr::Seq(_) => ValueKind::Seq,
@@ -575,7 +572,6 @@ impl Value {
             ValueRepr::F64(x) => x != 0.0,
             ValueRepr::Char(x) => x != '\x00',
             ValueRepr::String(ref x, _) => !x.is_empty(),
-            ValueRepr::StaticStr(x) => !x.is_empty(),
             ValueRepr::Bytes(ref x) => !x.is_empty(),
             ValueRepr::None | ValueRepr::Undefined => false,
             ValueRepr::Seq(ref x) => !x.is_empty(),
@@ -607,7 +603,6 @@ impl Value {
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Some(s.as_str()),
-            ValueRepr::StaticStr(s) => Some(s),
             _ => None,
         }
     }
@@ -616,7 +611,6 @@ impl Value {
     pub fn as_bytes(&self) -> Option<&[u8]> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Some(s.as_bytes()),
-            ValueRepr::StaticStr(s) => Some(s.as_bytes()),
             ValueRepr::Bytes(ref b) => Some(&b[..]),
             _ => None,
         }
@@ -658,7 +652,6 @@ impl Value {
     pub fn len(&self) -> Option<usize> {
         match self.0 {
             ValueRepr::String(ref s, _) => Some(s.chars().count()),
-            ValueRepr::StaticStr(s) => Some(s.chars().count()),
             ValueRepr::Map(ref items, _) => Some(items.len()),
             ValueRepr::Seq(ref items) => Some(items.len()),
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
@@ -823,7 +816,6 @@ impl Value {
                 ObjectKind::Struct(s) => match key {
                     Key::String(ref key) => return s.get_field(key),
                     Key::Str(key) => return s.get_field(key),
-                    Key::StaticStr(key) => return s.get_field(key),
                     _ => return None,
                 },
             },
@@ -860,7 +852,6 @@ impl Value {
     pub(crate) fn to_cowstr(&self) -> Cow<'_, str> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Cow::Borrowed(s.as_str()),
-            ValueRepr::StaticStr(s) => Cow::Borrowed(s),
             _ => Cow::Owned(self.to_string()),
         }
     }
@@ -902,7 +893,6 @@ impl Value {
                 .map_err(|_| ErrorKind::NonKey.into()),
             ValueRepr::Char(c) => Ok(Key::Char(c)),
             ValueRepr::String(ref s, _) => Ok(Key::String(s.clone())),
-            ValueRepr::StaticStr(s) => Ok(Key::StaticStr(s)),
             _ => Err(ErrorKind::NonKey.into()),
         }
     }
@@ -997,7 +987,6 @@ impl Serialize for Value {
             ValueRepr::U128(u) => serializer.serialize_u128(u.0),
             ValueRepr::I128(i) => serializer.serialize_i128(i.0),
             ValueRepr::String(ref s, _) => serializer.serialize_str(s),
-            ValueRepr::StaticStr(s) => serializer.serialize_str(s),
             ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
             ValueRepr::Seq(ref elements) => elements.serialize(serializer),
             ValueRepr::Map(ref entries, _) => {

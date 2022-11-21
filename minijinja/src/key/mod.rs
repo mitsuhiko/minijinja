@@ -22,7 +22,6 @@ pub enum Key<'a> {
     Char(char),
     String(Arc<String>),
     Str(&'a str),
-    StaticStr(&'static str),
 }
 
 pub type StaticKey = Key<'static>;
@@ -35,7 +34,6 @@ impl<'a> fmt::Debug for Key<'a> {
             Self::Char(val) => fmt::Debug::fmt(val, f),
             Self::String(val) => fmt::Debug::fmt(val, f),
             Self::Str(val) => fmt::Debug::fmt(val, f),
-            Self::StaticStr(val) => fmt::Debug::fmt(val, f),
         }
     }
 }
@@ -64,7 +62,6 @@ impl<'a> Key<'a> {
         match *self {
             Key::String(ref x) => Some(x.as_str()),
             Key::Str(x) => Some(x),
-            Key::StaticStr(x) => Some(x),
             _ => None,
         }
     }
@@ -76,12 +73,7 @@ impl<'a> Key<'a> {
             Key::Char(x) => InternalKeyRef::Char(x),
             Key::String(ref x) => InternalKeyRef::Str(x.as_str()),
             Key::Str(x) => InternalKeyRef::Str(x),
-            Key::StaticStr(x) => InternalKeyRef::Str(x),
         }
-    }
-
-    pub fn from_static_str(value: &'static str) -> StaticKey {
-        Key::StaticStr(value)
     }
 
     pub fn from_borrowed_value(value: &'a Value) -> Result<Key<'a>, Error> {
@@ -111,7 +103,6 @@ impl<'a> Key<'a> {
             }
             ValueRepr::Char(c) => Ok(Key::Char(c)),
             ValueRepr::String(ref s, _) => Ok(Key::Str(s)),
-            ValueRepr::StaticStr(s) => Ok(Key::StaticStr(s)),
             _ => Err(ErrorKind::NonKey.into()),
         }
     }
@@ -151,7 +142,6 @@ impl<'a> fmt::Display for Key<'a> {
             Key::Char(val) => write!(f, "{}", val),
             Key::String(val) => write!(f, "{}", val),
             Key::Str(val) => write!(f, "{}", val),
-            Key::StaticStr(val) => write!(f, "{}", val),
         }
     }
 }
