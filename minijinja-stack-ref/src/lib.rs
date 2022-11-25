@@ -9,7 +9,7 @@
 //! ```
 //! use minijinja::value::{StructObject, Value};
 //! use minijinja::{context, Environment};
-//! use minijinja_stack_ref::stack_token;
+//! use minijinja_stack_ref::scope;
 //!
 //! struct State {
 //!     version: &'static str,
@@ -36,14 +36,11 @@
 //!     version: env!("CARGO_PKG_VERSION"),
 //! };
 //!
-//! // a stack token is created with the stack_token! macro.  After the
-//! // creation of it, the utility methods on it can be used to get
-//! // references enclosed in values to it.
-//! stack_token!(scope);
-//!
-//! println!("{}", tmpl.render(context! {
-//!     state => scope.struct_object_ref(&state),
-//! }).unwrap());
+//! scope(|scope| {
+//!     println!("{}", tmpl.render(context! {
+//!         state => scope.struct_object_ref(&state),
+//!     }).unwrap());
+//! })
 //! ```
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -64,7 +61,7 @@ thread_local! {
 
 /// A handle to an enclosed value.
 ///
-/// For as long as the [`StackToken`] is still valid access to the
+/// For as long as the [`Scope`] is still valid access to the
 /// reference can be temporarily fetched via the [`with`](Self::with)
 /// method.  Doing so after the scope is gone, this will panic on all
 /// operations.
@@ -210,27 +207,18 @@ impl<T: Object> StructObject for StackHandleProxy<T> {
     }
 }
 
-/// A token on the stack for convenient temporary borrowing.
-pub struct StackToken {
+/// Captures the calling scope.
+pub struct Scope {
     id: u64,
     unset: bool,
     _marker: PhantomData<*const ()>,
 }
 
-impl StackToken {
-    /// Creates a stack token.
-    ///
-    /// # Safety
-    ///
-    /// This must never be called directly, the only permissible caller is the
-    /// [`stack_token`] macro which places it on the stack and immediately creates
-    /// a reference to it.  Because of how the value is constructed the dtor is
-    /// guaranteed to run and can clean up the reference in the TLS.
-    #[doc(hidden)]
-    pub unsafe fn __private_new() -> StackToken {
+impl Scope {
+    fn new() -> Scope {
         let id = STACK_SCOPE_COUNTER.fetch_add(1, Ordering::SeqCst);
         let unset = STACK_SCOPE_IS_VALID.with(|valid_ids| valid_ids.borrow_mut().insert(id));
-        StackToken {
+        Scope {
             id,
             unset,
             _marker: PhantomData,
@@ -267,7 +255,7 @@ impl StackToken {
     }
 }
 
-impl Drop for StackToken {
+impl Drop for Scope {
     fn drop(&mut self) {
         if self.unset {
             STACK_SCOPE_IS_VALID.with(|valid_ids| valid_ids.borrow_mut().remove(&self.id));
@@ -275,13 +263,9 @@ impl Drop for StackToken {
     }
 }
 
-/// Creates a [`StackToken`].
-#[macro_export]
-macro_rules! stack_token {
-    ($name:ident) => {
-        #[allow(unsafe_code)]
-        let $name = &unsafe { $crate::StackToken::__private_new() };
-    };
+/// Invokes a function with a reference to the stack scope so values can be borrowed.
+pub fn scope<R, F: FnOnce(&Scope) -> R>(f: F) -> R {
+    f(&Scope::new())
 }
 
 #[test]
@@ -289,10 +273,11 @@ fn test_stack_handle() {
     let value = vec![1, 2, 3];
 
     let leaked_handle = {
-        stack_token!(scope);
-        let value_handle: StackHandle<Vec<i32>> = scope.handle(&value);
-        assert_eq!(value_handle.with(|x| x.len()), 3);
-        value_handle
+        scope(|scope| {
+            let value_handle: StackHandle<Vec<i32>> = scope.handle(&value);
+            assert_eq!(value_handle.with(|x| x.len()), 3);
+            value_handle
+        })
     };
 
     assert_eq!(value.len(), 3);
@@ -304,10 +289,11 @@ fn test_stack_handle() {
 fn test_stack_handle_panic() {
     let value = vec![1, 2, 3];
     let leaked_handle = {
-        stack_token!(scope);
-        let value_handle: StackHandle<Vec<i32>> = scope.handle(&value);
-        assert_eq!(value_handle.with(|x| x.len()), 3);
-        value_handle
+        scope(|scope| {
+            let value_handle: StackHandle<Vec<i32>> = scope.handle(&value);
+            assert_eq!(value_handle.with(|x| x.len()), 3);
+            value_handle
+        })
     };
 
     assert_eq!(leaked_handle.with(|x| x.len()), 3);

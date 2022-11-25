@@ -2,7 +2,7 @@ use std::{env, fmt};
 
 use minijinja::value::{Object, StructObject, Value};
 use minijinja::{context, Environment, Error, ErrorKind, State};
-use minijinja_stack_ref::stack_token;
+use minijinja_stack_ref::scope;
 
 struct Config {
     version: &'static str,
@@ -46,21 +46,21 @@ fn main() {
     let utils = Utils;
     let items = &[1i32, 2, 3, 4][..];
 
-    stack_token!(scope);
-
-    let ctx = context! {
-        config => scope.struct_object_ref(&config),
-        utils => scope.object_ref(&utils),
-        items => scope.seq_object_ref(&items),
-    };
-    print!(
-        "{}",
-        env.render_str(
-            "version: {{ config.version }}\n\
+    scope(|scope| {
+        let ctx = context! {
+            config => scope.struct_object_ref(&config),
+            utils => scope.object_ref(&utils),
+            items => scope.seq_object_ref(&items),
+        };
+        print!(
+            "{}",
+            env.render_str(
+                "version: {{ config.version }}\n\
                 cwd: {{ utils.get_cwd() }}\n\
                 {% for item in items %}- {{ item }}\n{% endfor %}",
-            ctx
-        )
-        .unwrap()
-    );
+                ctx
+            )
+            .unwrap()
+        );
+    });
 }
