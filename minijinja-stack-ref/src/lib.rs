@@ -42,13 +42,13 @@
 //!     }).unwrap());
 //! })
 //! ```
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem::transmute;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
 use minijinja::{Error, State};
@@ -112,11 +112,12 @@ impl<T: StructObject + Send + Sync + 'static> StructObject for StackHandle<T> {
         self.with(|val| val.get_field(idx))
     }
 
-    fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
-        self.with(|val| {
-            // TODO: can the collection into the vector be avoided?
-            Box::new(val.fields().collect::<Vec<_>>().into_iter())
-        })
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        self.with(|val| val.static_fields())
+    }
+
+    fn fields(&self) -> Vec<Arc<String>> {
+        self.with(|val| val.fields())
     }
 
     fn field_count(&self) -> usize {
@@ -190,15 +191,9 @@ impl<T: Object> StructObject for StackHandleProxy<T> {
             .with(|val| unwrap_kind!(val, ObjectKind::Struct).get_field(name))
     }
 
-    fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
-        self.0.with(|val| {
-            Box::new(
-                unwrap_kind!(val, ObjectKind::Struct)
-                    .fields()
-                    .collect::<Vec<_>>()
-                    .into_iter(),
-            )
-        })
+    fn fields(&self) -> Vec<Arc<String>> {
+        self.0
+            .with(|val| unwrap_kind!(val, ObjectKind::Struct).fields())
     }
 
     fn field_count(&self) -> usize {

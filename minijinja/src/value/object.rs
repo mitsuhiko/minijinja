@@ -1,10 +1,10 @@
 use std::any::Any;
-use std::borrow::Cow;
 use std::fmt;
 use std::ops::Range;
+use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::Value;
+use crate::value::{intern, Value};
 use crate::vm::State;
 
 /// A utility trait that represents a dynamic object.
@@ -308,7 +308,6 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// for stringification and debug printing.
 ///
 /// ```
-/// use std::borrow::Cow;
 /// use minijinja::value::{Value, StructObject};
 ///
 /// struct Point(f32, f32, f32);
@@ -323,8 +322,8 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///         }
 ///     }
 ///
-///     fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
-///         Box::new(["x".into(), "y".into(), "z".into()].into_iter())
+///     fn static_fields(&self) -> Option<&'static [&'static str]> {
+///         Some(&["x", "y", "z"][..])
 ///     }
 /// }
 ///
@@ -340,7 +339,6 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// ```
 /// use std::fmt;
-/// use std::borrow::Cow;
 /// use minijinja::value::{Value, Object, ObjectKind, StructObject};
 ///
 /// #[derive(Debug, Clone)]
@@ -368,8 +366,8 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///         }
 ///     }
 ///
-///     fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
-///         Box::new(["x".into(), "y".into(), "z".into()].into_iter())
+///     fn static_fields(&self) -> Option<&'static [&'static str]> {
+///         Some(&["x", "y", "z"][..])
 ///     }
 /// }
 ///
@@ -391,18 +389,37 @@ pub trait StructObject: Send + Sync {
     /// that is fallible, instead use a method call.
     fn get_field(&self, name: &str) -> Option<Value>;
 
-    /// Iterates over the fields.
+    /// If possible returns a static vector of fields.
     ///
-    /// The default implementation returns an empty iterator.
-    fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
-        Box::new(None.into_iter())
+    /// If fields cannot be statically determined, then this must return `None`
+    /// and [`fields`](Self::fields) should be implemented instead.
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        None
     }
 
-    /// Returns the number of fields in the struct.
+    /// Returns a vector of fields.
     ///
-    /// The default implementation returns the number of fields.
+    /// This should be implemented if [`static_fields`](Self::static_fields) cannot
+    /// be implemented due to lifetime restrictions.  To avoid unnecessary
+    /// allocations of the fields themselves it's recommended to use the
+    /// [`intern`] function.
+    fn fields(&self) -> Vec<Arc<String>> {
+        self.static_fields()
+            .into_iter()
+            .flat_map(|fields| fields.iter().copied().map(intern))
+            .collect()
+    }
+
+    /// Returns the number of fields.
+    ///
+    /// The default implementation uses [`fields`](Self::fields) and
+    /// [`static_fields`](Self::static_fields) automatically.
     fn field_count(&self) -> usize {
-        self.fields().count()
+        if let Some(fields) = self.static_fields() {
+            fields.len()
+        } else {
+            self.fields().len()
+        }
     }
 }
 
@@ -413,7 +430,12 @@ impl<T: StructObject> StructObject for std::sync::Arc<T> {
     }
 
     #[inline]
-    fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        T::static_fields(self)
+    }
+
+    #[inline]
+    fn fields(&self) -> Vec<Arc<String>> {
         T::fields(self)
     }
 
@@ -459,11 +481,11 @@ pub struct SimpleStructObject<T>(pub T);
 impl<T: StructObject + 'static> fmt::Display for SimpleStructObject<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         ok!(write!(f, "["));
-        for (idx, field) in self.0.fields().enumerate() {
+        for (idx, field) in self.0.fields().iter().enumerate() {
             if idx > 0 {
                 ok!(write!(f, ", "));
             }
-            let val = self.0.get_field(&field).unwrap_or(Value::UNDEFINED);
+            let val = self.0.get_field(field).unwrap_or(Value::UNDEFINED);
             ok!(write!(f, "{:?}: {:?}", field, val));
         }
         write!(f, "]")

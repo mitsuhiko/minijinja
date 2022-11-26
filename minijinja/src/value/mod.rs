@@ -409,6 +409,26 @@ impl Default for Value {
     }
 }
 
+/// Intern a string.
+///
+/// When the `key_interning` feature is in used, then MiniJinja will attempt to
+/// reuse strings in certain cases.  This function can be used to utilize the
+/// same functionality.  There is no guarantee that a string will be interned
+/// as there are heuristics involved for it.  Additionally the string interning
+/// will only work during the template engine execution (eg: within filters etc.).
+///
+/// ```
+/// use minijinja::value::{intern, Value};
+/// let val = Value::from(intern("my_key"));
+/// ```
+pub fn intern(s: &str) -> Arc<String> {
+    if let Key::String(ref s) = Key::make_string_key(s) {
+        s.clone()
+    } else {
+        unreachable!()
+    }
+}
+
 #[allow(clippy::len_without_is_empty)]
 impl Value {
     /// The undefined value
@@ -925,9 +945,13 @@ impl Value {
                         // the assumption is that structs don't have excessive field counts
                         // and that most iterations go over all fields, so creating a
                         // temporary vector here is acceptable.
-                        let attrs = s.fields().map(Value::from).collect::<Vec<_>>();
-                        let attr_count = s.field_count();
-                        (ValueIteratorState::Seq(0, Arc::new(attrs)), attr_count)
+                        if let Some(fields) = s.static_fields() {
+                            (ValueIteratorState::StaticStr(0, fields), fields.len())
+                        } else {
+                            let attrs = s.fields();
+                            let attr_count = attrs.len();
+                            (ValueIteratorState::ArcStr(0, attrs), attr_count)
+                        }
                     }
                 }
             }
@@ -991,9 +1015,16 @@ impl Serialize for Value {
                 ObjectKind::Struct(s) => {
                     use serde::ser::SerializeMap;
                     let mut map = ok!(serializer.serialize_map(None));
-                    for k in s.fields() {
-                        let v = s.get_field(&k).unwrap_or(Value::UNDEFINED);
-                        ok!(map.serialize_entry(&k, &v));
+                    if let Some(fields) = s.static_fields() {
+                        for k in fields {
+                            let v = s.get_field(k).unwrap_or(Value::UNDEFINED);
+                            ok!(map.serialize_entry(k, &v));
+                        }
+                    } else {
+                        for k in s.fields() {
+                            let v = s.get_field(&k).unwrap_or(Value::UNDEFINED);
+                            ok!(map.serialize_entry(k.as_str(), &v));
+                        }
                     }
                     map.end()
                 }
@@ -1048,6 +1079,8 @@ impl fmt::Debug for OwnedValueIterator {
 enum ValueIteratorState {
     Empty,
     Seq(usize, Arc<Vec<Value>>),
+    StaticStr(usize, &'static [&'static str]),
+    ArcStr(usize, Vec<Arc<String>>),
     DynSeq(usize, Arc<dyn Object>),
     #[cfg(not(feature = "preserve_order"))]
     Map(Option<StaticKey>, Arc<ValueMap>),
@@ -1066,6 +1099,14 @@ impl ValueIteratorState {
                     x
                 })
                 .cloned(),
+            ValueIteratorState::StaticStr(idx, items) => items.get(*idx).map(|x| {
+                *idx += 1;
+                Value::from(intern(x))
+            }),
+            ValueIteratorState::ArcStr(idx, items) => items.get(*idx).map(|x| {
+                *idx += 1;
+                Value::from(x.clone())
+            }),
             ValueIteratorState::DynSeq(idx, obj) => {
                 if let ObjectKind::Seq(seq) = obj.kind() {
                     seq.get_item(*idx).map(|x| {
@@ -1121,8 +1162,8 @@ fn test_dynamic_object_roundtrip() {
             }
         }
 
-        fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
-            Box::new([Cow::Borrowed("value")].into_iter())
+        fn static_fields(&self) -> Option<&'static [&'static str]> {
+            Some(&["value"][..])
         }
     }
 

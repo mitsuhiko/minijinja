@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
@@ -136,8 +135,8 @@ impl Object for Macro {
 }
 
 impl StructObject for Macro {
-    fn fields(&self) -> Box<dyn Iterator<Item = Cow<'static, str>> + '_> {
-        Box::new([Cow::Borrowed("name"), Cow::Borrowed("arguments")].into_iter())
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        Some(&["name", "arguments"][..])
     }
 
     fn get_field(&self, name: &str) -> Option<Value> {
