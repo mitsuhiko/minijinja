@@ -772,29 +772,32 @@ mod builtins {
             .remove(b'-')
             .remove(b'_')
             .add(b' ');
-        match &value.0 {
-            ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
-            ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
-            ValueRepr::String(s, _) => {
-                Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
-            }
-            ValueRepr::Map(ref val, _) => {
-                let mut rv = String::new();
-                for (idx, (k, v)) in val.iter().enumerate() {
-                    if idx > 0 {
-                        rv.push('&');
-                    }
-                    write!(
-                        rv,
-                        "{}={}",
-                        percent_encoding::utf8_percent_encode(&k.to_string(), SET),
-                        percent_encoding::utf8_percent_encode(&v.to_string(), SET)
-                    )
-                    .unwrap();
+
+        if value.kind() == ValueKind::Map {
+            let mut rv = String::new();
+            for (idx, k) in value.try_iter()?.enumerate() {
+                if idx > 0 {
+                    rv.push('&');
                 }
-                Ok(rv)
+                let v = value.get_item(&k)?;
+                write!(
+                    rv,
+                    "{}={}",
+                    percent_encoding::utf8_percent_encode(&k.to_string(), SET),
+                    percent_encoding::utf8_percent_encode(&v.to_string(), SET)
+                )
+                .unwrap();
             }
-            _ => Ok(percent_encoding::utf8_percent_encode(&value.to_string(), SET).to_string()),
+            Ok(rv)
+        } else {
+            match &value.0 {
+                ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
+                ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
+                ValueRepr::String(s, _) => {
+                    Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
+                }
+                _ => Ok(percent_encoding::utf8_percent_encode(&value.to_string(), SET).to_string()),
+            }
         }
     }
 
