@@ -480,7 +480,7 @@ pub struct SimpleStructObject<T>(pub T);
 
 impl<T: StructObject + 'static> fmt::Display for SimpleStructObject<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        ok!(write!(f, "["));
+        ok!(write!(f, "{{"));
         for (idx, field) in self.0.fields().iter().enumerate() {
             if idx > 0 {
                 ok!(write!(f, ", "));
@@ -488,7 +488,7 @@ impl<T: StructObject + 'static> fmt::Display for SimpleStructObject<T> {
             let val = self.0.get_field(field).unwrap_or(Value::UNDEFINED);
             ok!(write!(f, "{:?}: {:?}", field, val));
         }
-        write!(f, "]")
+        write!(f, "}}")
     }
 }
 
