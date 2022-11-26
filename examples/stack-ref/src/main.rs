@@ -5,12 +5,18 @@ use minijinja::{context, Environment, Error, ErrorKind, State};
 use minijinja_stack_ref::scope;
 
 struct Config {
+    manifest_dir: &'static str,
     version: &'static str,
 }
 
 impl StructObject for Config {
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        Some(&["manifest_dir", "version"][..])
+    }
+
     fn get_field(&self, field: &str) -> Option<Value> {
         match field {
+            "manifest_dir" => Some(Value::from(self.manifest_dir)),
             "version" => Some(Value::from(self.version)),
             _ => None,
         }
@@ -41,6 +47,7 @@ fn main() {
     // values on the stack we want to pass dynamically to the template
     // without serialization
     let config = Config {
+        manifest_dir: env!("CARGO_MANIFEST_DIR"),
         version: env!("CARGO_PKG_VERSION"),
     };
     let utils = Utils;
@@ -52,15 +59,9 @@ fn main() {
             utils => scope.object_ref(&utils),
             items => scope.seq_object_ref(&items),
         };
-        print!(
+        println!(
             "{}",
-            env.render_str(
-                "version: {{ config.version }}\n\
-                cwd: {{ utils.get_cwd() }}\n\
-                {% for item in items %}- {{ item }}\n{% endfor %}",
-                ctx
-            )
-            .unwrap()
+            env.render_str(include_str!("template.txt"), ctx).unwrap()
         );
     });
 }
