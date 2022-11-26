@@ -897,25 +897,6 @@ impl Value {
         }
     }
 
-    pub(crate) fn iter_as_str_map(&self) -> impl Iterator<Item = (Cow<'_, str>, Value)> {
-        match self.0 {
-            ValueRepr::Map(ref m, _) => Box::new(
-                m.iter()
-                    .filter_map(|(k, v)| k.as_str().map(move |k| (Cow::Borrowed(k), v.clone()))),
-            ) as Box<dyn Iterator<Item = _>>,
-            ValueRepr::Dynamic(ref obj) => match obj.kind() {
-                ObjectKind::Plain | ObjectKind::Seq(_) => {
-                    Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>
-                }
-                ObjectKind::Struct(s) => Box::new(s.fields().filter_map(move |attr| {
-                    let val = some!(s.get_field(&attr));
-                    Some((attr, val))
-                })) as Box<dyn Iterator<Item = _>>,
-            },
-            _ => Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>,
-        }
-    }
-
     /// Iterates over the value without holding a reference.
     pub(crate) fn try_iter_owned(&self) -> Result<OwnedValueIterator, Error> {
         let (iter_state, len) = match self.0 {
