@@ -76,8 +76,8 @@ pub struct StackHandle<T> {
     id: u64,
 }
 
-unsafe impl<T> Send for StackHandle<T> {}
-unsafe impl<T> Sync for StackHandle<T> {}
+unsafe impl<T: Send> Send for StackHandle<T> {}
+unsafe impl<T: Sync> Sync for StackHandle<T> {}
 
 impl<T> StackHandle<T> {
     /// Checks if the handle is still valid.
