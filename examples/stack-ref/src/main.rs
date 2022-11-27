@@ -51,13 +51,13 @@ fn main() {
         version: env!("CARGO_PKG_VERSION"),
     };
     let utils = Utils;
-    let items = &[1i32, 2, 3, 4][..];
+    let items = [1i32, 2, 3, 4];
 
     scope(|scope| {
         let ctx = context! {
             config => scope.struct_object_ref(&config),
             utils => scope.object_ref(&utils),
-            items => scope.seq_object_ref(&items),
+            items => scope.seq_object_ref(&items[..]),
         };
         println!(
             "{}",
