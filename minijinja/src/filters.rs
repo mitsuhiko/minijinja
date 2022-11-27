@@ -754,6 +754,56 @@ mod builtins {
         })
     }
 
+    /// indents Value with spaces
+    ///
+    /// The first optional parameter to the filter can be set to `true` to
+    /// indent the first line. The parameter defaults to false.
+    /// the second optional parameter to the filter can be set to `true`
+    /// to indent blank lines. The parameter defaults to false.
+    /// This filter is useful, if you want to template yaml-files
+    ///
+    /// ```jinja
+    /// example:
+    ///   config:
+    /// {{ global_conifg|indent(2) }} #does not indent first line
+    /// {{ global_config|indent(2,true) }} #indent whole Value with two spaces
+    /// {{ global_config|indent(2,true,true)}} #indent whole Value and all Blank Lines value
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
+    pub fn indent(
+        mut value: String,
+        width: usize,
+        indent_first_line: Option<bool>,
+        indent_blank_lines: Option<bool>,
+    ) -> String {
+        fn strip_trailing_newline(input: &mut String) {
+            if let Some(stripped) = input.strip_suffix(&['\r', '\n'][..]) {
+                input.truncate(stripped.len());
+            }
+        }
+
+        strip_trailing_newline(&mut value);
+
+        let mut output: String = String::new();
+        let mut iterator = value.split('\n');
+        if !indent_first_line.unwrap_or(false) {
+            output.push_str(iterator.next().unwrap());
+            output.push('\n');
+        }
+        for line in iterator {
+            if line.is_empty() {
+                if indent_blank_lines.unwrap_or(false) {
+                    output.push_str(&" ".repeat(width));
+                }
+            } else {
+                output.push_str(format!("{}{}", " ".repeat(width), line).as_str());
+            }
+            output.push('\n');
+        }
+        strip_trailing_newline(&mut output);
+        output
+    }
+
     /// URL encodes a value.
     ///
     /// If given a map it encodes the parameters into a query set, otherwise it
