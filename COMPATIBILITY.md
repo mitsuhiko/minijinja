@@ -145,6 +145,5 @@ are available in MiniJinja or behave the same.
 
 ## Filters
 
-MiniJinja supports many common Jinja2 filters but leaves out many which perform
-dynamic invocation.  For instance `|map` and `|select` are not supported.  Likewise
-many string formatting filters like `|xmlattr` or `|urlize` are missing.
+MiniJinja supports many common Jinja2 filters but leaves out some.  For instance
+some string formatting filters like `|xmlattr` or `|urlize` are missing.
