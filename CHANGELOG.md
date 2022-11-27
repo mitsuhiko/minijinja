@@ -18,7 +18,7 @@ All notable changes to MiniJinja are documented here.
 - Exposed string interning via the `intern` function.
 - Improved support for structs in built-in filters.
 - Added `indent` filter. (#151)
-- Added the `map`, `select` and `reject` filters.
+- Added the `map`, `select` / `selectattr` and `reject` / `rejectattr` filters.
 - Added `safe` / `escaped` test.
 
 ## Breaking Changes

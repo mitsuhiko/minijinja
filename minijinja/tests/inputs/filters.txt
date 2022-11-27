@@ -70,7 +70,12 @@ float-round: {{ 42.5|round }}
 float-round-prec2: {{ 42.512345|round(2) }}
 select-odd: {{ [1, 2, 3, 4, 5, 6]|select("odd") }}
 select-truthy: {{ [undefined, null, 0, 42, 23, "", "aha"]|select }}
+reject-truthy: {{ [undefined, null, 0, 42, 23, "", "aha"]|reject }}
 reject-odd: {{ [1, 2, 3, 4, 5, 6]|reject("odd") }}
+select-attr: {{ [dict(active=true, key=1), dict(active=false, key=2)]|selectattr("active") }}
+reject-attr: {{ [dict(active=true, key=1), dict(active=false, key=2)]|rejectattr("active") }}
+select-attr: {{ [dict(active=true, key=1), dict(active=false, key=2)]|selectattr("key", "even") }}
+reject-attr: {{ [dict(active=true, key=1), dict(active=false, key=2)]|rejectattr("key", "even") }}
 map-maps: {{ [-1, -2, 3, 4, -5]|map("abs") }}
 map-attr: {{ [dict(a=1), dict(a=2), {}]|map(attribute='a', default=None) }}
 map-attr-deep: {{ [dict(a=[1]), dict(a=[2]), {}]|map(attribute='a.0', default=None) }}

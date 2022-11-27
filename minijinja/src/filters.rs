@@ -857,6 +857,7 @@ mod builtins {
         state: &State,
         invert: bool,
         value: Value,
+        attr: Option<Cow<'_, str>>,
         test_name: Option<Cow<'_, str>>,
         args: crate::value::Rest<Value>,
     ) -> Result<Vec<Value>, Error> {
@@ -872,14 +873,19 @@ mod builtins {
             None
         };
         for value in value.try_iter()? {
+            let test_value = if let Some(ref attr) = attr {
+                value.get_path(attr)?
+            } else {
+                value.clone()
+            };
             let passed = if let Some(test) = test {
-                let new_args = Some(value.clone())
+                let new_args = Some(test_value)
                     .into_iter()
                     .chain(args.0.iter().cloned())
                     .collect::<Vec<_>>();
                 test.perform(state, &new_args)?
             } else {
-                value.is_true()
+                test_value.is_true()
             };
             if passed != invert {
                 rv.push(value);
@@ -907,7 +913,28 @@ mod builtins {
         test_name: Option<Cow<'_, str>>,
         args: crate::value::Rest<Value>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, false, value, test_name, args)
+        select_or_reject(state, false, value, None, test_name, args)
+    }
+
+    /// Creates a new sequence of values of which an attribute passes a test.
+    ///
+    /// This functions like [`select`] but it will test an attribute of the
+    /// object itself:
+    ///
+    /// ```jinja
+    /// {{ users|selectattr("is_active") }} -> all users where x.is_active is true
+    /// {{ users|selectattr("id", "even") }} -> returns all users with an even id
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn selectattr(
+        state: &State,
+        value: Value,
+        attr: Cow<'_, str>,
+        test_name: Option<Cow<'_, str>>,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
+        select_or_reject(state, false, value, Some(attr), test_name, args)
     }
 
     /// Creates a new sequence of values that don't pass a test.
@@ -921,7 +948,28 @@ mod builtins {
         test_name: Option<Cow<'_, str>>,
         args: crate::value::Rest<Value>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, true, value, test_name, args)
+        select_or_reject(state, true, value, None, test_name, args)
+    }
+
+    /// Creates a new sequence of values of which an attribute does not pass a test.
+    ///
+    /// This functions like [`select`] but it will test an attribute of the
+    /// object itself:
+    ///
+    /// ```jinja
+    /// {{ users|rejectattr("is_active") }} -> all users where x.is_active is false
+    /// {{ users|rejectattr("id", "even") }} -> returns all users with an odd id
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn rejectattr(
+        state: &State,
+        value: Value,
+        attr: Cow<'_, str>,
+        test_name: Option<Cow<'_, str>>,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
+        select_or_reject(state, true, value, Some(attr), test_name, args)
     }
 
     /// Applies a filter to a sequence of objects or looks up an attribute.
