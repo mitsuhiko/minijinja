@@ -261,7 +261,7 @@ impl<T: Into<Value> + Send + Sync + Clone> SeqObject for [T] {
     }
 }
 
-impl SeqObject for Vec<Value> {
+impl<T: Into<Value> + Send + Sync + Clone> SeqObject for Vec<T> {
     #[inline(always)]
     fn get_item(&self, idx: usize) -> Option<Value> {
         self.get(idx).cloned().map(Into::into)

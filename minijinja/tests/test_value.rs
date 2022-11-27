@@ -175,6 +175,21 @@ fn test_seq_object_iteration_and_indexing() {
 }
 
 #[test]
+fn test_builtin_seq_objects() {
+    let rv = minijinja::render!(
+        "{{ val }}",
+        val => Value::from_seq_object(vec![true, false]),
+    );
+    assert_snapshot!(rv, @r###"[true, false]"###);
+
+    let rv = minijinja::render!(
+        "{{ val }}",
+        val => Value::from_seq_object(&["foo", "bar"][..]),
+    );
+    assert_snapshot!(rv, @r###"["foo", "bar"]"###);
+}
+
+#[test]
 fn test_value_string_interop() {
     let s = Arc::new(String::from("Hello"));
     let v = Value::from(s);
