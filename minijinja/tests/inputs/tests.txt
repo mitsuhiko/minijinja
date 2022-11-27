@@ -28,3 +28,5 @@ string: {{ string is string }}
 not-string: {{ mapping is string }}
 starts-with-a: {{ string is startingwith('a') }}
 ends-with-ha: {{ string is endingwith('ha') }}
+not-safe: {{ "foo" is safe }}
+safe: {{ "foo"|escape is safe }}

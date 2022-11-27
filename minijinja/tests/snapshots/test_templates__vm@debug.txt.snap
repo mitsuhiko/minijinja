@@ -37,10 +37,12 @@ State {
         tests: [
             "defined",
             "endingwith",
+            "escaped",
             "even",
             "mapping",
             "number",
             "odd",
+            "safe",
             "sequence",
             "startingwith",
             "string",

@@ -19,6 +19,7 @@ All notable changes to MiniJinja are documented here.
 - Improved support for structs in built-in filters.
 - Added `indent` filter. (#151)
 - Added the `map`, `select` and `reject` filters.
+- Added `safe` / `escaped` test.
 
 ## Breaking Changes
 

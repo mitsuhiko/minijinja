@@ -207,6 +207,13 @@ pub fn is_defined(v: Value) -> bool {
     !v.is_undefined()
 }
 
+/// Checks if a value is safe.
+///
+/// This filter is also registered with the `escaped` alias.
+pub fn is_safe(v: Value) -> bool {
+    v.is_safe()
+}
+
 #[cfg(feature = "builtins")]
 mod builtins {
     use super::*;
