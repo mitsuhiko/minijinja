@@ -17,7 +17,7 @@ fn create_env() -> Environment<'static> {
 fn test_basic() {
     let env = create_env();
     let t = env.get_template("hello").unwrap();
-    assert_eq!(t.render(&()).unwrap(), "Hello World!");
+    assert_eq!(t.render(()).unwrap(), "Hello World!");
 }
 
 #[test]
@@ -31,9 +31,9 @@ fn test_dynamic() {
     let mut env = Environment::new();
     env.set_source(source);
     let t = env.get_template("hello").unwrap();
-    assert_eq!(t.render(&()).unwrap(), "Hello World!");
+    assert_eq!(t.render(()).unwrap(), "Hello World!");
     let t = env.get_template("hello2").unwrap();
-    assert_eq!(t.render(&()).unwrap(), "Hello World 2!");
+    assert_eq!(t.render(()).unwrap(), "Hello World 2!");
     let err = env.get_template("missing").unwrap_err();
     assert_eq!(
         err.to_string(),

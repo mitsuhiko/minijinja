@@ -9,12 +9,12 @@ input_file: minijinja/tests/inputs/loop_over_non_iterable.txt
 
 Error {
     kind: InvalidOperation,
-    detail: "object is not iterable",
+    detail: "number is not iterable",
     name: "loop_over_non_iterable.txt",
     line: 1,
 }
 
-invalid operation: object is not iterable (in loop_over_non_iterable.txt:1)
+invalid operation: number is not iterable (in loop_over_non_iterable.txt:1)
 ------------------------- loop_over_non_iterable.txt --------------------------
    1 > [{% for item in seq %}{% endfor %}]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

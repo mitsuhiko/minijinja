@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::fmt;
 
 /// Represents a token in the stream.
@@ -16,8 +15,10 @@ pub enum Token<'a> {
     BlockEnd(bool),
     /// An identifier.
     Ident(&'a str),
-    /// A string.
-    Str(Cow<'a, str>),
+    /// A borrowed string.
+    Str(&'a str),
+    /// An allocated string.
+    String(String),
     /// An integer (limited to i64)
     Int(i64),
     /// A float
@@ -85,7 +86,7 @@ impl<'a> fmt::Display for Token<'a> {
             Token::BlockStart(_) => write!(f, "start of block"),
             Token::BlockEnd(_) => write!(f, "end of block"),
             Token::Ident(_) => write!(f, "identifier"),
-            Token::Str(_) => write!(f, "string"),
+            Token::Str(_) | Token::String(_) => write!(f, "string"),
             Token::Int(_) => write!(f, "integer"),
             Token::Float(_) => write!(f, "float"),
             Token::Plus => write!(f, "`+`"),

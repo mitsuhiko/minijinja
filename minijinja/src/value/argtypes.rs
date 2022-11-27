@@ -5,7 +5,9 @@ use std::ops::{Deref, DerefMut};
 
 use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
-use crate::value::{Arc, MapType, Object, Packed, StringType, Value, ValueKind, ValueRepr};
+use crate::value::{
+    Arc, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, ValueRepr,
+};
 use crate::vm::State;
 
 /// A utility trait that represents the return value of functions and filters.
@@ -90,10 +92,11 @@ where
 /// * signed integers: [`i8`], [`i16`], [`i32`], [`i64`], [`i128`]
 /// * floats: [`f32`], [`f64`]
 /// * bool: [`bool`]
-/// * string: [`String`], [`&str`], `Cow<'_, str>` ([`char`])
+/// * string: [`String`], [`&str`], `Cow<'_, str>`, [`char`]
 /// * bytes: [`&[u8]`][`slice`]
 /// * values: [`Value`], `&Value`
-/// * vectors: [`Vec<T>`], `&[Value]`
+/// * vectors: [`Vec<T>`]
+/// * sequences: [`&dyn SeqObject`](crate::value::SeqObject)
 ///
 /// The type is also implemented for optional values (`Option<T>`) which is used
 /// to encode optional parameters to filters, functions or tests.  Additionally
@@ -111,6 +114,10 @@ where
 /// Byte slices will borrow out of values carrying bytes or strings.  In the latter
 /// case the utf-8 bytes are returned.
 ///
+/// There are also further restrictions imposed on borrowing in some situations.
+/// For instance you cannot implicitly borrow out of sequences which means that
+/// for instance `Vec<&str>` is not a legal argument.
+///
 /// ## Notes on State
 ///
 /// When `&State` is used, it does not consume a passed parameter.  This means that
@@ -122,6 +129,14 @@ pub trait ArgType<'a> {
 
     #[doc(hidden)]
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error>;
+
+    #[doc(hidden)]
+    fn from_value_owned(_value: Value) -> Result<Self::Output, Error> {
+        Err(Error::new(
+            ErrorKind::InvalidOperation,
+            "type conversion is not legal in this situation (implicit borrow)",
+        ))
+    }
 
     #[doc(hidden)]
     fn from_state_and_value(
@@ -280,6 +295,12 @@ impl<T: Object> From<Arc<T>> for Value {
     }
 }
 
+impl From<Arc<String>> for Value {
+    fn from(value: Arc<String>) -> Self {
+        Value(ValueRepr::String(value, StringType::Normal))
+    }
+}
+
 macro_rules! value_from {
     ($src:ty, $dst:ident) => {
         impl From<$src> for Value {
@@ -350,6 +371,10 @@ macro_rules! primitive_try_from {
                     Some(value) => TryFrom::try_from(value.clone()),
                     None => Err(Error::from(ErrorKind::MissingArgument))
                 }
+            }
+
+            fn from_value_owned(value: Value) -> Result<Self, Error> {
+                TryFrom::try_from(value)
             }
         }
     }
@@ -422,6 +447,20 @@ impl<'a> ArgType<'a> for &[u8] {
     }
 }
 
+impl<'a> ArgType<'a> for &dyn SeqObject {
+    type Output = &'a dyn SeqObject;
+
+    #[inline(always)]
+    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+        match value {
+            Some(value) => value
+                .as_seq()
+                .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "value is not a sequence")),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
+        }
+    }
+}
+
 impl<'a, T: ArgType<'a>> ArgType<'a> for Option<T> {
     type Output = Option<T::Output>;
 
@@ -435,6 +474,14 @@ impl<'a, T: ArgType<'a>> ArgType<'a> for Option<T> {
                 }
             }
             None => Ok(None),
+        }
+    }
+
+    fn from_value_owned(value: Value) -> Result<Self::Output, Error> {
+        if value.is_undefined() || value.is_none() {
+            Ok(None)
+        } else {
+            T::from_value_owned(value).map(Some)
         }
     }
 }
@@ -458,18 +505,6 @@ impl<'a> ArgType<'a> for &Value {
     fn from_value(value: Option<&'a Value>) -> Result<&'a Value, Error> {
         match value {
             Some(value) => Ok(value),
-            None => Err(Error::from(ErrorKind::MissingArgument)),
-        }
-    }
-}
-
-impl<'a> ArgType<'a> for &[Value] {
-    type Output = &'a [Value];
-
-    #[inline(always)]
-    fn from_value(value: Option<&'a Value>) -> Result<&'a [Value], Error> {
-        match value {
-            Some(value) => Ok(ok!(value.as_slice())),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
@@ -547,6 +582,10 @@ impl<'a> ArgType<'a> for Value {
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
+
+    fn from_value_owned(value: Value) -> Result<Self, Error> {
+        Ok(value)
+    }
 }
 
 impl<'a> ArgType<'a> for String {
@@ -557,6 +596,41 @@ impl<'a> ArgType<'a> for String {
             Some(value) => Ok(value.to_string()),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
+    }
+
+    fn from_value_owned(value: Value) -> Result<Self, Error> {
+        Ok(value.to_string())
+    }
+}
+
+impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
+    type Output = Vec<T>;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            None => Ok(Vec::new()),
+            Some(value) => {
+                let seq = ok!(value
+                    .as_seq()
+                    .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not a sequence") }));
+                let mut rv = Vec::new();
+                for value in seq.iter() {
+                    rv.push(ok!(T::from_value_owned(value)));
+                }
+                Ok(rv)
+            }
+        }
+    }
+
+    fn from_value_owned(value: Value) -> Result<Self, Error> {
+        let seq = ok!(value
+            .as_seq()
+            .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not a sequence") }));
+        let mut rv = Vec::new();
+        for value in seq.iter() {
+            rv.push(ok!(T::from_value_owned(value)));
+        }
+        Ok(rv)
     }
 }
 
@@ -569,23 +643,5 @@ impl From<Value> for String {
 impl From<usize> for Value {
     fn from(val: usize) -> Self {
         Value::from(val as u64)
-    }
-}
-
-impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
-    type Output = Self;
-
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        match value {
-            None => Ok(Vec::new()),
-            Some(values) => {
-                let values = ok!(values.as_slice());
-                let mut rv = Vec::new();
-                for value in values {
-                    rv.push(ok!(T::from_value(Some(value))));
-                }
-                Ok(rv)
-            }
-        }
     }
 }

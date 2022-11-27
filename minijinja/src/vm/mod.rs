@@ -83,8 +83,9 @@ impl<'env> Vm<'env> {
                     env: self.env,
                     ctx: Context::new(Frame::new(root)),
                     current_block: None,
-                    instructions,
+                    current_call: None,
                     auto_escape,
+                    instructions,
                     blocks: prepare_blocks(blocks),
                     loaded_templates: BTreeSet::new(),
                     #[cfg(feature = "macros")]
@@ -115,8 +116,9 @@ impl<'env> Vm<'env> {
                     env: self.env,
                     ctx,
                     current_block: None,
-                    instructions,
+                    current_call: None,
                     auto_escape: state.auto_escape(),
+                    instructions,
                     blocks: BTreeMap::default(),
                     loaded_templates: BTreeSet::new(),
                     #[cfg(feature = "macros")]
@@ -281,6 +283,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::ListAppend => {
                     a = stack.pop();
+                    // this intentionally only works with actual sequences
                     if let ValueRepr::Seq(mut v) = stack.pop().0 {
                         Arc::make_mut(&mut v).push(a);
                         stack.push(Value(ValueRepr::Seq(v)))
@@ -347,7 +350,7 @@ impl<'env> Vm<'env> {
                     ctx_ok!(self.push_loop(state, a, *flags, pc, next_loop_recursion_jump.take()));
                 }
                 Instruction::Iterate(jump_target) => {
-                    let l = state.ctx.current_loop().expect("not inside a loop");
+                    let l = state.ctx.current_loop().unwrap();
                     l.object.idx.fetch_add(1, Ordering::Relaxed);
                     match l.iterator.next() {
                         Some(item) => stack.push(item),
@@ -356,6 +359,10 @@ impl<'env> Vm<'env> {
                             continue;
                         }
                     };
+                }
+                Instruction::PushDidNotIterate => {
+                    let l = state.ctx.current_loop().unwrap();
+                    stack.push(Value::from(l.object.idx.load(Ordering::Relaxed) == 0));
                 }
                 Instruction::Jump(jump_target) => {
                     pc = *jump_target;
@@ -421,6 +428,7 @@ impl<'env> Vm<'env> {
                     stack.push(out.end_capture(state.auto_escape));
                 }
                 Instruction::ApplyFilter(name, arg_count, local_id) => {
+                    state.current_call = Some(name);
                     let filter =
                         ctx_ok!(get_or_lookup_local(&mut loaded_filters, *local_id, || {
                             state.env.get_filter(name)
@@ -435,8 +443,10 @@ impl<'env> Vm<'env> {
                     a = ctx_ok!(filter.apply_to(state, args));
                     stack.drop_top(*arg_count);
                     stack.push(a);
+                    state.current_call = Some(name);
                 }
                 Instruction::PerformTest(name, arg_count, local_id) => {
+                    state.current_call = Some(name);
                     let test = ctx_ok!(get_or_lookup_local(&mut loaded_tests, *local_id, || {
                         state.env.get_test(name)
                     })
@@ -447,10 +457,13 @@ impl<'env> Vm<'env> {
                     let rv = ctx_ok!(test.perform(state, args));
                     stack.drop_top(*arg_count);
                     stack.push(Value::from(rv));
+                    state.current_call = None;
                 }
-                Instruction::CallFunction(function_name, arg_count) => {
+                Instruction::CallFunction(name, arg_count) => {
+                    state.current_call = Some(name);
+
                     // super is a special function reserved for super-ing into blocks.
-                    if *function_name == "super" {
+                    if *name == "super" {
                         if *arg_count != 0 {
                             bail!(Error::new(
                                 ErrorKind::InvalidOperation,
@@ -459,7 +472,7 @@ impl<'env> Vm<'env> {
                         }
                         stack.push(ctx_ok!(self.perform_super(state, out, true)));
                     // loop is a special name which when called recurses the current loop.
-                    } else if *function_name == "loop" {
+                    } else if *name == "loop" {
                         if *arg_count != 1 {
                             bail!(Error::new(
                                 ErrorKind::InvalidOperation,
@@ -468,7 +481,7 @@ impl<'env> Vm<'env> {
                         }
                         // leave the one argument on the stack for the recursion
                         recurse_loop!(true);
-                    } else if let Some(func) = state.ctx.load(self.env, function_name) {
+                    } else if let Some(func) = state.ctx.load(self.env, name) {
                         let args = stack.slice_top(*arg_count);
                         a = ctx_ok!(func.call(state, args));
                         stack.drop_top(*arg_count);
@@ -476,15 +489,19 @@ impl<'env> Vm<'env> {
                     } else {
                         bail!(Error::new(
                             ErrorKind::UnknownFunction,
-                            format!("{} is unknown", function_name),
+                            format!("{} is unknown", name),
                         ));
                     }
+
+                    state.current_call = None;
                 }
                 Instruction::CallMethod(name, arg_count) => {
+                    state.current_call = Some(name);
                     let args = stack.slice_top(*arg_count);
                     a = ctx_ok!(args[0].call_method(state, name, &args[1..]));
                     stack.drop_top(*arg_count);
                     stack.push(a);
+                    state.current_call = None;
                 }
                 Instruction::CallObject(arg_count) => {
                     let args = stack.slice_top(*arg_count);
@@ -499,9 +516,13 @@ impl<'env> Vm<'env> {
                     stack.pop();
                 }
                 Instruction::FastSuper => {
+                    // Note that we don't store 'current_call' here since it
+                    // would only be visible (and unused) internally.
                     ctx_ok!(self.perform_super(state, out, false));
                 }
                 Instruction::FastRecurse => {
+                    // Note that we don't store 'current_call' here since it
+                    // would only be visible (and unused) internally.
                     recurse_loop!(false);
                 }
                 // Explanation on the behavior of `LoadBlocks` and `RenderParent`.
@@ -584,14 +605,16 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         ignore_missing: bool,
     ) -> Result<(), Error> {
-        let choices = if let ValueRepr::Seq(ref choices) = name.0 {
-            &choices[..]
-        } else {
-            std::slice::from_ref(&name)
-        };
+        use crate::value::SeqObject;
+
+        let single_name_slice = std::slice::from_ref(&name);
+        let choices = name
+            .as_seq()
+            .unwrap_or(&single_name_slice as &dyn SeqObject);
+
         let mut templates_tried = vec![];
-        for name in choices {
-            let name = ok!(name.as_str().ok_or_else(|| {
+        for choice in choices.iter() {
+            let name = ok!(choice.as_str().ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
                     "template name was not a string",
@@ -601,7 +624,7 @@ impl<'env> Vm<'env> {
                 Ok(tmpl) => tmpl,
                 Err(err) => {
                     if err.kind() == ErrorKind::TemplateNotFound {
-                        templates_tried.push(name);
+                        templates_tried.push(choice);
                     } else {
                         return Err(err);
                     }
@@ -636,8 +659,8 @@ impl<'env> Vm<'env> {
                     )
                 } else {
                     format!(
-                        "tried to include one of multiple templates, none of which existed {:?}",
-                        templates_tried
+                        "tried to include one of multiple templates, none of which existed {}",
+                        Value::from(templates_tried)
                     )
                 },
             ))
@@ -798,22 +821,21 @@ impl<'env> Vm<'env> {
 
     fn unpack_list(&self, stack: &mut Stack, count: &usize) -> Result<(), Error> {
         let top = stack.pop();
-        let v =
-            ok!(top
-                .as_slice()
-                .map_err(|e| Error::new(ErrorKind::CannotUnpack, "not a sequence").with_source(e)));
-        if v.len() != *count {
+        let seq = ok!(top
+            .as_seq()
+            .ok_or_else(|| Error::new(ErrorKind::CannotUnpack, "not a sequence")));
+        if seq.item_count() != *count {
             return Err(Error::new(
                 ErrorKind::CannotUnpack,
                 format!(
                     "sequence of wrong length (expected {}, got {})",
                     *count,
-                    v.len()
+                    seq.item_count()
                 ),
             ));
         }
-        for value in v.iter().rev() {
-            stack.push(value.clone());
+        for item in seq.iter().rev() {
+            stack.push(item);
         }
         Ok(())
     }

@@ -244,15 +244,22 @@ mod builtins {
     /// </ul>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn range(lower: u32, upper: Option<u32>, step: Option<u32>) -> Vec<u32> {
+    pub fn range(lower: u32, upper: Option<u32>, step: Option<u32>) -> Result<Vec<u32>, Error> {
         let rng = match upper {
             Some(upper) => lower..upper,
             None => 0..lower,
         };
         if let Some(step) = step {
-            rng.step_by(step as usize).collect()
+            if step == 0 {
+                Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    "cannot create range with step of 0",
+                ))
+            } else {
+                Ok(rng.step_by(step as usize).collect())
+            }
         } else {
-            rng.collect()
+            Ok(rng.collect())
         }
     }
 

@@ -6,6 +6,25 @@ All notable changes to MiniJinja are documented here.
 
 - Filters, tests and other functions can now be registered with a dynamically
   allocated name. (#146)
+- Added `State::current_call` which exposes the name of the currently called
+  item. (#150)
+- Introduced revamped object model with `SeqObject` and `StructObject`. (#148)
+- Removed `Value::as_slice`
+- Introduced `Value::as_seq` and `Value::as_struct`.
+- Introduced `Value::from_seq_object` and `Value::from_struct_object`.
+- Added the ability for function arguments to be of type `&dyn SeqObject`.
+- Renamed `Iter` to `ValueIter`.
+- Added `Environment::render_named_str`. (#149)
+- Exposed string interning via the `intern` function.
+- Improved support for structs in built-in filters.
+
+## Breaking Changes
+
+- The `Object` model changed signficantly in this release.  It's now possible
+  for objects to have different shapes (structs or sequences today).  As a result
+  `SeqObject` and `StructObject` were added to the API.  For changing your objects
+  over have a look at the new documentation for `Object`.
+- The `Iter` type is now called `ValueIter`.
 
 # 0.26.0
 

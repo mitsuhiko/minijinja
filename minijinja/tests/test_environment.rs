@@ -35,7 +35,7 @@ fn test_expression_lifetimes() {
     {
         let x = String::from("1 + 1");
         let expr = env.compile_expression(&x).unwrap();
-        assert_eq!(expr.eval(&()).unwrap().to_string(), "2");
+        assert_eq!(expr.eval(()).unwrap().to_string(), "2");
     }
 }
 
@@ -44,10 +44,10 @@ fn test_clone() {
     let mut env = Environment::new();
     env.add_template("test", "a").unwrap();
     let mut env2 = env.clone();
-    assert_eq!(env2.get_template("test").unwrap().render(&()).unwrap(), "a");
+    assert_eq!(env2.get_template("test").unwrap().render(()).unwrap(), "a");
     env2.add_template("test", "b").unwrap();
-    assert_eq!(env2.get_template("test").unwrap().render(&()).unwrap(), "b");
-    assert_eq!(env.get_template("test").unwrap().render(&()).unwrap(), "a");
+    assert_eq!(env2.get_template("test").unwrap().render(()).unwrap(), "b");
+    assert_eq!(env.get_template("test").unwrap().render(()).unwrap(), "a");
 }
 
 #[test]

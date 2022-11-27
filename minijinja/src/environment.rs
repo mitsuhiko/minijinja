@@ -206,11 +206,36 @@ impl<'source> Environment<'source> {
     pub fn render_str<S: Serialize>(&self, source: &str, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _eval.
-        self._render_str(source, Value::from_serializable(&ctx))
+        self._render_str("<string>", source, Value::from_serializable(&ctx))
     }
 
-    fn _render_str(&self, source: &str, root: Value) -> Result<String, Error> {
-        let name = "<string>";
+    /// Parses and renders a template from a string in one go with name.
+    ///
+    /// Like [`render_str`](Self::render_str), but provide a name for the
+    /// template to be used instead of the default `<string>`.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// let env = Environment::new();
+    /// let rv = env.render_named_str(
+    ///     "template_name",
+    ///     "Hello {{ name }}",
+    ///     context! { name => "World" }
+    /// );
+    /// println!("{}", rv.unwrap());
+    /// ```
+    pub fn render_named_str<S: Serialize>(
+        &self,
+        name: &str,
+        source: &str,
+        ctx: S,
+    ) -> Result<String, Error> {
+        // reduce total amount of code faling under mono morphization into
+        // this function, and share the rest in _eval.
+        self._render_str(name, source, Value::from_serializable(&ctx))
+    }
+
+    fn _render_str(&self, name: &str, source: &str, root: Value) -> Result<String, Error> {
         let compiled = ok!(CompiledTemplate::from_name_and_source(name, source));
         let mut rv = String::new();
         Vm::new(self)
@@ -356,7 +381,7 @@ impl<'source> Environment<'source> {
     fn _compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
         let ast = ok!(parse_expr(expr));
         let mut gen = CodeGenerator::new("<expression>", expr);
-        ok!(gen.compile_expr(&ast));
+        gen.compile_expr(&ast);
         let (instructions, _) = gen.finish();
         Ok(Expression::new(self, instructions))
     }

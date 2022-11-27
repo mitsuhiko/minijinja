@@ -2,12 +2,12 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt::Write;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Arc, Value, ValueKind, ValueRepr};
+use crate::value::{Arc, ObjectKind, SeqObject, Value, ValueKind, ValueRepr};
 
-pub enum CoerceResult {
+pub enum CoerceResult<'a> {
     I128(i128, i128),
     F64(f64, f64),
-    String(String, String),
+    Str(&'a str, &'a str),
 }
 
 fn as_f64(value: &Value) -> Option<f64> {
@@ -22,16 +22,14 @@ fn as_f64(value: &Value) -> Option<f64> {
     })
 }
 
-pub fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
+pub fn coerce<'x>(a: &'x Value, b: &'x Value) -> Option<CoerceResult<'x>> {
     match (&a.0, &b.0) {
         // equal mappings are trivial
         (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
         (ValueRepr::U128(a), ValueRepr::U128(b)) => {
             Some(CoerceResult::I128(a.0 as i128, b.0 as i128))
         }
-        (ValueRepr::String(a, _), ValueRepr::String(b, _)) => {
-            Some(CoerceResult::String(a.to_string(), b.to_string()))
-        }
+        (ValueRepr::String(a, _), ValueRepr::String(b, _)) => Some(CoerceResult::Str(a, b)),
         (ValueRepr::I64(a), ValueRepr::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
         (ValueRepr::I128(a), ValueRepr::I128(b)) => Some(CoerceResult::I128(a.0, b.0)),
         (ValueRepr::F64(a), ValueRepr::F64(b)) => Some(CoerceResult::F64(*a, *b)),
@@ -97,28 +95,46 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         ));
     }
 
-    if let Some(s) = value.as_str() {
-        let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
-        return Ok(Value::from(
-            s.chars()
-                .skip(start)
-                .take(len)
-                .step_by(step)
-                .collect::<String>(),
-        ));
-    }
+    let maybe_seq = match value.0 {
+        ValueRepr::String(..) => {
+            let s = value.as_str().unwrap();
+            let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
+            return Ok(Value::from(
+                s.chars()
+                    .skip(start)
+                    .take(len)
+                    .step_by(step)
+                    .collect::<String>(),
+            ));
+        }
+        ValueRepr::Undefined | ValueRepr::None => return Ok(Value::from(Vec::<Value>::new())),
+        ValueRepr::Seq(ref s) => Some(&**s as &dyn SeqObject),
+        ValueRepr::Dynamic(ref dy) => {
+            if let ObjectKind::Seq(seq) = dy.kind() {
+                Some(seq)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    };
 
-    let slice = ok!(value.as_slice());
-    let (start, len) = get_offset_and_len(start, stop, || slice.len());
-    Ok(Value::from(
-        slice
-            .iter()
-            .skip(start)
-            .take(len)
-            .step_by(step)
-            .cloned()
-            .collect::<Vec<_>>(),
-    ))
+    match maybe_seq {
+        Some(seq) => {
+            let (start, len) = get_offset_and_len(start, stop, || seq.item_count());
+            Ok(Value::from(
+                seq.iter()
+                    .skip(start)
+                    .take(len)
+                    .step_by(step)
+                    .collect::<Vec<_>>(),
+            ))
+        }
+        None => Err(Error::new(
+            ErrorKind::InvalidOperation,
+            format!("value of type {} cannot be sliced", value.kind()),
+        )),
+    }
 }
 
 fn int_as_value(val: i128) -> Value {
@@ -167,7 +183,7 @@ pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     match coerce(lhs, rhs) {
         Some(CoerceResult::I128(a, b)) => Ok(int_as_value(a.wrapping_add(b))),
         Some(CoerceResult::F64(a, b)) => Ok((a + b).into()),
-        Some(CoerceResult::String(a, b)) => Ok(Value::from([a, b].concat())),
+        Some(CoerceResult::Str(a, b)) => Ok(Value::from([a, b].concat())),
         _ => Err(impossible_op("+", lhs, rhs)),
     }
 }
@@ -247,27 +263,27 @@ pub fn string_concat(mut left: Value, right: &Value) -> Value {
 
 /// Implements a containment operation on values.
 pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
-    match container.0 {
-        ValueRepr::Seq(ref values) => Ok(Value::from(values.contains(value))),
-        ValueRepr::Map(ref map, _) => {
-            let key = match value.clone().try_into_key() {
-                Ok(key) => key,
-                Err(_) => return Ok(Value::from(false)),
-            };
-            return Ok(Value::from(map.get(&key).is_some()));
+    let rv = if let Some(s) = container.as_str() {
+        if let Some(s2) = value.as_str() {
+            s.contains(s2)
+        } else {
+            s.contains(&value.to_string())
         }
-        ValueRepr::String(ref s, _) => {
-            return Ok(Value::from(if let Some(s2) = value.as_str() {
-                s.contains(s2)
-            } else {
-                s.contains(&value.to_string())
-            }));
-        }
-        _ => Err(Error::new(
+    } else if let Some(seq) = container.as_seq() {
+        seq.iter().any(|item| &item == value)
+    } else if let ValueRepr::Map(ref map, _) = container.0 {
+        let key = match value.clone().try_into_key() {
+            Ok(key) => key,
+            Err(_) => return Ok(Value::from(false)),
+        };
+        map.get(&key).is_some()
+    } else {
+        return Err(Error::new(
             ErrorKind::InvalidOperation,
             "cannot perform a containment check on this value",
-        )),
-    }
+        ));
+    };
+    Ok(Value::from(rv))
 }
 
 #[test]

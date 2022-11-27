@@ -191,7 +191,7 @@ impl<'source> CompiledTemplate<'source> {
         value::with_value_optimization(|| {
             let ast = ok!(parse(source, name));
             let mut gen = CodeGenerator::new(name, source);
-            ok!(gen.compile_stmt(&ast));
+            gen.compile_stmt(&ast);
             let (instructions, blocks) = gen.finish();
             Ok(CompiledTemplate {
                 instructions,

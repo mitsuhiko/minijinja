@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
@@ -52,7 +53,7 @@ impl<'env> Frame<'env> {
 impl<'env> fmt::Debug for Frame<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut m = f.debug_map();
-        m.entries(self.locals.iter());
+        m.entry(&"locals", &self.locals);
         if let Some(LoopState {
             object: ref controller,
             ..
@@ -61,7 +62,7 @@ impl<'env> fmt::Debug for Frame<'env> {
             m.entry(&"loop", controller);
         }
         if !self.ctx.is_undefined() {
-            m.entries(self.ctx.iter_as_str_map());
+            m.entry(&"ctx", &self.ctx);
         }
         m.finish()
     }
@@ -117,28 +118,34 @@ impl<'env> fmt::Debug for Context<'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fn dump<'a>(
             m: &mut std::fmt::DebugMap,
-            seen: &mut HashSet<&'a str>,
+            seen: &mut HashSet<Cow<'a, str>>,
             ctx: &'a Context<'a>,
         ) -> fmt::Result {
             for frame in ctx.stack.iter().rev() {
                 for (key, value) in frame.locals.iter() {
-                    if !seen.contains(key) {
-                        seen.insert(*key);
-                        m.entry(key, value);
+                    if !seen.contains(&Cow::Borrowed(*key)) {
+                        m.entry(&key, value);
+                        seen.insert(Cow::Borrowed(key));
                     }
                 }
 
                 if let Some(ref l) = frame.current_loop {
-                    if l.with_loop_var && !seen.contains(&"loop") {
-                        seen.insert("loop");
+                    if l.with_loop_var && !seen.contains("loop") {
                         m.entry(&"loop", &l.object);
+                        seen.insert(Cow::Borrowed("loop"));
                     }
                 }
 
-                for (key, value) in frame.ctx.iter_as_str_map() {
-                    if !seen.contains(key) {
-                        seen.insert(key);
-                        m.entry(&key, &value);
+                if let Ok(iter) = frame.ctx.try_iter() {
+                    for key in iter {
+                        if let Some(str_key) = key.as_str() {
+                            if !seen.contains(&Cow::Borrowed(str_key)) {
+                                if let Ok(value) = frame.ctx.get_item(&key) {
+                                    m.entry(&str_key, &value);
+                                    seen.insert(Cow::Owned(str_key.to_owned()));
+                                }
+                            }
+                        }
                     }
                 }
             }

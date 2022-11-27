@@ -17,13 +17,13 @@ $ cargo bench
 These are the results run on a MacBook Pro 16" 2021:
 
 ```
-cmp_compile/handlebars  time:   [47.935 µs 47.981 µs 48.031 µs]
-cmp_compile/liquid      time:   [37.415 µs 37.483 µs 37.566 µs]
-cmp_compile/minijinja   time:   [6.4807 µs 6.4920 µs 6.5035 µs]
-cmp_compile/tera        time:   [37.738 µs 37.791 µs 37.843 µs]
+cmp_compile/handlebars  time:   [46.691 µs 46.749 µs 46.810 µs]
+cmp_compile/liquid      time:   [35.316 µs 35.362 µs 35.417 µs]
+cmp_compile/minijinja   time:   [5.8038 µs 5.8112 µs 5.8186 µs]
+cmp_compile/tera        time:   [37.483 µs 37.548 µs 37.620 µs]
 
-cmp_render/handlebars   time:   [7.9399 µs 7.9572 µs 7.9742 µs]
-cmp_render/liquid       time:   [12.566 µs 12.590 µs 12.613 µs]
-cmp_render/minijinja    time:   [5.7659 µs 5.7765 µs 5.7871 µs]
-cmp_render/tera         time:   [9.4953 µs 9.5125 µs 9.5302 µs]
+cmp_render/handlebars   time:   [6.4022 µs 6.4082 µs 6.4149 µs]
+cmp_render/liquid       time:   [11.505 µs 11.525 µs 11.548 µs]
+cmp_render/minijinja    time:   [5.3910 µs 5.4023 µs 5.4148 µs]
+cmp_render/tera         time:   [7.8721 µs 7.8802 µs 7.8896 µs]
 ```
