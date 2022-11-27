@@ -4,10 +4,10 @@ use std::fmt::Write;
 use crate::error::{Error, ErrorKind};
 use crate::value::{Arc, ObjectKind, SeqObject, Value, ValueKind, ValueRepr};
 
-pub enum CoerceResult {
+pub enum CoerceResult<'a> {
     I128(i128, i128),
     F64(f64, f64),
-    String(String, String),
+    Str(&'a str, &'a str),
 }
 
 fn as_f64(value: &Value) -> Option<f64> {
@@ -22,16 +22,14 @@ fn as_f64(value: &Value) -> Option<f64> {
     })
 }
 
-pub fn coerce(a: &Value, b: &Value) -> Option<CoerceResult> {
+pub fn coerce<'x>(a: &'x Value, b: &'x Value) -> Option<CoerceResult<'x>> {
     match (&a.0, &b.0) {
         // equal mappings are trivial
         (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
         (ValueRepr::U128(a), ValueRepr::U128(b)) => {
             Some(CoerceResult::I128(a.0 as i128, b.0 as i128))
         }
-        (ValueRepr::String(a, _), ValueRepr::String(b, _)) => {
-            Some(CoerceResult::String(a.to_string(), b.to_string()))
-        }
+        (ValueRepr::String(a, _), ValueRepr::String(b, _)) => Some(CoerceResult::Str(a, b)),
         (ValueRepr::I64(a), ValueRepr::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
         (ValueRepr::I128(a), ValueRepr::I128(b)) => Some(CoerceResult::I128(a.0, b.0)),
         (ValueRepr::F64(a), ValueRepr::F64(b)) => Some(CoerceResult::F64(*a, *b)),
@@ -98,7 +96,8 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     }
 
     let maybe_seq = match value.0 {
-        ValueRepr::String(ref s, _) => {
+        ValueRepr::String(..) => {
+            let s = value.as_str().unwrap();
             let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
             return Ok(Value::from(
                 s.chars()
@@ -184,7 +183,7 @@ pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     match coerce(lhs, rhs) {
         Some(CoerceResult::I128(a, b)) => Ok(int_as_value(a.wrapping_add(b))),
         Some(CoerceResult::F64(a, b)) => Ok((a + b).into()),
-        Some(CoerceResult::String(a, b)) => Ok(Value::from([a, b].concat())),
+        Some(CoerceResult::Str(a, b)) => Ok(Value::from([a, b].concat())),
         _ => Err(impossible_op("+", lhs, rhs)),
     }
 }

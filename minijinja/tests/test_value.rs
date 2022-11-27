@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::fmt;
+use std::sync::Arc;
 
 use insta::assert_snapshot;
 use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
@@ -102,8 +103,8 @@ fn test_map_object_iteration_and_indexing() {
             }
         }
 
-        fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-            Box::new(["x", "y", "z"].into_iter())
+        fn static_fields(&self) -> Option<&'static [&'static str]> {
+            Some(&["x", "y", "z"][..])
         }
     }
 
@@ -171,4 +172,11 @@ fn test_seq_object_iteration_and_indexing() {
         point => Value::from_object(Point(1, 2, 3))
     );
     assert_snapshot!(rv, @r###"[1, 3, Undefined]"###);
+}
+
+#[test]
+fn test_value_string_interop() {
+    let s = Arc::new(String::from("Hello"));
+    let v = Value::from(s);
+    assert_eq!(v.as_str(), Some("Hello"));
 }

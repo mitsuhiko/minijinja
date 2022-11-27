@@ -16,7 +16,7 @@ pub(crate) struct Loop {
 impl fmt::Debug for Loop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("Loop");
-        for attr in self.fields() {
+        for attr in self.static_fields().unwrap() {
             s.field(attr, &self.get_field(attr).unwrap());
         }
         s.finish()
@@ -62,9 +62,9 @@ impl Object for Loop {
 }
 
 impl StructObject for Loop {
-    fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        Box::new(
-            [
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        Some(
+            &[
                 "index0",
                 "index",
                 "length",
@@ -74,8 +74,7 @@ impl StructObject for Loop {
                 "last",
                 "depth",
                 "depth0",
-            ]
-            .into_iter(),
+            ][..],
         )
     }
 

@@ -295,6 +295,12 @@ impl<T: Object> From<Arc<T>> for Value {
     }
 }
 
+impl From<Arc<String>> for Value {
+    fn from(value: Arc<String>) -> Self {
+        Value(ValueRepr::String(value, StringType::Normal))
+    }
+}
+
 macro_rules! value_from {
     ($src:ty, $dst:ident) => {
         impl From<$src> for Value {

@@ -318,12 +318,12 @@ impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => true,
-            (ValueRepr::String(a, _), ValueRepr::String(b, _)) => a == b,
+            (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a == b,
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
-                Some(ops::CoerceResult::String(a, b)) => a == b,
+                Some(ops::CoerceResult::Str(a, b)) => a == b,
                 None => false,
             },
         }
@@ -336,12 +336,11 @@ impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => Some(Ordering::Equal),
-            (ValueRepr::String(a, _), ValueRepr::String(b, _)) => a.partial_cmp(b),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.partial_cmp(b),
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a.partial_cmp(&b),
                 Some(ops::CoerceResult::I128(a, b)) => a.partial_cmp(&b),
-                Some(ops::CoerceResult::String(a, b)) => a.partial_cmp(&b),
+                Some(ops::CoerceResult::Str(a, b)) => a.partial_cmp(b),
                 None => None,
             },
         }
@@ -408,6 +407,26 @@ impl fmt::Display for Value {
 impl Default for Value {
     fn default() -> Value {
         ValueRepr::None.into()
+    }
+}
+
+/// Intern a string.
+///
+/// When the `key_interning` feature is in used, then MiniJinja will attempt to
+/// reuse strings in certain cases.  This function can be used to utilize the
+/// same functionality.  There is no guarantee that a string will be interned
+/// as there are heuristics involved for it.  Additionally the string interning
+/// will only work during the template engine execution (eg: within filters etc.).
+///
+/// ```
+/// use minijinja::value::{intern, Value};
+/// let val = Value::from(intern("my_key"));
+/// ```
+pub fn intern(s: &str) -> Arc<String> {
+    if let Key::String(ref s) = Key::make_string_key(s) {
+        s.clone()
+    } else {
+        unreachable!()
     }
 }
 
@@ -899,25 +918,6 @@ impl Value {
         }
     }
 
-    pub(crate) fn iter_as_str_map(&self) -> impl Iterator<Item = (&str, Value)> {
-        match self.0 {
-            ValueRepr::Map(ref m, _) => Box::new(
-                m.iter()
-                    .filter_map(|(k, v)| k.as_str().map(move |k| (k, v.clone()))),
-            ) as Box<dyn Iterator<Item = _>>,
-            ValueRepr::Dynamic(ref obj) => match obj.kind() {
-                ObjectKind::Plain | ObjectKind::Seq(_) => {
-                    Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>
-                }
-                ObjectKind::Struct(s) => Box::new(
-                    s.fields()
-                        .filter_map(move |attr| Some((attr, some!(s.get_field(attr))))),
-                ) as Box<dyn Iterator<Item = _>>,
-            },
-            _ => Box::new(None.into_iter()) as Box<dyn Iterator<Item = _>>,
-        }
-    }
-
     /// Iterates over the value without holding a reference.
     pub(crate) fn try_iter_owned(&self) -> Result<OwnedValueIterator, Error> {
         let (iter_state, len) = match self.0 {
@@ -946,9 +946,13 @@ impl Value {
                         // the assumption is that structs don't have excessive field counts
                         // and that most iterations go over all fields, so creating a
                         // temporary vector here is acceptable.
-                        let attrs = s.fields().map(Value::from).collect::<Vec<_>>();
-                        let attr_count = s.field_count();
-                        (ValueIteratorState::Seq(0, Arc::new(attrs)), attr_count)
+                        if let Some(fields) = s.static_fields() {
+                            (ValueIteratorState::StaticStr(0, fields), fields.len())
+                        } else {
+                            let attrs = s.fields();
+                            let attr_count = attrs.len();
+                            (ValueIteratorState::ArcStr(0, attrs), attr_count)
+                        }
                     }
                 }
             }
@@ -1012,9 +1016,16 @@ impl Serialize for Value {
                 ObjectKind::Struct(s) => {
                     use serde::ser::SerializeMap;
                     let mut map = ok!(serializer.serialize_map(None));
-                    for k in s.fields() {
-                        let v = s.get_field(k).unwrap_or(Value::UNDEFINED);
-                        ok!(map.serialize_entry(&k, &v));
+                    if let Some(fields) = s.static_fields() {
+                        for k in fields {
+                            let v = s.get_field(k).unwrap_or(Value::UNDEFINED);
+                            ok!(map.serialize_entry(k, &v));
+                        }
+                    } else {
+                        for k in s.fields() {
+                            let v = s.get_field(&k).unwrap_or(Value::UNDEFINED);
+                            ok!(map.serialize_entry(k.as_str(), &v));
+                        }
                     }
                     map.end()
                 }
@@ -1069,6 +1080,8 @@ impl fmt::Debug for OwnedValueIterator {
 enum ValueIteratorState {
     Empty,
     Seq(usize, Arc<Vec<Value>>),
+    StaticStr(usize, &'static [&'static str]),
+    ArcStr(usize, Vec<Arc<String>>),
     DynSeq(usize, Arc<dyn Object>),
     #[cfg(not(feature = "preserve_order"))]
     Map(Option<StaticKey>, Arc<ValueMap>),
@@ -1087,6 +1100,14 @@ impl ValueIteratorState {
                     x
                 })
                 .cloned(),
+            ValueIteratorState::StaticStr(idx, items) => items.get(*idx).map(|x| {
+                *idx += 1;
+                Value::from(intern(x))
+            }),
+            ValueIteratorState::ArcStr(idx, items) => items.get(*idx).map(|x| {
+                *idx += 1;
+                Value::from(x.clone())
+            }),
             ValueIteratorState::DynSeq(idx, obj) => {
                 if let ObjectKind::Seq(seq) = obj.kind() {
                     seq.get_item(*idx).map(|x| {
@@ -1142,8 +1163,8 @@ fn test_dynamic_object_roundtrip() {
             }
         }
 
-        fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-            Box::new(["value"].into_iter())
+        fn static_fields(&self) -> Option<&'static [&'static str]> {
+            Some(&["value"][..])
         }
     }
 

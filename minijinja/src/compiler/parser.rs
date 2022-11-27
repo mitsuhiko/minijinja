@@ -153,6 +153,7 @@ struct Parser<'a> {
     stream: TokenStream<'a>,
     #[allow(unused)]
     in_macro: bool,
+    #[allow(unused)]
     blocks: BTreeSet<&'a str>,
     depth: usize,
 }

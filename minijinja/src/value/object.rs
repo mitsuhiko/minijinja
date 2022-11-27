@@ -1,9 +1,10 @@
 use std::any::Any;
 use std::fmt;
 use std::ops::Range;
+use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::Value;
+use crate::value::{intern, Value};
 use crate::vm::State;
 
 /// A utility trait that represents a dynamic object.
@@ -321,8 +322,8 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///         }
 ///     }
 ///
-///     fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-///         Box::new(["x", "y", "z"].into_iter())
+///     fn static_fields(&self) -> Option<&'static [&'static str]> {
+///         Some(&["x", "y", "z"][..])
 ///     }
 /// }
 ///
@@ -365,8 +366,8 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///         }
 ///     }
 ///
-///     fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-///         Box::new(["x", "y", "z"].into_iter())
+///     fn static_fields(&self) -> Option<&'static [&'static str]> {
+///         Some(&["x", "y", "z"][..])
 ///     }
 /// }
 ///
@@ -388,18 +389,41 @@ pub trait StructObject: Send + Sync {
     /// that is fallible, instead use a method call.
     fn get_field(&self, name: &str) -> Option<Value>;
 
-    /// Iterates over the fields.
+    /// If possible returns a static vector of field names.
     ///
-    /// The default implementation returns an empty iterator.
-    fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        Box::new(None.into_iter())
+    /// If fields cannot be statically determined, then this must return `None`
+    /// and [`fields`](Self::fields) should be implemented instead.  If however
+    /// this method is implemented, then [`fields`](Self::fields) should not be
+    /// implemented as the default implementation dispatches to here, or it has
+    /// to be implemented to match the output.
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        None
     }
 
-    /// Returns the number of fields in the struct.
+    /// Returns a vector of field names.
     ///
-    /// The default implementation returns the number of fields.
+    /// This should be implemented if [`static_fields`](Self::static_fields) cannot
+    /// be implemented due to lifetime restrictions.  To avoid unnecessary
+    /// allocations of the fields themselves it's recommended to use the
+    /// [`intern`] function.  The default implementation converts the return value
+    /// of [`static_fields`](Self::static_fields) into a compatible format automatically.
+    fn fields(&self) -> Vec<Arc<String>> {
+        self.static_fields()
+            .into_iter()
+            .flat_map(|fields| fields.iter().copied().map(intern))
+            .collect()
+    }
+
+    /// Returns the number of fields.
+    ///
+    /// The default implementation uses [`fields`](Self::fields) and
+    /// [`static_fields`](Self::static_fields) automatically.
     fn field_count(&self) -> usize {
-        self.fields().count()
+        if let Some(fields) = self.static_fields() {
+            fields.len()
+        } else {
+            self.fields().len()
+        }
     }
 }
 
@@ -410,7 +434,12 @@ impl<T: StructObject> StructObject for std::sync::Arc<T> {
     }
 
     #[inline]
-    fn fields(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        T::static_fields(self)
+    }
+
+    #[inline]
+    fn fields(&self) -> Vec<Arc<String>> {
         T::fields(self)
     }
 
@@ -455,15 +484,15 @@ pub struct SimpleStructObject<T>(pub T);
 
 impl<T: StructObject + 'static> fmt::Display for SimpleStructObject<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        ok!(write!(f, "["));
-        for (idx, field) in self.0.fields().enumerate() {
+        ok!(write!(f, "{{"));
+        for (idx, field) in self.0.fields().iter().enumerate() {
             if idx > 0 {
                 ok!(write!(f, ", "));
             }
             let val = self.0.get_field(field).unwrap_or(Value::UNDEFINED);
             ok!(write!(f, "{:?}: {:?}", field, val));
         }
-        write!(f, "]")
+        write!(f, "}}")
     }
 }
 
@@ -471,7 +500,7 @@ impl<T: StructObject + 'static> fmt::Debug for SimpleStructObject<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut m = f.debug_map();
         for field in self.0.fields() {
-            let value = self.0.get_field(field).unwrap_or(Value::UNDEFINED);
+            let value = self.0.get_field(&field).unwrap_or(Value::UNDEFINED);
             m.entry(&field, &value);
         }
         m.finish()

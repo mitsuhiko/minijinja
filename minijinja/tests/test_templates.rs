@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::fs;
 
+use minijinja::value::{StructObject, Value};
 use minijinja::{context, Environment, Error, State};
 
 use similar_asserts::assert_eq;
@@ -89,6 +90,58 @@ fn test_custom_filter() {
     let tmpl = env.get_template("test").unwrap();
     let rv = tmpl.render(&ctx).unwrap();
     assert_eq!(rv, "[42]");
+}
+
+#[test]
+fn test_items_and_dictsort_with_structs() {
+    struct MyStruct;
+
+    impl StructObject for MyStruct {
+        fn get_field(&self, name: &str) -> Option<Value> {
+            match name {
+                "a" => Some(Value::from("A")),
+                "b" => Some(Value::from("B")),
+                _ => None,
+            }
+        }
+
+        fn static_fields(&self) -> Option<&'static [&'static str]> {
+            Some(&["b", "a"][..])
+        }
+    }
+
+    insta::assert_snapshot!(
+        minijinja::render!("{{ x|items }}", x => Value::from_struct_object(MyStruct)),
+        @r###"[["b", "B"], ["a", "A"]]"###
+    );
+    insta::assert_snapshot!(
+        minijinja::render!("{{ x|dictsort }}", x => Value::from_struct_object(MyStruct)),
+        @r###"[["a", "A"], ["b", "B"]]"###
+    );
+}
+
+#[test]
+fn test_urlencode_with_struct() {
+    struct MyStruct;
+
+    impl StructObject for MyStruct {
+        fn get_field(&self, name: &str) -> Option<Value> {
+            match name {
+                "a" => Some(Value::from("a 1")),
+                "b" => Some(Value::from("b 2")),
+                _ => None,
+            }
+        }
+
+        fn static_fields(&self) -> Option<&'static [&'static str]> {
+            Some(&["a", "b"][..])
+        }
+    }
+
+    insta::assert_snapshot!(
+        minijinja::render!("{{ x|urlencode }}", x => Value::from_struct_object(MyStruct)),
+        @"a=a%201&b=b%202"
+    );
 }
 
 #[test]

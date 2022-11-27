@@ -250,7 +250,8 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::value::ValueRepr;
+    use crate::key::Key;
+    use crate::value::{ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::fmt::Write;
     use std::mem;
@@ -341,22 +342,29 @@ mod builtins {
     /// This filter works like `|items` but sorts the pairs by key first.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn dictsort(v: Value) -> Result<Value, Error> {
-        let mut pairs = match v.0 {
-            ValueRepr::Map(ref v, _) => v.iter().collect::<Vec<_>>(),
-            _ => {
-                return Err(Error::new(
-                    ErrorKind::InvalidOperation,
-                    "cannot convert value into pair list",
-                ))
+        if v.kind() == ValueKind::Map {
+            let mut rv = Vec::new();
+            let iter = v.try_iter()?;
+            for key in iter {
+                let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
+                rv.push((key, value));
             }
-        };
-        pairs.sort_by(|a, b| a.0.cmp(b.0));
-        Ok(Value::from(
-            pairs
-                .into_iter()
-                .map(|(k, v)| vec![Value::from(k.clone()), v.clone()])
-                .collect::<Vec<_>>(),
-        ))
+            rv.sort_by(|a, b| {
+                Key::from_borrowed_value(&a.0)
+                    .unwrap()
+                    .cmp(&Key::from_borrowed_value(&b.0).unwrap())
+            });
+            Ok(Value::from(
+                rv.into_iter()
+                    .map(|(k, v)| Value::from(vec![k, v]))
+                    .collect::<Vec<_>>(),
+            ))
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "cannot convert value into pair list",
+            ))
+        }
     }
 
     /// Returns a list of pairs (items) from a mapping.
@@ -378,19 +386,20 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn items(v: Value) -> Result<Value, Error> {
-        Ok(Value::from(
-            match v.0 {
-                ValueRepr::Map(ref v, _) => v.iter(),
-                _ => {
-                    return Err(Error::new(
-                        ErrorKind::InvalidOperation,
-                        "cannot convert value into pair list",
-                    ))
-                }
+        if v.kind() == ValueKind::Map {
+            let mut rv = Vec::new();
+            let iter = v.try_iter()?;
+            for key in iter {
+                let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
+                rv.push(Value::from(vec![key, value]));
             }
-            .map(|(k, v)| vec![Value::from(k.clone()), v.clone()])
-            .collect::<Vec<_>>(),
-        ))
+            Ok(Value::from(rv))
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "cannot convert value into pair list",
+            ))
+        }
     }
 
     /// Reverses a list or string
@@ -763,29 +772,32 @@ mod builtins {
             .remove(b'-')
             .remove(b'_')
             .add(b' ');
-        match &value.0 {
-            ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
-            ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
-            ValueRepr::String(s, _) => {
-                Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
-            }
-            ValueRepr::Map(ref val, _) => {
-                let mut rv = String::new();
-                for (idx, (k, v)) in val.iter().enumerate() {
-                    if idx > 0 {
-                        rv.push('&');
-                    }
-                    write!(
-                        rv,
-                        "{}={}",
-                        percent_encoding::utf8_percent_encode(&k.to_string(), SET),
-                        percent_encoding::utf8_percent_encode(&v.to_string(), SET)
-                    )
-                    .unwrap();
+
+        if value.kind() == ValueKind::Map {
+            let mut rv = String::new();
+            for (idx, k) in value.try_iter()?.enumerate() {
+                if idx > 0 {
+                    rv.push('&');
                 }
-                Ok(rv)
+                let v = value.get_item(&k)?;
+                write!(
+                    rv,
+                    "{}={}",
+                    percent_encoding::utf8_percent_encode(&k.to_string(), SET),
+                    percent_encoding::utf8_percent_encode(&v.to_string(), SET)
+                )
+                .unwrap();
             }
-            _ => Ok(percent_encoding::utf8_percent_encode(&value.to_string(), SET).to_string()),
+            Ok(rv)
+        } else {
+            match &value.0 {
+                ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
+                ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
+                ValueRepr::String(s, _) => {
+                    Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
+                }
+                _ => Ok(percent_encoding::utf8_percent_encode(&value.to_string(), SET).to_string()),
+            }
         }
     }
 
