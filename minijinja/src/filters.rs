@@ -776,12 +776,13 @@ mod builtins {
         indent_first_line: Option<bool>,
         indent_blank_lines: Option<bool>,
     ) -> String {
-
         fn strip_trailing_newline(input: String) -> String {
-            String::from(input
-                .strip_suffix("\r\n")
-                .or_else(||input.strip_suffix('\n'))
-                .unwrap_or(input.as_str()))
+            String::from(
+                input
+                    .strip_suffix("\r\n")
+                    .or_else(|| input.strip_suffix('\n'))
+                    .unwrap_or(input.as_str()),
+            )
         }
 
         let value = strip_trailing_newline(value);
@@ -813,19 +814,13 @@ mod builtins {
     #[cfg(feature = "builtins")]
     fn test_indent_one_empty_line() {
         let teststring = String::from("\n");
-        assert_eq!(
-            indent(teststring, 2, None, None),
-            String::from("")
-        );
+        assert_eq!(indent(teststring, 2, None, None), String::from(""));
     }
     #[test]
     #[cfg(feature = "builtins")]
     fn test_indent_one_line() {
         let teststring = String::from("test\n");
-        assert_eq!(
-            indent(teststring, 2, None, None),
-            String::from("test")
-        );
+        assert_eq!(indent(teststring, 2, None, None), String::from("test"));
     }
     #[test]
     #[cfg(feature = "builtins")]
