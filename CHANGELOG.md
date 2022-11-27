@@ -15,6 +15,8 @@ All notable changes to MiniJinja are documented here.
 - Added the ability for function arguments to be of type `&dyn SeqObject`.
 - Renamed `Iter` to `ValueIter`.
 - Added `Environment::render_named_str`. (#149)
+- Exposed string interning via the `intern` function.
+- Improved support for structs in built-in filters.
 
 ## Breaking Changes
 

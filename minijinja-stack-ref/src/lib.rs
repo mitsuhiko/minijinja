@@ -1,10 +1,18 @@
 //! An extension package to MiniJinja that allows stack borrows.
 //!
-//! When implementing dynamic objects for MiniJinja lifetimes can quickly
-//! cause issues as it won't be possible to pass borrowed values to the
-//! template.  This crate allows you to get handles to values.  These
-//! handles are designed to forward to [`Object`], [`SeqObject`] and
-//! [`StructObject`] automatically.
+//! When implementing dynamic objects for MiniJinja lifetimes a common hurdle can
+//! be lifetimes.  That's because MiniJinja requires that all values passed to the
+//! template are owned by the runtime engine.  Thus it becomes impossible to carry
+//! non static lifetimes into the template.
+//!
+//! This crate provides a solution to this issue by moving lifetime checks to the
+//! runtime for MiniJinja objects.  One first needs to create a [`Scope`] with
+//! the [`scope`] function.  It invokes a callback to which a scope is passed
+//! which in turn then provides functionality to create
+//! [`Value`](minijinja::value::Value)s to those borrowed values such as the
+//! [`object_ref`](crate::Scope::object_ref) method.
+//!
+//! # Example
 //!
 //! ```
 //! use minijinja::value::{StructObject, Value};
@@ -27,20 +35,23 @@
 //! let mut env = Environment::new();
 //! env.add_template(
 //!     "info",
-//!     "app version: {{ state.version }}"
+//!     "app version: {{ state.version }}\nitems: {{ items }}"
 //! )
 //! .unwrap();
 //!
-//! let tmpl = env.get_template("info").unwrap();
 //! let state = State {
 //!     version: env!("CARGO_PKG_VERSION"),
 //! };
+//! let items = [1u32, 2, 3, 4];
 //!
-//! scope(|scope| {
-//!     println!("{}", tmpl.render(context! {
+//! let rv = scope(|scope| {
+//!     let tmpl = env.get_template("info").unwrap();
+//!     tmpl.render(context! {
 //!         state => scope.struct_object_ref(&state),
-//!     }).unwrap());
-//! })
+//!         items => scope.seq_object_ref(&items[..]),
+//!     }).unwrap()
+//! });
+//! println!("{}", rv);
 //! ```
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -71,15 +82,15 @@ thread_local! {
 ///
 /// A stack handle implements the underlying object protocols from
 /// MiniJinja.
-pub struct StackHandle<T> {
+pub struct StackHandle<T: ?Sized> {
     ptr: *const T,
     id: u64,
 }
 
-unsafe impl<T: Send> Send for StackHandle<T> {}
-unsafe impl<T: Sync> Sync for StackHandle<T> {}
+unsafe impl<T: Send + ?Sized> Send for StackHandle<T> {}
+unsafe impl<T: Sync + ?Sized> Sync for StackHandle<T> {}
 
-impl<T> StackHandle<T> {
+impl<T: ?Sized> StackHandle<T> {
     /// Checks if the handle is still valid.
     #[inline]
     pub fn is_valid(handle: &StackHandle<T>) -> bool {
@@ -97,7 +108,7 @@ impl<T> StackHandle<T> {
     }
 }
 
-impl<T: SeqObject + Send + Sync + 'static> SeqObject for StackHandle<T> {
+impl<T: SeqObject + Send + Sync + 'static + ?Sized> SeqObject for StackHandle<T> {
     fn get_item(&self, idx: usize) -> Option<Value> {
         self.with(|val| val.get_item(idx))
     }
@@ -107,7 +118,7 @@ impl<T: SeqObject + Send + Sync + 'static> SeqObject for StackHandle<T> {
     }
 }
 
-impl<T: StructObject + Send + Sync + 'static> StructObject for StackHandle<T> {
+impl<T: StructObject + Send + Sync + 'static + ?Sized> StructObject for StackHandle<T> {
     fn get_field(&self, idx: &str) -> Option<Value> {
         self.with(|val| val.get_field(idx))
     }
@@ -203,6 +214,8 @@ impl<T: Object> StructObject for StackHandleProxy<T> {
 }
 
 /// Captures the calling scope.
+///
+/// For how to use this type see [`scope`].
 pub struct Scope {
     id: u64,
     unset: bool,
@@ -221,7 +234,7 @@ impl Scope {
     }
 
     /// Creates a [`StackHandle`] to a value with at least the scope's lifetime.
-    pub fn handle<'env, T: 'env>(&'env self, value: &'env T) -> StackHandle<T> {
+    pub fn handle<'env, T: 'env + ?Sized>(&'env self, value: &'env T) -> StackHandle<T> {
         StackHandle {
             ptr: value as *const T,
             id: self.id,
@@ -238,14 +251,20 @@ impl Scope {
     /// Creates a [`Value`] from a borrowed [`SeqObject`].
     ///
     /// This is equivalent to `Value::from_seq_object(self.handle(value))`.
-    pub fn seq_object_ref<'env, T: SeqObject + 'static>(&'env self, value: &'env T) -> Value {
+    pub fn seq_object_ref<'env, T: SeqObject + 'static + ?Sized>(
+        &'env self,
+        value: &'env T,
+    ) -> Value {
         Value::from_seq_object(self.handle(value))
     }
 
     /// Creates a [`Value`] from a borrowed [`StructObject`].
     ///
     /// This is equivalent to `Value::from_struct_object(self.handle(value))`.
-    pub fn struct_object_ref<'env, T: StructObject + 'static>(&'env self, value: &'env T) -> Value {
+    pub fn struct_object_ref<'env, T: StructObject + 'static + ?Sized>(
+        &'env self,
+        value: &'env T,
+    ) -> Value {
         Value::from_struct_object(self.handle(value))
     }
 }
@@ -259,6 +278,17 @@ impl Drop for Scope {
 }
 
 /// Invokes a function with a reference to the stack scope so values can be borrowed.
+///
+/// ```
+/// # use minijinja_stack_ref::scope;
+/// use minijinja::render;
+///
+/// let items = [1u32, 2, 3, 4];
+/// let rv = scope(|scope| {
+///     render!("items: {{ items }}", items => scope.seq_object_ref(&items[..]))
+/// });
+/// assert_eq!(rv, "items: [1, 2, 3, 4]");
+/// ```
 pub fn scope<R, F: FnOnce(&Scope) -> R>(f: F) -> R {
     f(&Scope::new())
 }

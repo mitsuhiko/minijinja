@@ -76,7 +76,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     }
 }
 
-impl<T: Object> Object for std::sync::Arc<T> {
+impl<T: Object> Object for Arc<T> {
     #[inline]
     fn kind(&self) -> ObjectKind<'_> {
         T::kind(self)
@@ -225,7 +225,7 @@ impl dyn SeqObject + '_ {
     }
 }
 
-impl<T: SeqObject> SeqObject for std::sync::Arc<T> {
+impl<T: SeqObject> SeqObject for Arc<T> {
     #[inline]
     fn get_item(&self, idx: usize) -> Option<Value> {
         T::get_item(self, idx)
@@ -237,7 +237,19 @@ impl<T: SeqObject> SeqObject for std::sync::Arc<T> {
     }
 }
 
-impl<'a, T: Into<Value> + Send + Sync + Clone> SeqObject for &'a [T] {
+impl<'a, T: SeqObject + ?Sized> SeqObject for &'a T {
+    #[inline]
+    fn get_item(&self, idx: usize) -> Option<Value> {
+        T::get_item(self, idx)
+    }
+
+    #[inline]
+    fn item_count(&self) -> usize {
+        T::item_count(self)
+    }
+}
+
+impl<T: Into<Value> + Send + Sync + Clone> SeqObject for [T] {
     #[inline(always)]
     fn get_item(&self, idx: usize) -> Option<Value> {
         self.get(idx).cloned().map(Into::into)
@@ -427,7 +439,29 @@ pub trait StructObject: Send + Sync {
     }
 }
 
-impl<T: StructObject> StructObject for std::sync::Arc<T> {
+impl<T: StructObject> StructObject for Arc<T> {
+    #[inline]
+    fn get_field(&self, name: &str) -> Option<Value> {
+        T::get_field(self, name)
+    }
+
+    #[inline]
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        T::static_fields(self)
+    }
+
+    #[inline]
+    fn fields(&self) -> Vec<Arc<String>> {
+        T::fields(self)
+    }
+
+    #[inline]
+    fn field_count(&self) -> usize {
+        T::field_count(self)
+    }
+}
+
+impl<'a, T: StructObject + ?Sized> StructObject for &'a T {
     #[inline]
     fn get_field(&self, name: &str) -> Option<Value> {
         T::get_field(self, name)
