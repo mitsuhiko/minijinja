@@ -50,13 +50,12 @@ fn main() {
         manifest_dir: env!("CARGO_MANIFEST_DIR"),
         version: env!("CARGO_PKG_VERSION"),
     };
-    let utils = Utils;
     let items = [1i32, 2, 3, 4];
 
     scope(|scope| {
         let ctx = context! {
             config => scope.struct_object_ref(&config),
-            utils => scope.object_ref(&utils),
+            utils => scope.object_ref(&Utils),
             items => scope.seq_object_ref(&items[..]),
         };
         println!(
