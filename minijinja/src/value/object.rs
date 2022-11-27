@@ -389,20 +389,24 @@ pub trait StructObject: Send + Sync {
     /// that is fallible, instead use a method call.
     fn get_field(&self, name: &str) -> Option<Value>;
 
-    /// If possible returns a static vector of fields.
+    /// If possible returns a static vector of field names.
     ///
     /// If fields cannot be statically determined, then this must return `None`
-    /// and [`fields`](Self::fields) should be implemented instead.
+    /// and [`fields`](Self::fields) should be implemented instead.  If however
+    /// this method is implemented, then [`fields`](Self::fields) should not be
+    /// implemented as the default implementation dispatches to here, or it has
+    /// to be implemented to match the output.
     fn static_fields(&self) -> Option<&'static [&'static str]> {
         None
     }
 
-    /// Returns a vector of fields.
+    /// Returns a vector of field names.
     ///
     /// This should be implemented if [`static_fields`](Self::static_fields) cannot
     /// be implemented due to lifetime restrictions.  To avoid unnecessary
     /// allocations of the fields themselves it's recommended to use the
-    /// [`intern`] function.
+    /// [`intern`] function.  The default implementation converts the return value
+    /// of [`static_fields`](Self::static_fields) into a compatible format automatically.
     fn fields(&self) -> Vec<Arc<String>> {
         self.static_fields()
             .into_iter()
