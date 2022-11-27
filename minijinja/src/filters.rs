@@ -771,21 +771,18 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
     pub fn indent(
-        value: String,
+        mut value: String,
         width: usize,
         indent_first_line: Option<bool>,
         indent_blank_lines: Option<bool>,
     ) -> String {
-        fn strip_trailing_newline(input: String) -> String {
-            String::from(
-                input
-                    .strip_suffix("\r\n")
-                    .or_else(|| input.strip_suffix('\n'))
-                    .unwrap_or(input.as_str()),
-            )
+        fn strip_trailing_newline(input: &mut String) {
+            if let Some(stripped) = input.strip_suffix(&['\r', '\n'][..]) {
+                input.truncate(stripped.len());
+            }
         }
 
-        let value = strip_trailing_newline(value);
+        strip_trailing_newline(&mut value);
 
         let mut output: String = String::new();
         let mut iterator = value.split('\n');
@@ -794,19 +791,16 @@ mod builtins {
             output.push('\n');
         }
         for line in iterator {
-            // if iterator.peek().is_none() {
-            //     break // because split creates a empty String after the last new line
-            // }
             if line.is_empty() {
                 if indent_blank_lines.unwrap_or(false) {
-                    output.push_str(String::from(" ").repeat(width).as_str());
+                    output.push_str(&" ".repeat(width));
                 }
             } else {
-                output.push_str(format!("{}{}", String::from(" ").repeat(width), line).as_str());
+                output.push_str(format!("{}{}", " ".repeat(width), line).as_str());
             }
             output.push('\n');
         }
-        output = strip_trailing_newline(output); // strip last newline
+        strip_trailing_newline(&mut output);
         output
     }
 
