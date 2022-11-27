@@ -17,6 +17,7 @@ All notable changes to MiniJinja are documented here.
 - Added `Environment::render_named_str`. (#149)
 - Exposed string interning via the `intern` function.
 - Improved support for structs in built-in filters.
+- Added `indent` filter. (#151)
 
 ## Breaking Changes
 
