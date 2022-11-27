@@ -770,6 +770,7 @@ mod builtins {
     /// {{ global_config|indent(2,true,true)}} #indent whole Value and all Blank Lines value
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
+    #[cfg(feature = "builtins")]
     pub fn indent(
         mut value: String,
         width: usize,

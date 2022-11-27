@@ -61,6 +61,8 @@ batch-fill: {{ range(10)|batch(3, '-') }}
 slice: {{ range(10)|slice(3) }}
 slice-fill: {{ range(10)|slice(3, '-') }}
 items: {{ dict(a=1)|items }}
+indent: {{ "foo\nbar\nbaz"|indent(2)|tojson }}
+indent-first-line: {{ "foo\nbar\nbaz"|indent(2, true)|tojson }}
 int-abs: {{ -42|abs }}
 float-abs: {{ -42.5|abs }}
 int-round: {{ 42|round }}
