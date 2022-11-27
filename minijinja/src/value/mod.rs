@@ -965,6 +965,19 @@ impl Value {
         };
         Ok(OwnedValueIterator { iter_state, len })
     }
+
+    #[cfg(feature = "builtins")]
+    pub(crate) fn get_path(&self, path: &str) -> Result<Value, Error> {
+        let mut rv = self.clone();
+        for part in path.split('.') {
+            if let Ok(num) = part.parse::<usize>() {
+                rv = rv.get_item_by_index(num)?;
+            } else {
+                rv = rv.get_attr(part)?;
+            }
+        }
+        Ok(rv)
+    }
 }
 
 impl Serialize for Value {

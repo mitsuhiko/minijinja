@@ -77,6 +77,9 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::Boxe
         rv.insert("batch".into(), BoxedFilter::new(filters::batch));
         rv.insert("slice".into(), BoxedFilter::new(filters::slice));
         rv.insert("indent".into(), BoxedFilter::new(filters::indent));
+        rv.insert("select".into(), BoxedFilter::new(filters::select));
+        rv.insert("reject".into(), BoxedFilter::new(filters::reject));
+        rv.insert("map".into(), BoxedFilter::new(filters::map));
         #[cfg(feature = "json")]
         {
             rv.insert("tojson".into(), BoxedFilter::new(filters::tojson));

@@ -68,3 +68,10 @@ float-abs: {{ -42.5|abs }}
 int-round: {{ 42|round }}
 float-round: {{ 42.5|round }}
 float-round-prec2: {{ 42.512345|round(2) }}
+select-odd: {{ [1, 2, 3, 4, 5, 6]|select("odd") }}
+select-truthy: {{ [undefined, null, 0, 42, 23, "", "aha"]|select }}
+reject-odd: {{ [1, 2, 3, 4, 5, 6]|reject("odd") }}
+map-maps: {{ [-1, -2, 3, 4, -5]|map("abs") }}
+map-attr: {{ [dict(a=1), dict(a=2), {}]|map(attribute='a', default=None) }}
+map-attr-deep: {{ [dict(a=[1]), dict(a=[2]), {}]|map(attribute='a.0', default=None) }}
+map-attr-int: {{ [[1], [1, 2]]|map(attribute=1, default=999) }}

@@ -852,6 +852,163 @@ mod builtins {
         }
     }
 
+    #[cfg(feature = "builtins")]
+    fn select_or_reject(
+        state: &State,
+        invert: bool,
+        value: Value,
+        test_name: Option<Cow<'_, str>>,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
+        let mut rv = vec![];
+        let test = if let Some(test_name) = test_name {
+            Some(
+                state
+                    .env
+                    .get_test(&test_name)
+                    .ok_or_else(|| Error::from(ErrorKind::UnknownTest))?,
+            )
+        } else {
+            None
+        };
+        for value in value.try_iter()? {
+            let passed = if let Some(test) = test {
+                let new_args = Some(value.clone())
+                    .into_iter()
+                    .chain(args.0.iter().cloned())
+                    .collect::<Vec<_>>();
+                test.perform(state, &new_args)?
+            } else {
+                value.is_true()
+            };
+            if passed != invert {
+                rv.push(value);
+            }
+        }
+        Ok(rv)
+    }
+
+    /// Creates a new sequence of values that pass a test.
+    ///
+    /// Filters a sequence of objects by applying a test to each object.
+    /// Only values that pass the test are included.
+    ///
+    /// If no test is specified, each object will be evaluated as a boolean.
+    ///
+    /// ```jinja
+    /// {{ [1, 2, 3, 4]|select("odd") }} -> [1, 3]
+    /// {{ [false, null, 42]|select }} -> [42]
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn select(
+        state: &State,
+        value: Value,
+        test_name: Option<Cow<'_, str>>,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
+        select_or_reject(state, false, value, test_name, args)
+    }
+
+    /// Creates a new sequence of values that don't pass a test.
+    ///
+    /// This is the inverse of [`select`].
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn reject(
+        state: &State,
+        value: Value,
+        test_name: Option<Cow<'_, str>>,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
+        select_or_reject(state, true, value, test_name, args)
+    }
+
+    /// Applies a filter to a sequence of objects or looks up an attribute.
+    ///
+    /// This is useful when dealing with lists of objects but you are really
+    /// only interested in a certain value of it.
+    ///
+    /// The basic usage is mapping on an attribute. Given a list of users
+    /// you can for instance quickly select the username and join on it:
+    ///
+    /// ```jinja
+    /// {{ users|map(attribute='username')|join(', ') }}
+    /// ```
+    ///
+    /// You can specify a `default` value to use if an object in the list does
+    /// not have the given attribute.
+    ///
+    /// ```jinja
+    /// {{ users|map(attribute="username", default="Anonymous")|join(", ") }}
+    /// ```
+    ///
+    /// Alternatively you can have `map` invoke a filter by passing the name of the
+    /// filter and the arguments afterwards. A good example would be applying a
+    /// text conversion filter on a sequence:
+    ///
+    /// ```jinja
+    /// Users on this page: {{ titles|map('lower')|join(', ') }}
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn map(
+        state: &State,
+        value: Value,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
+        let mut rv = Vec::new();
+
+        // attribute mapping
+        if args.last().map_or(false, |x| x.is_kwargs()) {
+            let kwargs = args.first().unwrap();
+            if let Ok(attr) = kwargs.get_attr("attribute") {
+                // TODO: extra arguments shouldn't be ignored
+                if args.len() > 1 {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        "too many arguments",
+                    ));
+                }
+                let default = kwargs.get_attr("default").ok();
+                for value in value.try_iter()? {
+                    let sub_val = match attr.as_str() {
+                        Some(path) => value.get_path(path),
+                        None => value.get_item(&attr),
+                    };
+                    rv.push(match (sub_val, &default) {
+                        (Ok(attr), _) => attr,
+                        (Err(err), None) => return Err(err),
+                        (Err(_), Some(default)) => default.clone(),
+                    });
+                }
+                return Ok(rv);
+            }
+        }
+
+        // filter mapping
+        let filter_name = args
+            .0
+            .first()
+            .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "filter name is required"))?
+            .as_str()
+            .ok_or_else(|| {
+                Error::new(ErrorKind::InvalidOperation, "filter name must be a string")
+            })?;
+        let filter = state
+            .env
+            .get_filter(filter_name)
+            .ok_or_else(|| Error::from(ErrorKind::UnknownFilter))?;
+        for value in value.try_iter()? {
+            let new_args = Some(value.clone())
+                .into_iter()
+                .chain(args.0.iter().skip(1).cloned())
+                .collect::<Vec<_>>();
+            rv.push(filter.apply_to(state, &new_args)?);
+        }
+        Ok(rv)
+    }
+
     #[test]
     fn test_basics() {
         fn test(a: u32, b: u32) -> Result<u32, Error> {
