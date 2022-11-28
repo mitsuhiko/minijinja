@@ -5,6 +5,9 @@ engine is providing data whenever attributes are accessed.  This example is simi
 to the [load-resource](../load-resource) example but instead of loading data on a
 function call, the data is lazily loaded when attributes of an object are accessed.
 
+Also see [dynamic-context](../dynamic-context) for an example where
+the entire context is lazily computed.
+
 ```jinja
 <ul>
   {%- for item in site.nav %}

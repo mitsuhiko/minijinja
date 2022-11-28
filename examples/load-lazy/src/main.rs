@@ -1,29 +1,15 @@
 use std::collections::BTreeMap;
 use std::env;
-use std::fmt;
 use std::fs;
 use std::sync::Mutex;
 
-use minijinja::value::ObjectKind;
 use minijinja::value::StructObject;
-use minijinja::value::{Object, Value};
+use minijinja::value::Value;
 use minijinja::Environment;
 
 #[derive(Default, Debug)]
 struct Site {
     cache: Mutex<BTreeMap<String, Value>>,
-}
-
-impl fmt::Display for Site {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<Site>")
-    }
-}
-
-impl Object for Site {
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Struct(self)
-    }
 }
 
 impl StructObject for Site {
@@ -60,7 +46,7 @@ fn load_json(name: &str) -> Option<Value> {
 
 fn main() {
     let mut env = Environment::new();
-    env.add_global("site", Value::from_object(Site::default()));
+    env.add_global("site", Value::from_struct_object(Site::default()));
     env.add_template("template.html", include_str!("template.html"))
         .unwrap();
 
