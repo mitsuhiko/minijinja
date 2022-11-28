@@ -4,9 +4,9 @@ use std::env;
 use minijinja::value::{StructObject, Value};
 use minijinja::Environment;
 
-struct DynamiContext;
+struct DynamicContext;
 
-impl StructObject for DynamiContext {
+impl StructObject for DynamicContext {
     fn get_field(&self, field: &str) -> Option<Value> {
         Some(match field {
             "pid" => Value::from(std::process::id()),
@@ -34,7 +34,7 @@ fn main() {
         "{}",
         env.render_str(
             include_str!("template.txt"),
-            Value::from_struct_object(DynamiContext)
+            Value::from_struct_object(DynamicContext)
         )
         .unwrap()
     );
