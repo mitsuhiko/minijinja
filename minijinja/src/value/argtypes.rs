@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut};
 
@@ -279,6 +279,12 @@ impl<K: Into<StaticKey>, V: Into<Value>> FromIterator<(K, V)> for Value {
 
 impl<K: Into<StaticKey>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
     fn from(val: BTreeMap<K, V>) -> Self {
+        val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
+    }
+}
+
+impl<K: Into<StaticKey>, V: Into<Value>> From<HashMap<K, V>> for Value {
+    fn from(val: HashMap<K, V>) -> Self {
         val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
     }
 }

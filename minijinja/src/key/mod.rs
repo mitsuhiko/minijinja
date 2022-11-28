@@ -175,6 +175,20 @@ impl TryFrom<u64> for StaticKey {
     }
 }
 
+impl From<Arc<String>> for StaticKey {
+    #[inline(always)]
+    fn from(value: Arc<String>) -> Self {
+        Key::String(value)
+    }
+}
+
+impl From<String> for StaticKey {
+    #[inline(always)]
+    fn from(value: String) -> Self {
+        Key::String(Arc::new(value))
+    }
+}
+
 impl<'a> From<&'a str> for StaticKey {
     #[inline(always)]
     fn from(value: &'a str) -> Self {
