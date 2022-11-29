@@ -1,5 +1,10 @@
 //! An extension package to MiniJinja that allows stack borrows.
 //!
+//! **This is an experimental package. There might be soundness issues and there
+//! might be problems with the API. Please give feedback.**
+//!
+//! # Intro
+//!
 //! When implementing dynamic objects for MiniJinja lifetimes a common hurdle can
 //! be lifetimes.  That's because MiniJinja requires that all values passed to the
 //! template are owned by the runtime engine.  Thus it becomes impossible to carry
@@ -200,6 +205,13 @@ impl Drop for ResetHandleOnDrop {
 /// #   let _ = value;
 /// })
 /// ```
+///
+/// # Panics
+///
+/// This function panics if the passed object is not currently interacted with
+/// or not created via the [`Scope`].  In other words this function can only be
+/// used within object methods of [`Object`], [`SeqObject`] or [`StructObject`]
+/// of an object that has been put into a [`Value`] via a [`Scope`].
 pub fn reborrow<T: ?Sized, R>(obj: &T, f: for<'a> fn(&'a T, &'a Scope) -> R) -> R {
     CURRENT_HANDLE.with(|handle_ptr| {
         let handle = match unsafe {
