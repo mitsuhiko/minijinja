@@ -14,6 +14,8 @@
 //!
 //! # Example
 //!
+//! This example demonstrates how to pass borrowed information into a template:
+//!
 //! ```
 //! use minijinja::value::{StructObject, Value};
 //! use minijinja::{context, Environment};
@@ -53,12 +55,77 @@
 //! });
 //! println!("{}", rv);
 //! ```
+//!
+//! # Reborrowing
+//!
+//! If an object holds other complex values it can be interesting to again
+//! return a reference to a member rather.  In that case it becomes necessary
+//! again to get access to the [`Scope`].  This can be accomplished with the
+//! [`reborrow`] functionality which.  It lets you return references to `&self`
+//! from within an referenced object:
+//!
+//! ```
+//! use minijinja::value::{StructObject, Value};
+//! use minijinja::{context, Environment};
+//! use minijinja_stack_ref::scope;
+//!
+//! struct Config {
+//!     version: &'static str,
+//! }
+//!
+//! struct State {
+//!     config: Config,
+//! }
+//!
+//! impl StructObject for Config {
+//!     fn get_field(&self, field: &str) -> Option<Value> {
+//!         match field {
+//!             "version" => Some(Value::from(self.version)),
+//!             _ => None,
+//!         }
+//!     }
+//! }
+//!
+//! impl StructObject for State {
+//!     fn get_field(&self, field: &str) -> Option<Value> {
+//!         match field {
+//!             // return a reference to the inner config through reborrowing
+//!             "config" => Some(reborrow(self, |slf, scope| {
+//!                 scope.struct_object_ref(&slf.config)
+//!             })),
+//!             _ => None,
+//!         }
+//!     }
+//! }
+//!
+//! let mut env = Environment::new();
+//! env.add_template(
+//!     "info",
+//!     "app version: {{ state.config.version }}"
+//! )
+//! .unwrap();
+//!
+//! let state = State {
+//!     config: Config {
+//!         version: env!("CARGO_PKG_VERSION"),
+//!     }
+//! };
+//!
+//! let rv = scope(|scope| {
+//!     let tmpl = env.get_template("info").unwrap();
+//!     tmpl.render(context! {
+//!         state => scope.struct_object_ref(&state),
+//!     }).unwrap()
+//! });
+//! println!("{}", rv);
+//! ```
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::ffi::c_void;
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem::transmute;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
@@ -68,6 +135,7 @@ static STACK_SCOPE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 thread_local! {
     static STACK_SCOPE_IS_VALID: RefCell<HashSet<u64>> = RefCell::default();
+    static CURRENT_HANDLE: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
 }
 
 /// A handle to an enclosed value.
@@ -90,6 +158,86 @@ pub struct StackHandle<T: ?Sized> {
 unsafe impl<T: Send + ?Sized> Send for StackHandle<T> {}
 unsafe impl<T: Sync + ?Sized> Sync for StackHandle<T> {}
 
+struct ResetHandleOnDrop(*mut c_void);
+
+impl Drop for ResetHandleOnDrop {
+    fn drop(&mut self) {
+        CURRENT_HANDLE.with(|handle| handle.store(self.0, Ordering::SeqCst));
+    }
+}
+
+/// Reborrows a reference to a dynamic object with the scope's lifetime.
+///
+/// Within the trait methods of [`Object`], [`StructObject`] or [`SeqObject`] of a
+/// value that is currently referenced by a [`StackHandle`], this utility can be
+/// used to reborrow `&self` with the lifetime of the scope.
+///
+/// This lets code return a [`Value`] that borrows into a field of `&self`.
+///
+/// ```
+/// use minijinja::value::{Value, StructObject};
+/// use minijinja_stack_ref::{reborrow, scope};
+///
+/// struct MyObject {
+///     values: Vec<u32>,
+/// }
+///
+/// impl StructObject for MyObject {
+///     fn get_field(&self, field: &str) -> Option<Value> {
+///         match field {
+///             "values" => Some(reborrow(self, |slf, scope| {
+///                 scope.seq_object_ref(&slf.values[..])
+///             })),
+///             _ => None
+///         }
+///     }
+/// }
+///
+/// let obj = MyObject { values: (0..100).collect() };
+/// scope(|scope| {
+///     let value = scope.struct_object_ref(&obj);
+///     // do something with value
+/// #   let _ = value;
+/// })
+/// ```
+pub fn reborrow<T: ?Sized, R>(obj: &T, f: for<'a> fn(&'a T, &'a Scope) -> R) -> R {
+    CURRENT_HANDLE.with(|handle_ptr| {
+        let handle = match unsafe {
+            (handle_ptr.load(Ordering::SeqCst) as *const StackHandle<T>).as_ref()
+        } {
+            Some(handle) => handle,
+            None => {
+                panic!(
+                    "cannot reborrow &{} because there is no handle on the stack",
+                    std::any::type_name::<T>()
+                );
+            }
+        };
+
+        if handle.ptr != obj as *const T {
+            panic!(
+                "cannot reborrow &{} as it's not held in an active stack handle ({:?} != {:?})",
+                std::any::type_name::<T>(),
+                handle.ptr,
+                obj as *const T,
+            );
+        }
+
+        assert!(
+            StackHandle::is_valid(handle),
+            "cannot reborrow &{} because stack is gone",
+            std::any::type_name::<T>()
+        );
+
+        let scope = Scope {
+            id: handle.id,
+            unset: false,
+            _marker: PhantomData,
+        };
+        f(unsafe { &*handle.ptr as &T }, &scope)
+    })
+}
+
 impl<T: ?Sized> StackHandle<T> {
     /// Checks if the handle is still valid.
     #[inline]
@@ -104,6 +252,10 @@ impl<T: ?Sized> StackHandle<T> {
     /// This method panics if the handle is not valid.
     pub fn with<F: FnOnce(&T) -> R, R>(&self, f: F) -> R {
         assert!(StackHandle::is_valid(self), "stack is gone");
+        let _reset = ResetHandleOnDrop(
+            CURRENT_HANDLE
+                .with(|handle| handle.swap(self as *const _ as *mut c_void, Ordering::SeqCst)),
+        );
         f(unsafe { &*self.ptr as &T })
     }
 }
@@ -136,19 +288,19 @@ impl<T: StructObject + Send + Sync + 'static + ?Sized> StructObject for StackHan
     }
 }
 
-impl<T: Object> fmt::Debug for StackHandle<T> {
+impl<T: Object + ?Sized> fmt::Debug for StackHandle<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.with(|val| fmt::Debug::fmt(val, f))
     }
 }
 
-impl<T: Object> fmt::Display for StackHandle<T> {
+impl<T: Object + ?Sized> fmt::Display for StackHandle<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.with(|val| fmt::Display::fmt(val, f))
     }
 }
 
-impl<T: Object> Object for StackHandle<T> {
+impl<T: Object + ?Sized> Object for StackHandle<T> {
     fn kind(&self) -> ObjectKind<'_> {
         self.with(|val| match val.kind() {
             ObjectKind::Plain => ObjectKind::Plain,
@@ -172,7 +324,7 @@ impl<T: Object> Object for StackHandle<T> {
 }
 
 #[repr(transparent)]
-struct StackHandleProxy<T: Object>(StackHandle<T>);
+struct StackHandleProxy<T: Object + ?Sized>(StackHandle<T>);
 
 macro_rules! unwrap_kind {
     ($val:expr, $pat:path) => {
@@ -184,7 +336,7 @@ macro_rules! unwrap_kind {
     };
 }
 
-impl<T: Object> SeqObject for StackHandleProxy<T> {
+impl<T: Object + ?Sized> SeqObject for StackHandleProxy<T> {
     fn get_item(&self, idx: usize) -> Option<Value> {
         self.0
             .with(|val| unwrap_kind!(val, ObjectKind::Seq).get_item(idx))
@@ -196,7 +348,7 @@ impl<T: Object> SeqObject for StackHandleProxy<T> {
     }
 }
 
-impl<T: Object> StructObject for StackHandleProxy<T> {
+impl<T: Object + ?Sized> StructObject for StackHandleProxy<T> {
     fn get_field(&self, name: &str) -> Option<Value> {
         self.0
             .with(|val| unwrap_kind!(val, ObjectKind::Struct).get_field(name))
@@ -215,11 +367,18 @@ impl<T: Object> StructObject for StackHandleProxy<T> {
 
 /// Captures the calling scope.
 ///
-/// For how to use this type see [`scope`].
+/// To create a new scope, [`scope`] can be used.  To get the current active scope the
+/// [`reborrow`] functionality is available.
 pub struct Scope {
     id: u64,
     unset: bool,
     _marker: PhantomData<*const ()>,
+}
+
+impl fmt::Debug for Scope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Scope").field("id", &self.id).finish()
+    }
 }
 
 impl Scope {
@@ -244,7 +403,7 @@ impl Scope {
     /// Creates a [`Value`] from a borrowed [`Object`].
     ///
     /// This is equivalent to `Value::from_object(self.handle(value))`.
-    pub fn object_ref<'env, T: Object>(&'env self, value: &'env T) -> Value {
+    pub fn object_ref<'env, T: Object + ?Sized>(&'env self, value: &'env T) -> Value {
         Value::from_object(self.handle(value))
     }
 

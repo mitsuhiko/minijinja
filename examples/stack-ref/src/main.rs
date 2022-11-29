@@ -2,22 +2,43 @@ use std::{env, fmt};
 
 use minijinja::value::{Object, StructObject, Value};
 use minijinja::{context, Environment, Error, ErrorKind, State};
-use minijinja_stack_ref::scope;
+use minijinja_stack_ref::{reborrow, scope};
+
+struct NestedConfig {
+    active: bool,
+}
 
 struct Config {
     manifest_dir: &'static str,
     version: &'static str,
+    nested: NestedConfig,
 }
 
 impl StructObject for Config {
     fn static_fields(&self) -> Option<&'static [&'static str]> {
-        Some(&["manifest_dir", "version"][..])
+        Some(&["manifest_dir", "version", "nested"][..])
     }
 
     fn get_field(&self, field: &str) -> Option<Value> {
         match field {
             "manifest_dir" => Some(Value::from(self.manifest_dir)),
             "version" => Some(Value::from(self.version)),
+            "nested" => Some(reborrow(self, |slf, scope| {
+                scope.struct_object_ref(&slf.nested)
+            })),
+            _ => None,
+        }
+    }
+}
+
+impl StructObject for NestedConfig {
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        Some(&["active"][..])
+    }
+
+    fn get_field(&self, field: &str) -> Option<Value> {
+        match field {
+            "active" => Some(Value::from(self.active)),
             _ => None,
         }
     }
@@ -49,6 +70,7 @@ fn main() {
     let config = Config {
         manifest_dir: env!("CARGO_MANIFEST_DIR"),
         version: env!("CARGO_PKG_VERSION"),
+        nested: NestedConfig { active: true },
     };
     let items = [1i32, 2, 3, 4];
 
