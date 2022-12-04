@@ -50,6 +50,7 @@ State {
         ],
         filters: [
             "abs",
+            "attr",
             "batch",
             "bool",
             "count",
