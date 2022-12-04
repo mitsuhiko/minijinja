@@ -212,6 +212,8 @@ impl Drop for ResetHandleOnDrop {
 /// or not created via the [`Scope`].  In other words this function can only be
 /// used within object methods of [`Object`], [`SeqObject`] or [`StructObject`]
 /// of an object that has been put into a [`Value`] via a [`Scope`].
+///
+/// To check if reborrowing is possible, [`can_reborrow`] can be used instead.
 pub fn reborrow<T: ?Sized, R>(obj: &T, f: for<'a> fn(&'a T, &'a Scope) -> R) -> R {
     CURRENT_HANDLE.with(|handle_ptr| {
         let handle = match unsafe {
@@ -247,6 +249,51 @@ pub fn reborrow<T: ?Sized, R>(obj: &T, f: for<'a> fn(&'a T, &'a Scope) -> R) -> 
             _marker: PhantomData,
         };
         f(unsafe { &*handle.ptr as &T }, &scope)
+    })
+}
+
+/// Returns `true` if reborrowing is possible.
+///
+/// This can be used to make an object conditionally reborrow.  If this method returns
+/// `true`, then [`reborrow`] will not panic.
+///
+/// ```
+/// use minijinja::value::{Value, StructObject};
+/// use minijinja_stack_ref::{reborrow, can_reborrow, scope};
+///
+/// struct MyObject {
+///     values: Vec<u32>,
+/// }
+///
+/// impl StructObject for MyObject {
+///     fn get_field(&self, field: &str) -> Option<Value> {
+///         match field {
+///             "values" => if can_reborrow(self) {
+///                 Some(reborrow(self, |slf, scope| {
+///                     scope.seq_object_ref(&slf.values[..])
+///                 }))
+///             } else {
+///                 Some(Value::from_serializable(&self.values)),
+///             },
+///             _ => None
+///         }
+///     }
+/// }
+/// ```
+pub fn can_reborrow<T: ?Sized>(obj: &T) -> bool {
+    CURRENT_HANDLE.with(|handle_ptr| {
+        let handle = match unsafe {
+            (handle_ptr.load(Ordering::SeqCst) as *const StackHandle<T>).as_ref()
+        } {
+            Some(handle) => handle,
+            None => return false,
+        };
+
+        if handle.ptr != obj as *const T {
+            return false;
+        }
+
+        StackHandle::is_valid(handle)
     })
 }
 
