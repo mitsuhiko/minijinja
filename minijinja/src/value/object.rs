@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::any::{Any, TypeId};
 use std::fmt;
 use std::ops::Range;
 use std::sync::Arc;
@@ -73,6 +73,46 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
             ErrorKind::InvalidOperation,
             "tried to call non callable object",
         ))
+    }
+}
+
+impl dyn Object + '_ {
+    /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
+    ///
+    /// This is basically the "reverse" of [`from_object`](Value::from_object).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use minijinja::value::{Value, Object};
+    /// use std::fmt;
+    ///
+    /// #[derive(Debug)]
+    /// struct Thing {
+    ///     id: usize,
+    /// }
+    ///
+    /// impl fmt::Display for Thing {
+    ///     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    ///         fmt::Debug::fmt(self, f)
+    ///     }
+    /// }
+    ///
+    /// impl Object for Thing {}
+    ///
+    /// let x_value = Value::from_object(Thing { id: 42 });
+    /// let value_as_obj = x_value.as_object().unwrap();
+    /// let thing = value_as_obj.downcast_ref::<Thing>().unwrap();
+    /// assert_eq!(thing.id, 42);
+    /// ```
+    pub fn downcast_ref<T: Object>(&self) -> Option<&T> {
+        if (*self).type_id() == TypeId::of::<T>() {
+            unsafe {
+                let raw: *const (dyn Object) = self;
+                return (raw as *const u8 as *const T).as_ref();
+            }
+        }
+        None
     }
 }
 

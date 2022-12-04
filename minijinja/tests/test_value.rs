@@ -195,3 +195,17 @@ fn test_value_string_interop() {
     let v = Value::from(s);
     assert_eq!(v.as_str(), Some("Hello"));
 }
+
+#[test]
+fn test_value_object_interface() {
+    let val = Value::from_seq_object(vec![1u32, 2, 3, 4]);
+    let seq = val.as_seq().unwrap();
+    assert_eq!(seq.item_count(), 4);
+    let obj = val.as_object().unwrap();
+    let seq2 = match obj.kind() {
+        ObjectKind::Seq(s) => s,
+        _ => panic!("did not expect this"),
+    };
+    assert_eq!(seq2.item_count(), 4);
+    assert_eq!(obj.to_string(), "[1, 2, 3, 4]");
+}

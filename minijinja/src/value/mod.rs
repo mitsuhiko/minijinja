@@ -101,7 +101,6 @@
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
 
-use std::any::TypeId;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -637,6 +636,14 @@ impl Value {
         }
     }
 
+    /// If the valuen object, it's returned as [`Object`].
+    pub fn as_object(&self) -> Option<&dyn Object> {
+        match self.0 {
+            ValueRepr::Dynamic(ref dy) => Some(&**dy as &dyn Object),
+            _ => None,
+        }
+    }
+
     /// If the value is a sequence it's returned as [`SeqObject`].
     pub fn as_seq(&self) -> Option<&dyn SeqObject> {
         match self.0 {
@@ -788,7 +795,9 @@ impl Value {
 
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
     ///
-    /// This is basically the "reverse" of [`from_object`](Self::from_object).
+    /// This is basically the "reverse" of [`from_object`](Self::from_object).  It's also
+    /// a shortcut for [`downcast_ref`](trait.Object.html#method.downcast_ref)
+    /// on the return value of [`as_object`](Self::as_object).
     ///
     /// # Example
     ///
@@ -814,15 +823,7 @@ impl Value {
     /// assert_eq!(thing.id, 42);
     /// ```
     pub fn downcast_object_ref<T: Object>(&self) -> Option<&T> {
-        if let ValueRepr::Dynamic(ref obj) = self.0 {
-            if (**obj).type_id() == TypeId::of::<T>() {
-                unsafe {
-                    let raw: *const (dyn Object) = Arc::as_ptr(obj);
-                    return (raw as *const u8 as *const T).as_ref();
-                }
-            }
-        }
-        None
+        self.as_object().and_then(|x| x.downcast_ref())
     }
 
     fn get_item_opt(&self, key: &Value) -> Option<Value> {
