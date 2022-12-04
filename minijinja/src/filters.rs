@@ -593,15 +593,10 @@ mod builtins {
     /// an empty list is returned.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn list(value: Value) -> Result<Value, Error> {
-        if let Some(s) = value.as_str() {
-            Ok(Value::from(s.chars().map(Value::from).collect::<Vec<_>>()))
-        } else {
-            let iter = ok!(value.try_iter().map_err(|err| {
-                Error::new(ErrorKind::InvalidOperation, "cannot convert value to list")
-                    .with_source(err)
-            }));
-            Ok(Value::from(iter.collect::<Vec<_>>()))
-        }
+        let iter = ok!(value.try_iter().map_err(|err| {
+            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
+        }));
+        Ok(Value::from(iter.collect::<Vec<_>>()))
     }
 
     /// Converts the value into a boolean value.

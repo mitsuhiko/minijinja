@@ -923,6 +923,10 @@ impl Value {
     pub(crate) fn try_iter_owned(&self) -> Result<OwnedValueIterator, Error> {
         let (iter_state, len) = match self.0 {
             ValueRepr::None | ValueRepr::Undefined => (ValueIteratorState::Empty, 0),
+            ValueRepr::String(ref s, _) => (
+                ValueIteratorState::Chars(0, Arc::clone(s)),
+                s.chars().count(),
+            ),
             ValueRepr::Seq(ref seq) => (ValueIteratorState::Seq(0, Arc::clone(seq)), seq.len()),
             #[cfg(feature = "preserve_order")]
             ValueRepr::Map(ref items, _) => {
@@ -1093,6 +1097,7 @@ impl fmt::Debug for OwnedValueIterator {
 
 enum ValueIteratorState {
     Empty,
+    Chars(usize, Arc<String>),
     Seq(usize, Arc<Vec<Value>>),
     StaticStr(usize, &'static [&'static str]),
     ArcStr(usize, Vec<Arc<String>>),
@@ -1107,6 +1112,12 @@ impl ValueIteratorState {
     fn advance_state(&mut self) -> Option<Value> {
         match self {
             ValueIteratorState::Empty => None,
+            ValueIteratorState::Chars(offset, ref s) => {
+                s.as_str()[*offset..].chars().next().map(|c| {
+                    *offset += c.len_utf8();
+                    Value::from(c)
+                })
+            }
             ValueIteratorState::Seq(idx, items) => items
                 .get(*idx)
                 .map(|x| {

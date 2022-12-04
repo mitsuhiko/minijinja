@@ -20,6 +20,7 @@ All notable changes to MiniJinja are documented here.
 - Added `indent` filter. (#151)
 - Added the `map`, `select` / `selectattr` and `reject` / `rejectattr` filters.
 - Added `safe` / `escaped` test.
+- Strings now have the same iteration behavior as in Jinja2. (#152)
 
 ## Breaking Changes
 
