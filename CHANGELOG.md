@@ -9,6 +9,7 @@ All notable changes to MiniJinja are documented here.
 - Added `State::current_call` which exposes the name of the currently called
   item. (#150)
 - Introduced revamped object model with `SeqObject` and `StructObject`. (#148)
+- `Object` now directly exposes `downcast_ref` and `is`.
 - Removed `Value::as_slice`
 - Introduced `Value::as_seq` and `Value::as_struct`.
 - Introduced `Value::from_seq_object` and `Value::from_struct_object`.

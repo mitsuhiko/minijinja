@@ -76,7 +76,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     }
 }
 
-impl dyn Object + '_ {
+impl dyn Object {
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
     ///
     /// This is basically the "reverse" of [`from_object`](Value::from_object).
@@ -106,13 +106,15 @@ impl dyn Object + '_ {
     /// assert_eq!(thing.id, 42);
     /// ```
     pub fn downcast_ref<T: Object>(&self) -> Option<&T> {
-        if (*self).type_id() == TypeId::of::<T>() {
-            unsafe {
-                let raw: *const (dyn Object) = self;
-                return (raw as *const u8 as *const T).as_ref();
-            }
-        }
-        None
+        self.is::<T>().then(|| {
+            // SAFETY: `is` ensures this type cast is correct
+            unsafe { &*(self as *const dyn Object as *const T) }
+        })
+    }
+
+    /// Checks if the object is of a specific type.
+    pub fn is<T: Object>(&self) -> bool {
+        (*self).type_id() == TypeId::of::<T>()
     }
 }
 

@@ -201,6 +201,7 @@ fn test_value_object_interface() {
     let val = Value::from_seq_object(vec![1u32, 2, 3, 4]);
     let seq = val.as_seq().unwrap();
     assert_eq!(seq.item_count(), 4);
+
     let obj = val.as_object().unwrap();
     let seq2 = match obj.kind() {
         ObjectKind::Seq(s) => s,
@@ -208,4 +209,26 @@ fn test_value_object_interface() {
     };
     assert_eq!(seq2.item_count(), 4);
     assert_eq!(obj.to_string(), "[1, 2, 3, 4]");
+}
+
+#[test]
+fn test_obj_downcast() {
+    #[derive(Debug)]
+    struct Thing {
+        id: usize,
+    }
+
+    impl fmt::Display for Thing {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            fmt::Debug::fmt(self, f)
+        }
+    }
+
+    impl Object for Thing {}
+
+    let x_value = Value::from_object(Thing { id: 42 });
+    let value_as_obj = x_value.as_object().unwrap();
+    assert!(value_as_obj.is::<Thing>());
+    let thing = value_as_obj.downcast_ref::<Thing>().unwrap();
+    assert_eq!(thing.id, 42);
 }
