@@ -14,6 +14,14 @@ pub const LOOP_FLAG_WITH_LOOP_VAR: u8 = 1;
 /// This loop is recursive.
 pub const LOOP_FLAG_RECURSIVE: u8 = 2;
 
+/// This macro is self referential.
+#[cfg(feature = "macros")]
+pub const MACRO_SELF_REFERENTIAL: u8 = 1;
+
+/// This macro uses the caller var.
+#[cfg(feature = "macros")]
+pub const MACRO_CALLER: u8 = 2;
+
 /// Rust type to represent locals.
 pub type LocalId = u8;
 
@@ -211,7 +219,7 @@ pub enum Instruction<'source> {
 
     /// Builds a macro on the stack.
     #[cfg(feature = "macros")]
-    BuildMacro(&'source str, usize, bool),
+    BuildMacro(&'source str, usize, u8),
 
     /// Breaks from the interpreter loop (exists a function)
     #[cfg(feature = "macros")]

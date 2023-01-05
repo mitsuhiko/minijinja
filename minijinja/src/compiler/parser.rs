@@ -662,6 +662,8 @@ impl<'a> Parser<'a> {
             Token::Ident("from") => ast::Stmt::FromImport(respan!(ok!(self.parse_from_import()))),
             #[cfg(feature = "macros")]
             Token::Ident("macro") => ast::Stmt::Macro(respan!(ok!(self.parse_macro()))),
+            #[cfg(feature = "macros")]
+            Token::Ident("call") => ast::Stmt::CallBlock(respan!(ok!(self.parse_call_block()))),
             Token::Ident(name) => syntax_error!("unknown statement {}", name),
             token => syntax_error!("unknown {}, expected statement", token),
         })
@@ -952,11 +954,11 @@ impl<'a> Parser<'a> {
     }
 
     #[cfg(feature = "macros")]
-    fn parse_macro(&mut self) -> Result<ast::Macro<'a>, Error> {
-        let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier");
-        expect_token!(self, Token::ParenOpen, "`(`");
-        let mut args = Vec::new();
-        let mut defaults = Vec::new();
+    fn parse_args_and_defaults(
+        &mut self,
+        args: &mut Vec<ast::Expr<'a>>,
+        defaults: &mut Vec<ast::Expr<'a>>,
+    ) -> Result<(), Error> {
         loop {
             if skip_token!(self, Token::ParenClose) {
                 break;
@@ -974,6 +976,16 @@ impl<'a> Parser<'a> {
                 expect_token!(self, Token::Assign, "`=`");
             }
         }
+        Ok(())
+    }
+
+    #[cfg(feature = "macros")]
+    fn parse_macro(&mut self) -> Result<ast::Macro<'a>, Error> {
+        let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier");
+        expect_token!(self, Token::ParenOpen, "`(`");
+        let mut args = Vec::new();
+        let mut defaults = Vec::new();
+        self.parse_args_and_defaults(&mut args, &mut defaults)?;
         expect_token!(self, Token::BlockEnd(..), "end of block");
         let old_in_macro = std::mem::replace(&mut self.in_macro, true);
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endmacro"))));
@@ -984,6 +996,37 @@ impl<'a> Parser<'a> {
             args,
             defaults,
             body,
+        })
+    }
+
+    #[cfg(feature = "macros")]
+    fn parse_call_block(&mut self) -> Result<ast::CallBlock<'a>, Error> {
+        let span = self.stream.last_span();
+        let mut args = Vec::new();
+        let mut defaults = Vec::new();
+        if skip_token!(self, Token::ParenOpen) {
+            self.parse_args_and_defaults(&mut args, &mut defaults)?;
+        }
+        let call = match self.parse_expr()? {
+            ast::Expr::Call(call) => call,
+            _ => syntax_error!("expected call expression in call block"),
+        };
+        expect_token!(self, Token::BlockEnd(..), "end of block");
+        let old_in_macro = std::mem::replace(&mut self.in_macro, true);
+        let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endcall"))));
+        self.in_macro = old_in_macro;
+        ok!(self.stream.next());
+        Ok(ast::CallBlock {
+            call,
+            macro_decl: Spanned::new(
+                ast::Macro {
+                    name: "caller",
+                    args,
+                    defaults,
+                    body,
+                },
+                self.stream.expand_span(span),
+            ),
         })
     }
 

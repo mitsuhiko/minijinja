@@ -73,6 +73,8 @@ pub enum Stmt<'a> {
     Include(Spanned<Include<'a>>),
     #[cfg(feature = "macros")]
     Macro(Spanned<Macro<'a>>),
+    #[cfg(feature = "macros")]
+    CallBlock(Spanned<CallBlock<'a>>),
 }
 
 #[cfg(feature = "internal_debug")]
@@ -101,6 +103,8 @@ impl<'a> fmt::Debug for Stmt<'a> {
             Stmt::FromImport(s) => fmt::Debug::fmt(s, f),
             #[cfg(feature = "macros")]
             Stmt::Macro(s) => fmt::Debug::fmt(s, f),
+            #[cfg(feature = "macros")]
+            Stmt::CallBlock(s) => fmt::Debug::fmt(s, f),
         }
     }
 }
@@ -238,6 +242,14 @@ pub struct Macro<'a> {
     pub args: Vec<Expr<'a>>,
     pub defaults: Vec<Expr<'a>>,
     pub body: Vec<Stmt<'a>>,
+}
+
+/// A call block
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg(feature = "macros")]
+pub struct CallBlock<'a> {
+    pub call: Spanned<Call<'a>>,
+    pub macro_decl: Spanned<Macro<'a>>,
 }
 
 /// A "from" import

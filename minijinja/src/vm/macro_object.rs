@@ -20,6 +20,7 @@ pub(crate) struct MacroData {
     pub macro_ref_id: usize,
     pub closure: Value,
     pub self_reference: bool,
+    pub caller_reference: bool,
 }
 
 pub(crate) struct Macro {
@@ -80,6 +81,19 @@ impl Object for Macro {
             });
         }
 
+        let caller = if self.data.caller_reference {
+            kwargs_used.insert("caller");
+            match kwargs {
+                Some(kwargs) => kwargs
+                    .get(&Key::Str("caller"))
+                    .cloned()
+                    .unwrap_or(Value::UNDEFINED),
+                None => Value::UNDEFINED,
+            }
+        } else {
+            Value::UNDEFINED
+        };
+
         if let Some(kwargs) = kwargs {
             for key in kwargs.keys().filter_map(|x| x.as_str()) {
                 if !kwargs_used.contains(key) {
@@ -100,16 +114,21 @@ impl Object for Macro {
         // there.  Unfortunately because we only have a &self reference here, we
         // cannot bump our own refcount.  Instead we need to wrap the macro data
         // into an extra level of Arc to avoid unnecessary clones.
-        let closure = if self.data.self_reference {
+        let closure = if self.data.self_reference || !caller.is_undefined() {
             match self.data.closure.0 {
                 ValueRepr::Map(ref map, kind) => {
                     let mut map = map.clone();
-                    Arc::make_mut(&mut map).insert(
-                        Key::String(self.data.name.clone()),
-                        Value::from_object(Macro {
-                            data: self.data.clone(),
-                        }),
-                    );
+                    if self.data.self_reference {
+                        Arc::make_mut(&mut map).insert(
+                            Key::String(self.data.name.clone()),
+                            Value::from_object(Macro {
+                                data: self.data.clone(),
+                            }),
+                        );
+                    }
+                    if !caller.is_undefined() {
+                        Arc::make_mut(&mut map).insert(Key::Str("caller"), caller);
+                    }
                     ValueRepr::Map(map, kind).into()
                 }
                 _ => unreachable!(),
@@ -136,7 +155,7 @@ impl Object for Macro {
 
 impl StructObject for Macro {
     fn static_fields(&self) -> Option<&'static [&'static str]> {
-        Some(&["name", "arguments"][..])
+        Some(&["name", "arguments", "caller"][..])
     }
 
     fn get_field(&self, name: &str) -> Option<Value> {
@@ -152,6 +171,7 @@ impl StructObject for Macro {
                     .map(|x| Value(ValueRepr::String(x.clone(), StringType::Normal)))
                     .collect::<Vec<_>>(),
             )),
+            "caller" => Some(Value::from(self.data.caller_reference)),
             _ => None,
         }
     }

@@ -585,8 +585,8 @@ impl<'env> Vm<'env> {
                     stack.push(Value(ValueRepr::Map(module.into(), MapType::Normal)));
                 }
                 #[cfg(feature = "macros")]
-                Instruction::BuildMacro(name, offset, self_reference) => {
-                    self.build_macro(&mut stack, state, *offset, name, *self_reference);
+                Instruction::BuildMacro(name, offset, flags) => {
+                    self.build_macro(&mut stack, state, *offset, name, *flags);
                 }
                 #[cfg(feature = "macros")]
                 Instruction::Return => break,
@@ -847,8 +847,10 @@ impl<'env> Vm<'env> {
         state: &mut State,
         offset: usize,
         name: &str,
-        self_reference: bool,
+        flags: u8,
     ) {
+        use crate::compiler::instructions::{MACRO_CALLER, MACRO_SELF_REFERENTIAL};
+
         let arg_spec = match stack.pop().0 {
             ValueRepr::Seq(args) => args
                 .iter()
@@ -868,7 +870,8 @@ impl<'env> Vm<'env> {
                 arg_spec,
                 macro_ref_id,
                 closure,
-                self_reference,
+                self_reference: (flags & MACRO_SELF_REFERENTIAL) != 0,
+                caller_reference: (flags & MACRO_CALLER) != 0,
             }),
         }));
     }
