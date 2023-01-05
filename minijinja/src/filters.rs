@@ -302,11 +302,11 @@ mod builtins {
         rv
     }
 
-    /// Convert the string with all its characters lowercased 
+    /// Convert the string with all its characters lowercased
     /// apart from the first char which is uppercased.
-    /// 
+    ///
     /// ```jinja
-    /// <h1>{{ chapter.title|capitalize }}</h1> 
+    /// <h1>{{ chapter.title|capitalize }}</h1>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn capitalize(text: Cow<'_, str>) -> String {
