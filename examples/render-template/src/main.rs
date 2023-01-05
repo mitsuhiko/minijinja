@@ -30,7 +30,7 @@ fn execute() -> Result<(), Box<dyn std::error::Error>> {
     let ctx: serde_json::Value = serde_json::from_slice(&fs::read(&cli.context)?)?;
 
     let tmpl = env.get_template(name).unwrap();
-    print!("{}", tmpl.render(&ctx)?);
+    print!("{}", tmpl.render(ctx)?);
 
     Ok(())
 }

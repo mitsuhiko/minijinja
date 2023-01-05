@@ -51,7 +51,7 @@ impl Serializer for KeySerializer {
     }
 
     fn serialize_i64(self, v: i64) -> Result<StaticKey, Error> {
-        Ok(Key::I64(v as i64))
+        Ok(Key::I64(v))
     }
 
     fn serialize_i128(self, _: i128) -> Result<StaticKey, Error> {

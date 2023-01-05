@@ -343,9 +343,9 @@ impl<'source> Instructions<'source> {
             .line_infos
             .binary_search_by_key(&idx, |x| x.first_instruction as usize)
         {
-            Ok(idx) => &self.line_infos[idx as usize],
+            Ok(idx) => &self.line_infos[idx],
             Err(0) => return None,
-            Err(idx) => &self.line_infos[idx as usize - 1],
+            Err(idx) => &self.line_infos[idx - 1],
         };
         Some(loc.line as usize)
     }
@@ -358,9 +358,9 @@ impl<'source> Instructions<'source> {
                 .span_infos
                 .binary_search_by_key(&idx, |x| x.first_instruction as usize)
             {
-                Ok(idx) => &self.span_infos[idx as usize],
+                Ok(idx) => &self.span_infos[idx],
                 Err(0) => return None,
-                Err(idx) => &self.span_infos[idx as usize - 1],
+                Err(idx) => &self.span_infos[idx - 1],
             };
             loc.span
         }
