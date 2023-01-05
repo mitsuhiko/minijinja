@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+# 0.28.0
+
+- Added `capitalize` filter. (#163)
+
 # 0.27.0
 
 - Filters, tests and other functions can now be registered with a dynamically
