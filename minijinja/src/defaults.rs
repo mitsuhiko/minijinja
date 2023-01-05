@@ -58,6 +58,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::Boxe
         rv.insert("lower".into(), BoxedFilter::new(filters::lower));
         rv.insert("upper".into(), BoxedFilter::new(filters::upper));
         rv.insert("title".into(), BoxedFilter::new(filters::title));
+        rv.insert("capitalize".into(), BoxedFilter::new(filters::capitalize));
         rv.insert("replace".into(), BoxedFilter::new(filters::replace));
         rv.insert("length".into(), BoxedFilter::new(filters::length));
         rv.insert("count".into(), BoxedFilter::new(filters::length));
