@@ -540,9 +540,10 @@
 //!
 //! **Feature:** `macros` (included by default)
 //!
-//! This tag functions similar to a macro that is passed to another macro.   The
-//! following example shows a macro that takes advantage of the call
-//! functionality and how it can be used:
+//! This tag functions similar to a macro that is passed to another macro.  You can
+//! think of it as a way to declare an anonymous macro and pass it to another macro
+//! with the `caller` keyword argument.  The following example shows a macro that
+//! takes advantage of the call functionality and how it can be used:
 //!
 //! ```jinja
 //! {% macro dialog(title) %}
@@ -573,24 +574,25 @@
 //! {{ dialog(title="Hello World", caller=helper) }}
 //! ```
 //!
-//! It’s also possible to pass arguments back to the call block. This makes it
-//! useful as a replacement for loops:
+//! It’s also possible to pass arguments back to the call block.  This makes it
+//! useful as a replacement for loops.  Arguments are placed surrounded in
+//! parentheses right after the `call` keyword:
 //!
 //! ```jinja
-//! {% macro dump_users(users) -%}
+//! {% macro dump_users(users) %}
 //! <ul>
-//! {%- for user in users %}
+//! {% for user in users %}
 //!   <li><p>{{ user.username }}</p>{{ caller(user) }}</li>
-//! {%- endfor %}
+//! {% endfor %}
 //! </ul>
-//! {%- endmacro %}
+//! {% endmacro %}
 //!
 //! {% call(user) dump_users(list_of_user) %}
 //! <dl>
-//!   <dt>Realname</dt>
-//!   <dd>{{ user.realname|e }}</dd>
-//!   <dt>Description</dt>
-//!   <dd>{{ user.description }}</dd>
+//!   <dt>Name</dt>
+//!   <dd>{{ user.name }}</dd>
+//!   <dt>E-Mail</dt>
+//!   <dd>{{ user.email }}</dd>
 //! </dl>
 //! {% endcall %}
 //! ```
