@@ -22,6 +22,7 @@
 //!   - [`{% set %}`](#-set-)
 //!   - [`{% filter %}`](#-filter-)
 //!   - [`{% macro %}`](#-macro-)
+//!   - [`{% call %}`](#-call-)
 //!   - [`{% autoescape %}`](#-autoescape-)
 //!   - [`{% raw %}`](#-raw-)
 //!
@@ -531,6 +532,68 @@
 //! them at macro declaration time (eg: they use a closure).
 //!
 //! Macros can be imported via `{% import %}` or `{% from ... import %}`.
+//!
+//! Macros also accept a hidden `caller` keyword argument for the use with
+//! `{% call %}`.
+//!
+//! ## `{% call %}`
+//!
+//! **Feature:** `macros` (included by default)
+//!
+//! This tag functions similar to a macro that is passed to another macro.   The
+//! following example shows a macro that takes advantage of the call
+//! functionality and how it can be used:
+//!
+//! ```jinja
+//! {% macro dialog(title) %}
+//!   <div class="dialog">
+//!     <h3>{{ title }}</h3>
+//!     <div class="contents">{{ caller() }}</div>
+//!   </div>
+//! {% endmacro %}
+//!
+//! {% call dialog(title="Hello World") %}
+//!   This is the dialog body.
+//! {% endcall %}
+//! ```
+//!
+//! The above example is more or less equivalent with the following:
+//!
+//! ```jinja
+//! {% macro dialog(title) %}
+//!   <div class="dialog">
+//!     <h3>{{ title }}</h3>
+//!     <div class="contents">{{ caller() }}</div>
+//!   </div>
+//! {% endmacro %}
+//!
+//! {% macro helper() %}
+//!   This is the dialog body.
+//! {% endmacro %}
+//! {{ dialog(title="Hello World", caller=helper) }}
+//! ```
+//!
+//! It’s also possible to pass arguments back to the call block. This makes it
+//! useful as a replacement for loops:
+//!
+//! ```jinja
+//! {% macro dump_users(users) -%}
+//! <ul>
+//! {%- for user in users %}
+//!   <li><p>{{ user.username }}</p>{{ caller(user) }}</li>
+//! {%- endfor %}
+//! </ul>
+//! {%- endmacro %}
+//!
+//! {% call(user) dump_users(list_of_user) %}
+//! <dl>
+//!   <dt>Realname</dt>
+//!   <dd>{{ user.realname|e }}</dd>
+//!   <dt>Description</dt>
+//!   <dd>{{ user.description }}</dd>
+//! </dl>
+//! {% endcall %}
+//! ```
 //!
 //! ## `{% autoescape %}`
 //!
