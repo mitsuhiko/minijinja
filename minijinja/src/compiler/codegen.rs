@@ -698,34 +698,31 @@ impl<'source> CodeGenerator<'source> {
         self.pop_span();
     }
 
-    #[cfg(not(feature = "macros"))]
-    fn compile_call_args(
-        &mut self,
-        args: &[ast::Expr<'source>],
-        _: Option<&Caller<'source>>,
-    ) -> usize {
-        for arg in args {
-            self.compile_expr(arg);
-        }
-        return args.len();
-    }
-
-    #[cfg(feature = "macros")]
     fn compile_call_args(
         &mut self,
         args: &[ast::Expr<'source>],
         caller: Option<&Caller<'source>>,
     ) -> usize {
-        let caller = match caller {
-            Some(caller) => caller,
-            None => {
+        match caller {
+            // we can conditionally compile the caller part here since this will
+            // nicely call through for non macro builds
+            #[cfg(feature = "macros")]
+            Some(caller) => self.compile_call_args_with_caller(args, caller),
+            _ => {
                 for arg in args {
                     self.compile_expr(arg);
                 }
-                return args.len();
+                args.len()
             }
-        };
+        }
+    }
 
+    #[cfg(feature = "macros")]
+    fn compile_call_args_with_caller(
+        &mut self,
+        args: &[ast::Expr<'source>],
+        caller: &Caller<'source>,
+    ) -> usize {
         let mut injected_caller = false;
         for arg in args {
             if let ast::Expr::Kwargs(ref m) = arg {

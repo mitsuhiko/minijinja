@@ -83,15 +83,13 @@ impl Object for Macro {
 
         let caller = if self.data.caller_reference {
             kwargs_used.insert("caller");
-            match kwargs {
-                Some(kwargs) => kwargs
-                    .get(&Key::Str("caller"))
-                    .cloned()
-                    .unwrap_or(Value::UNDEFINED),
-                None => Value::UNDEFINED,
-            }
+            Some(
+                kwargs
+                    .and_then(|x| x.get(&Key::Str("caller")))
+                    .unwrap_or(&Value::UNDEFINED),
+            )
         } else {
-            Value::UNDEFINED
+            None
         };
 
         if let Some(kwargs) = kwargs {
@@ -114,24 +112,23 @@ impl Object for Macro {
         // there.  Unfortunately because we only have a &self reference here, we
         // cannot bump our own refcount.  Instead we need to wrap the macro data
         // into an extra level of Arc to avoid unnecessary clones.
-        let closure = if self.data.self_reference || !caller.is_undefined() {
-            match self.data.closure.0 {
-                ValueRepr::Map(ref map, kind) => {
-                    let mut map = map.clone();
-                    if self.data.self_reference {
-                        Arc::make_mut(&mut map).insert(
-                            Key::String(self.data.name.clone()),
-                            Value::from_object(Macro {
-                                data: self.data.clone(),
-                            }),
-                        );
-                    }
-                    if !caller.is_undefined() {
-                        Arc::make_mut(&mut map).insert(Key::Str("caller"), caller);
-                    }
-                    ValueRepr::Map(map, kind).into()
+        let closure = if self.data.self_reference || caller.is_some() {
+            if let ValueRepr::Map(ref map, kind) = self.data.closure.0 {
+                let mut map = map.clone();
+                if self.data.self_reference {
+                    Arc::make_mut(&mut map).insert(
+                        Key::String(self.data.name.clone()),
+                        Value::from_object(Macro {
+                            data: self.data.clone(),
+                        }),
+                    );
                 }
-                _ => unreachable!(),
+                if let Some(caller) = caller {
+                    Arc::make_mut(&mut map).insert(Key::Str("caller"), caller.clone());
+                }
+                ValueRepr::Map(map, kind).into()
+            } else {
+                unreachable!();
             }
         } else {
             self.data.closure.clone()
