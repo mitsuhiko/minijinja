@@ -53,6 +53,7 @@ State {
             "attr",
             "batch",
             "bool",
+            "capitalize",
             "count",
             "d",
             "default",

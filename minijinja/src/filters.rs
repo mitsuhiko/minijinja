@@ -302,6 +302,21 @@ mod builtins {
         rv
     }
 
+    /// Convert the string with all its characters lowercased
+    /// apart from the first char which is uppercased.
+    ///
+    /// ```jinja
+    /// <h1>{{ chapter.title|capitalize }}</h1>
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn capitalize(text: Cow<'_, str>) -> String {
+        let mut chars = text.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(f) => f.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
+        }
+    }
+
     /// Does a string replace.
     ///
     /// It replaces all ocurrences of the first parameter with the second.

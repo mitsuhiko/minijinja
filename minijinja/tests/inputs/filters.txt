@@ -1,6 +1,7 @@
 {
   "word": "Bird",
   "word_with_spaces": " Spacebird\n",
+  "three_words": "bird and dinosaur",
   "list": [
     1,
     2,
@@ -17,6 +18,9 @@ lower: {{ word|lower }}
 upper: {{ word|upper }}
 title: {{ word|title }}
 title-sentence: {{ "the bIrd, is The:word"|title }}
+title-three-words: {{ three_words|title }}
+capitalize: {{ word|capitalize }}
+capitalize-three-words: {{ three_words|capitalize }}
 replace: {{ word|replace("B", "th") }}
 escape: {{ "<"|escape }}
 e: {{ "<"|e }}
