@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt::Write;
-use std::fs;
+use std::{env, fs};
 
 use minijinja::value::{StructObject, Value};
 use minijinja::{context, Environment, Error, State};
@@ -10,16 +10,14 @@ use similar_asserts::assert_eq;
 #[test]
 fn test_vm() {
     let mut refs = Vec::new();
-    for entry in fs::read_dir("tests/inputs/refs").unwrap() {
-        let entry = entry.unwrap();
-        let filename = entry.file_name();
+    insta::glob!("inputs/refs/*", |entry| {
+        let filename = entry.file_name().unwrap();
         let filename = filename.to_str().unwrap();
-        if !filename.ends_with(".txt") && !filename.ends_with(".html") {
-            continue;
+        if filename.ends_with(".txt") || filename.ends_with(".html") {
+            let source = fs::read_to_string(entry).unwrap();
+            refs.push((entry.to_path_buf(), source));
         }
-        let source = fs::read_to_string(entry.path()).unwrap();
-        refs.push((entry.path().clone(), source));
-    }
+    });
 
     insta::glob!("inputs/*", |path| {
         if !path.metadata().unwrap().is_file() {

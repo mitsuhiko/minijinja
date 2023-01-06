@@ -54,6 +54,6 @@ memo-map = { version = "0.3.1", optional = true }
 unicode-ident = { version = "1.0.5", optional = true }
 
 [dev-dependencies]
-insta = { version = "1.19.0", features = ["glob", "serde"] }
+insta = { version = "1.26.0", features = ["glob", "serde"] }
 serde_json = "1.0.68"
 similar-asserts = "1.4.2"

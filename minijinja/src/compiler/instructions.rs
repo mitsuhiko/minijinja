@@ -1,9 +1,6 @@
 #[cfg(feature = "internal_debug")]
 use std::fmt;
 
-#[cfg(test)]
-use similar_asserts::assert_eq;
-
 use crate::compiler::tokens::Span;
 use crate::output::CaptureMode;
 use crate::value::Value;
