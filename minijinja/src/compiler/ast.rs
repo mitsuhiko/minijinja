@@ -150,6 +150,27 @@ impl<'a> fmt::Debug for Expr<'a> {
     }
 }
 
+impl<'a> Expr<'a> {
+    pub fn description(&self) -> &'static str {
+        match self {
+            Expr::Var(_) => "variable",
+            Expr::Const(_) => "constant",
+            Expr::Slice(_)
+            | Expr::UnaryOp(_)
+            | Expr::BinOp(_)
+            | Expr::IfExpr(_)
+            | Expr::GetAttr(_)
+            | Expr::GetItem(_) => "expression",
+            Expr::Call(_) => "call",
+            Expr::List(_) => "list literal",
+            Expr::Map(_) => "map literal",
+            Expr::Test(_) => "test expression",
+            Expr::Filter(_) => "filter expression",
+            Expr::Kwargs(_) => "keyword arguments",
+        }
+    }
+}
+
 /// Root template node.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Template<'a> {

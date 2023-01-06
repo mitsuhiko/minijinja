@@ -724,6 +724,8 @@ impl<'source> CodeGenerator<'source> {
         caller: &Caller<'source>,
     ) -> usize {
         let mut injected_caller = false;
+
+        // try to add the caller to already existing keyword arguments.
         for arg in args {
             if let ast::Expr::Kwargs(ref m) = arg {
                 self.set_line_from_span(m.span());
@@ -740,6 +742,8 @@ impl<'source> CodeGenerator<'source> {
             }
         }
 
+        // if there are no keyword args so far, create a new kwargs object
+        // and add caller to that.
         if !injected_caller {
             self.add(Instruction::LoadConst(Value::from("caller")));
             self.compile_macro_expression(caller);

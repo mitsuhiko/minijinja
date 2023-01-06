@@ -558,6 +558,8 @@
 //! {% endcall %}
 //! ```
 //!
+//! <details><summary><strong style="cursor: pointer">Macro Alternative:</strong></summary>
+//!
 //! The above example is more or less equivalent with the following:
 //!
 //! ```jinja
@@ -568,18 +570,21 @@
 //!   </div>
 //! {% endmacro %}
 //!
-//! {% macro helper() %}
+//! {% macro caller() %}
 //!   This is the dialog body.
 //! {% endmacro %}
-//! {{ dialog(title="Hello World", caller=helper) }}
+//! {{ dialog(title="Hello World", caller=caller) }}
 //! ```
 //!
+//! </details>
+//!
 //! It’s also possible to pass arguments back to the call block.  This makes it
-//! useful as a replacement for loops.  Arguments are placed surrounded in
-//! parentheses right after the `call` keyword:
+//! useful to build macros that behave like if statements or loops.  Arguments
+//! are placed surrounded in parentheses right after the `call` keyword and
+//! is followed by the macro to be called.
 //!
 //! ```jinja
-//! {% macro dump_users(users) %}
+//! {% macro render_user_list(users) %}
 //! <ul>
 //! {% for user in users %}
 //!   <li><p>{{ user.username }}</p>{{ caller(user) }}</li>
@@ -587,7 +592,7 @@
 //! </ul>
 //! {% endmacro %}
 //!
-//! {% call(user) dump_users(list_of_user) %}
+//! {% call(user) render_user_list(list_of_user) %}
 //! <dl>
 //!   <dt>Name</dt>
 //!   <dd>{{ user.name }}</dd>
