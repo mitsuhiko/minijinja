@@ -664,7 +664,7 @@ impl<'a> Parser<'a> {
             Token::Ident("macro") => ast::Stmt::Macro(respan!(ok!(self.parse_macro()))),
             #[cfg(feature = "macros")]
             Token::Ident("call") => ast::Stmt::CallBlock(respan!(ok!(self.parse_call_block()))),
-            Token::Ident("do") => ast::Stmt::Do(respan!(ok!(self.parse_do_block()))),
+            Token::Ident("do") => ast::Stmt::Do(respan!(ok!(self.parse_do()))),
             Token::Ident(name) => syntax_error!("unknown statement {}", name),
             token => syntax_error!("unknown {}, expected statement", token),
         })
@@ -1030,7 +1030,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_do_block(&mut self) -> Result<ast::Do<'a>, Error> {
+    fn parse_do(&mut self) -> Result<ast::Do<'a>, Error> {
         let mut args = Vec::new();
         let mut defaults = Vec::new();
         if skip_token!(self, Token::ParenOpen) {
