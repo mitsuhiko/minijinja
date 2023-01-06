@@ -954,6 +954,7 @@ impl<'a> Parser<'a> {
         Ok(ast::FromImport { expr, names })
     }
 
+    #[cfg(feature = "macros")]
     fn parse_macro_args_and_defaults(
         &mut self,
         args: &mut Vec<ast::Expr<'a>>,
