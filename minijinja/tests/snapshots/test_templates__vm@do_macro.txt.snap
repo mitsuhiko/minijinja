@@ -6,5 +6,6 @@ input_file: minijinja/tests/inputs/do_macro.txt
 ---
 
 
-Should be empty:
+Should be empty: 
 Should show: Dialog is Hello World
+
