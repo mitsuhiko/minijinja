@@ -51,3 +51,19 @@ jobs:
           override: true
       - name: Test
         run: make test
+
+  test-wasi:
+    name: Test on WASI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.61.0
+          profile: minimal
+          override: true
+      - name: Install WasmTime
+        run: curl https://wasmtime.dev/install.sh -sSf | bash
+      - name: Test
+        run: cd minijinja && cargo test --target=wasm32-wasi
