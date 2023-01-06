@@ -20,6 +20,7 @@ pub(crate) struct MacroData {
     pub macro_ref_id: usize,
     pub closure: Value,
     pub self_reference: bool,
+    pub caller_reference: bool,
 }
 
 pub(crate) struct Macro {
@@ -80,6 +81,17 @@ impl Object for Macro {
             });
         }
 
+        let caller = if self.data.caller_reference {
+            kwargs_used.insert("caller");
+            Some(
+                kwargs
+                    .and_then(|x| x.get(&Key::Str("caller")))
+                    .unwrap_or(&Value::UNDEFINED),
+            )
+        } else {
+            None
+        };
+
         if let Some(kwargs) = kwargs {
             for key in kwargs.keys().filter_map(|x| x.as_str()) {
                 if !kwargs_used.contains(key) {
@@ -100,19 +112,23 @@ impl Object for Macro {
         // there.  Unfortunately because we only have a &self reference here, we
         // cannot bump our own refcount.  Instead we need to wrap the macro data
         // into an extra level of Arc to avoid unnecessary clones.
-        let closure = if self.data.self_reference {
-            match self.data.closure.0 {
-                ValueRepr::Map(ref map, kind) => {
-                    let mut map = map.clone();
+        let closure = if self.data.self_reference || caller.is_some() {
+            if let ValueRepr::Map(ref map, kind) = self.data.closure.0 {
+                let mut map = map.clone();
+                if self.data.self_reference {
                     Arc::make_mut(&mut map).insert(
                         Key::String(self.data.name.clone()),
                         Value::from_object(Macro {
                             data: self.data.clone(),
                         }),
                     );
-                    ValueRepr::Map(map, kind).into()
                 }
-                _ => unreachable!(),
+                if let Some(caller) = caller {
+                    Arc::make_mut(&mut map).insert(Key::Str("caller"), caller.clone());
+                }
+                ValueRepr::Map(map, kind).into()
+            } else {
+                unreachable!();
             }
         } else {
             self.data.closure.clone()
@@ -136,7 +152,7 @@ impl Object for Macro {
 
 impl StructObject for Macro {
     fn static_fields(&self) -> Option<&'static [&'static str]> {
-        Some(&["name", "arguments"][..])
+        Some(&["name", "arguments", "caller"][..])
     }
 
     fn get_field(&self, name: &str) -> Option<Value> {
@@ -152,6 +168,7 @@ impl StructObject for Macro {
                     .map(|x| Value(ValueRepr::String(x.clone(), StringType::Normal)))
                     .collect::<Vec<_>>(),
             )),
+            "caller" => Some(Value::from(self.data.caller_reference)),
             _ => None,
         }
     }

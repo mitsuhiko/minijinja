@@ -11,6 +11,12 @@ use crate::value::Value;
 #[cfg(test)]
 use similar_asserts::assert_eq;
 
+#[cfg(feature = "macros")]
+type Caller<'source> = ast::Spanned<ast::Macro<'source>>;
+
+#[cfg(not(feature = "macros"))]
+type Caller<'source> = std::marker::PhantomData<&'source ()>;
+
 /// For the first `MAX_LOCALS` filters/tests, an ID is returned for faster lookups from the stack.
 fn get_local_id<'source>(ids: &mut BTreeMap<&'source str, LocalId>, name: &'source str) -> LocalId {
     if let Some(id) = ids.get(name) {
@@ -344,6 +350,10 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::Macro(macro_decl) => {
                 self.compile_macro(macro_decl);
             }
+            #[cfg(feature = "macros")]
+            ast::Stmt::CallBlock(call_block) => {
+                self.compile_call_block(call_block);
+            }
         }
     }
 
@@ -360,12 +370,11 @@ impl<'source> CodeGenerator<'source> {
     }
 
     #[cfg(feature = "macros")]
-    fn compile_macro(&mut self, macro_decl: &ast::Spanned<ast::Macro<'source>>) {
+    fn compile_macro_expression(&mut self, macro_decl: &ast::Spanned<ast::Macro<'source>>) {
+        use crate::compiler::instructions::{MACRO_CALLER, MACRO_SELF_REFERENTIAL};
         use crate::value::ValueRepr;
-
         self.set_line_from_span(macro_decl.span());
         let instr = self.add(Instruction::Jump(!0));
-
         let mut defaults_iter = macro_decl.defaults.iter().rev();
         for arg in macro_decl.args.iter().rev() {
             if let Some(default) = defaults_iter.next() {
@@ -378,21 +387,19 @@ impl<'source> CodeGenerator<'source> {
             }
             self.compile_assignment(arg);
         }
-
         for node in &macro_decl.body {
             self.compile_stmt(node);
         }
         self.add(Instruction::Return);
-
-        let undeclared = crate::compiler::meta::find_macro_closure(macro_decl);
+        let mut undeclared = crate::compiler::meta::find_macro_closure(macro_decl);
         let self_reference = undeclared.contains(macro_decl.name);
+        let caller_reference = undeclared.remove("caller");
         let macro_instr = self.next_instruction();
         for name in &undeclared {
             self.add(Instruction::LoadConst(Value::from(*name)));
             self.add(Instruction::Lookup(name));
         }
         self.add(Instruction::BuildMap(undeclared.len()));
-
         self.add(Instruction::LoadConst(Value::from(ValueRepr::Seq(
             macro_decl
                 .args
@@ -404,19 +411,31 @@ impl<'source> CodeGenerator<'source> {
                 .collect::<Vec<_>>()
                 .into(),
         ))));
-
-        self.add(Instruction::BuildMacro(
-            macro_decl.name,
-            instr + 1,
-            self_reference,
-        ));
-        self.add(Instruction::StoreLocal(macro_decl.name));
-
+        let mut flags = 0;
+        if self_reference {
+            flags |= MACRO_SELF_REFERENTIAL;
+        }
+        if caller_reference {
+            flags |= MACRO_CALLER;
+        }
+        self.add(Instruction::BuildMacro(macro_decl.name, instr + 1, flags));
         if let Some(Instruction::Jump(ref mut target)) = self.instructions.get_mut(instr) {
             *target = macro_instr;
         } else {
             unreachable!();
         }
+    }
+
+    #[cfg(feature = "macros")]
+    fn compile_macro(&mut self, macro_decl: &ast::Spanned<ast::Macro<'source>>) {
+        self.compile_macro_expression(macro_decl);
+        self.add(Instruction::StoreLocal(macro_decl.name));
+    }
+
+    #[cfg(feature = "macros")]
+    fn compile_call_block(&mut self, call_block: &ast::Spanned<ast::CallBlock<'source>>) {
+        self.compile_call(&call_block.call, Some(&call_block.macro_decl));
+        self.add(Instruction::Emit);
     }
 
     fn compile_if_stmt(&mut self, if_cond: &ast::Spanned<ast::IfCond<'source>>) {
@@ -607,7 +626,7 @@ impl<'source> CodeGenerator<'source> {
                 self.pop_span();
             }
             ast::Expr::Call(c) => {
-                self.compile_call(c);
+                self.compile_call(c, None);
             }
             ast::Expr::List(l) => {
                 if let Some(val) = l.as_const() {
@@ -648,14 +667,16 @@ impl<'source> CodeGenerator<'source> {
         }
     }
 
-    fn compile_call(&mut self, c: &ast::Spanned<ast::Call<'source>>) {
+    fn compile_call(
+        &mut self,
+        c: &ast::Spanned<ast::Call<'source>>,
+        caller: Option<&Caller<'source>>,
+    ) {
         self.push_span(c.span());
         match c.identify_call() {
             ast::CallType::Function(name) => {
-                for arg in &c.args {
-                    self.compile_expr(arg);
-                }
-                self.add(Instruction::CallFunction(name, c.args.len()));
+                let arg_count = self.compile_call_args(&c.args, caller);
+                self.add(Instruction::CallFunction(name, arg_count));
             }
             #[cfg(feature = "multi-template")]
             ast::CallType::Block(name) => {
@@ -665,20 +686,72 @@ impl<'source> CodeGenerator<'source> {
             }
             ast::CallType::Method(expr, name) => {
                 self.compile_expr(expr);
-                for arg in &c.args {
-                    self.compile_expr(arg);
-                }
-                self.add(Instruction::CallMethod(name, c.args.len() + 1));
+                let arg_count = self.compile_call_args(&c.args, caller);
+                self.add(Instruction::CallMethod(name, arg_count + 1));
             }
             ast::CallType::Object(expr) => {
                 self.compile_expr(expr);
-                for arg in &c.args {
-                    self.compile_expr(arg);
-                }
-                self.add(Instruction::CallObject(c.args.len() + 1));
+                let arg_count = self.compile_call_args(&c.args, caller);
+                self.add(Instruction::CallObject(arg_count + 1));
             }
         };
         self.pop_span();
+    }
+
+    fn compile_call_args(
+        &mut self,
+        args: &[ast::Expr<'source>],
+        caller: Option<&Caller<'source>>,
+    ) -> usize {
+        match caller {
+            // we can conditionally compile the caller part here since this will
+            // nicely call through for non macro builds
+            #[cfg(feature = "macros")]
+            Some(caller) => self.compile_call_args_with_caller(args, caller),
+            _ => {
+                for arg in args {
+                    self.compile_expr(arg);
+                }
+                args.len()
+            }
+        }
+    }
+
+    #[cfg(feature = "macros")]
+    fn compile_call_args_with_caller(
+        &mut self,
+        args: &[ast::Expr<'source>],
+        caller: &Caller<'source>,
+    ) -> usize {
+        let mut injected_caller = false;
+
+        // try to add the caller to already existing keyword arguments.
+        for arg in args {
+            if let ast::Expr::Kwargs(ref m) = arg {
+                self.set_line_from_span(m.span());
+                for (key, value) in &m.pairs {
+                    self.add(Instruction::LoadConst(Value::from(*key)));
+                    self.compile_expr(value);
+                }
+                self.add(Instruction::LoadConst(Value::from("caller")));
+                self.compile_macro_expression(caller);
+                self.add(Instruction::BuildKwargs(m.pairs.len() + 1));
+                injected_caller = true;
+            } else {
+                self.compile_expr(arg);
+            }
+        }
+
+        // if there are no keyword args so far, create a new kwargs object
+        // and add caller to that.
+        if !injected_caller {
+            self.add(Instruction::LoadConst(Value::from("caller")));
+            self.compile_macro_expression(caller);
+            self.add(Instruction::BuildKwargs(1));
+            args.len() + 1
+        } else {
+            args.len()
+        }
     }
 
     fn compile_bin_op(&mut self, c: &ast::Spanned<ast::BinOp<'source>>) {

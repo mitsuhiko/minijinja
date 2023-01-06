@@ -22,6 +22,7 @@
 //!   - [`{% set %}`](#-set-)
 //!   - [`{% filter %}`](#-filter-)
 //!   - [`{% macro %}`](#-macro-)
+//!   - [`{% call %}`](#-call-)
 //!   - [`{% autoescape %}`](#-autoescape-)
 //!   - [`{% raw %}`](#-raw-)
 //!
@@ -531,6 +532,75 @@
 //! them at macro declaration time (eg: they use a closure).
 //!
 //! Macros can be imported via `{% import %}` or `{% from ... import %}`.
+//!
+//! Macros also accept a hidden `caller` keyword argument for the use with
+//! `{% call %}`.
+//!
+//! ## `{% call %}`
+//!
+//! **Feature:** `macros` (included by default)
+//!
+//! This tag functions similar to a macro that is passed to another macro.  You can
+//! think of it as a way to declare an anonymous macro and pass it to another macro
+//! with the `caller` keyword argument.  The following example shows a macro that
+//! takes advantage of the call functionality and how it can be used:
+//!
+//! ```jinja
+//! {% macro dialog(title) %}
+//!   <div class="dialog">
+//!     <h3>{{ title }}</h3>
+//!     <div class="contents">{{ caller() }}</div>
+//!   </div>
+//! {% endmacro %}
+//!
+//! {% call dialog(title="Hello World") %}
+//!   This is the dialog body.
+//! {% endcall %}
+//! ```
+//!
+//! <details><summary><strong style="cursor: pointer">Macro Alternative:</strong></summary>
+//!
+//! The above example is more or less equivalent with the following:
+//!
+//! ```jinja
+//! {% macro dialog(title) %}
+//!   <div class="dialog">
+//!     <h3>{{ title }}</h3>
+//!     <div class="contents">{{ caller() }}</div>
+//!   </div>
+//! {% endmacro %}
+//!
+//! {% macro caller() %}
+//!   This is the dialog body.
+//! {% endmacro %}
+//! {{ dialog(title="Hello World", caller=caller) }}
+//! ```
+//!
+//! </details>
+//!
+//! It’s also possible to pass arguments back to the call block.  This makes it
+//! useful to build macros that behave like if statements or loops.  Arguments
+//! are placed surrounded in parentheses right after the `call` keyword and
+//! is followed by the macro to be called.
+//!
+//! ```jinja
+//! {% macro render_user_list(users) %}
+//! <ul>
+//! {% for user in users %}
+//!   <li><p>{{ user.username }}</p>{{ caller(user) }}</li>
+//! {% endfor %}
+//! </ul>
+//! {% endmacro %}
+//!
+//! {% call(user) render_user_list(list_of_user) %}
+//! <dl>
+//!   <dt>Name</dt>
+//!   <dd>{{ user.name }}</dd>
+//!   <dt>E-Mail</dt>
+//!   <dd>{{ user.email }}</dd>
+//! </dl>
+//! {% endcall %}
+//! ```
 //!
 //! ## `{% autoescape %}`
 //!

@@ -73,6 +73,8 @@ pub enum Stmt<'a> {
     Include(Spanned<Include<'a>>),
     #[cfg(feature = "macros")]
     Macro(Spanned<Macro<'a>>),
+    #[cfg(feature = "macros")]
+    CallBlock(Spanned<CallBlock<'a>>),
 }
 
 #[cfg(feature = "internal_debug")]
@@ -101,6 +103,8 @@ impl<'a> fmt::Debug for Stmt<'a> {
             Stmt::FromImport(s) => fmt::Debug::fmt(s, f),
             #[cfg(feature = "macros")]
             Stmt::Macro(s) => fmt::Debug::fmt(s, f),
+            #[cfg(feature = "macros")]
+            Stmt::CallBlock(s) => fmt::Debug::fmt(s, f),
         }
     }
 }
@@ -142,6 +146,27 @@ impl<'a> fmt::Debug for Expr<'a> {
             Expr::List(s) => fmt::Debug::fmt(s, f),
             Expr::Map(s) => fmt::Debug::fmt(s, f),
             Expr::Kwargs(s) => fmt::Debug::fmt(s, f),
+        }
+    }
+}
+
+impl<'a> Expr<'a> {
+    pub fn description(&self) -> &'static str {
+        match self {
+            Expr::Var(_) => "variable",
+            Expr::Const(_) => "constant",
+            Expr::Slice(_)
+            | Expr::UnaryOp(_)
+            | Expr::BinOp(_)
+            | Expr::IfExpr(_)
+            | Expr::GetAttr(_)
+            | Expr::GetItem(_) => "expression",
+            Expr::Call(_) => "call",
+            Expr::List(_) => "list literal",
+            Expr::Map(_) => "map literal",
+            Expr::Test(_) => "test expression",
+            Expr::Filter(_) => "filter expression",
+            Expr::Kwargs(_) => "keyword arguments",
         }
     }
 }
@@ -238,6 +263,14 @@ pub struct Macro<'a> {
     pub args: Vec<Expr<'a>>,
     pub defaults: Vec<Expr<'a>>,
     pub body: Vec<Stmt<'a>>,
+}
+
+/// A call block
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg(feature = "macros")]
+pub struct CallBlock<'a> {
+    pub call: Spanned<Call<'a>>,
+    pub macro_decl: Spanned<Macro<'a>>,
 }
 
 /// A "from" import
