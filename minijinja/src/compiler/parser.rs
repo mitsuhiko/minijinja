@@ -1043,7 +1043,7 @@ impl<'a> Parser<'a> {
 
         expect_token!(self, Token::BlockEnd(..), "end of block");
 
-        return Ok(ast::Do { call });
+        Ok(ast::Do { call })
     }
 
     fn subparse(
