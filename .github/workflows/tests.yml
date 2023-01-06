@@ -66,4 +66,4 @@ jobs:
       - name: Install WasmTime
         run: curl https://wasmtime.dev/install.sh -sSf | bash
       - name: Test
-        run: cd minijinja && cargo test --target=wasm32-wasi
+        run: cd minijinja && cargo test --all-features --target=wasm32-wasi
