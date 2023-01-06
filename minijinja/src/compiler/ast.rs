@@ -75,6 +75,7 @@ pub enum Stmt<'a> {
     Macro(Spanned<Macro<'a>>),
     #[cfg(feature = "macros")]
     CallBlock(Spanned<CallBlock<'a>>),
+    Do(Spanned<Do<'a>>),
 }
 
 #[cfg(feature = "internal_debug")]
@@ -105,6 +106,7 @@ impl<'a> fmt::Debug for Stmt<'a> {
             Stmt::Macro(s) => fmt::Debug::fmt(s, f),
             #[cfg(feature = "macros")]
             Stmt::CallBlock(s) => fmt::Debug::fmt(s, f),
+            Stmt::Do(s) => fmt::Debug::fmt(s, f),
         }
     }
 }
@@ -151,7 +153,6 @@ impl<'a> fmt::Debug for Expr<'a> {
 }
 
 impl<'a> Expr<'a> {
-    #[cfg(feature = "macros")]
     pub fn description(&self) -> &'static str {
         match self {
             Expr::Var(_) => "variable",
@@ -272,6 +273,12 @@ pub struct Macro<'a> {
 pub struct CallBlock<'a> {
     pub call: Spanned<Call<'a>>,
     pub macro_decl: Spanned<Macro<'a>>,
+}
+
+/// A call block
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+pub struct Do<'a> {
+    pub call: Spanned<Call<'a>>,
 }
 
 /// A "from" import

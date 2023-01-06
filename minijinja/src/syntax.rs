@@ -23,6 +23,7 @@
 //!   - [`{% filter %}`](#-filter-)
 //!   - [`{% macro %}`](#-macro-)
 //!   - [`{% call %}`](#-call-)
+//!   - [`{% do %}`](#-do-)
 //!   - [`{% autoescape %}`](#-autoescape-)
 //!   - [`{% raw %}`](#-raw-)
 //!
@@ -600,6 +601,38 @@
 //!   <dd>{{ user.email }}</dd>
 //! </dl>
 //! {% endcall %}
+//! ```
+//!
+//! ## `{% do %}`
+//!
+//! The do tag has the same functionality as regular template tags (`{{ ... }}`);
+//! except it doesn't output anything when called.
+//!
+//! This is useful if you have a function or macro that has a side-effect, and
+//! you don’t want to display output in the template. The following example
+//! shows a macro that uses the do functionality, and how it can be used:
+//!
+//! ```jinja
+//! {% macro dialog(title) %}
+//!   Dialog is {{ title }}
+//! {% endmacro %}
+//!
+//! {% do dialog(title="Hello World") %} <- does not output anything
+//! ```
+//!
+//! The above example will not output anything when using the `do` tag.
+//!
+//! This tag exists for consistency with Jinja2 and can be useful if you have
+//! custom functionality in templates that uses side-effects.  For instance if
+//! you expose a function to templates that can be used to log warnings:
+//!
+//! ```jinja
+//! {% for user in users %}
+//!   {% if user.deleted %}
+//!     {% log warn("Found unexpected deleted user in template") %}
+//!   {% endif %}
+//!   ...
+//! {% endfor %}
 //! ```
 //!
 //! ## `{% autoescape %}`

@@ -664,6 +664,7 @@ impl<'a> Parser<'a> {
             Token::Ident("macro") => ast::Stmt::Macro(respan!(ok!(self.parse_macro()))),
             #[cfg(feature = "macros")]
             Token::Ident("call") => ast::Stmt::CallBlock(respan!(ok!(self.parse_call_block()))),
+            Token::Ident("do") => ast::Stmt::Do(respan!(ok!(self.parse_do()))),
             Token::Ident(name) => syntax_error!("unknown statement {}", name),
             token => syntax_error!("unknown {}, expected statement", token),
         })
@@ -953,7 +954,6 @@ impl<'a> Parser<'a> {
         Ok(ast::FromImport { expr, names })
     }
 
-    #[cfg(feature = "macros")]
     fn parse_macro_args_and_defaults(
         &mut self,
         args: &mut Vec<ast::Expr<'a>>,
@@ -1033,6 +1033,17 @@ impl<'a> Parser<'a> {
             call,
             macro_decl: Spanned::new(macro_decl, self.stream.expand_span(span)),
         })
+    }
+
+    fn parse_do(&mut self) -> Result<ast::Do<'a>, Error> {
+        let call = match self.parse_expr()? {
+            ast::Expr::Call(call) => call,
+            expr => syntax_error!(
+                "expected call expression in call block, got {}",
+                expr.description()
+            ),
+        };
+        Ok(ast::Do { call })
     }
 
     fn subparse(
