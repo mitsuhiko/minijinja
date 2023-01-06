@@ -1043,11 +1043,11 @@ impl<'a> Parser<'a> {
         }
         let call = match self.parse_expr()? {
             ast::Expr::Call(call) => call,
-            _ => syntax_error!("expected call expression in call block"),
+            expr => syntax_error!(
+                "expected call expression in call block, got {}",
+                expr.description()
+            ),
         };
-
-        expect_token!(self, Token::BlockEnd(..), "end of block");
-
         Ok(ast::Do { call })
     }
 
@@ -1078,11 +1078,7 @@ impl<'a> Parser<'a> {
                         return Ok(rv);
                     }
                     rv.push(ok!(self.parse_stmt()));
-
-                    // Blockend may not exist, for example a do tag is not a block but a tag.
-                    if let Some((Token::BlockEnd(..), _)) = ok!(self.stream.current()) {
-                        expect_token!(self, Token::BlockEnd(..), "end of block");
-                    }
+                    expect_token!(self, Token::BlockEnd(..), "end of block");
                 }
                 _ => unreachable!("lexer produced garbage"),
             }

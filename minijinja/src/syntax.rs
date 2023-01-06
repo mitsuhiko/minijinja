@@ -23,6 +23,7 @@
 //!   - [`{% filter %}`](#-filter-)
 //!   - [`{% macro %}`](#-macro-)
 //!   - [`{% call %}`](#-call-)
+//!   - [`{% do %}`](#-do-)
 //!   - [`{% autoescape %}`](#-autoescape-)
 //!   - [`{% raw %}`](#-raw-)
 //!
@@ -607,31 +608,32 @@
 //! The do tag has the same functionality as regular template tags (`{{ ... }}`);
 //! except it doesn't output anything when called.
 //!
-//! This is useful if you have a function or macro that has verbose output, and
-//! you don’t want to display output in the template. The following example shows a macro that
-//! uses the do functionality, and how it can be used:
+//! This is useful if you have a function or macro that has a side-effect, and
+//! you don’t want to display output in the template. The following example
+//! shows a macro that uses the do functionality, and how it can be used:
 //!
 //! ```jinja
 //! {% macro dialog(title) %}
 //!   Dialog is {{ title }}
 //! {% endmacro %}
 //!
-//! {% do dialog(title="Hello World") %}
-//! {{ dialog(title="Hello World") }}
+//! {% do dialog(title="Hello World") %} <- does not output anything
 //! ```
 //!
-//! The above example will not output anything when using the `do` tag, but will output
-//! when using the regular template tag.
+//! The above example will not output anything when using the `do` tag.
 //!
-//! The `do` tag does not support the hidden `caller` keyword argument like the `call` tag
-//! does, as `do` is not a block but a tag. This means that there is no `{% enddo %}` tag as well,
-//! so you can't use it to call macros that use the `caller` keyword argument or pass in blocks.
-//! Doing so will result in the error `unknown function: caller is unknown`. //! This is the same
-//! functionality that Jinja2 has.
+//! This tag exists for consistency with Jinja2 and can be useful if you have
+//! custom functionality in templates that uses side-effects.  For instance if
+//! you expose a function to templates that can be used to log warnings:
 //!
-//! `Do` tags should be carefully considered, as you probably want to have cleaner
-//! functions/macros. They can however be useful in certain situations, such as functions that
-//! might execute SQL and return a result, but you don't want to display the result in the template.
+//! ```jinja
+//! {% for user in users %}
+//!   {% if user.deleted %}
+//!     {% log warn("Found unexpected deleted user in template") %}
+//!   {% endif %}
+//!   ...
+//! {% endfor %}
+//! ```
 //!
 //! ## `{% autoescape %}`
 //!

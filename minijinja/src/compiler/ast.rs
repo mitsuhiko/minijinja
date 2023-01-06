@@ -153,7 +153,6 @@ impl<'a> fmt::Debug for Expr<'a> {
 }
 
 impl<'a> Expr<'a> {
-    #[cfg(feature = "macros")]
     pub fn description(&self) -> &'static str {
         match self {
             Expr::Var(_) => "variable",
