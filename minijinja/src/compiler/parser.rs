@@ -1036,11 +1036,6 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_do(&mut self) -> Result<ast::Do<'a>, Error> {
-        let mut args = Vec::new();
-        let mut defaults = Vec::new();
-        if skip_token!(self, Token::ParenOpen) {
-            self.parse_macro_args_and_defaults(&mut args, &mut defaults)?;
-        }
         let call = match self.parse_expr()? {
             ast::Expr::Call(call) => call,
             expr => syntax_error!(
