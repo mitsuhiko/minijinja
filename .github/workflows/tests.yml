@@ -51,3 +51,22 @@ jobs:
           override: true
       - name: Test
         run: make test
+
+  test-wasi:
+    name: Test on WASI
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+          target: wasm32-wasi
+      - name: Install WasmTime
+        run: |
+          curl https://wasmtime.dev/install.sh -sSf | bash
+          echo "$HOME/.wasmtime/bin" >> $GITHUB_PATH
+      - name: Test
+        run: make wasi-test

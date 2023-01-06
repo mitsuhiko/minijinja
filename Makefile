@@ -15,6 +15,9 @@ test:
 	@echo "CARGO TEST ALL FEATURES"
 	@cd minijinja; cargo test --all-features
 
+wasi-test:
+	@cd minijinja; cargo test --all-features --target=wasm32-wasi -- --nocapture
+
 snapshot-tests:
 	@cd minijinja; cargo insta test --all-features --review
 
@@ -52,4 +55,4 @@ lint:
 	@rustup component add clippy 2> /dev/null
 	@cargo clippy --all -- -F clippy::dbg-macro -D warnings
 
-.PHONY: all doc test run-tests format format-check lint check snapshot-tests
+.PHONY: all doc test wasi-test run-tests format format-check lint check snapshot-tests
