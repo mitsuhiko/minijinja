@@ -354,6 +354,9 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::CallBlock(call_block) => {
                 self.compile_call_block(call_block);
             }
+            ast::Stmt::Do(do_block) => {
+                self.compile_do_block(do_block);
+            }
         }
     }
 
@@ -436,6 +439,10 @@ impl<'source> CodeGenerator<'source> {
     fn compile_call_block(&mut self, call_block: &ast::Spanned<ast::CallBlock<'source>>) {
         self.compile_call(&call_block.call, Some(&call_block.macro_decl));
         self.add(Instruction::Emit);
+    }
+
+    fn compile_do_block(&mut self, do_block: &ast::Spanned<ast::Do<'source>>) {
+        self.compile_call(&do_block.call, None);
     }
 
     fn compile_if_stmt(&mut self, if_cond: &ast::Spanned<ast::IfCond<'source>>) {

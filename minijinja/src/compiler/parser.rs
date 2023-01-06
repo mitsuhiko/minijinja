@@ -664,6 +664,7 @@ impl<'a> Parser<'a> {
             Token::Ident("macro") => ast::Stmt::Macro(respan!(ok!(self.parse_macro()))),
             #[cfg(feature = "macros")]
             Token::Ident("call") => ast::Stmt::CallBlock(respan!(ok!(self.parse_call_block()))),
+            Token::Ident("do") => ast::Stmt::Do(respan!(ok!(self.parse_do_block()))),
             Token::Ident(name) => syntax_error!("unknown statement {}", name),
             token => syntax_error!("unknown {}, expected statement", token),
         })
@@ -953,7 +954,6 @@ impl<'a> Parser<'a> {
         Ok(ast::FromImport { expr, names })
     }
 
-    #[cfg(feature = "macros")]
     fn parse_args_and_defaults(
         &mut self,
         args: &mut Vec<ast::Expr<'a>>,
@@ -1030,6 +1030,22 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn parse_do_block(&mut self) -> Result<ast::Do<'a>, Error> {
+        let mut args = Vec::new();
+        let mut defaults = Vec::new();
+        if skip_token!(self, Token::ParenOpen) {
+            self.parse_args_and_defaults(&mut args, &mut defaults)?;
+        }
+        let call = match self.parse_expr()? {
+            ast::Expr::Call(call) => call,
+            _ => syntax_error!("expected call expression in call block"),
+        };
+
+        expect_token!(self, Token::BlockEnd(..), "end of block");
+
+        return Ok(ast::Do { call });
+    }
+
     fn subparse(
         &mut self,
         end_check: &dyn Fn(&Token) -> bool,
@@ -1057,7 +1073,11 @@ impl<'a> Parser<'a> {
                         return Ok(rv);
                     }
                     rv.push(ok!(self.parse_stmt()));
-                    expect_token!(self, Token::BlockEnd(..), "end of block");
+
+                    // End of block may not exist, for example with do block.
+                    if let Some((Token::BlockEnd(..), _)) = ok!(self.stream.current()) {
+                        expect_token!(self, Token::BlockEnd(..), "end of block");
+                    }
                 }
                 _ => unreachable!("lexer produced garbage"),
             }

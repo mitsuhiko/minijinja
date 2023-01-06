@@ -597,6 +597,22 @@
 //! {% endcall %}
 //! ```
 //!
+//! ## `{% do %}`
+//!
+//! The do tag does the same thing as a using regular template tags (`{{ ... }}`); except it doesn't output anything.
+//! This is useful if you have a function or macro that has verbose output or side effects, but you don’t want to display output.
+//!
+//! ```jinja
+//! {% macro dialog(title) %}
+//!   Dialog is {{ title }}
+//! {% endmacro %}
+//!
+//! {% do dialog(title="Hello World") %}
+//! {{ dialog(title="Hello World") }}
+//! ```
+//!
+//! The above example will not output anything when using the `do` tag, but will output the dialog body when using the regular template tag.
+//!
 //! ## `{% autoescape %}`
 //!
 //! If you want you can activate and deactivate the autoescaping from within
