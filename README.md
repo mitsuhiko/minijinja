@@ -29,6 +29,9 @@ minimal v0.1.0 (examples/minimal)
     └── serde v1.0.144
 ```
 
+You can play with MiniJinja online [in the browser playground](https://mitsuhiko.github.io/minijinja-playground/)
+powered by a WASM build of MiniJinja.
+
 **Goals:**
 
 * [Well documented](https://docs.rs/minijinja), compact API
@@ -39,6 +42,7 @@ minimal v0.1.0 (examples/minimal)
 * [Well tested](https://github.com/mitsuhiko/minijinja/tree/main/minijinja/tests)
 * Support for [dynamic runtime objects](https://docs.rs/minijinja/latest/minijinja/value/trait.Object.html) with methods and dynamic attributes
 * [Descriptive errors](https://github.com/mitsuhiko/minijinja/tree/main/examples/error)
+* [Compiles to WebAssembly](https://github.com/mitsuhiko/minijinja-playground/blob/main/src/lib.rs)
 
 ## Example Template
 
@@ -87,4 +91,5 @@ sponsor](https://github.com/sponsors/mitsuhiko).
 - [Documentation](https://docs.rs/minijinja/)
 - [Examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
 - [Issue Tracker](https://github.com/mitsuhiko/minijinja/issues)
+- [MiniJinja Playground](https://mitsuhiko.github.io/minijinja-playground/)
 - License: [Apache-2.0](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
