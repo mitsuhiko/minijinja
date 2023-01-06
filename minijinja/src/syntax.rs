@@ -599,11 +599,12 @@
 //!
 //! ## `{% do %}`
 //!
-//! The do tag does the same thing as a using regular template tags (`{{ ... }}`);
-//! except it doesn't output anything.
+//! The do tag has the same functionality as regular template tags (`{{ ... }}`);
+//! except it doesn't output anything when called.
 //!
-//! This is useful if you have a function or macro that has verbose output or side effects,
-//! but you don’t want to display output.
+//! This is useful if you have a function or macro that has verbose output, and
+//! you don’t want to display output in the template. The following example shows a macro that
+//! uses the do functionality, and how it can be used:
 //!
 //! ```jinja
 //! {% macro dialog(title) %}
@@ -614,12 +615,18 @@
 //! {{ dialog(title="Hello World") }}
 //! ```
 //!
-//! The above example will not output anything when using the `do` tag,
-//! but will output the dialog body when using the regular template tag.
+//! The above example will not output anything when using the `do` tag, but will output
+//! when using the regular template tag.
 //!
-//! Note that the `do` tag does not support the hidden `caller` keyword argument like `call` does,
-//! as it's not a block. This means that there is no {% enddo %} tag as well, so you can't use it
-//! to call macros that use the `caller` keyword argument.
+//! The `do` tag does not support the hidden `caller` keyword argument like the `call` tag
+//! does, as `do` is not a block but a tag. This means that there is no `{% enddo %}` tag as well,
+//! so you can't use it to call macros that use the `caller` keyword argument or pass in blocks.
+//! Doing so will result in the error `unknown function: caller is unknown`. //! This is the same
+//! functionality that Jinja2 has.
+//!
+//! `Do` tags should be carefully considered, as you probably want to have cleaner
+//! functions/macros. They can however be useful in certain situations, such as functions that
+//! might execute SQL and return a result, but you don't want to display the result in the template.
 //!
 //! ## `{% autoescape %}`
 //!
