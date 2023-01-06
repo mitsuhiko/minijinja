@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Added `capitalize` filter. (#163)
 - Added support for `{% call %}`. (#164)
 - Added support for `{% do %}`. (#167)
+- Improved testsuite to execute on wasm32-wasi.
 
 # 0.27.0
 
