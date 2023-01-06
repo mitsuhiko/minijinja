@@ -16,6 +16,10 @@
 //! {% endfor %}
 //! ```
 //!
+//! You can play with MiniJinja online [in the browser
+//! playground](https://mitsuhiko.github.io/minijinja-playground/) powered by a
+//! WASM build of MiniJinja.
+//!
 //! # Why MiniJinja
 //!
 //! MiniJinja by its name wants to be a good default choice if you need a little
