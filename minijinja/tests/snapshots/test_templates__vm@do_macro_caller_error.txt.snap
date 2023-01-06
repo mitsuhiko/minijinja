@@ -1,0 +1,29 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{% macro dialog(title) %}\n    Dialog is {{ title }}\n    {{ caller() }}\n{% endmacro %}\n\nShould error: {{ dialog(title=\"Hello World\") }}"
+info: {}
+input_file: minijinja/tests/inputs/do_macro_caller_error.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: UnknownFunction,
+    detail: "caller is unknown",
+    name: "do_macro_caller_error.txt",
+    line: 3,
+}
+
+unknown function: caller is unknown (in do_macro_caller_error.txt:3)
+-------------------------- do_macro_caller_error.txt --------------------------
+   1 | {% macro dialog(title) %}
+   2 |     Dialog is {{ title }}
+   3 >     {{ caller() }}
+     i        ^^^^^^^^ unknown function
+   4 | {% endmacro %}
+   5 |
+   6 | Should error: {{ dialog(title="Hello World") }}
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Referenced variables: {
+    title: "Hello World",
+}
+-------------------------------------------------------------------------------
