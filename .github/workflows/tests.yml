@@ -60,11 +60,11 @@ jobs:
       - uses: actions/checkout@v1
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.61.0
-          profile: minimal
+          toolchain: stable
           override: true
+          profile: minimal
           target: wasm32-wasi
       - name: Install WasmTime
         run: curl https://wasmtime.dev/install.sh -sSf | bash
       - name: Test
-        run: cd minijinja && cargo test --all-features --target=wasm32-wasi
+        run: make wasi-test
