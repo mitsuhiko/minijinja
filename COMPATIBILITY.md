@@ -100,13 +100,13 @@ variables.  This means that the rendered content of the template is lost.
 ### `{% macro %}`
 
 The macro tag works very similar to Jinja2 but with some differences.  Most
-importantly the special `caller`, `varargs` and `kwargs` arguments are not
-supported.  The external introspectable attributes `catch_kwargs`, `catch_varargs`
-and `caller` are not supported.
+importantly the special `varargs` and `kwargs` arguments are not supported.
+The external introspectable attributes `catch_kwargs`, `catch_varargs` and
+are not supported.
 
 ### `{% call %}`
 
-This tag is not supported.
+`call` has feature parity with Jinja2.
 
 ### `{% with %}`
 

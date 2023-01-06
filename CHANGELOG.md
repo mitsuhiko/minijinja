@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 # 0.28.0
 
 - Added `capitalize` filter. (#163)
+- Added support for `{% call %}`. (#164)
 
 # 0.27.0
 
