@@ -1,8 +1,0 @@
-{}
----
-{% macro dialog(title) %}
-    Dialog is {{ title }}
-    {{ caller() }}
-{% endmacro %}
-
-Should error: {{ dialog(title="Hello World") }}
