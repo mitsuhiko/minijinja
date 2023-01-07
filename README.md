@@ -81,6 +81,18 @@ should make it possible to defer the upgrade to later.
 * [minijinja-stack-ref](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-stack-ref): provides
   functionality to pass values from the stack
 
+## Similar Projects
+
+These are related template engines for Rust:
+
+* [Askama](https://crates.io/crates/askama): Jinja inspired, type-safe, requires template
+  precompilation. Has significant divergence from Jinja syntax in parts.
+* [Tera](https://crates.io/crates/tera): Jinja inspired, dynamic, has divergences from Jinja.
+* [TinyTemplate](https://crates.io/crates/tinytemplate): minimal footprint template engine
+  with syntax that takes lose inspiration from Jinja and handlebars.
+* [Liquid](https://crates.io/crates/liquid): an implementation of Liquid templates for Rust.
+  Liquid was inspired by Django from which Jinja took it's inspiration.
+
 ## Sponsor
 
 If you like the project and find it useful you can [become a
