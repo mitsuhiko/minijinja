@@ -20,3 +20,9 @@ The render fuzzer is slightly more tricky to work with as part of what it's fuzz
 input to the template render function.  The template adding fuzzer upon crashing will
 dump the input as raw text into the artifacts directory which makes it trivial to
 understand what is going on.
+
+To repro a crash to iterate on it, use `make repro` with the right crash file:
+
+```
+$ make repro ARTIFACT=artifacts/render/crash-XXXX
+```
