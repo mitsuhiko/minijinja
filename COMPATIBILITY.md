@@ -1,7 +1,7 @@
 # Jinja2 Compatibility
 
 This document tracks the differences between Jinja2 and MiniJinja and what
-the state of compatiblity and future direction is.
+the state of compatibility and future direction is.
 
 ## Syntax Differences
 
@@ -19,7 +19,7 @@ The biggest differences between MiniJinja and Jinja2 stem from the different
 runtime environments.  Jinja2 leaks out a lot of the underlying Python engine
 whereas MiniJinja implements it's own runtime data model.
 
-The most significant differents are documented here:
+The most significant differences are documented here:
 
 ### Python Methods
 
