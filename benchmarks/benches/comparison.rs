@@ -26,7 +26,8 @@ struct Site {
     copyright: u32,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, askama::Template)]
+#[template(path = "comparison/askama.html")]
 struct Context {
     items: Vec<String>,
     site: Site,
@@ -195,6 +196,13 @@ pub fn bench_compare_render(c: &mut Criterion) {
         b.iter(|| {
             hbs.render("template.html", &black_box(Context::default()))
                 .unwrap();
+        });
+    });
+
+    g.bench_function("askama", |b| {
+        b.iter(|| {
+            let context = black_box(Context::default());
+            askama::Template::render(&context).unwrap();
         });
     });
 }
