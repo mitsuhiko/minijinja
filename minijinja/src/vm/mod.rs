@@ -560,8 +560,18 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "multi-template")]
                 Instruction::RenderParent => {
+                    // when an extends statement appears in a template, the last instruction
+                    // in that template is the `RenderParent` opcode.  However there is no
+                    // guarantee that we actually encountered the extends tag that would
+                    // have loaded the parent blocks (`LoadBlocks`).  Because of this it's
+                    // possible that we actually end up in this instruction without blocks
+                    // loaded.  In that case we interpret the opcode as if we're breaking
+                    // out of the eval loop.
+                    state.instructions = match parent_instructions.take() {
+                        Some(instr) => instr,
+                        None => break,
+                    };
                     out.end_capture(AutoEscape::None);
-                    state.instructions = parent_instructions.take().unwrap();
 
                     // then replace the instructions and set the pc to 0 again.
                     // this effectively means that the template engine will now

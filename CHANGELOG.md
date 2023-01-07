@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+# Unreleased
+
+- Resolve a runtime panic if `{% extends %}` appears in the template
+  but never is executed.
+
 # 0.28.0
 
 - Added `capitalize` filter. (#163)
