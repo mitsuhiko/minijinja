@@ -157,7 +157,7 @@ fn test_op_eq() {
 
 #[test]
 fn test_op_ne() {
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(1)));
     c.add(Instruction::LoadConst(Value::from("foo")));
     c.add(Instruction::Ne);
@@ -166,7 +166,7 @@ fn test_op_ne() {
     let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "true");
 
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from("foo")));
     c.add(Instruction::LoadConst(Value::from("foo")));
     c.add(Instruction::Ne);
@@ -178,7 +178,7 @@ fn test_op_ne() {
 
 #[test]
 fn test_op_lt() {
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(1)));
     c.add(Instruction::LoadConst(Value::from(2)));
     c.add(Instruction::Lt);
@@ -187,7 +187,7 @@ fn test_op_lt() {
     let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "true");
 
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(2)));
     c.add(Instruction::LoadConst(Value::from(1)));
     c.add(Instruction::Lt);
@@ -199,7 +199,7 @@ fn test_op_lt() {
 
 #[test]
 fn test_op_gt() {
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(1)));
     c.add(Instruction::LoadConst(Value::from(2)));
     c.add(Instruction::Gt);
@@ -208,7 +208,7 @@ fn test_op_gt() {
     let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "false");
 
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(2)));
     c.add(Instruction::LoadConst(Value::from(1)));
     c.add(Instruction::Gt);
@@ -220,7 +220,7 @@ fn test_op_gt() {
 
 #[test]
 fn test_op_lte() {
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(1)));
     c.add(Instruction::LoadConst(Value::from(1)));
     c.add(Instruction::Lte);
@@ -229,7 +229,7 @@ fn test_op_lte() {
     let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "true");
 
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(2)));
     c.add(Instruction::LoadConst(Value::from(1)));
     c.add(Instruction::Lte);
@@ -241,7 +241,7 @@ fn test_op_lte() {
 
 #[test]
 fn test_op_gte() {
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(1)));
     c.add(Instruction::LoadConst(Value::from(2)));
     c.add(Instruction::Gte);
@@ -250,7 +250,7 @@ fn test_op_gte() {
     let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "false");
 
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(1)));
     c.add(Instruction::LoadConst(Value::from(1)));
     c.add(Instruction::Gte);
@@ -262,7 +262,7 @@ fn test_op_gte() {
 
 #[test]
 fn test_op_not() {
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(0)));
     c.add(Instruction::Not);
     c.add(Instruction::Emit);
@@ -270,7 +270,7 @@ fn test_op_not() {
     let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "true");
 
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(true)));
     c.add(Instruction::Not);
     c.add(Instruction::Emit);
@@ -281,7 +281,7 @@ fn test_op_not() {
 
 #[test]
 fn test_string_concat() {
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from("foo")));
     c.add(Instruction::LoadConst(Value::from(42)));
     c.add(Instruction::StringConcat);
@@ -293,7 +293,7 @@ fn test_string_concat() {
 
 #[test]
 fn test_unpacking() {
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from(vec!["bar", "foo"])));
     c.add(Instruction::UnpackList(2));
     c.add(Instruction::StringConcat);
@@ -305,7 +305,7 @@ fn test_unpacking() {
 
 #[test]
 fn test_call_object() {
-    let mut c = CodeGenerator::new("<unkown>", "");
+    let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::LoadConst(Value::from_function(|a: u64| {
         42 + a
     })));
