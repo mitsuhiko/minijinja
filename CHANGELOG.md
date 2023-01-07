@@ -32,7 +32,7 @@ All notable changes to MiniJinja are documented here.
 
 ## Breaking Changes
 
-- The `Object` model changed signficantly in this release.  It's now possible
+- The `Object` model changed significantly in this release.  It's now possible
   for objects to have different shapes (structs or sequences today).  As a result
   `SeqObject` and `StructObject` were added to the API.  For changing your objects
   over have a look at the new documentation for `Object`.
@@ -315,7 +315,7 @@ All notable changes to MiniJinja are documented here.
 - Added support for tuple unpacking in lists.
 - Added dictsort filter.
 - Introduced a new trait `ArgType` to handle argument conversions for filters
-  and tests so optonal arguments can exist.
+  and tests so optional arguments can exist.
 - Renamed `ValueArgs` trait to `FunctionArgs`.
 - Added `reverse` filter.
 - Added `trim` filter.
