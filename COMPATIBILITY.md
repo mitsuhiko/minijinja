@@ -108,6 +108,10 @@ are not supported.
 
 `call` has feature parity with Jinja2.
 
+### `{% do %}`
+
+`do` has feature parity with Jinja2.
+
 ### `{% with %}`
 
 `with` has feature parity with Jinja2.
