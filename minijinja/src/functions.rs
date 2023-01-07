@@ -117,7 +117,7 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 /// ```
 ///
 /// ```jinja
-/// {{ include_file("filname.txt") }}
+/// {{ include_file("filename.txt") }}
 /// ```
 ///
 /// # Variadic
