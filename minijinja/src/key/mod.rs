@@ -92,7 +92,7 @@ impl<'a> Key<'a> {
             ValueRepr::F64(x) => {
                 // if a float is in fact looking like an integer we
                 // allow this to be used for indexing.  Why?  Because
-                // in Jinja division is always a division resuling
+                // in Jinja division is always a division resulting
                 // in floating point values (4 / 2 == 2.0).
                 let intval = x as i64;
                 if intval as f64 == x {

@@ -108,7 +108,7 @@ impl<'source> CodeGenerator<'source> {
         self.instructions.len()
     }
 
-    /// Creats a sub generator.
+    /// Creates a sub generator.
     #[cfg(feature = "multi-template")]
     fn new_subgenerator(&self) -> CodeGenerator<'source> {
         let mut sub = CodeGenerator::new(self.instructions.name(), self.instructions.source());

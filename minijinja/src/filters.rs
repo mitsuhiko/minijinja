@@ -47,7 +47,7 @@
 //!
 //! # Accessing State
 //!
-//! In some cases it can be necesary to access the execution [`State`].  Since a borrowed
+//! In some cases it can be necessary to access the execution [`State`].  Since a borrowed
 //! state implements [`ArgType`](crate::value::ArgType) it's possible to add a
 //! parameter that holds the state.  For instance the following filter appends
 //! the current template name to the string:
@@ -319,7 +319,7 @@ mod builtins {
 
     /// Does a string replace.
     ///
-    /// It replaces all ocurrences of the first parameter with the second.
+    /// It replaces all occurrences of the first parameter with the second.
     ///
     /// ```jinja
     /// {{ "Hello World"|replace("Hello", "Goodbye") }}

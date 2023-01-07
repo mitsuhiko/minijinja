@@ -6,7 +6,7 @@ input_file: minijinja/tests/parser-inputs/max-recursion-expr.txt
 Err(
     Error {
         kind: SyntaxError,
-        detail: "template exceeds maximum recusion limits",
+        detail: "template exceeds maximum recursion limits",
         name: "max-recursion-expr.txt",
         line: 1,
     },

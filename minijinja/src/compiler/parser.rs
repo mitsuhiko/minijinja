@@ -206,7 +206,7 @@ macro_rules! with_recursion_guard {
         if $parser.depth > MAX_RECURSION {
             return Err(Error::new(
                 ErrorKind::SyntaxError,
-                "template exceeds maximum recusion limits",
+                "template exceeds maximum recursion limits",
             ));
         }
         let rv = $expr;

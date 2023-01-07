@@ -248,7 +248,7 @@ impl Error {
         self.repr.name.as_deref()
     }
 
-    /// Returns the line number where the error ocurred.
+    /// Returns the line number where the error occurred.
     pub fn line(&self) -> Option<usize> {
         if self.repr.lineno > 0 {
             Some(self.repr.lineno)
@@ -257,7 +257,7 @@ impl Error {
         }
     }
 
-    /// Returns the line number where the error ocurred.
+    /// Returns the line number where the error occurred.
     #[cfg(feature = "debug")]
     pub(crate) fn span(&self) -> Option<Span> {
         self.repr.span
