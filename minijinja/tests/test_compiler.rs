@@ -57,3 +57,11 @@ fn test_const() {
 
     insta::assert_debug_snapshot!(&c.finish());
 }
+
+#[test]
+fn test_referenced_names_empty_bug() {
+    let c = CodeGenerator::new("<unknown>", "");
+    let instructions = c.finish().0;
+    let rv = instructions.get_referenced_names(0);
+    assert!(rv.is_empty());
+}
