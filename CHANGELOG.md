@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 - Resolve a runtime panic if `{% extends %}` appears in the template
   but never is executed.
+- Fixed recursion detection for macros.
 
 # 0.28.0
 

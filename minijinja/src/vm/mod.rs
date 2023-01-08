@@ -30,6 +30,10 @@ mod state;
 #[cfg(feature = "multi-template")]
 const INCLUDE_RECURSION_COST: usize = 10;
 
+// the cost of a single macro call against the stack limit.
+#[cfg(feature = "macros")]
+const MACRO_RECURSION_COST: usize = 5;
+
 /// Helps to evaluate something.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub struct Vm<'env> {
@@ -110,7 +114,7 @@ impl<'env> Vm<'env> {
     ) -> Result<Option<Value>, Error> {
         value::with_value_optimization(|| {
             let mut ctx = Context::new(Frame::new(root));
-            ok!(ctx.incr_depth(state.ctx.depth()));
+            ok!(ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST));
             self.eval_impl(
                 &mut State {
                     env: self.env,
