@@ -70,6 +70,8 @@ pub struct Environment<'source> {
     formatter: Arc<FormatterFunc>,
     #[cfg(feature = "debug")]
     debug: bool,
+    #[cfg(feature = "fuel")]
+    fuel: Option<u64>,
 }
 
 impl<'source> Default for Environment<'source> {
@@ -106,6 +108,8 @@ impl<'source> Environment<'source> {
             formatter: Arc::new(defaults::escape_formatter),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
+            #[cfg(feature = "fuel")]
+            fuel: None,
         }
     }
 
@@ -123,6 +127,8 @@ impl<'source> Environment<'source> {
             formatter: Arc::new(defaults::escape_formatter),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
+            #[cfg(feature = "fuel")]
+            fuel: None,
         }
     }
 
@@ -338,6 +344,28 @@ impl<'source> Environment<'source> {
     #[cfg(feature = "debug")]
     pub(crate) fn debug(&self) -> bool {
         self.debug
+    }
+
+    /// Sets the optional fuel of the engine.
+    ///
+    /// When MiniJinja is compiled with the `fuel` feature then every
+    /// instruction consumes a certain amount of fuel.  Usually `1`, some will
+    /// consume no fuel.  By default the engine has the fuel feature disabled
+    /// (`None`).  To turn on fuel set something like `Some(50000)` which will
+    /// allow 50.000 instructions to execute before running out of fuel.
+    ///
+    /// Fuel consumed per-render.
+    #[cfg(feature = "fuel")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fuel")))]
+    pub fn set_fuel(&mut self, fuel: Option<u64>) {
+        self.fuel = fuel;
+    }
+
+    /// Returns the configured fuel.
+    #[cfg(feature = "fuel")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fuel")))]
+    pub fn fuel(&self) -> Option<u64> {
+        self.fuel
     }
 
     /// Sets the template source for the environment.

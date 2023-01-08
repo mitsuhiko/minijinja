@@ -150,7 +150,7 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// use minijinja::value::Rest;
 ///
 /// fn pyjoin(joiner: String, values: Rest<String>) -> String {
-///     values.connect(&joiner)
+///     values.join(&joiner)
 /// }
 ///
 /// env.add_filter("pyjoin", pyjoin);

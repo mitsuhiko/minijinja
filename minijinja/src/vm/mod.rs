@@ -18,9 +18,14 @@ use crate::vm::state::BlockStack;
 #[cfg(feature = "macros")]
 use crate::vm::macro_object::{Macro, MacroData};
 
+#[cfg(feature = "fuel")]
+use crate::vm::fuel::FuelTracker;
+
 pub use crate::vm::state::State;
 
 mod context;
+#[cfg(feature = "fuel")]
+mod fuel;
 mod loop_object;
 #[cfg(feature = "macros")]
 mod macro_object;
@@ -94,6 +99,8 @@ impl<'env> Vm<'env> {
                     loaded_templates: BTreeSet::new(),
                     #[cfg(feature = "macros")]
                     macros: Arc::new(Vec::new()),
+                    #[cfg(feature = "fuel")]
+                    fuel_tracker: self.env.fuel().map(FuelTracker::new),
                 },
                 out,
             )
@@ -127,6 +134,8 @@ impl<'env> Vm<'env> {
                     loaded_templates: BTreeSet::new(),
                     #[cfg(feature = "macros")]
                     macros: state.macros.clone(),
+                    #[cfg(feature = "fuel")]
+                    fuel_tracker: state.fuel_tracker.clone(),
                 },
                 out,
                 Stack::from(args),
@@ -220,6 +229,13 @@ impl<'env> Vm<'env> {
                         Err(err) => bail!(err),
                     }
                 };
+            }
+
+            // if the fuel consumption feature is enabled, track the fuel
+            // consumption here.
+            #[cfg(feature = "fuel")]
+            if let Some(ref tracker) = state.fuel_tracker {
+                ctx_ok!(tracker.track(instr));
             }
 
             match instr {

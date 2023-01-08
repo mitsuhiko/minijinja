@@ -134,6 +134,9 @@ pub enum ErrorKind {
     CannotUnpack,
     /// Failed writing output.
     WriteFailure,
+    /// Engine ran out of fuel
+    #[cfg(feature = "fuel")]
+    OutOfFuel,
 }
 
 impl ErrorKind {
@@ -157,6 +160,8 @@ impl ErrorKind {
             ErrorKind::EvalBlock => "could not render block",
             ErrorKind::CannotUnpack => "cannot unpack",
             ErrorKind::WriteFailure => "failed to write output",
+            #[cfg(feature = "fuel")]
+            ErrorKind::OutOfFuel => "engine ran out of fuel",
         }
     }
 }
