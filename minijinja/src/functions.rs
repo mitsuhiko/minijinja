@@ -249,7 +249,10 @@ mod builtins {
     pub fn range(lower: u32, upper: Option<u32>, step: Option<u32>) -> Result<Vec<u32>, Error> {
         fn to_result<I: ExactSizeIterator<Item = u32>>(i: I) -> Result<Vec<u32>, Error> {
             if i.len() > 10000 {
-                Err(Error::new(ErrorKind::InvalidOperation, "range too large"))
+                Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    "range has too many elements",
+                ))
             } else {
                 Ok(i.collect())
             }
