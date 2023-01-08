@@ -157,6 +157,8 @@
 //!
 //! There are some additional features that can be enabled:
 //!
+//! - `fuel`: enables the `fuel` feature which makes the engine track fuel consumption which
+//!   can be used to better protect against expensive templates.
 //! - `source`: enables the `Source` type which helps with dynamic loading of templates.
 //! - `speedups`: enables all speedups, in particular it turns on the `v_htmlescape` dependency
 //!   for faster HTML escapling.  This also turns on `key_interning` automatically.

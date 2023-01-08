@@ -8,6 +8,9 @@ use crate::value::{ArgType, Value};
 use crate::vm::context::Context;
 use crate::AutoEscape;
 
+#[cfg(feature = "fuel")]
+use crate::vm::fuel::FuelTracker;
+
 /// Provides access to the current execution state of the engine.
 ///
 /// A read only reference is passed to filter functions and similar objects to
@@ -32,6 +35,8 @@ pub struct State<'vm, 'env> {
     pub(crate) loaded_templates: BTreeSet<&'env str>,
     #[cfg(feature = "macros")]
     pub(crate) macros: std::sync::Arc<Vec<(&'vm Instructions<'env>, usize)>>,
+    #[cfg(feature = "fuel")]
+    pub(crate) fuel_tracker: Option<std::sync::Arc<FuelTracker>>,
 }
 
 impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
@@ -91,6 +96,8 @@ impl<'vm, 'env> State<'vm, 'env> {
             loaded_templates: BTreeSet::new(),
             macros: Default::default(),
             current_call: None,
+            #[cfg(feature = "fuel")]
+            fuel_tracker: env.fuel().map(FuelTracker::new),
         })
     }
 

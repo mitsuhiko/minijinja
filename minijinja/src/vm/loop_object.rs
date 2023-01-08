@@ -80,6 +80,12 @@ impl StructObject for Loop {
 
     fn get_field(&self, name: &str) -> Option<Value> {
         let idx = self.idx.load(Ordering::Relaxed) as u64;
+        // if we never iterated, then all attributes are undefined.
+        // this can happen in some rare circumstances where the engine
+        // did not manage to iterate
+        if idx == !0 {
+            return Some(Value::UNDEFINED);
+        }
         let len = self.len as u64;
         match name {
             "index0" => Some(Value::from(idx)),

@@ -34,6 +34,7 @@ speedups = ["v_htmlescape", "key_interning"]
 builtins = []
 macros = []
 multi-template = []
+fuel = []
 
 # Extra Filters
 json = ["serde_json"]
