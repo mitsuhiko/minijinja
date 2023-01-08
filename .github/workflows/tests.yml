@@ -68,7 +68,7 @@ jobs:
         run: |
           curl https://wasmtime.dev/install.sh -sSf | bash
           curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/v4.0.0/wasmtime-v4.0.0-x86_64-linux-c-api.tar.xz
-          tar xvf wasmtime-v4.0.0-x86_64-linux-c-api.tar.x
+          tar xvf wasmtime-v4.0.0-x86_64-linux-c-api.tar.xz
           echo `pwd`/wasmtime-v4.0.0-x86_64-linux-c-api >> $GITHUB_PATH
       - name: Test
         run: make wasi-test
