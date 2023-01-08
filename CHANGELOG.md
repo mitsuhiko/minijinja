@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Resolve a runtime panic if `{% extends %}` appears in the template
   but never is executed.
 - Fixed recursion detection for macros.
+- Enforce a maximum size of 10000 items on the range output.
 
 # 0.28.0
 

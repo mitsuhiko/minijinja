@@ -243,8 +243,18 @@ mod builtins {
     /// {% endfor %}
     /// </ul>
     /// ```
+    ///
+    /// This function will refuse to create ranges over 10.000 items.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn range(lower: u32, upper: Option<u32>, step: Option<u32>) -> Result<Vec<u32>, Error> {
+        fn to_result<I: ExactSizeIterator<Item = u32>>(i: I) -> Result<Vec<u32>, Error> {
+            if i.len() > 10000 {
+                Err(Error::new(ErrorKind::InvalidOperation, "range too large"))
+            } else {
+                Ok(i.collect())
+            }
+        }
+
         let rng = match upper {
             Some(upper) => lower..upper,
             None => 0..lower,
@@ -256,10 +266,10 @@ mod builtins {
                     "cannot create range with step of 0",
                 ))
             } else {
-                Ok(rng.step_by(step as usize).collect())
+                to_result(rng.step_by(step as usize))
             }
         } else {
-            Ok(rng.collect())
+            to_result(rng)
         }
     }
 
