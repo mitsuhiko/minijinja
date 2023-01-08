@@ -23,7 +23,7 @@ fuzz_target!(|data: (&str, Vec<(&str, &str)>, Value)| {
 
     // set a rather conservative default fuel so that we don't spend too much
     // time on badly fuzzed templates that can be protected against.
-    env.set_fuel(50000);
+    env.set_fuel(Some(50000));
 
     if env.add_template("fuzz", root).is_err() {
         return;
