@@ -18,6 +18,11 @@ minijinja = { path = "../minijinja", features = ["json", "urlencode", "fuel"] }
 [workspace]
 members = ["."]
 
+[profile.release]
+debug = true
+overflow-checks = true
+debug-assertions = true
+
 [[bin]]
 name = "add_template"
 path = "fuzz_targets/add_template.rs"
