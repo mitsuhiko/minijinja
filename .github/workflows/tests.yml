@@ -67,6 +67,8 @@ jobs:
       - name: Install WasmTime
         run: |
           curl https://wasmtime.dev/install.sh -sSf | bash
-          echo "$HOME/.wasmtime/bin" >> $GITHUB_PATH
+          curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/v4.0.0/wasmtime-v4.0.0-x86_64-linux.tar.xz
+          tar xvf wasmtime-v4.0.0-x86_64-linux.tar.xz
+          echo `pwd`/wasmtime-v4.0.0-x86_64-linux >> $GITHUB_PATH
       - name: Test
         run: make wasi-test
