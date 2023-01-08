@@ -16,4 +16,4 @@ clean-corpus:
 .PHONY: repro
 repro:
 	@if [ "x$(ARTIFACT)" == x ]; then echo 'no artifact specified, run `make repro ARTIFACT=artifacts/x/y`'; exit 1; fi; \
-		TARGET=$$(echo '$(ARTIFACT)' | cut -d/ -f2); RUSTC_BOOTSTRAP=1 cargo fuzz run $$TARGET "$(ARTIFACT)"
+		TARGET=$$(echo '$(ARTIFACT)' | perl -p -e 's/^.*\bartifacts\/(.*?)\/.*$$/\1/'); RUSTC_BOOTSTRAP=1 cargo fuzz run $$TARGET "$(ARTIFACT)"
