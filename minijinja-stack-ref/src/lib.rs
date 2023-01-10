@@ -72,7 +72,7 @@
 //! ```
 //! use minijinja::value::{StructObject, Value};
 //! use minijinja::{context, Environment};
-//! use minijinja_stack_ref::scope;
+//! use minijinja_stack_ref::{reborrow, scope};
 //!
 //! struct Config {
 //!     version: &'static str,
@@ -273,7 +273,7 @@ pub fn reborrow<T: ?Sized, R>(obj: &T, f: for<'a> fn(&'a T, &'a Scope) -> R) -> 
 ///                     scope.seq_object_ref(&slf.values[..])
 ///                 }))
 ///             } else {
-///                 Some(Value::from_serializable(&self.values)),
+///                 Some(Value::from_serializable(&self.values))
 ///             },
 ///             _ => None
 ///         }
