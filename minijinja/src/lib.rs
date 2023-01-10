@@ -238,4 +238,8 @@ pub mod machinery {
     pub fn make_string_output(s: &mut String) -> Output<'_> {
         Output::with_string(s)
     }
+
+    pub fn compiled_template_instructions<'source>(compiled_template: CompiledTemplate<'source>) -> Vec<Instruction<'source>> {
+        compiled_template.instructions.instructions
+    }
 }
