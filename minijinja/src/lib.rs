@@ -239,7 +239,7 @@ pub mod machinery {
         Output::with_string(s)
     }
 
-    pub fn compiled_template_instructions<'source>(compiled_template: CompiledTemplate<'source>) -> Vec<Instruction<'source>> {
-        compiled_template.instructions.instructions
+    pub fn instructions_list(instructions: Instructions) -> Vec<Instruction> {
+        instructions.instructions
     }
 }
