@@ -207,6 +207,11 @@ pub fn is_defined(v: Value) -> bool {
     !v.is_undefined()
 }
 
+/// Checks if a value is none.
+pub fn is_none(v: Value) -> bool {
+    v.is_none()
+}
+
 /// Checks if a value is safe.
 ///
 /// This filter is also registered with the `escaped` alias.

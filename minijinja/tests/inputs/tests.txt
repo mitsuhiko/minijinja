@@ -18,6 +18,8 @@ undefined: {{ two is undefined }}
 defined: {{ two is defined }}
 undefined2: {{ ohwell is undefined }}
 defined2: {{ ohwell is defined }}
+none: {{ none is none }}
+not-none: {{ 42 is not none }}
 number-int: {{ two is number }}
 number-float: {{ two_dot_two is number }}
 not-seq: {{ two is sequence }}
