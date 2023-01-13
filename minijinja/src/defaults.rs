@@ -101,6 +101,7 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
     let mut rv = BTreeMap::new();
     rv.insert("undefined".into(), BoxedTest::new(tests::is_undefined));
     rv.insert("defined".into(), BoxedTest::new(tests::is_defined));
+    rv.insert("none".into(), BoxedTest::new(tests::is_none));
     rv.insert("safe".into(), BoxedTest::new(tests::is_safe));
     rv.insert("escaped".into(), BoxedTest::new(tests::is_safe));
     #[cfg(feature = "builtins")]
