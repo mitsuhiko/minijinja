@@ -1,7 +1,7 @@
 # wasm-basic
 
-A simple example of how to use the `wasm-bindgen` crate and MiniJinja together
-to render a template from a string.
+A simple example of how to use the `yew` and MiniJinja together to render a
+template from a string.
 
 This example uses [Trunk](https://trunkrs.dev/), which will build the project
 and bundle everything together. It's similar to wasm-pack, but wasm-pack doesn't
@@ -14,5 +14,3 @@ $ trunk serve
 ```
 
 This will run and build the project locally on http://localhost:8080.
-
-You can also view an example output of this project [here](...).
