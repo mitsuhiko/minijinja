@@ -31,7 +31,7 @@ methods are rareful useful and filters should be used instead.
 ### Tuples
 
 MiniJinja does not implement tuples.  The creation of tuples with tuple syntax
-instead create lists.
+instead creates lists.
 
 ### Keyword Arguments
 
