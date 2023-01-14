@@ -7,14 +7,14 @@ TemplateData("before ")
   "before "
 TemplateData("{% raw %} this is a {{ raw }} {% block %} {% endraw %}")
   "{% raw %} this is a {{ raw }} {% block %} {% endraw %}"
-TemplateData(" after\n\nbefore ")
-  " after\n\nbefore "
+TemplateData(" after\n\nbefore")
+  " after\n\nbefore"
 TemplateData("{%- raw %} this is a {{ raw }} {% block %} {% endraw -%}")
   "{%- raw %} this is a {{ raw }} {% block %} {% endraw -%}"
-TemplateData(" after\n\nbefore ")
-  " after\n\nbefore "
+TemplateData("after\n\nbefore")
+  "after\n\nbefore"
 TemplateData("{%- raw -%} this is a {{ raw }} {% block %} {%- endraw -%}")
   "{%- raw -%} this is a {{ raw }} {% block %} {%- endraw -%}"
-TemplateData(" after")
-  " after"
+TemplateData("after")
+  "after"
 

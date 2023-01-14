@@ -20,7 +20,7 @@ struct TokenizerState<'s> {
 }
 
 #[inline(always)]
-fn find_marker(a: &str) -> Option<usize> {
+fn find_marker(a: &str) -> Option<(usize, bool)> {
     let bytes = a.as_bytes();
     let mut offset = 0;
     loop {
@@ -29,7 +29,10 @@ fn find_marker(a: &str) -> Option<usize> {
             None => return None,
         };
         if let Some(b'{' | b'%' | b'#') = bytes.get(offset + idx + 1).copied() {
-            return Some(offset + idx);
+            return Some((
+                offset + idx,
+                bytes.get(offset + idx + 2).copied() == Some(b'-'),
+            ));
         }
         offset += idx + 1;
     }
@@ -73,8 +76,9 @@ fn lex_identifier(s: &str) -> usize {
         .count()
 }
 
-fn skip_basic_tag(block_str: &str, name: &str) -> Option<usize> {
+fn skip_basic_tag(block_str: &str, name: &str) -> Option<(usize, bool)> {
     let mut ptr = block_str;
+    let mut trim = false;
 
     if let Some(rest) = ptr.strip_prefix('-') {
         ptr = rest;
@@ -93,13 +97,14 @@ fn skip_basic_tag(block_str: &str, name: &str) -> Option<usize> {
     }
     if let Some(rest) = ptr.strip_prefix('-') {
         ptr = rest;
+        trim = true;
     }
     ptr = match ptr.strip_prefix("%}") {
         Some(ptr) => ptr,
         None => return None,
     };
 
-    Some(block_str.len() - ptr.len())
+    Some((block_str.len() - ptr.len(), trim))
 }
 
 impl<'s> TokenizerState<'s> {
@@ -224,10 +229,27 @@ impl<'s> TokenizerState<'s> {
             (Token::Str(&s[1..s.len() - 1]), self.span(old_loc))
         })
     }
+
+    fn skip_whitespace(&mut self) {
+        let skip = self
+            .rest
+            .chars()
+            .map_while(|c| {
+                if c.is_whitespace() {
+                    Some(c.len_utf8())
+                } else {
+                    None
+                }
+            })
+            .sum::<usize>();
+        if skip > 0 {
+            self.advance(skip);
+        }
+    }
 }
 
-/// Tokenizes without whitespace handling.
-fn tokenize_raw(
+/// Tokenizes the source.
+pub fn tokenize(
     input: &str,
     in_expr: bool,
 ) -> impl Iterator<Item = Result<(Token<'_>, Span), Error>> {
@@ -242,13 +264,14 @@ fn tokenize_raw(
         current_line: 1,
         current_col: 0,
     };
+    let mut trim_leading_whitespace = false;
 
     std::iter::from_fn(move || loop {
         if state.rest.is_empty() || state.failed {
             return None;
         }
 
-        let old_loc = state.loc();
+        let mut old_loc = state.loc();
         match state.stack.last() {
             Some(LexerState::Template) => {
                 match state.rest.get(..2) {
@@ -267,13 +290,16 @@ fn tokenize_raw(
                         // raw blocks require some special handling.  If we are at the beginning of a raw
                         // block we want to skip everything until {% endraw %} completely ignoring iterior
                         // syntax and emit the entire raw block as TemplateData.
-                        if let Some(mut ptr) = skip_basic_tag(&state.rest[2..], "raw") {
+                        if let Some((mut ptr, _)) = skip_basic_tag(&state.rest[2..], "raw") {
                             ptr += 2;
                             while let Some(block) = memstr(&state.rest.as_bytes()[ptr..], b"{%") {
                                 ptr += block + 2;
-                                if let Some(endraw) = skip_basic_tag(&state.rest[ptr..], "endraw") {
+                                if let Some((endraw, trim)) =
+                                    skip_basic_tag(&state.rest[ptr..], "endraw")
+                                {
                                     let result = &state.rest[..ptr + endraw];
                                     state.advance(ptr + endraw);
+                                    trim_leading_whitespace = trim;
                                     return Some(Ok((
                                         Token::TemplateData(result),
                                         state.span(old_loc),
@@ -296,6 +322,15 @@ fn tokenize_raw(
                     }
                     Some("{#") => {
                         if let Some(comment_end) = memstr(state.rest.as_bytes(), b"#}") {
+                            if state
+                                .rest
+                                .as_bytes()
+                                .get(comment_end.saturating_sub(1))
+                                .copied()
+                                == Some(b'-')
+                            {
+                                trim_leading_whitespace = true;
+                            }
                             state.advance(comment_end + 2);
                             continue;
                         } else {
@@ -305,11 +340,28 @@ fn tokenize_raw(
                     _ => {}
                 }
 
-                let lead = match find_marker(state.rest) {
-                    Some(start) => state.advance(start),
-                    None => state.advance(state.rest.len()),
+                if trim_leading_whitespace {
+                    trim_leading_whitespace = false;
+                    state.skip_whitespace();
+                    old_loc = state.loc();
+                }
+
+                let (lead, span) = match find_marker(state.rest) {
+                    Some((start, false)) => (state.advance(start), state.span(old_loc)),
+                    Some((start, _)) => {
+                        let peeked = &state.rest[..start];
+                        let trimmed = peeked.trim_end();
+                        let lead = state.advance(trimmed.len());
+                        let span = state.span(old_loc);
+                        state.advance(peeked.len() - trimmed.len());
+                        (lead, span)
+                    }
+                    None => (state.advance(state.rest.len()), state.span(old_loc)),
                 };
-                return Some(Ok((Token::TemplateData(lead), state.span(old_loc))));
+                if lead.is_empty() {
+                    continue;
+                }
+                return Some(Ok((Token::TemplateData(lead), span)));
             }
             Some(LexerState::InBlock | LexerState::InVariable) => {
                 // in blocks whitespace is generally ignored, skip it.
@@ -334,6 +386,7 @@ fn tokenize_raw(
                 if let Some(&LexerState::InBlock) = state.stack.last() {
                     if let Some("-%}") = state.rest.get(..3) {
                         state.stack.pop();
+                        trim_leading_whitespace = true;
                         state.advance(3);
                         return Some(Ok((Token::BlockEnd(true), state.span(old_loc))));
                     }
@@ -346,6 +399,7 @@ fn tokenize_raw(
                     if let Some("-}}") = state.rest.get(..3) {
                         state.stack.pop();
                         state.advance(3);
+                        trim_leading_whitespace = true;
                         return Some(Ok((Token::VariableEnd(true), state.span(old_loc))));
                     }
                     if let Some("}}") = state.rest.get(..2) {
@@ -413,83 +467,34 @@ fn tokenize_raw(
     })
 }
 
-/// Automatically removes whitespace around blocks.
-fn whitespace_filter<'a, I: Iterator<Item = Result<(Token<'a>, Span), Error>>>(
-    iter: I,
-) -> impl Iterator<Item = Result<(Token<'a>, Span), Error>> {
-    let mut iter = iter.peekable();
-    let mut remove_leading_ws = false;
-    // TODO: this does not update spans
-    std::iter::from_fn(move || loop {
-        return match iter.next() {
-            Some(Ok((Token::TemplateData(mut data), span))) => {
-                if remove_leading_ws {
-                    remove_leading_ws = false;
-                    data = data.trim_start();
-                }
-                if matches!(
-                    iter.peek(),
-                    Some(Ok((
-                        Token::VariableStart(true) | Token::BlockStart(true),
-                        _
-                    )))
-                ) {
-                    data = data.trim_end();
-                }
-                // if we trim down template data completely, skip to the
-                // next token
-                if data.is_empty() {
-                    continue;
-                }
-                Some(Ok((Token::TemplateData(data), span)))
-            }
-            rv @ Some(Ok((Token::VariableEnd(true) | Token::BlockEnd(true), _))) => {
-                remove_leading_ws = true;
-                rv
-            }
-            other => {
-                remove_leading_ws = false;
-                other
-            }
-        };
-    })
-}
-
-/// Tokenizes the source.
-pub fn tokenize(
-    input: &str,
-    in_expr: bool,
-) -> impl Iterator<Item = Result<(Token<'_>, Span), Error>> {
-    whitespace_filter(tokenize_raw(input, in_expr))
-}
-
 #[test]
 fn test_find_marker() {
     assert!(find_marker("{").is_none());
     assert!(find_marker("foo").is_none());
     assert!(find_marker("foo {").is_none());
-    assert_eq!(find_marker("foo {{"), Some(4));
+    assert_eq!(find_marker("foo {{"), Some((4, false)));
+    assert_eq!(find_marker("foo {{-"), Some((4, true)));
 }
 
 #[test]
 fn test_is_basic_tag() {
-    assert_eq!(skip_basic_tag(" raw %}", "raw"), Some(7));
+    assert_eq!(skip_basic_tag(" raw %}", "raw"), Some((7, false)));
     assert_eq!(skip_basic_tag(" raw %}", "endraw"), None);
-    assert_eq!(skip_basic_tag("  raw  %}", "raw"), Some(9));
-    assert_eq!(skip_basic_tag("-  raw  -%}", "raw"), Some(11));
+    assert_eq!(skip_basic_tag("  raw  %}", "raw"), Some((9, false)));
+    assert_eq!(skip_basic_tag("-  raw  -%}", "raw"), Some((11, true)));
 }
 
 #[test]
 fn test_basic_identifiers() {
     fn assert_ident(s: &str) {
-        match tokenize_raw(s, true).next() {
+        match tokenize(s, true).next() {
             Some(Ok((Token::Ident(ident), _))) if ident == s => {}
             _ => panic!("did not get a matching token result: {:?}", s),
         }
     }
 
     fn assert_not_ident(s: &str) {
-        let res = tokenize_raw(s, true).collect::<Result<Vec<_>, _>>();
+        let res = tokenize(s, true).collect::<Result<Vec<_>, _>>();
         if let Ok(tokens) = res {
             if let &[(Token::Ident(_), _)] = &tokens[..] {
                 panic!("got a single ident for {:?}", s)
