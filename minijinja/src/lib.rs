@@ -142,6 +142,9 @@
 //!   - `multi-template`: when removed the templates related to imports and extends
 //!     are removed (`{% from %}`, `{% import %}`, `{% include %}`, and `{% extends %}`
 //!     as well as `{% block %}`).
+//!   - `adjacent-loop-items`: when removed the `previtem` and `nextitem` attributes of
+//!     the `loop` object no longer exist.  Removing this feature can provide faster
+//!     template execution when a lot of loops are involved.
 //!   - `unicode`: when added unicode identifiers are supported.  Without this features
 //!     only ASCII identifiers can be used for variable names and attributes.
 //!

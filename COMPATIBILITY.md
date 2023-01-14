@@ -66,12 +66,7 @@ forms of auto escaping as well.
 
 ### `{% for %}`
 
-`for` works is at feature parity with Jinja2 with the exception of the
-missing support for `loop.previtem` and `loop.nexitem`.  Supporting this
-is possible but has not been implemented yet because it requires taking
-a mutex for each loop iteration.
-
-**Tracking issue:** [#47](https://github.com/mitsuhiko/minijinja/issues/47)
+`for` has feature parity with Jinja2.
 
 ### `{% if %}`
 

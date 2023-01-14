@@ -203,6 +203,8 @@
 //! - `loop.cycle`: A helper function to cycle between a list of sequences. See the explanation below.
 //! - `loop.depth`: Indicates how deep in a recursive loop the rendering currently is. Starts at level 1
 //! - `loop.depth0`: Indicates how deep in a recursive loop the rendering currently is. Starts at level 0
+//! - `loop.previtem`: The item from the previous iteration of the loop. `Undefined` during the first iteration.
+//! - `loop.nextitem`: The item from the previous iteration of the loop. `Undefined` during the last iteration.
 //! - `loop.changed(...args)`: Returns true if the passed values have changed since the last time it was called with the same arguments.
 //! - `loop.cycle(...args)`: Returns a value from the passed sequence in a cycle.
 //!
@@ -267,6 +269,10 @@
 //! {% endfor %}
 //! </ul>
 //! ```
+//!
+//! **Special note:** the `previtem` and `nextitem` attributes are available by default
+//! but can be disabled by removing the `adjacent-loop-items` crate feature.  Removing
+//! these attributes can provide meaningful speedups for templates with a lot of loops.
 //!
 //! ## `{% if %}`
 //!

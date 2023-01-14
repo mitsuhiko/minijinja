@@ -43,6 +43,12 @@ Referenced variables: {
         last: false,
         depth: 1,
         depth0: 0,
+        previtem: Undefined,
+        nextitem: [
+            2,
+            3,
+            4,
+        ],
     },
     seq: [
         [

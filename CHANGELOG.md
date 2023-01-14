@@ -12,6 +12,7 @@ All notable changes to MiniJinja are documented here.
 - Added `none` test. (#185)
 - Improved various issues with whitespace trimming. (#187)
 - `Value::default` now returns `Undefined` rather than `None`.
+- Added support for `loop.previtem` and `loop.nextitem`. (#188)
 
 # 0.28.0
 

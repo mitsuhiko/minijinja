@@ -4,5 +4,6 @@ An example using MiniJinja without default features.
 
 ```console
 $ cargo run
-Hello World!
+1. Hello John!
+2. Hello Peter!
 ```

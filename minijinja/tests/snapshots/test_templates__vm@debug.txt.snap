@@ -24,6 +24,8 @@ State {
             last: true,
             depth: 1,
             depth0: 0,
+            previtem: Undefined,
+            nextitem: Undefined,
         },
         "f": minijinja::functions::builtins::range,
         "upper": 1,
