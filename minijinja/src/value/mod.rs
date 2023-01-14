@@ -405,7 +405,7 @@ impl fmt::Display for Value {
 
 impl Default for Value {
     fn default() -> Value {
-        ValueRepr::None.into()
+        ValueRepr::Undefined.into()
     }
 }
 

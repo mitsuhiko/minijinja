@@ -11,6 +11,7 @@ All notable changes to MiniJinja are documented here.
 - Added fuel tracking support.
 - Added `none` test. (#185)
 - Improved various issues with whitespace trimming. (#187)
+- `Value::default` now returns `Undefined` rather than `None`.
 
 # 0.28.0
 
