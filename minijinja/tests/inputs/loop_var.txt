@@ -14,4 +14,6 @@
     revindex={{ loop.revindex }}
     revindex0={{ loop.revindex0 }}
     cycle={{ loop.cycle("odd", "even") }}
+    previtem={{ loop.previtem }}
+    nextitem={{ loop.nextitem }}
 {% endfor %}

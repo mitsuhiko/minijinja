@@ -372,7 +372,22 @@ impl<'env> Vm<'env> {
                 Instruction::Iterate(jump_target) => {
                     let l = state.ctx.current_loop().unwrap();
                     l.object.idx.fetch_add(1, Ordering::Relaxed);
-                    match l.iterator.next() {
+
+                    let next = {
+                        #[cfg(feature = "adjacent-loop-items")]
+                        {
+                            let mut triple = l.object.value_triple.lock().unwrap();
+                            triple.0 = triple.1.take();
+                            triple.1 = triple.2.take();
+                            triple.2 = l.iterator.next();
+                            triple.1.clone()
+                        }
+                        #[cfg(not(feature = "adjacent-loop-items"))]
+                        {
+                            l.iterator.next()
+                        }
+                    };
+                    match next {
                         Some(item) => stack.push(item),
                         None => {
                             pc = *jump_target;
@@ -822,7 +837,8 @@ impl<'env> Vm<'env> {
         pc: usize,
         current_recursion_jump: Option<(usize, bool)>,
     ) -> Result<(), Error> {
-        let iterator = ok!(iterable.try_iter_owned());
+        #[allow(unused_mut)]
+        let mut iterator = ok!(iterable.try_iter_owned());
         let len = iterator.len();
         let depth = state
             .ctx
@@ -833,7 +849,6 @@ impl<'env> Vm<'env> {
         let with_loop_var = flags & LOOP_FLAG_WITH_LOOP_VAR != 0;
         ok!(state.ctx.push_frame(Frame {
             current_loop: Some(LoopState {
-                iterator,
                 with_loop_var,
                 recurse_jump_target: if recursive { Some(pc) } else { None },
                 current_recursion_jump,
@@ -841,8 +856,11 @@ impl<'env> Vm<'env> {
                     idx: AtomicUsize::new(!0usize),
                     len,
                     depth,
+                    #[cfg(feature = "adjacent-loop-items")]
+                    value_triple: Mutex::new((None, None, iterator.next())),
                     last_changed_value: Mutex::default(),
                 }),
+                iterator,
             }),
             ..Frame::default()
         }));
