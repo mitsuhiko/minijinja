@@ -1,10 +1,10 @@
 ---
 source: minijinja/tests/test_lexer.rs
-description: "foo {{- bar -}} baz {{ blah }} blub"
+description: "foo {{- bar -}} baz {{ blah }} blub\nfoo {#- comment -#} baz {# blah #} blub"
 input_file: minijinja/tests/lexer-inputs/whitespace.txt
 ---
 TemplateData("foo")
-  "foo "
+  "foo"
 VariableStart(true)
   "{{-"
 Ident("bar")
@@ -12,13 +12,17 @@ Ident("bar")
 VariableEnd(true)
   "-}}"
 TemplateData("baz ")
-  " baz "
+  "baz "
 VariableStart(false)
   "{{"
 Ident("blah")
   "blah"
 VariableEnd(false)
   "}}"
+TemplateData(" blub\nfoo")
+  " blub\nfoo"
+TemplateData("baz ")
+  "baz "
 TemplateData(" blub\n")
   " blub\n"
 
