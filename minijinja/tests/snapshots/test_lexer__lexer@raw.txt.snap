@@ -4,10 +4,17 @@ description: "before {% raw %} this is a {{ raw }} {% block %} {% endraw %} afte
 input_file: minijinja/tests/lexer-inputs/raw.txt
 ---
 TemplateData("before ")
+  "before "
 TemplateData("{% raw %} this is a {{ raw }} {% block %} {% endraw %}")
+  "{% raw %} this is a {{ raw }} {% block %} {% endraw %}"
 TemplateData(" after\n\nbefore ")
+  " after\n\nbefore "
 TemplateData("{%- raw %} this is a {{ raw }} {% block %} {% endraw -%}")
+  "{%- raw %} this is a {{ raw }} {% block %} {% endraw -%}"
 TemplateData(" after\n\nbefore ")
+  " after\n\nbefore "
 TemplateData("{%- raw -%} this is a {{ raw }} {% block %} {%- endraw -%}")
+  "{%- raw -%} this is a {{ raw }} {% block %} {%- endraw -%}"
 TemplateData(" after")
+  " after"
 

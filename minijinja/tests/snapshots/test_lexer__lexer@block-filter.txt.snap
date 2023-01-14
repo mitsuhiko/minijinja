@@ -4,16 +4,29 @@ description: "{% for item in seq -%}\n  {{ item }}{% endfor %}"
 input_file: minijinja/tests/lexer-inputs/block-filter.txt
 ---
 BlockStart(false)
+  "{%"
 Ident("for")
+  "for"
 Ident("item")
+  "item"
 Ident("in")
+  "in"
 Ident("seq")
+  "seq"
 BlockEnd(true)
+  "-%}"
 VariableStart(false)
+  "{{"
 Ident("item")
+  "item"
 VariableEnd(false)
+  "}}"
 BlockStart(false)
+  "{%"
 Ident("endfor")
+  "endfor"
 BlockEnd(false)
+  "%}"
 TemplateData("\n")
+  "\n"
 

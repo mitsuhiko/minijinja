@@ -4,29 +4,55 @@ description: "{{ with_int(42, -42) }}\n{{ with_float(1.5, -1.5) }}\n{{ with_stri
 input_file: minijinja/tests/lexer-inputs/things.txt
 ---
 VariableStart(false)
+  "{{"
 Ident("with_int")
+  "with_int"
 ParenOpen
+  "("
 Int(42)
+  "42"
 Comma
+  ","
 Minus
+  "-"
 Int(42)
+  "42"
 ParenClose
+  ")"
 VariableEnd(false)
+  "}}"
 TemplateData("\n")
+  "\n"
 VariableStart(false)
+  "{{"
 Ident("with_float")
+  "with_float"
 ParenOpen
+  "("
 Float(1.5)
+  "1.5"
 Comma
+  ","
 Minus
+  "-"
 Float(1.5)
+  "1.5"
 ParenClose
+  ")"
 VariableEnd(false)
+  "}}"
 TemplateData("\n")
+  "\n"
 VariableStart(false)
+  "{{"
 Ident("with_string")
+  "with_string"
 ParenOpen
+  "("
 Str("string")
+  "\"string\""
 ParenClose
+  ")"
 VariableEnd(false)
+  "}}"
 

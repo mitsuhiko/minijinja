@@ -297,6 +297,7 @@ fn tokenize_raw(
                     Some("{#") => {
                         if let Some(comment_end) = memstr(state.rest.as_bytes(), b"#}") {
                             state.advance(comment_end + 2);
+                            continue;
                         } else {
                             return Some(Err(state.syntax_error("unexpected end of comment")));
                         }

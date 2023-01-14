@@ -4,41 +4,79 @@ description: "{{ true }}\n{{ false }}\n{{ null }}\n{{ 1.0 }}\n{{ 2 }}\n{{ [1, 2,
 input_file: minijinja/tests/lexer-inputs/literals.txt
 ---
 VariableStart(false)
+  "{{"
 Ident("true")
+  "true"
 VariableEnd(false)
+  "}}"
 TemplateData("\n")
+  "\n"
 VariableStart(false)
+  "{{"
 Ident("false")
+  "false"
 VariableEnd(false)
+  "}}"
 TemplateData("\n")
+  "\n"
 VariableStart(false)
+  "{{"
 Ident("null")
+  "null"
 VariableEnd(false)
+  "}}"
 TemplateData("\n")
+  "\n"
 VariableStart(false)
+  "{{"
 Float(1.0)
+  "1.0"
 VariableEnd(false)
+  "}}"
 TemplateData("\n")
+  "\n"
 VariableStart(false)
+  "{{"
 Int(2)
+  "2"
 VariableEnd(false)
+  "}}"
 TemplateData("\n")
+  "\n"
 VariableStart(false)
+  "{{"
 BracketOpen
+  "["
 Int(1)
+  "1"
 Comma
+  ","
 Int(2)
+  "2"
 Comma
+  ","
 Int(3)
+  "3"
 BracketClose
+  "]"
 VariableEnd(false)
+  "}}"
 TemplateData("\n")
+  "\n"
 VariableStart(false)
+  "{{"
 BraceOpen
+  "{"
 Str("foo")
+  "\"foo\""
 Colon
+  ":"
 Str("bar")
+  "\"bar\""
 BraceClose
+  "}"
 VariableEnd(false)
+  "}}"
 TemplateData("\n")
+  "\n"
 

@@ -4,8 +4,13 @@ description: "Hello {{ name }}!"
 input_file: minijinja/tests/lexer-inputs/basic.txt
 ---
 TemplateData("Hello ")
+  "Hello "
 VariableStart(false)
+  "{{"
 Ident("name")
+  "name"
 VariableEnd(false)
+  "}}"
 TemplateData("!\n")
+  "!\n"
 

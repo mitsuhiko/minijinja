@@ -4,36 +4,69 @@ description: "{# useless comment #}\n{{ foo.bar[baz].blah }}\n{{ {\"foo\": \"bar
 input_file: minijinja/tests/lexer-inputs/attrs.txt
 ---
 TemplateData("\n")
+  "\n"
 VariableStart(false)
+  "{{"
 Ident("foo")
+  "foo"
 Dot
+  "."
 Ident("bar")
+  "bar"
 BracketOpen
+  "["
 Ident("baz")
+  "baz"
 BracketClose
+  "]"
 Dot
+  "."
 Ident("blah")
+  "blah"
 VariableEnd(false)
+  "}}"
 TemplateData("\n")
+  "\n"
 VariableStart(false)
+  "{{"
 BraceOpen
+  "{"
 Str("foo")
+  "\"foo\""
 Colon
+  ":"
 Str("bar")
+  "\"bar\""
 BraceClose
+  "}"
 Dot
+  "."
 Ident("test")
+  "test"
 VariableEnd(false)
+  "}}"
 TemplateData("\n")
+  "\n"
 VariableStart(false)
+  "{{"
 BracketOpen
+  "["
 Int(1)
+  "1"
 Comma
+  ","
 Int(2)
+  "2"
 Comma
+  ","
 Int(3)
+  "3"
 BracketClose
+  "]"
 Dot
+  "."
 Ident("test")
+  "test"
 VariableEnd(false)
+  "}}"
 

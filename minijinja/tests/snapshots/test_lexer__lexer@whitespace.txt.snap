@@ -4,12 +4,21 @@ description: "foo {{- bar -}} baz {{ blah }} blub"
 input_file: minijinja/tests/lexer-inputs/whitespace.txt
 ---
 TemplateData("foo")
+  "foo "
 VariableStart(true)
+  "{{-"
 Ident("bar")
+  "bar"
 VariableEnd(true)
+  "-}}"
 TemplateData("baz ")
+  " baz "
 VariableStart(false)
+  "{{"
 Ident("blah")
+  "blah"
 VariableEnd(false)
+  "}}"
 TemplateData(" blub\n")
+  " blub\n"
 
