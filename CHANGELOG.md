@@ -10,6 +10,7 @@ All notable changes to MiniJinja are documented here.
 - Enforce a maximum size of 10000 items on the range output.
 - Added fuel tracking support.
 - Added `none` test. (#185)
+- Improved various issues with whitespace trimming. (#187)
 
 # 0.28.0
 
