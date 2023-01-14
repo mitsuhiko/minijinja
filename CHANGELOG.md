@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-# Unreleased
+## 0.29.0
 
 - Resolve a runtime panic if `{% extends %}` appears in the template
   but never is executed.
@@ -14,14 +14,14 @@ All notable changes to MiniJinja are documented here.
 - `Value::default` now returns `Undefined` rather than `None`.
 - Added support for `loop.previtem` and `loop.nextitem`. (#188)
 
-# 0.28.0
+## 0.28.0
 
 - Added `capitalize` filter. (#163)
 - Added support for `{% call %}`. (#164)
 - Added support for `{% do %}`. (#167)
 - Improved testsuite to execute on wasm32-wasi.
 
-# 0.27.0
+## 0.27.0
 
 - Filters, tests and other functions can now be registered with a dynamically
   allocated name. (#146)
@@ -42,7 +42,7 @@ All notable changes to MiniJinja are documented here.
 - Added `safe` / `escaped` test.
 - Strings now have the same iteration behavior as in Jinja2. (#152)
 
-## Breaking Changes
+### Breaking Changes
 
 - The `Object` model changed significantly in this release.  It's now possible
   for objects to have different shapes (structs or sequences today).  As a result
@@ -50,7 +50,7 @@ All notable changes to MiniJinja are documented here.
   over have a look at the new documentation for `Object`.
 - The `Iter` type is now called `ValueIter`.
 
-# 0.26.0
+## 0.26.0
 
 - Changed `Object::attributes` to being an iterator. (#138)
 - `Arc<T: Object>` now implements `Object`. (#139)
@@ -59,24 +59,24 @@ All notable changes to MiniJinja are documented here.
 - Performance improvements for value conversions and object creation. (#142)
 - Align iteration behavior of dynamic objects with maps.
 
-## Breaking Changes
+### Breaking Changes
 
 - The `attributes` method on objects now returns iterators.  To make the
   transition easy change `[..]` to `Box::new([..].into_iter())`.
 
-# 0.25.0
+## 0.25.0
 
 - Added support for recursive macro invocations. (#133)
 - Added optional unicode identifier support. (#134)
 
-# 0.24.0
+## 0.24.0
 
 - Catch divisions by zero.
 - Correctly render `inf` floats.
 - Enforce a maximum recursion depth during parsing.
 - Added `Value::try_iter` to iterate over maps and sequences. (#132)
 
-# 0.23.0
+## 0.23.0
 
 - Added `Value::from_function`. (#121)
 - Fixed incorrect location information with blocks.
@@ -94,21 +94,21 @@ All notable changes to MiniJinja are documented here.
   the heavier pieces of MiniJinja.
 - Fixed an issue that caused trailing commas not to work in lists.
 
-# 0.22.1
+## 0.22.1
 
 - Fixed an incorrect manifest for `minijinja-autoreload`.
 
-# 0.22.0
+## 0.22.0
 
 - Add `defined` and `undefined` tests to always be included.
 - Removed `Source::load_from_path`.
 - Added `Source::from_path`.
 
-## Breaking Changes
+### Breaking Changes
 
 - Removed `Source::load_from_path`.  Use `Source::with_loader` instead.
 
-# 0.21.0
+## 0.21.0
 
 - Added custom autoescape settings.
 - Added custom formatters.
@@ -124,14 +124,14 @@ All notable changes to MiniJinja are documented here.
 - `ImpossibleOperation` is now `InvalidOperation`.
 - Added support for slice syntax. (#120)
 
-## Breaking Changes
+### Breaking Changes
 
 - `Filter`, `Test` and `Function` are now sealed traits.
 - `ErrorKind::ImpossibleOperation` is now `ErrorKind::InvalidOperation`.
 - Moved up MSRV to 1.61.0 due to bugs on older rust versions related to
   HRTBs.
 
-# 0.20.0
+## 0.20.0
 
 - Remove internal refcounts from environment.
 - Changed `Object` and `FunctionArgs` interface to take
@@ -143,7 +143,7 @@ All notable changes to MiniJinja are documented here.
   functions can now directly return values instead of results. (#107)
 - MiniJinja no longer silently iterates over non iterable values.
 
-## Breaking Changes
+### Breaking Changes
 
 - The `meta` API is gone without replacement.
 - `Object::call_method` and `Object::call` now take the arguments
@@ -156,12 +156,12 @@ All notable changes to MiniJinja are documented here.
 - `DebugInfo` is no longer exposed.  This might come back if a better
   API can be found.
 
-# 0.19.1
+## 0.19.1
 
 - Fixed binary subtraction operator requiring a space. (#94)
 - Fixed trailing commas not working in function calls. (#95)
 
-# 0.19.0
+## 0.19.0
 
 - Small internal improvements to context creation. (#79)
 - Add support for JSON/YAML/JavaScript Escaping.  (#82)
@@ -174,50 +174,50 @@ All notable changes to MiniJinja are documented here.
 - Fixed an issue where trailing whitespace removal did not work on blocks.  (#90)
 - Added `loop.changed()` method.  (#91)
 
-# 0.18.1
+## 0.18.1
 
 - Fixed a bad dependency declaration.
 
-# 0.18.0
+## 0.18.0
 
 - Improved debug printing of context.
 - Added `-`, `_` and `.` to set of unescaped characters in `urlencode`. (#72)
 - Bumped `v_htmlescape` dependency. (#74)
 
-# 0.17.0
+## 0.17.0
 
 - Added support for `{% raw %}`. (#67)
 - Minimum Rust version moved up to 1.45.
 - Added support for `{% set %}`. (#70)
 
-# 0.16.0
+## 0.16.0
 
 - Added support for unpacking in `with` blocks. (#65)
 
-# 0.15.0
+## 0.15.0
 
 - Bumped minimum version requirement to 1.43.
 - Internal refactorings.
 - Added support for fully dynamic loading via `Source::with_loader`.
 - Renamed `get_source` to `source`.
 
-# 0.14.1
+## 0.14.1
 
 - Fixed `or` expressions not working properly.
 
-# 0.14.0
+## 0.14.0
 
 - Added `bool` filter.
 - Added `meta` API. (#55)
 - Added support for `ignore missing` in include tags. (#56)
 - Added support for choices in include tags. (#57)
 
-# 0.13.0
+## 0.13.0
 
 - Removed deprecated functionality.
 - Fix an panic in debug error printing. (#49)
 
-# 0.12.0
+## 0.12.0
 
 - Deprecated `Primitive` and `as_primitive`.
 - Deprecated `as_f64`.
@@ -244,11 +244,11 @@ All notable changes to MiniJinja are documented here.
   by removing the default `deserialization` feature.
 - Removed optional `memchr` dependency as it does not appear to be useful.
 
-# 0.11.0
+## 0.11.0
 
 *Yanked* — this was a release from the wrong branch
 
-# 0.10.0
+## 0.10.0
 
 - Restructured the value type internally to be simpler and not use unsafe at the
   cost of slightly larger memory footprint. (#30)
@@ -259,20 +259,20 @@ All notable changes to MiniJinja are documented here.
   be disabled by removing the default `key_interning` feature. (#35)
 - Removed deprecated `Single` type.
 
-# 0.9.0
+## 0.9.0
 
 - Remove one trailing newline to be consistent with Jinja2.
 - Resolved a bug where borrowed keys on dynamic objects could not be looked up. (#29)
 
-# 0.8.2
+## 0.8.2
 
 - Restored unconditional compatibility with 1.42.
 
-# 0.8.1
+## 0.8.1
 
 - Turned on all features for the docs on docs.rs
 
-# 0.8.0
+## 0.8.0
 
 - Added `context!` and deprecate `Single`.
 - Correctly report template file names in errors.
@@ -283,11 +283,11 @@ All notable changes to MiniJinja are documented here.
 - Added `tojson` filter.
 - Added `urlencode` filter.
 
-# 0.7.0
+## 0.7.0
 
 - Made the `source` method on error be bound to `Send` and `Sync`.
 
-# 0.6.0
+## 0.6.0
 
 - Added `default` filter.
 - Added `startingwith` and `endingwith` tests.
@@ -300,7 +300,7 @@ All notable changes to MiniJinja are documented here.
 - Added keyword arguments to function and filter invocations.
 - Added Jinja2 filter aliases `e`, `d` and `count`.
 
-# 0.5.0
+## 0.5.0
 
 - Added support for rustc 1.41.0
 - Added `v_htmlescape` feature to turn on a faster HTML escaping.
@@ -321,7 +321,7 @@ All notable changes to MiniJinja are documented here.
 - Added `{% filter %}` blocks.
 - Added `value::Single` type to render simple templates with a single value passed.
 
-# 0.4.0
+## 0.4.0
 
 - Added the ability to roundtrip arbitrary values via the serialize interface.
 - Added support for tuple unpacking in lists.
@@ -345,16 +345,16 @@ All notable changes to MiniJinja are documented here.
 - Added `in` and `not in` expressions.
 - Added inline `if` expressions.
 
-# 0.3.0
+## 0.3.0
 
 - Added support for `{% include %}`
 - Resolved a bug that caused `with` blocks to fully shadow the outer scope.
 - Improved documentation in the crate.
 
-# 0.2.0
+## 0.2.0
 
 - Added support for rustc versions down to 1.42.0
 
-# 0.1.0
+## 0.1.0
 
 - Initial release of the library
