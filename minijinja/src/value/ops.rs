@@ -78,10 +78,10 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     } else {
         ok!(start.try_into())
     };
-    let stop: Option<i64> = if stop.is_none() {
+    let stop = if stop.is_none() {
         None
     } else {
-        Some(ok!(stop.try_into()))
+        Some(ok!(i64::try_from(stop)))
     };
     let step = if step.is_none() {
         1

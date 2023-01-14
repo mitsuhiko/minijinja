@@ -50,11 +50,7 @@ fn lex_identifier(s: &str) -> usize {
             } else {
                 unicode_ident::is_xid_continue(c)
             };
-            if cont {
-                Some(c.len_utf8())
-            } else {
-                None
-            }
+            cont.then(|| c.len_utf8())
         })
         .sum::<usize>()
 }
@@ -234,13 +230,7 @@ impl<'s> TokenizerState<'s> {
         let skip = self
             .rest
             .chars()
-            .map_while(|c| {
-                if c.is_whitespace() {
-                    Some(c.len_utf8())
-                } else {
-                    None
-                }
-            })
+            .map_while(|c| c.is_whitespace().then(|| c.len_utf8()))
             .sum::<usize>();
         if skip > 0 {
             self.advance(skip);
