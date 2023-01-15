@@ -13,6 +13,7 @@ use crate::value::{MapType, Value, ValueMap, ValueRepr};
 /// to nodes, but it also ensures the nodes is heap allocated.  The
 /// latter is useful to ensure that enum variants do not cause the enum
 /// to become too large.
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Spanned<T> {
     node: Box<T>,
     span: Span,
@@ -50,6 +51,11 @@ impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
 }
 
 /// A statement node.
+#[cfg_attr(
+    feature = "unstable_machinery_serde",
+    derive(serde::Serialize),
+    serde(tag = "stmt")
+)]
 pub enum Stmt<'a> {
     Template(Spanned<Template<'a>>),
     EmitExpr(Spanned<EmitExpr<'a>>),
@@ -113,6 +119,11 @@ impl<'a> fmt::Debug for Stmt<'a> {
 
 /// An expression node.
 #[allow(clippy::enum_variant_names)]
+#[cfg_attr(
+    feature = "unstable_machinery_serde",
+    derive(serde::Serialize),
+    serde(tag = "expr")
+)]
 pub enum Expr<'a> {
     Var(Spanned<Var<'a>>),
     Const(Spanned<Const>),
@@ -175,12 +186,14 @@ impl<'a> Expr<'a> {
 
 /// Root template node.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Template<'a> {
     pub children: Vec<Stmt<'a>>,
 }
 
 /// A for loop.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct ForLoop<'a> {
     pub target: Expr<'a>,
     pub iter: Expr<'a>,
@@ -192,6 +205,7 @@ pub struct ForLoop<'a> {
 
 /// An if/else condition.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct IfCond<'a> {
     pub expr: Expr<'a>,
     pub true_body: Vec<Stmt<'a>>,
@@ -200,6 +214,7 @@ pub struct IfCond<'a> {
 
 /// A with block.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct WithBlock<'a> {
     pub assignments: Vec<(Expr<'a>, Expr<'a>)>,
     pub body: Vec<Stmt<'a>>,
@@ -207,6 +222,7 @@ pub struct WithBlock<'a> {
 
 /// A set statement.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Set<'a> {
     pub target: Expr<'a>,
     pub expr: Expr<'a>,
@@ -214,6 +230,7 @@ pub struct Set<'a> {
 
 /// A set capture statement.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct SetBlock<'a> {
     pub target: Expr<'a>,
     pub filter: Option<Expr<'a>>,
@@ -223,6 +240,7 @@ pub struct SetBlock<'a> {
 /// A block for inheritance elements.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 #[cfg(feature = "multi-template")]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Block<'a> {
     pub name: &'a str,
     pub body: Vec<Stmt<'a>>,
@@ -231,6 +249,7 @@ pub struct Block<'a> {
 /// An extends block.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 #[cfg(feature = "multi-template")]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Extends<'a> {
     pub name: Expr<'a>,
 }
@@ -238,6 +257,7 @@ pub struct Extends<'a> {
 /// An include block.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 #[cfg(feature = "multi-template")]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Include<'a> {
     pub name: Expr<'a>,
     pub ignore_missing: bool,
@@ -245,6 +265,7 @@ pub struct Include<'a> {
 
 /// An auto escape control block.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct AutoEscape<'a> {
     pub enabled: Expr<'a>,
     pub body: Vec<Stmt<'a>>,
@@ -252,6 +273,7 @@ pub struct AutoEscape<'a> {
 
 /// Applies filters to a block.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct FilterBlock<'a> {
     pub filter: Expr<'a>,
     pub body: Vec<Stmt<'a>>,
@@ -260,6 +282,7 @@ pub struct FilterBlock<'a> {
 /// Declares a macro.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 #[cfg(feature = "macros")]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Macro<'a> {
     pub name: &'a str,
     pub args: Vec<Expr<'a>>,
@@ -270,6 +293,7 @@ pub struct Macro<'a> {
 /// A call block
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 #[cfg(feature = "macros")]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct CallBlock<'a> {
     pub call: Spanned<Call<'a>>,
     pub macro_decl: Spanned<Macro<'a>>,
@@ -277,6 +301,7 @@ pub struct CallBlock<'a> {
 
 /// A call block
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Do<'a> {
     pub call: Spanned<Call<'a>>,
 }
@@ -284,6 +309,7 @@ pub struct Do<'a> {
 /// A "from" import
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 #[cfg(feature = "multi-template")]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct FromImport<'a> {
     pub expr: Expr<'a>,
     pub names: Vec<(Expr<'a>, Option<Expr<'a>>)>,
@@ -292,6 +318,7 @@ pub struct FromImport<'a> {
 /// A full module import
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 #[cfg(feature = "multi-template")]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Import<'a> {
     pub expr: Expr<'a>,
     pub name: Expr<'a>,
@@ -299,30 +326,35 @@ pub struct Import<'a> {
 
 /// Outputs the expression.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct EmitExpr<'a> {
     pub expr: Expr<'a>,
 }
 
 /// Outputs raw template code.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct EmitRaw<'a> {
     pub raw: &'a str,
 }
 
 /// Looks up a variable.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Var<'a> {
     pub id: &'a str,
 }
 
 /// Loads a constant
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Const {
     pub value: Value,
 }
 
 /// Represents a slice.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Slice<'a> {
     pub expr: Expr<'a>,
     pub start: Option<Expr<'a>>,
@@ -332,6 +364,7 @@ pub struct Slice<'a> {
 
 /// A kind of unary operator.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub enum UnaryOpKind {
     Not,
     Neg,
@@ -339,6 +372,7 @@ pub enum UnaryOpKind {
 
 /// An unary operator expression.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct UnaryOp<'a> {
     pub op: UnaryOpKind,
     pub expr: Expr<'a>,
@@ -346,6 +380,7 @@ pub struct UnaryOp<'a> {
 
 /// A kind of binary operator.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub enum BinOpKind {
     Eq,
     Ne,
@@ -368,6 +403,7 @@ pub enum BinOpKind {
 
 /// A binary operator expression.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct BinOp<'a> {
     pub op: BinOpKind,
     pub left: Expr<'a>,
@@ -376,6 +412,7 @@ pub struct BinOp<'a> {
 
 /// An if expression.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct IfExpr<'a> {
     pub test_expr: Expr<'a>,
     pub true_expr: Expr<'a>,
@@ -384,6 +421,7 @@ pub struct IfExpr<'a> {
 
 /// A filter expression.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Filter<'a> {
     pub name: &'a str,
     pub expr: Option<Expr<'a>>,
@@ -392,6 +430,7 @@ pub struct Filter<'a> {
 
 /// A test expression.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Test<'a> {
     pub name: &'a str,
     pub expr: Expr<'a>,
@@ -400,6 +439,7 @@ pub struct Test<'a> {
 
 /// An attribute lookup expression.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct GetAttr<'a> {
     pub expr: Expr<'a>,
     pub name: &'a str,
@@ -407,6 +447,7 @@ pub struct GetAttr<'a> {
 
 /// An item lookup expression.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct GetItem<'a> {
     pub expr: Expr<'a>,
     pub subscript_expr: Expr<'a>,
@@ -414,6 +455,7 @@ pub struct GetItem<'a> {
 
 /// Calls something.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Call<'a> {
     pub expr: Expr<'a>,
     pub args: Vec<Expr<'a>>,
@@ -421,6 +463,7 @@ pub struct Call<'a> {
 
 /// Creates a list of values.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct List<'a> {
     pub items: Vec<Expr<'a>>,
 }
@@ -443,6 +486,7 @@ impl<'a> List<'a> {
 
 /// Creates a map of kwargs
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Kwargs<'a> {
     pub pairs: Vec<(&'a str, Expr<'a>)>,
 }
@@ -466,6 +510,7 @@ impl<'a> Kwargs<'a> {
 
 /// Creates a map of values.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Map<'a> {
     pub keys: Vec<Expr<'a>>,
     pub values: Vec<Expr<'a>>,
@@ -498,6 +543,7 @@ impl<'a> Map<'a> {
 
 /// Defines the specific type of call.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub enum CallType<'ast, 'source> {
     Function(&'source str),
     Method(&'ast Expr<'source>, &'source str),
