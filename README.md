@@ -78,6 +78,7 @@ should make it possible to defer the upgrade to later.
 ## Related Crates
 
 * [minijinja-autoreload](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-autoreload): provides
+  auto reloading functionality of environments
 * [minijinja-stack-ref](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-stack-ref): provides
   functionality to pass values from the stack
 
