@@ -27,6 +27,11 @@ pub const MAX_LOCALS: usize = 50;
 
 /// Represents an instruction for the VM.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(
+    feature = "unstable_machinery_serde",
+    derive(serde::Serialize),
+    serde(tag = "op", content = "arg")
+)]
 #[derive(Clone)]
 pub enum Instruction<'source> {
     /// Emits raw source

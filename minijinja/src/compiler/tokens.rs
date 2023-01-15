@@ -2,6 +2,11 @@ use std::fmt;
 
 /// Represents a token in the stream.
 #[derive(Debug)]
+#[cfg_attr(
+    feature = "unstable_machinery_serde",
+    derive(serde::Serialize),
+    serde(tag = "name", content = "payload")
+)]
 pub enum Token<'a> {
     /// Raw template data.
     TemplateData(&'a str),
@@ -121,6 +126,7 @@ impl<'a> fmt::Display for Token<'a> {
 
 /// Token span information
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Span {
     pub start_line: usize,
     pub start_col: usize,

@@ -44,6 +44,7 @@ urlencode = ["percent-encoding"]
 # Internal Features that should not be used
 internal_debug = []
 unstable_machinery = ["internal_debug"]
+unstable_machinery_serde = ["unstable_machinery", "serde/derive"]
 
 [dependencies]
 serde = "1.0.130"

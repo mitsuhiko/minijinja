@@ -5,6 +5,7 @@ use crate::value::Value;
 
 /// How should output be captured?
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub enum CaptureMode {
     Capture,
     #[allow(unused)]
