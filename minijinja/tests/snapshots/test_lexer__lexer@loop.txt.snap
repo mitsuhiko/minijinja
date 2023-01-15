@@ -5,7 +5,7 @@ input_file: minijinja/tests/lexer-inputs/loop.txt
 ---
 TemplateData("<ul>\n")
   "<ul>\n"
-BlockStart(false)
+BlockStart
   "{%"
 Ident("for")
   "for"
@@ -15,23 +15,23 @@ Ident("in")
   "in"
 Ident("sequence")
   "sequence"
-BlockEnd(false)
+BlockEnd
   "%}"
 TemplateData("\n    <li>")
   "\n    <li>"
-VariableStart(false)
+VariableStart
   "{{"
 Ident("item")
   "item"
-VariableEnd(false)
+VariableEnd
   "}}"
 TemplateData("</li>\n")
   "</li>\n"
-BlockStart(false)
+BlockStart
   "{%"
 Ident("endfor")
   "endfor"
-BlockEnd(false)
+BlockEnd
   "%}"
 TemplateData("\n</ul>")
   "\n</ul>"

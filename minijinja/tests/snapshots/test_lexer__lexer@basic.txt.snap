@@ -5,11 +5,11 @@ input_file: minijinja/tests/lexer-inputs/basic.txt
 ---
 TemplateData("Hello ")
   "Hello "
-VariableStart(false)
+VariableStart
   "{{"
 Ident("name")
   "name"
-VariableEnd(false)
+VariableEnd
   "}}"
 TemplateData("!\n")
   "!\n"

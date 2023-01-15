@@ -3,7 +3,7 @@ source: minijinja/tests/test_lexer.rs
 description: "{{ with_int(42, -42) }}\n{{ with_float(1.5, -1.5) }}\n{{ with_string(\"string\") }}"
 input_file: minijinja/tests/lexer-inputs/things.txt
 ---
-VariableStart(false)
+VariableStart
   "{{"
 Ident("with_int")
   "with_int"
@@ -19,11 +19,11 @@ Int(42)
   "42"
 ParenClose
   ")"
-VariableEnd(false)
+VariableEnd
   "}}"
 TemplateData("\n")
   "\n"
-VariableStart(false)
+VariableStart
   "{{"
 Ident("with_float")
   "with_float"
@@ -39,11 +39,11 @@ Float(1.5)
   "1.5"
 ParenClose
   ")"
-VariableEnd(false)
+VariableEnd
   "}}"
 TemplateData("\n")
   "\n"
-VariableStart(false)
+VariableStart
   "{{"
 Ident("with_string")
   "with_string"
@@ -53,6 +53,6 @@ Str("string")
   "\"string\""
 ParenClose
   ")"
-VariableEnd(false)
+VariableEnd
   "}}"
 

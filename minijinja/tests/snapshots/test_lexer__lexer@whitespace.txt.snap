@@ -5,19 +5,19 @@ input_file: minijinja/tests/lexer-inputs/whitespace.txt
 ---
 TemplateData("foo")
   "foo"
-VariableStart(true)
+VariableStart
   "{{-"
 Ident("bar")
   "bar"
-VariableEnd(true)
+VariableEnd
   "-}}"
 TemplateData("baz ")
   "baz "
-VariableStart(false)
+VariableStart
   "{{"
 Ident("blah")
   "blah"
-VariableEnd(false)
+VariableEnd
   "}}"
 TemplateData(" blub\nfoo")
   " blub\nfoo"

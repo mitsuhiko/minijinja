@@ -5,7 +5,7 @@ input_file: minijinja/tests/lexer-inputs/attrs.txt
 ---
 TemplateData("\n")
   "\n"
-VariableStart(false)
+VariableStart
   "{{"
 Ident("foo")
   "foo"
@@ -23,11 +23,11 @@ Dot
   "."
 Ident("blah")
   "blah"
-VariableEnd(false)
+VariableEnd
   "}}"
 TemplateData("\n")
   "\n"
-VariableStart(false)
+VariableStart
   "{{"
 BraceOpen
   "{"
@@ -43,11 +43,11 @@ Dot
   "."
 Ident("test")
   "test"
-VariableEnd(false)
+VariableEnd
   "}}"
 TemplateData("\n")
   "\n"
-VariableStart(false)
+VariableStart
   "{{"
 BracketOpen
   "["
@@ -67,6 +67,6 @@ Dot
   "."
 Ident("test")
   "test"
-VariableEnd(false)
+VariableEnd
   "}}"
 

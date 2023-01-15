@@ -5,14 +5,14 @@ use std::fmt;
 pub enum Token<'a> {
     /// Raw template data.
     TemplateData(&'a str),
-    /// Variable block start (with or without whitespace removal).
-    VariableStart(bool),
-    /// Variable block start (with or without whitespace removal).
-    VariableEnd(bool),
-    /// Statement block start (with or without whitespace removal).
-    BlockStart(bool),
-    /// Statement block start (with or without whitespace removal).
-    BlockEnd(bool),
+    /// Variable block start.
+    VariableStart,
+    /// Variable block end
+    VariableEnd,
+    /// Statement block start
+    BlockStart,
+    /// Statement block end
+    BlockEnd,
     /// An identifier.
     Ident(&'a str),
     /// A borrowed string.
@@ -81,10 +81,10 @@ impl<'a> fmt::Display for Token<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Token::TemplateData(_) => write!(f, "template-data"),
-            Token::VariableStart(_) => write!(f, "start of variable block"),
-            Token::VariableEnd(_) => write!(f, "end of variable block"),
-            Token::BlockStart(_) => write!(f, "start of block"),
-            Token::BlockEnd(_) => write!(f, "end of block"),
+            Token::VariableStart => write!(f, "start of variable block"),
+            Token::VariableEnd => write!(f, "end of variable block"),
+            Token::BlockStart => write!(f, "start of block"),
+            Token::BlockEnd => write!(f, "end of block"),
             Token::Ident(_) => write!(f, "identifier"),
             Token::Str(_) | Token::String(_) => write!(f, "string"),
             Token::Int(_) => write!(f, "integer"),

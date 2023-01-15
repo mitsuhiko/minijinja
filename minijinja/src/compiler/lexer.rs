@@ -266,15 +266,13 @@ pub fn tokenize(
             Some(LexerState::Template) => {
                 match state.rest.get(..2) {
                     Some("{{") => {
-                        let ws = if state.rest.as_bytes().get(2) == Some(&b'-') {
+                        if state.rest.as_bytes().get(2) == Some(&b'-') {
                             state.advance(3);
-                            true
                         } else {
                             state.advance(2);
-                            false
-                        };
+                        }
                         state.stack.push(LexerState::InVariable);
-                        return Some(Ok((Token::VariableStart(ws), state.span(old_loc))));
+                        return Some(Ok((Token::VariableStart, state.span(old_loc))));
                     }
                     Some("{%") => {
                         // raw blocks require some special handling.  If we are at the beginning of a raw
@@ -299,16 +297,14 @@ pub fn tokenize(
                             return Some(Err(state.syntax_error("unexpected end of raw block")));
                         }
 
-                        let ws = if state.rest.as_bytes().get(2) == Some(&b'-') {
+                        if state.rest.as_bytes().get(2) == Some(&b'-') {
                             state.advance(3);
-                            true
                         } else {
                             state.advance(2);
-                            false
-                        };
+                        }
 
                         state.stack.push(LexerState::InBlock);
-                        return Some(Ok((Token::BlockStart(ws), state.span(old_loc))));
+                        return Some(Ok((Token::BlockStart, state.span(old_loc))));
                     }
                     Some("{#") => {
                         if let Some(comment_end) = memstr(state.rest.as_bytes(), b"#}") {
@@ -378,24 +374,24 @@ pub fn tokenize(
                         state.stack.pop();
                         trim_leading_whitespace = true;
                         state.advance(3);
-                        return Some(Ok((Token::BlockEnd(true), state.span(old_loc))));
+                        return Some(Ok((Token::BlockEnd, state.span(old_loc))));
                     }
                     if let Some("%}") = state.rest.get(..2) {
                         state.stack.pop();
                         state.advance(2);
-                        return Some(Ok((Token::BlockEnd(false), state.span(old_loc))));
+                        return Some(Ok((Token::BlockEnd, state.span(old_loc))));
                     }
                 } else {
                     if let Some("-}}") = state.rest.get(..3) {
                         state.stack.pop();
                         state.advance(3);
                         trim_leading_whitespace = true;
-                        return Some(Ok((Token::VariableEnd(true), state.span(old_loc))));
+                        return Some(Ok((Token::VariableEnd, state.span(old_loc))));
                     }
                     if let Some("}}") = state.rest.get(..2) {
                         state.stack.pop();
                         state.advance(2);
-                        return Some(Ok((Token::VariableEnd(false), state.span(old_loc))));
+                        return Some(Ok((Token::VariableEnd, state.span(old_loc))));
                     }
                 }
 

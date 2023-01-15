@@ -689,10 +689,7 @@ impl<'a> Parser<'a> {
             }
             if matches_token!(
                 self,
-                Token::ParenClose
-                    | Token::VariableEnd(..)
-                    | Token::BlockEnd(..)
-                    | Token::Ident("in")
+                Token::ParenClose | Token::VariableEnd | Token::BlockEnd | Token::Ident("in")
             ) {
                 break;
             }
@@ -730,10 +727,10 @@ impl<'a> Parser<'a> {
             None
         };
         let recursive = skip_token!(self, Token::Ident("recursive"));
-        expect_token!(self, Token::BlockEnd(..), "end of block");
+        expect_token!(self, Token::BlockEnd, "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endfor" | "else"))));
         let else_body = if skip_token!(self, Token::Ident("else")) {
-            expect_token!(self, Token::BlockEnd(..), "end of block");
+            expect_token!(self, Token::BlockEnd, "end of block");
             ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endfor"))))
         } else {
             Vec::new()
@@ -751,12 +748,12 @@ impl<'a> Parser<'a> {
 
     fn parse_if_cond(&mut self) -> Result<ast::IfCond<'a>, Error> {
         let expr = ok!(self.parse_expr_noif());
-        expect_token!(self, Token::BlockEnd(..), "end of block");
+        expect_token!(self, Token::BlockEnd, "end of block");
         let true_body =
             ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endif" | "else" | "elif"))));
         let false_body = match ok!(self.stream.next()) {
             Some((Token::Ident("else"), _)) => {
-                expect_token!(self, Token::BlockEnd(..), "end of block");
+                expect_token!(self, Token::BlockEnd, "end of block");
                 let rv = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endif"))));
                 ok!(self.stream.next());
                 rv
@@ -778,7 +775,7 @@ impl<'a> Parser<'a> {
     fn parse_with_block(&mut self) -> Result<ast::WithBlock<'a>, Error> {
         let mut assignments = Vec::new();
 
-        while !matches_token!(self, Token::BlockEnd(_)) {
+        while !matches_token!(self, Token::BlockEnd) {
             if !assignments.is_empty() {
                 expect_token!(self, Token::Comma, "comma");
             }
@@ -794,7 +791,7 @@ impl<'a> Parser<'a> {
             assignments.push((target, expr));
         }
 
-        expect_token!(self, Token::BlockEnd(..), "end of block");
+        expect_token!(self, Token::BlockEnd, "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endwith"))));
         ok!(self.stream.next());
         Ok(ast::WithBlock { assignments, body })
@@ -809,13 +806,13 @@ impl<'a> Parser<'a> {
             (ok!(self.parse_assign_name()), false)
         };
 
-        if !in_paren && matches_token!(self, Token::BlockEnd(..) | Token::Pipe) {
+        if !in_paren && matches_token!(self, Token::BlockEnd | Token::Pipe) {
             let filter = if skip_token!(self, Token::Pipe) {
                 Some(ok!(self.parse_filter_chain()))
             } else {
                 None
             };
-            expect_token!(self, Token::BlockEnd(..), "end of block");
+            expect_token!(self, Token::BlockEnd, "end of block");
             let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endset"))));
             ok!(self.stream.next());
             Ok(SetParseResult::SetBlock(ast::SetBlock {
@@ -840,7 +837,7 @@ impl<'a> Parser<'a> {
             syntax_error!("block '{}' defined twice", name);
         }
 
-        expect_token!(self, Token::BlockEnd(..), "end of block");
+        expect_token!(self, Token::BlockEnd, "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endblock"))));
         ok!(self.stream.next());
 
@@ -859,7 +856,7 @@ impl<'a> Parser<'a> {
     }
     fn parse_auto_escape(&mut self) -> Result<ast::AutoEscape<'a>, Error> {
         let enabled = ok!(self.parse_expr());
-        expect_token!(self, Token::BlockEnd(..), "end of block");
+        expect_token!(self, Token::BlockEnd, "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endautoescape"))));
         ok!(self.stream.next());
         Ok(ast::AutoEscape { enabled, body })
@@ -868,7 +865,7 @@ impl<'a> Parser<'a> {
     fn parse_filter_chain(&mut self) -> Result<ast::Expr<'a>, Error> {
         let mut filter = None;
 
-        while !matches_token!(self, Token::BlockEnd(..)) {
+        while !matches_token!(self, Token::BlockEnd) {
             if filter.is_some() {
                 expect_token!(self, Token::Pipe, "`|`");
             }
@@ -893,7 +890,7 @@ impl<'a> Parser<'a> {
 
     fn parse_filter_block(&mut self) -> Result<ast::FilterBlock<'a>, Error> {
         let filter = ok!(self.parse_filter_chain());
-        expect_token!(self, Token::BlockEnd(..), "end of block");
+        expect_token!(self, Token::BlockEnd, "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endfilter"))));
         ok!(self.stream.next());
         Ok(ast::FilterBlock { filter, body })
@@ -934,13 +931,13 @@ impl<'a> Parser<'a> {
         let mut names = Vec::new();
         expect_token!(self, Token::Ident("import"), "import");
         loop {
-            if matches_token!(self, Token::BlockEnd(_)) {
+            if matches_token!(self, Token::BlockEnd) {
                 break;
             }
             if !names.is_empty() {
                 expect_token!(self, Token::Comma, "`,`");
             }
-            if matches_token!(self, Token::BlockEnd(_)) {
+            if matches_token!(self, Token::BlockEnd) {
                 break;
             }
             let name = ok!(self.parse_assign_name());
@@ -987,7 +984,7 @@ impl<'a> Parser<'a> {
         defaults: Vec<ast::Expr<'a>>,
         name: Option<&'a str>,
     ) -> Result<ast::Macro<'a>, Error> {
-        expect_token!(self, Token::BlockEnd(..), "end of block");
+        expect_token!(self, Token::BlockEnd, "end of block");
         let old_in_macro = std::mem::replace(&mut self.in_macro, true);
         let body = ok!(self.subparse(&|tok| match tok {
             Token::Ident("endmacro") if name.is_some() => true,
@@ -1057,15 +1054,15 @@ impl<'a> Parser<'a> {
                 Token::TemplateData(raw) => {
                     rv.push(ast::Stmt::EmitRaw(Spanned::new(ast::EmitRaw { raw }, span)))
                 }
-                Token::VariableStart(_) => {
+                Token::VariableStart => {
                     let expr = ok!(self.parse_expr());
                     rv.push(ast::Stmt::EmitExpr(Spanned::new(
                         ast::EmitExpr { expr },
                         self.stream.expand_span(span),
                     )));
-                    expect_token!(self, Token::VariableEnd(..), "end of variable block");
+                    expect_token!(self, Token::VariableEnd, "end of variable block");
                 }
-                Token::BlockStart(_) => {
+                Token::BlockStart => {
                     let (tok, _span) = match ok!(self.stream.current()) {
                         Some(rv) => rv,
                         None => syntax_error!("unexpected end of input, expected keyword"),
@@ -1074,7 +1071,7 @@ impl<'a> Parser<'a> {
                         return Ok(rv);
                     }
                     rv.push(ok!(self.parse_stmt()));
-                    expect_token!(self, Token::BlockEnd(..), "end of block");
+                    expect_token!(self, Token::BlockEnd, "end of block");
                 }
                 _ => unreachable!("lexer produced garbage"),
             }

@@ -3,7 +3,7 @@ source: minijinja/tests/test_lexer.rs
 description: "{{ (!a + b) * (c - d) / e % f // g ~ h }}"
 input_file: minijinja/tests/lexer-inputs/operators.txt
 ---
-VariableStart(false)
+VariableStart
   "{{"
 ParenOpen
   "("
@@ -45,6 +45,6 @@ Tilde
   "~"
 Ident("h")
   "h"
-VariableEnd(false)
+VariableEnd
   "}}"
 
