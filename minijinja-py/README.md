@@ -10,3 +10,5 @@ To build and run the unit-tests in a on-demand virtual environment use
 ```
 $ make
 ```
+
+For an example of how this is used see `hello.py`.
