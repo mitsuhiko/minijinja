@@ -4,9 +4,9 @@ INDEX = """{% extends "layout.html" %}
 {% block title %}{{ page.title }}{% endblock %}
 {% block body %}
   <ul>
-  {% for item in items %}
+  {%- for item in items %}
     <li>{{ item }}
-  {% endfor %}
+  {%- endfor %}
   </ul>
 {% endblock %}
 """
