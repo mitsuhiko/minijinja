@@ -163,11 +163,11 @@ pub fn to_minijinja_value(value: &PyAny) -> Value {
         })
     } else if value.is_none() {
         Value::from(())
+    } else if let Ok(val) = value.extract::<bool>() {
+        Value::from(val)
     } else if let Ok(val) = value.extract::<i64>() {
         Value::from(val)
     } else if let Ok(val) = value.extract::<f64>() {
-        Value::from(val)
-    } else if let Ok(val) = value.extract::<bool>() {
         Value::from(val)
     } else if let Ok(val) = value.extract::<&str>() {
         Value::from(val)
