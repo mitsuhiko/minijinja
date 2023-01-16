@@ -3,7 +3,7 @@ requires = ["maturin>=0.14,<0.15"]
 build-backend = "maturin"
 
 [project]
-name = "minijinja-py"
+name = "minijinja"
 requires-python = ">=3.7"
 classifiers = [
     "Programming Language :: Rust",
@@ -11,4 +11,5 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 
-
+[tool.maturin]
+python-source = "python"
