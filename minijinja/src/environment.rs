@@ -341,8 +341,9 @@ impl<'source> Environment<'source> {
         self.debug = enabled;
     }
 
+    /// Returns the current value of the debug flag.
     #[cfg(feature = "debug")]
-    pub(crate) fn debug(&self) -> bool {
+    pub fn debug(&self) -> bool {
         self.debug
     }
 

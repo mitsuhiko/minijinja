@@ -636,7 +636,7 @@ impl Value {
         }
     }
 
-    /// If the valuen object, it's returned as [`Object`].
+    /// If the value is an object, it's returned as [`Object`].
     pub fn as_object(&self) -> Option<&dyn Object> {
         match self.0 {
             ValueRepr::Dynamic(ref dy) => Some(&**dy as &dyn Object),
