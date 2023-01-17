@@ -1119,10 +1119,19 @@ pub fn parse<'source, 'name>(
 /// Parses an expression
 pub fn parse_expr(source: &str) -> Result<ast::Expr<'_>, Error> {
     let mut parser = Parser::new(source, true);
-    parser.parse_expr().map_err(|mut err| {
-        if err.line().is_none() {
-            err.set_filename_and_span("<expression>", parser.stream.last_span())
-        }
-        err
-    })
+    parser
+        .parse_expr()
+        .and_then(|result| {
+            if parser.stream.next()?.is_some() {
+                syntax_error!("unexpected input after expression")
+            } else {
+                Ok(result)
+            }
+        })
+        .map_err(|mut err| {
+            if err.line().is_none() {
+                err.set_filename_and_span("<expression>", parser.stream.last_span())
+            }
+            err
+        })
 }

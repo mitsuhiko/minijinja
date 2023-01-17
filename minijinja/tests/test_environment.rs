@@ -28,6 +28,12 @@ fn test_expression() {
 }
 
 #[test]
+fn test_expression_bug() {
+    let env = Environment::new();
+    assert!(env.compile_expression("42.blahadsf()").is_err());
+}
+
+#[test]
 fn test_expression_lifetimes() {
     let mut env = Environment::new();
     let s = String::new();
