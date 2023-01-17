@@ -2,6 +2,7 @@ use std::cell::RefCell;
 
 use minijinja::{Error, ErrorKind};
 use pyo3::exceptions::PyRuntimeError;
+use pyo3::ffi::PyErr_WriteUnraisable;
 use pyo3::prelude::*;
 
 thread_local! {
@@ -23,4 +24,11 @@ pub fn to_py_error(original_err: Error) -> PyErr {
             .take()
             .unwrap_or_else(|| PyRuntimeError::new_err(format!("{:#}", original_err)))
     })
+}
+
+pub fn report_unraisable(py: Python<'_>, err: PyErr) {
+    err.restore(py);
+    unsafe {
+        PyErr_WriteUnraisable(std::ptr::null_mut());
+    }
 }

@@ -17,11 +17,10 @@ LAYOUT = """<!doctype html>
 </body>
 """
 
-env = Environment()
-env.set_loader({
+env = Environment(templates={
     "index.html": INDEX,
     "layout.html": LAYOUT,
-}.get)
+})
 
 print(env.render_template(
     'index.html',

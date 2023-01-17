@@ -1,16 +1,21 @@
+use std::collections::BTreeMap;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value, ValueKind};
-use minijinja::{Error, State};
+use minijinja::{AutoEscape, Error, State};
 
+use once_cell::sync::OnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySequence, PyTuple};
 
 use crate::error_support::to_minijinja_error;
 
-fn is_safe_py_attr(name: &str) -> bool {
-    !name.starts_with("__") && !name.ends_with("__")
+static AUTO_ESCAPE_CACHE: Mutex<BTreeMap<String, AutoEscape>> = Mutex::new(BTreeMap::new());
+static MARK_SAFE: OnceCell<Py<PyAny>> = OnceCell::new();
+
+fn is_safe_attr(name: &str) -> bool {
+    !name.starts_with('_')
 }
 
 pub struct DictLikeObject {
@@ -19,7 +24,7 @@ pub struct DictLikeObject {
 
 impl StructObject for DictLikeObject {
     fn get_field(&self, name: &str) -> Option<Value> {
-        if !is_safe_py_attr(name) {
+        if !is_safe_attr(name) {
             return None;
         }
         Python::with_gil(|py| {
@@ -93,7 +98,7 @@ impl Object for DynamicObject {
     }
 
     fn call_method(&self, _: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
-        if name.starts_with('_') {
+        if !is_safe_attr(name) {
             return Err(Error::new(
                 minijinja::ErrorKind::InvalidOperation,
                 "insecure method call",
@@ -140,7 +145,7 @@ impl SeqObject for DynamicObject {
 
 impl StructObject for DynamicObject {
     fn get_field(&self, name: &str) -> Option<Value> {
-        if !is_safe_py_attr(name) {
+        if !is_safe_attr(name) {
             return None;
         }
         Python::with_gil(|py| {
@@ -170,6 +175,17 @@ pub fn to_minijinja_value(value: &PyAny) -> Value {
     } else if let Ok(val) = value.extract::<f64>() {
         Value::from(val)
     } else if let Ok(val) = value.extract::<&str>() {
+        if let Ok(to_html) = value.getattr("__html__") {
+            if to_html.is_callable() {
+                // TODO: if to_minijinja_value returns results we could
+                // report the swallowed error of __html__.
+                if let Ok(html) = to_html.call0() {
+                    if let Ok(val) = html.extract::<&str>() {
+                        return Value::from_safe_string(val.into());
+                    }
+                }
+            }
+        }
         Value::from(val)
     } else {
         let mut sequencified = None;
@@ -191,7 +207,22 @@ pub fn to_python_value(value: Value) -> PyResult<Py<PyAny>> {
     Python::with_gil(|py| to_python_value_impl(py, value))
 }
 
+fn mark_string_safe(py: Python<'_>, value: &str) -> PyResult<Py<PyAny>> {
+    let safe: &Py<PyAny> = MARK_SAFE.get_or_try_init::<_, PyErr>(|| {
+        let module = py.import("minijinja_py")?;
+        Ok(module.getattr("safe")?.into())
+    })?;
+    safe.call1(py, PyTuple::new(py, [value]))
+}
+
 fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
+    // if we are holding a true dynamic object, we want to allow bidirectional
+    // conversion.  That means that when passing the object back to Python we
+    // extract the retained raw Python reference.
+    if let Some(pyobj) = value.downcast_object_ref::<DynamicObject>() {
+        return Ok(pyobj.inner.clone());
+    }
+
     if let Some(seq) = value.as_seq() {
         let rv = PyList::empty(py);
         for idx in 0..seq.item_count() {
@@ -232,7 +263,13 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
                     unreachable!()
                 }
             }
-            ValueKind::String => Ok(value.as_str().unwrap().into_py(py)),
+            ValueKind::String => {
+                if value.is_safe() {
+                    Ok(mark_string_safe(py, value.as_str().unwrap())?)
+                } else {
+                    Ok(value.as_str().unwrap().into_py(py))
+                }
+            }
             ValueKind::Bytes => Ok(value.as_bytes().unwrap().into_py(py)),
             // this should be covered above
             ValueKind::Seq => unreachable!(),
@@ -277,4 +314,14 @@ pub fn to_python_args<'py>(
     }
     let py_args = PyTuple::new(py, py_args);
     Ok((py_args, py_kwargs))
+}
+
+pub fn get_custom_autoescape(value: &str) -> AutoEscape {
+    let mut cache = AUTO_ESCAPE_CACHE.lock().unwrap();
+    if let Some(rv) = cache.get(value).copied() {
+        return rv;
+    }
+    let val = AutoEscape::Custom(Box::leak(value.to_string().into_boxed_str()));
+    cache.insert(value.to_string(), val);
+    val
 }
