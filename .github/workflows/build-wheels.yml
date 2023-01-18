@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [x86_64, aarch64]
+        target: [i686, x86_64, armv7l, aarch64]
 
     steps:
       - uses: actions/checkout@v3
