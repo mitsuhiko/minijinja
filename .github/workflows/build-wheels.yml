@@ -26,37 +26,11 @@ jobs:
           path: dist
 
   linux:
-    name: Linux Wheels (Native)
+    name: Linux Wheels
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [x86_64, i686]
-
-    steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
-      with:
-        python-version: "3.10"
-        architecture: x64
-    - uses: dtolnay/rust-toolchain@stable
-    - name: Build wheels
-      uses: PyO3/maturin-action@v1
-      with:
-        target: ${{ matrix.target }}
-        manylinux: auto
-        args: --release --out dist -m python/Cargo.toml
-    - name: Upload wheels
-      uses: actions/upload-artifact@v3
-      with:
-        name: wheels
-        path: dist
-
-  linux-cross:
-    name: Linux Wheels (Cross Compiled)
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target: [aarch64, armv7, s390x, ppc64le, ppc64]
+        target: [x86_64, aarch64]
 
     steps:
       - uses: actions/checkout@v3
