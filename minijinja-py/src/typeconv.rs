@@ -209,7 +209,7 @@ pub fn to_python_value(value: Value) -> PyResult<Py<PyAny>> {
 
 fn mark_string_safe(py: Python<'_>, value: &str) -> PyResult<Py<PyAny>> {
     let safe: &Py<PyAny> = MARK_SAFE.get_or_try_init::<_, PyErr>(|| {
-        let module = py.import("minijinja_py")?;
+        let module = py.import("minijinja")?;
         Ok(module.getattr("safe")?.into())
     })?;
     safe.call1(py, PyTuple::new(py, [value]))

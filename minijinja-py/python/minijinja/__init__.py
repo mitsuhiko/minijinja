@@ -1,4 +1,4 @@
-from . import minijinja_py as _lowlevel
+from . import _lowlevel
 
 
 __all__ = ["Environment", "safe", "escape", "render_str", "eval_expr"]
