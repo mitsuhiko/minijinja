@@ -20,8 +20,7 @@ pub struct Environment {
 #[pymethods]
 impl Environment {
     #[new]
-    #[pyo3(signature = (**_kwargs))]
-    fn py_new(_kwargs: Option<&PyDict>) -> PyResult<Self> {
+    fn py_new() -> PyResult<Self> {
         Ok(Environment {
             inner: Mutex::new(minijinja::Environment::new()),
         })
