@@ -3,16 +3,16 @@ all: develop test
 
 .venv:
 	python3 -mvenv .venv
-	pip install --upgrade pip
-	pip install maturin pytest markupsafe black
+	.venv/bin/pip install --upgrade pip
+	.venv/bin/pip install maturin pytest markupsafe black
 
 .PHONY: test
 develop: .venv
-	.venv/bin/maturin develop
+	. .venv/bin/activate; maturin develop
 
 .PHONY: develop-release
 develop-release: .venv
-	.venv/bin/maturin develop --release
+	. .venv/bin/activate; maturin develop --release
 
 .PHONY: test
 test: .venv

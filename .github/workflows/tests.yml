@@ -88,3 +88,17 @@ jobs:
           echo `pwd`/wasmtime-v4.0.0-x86_64-linux >> $GITHUB_PATH
       - name: Test
         run: make wasi-test
+
+  test-python:
+    name: Test on Python binding
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+      - name: Test
+        run: make python-test
