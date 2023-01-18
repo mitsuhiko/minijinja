@@ -18,6 +18,9 @@ test:
 wasi-test:
 	@cd minijinja; cargo test --all-features --target=wasm32-wasi -- --nocapture
 
+python-test:
+	@make -C minijinja-py
+
 snapshot-tests:
 	@cd minijinja; cargo insta test --all-features --review
 
