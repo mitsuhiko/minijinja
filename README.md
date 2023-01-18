@@ -43,6 +43,7 @@ powered by a WASM build of MiniJinja.
 * Support for [dynamic runtime objects](https://docs.rs/minijinja/latest/minijinja/value/trait.Object.html) with methods and dynamic attributes
 * [Descriptive errors](https://github.com/mitsuhiko/minijinja/tree/main/examples/error)
 * [Compiles to WebAssembly](https://github.com/mitsuhiko/minijinja-playground/blob/main/src/lib.rs)
+* [Works with Python](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py)
 
 ## Example Template
 

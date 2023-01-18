@@ -1,25 +1,32 @@
-# minijinja-py
+<div align="center">
+  <img src="https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo.png" alt="" width=320>
+  <p><strong>MiniJinja for Python: a powerful template engine for Rust and Python</strong></p>
+
+[![Build Status](https://github.com/mitsuhiko/minijinja/workflows/Tests/badge.svg?branch=main)](https://github.com/mitsuhiko/minijinja/actions?query=workflow%3ATests)
+[![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
+[![Crates.io](https://img.shields.io/crates/d/minijinja.svg)](https://crates.io/crates/minijinja)
+[![rustc 1.61.0](https://img.shields.io/badge/rust-1.61%2B-orange.svg)](https://img.shields.io/badge/rust-1.61%2B-orange.svg)
+[![Documentation](https://docs.rs/minijinja/badge.svg)](https://docs.rs/minijinja)
+
+</div>
 
 `minijinja-py` is an experimental binding of
-[MiniJinja](https://github.com/mitsuhiko/minijinja) to Python.  It has very
-limited functionality and it's unclear if this project has any future or value.
-These bindings use [maturin](https://www.maturin.rs/) and
-[pyo3](https://pyo3.rs/) and allow MiniJinja.
+[MiniJinja](https://github.com/mitsuhiko/minijinja) to Python.  It has somewhat
+limited functionality compared to the Rust version.  These bindings use
+[maturin](https://www.maturin.rs/) and [pyo3](https://pyo3.rs/).
+
+You might want to use MiniJinja instead of Jinja2 when the full feature set
+of Jinja2 is not required and you want to have the same rendering experience
+of a data set between Rust and Python.
 
 With these bindings MiniJinja can render some Python objects and values
 that are passed to templates, but there are clear limitations with regards
 to what can be done.
 
-To build and run the unit-tests in a on-demand virtual environment use
+To install MiniJinja for Python you can fetch the package [from PyPI](https://pypi.org/project/minijinja/):
 
 ```
-$ make
-```
-
-To play around with it, you can use the `hello.py` file as inspiration:
-
-```
-$ .venv/bin/python hello.py
+$ pip install minijinja
 ```
 
 ## Basic API
@@ -95,3 +102,15 @@ Here is what this means for some basic types:
   subclass.  This means that a `markupsafe.Markup` object will appear as safe string in
   MiniJinja.  This information can also flow back to Python again.
 
+## Sponsor
+
+If you like the project and find it useful you can [become a
+sponsor](https://github.com/sponsors/mitsuhiko).
+
+## License and Links
+
+- [Documentation](https://docs.rs/minijinja/)
+- [Examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
+- [Issue Tracker](https://github.com/mitsuhiko/minijinja/issues)
+- [MiniJinja Playground](https://mitsuhiko.github.io/minijinja-playground/)
+- License: [Apache-2.0](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
