@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 0.30.0
+
+- Expose `debug` flag from environment.
+- Added experimental Python bindings.
+
 ## 0.29.0
 
 - Resolve a runtime panic if `{% extends %}` appears in the template
