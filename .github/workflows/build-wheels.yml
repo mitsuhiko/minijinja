@@ -42,7 +42,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist -m minijinja-py/Cargo.toml
+          args: --release --out dist -m minijinja-py/Cargo.toml --interpreter python3.10
           manylinux: auto
       - name: Upload wheels
         uses: actions/upload-artifact@v3
