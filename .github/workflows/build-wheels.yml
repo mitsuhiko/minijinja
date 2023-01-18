@@ -1,0 +1,26 @@
+name: Build Wheels
+
+# Todo: remove push
+on: [workflow_dispatch, push]
+
+jobs:
+  macos:
+    name: macOS Wheels
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.10
+          architecture: x64
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build wheels - universal2
+        uses: PyO3/maturin-action@v1
+        with:
+          args: --release --universal2 --out dist -m minijinja-py/Cargo.toml
+      - name: Upload wheels
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: dist
