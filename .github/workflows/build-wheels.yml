@@ -2,7 +2,7 @@ name: Build Wheels
 
 on:
   push:
-    tags: *
+    tags: "*"
   workflow_dispatch:
 
 jobs:
@@ -72,6 +72,22 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist -m minijinja-py/Cargo.toml
       - name: Upload wheels
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: dist
+
+  sdist:
+    name: Linux Wheels
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist -m minijinja-py/Cargo.toml
+      - name: Upload sdist
         uses: actions/upload-artifact@v3
         with:
           name: wheels
