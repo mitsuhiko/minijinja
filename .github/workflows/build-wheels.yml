@@ -1,7 +1,6 @@
 name: Build Wheels
 
-# Todo: remove push
-on: [workflow_dispatch, push]
+on: [workflow_dispatch]
 
 jobs:
   macos:
