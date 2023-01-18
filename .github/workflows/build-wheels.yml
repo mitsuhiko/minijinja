@@ -7,7 +7,7 @@ on:
 
 jobs:
   macos:
-    name: macOS Wheels
+    name: macOS Wheels (universal2)
     runs-on: macos-latest
 
     steps:
@@ -78,7 +78,7 @@ jobs:
           path: dist
 
   sdist:
-    name: Linux Wheels
+    name: Source Distribution
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
