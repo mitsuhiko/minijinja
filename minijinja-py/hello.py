@@ -1,4 +1,4 @@
-from minijinja_py import Environment
+from minijinja import Environment
 
 INDEX = """{% extends "layout.html" %}
 {% block title %}{{ page.title }}{% endblock %}

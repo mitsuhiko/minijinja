@@ -1,2 +1,3 @@
 .venv
-python/minijinja_py/minijinja_py.*
+__pycache__
+python/minijinja/_lowlevel.*

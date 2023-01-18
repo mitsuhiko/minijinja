@@ -1,4 +1,4 @@
-from . import minijinja_py as _lowlevel
+from . import _lowlevel
 
 
 __all__ = ["Environment", "safe", "escape", "render_str", "eval_expr"]
@@ -6,6 +6,9 @@ __all__ = ["Environment", "safe", "escape", "render_str", "eval_expr"]
 
 class Environment(_lowlevel.Environment):
     """Represents a MiniJinja environment"""
+    def __new__(cls, *args, **kwargs):
+        # `_lowlevel.Environment` does not accept any arguments
+        return super().__new__(cls)
 
     def __init__(
         self,

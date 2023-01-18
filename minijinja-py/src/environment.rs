@@ -12,7 +12,7 @@ use crate::typeconv::{
 };
 
 /// Represents a MiniJinja environment.
-#[pyclass(subclass)]
+#[pyclass(subclass, module = "minijinja._lowlevel")]
 pub struct Environment {
     inner: Mutex<minijinja::Environment<'static>>,
 }
@@ -234,11 +234,10 @@ impl Environment {
     ///
     /// The first argument is the name of the template, all other arguments must be passed
     /// as keyword arguments and are pass as render context of the template.
-    #[args(ctx = "**")]
-    #[pyo3(text_signature = "(self, template_name, /, **ctx)")]
-    pub fn render_template(&self, __template_name: &str, ctx: Option<&PyDict>) -> PyResult<String> {
+    #[pyo3(signature = (template_name, /, **ctx))]
+    pub fn render_template(&self, template_name: &str, ctx: Option<&PyDict>) -> PyResult<String> {
         let env = self.inner.lock().unwrap();
-        let tmpl = env.get_template(__template_name).map_err(to_py_error)?;
+        let tmpl = env.get_template(template_name).map_err(to_py_error)?;
         let ctx = ctx
             .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
             .unwrap_or_else(|| context!());
@@ -249,28 +248,26 @@ impl Environment {
     ///
     /// The first argument is the source of the template, all other arguments must be passed
     /// as keyword arguments and are pass as render context of the template.
-    #[args(ctx = "**")]
-    #[pyo3(text_signature = "(self, source, name=None, /, **ctx)")]
+    #[pyo3(signature = (source, name=None, /, **ctx))]
     pub fn render_str(
         &self,
-        __source: &str,
-        __name: Option<&str>,
+        source: &str,
+        name: Option<&str>,
         ctx: Option<&PyDict>,
     ) -> PyResult<String> {
         let env = self.inner.lock().unwrap();
         let ctx = ctx
             .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
             .unwrap_or_else(|| context!());
-        env.render_named_str(__name.unwrap_or("<string>"), __source, ctx)
+        env.render_named_str(name.unwrap_or("<string>"), source, ctx)
             .map_err(to_py_error)
     }
 
     /// Evaluates an expression with a given context.
-    #[args(ctx = "**")]
-    #[pyo3(text_signature = "(self, expr, /, **ctx)")]
-    pub fn eval_expr(&self, __expression: &str, ctx: Option<&PyDict>) -> PyResult<Py<PyAny>> {
+    #[pyo3(signature = (expression, /, **ctx))]
+    pub fn eval_expr(&self, expression: &str, ctx: Option<&PyDict>) -> PyResult<Py<PyAny>> {
         let env = self.inner.lock().unwrap();
-        let expr = env.compile_expression(__expression).map_err(to_py_error)?;
+        let expr = env.compile_expression(expression).map_err(to_py_error)?;
         let ctx = ctx
             .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
             .unwrap_or_else(|| context!());

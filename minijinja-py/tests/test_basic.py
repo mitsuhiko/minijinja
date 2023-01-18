@@ -1,6 +1,6 @@
 import pytest
 from _pytest.unraisableexception import catch_unraisable_exception
-from minijinja_py import Environment, safe
+from minijinja import Environment, safe
 
 
 def test_expression():

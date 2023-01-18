@@ -156,13 +156,13 @@ impl StructObject for DynamicObject {
 }
 
 pub fn to_minijinja_value(value: &PyAny) -> Value {
-    if let Ok(dict) = value.cast_as::<PyDict>() {
+    if let Ok(dict) = value.downcast::<PyDict>() {
         Value::from_struct_object(DictLikeObject { inner: dict.into() })
-    } else if let Ok(tup) = value.cast_as::<PyTuple>() {
+    } else if let Ok(tup) = value.downcast::<PyTuple>() {
         Value::from_seq_object(ListLikeObject {
             inner: tup.as_sequence().into(),
         })
-    } else if let Ok(list) = value.cast_as::<PyList>() {
+    } else if let Ok(list) = value.downcast::<PyList>() {
         Value::from_seq_object(ListLikeObject {
             inner: list.as_sequence().into(),
         })
@@ -209,7 +209,7 @@ pub fn to_python_value(value: Value) -> PyResult<Py<PyAny>> {
 
 fn mark_string_safe(py: Python<'_>, value: &str) -> PyResult<Py<PyAny>> {
     let safe: &Py<PyAny> = MARK_SAFE.get_or_try_init::<_, PyErr>(|| {
-        let module = py.import("minijinja_py")?;
+        let module = py.import("minijinja")?;
         Ok(module.getattr("safe")?.into())
     })?;
     safe.call1(py, PyTuple::new(py, [value]))

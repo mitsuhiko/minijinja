@@ -31,7 +31,7 @@ like in `minijinja` with some Python specific changes.  For instance instead of
 directly to the environment or a `loader` function.
 
 ```python
-from minijinja_py import Environment
+from minijinja import Environment
 
 env = Environment(templates={
     "template_name": "Template source"
