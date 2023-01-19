@@ -20,7 +20,7 @@ impl StateRef {
     /// Returns a reference to the environment.
     #[getter]
     pub fn get_env(&self) -> PyResult<Py<Environment>> {
-        with_environment(|env| Ok(env.into()))
+        with_environment(Ok)
     }
 
     /// Returns the name of the template.
