@@ -1,15 +1,23 @@
+use std::ffi::c_void;
+use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::Mutex;
 
 use minijinja::value::{Rest, Value};
-use minijinja::{context, AutoEscape, Error, Source};
+use minijinja::{context, AutoEscape, Error, Source, State};
+use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 
 use crate::error_support::{report_unraisable, to_minijinja_error, to_py_error};
+use crate::state::bind_state;
 use crate::typeconv::{
     get_custom_autoescape, to_minijinja_value, to_python_args, to_python_value, DictLikeObject,
 };
+
+thread_local! {
+    static CURRENT_ENV: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
+}
 
 /// Represents a MiniJinja environment.
 #[pyclass(subclass, module = "minijinja._lowlevel")]
@@ -66,14 +74,16 @@ impl Environment {
         let mut env = self.inner.lock().unwrap();
         env.add_filter(
             name.to_string(),
-            move |args: Rest<Value>| -> Result<Value, Error> {
+            move |state: &State, args: Rest<Value>| -> Result<Value, Error> {
                 Python::with_gil(|py| {
-                    let (py_args, py_kwargs) =
-                        to_python_args(py, &args).map_err(to_minijinja_error)?;
-                    let rv = callback
-                        .call(py, py_args, py_kwargs)
-                        .map_err(to_minijinja_error)?;
-                    Ok(to_minijinja_value(rv.as_ref(py)))
+                    bind_state(state, || {
+                        let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), &args)
+                            .map_err(to_minijinja_error)?;
+                        let rv = callback
+                            .call(py, py_args, py_kwargs)
+                            .map_err(to_minijinja_error)?;
+                        Ok(to_minijinja_value(rv.as_ref(py)))
+                    })
                 })
             },
         );
@@ -97,14 +107,16 @@ impl Environment {
         let mut env = self.inner.lock().unwrap();
         env.add_test(
             name.to_string(),
-            move |args: Rest<Value>| -> Result<bool, Error> {
+            move |state: &State, args: Rest<Value>| -> Result<bool, Error> {
                 Python::with_gil(|py| {
-                    let (py_args, py_kwargs) =
-                        to_python_args(py, &args).map_err(to_minijinja_error)?;
-                    let rv = callback
-                        .call(py, py_args, py_kwargs)
-                        .map_err(to_minijinja_error)?;
-                    Ok(to_minijinja_value(rv.as_ref(py)).is_true())
+                    bind_state(state, || {
+                        let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), &args)
+                            .map_err(to_minijinja_error)?;
+                        let rv = callback
+                            .call(py, py_args, py_kwargs)
+                            .map_err(to_minijinja_error)?;
+                        Ok(to_minijinja_value(rv.as_ref(py)).is_true())
+                    })
                 })
             },
         );
@@ -123,14 +135,16 @@ impl Environment {
         let mut env = self.inner.lock().unwrap();
         env.add_function(
             name.to_string(),
-            move |args: Rest<Value>| -> Result<Value, Error> {
+            move |state: &State, args: Rest<Value>| -> Result<Value, Error> {
                 Python::with_gil(|py| {
-                    let (py_args, py_kwargs) =
-                        to_python_args(py, &args).map_err(to_minijinja_error)?;
-                    let rv = callback
-                        .call(py, py_args, py_kwargs)
-                        .map_err(to_minijinja_error)?;
-                    Ok(to_minijinja_value(rv.as_ref(py)))
+                    bind_state(state, || {
+                        let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), &args)
+                            .map_err(to_minijinja_error)?;
+                        let rv = callback
+                            .call(py, py_args, py_kwargs)
+                            .map_err(to_minijinja_error)?;
+                        Ok(to_minijinja_value(rv.as_ref(py)))
+                    })
                 })
             },
         );
@@ -235,13 +249,19 @@ impl Environment {
     /// The first argument is the name of the template, all other arguments must be passed
     /// as keyword arguments and are pass as render context of the template.
     #[pyo3(signature = (template_name, /, **ctx))]
-    pub fn render_template(&self, template_name: &str, ctx: Option<&PyDict>) -> PyResult<String> {
-        let env = self.inner.lock().unwrap();
-        let tmpl = env.get_template(template_name).map_err(to_py_error)?;
-        let ctx = ctx
-            .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
-            .unwrap_or_else(|| context!());
-        tmpl.render(ctx).map_err(to_py_error)
+    pub fn render_template(
+        slf: PyRef<'_, Self>,
+        template_name: &str,
+        ctx: Option<&PyDict>,
+    ) -> PyResult<String> {
+        bind_environment(slf.as_ptr(), || {
+            let env = slf.inner.lock().unwrap();
+            let tmpl = env.get_template(template_name).map_err(to_py_error)?;
+            let ctx = ctx
+                .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
+                .unwrap_or_else(|| context!());
+            tmpl.render(ctx).map_err(to_py_error)
+        })
     }
 
     /// Renders a template from a string
@@ -250,27 +270,61 @@ impl Environment {
     /// as keyword arguments and are pass as render context of the template.
     #[pyo3(signature = (source, name=None, /, **ctx))]
     pub fn render_str(
-        &self,
+        slf: PyRef<'_, Self>,
         source: &str,
         name: Option<&str>,
         ctx: Option<&PyDict>,
     ) -> PyResult<String> {
-        let env = self.inner.lock().unwrap();
-        let ctx = ctx
-            .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
-            .unwrap_or_else(|| context!());
-        env.render_named_str(name.unwrap_or("<string>"), source, ctx)
-            .map_err(to_py_error)
+        bind_environment(slf.as_ptr(), || {
+            let env = slf.inner.lock().unwrap();
+            let ctx = ctx
+                .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
+                .unwrap_or_else(|| context!());
+            env.render_named_str(name.unwrap_or("<string>"), source, ctx)
+                .map_err(to_py_error)
+        })
     }
 
     /// Evaluates an expression with a given context.
     #[pyo3(signature = (expression, /, **ctx))]
-    pub fn eval_expr(&self, expression: &str, ctx: Option<&PyDict>) -> PyResult<Py<PyAny>> {
-        let env = self.inner.lock().unwrap();
-        let expr = env.compile_expression(expression).map_err(to_py_error)?;
-        let ctx = ctx
-            .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
-            .unwrap_or_else(|| context!());
-        to_python_value(expr.eval(ctx).map_err(to_py_error)?)
+    pub fn eval_expr(
+        slf: PyRef<'_, Self>,
+        expression: &str,
+        ctx: Option<&PyDict>,
+    ) -> PyResult<Py<PyAny>> {
+        bind_environment(slf.as_ptr(), || {
+            let env = slf.inner.lock().unwrap();
+            let expr = env.compile_expression(expression).map_err(to_py_error)?;
+            let ctx = ctx
+                .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
+                .unwrap_or_else(|| context!());
+            to_python_value(expr.eval(ctx).map_err(to_py_error)?)
+        })
+    }
+}
+
+pub fn with_environment<R, F: FnOnce(Py<Environment>) -> PyResult<R>>(f: F) -> PyResult<R> {
+    Python::with_gil(|py| {
+        CURRENT_ENV.with(|handle| {
+            let ptr = handle.load(Ordering::Relaxed) as *mut _;
+            match unsafe { Py::<Environment>::from_borrowed_ptr_or_opt(py, ptr) } {
+                Some(env) => f(env),
+                None => Err(PyRuntimeError::new_err(
+                    "environment cannot be used outside of template render",
+                )),
+            }
+        })
+    })
+}
+
+/// Invokes a function with the state stashed away.
+pub fn bind_environment<R, F: FnOnce() -> R>(envptr: *mut pyo3::ffi::PyObject, f: F) -> R {
+    let old_handle = CURRENT_ENV
+        .with(|handle| handle.swap(envptr as *const _ as *mut c_void, Ordering::Relaxed));
+    let rv = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+    CURRENT_ENV.with(|handle| handle.store(old_handle, Ordering::Relaxed));
+    match rv {
+        Ok(rv) => rv,
+        Err(payload) => std::panic::resume_unwind(payload),
     }
 }

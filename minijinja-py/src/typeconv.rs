@@ -10,6 +10,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySequence, PyTuple};
 
 use crate::error_support::to_minijinja_error;
+use crate::state::{bind_state, StateRef};
 
 static AUTO_ESCAPE_CACHE: Mutex<BTreeMap<String, AutoEscape>> = Mutex::new(BTreeMap::new());
 static MARK_SAFE: OnceCell<Py<PyAny>> = OnceCell::new();
@@ -87,17 +88,20 @@ impl Object for DynamicObject {
         })
     }
 
-    fn call(&self, _: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         Python::with_gil(|py| -> Result<Value, Error> {
-            let inner = self.inner.as_ref(py);
-            let (py_args, py_kwargs) = to_python_args(py, args).map_err(to_minijinja_error)?;
-            Ok(to_minijinja_value(
-                inner.call(py_args, py_kwargs).map_err(to_minijinja_error)?,
-            ))
+            bind_state(state, || {
+                let inner = self.inner.as_ref(py);
+                let (py_args, py_kwargs) =
+                    to_python_args(py, inner, args).map_err(to_minijinja_error)?;
+                Ok(to_minijinja_value(
+                    inner.call(py_args, py_kwargs).map_err(to_minijinja_error)?,
+                ))
+            })
         })
     }
 
-    fn call_method(&self, _: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         if !is_safe_attr(name) {
             return Err(Error::new(
                 minijinja::ErrorKind::InvalidOperation,
@@ -105,13 +109,16 @@ impl Object for DynamicObject {
             ));
         }
         Python::with_gil(|py| -> Result<Value, Error> {
-            let inner = self.inner.as_ref(py);
-            let (py_args, py_kwargs) = to_python_args(py, args).map_err(to_minijinja_error)?;
-            Ok(to_minijinja_value(
-                inner
-                    .call_method(name, py_args, py_kwargs)
-                    .map_err(to_minijinja_error)?,
-            ))
+            bind_state(state, || {
+                let inner = self.inner.as_ref(py);
+                let (py_args, py_kwargs) =
+                    to_python_args(py, inner, args).map_err(to_minijinja_error)?;
+                Ok(to_minijinja_value(
+                    inner
+                        .call_method(name, py_args, py_kwargs)
+                        .map_err(to_minijinja_error)?,
+                ))
+            })
         })
     }
 }
@@ -293,10 +300,19 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
 
 pub fn to_python_args<'py>(
     py: Python<'py>,
+    callback: &PyAny,
     args: &[Value],
 ) -> PyResult<(&'py PyTuple, Option<&'py PyDict>)> {
     let mut py_args = Vec::new();
     let mut py_kwargs = None;
+
+    if callback
+        .getattr("__minijinja_pass_state__")
+        .map_or(false, |x| x.is_true().unwrap_or(false))
+    {
+        py_args.push(Py::new(py, StateRef)?.to_object(py));
+    }
+
     for arg in args {
         if arg.is_kwargs() {
             let kwargs = py_kwargs.get_or_insert_with(|| PyDict::new(py));

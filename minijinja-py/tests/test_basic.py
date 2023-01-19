@@ -1,4 +1,3 @@
-import pytest
 from _pytest.unraisableexception import catch_unraisable_exception
 from minijinja import Environment, safe
 

@@ -1,11 +1,12 @@
 from . import _lowlevel
 
 
-__all__ = ["Environment", "safe", "escape", "render_str", "eval_expr"]
+__all__ = ["Environment", "safe", "escape", "render_str", "eval_expr", "pass_state"]
 
 
 class Environment(_lowlevel.Environment):
     """Represents a MiniJinja environment"""
+
     def __new__(cls, *args, **kwargs):
         # `_lowlevel.Environment` does not accept any arguments
         return super().__new__(cls)
@@ -73,3 +74,9 @@ except ImportError:
 def safe(s):
     """Marks a string as safe."""
     return Markup(s)
+
+
+def pass_state(f):
+    """Pass the engine state to the function as first argument."""
+    f.__minijinja_pass_state__ = True
+    return f
