@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+- Changed `add_global` to perform `Into<Value>` implicitly.
+
 ## 0.30.0
 
 - Expose `debug` flag from environment.

@@ -478,11 +478,12 @@ impl<'source> Environment<'source> {
     }
 
     /// Adds a global variable.
-    pub fn add_global<N>(&mut self, name: N, value: Value)
+    pub fn add_global<N, V>(&mut self, name: N, value: V)
     where
         N: Into<Cow<'source, str>>,
+        V: Into<Value>,
     {
-        self.globals.insert(name.into(), value);
+        self.globals.insert(name.into(), value.into());
     }
 
     /// Removes a global function or variable by name.
