@@ -32,3 +32,4 @@ Repository = "https://github.com/mitsuhiko/minijinja"
 
 [tool.maturin]
 python-source = "python"
+strip = true
