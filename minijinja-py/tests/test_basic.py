@@ -1,5 +1,5 @@
 from _pytest.unraisableexception import catch_unraisable_exception
-from minijinja import Environment, safe
+from minijinja import Environment, TemplateError, safe
 
 
 def test_expression():
@@ -150,3 +150,18 @@ def test_markup_transfer():
     rv = env.eval_expr("'<test>'|escape")
     assert hasattr(rv, "__html__")
     assert rv.__html__() == "&lt;test&gt;"
+
+
+def test_error():
+    env = Environment()
+    try:
+        env.eval_expr("1 +")
+    except TemplateError as e:
+        assert e.name == "<expression>"
+        assert "unexpected end of input" in e.message
+        assert "1 > 1 +" not in e.message
+        assert "1 > 1 +" in str(e)
+        assert e.line == 1
+        assert e.kind == "SyntaxError"
+    else:
+        assert False, "expected error"

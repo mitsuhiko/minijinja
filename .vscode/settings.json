@@ -1,4 +1,5 @@
 {
     "rust-analyzer.cargo.allFeatures": true,
-    "rust-analyzer.checkOnSave.command": "clippy"
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "python.formatting.provider": "black"
 }

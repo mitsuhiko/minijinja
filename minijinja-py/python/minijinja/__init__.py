@@ -1,7 +1,14 @@
 from . import _lowlevel
 
-
-__all__ = ["Environment", "safe", "escape", "render_str", "eval_expr", "pass_state"]
+__all__ = [
+    "Environment",
+    "TemplateError",
+    "safe",
+    "escape",
+    "render_str",
+    "eval_expr",
+    "pass_state",
+]
 
 
 class Environment(_lowlevel.Environment):
@@ -22,7 +29,7 @@ class Environment(_lowlevel.Environment):
         fuel=None,
         auto_escape_callback=None,
     ):
-        super()
+        super().__init__()
         if loader is not None:
             if templates:
                 raise TypeError("Cannot set loader and templates at the same time")
@@ -45,14 +52,17 @@ class Environment(_lowlevel.Environment):
             self.auto_escape_callback = auto_escape_callback
 
 
-def render_str(__source, __name=None, **context):
+DEFAULT_ENVIRONMENT = Environment()
+
+
+def render_str(*args, **context):
     """Shortcut to render a string with the default environment."""
-    return Environment().render_str(__source, __name, **context)
+    return DEFAULT_ENVIRONMENT.render_str(*args, **context)
 
 
-def eval_expr(__expr, **context):
+def eval_expr(*args, **context):
     """Evaluate an expression with the default environment."""
-    return Environment().eval_expr(__expr, **context)
+    return DEFAULT_ENVIRONMENT.eval_expr(*args, **context)
 
 
 try:
@@ -80,3 +90,51 @@ def pass_state(f):
     """Pass the engine state to the function as first argument."""
     f.__minijinja_pass_state__ = True
     return f
+
+
+class TemplateError(RuntimeError):
+    """Represents a runtime error in the template engine."""
+
+    def __init__(self, message):
+        super().__init__(message)
+        self._info = None
+
+    @property
+    def message(self):
+        """The short message of the error."""
+        return self.args[0]
+
+    @property
+    def kind(self):
+        """The kind of the error."""
+        if self._info is None:
+            return "Unknown"
+        else:
+            return self._info.kind
+
+    @property
+    def name(self):
+        """The name of the template."""
+        if self._info is not None:
+            return self._info.name
+
+    @property
+    def line(self):
+        """The line of the error."""
+        if self._info is not None:
+            return self._info.line
+
+    def __str__(self):
+        if self._info is not None:
+            return self._info.full_description
+        return self.message
+
+
+def _internal_make_error(info):
+    # Internal utility function used by the rust binding to create a template error
+    # with info object.  We cannot directly create an error on the Rust side because
+    # we want to subclass the runtime error, but on the limited abi it's not possible
+    # to create subclasses (yet!)
+    err = TemplateError(info.description)
+    err._info = info
+    return err

@@ -9,5 +9,6 @@ mod typeconv;
 fn _lowlevel(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<environment::Environment>()?;
     m.add_class::<state::StateRef>()?;
+    m.add_class::<error_support::ErrorInfo>()?;
     Ok(())
 }
