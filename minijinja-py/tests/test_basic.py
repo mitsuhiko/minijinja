@@ -93,6 +93,42 @@ def test_basic_types():
     assert rv == {"a": 42, "b": 42.5, "c": "blah"}
 
 
+def test_loader():
+    called = []
+
+    def my_loader(name):
+        called.append(name)
+        return "Hello from " + name
+
+    env = Environment(loader=my_loader)
+    assert env.render_template("index.html") == "Hello from index.html"
+    assert env.render_template("index.html") == "Hello from index.html"
+    assert env.render_template("other.html") == "Hello from other.html"
+    assert env.loader is my_loader
+    assert called == ["index.html", "other.html"]
+    env.loader = my_loader
+    assert env.render_template("index.html") == "Hello from index.html"
+    assert called == ["index.html", "other.html", "index.html"]
+    env.reload()
+    assert env.render_template("index.html") == "Hello from index.html"
+    assert called == ["index.html", "other.html", "index.html", "index.html"]
+
+
+def test_loader_reload():
+    called = []
+
+    def my_loader(name):
+        called.append(name)
+        return "Hello from " + name
+
+    env = Environment(loader=my_loader)
+    env.reload_before_render = True
+    assert env.render_template("index.html") == "Hello from index.html"
+    assert env.render_template("index.html") == "Hello from index.html"
+    assert env.render_template("other.html") == "Hello from other.html"
+    assert called == ["index.html", "index.html", "other.html"]
+
+
 def test_autoescape():
     def auto_escape(name):
         assert name == "foo.html"

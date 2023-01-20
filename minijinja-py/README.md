@@ -43,15 +43,6 @@ from minijinja import Environment
 env = Environment(templates={
     "template_name": "Template source"
 })
-
-# alternatively
-
-def loader(template_name):
-    if template_name == "template_name":
-        return "Template source"
-    return None
-
-env = Environment(loader=loader)
 ```
 
 To render a template you can use the `render_template` method:
@@ -61,7 +52,7 @@ result = env.render_template('template_name', var1="value 1", var2="value 2")
 print(result)
 ```
 
-## Utility
+## Purpose
 
 MiniJinja attemps a certain level of compatibiliy with Jinja2, but it does not
 try to achieve this at all costs.  As a result you will notice that quite a few
@@ -75,6 +66,47 @@ Additionally MiniJinja has a stronger sandbox than Jinja2 and might perform ever
 slightly better in some situations.  However you should be aware that due to the
 marshalling that needs to happen in either direction there is a certain amount of
 loss of information.
+
+## Dynamic Template Loading
+
+MiniJinja's Python bindings inherit the underlying behavior of how MiniJinja loads
+templates.  Templates are loaded on first use and then cached.  The templates are
+loaded via a "source" (called `loader` in MiniJinja's Python bindings).  To trigger
+a reload you can call `env.reload()` or alternatively set `env.reload_before_render`
+to `True`.
+
+```python
+def my_loader(name):
+    segments = []
+    for segment in name.split("/"):
+        if "\\" in segment or segment in (".", ".."):
+            return None
+        segments.append(segment)
+    try:
+        with open(os.path.join(TEMPLATES, *segments)) as f:
+            return f.read()
+    except (IOError, OSError):
+        pass
+
+env = Environment(loader=my_loader)
+env.reload_before_render = True
+print(env.render_template("index.html"))
+```
+
+Alternatively templates can manually be loaded and unloaded with `env.add_template`
+and `env.remove_template`.
+
+## Auto Escaping
+
+The default behavior is to use auto escaping file files ending in `.html`.  You can
+customize this behavior by overriding the `auto_escape_callback`:
+
+```python
+env = Environment(auto_escape_callback=lambda x: x.endswith((".html", ".foo")))
+```
+
+MiniJinja uses [markupsafe](https://github.com/pallets/markupsafe) if it's available
+on the Python side.  It will honor `__html__`.
 
 ## Runtime Behavior
 

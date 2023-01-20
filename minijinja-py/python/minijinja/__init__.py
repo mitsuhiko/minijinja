@@ -28,6 +28,7 @@ class Environment(_lowlevel.Environment):
         debug=True,
         fuel=None,
         auto_escape_callback=None,
+        reload_before_render=False,
     ):
         super().__init__()
         if loader is not None:
@@ -50,6 +51,7 @@ class Environment(_lowlevel.Environment):
         self.debug = debug
         if auto_escape_callback is not None:
             self.auto_escape_callback = auto_escape_callback
+        self.reload_before_render = reload_before_render
 
 
 DEFAULT_ENVIRONMENT = Environment()
