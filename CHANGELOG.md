@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## Unreleased
 
 - Changed `add_global` to perform `Into<Value>` implicitly.
+- Added `source_mut` to retrieve a mutable reference to the source.
 
 ## 0.30.0
 

@@ -397,6 +397,16 @@ impl<'source> Environment<'source> {
         }
     }
 
+    /// Returns the currently set source as mutable reference.
+    #[cfg(feature = "source")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
+    pub fn source_mut(&mut self) -> Option<&mut crate::source::Source> {
+        match self.templates {
+            Source::Borrowed(_) => None,
+            Source::Owned(ref mut source) => Some(source),
+        }
+    }
+
     /// Compiles an expression.
     ///
     /// This lets one compile an expression in the template language and
