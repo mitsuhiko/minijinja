@@ -215,11 +215,11 @@ pub fn to_python_value(value: Value) -> PyResult<Py<PyAny>> {
 }
 
 fn mark_string_safe(py: Python<'_>, value: &str) -> PyResult<Py<PyAny>> {
-    let safe: &Py<PyAny> = MARK_SAFE.get_or_try_init::<_, PyErr>(|| {
-        let module = py.import("minijinja")?;
-        Ok(module.getattr("safe")?.into())
+    let mark_safe: &Py<PyAny> = MARK_SAFE.get_or_try_init::<_, PyErr>(|| {
+        let module = py.import("minijinja._internal")?;
+        Ok(module.getattr("mark_safe")?.into())
     })?;
-    safe.call1(py, PyTuple::new(py, [value]))
+    mark_safe.call1(py, PyTuple::new(py, [value]))
 }
 
 fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {

@@ -1,4 +1,5 @@
-from . import TemplateError
+# This file contains functions that the rust module imports.
+from . import TemplateError, safe
 
 
 def make_error(info):
@@ -9,3 +10,7 @@ def make_error(info):
     err = TemplateError(info.description)
     err._info = info
     return err
+
+
+# used by the rust runtime to mark something as safe
+mark_safe = safe
