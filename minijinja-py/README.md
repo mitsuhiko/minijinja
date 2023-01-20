@@ -108,6 +108,23 @@ env = Environment(auto_escape_callback=lambda x: x.endswith((".html", ".foo")))
 MiniJinja uses [markupsafe](https://github.com/pallets/markupsafe) if it's available
 on the Python side.  It will honor `__html__`.
 
+## State Access
+
+Functions passed to the environment such as filters or global functions can
+optionally have the template state passed by using the `pass_state` parameter.
+This is similar to `pass_context` in Jinja2.  It can be used to look at the
+name of the template or to look up variables in the context.
+
+```python
+from minijinja import pass_state
+
+@pass_state
+def my_filter(state, value):
+    return state.lookup("a_variable") + value
+
+env.add_filter("add_a_variable", my_filter)
+```
+
 ## Runtime Behavior
 
 MiniJinja uses it's own runtime model which is not matching the Python

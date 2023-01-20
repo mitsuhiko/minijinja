@@ -6,6 +6,9 @@ All notable changes to MiniJinja are documented here.
 
 - Changed `add_global` to perform `Into<Value>` implicitly.
 - Added `source_mut` to retrieve a mutable reference to the source.
+- Improved Python bindings by adding support for template reloading, better
+  documentation, error reporting.
+- Added `pass_state` to the Python binding.
 
 ## 0.30.0
 
