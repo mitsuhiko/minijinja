@@ -471,7 +471,7 @@ impl<'env> Vm<'env> {
                         .ok_or_else(|| {
                             Error::new(
                                 ErrorKind::UnknownFilter,
-                                format!("filter {} is unknown", name),
+                                format!("filter {name} is unknown"),
                             )
                         }));
                     let args = stack.slice_top(*arg_count);
@@ -486,7 +486,7 @@ impl<'env> Vm<'env> {
                         state.env.get_test(name)
                     })
                     .ok_or_else(|| {
-                        Error::new(ErrorKind::UnknownTest, format!("test {} is unknown", name))
+                        Error::new(ErrorKind::UnknownTest, format!("test {name} is unknown"))
                     }));
                     let args = stack.slice_top(*arg_count);
                     let rv = ctx_ok!(test.perform(state, args));
@@ -524,7 +524,7 @@ impl<'env> Vm<'env> {
                     } else {
                         bail!(Error::new(
                             ErrorKind::UnknownFunction,
-                            format!("{} is unknown", name),
+                            format!("{name} is unknown"),
                         ));
                     }
 
@@ -789,10 +789,7 @@ impl<'env> Vm<'env> {
         if state.loaded_templates.contains(&name) {
             return Err(Error::new(
                 ErrorKind::InvalidOperation,
-                format!(
-                    "cycle in template inheritance. {:?} was referenced more than once",
-                    name
-                ),
+                format!("cycle in template inheritance. {name:?} was referenced more than once"),
             ));
         }
         let tmpl = ok!(self.env.get_template(name));

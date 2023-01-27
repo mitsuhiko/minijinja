@@ -210,7 +210,7 @@ impl fmt::Debug for BoxedFunction {
 
 impl fmt::Display for BoxedFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -310,7 +310,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn debug(state: &State) -> String {
-        format!("{:#?}", state)
+        format!("{state:#?}")
     }
 }
 

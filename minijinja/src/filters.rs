@@ -477,7 +477,7 @@ mod builtins {
                 if let Some(s) = item.as_str() {
                     rv.push_str(s);
                 } else {
-                    write!(rv, "{}", item).ok();
+                    write!(rv, "{item}").ok();
                 }
             }
             Ok(rv)

@@ -55,7 +55,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
         let _args = args;
         Err(Error::new(
             ErrorKind::UnknownMethod,
-            format!("object has no method named {}", name),
+            format!("object has no method named {name}"),
         ))
     }
 
@@ -535,7 +535,7 @@ impl<T: SeqObject + 'static> fmt::Display for SimpleSeqObject<T> {
             if idx > 0 {
                 ok!(write!(f, ", "));
             }
-            ok!(write!(f, "{:?}", val));
+            ok!(write!(f, "{val:?}"));
         }
         write!(f, "]")
     }
@@ -566,7 +566,7 @@ impl<T: StructObject + 'static> fmt::Display for SimpleStructObject<T> {
                 ok!(write!(f, ", "));
             }
             let val = self.0.get_field(field).unwrap_or(Value::UNDEFINED);
-            ok!(write!(f, "{:?}: {:?}", field, val));
+            ok!(write!(f, "{field:?}: {val:?}"));
         }
         write!(f, "}}")
     }

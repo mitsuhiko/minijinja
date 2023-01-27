@@ -47,11 +47,11 @@ impl Object for Magic {
         if name == "make_class" {
             // single string argument
             let (tag,): (&str,) = from_args(args)?;
-            Ok(Value::from(format!("magic-{}", tag)))
+            Ok(Value::from(format!("magic-{tag}")))
         } else {
             Err(Error::new(
                 minijinja::ErrorKind::UnknownMethod,
-                format!("object has no method named {}", name),
+                format!("object has no method named {name}"),
             ))
         }
     }

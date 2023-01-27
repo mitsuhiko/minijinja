@@ -9,9 +9,9 @@ fn main() {
     let mut env = Environment::new();
     env.set_formatter(|out, _state, value| {
         if !value.is_safe() {
-            write!(out, "{:?}", value)?;
+            write!(out, "{value:?}")?;
         } else {
-            write!(out, "{}", value)?;
+            write!(out, "{value}")?;
         }
         Ok(())
     });

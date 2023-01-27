@@ -236,7 +236,7 @@ impl fmt::Display for ValueKind {
             ValueKind::Seq => "sequence",
             ValueKind::Map => "map",
         };
-        write!(f, "{}", ty)
+        write!(f, "{ty}")
     }
 }
 
@@ -356,9 +356,9 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
             ValueRepr::Undefined => Ok(()),
-            ValueRepr::Bool(val) => write!(f, "{}", val),
-            ValueRepr::U64(val) => write!(f, "{}", val),
-            ValueRepr::I64(val) => write!(f, "{}", val),
+            ValueRepr::Bool(val) => write!(f, "{val}"),
+            ValueRepr::U64(val) => write!(f, "{val}"),
+            ValueRepr::I64(val) => write!(f, "{val}"),
             ValueRepr::F64(val) => {
                 if val.is_nan() {
                     write!(f, "NaN")
@@ -369,13 +369,13 @@ impl fmt::Display for Value {
                     if !num.contains('.') {
                         num.push_str(".0");
                     }
-                    write!(f, "{}", num)
+                    write!(f, "{num}")
                 }
             }
-            ValueRepr::Char(val) => write!(f, "{}", val),
+            ValueRepr::Char(val) => write!(f, "{val}"),
             ValueRepr::None => write!(f, "none"),
             ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
-            ValueRepr::String(val, _) => write!(f, "{}", val),
+            ValueRepr::String(val, _) => write!(f, "{val}"),
             ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
             ValueRepr::Seq(values) => {
                 ok!(write!(f, "["));
@@ -383,7 +383,7 @@ impl fmt::Display for Value {
                     if idx > 0 {
                         ok!(write!(f, ", "));
                     }
-                    ok!(write!(f, "{:?}", val));
+                    ok!(write!(f, "{val:?}"));
                 }
                 write!(f, "]")
             }
@@ -393,12 +393,12 @@ impl fmt::Display for Value {
                     if idx > 0 {
                         ok!(write!(f, ", "));
                     }
-                    ok!(write!(f, "{:?}: {:?}", key, val));
+                    ok!(write!(f, "{key:?}: {val:?}"));
                 }
                 write!(f, "}}")
             }
             ValueRepr::U128(val) => write!(f, "{}", { val.0 }),
-            ValueRepr::Dynamic(x) => write!(f, "{}", x),
+            ValueRepr::Dynamic(x) => write!(f, "{x}"),
         }
     }
 }
@@ -896,7 +896,7 @@ impl Value {
         }
         Err(Error::new(
             ErrorKind::InvalidOperation,
-            format!("object has no method named {}", name),
+            format!("object has no method named {name}"),
         ))
     }
 

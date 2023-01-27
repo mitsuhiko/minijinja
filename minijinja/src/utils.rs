@@ -29,7 +29,7 @@ fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
         value.kind(),
         ValueKind::Undefined | ValueKind::None | ValueKind::Bool | ValueKind::Number
     ) {
-        write!(out, "{}", value)
+        write!(out, "{value}")
     } else if let Some(s) = value.as_str() {
         write!(out, "{}", HtmlEscape(s))
     } else {
@@ -40,10 +40,7 @@ fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
 fn invalid_autoescape(name: &str) -> Result<(), Error> {
     Err(Error::new(
         ErrorKind::InvalidOperation,
-        format!(
-            "Default formatter does not know how to format to custom format '{}'",
-            name
-        ),
+        format!("Default formatter does not know how to format to custom format '{name}'"),
     ))
 }
 
@@ -61,14 +58,14 @@ pub fn write_escaped(
     }
 
     match auto_escape {
-        AutoEscape::None => write!(out, "{}", value).map_err(Error::from),
+        AutoEscape::None => write!(out, "{value}").map_err(Error::from),
         AutoEscape::Html => write_with_html_escaping(out, value).map_err(Error::from),
         #[cfg(feature = "json")]
         AutoEscape::Json => {
             let value = ok!(serde_json::to_string(&value).map_err(|err| {
                 Error::new(ErrorKind::BadSerialization, "unable to format to JSON").with_source(err)
             }));
-            write!(out, "{}", value).map_err(Error::from)
+            write!(out, "{value}").map_err(Error::from)
         }
         AutoEscape::Custom(name) => invalid_autoescape(name),
     }

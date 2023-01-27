@@ -24,7 +24,7 @@ macro_rules! syntax_error {
 fn unexpected<D: fmt::Display>(unexpected: D, expected: &str) -> Error {
     Error::new(
         ErrorKind::SyntaxError,
-        format!("unexpected {}, expected {}", unexpected, expected),
+        format!("unexpected {unexpected}, expected {expected}"),
     )
 }
 
@@ -1091,10 +1091,7 @@ impl<'a> Parser<'a> {
 }
 
 /// Parses a template
-pub fn parse<'source, 'name>(
-    source: &'source str,
-    filename: &'name str,
-) -> Result<ast::Stmt<'source>, Error> {
+pub fn parse<'source>(source: &'source str, filename: &str) -> Result<ast::Stmt<'source>, Error> {
     // we want to chop off a single newline at the end.  This means that a template
     // by default does not end in a newline which is a useful property to allow
     // inline templates to work.  If someone wants a trailing newline the expectation

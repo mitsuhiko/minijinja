@@ -232,7 +232,7 @@ impl Error {
     pub(crate) fn new_not_found(name: &str) -> Error {
         Error::new(
             ErrorKind::TemplateNotFound,
-            format!("template {:?} does not exist", name),
+            format!("template {name:?} does not exist"),
         )
     }
 

@@ -33,9 +33,9 @@ fn App() -> Html {
     let rendered = match serde_json::from_str::<Context>(context.as_str()) {
         Ok(ctx) => match env.render_str(template.as_str(), ctx) {
             Ok(result) => result,
-            Err(err) => format!("{:#}", err),
+            Err(err) => format!("{err:#}"),
         },
-        Err(err) => format!("JSON context error: {}", err),
+        Err(err) => format!("JSON context error: {err}"),
     };
 
     html! {

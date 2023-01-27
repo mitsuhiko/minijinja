@@ -137,11 +137,11 @@ impl<'a> Ord for Key<'a> {
 impl<'a> fmt::Display for Key<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Key::Bool(val) => write!(f, "{}", val),
-            Key::I64(val) => write!(f, "{}", val),
-            Key::Char(val) => write!(f, "{}", val),
-            Key::String(val) => write!(f, "{}", val),
-            Key::Str(val) => write!(f, "{}", val),
+            Key::Bool(val) => write!(f, "{val}"),
+            Key::I64(val) => write!(f, "{val}"),
+            Key::Char(val) => write!(f, "{val}"),
+            Key::String(val) => write!(f, "{val}"),
+            Key::Str(val) => write!(f, "{val}"),
         }
     }
 }
