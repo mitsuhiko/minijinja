@@ -25,9 +25,6 @@ pub struct DictLikeObject {
 
 impl StructObject for DictLikeObject {
     fn get_field(&self, name: &str) -> Option<Value> {
-        if !is_safe_attr(name) {
-            return None;
-        }
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
             inner.get_item(name).map(to_minijinja_value)
