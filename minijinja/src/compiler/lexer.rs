@@ -475,7 +475,7 @@ fn test_basic_identifiers() {
     fn assert_ident(s: &str) {
         match tokenize(s, true).next() {
             Some(Ok((Token::Ident(ident), _))) if ident == s => {}
-            _ => panic!("did not get a matching token result: {:?}", s),
+            _ => panic!("did not get a matching token result: {s:?}"),
         }
     }
 
@@ -483,7 +483,7 @@ fn test_basic_identifiers() {
         let res = tokenize(s, true).collect::<Result<Vec<_>, _>>();
         if let Ok(tokens) = res {
             if let &[(Token::Ident(_), _)] = &tokens[..] {
-                panic!("got a single ident for {:?}", s)
+                panic!("got a single ident for {s:?}")
             }
         }
     }

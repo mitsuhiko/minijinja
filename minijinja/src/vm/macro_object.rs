@@ -31,7 +31,7 @@ pub(crate) struct Macro {
 
 impl fmt::Debug for Macro {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
@@ -69,7 +69,7 @@ impl Object for Macro {
                 (Some(_), Some(_)) => {
                     return Err(Error::new(
                         ErrorKind::TooManyArguments,
-                        format!("duplicate argument `{}`", name),
+                        format!("duplicate argument `{name}`"),
                     ))
                 }
                 (Some(arg), None) => arg.clone(),
@@ -97,7 +97,7 @@ impl Object for Macro {
                 if !kwargs_used.contains(key) {
                     return Err(Error::new(
                         ErrorKind::TooManyArguments,
-                        format!("unknown keyword argument `{}`", key),
+                        format!("unknown keyword argument `{key}`"),
                     ));
                 }
             }

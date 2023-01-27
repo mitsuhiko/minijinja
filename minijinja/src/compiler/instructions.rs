@@ -428,7 +428,7 @@ impl<'source> fmt::Debug for Instructions<'source> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 ok!(write!(f, "{:>05} | {:?}", self.0, self.1,));
                 if let Some(line) = self.2 {
-                    ok!(write!(f, "  [line {}]", line));
+                    ok!(write!(f, "  [line {line}]"));
                 }
                 Ok(())
             }

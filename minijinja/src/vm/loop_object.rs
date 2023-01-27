@@ -57,7 +57,7 @@ impl Object for Loop {
         } else {
             Err(Error::new(
                 ErrorKind::UnknownMethod,
-                format!("loop object has no method named {}", name),
+                format!("loop object has no method named {name}"),
             ))
         }
     }

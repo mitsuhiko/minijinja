@@ -19,5 +19,5 @@ fn main() {
     let env = std::env::vars().collect::<BTreeMap<_, _>>();
     let result = expr.eval(context!(env)).unwrap();
     let serialized = serde_json::to_string_pretty(&result).unwrap();
-    println!("{}", serialized);
+    println!("{serialized}");
 }

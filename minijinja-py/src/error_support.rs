@@ -47,7 +47,7 @@ impl ErrorInfo {
         let mut err = &self.err as &dyn std::error::Error;
         while let Some(next_err) = err.source() {
             rv.push('\n');
-            writeln!(&mut rv, "caused by: {:#}", next_err).unwrap();
+            writeln!(&mut rv, "caused by: {next_err:#}").unwrap();
             err = next_err;
         }
         rv

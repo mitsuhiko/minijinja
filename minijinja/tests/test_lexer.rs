@@ -33,7 +33,7 @@ fn lookup_span(source: &str, span: Span) -> &str {
         }
     }
 
-    panic!("span {:?} out of range", span)
+    panic!("span {span:?} out of range")
 }
 
 #[test]
@@ -48,8 +48,8 @@ fn test_lexer() {
             let mut stringified = String::new();
             for (token, span) in tokens.unwrap() {
                 let token_source = lookup_span(&contents, span);
-                writeln!(stringified, "{:?}", token).unwrap();
-                writeln!(stringified, "  {:?}", token_source).unwrap();
+                writeln!(stringified, "{token:?}").unwrap();
+                writeln!(stringified, "  {token_source:?}").unwrap();
             }
             insta::assert_snapshot!(&stringified);
         });

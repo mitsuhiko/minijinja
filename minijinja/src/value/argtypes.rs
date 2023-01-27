@@ -351,7 +351,7 @@ value_from!(Arc<dyn Object>, Dynamic);
 fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {
     Error::new(
         ErrorKind::InvalidOperation,
-        format!("cannot convert {} to {}", kind, target),
+        format!("cannot convert {kind} to {target}"),
     )
 }
 

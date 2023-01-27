@@ -36,8 +36,8 @@ fn test_vm() {
 
         let content = iter.next().unwrap();
         let rendered = if let Err(err) = env.add_template(filename, content) {
-            let mut rendered = format!("!!!SYNTAX ERROR!!!\n\n{:#?}\n\n", err);
-            writeln!(rendered, "{:#}", err).unwrap();
+            let mut rendered = format!("!!!SYNTAX ERROR!!!\n\n{err:#?}\n\n");
+            writeln!(rendered, "{err:#}").unwrap();
             rendered
         } else {
             let template = env.get_template(filename).unwrap();
@@ -48,13 +48,13 @@ fn test_vm() {
                     rendered
                 }
                 Err(err) => {
-                    let mut rendered = format!("!!!ERROR!!!\n\n{:#?}\n\n", err);
+                    let mut rendered = format!("!!!ERROR!!!\n\n{err:#?}\n\n");
 
-                    writeln!(rendered, "{:#}", err).unwrap();
+                    writeln!(rendered, "{err:#}").unwrap();
                     let mut err = &err as &dyn std::error::Error;
                     while let Some(next_err) = err.source() {
                         writeln!(rendered).unwrap();
-                        writeln!(rendered, "caused by: {:#}", next_err).unwrap();
+                        writeln!(rendered, "caused by: {next_err:#}").unwrap();
                         err = next_err;
                     }
 
@@ -76,7 +76,7 @@ fn test_vm() {
 #[test]
 fn test_custom_filter() {
     fn test_filter(_: &State, value: String) -> Result<String, Error> {
-        Ok(format!("[{}]", value))
+        Ok(format!("[{value}]"))
     }
 
     let mut ctx = BTreeMap::new();

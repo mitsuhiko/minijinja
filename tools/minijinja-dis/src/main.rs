@@ -7,10 +7,10 @@ use argh::FromArgs;
 use minijinja::machinery::{parse, CompiledTemplate, Instructions};
 
 fn print_instructions(instructions: &Instructions, block_name: &str) {
-    println!("Block: {:?}", block_name);
+    println!("Block: {block_name:?}");
     for idx in 0.. {
         if let Some(instruction) = instructions.get(idx) {
-            println!("  {:4}: {:?}", idx, instruction);
+            println!("  {idx:4}: {instruction:?}");
         } else {
             break;
         }
@@ -65,11 +65,11 @@ fn execute() -> Result<(), Box<dyn Error>> {
 
 fn main() {
     if let Err(err) = execute() {
-        eprintln!("Error: {:#}", err);
+        eprintln!("Error: {err:#}");
         let mut source_opt = err.source();
         while let Some(source) = source_opt {
             eprintln!();
-            eprintln!("caused by: {:#}", source);
+            eprintln!("caused by: {source:#}");
             source_opt = source.source();
         }
     }

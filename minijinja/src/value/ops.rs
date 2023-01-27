@@ -160,7 +160,7 @@ fn impossible_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
 fn failed_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
     Error::new(
         ErrorKind::InvalidOperation,
-        format!("unable to calculate {} {} {}", lhs, op, rhs),
+        format!("unable to calculate {lhs} {op} {rhs}"),
     )
 }
 
@@ -253,11 +253,11 @@ pub fn string_concat(mut left: Value, right: &Value) -> Value {
         // if we're a string and we have a single reference to it, we can
         // directly append into ourselves and reconstruct the value
         ValueRepr::String(ref mut s, _) => {
-            write!(Arc::make_mut(s), "{}", right).ok();
+            write!(Arc::make_mut(s), "{right}").ok();
             left
         }
         // otherwise we use format! to concat the two values
-        _ => Value::from(format!("{}{}", left, right)),
+        _ => Value::from(format!("{left}{right}")),
     }
 }
 
