@@ -253,6 +253,7 @@ mod builtins {
     use crate::key::Key;
     use crate::value::{ValueKind, ValueRepr};
     use std::borrow::Cow;
+    use std::cmp::Ordering;
     use std::fmt::Write;
     use std::mem;
 
@@ -612,6 +613,42 @@ mod builtins {
                 "cannot get last item from value",
             ))
         }
+    }
+
+    /// Returns the smallest item from the list.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn min(value: Value) -> Result<Value, Error> {
+        let iter = ok!(value.try_iter().map_err(|err| {
+            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
+        }));
+        Ok(iter
+            .min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less))
+            .unwrap_or(Value::UNDEFINED))
+    }
+
+    /// Returns the largest item from the list.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn max(value: Value) -> Result<Value, Error> {
+        let iter = ok!(value.try_iter().map_err(|err| {
+            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
+        }));
+        Ok(iter
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less))
+            .unwrap_or(Value::UNDEFINED))
+    }
+
+    /// Returns the sorted version of the given list.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn sort(value: Value, reverse: Option<bool>) -> Result<Value, Error> {
+        let mut items = ok!(value.try_iter().map_err(|err| {
+            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
+        }))
+        .collect::<Vec<_>>();
+        items.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less));
+        if reverse.unwrap_or(false) {
+            items.reverse();
+        }
+        Ok(Value::from(items))
     }
 
     /// Converts the input value into a list.
