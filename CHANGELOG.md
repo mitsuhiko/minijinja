@@ -2,6 +2,12 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 0.30.2
+
+- Fixed Python bindings not allowing to access dict keys prefixed with an
+  underscore. (#197)
+- Added `min`, `max` and `sort` filters. (#199)
+
 ## 0.30.1
 
 - Changed `add_global` to perform `Into<Value>` implicitly.
