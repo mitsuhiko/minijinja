@@ -7,6 +7,7 @@
     2,
     3
   ],
+  "other_list": [1, 4, 2, 9, 111],
   "map": {
     "a": "b",
     "c": "d"
@@ -54,6 +55,10 @@ first-undefined: {{ []|first is undefined }}
 last-list: {{ list|last }}
 last-word: {{ word|last }}
 last-undefined: {{ []|first is undefined }}
+min: {{ other_list|min }}
+max: {{ other_list|max }}
+sort: {{ other_list|sort }}
+sort-reverse: {{ other_list|sort(true) }}
 d: {{ undefined|d == "" }}
 json: {{ map|tojson }}
 json-pretty: {{ map|tojson(true) }}
