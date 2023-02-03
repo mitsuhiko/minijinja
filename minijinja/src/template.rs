@@ -80,7 +80,7 @@ impl<'env> Template<'env> {
     /// ```
     pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
-        // this function, and share the rest in _eval.
+        // this function, and share the rest in _render.
         self._render(Value::from_serializable(&ctx))
     }
 
@@ -110,6 +110,7 @@ impl<'env> Template<'env> {
             Value::from_serializable(&ctx),
             &mut Output::with_write(&mut wrapper),
         )
+        .map(|_| ())
         .map_err(|err| {
             wrapper
                 .err
@@ -122,16 +123,14 @@ impl<'env> Template<'env> {
         })
     }
 
-    fn _eval(&self, root: Value, out: &mut Output) -> Result<(), Error> {
-        Vm::new(self.env)
-            .eval(
-                &self.compiled.instructions,
-                root,
-                &self.compiled.blocks,
-                out,
-                self.initial_auto_escape,
-            )
-            .map(|_| ())
+    fn _eval(&self, root: Value, out: &mut Output) -> Result<Option<Value>, Error> {
+        Vm::new(self.env).eval(
+            &self.compiled.instructions,
+            root,
+            &self.compiled.blocks,
+            out,
+            self.initial_auto_escape,
+        )
     }
 
     /// Returns the root instructions.
