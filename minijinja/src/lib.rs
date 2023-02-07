@@ -181,7 +181,6 @@
 #[macro_use]
 mod macros;
 
-mod compiler;
 mod defaults;
 mod environment;
 mod error;
@@ -197,6 +196,7 @@ pub mod functions;
 pub mod syntax;
 pub mod tests;
 pub mod value;
+pub mod compiler;
 
 #[cfg(feature = "source")]
 mod source;
