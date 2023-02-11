@@ -68,7 +68,7 @@ impl<'env> Template<'env> {
     ///
     /// The provided value is used as the initial context for the template.  It
     /// can be any object that implements [`Serialize`](serde::Serialize).  You
-    /// can eiher create your own struct and derive `Serialize` for it or the
+    /// can either create your own struct and derive `Serialize` for it or the
     /// [`context!`](crate::context) macro can be used to create an ad-hoc context.
     ///
     /// ```
@@ -81,13 +81,7 @@ impl<'env> Template<'env> {
     pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _render.
-        self._render(Value::from_serializable(&ctx))
-    }
-
-    fn _render(&self, root: Value) -> Result<String, Error> {
-        let mut rv = String::new();
-        self._eval(root, &mut Output::with_string(&mut rv))
-            .map(|_| rv)
+        self.render_value(Value::from_serializable(&ctx))
     }
 
     /// Renders the template into a [`io::Write`].
@@ -123,6 +117,73 @@ impl<'env> Template<'env> {
         })
     }
 
+    /// Renders the template into a [`fmt::Write`].
+    ///
+    /// This works exactly like [`render`](Self::render) but instead writes the template
+    /// as it's evaluating into a [`fmt::Write`].
+    ///
+    /// One reason to use this function instead of [`render`](Self::render) is to
+    /// precisely allocate the render result's underlying [`String`] buffer:
+    ///
+    /// ```
+    /// # use minijinja::{Environment, Output, context};
+    /// # let mut env = Environment::new();
+    /// # env.add_template("hello", "Hello {{ name }}!").unwrap();
+    /// let tmpl = env.get_template("hello").unwrap();
+    /// let mut buf = String::with_capacity(tmpl.size_hint() + 4);
+    /// tmpl.render_to_fmt_write(context!(name => "Jane"), &mut buf).unwrap();
+    /// println!("{}", buf);
+    /// ```
+    pub fn render_to_fmt_write<S: Serialize, W: fmt::Write>(
+        &self,
+        ctx: S,
+        w: &mut W,
+    ) -> Result<(), Error> {
+        self._eval(Value::from_serializable(&ctx), &mut Output::with_write(w))
+            .map(|_| ())
+    }
+
+    /// Renders the template into a string.
+    ///
+    /// This works exactly like [`render`](Self::render) but takes a monomorphized
+    /// [`Value`] instead, allowing you to avoid reserializing if you are manipulating
+    /// [`Value`] types directly.
+    /// ```
+    /// # use minijinja::{Environment, Output, context, value::Value};
+    /// # let mut env = Environment::new();
+    /// # env.add_template("hello", "Hello {{ name }}!").unwrap();
+    /// let tmpl = env.get_template("hello").unwrap();
+    /// let value: Value = [("name", "Anya")].into_iter().collect();
+    /// tmpl.render_value(value).unwrap();
+    /// ```
+    pub fn render_value(&self, value: Value) -> Result<String, Error> {
+        let mut rv = String::with_capacity(self.size_hint());
+        self._eval(value, &mut Output::with_string(&mut rv))
+            .map(|_| rv)
+    }
+
+    /// Renders the template into a [`fmt::Write`].
+    ///
+    /// This works exactly like [`render_to_fmt_write`](Self::render_to_fmt_write) but
+    /// takes a monomorphized [`Value`] instead.
+    /// ```
+    /// # use minijinja::{Environment, Output, context, value::Value};
+    /// # let mut env = Environment::new();
+    /// # env.add_template("hello", "Hello {{ name }}!").unwrap();
+    /// let tmpl = env.get_template("hello").unwrap();
+    /// let value: Value = [("name", "Pavel")].into_iter().collect();
+    /// let mut buf = String::with_capacity(tmpl.size_hint() + 5);
+    /// tmpl.render_to_fmt_write(value, &mut buf).unwrap();
+    /// println!("{}", buf);
+    /// ```
+    pub fn render_value_to_fmt_write<W: fmt::Write>(
+        &self,
+        value: Value,
+        w: &mut W,
+    ) -> Result<(), Error> {
+        self._eval(value, &mut Output::with_write(w)).map(|_| ())
+    }
+
     fn _eval(&self, root: Value, out: &mut Output) -> Result<Option<Value>, Error> {
         Vm::new(self.env).eval(
             &self.compiled.instructions,
@@ -131,6 +192,28 @@ impl<'env> Template<'env> {
             out,
             self.initial_auto_escape,
         )
+    }
+
+    /// A size hint for pre-allocating rendering buffers which uses the
+    /// original template source length, in bytes. This is intentionally conservative
+    /// and any sufficiently complex template logic or large context will cause the
+    /// buffer to grow at least once during rendering.
+    ///
+    /// If the size of the context you are rendering is unknown you could consider
+    /// hand-rolling your own heuristic, for example using [`usize::next_multiple_of`]
+    /// or [`usize::next_power_of_two`]:
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// # let mut env = Environment::new();
+    /// # env.add_template("hello", "Hello {{ name }}!").unwrap();
+    /// let tmpl = env.get_template("hello").unwrap();
+    /// let size_hint = tmpl.size_hint().next_power_of_two();
+    /// assert_eq!(tmpl.source().len(), 17);
+    /// assert_eq!(size_hint, 32);
+    /// ```
+    pub fn size_hint(&self) -> usize {
+        self.source().len()
     }
 
     /// Returns the root instructions.
