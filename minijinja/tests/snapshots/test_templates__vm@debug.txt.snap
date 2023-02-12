@@ -52,6 +52,7 @@ State {
             "ge",
             "greaterthan",
             "gt",
+            "in",
             "le",
             "lessthan",
             "lt",

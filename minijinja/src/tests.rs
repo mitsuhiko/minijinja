@@ -342,6 +342,17 @@ mod builtins {
         *value >= *other
     }
 
+    /// Test version of `in`.
+    ///
+    /// This is useful when combined with [`select`].
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_in(value: &Value, other: &Value) -> bool {
+        crate::value::ops::contains(other, value)
+            .map(|value| value.is_true())
+            .unwrap_or(false)
+    }
+
     #[test]
     fn test_basics() {
         fn test(_: &State, a: u32, b: u32) -> bool {

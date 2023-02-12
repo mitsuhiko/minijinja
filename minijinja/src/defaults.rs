@@ -138,6 +138,7 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
         rv.insert(">".into(), BoxedTest::new(tests::is_gt));
         rv.insert("ge".into(), BoxedTest::new(tests::is_ge));
         rv.insert(">=".into(), BoxedTest::new(tests::is_ge));
+        rv.insert("in".into(), BoxedTest::new(tests::is_in));
     }
     rv
 }
