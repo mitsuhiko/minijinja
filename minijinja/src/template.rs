@@ -78,6 +78,9 @@ impl<'env> Template<'env> {
     /// let tmpl = env.get_template("hello").unwrap();
     /// println!("{}", tmpl.render(context!(name => "John")).unwrap());
     /// ```
+    ///
+    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// efficiently passed to render.  It does not undergo actual serialization.
     pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _render.
@@ -104,6 +107,9 @@ impl<'env> Template<'env> {
     /// let tmpl = env.get_template("hello").unwrap();
     /// tmpl.render_to_write(context!(name => "John"), &mut stdout()).unwrap();
     /// ```
+    ///
+    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// efficiently passed to render.  It does not undergo actual serialization.
     pub fn render_to_write<S: Serialize, W: io::Write>(&self, ctx: S, w: W) -> Result<(), Error> {
         let mut wrapper = WriteWrapper { w, err: None };
         self._eval(

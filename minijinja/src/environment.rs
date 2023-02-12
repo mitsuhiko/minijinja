@@ -209,6 +209,9 @@ impl<'source> Environment<'source> {
     /// let rv = env.render_str("Hello {{ name }}", context! { name => "World" });
     /// println!("{}", rv.unwrap());
     /// ```
+    ///
+    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// efficiently passed to render.  It does not undergo actual serialization.
     pub fn render_str<S: Serialize>(&self, source: &str, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _eval.
@@ -230,6 +233,9 @@ impl<'source> Environment<'source> {
     /// );
     /// println!("{}", rv.unwrap());
     /// ```
+    ///
+    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// efficiently passed to render.  It does not undergo actual serialization.
     pub fn render_named_str<S: Serialize>(
         &self,
         name: &str,
