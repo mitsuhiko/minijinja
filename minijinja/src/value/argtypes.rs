@@ -428,7 +428,6 @@ primitive_try_from!(f64, {
 impl<'a> ArgType<'a> for &str {
     type Output = &'a str;
 
-    #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => value
@@ -442,7 +441,6 @@ impl<'a> ArgType<'a> for &str {
 impl<'a> ArgType<'a> for &[u8] {
     type Output = &'a [u8];
 
-    #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => value
@@ -456,7 +454,6 @@ impl<'a> ArgType<'a> for &[u8] {
 impl<'a> ArgType<'a> for &dyn SeqObject {
     type Output = &'a dyn SeqObject;
 
-    #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => value
@@ -562,7 +559,6 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
             .collect::<Result<_, _>>())))
     }
 
-    #[inline(always)]
     fn from_state_and_values(
         _state: Option<&'a State>,
         values: &'a [Value],

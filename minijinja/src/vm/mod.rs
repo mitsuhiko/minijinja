@@ -54,7 +54,6 @@ fn prepare_blocks<'env, 'vm>(
         .collect()
 }
 
-#[inline(always)]
 fn get_or_lookup_local<T, F>(vec: &mut [Option<T>], local_id: u8, f: F) -> Option<T>
 where
     T: Copy,
@@ -108,7 +107,6 @@ impl<'env> Vm<'env> {
     }
 
     /// Evaluate a macro in a state.
-    #[inline(always)]
     #[cfg(feature = "macros")]
     pub fn eval_macro(
         &self,
