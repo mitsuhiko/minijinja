@@ -374,7 +374,7 @@ impl ser::SerializeStruct for SerializeStruct {
         match self.name {
             VALUE_HANDLE_MARKER => {
                 let handle_id = match self.fields.get(&Key::Str("handle")) {
-                    Some(&Value(ValueRepr::U64(handle_id))) => handle_id as usize,
+                    Some(&Value(ValueRepr::U64(handle_id))) => handle_id,
                     _ => panic!("bad handle reference in value roundtrip"),
                 };
                 Ok(VALUE_HANDLES.with(|handles| {

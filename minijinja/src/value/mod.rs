@@ -108,7 +108,7 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::marker::PhantomData;
-use std::sync::atomic::{self, AtomicBool, AtomicUsize};
+use std::sync::atomic::{self, AtomicBool, AtomicU64};
 use std::sync::Arc;
 
 use serde::ser::{Serialize, Serializer};
@@ -146,8 +146,8 @@ pub(crate) type ValueMap = std::collections::BTreeMap<StaticKey, Value>;
 
 thread_local! {
     static INTERNAL_SERIALIZATION: AtomicBool = AtomicBool::new(false);
-    static LAST_VALUE_HANDLE: AtomicUsize = AtomicUsize::new(0);
-    static VALUE_HANDLES: RefCell<BTreeMap<usize, Value>> = RefCell::new(BTreeMap::new());
+    static LAST_VALUE_HANDLE: AtomicU64 = AtomicU64::new(0);
+    static VALUE_HANDLES: RefCell<BTreeMap<u64, Value>> = RefCell::new(BTreeMap::new());
 }
 
 /// Function that returns true when serialization for [`Value`] is taking place.
@@ -1006,8 +1006,7 @@ impl Serialize for Value {
             ValueRepr::I64(i) => serializer.serialize_i64(i),
             ValueRepr::F64(f) => serializer.serialize_f64(f),
             ValueRepr::Char(c) => serializer.serialize_char(c),
-            ValueRepr::None => serializer.serialize_unit(),
-            ValueRepr::Undefined => serializer.serialize_unit(),
+            ValueRepr::None | ValueRepr::Undefined => serializer.serialize_unit(),
             ValueRepr::U128(u) => serializer.serialize_u128(u.0),
             ValueRepr::I128(i) => serializer.serialize_i128(i.0),
             ValueRepr::String(ref s, _) => serializer.serialize_str(s),
@@ -1165,6 +1164,8 @@ impl ValueIteratorState {
 
 #[test]
 fn test_dynamic_object_roundtrip() {
+    use std::sync::atomic::AtomicUsize;
+
     #[derive(Debug)]
     struct X(AtomicUsize);
 
