@@ -5,7 +5,9 @@ All notable changes to MiniJinja are documented here.
 ## 0.31.0
 
 - Added the Jinja2 tests `==`, `!=`, `<`, `<=`, `>`, `>=` and `in` for the
-  use with `select` and `reject`.
+  use with `select` and `reject`. (#205)
+- String rendering now uses fewer reallocations by setting an initial
+  capacity based on the complexity of the template. (#206)
 
 ## 0.30.2
 
