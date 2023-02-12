@@ -1073,8 +1073,12 @@ mod builtins {
 
         // attribute mapping
         if args.last().map_or(false, |x| x.is_kwargs()) {
-            let kwargs = args.first().unwrap();
-            if let Ok(attr) = kwargs.get_attr("attribute") {
+            let kwargs = args.last().unwrap();
+            if let Some(attr) = kwargs
+                .get_attr("attribute")
+                .ok()
+                .filter(|x| !x.is_undefined())
+            {
                 // TODO: extra arguments shouldn't be ignored
                 if args.len() > 1 {
                     return Err(Error::new(
