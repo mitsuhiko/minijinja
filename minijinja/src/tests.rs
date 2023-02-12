@@ -198,21 +198,37 @@ impl BoxedTest {
 }
 
 /// Checks if a value is undefined.
+///
+/// ```jinja
+/// {{ 42 is undefined }} -> false
+/// ```
 pub fn is_undefined(v: Value) -> bool {
     v.is_undefined()
 }
 
 /// Checks if a value is defined.
+///
+/// ```jinja
+/// {{ 42 is defined }} -> true
+/// ```
 pub fn is_defined(v: Value) -> bool {
     !v.is_undefined()
 }
 
 /// Checks if a value is none.
+///
+/// ```jinja
+/// {{ none is none }} -> true
+/// ```
 pub fn is_none(v: Value) -> bool {
     v.is_none()
 }
 
 /// Checks if a value is safe.
+///
+/// ```jinja
+/// {{ "<hello>"|escape is safe }} -> true
+/// ```
 ///
 /// This filter is also registered with the `escaped` alias.
 pub fn is_safe(v: Value) -> bool {
@@ -229,48 +245,86 @@ mod builtins {
     use crate::value::ValueKind;
 
     /// Checks if a value is odd.
+    ///
+    /// ```jinja
+    /// {{ 41 is odd }} -> true
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_odd(v: Value) -> bool {
         i128::try_from(v).ok().map_or(false, |x| x % 2 != 0)
     }
 
     /// Checks if a value is even.
+    ///
+    /// ```jinja
+    /// {{ 42 is even }} -> true
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_even(v: Value) -> bool {
         i128::try_from(v).ok().map_or(false, |x| x % 2 == 0)
     }
 
     /// Checks if this value is a number.
+    ///
+    /// ```jinja
+    /// {{ 42 is number }} -> true
+    /// {{ "42" is number }} -> false
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_number(v: Value) -> bool {
         matches!(v.kind(), ValueKind::Number)
     }
 
     /// Checks if this value is a string.
+    ///
+    /// ```jinja
+    /// {{ "42" is string }} -> true
+    /// {{ 42 is string }} -> false
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_string(v: Value) -> bool {
         matches!(v.kind(), ValueKind::String)
     }
 
     /// Checks if this value is a sequence
+    ///
+    /// ```jinja
+    /// {{ [1, 2, 3] is sequence }} -> true
+    /// {{ 42 is sequence }} -> false
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_sequence(v: Value) -> bool {
         matches!(v.kind(), ValueKind::Seq)
     }
 
     /// Checks if this value is a mapping
+    ///
+    /// ```jinja
+    /// {{ {"foo": "bar"} is mapping }} -> true
+    /// {{ [1, 2, 3] is mapping }} -> false
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_mapping(v: Value) -> bool {
         matches!(v.kind(), ValueKind::Map)
     }
 
     /// Checks if the value is starting with a string.
+    ///
+    /// ```jinja
+    /// {{ "foobar" is startingwith "foo" }} -> true
+    /// {{ "foobar" is startingwith "bar" }} -> false
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_startingwith(v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
         v.starts_with(&other as &str)
     }
 
     /// Checks if the value is ending with a string.
+    ///
+    /// ```jinja
+    /// {{ "foobar" is endingwith "bar" }} -> true
+    /// {{ "foobar" is endingwith "foo" }} -> false
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_endingwith(v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
         v.ends_with(&other as &str)
@@ -279,6 +333,11 @@ mod builtins {
     /// Test version of `==`.
     ///
     /// This is useful when combined with [`select`](crate::filters::select).
+    ///
+    /// ```jinja
+    /// {{ 1 is eq 1 }} -> true
+    /// {{ [1, 2, 3]|select("==", 1) }} => [1]
+    /// ```
     ///
     /// By default aliased to `equalto` and `==`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
@@ -291,6 +350,11 @@ mod builtins {
     ///
     /// This is useful when combined with [`select`](crate::filters::select).
     ///
+    /// ```jinja
+    /// {{ 2 is ne 1 }} -> true
+    /// {{ [1, 2, 3]|select("!=", 1) }} => [2, 3]
+    /// ```
+    ///
     /// By default aliased to `!=`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
@@ -301,6 +365,11 @@ mod builtins {
     /// Test version of `<`.
     ///
     /// This is useful when combined with [`select`](crate::filters::select).
+    ///
+    /// ```jinja
+    /// {{ 1 is lt 2 }} -> true
+    /// {{ [1, 2, 3]|select("<", 2) }} => [1]
+    /// ```
     ///
     /// By default aliased to `lessthan` and `<`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
@@ -313,6 +382,11 @@ mod builtins {
     ///
     /// This is useful when combined with [`select`](crate::filters::select).
     ///
+    /// ```jinja
+    /// {{ 1 is le 2 }} -> true
+    /// {{ [1, 2, 3]|select("<=", 2) }} => [1, 2]
+    /// ```
+    ///
     /// By default aliased to `<=`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
@@ -323,6 +397,11 @@ mod builtins {
     /// Test version of `>`.
     ///
     /// This is useful when combined with [`select`](crate::filters::select).
+    ///
+    /// ```jinja
+    /// {{ 2 is gt 1 }} -> true
+    /// {{ [1, 2, 3]|select(">", 2) }} => [3]
+    /// ```
     ///
     /// By default aliased to `greaterthan` and `>`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
@@ -335,6 +414,11 @@ mod builtins {
     ///
     /// This is useful when combined with [`select`](crate::filters::select).
     ///
+    /// ```jinja
+    /// {{ 2 is ge 1 }} -> true
+    /// {{ [1, 2, 3]|select(">=", 2) }} => [2, 3]
+    /// ```
+    ///
     /// By default aliased to `>=`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
@@ -343,6 +427,11 @@ mod builtins {
     }
 
     /// Test version of `in`.
+    ///
+    /// ```jinja
+    /// {{ 1 is in [1, 2, 3] }} -> true
+    /// {{ [1, 2, 3]|select("in", [1, 2]) }} => [1, 2]
+    /// ```
     ///
     /// This is useful when combined with [`select`](crate::filters::select).
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
