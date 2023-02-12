@@ -67,6 +67,11 @@ fn main() {
 }
 ```
 
+## Getting Help
+
+If you are stuck with `MiniJinja`, have suggestions or need help, you can use the
+[GitHub Discussions](https://github.com/mitsuhiko/minijinja/discussions).
+
 ## Minimum Rust Version
 
 MiniJinja's development version requires Rust 1.61 due to limitations with
@@ -105,6 +110,7 @@ sponsor](https://github.com/sponsors/mitsuhiko).
 ## License and Links
 
 - [Documentation](https://docs.rs/minijinja/)
+- [Discussions](https://github.com/mitsuhiko/minijinja/discussions)
 - [Examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
 - [Issue Tracker](https://github.com/mitsuhiko/minijinja/issues)
 - [MiniJinja Playground](https://mitsuhiko.github.io/minijinja-playground/)
