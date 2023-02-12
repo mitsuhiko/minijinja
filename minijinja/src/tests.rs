@@ -278,7 +278,7 @@ mod builtins {
 
     /// Test version of `==`.
     ///
-    /// This is useful when combined with [`select`].
+    /// This is useful when combined with [`select`](crate::filters::select).
     ///
     /// By default aliased to `equalto` and `==`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
@@ -289,7 +289,7 @@ mod builtins {
 
     /// Test version of `!=`.
     ///
-    /// This is useful when combined with [`select`].
+    /// This is useful when combined with [`select`](crate::filters::select).
     ///
     /// By default aliased to `!=`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
@@ -300,7 +300,7 @@ mod builtins {
 
     /// Test version of `<`.
     ///
-    /// This is useful when combined with [`select`].
+    /// This is useful when combined with [`select`](crate::filters::select).
     ///
     /// By default aliased to `lessthan` and `<`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
@@ -311,7 +311,7 @@ mod builtins {
 
     /// Test version of `<=`.
     ///
-    /// This is useful when combined with [`select`].
+    /// This is useful when combined with [`select`](crate::filters::select).
     ///
     /// By default aliased to `<=`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
@@ -322,7 +322,7 @@ mod builtins {
 
     /// Test version of `>`.
     ///
-    /// This is useful when combined with [`select`].
+    /// This is useful when combined with [`select`](crate::filters::select).
     ///
     /// By default aliased to `greaterthan` and `>`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
@@ -333,7 +333,7 @@ mod builtins {
 
     /// Test version of `>=`.
     ///
-    /// This is useful when combined with [`select`].
+    /// This is useful when combined with [`select`](crate::filters::select).
     ///
     /// By default aliased to `>=`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
@@ -344,7 +344,7 @@ mod builtins {
 
     /// Test version of `in`.
     ///
-    /// This is useful when combined with [`select`].
+    /// This is useful when combined with [`select`](crate::filters::select).
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
     pub fn is_in(value: &Value, other: &Value) -> bool {
