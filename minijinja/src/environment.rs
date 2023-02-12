@@ -249,7 +249,7 @@ impl<'source> Environment<'source> {
 
     fn _render_str(&self, name: &str, source: &str, root: Value) -> Result<String, Error> {
         let compiled = ok!(CompiledTemplate::from_name_and_source(name, source));
-        let mut rv = String::new();
+        let mut rv = String::with_capacity(compiled.buffer_size_hint);
         Vm::new(self)
             .eval(
                 &compiled.instructions,

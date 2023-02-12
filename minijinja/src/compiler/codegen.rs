@@ -47,6 +47,7 @@ pub struct CodeGenerator<'source> {
     span_stack: Vec<Span>,
     filter_local_ids: BTreeMap<&'source str, LocalId>,
     test_local_ids: BTreeMap<&'source str, LocalId>,
+    raw_template_bytes: usize,
     #[cfg(feature = "multi-template")]
     has_extends: bool,
 }
@@ -62,6 +63,7 @@ impl<'source> CodeGenerator<'source> {
             span_stack: Vec::new(),
             filter_local_ids: BTreeMap::new(),
             test_local_ids: BTreeMap::new(),
+            raw_template_bytes: 0,
             #[cfg(feature = "multi-template")]
             has_extends: false,
         }
@@ -248,6 +250,7 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::EmitRaw(raw) => {
                 self.set_line_from_span(raw.span());
                 self.add(Instruction::EmitRaw(raw.raw));
+                self.raw_template_bytes += raw.raw.len();
             }
             ast::Stmt::ForLoop(for_loop) => {
                 self.compile_for_loop(for_loop);
@@ -793,6 +796,17 @@ impl<'source> CodeGenerator<'source> {
         self.compile_expr(&c.right);
         self.add(instr);
         self.pop_span();
+    }
+
+    /// Returns the size hint for buffers.
+    ///
+    /// This is a proposal for the initial buffer size when rendering directly to a string.
+    pub fn buffer_size_hint(&self) -> usize {
+        // for now the assumption is made that twice the bytes of template code without
+        // control structures, rounded up to the next power of two is a good default.  The
+        // round to the next power of two is chosen because the underlying vector backing
+        // strings prefers powers of two.
+        (self.raw_template_bytes * 2).next_power_of_two()
     }
 
     /// Converts the compiler into the instructions.

@@ -88,7 +88,7 @@ impl<'env> Template<'env> {
     }
 
     fn _render(&self, root: Value) -> Result<String, Error> {
-        let mut rv = String::new();
+        let mut rv = String::with_capacity(self.compiled.buffer_size_hint);
         self._eval(root, &mut Output::with_string(&mut rv))
             .map(|_| rv)
     }
@@ -164,6 +164,8 @@ pub struct CompiledTemplate<'source> {
     pub instructions: Instructions<'source>,
     /// Block local instructions.
     pub blocks: BTreeMap<&'source str, Instructions<'source>>,
+    /// Optional size hint for string rendering.
+    pub buffer_size_hint: usize,
 }
 
 impl<'env> fmt::Debug for CompiledTemplate<'env> {
@@ -197,10 +199,12 @@ impl<'source> CompiledTemplate<'source> {
             let ast = ok!(parse(source, name));
             let mut gen = CodeGenerator::new(name, source);
             gen.compile_stmt(&ast);
+            let buffer_size_hint = gen.buffer_size_hint();
             let (instructions, blocks) = gen.finish();
             Ok(CompiledTemplate {
                 instructions,
                 blocks,
+                buffer_size_hint,
             })
         })
     }
