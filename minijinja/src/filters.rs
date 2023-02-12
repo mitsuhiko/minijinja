@@ -924,6 +924,7 @@ mod builtins {
     ) -> Result<Vec<Value>, Error> {
         let mut rv = vec![];
         let test = if let Some(test_name) = test_name {
+            dbg!(&test_name);
             Some(
                 state
                     .env
