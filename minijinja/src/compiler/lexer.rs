@@ -19,7 +19,6 @@ struct TokenizerState<'s> {
     current_col: usize,
 }
 
-#[inline(always)]
 fn find_marker(a: &str) -> Option<(usize, bool)> {
     let bytes = a.as_bytes();
     let mut offset = 0;
