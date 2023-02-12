@@ -87,6 +87,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::Boxe
         rv.insert("selectattr".into(), BoxedFilter::new(filters::selectattr));
         rv.insert("rejectattr".into(), BoxedFilter::new(filters::rejectattr));
         rv.insert("map".into(), BoxedFilter::new(filters::map));
+
         #[cfg(feature = "json")]
         {
             rv.insert("tojson".into(), BoxedFilter::new(filters::tojson));
@@ -120,6 +121,24 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
             BoxedTest::new(tests::is_startingwith),
         );
         rv.insert("endingwith".into(), BoxedTest::new(tests::is_endingwith));
+
+        // operators
+        rv.insert("eq".into(), BoxedTest::new(tests::is_eq));
+        rv.insert("equalto".into(), BoxedTest::new(tests::is_eq));
+        rv.insert("==".into(), BoxedTest::new(tests::is_eq));
+        rv.insert("ne".into(), BoxedTest::new(tests::is_ne));
+        rv.insert("!=".into(), BoxedTest::new(tests::is_ne));
+        rv.insert("lt".into(), BoxedTest::new(tests::is_lt));
+        rv.insert("lessthan".into(), BoxedTest::new(tests::is_lt));
+        rv.insert("<".into(), BoxedTest::new(tests::is_lt));
+        rv.insert("le".into(), BoxedTest::new(tests::is_le));
+        rv.insert("<=".into(), BoxedTest::new(tests::is_le));
+        rv.insert("gt".into(), BoxedTest::new(tests::is_gt));
+        rv.insert("greaterthan".into(), BoxedTest::new(tests::is_gt));
+        rv.insert(">".into(), BoxedTest::new(tests::is_gt));
+        rv.insert("ge".into(), BoxedTest::new(tests::is_ge));
+        rv.insert(">=".into(), BoxedTest::new(tests::is_ge));
+        rv.insert("in".into(), BoxedTest::new(tests::is_in));
     }
     rv
 }

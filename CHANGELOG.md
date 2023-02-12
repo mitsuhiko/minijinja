@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 0.31.0
+
+- Added the Jinja2 tests `==`, `!=`, `<`, `<=`, `>`, `>=` and `in` for the
+  use with `select` and `reject`.
+
 ## 0.30.2
 
 - Fixed Python bindings not allowing to access dict keys prefixed with an

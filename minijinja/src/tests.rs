@@ -276,6 +276,83 @@ mod builtins {
         v.ends_with(&other as &str)
     }
 
+    /// Test version of `==`.
+    ///
+    /// This is useful when combined with [`select`].
+    ///
+    /// By default aliased to `equalto` and `==`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_eq(value: &Value, other: &Value) -> bool {
+        *value == *other
+    }
+
+    /// Test version of `!=`.
+    ///
+    /// This is useful when combined with [`select`].
+    ///
+    /// By default aliased to `!=`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_ne(value: &Value, other: &Value) -> bool {
+        *value != *other
+    }
+
+    /// Test version of `<`.
+    ///
+    /// This is useful when combined with [`select`].
+    ///
+    /// By default aliased to `lessthan` and `<`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_lt(value: &Value, other: &Value) -> bool {
+        *value < *other
+    }
+
+    /// Test version of `<=`.
+    ///
+    /// This is useful when combined with [`select`].
+    ///
+    /// By default aliased to `<=`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_le(value: &Value, other: &Value) -> bool {
+        *value <= *other
+    }
+
+    /// Test version of `>`.
+    ///
+    /// This is useful when combined with [`select`].
+    ///
+    /// By default aliased to `greaterthan` and `>`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_gt(value: &Value, other: &Value) -> bool {
+        *value > *other
+    }
+
+    /// Test version of `>=`.
+    ///
+    /// This is useful when combined with [`select`].
+    ///
+    /// By default aliased to `>=`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_ge(value: &Value, other: &Value) -> bool {
+        *value >= *other
+    }
+
+    /// Test version of `in`.
+    ///
+    /// This is useful when combined with [`select`].
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_in(value: &Value, other: &Value) -> bool {
+        crate::value::ops::contains(other, value)
+            .map(|value| value.is_true())
+            .unwrap_or(false)
+    }
+
     #[test]
     fn test_basics() {
         fn test(_: &State, a: u32, b: u32) -> bool {
