@@ -996,8 +996,7 @@ impl Serialize for Value {
         // enable round tripping of values
         if serializing_for_value() {
             use serde::ser::SerializeStruct;
-            let handle =
-                LAST_VALUE_HANDLE.with(|x| x.fetch_add(1, atomic::Ordering::Relaxed)) as usize;
+            let handle = LAST_VALUE_HANDLE.with(|x| x.fetch_add(1, atomic::Ordering::Relaxed));
             VALUE_HANDLES.with(|handles| handles.borrow_mut().insert(handle, self.clone()));
             let mut s = ok!(serializer.serialize_struct(VALUE_HANDLE_MARKER, 1));
             ok!(s.serialize_field("handle", &handle));
