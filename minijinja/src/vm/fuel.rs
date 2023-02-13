@@ -1,12 +1,14 @@
 use crate::compiler::instructions::Instruction;
 use crate::error::{Error, ErrorKind};
 
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
 
 /// Helper for tracking fuel consumption
 pub struct FuelTracker {
-    remaining: AtomicI64,
+    // This should be an AtomicI64 but sadly 32bit targets do not necessarily have
+    // AtomicI64 available.
+    remaining: AtomicIsize,
 }
 
 impl FuelTracker {
@@ -16,7 +18,7 @@ impl FuelTracker {
     /// shared across nested invocations of the template evaluation.
     pub fn new(fuel: u64) -> Arc<FuelTracker> {
         Arc::new(FuelTracker {
-            remaining: AtomicI64::new(fuel as i64),
+            remaining: AtomicIsize::new(fuel as isize),
         })
     }
 
@@ -34,7 +36,7 @@ impl FuelTracker {
 }
 
 /// How much fuel does an instruction consume?
-fn fuel_for_instruction(instruction: &Instruction) -> i64 {
+fn fuel_for_instruction(instruction: &Instruction) -> isize {
     match instruction {
         Instruction::BeginCapture(_)
         | Instruction::LoadBlocks
