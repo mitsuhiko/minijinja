@@ -108,7 +108,7 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::marker::PhantomData;
-use std::sync::atomic::{self, AtomicBool, AtomicU64};
+use std::sync::atomic::{self, AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
 use serde::ser::{Serialize, Serializer};
@@ -146,8 +146,11 @@ pub(crate) type ValueMap = std::collections::BTreeMap<StaticKey, Value>;
 
 thread_local! {
     static INTERNAL_SERIALIZATION: AtomicBool = AtomicBool::new(false);
-    static LAST_VALUE_HANDLE: AtomicU64 = AtomicU64::new(0);
-    static VALUE_HANDLES: RefCell<BTreeMap<u64, Value>> = RefCell::new(BTreeMap::new());
+
+    // This should be an AtomicU64 but sadly 32bit targets do not necessarily have
+    // AtomicU64 available.
+    static LAST_VALUE_HANDLE: AtomicUsize = AtomicUsize::new(0);
+    static VALUE_HANDLES: RefCell<BTreeMap<usize, Value>> = RefCell::new(BTreeMap::new());
 }
 
 /// Function that returns true when serialization for [`Value`] is taking place.
