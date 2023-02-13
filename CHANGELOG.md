@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 0.30.4
+
+- Restore compilation on 32bit targets. (#207)
+
 ## 0.30.3
 
 - Added the Jinja2 tests `==`, `!=`, `<`, `<=`, `>`, `>=` and `in` for the
