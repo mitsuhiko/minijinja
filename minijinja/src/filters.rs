@@ -363,7 +363,7 @@ mod builtins {
     pub fn dictsort(v: Value) -> Result<Value, Error> {
         if v.kind() == ValueKind::Map {
             let mut rv = Vec::new();
-            let iter = v.try_iter()?;
+            let iter = ok!(v.try_iter());
             for key in iter {
                 let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
                 rv.push((key, value));
@@ -407,7 +407,7 @@ mod builtins {
     pub fn items(v: Value) -> Result<Value, Error> {
         if v.kind() == ValueKind::Map {
             let mut rv = Vec::new();
-            let iter = v.try_iter()?;
+            let iter = ok!(v.try_iter());
             for key in iter {
                 let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
                 rv.push(Value::from(vec![key, value]));
@@ -890,11 +890,11 @@ mod builtins {
 
         if value.kind() == ValueKind::Map {
             let mut rv = String::new();
-            for (idx, k) in value.try_iter()?.enumerate() {
+            for (idx, k) in ok!(value.try_iter()).enumerate() {
                 if idx > 0 {
                     rv.push('&');
                 }
-                let v = value.get_item(&k)?;
+                let v = ok!(value.get_item(&k));
                 write!(
                     rv,
                     "{}={}",
@@ -927,18 +927,16 @@ mod builtins {
     ) -> Result<Vec<Value>, Error> {
         let mut rv = vec![];
         let test = if let Some(test_name) = test_name {
-            Some(
-                state
-                    .env
-                    .get_test(&test_name)
-                    .ok_or_else(|| Error::from(ErrorKind::UnknownTest))?,
-            )
+            Some(ok!(state
+                .env
+                .get_test(&test_name)
+                .ok_or_else(|| Error::from(ErrorKind::UnknownTest))))
         } else {
             None
         };
-        for value in value.try_iter()? {
+        for value in ok!(value.try_iter()) {
             let test_value = if let Some(ref attr) = attr {
-                value.get_path(attr)?
+                ok!(value.get_path(attr))
             } else {
                 value.clone()
             };
@@ -947,7 +945,7 @@ mod builtins {
                     .into_iter()
                     .chain(args.0.iter().cloned())
                     .collect::<Vec<_>>();
-                test.perform(state, &new_args)?
+                ok!(test.perform(state, &new_args))
             } else {
                 test_value.is_true()
             };
@@ -1087,7 +1085,7 @@ mod builtins {
                     ));
                 }
                 let default = kwargs.get_attr("default").ok();
-                for value in value.try_iter()? {
+                for value in ok!(value.try_iter()) {
                     let sub_val = match attr.as_str() {
                         Some(path) => value.get_path(path),
                         None => value.get_item(&attr),
@@ -1103,24 +1101,24 @@ mod builtins {
         }
 
         // filter mapping
-        let filter_name = args
+        let filter_name = ok!(args
             .0
             .first()
-            .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "filter name is required"))?
-            .as_str()
-            .ok_or_else(|| {
-                Error::new(ErrorKind::InvalidOperation, "filter name must be a string")
-            })?;
-        let filter = state
+            .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "filter name is required")));
+        let filter_name = ok!(filter_name.as_str().ok_or_else(|| {
+            Error::new(ErrorKind::InvalidOperation, "filter name must be a string")
+        }));
+
+        let filter = ok!(state
             .env
             .get_filter(filter_name)
-            .ok_or_else(|| Error::from(ErrorKind::UnknownFilter))?;
-        for value in value.try_iter()? {
+            .ok_or_else(|| Error::from(ErrorKind::UnknownFilter)));
+        for value in ok!(value.try_iter()) {
             let new_args = Some(value.clone())
                 .into_iter()
                 .chain(args.0.iter().skip(1).cloned())
                 .collect::<Vec<_>>();
-            rv.push(filter.apply_to(state, &new_args)?);
+            rv.push(ok!(filter.apply_to(state, &new_args)));
         }
         Ok(rv)
     }

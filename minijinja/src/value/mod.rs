@@ -976,9 +976,9 @@ impl Value {
         let mut rv = self.clone();
         for part in path.split('.') {
             if let Ok(num) = part.parse::<usize>() {
-                rv = rv.get_item_by_index(num)?;
+                rv = ok!(rv.get_item_by_index(num));
             } else {
-                rv = rv.get_attr(part)?;
+                rv = ok!(rv.get_attr(part));
             }
         }
         Ok(rv)

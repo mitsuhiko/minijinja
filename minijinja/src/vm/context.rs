@@ -205,7 +205,7 @@ impl<'env> Context<'env> {
 
     /// Pushes a new layer.
     pub fn push_frame(&mut self, layer: Frame<'env>) -> Result<(), Error> {
-        self.check_depth()?;
+        ok!(self.check_depth());
         self.stack.push(layer);
         Ok(())
     }
@@ -241,7 +241,7 @@ impl<'env> Context<'env> {
     #[allow(unused)]
     pub fn incr_depth(&mut self, delta: usize) -> Result<(), Error> {
         self.outer_stack_depth += delta;
-        self.check_depth()?;
+        ok!(self.check_depth());
         Ok(())
     }
 

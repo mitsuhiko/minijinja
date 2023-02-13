@@ -1007,7 +1007,7 @@ impl<'a> Parser<'a> {
         expect_token!(self, Token::ParenOpen, "`(`");
         let mut args = Vec::new();
         let mut defaults = Vec::new();
-        self.parse_macro_args_and_defaults(&mut args, &mut defaults)?;
+        ok!(self.parse_macro_args_and_defaults(&mut args, &mut defaults));
         self.parse_macro_or_call_block_body(args, defaults, Some(name))
     }
 
@@ -1017,16 +1017,16 @@ impl<'a> Parser<'a> {
         let mut args = Vec::new();
         let mut defaults = Vec::new();
         if skip_token!(self, Token::ParenOpen) {
-            self.parse_macro_args_and_defaults(&mut args, &mut defaults)?;
+            ok!(self.parse_macro_args_and_defaults(&mut args, &mut defaults));
         }
-        let call = match self.parse_expr()? {
+        let call = match ok!(self.parse_expr()) {
             ast::Expr::Call(call) => call,
             expr => syntax_error!(
                 "expected call expression in call block, got {}",
                 expr.description()
             ),
         };
-        let macro_decl = self.parse_macro_or_call_block_body(args, defaults, None)?;
+        let macro_decl = ok!(self.parse_macro_or_call_block_body(args, defaults, None));
         Ok(ast::CallBlock {
             call,
             macro_decl: Spanned::new(macro_decl, self.stream.expand_span(span)),
@@ -1034,7 +1034,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_do(&mut self) -> Result<ast::Do<'a>, Error> {
-        let call = match self.parse_expr()? {
+        let call = match ok!(self.parse_expr()) {
             ast::Expr::Call(call) => call,
             expr => syntax_error!(
                 "expected call expression in call block, got {}",
@@ -1119,7 +1119,7 @@ pub fn parse_expr(source: &str) -> Result<ast::Expr<'_>, Error> {
     parser
         .parse_expr()
         .and_then(|result| {
-            if parser.stream.next()?.is_some() {
+            if ok!(parser.stream.next()).is_some() {
                 syntax_error!("unexpected input after expression")
             } else {
                 Ok(result)
