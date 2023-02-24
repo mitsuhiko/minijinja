@@ -139,7 +139,9 @@
 //!   can use positional arguments.  Additionally keyword arguments are supported
 //!   which are treated like a dict syntax.  Eg: `foo(a=1, b=2)` is the same as
 //!   `foo({"a": 1, "b": 2})`.
-//! - ``.`` / ``[]``: Get an attribute of an object.
+//! - ``.`` / ``[]``: Get an attribute of an object.  If an object does not have a specific
+//!   attribute or item then `undefined` is returned.  Accessing a property of an already
+//!   undefined value will result in an error.
 //! - ``[start:stop]`` / ``[start:stop:step]``: slices a list or string.  All three expressions
 //!   are optional (`start`, `stop`, `step`).  For instance ``"Hello World"[:5]`` will return
 //!   just `"Hello"`.  Likewise ``"Hello"[1:-1]`` will return `"ell"`.  The step component can
