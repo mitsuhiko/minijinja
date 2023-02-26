@@ -6,6 +6,8 @@ All notable changes to MiniJinja are documented here.
 
 - Small performance improvements for when `preserve_order` is used by
   passing known capacities to the constructor.
+- Minor performance improvements to the VM by giving the stack an initial
+  capacity.
 
 ## 0.30.4
 

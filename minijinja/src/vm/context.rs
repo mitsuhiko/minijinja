@@ -69,9 +69,16 @@ impl<'env> fmt::Debug for Frame<'env> {
 }
 
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
-#[derive(Default)]
 pub(crate) struct Stack {
     values: Vec<Value>,
+}
+
+impl Default for Stack {
+    fn default() -> Stack {
+        Stack {
+            values: Vec::with_capacity(16),
+        }
+    }
 }
 
 impl Stack {
@@ -108,7 +115,6 @@ impl From<Vec<Value>> for Stack {
     }
 }
 
-#[derive(Default)]
 pub(crate) struct Context<'env> {
     stack: Vec<Frame<'env>>,
     outer_stack_depth: usize,
@@ -159,13 +165,21 @@ impl<'env> fmt::Debug for Context<'env> {
     }
 }
 
+impl<'env> Default for Context<'env> {
+    fn default() -> Context<'env> {
+        Context {
+            stack: Vec::with_capacity(32),
+            outer_stack_depth: 0,
+        }
+    }
+}
+
 impl<'env> Context<'env> {
     /// Creates a context
     pub fn new(frame: Frame<'env>) -> Context<'env> {
-        Context {
-            stack: vec![frame],
-            outer_stack_depth: 0,
-        }
+        let mut rv = Context::default();
+        rv.stack.push(frame);
+        rv
     }
 
     /// Stores a variable in the context.
