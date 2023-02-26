@@ -80,8 +80,9 @@ impl<'vm, 'env> State<'vm, 'env> {
     }
 
     /// Looks up a variable by name in the context.
+    #[inline(always)]
     pub fn lookup(&self, name: &str) -> Option<Value> {
-        self.ctx.load(self.env(), name)
+        self.ctx.load(self.env, name)
     }
 
     #[cfg(test)]
@@ -112,7 +113,7 @@ impl<'vm, 'env> State<'vm, 'env> {
             referenced_locals: instructions
                 .get_referenced_names(pc)
                 .into_iter()
-                .filter_map(|n| Some((n.to_string(), some!(self.ctx.load(self.env, n)))))
+                .filter_map(|n| Some((n.to_string(), some!(self.lookup(n)))))
                 .collect(),
         }
     }

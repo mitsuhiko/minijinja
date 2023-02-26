@@ -249,7 +249,7 @@ impl<'env> Vm<'env> {
                     state.ctx.store(name, stack.pop());
                 }
                 Instruction::Lookup(name) => {
-                    stack.push(state.ctx.load(self.env, name).unwrap_or(Value::UNDEFINED));
+                    stack.push(state.lookup(name).unwrap_or(Value::UNDEFINED));
                 }
                 Instruction::GetAttr(name) => {
                     a = stack.pop();
@@ -514,7 +514,7 @@ impl<'env> Vm<'env> {
                         }
                         // leave the one argument on the stack for the recursion
                         recurse_loop!(true);
-                    } else if let Some(func) = state.ctx.load(self.env, name) {
+                    } else if let Some(func) = state.lookup(name) {
                         let args = stack.slice_top(*arg_count);
                         a = ctx_ok!(func.call(state, args));
                         stack.drop_top(*arg_count);
