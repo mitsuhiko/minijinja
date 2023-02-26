@@ -10,7 +10,7 @@ use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::AutoEscape;
-use crate::value::{self, ops, MapType, Value, ValueMap, ValueRepr};
+use crate::value::{self, ops, value_map_with_capacity, MapType, Value, ValueRepr};
 use crate::vm::context::{Context, Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
@@ -271,7 +271,7 @@ impl<'env> Vm<'env> {
                     stack.push(value.clone());
                 }
                 Instruction::BuildMap(pair_count) => {
-                    let mut map = ValueMap::new();
+                    let mut map = value_map_with_capacity(*pair_count);
                     for _ in 0..*pair_count {
                         let value = stack.pop();
                         let key = ctx_ok!(stack.pop().try_into_key());
@@ -280,7 +280,7 @@ impl<'env> Vm<'env> {
                     stack.push(Value(ValueRepr::Map(map.into(), MapType::Normal)))
                 }
                 Instruction::BuildKwargs(pair_count) => {
-                    let mut map = ValueMap::new();
+                    let mut map = value_map_with_capacity(*pair_count);
                     for _ in 0..*pair_count {
                         let value = stack.pop();
                         let key = stack.pop().try_into_key().unwrap();
@@ -621,7 +621,7 @@ impl<'env> Vm<'env> {
                 #[cfg(feature = "multi-template")]
                 Instruction::ExportLocals => {
                     let locals = state.ctx.current_locals();
-                    let mut module = ValueMap::new();
+                    let mut module = value_map_with_capacity(locals.len());
                     for (key, value) in locals.iter() {
                         module.insert((*key).into(), value.clone());
                     }

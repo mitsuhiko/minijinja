@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 0.31.0
+
+- Small performance improvements for when `preserve_order` is used by
+  passing known capacities to the constructor.
+
 ## 0.30.4
 
 - Restore compilation on 32bit targets. (#207)

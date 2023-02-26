@@ -144,6 +144,19 @@ pub(crate) type ValueMap = indexmap::IndexMap<StaticKey, Value>;
 #[cfg(not(feature = "preserve_order"))]
 pub(crate) type ValueMap = std::collections::BTreeMap<StaticKey, Value>;
 
+#[inline(always)]
+pub(crate) fn value_map_with_capacity(capacity: usize) -> ValueMap {
+    #[cfg(not(feature = "preserve_order"))]
+    {
+        let _ = capacity;
+        ValueMap::new()
+    }
+    #[cfg(feature = "preserve_order")]
+    {
+        ValueMap::with_capacity(capacity)
+    }
+}
+
 thread_local! {
     static INTERNAL_SERIALIZATION: AtomicBool = AtomicBool::new(false);
 

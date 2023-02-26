@@ -5,8 +5,8 @@ use serde::{ser, Serialize, Serializer};
 use crate::error::Error;
 use crate::key::{Key, KeySerializer, StaticKey};
 use crate::value::{
-    Arc, MapType, Packed, StringType, Value, ValueMap, ValueRepr, VALUE_HANDLES,
-    VALUE_HANDLE_MARKER,
+    value_map_with_capacity, Arc, MapType, Packed, StringType, Value, ValueMap, ValueRepr,
+    VALUE_HANDLES, VALUE_HANDLE_MARKER,
 };
 
 pub struct ValueSerializer;
@@ -136,7 +136,7 @@ impl Serializer for ValueSerializer {
     where
         T: Serialize,
     {
-        let mut map = ValueMap::new();
+        let mut map = value_map_with_capacity(1);
         map.insert(Key::Str(variant), ok!(value.serialize(self)));
         Ok(ValueRepr::Map(Arc::new(map), MapType::Normal).into())
     }
@@ -176,9 +176,9 @@ impl Serializer for ValueSerializer {
         })
     }
 
-    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Error> {
+    fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Error> {
         Ok(SerializeMap {
-            entries: ValueMap::new(),
+            entries: value_map_with_capacity(len.unwrap_or(0)),
             key: None,
         })
     }
@@ -186,11 +186,11 @@ impl Serializer for ValueSerializer {
     fn serialize_struct(
         self,
         name: &'static str,
-        _len: usize,
+        len: usize,
     ) -> Result<Self::SerializeStruct, Error> {
         Ok(SerializeStruct {
             name,
-            fields: ValueMap::new(),
+            fields: value_map_with_capacity(len),
         })
     }
 
@@ -199,11 +199,11 @@ impl Serializer for ValueSerializer {
         _name: &'static str,
         _variant_index: u32,
         variant: &'static str,
-        _len: usize,
+        len: usize,
     ) -> Result<Self::SerializeStructVariant, Error> {
         Ok(SerializeStructVariant {
             variant,
-            map: ValueMap::new(),
+            map: value_map_with_capacity(len),
         })
     }
 }
@@ -293,7 +293,7 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
     }
 
     fn end(self) -> Result<Value, Error> {
-        let mut map = ValueMap::new();
+        let mut map = value_map_with_capacity(1);
         map.insert(
             Key::Str(self.name),
             Value(ValueRepr::Seq(self.fields.into())),
