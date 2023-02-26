@@ -724,7 +724,21 @@ impl Value {
     /// # Ok(()) }
     /// ```
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
-        let value = match self.0 {
+        if self.is_undefined() {
+            Err(Error::from(ErrorKind::UndefinedError))
+        } else {
+            Ok(self.get_attr_fast(key).unwrap_or(Value::UNDEFINED))
+        }
+    }
+
+    /// Alternative lookup strategy without error handling exclusively for context
+    /// resolution.
+    ///
+    /// The main difference is that the return value will be `None` if the value is
+    /// unable to look up the key rather than returning `Undefined` and errors will
+    /// also not be created.
+    pub(crate) fn get_attr_fast(&self, key: &str) -> Option<Value> {
+        match self.0 {
             ValueRepr::Map(ref items, _) => {
                 let lookup_key = Key::Str(key);
                 items.get(&lookup_key).cloned()
@@ -733,12 +747,8 @@ impl Value {
                 ObjectKind::Plain | ObjectKind::Seq(_) => None,
                 ObjectKind::Struct(s) => s.get_field(key),
             },
-            ValueRepr::Undefined => {
-                return Err(Error::from(ErrorKind::UndefinedError));
-            }
             _ => None,
-        };
-        Ok(value.unwrap_or(Value::UNDEFINED))
+        }
     }
 
     /// Looks up an index of the value.

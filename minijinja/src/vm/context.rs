@@ -192,9 +192,7 @@ impl<'env> Context<'env> {
         for frame in self.stack.iter().rev() {
             // look at locals first
             if let Some(value) = frame.locals.get(key) {
-                if !value.is_undefined() {
-                    return Some(value.clone());
-                }
+                return Some(value.clone());
             }
 
             // if we are a loop, check if we are looking up the special loop var.
@@ -204,13 +202,10 @@ impl<'env> Context<'env> {
                 }
             }
 
-            // if the frame context is undefined, we skip the lookup
-            if !frame.ctx.is_undefined() {
-                if let Ok(rv) = frame.ctx.get_attr(key) {
-                    if !rv.is_undefined() {
-                        return Some(rv);
-                    }
-                }
+            // perform a fast lookup.  This one will not produce errors if the
+            // context is undefined or of the wrong type.
+            if let Some(rv) = frame.ctx.get_attr_fast(key) {
+                return Some(rv);
             }
         }
 
