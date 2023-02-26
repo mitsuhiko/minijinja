@@ -102,13 +102,12 @@
 // on the content module in serde::private::ser.
 
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::marker::PhantomData;
-use std::sync::atomic::{self, AtomicBool, AtomicUsize};
 use std::sync::Arc;
 
 use serde::ser::{Serialize, Serializer};
@@ -158,11 +157,11 @@ pub(crate) fn value_map_with_capacity(capacity: usize) -> ValueMap {
 }
 
 thread_local! {
-    static INTERNAL_SERIALIZATION: AtomicBool = AtomicBool::new(false);
+    static INTERNAL_SERIALIZATION: Cell<bool> = Cell::new(false);
 
     // This should be an AtomicU64 but sadly 32bit targets do not necessarily have
     // AtomicU64 available.
-    static LAST_VALUE_HANDLE: AtomicUsize = AtomicUsize::new(0);
+    static LAST_VALUE_HANDLE: Cell<usize> = Cell::new(0);
     static VALUE_HANDLES: RefCell<BTreeMap<usize, Value>> = RefCell::new(BTreeMap::new());
 }
 
@@ -183,7 +182,7 @@ thread_local! {
 /// gets sent there, even at the cost of serializing something that cannot be
 /// deserialized.
 pub fn serializing_for_value() -> bool {
-    INTERNAL_SERIALIZATION.with(|flag| flag.load(atomic::Ordering::Relaxed))
+    INTERNAL_SERIALIZATION.with(|flag| flag.get())
 }
 
 /// Enables a temporary code section within which some value
@@ -207,10 +206,10 @@ pub(crate) fn with_value_optimization<R, F: FnOnce() -> R>(f: F) -> R {
 /// tripping serialization.
 fn with_internal_serialization<R, F: FnOnce() -> R>(f: F) -> R {
     INTERNAL_SERIALIZATION.with(|flag| {
-        let old = flag.load(atomic::Ordering::Relaxed);
-        flag.store(true, atomic::Ordering::Relaxed);
+        let old = flag.get();
+        flag.set(true);
         let _on_drop = OnDrop::new(|| {
-            flag.store(old, atomic::Ordering::Relaxed);
+            flag.set(old);
         });
         with_value_optimization(f)
     })
@@ -1021,7 +1020,11 @@ impl Serialize for Value {
         // enable round tripping of values
         if serializing_for_value() {
             use serde::ser::SerializeStruct;
-            let handle = LAST_VALUE_HANDLE.with(|x| x.fetch_add(1, atomic::Ordering::Relaxed));
+            let handle = LAST_VALUE_HANDLE.with(|x| {
+                let rv = x.get() + 1;
+                x.set(rv);
+                rv
+            });
             VALUE_HANDLES.with(|handles| handles.borrow_mut().insert(handle, self.clone()));
             let mut s = ok!(serializer.serialize_struct(VALUE_HANDLE_MARKER, 1));
             ok!(s.serialize_field("handle", &handle));
@@ -1192,7 +1195,7 @@ impl ValueIteratorState {
 
 #[test]
 fn test_dynamic_object_roundtrip() {
-    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::{self, AtomicUsize};
 
     #[derive(Debug)]
     struct X(AtomicUsize);

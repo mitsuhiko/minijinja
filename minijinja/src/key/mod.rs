@@ -203,15 +203,14 @@ impl<'a> From<&'a str> for StaticKey {
 #[cfg(feature = "key_interning")]
 pub mod key_interning {
     use super::*;
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
     use std::collections::HashSet;
-    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use crate::utils::OnDrop;
 
     thread_local! {
         static STRING_KEY_CACHE: RefCell<HashSet<CachedKey<'static>>> = Default::default();
-        static STRING_KEY_CACHE_DEPTH: AtomicUsize = AtomicUsize::new(0);
+        static STRING_KEY_CACHE_DEPTH: Cell<usize> = Cell::new(0);
     }
 
     enum CachedKey<'a> {
@@ -242,22 +241,24 @@ pub mod key_interning {
 
     impl<'a> Eq for CachedKey<'a> {}
 
+    #[inline(always)]
     pub(crate) fn with<R, F: FnOnce() -> R>(f: F) -> R {
-        STRING_KEY_CACHE.with(|cache| {
-            STRING_KEY_CACHE_DEPTH.with(|depth| {
-                depth.fetch_add(1, Ordering::Relaxed);
-                let _on_drop = OnDrop::new(|| {
-                    if depth.fetch_sub(1, Ordering::Relaxed) == 1 {
-                        cache.borrow_mut().clear();
-                    }
-                });
-                f()
-            })
+        STRING_KEY_CACHE_DEPTH.with(|depth| {
+            depth.set(depth.get() + 1);
+            let _on_drop = OnDrop::new(|| {
+                let new = depth.get() - 1;
+                depth.set(new);
+                if new == 0 {
+                    STRING_KEY_CACHE.with(|cache| cache.borrow_mut().clear());
+                }
+            });
+            f()
         })
     }
 
+    #[inline(always)]
     pub(crate) fn try_intern(s: &str) -> Arc<String> {
-        let depth = STRING_KEY_CACHE_DEPTH.with(|depth| depth.load(Ordering::Relaxed));
+        let depth = STRING_KEY_CACHE_DEPTH.with(|depth| depth.get());
 
         // strings longer than 16 bytes are never interned or if we're at
         // depth 0.  (serialization code outside of internal serialization)

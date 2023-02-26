@@ -11,6 +11,7 @@ All notable changes to MiniJinja are documented here.
 - Change the internal representation of spans to use `u32` rather than
   `usize` for line and column offsets as a small speed improvement during
   compilation.
+- Performance improvements for the key interning.
 
 ## 0.30.4
 
