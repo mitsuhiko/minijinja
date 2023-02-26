@@ -296,21 +296,21 @@ impl<'source> Instructions<'source> {
         rv
     }
 
-    fn add_line_record(&mut self, instr: usize, line: usize) {
+    fn add_line_record(&mut self, instr: usize, line: u32) {
         let same_loc = self
             .line_infos
             .last()
-            .map_or(false, |last_loc| last_loc.line as usize == line);
+            .map_or(false, |last_loc| last_loc.line == line);
         if !same_loc {
             self.line_infos.push(LineInfo {
                 first_instruction: instr as u32,
-                line: line as u32,
+                line,
             });
         }
     }
 
     /// Adds a new instruction with line number.
-    pub fn add_with_line(&mut self, instr: Instruction<'source>, line: usize) -> usize {
+    pub fn add_with_line(&mut self, instr: Instruction<'source>, line: u32) -> usize {
         let rv = self.add(instr);
         self.add_line_record(rv, line);
 

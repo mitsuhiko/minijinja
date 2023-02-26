@@ -128,10 +128,10 @@ impl<'a> fmt::Display for Token<'a> {
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Span {
-    pub start_line: usize,
-    pub start_col: usize,
-    pub end_line: usize,
-    pub end_col: usize,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
 }
 
 impl fmt::Debug for Span {

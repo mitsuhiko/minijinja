@@ -8,6 +8,9 @@ All notable changes to MiniJinja are documented here.
   passing known capacities to the constructor.
 - Minor performance improvements to the VM by giving the stack an initial
   capacity.
+- Change the internal representation of spans to use `u32` rather than
+  `usize` for line and column offsets as a small speed improvement during
+  compilation.
 
 ## 0.30.4
 

@@ -15,8 +15,8 @@ struct TokenizerState<'s> {
     stack: Vec<LexerState>,
     rest: &'s str,
     failed: bool,
-    current_line: usize,
-    current_col: usize,
+    current_line: u32,
+    current_col: u32,
 }
 
 fn find_marker(a: &str) -> Option<(usize, bool)> {
@@ -119,11 +119,11 @@ impl<'s> TokenizerState<'s> {
     }
 
     #[inline(always)]
-    fn loc(&self) -> (usize, usize) {
+    fn loc(&self) -> (u32, u32) {
         (self.current_line, self.current_col)
     }
 
-    fn span(&self, start: (usize, usize)) -> Span {
+    fn span(&self, start: (u32, u32)) -> Span {
         let (start_line, start_col) = start;
         Span {
             start_line,

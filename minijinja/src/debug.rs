@@ -69,8 +69,8 @@ pub(super) fn render_debug_info(
                 ok!(writeln!(
                     f,
                     "     i {}{} {}",
-                    " ".repeat(span.start_col),
-                    "^".repeat(span.end_col - span.start_col),
+                    " ".repeat(span.start_col as usize),
+                    "^".repeat(span.end_col as usize - span.start_col as usize),
                     kind,
                 ));
             }

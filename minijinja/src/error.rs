@@ -226,7 +226,7 @@ impl Error {
     pub(crate) fn set_filename_and_span(&mut self, filename: &str, span: Span) {
         self.repr.name = Some(filename.into());
         self.repr.span = Some(span);
-        self.repr.lineno = span.start_line;
+        self.repr.lineno = span.start_line as usize;
     }
 
     pub(crate) fn new_not_found(name: &str) -> Error {

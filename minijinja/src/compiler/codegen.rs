@@ -43,7 +43,7 @@ pub struct CodeGenerator<'source> {
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,
     pending_block: Vec<PendingBlock>,
-    current_line: usize,
+    current_line: u32,
     span_stack: Vec<Span>,
     filter_local_ids: BTreeMap<&'source str, LocalId>,
     test_local_ids: BTreeMap<&'source str, LocalId>,
@@ -70,7 +70,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     /// Sets the current location's line.
-    pub fn set_line(&mut self, lineno: usize) {
+    pub fn set_line(&mut self, lineno: u32) {
         self.current_line = lineno;
     }
 
