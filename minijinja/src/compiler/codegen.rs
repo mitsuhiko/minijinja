@@ -58,9 +58,9 @@ impl<'source> CodeGenerator<'source> {
         CodeGenerator {
             instructions: Instructions::new(file, source),
             blocks: BTreeMap::new(),
-            pending_block: Vec::new(),
+            pending_block: Vec::with_capacity(32),
             current_line: 0,
-            span_stack: Vec::new(),
+            span_stack: Vec::with_capacity(32),
             filter_local_ids: BTreeMap::new(),
             test_local_ids: BTreeMap::new(),
             raw_template_bytes: 0,

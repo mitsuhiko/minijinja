@@ -362,7 +362,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn dictsort(v: Value) -> Result<Value, Error> {
         if v.kind() == ValueKind::Map {
-            let mut rv = Vec::new();
+            let mut rv = Vec::with_capacity(v.len().unwrap_or(0));
             let iter = ok!(v.try_iter());
             for key in iter {
                 let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
@@ -406,7 +406,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn items(v: Value) -> Result<Value, Error> {
         if v.kind() == ValueKind::Map {
-            let mut rv = Vec::new();
+            let mut rv = Vec::with_capacity(v.len().unwrap_or(0));
             let iter = ok!(v.try_iter());
             for key in iter {
                 let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
@@ -707,7 +707,7 @@ mod builtins {
         let items_per_slice = len / count;
         let slices_with_extra = len % count;
         let mut offset = 0;
-        let mut rv = Vec::new();
+        let mut rv = Vec::with_capacity(count);
 
         for slice in 0..count {
             let start = offset + slice * items_per_slice;
@@ -751,7 +751,10 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn batch(value: Value, count: usize, fill_with: Option<Value>) -> Result<Value, Error> {
-        let mut rv = Vec::new();
+        if count == 0 {
+            return Err(Error::new(ErrorKind::InvalidOperation, "count cannot be 0"));
+        }
+        let mut rv = Vec::with_capacity(value.len().unwrap_or(0) / count);
         let mut tmp = Vec::with_capacity(count);
 
         for item in ok!(value.try_iter_owned()) {
@@ -1067,7 +1070,7 @@ mod builtins {
         value: Value,
         args: crate::value::Rest<Value>,
     ) -> Result<Vec<Value>, Error> {
-        let mut rv = Vec::new();
+        let mut rv = Vec::with_capacity(value.len().unwrap_or(0));
 
         // attribute mapping
         if args.last().map_or(false, |x| x.is_kwargs()) {

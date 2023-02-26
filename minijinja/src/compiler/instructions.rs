@@ -259,10 +259,10 @@ impl<'source> Instructions<'source> {
     /// Creates a new instructions object.
     pub fn new(name: &'source str, source: &'source str) -> Instructions<'source> {
         Instructions {
-            instructions: Vec::new(),
-            line_infos: Vec::new(),
+            instructions: Vec::with_capacity(128),
+            line_infos: Vec::with_capacity(128),
             #[cfg(feature = "debug")]
-            span_infos: Vec::new(),
+            span_infos: Vec::with_capacity(128),
             name,
             source,
         }
