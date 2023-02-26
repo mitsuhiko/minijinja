@@ -724,11 +724,16 @@ impl Value {
     /// # Ok(()) }
     /// ```
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
-        if self.is_undefined() {
-            Err(Error::from(ErrorKind::UndefinedError))
-        } else {
-            Ok(self.get_attr_fast(key).unwrap_or(Value::UNDEFINED))
+        Ok(match self.0 {
+            ValueRepr::Undefined => return Err(Error::from(ErrorKind::UndefinedError)),
+            ValueRepr::Map(ref items, _) => items.get(&Key::Str(key)).cloned(),
+            ValueRepr::Dynamic(ref dy) => match dy.kind() {
+                ObjectKind::Struct(s) => s.get_field(key),
+                ObjectKind::Plain | ObjectKind::Seq(_) => None,
+            },
+            _ => None,
         }
+        .unwrap_or(Value::UNDEFINED))
     }
 
     /// Alternative lookup strategy without error handling exclusively for context
@@ -739,13 +744,10 @@ impl Value {
     /// also not be created.
     pub(crate) fn get_attr_fast(&self, key: &str) -> Option<Value> {
         match self.0 {
-            ValueRepr::Map(ref items, _) => {
-                let lookup_key = Key::Str(key);
-                items.get(&lookup_key).cloned()
-            }
+            ValueRepr::Map(ref items, _) => items.get(&Key::Str(key)).cloned(),
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Plain | ObjectKind::Seq(_) => None,
                 ObjectKind::Struct(s) => s.get_field(key),
+                ObjectKind::Plain | ObjectKind::Seq(_) => None,
             },
             _ => None,
         }
