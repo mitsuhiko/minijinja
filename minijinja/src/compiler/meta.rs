@@ -149,20 +149,20 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
                 stmt.body.iter().for_each(|x| walk(x, state));
                 state.pop();
             }
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             ast::Stmt::Block(stmt) => {
                 state.push();
                 state.assign("super");
                 stmt.body.iter().for_each(|x| walk(x, state));
                 state.pop();
             }
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             ast::Stmt::Extends(_) | ast::Stmt::Include(_) => {}
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             ast::Stmt::Import(stmt) => {
                 assign_nested(&stmt.name, state);
             }
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             ast::Stmt::FromImport(stmt) => stmt.names.iter().for_each(|(arg, alias)| {
                 assign_nested(alias.as_ref().unwrap_or(arg), state);
             }),

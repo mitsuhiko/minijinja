@@ -13,6 +13,9 @@ All notable changes to MiniJinja are documented here.
   compilation.
 - Performance improvements for the key interning.
 - Disabled `key_interning` by default.
+- Renamed features `multi-template` to `multi_template` and
+  `adjacent-loop-items` to `adjacent_loop_items`. The old feature names will
+  hang around until 1.x as legacy aliases.
 
 ## 0.30.4
 
@@ -132,7 +135,7 @@ All notable changes to MiniJinja are documented here.
   to a function or filter is a normal object or if it represents
   keyword arguments.
 - Added the ability to call functions stored on objects.
-- Added `macros` and `multi-template` features to disable some of
+- Added `macros` and `multi_template` features to disable some of
   the heavier pieces of MiniJinja.
 - Fixed an issue that caused trailing commas not to work in lists.
 

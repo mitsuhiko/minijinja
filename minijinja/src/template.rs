@@ -140,19 +140,19 @@ impl<'env> Template<'env> {
     }
 
     /// Returns the root instructions.
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     pub(crate) fn instructions(&self) -> &'env Instructions<'env> {
         &self.compiled.instructions
     }
 
     /// Returns the blocks.
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     pub(crate) fn blocks(&self) -> &'env BTreeMap<&'env str, Instructions<'env>> {
         &self.compiled.blocks
     }
 
     /// Returns the initial auto escape setting.
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     pub(crate) fn initial_auto_escape(&self) -> AutoEscape {
         self.initial_auto_escape
     }

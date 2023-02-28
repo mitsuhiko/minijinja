@@ -139,10 +139,10 @@
 //!   - `builtins`: if this feature is removed the default filters, tests and
 //!     functions are not implemented.
 //!   - `macros`: when removed the `{% macro %}` tag is not included.
-//!   - `multi-template`: when removed the templates related to imports and extends
+//!   - `multi_template`: when removed the templates related to imports and extends
 //!     are removed (`{% from %}`, `{% import %}`, `{% include %}`, and `{% extends %}`
 //!     as well as `{% block %}`).
-//!   - `adjacent-loop-items`: when removed the `previtem` and `nextitem` attributes of
+//!   - `adjacent_loop_items`: when removed the `previtem` and `nextitem` attributes of
 //!     the `loop` object no longer exist.  Removing this feature can provide faster
 //!     template execution when a lot of loops are involved.
 //!   - `unicode`: when added unicode identifiers are supported.  Without this features

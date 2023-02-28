@@ -1,5 +1,5 @@
 DOC_FEATURES=source,json,urlencode
-TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug,macros,multi-template,adjacent-loop-items
+TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items
 
 .PHONY: all
 all: test
@@ -49,8 +49,8 @@ check:
 	@cd minijinja; cargo check --all-features
 	@echo "check macro only:"
 	@cd minijinja; cargo check --no-default-features --features macros
-	@echo "check multi-template only:"
-	@cd minijinja; cargo check --no-default-features --features multi-template
+	@echo "check multi_template only:"
+	@cd minijinja; cargo check --no-default-features --features multi_template
 	@echo "check minijinja-autoreload:"
 	@cd minijinja-autoreload; cargo check
 	@cd minijinja-autoreload; cargo check --no-default-features

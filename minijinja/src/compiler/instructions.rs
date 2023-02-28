@@ -200,23 +200,23 @@ pub enum Instruction<'source> {
     FastRecurse,
 
     /// Call into a block.
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     CallBlock(&'source str),
 
     /// Loads block from a template with name on stack ("extends")
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     LoadBlocks,
 
     /// Renders the parent template
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     RenderParent,
 
     /// Includes another template.
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     Include(bool),
 
     /// Builds a module
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     ExportLocals,
 
     /// Builds a macro on the stack.

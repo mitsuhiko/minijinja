@@ -273,7 +273,7 @@
 //! ```
 //!
 //! **Special note:** the `previtem` and `nextitem` attributes are available by default
-//! but can be disabled by removing the `adjacent-loop-items` crate feature.  Removing
+//! but can be disabled by removing the `adjacent_loop_items` crate feature.  Removing
 //! these attributes can provide meaningful speedups for templates with a lot of loops.
 //!
 //! ## `{% if %}`
@@ -306,7 +306,7 @@
 //!
 //! ## `{% extends %}`
 //!
-//! **Feature:** `multi-template` (included by default)
+//! **Feature:** `multi_template` (included by default)
 //!
 //! The `extends` tag can be used to extend one template from another.  You can have multiple
 //! `extends` tags in a file, but only one of them may be executed at a time.  For more
@@ -391,7 +391,7 @@
 //!
 //! ## `{% include %}`
 //!
-//! **Feature:** `multi-template` (included by default)
+//! **Feature:** `multi_template` (included by default)
 //!  
 //! The `include` tag is useful to include a template and return the rendered contents of that file
 //! into the current namespace::
@@ -423,7 +423,7 @@
 //!
 //! ## `{% import %}`
 //!
-//! **Feature:** `multi-template` (included by default)
+//! **Feature:** `multi_template` (included by default)
 //!
 //! MiniJinja supports the `{% import %}` and `{% from ... import ... %}`
 //! syntax.  With it variables or macros can be included from other templates:

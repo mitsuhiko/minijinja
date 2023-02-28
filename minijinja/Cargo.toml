@@ -17,7 +17,7 @@ features = ["source", "json", "urlencode"]
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [features]
-default = ["builtins", "debug", "deserialization", "macros", "multi-template", "adjacent-loop-items"]
+default = ["builtins", "debug", "deserialization", "macros", "multi_template", "adjacent_loop_items"]
 
 # API features
 preserve_order = ["indexmap"]
@@ -33,8 +33,8 @@ speedups = ["v_htmlescape"]
 # Engine Features
 builtins = []
 macros = []
-multi-template = []
-adjacent-loop-items = []
+multi_template = []
+adjacent_loop_items = []
 fuel = []
 
 # Extra Filters
@@ -45,6 +45,10 @@ urlencode = ["percent-encoding"]
 internal_debug = []
 unstable_machinery = ["internal_debug"]
 unstable_machinery_serde = ["unstable_machinery", "serde/derive"]
+
+# Incorrectly named features to be removed in 1.x
+multi-template = ["multi_template"]
+adjacent-loop-items = ["adjacent_loop_items"]
 
 [dependencies]
 serde = "1.0.130"

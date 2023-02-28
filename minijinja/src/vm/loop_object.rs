@@ -10,7 +10,7 @@ pub(crate) struct Loop {
     pub len: usize,
     pub idx: AtomicUsize,
     pub depth: usize,
-    #[cfg(feature = "adjacent-loop-items")]
+    #[cfg(feature = "adjacent_loop_items")]
     pub value_triple: Mutex<(Option<Value>, Option<Value>, Option<Value>)>,
     pub last_changed_value: Mutex<Option<Vec<Value>>>,
 }
@@ -76,9 +76,9 @@ impl StructObject for Loop {
                 "last",
                 "depth",
                 "depth0",
-                #[cfg(feature = "adjacent-loop-items")]
+                #[cfg(feature = "adjacent_loop_items")]
                 "previtem",
-                #[cfg(feature = "adjacent-loop-items")]
+                #[cfg(feature = "adjacent_loop_items")]
                 "nextitem",
             ][..],
         )
@@ -103,7 +103,7 @@ impl StructObject for Loop {
             "last" => Some(Value::from(len == 0 || idx == len - 1)),
             "depth" => Some(Value::from(self.depth + 1)),
             "depth0" => Some(Value::from(self.depth)),
-            #[cfg(feature = "adjacent-loop-items")]
+            #[cfg(feature = "adjacent_loop_items")]
             "previtem" => Some(
                 self.value_triple
                     .lock()
@@ -112,7 +112,7 @@ impl StructObject for Loop {
                     .clone()
                     .unwrap_or(Value::UNDEFINED),
             ),
-            #[cfg(feature = "adjacent-loop-items")]
+            #[cfg(feature = "adjacent_loop_items")]
             "nextitem" => Some(
                 self.value_triple
                     .lock()

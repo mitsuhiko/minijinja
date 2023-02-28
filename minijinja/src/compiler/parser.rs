@@ -650,15 +650,15 @@ impl<'a> Parser<'a> {
             Token::Ident("filter") => {
                 ast::Stmt::FilterBlock(respan!(ok!(self.parse_filter_block())))
             }
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             Token::Ident("block") => ast::Stmt::Block(respan!(ok!(self.parse_block()))),
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             Token::Ident("extends") => ast::Stmt::Extends(respan!(ok!(self.parse_extends()))),
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             Token::Ident("include") => ast::Stmt::Include(respan!(ok!(self.parse_include()))),
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             Token::Ident("import") => ast::Stmt::Import(respan!(ok!(self.parse_import()))),
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             Token::Ident("from") => ast::Stmt::FromImport(respan!(ok!(self.parse_from_import()))),
             #[cfg(feature = "macros")]
             Token::Ident("macro") => ast::Stmt::Macro(respan!(ok!(self.parse_macro()))),
@@ -827,7 +827,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     fn parse_block(&mut self) -> Result<ast::Block<'a>, Error> {
         if self.in_macro {
             syntax_error!("block tags in macros are not allowed");
@@ -896,13 +896,13 @@ impl<'a> Parser<'a> {
         Ok(ast::FilterBlock { filter, body })
     }
 
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     fn parse_extends(&mut self) -> Result<ast::Extends<'a>, Error> {
         let name = ok!(self.parse_expr());
         Ok(ast::Extends { name })
     }
 
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     fn parse_include(&mut self) -> Result<ast::Include<'a>, Error> {
         let name = ok!(self.parse_expr());
         let ignore_missing = if skip_token!(self, Token::Ident("ignore")) {
@@ -917,7 +917,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     fn parse_import(&mut self) -> Result<ast::Import<'a>, Error> {
         let expr = ok!(self.parse_expr());
         expect_token!(self, Token::Ident("as"), "as");
@@ -925,7 +925,7 @@ impl<'a> Parser<'a> {
         Ok(ast::Import { expr, name })
     }
 
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     fn parse_from_import(&mut self) -> Result<ast::FromImport<'a>, Error> {
         let expr = ok!(self.parse_expr());
         let mut names = Vec::new();

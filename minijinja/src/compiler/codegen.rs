@@ -48,7 +48,7 @@ pub struct CodeGenerator<'source> {
     filter_local_ids: BTreeMap<&'source str, LocalId>,
     test_local_ids: BTreeMap<&'source str, LocalId>,
     raw_template_bytes: usize,
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     has_extends: bool,
 }
 
@@ -64,7 +64,7 @@ impl<'source> CodeGenerator<'source> {
             filter_local_ids: BTreeMap::new(),
             test_local_ids: BTreeMap::new(),
             raw_template_bytes: 0,
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             has_extends: false,
         }
     }
@@ -111,7 +111,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     /// Creates a sub generator.
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     fn new_subgenerator(&self) -> CodeGenerator<'source> {
         let mut sub = CodeGenerator::new(self.instructions.name(), self.instructions.source());
         sub.current_line = self.current_line;
@@ -120,7 +120,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     /// Finishes a sub generator and syncs it back.
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     fn finish_subgenerator(&mut self, sub: CodeGenerator<'source>) -> Instructions<'source> {
         self.current_line = sub.current_line;
         let (instructions, blocks) = sub.finish();
@@ -237,7 +237,7 @@ impl<'source> CodeGenerator<'source> {
                 for node in &t.children {
                     self.compile_stmt(node);
                 }
-                #[cfg(feature = "multi-template")]
+                #[cfg(feature = "multi_template")]
                 {
                     if self.has_extends {
                         self.add(Instruction::RenderParent);
@@ -306,11 +306,11 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_expr(&filter_block.filter);
                 self.add(Instruction::Emit);
             }
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             ast::Stmt::Block(block) => {
                 self.compile_block(block);
             }
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             ast::Stmt::Import(import) => {
                 self.add(Instruction::BeginCapture(CaptureMode::Discard));
                 self.add(Instruction::PushWith);
@@ -321,7 +321,7 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_assignment(&import.name);
                 self.add(Instruction::EndCapture);
             }
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             ast::Stmt::FromImport(from_import) => {
                 self.add(Instruction::BeginCapture(CaptureMode::Discard));
                 self.add(Instruction::PushWith);
@@ -336,14 +336,14 @@ impl<'source> CodeGenerator<'source> {
                 }
                 self.add(Instruction::EndCapture);
             }
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             ast::Stmt::Extends(extends) => {
                 self.set_line_from_span(extends.span());
                 self.compile_expr(&extends.name);
                 self.add_with_span(Instruction::LoadBlocks, extends.span());
                 self.has_extends = true;
             }
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             ast::Stmt::Include(include) => {
                 self.set_line_from_span(include.span());
                 self.compile_expr(&include.name);
@@ -363,7 +363,7 @@ impl<'source> CodeGenerator<'source> {
         }
     }
 
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     fn compile_block(&mut self, block: &ast::Spanned<ast::Block<'source>>) {
         self.set_line_from_span(block.span());
         let mut sub = self.new_subgenerator();
@@ -478,7 +478,7 @@ impl<'source> CodeGenerator<'source> {
                         return;
                     }
                 }
-                #[cfg(feature = "multi-template")]
+                #[cfg(feature = "multi_template")]
                 ast::CallType::Block(name) => {
                     self.add(Instruction::CallBlock(name));
                     return;
@@ -688,7 +688,7 @@ impl<'source> CodeGenerator<'source> {
                 let arg_count = self.compile_call_args(&c.args, caller);
                 self.add(Instruction::CallFunction(name, arg_count));
             }
-            #[cfg(feature = "multi-template")]
+            #[cfg(feature = "multi_template")]
             ast::CallType::Block(name) => {
                 self.add(Instruction::BeginCapture(CaptureMode::Capture));
                 self.add(Instruction::CallBlock(name));

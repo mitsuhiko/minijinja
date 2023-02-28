@@ -173,7 +173,7 @@ impl<'vm, 'env> BlockStack<'vm, 'env> {
         self.depth = self.depth.checked_sub(1).unwrap()
     }
 
-    #[cfg(feature = "multi-template")]
+    #[cfg(feature = "multi_template")]
     pub fn append_instructions(&mut self, instructions: &'vm Instructions<'env>) {
         self.instructions.push(instructions);
     }
