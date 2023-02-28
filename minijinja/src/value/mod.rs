@@ -459,9 +459,20 @@ impl Value {
     /// # use minijinja::value::Value;
     /// let val = Value::from_serializable(&vec![1, 2, 3]);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// This method panics if types are passed which are not supported by the
+    /// underlying rendering system.  Today this is the case for value types that
+    /// have unrepresentable keys.  The desire is that eventually this call will no
+    /// longer panic under any circumstances.
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
         let _serialization_guard = mark_internal_serialization();
         let _optimization_guard = value_optimization();
+
+        // note on unwrap: `SerializationFailed` behaves like `Infallible` in that
+        // it should never happen.  Instead the creation of this error itself will
+        // panic instead.
         Serialize::serialize(value, ValueSerializer).unwrap()
     }
 

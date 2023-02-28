@@ -315,15 +315,6 @@ impl From<fmt::Error> for Error {
     }
 }
 
-impl serde::ser::Error for Error {
-    fn custom<T>(msg: T) -> Self
-    where
-        T: fmt::Display,
-    {
-        Error::new(ErrorKind::BadSerialization, msg.to_string())
-    }
-}
-
 pub fn attach_basic_debug_info<T>(rv: Result<T, Error>, source: &str) -> Result<T, Error> {
     #[cfg(feature = "debug")]
     {

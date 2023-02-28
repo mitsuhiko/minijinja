@@ -14,6 +14,31 @@ use similar_asserts::assert_eq;
 /// internal marker to seal up some trait methods
 pub struct SealedMarker;
 
+/// Internal dummy error type for the internal serialization system.
+///
+/// This error does not actually "error", it instead panics.  For more
+/// information see `Value::from_serializable`.
+#[derive(Debug)]
+pub struct SerializationFailed;
+
+impl std::error::Error for SerializationFailed {}
+
+impl fmt::Display for SerializationFailed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "serialization failed")
+    }
+}
+
+impl serde::ser::Error for SerializationFailed {
+    #[track_caller]
+    fn custom<T>(msg: T) -> Self
+    where
+        T: fmt::Display,
+    {
+        panic!("{}", msg)
+    }
+}
+
 pub fn memchr(haystack: &[u8], needle: u8) -> Option<usize> {
     haystack.iter().position(|&x| x == needle)
 }
