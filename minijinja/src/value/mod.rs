@@ -185,33 +185,28 @@ pub fn serializing_for_value() -> bool {
     INTERNAL_SERIALIZATION.with(|flag| flag.get())
 }
 
-/// Enables a temporary code section within which some value
-/// optimizations are enabled.  Currently this is exclusively
-/// used to automatically intern keys when the `key_interning`
-/// feature is enabled.
+/// When key interning is enabled while the returned token is held keys are
+/// interned in a map, freed at the end of the section.
+#[cfg(feature = "key_interning")]
+pub(crate) use crate::key::key_interning::use_string_cache as value_optimization;
+
+/// Without key interning this is a dummy drop.
+#[cfg(not(feature = "key_interning"))]
 #[inline(always)]
-pub(crate) fn with_value_optimization<R, F: FnOnce() -> R>(f: F) -> R {
-    #[cfg(not(feature = "key_interning"))]
-    {
-        f()
-    }
-    #[cfg(feature = "key_interning")]
-    {
-        crate::key::key_interning::with(f)
-    }
+pub(crate) fn value_optimization() -> impl Drop {
+    OnDrop::new(|| {})
 }
 
-/// Executes code within the context of internal serialization
-/// which causes the value type to enable the internal round
-/// tripping serialization.
-fn with_internal_serialization<R, F: FnOnce() -> R>(f: F) -> R {
-    INTERNAL_SERIALIZATION.with(|flag| {
+fn mark_internal_serialization() -> impl Drop {
+    let old = INTERNAL_SERIALIZATION.with(|flag| {
         let old = flag.get();
         flag.set(true);
-        let _on_drop = OnDrop::new(|| {
-            flag.set(old);
-        });
-        with_value_optimization(f)
+        old
+    });
+    OnDrop::new(move || {
+        if !old {
+            INTERNAL_SERIALIZATION.with(|flag| flag.set(false));
+        }
     })
 }
 
@@ -465,7 +460,9 @@ impl Value {
     /// let val = Value::from_serializable(&vec![1, 2, 3]);
     /// ```
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
-        with_internal_serialization(|| Serialize::serialize(value, ValueSerializer).unwrap())
+        let _serialization_guard = mark_internal_serialization();
+        let _optimization_guard = value_optimization();
+        Serialize::serialize(value, ValueSerializer).unwrap()
     }
 
     /// Creates a value from a safe string.

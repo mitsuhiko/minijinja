@@ -85,25 +85,24 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         auto_escape: AutoEscape,
     ) -> Result<Option<Value>, Error> {
-        value::with_value_optimization(|| {
-            self.eval_state(
-                &mut State {
-                    env: self.env,
-                    ctx: Context::new(Frame::new(root)),
-                    current_block: None,
-                    current_call: None,
-                    auto_escape,
-                    instructions,
-                    blocks: prepare_blocks(blocks),
-                    loaded_templates: BTreeSet::new(),
-                    #[cfg(feature = "macros")]
-                    macros: Arc::new(Vec::new()),
-                    #[cfg(feature = "fuel")]
-                    fuel_tracker: self.env.fuel().map(FuelTracker::new),
-                },
-                out,
-            )
-        })
+        let _guard = value::value_optimization();
+        self.eval_state(
+            &mut State {
+                env: self.env,
+                ctx: Context::new(Frame::new(root)),
+                current_block: None,
+                current_call: None,
+                auto_escape,
+                instructions,
+                blocks: prepare_blocks(blocks),
+                loaded_templates: BTreeSet::new(),
+                #[cfg(feature = "macros")]
+                macros: Arc::new(Vec::new()),
+                #[cfg(feature = "fuel")]
+                fuel_tracker: self.env.fuel().map(FuelTracker::new),
+            },
+            out,
+        )
     }
 
     /// Evaluate a macro in a state.
@@ -117,29 +116,27 @@ impl<'env> Vm<'env> {
         state: &State,
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
-        value::with_value_optimization(|| {
-            let mut ctx = Context::new(Frame::new(root));
-            ok!(ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST));
-            self.eval_impl(
-                &mut State {
-                    env: self.env,
-                    ctx,
-                    current_block: None,
-                    current_call: None,
-                    auto_escape: state.auto_escape(),
-                    instructions,
-                    blocks: BTreeMap::default(),
-                    loaded_templates: BTreeSet::new(),
-                    #[cfg(feature = "macros")]
-                    macros: state.macros.clone(),
-                    #[cfg(feature = "fuel")]
-                    fuel_tracker: state.fuel_tracker.clone(),
-                },
-                out,
-                Stack::from(args),
-                pc,
-            )
-        })
+        let mut ctx = Context::new(Frame::new(root));
+        ok!(ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST));
+        self.eval_impl(
+            &mut State {
+                env: self.env,
+                ctx,
+                current_block: None,
+                current_call: None,
+                auto_escape: state.auto_escape(),
+                instructions,
+                blocks: BTreeMap::default(),
+                loaded_templates: BTreeSet::new(),
+                #[cfg(feature = "macros")]
+                macros: state.macros.clone(),
+                #[cfg(feature = "fuel")]
+                fuel_tracker: state.fuel_tracker.clone(),
+            },
+            out,
+            Stack::from(args),
+            pc,
+        )
     }
 
     /// This is the actual evaluation loop that works with a specific context.

@@ -32,6 +32,11 @@ pub mod __context {
     use std::sync::Arc;
 
     #[inline(always)]
+    pub fn value_optimization() -> impl Drop {
+        crate::value::value_optimization()
+    }
+
+    #[inline(always)]
     pub fn make() -> ValueMap {
         ValueMap::default()
     }
@@ -96,6 +101,7 @@ macro_rules! context {
     (
         $($key:ident $(=> $value:expr)?),* $(,)?
     ) => {{
+        let _guard = $crate::__context::value_optimization();
         let mut ctx = $crate::__context::make();
         $(
             $crate::__context_pair!(ctx, $key $(, $value)?);

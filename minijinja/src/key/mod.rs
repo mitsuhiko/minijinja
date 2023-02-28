@@ -202,15 +202,15 @@ impl<'a> From<&'a str> for StaticKey {
 
 #[cfg(feature = "key_interning")]
 pub mod key_interning {
+    use crate::utils::OnDrop;
+
     use super::*;
     use std::cell::{Cell, RefCell};
     use std::collections::HashSet;
 
-    use crate::utils::OnDrop;
-
     thread_local! {
         static STRING_KEY_CACHE: RefCell<HashSet<CachedKey<'static>>> = Default::default();
-        static STRING_KEY_CACHE_DEPTH: Cell<usize> = Cell::new(0);
+        static USE_STRING_KEY_CACHE: Cell<bool> = Cell::new(false);
     }
 
     enum CachedKey<'a> {
@@ -241,29 +241,26 @@ pub mod key_interning {
 
     impl<'a> Eq for CachedKey<'a> {}
 
-    #[inline(always)]
-    pub(crate) fn with<R, F: FnOnce() -> R>(f: F) -> R {
-        STRING_KEY_CACHE_DEPTH.with(|depth| {
-            depth.set(depth.get() + 1);
-            let _on_drop = OnDrop::new(|| {
-                let new = depth.get() - 1;
-                depth.set(new);
-                if new == 0 {
-                    STRING_KEY_CACHE.with(|cache| cache.borrow_mut().clear());
-                }
-            });
-            f()
+    pub fn use_string_cache() -> impl Drop {
+        let was_enabled = USE_STRING_KEY_CACHE.with(|flag| {
+            let was_enabled = flag.get();
+            flag.set(true);
+            was_enabled
+        });
+        OnDrop::new(move || {
+            if !was_enabled {
+                USE_STRING_KEY_CACHE.with(|flag| flag.set(false));
+                STRING_KEY_CACHE.with(|cache| cache.borrow_mut().clear());
+            }
         })
     }
 
     #[inline(always)]
     pub(crate) fn try_intern(s: &str) -> Arc<String> {
-        let depth = STRING_KEY_CACHE_DEPTH.with(|depth| depth.get());
-
         // strings longer than 16 bytes are never interned or if we're at
         // depth 0.  (serialization code outside of internal serialization)
         // not checking for depth can cause a memory leak.
-        if depth == 0 || s.len() > 16 {
+        if s.len() > 16 || !USE_STRING_KEY_CACHE.with(|flag| flag.get()) {
             return Arc::new(String::from(s));
         }
 

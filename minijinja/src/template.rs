@@ -195,17 +195,16 @@ impl<'source> CompiledTemplate<'source> {
     ) -> Result<CompiledTemplate<'source>, Error> {
         // the parser/compiler combination can create constants in which case
         // we can probably benefit from the value optimization a bit.
-        value::with_value_optimization(|| {
-            let ast = ok!(parse(source, name));
-            let mut gen = CodeGenerator::new(name, source);
-            gen.compile_stmt(&ast);
-            let buffer_size_hint = gen.buffer_size_hint();
-            let (instructions, blocks) = gen.finish();
-            Ok(CompiledTemplate {
-                instructions,
-                blocks,
-                buffer_size_hint,
-            })
+        let _guard = value::value_optimization();
+        let ast = ok!(parse(source, name));
+        let mut gen = CodeGenerator::new(name, source);
+        gen.compile_stmt(&ast);
+        let buffer_size_hint = gen.buffer_size_hint();
+        let (instructions, blocks) = gen.finish();
+        Ok(CompiledTemplate {
+            instructions,
+            blocks,
+            buffer_size_hint,
         })
     }
 }
