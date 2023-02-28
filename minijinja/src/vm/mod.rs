@@ -250,7 +250,16 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::GetAttr(name) => {
                     a = stack.pop();
-                    stack.push(ctx_ok!(a.get_attr(name)));
+                    // This is a common enough operation that it's interesting to consider a fast
+                    // path here.  This is slightly faster than the regular attr lookup because we
+                    // do not need to pass down the error object for the more common success case.
+                    // Only when we cannot look up something, we start to consider the undefined
+                    // special case.
+                    stack.push(match a.get_attr_fast(name) {
+                        Some(value) => value,
+                        None if a.is_undefined() => bail!(Error::from(ErrorKind::UndefinedError)),
+                        None => Value::UNDEFINED,
+                    });
                 }
                 Instruction::GetItem => {
                     a = stack.pop();
