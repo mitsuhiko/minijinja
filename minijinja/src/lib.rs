@@ -152,9 +152,12 @@
 //!
 //!   - `debug`: if this feature is removed some debug functionality of the engine is
 //!     removed as well.  This mainly affects the quality of error reporting.
-//!   - `key_interning`: if this feature is removed the automatic string interning in
-//!     the value type is disabled.  The default behavior can cut down on the memory
-//!     consumption of the value type by interning all string keys used in values.
+//!   - `key_interning`: if this feature is enabled the automatic string interning in
+//!     the value type is enabled.  This feature used to be turned on by default but
+//!     has negative performance effects in newer versions of MiniJinja since a lot of
+//!     the previous uses of key interning are no longer needed.  Enabling it however
+//!     cuts down on memory usage slightly in certain scenarios by interning all string
+//!     keys used in dynamic map values.
 //!   - `deserialization`: when removed this disables deserialization support for
 //!     the [`Value`](crate::value::Value) type.
 //!
@@ -164,7 +167,7 @@
 //!   can be used to better protect against expensive templates.
 //! - `source`: enables the `Source` type which helps with dynamic loading of templates.
 //! - `speedups`: enables all speedups, in particular it turns on the `v_htmlescape` dependency
-//!   for faster HTML escapling.  This also turns on `key_interning` automatically.
+//!   for faster HTML escapling.
 //! - `json`: When enabled the `tojson` filter is added as builtin filter as well as
 //!   the ability to auto escape via `AutoEscape::Json`.
 //! - `urlencode`: When enabled the `urlencode` filter is added as builtin filter.

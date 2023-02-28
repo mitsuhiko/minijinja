@@ -12,6 +12,7 @@ All notable changes to MiniJinja are documented here.
   `usize` for line and column offsets as a small speed improvement during
   compilation.
 - Performance improvements for the key interning.
+- Disabled `key_interning` by default.
 
 ## 0.30.4
 

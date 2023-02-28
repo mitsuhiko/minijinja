@@ -17,7 +17,7 @@ features = ["source", "json", "urlencode"]
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [features]
-default = ["builtins", "debug", "key_interning", "deserialization", "macros", "multi-template", "adjacent-loop-items"]
+default = ["builtins", "debug", "deserialization", "macros", "multi-template", "adjacent-loop-items"]
 
 # API features
 preserve_order = ["indexmap"]
@@ -28,7 +28,7 @@ unicode = ["unicode-ident"]
 
 # Speedups
 key_interning = []
-speedups = ["v_htmlescape", "key_interning"]
+speedups = ["v_htmlescape"]
 
 # Engine Features
 builtins = []
