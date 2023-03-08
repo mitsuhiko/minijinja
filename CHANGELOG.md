@@ -4,7 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## 0.30.6
 
-- Resolve bad closure being generated for `do` blocks.
+- Resolve bad closure being generated for `do` blocks. (#219)
 
 ## 0.30.5
 
