@@ -172,7 +172,10 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
             }
             #[cfg(feature = "macros")]
             ast::Stmt::CallBlock(_) => {}
-            ast::Stmt::Do(_) => {}
+            ast::Stmt::Do(stmt) => {
+                visit_expr(&stmt.call.expr, state);
+                stmt.call.args.iter().for_each(|x| visit_expr(x, state));
+            }
         }
     }
 
