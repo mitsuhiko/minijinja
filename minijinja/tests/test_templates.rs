@@ -152,6 +152,46 @@ fn test_single() {
 }
 
 #[test]
+fn test_values_scientific_notation() {
+    let mut env = Environment::new();
+    env.add_template("sci1", "VALUE = {{ value or -12.4E-4 }}")
+        .unwrap();
+    let tmpl = env.get_template("sci1").unwrap();
+    let rv = tmpl.render(context!(value => -12.4E-3)).unwrap();
+    assert_eq!(rv, "VALUE = -0.0124");
+    let rv = tmpl.render(context!());
+    // assert_eq!(rv, "VALUE = -0.00124");
+    assert!(rv.is_ok());
+
+    env.add_template("sci2", "VALUE = {{ value or 1.4E4 }}")
+        .unwrap();
+    let tmpl = env.get_template("sci2").unwrap();
+    let rv = tmpl.render(context!());
+    assert!(rv.is_ok());
+
+    env.add_template("sci3", "VALUE = {{ value or 1.4e+4}}")
+        .unwrap();
+    let tmpl = env.get_template("sci3").unwrap();
+    let rv = tmpl.render(context!());
+    assert!(rv.is_ok());
+
+    env.add_template("sci4", "VALUE = {{ 1.4+4}}").unwrap();
+    let tmpl = env.get_template("sci4").unwrap();
+    let rv = tmpl.render(context!());
+    assert!(rv.is_ok());
+
+    env.add_template("sci5", "VALUE = {{ 1.4+1E-1}}").unwrap();
+    let tmpl = env.get_template("sci5").unwrap();
+    let rv = tmpl.render(context!());
+    assert!(rv.is_ok());
+
+    env.add_template("sci6", "VALUE = {{ 1.0E0+1.0}}").unwrap();
+    let tmpl = env.get_template("sci6").unwrap();
+    let rv = tmpl.render(context!());
+    assert!(rv.is_ok());
+}
+
+#[test]
 fn test_auto_escaping() {
     let mut env = Environment::new();
     env.add_template("index.html", "{{ var }}").unwrap();

@@ -139,21 +139,34 @@ impl<'s> TokenizerState<'s> {
     }
 
     fn eat_number(&mut self) -> Result<(Token<'s>, Span), Error> {
+        #[derive(Copy, Clone)]
+        enum State {
+            Integer,      // 123
+            Fraction,     // .123
+            Exponent,     // E | e
+            ExponentSign, // +|-
+        }
+
         let old_loc = self.loc();
-        let mut is_float = false;
-        let num_len = self
+        let mut state = State::Integer;
+        let mut num_len = self
             .rest
-            .as_bytes()
-            .iter()
-            .take_while(|&&c| {
-                if !is_float && c == b'.' {
-                    is_float = true;
-                    true
-                } else {
-                    c.is_ascii_digit()
-                }
-            })
+            .chars()
+            .take_while(|&c| c.is_ascii_digit())
             .count();
+        for c in self.rest.chars().skip(num_len) {
+            state = match (c, state) {
+                ('.', State::Integer) => State::Fraction,
+                ('E' | 'e', State::Integer | State::Fraction) => State::Exponent,
+                ('+' | '-', State::Exponent) => State::ExponentSign,
+                ('0'..='9', State::Exponent) => State::ExponentSign,
+                ('0'..='9', state) => state,
+                _ => break,
+            };
+            num_len += 1;
+        }
+        let is_float = !matches!(state, State::Integer);
+
         let num = self.advance(num_len);
         Ok(if is_float {
             (
