@@ -168,23 +168,18 @@ impl<'s> TokenizerState<'s> {
         let is_float = !matches!(state, State::Integer);
 
         let num = self.advance(num_len);
-        Ok(if is_float {
-            (
-                Token::Float(match num.parse::<f64>() {
-                    Ok(val) => val,
-                    Err(_) => return Err(self.syntax_error("invalid float")),
-                }),
-                self.span(old_loc),
-            )
-        } else {
-            (
-                Token::Int(match num.parse::<i64>() {
-                    Ok(val) => val,
-                    Err(_) => return Err(self.syntax_error("invalid integer")),
-                }),
-                self.span(old_loc),
-            )
-        })
+        Ok((
+            ok!(if is_float {
+                num.parse()
+                    .map(Token::Float)
+                    .map_err(|_| self.syntax_error("invalid float"))
+            } else {
+                num.parse()
+                    .map(Token::Int)
+                    .map_err(|_| self.syntax_error("invalid integer"))
+            }),
+            self.span(old_loc),
+        ))
     }
 
     fn eat_identifier(&mut self) -> Result<(Token<'s>, Span), Error> {
