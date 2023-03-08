@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## 0.30.6
 
 - Resolve bad closure being generated for `do` blocks. (#219)
+- Add support for float number values in scientific notation. (#220)
 
 ## 0.30.5
 
