@@ -1,6 +1,6 @@
 [package]
 name = "minijinja-stack-ref"
-version = "0.30.5"
+version = "0.30.6"
 edition = "2018"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
@@ -15,4 +15,4 @@ rust-version = "1.61"
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [dependencies]
-minijinja = { version = "0.30.5", path = "../minijinja", default-features = false }
+minijinja = { version = "0.30.6", path = "../minijinja", default-features = false }
