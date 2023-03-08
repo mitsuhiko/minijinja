@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 0.30.6
+
+- Resolve bad closure being generated for `do` blocks.
+
 ## 0.30.5
 
 - Small performance improvements for when `preserve_order` is used by
