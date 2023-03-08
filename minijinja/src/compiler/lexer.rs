@@ -139,39 +139,30 @@ impl<'s> TokenizerState<'s> {
     }
 
     fn eat_number(&mut self) -> Result<(Token<'s>, Span), Error> {
-        let old_loc = self.loc();
-
-        // state for reading float number
-        #[derive(Debug, Clone)]
+        #[derive(Copy, Clone)]
         enum State {
-            Integer,            // 123
-            Fraction,           // .123
-            Exponent,           // E | e
-            ExponentSign,       // +|-
+            Integer,      // 123
+            Fraction,     // .123
+            Exponent,     // E | e
+            ExponentSign, // +|-
         }
+
+        let old_loc = self.loc();
         let mut state = State::Integer;
-        let mut num_len = self.rest.chars().take_while(|&c| c.is_ascii_digit()).count();
+        let mut num_len = self
+            .rest
+            .chars()
+            .take_while(|&c| c.is_ascii_digit())
+            .count();
         for c in self.rest.chars().skip(num_len) {
-            match c {
-                '.' => match state {
-                    State::Integer => state = State::Fraction,
-                    _ => break,
-                },
-                'E' | 'e' => match state {
-                    State::Integer | State::Fraction => state = State::Exponent,
-                    _ => break,
-                },
-                '+' | '-' => match state {
-                    State::Exponent => state = State::ExponentSign,
-                    // State::Exponent => {},
-                    _ => break,
-                },
-                '0'..='9' => match state {
-                    State::Exponent => state = State::ExponentSign,
-                    _ => {}
-                }
+            state = match (c, state) {
+                ('.', State::Integer) => State::Fraction,
+                ('E' | 'e', State::Integer | State::Fraction) => State::Exponent,
+                ('+' | '-', State::Exponent) => State::ExponentSign,
+                ('0'..='9', State::Exponent) => State::ExponentSign,
+                ('0'..='9', state) => state,
                 _ => break,
-            }
+            };
             num_len += 1;
         }
         let is_float = !matches!(state, State::Integer);

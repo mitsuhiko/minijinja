@@ -154,7 +154,8 @@ fn test_single() {
 #[test]
 fn test_values_scientific_notation() {
     let mut env = Environment::new();
-    env.add_template("sci1", "VALUE = {{ value or -12.4E-4 }}").unwrap();
+    env.add_template("sci1", "VALUE = {{ value or -12.4E-4 }}")
+        .unwrap();
     let tmpl = env.get_template("sci1").unwrap();
     let rv = tmpl.render(context!(value => -12.4E-3)).unwrap();
     assert_eq!(rv, "VALUE = -0.0124");
@@ -162,12 +163,14 @@ fn test_values_scientific_notation() {
     // assert_eq!(rv, "VALUE = -0.00124");
     assert!(rv.is_ok());
 
-    env.add_template("sci2", "VALUE = {{ value or 1.4E4 }}").unwrap();
+    env.add_template("sci2", "VALUE = {{ value or 1.4E4 }}")
+        .unwrap();
     let tmpl = env.get_template("sci2").unwrap();
     let rv = tmpl.render(context!());
     assert!(rv.is_ok());
 
-    env.add_template("sci3", "VALUE = {{ value or 1.4e+4}}").unwrap();
+    env.add_template("sci3", "VALUE = {{ value or 1.4e+4}}")
+        .unwrap();
     let tmpl = env.get_template("sci3").unwrap();
     let rv = tmpl.render(context!());
     assert!(rv.is_ok());
