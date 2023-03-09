@@ -85,7 +85,7 @@ impl<'vm, 'env> State<'vm, 'env> {
         self.ctx.load(self.env, name)
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn with_dummy<R, F: FnOnce(&State) -> R>(env: &'env Environment<'env>, f: F) -> R {
         f(&State {
             env,

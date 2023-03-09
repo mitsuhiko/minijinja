@@ -13,7 +13,7 @@ rust-version = "1.61"
 exclude = ["tests"]
 
 [package.metadata.docs.rs]
-features = ["source", "json", "urlencode"]
+features = ["source", "json", "urlencode", "testutils"]
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [features]
@@ -25,6 +25,7 @@ deserialization = []
 debug = []
 source = ["self_cell", "memo-map"]
 unicode = ["unicode-ident"]
+testutils = []
 
 # Speedups
 key_interning = []

@@ -449,13 +449,14 @@ mod builtins {
             a == b
         }
 
-        let env = crate::Environment::new();
-        State::with_dummy(&env, |state| {
-            let bx = BoxedTest::new(test);
-            assert!(bx
-                .perform(state, &[Value::from(23), Value::from(23)][..])
-                .unwrap());
-        });
+        let mut env = crate::Environment::new();
+        env.add_test("test", test);
+        assert!(crate::testutils::perform_test(
+            &env,
+            "test",
+            &[Value::from(23), Value::from(23)][..]
+        )
+        .unwrap());
     }
 }
 
