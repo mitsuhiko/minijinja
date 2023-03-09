@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 0.30.7
+
+- Added `testsupport` module. (#221)
+
 ## 0.30.6
 
 - Resolve bad closure being generated for `do` blocks. (#219)
