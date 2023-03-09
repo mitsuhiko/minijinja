@@ -4,7 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## 0.30.7
 
-- Added `testsupport` module. (#221)
+- Added `testutils` module. (#221)
 
 ## 0.30.6
 
