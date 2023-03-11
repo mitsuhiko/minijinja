@@ -161,8 +161,8 @@ thread_local! {
 
     // This should be an AtomicU64 but sadly 32bit targets do not necessarily have
     // AtomicU64 available.
-    static LAST_VALUE_HANDLE: Cell<usize> = Cell::new(0);
-    static VALUE_HANDLES: RefCell<BTreeMap<usize, Value>> = RefCell::new(BTreeMap::new());
+    static LAST_VALUE_HANDLE: Cell<u32> = Cell::new(0);
+    static VALUE_HANDLES: RefCell<BTreeMap<u32, Value>> = RefCell::new(BTreeMap::new());
 }
 
 /// Function that returns true when serialization for [`Value`] is taking place.
@@ -1027,16 +1027,21 @@ impl Serialize for Value {
     {
         // enable round tripping of values
         if serializing_for_value() {
-            use serde::ser::SerializeTupleVariant;
             let handle = LAST_VALUE_HANDLE.with(|x| {
-                let rv = x.get() + 1;
+                // we are okay with overflowing the handle here because these values only
+                // live for a very short period of time and it's not likely that you run out
+                // of an entire u32 worth of handles in a single serialization operation.
+                // This lets us stick the handle into a unit variant in the serde data model.
+                let rv = x.get().wrapping_add(1);
                 x.set(rv);
                 rv
             });
             VALUE_HANDLES.with(|handles| handles.borrow_mut().insert(handle, self.clone()));
-            let mut s = ok!(serializer.serialize_tuple_variant("", 0, VALUE_HANDLE_MARKER, 1));
-            ok!(s.serialize_field(&handle));
-            return s.end();
+            return serializer.serialize_unit_variant(
+                VALUE_HANDLE_MARKER,
+                handle,
+                VALUE_HANDLE_MARKER,
+            );
         }
 
         match self.0 {

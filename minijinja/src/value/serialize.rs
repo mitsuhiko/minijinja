@@ -107,11 +107,20 @@ impl Serializer for ValueSerializer {
 
     fn serialize_unit_variant(
         self,
-        _name: &'static str,
-        _variant_index: u32,
+        name: &'static str,
+        variant_index: u32,
         variant: &'static str,
     ) -> Result<Value, SerializationFailed> {
-        Ok(Value::from(variant))
+        if name == VALUE_HANDLE_MARKER && variant == VALUE_HANDLE_MARKER {
+            Ok(VALUE_HANDLES.with(|handles| {
+                let mut handles = handles.borrow_mut();
+                handles
+                    .remove(&variant_index)
+                    .expect("value handle not in registry")
+            }))
+        } else {
+            Ok(Value::from(variant))
+        }
     }
 
     fn serialize_newtype_struct<T: ?Sized>(
@@ -291,25 +300,12 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
     }
 
     fn end(self) -> Result<Value, SerializationFailed> {
-        if self.name == VALUE_HANDLE_MARKER && self.fields.len() == 1 {
-            let handle_id = match self.fields.get(0) {
-                Some(&Value(ValueRepr::U64(handle_id))) => handle_id as usize,
-                _ => panic!("bad handle reference in value roundtrip"),
-            };
-            Ok(VALUE_HANDLES.with(|handles| {
-                let mut handles = handles.borrow_mut();
-                handles
-                    .remove(&handle_id)
-                    .expect("value handle not in registry")
-            }))
-        } else {
-            let mut map = value_map_with_capacity(1);
-            map.insert(
-                Key::Str(self.name),
-                Value(ValueRepr::Seq(self.fields.into())),
-            );
-            Ok(Value(ValueRepr::Map(map.into(), MapType::Normal)))
-        }
+        let mut map = value_map_with_capacity(1);
+        map.insert(
+            Key::Str(self.name),
+            Value(ValueRepr::Seq(self.fields.into())),
+        );
+        Ok(Value(ValueRepr::Map(map.into(), MapType::Normal)))
     }
 }
 
