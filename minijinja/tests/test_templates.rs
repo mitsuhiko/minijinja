@@ -338,3 +338,26 @@ fn test_current_call_state() {
     "#
     );
 }
+
+#[test]
+#[should_panic = "can only flatten structs and maps"]
+fn test_flattening() {
+    // ideally this would work, but unfortuantely the way serde flatten works makes it
+    // impossible for us to support with the internal optimizations in the value model.
+    // see https://github.com/mitsuhiko/minijinja/issues/222
+    #[derive(Debug, serde::Serialize)]
+    struct Context {
+        a: i32,
+        #[serde(flatten)]
+        more: Value,
+    }
+
+    let ctx = Context {
+        a: 42,
+        more: Value::from(BTreeMap::from([("b", 23)])),
+    };
+
+    let env = Environment::new();
+    let rv = env.render_str("{{ debug() }}", ctx).unwrap();
+    assert_eq!(rv, "42|23");
+}
