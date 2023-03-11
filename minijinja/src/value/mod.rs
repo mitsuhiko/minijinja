@@ -1027,15 +1027,15 @@ impl Serialize for Value {
     {
         // enable round tripping of values
         if serializing_for_value() {
-            use serde::ser::SerializeStruct;
+            use serde::ser::SerializeTupleVariant;
             let handle = LAST_VALUE_HANDLE.with(|x| {
                 let rv = x.get() + 1;
                 x.set(rv);
                 rv
             });
             VALUE_HANDLES.with(|handles| handles.borrow_mut().insert(handle, self.clone()));
-            let mut s = ok!(serializer.serialize_struct(VALUE_HANDLE_MARKER, 1));
-            ok!(s.serialize_field("handle", &handle));
+            let mut s = ok!(serializer.serialize_tuple_variant("", 0, VALUE_HANDLE_MARKER, 1));
+            ok!(s.serialize_field(&handle));
             return s.end();
         }
 

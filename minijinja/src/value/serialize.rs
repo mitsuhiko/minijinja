@@ -184,11 +184,10 @@ impl Serializer for ValueSerializer {
 
     fn serialize_struct(
         self,
-        name: &'static str,
+        _name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStruct, SerializationFailed> {
         Ok(SerializeStruct {
-            name,
             fields: value_map_with_capacity(len),
         })
     }
@@ -292,12 +291,25 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
     }
 
     fn end(self) -> Result<Value, SerializationFailed> {
-        let mut map = value_map_with_capacity(1);
-        map.insert(
-            Key::Str(self.name),
-            Value(ValueRepr::Seq(self.fields.into())),
-        );
-        Ok(Value(ValueRepr::Map(map.into(), MapType::Normal)))
+        if self.name == VALUE_HANDLE_MARKER && self.fields.len() == 1 {
+            let handle_id = match self.fields.get(0) {
+                Some(&Value(ValueRepr::U64(handle_id))) => handle_id as usize,
+                _ => panic!("bad handle reference in value roundtrip"),
+            };
+            Ok(VALUE_HANDLES.with(|handles| {
+                let mut handles = handles.borrow_mut();
+                handles
+                    .remove(&handle_id)
+                    .expect("value handle not in registry")
+            }))
+        } else {
+            let mut map = value_map_with_capacity(1);
+            map.insert(
+                Key::Str(self.name),
+                Value(ValueRepr::Seq(self.fields.into())),
+            );
+            Ok(Value(ValueRepr::Map(map.into(), MapType::Normal)))
+        }
     }
 }
 
@@ -356,7 +368,6 @@ impl ser::SerializeMap for SerializeMap {
 }
 
 pub struct SerializeStruct {
-    name: &'static str,
     fields: ValueMap,
 }
 
@@ -378,21 +389,7 @@ impl ser::SerializeStruct for SerializeStruct {
     }
 
     fn end(self) -> Result<Value, SerializationFailed> {
-        match self.name {
-            VALUE_HANDLE_MARKER => {
-                let handle_id = match self.fields.get(&Key::Str("handle")) {
-                    Some(&Value(ValueRepr::U64(handle_id))) => handle_id as usize,
-                    _ => panic!("bad handle reference in value roundtrip"),
-                };
-                Ok(VALUE_HANDLES.with(|handles| {
-                    let mut handles = handles.borrow_mut();
-                    handles
-                        .remove(&handle_id)
-                        .expect("value handle not in registry")
-                }))
-            }
-            _ => Ok(ValueRepr::Map(Arc::new(self.fields), MapType::Normal).into()),
-        }
+        Ok(ValueRepr::Map(Arc::new(self.fields), MapType::Normal).into())
     }
 }
 
