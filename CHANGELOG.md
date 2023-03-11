@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## 0.30.7
 
 - Added `testutils` module. (#221)
+- Make it more obvious that serde flatten sometimes does not work. (#223)
 
 ## 0.30.6
 
