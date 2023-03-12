@@ -904,15 +904,6 @@ impl Value {
         }
     }
 
-    /// Like `as_str` but always stringifies the value.
-    #[allow(unused)]
-    pub(crate) fn to_cowstr(&self) -> Cow<'_, str> {
-        match &self.0 {
-            ValueRepr::String(ref s, _) => Cow::Borrowed(s.as_str()),
-            _ => Cow::Owned(self.to_string()),
-        }
-    }
-
     /// Calls a method on the value.
     pub(crate) fn call_method(
         &self,

@@ -495,7 +495,10 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
     #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<Cow<'a, str>, Error> {
         match value {
-            Some(value) => Ok(value.to_cowstr()),
+            Some(value) => Ok(match value.0 {
+                ValueRepr::String(ref s, _) => Cow::Borrowed(s.as_str()),
+                _ => Cow::Owned(value.to_string()),
+            }),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
