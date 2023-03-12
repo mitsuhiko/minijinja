@@ -30,10 +30,7 @@ pub fn simple_eval<S: serde::Serialize>(
 #[test]
 fn test_loop() {
     let mut ctx = std::collections::BTreeMap::new();
-    ctx.insert(
-        "items",
-        Value::from((1..=9).into_iter().collect::<Vec<_>>()),
-    );
+    ctx.insert("items", Value::from((1..=9).collect::<Vec<_>>()));
 
     let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::Lookup("items"));

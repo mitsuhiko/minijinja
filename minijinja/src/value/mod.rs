@@ -101,7 +101,6 @@
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
 
-use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
