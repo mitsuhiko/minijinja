@@ -404,10 +404,10 @@ mod builtins {
     /// </dl>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn items(state: &State, v: Value) -> Result<Value, Error> {
+    pub fn items(v: Value) -> Result<Value, Error> {
         if v.kind() == ValueKind::Map {
             let mut rv = Vec::with_capacity(v.len().unwrap_or(0));
-            let iter = ok!(state.undefined_behavior().try_iter(v.clone()));
+            let iter = ok!(v.try_iter());
             for key in iter {
                 let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
                 rv.push(Value::from(vec![key, value]));
@@ -621,14 +621,9 @@ mod builtins {
     /// Returns the smallest item from the list.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn min(state: &State, value: Value) -> Result<Value, Error> {
-        let iter = ok!(state
-            .env()
-            .undefined_behavior()
-            .try_iter(value)
-            .map_err(|err| {
-                Error::new(ErrorKind::InvalidOperation, "cannot convert value to list")
-                    .with_source(err)
-            }));
+        let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
+            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
+        }));
         Ok(iter
             .min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less))
             .unwrap_or(Value::UNDEFINED))
@@ -637,14 +632,9 @@ mod builtins {
     /// Returns the largest item from the list.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn max(state: &State, value: Value) -> Result<Value, Error> {
-        let iter = ok!(state
-            .env()
-            .undefined_behavior()
-            .try_iter(value)
-            .map_err(|err| {
-                Error::new(ErrorKind::InvalidOperation, "cannot convert value to list")
-                    .with_source(err)
-            }));
+        let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
+            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
+        }));
         Ok(iter
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less))
             .unwrap_or(Value::UNDEFINED))
@@ -653,14 +643,9 @@ mod builtins {
     /// Returns the sorted version of the given list.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn sort(state: &State, value: Value, reverse: Option<bool>) -> Result<Value, Error> {
-        let mut items = ok!(state
-            .env()
-            .undefined_behavior()
-            .try_iter(value)
-            .map_err(|err| {
-                Error::new(ErrorKind::InvalidOperation, "cannot convert value to list")
-                    .with_source(err)
-            }))
+        let mut items = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
+            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
+        }))
         .collect::<Vec<_>>();
         items.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less));
         if reverse.unwrap_or(false) {
@@ -677,14 +662,9 @@ mod builtins {
     /// an empty list is returned.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn list(state: &State, value: Value) -> Result<Value, Error> {
-        let iter = ok!(state
-            .env()
-            .undefined_behavior()
-            .try_iter(value)
-            .map_err(|err| {
-                Error::new(ErrorKind::InvalidOperation, "cannot convert value to list")
-                    .with_source(err)
-            }));
+        let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
+            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
+        }));
         Ok(Value::from(iter.collect::<Vec<_>>()))
     }
 
@@ -913,7 +893,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "urlencode"))))]
     #[cfg(feature = "urlencode")]
-    pub fn urlencode(state: &State, value: Value) -> Result<String, Error> {
+    pub fn urlencode(value: Value) -> Result<String, Error> {
         const SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
             .remove(b'/')
             .remove(b'.')
@@ -923,7 +903,7 @@ mod builtins {
 
         if value.kind() == ValueKind::Map {
             let mut rv = String::new();
-            for (idx, k) in ok!(state.undefined_behavior().try_iter(value.clone())).enumerate() {
+            for (idx, k) in ok!(value.try_iter()).enumerate() {
                 if idx > 0 {
                     rv.push('&');
                 }
