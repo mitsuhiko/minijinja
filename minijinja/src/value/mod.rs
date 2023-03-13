@@ -326,13 +326,20 @@ impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => true,
+            (ValueRepr::Undefined, ValueRepr::Undefined) => true,
             (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a == b,
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
-                None => false,
+                None => {
+                    if let (Some(a), Some(b)) = (self.as_seq(), other.as_seq()) {
+                        a.iter().eq(b.iter())
+                    } else {
+                        false
+                    }
+                }
             },
         }
     }
@@ -344,6 +351,7 @@ impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => Some(Ordering::Equal),
+            (ValueRepr::Undefined, ValueRepr::Undefined) => Some(Ordering::Equal),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.partial_cmp(b),
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a.partial_cmp(&b),
@@ -860,7 +868,7 @@ impl Value {
         self.as_object().and_then(|x| x.downcast_ref())
     }
 
-    fn get_item_opt(&self, key: &Value) -> Option<Value> {
+    pub(crate) fn get_item_opt(&self, key: &Value) -> Option<Value> {
         let key = some!(Key::from_borrowed_value(key).ok());
 
         let seq = match self.0 {
