@@ -620,8 +620,8 @@ mod builtins {
 
     /// Returns the smallest item from the list.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn min(value: Value) -> Result<Value, Error> {
-        let iter = ok!(value.try_iter().map_err(|err| {
+    pub fn min(state: &State, value: Value) -> Result<Value, Error> {
+        let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
         Ok(iter
@@ -631,8 +631,8 @@ mod builtins {
 
     /// Returns the largest item from the list.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn max(value: Value) -> Result<Value, Error> {
-        let iter = ok!(value.try_iter().map_err(|err| {
+    pub fn max(state: &State, value: Value) -> Result<Value, Error> {
+        let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
         Ok(iter
@@ -642,8 +642,8 @@ mod builtins {
 
     /// Returns the sorted version of the given list.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn sort(value: Value, reverse: Option<bool>) -> Result<Value, Error> {
-        let mut items = ok!(value.try_iter().map_err(|err| {
+    pub fn sort(state: &State, value: Value, reverse: Option<bool>) -> Result<Value, Error> {
+        let mut items = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }))
         .collect::<Vec<_>>();
@@ -661,8 +661,8 @@ mod builtins {
     /// string this returns the characters.  If the value is undefined
     /// an empty list is returned.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn list(value: Value) -> Result<Value, Error> {
-        let iter = ok!(value.try_iter().map_err(|err| {
+    pub fn list(state: &State, value: Value) -> Result<Value, Error> {
+        let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
         Ok(Value::from(iter.collect::<Vec<_>>()))
@@ -698,11 +698,16 @@ mod builtins {
     /// If you pass it a second argument it’s used to fill missing values on the
     /// last iteration.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn slice(value: Value, count: usize, fill_with: Option<Value>) -> Result<Value, Error> {
+    pub fn slice(
+        state: &State,
+        value: Value,
+        count: usize,
+        fill_with: Option<Value>,
+    ) -> Result<Value, Error> {
         if count == 0 {
             return Err(Error::new(ErrorKind::InvalidOperation, "count cannot be 0"));
         }
-        let items = ok!(value.try_iter_owned()).collect::<Vec<_>>();
+        let items = ok!(state.undefined_behavior().try_iter(value)).collect::<Vec<_>>();
         let len = items.len();
         let items_per_slice = len / count;
         let slices_with_extra = len % count;
@@ -750,14 +755,19 @@ mod builtins {
     /// </table>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn batch(value: Value, count: usize, fill_with: Option<Value>) -> Result<Value, Error> {
+    pub fn batch(
+        state: &State,
+        value: Value,
+        count: usize,
+        fill_with: Option<Value>,
+    ) -> Result<Value, Error> {
         if count == 0 {
             return Err(Error::new(ErrorKind::InvalidOperation, "count cannot be 0"));
         }
         let mut rv = Vec::with_capacity(value.len().unwrap_or(0) / count);
         let mut tmp = Vec::with_capacity(count);
 
-        for item in ok!(value.try_iter_owned()) {
+        for item in ok!(state.undefined_behavior().try_iter(value)) {
             if tmp.len() == count {
                 rv.push(Value::from(mem::replace(
                     &mut tmp,
@@ -937,7 +947,7 @@ mod builtins {
         } else {
             None
         };
-        for value in ok!(value.try_iter()) {
+        for value in ok!(state.undefined_behavior().try_iter(value)) {
             let test_value = if let Some(ref attr) = attr {
                 ok!(value.get_path(attr))
             } else {
@@ -1088,7 +1098,7 @@ mod builtins {
                     ));
                 }
                 let default = kwargs.get_attr("default").ok();
-                for value in ok!(value.try_iter()) {
+                for value in ok!(state.undefined_behavior().try_iter(value)) {
                     let sub_val = match attr.as_str() {
                         Some(path) => value.get_path(path),
                         None => value.get_item(&attr),
@@ -1116,7 +1126,7 @@ mod builtins {
             .env
             .get_filter(filter_name)
             .ok_or_else(|| Error::from(ErrorKind::UnknownFilter)));
-        for value in ok!(value.try_iter()) {
+        for value in ok!(state.undefined_behavior().try_iter(value)) {
             let new_args = Some(value.clone())
                 .into_iter()
                 .chain(args.0.iter().skip(1).cloned())

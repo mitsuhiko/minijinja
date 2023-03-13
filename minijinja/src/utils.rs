@@ -5,7 +5,7 @@ use std::iter::{once, repeat};
 use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{StringType, Value, ValueKind, ValueRepr};
+use crate::value::{OwnedValueIterator, StringType, Value, ValueKind, ValueRepr};
 use crate::Output;
 
 #[cfg(test)]
@@ -124,6 +124,72 @@ pub enum AutoEscape {
     /// format and would error.  The use of these requires a custom formatter.
     /// See [`set_formatter`](crate::Environment::set_formatter).
     Custom(&'static str),
+}
+
+/// Defines the behavior of undefined values in the engine.
+///
+/// At present there are three types of behaviors available which mirror the behaviors
+/// that Jinja2 provides out of the box.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum UndefinedBehavior {
+    /// The default, somewhat lenient undefined behavior.
+    ///
+    /// * **printing:** allowed (returns empty string)
+    /// * **iteration:** allowed (returns empty array)
+    /// * **attribute access of undefined values:** fails
+    Lenient,
+    /// Like `Lenient`, but also allows chaining of undefined lookups.
+    ///
+    /// * **printing:** allowed (returns empty string)
+    /// * **iteration:** allowed (returns empty array)
+    /// * **attribute access of undefined values:** allowed (returns [`undefined`](Value::UNDEFINED))
+    Chainable,
+    /// Complains very quickly about undefined values.
+    ///
+    /// * **printing:** fails
+    /// * **iteration:** fails
+    /// * **attribute access of undefined values:** fails
+    Strict,
+}
+
+impl Default for UndefinedBehavior {
+    fn default() -> UndefinedBehavior {
+        UndefinedBehavior::Lenient
+    }
+}
+
+impl UndefinedBehavior {
+    /// Utility method used in the engine to determine what to do when an undefined is
+    /// encountered.
+    ///
+    /// The flag indicates if this is the first or second level of undefined value.  If
+    /// `parent_was_undefined` is set to `true`, the undefined was created by looking up
+    /// a missing attribute on an undefined value.  If `false` the undefined was created by
+    /// looing up a missing attribute on a defined value.
+    pub(crate) fn handle_undefined(self, parent_was_undefined: bool) -> Result<Value, Error> {
+        match (self, parent_was_undefined) {
+            (UndefinedBehavior::Lenient, false) | (UndefinedBehavior::Chainable, _) => {
+                Ok(Value::UNDEFINED)
+            }
+            (UndefinedBehavior::Lenient, true) | (UndefinedBehavior::Strict, _) => {
+                Err(Error::from(ErrorKind::UndefinedError))
+            }
+        }
+    }
+
+    /// Tries to iterate over a value while handling the undefined value.
+    ///
+    /// If the value is undefined, then iteration fails if the behavior is set to strict,
+    /// otherwise it succeeds with an empty iteration.  This is also internally used in the
+    /// engine to convert values to lists.
+    pub(crate) fn try_iter(self, value: Value) -> Result<OwnedValueIterator, Error> {
+        if matches!(self, UndefinedBehavior::Strict) && value.is_undefined() {
+            Err(Error::from(ErrorKind::UndefinedError))
+        } else {
+            value.try_iter_owned()
+        }
+    }
 }
 
 /// Helper to HTML escape a string.

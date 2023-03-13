@@ -9,7 +9,7 @@ use crate::compiler::instructions::{
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
-use crate::utils::AutoEscape;
+use crate::utils::{AutoEscape, UndefinedBehavior};
 use crate::value::{self, ops, value_map_with_capacity, MapType, Value, ValueRepr};
 use crate::vm::context::{Context, Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
@@ -157,6 +157,7 @@ impl<'env> Vm<'env> {
         mut pc: usize,
     ) -> Result<Option<Value>, Error> {
         let initial_auto_escape = state.auto_escape;
+        let undefined_behavior = state.undefined_behavior();
         let mut auto_escape_stack = vec![];
         let mut next_loop_recursion_jump = None;
         let mut loaded_filters = [None; MAX_LOCALS];
@@ -257,20 +258,25 @@ impl<'env> Vm<'env> {
                     // special case.
                     stack.push(match a.get_attr_fast(name) {
                         Some(value) => value,
-                        None if a.is_undefined() => bail!(Error::from(ErrorKind::UndefinedError)),
-                        None => Value::UNDEFINED,
+                        None => ctx_ok!(undefined_behavior.handle_undefined(a.is_undefined())),
                     });
                 }
                 Instruction::GetItem => {
                     a = stack.pop();
                     b = stack.pop();
-                    stack.push(ctx_ok!(b.get_item(&a)));
+                    stack.push(match b.get_item_opt(&a) {
+                        Some(value) => value,
+                        None => ctx_ok!(undefined_behavior.handle_undefined(b.is_undefined())),
+                    });
                 }
                 Instruction::Slice => {
                     let step = stack.pop();
                     let stop = stack.pop();
                     b = stack.pop();
                     a = stack.pop();
+                    if a.is_undefined() && matches!(undefined_behavior, UndefinedBehavior::Strict) {
+                        bail!(Error::from(ErrorKind::UndefinedError));
+                    }
                     stack.push(ctx_ok!(ops::slice(a, b, stop, step)));
                 }
                 Instruction::LoadConst(value) => {
@@ -839,7 +845,7 @@ impl<'env> Vm<'env> {
         current_recursion_jump: Option<(usize, bool)>,
     ) -> Result<(), Error> {
         #[allow(unused_mut)]
-        let mut iterator = ok!(iterable.try_iter_owned());
+        let mut iterator = ok!(state.undefined_behavior().try_iter(iterable));
         let len = iterator.len();
         let depth = state
             .ctx

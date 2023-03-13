@@ -7,11 +7,11 @@ use serde::Serialize;
 
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::parser::parse_expr;
-use crate::error::{attach_basic_debug_info, Error};
+use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::expression::Expression;
 use crate::output::Output;
 use crate::template::{CompiledTemplate, Template};
-use crate::utils::{AutoEscape, BTreeMapKeysDebug};
+use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
 use crate::value::{FunctionArgs, FunctionResult, Value};
 use crate::vm::{State, Vm};
 use crate::{defaults, filters, functions, tests};
@@ -67,6 +67,7 @@ pub struct Environment<'source> {
     tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
     pub(crate) globals: BTreeMap<Cow<'source, str>, Value>,
     default_auto_escape: Arc<AutoEscapeFunc>,
+    undefined_behavior: UndefinedBehavior,
     formatter: Arc<FormatterFunc>,
     #[cfg(feature = "debug")]
     debug: bool,
@@ -105,6 +106,7 @@ impl<'source> Environment<'source> {
             tests: defaults::get_builtin_tests(),
             globals: defaults::get_globals(),
             default_auto_escape: Arc::new(defaults::default_auto_escape_callback),
+            undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
@@ -124,6 +126,7 @@ impl<'source> Environment<'source> {
             tests: Default::default(),
             globals: Default::default(),
             default_auto_escape: Arc::new(defaults::no_auto_escape),
+            undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
@@ -286,6 +289,24 @@ impl<'source> Environment<'source> {
         F: Fn(&str) -> AutoEscape + 'static + Sync + Send,
     {
         self.default_auto_escape = Arc::new(f);
+    }
+
+    /// Changes the undefined behavior.
+    ///
+    /// This changes the runtime behavior of [`undefined`](Value::UNDEFINED) values in
+    /// the template engine.  For more information see [`UndefinedBehavior`].  The
+    /// default is [`UndefinedBehavior::Lenient`].
+    pub fn set_undefined_behavior(&mut self, behavior: UndefinedBehavior) {
+        self.undefined_behavior = behavior;
+    }
+
+    /// Returns the current undefined behavior.
+    ///
+    /// This is particularly useful if a filter function or similar wants to change its
+    /// behavior with regards to undefined values.
+    #[inline(always)]
+    pub fn undefined_behavior(&self) -> UndefinedBehavior {
+        self.undefined_behavior
     }
 
     /// Sets a different formatter function.
@@ -537,6 +558,10 @@ impl<'source> Environment<'source> {
         state: &State,
         out: &mut Output,
     ) -> Result<(), Error> {
-        (self.formatter)(out, state, value)
+        if value.is_undefined() && matches!(self.undefined_behavior, UndefinedBehavior::Strict) {
+            Err(Error::from(ErrorKind::UndefinedError))
+        } else {
+            (self.formatter)(out, state, value)
+        }
     }
 }

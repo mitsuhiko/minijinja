@@ -217,7 +217,7 @@ pub use self::error::{Error, ErrorKind};
 pub use self::expression::Expression;
 pub use self::output::Output;
 pub use self::template::Template;
-pub use self::utils::{AutoEscape, HtmlEscape};
+pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
 
 #[cfg(feature = "source")]
 pub use self::source::Source;

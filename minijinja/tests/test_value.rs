@@ -232,3 +232,10 @@ fn test_obj_downcast() {
     let thing = value_as_obj.downcast_ref::<Thing>().unwrap();
     assert_eq!(thing.id, 42);
 }
+
+#[test]
+fn test_value_cmp() {
+    assert_eq!(Value::from(&[1][..]), Value::from(&[1][..]));
+    assert_ne!(Value::from(&[1][..]), Value::from(&[2][..]));
+    assert_eq!(Value::UNDEFINED, Value::UNDEFINED);
+}
