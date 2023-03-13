@@ -146,7 +146,7 @@ pub trait ArgType<'a> {
     ) -> Result<(Self::Output, usize), Error> {
         if value.map_or(false, |x| x.is_undefined())
             && state.map_or(false, |x| {
-                matches!(x.env().undefined_behavior(), UndefinedBehavior::Strict)
+                matches!(x.undefined_behavior(), UndefinedBehavior::Strict)
             })
         {
             Err(Error::from(ErrorKind::UndefinedError))
@@ -589,6 +589,13 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 
 impl<'a> ArgType<'a> for Value {
     type Output = Self;
+
+    fn from_state_and_value(
+        _state: Option<&'a State>,
+        value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
+        Ok((ok!(Self::from_value(value)), 1))
+    }
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {

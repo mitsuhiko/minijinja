@@ -157,7 +157,7 @@ impl<'env> Vm<'env> {
         mut pc: usize,
     ) -> Result<Option<Value>, Error> {
         let initial_auto_escape = state.auto_escape;
-        let undefined_behavior = state.env.undefined_behavior();
+        let undefined_behavior = state.undefined_behavior();
         let mut auto_escape_stack = vec![];
         let mut next_loop_recursion_jump = None;
         let mut loaded_filters = [None; MAX_LOCALS];
@@ -845,7 +845,7 @@ impl<'env> Vm<'env> {
         current_recursion_jump: Option<(usize, bool)>,
     ) -> Result<(), Error> {
         #[allow(unused_mut)]
-        let mut iterator = ok!(state.env().undefined_behavior().try_iter(iterable));
+        let mut iterator = ok!(state.undefined_behavior().try_iter(iterable));
         let len = iterator.len();
         let depth = state
             .ctx

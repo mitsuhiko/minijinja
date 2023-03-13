@@ -407,7 +407,7 @@ mod builtins {
     pub fn items(state: &State, v: Value) -> Result<Value, Error> {
         if v.kind() == ValueKind::Map {
             let mut rv = Vec::with_capacity(v.len().unwrap_or(0));
-            let iter = ok!(state.env().undefined_behavior().try_iter(v.clone()));
+            let iter = ok!(state.undefined_behavior().try_iter(v.clone()));
             for key in iter {
                 let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
                 rv.push(Value::from(vec![key, value]));
@@ -727,7 +727,7 @@ mod builtins {
         if count == 0 {
             return Err(Error::new(ErrorKind::InvalidOperation, "count cannot be 0"));
         }
-        let items = ok!(state.env().undefined_behavior().try_iter(value)).collect::<Vec<_>>();
+        let items = ok!(state.undefined_behavior().try_iter(value)).collect::<Vec<_>>();
         let len = items.len();
         let items_per_slice = len / count;
         let slices_with_extra = len % count;
@@ -787,7 +787,7 @@ mod builtins {
         let mut rv = Vec::with_capacity(value.len().unwrap_or(0) / count);
         let mut tmp = Vec::with_capacity(count);
 
-        for item in ok!(state.env().undefined_behavior().try_iter(value)) {
+        for item in ok!(state.undefined_behavior().try_iter(value)) {
             if tmp.len() == count {
                 rv.push(Value::from(mem::replace(
                     &mut tmp,
@@ -923,9 +923,7 @@ mod builtins {
 
         if value.kind() == ValueKind::Map {
             let mut rv = String::new();
-            for (idx, k) in
-                ok!(state.env().undefined_behavior().try_iter(value.clone())).enumerate()
-            {
+            for (idx, k) in ok!(state.undefined_behavior().try_iter(value.clone())).enumerate() {
                 if idx > 0 {
                     rv.push('&');
                 }
@@ -969,7 +967,7 @@ mod builtins {
         } else {
             None
         };
-        for value in ok!(state.env().undefined_behavior().try_iter(value)) {
+        for value in ok!(state.undefined_behavior().try_iter(value)) {
             let test_value = if let Some(ref attr) = attr {
                 ok!(value.get_path(attr))
             } else {
@@ -1120,7 +1118,7 @@ mod builtins {
                     ));
                 }
                 let default = kwargs.get_attr("default").ok();
-                for value in ok!(state.env().undefined_behavior().try_iter(value)) {
+                for value in ok!(state.undefined_behavior().try_iter(value)) {
                     let sub_val = match attr.as_str() {
                         Some(path) => value.get_path(path),
                         None => value.get_item(&attr),
@@ -1148,7 +1146,7 @@ mod builtins {
             .env
             .get_filter(filter_name)
             .ok_or_else(|| Error::from(ErrorKind::UnknownFilter)));
-        for value in ok!(state.env().undefined_behavior().try_iter(value)) {
+        for value in ok!(state.undefined_behavior().try_iter(value)) {
             let new_args = Some(value.clone())
                 .into_iter()
                 .chain(args.0.iter().skip(1).cloned())

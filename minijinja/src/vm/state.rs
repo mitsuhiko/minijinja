@@ -4,9 +4,9 @@ use std::fmt;
 use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
+use crate::utils::{AutoEscape, UndefinedBehavior};
 use crate::value::{ArgType, Value};
 use crate::vm::context::Context;
-use crate::AutoEscape;
 
 #[cfg(feature = "fuel")]
 use crate::vm::fuel::FuelTracker;
@@ -54,6 +54,7 @@ impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
 
 impl<'vm, 'env> State<'vm, 'env> {
     /// Returns a reference to the current environment.
+    #[inline(always)]
     pub fn env(&self) -> &Environment<'_> {
         self.env
     }
@@ -64,17 +65,26 @@ impl<'vm, 'env> State<'vm, 'env> {
     }
 
     /// Returns the current value of the auto escape flag.
+    #[inline(always)]
     pub fn auto_escape(&self) -> AutoEscape {
         self.auto_escape
     }
 
+    /// Returns the current undefined behavior.
+    #[inline(always)]
+    pub fn undefined_behavior(&self) -> UndefinedBehavior {
+        self.env.undefined_behavior()
+    }
+
     /// Returns the name of the innermost block.
+    #[inline(always)]
     pub fn current_block(&self) -> Option<&str> {
         self.current_block
     }
 
     /// Returns the name of the item (filter, function, test, method) currently
     /// being called.
+    #[inline(always)]
     pub fn current_call(&self) -> Option<&str> {
         self.current_call
     }

@@ -160,7 +160,13 @@ impl Default for UndefinedBehavior {
 }
 
 impl UndefinedBehavior {
-    /// Decides what to do with an undefined value.
+    /// Utility method used in the engine to determine what to do when an undefined is
+    /// encountered.
+    ///
+    /// The flag indicates if this is the first or second level of undefined value.  If
+    /// `parent_was_undefined` is set to `true`, the undefined was created by looking up
+    /// a missing attribute on an undefined value.  If `false` the undefined was created by
+    /// looing up a missing attribute on a defined value.
     pub(crate) fn handle_undefined(self, parent_was_undefined: bool) -> Result<Value, Error> {
         match (self, parent_was_undefined) {
             (UndefinedBehavior::Lenient, false) | (UndefinedBehavior::Chainable, _) => {
@@ -172,7 +178,11 @@ impl UndefinedBehavior {
         }
     }
 
-    /// Tries to iterate over a value.
+    /// Tries to iterate over a value while handling the undefined value.
+    ///
+    /// If the value is undefined, then iteration fails if the behavior is set to strict,
+    /// otherwise it succeeds with an empty iteration.  This is also internally used in the
+    /// engine to convert values to lists.
     pub(crate) fn try_iter(self, value: Value) -> Result<OwnedValueIterator, Error> {
         if matches!(self, UndefinedBehavior::Strict) && value.is_undefined() {
             Err(Error::from(ErrorKind::UndefinedError))

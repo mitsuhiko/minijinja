@@ -304,6 +304,7 @@ impl<'source> Environment<'source> {
     ///
     /// This is particularly useful if a filter function or similar wants to change its
     /// behavior with regards to undefined values.
+    #[inline(always)]
     pub fn undefined_behavior(&self) -> UndefinedBehavior {
         self.undefined_behavior
     }
