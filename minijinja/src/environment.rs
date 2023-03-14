@@ -197,7 +197,7 @@ impl<'source> Environment<'source> {
         Ok(Template::new(
             self,
             compiled,
-            self.get_initial_auto_escape(name),
+            self.initial_auto_escape(name),
         ))
     }
 
@@ -259,7 +259,7 @@ impl<'source> Environment<'source> {
                 root,
                 &compiled.blocks,
                 &mut Output::with_string(&mut rv),
-                self.get_initial_auto_escape(name),
+                self.initial_auto_escape(name),
             )
             .map(|_| rv)
     }
@@ -543,7 +543,7 @@ impl<'source> Environment<'source> {
         self.tests.get(name)
     }
 
-    pub(crate) fn get_initial_auto_escape(&self, name: &str) -> AutoEscape {
+    pub(crate) fn initial_auto_escape(&self, name: &str) -> AutoEscape {
         (self.default_auto_escape)(name)
     }
 

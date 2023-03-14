@@ -233,7 +233,7 @@ pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
     // of the initial state and if that is also not set it falls back
     // to HTML.
     let auto_escape = match state.auto_escape() {
-        AutoEscape::None => match state.env().get_initial_auto_escape(state.name()) {
+        AutoEscape::None => match state.env().initial_auto_escape(state.name()) {
             AutoEscape::None => AutoEscape::Html,
             other => other,
         },
