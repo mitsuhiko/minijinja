@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::Mutex;
 
 use minijinja::value::{Rest, Value};
-use minijinja::{context, AutoEscape, Error, Source, State};
+use minijinja::{context, AutoEscape, Error, Source, State, UndefinedBehavior};
 use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -57,6 +57,39 @@ impl Environment {
     pub fn get_debug(&self) -> PyResult<bool> {
         let inner = self.inner.lock().unwrap();
         Ok(inner.env.debug())
+    }
+
+    /// Sets the undefined behavior.
+    #[setter]
+    pub fn set_undefined_behavior(&self, value: &str) -> PyResult<()> {
+        let mut inner = self.inner.lock().unwrap();
+        inner.env.set_undefined_behavior(match value {
+            "strict" => UndefinedBehavior::Strict,
+            "lenient" => UndefinedBehavior::Lenient,
+            "chainable" => UndefinedBehavior::Chainable,
+            _ => {
+                return Err(PyRuntimeError::new_err(
+                    "invalid value for undefined behavior",
+                ))
+            }
+        });
+        Ok(())
+    }
+
+    /// Gets the undefined behavior.
+    #[getter]
+    pub fn get_undefined_behavior(&self) -> PyResult<&'static str> {
+        let inner = self.inner.lock().unwrap();
+        Ok(match inner.env.undefined_behavior() {
+            UndefinedBehavior::Lenient => "lenient",
+            UndefinedBehavior::Chainable => "chainable",
+            UndefinedBehavior::Strict => "strict",
+            _ => {
+                return Err(PyRuntimeError::new_err(
+                    "invalid value for undefined behavior",
+                ))
+            }
+        })
     }
 
     /// Sets fuel
