@@ -51,8 +51,9 @@ pub fn escape_formatter(out: &mut Output, state: &State, value: &Value) -> Resul
 pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::BoxedFilter> {
     let mut rv = BTreeMap::new();
     rv.insert("safe".into(), BoxedFilter::new(filters::safe));
-    rv.insert("escape".into(), BoxedFilter::new(filters::escape));
-    rv.insert("e".into(), BoxedFilter::new(filters::escape));
+    let escape = BoxedFilter::new(filters::escape);
+    rv.insert("escape".into(), escape.clone());
+    rv.insert("e".into(), escape);
     #[cfg(feature = "builtins")]
     {
         rv.insert("lower".into(), BoxedFilter::new(filters::lower));
@@ -60,8 +61,9 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::Boxe
         rv.insert("title".into(), BoxedFilter::new(filters::title));
         rv.insert("capitalize".into(), BoxedFilter::new(filters::capitalize));
         rv.insert("replace".into(), BoxedFilter::new(filters::replace));
-        rv.insert("length".into(), BoxedFilter::new(filters::length));
-        rv.insert("count".into(), BoxedFilter::new(filters::length));
+        let length = BoxedFilter::new(filters::length);
+        rv.insert("length".into(), length.clone());
+        rv.insert("count".into(), length);
         rv.insert("dictsort".into(), BoxedFilter::new(filters::dictsort));
         rv.insert("items".into(), BoxedFilter::new(filters::items));
         rv.insert("reverse".into(), BoxedFilter::new(filters::reverse));
@@ -106,8 +108,9 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
     rv.insert("undefined".into(), BoxedTest::new(tests::is_undefined));
     rv.insert("defined".into(), BoxedTest::new(tests::is_defined));
     rv.insert("none".into(), BoxedTest::new(tests::is_none));
-    rv.insert("safe".into(), BoxedTest::new(tests::is_safe));
-    rv.insert("escaped".into(), BoxedTest::new(tests::is_safe));
+    let is_safe = BoxedTest::new(tests::is_safe);
+    rv.insert("safe".into(), is_safe.clone());
+    rv.insert("escaped".into(), is_safe);
     #[cfg(feature = "builtins")]
     {
         rv.insert("odd".into(), BoxedTest::new(tests::is_odd));
@@ -123,21 +126,27 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
         rv.insert("endingwith".into(), BoxedTest::new(tests::is_endingwith));
 
         // operators
-        rv.insert("eq".into(), BoxedTest::new(tests::is_eq));
-        rv.insert("equalto".into(), BoxedTest::new(tests::is_eq));
-        rv.insert("==".into(), BoxedTest::new(tests::is_eq));
-        rv.insert("ne".into(), BoxedTest::new(tests::is_ne));
-        rv.insert("!=".into(), BoxedTest::new(tests::is_ne));
-        rv.insert("lt".into(), BoxedTest::new(tests::is_lt));
-        rv.insert("lessthan".into(), BoxedTest::new(tests::is_lt));
-        rv.insert("<".into(), BoxedTest::new(tests::is_lt));
-        rv.insert("le".into(), BoxedTest::new(tests::is_le));
-        rv.insert("<=".into(), BoxedTest::new(tests::is_le));
-        rv.insert("gt".into(), BoxedTest::new(tests::is_gt));
-        rv.insert("greaterthan".into(), BoxedTest::new(tests::is_gt));
-        rv.insert(">".into(), BoxedTest::new(tests::is_gt));
-        rv.insert("ge".into(), BoxedTest::new(tests::is_ge));
-        rv.insert(">=".into(), BoxedTest::new(tests::is_ge));
+        let is_eq = BoxedTest::new(tests::is_eq);
+        rv.insert("eq".into(), is_eq.clone());
+        rv.insert("equalto".into(), is_eq.clone());
+        rv.insert("==".into(), is_eq);
+        let is_ne = BoxedTest::new(tests::is_ne);
+        rv.insert("ne".into(), is_ne.clone());
+        rv.insert("!=".into(), is_ne);
+        let is_lt = BoxedTest::new(tests::is_lt);
+        rv.insert("lt".into(), is_lt.clone());
+        rv.insert("lessthan".into(), is_lt.clone());
+        rv.insert("<".into(), is_lt);
+        let is_le = BoxedTest::new(tests::is_le);
+        rv.insert("le".into(), is_le.clone());
+        rv.insert("<=".into(), is_le);
+        let is_gt = BoxedTest::new(tests::is_gt);
+        rv.insert("gt".into(), is_gt.clone());
+        rv.insert("greaterthan".into(), is_gt.clone());
+        rv.insert(">".into(), is_gt);
+        let is_ge = BoxedTest::new(tests::is_ge);
+        rv.insert("ge".into(), is_ge.clone());
+        rv.insert(">=".into(), is_ge);
         rv.insert("in".into(), BoxedTest::new(tests::is_in));
     }
     rv
