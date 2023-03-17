@@ -29,6 +29,7 @@ pub mod __context {
     use crate::key::Key;
     use crate::value::{MapType, Value, ValueMap, ValueRepr};
     use crate::Environment;
+    use std::rc::Rc;
     use std::sync::Arc;
 
     #[inline(always)]
@@ -51,9 +52,9 @@ pub mod __context {
         ValueRepr::Map(Arc::new(ctx), MapType::Normal).into()
     }
 
-    pub fn thread_local_env() -> Environment<'static> {
+    pub fn thread_local_env() -> Rc<Environment<'static>> {
         thread_local! {
-            static ENV: Environment<'static> = Environment::new()
+            static ENV: Rc<Environment<'static>> = Rc::new(Environment::new());
         }
         ENV.with(|x| x.clone())
     }

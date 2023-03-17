@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Added `testutils` module. (#221)
 - Make it more obvious that serde flatten sometimes does not work. (#223)
 - Added configurable "undefined" value behavior. (#227)
+- Make `render!()` reuse the hidden environment.
 
 ## 0.30.6
 
