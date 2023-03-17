@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use serde::ser::{self, Impossible, Serialize, Serializer};
+use serde::ser::{Impossible, Serialize, Serializer};
 
 use crate::key::{Key, StaticKey};
 use crate::utils::SerializationFailed;
@@ -54,8 +54,9 @@ impl Serializer for KeySerializer {
         Ok(Key::I64(v))
     }
 
+    #[cold]
     fn serialize_i128(self, _: i128) -> Result<StaticKey, SerializationFailed> {
-        Err(ser::Error::custom("unsupported key type i128"))
+        panic!("unsupported key type i128")
     }
 
     fn serialize_u8(self, v: u8) -> Result<StaticKey, SerializationFailed> {
@@ -71,19 +72,25 @@ impl Serializer for KeySerializer {
     }
 
     fn serialize_u64(self, v: u64) -> Result<StaticKey, SerializationFailed> {
-        Key::try_from(v).map_err(|_| ser::Error::custom("out of bounds for i64"))
+        match Key::try_from(v) {
+            Ok(rv) => Ok(rv),
+            Err(_) => panic!("out of bounds for i64"),
+        }
     }
 
+    #[cold]
     fn serialize_u128(self, _: u128) -> Result<StaticKey, SerializationFailed> {
-        Err(ser::Error::custom("unsupported key type u128"))
+        panic!("unsupported key type u128")
     }
 
+    #[cold]
     fn serialize_f32(self, _: f32) -> Result<StaticKey, SerializationFailed> {
-        Err(ser::Error::custom("unsupported key type f32"))
+        panic!("unsupported key type f32")
     }
 
+    #[cold]
     fn serialize_f64(self, _: f64) -> Result<StaticKey, SerializationFailed> {
-        Err(ser::Error::custom("unsupported key type f64"))
+        panic!("unsupported key type f64")
     }
 
     fn serialize_char(self, v: char) -> Result<StaticKey, SerializationFailed> {
@@ -94,12 +101,14 @@ impl Serializer for KeySerializer {
         Ok(Key::make_string_key(value))
     }
 
+    #[cold]
     fn serialize_bytes(self, _value: &[u8]) -> Result<StaticKey, SerializationFailed> {
-        Err(ser::Error::custom("unsupported key type bytes"))
+        panic!("unsupported key type bytes")
     }
 
+    #[cold]
     fn serialize_none(self) -> Result<StaticKey, SerializationFailed> {
-        Err(ser::Error::custom("unsupported key type unit"))
+        panic!("unsupported key type unit")
     }
 
     fn serialize_some<T: ?Sized>(self, value: &T) -> Result<StaticKey, SerializationFailed>
@@ -109,12 +118,14 @@ impl Serializer for KeySerializer {
         value.serialize(self)
     }
 
+    #[cold]
     fn serialize_unit(self) -> Result<StaticKey, SerializationFailed> {
-        Err(ser::Error::custom("unsupported key type unit"))
+        panic!("unsupported key type unit")
     }
 
+    #[cold]
     fn serialize_unit_struct(self, _name: &'static str) -> Result<StaticKey, SerializationFailed> {
-        Err(ser::Error::custom("unsupported key type unit"))
+        panic!("unsupported key type unit")
     }
 
     fn serialize_unit_variant(
@@ -150,24 +161,26 @@ impl Serializer for KeySerializer {
         value.serialize(self)
     }
 
+    #[cold]
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, SerializationFailed> {
-        Err(ser::Error::custom("sequences as keys are not supported"))
+        panic!("sequences as keys are not supported")
     }
 
+    #[cold]
     fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, SerializationFailed> {
-        Err(ser::Error::custom("tuples as keys are not supported"))
+        panic!("tuples as keys are not supported")
     }
 
+    #[cold]
     fn serialize_tuple_struct(
         self,
         _name: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleStruct, SerializationFailed> {
-        Err(ser::Error::custom(
-            "tuple structs as keys are not supported",
-        ))
+        panic!("tuple structs as keys are not supported")
     }
 
+    #[cold]
     fn serialize_tuple_variant(
         self,
         _name: &'static str,
@@ -175,26 +188,27 @@ impl Serializer for KeySerializer {
         _variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant, SerializationFailed> {
-        Err(ser::Error::custom(
-            "tuple variants as keys are not supported",
-        ))
+        panic!("tuple variants as keys are not supported",)
     }
 
+    #[cold]
     fn serialize_map(
         self,
         _jlen: Option<usize>,
     ) -> Result<Self::SerializeMap, SerializationFailed> {
-        Err(ser::Error::custom("maps as keys are not supported"))
+        panic!("maps as keys are not supported")
     }
 
+    #[cold]
     fn serialize_struct(
         self,
         _name: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStruct, SerializationFailed> {
-        Err(ser::Error::custom("structs as keys are not supported"))
+        panic!("structs as keys are not supported")
     }
 
+    #[cold]
     fn serialize_struct_variant(
         self,
         _name: &'static str,
@@ -202,6 +216,6 @@ impl Serializer for KeySerializer {
         _variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant, SerializationFailed> {
-        Err(ser::Error::custom("structs as keys are not supported"))
+        panic!("structs as keys are not supported")
     }
 }

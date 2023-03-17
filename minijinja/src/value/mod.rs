@@ -477,10 +477,12 @@ impl Value {
         let _serialization_guard = mark_internal_serialization();
         let _optimization_guard = value_optimization();
 
-        // note on unwrap: `SerializationFailed` behaves like `Infallible` in that
-        // it should never happen.  Instead the creation of this error itself will
-        // panic instead.
-        Serialize::serialize(value, ValueSerializer).unwrap()
+        // note on `SerializationFailed` behaves like `Infallible` in that it should
+        // never happen.  Instead the creation of this error itself will panic instead.
+        match Serialize::serialize(value, ValueSerializer) {
+            Ok(rv) => rv,
+            Err(infallible) => match infallible {},
+        }
     }
 
     /// Creates a value from a safe string.

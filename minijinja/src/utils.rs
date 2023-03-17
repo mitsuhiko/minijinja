@@ -31,6 +31,7 @@ impl fmt::Display for SerializationFailed {
 
 impl serde::ser::Error for SerializationFailed {
     #[track_caller]
+    #[cold]
     fn custom<T>(msg: T) -> Self
     where
         T: fmt::Display,
