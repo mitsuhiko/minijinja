@@ -19,13 +19,13 @@ pub struct SealedMarker;
 /// This error does not actually "error", it instead panics.  For more
 /// information see `Value::from_serializable`.
 #[derive(Debug)]
-pub struct SerializationFailed;
+pub enum SerializationFailed {}
 
 impl std::error::Error for SerializationFailed {}
 
 impl fmt::Display for SerializationFailed {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "serialization failed")
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unreachable!();
     }
 }
 
