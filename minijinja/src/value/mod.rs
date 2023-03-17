@@ -470,9 +470,9 @@ impl Value {
     /// # Panics
     ///
     /// This method panics if types are passed which are not supported by the
-    /// underlying rendering system.  Today this is the case for value types that
-    /// have unrepresentable keys.  The desire is that eventually this call will no
-    /// longer panic under any circumstances.
+    /// underlying rendering system.  Today this is the case for value types
+    /// that have unrepresentable keys, when custom serialize implementation
+    /// fail (for instance when invalid types are attempted to be flattened).
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
         let _serialization_guard = mark_internal_serialization();
         let _optimization_guard = value_optimization();
