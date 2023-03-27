@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 0.31.0
+
+- Changed the closure behavior of macros to match the one of Jinja2. (#233)
+
 ## 0.30.7
 
 - Added `testutils` module. (#221)
