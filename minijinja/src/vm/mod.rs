@@ -23,6 +23,7 @@ use crate::vm::fuel::FuelTracker;
 
 pub use crate::vm::state::State;
 
+mod closure_object;
 mod context;
 #[cfg(feature = "fuel")]
 mod fuel;
