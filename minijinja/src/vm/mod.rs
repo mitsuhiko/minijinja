@@ -23,6 +23,7 @@ use crate::vm::fuel::FuelTracker;
 
 pub use crate::vm::state::State;
 
+mod closure_object;
 mod context;
 #[cfg(feature = "fuel")]
 mod fuel;
@@ -107,16 +108,21 @@ impl<'env> Vm<'env> {
 
     /// Evaluate a macro in a state.
     #[cfg(feature = "macros")]
+    #[allow(clippy::too_many_arguments)]
     pub fn eval_macro(
         &self,
         instructions: &Instructions<'env>,
         pc: usize,
-        root: Value,
+        closure: Value,
+        caller: Option<Value>,
         out: &mut Output,
         state: &State,
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
-        let mut ctx = Context::new(Frame::new(root));
+        let mut ctx = Context::new(Frame::new(closure));
+        if let Some(caller) = caller {
+            ctx.store("caller", caller);
+        }
         ok!(ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST));
         self.eval_impl(
             &mut State {
@@ -645,6 +651,14 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "macros")]
                 Instruction::Return => break,
+                #[cfg(feature = "macros")]
+                Instruction::Enclose(name) => {
+                    state.ctx.enclose(state.env, name);
+                }
+                #[cfg(feature = "macros")]
+                Instruction::GetClosure => {
+                    stack.push(Value::from(state.ctx.closure()));
+                }
             }
             pc += 1;
         }
@@ -689,8 +703,10 @@ impl<'env> Vm<'env> {
             let old_escape = mem::replace(&mut state.auto_escape, tmpl.initial_auto_escape());
             let old_instructions = mem::replace(&mut state.instructions, tmpl.instructions());
             let old_blocks = mem::replace(&mut state.blocks, prepare_blocks(tmpl.blocks()));
+            let old_closure = state.ctx.take_closure();
             ok!(state.ctx.incr_depth(INCLUDE_RECURSION_COST));
             let rv = self.eval_state(state, out);
+            state.ctx.reset_closure(old_closure);
             state.ctx.decr_depth(INCLUDE_RECURSION_COST);
             state.auto_escape = old_escape;
             state.instructions = old_instructions;
@@ -904,7 +920,7 @@ impl<'env> Vm<'env> {
         name: &str,
         flags: u8,
     ) {
-        use crate::compiler::instructions::{MACRO_CALLER, MACRO_SELF_REFERENTIAL};
+        use crate::compiler::instructions::MACRO_CALLER;
 
         let arg_spec = match stack.pop().0 {
             ValueRepr::Seq(args) => args
@@ -925,7 +941,6 @@ impl<'env> Vm<'env> {
                 arg_spec,
                 macro_ref_id,
                 closure,
-                self_reference: (flags & MACRO_SELF_REFERENTIAL) != 0,
                 caller_reference: (flags & MACRO_CALLER) != 0,
             }),
         }));
