@@ -377,7 +377,7 @@ impl<'source> CodeGenerator<'source> {
 
     #[cfg(feature = "macros")]
     fn compile_macro_expression(&mut self, macro_decl: &ast::Spanned<ast::Macro<'source>>) {
-        use crate::compiler::instructions::{MACRO_CALLER, MACRO_SELF_REFERENTIAL};
+        use crate::compiler::instructions::MACRO_CALLER;
         use crate::value::ValueRepr;
         self.set_line_from_span(macro_decl.span());
         let instr = self.add(Instruction::Jump(!0));
@@ -398,14 +398,12 @@ impl<'source> CodeGenerator<'source> {
         }
         self.add(Instruction::Return);
         let mut undeclared = crate::compiler::meta::find_macro_closure(macro_decl);
-        let self_reference = undeclared.contains(macro_decl.name);
         let caller_reference = undeclared.remove("caller");
         let macro_instr = self.next_instruction();
         for name in &undeclared {
-            self.add(Instruction::LoadConst(Value::from(*name)));
-            self.add(Instruction::Lookup(name));
+            self.add(Instruction::Enclose(name));
         }
-        self.add(Instruction::BuildMap(undeclared.len()));
+        self.add(Instruction::GetClosure);
         self.add(Instruction::LoadConst(Value::from(ValueRepr::Seq(
             macro_decl
                 .args
@@ -418,9 +416,6 @@ impl<'source> CodeGenerator<'source> {
                 .into(),
         ))));
         let mut flags = 0;
-        if self_reference {
-            flags |= MACRO_SELF_REFERENTIAL;
-        }
         if caller_reference {
             flags |= MACRO_CALLER;
         }

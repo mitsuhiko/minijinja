@@ -19,7 +19,6 @@ pub(crate) struct MacroData {
     // state under `state.macros`.
     pub macro_ref_id: usize,
     pub closure: Value,
-    pub self_reference: bool,
     pub caller_reference: bool,
 }
 
@@ -85,8 +84,8 @@ impl Object for Macro {
             kwargs_used.insert("caller");
             Some(
                 kwargs
-                    .and_then(|x| x.get(&Key::Str("caller")))
-                    .unwrap_or(&Value::UNDEFINED),
+                    .and_then(|x| x.get(&Key::Str("caller")).cloned())
+                    .unwrap_or(Value::UNDEFINED),
             )
         } else {
             None
@@ -112,27 +111,7 @@ impl Object for Macro {
         // there.  Unfortunately because we only have a &self reference here, we
         // cannot bump our own refcount.  Instead we need to wrap the macro data
         // into an extra level of Arc to avoid unnecessary clones.
-        let closure = if self.data.self_reference || caller.is_some() {
-            if let ValueRepr::Map(ref map, kind) = self.data.closure.0 {
-                let mut map = map.clone();
-                if self.data.self_reference {
-                    Arc::make_mut(&mut map).insert(
-                        Key::String(self.data.name.clone()),
-                        Value::from_object(Macro {
-                            data: self.data.clone(),
-                        }),
-                    );
-                }
-                if let Some(caller) = caller {
-                    Arc::make_mut(&mut map).insert(Key::Str("caller"), caller.clone());
-                }
-                ValueRepr::Map(map, kind).into()
-            } else {
-                unreachable!();
-            }
-        } else {
-            self.data.closure.clone()
-        };
+        let closure = self.data.closure.clone();
 
         // This requires some explanation here.  Because we get the state as &State and
         // not &mut State we are required to create a new state here.  This is unfortunate
@@ -140,7 +119,15 @@ impl Object for Macro {
         // Because macros cannot return anything other than strings (most importantly they)
         // can't return other macros this is however not an issue, as modifications in the
         // macro cannot leak out.
-        ok!(vm.eval_macro(instructions, *offset, closure, &mut out, state, arg_values));
+        ok!(vm.eval_macro(
+            instructions,
+            *offset,
+            closure,
+            caller,
+            &mut out,
+            state,
+            arg_values
+        ));
 
         Ok(if !matches!(state.auto_escape(), AutoEscape::None) {
             Value::from_safe_string(rv)

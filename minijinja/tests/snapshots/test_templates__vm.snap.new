@@ -1,0 +1,27 @@
+---
+source: minijinja/tests/test_templates.rs
+assertion_line: 71
+description: "{%- include \"example_macro.txt\" %}\n{%- set d = \"should never show up\" %}\n{{ example(1, 2, 3) }}\n{{ example(1, 2) }}"
+info: {}
+input_file: minijinja/tests/inputs/macro_include.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: TemplateNotFound,
+    detail: "tried to include non-existing template \"example_macro.txt\"",
+    name: "macro_include.txt",
+    line: 1,
+}
+
+template not found: tried to include non-existing template "example_macro.txt" (in macro_include.txt:1)
+------------------------------ macro_include.txt ------------------------------
+   1 > {%- include "example_macro.txt" %}
+     i     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ template not found
+   2 | {%- set d = "should never show up" %}
+   3 | {{ example(1, 2, 3) }}
+   4 | {{ example(1, 2) }}
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------
+

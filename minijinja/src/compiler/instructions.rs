@@ -11,10 +11,6 @@ pub const LOOP_FLAG_WITH_LOOP_VAR: u8 = 1;
 /// This loop is recursive.
 pub const LOOP_FLAG_RECURSIVE: u8 = 2;
 
-/// This macro is self referential.
-#[cfg(feature = "macros")]
-pub const MACRO_SELF_REFERENTIAL: u8 = 1;
-
 /// This macro uses the caller var.
 #[cfg(feature = "macros")]
 pub const MACRO_CALLER: u8 = 2;
@@ -230,6 +226,14 @@ pub enum Instruction<'source> {
     /// True if the value is undefined
     #[cfg(feature = "macros")]
     IsUndefined,
+
+    /// Encloses a variable.
+    #[cfg(feature = "macros")]
+    Enclose(&'source str),
+
+    /// Returns the closure of this context level.
+    #[cfg(feature = "macros")]
+    GetClosure,
 }
 
 #[derive(Copy, Clone)]

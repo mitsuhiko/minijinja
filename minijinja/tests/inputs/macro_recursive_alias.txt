@@ -28,5 +28,4 @@
     </nest>
 {%- endmacro -%}
 {% set not_nest = nest %}
-{% set nest = "not callable" %}
 {{ not_nest(top_level) }}

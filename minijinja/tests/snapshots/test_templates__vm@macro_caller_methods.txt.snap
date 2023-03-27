@@ -9,7 +9,7 @@ input_file: minijinja/tests/inputs/macro_caller_methods.txt
 
 
 
-  closure: original closure
+  closure: other closure
   name: caller
   args: ["a", "b"]
   caller: false

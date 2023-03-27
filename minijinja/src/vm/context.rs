@@ -1,11 +1,12 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::value::{OwnedValueIterator, Value};
+use crate::key::{Key, StaticKey};
+use crate::value::{intern, Object, ObjectKind, OwnedValueIterator, StructObject, Value};
 use crate::vm::loop_object::Loop;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
@@ -27,10 +28,57 @@ pub(crate) struct LoopState {
     pub(crate) object: Arc<Loop>,
 }
 
+/// Utility to enclose values for macros.
+///
+/// See `closure` on the [`Frame`] for how it's used.
+#[derive(Debug, Default)]
+pub(crate) struct Closure {
+    pub(crate) values: Mutex<BTreeMap<StaticKey, Value>>,
+}
+
+impl fmt::Display for Closure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut m = f.debug_map();
+        for (key, value) in self.values.lock().unwrap().iter() {
+            m.entry(&key, &value);
+        }
+        m.finish()
+    }
+}
+
+impl Object for Closure {
+    fn kind(&self) -> ObjectKind<'_> {
+        ObjectKind::Struct(self)
+    }
+}
+
+impl StructObject for Closure {
+    fn fields(&self) -> Vec<Arc<String>> {
+        self.values
+            .lock()
+            .unwrap()
+            .keys()
+            .filter_map(|x| x.as_str())
+            .map(intern)
+            .collect()
+    }
+
+    fn get_field(&self, name: &str) -> Option<Value> {
+        self.values.lock().unwrap().get(&Key::Str(name)).cloned()
+    }
+}
+
 pub(crate) struct Frame<'env> {
     pub(crate) locals: Locals<'env>,
     pub(crate) ctx: Value,
     pub(crate) current_loop: Option<LoopState>,
+
+    // normally a frame does not carry a closure, but it can when a macro is
+    // declared.  Once that happens, all writes to the frames locals are also
+    // duplicated into the closure.  Macros declared on that level, then share
+    // the closure object to enclose the parent values.  This emulates the
+    // behavior of closures in Jinja2.
+    pub(crate) closure: Option<Arc<Closure>>,
 }
 
 impl<'env> Default for Frame<'env> {
@@ -45,6 +93,7 @@ impl<'env> Frame<'env> {
             locals: Locals::new(),
             ctx,
             current_loop: None,
+            closure: None,
         }
     }
 }
@@ -184,7 +233,62 @@ impl<'env> Context<'env> {
 
     /// Stores a variable in the context.
     pub fn store(&mut self, key: &'env str, value: Value) {
-        self.stack.last_mut().unwrap().locals.insert(key, value);
+        let top = self.stack.last_mut().unwrap();
+        if let Some(ref closure) = top.closure {
+            closure
+                .values
+                .lock()
+                .unwrap()
+                .insert(StaticKey::from(key), value.clone());
+        }
+        top.locals.insert(key, value);
+    }
+
+    /// Adds a value to a closure if missing.
+    ///
+    /// All macros declare on a certain level reuse the same closure.  This is done
+    /// to emulate the behavior of how scopes work in Jinja2 in Python.  The
+    /// unfortunate downside is that this has to be done with a `Mutex`.
+    #[cfg(feature = "macros")]
+    pub fn enclose(&mut self, env: &Environment, key: &str) {
+        let value = self.load(env, key);
+        let top = self.stack.last_mut().unwrap();
+        let closure = top
+            .closure
+            .get_or_insert_with(|| Arc::new(Closure::default()));
+        let mut values = closure.values.lock().unwrap();
+        if !values.contains_key(&Key::Str(key)) {
+            values.insert(key.into(), value.unwrap_or(Value::UNDEFINED));
+        }
+    }
+
+    /// Loads the closure and returns it.
+    #[cfg(feature = "macros")]
+    pub fn closure(&mut self) -> Arc<Closure> {
+        let top = self.stack.last_mut().unwrap();
+        top.closure
+            .get_or_insert_with(|| Arc::new(Closure::default()))
+            .clone()
+    }
+
+    /// Temporarily takes the closure.
+    ///
+    /// This is done because includes are in the same scope as the module that
+    /// triggers the import, but we do not want to allow closures to be modified
+    /// from another file as this would be very confusing.
+    ///
+    /// This means that if you override a variable referenced by a macro after
+    /// including in the parent template, it will not override the value seen by
+    /// the macro.
+    #[cfg(feature = "macros")]
+    pub fn take_closure(&mut self) -> Option<Arc<Closure>> {
+        self.stack.last_mut().unwrap().closure.take()
+    }
+
+    /// Puts the closure back.
+    #[cfg(feature = "macros")]
+    pub fn reset_closure(&mut self, closure: Option<Arc<Closure>>) {
+        self.stack.last_mut().unwrap().closure = closure;
     }
 
     /// Looks up a variable in the context.
