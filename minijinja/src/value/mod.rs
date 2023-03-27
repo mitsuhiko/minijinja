@@ -216,8 +216,6 @@ pub enum ValueKind {
     Undefined,
     /// The value is the none singleton ([`()`])
     None,
-    /// The value is invalid
-    Invalid,
     /// The value is a [`bool`]
     Bool,
     /// The value is a number of a supported type.
@@ -239,7 +237,6 @@ impl fmt::Display for ValueKind {
         let ty = match *self {
             ValueKind::Undefined => "undefined",
             ValueKind::None => "none",
-            ValueKind::Invalid => "invalid",
             ValueKind::Bool => "bool",
             ValueKind::Number => "number",
             ValueKind::Char => "char",
@@ -594,13 +591,14 @@ impl Value {
             ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::F64(_) => ValueKind::Number,
             ValueRepr::Char(_) => ValueKind::Char,
             ValueRepr::None => ValueKind::None,
-            ValueRepr::Invalid(_) => ValueKind::Invalid,
             ValueRepr::I128(_) => ValueKind::Number,
             ValueRepr::String(..) => ValueKind::String,
             ValueRepr::Bytes(_) => ValueKind::Bytes,
             ValueRepr::U128(_) => ValueKind::Number,
             ValueRepr::Seq(_) => ValueKind::Seq,
             ValueRepr::Map(..) => ValueKind::Map,
+            // XXX: invalid values report themselves as maps which is a lie
+            ValueRepr::Invalid(_) => ValueKind::Map,
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
                 // XXX: basic objects should probably not report as map
                 ObjectKind::Plain => ValueKind::Map,
