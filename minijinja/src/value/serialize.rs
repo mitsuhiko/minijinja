@@ -10,7 +10,7 @@ use crate::value::{
 };
 
 #[derive(Debug)]
-pub struct InvalidValue(String);
+pub struct InvalidValue(Arc<String>);
 
 impl std::error::Error for InvalidValue {}
 
@@ -25,7 +25,7 @@ impl serde::ser::Error for InvalidValue {
     where
         T: fmt::Display,
     {
-        InvalidValue(msg.to_string())
+        InvalidValue(Arc::new(msg.to_string()))
     }
 }
 
@@ -36,7 +36,7 @@ impl serde::ser::Error for InvalidValue {
 pub fn transform<T: Serialize>(value: T) -> Value {
     match value.serialize(ValueSerializer) {
         Ok(rv) => rv,
-        Err(invalid) => ValueRepr::Invalid(invalid.0.into()).into(),
+        Err(invalid) => ValueRepr::Invalid(invalid.0).into(),
     }
 }
 
