@@ -5,6 +5,9 @@ All notable changes to MiniJinja are documented here.
 ## 0.31.0
 
 - Changed the closure behavior of macros to match the one of Jinja2. (#233)
+- `Value::from_serializable` will no longer panic on invalid values.  Instead
+  the error is deferred to runtime which makes working with objects possible
+  that are only partially valid for the runtime environment. (#234)
 
 ## 0.30.7
 

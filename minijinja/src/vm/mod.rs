@@ -90,7 +90,7 @@ impl<'env> Vm<'env> {
         self.eval_state(
             &mut State {
                 env: self.env,
-                ctx: Context::new(Frame::new(root)),
+                ctx: Context::new(Frame::new(ok!(root.assert_valid()))),
                 current_block: None,
                 current_call: None,
                 auto_escape,
@@ -253,7 +253,10 @@ impl<'env> Vm<'env> {
                     state.ctx.store(name, stack.pop());
                 }
                 Instruction::Lookup(name) => {
-                    stack.push(state.lookup(name).unwrap_or(Value::UNDEFINED));
+                    stack.push(ok!(state
+                        .lookup(name)
+                        .unwrap_or(Value::UNDEFINED)
+                        .assert_valid()));
                 }
                 Instruction::GetAttr(name) => {
                     a = stack.pop();
@@ -263,7 +266,7 @@ impl<'env> Vm<'env> {
                     // Only when we cannot look up something, we start to consider the undefined
                     // special case.
                     stack.push(match a.get_attr_fast(name) {
-                        Some(value) => value,
+                        Some(value) => ctx_ok!(value.assert_valid()),
                         None => ctx_ok!(undefined_behavior.handle_undefined(a.is_undefined())),
                     });
                 }
@@ -271,7 +274,7 @@ impl<'env> Vm<'env> {
                     a = stack.pop();
                     b = stack.pop();
                     stack.push(match b.get_item_opt(&a) {
-                        Some(value) => value,
+                        Some(value) => ctx_ok!(value.assert_valid()),
                         None => ctx_ok!(undefined_behavior.handle_undefined(b.is_undefined())),
                     });
                 }
@@ -404,7 +407,7 @@ impl<'env> Vm<'env> {
                         }
                     };
                     match next {
-                        Some(item) => stack.push(item),
+                        Some(item) => stack.push(ctx_ok!(item.assert_valid())),
                         None => {
                             pc = *jump_target;
                             continue;

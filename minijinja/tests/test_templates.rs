@@ -339,25 +339,88 @@ fn test_current_call_state() {
     );
 }
 
+// ideally this would work, but unfortuantely the way serde flatten works makes it
+// impossible for us to support with the internal optimizations in the value model.
+// see https://github.com/mitsuhiko/minijinja/issues/222
+#[derive(Debug, serde::Serialize)]
+struct Bad {
+    a: i32,
+    #[serde(flatten)]
+    more: Value,
+}
+
 #[test]
 #[should_panic = "can only flatten structs and maps"]
 fn test_flattening() {
-    // ideally this would work, but unfortuantely the way serde flatten works makes it
-    // impossible for us to support with the internal optimizations in the value model.
-    // see https://github.com/mitsuhiko/minijinja/issues/222
-    #[derive(Debug, serde::Serialize)]
-    struct Context {
-        a: i32,
-        #[serde(flatten)]
-        more: Value,
-    }
-
-    let ctx = Context {
+    let ctx = Bad {
         a: 42,
         more: Value::from(BTreeMap::from([("b", 23)])),
     };
 
     let env = Environment::new();
-    let rv = env.render_str("{{ debug() }}", ctx).unwrap();
-    assert_eq!(rv, "42|23");
+    env.render_str("{{ debug() }}", ctx).unwrap();
+}
+
+#[test]
+fn test_flattening_sub_item_good() {
+    let bad = Bad {
+        a: 42,
+        more: Value::from(BTreeMap::from([("b", 23)])),
+    };
+
+    let ctx = context!(bad, good => "good");
+    let env = Environment::new();
+
+    // we are not touching a bad value, so we are good
+    let rv = env.render_str("{{ good }}", ctx).unwrap();
+    assert_eq!(rv, "good");
+}
+
+#[test]
+#[should_panic = "can only flatten structs and maps"]
+fn test_flattening_sub_item_bad_lookup() {
+    let bad = Bad {
+        a: 42,
+        more: Value::from(BTreeMap::from([("b", 23)])),
+    };
+
+    let ctx = context!(bad, good => "good");
+    let env = Environment::new();
+
+    // resolving an invalid value will fail
+    env.render_str("{{ bad }}", ctx).unwrap();
+}
+
+#[test]
+#[should_panic = "can only flatten structs and maps"]
+fn test_flattening_sub_item_bad_attr() {
+    let bad = Bad {
+        a: 42,
+        more: Value::from(BTreeMap::from([("b", 23)])),
+    };
+
+    let ctx = context!(good => context!(bad));
+    let env = Environment::new();
+
+    // resolving an invalid value will fail, even in an attribute lookup
+    env.render_str("{% if good.bad %}...{% endif %}", ctx)
+        .unwrap();
+}
+
+#[test]
+fn test_flattening_sub_item_shielded_print() {
+    let bad = Bad {
+        a: 42,
+        more: Value::from(BTreeMap::from([("b", 23)])),
+    };
+
+    let ctx = context!(good => context!(bad));
+    let env = Environment::new();
+
+    // this on the other hand is okay
+    let value = env.render_str("{{ good }}", ctx).unwrap();
+    assert_eq!(
+        value,
+        r#"{"bad": <invalid value: can only flatten structs and maps (got an enum)>}"#
+    );
 }

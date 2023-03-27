@@ -116,7 +116,7 @@ use crate::functions;
 use crate::key::{Key, StaticKey};
 use crate::utils::OnDrop;
 use crate::value::object::{SimpleSeqObject, SimpleStructObject};
-use crate::value::serialize::ValueSerializer;
+use crate::value::serialize::transform;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Rest};
@@ -216,6 +216,8 @@ pub enum ValueKind {
     Undefined,
     /// The value is the none singleton ([`()`])
     None,
+    /// The value is invalid
+    Invalid,
     /// The value is a [`bool`]
     Bool,
     /// The value is a number of a supported type.
@@ -237,6 +239,7 @@ impl fmt::Display for ValueKind {
         let ty = match *self {
             ValueKind::Undefined => "undefined",
             ValueKind::None => "none",
+            ValueKind::Invalid => "invalid",
             ValueKind::Bool => "bool",
             ValueKind::Number => "number",
             ValueKind::Char => "char",
@@ -288,6 +291,7 @@ pub(crate) enum ValueRepr {
     F64(f64),
     Char(char),
     None,
+    Invalid(Arc<String>),
     U128(Packed<u128>),
     I128(Packed<i128>),
     String(Arc<String>, StringType),
@@ -307,6 +311,7 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::F64(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Char(val) => fmt::Debug::fmt(val, f),
             ValueRepr::None => write!(f, "None"),
+            ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
@@ -391,6 +396,7 @@ impl fmt::Display for Value {
             }
             ValueRepr::Char(val) => write!(f, "{val}"),
             ValueRepr::None => write!(f, "none"),
+            ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
             ValueRepr::String(val, _) => write!(f, "{val}"),
             ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
@@ -467,22 +473,17 @@ impl Value {
     /// let val = Value::from_serializable(&vec![1, 2, 3]);
     /// ```
     ///
-    /// # Panics
-    ///
-    /// This method panics if types are passed which are not supported by the
-    /// underlying rendering system.  Today this is the case for value types
-    /// that have unrepresentable keys, when custom serialize implementation
-    /// fail (for instance when invalid types are attempted to be flattened).
+    /// This method does not fail but it might return a value that is not valid.  Such
+    /// values will when operated on fail in the template engine in most situations.
+    /// This for instance can happen if the underlying implementation of [`Serialize`]
+    /// fails.  There are also cases where invalid objects are silently hidden in the
+    /// engine today.  This is for instance the case for when keys are used in hash maps
+    /// that the engine cannot deal with.  Invalid values are considered an implementation
+    /// detail.  There is currently no API to validate a value.
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
         let _serialization_guard = mark_internal_serialization();
         let _optimization_guard = value_optimization();
-
-        // note on `SerializationFailed` behaves like `Infallible` in that it should
-        // never happen.  Instead the creation of this error itself will panic instead.
-        match Serialize::serialize(value, ValueSerializer) {
-            Ok(rv) => rv,
-            Err(infallible) => match infallible {},
-        }
+        transform(value)
     }
 
     /// Creates a value from a safe string.
@@ -593,6 +594,7 @@ impl Value {
             ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::F64(_) => ValueKind::Number,
             ValueRepr::Char(_) => ValueKind::Char,
             ValueRepr::None => ValueKind::None,
+            ValueRepr::Invalid(_) => ValueKind::Invalid,
             ValueRepr::I128(_) => ValueKind::Number,
             ValueRepr::String(..) => ValueKind::String,
             ValueRepr::Bytes(_) => ValueKind::Bytes,
@@ -625,7 +627,7 @@ impl Value {
             ValueRepr::Char(x) => x != '\x00',
             ValueRepr::String(ref x, _) => !x.is_empty(),
             ValueRepr::Bytes(ref x) => !x.is_empty(),
-            ValueRepr::None | ValueRepr::Undefined => false,
+            ValueRepr::None | ValueRepr::Undefined | ValueRepr::Invalid(_) => false,
             ValueRepr::Seq(ref x) => !x.is_empty(),
             ValueRepr::Map(ref x, _) => !x.is_empty(),
             ValueRepr::Dynamic(ref x) => match x.kind() {
@@ -901,6 +903,15 @@ impl Value {
         }
     }
 
+    /// Asserts that the value is valid.
+    pub(crate) fn assert_valid(self) -> Result<Value, Error> {
+        if let ValueRepr::Invalid(ref err) = self.0 {
+            Err(Error::new(ErrorKind::BadSerialization, err.to_string()))
+        } else {
+            Ok(self)
+        }
+    }
+
     /// Calls the value directly.
     pub(crate) fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         if let ValueRepr::Dynamic(ref dy) = self.0 {
@@ -1050,7 +1061,9 @@ impl Serialize for Value {
             ValueRepr::I64(i) => serializer.serialize_i64(i),
             ValueRepr::F64(f) => serializer.serialize_f64(f),
             ValueRepr::Char(c) => serializer.serialize_char(c),
-            ValueRepr::None | ValueRepr::Undefined => serializer.serialize_unit(),
+            ValueRepr::None | ValueRepr::Undefined | ValueRepr::Invalid(_) => {
+                serializer.serialize_unit()
+            }
             ValueRepr::U128(u) => serializer.serialize_u128(u.0),
             ValueRepr::I128(i) => serializer.serialize_i128(i.0),
             ValueRepr::String(ref s, _) => serializer.serialize_str(s),
