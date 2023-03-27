@@ -87,10 +87,13 @@ impl<'env> Vm<'env> {
         auto_escape: AutoEscape,
     ) -> Result<Option<Value>, Error> {
         let _guard = value::value_optimization();
+        if let ValueRepr::Invalid(ref err) = root.0 {
+            return Err(Error::new(ErrorKind::BadSerialization, err.to_string()));
+        }
         self.eval_state(
             &mut State {
                 env: self.env,
-                ctx: Context::new(Frame::new(ok!(root.assert_valid()))),
+                ctx: Context::new(Frame::new(root)),
                 current_block: None,
                 current_call: None,
                 auto_escape,
@@ -233,6 +236,16 @@ impl<'env> Vm<'env> {
                 };
             }
 
+            macro_rules! assert_valid {
+                ($expr:expr) => {{
+                    let val = $expr;
+                    if let ValueRepr::Invalid(ref err) = val.0 {
+                        bail!(Error::new(ErrorKind::BadSerialization, err.to_string()));
+                    }
+                    val
+                }};
+            }
+
             // if the fuel consumption feature is enabled, track the fuel
             // consumption here.
             #[cfg(feature = "fuel")]
@@ -253,10 +266,9 @@ impl<'env> Vm<'env> {
                     state.ctx.store(name, stack.pop());
                 }
                 Instruction::Lookup(name) => {
-                    stack.push(ok!(state
+                    stack.push(assert_valid!(state
                         .lookup(name)
-                        .unwrap_or(Value::UNDEFINED)
-                        .assert_valid()));
+                        .unwrap_or(Value::UNDEFINED)));
                 }
                 Instruction::GetAttr(name) => {
                     a = stack.pop();
@@ -266,7 +278,7 @@ impl<'env> Vm<'env> {
                     // Only when we cannot look up something, we start to consider the undefined
                     // special case.
                     stack.push(match a.get_attr_fast(name) {
-                        Some(value) => ctx_ok!(value.assert_valid()),
+                        Some(value) => assert_valid!(value),
                         None => ctx_ok!(undefined_behavior.handle_undefined(a.is_undefined())),
                     });
                 }
@@ -274,7 +286,7 @@ impl<'env> Vm<'env> {
                     a = stack.pop();
                     b = stack.pop();
                     stack.push(match b.get_item_opt(&a) {
-                        Some(value) => ctx_ok!(value.assert_valid()),
+                        Some(value) => assert_valid!(value),
                         None => ctx_ok!(undefined_behavior.handle_undefined(b.is_undefined())),
                     });
                 }
@@ -407,7 +419,7 @@ impl<'env> Vm<'env> {
                         }
                     };
                     match next {
-                        Some(item) => stack.push(ctx_ok!(item.assert_valid())),
+                        Some(item) => stack.push(assert_valid!(item)),
                         None => {
                             pc = *jump_target;
                             continue;

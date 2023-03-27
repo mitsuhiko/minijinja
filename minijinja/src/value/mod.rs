@@ -903,15 +903,6 @@ impl Value {
         }
     }
 
-    /// Asserts that the value is valid.
-    pub(crate) fn assert_valid(self) -> Result<Value, Error> {
-        if let ValueRepr::Invalid(ref err) = self.0 {
-            Err(Error::new(ErrorKind::BadSerialization, err.to_string()))
-        } else {
-            Ok(self)
-        }
-    }
-
     /// Calls the value directly.
     pub(crate) fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         if let ValueRepr::Dynamic(ref dy) = self.0 {
