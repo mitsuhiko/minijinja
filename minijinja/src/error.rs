@@ -155,7 +155,7 @@ impl ErrorKind {
             ErrorKind::UnknownMethod => "unknown method",
             ErrorKind::BadEscape => "bad string escape",
             ErrorKind::UndefinedError => "undefined value",
-            ErrorKind::BadSerialization => "could not serialize to internal format",
+            ErrorKind::BadSerialization => "could not serialize to value",
             ErrorKind::BadInclude => "could not render include",
             ErrorKind::EvalBlock => "could not render block",
             ErrorKind::CannotUnpack => "cannot unpack",
