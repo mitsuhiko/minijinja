@@ -1,4 +1,4 @@
-# dynamic
+# dynamic-objects
 
 This example demonstrates how to pass dynamic runtime objects to the
 engine for custom behavior.

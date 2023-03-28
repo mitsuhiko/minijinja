@@ -10,13 +10,14 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [build-script](build-script): Demonstrates how to generate Rust code with MiniJinja in build scripts.
 * [debug](debug): contains an example showing the built-in `debug()` function.
 * [dynamic-context](dynamic-context): demonstrates how to use dynamic objects as template context.
-* [dynamic](dynamic): demonstrates how to use dynamic objects in templates.
+* [dynamic-objects](dynamic-objects): demonstrates how to use dynamic objects in templates.
 * [error](error): shows the built-in error reporting support.
 * [expr](expr): demonstrates the expression evaluation support.
 * [filters](filters): Shows how to write and use custom filters and global functions.
 * [generate-yaml](generate-yaml): renders YAML files from Jinja templates.
 * [hello](hello): minimal Hello World example.
 * [inheritance](inheritance): demonstrates how to use template inheritance.
+* [invalid-value](invalid-value): demonstrates how the engine deals with invalid values.
 * [load-lazy](load-lazy): Demonstrates how to load data lazy on demand.
 * [load-resource](load-resource): Demonstrates how to load files dynamically from disk within templates.
 * [loader](loader): shows how to load templates dynamically at runtime.
