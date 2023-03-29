@@ -370,6 +370,9 @@ impl<'env> Vm<'env> {
                 Instruction::In => {
                     a = stack.pop();
                     b = stack.pop();
+                    // the in-operator can fail if the value is undefined and
+                    // we are in strict mode.
+                    ctx_ok!(state.undefined_behavior().assert_iterable(&a));
                     stack.push(ctx_ok!(ops::contains(&a, &b)));
                 }
                 Instruction::Neg => {

@@ -27,6 +27,7 @@ fn test_lenient_undefined() {
     assert_eq!(render!(in env, "{{ undefined is undefined }}"), "true");
     assert_eq!(render!(in env, "{{ undefined|list }}"), "[]");
     assert_eq!(render!(in env, "<{{ undefined|test }}>"), "<>");
+    assert_eq!(render!(in env, "{{ 42 in undefined }}"), "false");
 }
 
 #[test]
@@ -72,6 +73,12 @@ fn test_strict_undefined() {
             .kind(),
         ErrorKind::UndefinedError
     );
+    assert_eq!(
+        env.render_str("{{ 42 in undefined }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
 }
 
 #[test]
@@ -94,4 +101,5 @@ fn test_chainable_undefined() {
     assert_eq!(render!(in env, "{{ undefined is undefined }}"), "true");
     assert_eq!(render!(in env, "{{ undefined|list }}"), "[]");
     assert_eq!(render!(in env, "<{{ undefined|test }}>"), "<>");
+    assert_eq!(render!(in env, "{{ 42 in undefined }}"), "false");
 }

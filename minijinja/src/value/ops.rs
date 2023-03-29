@@ -263,6 +263,11 @@ pub fn string_concat(mut left: Value, right: &Value) -> Value {
 
 /// Implements a containment operation on values.
 pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
+    // Special case where if the container is undefined, it cannot hold
+    // values.  For strict containment checks the vm has a special case.
+    if container.is_undefined() {
+        return Ok(Value::from(false));
+    }
     let rv = if let Some(s) = container.as_str() {
         if let Some(s2) = value.as_str() {
             s.contains(s2)

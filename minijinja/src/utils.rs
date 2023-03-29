@@ -159,10 +159,16 @@ impl UndefinedBehavior {
     /// otherwise it succeeds with an empty iteration.  This is also internally used in the
     /// engine to convert values to lists.
     pub(crate) fn try_iter(self, value: Value) -> Result<OwnedValueIterator, Error> {
+        self.assert_iterable(&value)
+            .and_then(|_| value.try_iter_owned())
+    }
+
+    /// Are we strict on iteration?
+    pub(crate) fn assert_iterable(self, value: &Value) -> Result<(), Error> {
         if matches!(self, UndefinedBehavior::Strict) && value.is_undefined() {
             Err(Error::from(ErrorKind::UndefinedError))
         } else {
-            value.try_iter_owned()
+            Ok(())
         }
     }
 }

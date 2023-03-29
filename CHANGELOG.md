@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 0.31.1
+
+- The `in` operator now does not fail if the value is undefined and the
+  undefined behavior is not strict.
+
 ## 0.31.0
 
 - Changed the closure behavior of macros to match the one of Jinja2. (#233)
