@@ -18,7 +18,7 @@ fn main() {
 
     let good = true;
     let bad = BadStruct { a: 1, b: 2 };
-    let container = context! { good, bad => bad.clone() };
+    let container = context! { good, bad };
     let ctx = context! { good, bad, container };
 
     for name in ["good.txt", "mixed.txt", "bad.txt"] {
