@@ -130,6 +130,8 @@ def test_loader_reload():
 
 
 def test_autoescape():
+    assert Environment().auto_escape_callback is None
+
     def auto_escape(name):
         assert name == "foo.html"
         return "html"
@@ -138,6 +140,7 @@ def test_autoescape():
         auto_escape_callback=auto_escape,
         loader=lambda x: "Hello {{ foo }}",
     )
+    assert env.auto_escape_callback is auto_escape
 
     rv = env.render_template("foo.html", foo="<x>")
     assert rv == "Hello &lt;x&gt;"

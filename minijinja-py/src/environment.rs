@@ -22,6 +22,7 @@ thread_local! {
 struct Inner {
     env: minijinja::Environment<'static>,
     loader: Option<Py<PyAny>>,
+    auto_escape_callback: Option<Py<PyAny>>,
 }
 
 /// Represents a MiniJinja environment.
@@ -39,6 +40,7 @@ impl Environment {
             inner: Mutex::new(Inner {
                 env: minijinja::Environment::new(),
                 loader: None,
+                auto_escape_callback: None,
             }),
             reload_before_render: AtomicBool::new(false),
         })
@@ -223,9 +225,9 @@ impl Environment {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
         let callback: Py<PyAny> = callback.into();
-        self.inner
-            .lock()
-            .unwrap()
+        let mut inner = self.inner.lock().unwrap();
+        inner.auto_escape_callback = Some(callback.clone());
+        inner
             .env
             .set_auto_escape_callback(move |name: &str| -> AutoEscape {
                 Python::with_gil(|py| {
@@ -258,6 +260,11 @@ impl Environment {
                 })
             });
         Ok(())
+    }
+
+    #[getter]
+    pub fn get_auto_escape_callback(&self) -> PyResult<Option<Py<PyAny>>> {
+        Ok(self.inner.lock().unwrap().auto_escape_callback.clone())
     }
 
     /// Sets a loader function for the environment.
