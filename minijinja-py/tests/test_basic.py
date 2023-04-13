@@ -1,5 +1,8 @@
+import binascii
+import pytest
+
 from _pytest.unraisableexception import catch_unraisable_exception
-from minijinja import Environment, TemplateError, safe
+from minijinja import Environment, TemplateError, safe, pass_state
 
 
 def test_expression():
@@ -130,6 +133,8 @@ def test_loader_reload():
 
 
 def test_autoescape():
+    assert Environment().auto_escape_callback is None
+
     def auto_escape(name):
         assert name == "foo.html"
         return "html"
@@ -138,6 +143,7 @@ def test_autoescape():
         auto_escape_callback=auto_escape,
         loader=lambda x: "Hello {{ foo }}",
     )
+    assert env.auto_escape_callback is auto_escape
 
     rv = env.render_template("foo.html", foo="<x>")
     assert rv == "Hello &lt;x&gt;"
@@ -146,6 +152,38 @@ def test_autoescape():
         rv = env.render_template("invalid.html", foo="<x>")
         assert rv == "Hello <x>"
         assert cm.unraisable[0] is AssertionError
+
+
+def test_finalizer():
+    assert Environment().finalizer is None
+
+    @pass_state
+    def my_finalizer(state, value):
+        assert state.name == "<string>"
+        if value is None:
+            return ""
+        elif isinstance(value, bytes):
+            return binascii.b2a_hex(value).decode("utf-8")
+        return NotImplemented
+
+    env = Environment(finalizer=my_finalizer)
+
+    rv = env.render_str("[{{ foo }}]")
+    assert rv == "[]"
+    rv = env.render_str("[{{ foo }}]", foo=None)
+    assert rv == "[]"
+    rv = env.render_str("[{{ foo }}]", foo="test")
+    assert rv == "[test]"
+    rv = env.render_str("[{{ foo }}]", foo=b"test")
+    assert rv == "[74657374]"
+
+    def raising_finalizer(value):
+        1 / 0
+
+    env = Environment(finalizer=raising_finalizer)
+
+    with pytest.raises(ZeroDivisionError):
+        env.render_str("{{ whatever }}")
 
 
 def test_globals():

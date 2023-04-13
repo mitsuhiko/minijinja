@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::Mutex;
 
 use minijinja::value::{Rest, Value};
-use minijinja::{context, AutoEscape, Error, Source, State, UndefinedBehavior};
+use minijinja::{context, escape_formatter, AutoEscape, Error, Source, State, UndefinedBehavior};
 use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -22,6 +22,8 @@ thread_local! {
 struct Inner {
     env: minijinja::Environment<'static>,
     loader: Option<Py<PyAny>>,
+    auto_escape_callback: Option<Py<PyAny>>,
+    finalizer_callback: Option<Py<PyAny>>,
 }
 
 /// Represents a MiniJinja environment.
@@ -39,6 +41,8 @@ impl Environment {
             inner: Mutex::new(Inner {
                 env: minijinja::Environment::new(),
                 loader: None,
+                auto_escape_callback: None,
+                finalizer_callback: None,
             }),
             reload_before_render: AtomicBool::new(false),
         })
@@ -223,9 +227,9 @@ impl Environment {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
         let callback: Py<PyAny> = callback.into();
-        self.inner
-            .lock()
-            .unwrap()
+        let mut inner = self.inner.lock().unwrap();
+        inner.auto_escape_callback = Some(callback.clone());
+        inner
             .env
             .set_auto_escape_callback(move |name: &str| -> AutoEscape {
                 Python::with_gil(|py| {
@@ -258,6 +262,52 @@ impl Environment {
                 })
             });
         Ok(())
+    }
+
+    #[getter]
+    pub fn get_auto_escape_callback(&self) -> PyResult<Option<Py<PyAny>>> {
+        Ok(self.inner.lock().unwrap().auto_escape_callback.clone())
+    }
+
+    /// Sets a finalizer.
+    ///
+    /// A finalizer is called before a value is rendered to customize it.
+    #[setter]
+    pub fn set_finalizer(&self, callback: &PyAny) -> PyResult<()> {
+        if !callback.is_callable() {
+            return Err(PyRuntimeError::new_err("expected callback"));
+        }
+        let callback: Py<PyAny> = callback.into();
+        let mut inner = self.inner.lock().unwrap();
+        inner.finalizer_callback = Some(callback.clone());
+        inner.env.set_formatter(move |output, state, value| {
+            Python::with_gil(|py| -> Result<(), Error> {
+                let maybe_new_value = bind_state(state, || -> Result<_, Error> {
+                    let args = std::slice::from_ref(value);
+                    let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), args)
+                        .map_err(to_minijinja_error)?;
+                    let rv = callback
+                        .call(py, py_args, py_kwargs)
+                        .map_err(to_minijinja_error)?;
+                    if rv.is(&py.NotImplemented()) {
+                        Ok(None)
+                    } else {
+                        Ok(Some(to_minijinja_value(rv.as_ref(py))))
+                    }
+                })?;
+                let value = match maybe_new_value {
+                    Some(ref new_value) => new_value,
+                    None => value,
+                };
+                escape_formatter(output, state, value)
+            })
+        });
+        Ok(())
+    }
+
+    #[getter]
+    pub fn get_finalizer(&self) -> PyResult<Option<Py<PyAny>>> {
+        Ok(self.inner.lock().unwrap().finalizer_callback.clone())
     }
 
     /// Sets a loader function for the environment.
