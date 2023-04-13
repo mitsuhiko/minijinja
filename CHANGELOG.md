@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 - The `in` operator now does not fail if the value is undefined and the
   undefined behavior is not strict. (#235)
+- The Python binding now supports finalizers. (#238)
 
 ## 0.31.0
 
