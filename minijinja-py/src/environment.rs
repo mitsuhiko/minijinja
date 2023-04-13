@@ -286,7 +286,6 @@ impl Environment {
                     let args = std::slice::from_ref(value);
                     let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), args)
                         .map_err(to_minijinja_error)?;
-                    dbg!(&py_args, py_kwargs);
                     let rv = callback
                         .call(py, py_args, py_kwargs)
                         .map_err(to_minijinja_error)?;
