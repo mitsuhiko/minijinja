@@ -108,6 +108,26 @@ env = Environment(auto_escape_callback=lambda x: x.endswith((".html", ".foo")))
 MiniJinja uses [markupsafe](https://github.com/pallets/markupsafe) if it's available
 on the Python side.  It will honor `__html__`.
 
+## Finalizers
+
+Instead of custom formatters like in MiniJinja, you can define a finalizer instead
+which is similar to how it works in Jinja2.  It's passed a value (or optional also
+the state as first argument whne `pass_state` is used) and can return a new value.
+If the special `NotImplemented` value is returned, the original value is rendered
+without any modification:
+
+```
+from minijinja import Environment
+
+def finalizer(value):
+    if value is None:
+	return ""
+    return NotImplemented
+
+env = Environment(finalizer=finalizer)
+assert env.render_str("{{ none }}") == ""
+```
+
 ## State Access
 
 Functions passed to the environment such as filters or global functions can

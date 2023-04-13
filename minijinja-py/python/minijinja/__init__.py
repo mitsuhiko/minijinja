@@ -29,6 +29,7 @@ class Environment(_lowlevel.Environment):
         fuel=None,
         undefined_behavior=None,
         auto_escape_callback=None,
+        finalizer=None,
         reload_before_render=False,
     ):
         super().__init__()
@@ -52,6 +53,8 @@ class Environment(_lowlevel.Environment):
         self.debug = debug
         if auto_escape_callback is not None:
             self.auto_escape_callback = auto_escape_callback
+        if finalizer is not None:
+            self.finalizer = finalizer
         if undefined_behavior is not None:
             self.undefined_behavior = undefined_behavior
         self.reload_before_render = reload_before_render
