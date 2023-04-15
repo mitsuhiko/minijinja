@@ -608,6 +608,18 @@ impl Value {
         }
     }
 
+    /// Returns `true` if the value is number.
+    pub fn is_number(&self) -> bool {
+        matches!(
+            self.0,
+            ValueRepr::U64(_)
+                | ValueRepr::I64(_)
+                | ValueRepr::F64(_)
+                | ValueRepr::I128(_)
+                | ValueRepr::U128(_)
+        )
+    }
+
     /// Returns `true` if the map represents keyword arguments.
     pub fn is_kwargs(&self) -> bool {
         matches!(self.0, ValueRepr::Map(_, MapType::Kwargs))
@@ -649,6 +661,16 @@ impl Value {
     /// Returns `true` if this value is none.
     pub fn is_none(&self) -> bool {
         matches!(&self.0, ValueRepr::None)
+    }
+
+    /// If the value is `f64`, return it.
+    pub fn as_f64(&self) -> Option<f64> {
+        match self.0 {
+            ValueRepr::U64(x) => Some(x as f64),
+            ValueRepr::I64(x) => Some(x as f64),
+            ValueRepr::F64(x) => Some(x),
+            _ => None,
+        }
     }
 
     /// If the value is a string, return it.
