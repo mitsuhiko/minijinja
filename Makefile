@@ -40,6 +40,9 @@ run-tests:
 	@cd minijinja; cargo test --no-default-features --features=speedups,$(FEATURES)
 	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
 	@cd minijinja; cargo check --no-default-features --features=debug
+	@cd minijinja-autoreload; cargo test
+	@cd minijinja-contrib; cargo test
+	@cd minijinja-stack-ref; cargo test
 
 .PHONY: check
 check:
