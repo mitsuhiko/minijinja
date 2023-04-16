@@ -27,35 +27,28 @@ pub fn pluralize(
     singular: Option<String>,
     plural: Option<String>,
 ) -> Result<Value, Error> {
-    macro_rules! int_try_from {
-         ($ty:ty) => {
-             <$ty>::try_from(v.clone()).ok().map(|v| v != 1)
-         };
-         ($fty:ty, $($ty:ty),*) => {
-             int_try_from!($fty).or_else(|| int_try_from!($($ty),*))
-         }
-     }
-    let is_plural: bool = v
-        .as_str()
-        .and_then(|s| s.parse::<i128>().ok())
-        .map(|l| l != 1)
-        .or_else(|| v.len().map(|l| l != 1))
-        .or_else(|| int_try_from!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, usize))
-        .ok_or_else(|| {
-            Error::new(
-                ErrorKind::InvalidOperation,
-                format!(
-                    "Pluralize argument is not an integer, or a sequence / object with a \
+    let is_singular = match v.len() {
+        Some(val) => val == 1,
+        None => match i64::try_from(v.clone()) {
+            Ok(val) => val == 1,
+            Err(_) => {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!(
+                        "Pluralize argument is not an integer, or a sequence / object with a \
                          length but of type {}",
-                    v.kind()
-                ),
-            )
-        })?;
-    Ok(match (is_plural, singular, plural) {
-        (false, None, _) => "".into(),
-        (false, Some(suffix), _) => suffix.into(),
-        (true, _, None) => "s".into(),
-        (true, _, Some(suffix)) => suffix.into(),
+                        v.kind()
+                    ),
+                ));
+            }
+        },
+    };
+
+    Ok(match (is_singular, singular, plural) {
+        (true, None, _) => "".into(),
+        (true, Some(suffix), _) => suffix.into(),
+        (false, _, None) => "s".into(),
+        (false, _, Some(suffix)) => suffix.into(),
     })
 }
 
@@ -131,21 +124,11 @@ fn test_pluralize() {
         &env.render_str(
             r#"You have {{ num_cherries }} cherr{{ num_cherries|pluralize("y", "ies") }}."#,
             context! {
-                num_cherries => "5",
+                num_cherries => 5,
             }
         )
         .unwrap(),
         "You have 5 cherries."
-    );
-    assert_eq!(
-        &env.render_str(
-            r#"You have 1 cherr{{ num_cherries|pluralize("y", "ies") }}."#,
-            context! {
-                num_cherries => true,
-            }
-        )
-        .unwrap(),
-        "You have 1 cherry.",
     );
     assert_eq!(
         &env.render_str(
