@@ -428,9 +428,17 @@ primitive_try_from!(char, {
     ValueRepr::Char(val) => val,
 });
 primitive_try_from!(f32, {
+    ValueRepr::U64(val) => val as f32,
+    ValueRepr::I64(val) => val as f32,
+    ValueRepr::U128(val) => val.0 as f32,
+    ValueRepr::I128(val) => val.0 as f32,
     ValueRepr::F64(val) => val as f32,
 });
 primitive_try_from!(f64, {
+    ValueRepr::U64(val) => val as f64,
+    ValueRepr::I64(val) => val as f64,
+    ValueRepr::U128(val) => val.0 as f64,
+    ValueRepr::I128(val) => val.0 as f64,
     ValueRepr::F64(val) => val,
 });
 
@@ -665,4 +673,14 @@ impl From<usize> for Value {
     fn from(val: usize) -> Self {
         Value::from(val as u64)
     }
+}
+
+#[test]
+fn test_as_f64() {
+    let v = Value::from(42u32);
+    let f: f64 = v.try_into().unwrap();
+    assert_eq!(f, 42.0);
+    let v = Value::from(42.5);
+    let f: f64 = v.try_into().unwrap();
+    assert_eq!(f, 42.5);
 }

@@ -608,6 +608,20 @@ impl Value {
         }
     }
 
+    /// Returns `true` if the value is a number.
+    ///
+    /// To convert a value into a primitive number, use [`TryFrom`] or [`TryInto`].
+    pub fn is_number(&self) -> bool {
+        matches!(
+            self.0,
+            ValueRepr::U64(_)
+                | ValueRepr::I64(_)
+                | ValueRepr::F64(_)
+                | ValueRepr::I128(_)
+                | ValueRepr::U128(_)
+        )
+    }
+
     /// Returns `true` if the map represents keyword arguments.
     pub fn is_kwargs(&self) -> bool {
         matches!(self.0, ValueRepr::Map(_, MapType::Kwargs))
