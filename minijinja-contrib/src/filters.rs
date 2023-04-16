@@ -1,3 +1,5 @@
+#[cfg(test)]
+use similar_asserts::assert_eq;
 use std::convert::TryFrom;
 
 use minijinja::value::Value;
@@ -65,7 +67,7 @@ fn test_pluralize() {
         (10, "You have 10 messages."),
     ] {
         assert_eq!(
-            &env.render_str(
+            env.render_str(
                 "You have {{ num_messages }} message{{ num_messages|pluralize }}.",
                 context! {
                     num_messages => num,
@@ -82,7 +84,7 @@ fn test_pluralize() {
         (10, "You have 10 walruses."),
     ] {
         assert_eq!(
-            &env.render_str(
+            env.render_str(
                 r#"You have {{ num_walruses }} walrus{{ num_walruses|pluralize(None, "es") }}."#,
                 context! {
                     num_walruses => num,
@@ -99,7 +101,7 @@ fn test_pluralize() {
         (10, "You have 10 cherries."),
     ] {
         assert_eq!(
-            &env.render_str(
+            env.render_str(
                 r#"You have {{ num_cherries }} cherr{{ num_cherries|pluralize("y", "ies") }}."#,
                 context! {
                     num_cherries => num,
@@ -111,7 +113,7 @@ fn test_pluralize() {
     }
 
     assert_eq!(
-        &env.render_str(
+        env.render_str(
             r#"You have {{ num_cherries|length }} cherr{{ num_cherries|pluralize("y", "ies") }}."#,
             context! {
                 num_cherries => vec![(); 5],
@@ -121,7 +123,7 @@ fn test_pluralize() {
         "You have 5 cherries."
     );
     assert_eq!(
-        &env.render_str(
+        env.render_str(
             r#"You have {{ num_cherries }} cherr{{ num_cherries|pluralize("y", "ies") }}."#,
             context! {
                 num_cherries => 5,
@@ -131,7 +133,7 @@ fn test_pluralize() {
         "You have 5 cherries."
     );
     assert_eq!(
-        &env.render_str(
+        env.render_str(
             r#"You have {{ num_cherries }} cherr{{ num_cherries|pluralize("y", "ies") }}."#,
             context! {
                 num_cherries => 0.5f32,

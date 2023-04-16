@@ -19,3 +19,4 @@ minijinja = { version = "0.31.1", path = "../minijinja", default-features = fals
 
 [dev-dependencies]
 minijinja = { version = "0.31.1", path = "../minijinja", features = ["source"] }
+similar-asserts = "1.4.2"
