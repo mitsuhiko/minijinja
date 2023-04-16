@@ -641,6 +641,10 @@ mod builtins {
     }
 
     /// Returns the sorted version of the given list.
+    /// ```jinja
+    /// {{ [1, 3, 2, 4]|sort }} -> [4, 3, 2, 1]
+    /// {{ [1, 3, 2, 4]|sort(true) }} -> [1, 2, 3, 4]
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn sort(state: &State, value: Value, reverse: Option<bool>) -> Result<Value, Error> {
         let mut items = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
@@ -655,6 +659,12 @@ mod builtins {
     }
 
     /// Returns the sorted by `attr` version of the given list.
+    /// ```jinja
+    /// # Sort users by age in descending order.
+    /// {{ users|sortattr("age") }}
+    /// # Sort users by age in ascending order.
+    /// {{ users|sortattr("age", true) }}
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn sortattr(
         state: &State,
