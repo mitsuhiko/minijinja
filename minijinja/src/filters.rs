@@ -654,6 +654,28 @@ mod builtins {
         Ok(Value::from(items))
     }
 
+    /// Returns the sorted by `attr` version of the given list.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn sortattr(
+        state: &State,
+        value: Value,
+        attr: Cow<'_, str>,
+        reverse: Option<bool>,
+    ) -> Result<Value, Error> {
+        let mut items = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
+            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
+        }))
+        .collect::<Vec<_>>();
+        items.sort_by(|a, b| match (a.get_path(&attr), b.get_path(&attr)) {
+            (Ok(a), Ok(b)) => a.partial_cmp(&b).unwrap_or(Ordering::Less),
+            _ => Ordering::Equal,
+        });
+        if reverse.unwrap_or(false) {
+            items.reverse();
+        }
+        Ok(Value::from(items))
+    }
+
     /// Converts the input value into a list.
     ///
     /// If the value is already a list, then it's returned unchanged.
