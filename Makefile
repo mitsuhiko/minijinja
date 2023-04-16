@@ -10,7 +10,7 @@ build:
 
 .PHONY: doc
 doc:
-	@cd minijinja; RUSTC_BOOTSTRAP=1 RUSTDOCFLAGS="--cfg=docsrs --html-in-header doc-header.html" cargo doc -p minijinja -p minijinja-autoreload -p minijinja-stack-ref --no-deps --features=$(DOC_FEATURES)
+	@cd minijinja; RUSTC_BOOTSTRAP=1 RUSTDOCFLAGS="--cfg=docsrs --html-in-header doc-header.html" cargo doc -p minijinja -p minijinja-autoreload -p minijinja-stack-ref -p minijinja-contrib --no-deps --features=$(DOC_FEATURES)
 
 .PHONY: test
 test:
