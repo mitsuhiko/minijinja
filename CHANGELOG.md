@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+- Added `Value::is_number`. (#240)
+- `TryFrom` for `Value` now converts integers to `f32` and `f64`.
+
 ## 0.31.1
 
 - The `in` operator now does not fail if the value is undefined and the

@@ -608,7 +608,9 @@ impl Value {
         }
     }
 
-    /// Returns `true` if the value is number.
+    /// Returns `true` if the value is a number.
+    ///
+    /// To convert a value into a primitive number, use [`TryFrom`] or [`TryInto`].
     pub fn is_number(&self) -> bool {
         matches!(
             self.0,
@@ -661,16 +663,6 @@ impl Value {
     /// Returns `true` if this value is none.
     pub fn is_none(&self) -> bool {
         matches!(&self.0, ValueRepr::None)
-    }
-
-    /// If the value is `f64`, return it.
-    pub fn as_f64(&self) -> Option<f64> {
-        match self.0 {
-            ValueRepr::U64(x) => Some(x as f64),
-            ValueRepr::I64(x) => Some(x as f64),
-            ValueRepr::F64(x) => Some(x),
-            _ => None,
-        }
     }
 
     /// If the value is a string, return it.
