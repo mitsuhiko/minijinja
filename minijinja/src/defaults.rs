@@ -78,7 +78,6 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::Boxe
         rv.insert("min".into(), BoxedFilter::new(filters::min));
         rv.insert("max".into(), BoxedFilter::new(filters::max));
         rv.insert("sort".into(), BoxedFilter::new(filters::sort));
-        rv.insert("sortattr".into(), BoxedFilter::new(filters::sortattr));
         rv.insert("d".into(), BoxedFilter::new(filters::default));
         rv.insert("list".into(), BoxedFilter::new(filters::list));
         rv.insert("bool".into(), BoxedFilter::new(filters::bool));

@@ -643,43 +643,31 @@ mod builtins {
     /// Returns the sorted version of the given list.
     /// ```jinja
     /// {{ [1, 3, 2, 4]|sort }} -> [4, 3, 2, 1]
-    /// {{ [1, 3, 2, 4]|sort(true) }} -> [1, 2, 3, 4]
+    /// {{ [1, 3, 2, 4]|sort(reverse=true) }} -> [1, 2, 3, 4]
+    /// # Sort users by age attribute in descending order.
+    /// {{ users|sortattr(attribute="age") }}
+    /// # Sort users by age attribute in ascending order.
+    /// {{ users|sortattr(attribute="age", reverse=true) }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn sort(state: &State, value: Value, reverse: Option<bool>) -> Result<Value, Error> {
-        let mut items = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
-            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
-        }))
-        .collect::<Vec<_>>();
-        items.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less));
-        if reverse.unwrap_or(false) {
-            items.reverse();
-        }
-        Ok(Value::from(items))
-    }
-
-    /// Returns the sorted by `attr` version of the given list.
-    /// ```jinja
-    /// # Sort users by age in descending order.
-    /// {{ users|sortattr("age") }}
-    /// # Sort users by age in ascending order.
-    /// {{ users|sortattr("age", true) }}
-    /// ```
-    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn sortattr(
+    pub fn sort(
         state: &State,
         value: Value,
-        attr: Cow<'_, str>,
+        attribute: Option<Cow<'_, str>>,
         reverse: Option<bool>,
     ) -> Result<Value, Error> {
         let mut items = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }))
         .collect::<Vec<_>>();
-        items.sort_by(|a, b| match (a.get_path(&attr), b.get_path(&attr)) {
-            (Ok(a), Ok(b)) => a.partial_cmp(&b).unwrap_or(Ordering::Less),
-            _ => Ordering::Equal,
-        });
+        if let Some(attr) = attribute {
+            items.sort_by(|a, b| match (a.get_path(&attr), b.get_path(&attr)) {
+                (Ok(a), Ok(b)) => a.partial_cmp(&b).unwrap_or(Ordering::Less),
+                _ => Ordering::Equal,
+            });
+        } else {
+            items.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less));
+        }
         if reverse.unwrap_or(false) {
             items.reverse();
         }
