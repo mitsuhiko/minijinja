@@ -21,3 +21,6 @@ watch-fs = ["notify"]
 [dependencies]
 minijinja = { version = "0.31.1", path = "../minijinja", default-features = false }
 notify = { version = "5.0.0", optional = true, default-features = false, features = ["macos_fsevent"] }
+
+[dev-dependencies]
+minijinja = { version = "0.31.1", path = "../minijinja", features = ["source"] }
