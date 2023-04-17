@@ -650,27 +650,29 @@ mod builtins {
     /// {{ users|sortattr(attribute="age", reverse=true) }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn sort(
-        state: &State,
-        value: Value,
-        attribute: Option<Cow<'_, str>>,
-        reverse: Option<bool>,
-    ) -> Result<Value, Error> {
+    pub fn sort(state: &State, value: Value, kwargs: Value) -> Result<Value, Error> {
         let mut items = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }))
         .collect::<Vec<_>>();
-        if let Some(attr) = attribute {
-            items.sort_by(|a, b| match (a.get_path(&attr), b.get_path(&attr)) {
+        if let Ok(attr) = kwargs.get_attr("attribute") {
+            let attr = attr.as_str().ok_or_else(|| {
+                Error::new(ErrorKind::InvalidOperation, "attribute must be a string")
+            })?;
+            items.sort_by(|a, b| match (a.get_path(attr), b.get_path(attr)) {
                 (Ok(a), Ok(b)) => a.partial_cmp(&b).unwrap_or(Ordering::Less),
                 _ => Ordering::Equal,
             });
         } else {
             items.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less));
         }
-        if reverse.unwrap_or(false) {
-            items.reverse();
+
+        if let Ok(reverse) = kwargs.get_attr("reverse") {
+            if reverse.is_true() {
+                items.reverse();
+            }
         }
+
         Ok(Value::from(items))
     }
 

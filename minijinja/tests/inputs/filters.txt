@@ -58,7 +58,7 @@ last-undefined: {{ []|first is undefined }}
 min: {{ other_list|min }}
 max: {{ other_list|max }}
 sort: {{ other_list|sort }}
-sort-reverse: {{ other_list|sort(true) }}
+sort-reverse: {{ other_list|sort(reverse=true) }}
 d: {{ undefined|d == "" }}
 json: {{ map|tojson }}
 json-pretty: {{ map|tojson(true) }}
