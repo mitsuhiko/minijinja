@@ -45,14 +45,14 @@ fn find_marker_memchr(a: &str) -> Option<(usize, bool)> {
 fn find_marker(a: &str, syntax: &SyntaxConfig) -> Option<(usize, bool)> {
     // If we have a custom delimiter we need to use the aho-corasick
     // otherwise we can use internal memchr.
-    let Some(ref ac) = syntax.aho_corasick else {
-        return find_marker_memchr(a);
-     };
-
-    let bytes = a.as_bytes();
-
-    ac.find(bytes)
-        .map(|m| (m.start(), bytes.get(m.start() + 2).copied() == Some(b'-')))
+    match syntax.aho_corasick {
+        Some(ref ac) => {
+            let bytes = a.as_bytes();
+            ac.find(bytes)
+                .map(|m| (m.start(), bytes.get(m.start() + 2).copied() == Some(b'-')))
+        }
+        None => find_marker_memchr(a),
+    }
 }
 
 #[cfg(not(feature = "custom_delimiters"))]
