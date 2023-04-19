@@ -12,6 +12,8 @@ use self_cell::self_cell;
 use crate::error::{Error, ErrorKind};
 use crate::settings::SyntaxConfig;
 use crate::template::CompiledTemplate;
+
+#[cfg(feature = "custom_delimiters")]
 use crate::Syntax;
 
 #[cfg(test)]
@@ -44,11 +46,11 @@ enum SourceBacking {
     Dynamic {
         templates: MemoMap<String, Arc<LoadedTemplate>>,
         loader: Arc<LoadFunc>,
-        syntax: SyntaxConfig,
+        syntax: Arc<SyntaxConfig>,
     },
     Static {
         templates: HashMap<String, Arc<LoadedTemplate>>,
-        syntax: SyntaxConfig,
+        syntax: Arc<SyntaxConfig>,
     },
 }
 
@@ -104,7 +106,7 @@ impl Source {
         Source {
             backing: SourceBacking::Static {
                 templates: HashMap::new(),
-                syntax: SyntaxConfig::default(),
+                syntax: Default::default(),
             },
         }
     }
@@ -117,7 +119,7 @@ impl Source {
         match self.backing {
             SourceBacking::Dynamic { ref mut syntax, .. }
             | SourceBacking::Static { ref mut syntax, .. } => {
-                *syntax = new_syntax.try_into()?;
+                *syntax = Arc::new(new_syntax.compile()?);
             }
         }
         Ok(())
@@ -129,9 +131,10 @@ impl Source {
         &self._syntax_config().syntax
     }
 
-    pub(crate) fn _syntax_config(&self) -> &SyntaxConfig {
+    pub(crate) fn _syntax_config(&self) -> &Arc<SyntaxConfig> {
         match &self.backing {
-            SourceBacking::Dynamic { syntax, .. } | SourceBacking::Static { syntax, .. } => syntax,
+            SourceBacking::Dynamic { ref syntax, .. }
+            | SourceBacking::Static { ref syntax, .. } => syntax,
         }
     }
 
@@ -227,7 +230,7 @@ impl Source {
                 CompiledTemplate::from_name_and_source_with_syntax(
                     name.as_str(),
                     source,
-                    self._syntax_config(),
+                    self._syntax_config().clone(),
                 )
             }
         ));
@@ -264,6 +267,7 @@ impl Source {
                 syntax,
             } => Ok(
                 ok!(templates.get_or_try_insert(name, || -> Result<_, Error> {
+                    let syntax = syntax.clone();
                     let source = ok!(loader(name));
                     let owner = (name.to_owned(), source);
                     let tmpl = ok!(LoadedTemplate::try_new(

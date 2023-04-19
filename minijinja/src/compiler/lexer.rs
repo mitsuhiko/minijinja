@@ -1,4 +1,5 @@
 use std::borrow::Borrow;
+use std::sync::Arc;
 
 use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
@@ -271,7 +272,7 @@ impl<'s> TokenizerState<'s> {
 pub fn tokenize(
     input: &str,
     in_expr: bool,
-    syntax_config: SyntaxConfig,
+    syntax_config: Arc<SyntaxConfig>,
 ) -> impl Iterator<Item = Result<(Token<'_>, Span), Error>> {
     let mut state = TokenizerState {
         rest: input,
@@ -518,7 +519,7 @@ fn test_find_marker_custom_syntax() {
         comment_end: "*/".into(),
     };
 
-    let syntax_config: SyntaxConfig = syntax.try_into().expect("failed to create syntax config");
+    let syntax_config: SyntaxConfig = syntax.compile().expect("failed to create syntax config");
 
     assert_eq!(find_marker("%{", &syntax_config), Some((0, false)));
     assert!(find_marker("/", &syntax_config).is_none());
@@ -538,14 +539,14 @@ fn test_is_basic_tag() {
 #[test]
 fn test_basic_identifiers() {
     fn assert_ident(s: &str) {
-        match tokenize(s, true, SyntaxConfig::default()).next() {
+        match tokenize(s, true, Default::default()).next() {
             Some(Ok((Token::Ident(ident), _))) if ident == s => {}
             _ => panic!("did not get a matching token result: {s:?}"),
         }
     }
 
     fn assert_not_ident(s: &str) {
-        let res = tokenize(s, true, SyntaxConfig::default()).collect::<Result<Vec<_>, _>>();
+        let res = tokenize(s, true, Default::default()).collect::<Result<Vec<_>, _>>();
         if let Ok(tokens) = res {
             if let &[(Token::Ident(_), _)] = &tokens[..] {
                 panic!("got a single ident for {s:?}")

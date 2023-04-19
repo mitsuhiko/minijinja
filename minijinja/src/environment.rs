@@ -21,7 +21,7 @@ type TemplateMap<'source> = BTreeMap<&'source str, Arc<CompiledTemplate<'source>
 
 #[derive(Clone)]
 enum Source<'source> {
-    Borrowed(TemplateMap<'source>, SyntaxConfig),
+    Borrowed(TemplateMap<'source>, Arc<SyntaxConfig>),
     #[cfg(feature = "source")]
     Owned(crate::source::Source),
 }
@@ -102,7 +102,7 @@ impl<'source> Environment<'source> {
     /// [`empty`](Environment::empty) method.
     pub fn new() -> Environment<'source> {
         Environment {
-            templates: Source::Borrowed(Default::default(), SyntaxConfig::default()),
+            templates: Source::Borrowed(Default::default(), Default::default()),
             filters: defaults::get_builtin_filters(),
             tests: defaults::get_builtin_tests(),
             globals: defaults::get_globals(),
@@ -122,7 +122,7 @@ impl<'source> Environment<'source> {
     /// logic for auto escaping configured.
     pub fn empty() -> Environment<'source> {
         Environment {
-            templates: Source::Borrowed(Default::default(), SyntaxConfig::default()),
+            templates: Source::Borrowed(Default::default(), Default::default()),
             filters: Default::default(),
             tests: Default::default(),
             globals: Default::default(),
@@ -153,7 +153,9 @@ impl<'source> Environment<'source> {
         match self.templates {
             Source::Borrowed(ref mut map, ref syntax) => {
                 let compiled_template = ok!(CompiledTemplate::from_name_and_source_with_syntax(
-                    name, source, syntax,
+                    name,
+                    source,
+                    syntax.clone()
                 ));
                 map.insert(name, Arc::new(compiled_template));
                 Ok(())
@@ -257,7 +259,7 @@ impl<'source> Environment<'source> {
         let compiled = ok!(CompiledTemplate::from_name_and_source_with_syntax(
             name,
             source,
-            self._syntax_config()
+            self._syntax_config().clone()
         ));
         let mut rv = String::with_capacity(compiled.buffer_size_hint);
         Vm::new(self)
@@ -409,7 +411,7 @@ impl<'source> Environment<'source> {
     #[cfg(feature = "custom_delimiters")]
     pub fn set_syntax(&mut self, syntax: crate::settings::Syntax) -> Result<(), Error> {
         match self.templates {
-            Source::Borrowed(_, ref mut syn) => *syn = syntax.try_into()?,
+            Source::Borrowed(_, ref mut syn) => *syn = Arc::new(syntax.compile()?),
             #[cfg(feature = "source")]
             Source::Owned(ref mut source) => source.set_syntax(syntax)?,
         };
@@ -422,7 +424,7 @@ impl<'source> Environment<'source> {
         &self._syntax_config().syntax
     }
 
-    fn _syntax_config(&self) -> &SyntaxConfig {
+    fn _syntax_config(&self) -> &Arc<SyntaxConfig> {
         match self.templates {
             Source::Borrowed(_, ref syn) => syn,
             #[cfg(feature = "source")]
@@ -479,7 +481,7 @@ impl<'source> Environment<'source> {
     }
 
     fn _compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
-        let ast = ok!(parse_expr(expr, self._syntax_config().to_owned()));
+        let ast = ok!(parse_expr(expr, self._syntax_config().clone()));
         let mut gen = CodeGenerator::new("<expression>", expr);
         gen.compile_expr(&ast);
         let (instructions, _) = gen.finish();
