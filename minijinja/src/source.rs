@@ -47,6 +47,7 @@ enum SourceBacking {
     },
     Static {
         templates: HashMap<String, Arc<LoadedTemplate>>,
+        syntax: Syntax,
     },
 }
 
@@ -63,7 +64,7 @@ impl fmt::Debug for Source {
                 .debug_list()
                 .entries(templates.iter().map(|x| x.0))
                 .finish(),
-            SourceBacking::Static { templates } => f
+            SourceBacking::Static { templates, .. } => f
                 .debug_list()
                 .entries(templates.iter().map(|x| x.0))
                 .finish(),
@@ -102,7 +103,33 @@ impl Source {
         Source {
             backing: SourceBacking::Static {
                 templates: HashMap::new(),
+                syntax: Syntax::default(),
             },
+        }
+    }
+
+    /// Sets the syntax for the source.
+    ///
+    /// See [`Syntax`](crate::Syntax) for more information.
+    #[cfg(feature = "custom_delimiters")]
+    pub fn set_syntax(&mut self, new_syntax: Syntax) {
+        match self.backing {
+            SourceBacking::Dynamic { ref mut syntax, .. }
+            | SourceBacking::Static { ref mut syntax, .. } => {
+                *syntax = new_syntax;
+            }
+        }
+    }
+
+    /// Returns the current syntax.
+    #[cfg(feature = "custom_delimiters")]
+    pub fn syntax(&self) -> Syntax {
+        self._syntax()
+    }
+
+    fn _syntax(&self) -> Syntax {
+        match self.backing {
+            SourceBacking::Dynamic { syntax, .. } | SourceBacking::Static { syntax, .. } => syntax,
         }
     }
 
@@ -195,7 +222,11 @@ impl Source {
         let tmpl = ok!(LoadedTemplate::try_new(
             owner,
             |(name, source)| -> Result<_, Error> {
-                CompiledTemplate::from_name_and_source(name.as_str(), source)
+                CompiledTemplate::from_name_and_source_with_syntax(
+                    name.as_str(),
+                    source,
+                    self._syntax(),
+                )
             }
         ));
 
@@ -247,7 +278,7 @@ impl Source {
                 }))
                 .borrow_dependent(),
             ),
-            SourceBacking::Static { templates } => templates
+            SourceBacking::Static { templates, .. } => templates
                 .get(name)
                 .map(|value| value.borrow_dependent())
                 .ok_or_else(|| Error::new_not_found(name)),

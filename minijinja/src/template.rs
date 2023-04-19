@@ -183,6 +183,7 @@ impl<'env> fmt::Debug for CompiledTemplate<'env> {
 
 impl<'source> CompiledTemplate<'source> {
     /// Creates a compiled template from name and source.
+    #[cfg(feature = "unstable_machinery")]
     pub fn from_name_and_source(
         name: &'source str,
         source: &'source str,

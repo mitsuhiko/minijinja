@@ -1092,6 +1092,7 @@ impl<'a> Parser<'a> {
 }
 
 /// Parses a template
+#[cfg(feature = "unstable_machinery")]
 pub fn parse<'source>(source: &'source str, filename: &str) -> Result<ast::Stmt<'source>, Error> {
     parse_with_syntax(source, filename, Default::default())
 }

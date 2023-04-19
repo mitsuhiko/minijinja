@@ -1,5 +1,5 @@
-DOC_FEATURES=source,json,urlencode,testutils
-TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items
+DOC_FEATURES=source,json,urlencode,testutils,custom_delimiters
+TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_delimiters
 
 .PHONY: all
 all: test

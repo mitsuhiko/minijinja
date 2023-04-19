@@ -173,6 +173,8 @@
 //!   the previous uses of key interning are no longer needed.  Enabling it however
 //!   cuts down on memory usage slightly in certain scenarios by interning all string
 //!   keys used in dynamic map values.
+//! - `custom_delimiters`: when this feature is enabled, custom delimiters are supported by
+//!   the parser.
 //!
 //! </details>
 #![allow(clippy::cognitive_complexity)]
@@ -240,7 +242,7 @@ pub mod machinery {
     pub use crate::compiler::codegen::CodeGenerator;
     pub use crate::compiler::instructions::{Instruction, Instructions};
     pub use crate::compiler::lexer::tokenize;
-    pub use crate::compiler::parser::parse;
+    pub use crate::compiler::parser::{parse, parse_with_syntax};
     pub use crate::compiler::tokens::{Span, Token};
     pub use crate::template::CompiledTemplate;
     pub use crate::vm::Vm;

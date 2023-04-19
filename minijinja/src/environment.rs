@@ -408,17 +408,29 @@ impl<'source> Environment<'source> {
         self.fuel
     }
 
-    #[cfg(feature = "custom_delimiters")]
     /// Sets the syntax for the environment.
     ///
     /// See [`Syntax`](crate::Syntax) for more information.
+    #[cfg(feature = "custom_delimiters")]
     pub fn set_syntax(&mut self, syntax: Syntax) {
+        #[cfg(feature = "source")]
+        {
+            if let Some(source) = self.source_mut() {
+                return source.set_syntax(syntax);
+            }
+        }
         self.syntax = syntax;
     }
 
-    #[cfg(feature = "custom_delimiters")]
     /// Returns the current syntax.
+    #[cfg(feature = "custom_delimiters")]
     pub fn syntax(&self) -> Syntax {
+        #[cfg(feature = "source")]
+        {
+            if let Some(source) = self.source() {
+                return source.syntax();
+            }
+        }
         self.syntax
     }
 
