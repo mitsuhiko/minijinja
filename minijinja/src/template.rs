@@ -188,14 +188,14 @@ impl<'source> CompiledTemplate<'source> {
         name: &'source str,
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
-        Self::from_name_and_source_with_syntax(name, source, Syntax::default())
+        Self::from_name_and_source_with_syntax(name, source, &Syntax::default())
     }
 
     /// Creates a compiled template from name and source using the given settings.
     pub fn from_name_and_source_with_syntax(
         name: &'source str,
         source: &'source str,
-        syntax: Syntax,
+        syntax: &Syntax,
     ) -> Result<CompiledTemplate<'source>, Error> {
         attach_basic_debug_info(
             Self::_from_name_settings_and_source_with_syntax_impl(name, source, syntax),
@@ -206,7 +206,7 @@ impl<'source> CompiledTemplate<'source> {
     fn _from_name_settings_and_source_with_syntax_impl(
         name: &'source str,
         source: &'source str,
-        syntax: Syntax,
+        syntax: &Syntax,
     ) -> Result<CompiledTemplate<'source>, Error> {
         // the parser/compiler combination can create constants in which case
         // we can probably benefit from the value optimization a bit.

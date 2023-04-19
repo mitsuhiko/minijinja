@@ -158,7 +158,7 @@ impl<'source> Environment<'source> {
                 let compiled_template = ok!(CompiledTemplate::from_name_and_source_with_syntax(
                     name,
                     source,
-                    self.syntax
+                    &self.syntax
                 ));
                 map.insert(name, Arc::new(compiled_template));
                 Ok(())
@@ -262,7 +262,7 @@ impl<'source> Environment<'source> {
         let compiled = ok!(CompiledTemplate::from_name_and_source_with_syntax(
             name,
             source,
-            self.syntax
+            &self.syntax
         ));
         let mut rv = String::with_capacity(compiled.buffer_size_hint);
         Vm::new(self)
@@ -424,14 +424,14 @@ impl<'source> Environment<'source> {
 
     /// Returns the current syntax.
     #[cfg(feature = "custom_delimiters")]
-    pub fn syntax(&self) -> Syntax {
+    pub fn syntax(&self) -> &Syntax {
         #[cfg(feature = "source")]
         {
             if let Some(source) = self.source() {
                 return source.syntax();
             }
         }
-        self.syntax
+        &self.syntax
     }
 
     /// Sets the template source for the environment.

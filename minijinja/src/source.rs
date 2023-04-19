@@ -123,12 +123,12 @@ impl Source {
 
     /// Returns the current syntax.
     #[cfg(feature = "custom_delimiters")]
-    pub fn syntax(&self) -> Syntax {
+    pub fn syntax(&self) -> &Syntax {
         self._syntax()
     }
 
-    fn _syntax(&self) -> Syntax {
-        match self.backing {
+    fn _syntax(&self) -> &Syntax {
+        match &self.backing {
             SourceBacking::Dynamic { syntax, .. } | SourceBacking::Static { syntax, .. } => syntax,
         }
     }
@@ -270,7 +270,7 @@ impl Source {
                             CompiledTemplate::from_name_and_source_with_syntax(
                                 name.as_str(),
                                 source,
-                                *syntax,
+                                syntax,
                             )
                         }
                     ));

@@ -1094,14 +1094,14 @@ impl<'a> Parser<'a> {
 /// Parses a template
 #[cfg(feature = "unstable_machinery")]
 pub fn parse<'source>(source: &'source str, filename: &str) -> Result<ast::Stmt<'source>, Error> {
-    parse_with_syntax(source, filename, Default::default())
+    parse_with_syntax(source, filename, &Default::default())
 }
 
 /// Parses a template with a specific syntax
 pub fn parse_with_syntax<'source>(
     source: &'source str,
     filename: &str,
-    syntax: Syntax,
+    syntax: &Syntax,
 ) -> Result<ast::Stmt<'source>, Error> {
     // we want to chop off a single newline at the end.  This means that a template
     // by default does not end in a newline which is a useful property to allow
@@ -1115,7 +1115,7 @@ pub fn parse_with_syntax<'source>(
         source = &source[..source.len() - 1];
     }
 
-    let mut parser = Parser::new(source, false, syntax);
+    let mut parser = Parser::new(source, false, syntax.clone());
     parser.parse().map_err(|mut err| {
         if err.line().is_none() {
             err.set_filename_and_span(filename, parser.stream.last_span())

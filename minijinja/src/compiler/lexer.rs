@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
 use crate::utils::{memstr, unescape};
@@ -21,7 +23,7 @@ struct TokenizerState<'s> {
 }
 
 #[cfg(not(feature = "custom_delimiters"))]
-fn find_marker(a: &str, _syntax: Syntax) -> Option<(usize, bool)> {
+fn find_marker(a: &str, _syntax: &Syntax) -> Option<(usize, bool)> {
     use crate::utils::memchr;
     let bytes = a.as_bytes();
     let mut offset = 0;
@@ -41,11 +43,11 @@ fn find_marker(a: &str, _syntax: Syntax) -> Option<(usize, bool)> {
 }
 
 #[cfg(feature = "custom_delimiters")]
-fn find_marker(a: &str, syntax: Syntax) -> Option<(usize, bool)> {
+fn find_marker(a: &str, syntax: &Syntax) -> Option<(usize, bool)> {
     let patterns = &[
-        syntax.block_start,
-        syntax.variable_start,
-        syntax.comment_start,
+        syntax.block_start.as_bytes(),
+        syntax.variable_start.as_bytes(),
+        syntax.comment_start.as_bytes(),
     ];
     use aho_corasick::AhoCorasick;
     let ac = AhoCorasick::new(patterns).unwrap();
@@ -363,7 +365,7 @@ pub fn tokenize(
                     old_loc = state.loc();
                 }
 
-                let (lead, span) = match find_marker(state.rest, syntax) {
+                let (lead, span) = match find_marker(state.rest, &syntax) {
                     Some((start, false)) => (state.advance(start), state.span(old_loc)),
                     Some((start, _)) => {
                         let peeked = &state.rest[..start];
@@ -407,7 +409,7 @@ pub fn tokenize(
                         state.advance(3);
                         return Some(Ok((Token::BlockEnd, state.span(old_loc))));
                     }
-                    if state.rest.get(..2) == Some(syntax.block_end) {
+                    if state.rest.get(..2) == Some(syntax.block_end.borrow()) {
                         state.stack.pop();
                         state.advance(2);
                         return Some(Ok((Token::BlockEnd, state.span(old_loc))));
@@ -419,7 +421,7 @@ pub fn tokenize(
                         trim_leading_whitespace = true;
                         return Some(Ok((Token::VariableEnd, state.span(old_loc))));
                     }
-                    if state.rest.get(..2) == Some(syntax.variable_end) {
+                    if state.rest.get(..2) == Some(syntax.variable_end.borrow()) {
                         state.stack.pop();
                         state.advance(2);
                         return Some(Ok((Token::VariableEnd, state.span(old_loc))));
@@ -486,26 +488,31 @@ pub fn tokenize(
 
 #[test]
 fn test_find_marker() {
-    assert!(find_marker("{", Default::default()).is_none());
-    assert!(find_marker("foo", Default::default()).is_none());
-    assert!(find_marker("foo {", Default::default()).is_none());
-    assert_eq!(find_marker("foo {{", Default::default()), Some((4, false)));
-    assert_eq!(find_marker("foo {{-", Default::default()), Some((4, true)));
+    let syntax = Syntax::default();
+    assert!(find_marker("{", &syntax).is_none());
+    assert!(find_marker("foo", &syntax).is_none());
+    assert!(find_marker("foo {", &syntax).is_none());
+    assert_eq!(find_marker("foo {{", &syntax), Some((4, false)));
+    assert_eq!(find_marker("foo {{-", &syntax), Some((4, true)));
 }
 
 #[test]
 #[cfg(feature = "custom_delimiters")]
 fn test_find_marker_custom_syntax() {
-    let mut syntax = Syntax::default();
-    syntax.set_block_delimiters("%{", "}%");
-    syntax.set_variable_delimiters("[[", "]]");
-    syntax.set_comment_delimiters("/*", "*/");
+    let syntax = Syntax {
+        block_start: "%{".into(),
+        block_end: "}%".into(),
+        variable_start: "[[".into(),
+        variable_end: "]]".into(),
+        comment_start: "/*".into(),
+        comment_end: "*/".into(),
+    };
 
-    assert_eq!(find_marker("%{", syntax), Some((0, false)));
-    assert!(find_marker("/", syntax).is_none());
-    assert!(find_marker("foo [", syntax).is_none());
-    assert_eq!(find_marker("foo /*", syntax), Some((4, false)));
-    assert_eq!(find_marker("foo [[-", syntax), Some((4, true)));
+    assert_eq!(find_marker("%{", &syntax), Some((0, false)));
+    assert!(find_marker("/", &syntax).is_none());
+    assert!(find_marker("foo [", &syntax).is_none());
+    assert_eq!(find_marker("foo /*", &syntax), Some((4, false)));
+    assert_eq!(find_marker("foo [[-", &syntax), Some((4, true)));
 }
 
 #[test]
