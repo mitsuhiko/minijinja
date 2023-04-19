@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 /// The configuration for the environment and the parser.
 /// This includes configurations to use custom delimiters
+#[cfg(not(feature = "custom_delimiters"))]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Syntax {
     pub(crate) block_start: Cow<'static, str>,
@@ -10,6 +11,25 @@ pub struct Syntax {
     pub(crate) variable_end: Cow<'static, str>,
     pub(crate) comment_start: Cow<'static, str>,
     pub(crate) comment_end: Cow<'static, str>,
+}
+
+/// The configuration for the environment and the parser.
+/// This includes configurations to use custom delimiters
+#[cfg(feature = "custom_delimiters")]
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Syntax {
+    /// The start of a block. By default it is `{%`.
+    pub block_start: Cow<'static, str>,
+    /// The end of a block. By default it is `%}`.
+    pub block_end: Cow<'static, str>,
+    /// The start of a variable. By default it is `{{`.
+    pub variable_start: Cow<'static, str>,
+    /// The end of a variable. By default it is `}}`.
+    pub variable_end: Cow<'static, str>,
+    /// The start of a comment. By default it is `{#`.
+    pub comment_start: Cow<'static, str>,
+    /// The end of a comment. By default it is `#}`.
+    pub comment_end: Cow<'static, str>,
 }
 
 impl Default for Syntax {
@@ -22,60 +42,5 @@ impl Default for Syntax {
             comment_start: r#"{#"#.into(),
             comment_end: r#"#}"#.into(),
         }
-    }
-}
-
-impl Syntax {
-    /// Creates a new settings object with custom delimiters.
-    #[cfg(feature = "custom_delimiters")]
-    pub fn new<T>(
-        block_start: T,
-        block_end: T,
-        variable_start: T,
-        variable_end: T,
-        comment_start: T,
-        comment_end: T,
-    ) -> Self
-    where
-        T: Into<Cow<'static, str>>,
-    {
-        Syntax {
-            block_start: block_start.into(),
-            block_end: block_end.into(),
-            variable_start: variable_start.into(),
-            variable_end: variable_end.into(),
-            comment_start: comment_start.into(),
-            comment_end: comment_end.into(),
-        }
-    }
-
-    /// Sets the block delimiters.
-    #[cfg(feature = "custom_delimiters")]
-    pub fn set_block_delimiters<T>(&mut self, start: T, end: T)
-    where
-        T: Into<Cow<'static, str>>,
-    {
-        self.block_start = start.into();
-        self.block_end = end.into();
-    }
-
-    /// Sets the variable delimiters.
-    #[cfg(feature = "custom_delimiters")]
-    pub fn set_variable_delimiters<T>(&mut self, start: T, end: T)
-    where
-        T: Into<Cow<'static, str>>,
-    {
-        self.variable_start = start.into();
-        self.variable_end = end.into();
-    }
-
-    /// Sets the comment delimiters.
-    #[cfg(feature = "custom_delimiters")]
-    pub fn set_comment_delimiters<T>(&mut self, start: T, end: T)
-    where
-        T: Into<Cow<'static, str>>,
-    {
-        self.comment_start = start.into();
-        self.comment_end = end.into();
     }
 }
