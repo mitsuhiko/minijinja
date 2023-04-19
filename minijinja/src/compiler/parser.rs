@@ -5,7 +5,7 @@ use crate::compiler::ast::{self, Spanned};
 use crate::compiler::lexer::tokenize;
 use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
-use crate::settings::Syntax;
+use crate::settings::SyntaxConfig;
 use crate::value::Value;
 
 const MAX_RECURSION: usize = 150;
@@ -96,7 +96,7 @@ struct TokenStream<'a> {
 
 impl<'a> TokenStream<'a> {
     /// Tokenize a template
-    pub fn new(source: &'a str, in_expr: bool, syntax: Syntax) -> TokenStream<'a> {
+    pub fn new(source: &'a str, in_expr: bool, syntax: SyntaxConfig) -> TokenStream<'a> {
         let mut iter = Box::new(tokenize(source, in_expr, syntax)) as Box<dyn Iterator<Item = _>>;
         let current = iter.next();
         TokenStream {
@@ -217,7 +217,7 @@ macro_rules! with_recursion_guard {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(source: &'a str, in_expr: bool, syntax: Syntax) -> Parser<'a> {
+    pub fn new(source: &'a str, in_expr: bool, syntax: SyntaxConfig) -> Parser<'a> {
         Parser {
             stream: TokenStream::new(source, in_expr, syntax),
             in_macro: false,
@@ -1101,7 +1101,7 @@ pub fn parse<'source>(source: &'source str, filename: &str) -> Result<ast::Stmt<
 pub fn parse_with_syntax<'source>(
     source: &'source str,
     filename: &str,
-    syntax: &Syntax,
+    syntax: &SyntaxConfig,
 ) -> Result<ast::Stmt<'source>, Error> {
     // we want to chop off a single newline at the end.  This means that a template
     // by default does not end in a newline which is a useful property to allow
@@ -1125,8 +1125,8 @@ pub fn parse_with_syntax<'source>(
 }
 
 /// Parses an expression
-pub fn parse_expr(source: &str) -> Result<ast::Expr<'_>, Error> {
-    let mut parser = Parser::new(source, true, Syntax::default());
+pub fn parse_expr(source: &str, syntax: SyntaxConfig) -> Result<ast::Expr<'_>, Error> {
+    let mut parser = Parser::new(source, true, syntax);
     parser
         .parse_expr()
         .and_then(|result| {

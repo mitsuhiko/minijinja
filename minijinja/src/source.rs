@@ -10,6 +10,7 @@ use memo_map::MemoMap;
 use self_cell::self_cell;
 
 use crate::error::{Error, ErrorKind};
+use crate::settings::SyntaxConfig;
 use crate::template::CompiledTemplate;
 use crate::Syntax;
 
@@ -43,11 +44,11 @@ enum SourceBacking {
     Dynamic {
         templates: MemoMap<String, Arc<LoadedTemplate>>,
         loader: Arc<LoadFunc>,
-        syntax: Syntax,
+        syntax: SyntaxConfig,
     },
     Static {
         templates: HashMap<String, Arc<LoadedTemplate>>,
-        syntax: Syntax,
+        syntax: SyntaxConfig,
     },
 }
 
@@ -103,7 +104,7 @@ impl Source {
         Source {
             backing: SourceBacking::Static {
                 templates: HashMap::new(),
-                syntax: Syntax::default(),
+                syntax: SyntaxConfig::default(),
             },
         }
     }
@@ -112,22 +113,23 @@ impl Source {
     ///
     /// See [`Syntax`](crate::Syntax) for more information.
     #[cfg(feature = "custom_delimiters")]
-    pub fn set_syntax(&mut self, new_syntax: Syntax) {
+    pub fn set_syntax(&mut self, new_syntax: Syntax) -> Result<(), Error> {
         match self.backing {
             SourceBacking::Dynamic { ref mut syntax, .. }
             | SourceBacking::Static { ref mut syntax, .. } => {
-                *syntax = new_syntax;
+                *syntax = new_syntax.try_into()?;
             }
         }
+        Ok(())
     }
 
     /// Returns the current syntax.
     #[cfg(feature = "custom_delimiters")]
     pub fn syntax(&self) -> &Syntax {
-        self._syntax()
+        &self._syntax_config().syntax
     }
 
-    pub(crate) fn _syntax(&self) -> &Syntax {
+    pub(crate) fn _syntax_config(&self) -> &SyntaxConfig {
         match &self.backing {
             SourceBacking::Dynamic { syntax, .. } | SourceBacking::Static { syntax, .. } => syntax,
         }
@@ -225,7 +227,7 @@ impl Source {
                 CompiledTemplate::from_name_and_source_with_syntax(
                     name.as_str(),
                     source,
-                    self._syntax(),
+                    self._syntax_config(),
                 )
             }
         ));

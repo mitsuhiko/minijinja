@@ -10,7 +10,7 @@ use crate::compiler::parser::parse_expr;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::expression::Expression;
 use crate::output::Output;
-use crate::settings::Syntax;
+use crate::settings::SyntaxConfig;
 use crate::template::{CompiledTemplate, Template};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
 use crate::value::{FunctionArgs, FunctionResult, Value};
@@ -21,7 +21,7 @@ type TemplateMap<'source> = BTreeMap<&'source str, Arc<CompiledTemplate<'source>
 
 #[derive(Clone)]
 enum Source<'source> {
-    Borrowed(TemplateMap<'source>, Syntax),
+    Borrowed(TemplateMap<'source>, SyntaxConfig),
     #[cfg(feature = "source")]
     Owned(crate::source::Source),
 }
@@ -102,7 +102,7 @@ impl<'source> Environment<'source> {
     /// [`empty`](Environment::empty) method.
     pub fn new() -> Environment<'source> {
         Environment {
-            templates: Source::Borrowed(Default::default(), Syntax::default()),
+            templates: Source::Borrowed(Default::default(), SyntaxConfig::default()),
             filters: defaults::get_builtin_filters(),
             tests: defaults::get_builtin_tests(),
             globals: defaults::get_globals(),
@@ -122,7 +122,7 @@ impl<'source> Environment<'source> {
     /// logic for auto escaping configured.
     pub fn empty() -> Environment<'source> {
         Environment {
-            templates: Source::Borrowed(Default::default(), Syntax::default()),
+            templates: Source::Borrowed(Default::default(), SyntaxConfig::default()),
             filters: Default::default(),
             tests: Default::default(),
             globals: Default::default(),
@@ -257,7 +257,7 @@ impl<'source> Environment<'source> {
         let compiled = ok!(CompiledTemplate::from_name_and_source_with_syntax(
             name,
             source,
-            self._syntax()
+            self._syntax_config()
         ));
         let mut rv = String::with_capacity(compiled.buffer_size_hint);
         Vm::new(self)
@@ -407,25 +407,26 @@ impl<'source> Environment<'source> {
     ///
     /// See [`Syntax`](crate::Syntax) for more information.
     #[cfg(feature = "custom_delimiters")]
-    pub fn set_syntax(&mut self, syntax: Syntax) {
+    pub fn set_syntax(&mut self, syntax: crate::settings::Syntax) -> Result<(), Error> {
         match self.templates {
-            Source::Borrowed(_, ref mut syn) => *syn = syntax,
+            Source::Borrowed(_, ref mut syn) => *syn = syntax.try_into()?,
             #[cfg(feature = "source")]
-            Source::Owned(ref mut source) => source.set_syntax(syntax),
-        }
+            Source::Owned(ref mut source) => source.set_syntax(syntax)?,
+        };
+        Ok(())
     }
 
     /// Returns the current syntax.
     #[cfg(feature = "custom_delimiters")]
-    pub fn syntax(&self) -> &Syntax {
-        self._syntax()
+    pub fn syntax(&self) -> &crate::settings::Syntax {
+        &self._syntax_config().syntax
     }
 
-    fn _syntax(&self) -> &Syntax {
+    fn _syntax_config(&self) -> &SyntaxConfig {
         match self.templates {
             Source::Borrowed(_, ref syn) => syn,
             #[cfg(feature = "source")]
-            Source::Owned(ref source) => source._syntax(),
+            Source::Owned(ref source) => source._syntax_config(),
         }
     }
 
@@ -478,7 +479,7 @@ impl<'source> Environment<'source> {
     }
 
     fn _compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
-        let ast = ok!(parse_expr(expr));
+        let ast = ok!(parse_expr(expr, self._syntax_config().to_owned()));
         let mut gen = CodeGenerator::new("<expression>", expr);
         gen.compile_expr(&ast);
         let (instructions, _) = gen.finish();
