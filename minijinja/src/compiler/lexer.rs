@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
-use crate::settings::SyntaxConfig;
+use crate::settings::{StartMarker, SyntaxConfig};
 use crate::utils::{memchr, memstr, unescape};
 
 #[cfg(test)]
@@ -48,14 +48,12 @@ fn find_marker(a: &str, syntax: &SyntaxConfig) -> Option<(usize, bool)> {
     match syntax.aho_corasick {
         Some(ref ac) => {
             let bytes = a.as_bytes();
-            let m = ac.find(bytes).map(|m| {
+            ac.find(bytes).map(|m| {
                 (
                     m.start(),
                     bytes.get(m.start() + m.len()).copied() == Some(b'-'),
                 )
-            });
-            println!("{:?} {:?}", m, a);
-            m
+            })
         }
         None => find_marker_memchr(a),
     }
@@ -301,85 +299,101 @@ pub fn tokenize(
         let mut old_loc = state.loc();
         match state.stack.last() {
             Some(LexerState::Template) => {
-                if state.rest.get(..syntax_config.syntax.variable_start.len())
-                    == Some(&syntax_config.syntax.variable_start)
-                {
-                    if state.rest.as_bytes().get(2) == Some(&b'-') {
-                        state.advance(syntax_config.syntax.variable_start.len() + 1);
-                    } else {
-                        state.advance(syntax_config.syntax.variable_start.len());
-                    }
-                    state.stack.push(LexerState::InVariable);
-                    return Some(Ok((Token::VariableStart, state.span(old_loc))));
-                }
-                if state.rest.get(..syntax_config.syntax.block_start.len())
-                    == Some(&syntax_config.syntax.block_start)
-                {
-                    // raw blocks require some special handling.  If we are at the beginning of a raw
-                    // block we want to skip everything until {% endraw %} completely ignoring iterior
-                    // syntax and emit the entire raw block as TemplateData.
-                    if let Some((mut ptr, _)) = skip_basic_tag(
-                        &state.rest[syntax_config.syntax.block_start.len()..],
-                        "raw",
-                        &syntax_config.syntax.block_end,
-                    ) {
-                        ptr += syntax_config.syntax.block_start.len();
-                        while let Some(block) = memstr(
-                            &state.rest.as_bytes()[ptr..],
-                            syntax_config.syntax.block_start.as_bytes(),
-                        ) {
-                            ptr += block + syntax_config.syntax.block_start.len();
-                            if let Some((endraw, trim)) = skip_basic_tag(
-                                &state.rest[ptr..],
-                                "endraw",
-                                &syntax_config.syntax.block_end,
-                            ) {
-                                let result = &state.rest[..ptr + endraw];
-                                state.advance(ptr + endraw);
-                                trim_leading_whitespace = trim;
-                                return Some(Ok((
-                                    Token::TemplateData(result),
-                                    state.span(old_loc),
-                                )));
+                for start_delimiter in syntax_config.start_delimiters_order() {
+                    match start_delimiter {
+                        StartMarker::Comment => {
+                            if state.rest.get(..syntax_config.syntax.comment_start.len())
+                                == Some(&syntax_config.syntax.comment_start)
+                            {
+                                if let Some(comment_end) = memstr(
+                                    state.rest.as_bytes(),
+                                    syntax_config.syntax.comment_end.as_bytes(),
+                                ) {
+                                    if state
+                                        .rest
+                                        .as_bytes()
+                                        .get(comment_end.saturating_sub(1))
+                                        .copied()
+                                        == Some(b'-')
+                                    {
+                                        trim_leading_whitespace = true;
+                                    }
+                                    state.advance(
+                                        comment_end + syntax_config.syntax.comment_end.len(),
+                                    );
+                                    continue;
+                                } else {
+                                    return Some(Err(
+                                        state.syntax_error("unexpected end of comment")
+                                    ));
+                                }
                             }
                         }
-                        return Some(Err(state.syntax_error("unexpected end of raw block")));
-                    }
-
-                    if state
-                        .rest
-                        .as_bytes()
-                        .get(syntax_config.syntax.block_start.len())
-                        == Some(&b'-')
-                    {
-                        state.advance(syntax_config.syntax.block_start.len() + 1);
-                    } else {
-                        state.advance(syntax_config.syntax.block_start.len());
-                    }
-
-                    state.stack.push(LexerState::InBlock);
-                    return Some(Ok((Token::BlockStart, state.span(old_loc))));
-                }
-                if state.rest.get(..syntax_config.syntax.comment_start.len())
-                    == Some(&syntax_config.syntax.comment_start)
-                {
-                    if let Some(comment_end) = memstr(
-                        state.rest.as_bytes(),
-                        syntax_config.syntax.comment_end.as_bytes(),
-                    ) {
-                        if state
-                            .rest
-                            .as_bytes()
-                            .get(comment_end.saturating_sub(1))
-                            .copied()
-                            == Some(b'-')
-                        {
-                            trim_leading_whitespace = true;
+                        StartMarker::Variable => {
+                            if state.rest.get(..syntax_config.syntax.variable_start.len())
+                                == Some(&syntax_config.syntax.variable_start)
+                            {
+                                if state.rest.as_bytes().get(2) == Some(&b'-') {
+                                    state.advance(syntax_config.syntax.variable_start.len() + 1);
+                                } else {
+                                    state.advance(syntax_config.syntax.variable_start.len());
+                                }
+                                state.stack.push(LexerState::InVariable);
+                                return Some(Ok((Token::VariableStart, state.span(old_loc))));
+                            }
                         }
-                        state.advance(comment_end + syntax_config.syntax.comment_end.len());
-                        continue;
-                    } else {
-                        return Some(Err(state.syntax_error("unexpected end of comment")));
+                        StartMarker::Block => {
+                            if state.rest.get(..syntax_config.syntax.block_start.len())
+                                == Some(&syntax_config.syntax.block_start)
+                            {
+                                // raw blocks require some special handling.  If we are at the beginning of a raw
+                                // block we want to skip everything until {% endraw %} completely ignoring iterior
+                                // syntax and emit the entire raw block as TemplateData.
+                                if let Some((mut ptr, _)) = skip_basic_tag(
+                                    &state.rest[syntax_config.syntax.block_start.len()..],
+                                    "raw",
+                                    &syntax_config.syntax.block_end,
+                                ) {
+                                    ptr += syntax_config.syntax.block_start.len();
+                                    while let Some(block) = memstr(
+                                        &state.rest.as_bytes()[ptr..],
+                                        syntax_config.syntax.block_start.as_bytes(),
+                                    ) {
+                                        ptr += block + syntax_config.syntax.block_start.len();
+                                        if let Some((endraw, trim)) = skip_basic_tag(
+                                            &state.rest[ptr..],
+                                            "endraw",
+                                            &syntax_config.syntax.block_end,
+                                        ) {
+                                            let result = &state.rest[..ptr + endraw];
+                                            state.advance(ptr + endraw);
+                                            trim_leading_whitespace = trim;
+                                            return Some(Ok((
+                                                Token::TemplateData(result),
+                                                state.span(old_loc),
+                                            )));
+                                        }
+                                    }
+                                    return Some(Err(
+                                        state.syntax_error("unexpected end of raw block")
+                                    ));
+                                }
+
+                                if state
+                                    .rest
+                                    .as_bytes()
+                                    .get(syntax_config.syntax.block_start.len())
+                                    == Some(&b'-')
+                                {
+                                    state.advance(syntax_config.syntax.block_start.len() + 1);
+                                } else {
+                                    state.advance(syntax_config.syntax.block_start.len());
+                                }
+
+                                state.stack.push(LexerState::InBlock);
+                                return Some(Ok((Token::BlockStart, state.span(old_loc))));
+                            }
+                        }
                     }
                 }
 

@@ -40,7 +40,9 @@ impl Default for Syntax {
 
 #[cfg(feature = "custom_delimiters")]
 impl Syntax {
-    pub(crate) fn compile(self) -> Result<SyntaxConfig, Error> {
+    #[cfg(feature = "unstable_machinery")]
+    /// Creates a new syntax configuration with custom delimiters.
+    pub fn compile(self) -> Result<SyntaxConfig, Error> {
         ok!(self.check_delimiters());
 
         let patterns = [
@@ -72,12 +74,38 @@ impl Syntax {
     }
 }
 
+pub(crate) enum StartMarker {
+    Variable,
+    Block,
+    Comment,
+}
+
 /// Internal configuration for the environment and the parser.
 #[derive(Debug, Default)]
 pub struct SyntaxConfig {
     pub(crate) syntax: Syntax,
     #[cfg(feature = "custom_delimiters")]
     pub(crate) aho_corasick: Option<aho_corasick::AhoCorasick>,
+}
+
+impl SyntaxConfig {
+    /// Returns the start delimiters in order of length.
+    /// This is used to find the longest delimiter first.
+    pub(crate) fn start_delimiters_order(&self) -> [StartMarker; 3] {
+        let mut order = [
+            StartMarker::Variable,
+            StartMarker::Block,
+            StartMarker::Comment,
+        ];
+        order.sort_by_key(|marker| {
+            std::cmp::Reverse(match marker {
+                StartMarker::Variable => self.syntax.variable_start.as_ref().len(),
+                StartMarker::Block => self.syntax.block_start.as_ref().len(),
+                StartMarker::Comment => self.syntax.comment_start.as_ref().len(),
+            })
+        });
+        order
+    }
 }
 
 #[cfg(test)]
@@ -104,18 +132,22 @@ mod test {
         let input = "{for x in range(3)}${x}{endfor}{* nothing *}";
 
         let mut matches = aho_corasick.find_iter(input);
-
+        // '{'
         let statement_match = matches.next().unwrap();
         assert_eq!(statement_match.start(), 0);
         assert_eq!(statement_match.end(), 1);
+
+        // '${'
         let var_match = matches.next().unwrap();
         assert_eq!(var_match.start(), 19);
         assert_eq!(var_match.end(), 21);
 
+        // '{'
         let statemend_end_match = matches.next().unwrap();
         assert_eq!(statemend_end_match.start(), 23);
         assert_eq!(statemend_end_match.end(), 24);
 
+        // '{*'
         let comment_match = matches.next().unwrap();
         assert_eq!(comment_match.start(), 31);
         assert_eq!(comment_match.end(), 33);
