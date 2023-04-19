@@ -443,5 +443,5 @@ fn test_custom_syntax() {
     let value = env
         .render_str("{for x in range(3)}${x}{endfor}{* nothing *}", ())
         .unwrap();
-    assert_eq!(value, r"123");
+    assert_eq!(value, r"012");
 }
