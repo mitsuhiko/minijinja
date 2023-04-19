@@ -48,12 +48,14 @@ fn find_marker(a: &str, syntax: &SyntaxConfig) -> Option<(usize, bool)> {
     match syntax.aho_corasick {
         Some(ref ac) => {
             let bytes = a.as_bytes();
-            ac.find(bytes).map(|m| {
+            let m = ac.find(bytes).map(|m| {
                 (
                     m.start(),
                     bytes.get(m.start() + m.len()).copied() == Some(b'-'),
                 )
-            })
+            });
+            println!("{:?} {:?}", m, a);
+            m
         }
         None => find_marker_memchr(a),
     }
