@@ -191,6 +191,7 @@ mod error;
 mod expression;
 mod key;
 mod output;
+mod settings;
 mod template;
 mod utils;
 mod vm;
@@ -216,6 +217,7 @@ pub use self::environment::Environment;
 pub use self::error::{Error, ErrorKind};
 pub use self::expression::Expression;
 pub use self::output::Output;
+pub use self::settings::Syntax;
 pub use self::template::Template;
 pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
 

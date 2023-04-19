@@ -10,6 +10,7 @@ use crate::compiler::parser::parse_expr;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::expression::Expression;
 use crate::output::Output;
+use crate::settings::Syntax;
 use crate::template::{CompiledTemplate, Template};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
 use crate::value::{FunctionArgs, FunctionResult, Value};
@@ -65,6 +66,7 @@ pub struct Environment<'source> {
     templates: Source<'source>,
     filters: BTreeMap<Cow<'source, str>, filters::BoxedFilter>,
     tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
+    syntax: Syntax,
     pub(crate) globals: BTreeMap<Cow<'source, str>, Value>,
     default_auto_escape: Arc<AutoEscapeFunc>,
     undefined_behavior: UndefinedBehavior,
@@ -105,6 +107,7 @@ impl<'source> Environment<'source> {
             filters: defaults::get_builtin_filters(),
             tests: defaults::get_builtin_tests(),
             globals: defaults::get_globals(),
+            syntax: Default::default(),
             default_auto_escape: Arc::new(defaults::default_auto_escape_callback),
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
@@ -125,6 +128,7 @@ impl<'source> Environment<'source> {
             filters: Default::default(),
             tests: Default::default(),
             globals: Default::default(),
+            syntax: Default::default(),
             default_auto_escape: Arc::new(defaults::no_auto_escape),
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
@@ -151,7 +155,11 @@ impl<'source> Environment<'source> {
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
         match self.templates {
             Source::Borrowed(ref mut map) => {
-                let compiled_template = ok!(CompiledTemplate::from_name_and_source(name, source));
+                let compiled_template = ok!(CompiledTemplate::from_name_and_source_with_syntax(
+                    name,
+                    source,
+                    self.syntax
+                ));
                 map.insert(name, Arc::new(compiled_template));
                 Ok(())
             }
@@ -251,7 +259,11 @@ impl<'source> Environment<'source> {
     }
 
     fn _render_str(&self, name: &str, source: &str, root: Value) -> Result<String, Error> {
-        let compiled = ok!(CompiledTemplate::from_name_and_source(name, source));
+        let compiled = ok!(CompiledTemplate::from_name_and_source_with_syntax(
+            name,
+            source,
+            self.syntax
+        ));
         let mut rv = String::with_capacity(compiled.buffer_size_hint);
         Vm::new(self)
             .eval(
@@ -394,6 +406,20 @@ impl<'source> Environment<'source> {
     #[cfg_attr(docsrs, doc(cfg(feature = "fuel")))]
     pub fn fuel(&self) -> Option<u64> {
         self.fuel
+    }
+
+    #[cfg(feature = "custom_delimiters")]
+    /// Sets the syntax for the environment.
+    ///
+    /// See [`Syntax`](crate::Syntax) for more information.
+    pub fn set_syntax(&mut self, syntax: Syntax) {
+        self.syntax = syntax;
+    }
+
+    #[cfg(feature = "custom_delimiters")]
+    /// Returns the current syntax.
+    pub fn syntax(&self) -> Syntax {
+        self.syntax
     }
 
     /// Sets the template source for the environment.

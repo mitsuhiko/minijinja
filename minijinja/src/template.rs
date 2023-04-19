@@ -5,10 +5,11 @@ use serde::Serialize;
 
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
-use crate::compiler::parser::parse;
+use crate::compiler::parser::parse_with_syntax;
 use crate::environment::Environment;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::output::{Output, WriteWrapper};
+use crate::settings::Syntax;
 use crate::utils::AutoEscape;
 use crate::value::{self, Value};
 use crate::vm::Vm;
@@ -186,17 +187,30 @@ impl<'source> CompiledTemplate<'source> {
         name: &'source str,
         source: &'source str,
     ) -> Result<CompiledTemplate<'source>, Error> {
-        attach_basic_debug_info(Self::_from_name_and_source_impl(name, source), source)
+        Self::from_name_and_source_with_syntax(name, source, Syntax::default())
     }
 
-    fn _from_name_and_source_impl(
+    /// Creates a compiled template from name and source using the given settings.
+    pub fn from_name_and_source_with_syntax(
         name: &'source str,
         source: &'source str,
+        syntax: Syntax,
+    ) -> Result<CompiledTemplate<'source>, Error> {
+        attach_basic_debug_info(
+            Self::_from_name_settings_and_source_with_syntax_impl(name, source, syntax),
+            source,
+        )
+    }
+
+    fn _from_name_settings_and_source_with_syntax_impl(
+        name: &'source str,
+        source: &'source str,
+        syntax: Syntax,
     ) -> Result<CompiledTemplate<'source>, Error> {
         // the parser/compiler combination can create constants in which case
         // we can probably benefit from the value optimization a bit.
         let _guard = value::value_optimization();
-        let ast = ok!(parse(source, name));
+        let ast = ok!(parse_with_syntax(source, name, syntax));
         let mut gen = CodeGenerator::new(name, source);
         gen.compile_stmt(&ast);
         let buffer_size_hint = gen.buffer_size_hint();

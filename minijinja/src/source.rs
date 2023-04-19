@@ -11,6 +11,7 @@ use self_cell::self_cell;
 
 use crate::error::{Error, ErrorKind};
 use crate::template::CompiledTemplate;
+use crate::Syntax;
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -42,6 +43,7 @@ enum SourceBacking {
     Dynamic {
         templates: MemoMap<String, Arc<LoadedTemplate>>,
         loader: Arc<LoadFunc>,
+        syntax: Syntax,
     },
     Static {
         templates: HashMap<String, Arc<LoadedTemplate>>,
@@ -138,6 +140,7 @@ impl Source {
                     Some(rv) => Ok(rv),
                     None => Err(Error::new_not_found(name)),
                 }),
+                syntax: Default::default(),
             },
         }
     }
@@ -202,7 +205,9 @@ impl Source {
             } => {
                 templates.replace(name, Arc::new(tmpl));
             }
-            SourceBacking::Static { ref mut templates } => {
+            SourceBacking::Static {
+                ref mut templates, ..
+            } => {
                 templates.insert(name, Arc::new(tmpl));
             }
         }
@@ -213,28 +218,35 @@ impl Source {
     pub fn remove_template(&mut self, name: &str) {
         match &mut self.backing {
             SourceBacking::Dynamic { templates, .. } => templates.remove(name),
-            SourceBacking::Static { templates } => templates.remove(name),
+            SourceBacking::Static { templates, .. } => templates.remove(name),
         };
     }
 
     /// Gets a compiled template from the source.
     pub(crate) fn get_compiled_template(&self, name: &str) -> Result<&CompiledTemplate<'_>, Error> {
         match &self.backing {
-            SourceBacking::Dynamic { templates, loader } => Ok(ok!(templates.get_or_try_insert(
-                name,
-                || -> Result<_, Error> {
+            SourceBacking::Dynamic {
+                templates,
+                loader,
+                syntax,
+            } => Ok(
+                ok!(templates.get_or_try_insert(name, || -> Result<_, Error> {
                     let source = ok!(loader(name));
                     let owner = (name.to_owned(), source);
                     let tmpl = ok!(LoadedTemplate::try_new(
                         owner,
                         |(name, source)| -> Result<_, Error> {
-                            CompiledTemplate::from_name_and_source(name.as_str(), source)
+                            CompiledTemplate::from_name_and_source_with_syntax(
+                                name.as_str(),
+                                source,
+                                *syntax,
+                            )
                         }
                     ));
                     Ok(Arc::new(tmpl))
-                }
-            ))
-            .borrow_dependent()),
+                }))
+                .borrow_dependent(),
+            ),
             SourceBacking::Static { templates } => templates
                 .get(name)
                 .map(|value| value.borrow_dependent())

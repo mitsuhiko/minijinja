@@ -682,5 +682,3 @@
 //! </ul>
 //! {% endraw %}
 //! ```
-
-// this is just for docs

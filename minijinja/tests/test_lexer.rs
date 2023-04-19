@@ -40,7 +40,8 @@ fn lookup_span(source: &str, span: Span) -> &str {
 fn test_lexer() {
     insta::glob!("lexer-inputs/*.txt", |path| {
         let contents = std::fs::read_to_string(path).unwrap();
-        let tokens: Result<Vec<_>, _> = tokenize(&contents, false).collect();
+
+        let tokens: Result<Vec<_>, _> = tokenize(&contents, false, Default::default()).collect();
         insta::with_settings!({
             description => contents.trim_end(),
             omit_expression => true
