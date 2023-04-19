@@ -6,9 +6,10 @@ use {
     aho_corasick::AhoCorasick,
 };
 
-/// The configuration for the environment and the parser.
+/// The delimiter configuration for the environment and the parser.
 /// This includes configurations to use custom delimiters
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(docsrs, doc(cfg(feature = "custom_delimiters")))]
 pub struct Syntax {
     /// The start of a block. By default it is `{%`.
     pub block_start: Cow<'static, str>,

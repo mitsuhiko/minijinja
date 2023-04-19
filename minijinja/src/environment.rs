@@ -407,8 +407,12 @@ impl<'source> Environment<'source> {
 
     /// Sets the syntax for the environment.
     ///
+    /// Note that when `source` is used, the syntax is held on the underlying source
+    /// which means that the actual source needs to have it's syntax changed.
+    ///
     /// See [`Syntax`](crate::Syntax) for more information.
     #[cfg(feature = "custom_delimiters")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_delimiters")))]
     pub fn set_syntax(&mut self, syntax: crate::settings::Syntax) -> Result<(), Error> {
         match self.templates {
             Source::Borrowed(_, ref mut syn) => *syn = Arc::new(syntax.compile()?),
@@ -420,6 +424,7 @@ impl<'source> Environment<'source> {
 
     /// Returns the current syntax.
     #[cfg(feature = "custom_delimiters")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_delimiters")))]
     pub fn syntax(&self) -> &crate::settings::Syntax {
         &self._syntax_config().syntax
     }
