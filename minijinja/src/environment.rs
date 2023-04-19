@@ -21,7 +21,7 @@ type TemplateMap<'source> = BTreeMap<&'source str, Arc<CompiledTemplate<'source>
 
 #[derive(Clone)]
 enum Source<'source> {
-    Borrowed(TemplateMap<'source>),
+    Borrowed(TemplateMap<'source>, Syntax),
     #[cfg(feature = "source")]
     Owned(crate::source::Source),
 }
@@ -29,7 +29,7 @@ enum Source<'source> {
 impl<'source> fmt::Debug for Source<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Borrowed(tmpls) => fmt::Debug::fmt(&BTreeMapKeysDebug(tmpls), f),
+            Self::Borrowed(tmpls, _) => fmt::Debug::fmt(&BTreeMapKeysDebug(tmpls), f),
             #[cfg(feature = "source")]
             Self::Owned(arg0) => fmt::Debug::fmt(arg0, f),
         }
@@ -66,7 +66,6 @@ pub struct Environment<'source> {
     templates: Source<'source>,
     filters: BTreeMap<Cow<'source, str>, filters::BoxedFilter>,
     tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
-    syntax: Syntax,
     pub(crate) globals: BTreeMap<Cow<'source, str>, Value>,
     default_auto_escape: Arc<AutoEscapeFunc>,
     undefined_behavior: UndefinedBehavior,
@@ -103,11 +102,10 @@ impl<'source> Environment<'source> {
     /// [`empty`](Environment::empty) method.
     pub fn new() -> Environment<'source> {
         Environment {
-            templates: Source::Borrowed(Default::default()),
+            templates: Source::Borrowed(Default::default(), Syntax::default()),
             filters: defaults::get_builtin_filters(),
             tests: defaults::get_builtin_tests(),
             globals: defaults::get_globals(),
-            syntax: Default::default(),
             default_auto_escape: Arc::new(defaults::default_auto_escape_callback),
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
@@ -124,11 +122,10 @@ impl<'source> Environment<'source> {
     /// logic for auto escaping configured.
     pub fn empty() -> Environment<'source> {
         Environment {
-            templates: Source::Borrowed(Default::default()),
+            templates: Source::Borrowed(Default::default(), Syntax::default()),
             filters: Default::default(),
             tests: Default::default(),
             globals: Default::default(),
-            syntax: Default::default(),
             default_auto_escape: Arc::new(defaults::no_auto_escape),
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
@@ -154,11 +151,9 @@ impl<'source> Environment<'source> {
     )]
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
         match self.templates {
-            Source::Borrowed(ref mut map) => {
+            Source::Borrowed(ref mut map, ref syntax) => {
                 let compiled_template = ok!(CompiledTemplate::from_name_and_source_with_syntax(
-                    name,
-                    source,
-                    &self.syntax
+                    name, source, syntax,
                 ));
                 map.insert(name, Arc::new(compiled_template));
                 Ok(())
@@ -171,7 +166,7 @@ impl<'source> Environment<'source> {
     /// Removes a template by name.
     pub fn remove_template(&mut self, name: &str) {
         match self.templates {
-            Source::Borrowed(ref mut map) => {
+            Source::Borrowed(ref mut map, _) => {
                 map.remove(name);
             }
             #[cfg(feature = "source")]
@@ -196,7 +191,7 @@ impl<'source> Environment<'source> {
     /// ```
     pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
         let compiled = match &self.templates {
-            Source::Borrowed(ref map) => {
+            Source::Borrowed(ref map, _) => {
                 ok!(map.get(name).ok_or_else(|| Error::new_not_found(name)))
             }
             #[cfg(feature = "source")]
@@ -262,7 +257,7 @@ impl<'source> Environment<'source> {
         let compiled = ok!(CompiledTemplate::from_name_and_source_with_syntax(
             name,
             source,
-            &self.syntax
+            self._syntax()
         ));
         let mut rv = String::with_capacity(compiled.buffer_size_hint);
         Vm::new(self)
@@ -413,25 +408,25 @@ impl<'source> Environment<'source> {
     /// See [`Syntax`](crate::Syntax) for more information.
     #[cfg(feature = "custom_delimiters")]
     pub fn set_syntax(&mut self, syntax: Syntax) {
-        #[cfg(feature = "source")]
-        {
-            if let Some(source) = self.source_mut() {
-                return source.set_syntax(syntax);
-            }
+        match self.templates {
+            Source::Borrowed(_, ref mut syn) => *syn = syntax,
+            #[cfg(feature = "source")]
+            Source::Owned(ref mut source) => source.set_syntax(syntax),
         }
-        self.syntax = syntax;
     }
 
     /// Returns the current syntax.
     #[cfg(feature = "custom_delimiters")]
     pub fn syntax(&self) -> &Syntax {
-        #[cfg(feature = "source")]
-        {
-            if let Some(source) = self.source() {
-                return source.syntax();
-            }
+        self._syntax()
+    }
+
+    fn _syntax(&self) -> &Syntax {
+        match self.templates {
+            Source::Borrowed(_, ref syn) => syn,
+            #[cfg(feature = "source")]
+            Source::Owned(ref source) => source._syntax(),
         }
-        &self.syntax
     }
 
     /// Sets the template source for the environment.
@@ -457,7 +452,7 @@ impl<'source> Environment<'source> {
     #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
     pub fn source(&self) -> Option<&crate::source::Source> {
         match self.templates {
-            Source::Borrowed(_) => None,
+            Source::Borrowed(..) => None,
             Source::Owned(ref source) => Some(source),
         }
     }
@@ -467,7 +462,7 @@ impl<'source> Environment<'source> {
     #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
     pub fn source_mut(&mut self) -> Option<&mut crate::source::Source> {
         match self.templates {
-            Source::Borrowed(_) => None,
+            Source::Borrowed(..) => None,
             Source::Owned(ref mut source) => Some(source),
         }
     }

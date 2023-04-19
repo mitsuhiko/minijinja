@@ -127,7 +127,7 @@ impl Source {
         self._syntax()
     }
 
-    fn _syntax(&self) -> &Syntax {
+    pub(crate) fn _syntax(&self) -> &Syntax {
         match &self.backing {
             SourceBacking::Dynamic { syntax, .. } | SourceBacking::Static { syntax, .. } => syntax,
         }
