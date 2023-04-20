@@ -356,6 +356,21 @@ mod builtins {
         })
     }
 
+    fn sort_helper(a: &Value, b: &Value, case_sensitive: bool) -> Ordering {
+        if !case_sensitive && (a.kind() == ValueKind::String || b.kind() == ValueKind::String) {
+            // TODO: optional unicode support
+            return a
+                .to_string()
+                .to_ascii_lowercase()
+                .cmp(&b.to_string().to_ascii_lowercase());
+        }
+        match (Key::from_borrowed_value(a), Key::from_borrowed_value(b)) {
+            (Ok(a), Ok(b)) => a.partial_cmp(&b),
+            _ => a.partial_cmp(b),
+        }
+        .unwrap_or(Ordering::Less)
+    }
+
     /// Dict sorting functionality.
     ///
     /// This filter works like `|items` but sorts the pairs by key first.
@@ -381,18 +396,7 @@ mod builtins {
             let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
             rv.sort_by(|a, b| {
                 let (a, b) = if by_value { (&a.1, &b.1) } else { (&a.0, &b.0) };
-                if !case_sensitive
-                    && (a.kind() == ValueKind::String || b.kind() == ValueKind::String)
-                {
-                    // TODO: optional unicode support
-                    return a
-                        .to_string()
-                        .to_ascii_lowercase()
-                        .cmp(&b.to_string().to_ascii_lowercase());
-                }
-                Key::from_borrowed_value(a)
-                    .unwrap()
-                    .cmp(&Key::from_borrowed_value(b).unwrap())
+                sort_helper(a, b, case_sensitive)
             });
             if let Some(true) = ok!(kwargs.get("reverse")) {
                 rv.reverse();
@@ -680,19 +684,18 @@ mod builtins {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }))
         .collect::<Vec<_>>();
+        let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
         if let Some(attr) = ok!(kwargs.get::<Option<&str>>("attribute")) {
             items.sort_by(|a, b| match (a.get_path(attr), b.get_path(attr)) {
-                (Ok(a), Ok(b)) => a.partial_cmp(&b).unwrap_or(Ordering::Less),
+                (Ok(a), Ok(b)) => sort_helper(&a, &b, case_sensitive),
                 _ => Ordering::Equal,
             });
         } else {
-            items.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less));
+            items.sort_by(|a, b| sort_helper(a, b, case_sensitive))
         }
-
         if let Some(true) = ok!(kwargs.get("reverse")) {
             items.reverse();
         }
-
         ok!(kwargs.assert_all_used());
         Ok(Value::from(items))
     }
