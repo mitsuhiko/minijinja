@@ -374,6 +374,12 @@ mod builtins {
     /// Dict sorting functionality.
     ///
     /// This filter works like `|items` but sorts the pairs by key first.
+    ///
+    /// The filter accepts a few keyword arguments:
+    ///
+    /// * `case_sensitive`: set to `true` to make the sorting of strings case sensitive.
+    /// * `by`: set to `"value"` to sort by value. Defaults to `"key"`.
+    /// * `reverse`: set to `true` to sort in reverse.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn dictsort(v: Value, kwargs: Kwargs) -> Result<Value, Error> {
         if v.kind() == ValueKind::Map {
@@ -670,6 +676,13 @@ mod builtins {
     }
 
     /// Returns the sorted version of the given list.
+    ///
+    /// The filter accepts a few keyword arguments:
+    ///
+    /// * `case_sensitive`: set to `true` to make the sorting of strings case sensitive.
+    /// * `attribute`: can be set to an attribute or dotted path to sort by that attribute
+    /// * `reverse`: set to `true` to sort in reverse.
+    ///
     /// ```jinja
     /// {{ [1, 3, 2, 4]|sort }} -> [4, 3, 2, 1]
     /// {{ [1, 3, 2, 4]|sort(reverse=true) }} -> [1, 2, 3, 4]
