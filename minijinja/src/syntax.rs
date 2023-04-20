@@ -26,6 +26,7 @@
 //!   - [`{% do %}`](#-do-)
 //!   - [`{% autoescape %}`](#-autoescape-)
 //!   - [`{% raw %}`](#-raw-)
+//! - [Custom Delimiters](#custom-delimiters)
 //!
 //! </details>
 //!
@@ -682,5 +683,40 @@
 //! </ul>
 //! {% endraw %}
 //! ```
+//!
+#![cfg_attr(
+    feature = "custom_syntax",
+    doc = r#"
+# Custom Delimiters
 
-// this is just for docs
+When MiniJinja has been compiled with the `custom_syntax` feature (see
+[`Syntax`](crate::Syntax)), it's possible to reconfigure the delimiters of the
+templates.  This is generally not recommended but it's useful for situations
+where Jinja templates are used to generate files with a syntax that would be
+conflicting for Jinja.  With custom delimiters it can for instance be more
+convenient to generate LaTeX files:
+
+```
+# use minijinja::{Environment, Syntax};
+let mut environment = Environment::new();
+environment.set_syntax(Syntax {
+    block_start: "\\BLOCK{".into(),
+    block_end: "}".into(),
+    variable_start: "\\VAR{".into(),
+    variable_end: "}".into(),
+    comment_start: "\\#{".into(),
+    comment_end: "}".into(),
+}).unwrap();
+```
+
+And then a template might look like this instead:
+
+```latex
+\begin{itemize}
+\BLOCK{for item in sequence}
+  \item \VAR{item}
+\BLOCK{endfor}
+\end{itemize}
+```
+"#
+)]

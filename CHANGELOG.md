@@ -6,6 +6,8 @@ All notable changes to MiniJinja are documented here.
 
 - Added `Value::is_number`. (#240)
 - `TryFrom` for `Value` now converts integers to `f32` and `f64`.
+- Added the new `custom_syntax` feature which allows custom delimiters
+  to be configured. (#245)
 
 ## 0.31.1
 

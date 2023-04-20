@@ -1,5 +1,5 @@
-DOC_FEATURES=source,json,urlencode,testutils
-TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items
+DOC_FEATURES=source,json,urlencode,testutils,custom_syntax
+TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax
 
 .PHONY: all
 all: test
@@ -50,6 +50,12 @@ check:
 	@cd minijinja; cargo check --no-default-features
 	@echo "check all features:"
 	@cd minijinja; cargo check --all-features
+	@echo "check custom-delimiters:"
+	@cd minijinja; cargo check --features=custom_syntax
+	@echo "check custom-delimiters+source:"
+	@cd minijinja; cargo check --features=custom_syntax,source
+	@echo "check source:"
+	@cd minijinja; cargo check --features=source
 	@echo "check macro only:"
 	@cd minijinja; cargo check --no-default-features --features macros
 	@echo "check multi_template only:"

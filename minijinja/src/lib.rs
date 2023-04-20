@@ -173,6 +173,8 @@
 //!   the previous uses of key interning are no longer needed.  Enabling it however
 //!   cuts down on memory usage slightly in certain scenarios by interning all string
 //!   keys used in dynamic map values.
+//! - `custom_syntax`: when this feature is enabled, custom delimiters are supported by
+//!   the parser.
 //!
 //! </details>
 #![allow(clippy::cognitive_complexity)]
@@ -208,6 +210,9 @@ pub mod testutils;
 #[cfg(feature = "source")]
 mod source;
 
+#[cfg(feature = "custom_syntax")]
+mod custom_syntax;
+
 #[cfg(feature = "debug")]
 mod debug;
 
@@ -218,6 +223,9 @@ pub use self::expression::Expression;
 pub use self::output::Output;
 pub use self::template::Template;
 pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
+
+#[cfg(feature = "custom_syntax")]
+pub use self::custom_syntax::Syntax;
 
 #[cfg(feature = "source")]
 pub use self::source::Source;
@@ -237,8 +245,8 @@ pub mod machinery {
     pub use crate::compiler::ast;
     pub use crate::compiler::codegen::CodeGenerator;
     pub use crate::compiler::instructions::{Instruction, Instructions};
-    pub use crate::compiler::lexer::tokenize;
-    pub use crate::compiler::parser::parse;
+    pub use crate::compiler::lexer::{tokenize, SyntaxConfig};
+    pub use crate::compiler::parser::{parse, parse_with_syntax};
     pub use crate::compiler::tokens::{Span, Token};
     pub use crate::template::CompiledTemplate;
     pub use crate::vm::Vm;

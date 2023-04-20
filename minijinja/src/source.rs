@@ -9,6 +9,7 @@ use std::sync::Arc;
 use memo_map::MemoMap;
 use self_cell::self_cell;
 
+use crate::compiler::lexer::SyntaxConfig;
 use crate::error::{Error, ErrorKind};
 use crate::template::CompiledTemplate;
 
@@ -42,9 +43,11 @@ enum SourceBacking {
     Dynamic {
         templates: MemoMap<String, Arc<LoadedTemplate>>,
         loader: Arc<LoadFunc>,
+        syntax: SyntaxConfig,
     },
     Static {
         templates: HashMap<String, Arc<LoadedTemplate>>,
+        syntax: SyntaxConfig,
     },
 }
 
@@ -61,7 +64,7 @@ impl fmt::Debug for Source {
                 .debug_list()
                 .entries(templates.iter().map(|x| x.0))
                 .finish(),
-            SourceBacking::Static { templates } => f
+            SourceBacking::Static { templates, .. } => f
                 .debug_list()
                 .entries(templates.iter().map(|x| x.0))
                 .finish(),
@@ -100,7 +103,37 @@ impl Source {
         Source {
             backing: SourceBacking::Static {
                 templates: HashMap::new(),
+                syntax: Default::default(),
             },
+        }
+    }
+
+    /// Sets the syntax for the source.
+    ///
+    /// See [`Syntax`](crate::Syntax) for more information.
+    #[cfg(feature = "custom_syntax")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub fn set_syntax(&mut self, new_syntax: crate::custom_syntax::Syntax) -> Result<(), Error> {
+        match self.backing {
+            SourceBacking::Dynamic { ref mut syntax, .. }
+            | SourceBacking::Static { ref mut syntax, .. } => {
+                *syntax = ok!(new_syntax.compile());
+            }
+        }
+        Ok(())
+    }
+
+    /// Returns the current syntax.
+    #[cfg(feature = "custom_syntax")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub fn syntax(&self) -> &crate::custom_syntax::Syntax {
+        &self._syntax_config().syntax
+    }
+
+    pub(crate) fn _syntax_config(&self) -> &SyntaxConfig {
+        match &self.backing {
+            SourceBacking::Dynamic { ref syntax, .. }
+            | SourceBacking::Static { ref syntax, .. } => syntax,
         }
     }
 
@@ -138,6 +171,7 @@ impl Source {
                     Some(rv) => Ok(rv),
                     None => Err(Error::new_not_found(name)),
                 }),
+                syntax: Default::default(),
             },
         }
     }
@@ -192,7 +226,11 @@ impl Source {
         let tmpl = ok!(LoadedTemplate::try_new(
             owner,
             |(name, source)| -> Result<_, Error> {
-                CompiledTemplate::from_name_and_source(name.as_str(), source)
+                CompiledTemplate::from_name_and_source_with_syntax(
+                    name.as_str(),
+                    source,
+                    self._syntax_config().clone(),
+                )
             }
         ));
 
@@ -202,7 +240,9 @@ impl Source {
             } => {
                 templates.replace(name, Arc::new(tmpl));
             }
-            SourceBacking::Static { ref mut templates } => {
+            SourceBacking::Static {
+                ref mut templates, ..
+            } => {
                 templates.insert(name, Arc::new(tmpl));
             }
         }
@@ -213,29 +253,37 @@ impl Source {
     pub fn remove_template(&mut self, name: &str) {
         match &mut self.backing {
             SourceBacking::Dynamic { templates, .. } => templates.remove(name),
-            SourceBacking::Static { templates } => templates.remove(name),
+            SourceBacking::Static { templates, .. } => templates.remove(name),
         };
     }
 
     /// Gets a compiled template from the source.
     pub(crate) fn get_compiled_template(&self, name: &str) -> Result<&CompiledTemplate<'_>, Error> {
         match &self.backing {
-            SourceBacking::Dynamic { templates, loader } => Ok(ok!(templates.get_or_try_insert(
-                name,
-                || -> Result<_, Error> {
+            SourceBacking::Dynamic {
+                templates,
+                loader,
+                syntax,
+            } => Ok(
+                ok!(templates.get_or_try_insert(name, || -> Result<_, Error> {
+                    let syntax = syntax.clone();
                     let source = ok!(loader(name));
                     let owner = (name.to_owned(), source);
                     let tmpl = ok!(LoadedTemplate::try_new(
                         owner,
                         |(name, source)| -> Result<_, Error> {
-                            CompiledTemplate::from_name_and_source(name.as_str(), source)
+                            CompiledTemplate::from_name_and_source_with_syntax(
+                                name.as_str(),
+                                source,
+                                syntax,
+                            )
                         }
                     ));
                     Ok(Arc::new(tmpl))
-                }
-            ))
-            .borrow_dependent()),
-            SourceBacking::Static { templates } => templates
+                }))
+                .borrow_dependent(),
+            ),
+            SourceBacking::Static { templates, .. } => templates
                 .get(name)
                 .map(|value| value.borrow_dependent())
                 .ok_or_else(|| Error::new_not_found(name)),
