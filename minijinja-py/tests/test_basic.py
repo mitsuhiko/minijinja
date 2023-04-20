@@ -239,3 +239,16 @@ def test_error():
         assert e.kind == "SyntaxError"
     else:
         assert False, "expected error"
+
+
+def test_custom_syntax():
+    env = Environment(
+        block_start_string="[%",
+        block_end_string="%]",
+        variable_start_string="{",
+        variable_end_string="}",
+        comment_start_string="/*",
+        comment_end_string="*/",
+    )
+    rv = env.render_str('[% if true %]{value}[% endif %]/* nothing */', value=42)
+    assert rv == '42'

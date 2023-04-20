@@ -31,6 +31,12 @@ class Environment(_lowlevel.Environment):
         auto_escape_callback=None,
         finalizer=None,
         reload_before_render=False,
+        block_start_string="{%",
+        block_end_string="%}",
+        variable_start_string="{{",
+        variable_end_string="}}",
+        comment_start_string="{#",
+        comment_end_string="#}",
     ):
         super().__init__()
         if loader is not None:
@@ -58,6 +64,15 @@ class Environment(_lowlevel.Environment):
         if undefined_behavior is not None:
             self.undefined_behavior = undefined_behavior
         self.reload_before_render = reload_before_render
+
+        # XXX: because this is not an atomic reconfigure if you set one of
+        # the values to a conflicting set, it will immediately error out :(
+        self.block_start_string = block_start_string
+        self.block_end_string = block_end_string
+        self.variable_start_string = variable_start_string
+        self.variable_end_string = variable_end_string
+        self.comment_start_string = comment_start_string
+        self.comment_end_string = comment_end_string
 
 
 DEFAULT_ENVIRONMENT = Environment()

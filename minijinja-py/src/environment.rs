@@ -3,7 +3,9 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::Mutex;
 
 use minijinja::value::{Rest, Value};
-use minijinja::{context, escape_formatter, AutoEscape, Error, Source, State, UndefinedBehavior};
+use minijinja::{
+    context, escape_formatter, AutoEscape, Error, Source, State, Syntax, UndefinedBehavior,
+};
 use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -19,11 +21,45 @@ thread_local! {
     static CURRENT_ENV: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
 }
 
+macro_rules! syntax_setter {
+    ($slf:expr, $value:expr, $field:ident, $default:expr) => {{
+        let value = $value;
+        let mut inner = $slf.inner.lock().unwrap();
+        if inner.syntax.is_none() {
+            if value == $default {
+                return Ok(());
+            }
+            inner.syntax = Some(Syntax::default());
+        }
+        if let Some(ref mut syntax) = inner.syntax {
+            if syntax.$field != value {
+                syntax.$field = value.into();
+                let new_syntax = syntax.clone();
+                inner.env.set_syntax(new_syntax).map_err(to_py_error)?;
+            }
+        }
+        Ok(())
+    }};
+}
+
+macro_rules! syntax_getter {
+    ($slf:expr, $field:ident, $default:expr) => {{
+        $slf.inner
+            .lock()
+            .unwrap()
+            .syntax
+            .as_ref()
+            .map_or($default, |x| &x.$field)
+            .into()
+    }};
+}
+
 struct Inner {
     env: minijinja::Environment<'static>,
     loader: Option<Py<PyAny>>,
     auto_escape_callback: Option<Py<PyAny>>,
     finalizer_callback: Option<Py<PyAny>>,
+    syntax: Option<Syntax>,
 }
 
 /// Represents a MiniJinja environment.
@@ -43,6 +79,7 @@ impl Environment {
                 loader: None,
                 auto_escape_callback: None,
                 finalizer_callback: None,
+                syntax: None,
             }),
             reload_before_render: AtomicBool::new(false),
         })
@@ -328,7 +365,8 @@ impl Environment {
         };
         let mut inner = self.inner.lock().unwrap();
         inner.loader = callback.clone();
-        inner.env.set_source(if let Some(callback) = callback {
+
+        let mut source = if let Some(callback) = callback {
             Source::with_loader(move |name| {
                 Python::with_gil(|py| {
                     let callback = callback.as_ref(py);
@@ -344,7 +382,10 @@ impl Environment {
             })
         } else {
             Source::new()
-        });
+        };
+        source.set_syntax(Syntax::default()).map_err(to_py_error)?;
+        inner.env.set_source(source);
+
         Ok(())
     }
 
@@ -374,6 +415,66 @@ impl Environment {
     #[getter]
     pub fn get_reload_before_render(&self) -> bool {
         self.reload_before_render.load(Ordering::Relaxed)
+    }
+
+    #[setter]
+    pub fn set_variable_start_string(&self, value: String) -> PyResult<()> {
+        syntax_setter!(self, value, variable_start, "{{")
+    }
+
+    #[getter]
+    pub fn get_variable_start_string(&self) -> String {
+        syntax_getter!(self, variable_start, "{{")
+    }
+
+    #[setter]
+    pub fn set_block_start_string(&self, value: String) -> PyResult<()> {
+        syntax_setter!(self, value, block_start, "{%")
+    }
+
+    #[getter]
+    pub fn get_block_start_string(&self) -> String {
+        syntax_getter!(self, block_start, "{%")
+    }
+
+    #[setter]
+    pub fn set_comment_start_string(&self, value: String) -> PyResult<()> {
+        syntax_setter!(self, value, comment_start, "{#")
+    }
+
+    #[getter]
+    pub fn get_comment_start_string(&self) -> String {
+        syntax_getter!(self, comment_start, "{#")
+    }
+
+    #[setter]
+    pub fn set_variable_end_string(&self, value: String) -> PyResult<()> {
+        syntax_setter!(self, value, variable_end, "}}")
+    }
+
+    #[getter]
+    pub fn get_variable_end_string(&self) -> String {
+        syntax_getter!(self, variable_end, "}}")
+    }
+
+    #[setter]
+    pub fn set_block_end_string(&self, value: String) -> PyResult<()> {
+        syntax_setter!(self, value, block_end, "%}")
+    }
+
+    #[getter]
+    pub fn get_block_end_string(&self) -> String {
+        syntax_getter!(self, block_end, "%}")
+    }
+
+    #[setter]
+    pub fn set_comment_end_string(&self, value: String) -> PyResult<()> {
+        syntax_setter!(self, value, comment_end, "#}")
+    }
+
+    #[getter]
+    pub fn get_comment_end_string(&self) -> String {
+        syntax_getter!(self, comment_end, "#}")
     }
 
     /// Manually adds a template to the environment.
