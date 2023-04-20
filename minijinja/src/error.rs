@@ -137,6 +137,9 @@ pub enum ErrorKind {
     /// Engine ran out of fuel
     #[cfg(feature = "fuel")]
     OutOfFuel,
+    #[cfg(feature = "custom_syntax")]
+    /// Error creating aho-corasick delimiters
+    InvalidDelimiter,
 }
 
 impl ErrorKind {
@@ -162,6 +165,8 @@ impl ErrorKind {
             ErrorKind::WriteFailure => "failed to write output",
             #[cfg(feature = "fuel")]
             ErrorKind::OutOfFuel => "engine ran out of fuel",
+            #[cfg(feature = "custom_syntax")]
+            ErrorKind::InvalidDelimiter => "invalid custom delimiters",
         }
     }
 }

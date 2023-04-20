@@ -1,5 +1,5 @@
-DOC_FEATURES=source,json,urlencode,testutils
-TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items
+DOC_FEATURES=source,json,urlencode,testutils,custom_syntax
+TEST_FEATURES=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax
 
 .PHONY: all
 all: test
@@ -10,7 +10,7 @@ build:
 
 .PHONY: doc
 doc:
-	@cd minijinja; RUSTC_BOOTSTRAP=1 RUSTDOCFLAGS="--cfg=docsrs --html-in-header doc-header.html" cargo doc -p minijinja -p minijinja-autoreload -p minijinja-stack-ref --no-deps --features=$(DOC_FEATURES)
+	@cd minijinja; RUSTC_BOOTSTRAP=1 RUSTDOCFLAGS="--cfg=docsrs --html-in-header doc-header.html" cargo doc -p minijinja -p minijinja-autoreload -p minijinja-stack-ref -p minijinja-contrib --no-deps --features=$(DOC_FEATURES)
 
 .PHONY: test
 test:
@@ -40,6 +40,9 @@ run-tests:
 	@cd minijinja; cargo test --no-default-features --features=speedups,$(FEATURES)
 	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
 	@cd minijinja; cargo check --no-default-features --features=debug
+	@cd minijinja-autoreload; cargo test
+	@cd minijinja-contrib; cargo test
+	@cd minijinja-stack-ref; cargo test
 
 .PHONY: check
 check:
@@ -47,6 +50,12 @@ check:
 	@cd minijinja; cargo check --no-default-features
 	@echo "check all features:"
 	@cd minijinja; cargo check --all-features
+	@echo "check custom-delimiters:"
+	@cd minijinja; cargo check --features=custom_syntax
+	@echo "check custom-delimiters+source:"
+	@cd minijinja; cargo check --features=custom_syntax,source
+	@echo "check source:"
+	@cd minijinja; cargo check --features=source
 	@echo "check macro only:"
 	@cd minijinja; cargo check --no-default-features --features macros
 	@echo "check multi_template only:"

@@ -13,7 +13,7 @@ rust-version = "1.61"
 exclude = ["tests"]
 
 [package.metadata.docs.rs]
-features = ["source", "json", "urlencode", "testutils"]
+features = ["source", "json", "urlencode", "testutils", "custom_syntax"]
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [features]
@@ -26,6 +26,7 @@ debug = []
 source = ["self_cell", "memo-map"]
 unicode = ["unicode-ident"]
 testutils = []
+custom_syntax = ["dep:aho-corasick"]
 
 # Speedups
 key_interning = []
@@ -52,6 +53,7 @@ multi-template = ["multi_template"]
 adjacent-loop-items = ["adjacent_loop_items"]
 
 [dependencies]
+aho-corasick = { version = "1.0", default-features = false, optional = true }
 serde = "1.0.130"
 v_htmlescape = { version = "0.15.8", optional = true }
 self_cell = { version = "0.10.1", optional = true }

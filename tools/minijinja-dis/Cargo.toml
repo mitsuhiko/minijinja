@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 argh = "0.1.8"
-minijinja = { path = "../../minijinja", features = ["unstable_machinery"] }
+minijinja = { path = "../../minijinja", features = ["unstable_machinery", "custom_syntax"] }

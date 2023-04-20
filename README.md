@@ -85,6 +85,8 @@ should make it possible to defer the upgrade to later.
 
 * [minijinja-autoreload](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-autoreload): provides
   auto reloading functionality of environments
+* [minijinja-contrib](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-contrib): provides
+  additional utilities too specific for the core
 * [minijinja-stack-ref](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-stack-ref): provides
   functionality to pass values from the stack
 * [minijinja-py](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py): makes MiniJinja

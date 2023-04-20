@@ -7,3 +7,4 @@ cd $SCRIPT_DIR/..
 cargo publish -p minijinja
 cargo publish -p minijinja-autoreload
 cargo publish -p minijinja-stack-ref
+cargo publish -p minijinja-contrib
