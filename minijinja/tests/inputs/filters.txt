@@ -7,6 +7,10 @@
     2,
     3
   ],
+  "objects": [
+    {"name": "b"},
+    {"name": "a"}
+  ],
   "other_list": [1, 4, 2, 9, 111],
   "map": {
     "a": "b",
@@ -59,6 +63,7 @@ min: {{ other_list|min }}
 max: {{ other_list|max }}
 sort: {{ other_list|sort }}
 sort-reverse: {{ other_list|sort(reverse=true) }}
+sort-attribute {{ objects|sort(attribute="name") }}
 d: {{ undefined|d == "" }}
 json: {{ map|tojson }}
 json-pretty: {{ map|tojson(true) }}
