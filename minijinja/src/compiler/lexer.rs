@@ -1,5 +1,5 @@
 use crate::compiler::tokens::{Span, Token};
-use crate::custom_syntax::{StartMarker, SyntaxConfig};
+use crate::custom_syntax::SyntaxConfig;
 use crate::error::{Error, ErrorKind};
 use crate::utils::{memchr, memstr, unescape};
 
@@ -10,6 +10,14 @@ enum LexerState {
     Template,
     InVariable,
     InBlock,
+}
+
+/// Utility enum that defines a marker.
+#[derive(Debug, Copy, Clone)]
+pub enum StartMarker {
+    Variable,
+    Block,
+    Comment,
 }
 
 struct TokenizerState<'s> {
