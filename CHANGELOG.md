@@ -8,6 +8,10 @@ All notable changes to MiniJinja are documented here.
 - `TryFrom` for `Value` now converts integers to `f32` and `f64`.
 - Added the new `custom_syntax` feature which allows custom delimiters
   to be configured. (#245)
+- Added `Kwargs` abstraction to easier handle keyword arguments.
+- Fixed an issue that `Option<T>` was incorrectly picking up `none`
+  for undefined values.
+- The `sort` filter now accepts `reverse` by keyword argument.
 
 ## 0.31.1
 
