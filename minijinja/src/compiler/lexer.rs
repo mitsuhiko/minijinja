@@ -299,27 +299,33 @@ pub fn tokenize(
         let mut old_loc = state.loc();
         match state.stack.last() {
             Some(LexerState::Template) => {
-                for start_delimiter in syntax_config.start_delimiters_order() {
+                for start_delimiter in syntax_config.start_delimiters_order {
                     match start_delimiter {
                         StartMarker::Comment => {
                             if state.rest.get(..syntax_config.syntax.comment_start.len())
                                 == Some(&syntax_config.syntax.comment_start)
                             {
                                 if let Some(comment_end) = memstr(
-                                    state.rest.as_bytes(),
+                                    &state.rest.as_bytes()
+                                        [syntax_config.syntax.comment_start.len()..],
                                     syntax_config.syntax.comment_end.as_bytes(),
                                 ) {
                                     if state
                                         .rest
                                         .as_bytes()
-                                        .get(comment_end.saturating_sub(1))
+                                        .get(
+                                            comment_end.saturating_sub(1)
+                                                + syntax_config.syntax.comment_start.len(),
+                                        )
                                         .copied()
                                         == Some(b'-')
                                     {
                                         trim_leading_whitespace = true;
                                     }
                                     state.advance(
-                                        comment_end + syntax_config.syntax.comment_end.len(),
+                                        comment_end
+                                            + syntax_config.syntax.comment_start.len()
+                                            + syntax_config.syntax.comment_end.len(),
                                     );
                                     continue;
                                 } else {
@@ -400,8 +406,8 @@ pub fn tokenize(
                 if trim_leading_whitespace {
                     trim_leading_whitespace = false;
                     state.skip_whitespace();
-                    old_loc = state.loc();
                 }
+                old_loc = state.loc();
 
                 let (lead, span) = match find_marker(state.rest, &syntax_config) {
                     Some((start, false)) => (state.advance(start), state.span(old_loc)),
