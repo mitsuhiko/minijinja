@@ -7,6 +7,10 @@
     2,
     3
   ],
+  "objects": [
+    {"name": "b"},
+    {"name": "a"}
+  ],
   "other_list": [1, 4, 2, 9, 111],
   "map": {
     "a": "b",
@@ -58,7 +62,8 @@ last-undefined: {{ []|first is undefined }}
 min: {{ other_list|min }}
 max: {{ other_list|max }}
 sort: {{ other_list|sort }}
-sort-reverse: {{ other_list|sort(true) }}
+sort-reverse: {{ other_list|sort(reverse=true) }}
+sort-attribute {{ objects|sort(attribute="name") }}
 d: {{ undefined|d == "" }}
 json: {{ map|tojson }}
 json-pretty: {{ map|tojson(true) }}
@@ -87,6 +92,6 @@ select-attr: {{ [dict(active=true, key=1), dict(active=false, key=2)]|selectattr
 reject-attr: {{ [dict(active=true, key=1), dict(active=false, key=2)]|rejectattr("key", "even") }}
 map-maps: {{ [-1, -2, 3, 4, -5]|map("abs") }}
 map-attr: {{ [dict(a=1), dict(a=2), {}]|map(attribute='a', default=None) }}
-map-attr-deep: {{ [dict(a=[1]), dict(a=[2]), {}]|map(attribute='a.0', default=None) }}
+map-attr-deep: {{ [dict(a=[1]), dict(a=[2]), dict(a=[])]|map(attribute='a.0', default=None) }}
 map-attr-int: {{ [[1], [1, 2]]|map(attribute=1, default=999) }}
 attr-filter: {{ map|attr("a") }}

@@ -119,7 +119,7 @@ use crate::value::object::{SimpleSeqObject, SimpleStructObject};
 use crate::value::serialize::transform;
 use crate::vm::State;
 
-pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Rest};
+pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
 pub use crate::value::object::{Object, ObjectKind, SeqObject, SeqObjectIter, StructObject};
 
 mod argtypes;

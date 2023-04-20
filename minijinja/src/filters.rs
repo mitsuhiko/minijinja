@@ -254,7 +254,7 @@ mod builtins {
 
     use crate::error::ErrorKind;
     use crate::key::Key;
-    use crate::value::{ValueKind, ValueRepr};
+    use crate::value::{Kwargs, ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::cmp::Ordering;
     use std::fmt::Write;
@@ -641,16 +641,34 @@ mod builtins {
     }
 
     /// Returns the sorted version of the given list.
+    /// ```jinja
+    /// {{ [1, 3, 2, 4]|sort }} -> [4, 3, 2, 1]
+    /// {{ [1, 3, 2, 4]|sort(reverse=true) }} -> [1, 2, 3, 4]
+    /// # Sort users by age attribute in descending order.
+    /// {{ users|sort(attribute="age") }}
+    /// # Sort users by age attribute in ascending order.
+    /// {{ users|sort(attribute="age", reverse=true) }}
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn sort(state: &State, value: Value, reverse: Option<bool>) -> Result<Value, Error> {
+    pub fn sort(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
         let mut items = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }))
         .collect::<Vec<_>>();
-        items.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less));
-        if reverse.unwrap_or(false) {
+        if let Some(attr) = ok!(kwargs.get::<Option<&str>>("attribute")) {
+            items.sort_by(|a, b| match (a.get_path(attr), b.get_path(attr)) {
+                (Ok(a), Ok(b)) => a.partial_cmp(&b).unwrap_or(Ordering::Less),
+                _ => Ordering::Equal,
+            });
+        } else {
+            items.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less));
+        }
+
+        if let Some(true) = ok!(kwargs.get("reverse")) {
             items.reverse();
         }
+
+        ok!(kwargs.assert_all_used());
         Ok(Value::from(items))
     }
 
@@ -1083,39 +1101,39 @@ mod builtins {
         let mut rv = Vec::with_capacity(value.len().unwrap_or(0));
 
         // attribute mapping
-        if args.last().map_or(false, |x| x.is_kwargs()) {
-            let kwargs = args.last().unwrap();
-            if let Some(attr) = kwargs
-                .get_attr("attribute")
-                .ok()
-                .filter(|x| !x.is_undefined())
-            {
-                // TODO: extra arguments shouldn't be ignored
-                if args.len() > 1 {
-                    return Err(Error::new(
-                        ErrorKind::InvalidOperation,
-                        "too many arguments",
-                    ));
-                }
-                let default = kwargs.get_attr("default").ok();
-                for value in ok!(state.undefined_behavior().try_iter(value)) {
-                    let sub_val = match attr.as_str() {
-                        Some(path) => value.get_path(path),
-                        None => value.get_item(&attr),
-                    };
-                    rv.push(match (sub_val, &default) {
-                        (Ok(attr), _) => attr,
-                        (Err(err), None) => return Err(err),
-                        (Err(_), Some(default)) => default.clone(),
-                    });
-                }
-                return Ok(rv);
+        let (args, kwargs) = Kwargs::from_args(&args);
+        if let Some(attr) = ok!(kwargs.get::<Option<Value>>("attribute")) {
+            if !args.is_empty() {
+                return Err(Error::from(ErrorKind::TooManyArguments));
             }
+            let default = ok!(kwargs.get::<Option<Value>>("default"));
+            for value in ok!(state.undefined_behavior().try_iter(value)) {
+                let sub_val = match attr.as_str() {
+                    Some(path) => value.get_path(path),
+                    None => value.get_item(&attr),
+                };
+                rv.push(match (sub_val, &default) {
+                    (Ok(attr), _) => {
+                        if attr.is_undefined() {
+                            if let Some(ref default) = default {
+                                default.clone()
+                            } else {
+                                Value::UNDEFINED
+                            }
+                        } else {
+                            attr
+                        }
+                    }
+                    (Err(_), Some(default)) => default.clone(),
+                    (Err(err), None) => return Err(err),
+                });
+            }
+            ok!(kwargs.assert_all_used());
+            return Ok(rv);
         }
 
         // filter mapping
         let filter_name = ok!(args
-            .0
             .first()
             .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "filter name is required")));
         let filter_name = ok!(filter_name.as_str().ok_or_else(|| {
@@ -1129,7 +1147,7 @@ mod builtins {
         for value in ok!(state.undefined_behavior().try_iter(value)) {
             let new_args = Some(value.clone())
                 .into_iter()
-                .chain(args.0.iter().skip(1).cloned())
+                .chain(args.iter().skip(1).cloned())
                 .collect::<Vec<_>>();
             rv.push(ok!(filter.apply_to(state, &new_args)));
         }
