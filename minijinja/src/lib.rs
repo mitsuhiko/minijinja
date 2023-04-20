@@ -187,7 +187,6 @@
 mod macros;
 
 mod compiler;
-mod custom_syntax;
 mod defaults;
 mod environment;
 mod error;
@@ -210,6 +209,9 @@ pub mod testutils;
 
 #[cfg(feature = "source")]
 mod source;
+
+#[cfg(feature = "custom_syntax")]
+mod custom_syntax;
 
 #[cfg(feature = "debug")]
 mod debug;
@@ -243,10 +245,9 @@ pub mod machinery {
     pub use crate::compiler::ast;
     pub use crate::compiler::codegen::CodeGenerator;
     pub use crate::compiler::instructions::{Instruction, Instructions};
-    pub use crate::compiler::lexer::tokenize;
+    pub use crate::compiler::lexer::{tokenize, SyntaxConfig};
     pub use crate::compiler::parser::{parse, parse_with_syntax};
     pub use crate::compiler::tokens::{Span, Token};
-    pub use crate::custom_syntax::SyntaxConfig;
     pub use crate::template::CompiledTemplate;
     pub use crate::vm::Vm;
 

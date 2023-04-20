@@ -6,8 +6,8 @@ use std::sync::Arc;
 use serde::Serialize;
 
 use crate::compiler::codegen::CodeGenerator;
+use crate::compiler::lexer::SyntaxConfig;
 use crate::compiler::parser::parse_expr;
-use crate::custom_syntax::SyntaxConfig;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::expression::Expression;
 use crate::output::Output;

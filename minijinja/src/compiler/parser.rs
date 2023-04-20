@@ -2,9 +2,8 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::compiler::ast::{self, Spanned};
-use crate::compiler::lexer::tokenize;
+use crate::compiler::lexer::{tokenize, SyntaxConfig};
 use crate::compiler::tokens::{Span, Token};
-use crate::custom_syntax::SyntaxConfig;
 use crate::error::{Error, ErrorKind};
 use crate::value::Value;
 

@@ -1,10 +1,17 @@
 use crate::compiler::tokens::{Span, Token};
-use crate::custom_syntax::SyntaxConfig;
 use crate::error::{Error, ErrorKind};
 use crate::utils::{memchr, memstr, unescape};
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
+
+#[cfg(feature = "custom_syntax")]
+pub use crate::custom_syntax::SyntaxConfig;
+
+/// Non configurable syntax config
+#[cfg(not(feature = "custom_syntax"))]
+#[derive(Debug, Copy, Clone, Default)]
+pub struct SyntaxConfig;
 
 enum LexerState {
     Template,

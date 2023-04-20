@@ -9,7 +9,7 @@ use std::sync::Arc;
 use memo_map::MemoMap;
 use self_cell::self_cell;
 
-use crate::custom_syntax::SyntaxConfig;
+use crate::compiler::lexer::SyntaxConfig;
 use crate::error::{Error, ErrorKind};
 use crate::template::CompiledTemplate;
 

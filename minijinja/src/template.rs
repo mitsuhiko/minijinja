@@ -5,8 +5,8 @@ use serde::Serialize;
 
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
+use crate::compiler::lexer::SyntaxConfig;
 use crate::compiler::parser::parse_with_syntax;
-use crate::custom_syntax::SyntaxConfig;
 use crate::environment::Environment;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::output::{Output, WriteWrapper};
