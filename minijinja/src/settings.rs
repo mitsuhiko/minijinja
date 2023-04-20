@@ -25,16 +25,18 @@ pub struct Syntax {
     pub comment_end: Cow<'static, str>,
 }
 
+const DEFAULT_SYNTAX: Syntax = Syntax {
+    block_start: Cow::Borrowed("{%"),
+    block_end: Cow::Borrowed("%}"),
+    variable_start: Cow::Borrowed("{{"),
+    variable_end: Cow::Borrowed("}}"),
+    comment_start: Cow::Borrowed("{#"),
+    comment_end: Cow::Borrowed("#}"),
+};
+
 impl Default for Syntax {
     fn default() -> Self {
-        Syntax {
-            block_start: "{%".into(),
-            block_end: "%}".into(),
-            variable_start: "{{".into(),
-            variable_end: "}}".into(),
-            comment_start: "{#".into(),
-            comment_end: "#}".into(),
-        }
+        DEFAULT_SYNTAX
     }
 }
 
@@ -42,6 +44,10 @@ impl Default for Syntax {
 impl Syntax {
     /// Creates a new syntax configuration with custom delimiters.
     pub fn compile(self) -> Result<SyntaxConfig, Error> {
+        if self == DEFAULT_SYNTAX {
+            return Ok(SyntaxConfig::default());
+        }
+
         ok!(self.check_delimiters());
 
         let mut delimiter_order = [
@@ -57,15 +63,13 @@ impl Syntax {
             })
         });
 
-        let patterns = delimiter_order.map(|x| match x {
-            StartMarker::Variable => &self.variable_start as &str,
-            StartMarker::Block => &self.block_start as &str,
-            StartMarker::Comment => &self.comment_start as &str,
-        });
-
         let aho_corasick = ok!(AhoCorasick::builder()
-            .match_kind(aho_corasick::MatchKind::LeftmostFirst)
-            .build(patterns)
+            .match_kind(aho_corasick::MatchKind::LeftmostLongest)
+            .build([
+                &self.variable_start as &str,
+                &self.block_start as &str,
+                &self.comment_start as &str,
+            ])
             .map_err(|_| ErrorKind::InvalidDelimiter.into()));
         Ok(SyntaxConfig {
             syntax: self,
@@ -88,7 +92,7 @@ impl Syntax {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) enum StartMarker {
+pub enum StartMarker {
     Variable,
     Block,
     Comment,
@@ -97,7 +101,9 @@ pub(crate) enum StartMarker {
 /// Internal configuration for the environment and the parser.
 #[derive(Debug)]
 pub struct SyntaxConfig {
+    #[cfg(feature = "custom_delimiters")]
     pub(crate) syntax: Syntax,
+    #[cfg(feature = "custom_delimiters")]
     pub(crate) start_delimiters_order: [StartMarker; 3],
     #[cfg(feature = "custom_delimiters")]
     pub(crate) aho_corasick: Option<aho_corasick::AhoCorasick>,
@@ -106,7 +112,9 @@ pub struct SyntaxConfig {
 impl Default for SyntaxConfig {
     fn default() -> SyntaxConfig {
         SyntaxConfig {
+            #[cfg(feature = "custom_delimiters")]
             syntax: Syntax::default(),
+            #[cfg(feature = "custom_delimiters")]
             start_delimiters_order: [
                 StartMarker::Variable,
                 StartMarker::Block,

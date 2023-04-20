@@ -415,9 +415,9 @@ impl<'source> Environment<'source> {
     #[cfg_attr(docsrs, doc(cfg(feature = "custom_delimiters")))]
     pub fn set_syntax(&mut self, syntax: crate::settings::Syntax) -> Result<(), Error> {
         match self.templates {
-            Source::Borrowed(_, ref mut syn) => *syn = Arc::new(syntax.compile()?),
+            Source::Borrowed(_, ref mut syn) => *syn = Arc::new(ok!(syntax.compile())),
             #[cfg(feature = "source")]
-            Source::Owned(ref mut source) => source.set_syntax(syntax)?,
+            Source::Owned(ref mut source) => ok!(source.set_syntax(syntax)),
         };
         Ok(())
     }

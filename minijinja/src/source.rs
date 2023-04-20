@@ -120,7 +120,7 @@ impl Source {
         match self.backing {
             SourceBacking::Dynamic { ref mut syntax, .. }
             | SourceBacking::Static { ref mut syntax, .. } => {
-                *syntax = Arc::new(new_syntax.compile()?);
+                *syntax = Arc::new(ok!(new_syntax.compile()));
             }
         }
         Ok(())
