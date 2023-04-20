@@ -426,7 +426,7 @@ fn test_flattening_sub_item_shielded_print() {
 }
 
 #[test]
-#[cfg(feature = "custom_delimiters")]
+#[cfg(feature = "custom_syntax")]
 fn test_custom_syntax() {
     let mut env = Environment::new();
     env.set_syntax(minijinja::Syntax {

@@ -685,11 +685,11 @@
 //! ```
 //!
 #![cfg_attr(
-    feature = "custom_delimiters",
+    feature = "custom_syntax",
     doc = r#"
 # Custom Delimiters
 
-When MiniJinja has been compiled with the `custom_delimiters` feature (see
+When MiniJinja has been compiled with the `custom_syntax` feature (see
 [`Syntax`](crate::Syntax)), it's possible to reconfigure the delimiters of the
 templates.  This is generally not recommended but it's useful for situations
 where Jinja templates are used to generate files with a syntax that would be

@@ -7,10 +7,10 @@ use serde::Serialize;
 
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::parser::parse_expr;
+use crate::custom_syntax::SyntaxConfig;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::expression::Expression;
 use crate::output::Output;
-use crate::settings::SyntaxConfig;
 use crate::template::{CompiledTemplate, Template};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
 use crate::value::{FunctionArgs, FunctionResult, Value};
@@ -21,7 +21,7 @@ type TemplateMap<'source> = BTreeMap<&'source str, Arc<CompiledTemplate<'source>
 
 #[derive(Clone)]
 enum Source<'source> {
-    Borrowed(TemplateMap<'source>, Arc<SyntaxConfig>),
+    Borrowed(TemplateMap<'source>, SyntaxConfig),
     #[cfg(feature = "source")]
     Owned(crate::source::Source),
 }
@@ -411,11 +411,11 @@ impl<'source> Environment<'source> {
     /// which means that the actual source needs to have it's syntax changed.
     ///
     /// See [`Syntax`](crate::Syntax) for more information.
-    #[cfg(feature = "custom_delimiters")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "custom_delimiters")))]
-    pub fn set_syntax(&mut self, syntax: crate::settings::Syntax) -> Result<(), Error> {
+    #[cfg(feature = "custom_syntax")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub fn set_syntax(&mut self, syntax: crate::custom_syntax::Syntax) -> Result<(), Error> {
         match self.templates {
-            Source::Borrowed(_, ref mut syn) => *syn = Arc::new(ok!(syntax.compile())),
+            Source::Borrowed(_, ref mut syn) => *syn = ok!(syntax.compile()),
             #[cfg(feature = "source")]
             Source::Owned(ref mut source) => ok!(source.set_syntax(syntax)),
         };
@@ -423,13 +423,13 @@ impl<'source> Environment<'source> {
     }
 
     /// Returns the current syntax.
-    #[cfg(feature = "custom_delimiters")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "custom_delimiters")))]
-    pub fn syntax(&self) -> &crate::settings::Syntax {
+    #[cfg(feature = "custom_syntax")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub fn syntax(&self) -> &crate::custom_syntax::Syntax {
         &self._syntax_config().syntax
     }
 
-    fn _syntax_config(&self) -> &Arc<SyntaxConfig> {
+    fn _syntax_config(&self) -> &SyntaxConfig {
         match self.templates {
             Source::Borrowed(_, ref syn) => syn,
             #[cfg(feature = "source")]

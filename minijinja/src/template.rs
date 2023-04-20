@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::sync::Arc;
 use std::{fmt, io};
 
 use serde::Serialize;
@@ -7,10 +6,10 @@ use serde::Serialize;
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
 use crate::compiler::parser::parse_with_syntax;
+use crate::custom_syntax::SyntaxConfig;
 use crate::environment::Environment;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::output::{Output, WriteWrapper};
-use crate::settings::SyntaxConfig;
 use crate::utils::AutoEscape;
 use crate::value::{self, Value};
 use crate::vm::Vm;
@@ -196,7 +195,7 @@ impl<'source> CompiledTemplate<'source> {
     pub fn from_name_and_source_with_syntax(
         name: &'source str,
         source: &'source str,
-        syntax: Arc<SyntaxConfig>,
+        syntax: SyntaxConfig,
     ) -> Result<CompiledTemplate<'source>, Error> {
         attach_basic_debug_info(
             Self::_from_name_settings_and_source_with_syntax_impl(name, source, syntax),
@@ -207,7 +206,7 @@ impl<'source> CompiledTemplate<'source> {
     fn _from_name_settings_and_source_with_syntax_impl(
         name: &'source str,
         source: &'source str,
-        syntax: Arc<SyntaxConfig>,
+        syntax: SyntaxConfig,
     ) -> Result<CompiledTemplate<'source>, Error> {
         // the parser/compiler combination can create constants in which case
         // we can probably benefit from the value optimization a bit.

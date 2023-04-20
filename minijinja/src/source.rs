@@ -9,8 +9,8 @@ use std::sync::Arc;
 use memo_map::MemoMap;
 use self_cell::self_cell;
 
+use crate::custom_syntax::SyntaxConfig;
 use crate::error::{Error, ErrorKind};
-use crate::settings::SyntaxConfig;
 use crate::template::CompiledTemplate;
 
 #[cfg(test)]
@@ -43,11 +43,11 @@ enum SourceBacking {
     Dynamic {
         templates: MemoMap<String, Arc<LoadedTemplate>>,
         loader: Arc<LoadFunc>,
-        syntax: Arc<SyntaxConfig>,
+        syntax: SyntaxConfig,
     },
     Static {
         templates: HashMap<String, Arc<LoadedTemplate>>,
-        syntax: Arc<SyntaxConfig>,
+        syntax: SyntaxConfig,
     },
 }
 
@@ -111,26 +111,26 @@ impl Source {
     /// Sets the syntax for the source.
     ///
     /// See [`Syntax`](crate::Syntax) for more information.
-    #[cfg(feature = "custom_delimiters")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "custom_delimiters")))]
-    pub fn set_syntax(&mut self, new_syntax: crate::settings::Syntax) -> Result<(), Error> {
+    #[cfg(feature = "custom_syntax")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub fn set_syntax(&mut self, new_syntax: crate::custom_syntax::Syntax) -> Result<(), Error> {
         match self.backing {
             SourceBacking::Dynamic { ref mut syntax, .. }
             | SourceBacking::Static { ref mut syntax, .. } => {
-                *syntax = Arc::new(ok!(new_syntax.compile()));
+                *syntax = ok!(new_syntax.compile());
             }
         }
         Ok(())
     }
 
     /// Returns the current syntax.
-    #[cfg(feature = "custom_delimiters")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "custom_delimiters")))]
-    pub fn syntax(&self) -> &crate::settings::Syntax {
+    #[cfg(feature = "custom_syntax")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub fn syntax(&self) -> &crate::custom_syntax::Syntax {
         &self._syntax_config().syntax
     }
 
-    pub(crate) fn _syntax_config(&self) -> &Arc<SyntaxConfig> {
+    pub(crate) fn _syntax_config(&self) -> &SyntaxConfig {
         match &self.backing {
             SourceBacking::Dynamic { ref syntax, .. }
             | SourceBacking::Static { ref syntax, .. } => syntax,

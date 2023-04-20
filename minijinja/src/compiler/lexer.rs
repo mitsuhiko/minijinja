@@ -1,8 +1,6 @@
-use std::sync::Arc;
-
 use crate::compiler::tokens::{Span, Token};
+use crate::custom_syntax::{StartMarker, SyntaxConfig};
 use crate::error::{Error, ErrorKind};
-use crate::settings::{StartMarker, SyntaxConfig};
 use crate::utils::{memchr, memstr, unescape};
 
 #[cfg(test)]
@@ -40,7 +38,7 @@ fn find_start_marker_memchr(a: &str) -> Option<(usize, bool)> {
     }
 }
 
-#[cfg(feature = "custom_delimiters")]
+#[cfg(feature = "custom_syntax")]
 fn find_start_marker(a: &str, syntax_config: &SyntaxConfig) -> Option<(usize, bool)> {
     // If we have a custom delimiter we need to use the aho-corasick
     // otherwise we can use internal memchr.
@@ -58,19 +56,19 @@ fn find_start_marker(a: &str, syntax_config: &SyntaxConfig) -> Option<(usize, bo
     }
 }
 
-#[cfg(not(feature = "custom_delimiters"))]
+#[cfg(not(feature = "custom_syntax"))]
 fn find_start_marker(a: &str, _syntax_config: &SyntaxConfig) -> Option<(usize, bool)> {
     find_start_marker_memchr(a)
 }
 
 fn match_start_marker(rest: &str, syntax_config: &SyntaxConfig) -> Option<(StartMarker, usize)> {
-    #[cfg(not(feature = "custom_delimiters"))]
+    #[cfg(not(feature = "custom_syntax"))]
     {
         let _ = syntax_config;
         return match_start_marker_default(rest);
     }
 
-    #[cfg(feature = "custom_delimiters")]
+    #[cfg(feature = "custom_syntax")]
     {
         if syntax_config.aho_corasick.is_none() {
             return match_start_marker_default(rest);
@@ -312,7 +310,7 @@ impl<'s> TokenizerState<'s> {
 pub fn tokenize(
     input: &str,
     in_expr: bool,
-    syntax_config: Arc<SyntaxConfig>,
+    syntax_config: SyntaxConfig,
 ) -> impl Iterator<Item = Result<(Token<'_>, Span), Error>> {
     let mut state = TokenizerState {
         rest: input,
@@ -329,7 +327,7 @@ pub fn tokenize(
 
     std::iter::from_fn(move || {
         let (variable_end, block_start, block_end, comment_end) = {
-            #[cfg(feature = "custom_delimiters")]
+            #[cfg(feature = "custom_syntax")]
             {
                 (
                     &syntax_config.syntax.variable_end as &str,
@@ -338,7 +336,7 @@ pub fn tokenize(
                     &syntax_config.syntax.comment_end as &str,
                 )
             }
-            #[cfg(not(feature = "custom_delimiters"))]
+            #[cfg(not(feature = "custom_syntax"))]
             {
                 // hardcode them here again, so the compiler can optimize
                 ("}}", "{%", "%}", "#}")
@@ -566,7 +564,7 @@ fn test_find_marker() {
 }
 
 #[test]
-#[cfg(feature = "custom_delimiters")]
+#[cfg(feature = "custom_syntax")]
 fn test_find_marker_custom_syntax() {
     use crate::Syntax;
 
@@ -579,7 +577,7 @@ fn test_find_marker_custom_syntax() {
         comment_end: "*/".into(),
     };
 
-    let syntax_config: SyntaxConfig = syntax.compile().expect("failed to create syntax config");
+    let syntax_config = syntax.compile().expect("failed to create syntax config");
 
     assert_eq!(find_start_marker("%{", &syntax_config), Some((0, false)));
     assert!(find_start_marker("/", &syntax_config).is_none());
