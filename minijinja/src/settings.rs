@@ -1,14 +1,32 @@
-use std::borrow::Cow;
-
 #[cfg(feature = "custom_delimiters")]
 use {
     crate::error::{Error, ErrorKind},
     aho_corasick::AhoCorasick,
+    std::borrow::Cow,
 };
 
 /// The delimiter configuration for the environment and the parser.
-/// This includes configurations to use custom delimiters
+///
+/// MiniJinja allows you to override the syntax configuration for
+/// templates by setting different delimiters.  The end markers can
+/// be shared, but the start markers need to be distinct.  It would
+/// thus not be valid to configure `{{` to be the marker for both
+/// variables and blocks.
+///
+/// ```
+/// # use minijinja::{Environment, Syntax};
+/// let mut environment = Environment::new();
+/// environment.set_syntax(Syntax {
+///     block_start: "\\BLOCK{".into(),
+///     block_end: "}".into(),
+///     variable_start: "\\VAR{".into(),
+///     variable_end: "}".into(),
+///     comment_start: "\\#{".into(),
+///     comment_end: "}".into(),
+/// }).unwrap();
+/// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg(feature = "custom_delimiters")]
 #[cfg_attr(docsrs, doc(cfg(feature = "custom_delimiters")))]
 pub struct Syntax {
     /// The start of a block. By default it is `{%`.
@@ -25,6 +43,7 @@ pub struct Syntax {
     pub comment_end: Cow<'static, str>,
 }
 
+#[cfg(feature = "custom_delimiters")]
 const DEFAULT_SYNTAX: Syntax = Syntax {
     block_start: Cow::Borrowed("{%"),
     block_end: Cow::Borrowed("%}"),
@@ -34,6 +53,7 @@ const DEFAULT_SYNTAX: Syntax = Syntax {
     comment_end: Cow::Borrowed("#}"),
 };
 
+#[cfg(feature = "custom_delimiters")]
 impl Default for Syntax {
     fn default() -> Self {
         DEFAULT_SYNTAX

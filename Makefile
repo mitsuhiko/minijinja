@@ -50,6 +50,12 @@ check:
 	@cd minijinja; cargo check --no-default-features
 	@echo "check all features:"
 	@cd minijinja; cargo check --all-features
+	@echo "check custom-delimiters:"
+	@cd minijinja; cargo check --features=custom_delimiters
+	@echo "check custom-delimiters+source:"
+	@cd minijinja; cargo check --features=custom_delimiters,source
+	@echo "check source:"
+	@cd minijinja; cargo check --features=source
 	@echo "check macro only:"
 	@cd minijinja; cargo check --no-default-features --features macros
 	@echo "check multi_template only:"

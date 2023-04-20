@@ -219,9 +219,11 @@ pub use self::environment::Environment;
 pub use self::error::{Error, ErrorKind};
 pub use self::expression::Expression;
 pub use self::output::Output;
-pub use self::settings::Syntax;
 pub use self::template::Template;
 pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
+
+#[cfg(feature = "custom_delimiters")]
+pub use self::settings::Syntax;
 
 #[cfg(feature = "source")]
 pub use self::source::Source;

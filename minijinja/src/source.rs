@@ -13,9 +13,6 @@ use crate::error::{Error, ErrorKind};
 use crate::settings::SyntaxConfig;
 use crate::template::CompiledTemplate;
 
-#[cfg(feature = "custom_delimiters")]
-use crate::Syntax;
-
 #[cfg(test)]
 use similar_asserts::assert_eq;
 
@@ -116,7 +113,7 @@ impl Source {
     /// See [`Syntax`](crate::Syntax) for more information.
     #[cfg(feature = "custom_delimiters")]
     #[cfg_attr(docsrs, doc(cfg(feature = "custom_delimiters")))]
-    pub fn set_syntax(&mut self, new_syntax: Syntax) -> Result<(), Error> {
+    pub fn set_syntax(&mut self, new_syntax: crate::settings::Syntax) -> Result<(), Error> {
         match self.backing {
             SourceBacking::Dynamic { ref mut syntax, .. }
             | SourceBacking::Static { ref mut syntax, .. } => {
@@ -129,7 +126,7 @@ impl Source {
     /// Returns the current syntax.
     #[cfg(feature = "custom_delimiters")]
     #[cfg_attr(docsrs, doc(cfg(feature = "custom_delimiters")))]
-    pub fn syntax(&self) -> &Syntax {
+    pub fn syntax(&self) -> &crate::settings::Syntax {
         &self._syntax_config().syntax
     }
 
