@@ -54,7 +54,8 @@
 //!
 //! If a function wants to disambiugate between a value passed as keyword argument or not,
 //! the the [`Value::is_kwargs`] can be used which returns `true` if a value represents
-//! keyword arguments as opposed to just a map.
+//! keyword arguments as opposed to just a map.  A more convenient way to work with keyword
+//! arguments is the [`Kwargs`](crate::value::Kwargs) type.
 //!
 //! # Built-in Functions
 //!

@@ -597,6 +597,35 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 }
 
 /// Utility to accept keyword arguments.
+///
+/// Keyword arguments are represented as regular values as the last argument
+/// in an argument list.  This can be quite complex to use manually so this
+/// type is added as a utility.  You can use [`get`](Self::get) to fetch a
+/// single keyword argument and then use [`assert_all_used`](Self::assert_all_used)
+/// to make sure extra arguments create an error.
+///
+/// Here an example of a function modifying values in different ways.
+///
+/// ```
+/// use minijinja::value::{Value, Kwargs};
+/// use minijinja::Error;
+///
+/// fn modify(mut values: Vec<Value>, options: Kwargs) -> Result<Vec<Value>, Error> {
+///     // get pulls a parameter of any type.  Same as from_args.  For optional
+///     // boolean values the type inference is particularly convenient.
+///     if let Some(true) = options.get("reverse")? {
+///         values.reverse();
+///     }
+///     if let Some(limit) = options.get("limit")? {
+///         values.truncate(limit);
+///     }
+///     options.assert_all_used()?;
+///     Ok(values)
+/// }
+/// ```
+///
+/// If for whatever reason you need a value again you can use [`Into`] to
+/// convert it back into a [`Value`].
 #[derive(Debug, Clone)]
 pub struct Kwargs {
     values: Arc<ValueMap>,
@@ -642,6 +671,17 @@ impl Kwargs {
     }
 
     /// Split off kwargs from args.
+    ///
+    /// This is useful when [`Rest`] is used to consume all arguments:
+    ///
+    /// ```rust
+    /// # use minijinja::value::{Value, Rest, Kwargs};
+    /// fn my_func(args: Rest<Value>) -> Value {
+    ///     let (args, kwargs) = Kwargs::from_args(&args);
+    ///     // do something with args and kwargs
+    /// # todo!()
+    /// }
+    /// ```
     pub fn from_args(args: &[Value]) -> (&[Value], Kwargs) {
         if let Some(value) = args.last() {
             if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
@@ -660,6 +700,24 @@ impl Kwargs {
     }
 
     /// Gets a single argument from the kwargs and marks it as used.
+    ///
+    /// This method works pretty much like [`from_args`] and marks any parameter
+    /// used internally.  For optional arguments you would typically use
+    /// `Option<T>` and for non optional ones directly `T`.
+    ///
+    /// Examples:
+    ///
+    /// ```
+    /// # use minijinja::Error;
+    /// # use minijinja::value::Kwargs; fn f(kwargs: Kwargs) -> Result<(), Error> {
+    /// // f(int=42) -> Some(42)
+    /// // f() -> None
+    /// let optional_int: Option<u32> = kwargs.get("int")?;
+    /// // f(int=42) -> 42
+    /// // f() -> Error
+    /// let required_int: u32 = kwargs.get("int")?;
+    /// # Ok(()) }
+    /// ```
     ///
     /// If you don't want to mark it as used, us [`peek`](Self::peek) instead.
     pub fn get<'a, T>(&'a self, key: &'a str) -> Result<T, Error>
@@ -700,6 +758,24 @@ impl Kwargs {
             }
         }
         Ok(())
+    }
+}
+
+impl From<Kwargs> for Value {
+    fn from(value: Kwargs) -> Self {
+        Value(ValueRepr::Map(value.values, MapType::Kwargs))
+    }
+}
+
+impl TryFrom<Value> for Kwargs {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value.0 {
+            ValueRepr::Undefined => Ok(Kwargs::new(Default::default())),
+            ValueRepr::Map(ref val, MapType::Kwargs) => Ok(Kwargs::new(val.clone())),
+            _ => Err(Error::from(ErrorKind::InvalidOperation)),
+        }
     }
 }
 

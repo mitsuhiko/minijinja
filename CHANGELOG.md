@@ -12,6 +12,8 @@ All notable changes to MiniJinja are documented here.
 - Fixed an issue that `Option<T>` was incorrectly picking up `none`
   for undefined values.
 - The `sort` filter now accepts `reverse` by keyword argument.
+- The `dictsort` filter now supports reversing, by value sorting,
+  and is sorting case insensitive by default.
 
 ## 0.31.1
 

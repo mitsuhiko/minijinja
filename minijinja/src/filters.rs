@@ -360,7 +360,7 @@ mod builtins {
     ///
     /// This filter works like `|items` but sorts the pairs by key first.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn dictsort(v: Value) -> Result<Value, Error> {
+    pub fn dictsort(v: Value, kwargs: Kwargs) -> Result<Value, Error> {
         if v.kind() == ValueKind::Map {
             let mut rv = Vec::with_capacity(v.len().unwrap_or(0));
             let iter = ok!(v.try_iter());
@@ -368,11 +368,36 @@ mod builtins {
                 let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
                 rv.push((key, value));
             }
+            let by_value = match ok!(kwargs.get("by")) {
+                None | Some("key") => false,
+                Some("value") => true,
+                Some(invalid) => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("invalid value '{}' for 'by' parameter", invalid),
+                    ))
+                }
+            };
+            let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
             rv.sort_by(|a, b| {
-                Key::from_borrowed_value(&a.0)
+                let (a, b) = if by_value { (&a.1, &b.1) } else { (&a.0, &b.0) };
+                if !case_sensitive
+                    && (a.kind() == ValueKind::String || b.kind() == ValueKind::String)
+                {
+                    // TODO: optional unicode support
+                    return a
+                        .to_string()
+                        .to_ascii_lowercase()
+                        .cmp(&b.to_string().to_ascii_lowercase());
+                }
+                Key::from_borrowed_value(a)
                     .unwrap()
-                    .cmp(&Key::from_borrowed_value(&b.0).unwrap())
+                    .cmp(&Key::from_borrowed_value(b).unwrap())
             });
+            if let Some(true) = ok!(kwargs.get("reverse")) {
+                rv.reverse();
+            }
+            ok!(kwargs.assert_all_used());
             Ok(Value::from(
                 rv.into_iter()
                     .map(|(k, v)| Value::from(vec![k, v]))
