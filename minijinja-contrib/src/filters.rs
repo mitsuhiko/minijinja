@@ -24,11 +24,7 @@ use minijinja::{Error, ErrorKind};
 /// ```jinja
 /// {{ platypuses|length }} platypus{{ platypuses|pluralize(None, "es") }}.
 /// ```
-pub fn pluralize(
-    v: Value,
-    singular: Option<String>,
-    plural: Option<String>,
-) -> Result<Value, Error> {
+pub fn pluralize(v: Value, singular: Option<Value>, plural: Option<Value>) -> Result<Value, Error> {
     let is_singular = match v.len() {
         Some(val) => val == 1,
         None => match i64::try_from(v.clone()) {
@@ -46,12 +42,17 @@ pub fn pluralize(
         },
     };
 
-    Ok(match (is_singular, singular, plural) {
-        (true, None, _) => "".into(),
-        (true, Some(suffix), _) => suffix.into(),
-        (false, _, None) => "s".into(),
-        (false, _, Some(suffix)) => suffix.into(),
-    })
+    let (rv, default) = if is_singular {
+        (singular.unwrap_or(Value::UNDEFINED), "")
+    } else {
+        (plural.unwrap_or(Value::UNDEFINED), "s")
+    };
+
+    if rv.is_undefined() || rv.is_none() {
+        Ok(Value::from(default))
+    } else {
+        Ok(rv)
+    }
 }
 
 #[test]

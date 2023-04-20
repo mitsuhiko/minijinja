@@ -1,5 +1,6 @@
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap};
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut};
 
@@ -7,7 +8,7 @@ use crate::error::{Error, ErrorKind};
 use crate::key::{Key, StaticKey};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
-    Arc, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, ValueRepr,
+    Arc, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, ValueMap, ValueRepr,
 };
 use crate::vm::State;
 
@@ -487,7 +488,7 @@ impl<'a, T: ArgType<'a>> ArgType<'a> for Option<T> {
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => {
-                if value.is_undefined() || value.is_none() {
+                if value.is_undefined() {
                     Ok(None)
                 } else {
                     T::from_value(Some(value)).map(Some)
@@ -592,6 +593,113 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
                 .collect::<Result<_, _>>())),
             args.len(),
         ))
+    }
+}
+
+/// Utility to accept keyword arguments.
+#[derive(Debug, Clone)]
+pub struct Kwargs {
+    values: Arc<ValueMap>,
+    used: RefCell<HashSet<String>>,
+}
+
+impl<'a> ArgType<'a> for Kwargs {
+    type Output = Self;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            Some(value) => {
+                if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
+                    Ok(Kwargs::new(map.clone()))
+                } else {
+                    Err(Error::from(ErrorKind::MissingArgument))
+                }
+            }
+            None => Ok(Kwargs::new(Default::default())),
+        }
+    }
+
+    fn from_state_and_values(
+        _state: Option<&'a State>,
+        values: &'a [Value],
+        offset: usize,
+    ) -> Result<(Self, usize), Error> {
+        if let Some(value) = values.get(offset) {
+            if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
+                return Ok((Kwargs::new(map.clone()), 1));
+            }
+        }
+        Ok((Kwargs::new(Default::default()), 0))
+    }
+}
+
+impl Kwargs {
+    fn new(map: Arc<ValueMap>) -> Kwargs {
+        Kwargs {
+            values: map,
+            used: RefCell::new(HashSet::new()),
+        }
+    }
+
+    /// Split off kwargs from args.
+    pub fn from_args(args: &[Value]) -> (&[Value], Kwargs) {
+        if let Some(value) = args.last() {
+            if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
+                return (&args[..args.len() - 1], Kwargs::new(map.clone()));
+            }
+        }
+        (args, Kwargs::new(Default::default()))
+    }
+
+    /// Get a single argument from the kwargs but don't mark it as used.
+    pub fn peek<'a, T>(&'a self, key: &'a str) -> Result<T, Error>
+    where
+        T: ArgType<'a, Output = T>,
+    {
+        T::from_value(self.values.get(&Key::Str(key)))
+    }
+
+    /// Gets a single argument from the kwargs and marks it as used.
+    ///
+    /// If you don't want to mark it as used, us [`peek`](Self::peek) instead.
+    pub fn get<'a, T>(&'a self, key: &'a str) -> Result<T, Error>
+    where
+        T: ArgType<'a, Output = T>,
+    {
+        let rv = ok!(self.peek::<T>(key));
+        self.used.borrow_mut().insert(key.to_string());
+        Ok(rv)
+    }
+
+    /// Checks if a keyword argument exists.
+    pub fn has(&self, key: &str) -> bool {
+        self.values.contains_key(&Key::Str(key))
+    }
+
+    /// Iterates over all passed keyword arguments.
+    pub fn args(&self) -> impl Iterator<Item = &str> {
+        self.values.iter().filter_map(|x| x.0.as_str())
+    }
+
+    /// Asserts that all kwargs were used.
+    pub fn assert_all_used(&self) -> Result<(), Error> {
+        let used = self.used.borrow();
+        for key in self.values.keys() {
+            if let Some(key) = key.as_str() {
+                if !used.contains(key) {
+                    return Err(Error::new(
+                        ErrorKind::TooManyArguments,
+                        format!("unknown keyword argument '{}'", key),
+                    ));
+                }
+            } else {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    "non string keys passed to kwargs",
+                ));
+            }
+        }
+        Ok(())
     }
 }
 

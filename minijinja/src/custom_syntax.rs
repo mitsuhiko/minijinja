@@ -167,7 +167,6 @@ fn test_compile() {
 
     // '{*'
     let comment_match = matches.next().unwrap();
-    dbg!(&input.get(comment_match.start()..comment_match.end()));
     assert_eq!(comment_match.start(), 31);
     assert_eq!(comment_match.end(), 33);
 
