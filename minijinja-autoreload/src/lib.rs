@@ -267,7 +267,7 @@ impl Notifier {
                         kind,
                         EventKind::Create(_)
                             | EventKind::Remove(_)
-                            | EventKind::Modify(ModifyKind::Data(_) | ModifyKind::Name(_))
+                            | EventKind::Modify(ModifyKind::Data(_) | ModifyKind::Name(_) | ModifyKind::Any)
                     ) {
                         if let Some(inner) = weak_handle.upgrade() {
                             inner.lock().unwrap().should_reload = true;
