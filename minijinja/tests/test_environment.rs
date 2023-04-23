@@ -46,6 +46,14 @@ fn test_expression_lifetimes() {
 }
 
 #[test]
+fn test_expression_undeclared_variables() {
+    let env = Environment::new();
+    let expr = env.compile_expression("[foo, bar]").unwrap();
+    let undeclared = expr.undeclared_variables();
+    assert_eq!(undeclared, ["foo", "bar"].into_iter().collect());
+}
+
+#[test]
 fn test_clone() {
     let mut env = Environment::new();
     env.add_template("test", "a").unwrap();

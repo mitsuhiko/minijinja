@@ -445,3 +445,13 @@ fn test_custom_syntax() {
         .unwrap();
     assert_eq!(value, r"012");
 }
+
+#[test]
+fn test_undeclared_variables() {
+    let mut env = Environment::new();
+    env.add_template("demo", "{% set x = foo %}{{ x }}{{ bar }}")
+        .unwrap();
+    let tmpl = env.get_template("demo").unwrap();
+    let undeclared = tmpl.undeclared_variables();
+    assert_eq!(undeclared, ["foo", "bar"].into_iter().collect());
+}

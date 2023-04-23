@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::{fmt, io};
 
 use serde::Serialize;
@@ -6,6 +6,7 @@ use serde::Serialize;
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
 use crate::compiler::lexer::SyntaxConfig;
+use crate::compiler::meta::find_undeclared;
 use crate::compiler::parser::parse_with_syntax;
 use crate::environment::Environment;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
@@ -140,6 +141,33 @@ impl<'env> Template<'env> {
         )
     }
 
+    /// Returns a set of all undeclared variables in the template.
+    ///
+    /// This returns a set of all variables that might be looked up
+    /// at runtime by the template.  Since this is runs a static
+    /// analysis, the actual control flow is not considered.  This
+    /// also cannot take into account what happens due to includes,
+    /// imports or extending.
+    ///
+    /// ```rust
+    /// # use minijinja::Environment;
+    /// let mut env = Environment::new();
+    /// env.add_template("x", "{% set x = foo %}{{ x }}{{ bar }}").unwrap();
+    /// let tmpl = env.get_template("x").unwrap();
+    /// let undeclared = tmpl.undeclared_variables();
+    /// assert_eq!(undeclared, ["foo", "bar"].into_iter().collect());
+    /// ```
+    pub fn undeclared_variables(&self) -> HashSet<&str> {
+        match parse_with_syntax(
+            self.compiled.instructions.source(),
+            self.name(),
+            self.compiled.syntax.clone(),
+        ) {
+            Ok(ast) => find_undeclared(&ast),
+            Err(_) => HashSet::new(),
+        }
+    }
+
     /// Returns the root instructions.
     #[cfg(feature = "multi_template")]
     pub(crate) fn instructions(&self) -> &'env Instructions<'env> {
@@ -167,6 +195,8 @@ pub struct CompiledTemplate<'source> {
     pub blocks: BTreeMap<&'source str, Instructions<'source>>,
     /// Optional size hint for string rendering.
     pub buffer_size_hint: usize,
+    /// The syntax config that created it.
+    pub syntax: SyntaxConfig,
 }
 
 impl<'env> fmt::Debug for CompiledTemplate<'env> {
@@ -211,7 +241,7 @@ impl<'source> CompiledTemplate<'source> {
         // the parser/compiler combination can create constants in which case
         // we can probably benefit from the value optimization a bit.
         let _guard = value::value_optimization();
-        let ast = ok!(parse_with_syntax(source, name, syntax));
+        let ast = ok!(parse_with_syntax(source, name, syntax.clone()));
         let mut gen = CodeGenerator::new(name, source);
         gen.compile_stmt(&ast);
         let buffer_size_hint = gen.buffer_size_hint();
@@ -220,6 +250,7 @@ impl<'source> CompiledTemplate<'source> {
             instructions,
             blocks,
             buffer_size_hint,
+            syntax,
         })
     }
 }
