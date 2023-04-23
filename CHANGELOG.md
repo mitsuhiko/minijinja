@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 0.32.1
+
+- Fixed an issue with autoreload not working propertly on windows. (#249)
+
 ## 0.32.0
 
 - Added `Value::is_number`. (#240)
