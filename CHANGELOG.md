@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+- Hide accidentally exposed `Syntax::compile` method.
+
 ## 0.32.1
 
 - Fixed an issue with autoreload not working propertly on windows. (#249)

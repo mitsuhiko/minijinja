@@ -59,7 +59,7 @@ impl Default for Syntax {
 
 impl Syntax {
     /// Creates a new syntax configuration with custom delimiters.
-    pub fn compile(self) -> Result<SyntaxConfig, Error> {
+    pub(crate) fn compile(self) -> Result<SyntaxConfig, Error> {
         if self == DEFAULT_SYNTAX {
             return Ok(SyntaxConfig::default());
         }
