@@ -5,10 +5,9 @@ the state of compatibility and future direction is.
 
 ## Syntax Differences
 
-MiniJinja does not support line statements and the ability to customize the
-delimiters.  Both of those are currently intentional to better leverage
-the editor ecosystem which typically cannot deal with these reconfigured
-Jinja templates.
+MiniJinja does not support line statements and custom delimiters are an
+optional feature that is largely discouraged.  For custom delimiters the
+`custom_syntax` feature needs to be enabled.
 
 MiniJinja by default does not allow unicode identifiers.  These need to be
 turned on with the `unicode` feature to achieve parity with Jinja2.
