@@ -34,7 +34,7 @@ def test_callable_attrs():
 
 def test_generator():
     def hmm():
-        # this implicity gets converted into a list. it's not a real iterator
+        # This implicitly gets converted into a list. It's not a real iterator.
         yield 1
         yield 2
         yield 3

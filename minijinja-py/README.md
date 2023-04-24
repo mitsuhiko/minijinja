@@ -54,7 +54,7 @@ print(result)
 
 ## Purpose
 
-MiniJinja attemps a certain level of compatibiliy with Jinja2, but it does not
+MiniJinja attempts a certain level of compatibility with Jinja2, but it does not
 try to achieve this at all costs.  As a result you will notice that quite a few
 templates will refuse to render with MiniJinja despite the fact that they probably
 look quite innocent.  It is however possible to write templates that render to the
@@ -112,7 +112,7 @@ on the Python side.  It will honor `__html__`.
 
 Instead of custom formatters like in MiniJinja, you can define a finalizer instead
 which is similar to how it works in Jinja2.  It's passed a value (or optional also
-the state as first argument whne `pass_state` is used) and can return a new value.
+the state as first argument when `pass_state` is used) and can return a new value.
 If the special `NotImplemented` value is returned, the original value is rendered
 without any modification:
 
