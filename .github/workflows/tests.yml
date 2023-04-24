@@ -8,12 +8,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          profile: minimal
-          override: true
       - name: Check
         run: make check
       - name: Test
@@ -24,12 +22,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
-          profile: minimal
-          override: true
       - name: Check
         run: make check
       - name: Test
@@ -41,12 +37,10 @@ jobs:
   #   name: Build on 1.45.0
   #   runs-on: ubuntu-latest
   #   steps:
-  #     - uses: actions/checkout@v1
-  #     - uses: actions-rs/toolchain@v1
+  #     - uses: actions/checkout@v3
+  #     - uses: dtolnay/rust-toolchain@master
   #       with:
   #         toolchain: 1.45.0
-  #         profile: minimal
-  #         override: true
   #     - name: Build
   #       run: cargo build --features=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug
   #       working-directory: ./minijinja
@@ -59,13 +53,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.61.0
-          target: armv5te-unknown-linux-gnueabi
-          profile: minimal
-          override: true
+          targets: armv5te-unknown-linux-gnueabi
       - name: Check
         run: cargo check --all-features -p minijinja --target armv5te-unknown-linux-gnueabi
 
@@ -74,12 +66,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.61.0
-          profile: minimal
-          override: true
       - name: Test
         run: make test
 
@@ -88,13 +78,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          override: true
-          profile: minimal
-          target: wasm32-wasi
+          targets: wasm32-wasi
       - name: Install WasmTime
         run: |
           curl https://wasmtime.dev/install.sh -sSf | bash
@@ -109,11 +97,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-          override: true
-          profile: minimal
       - name: Test
         run: make python-test
