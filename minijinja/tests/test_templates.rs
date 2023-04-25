@@ -339,7 +339,7 @@ fn test_current_call_state() {
     );
 }
 
-// ideally this would work, but unfortuantely the way serde flatten works makes it
+// ideally this would work, but unfortunately the way serde flatten works makes it
 // impossible for us to support with the internal optimizations in the value model.
 // see https://github.com/mitsuhiko/minijinja/issues/222
 #[derive(Debug, serde::Serialize)]
