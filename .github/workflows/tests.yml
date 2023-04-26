@@ -61,6 +61,18 @@ jobs:
       - name: Check
         run: cargo check --all-features -p minijinja --target armv5te-unknown-linux-gnueabi
 
+  test-fuel-feature:
+    name: Check on 1.61.0 (fuel feature)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.61.0
+      - name: Check
+        run: cargo check --no-default-features -p minijinja --features fuel
+
   test-stable:
     name: Test on 1.61.0
     runs-on: ubuntu-latest
