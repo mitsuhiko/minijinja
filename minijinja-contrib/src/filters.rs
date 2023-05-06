@@ -18,7 +18,7 @@ use minijinja::{Error, ErrorKind};
 /// ```
 ///
 /// ```jinja
-/// {{ entities|length }} entit{{ users|pluralize("y", "ies") }}.
+/// {{ entities|length }} entit{{ entities|pluralize("y", "ies") }}.
 /// ```
 ///
 /// ```jinja
