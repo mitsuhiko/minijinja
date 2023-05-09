@@ -31,5 +31,6 @@ Repository = "https://github.com/mitsuhiko/minijinja"
 "Donate" = "https://github.com/sponsors/mitsuhiko"
 
 [tool.maturin]
+module-name = "minijinja._lowlevel"
 python-source = "python"
 strip = true
