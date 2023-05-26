@@ -68,12 +68,15 @@ impl<'env, 'source> Expression<'env, 'source> {
     ///
     /// This works the same as
     /// [`Template::undeclared_variables`](crate::Template::undeclared_variables).
-    pub fn undeclared_variables(&self) -> HashSet<&str> {
+    pub fn undeclared_variables(&self, nested: bool) -> HashSet<String> {
         match parse_expr(self.instructions.source(), SyntaxConfig::default()) {
-            Ok(expr) => find_undeclared(&ast::Stmt::EmitExpr(ast::Spanned::new(
-                ast::EmitExpr { expr },
-                Default::default(),
-            ))),
+            Ok(expr) => find_undeclared(
+                &ast::Stmt::EmitExpr(ast::Spanned::new(
+                    ast::EmitExpr { expr },
+                    Default::default(),
+                )),
+                nested,
+            ),
             Err(_) => HashSet::new(),
         }
     }
