@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 0.33.0
 
 - Hide accidentally exposed `Syntax::compile` method.
 - Added `undeclared_variables` methods to `Template` and `Expression`. (#250)

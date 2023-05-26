@@ -1,6 +1,6 @@
 [package]
 name = "minijinja-contrib"
-version = "0.32.1"
+version = "0.33.0"
 edition = "2018"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
@@ -15,8 +15,8 @@ rust-version = "1.61"
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [dependencies]
-minijinja = { version = "0.32.1", path = "../minijinja", default-features = false }
+minijinja = { version = "0.33.0", path = "../minijinja", default-features = false }
 
 [dev-dependencies]
-minijinja = { version = "0.32.1", path = "../minijinja", features = ["source"] }
+minijinja = { version = "0.33.0", path = "../minijinja", features = ["source"] }
 similar-asserts = "1.4.2"
