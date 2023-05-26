@@ -147,23 +147,26 @@ impl<'env> Template<'env> {
     /// at runtime by the template.  Since this is runs a static
     /// analysis, the actual control flow is not considered.  This
     /// also cannot take into account what happens due to includes,
-    /// imports or extending.
+    /// imports or extending.  If `nested` is set to `true`, then also
+    /// nested trivial attribute lookups are considered and returned.
     ///
     /// ```rust
     /// # use minijinja::Environment;
     /// let mut env = Environment::new();
-    /// env.add_template("x", "{% set x = foo %}{{ x }}{{ bar }}").unwrap();
+    /// env.add_template("x", "{% set x = foo %}{{ x }}{{ bar.baz }}").unwrap();
     /// let tmpl = env.get_template("x").unwrap();
-    /// let undeclared = tmpl.undeclared_variables();
-    /// assert_eq!(undeclared, ["foo", "bar"].into_iter().collect());
+    /// let undeclared = tmpl.undeclared_variables(false);
+    /// // returns ["foo", "bar"]
+    /// let undeclared = tmpl.undeclared_variables(true);
+    /// // returns ["foo", "bar.baz"]
     /// ```
-    pub fn undeclared_variables(&self) -> HashSet<&str> {
+    pub fn undeclared_variables(&self, nested: bool) -> HashSet<String> {
         match parse_with_syntax(
             self.compiled.instructions.source(),
             self.name(),
             self.compiled.syntax.clone(),
         ) {
-            Ok(ast) => find_undeclared(&ast),
+            Ok(ast) => find_undeclared(&ast, nested),
             Err(_) => HashSet::new(),
         }
     }

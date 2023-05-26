@@ -1,9 +1,11 @@
 use std::collections::HashSet;
+use std::fmt::Write;
 
 use crate::compiler::ast;
 
 struct AssignmentTracker<'a> {
     out: HashSet<&'a str>,
+    nested_out: Option<HashSet<String>>,
     assigned: Vec<HashSet<&'a str>>,
 }
 
@@ -14,6 +16,14 @@ impl<'a> AssignmentTracker<'a> {
 
     fn assign(&mut self, name: &'a str) {
         self.assigned.last_mut().unwrap().insert(name);
+    }
+
+    fn assign_nested(&mut self, name: String) {
+        if let Some(ref mut nested_out) = self.nested_out {
+            if !nested_out.contains(&name) {
+                nested_out.insert(name);
+            }
+        }
     }
 
     fn push(&mut self) {
@@ -30,6 +40,7 @@ impl<'a> AssignmentTracker<'a> {
 pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
     let mut state = AssignmentTracker {
         out: HashSet::new(),
+        nested_out: None,
         assigned: vec![Default::default()],
     };
     m.args.iter().for_each(|arg| track_assign(arg, &mut state));
@@ -38,13 +49,22 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
 }
 
 /// Finds all variables that are undeclared in a template.
-pub fn find_undeclared<'a>(t: &ast::Stmt<'a>) -> HashSet<&'a str> {
+pub fn find_undeclared(t: &ast::Stmt<'_>, track_nested: bool) -> HashSet<String> {
     let mut state = AssignmentTracker {
         out: HashSet::new(),
+        nested_out: if track_nested {
+            Some(HashSet::new())
+        } else {
+            None
+        },
         assigned: vec![Default::default()],
     };
     track_walk(t, &mut state);
-    state.out
+    if let Some(nested) = state.nested_out {
+        nested
+    } else {
+        state.out.into_iter().map(|x| x.to_string()).collect()
+    }
 }
 
 fn tracker_visit_expr_opt<'a>(expr: &Option<ast::Expr<'a>>, state: &mut AssignmentTracker<'a>) {
@@ -58,7 +78,13 @@ fn tracker_visit_expr<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a
         ast::Expr::Var(var) => {
             if !state.is_assigned(var.id) {
                 state.out.insert(var.id);
-                state.assign(var.id);
+                // if we are not tracking nested assignments, we can consider a variable
+                // to be assigned the first time we perform a lookup.
+                if state.nested_out.is_none() {
+                    state.assign(var.id);
+                } else {
+                    state.assign_nested(var.id.to_string());
+                }
             }
         }
         ast::Expr::Const(_) => {}
@@ -80,7 +106,36 @@ fn tracker_visit_expr<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a
             tracker_visit_expr(&expr.expr, state);
             expr.args.iter().for_each(|x| tracker_visit_expr(x, state));
         }
-        ast::Expr::GetAttr(expr) => tracker_visit_expr(&expr.expr, state),
+        ast::Expr::GetAttr(expr) => {
+            // if we are tracking nested, we check if we have a chain of attribute
+            // lookups that terminate in a variable lookup.  In that case we can
+            // assign the nested lookup.
+            if state.nested_out.is_some() {
+                let mut attrs = vec![expr.name];
+                let mut ptr = &expr.expr;
+                loop {
+                    match ptr {
+                        ast::Expr::Var(var) => {
+                            if !state.is_assigned(var.id) {
+                                let mut rv = var.id.to_string();
+                                for attr in attrs.iter().rev() {
+                                    write!(rv, ".{}", attr).ok();
+                                }
+                                state.assign_nested(rv);
+                                return;
+                            }
+                        }
+                        ast::Expr::GetAttr(expr) => {
+                            attrs.push(expr.name);
+                            ptr = &expr.expr;
+                            continue;
+                        }
+                        _ => break,
+                    }
+                }
+            }
+            tracker_visit_expr(&expr.expr, state)
+        }
         ast::Expr::GetItem(expr) => {
             tracker_visit_expr(&expr.expr, state);
             tracker_visit_expr(&expr.subscript_expr, state);
