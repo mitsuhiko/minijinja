@@ -10,7 +10,7 @@ pub use crate::custom_syntax::SyntaxConfig;
 
 /// Non configurable syntax config
 #[cfg(not(feature = "custom_syntax"))]
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct SyntaxConfig;
 
 enum LexerState {
@@ -80,7 +80,7 @@ fn match_start_marker(rest: &str, syntax_config: &SyntaxConfig) -> Option<(Start
     #[cfg(not(feature = "custom_syntax"))]
     {
         let _ = syntax_config;
-        return match_start_marker_default(rest);
+        match_start_marker_default(rest)
     }
 
     #[cfg(feature = "custom_syntax")]
