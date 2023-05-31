@@ -50,10 +50,7 @@ fn fuel_for_instruction(instruction: &Instruction) -> isize {
         #[cfg(feature = "multi_template")]
         Instruction::ExportLocals => 0,
         #[cfg(feature = "macros")]
-        Instruction::LoadBlocks
-        | Instruction::BuildMacro(..)
-        | Instruction::Return
-        | Instruction::RenderParent => 0,
+        Instruction::LoadBlocks | Instruction::BuildMacro(..) | Instruction::Return => 0,
         _ => 1,
     }
 }
