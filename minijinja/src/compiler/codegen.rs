@@ -48,8 +48,6 @@ pub struct CodeGenerator<'source> {
     filter_local_ids: BTreeMap<&'source str, LocalId>,
     test_local_ids: BTreeMap<&'source str, LocalId>,
     raw_template_bytes: usize,
-    #[cfg(feature = "multi_template")]
-    has_extends: bool,
 }
 
 impl<'source> CodeGenerator<'source> {
@@ -64,8 +62,6 @@ impl<'source> CodeGenerator<'source> {
             filter_local_ids: BTreeMap::new(),
             test_local_ids: BTreeMap::new(),
             raw_template_bytes: 0,
-            #[cfg(feature = "multi_template")]
-            has_extends: false,
         }
     }
 
@@ -237,12 +233,6 @@ impl<'source> CodeGenerator<'source> {
                 for node in &t.children {
                     self.compile_stmt(node);
                 }
-                #[cfg(feature = "multi_template")]
-                {
-                    if self.has_extends {
-                        self.add(Instruction::RenderParent);
-                    }
-                }
             }
             ast::Stmt::EmitExpr(expr) => {
                 self.compile_emit_expr(expr);
@@ -341,7 +331,6 @@ impl<'source> CodeGenerator<'source> {
                 self.set_line_from_span(extends.span());
                 self.compile_expr(&extends.name);
                 self.add_with_span(Instruction::LoadBlocks, extends.span());
-                self.has_extends = true;
             }
             #[cfg(feature = "multi_template")]
             ast::Stmt::Include(include) => {

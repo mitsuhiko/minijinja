@@ -203,10 +203,6 @@ pub enum Instruction<'source> {
     #[cfg(feature = "multi_template")]
     LoadBlocks,
 
-    /// Renders the parent template
-    #[cfg(feature = "multi_template")]
-    RenderParent,
-
     /// Includes another template.
     #[cfg(feature = "multi_template")]
     Include(bool),

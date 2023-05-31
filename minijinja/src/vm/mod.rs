@@ -174,7 +174,7 @@ impl<'env> Vm<'env> {
 
         // If we are extending we are holding the instructions of the target parent
         // template here.  This is used to detect multiple extends and the evaluation
-        // uses these instructions when RenderParent is evaluated.
+        // uses these instructions when it makes it to the end of the instructions.
         #[cfg(feature = "multi_template")]
         let mut parent_instructions = None;
 
@@ -194,7 +194,28 @@ impl<'env> Vm<'env> {
             }};
         }
 
-        while let Some(instr) = state.instructions.get(pc) {
+        loop {
+            let instr = match state.instructions.get(pc) {
+                Some(instr) => instr,
+                #[cfg(not(feature = "multi_template"))]
+                None => break,
+                #[cfg(feature = "multi_template")]
+                None => {
+                    // when an extends statement appears in a template, when we hit the
+                    // last instruction we need to check if parent instructions were
+                    // stashed away (which means we found an extends tag which invoked
+                    // `LoadBlocks`).  If we do find instructions, we reset back to 0
+                    // from the new instructions.
+                    state.instructions = match parent_instructions.take() {
+                        Some(instr) => instr,
+                        None => break,
+                    };
+                    out.end_capture(AutoEscape::None);
+                    pc = 0;
+                    continue;
+                }
+            };
+
             // if we only have two arguments that we pull from the stack, we
             // can assign them to a and b.  This slightly reduces the amount of
             // code bloat generated here.  Do the same for a potential error
@@ -594,13 +615,15 @@ impl<'env> Vm<'env> {
                     // would only be visible (and unused) internally.
                     recurse_loop!(false);
                 }
-                // Explanation on the behavior of `LoadBlocks` and `RenderParent`.
+                // Explanation on the behavior of `LoadBlocks` and rendering of
+                // inherited templates:
+                //
                 // MiniJinja inherits the behavior from Jinja2 where extending
                 // loads the blocks (`LoadBlocks`) and the rest of the template
                 // keeps executing but with output disabled, only at the end the
-                // parent template is then invoked (`RenderParent`).  This has the
-                // effect that you can still set variables or declare macros and
-                // that they become visible in the blocks.
+                // parent template is then invoked.  This has the effect that
+                // you can still set variables or declare macros and that they
+                // become visible in the blocks.
                 //
                 // This behavior has a few downsides.  First of all what happens
                 // in the parent template overrides what happens in the child.
@@ -626,28 +649,6 @@ impl<'env> Vm<'env> {
                     }
                     parent_instructions = Some(ctx_ok!(self.load_blocks(a, state)));
                     out.begin_capture(CaptureMode::Discard);
-                }
-                #[cfg(feature = "multi_template")]
-                Instruction::RenderParent => {
-                    // when an extends statement appears in a template, the last instruction
-                    // in that template is the `RenderParent` opcode.  However there is no
-                    // guarantee that we actually encountered the extends tag that would
-                    // have loaded the parent blocks (`LoadBlocks`).  Because of this it's
-                    // possible that we actually end up in this instruction without blocks
-                    // loaded.  In that case we interpret the opcode as if we're breaking
-                    // out of the eval loop.
-                    state.instructions = match parent_instructions.take() {
-                        Some(instr) => instr,
-                        None => break,
-                    };
-                    out.end_capture(AutoEscape::None);
-
-                    // then replace the instructions and set the pc to 0 again.
-                    // this effectively means that the template engine will now
-                    // execute the extended template's code instead.  From this
-                    // there is no way back.
-                    pc = 0;
-                    continue;
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::Include(ignore_missing) => {
