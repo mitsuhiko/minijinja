@@ -520,7 +520,11 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::CallBlock(name) => {
-                    if parent_instructions.is_none() {
+                    let discarded = out
+                        .capture_mode()
+                        .map(|x| x == CaptureMode::Discard)
+                        .unwrap_or(false);
+                    if parent_instructions.is_none() && !discarded {
                         self.call_block(name, state, out)?;
                     }
                 }
