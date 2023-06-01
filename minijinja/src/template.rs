@@ -180,7 +180,12 @@ impl<'env> Template<'env> {
     /// **Note on values:** The [`Value`] type implements `Serialize` and can be
     /// efficiently passed to render.  It does not undergo actual serialization.
     #[cfg(feature = "multi_template")]
-    pub fn render_block_to_write<S: Serialize, W: io::Write>(&self, block: &str, ctx: S, w: W) -> Result<(), Error> {
+    pub fn render_block_to_write<S: Serialize, W: io::Write>(
+        &self,
+        block: &str,
+        ctx: S,
+        w: W,
+    ) -> Result<(), Error> {
         let mut wrapper = WriteWrapper { w, err: None };
         self._eval_block(
             block,
