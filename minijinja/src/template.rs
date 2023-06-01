@@ -9,7 +9,7 @@ use crate::compiler::lexer::SyntaxConfig;
 use crate::compiler::meta::find_undeclared;
 use crate::compiler::parser::parse_with_syntax;
 use crate::environment::Environment;
-use crate::error::{attach_basic_debug_info, Error, ErrorKind};
+use crate::error::{attach_basic_debug_info, Error};
 use crate::output::{Output, WriteWrapper};
 use crate::utils::AutoEscape;
 use crate::value::{self, Value};
@@ -70,7 +70,7 @@ impl<'env> Template<'env> {
     ///
     /// The provided value is used as the initial context for the template.  It
     /// can be any object that implements [`Serialize`](serde::Serialize).  You
-    /// can eiher create your own struct and derive `Serialize` for it or the
+    /// can either create your own struct and derive `Serialize` for it or the
     /// [`context!`](crate::context) macro can be used to create an ad-hoc context.
     ///
     /// ```
@@ -97,10 +97,10 @@ impl<'env> Template<'env> {
 
     /// Renders the template block into a string.
     ///
-    /// The provided value is used as the initial context for the template.  It
-    /// can be any object that implements [`Serialize`](serde::Serialize).  You
-    /// can eiher create your own struct and derive `Serialize` for it or the
-    /// [`context!`](crate::context) macro can be used to create an ad-hoc context.
+    /// This method works like [`render`](Self::render) but it only renders a specific
+    /// block in the template.  The first argument is the name of the block.
+    ///
+    /// This renders only the block `hi` in the template:
     ///
     /// ```
     /// # use minijinja::{Environment, context};
@@ -131,6 +131,8 @@ impl<'env> Template<'env> {
     /// This works exactly like [`render`](Self::render) but instead writes the template
     /// as it's evaluating into a [`io::Write`].
     ///
+    /// This renders only the block `hi` in the template:
+    ///
     /// ```
     /// # use minijinja::{Environment, context};
     /// # let mut env = Environment::new();
@@ -150,22 +152,13 @@ impl<'env> Template<'env> {
             &mut Output::with_write(&mut wrapper),
         )
         .map(|_| ())
-        .map_err(|err| {
-            wrapper
-                .err
-                .take()
-                .map(|io_err| {
-                    Error::new(ErrorKind::WriteFailure, "I/O error during rendering")
-                        .with_source(io_err)
-                })
-                .unwrap_or(err)
-        })
+        .map_err(|err| wrapper.take_err(err))
     }
 
     /// Renders the template block into a [`io::Write`].
     ///
-    /// This works exactly like [`render`](Self::render) but instead writes the template
-    /// block as it's evaluating into a [`io::Write`].
+    /// This works exactly like [`render_to_write`](Self::render_to_write) but renders
+    /// a single block.  The first argument is the name of the block.
     ///
     /// ```
     /// # use minijinja::{Environment, context};
@@ -193,16 +186,7 @@ impl<'env> Template<'env> {
             &mut Output::with_write(&mut wrapper),
         )
         .map(|_| ())
-        .map_err(|err| {
-            wrapper
-                .err
-                .take()
-                .map(|io_err| {
-                    Error::new(ErrorKind::WriteFailure, "I/O error during rendering")
-                        .with_source(io_err)
-                })
-                .unwrap_or(err)
-        })
+        .map_err(|err| wrapper.take_err(err))
     }
 
     fn _eval(&self, root: Value, out: &mut Output) -> Result<Option<Value>, Error> {

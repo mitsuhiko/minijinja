@@ -10,16 +10,13 @@ use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{AutoEscape, UndefinedBehavior};
-use crate::value::{self, ops, value_map_with_capacity, MapType, Value, ValueRepr};
+use crate::value::{ops, value_map_with_capacity, value_optimization, MapType, Value, ValueRepr};
 use crate::vm::context::{Context, Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
 use crate::vm::macro_object::{Macro, MacroData};
-
-#[cfg(feature = "fuel")]
-use crate::vm::fuel::FuelTracker;
 
 pub use crate::vm::state::State;
 
@@ -86,25 +83,15 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         auto_escape: AutoEscape,
     ) -> Result<Option<Value>, Error> {
-        let _guard = value::value_optimization();
-        if let ValueRepr::Invalid(ref err) = root.0 {
-            return Err(Error::new(ErrorKind::BadSerialization, err.to_string()));
-        }
+        let _guard = value_optimization();
         self.eval_state(
-            &mut State {
-                env: self.env,
-                ctx: Context::new(Frame::new(root)),
-                current_block: None,
-                current_call: None,
+            &mut State::new(
+                self.env,
+                Context::new(ok!(Frame::new_checked(root))),
                 auto_escape,
                 instructions,
-                blocks: prepare_blocks(blocks),
-                loaded_templates: BTreeSet::new(),
-                #[cfg(feature = "macros")]
-                macros: Arc::new(Vec::new()),
-                #[cfg(feature = "fuel")]
-                fuel_tracker: self.env.fuel().map(FuelTracker::new),
-            },
+                prepare_blocks(blocks),
+            ),
             out,
         )
     }
@@ -120,29 +107,17 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         auto_escape: AutoEscape,
     ) -> Result<Option<Value>, Error> {
-        let _guard = value::value_optimization();
-        if let ValueRepr::Invalid(ref err) = root.0 {
-            return Err(Error::new(ErrorKind::BadSerialization, err.to_string()));
-        }
-        out.begin_capture(CaptureMode::Discard);
-        let mut state = State {
-            env: self.env,
-            ctx: Context::new(Frame::new(root)),
-            current_block: None,
-            current_call: None,
+        let _guard = value_optimization();
+        let mut state = State::new(
+            self.env,
+            Context::new(ok!(Frame::new_checked(root))),
             auto_escape,
             instructions,
-            blocks: prepare_blocks(blocks),
-            loaded_templates: BTreeSet::new(),
-            #[cfg(feature = "macros")]
-            macros: Arc::new(Vec::new()),
-            #[cfg(feature = "fuel")]
-            fuel_tracker: self.env.fuel().map(FuelTracker::new),
-        };
-
+            prepare_blocks(blocks),
+        );
+        out.begin_capture(CaptureMode::Discard);
         self.eval_state(&mut state, out)?;
         out.end_capture(state.auto_escape);
-
         self.call_block(block, &mut state, out)
     }
 
@@ -520,11 +495,7 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::CallBlock(name) => {
-                    let discarded = out
-                        .capture_mode()
-                        .map(|x| x == CaptureMode::Discard)
-                        .unwrap_or(false);
-                    if parent_instructions.is_none() && !discarded {
+                    if parent_instructions.is_none() && !out.is_discarding() {
                         self.call_block(name, state, out)?;
                     }
                 }
@@ -894,8 +865,8 @@ impl<'env> Vm<'env> {
             rv
         } else {
             Err(Error::new(
-                ErrorKind::InvalidOperation,
-                "tried to invoke unknown block",
+                ErrorKind::UnknownBlock,
+                format!("block '{}' not found", name),
             ))
         }
     }

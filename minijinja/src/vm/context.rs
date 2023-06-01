@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::value::{OwnedValueIterator, Value};
+use crate::value::{OwnedValueIterator, Value, ValueRepr};
 use crate::vm::closure_object::Closure;
 use crate::vm::loop_object::Loop;
 
@@ -48,12 +48,22 @@ impl<'env> Default for Frame<'env> {
 }
 
 impl<'env> Frame<'env> {
+    /// Creates a new frame with the given context and no validation
     pub fn new(ctx: Value) -> Frame<'env> {
         Frame {
             locals: Locals::new(),
             ctx,
             current_loop: None,
             closure: None,
+        }
+    }
+
+    /// Creates a new frame with the given context and validates the the value is not invalid
+    pub fn new_checked(root: Value) -> Result<Frame<'env>, Error> {
+        if let ValueRepr::Invalid(ref err) = root.0 {
+            Err(Error::new(ErrorKind::BadSerialization, err.to_string()))
+        } else {
+            Ok(Frame::new(root))
         }
     }
 }

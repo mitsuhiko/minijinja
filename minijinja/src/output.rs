@@ -1,5 +1,6 @@
 use std::{fmt, io};
 
+use crate::error::{Error, ErrorKind};
 use crate::utils::AutoEscape;
 use crate::value::Value;
 
@@ -76,14 +77,10 @@ impl<'a> Output<'a> {
         }
     }
 
+    /// Returns `true` if the output is discarding.
     #[inline(always)]
-    /// Returns the current capture mode, if any.
-    pub fn capture_mode(&self) -> Option<CaptureMode> {
-        match self.capture_stack.last() {
-            Some(Some(_)) => Some(CaptureMode::Capture),
-            Some(None) => Some(CaptureMode::Discard),
-            None => None,
-        }
+    pub fn is_discarding(&self) -> bool {
+        matches!(self.capture_stack.last(), Some(None))
     }
 
     /// Writes some data to the underlying buffer contained within this output.
@@ -142,6 +139,19 @@ impl fmt::Write for NullWriter {
 pub struct WriteWrapper<W> {
     pub w: W,
     pub err: Option<io::Error>,
+}
+
+impl<W> WriteWrapper<W> {
+    /// Replaces the given error with the held error if available.
+    pub fn take_err(&mut self, original: Error) -> Error {
+        self.err
+            .take()
+            .map(|io_err| {
+                Error::new(ErrorKind::WriteFailure, "I/O error during rendering")
+                    .with_source(io_err)
+            })
+            .unwrap_or(original)
+    }
 }
 
 impl<W: io::Write> fmt::Write for WriteWrapper<W> {
