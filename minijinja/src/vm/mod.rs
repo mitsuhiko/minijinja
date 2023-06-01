@@ -109,6 +109,43 @@ impl<'env> Vm<'env> {
         )
     }
 
+    #[cfg(feature = "multi_template")]
+    /// Evaluates the given inputs and block
+    pub fn eval_block(
+        &self,
+        block: &str,
+        instructions: &Instructions<'env>,
+        root: Value,
+        blocks: &BTreeMap<&'env str, Instructions<'env>>,
+        out: &mut Output,
+        auto_escape: AutoEscape,
+    ) -> Result<Option<Value>, Error> {
+        let _guard = value::value_optimization();
+        if let ValueRepr::Invalid(ref err) = root.0 {
+            return Err(Error::new(ErrorKind::BadSerialization, err.to_string()));
+        }
+        out.begin_capture(CaptureMode::Discard);
+        let mut state = State {
+            env: self.env,
+            ctx: Context::new(Frame::new(root)),
+            current_block: None,
+            current_call: None,
+            auto_escape,
+            instructions,
+            blocks: prepare_blocks(blocks),
+            loaded_templates: BTreeSet::new(),
+            #[cfg(feature = "macros")]
+            macros: Arc::new(Vec::new()),
+            #[cfg(feature = "fuel")]
+            fuel_tracker: self.env.fuel().map(FuelTracker::new),
+        };
+
+        self.eval_state(&mut state, out)?;
+        out.end_capture(state.auto_escape);
+
+        self.call_block(block, &mut state, out)
+    }
+
     /// Evaluate a macro in a state.
     #[cfg(feature = "macros")]
     #[allow(clippy::too_many_arguments)]
@@ -483,24 +520,12 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::CallBlock(name) => {
-                    if parent_instructions.is_none() {
-                        let old_block = state.current_block;
-                        state.current_block = Some(name);
-                        if let Some(block_stack) = state.blocks.get(name) {
-                            let old_instructions =
-                                mem::replace(&mut state.instructions, block_stack.instructions());
-                            ctx_ok!(state.ctx.push_frame(Frame::default()));
-                            let rv = self.eval_state(state, out);
-                            state.ctx.pop_frame();
-                            state.instructions = old_instructions;
-                            ctx_ok!(rv);
-                        } else {
-                            bail!(Error::new(
-                                ErrorKind::InvalidOperation,
-                                "tried to invoke unknown block"
-                            ));
-                        }
-                        state.current_block = old_block;
+                    let discarded = out
+                        .capture_mode()
+                        .map(|x| x == CaptureMode::Discard)
+                        .unwrap_or(false);
+                    if parent_instructions.is_none() && !discarded {
+                        self.call_block(name, state, out)?;
                     }
                 }
                 Instruction::PushAutoEscape => {
@@ -847,6 +872,32 @@ impl<'env> Vm<'env> {
                 .append_instructions(instr);
         }
         Ok(tmpl.instructions())
+    }
+
+    #[cfg(feature = "multi_template")]
+    fn call_block(
+        &self,
+        name: &'env str,
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
+    ) -> Result<Option<Value>, Error> {
+        let old_block = state.current_block;
+        state.current_block = Some(name);
+        if let Some(block_stack) = state.blocks.get(name) {
+            let old_instructions =
+                mem::replace(&mut state.instructions, block_stack.instructions());
+            state.ctx.push_frame(Frame::default())?;
+            let rv = self.eval_state(state, out);
+            state.ctx.pop_frame();
+            state.instructions = old_instructions;
+            state.current_block = old_block;
+            rv
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "tried to invoke unknown block",
+            ))
+        }
     }
 
     fn derive_auto_escape(

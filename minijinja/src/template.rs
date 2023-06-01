@@ -95,6 +95,37 @@ impl<'env> Template<'env> {
             .map(|_| rv)
     }
 
+    /// Renders the template block into a string.
+    ///
+    /// The provided value is used as the initial context for the template.  It
+    /// can be any object that implements [`Serialize`](serde::Serialize).  You
+    /// can eiher create your own struct and derive `Serialize` for it or the
+    /// [`context!`](crate::context) macro can be used to create an ad-hoc context.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// # let mut env = Environment::new();
+    /// # env.add_template("hello", "{% block hi %}Hello {{ name }}!{% endblock %}").unwrap();
+    /// let tmpl = env.get_template("hello").unwrap();
+    /// println!("{}", tmpl.render_block("hi", context!(name => "John")).unwrap());
+    /// ```
+    ///
+    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// efficiently passed to render.  It does not undergo actual serialization.
+    #[cfg(feature = "multi_template")]
+    pub fn render_block<S: Serialize>(&self, block: &str, ctx: S) -> Result<String, Error> {
+        // reduce total amount of code faling under mono morphization into
+        // this function, and share the rest in _render.
+        self._render_block(block, Value::from_serializable(&ctx))
+    }
+
+    #[cfg(feature = "multi_template")]
+    fn _render_block(&self, block: &str, root: Value) -> Result<String, Error> {
+        let mut rv = String::with_capacity(self.compiled.buffer_size_hint);
+        self._eval_block(block, root, &mut Output::with_string(&mut rv))
+            .map(|_| rv)
+    }
+
     /// Renders the template into a [`io::Write`].
     ///
     /// This works exactly like [`render`](Self::render) but instead writes the template
@@ -131,8 +162,68 @@ impl<'env> Template<'env> {
         })
     }
 
+    /// Renders the template block into a [`io::Write`].
+    ///
+    /// This works exactly like [`render`](Self::render) but instead writes the template
+    /// block as it's evaluating into a [`io::Write`].
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// # let mut env = Environment::new();
+    /// # env.add_template("hello", "{% block hi %}Hello {{ name }}!{% endblock %}").unwrap();
+    /// use std::io::stdout;
+    ///
+    /// let tmpl = env.get_template("hello").unwrap();
+    /// tmpl.render_block_to_write("hi", context!(name => "John"), &mut stdout()).unwrap();
+    /// ```
+    ///
+    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// efficiently passed to render.  It does not undergo actual serialization.
+    #[cfg(feature = "multi_template")]
+    pub fn render_block_to_write<S: Serialize, W: io::Write>(
+        &self,
+        block: &str,
+        ctx: S,
+        w: W,
+    ) -> Result<(), Error> {
+        let mut wrapper = WriteWrapper { w, err: None };
+        self._eval_block(
+            block,
+            Value::from_serializable(&ctx),
+            &mut Output::with_write(&mut wrapper),
+        )
+        .map(|_| ())
+        .map_err(|err| {
+            wrapper
+                .err
+                .take()
+                .map(|io_err| {
+                    Error::new(ErrorKind::WriteFailure, "I/O error during rendering")
+                        .with_source(io_err)
+                })
+                .unwrap_or(err)
+        })
+    }
+
     fn _eval(&self, root: Value, out: &mut Output) -> Result<Option<Value>, Error> {
         Vm::new(self.env).eval(
+            &self.compiled.instructions,
+            root,
+            &self.compiled.blocks,
+            out,
+            self.initial_auto_escape,
+        )
+    }
+
+    #[cfg(feature = "multi_template")]
+    fn _eval_block(
+        &self,
+        block: &str,
+        root: Value,
+        out: &mut Output,
+    ) -> Result<Option<Value>, Error> {
+        Vm::new(self.env).eval_block(
+            block,
             &self.compiled.instructions,
             root,
             &self.compiled.blocks,

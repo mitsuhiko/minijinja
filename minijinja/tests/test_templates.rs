@@ -74,6 +74,72 @@ fn test_vm() {
 }
 
 #[test]
+fn test_vm_block_fragments() {
+    let mut refs = Vec::new();
+    insta::glob!("fragment-inputs/refs/*", |entry| {
+        let filename = entry.file_name().unwrap();
+        let filename = filename.to_str().unwrap();
+        if filename.ends_with(".txt") || filename.ends_with(".html") {
+            let source = fs::read_to_string(entry).unwrap();
+            refs.push((entry.to_path_buf(), source));
+        }
+    });
+
+    insta::glob!("fragment-inputs/*", |path| {
+        if !path.metadata().unwrap().is_file() {
+            return;
+        }
+        let filename = path.file_name().unwrap().to_str().unwrap();
+        let contents = std::fs::read_to_string(path).unwrap();
+        let mut iter = contents.splitn(2, "\n---\n");
+        let mut env = Environment::new();
+        let ctx: serde_json::Value = serde_json::from_str(iter.next().unwrap()).unwrap();
+
+        for (path, source) in &refs {
+            let ref_filename = path.file_name().unwrap().to_str().unwrap();
+            env.add_template(ref_filename, source).unwrap();
+        }
+
+        let content = iter.next().unwrap();
+        let rendered = if let Err(err) = env.add_template(filename, content) {
+            let mut rendered = format!("!!!SYNTAX ERROR!!!\n\n{err:#?}\n\n");
+            writeln!(rendered, "{err:#}").unwrap();
+            rendered
+        } else {
+            let template = env.get_template(filename).unwrap();
+
+            match template.render_block("fragment", &ctx) {
+                Ok(mut rendered) => {
+                    rendered.push('\n');
+                    rendered
+                }
+                Err(err) => {
+                    let mut rendered = format!("!!!ERROR!!!\n\n{err:#?}\n\n");
+
+                    writeln!(rendered, "{err:#}").unwrap();
+                    let mut err = &err as &dyn std::error::Error;
+                    while let Some(next_err) = err.source() {
+                        writeln!(rendered).unwrap();
+                        writeln!(rendered, "caused by: {next_err:#}").unwrap();
+                        err = next_err;
+                    }
+
+                    rendered
+                }
+            }
+        };
+
+        insta::with_settings!({
+            info => &ctx,
+            description => content.trim_end(),
+            omit_expression => true
+        }, {
+            insta::assert_snapshot!(&rendered);
+        });
+    });
+}
+
+#[test]
 fn test_custom_filter() {
     fn test_filter(_: &State, value: String) -> Result<String, Error> {
         Ok(format!("[{value}]"))
@@ -469,4 +535,21 @@ fn test_undeclared_variables() {
             .map(|x| x.to_string())
             .collect()
     );
+}
+
+#[test]
+fn test_block_fragments() {
+    let mut env = Environment::new();
+    env.add_template(
+        "demo",
+        "I am outside the fragment{% block foo %}foo{% endblock %}So am I!",
+    )
+    .unwrap();
+    let tmpl = env.get_template("demo").unwrap();
+
+    let rv_a = tmpl.render(&()).unwrap();
+    let rv_b = tmpl.render_block("foo", &()).unwrap();
+
+    assert_eq!(rv_a, "I am outside the fragmentfooSo am I!");
+    assert_eq!(rv_b, "foo");
 }

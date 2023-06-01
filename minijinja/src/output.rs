@@ -4,7 +4,7 @@ use crate::utils::AutoEscape;
 use crate::value::Value;
 
 /// How should output be captured?
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub enum CaptureMode {
     Capture,
@@ -73,6 +73,16 @@ impl<'a> Output<'a> {
             Some(Some(stream)) => stream as _,
             Some(None) => NullWriter::get_mut(),
             None => self.w,
+        }
+    }
+
+    #[inline(always)]
+    /// Returns the current capture mode, if any.
+    pub fn capture_mode(&self) -> Option<CaptureMode> {
+        match self.capture_stack.last() {
+            Some(Some(_)) => Some(CaptureMode::Capture),
+            Some(None) => Some(CaptureMode::Discard),
+            None => None,
         }
     }
 
