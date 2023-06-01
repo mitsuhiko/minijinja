@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::sync::Arc;
 
 use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
@@ -53,6 +54,30 @@ impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
 }
 
 impl<'vm, 'env> State<'vm, 'env> {
+    /// Creates a new state.
+    pub(crate) fn new(
+        env: &'env Environment,
+        ctx: Context<'env>,
+        auto_escape: AutoEscape,
+        instructions: &'vm Instructions<'env>,
+        blocks: BTreeMap<&'env str, BlockStack<'vm, 'env>>,
+    ) -> State<'vm, 'env> {
+        State {
+            env,
+            ctx,
+            current_block: None,
+            current_call: None,
+            auto_escape,
+            instructions,
+            blocks,
+            loaded_templates: BTreeSet::new(),
+            #[cfg(feature = "macros")]
+            macros: Arc::new(Vec::new()),
+            #[cfg(feature = "fuel")]
+            fuel_tracker: env.fuel().map(FuelTracker::new),
+        }
+    }
+
     /// Returns a reference to the current environment.
     #[inline(always)]
     pub fn env(&self) -> &Environment<'_> {
@@ -97,19 +122,13 @@ impl<'vm, 'env> State<'vm, 'env> {
 
     #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn with_dummy<R, F: FnOnce(&State) -> R>(env: &'env Environment<'env>, f: F) -> R {
-        f(&State {
+        f(&State::new(
             env,
-            ctx: Context::default(),
-            current_block: None,
-            auto_escape: AutoEscape::None,
-            instructions: &Instructions::new("<unknown>", ""),
-            blocks: BTreeMap::new(),
-            loaded_templates: BTreeSet::new(),
-            macros: Default::default(),
-            current_call: None,
-            #[cfg(feature = "fuel")]
-            fuel_tracker: env.fuel().map(FuelTracker::new),
-        })
+            Context::default(),
+            AutoEscape::None,
+            &Instructions::new("<unknown>", ""),
+            BTreeMap::new(),
+        ))
     }
 
     #[cfg(feature = "debug")]

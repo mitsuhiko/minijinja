@@ -140,6 +140,9 @@ pub enum ErrorKind {
     #[cfg(feature = "custom_syntax")]
     /// Error creating aho-corasick delimiters
     InvalidDelimiter,
+    /// An unknown block was called
+    #[cfg(feature = "multi_template")]
+    UnknownBlock,
 }
 
 impl ErrorKind {
@@ -167,6 +170,8 @@ impl ErrorKind {
             ErrorKind::OutOfFuel => "engine ran out of fuel",
             #[cfg(feature = "custom_syntax")]
             ErrorKind::InvalidDelimiter => "invalid custom delimiters",
+            #[cfg(feature = "multi_template")]
+            ErrorKind::UnknownBlock => "unknown block",
         }
     }
 }
