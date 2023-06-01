@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## 0.34.0
 
+- Updated `self_cell` and `percent-encoding` dependencies.  (#264)
+
 - Added `Template::render_block` and `Template::render_block_to_write` which
   allows rendering a single block in isolation.  (#262)
 
