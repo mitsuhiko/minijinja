@@ -226,6 +226,32 @@ impl<'source> Environment<'source> {
         self._render_str("<string>", source, Value::from_serializable(&ctx))
     }
 
+    /// Parses and renders a template block from a string in one go.
+    ///
+    /// In some cases you really only need a template to be rendered once from
+    /// a string and returned.  The internal name of the template is `<string>`.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// let env = Environment::new();
+    /// let rv = env.render_block_str("{% block myblock %}Hello {{ name }}{% endblock %}", "myblock", context! { name => "World" });
+    /// println!("{}", rv.unwrap());
+    /// ```
+    ///
+    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// efficiently passed to render.  It does not undergo actual serialization.
+    #[cfg(feature = "multi_template")]
+    pub fn render_block_str<S: Serialize>(
+        &self,
+        source: &str,
+        block: &str,
+        ctx: S,
+    ) -> Result<String, Error> {
+        // reduce total amount of code faling under mono morphization into
+        // this function, and share the rest in _eval.
+        self._render_block_str("<string>", source, block, Value::from_serializable(&ctx))
+    }
+
     /// Parses and renders a template from a string in one go with name.
     ///
     /// Like [`render_str`](Self::render_str), but provide a name for the
@@ -255,6 +281,38 @@ impl<'source> Environment<'source> {
         self._render_str(name, source, Value::from_serializable(&ctx))
     }
 
+    /// Parses and renders a template block from a string in one go with name.
+    ///
+    /// Like [`render_str`](Self::render_str), but provide a name for the
+    /// template to be used instead of the default `<string>`.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// let env = Environment::new();
+    /// let rv = env.render_block_named_str(
+    ///     "template_name",
+    ///     "{% block myblock %}Hello {{ name }}{% endblock %}",
+    ///     "myblock",
+    ///     context! { name => "World" }
+    /// );
+    /// println!("{}", rv.unwrap());
+    /// ```
+    ///
+    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// efficiently passed to render.  It does not undergo actual serialization.
+    #[cfg(feature = "multi_template")]
+    pub fn render_block_named_str<S: Serialize>(
+        &self,
+        name: &str,
+        source: &str,
+        block: &str,
+        ctx: S,
+    ) -> Result<String, Error> {
+        // reduce total amount of code faling under mono morphization into
+        // this function, and share the rest in _eval.
+        self._render_block_str(name, source, block, Value::from_serializable(&ctx))
+    }
+
     fn _render_str(&self, name: &str, source: &str, root: Value) -> Result<String, Error> {
         let compiled = ok!(CompiledTemplate::from_name_and_source_with_syntax(
             name,
@@ -264,6 +322,32 @@ impl<'source> Environment<'source> {
         let mut rv = String::with_capacity(compiled.buffer_size_hint);
         Vm::new(self)
             .eval(
+                &compiled.instructions,
+                root,
+                &compiled.blocks,
+                &mut Output::with_string(&mut rv),
+                self.initial_auto_escape(name),
+            )
+            .map(|_| rv)
+    }
+
+    #[cfg(feature = "multi_template")]
+    fn _render_block_str(
+        &self,
+        name: &str,
+        source: &str,
+        block: &str,
+        root: Value,
+    ) -> Result<String, Error> {
+        let compiled = ok!(CompiledTemplate::from_name_and_source_with_syntax(
+            name,
+            source,
+            self._syntax_config().clone()
+        ));
+        let mut rv = String::with_capacity(compiled.buffer_size_hint);
+        Vm::new(self)
+            .eval_block(
+                block,
                 &compiled.instructions,
                 root,
                 &compiled.blocks,
