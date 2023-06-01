@@ -1,8 +1,0 @@
----
-source: minijinja/tests/test_templates.rs
-description: "{% extends \"simple2_layout.txt\" %}\n{% block fragment %}[{{ super() }}]{% endblock %}"
-info: {}
-input_file: minijinja/tests/fragment-inputs/block_super_super.txt
----
-[(default body)]
-

@@ -1,9 +1,0 @@
----
-source: minijinja/tests/test_templates.rs
-description: "{% extends template %}\n{% block title %}[{{ super() }}]{% endblock %}\n{% block fragment %}{{ super()|upper }}{% endblock %}"
-info:
-  template: simple_layout.txt
-input_file: minijinja/tests/fragment-inputs/block_super.txt
----
-DEFAULT BODY
-
