@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 0.34.0
+
+- Added `Template::render_block` and `Template::render_block_to_write` which
+  allows rendering a single block in isolation.  (#262)
+
 ## 0.33.0
 
 - Hide accidentally exposed `Syntax::compile` method.
