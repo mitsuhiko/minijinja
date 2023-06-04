@@ -553,3 +553,27 @@ fn test_block_fragments() {
     assert_eq!(rv_a, "I am outside the fragmentfooSo am I!");
     assert_eq!(rv_b, "foo");
 }
+
+#[test]
+fn test_module() {
+    let mut env = Environment::new();
+    env.add_template(
+        "foo.html",
+        r#"
+        {% set global = variable * 2 %}
+        {% macro something() %}{{ global }}{% endmacro %}
+        {% block baz %}[{{ global }}]{% endblock %}
+    "#,
+    )
+    .unwrap();
+    let template = env.get_template("foo.html").unwrap();
+    let mut module = template
+        .eval_to_module(context! {
+            variable => 23
+        })
+        .unwrap();
+    assert_eq!(module.get_global("range"), None);
+    assert_eq!(module.get_global("global"), Some(Value::from(23 * 2)));
+    assert_eq!(module.invoke_macro("something", &[]).unwrap(), "46");
+    assert_eq!(module.render_block("baz").unwrap(), "[46]");
+}

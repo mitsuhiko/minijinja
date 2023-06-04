@@ -255,6 +255,15 @@ pub struct Instructions<'source> {
     source: &'source str,
 }
 
+pub(crate) static EMPTY_INSTRUCTIONS: Instructions<'static> = Instructions {
+    instructions: Vec::new(),
+    line_infos: Vec::new(),
+    #[cfg(feature = "debug")]
+    span_infos: Vec::new(),
+    name: "<unknown>",
+    source: "",
+};
+
 impl<'source> Instructions<'source> {
     /// Creates a new instructions object.
     pub fn new(name: &'source str, source: &'source str) -> Instructions<'source> {

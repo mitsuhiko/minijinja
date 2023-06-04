@@ -78,6 +78,17 @@ impl<'vm, 'env> State<'vm, 'env> {
         }
     }
 
+    /// Creates an empty state for an environment.
+    pub(crate) fn new_for_env(env: &'env Environment) -> State<'env, 'env> {
+        State::new(
+            env,
+            Context::default(),
+            AutoEscape::None,
+            &crate::compiler::instructions::EMPTY_INSTRUCTIONS,
+            BTreeMap::new(),
+        )
+    }
+
     /// Returns a reference to the current environment.
     #[inline(always)]
     pub fn env(&self) -> &Environment<'_> {
@@ -109,6 +120,10 @@ impl<'vm, 'env> State<'vm, 'env> {
 
     /// Returns the name of the item (filter, function, test, method) currently
     /// being called.
+    ///
+    /// Note that this information is only available if the template engine itself
+    /// calls a method.  Nested calls (for instance the `map` filter calling into
+    /// another filter) will not be reflected here.
     #[inline(always)]
     pub fn current_call(&self) -> Option<&str> {
         self.current_call
@@ -118,17 +133,6 @@ impl<'vm, 'env> State<'vm, 'env> {
     #[inline(always)]
     pub fn lookup(&self, name: &str) -> Option<Value> {
         self.ctx.load(self.env, name)
-    }
-
-    #[cfg(any(test, feature = "testutils"))]
-    pub(crate) fn with_dummy<R, F: FnOnce(&State) -> R>(env: &'env Environment<'env>, f: F) -> R {
-        f(&State::new(
-            env,
-            Context::default(),
-            AutoEscape::None,
-            &Instructions::new("<unknown>", ""),
-            BTreeMap::new(),
-        ))
     }
 
     #[cfg(feature = "debug")]

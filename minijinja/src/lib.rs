@@ -221,7 +221,7 @@ pub use self::environment::Environment;
 pub use self::error::{Error, ErrorKind};
 pub use self::expression::Expression;
 pub use self::output::Output;
-pub use self::template::Template;
+pub use self::template::{Template, TemplateModule};
 pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
 
 #[cfg(feature = "custom_syntax")]
