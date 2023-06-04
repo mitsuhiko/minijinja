@@ -108,7 +108,10 @@ fn test_vm_block_fragments() {
         } else {
             let template = env.get_template(filename).unwrap();
 
-            match template.render_block("fragment", &ctx) {
+            match template
+                .eval_to_module(&ctx)
+                .and_then(|mut x| x.render_block("fragment"))
+            {
                 Ok(mut rendered) => {
                     rendered.push('\n');
                     rendered
@@ -447,8 +450,36 @@ fn test_block_fragments() {
     let tmpl = env.get_template("demo").unwrap();
 
     let rv_a = tmpl.render(()).unwrap();
-    let rv_b = tmpl.render_block("foo", ()).unwrap();
+    let rv_b = tmpl
+        .eval_to_module(())
+        .unwrap()
+        .render_block("foo")
+        .unwrap();
 
     assert_eq!(rv_a, "I am outside the fragmentfooSo am I!");
     assert_eq!(rv_b, "foo");
+}
+
+#[test]
+fn test_module() {
+    let mut env = Environment::new();
+    env.add_template(
+        "foo.html",
+        r#"
+        {% set global = variable * 2 %}
+        {% macro something() %}{{ global }}{% endmacro %}
+        {% block baz %}[{{ global }}]{% endblock %}
+    "#,
+    )
+    .unwrap();
+    let template = env.get_template("foo.html").unwrap();
+    let mut module = template
+        .eval_to_module(context! {
+            variable => 23
+        })
+        .unwrap();
+    assert_eq!(module.get_global("range"), None);
+    assert_eq!(module.get_global("global"), Some(Value::from(23 * 2)));
+    assert_eq!(module.invoke_macro("something", &[]).unwrap(), "46");
+    assert_eq!(module.render_block("baz").unwrap(), "[46]");
 }

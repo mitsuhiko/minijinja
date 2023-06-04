@@ -14,6 +14,7 @@ use crate::output::{Output, WriteWrapper};
 use crate::utils::AutoEscape;
 use crate::value::{self, Value};
 use crate::vm::Vm;
+use crate::{ErrorKind, State};
 
 /// Represents a handle to a template.
 ///
@@ -95,43 +96,10 @@ impl<'env> Template<'env> {
             .map(|_| rv)
     }
 
-    /// Renders the template block into a string.
-    ///
-    /// This method works like [`render`](Self::render) but it only renders a specific
-    /// block in the template.  The first argument is the name of the block.
-    ///
-    /// This renders only the block `hi` in the template:
-    ///
-    /// ```
-    /// # use minijinja::{Environment, context};
-    /// # let mut env = Environment::new();
-    /// # env.add_template("hello", "{% block hi %}Hello {{ name }}!{% endblock %}").unwrap();
-    /// let tmpl = env.get_template("hello").unwrap();
-    /// println!("{}", tmpl.render_block("hi", context!(name => "John")).unwrap());
-    /// ```
-    ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
-    /// efficiently passed to render.  It does not undergo actual serialization.
-    #[cfg(feature = "multi_template")]
-    pub fn render_block<S: Serialize>(&self, block: &str, ctx: S) -> Result<String, Error> {
-        // reduce total amount of code faling under mono morphization into
-        // this function, and share the rest in _render.
-        self._render_block(block, Value::from_serializable(&ctx))
-    }
-
-    #[cfg(feature = "multi_template")]
-    fn _render_block(&self, block: &str, root: Value) -> Result<String, Error> {
-        let mut rv = String::with_capacity(self.compiled.buffer_size_hint);
-        self._eval_block(block, root, &mut Output::with_string(&mut rv))
-            .map(|_| rv)
-    }
-
     /// Renders the template into a [`io::Write`].
     ///
     /// This works exactly like [`render`](Self::render) but instead writes the template
     /// as it's evaluating into a [`io::Write`].
-    ///
-    /// This renders only the block `hi` in the template:
     ///
     /// ```
     /// # use minijinja::{Environment, context};
@@ -155,59 +123,33 @@ impl<'env> Template<'env> {
         .map_err(|err| wrapper.take_err(err))
     }
 
-    /// Renders the template block into a [`io::Write`].
+    /// Evaluates the template into a [`TemplateModule`].
     ///
-    /// This works exactly like [`render_to_write`](Self::render_to_write) but renders
-    /// a single block.  The first argument is the name of the block.
+    /// This evaluates the template, discards the output and stores the final
+    /// state in the evaluated module.  From there global variables or blocks
+    /// can be accessed.  What this does is quite similar to how the engine
+    /// interally works with tempaltes that are extended or imported from.
     ///
-    /// ```
-    /// # use minijinja::{Environment, context};
-    /// # let mut env = Environment::new();
-    /// # env.add_template("hello", "{% block hi %}Hello {{ name }}!{% endblock %}").unwrap();
-    /// use std::io::stdout;
-    ///
-    /// let tmpl = env.get_template("hello").unwrap();
-    /// tmpl.render_block_to_write("hi", context!(name => "John"), &mut stdout()).unwrap();
-    /// ```
-    ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
-    /// efficiently passed to render.  It does not undergo actual serialization.
-    #[cfg(feature = "multi_template")]
-    pub fn render_block_to_write<S: Serialize, W: io::Write>(
-        &self,
-        block: &str,
-        ctx: S,
-        w: W,
-    ) -> Result<(), Error> {
-        let mut wrapper = WriteWrapper { w, err: None };
-        self._eval_block(
-            block,
-            Value::from_serializable(&ctx),
-            &mut Output::with_write(&mut wrapper),
-        )
-        .map(|_| ())
-        .map_err(|err| wrapper.take_err(err))
+    /// For more information see [`TemplateModule`].
+    pub fn eval_to_module<S: Serialize>(&self, ctx: S) -> Result<TemplateModule<'_, 'env>, Error> {
+        let root = Value::from_serializable(&ctx);
+        let mut out = Output::null();
+        let vm = Vm::new(self.env);
+        let state = ok!(vm.eval_to_module(
+            &self.compiled.instructions,
+            root,
+            &self.compiled.blocks,
+            &mut out,
+            self.initial_auto_escape,
+        ));
+        Ok(TemplateModule {
+            template: self,
+            state,
+        })
     }
 
     fn _eval(&self, root: Value, out: &mut Output) -> Result<Option<Value>, Error> {
         Vm::new(self.env).eval(
-            &self.compiled.instructions,
-            root,
-            &self.compiled.blocks,
-            out,
-            self.initial_auto_escape,
-        )
-    }
-
-    #[cfg(feature = "multi_template")]
-    fn _eval_block(
-        &self,
-        block: &str,
-        root: Value,
-        out: &mut Output,
-    ) -> Result<Option<Value>, Error> {
-        Vm::new(self.env).eval_block(
-            block,
             &self.compiled.instructions,
             root,
             &self.compiled.blocks,
@@ -262,6 +204,107 @@ impl<'env> Template<'env> {
     #[cfg(feature = "multi_template")]
     pub(crate) fn initial_auto_escape(&self) -> AutoEscape {
         self.initial_auto_escape
+    }
+}
+
+/// Represents an evaluated template as module.
+///
+/// The engine internally sometimes treats templates as modules.  This happens
+/// for instance for template inheritance or when importing global variables or
+/// macros.  In the VM modules are virtual and never actually created, however
+/// for some advanced use cases the same logic is exposed via this type.
+///
+/// This lets you call macros or blocks of a template from outside of the
+/// template evaluation.  Because template modules hold mutable states, some
+/// of the methods take `&mut self`.  The template module internally retains the
+/// state of the execution and provides ways to extract some information from
+/// it.
+pub struct TemplateModule<'template: 'env, 'env> {
+    template: &'template Template<'env>,
+    state: State<'template, 'env>,
+}
+
+impl<'template, 'env> TemplateModule<'template, 'env> {
+    /// Returns a reference to the [`Template`] behind the module.
+    pub fn template(&self) -> &'template Template<'env> {
+        self.template
+    }
+
+    /// Returns the [`State`] of the module.
+    pub fn state(&self) -> &State<'template, 'env> {
+        &self.state
+    }
+
+    /// Renders a block with the given name into a string.
+    ///
+    /// This method works like [`render`](Template::render) but it only renders a specific
+    /// block in the template.  The first argument is the name of the block.
+    ///
+    /// This renders only the block `hi` in the template:
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// # fn test() -> Result<(), minijinja::Error> {
+    /// # let mut env = Environment::new();
+    /// # env.add_template("hello", "{% block hi %}Hello {{ name }}!{% endblock %}")?;
+    /// let tmpl = env.get_template("hello")?;
+    /// let rv = tmpl
+    ///     .eval_to_module(context!(name => "John"))?
+    ///     .render_block("hi")?;
+    /// println!("{}", rv);
+    /// # Ok(()) }
+    /// ```
+    ///
+    /// Note that rendering a block is a stateful operation.  If an error
+    /// is returned the module has to be re-created as the internal state
+    /// can end up corrupted.
+    #[cfg(feature = "multi_template")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
+    pub fn render_block(&mut self, block: &str) -> Result<String, Error> {
+        let mut buf = String::new();
+        Vm::new(self.state.env)
+            .call_block(block, &mut self.state, &mut Output::with_string(&mut buf))
+            .map(|_| buf)
+    }
+
+    /// Renders a block with the given name into a [`io::Write`].
+    ///
+    /// For details see [`render_block`](Self::render_block).
+    #[cfg(feature = "multi_template")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
+    pub fn render_block_to_write<W>(&mut self, block: &str, w: W) -> Result<(), Error>
+    where
+        W: io::Write,
+    {
+        let mut wrapper = WriteWrapper { w, err: None };
+        Vm::new(self.state.env)
+            .call_block(
+                block,
+                &mut self.state,
+                &mut Output::with_write(&mut wrapper),
+            )
+            .map(|_| ())
+            .map_err(|err| wrapper.take_err(err))
+    }
+
+    /// Looks up a global macro and invokes it.
+    ///
+    /// This looks up a value like [`get_global`](Self::get_global) does and
+    /// invokes it.  It's not possible to call values directly under normal
+    /// circumstances as the state is not available that is necessary to
+    /// trigger a call.
+    #[cfg(feature = "macros")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+    pub fn invoke_macro(&self, name: &str, args: &[Value]) -> Result<String, Error> {
+        let f = ok!(self
+            .get_global(name)
+            .ok_or_else(|| Error::new(ErrorKind::UnknownFunction, "macro not found")));
+        f.call(&self.state, args).map(Into::into)
+    }
+
+    /// Looks up a globally set variable in the template scope.
+    pub fn get_global(&self, name: &str) -> Option<Value> {
+        self.state.ctx.current_locals().get(name).cloned()
     }
 }
 

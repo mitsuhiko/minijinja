@@ -43,9 +43,9 @@ pub struct Vm<'env> {
     env: &'env Environment<'env>,
 }
 
-fn prepare_blocks<'env, 'vm>(
-    blocks: &'vm BTreeMap<&'env str, Instructions<'env>>,
-) -> BTreeMap<&'env str, BlockStack<'vm, 'env>> {
+fn prepare_blocks<'env, 'template>(
+    blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
+) -> BTreeMap<&'env str, BlockStack<'template, 'env>> {
     blocks
         .iter()
         .map(|(name, instr)| (*name, BlockStack::new(instr)))
@@ -96,17 +96,15 @@ impl<'env> Vm<'env> {
         )
     }
 
-    #[cfg(feature = "multi_template")]
-    /// Evaluates the given inputs and block
-    pub fn eval_block(
+    /// Evaluates the template as module
+    pub fn eval_to_module<'template>(
         &self,
-        block: &str,
-        instructions: &Instructions<'env>,
+        instructions: &'template Instructions<'env>,
         root: Value,
-        blocks: &BTreeMap<&'env str, Instructions<'env>>,
+        blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
         out: &mut Output,
         auto_escape: AutoEscape,
-    ) -> Result<Option<Value>, Error> {
+    ) -> Result<State<'template, 'env>, Error> {
         let _guard = value_optimization();
         let mut state = State::new(
             self.env,
@@ -115,10 +113,8 @@ impl<'env> Vm<'env> {
             instructions,
             prepare_blocks(blocks),
         );
-        out.begin_capture(CaptureMode::Discard);
         self.eval_state(&mut state, out)?;
-        out.end_capture(state.auto_escape);
-        self.call_block(block, &mut state, out)
+        Ok(state)
     }
 
     /// Evaluate a macro in a state.
@@ -638,7 +634,7 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::ExportLocals => {
-                    let locals = state.ctx.current_locals();
+                    let locals = state.ctx.current_locals_mut();
                     let mut module = value_map_with_capacity(locals.len());
                     for (key, value) in locals.iter() {
                         module.insert((*key).into(), value.clone());
@@ -831,15 +827,14 @@ impl<'env> Vm<'env> {
     }
 
     #[cfg(feature = "multi_template")]
-    fn call_block(
+    pub(crate) fn call_block(
         &self,
-        name: &'env str,
+        name: &str,
         state: &mut State<'_, 'env>,
         out: &mut Output,
     ) -> Result<Option<Value>, Error> {
-        let old_block = state.current_block;
-        state.current_block = Some(name);
-        if let Some(block_stack) = state.blocks.get(name) {
+        if let Some((name, block_stack)) = state.blocks.get_key_value(name) {
+            let old_block = mem::replace(&mut state.current_block, Some(name));
             let old_instructions =
                 mem::replace(&mut state.instructions, block_stack.instructions());
             state.ctx.push_frame(Frame::default())?;

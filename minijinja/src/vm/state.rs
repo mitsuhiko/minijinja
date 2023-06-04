@@ -24,22 +24,22 @@ use crate::vm::fuel::FuelTracker;
 /// **Notes on lifetimes:** the state object exposes some of the internal
 /// lifetimes through the type.  You should always elide these lifetimes
 /// as there might be lifetimes added or removed between releases.
-pub struct State<'vm, 'env> {
+pub struct State<'template, 'env> {
     pub(crate) env: &'env Environment<'env>,
     pub(crate) ctx: Context<'env>,
     pub(crate) current_block: Option<&'env str>,
     pub(crate) auto_escape: AutoEscape,
-    pub(crate) instructions: &'vm Instructions<'env>,
-    pub(crate) blocks: BTreeMap<&'env str, BlockStack<'vm, 'env>>,
+    pub(crate) instructions: &'template Instructions<'env>,
+    pub(crate) blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
     #[allow(unused)]
     pub(crate) loaded_templates: BTreeSet<&'env str>,
     #[cfg(feature = "macros")]
-    pub(crate) macros: std::sync::Arc<Vec<(&'vm Instructions<'env>, usize)>>,
+    pub(crate) macros: std::sync::Arc<Vec<(&'template Instructions<'env>, usize)>>,
     #[cfg(feature = "fuel")]
     pub(crate) fuel_tracker: Option<std::sync::Arc<FuelTracker>>,
 }
 
-impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
+impl<'template, 'env> fmt::Debug for State<'template, 'env> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("State");
         ds.field("name", &self.instructions.name());
@@ -51,15 +51,15 @@ impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
     }
 }
 
-impl<'vm, 'env> State<'vm, 'env> {
+impl<'template, 'env> State<'template, 'env> {
     /// Creates a new state.
     pub(crate) fn new(
         env: &'env Environment,
         ctx: Context<'env>,
         auto_escape: AutoEscape,
-        instructions: &'vm Instructions<'env>,
-        blocks: BTreeMap<&'env str, BlockStack<'vm, 'env>>,
-    ) -> State<'vm, 'env> {
+        instructions: &'template Instructions<'env>,
+        blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
+    ) -> State<'template, 'env> {
         State {
             env,
             ctx,
@@ -73,6 +73,18 @@ impl<'vm, 'env> State<'vm, 'env> {
             #[cfg(feature = "fuel")]
             fuel_tracker: env.fuel().map(FuelTracker::new),
         }
+    }
+
+    /// Creates an empty state for an environment.
+    #[allow(unused)]
+    pub(crate) fn new_for_env(env: &'env Environment) -> State<'env, 'env> {
+        State::new(
+            env,
+            Context::default(),
+            AutoEscape::None,
+            &crate::compiler::instructions::EMPTY_INSTRUCTIONS,
+            BTreeMap::new(),
+        )
     }
 
     /// Returns a reference to the current environment.
@@ -108,17 +120,6 @@ impl<'vm, 'env> State<'vm, 'env> {
     #[inline(always)]
     pub fn lookup(&self, name: &str) -> Option<Value> {
         self.ctx.load(self.env, name)
-    }
-
-    #[cfg(any(test, feature = "testutils"))]
-    pub(crate) fn with_dummy<R, F: FnOnce(&State) -> R>(env: &'env Environment<'env>, f: F) -> R {
-        f(&State::new(
-            env,
-            Context::default(),
-            AutoEscape::None,
-            &Instructions::new("<unknown>", ""),
-            BTreeMap::new(),
-        ))
     }
 
     #[cfg(feature = "debug")]
@@ -161,20 +162,20 @@ impl<'a> ArgType<'a> for &State<'_, '_> {
 
 /// Tracks a block and it's parents for super.
 #[derive(Default)]
-pub(crate) struct BlockStack<'vm, 'env> {
-    instructions: Vec<&'vm Instructions<'env>>,
+pub(crate) struct BlockStack<'template, 'env> {
+    instructions: Vec<&'template Instructions<'env>>,
     depth: usize,
 }
 
-impl<'vm, 'env> BlockStack<'vm, 'env> {
-    pub fn new(instructions: &'vm Instructions<'env>) -> BlockStack<'vm, 'env> {
+impl<'template, 'env> BlockStack<'template, 'env> {
+    pub fn new(instructions: &'template Instructions<'env>) -> BlockStack<'template, 'env> {
         BlockStack {
             instructions: vec![instructions],
             depth: 0,
         }
     }
 
-    pub fn instructions(&self) -> &'vm Instructions<'env> {
+    pub fn instructions(&self) -> &'template Instructions<'env> {
         self.instructions.get(self.depth).copied().unwrap()
     }
 
@@ -193,7 +194,7 @@ impl<'vm, 'env> BlockStack<'vm, 'env> {
     }
 
     #[cfg(feature = "multi_template")]
-    pub fn append_instructions(&mut self, instructions: &'vm Instructions<'env>) {
+    pub fn append_instructions(&mut self, instructions: &'template Instructions<'env>) {
         self.instructions.push(instructions);
     }
 }

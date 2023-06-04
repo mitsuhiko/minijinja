@@ -51,7 +51,8 @@ use crate::State;
 pub fn format(env: &Environment, value: Value) -> Result<String, Error> {
     let mut rv = String::new();
     let mut out = Output::with_string(&mut rv);
-    State::with_dummy(env, |state| env.format(&value, state, &mut out)).map(|_| rv)
+    env.format(&value, &State::new_for_env(env), &mut out)
+        .map(|_| rv)
 }
 
 /// Invokes a filter of an environment.
@@ -64,10 +65,11 @@ pub fn format(env: &Environment, value: Value) -> Result<String, Error> {
 /// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "testutils")))]
 pub fn apply_filter(env: &Environment, filter: &str, args: &[Value]) -> Result<Value, Error> {
-    State::with_dummy(env, |state| match env.get_filter(filter) {
-        Some(filter) => filter.apply_to(state, args),
+    let state = State::new_for_env(env);
+    match env.get_filter(filter) {
+        Some(filter) => filter.apply_to(&state, args),
         None => Err(Error::from(ErrorKind::UnknownFilter)),
-    })
+    }
 }
 
 /// Invokes a test of an environment.
@@ -80,10 +82,11 @@ pub fn apply_filter(env: &Environment, filter: &str, args: &[Value]) -> Result<V
 /// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "testutils")))]
 pub fn perform_test(env: &Environment, test: &str, args: &[Value]) -> Result<bool, Error> {
-    State::with_dummy(env, |state| match env.get_test(test) {
-        Some(test) => test.perform(state, args),
+    let state = State::new_for_env(env);
+    match env.get_test(test) {
+        Some(test) => test.perform(&state, args),
         None => Err(Error::from(ErrorKind::UnknownTest)),
-    })
+    }
 }
 
 /// Invokes a global function.
@@ -96,8 +99,9 @@ pub fn perform_test(env: &Environment, test: &str, args: &[Value]) -> Result<boo
 /// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "testutils")))]
 pub fn invoke_global(env: &Environment, func: &str, args: &[Value]) -> Result<Value, Error> {
-    State::with_dummy(env, |state| match env.globals.get(func) {
-        Some(func) => func.call(state, args),
+    let state = State::new_for_env(env);
+    match env.globals.get(func) {
+        Some(func) => func.call(&state, args),
         None => Err(Error::from(ErrorKind::UnknownFunction)),
-    })
+    }
 }

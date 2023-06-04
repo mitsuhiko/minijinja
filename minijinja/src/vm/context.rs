@@ -290,8 +290,14 @@ impl<'env> Context<'env> {
 
     /// Returns the current locals.
     #[track_caller]
+    pub fn current_locals(&self) -> &Locals<'env> {
+        &self.stack.last().unwrap().locals
+    }
+
+    /// Returns the current locals mutably.
+    #[track_caller]
     #[cfg(feature = "multi_template")]
-    pub fn current_locals(&mut self) -> &mut Locals<'env> {
+    pub fn current_locals_mut(&mut self) -> &mut Locals<'env> {
         &mut self.stack.last_mut().unwrap().locals
     }
 
