@@ -28,7 +28,6 @@ pub struct State<'vm, 'env> {
     pub(crate) env: &'env Environment<'env>,
     pub(crate) ctx: Context<'env>,
     pub(crate) current_block: Option<&'env str>,
-    pub(crate) current_call: Option<&'env str>,
     pub(crate) auto_escape: AutoEscape,
     pub(crate) instructions: &'vm Instructions<'env>,
     pub(crate) blocks: BTreeMap<&'env str, BlockStack<'vm, 'env>>,
@@ -45,7 +44,6 @@ impl<'vm, 'env> fmt::Debug for State<'vm, 'env> {
         let mut ds = f.debug_struct("State");
         ds.field("name", &self.instructions.name());
         ds.field("current_block", &self.current_block);
-        ds.field("current_call", &self.current_call);
         ds.field("auto_escape", &self.auto_escape);
         ds.field("ctx", &self.ctx);
         ds.field("env", &self.env);
@@ -66,7 +64,6 @@ impl<'vm, 'env> State<'vm, 'env> {
             env,
             ctx,
             current_block: None,
-            current_call: None,
             auto_escape,
             instructions,
             blocks,
@@ -105,13 +102,6 @@ impl<'vm, 'env> State<'vm, 'env> {
     #[inline(always)]
     pub fn current_block(&self) -> Option<&str> {
         self.current_block
-    }
-
-    /// Returns the name of the item (filter, function, test, method) currently
-    /// being called.
-    #[inline(always)]
-    pub fn current_call(&self) -> Option<&str> {
-        self.current_call
     }
 
     /// Looks up a variable by name in the context.
