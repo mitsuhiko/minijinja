@@ -9,7 +9,6 @@ def test_func_state():
         assert state.name == "template-name"
         assert state.auto_escape is None
         assert state.current_block == "foo"
-        assert state.current_call == "my_func"
         assert state.lookup("bar") == 23
         assert state.lookup("aha") is None
         assert state.lookup("my_func") is my_func
@@ -33,7 +32,6 @@ def test_global_func_state():
         assert state.name == "template-name"
         assert state.auto_escape is None
         assert state.current_block == "foo"
-        assert state.current_call == "my_func"
         assert state.lookup("bar") == 23
         assert state.lookup("aha") is None
         assert state.env is env
@@ -57,7 +55,6 @@ def test_filter_state():
         assert state.name == "template-name"
         assert state.auto_escape is None
         assert state.current_block == "foo"
-        assert state.current_call == "myfilter"
         assert state.lookup("bar") == 23
         assert state.lookup("aha") is None
         assert state.env is env
@@ -81,7 +78,6 @@ def test_test_state():
         assert state.name == "template-name"
         assert state.auto_escape is None
         assert state.current_block == "foo"
-        assert state.current_call == "mytest"
         assert state.lookup("bar") == 23
         assert state.lookup("aha") is None
         assert state.env is env

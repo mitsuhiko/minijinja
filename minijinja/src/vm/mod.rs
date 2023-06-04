@@ -144,7 +144,6 @@ impl<'env> Vm<'env> {
                 env: self.env,
                 ctx,
                 current_block: None,
-                current_call: None,
                 auto_escape: state.auto_escape(),
                 instructions,
                 blocks: BTreeMap::default(),
@@ -514,7 +513,6 @@ impl<'env> Vm<'env> {
                     stack.push(out.end_capture(state.auto_escape));
                 }
                 Instruction::ApplyFilter(name, arg_count, local_id) => {
-                    state.current_call = Some(name);
                     let filter =
                         ctx_ok!(get_or_lookup_local(&mut loaded_filters, *local_id, || {
                             state.env.get_filter(name)
@@ -529,10 +527,8 @@ impl<'env> Vm<'env> {
                     a = ctx_ok!(filter.apply_to(state, args));
                     stack.drop_top(*arg_count);
                     stack.push(a);
-                    state.current_call = Some(name);
                 }
                 Instruction::PerformTest(name, arg_count, local_id) => {
-                    state.current_call = Some(name);
                     let test = ctx_ok!(get_or_lookup_local(&mut loaded_tests, *local_id, || {
                         state.env.get_test(name)
                     })
@@ -543,11 +539,8 @@ impl<'env> Vm<'env> {
                     let rv = ctx_ok!(test.perform(state, args));
                     stack.drop_top(*arg_count);
                     stack.push(Value::from(rv));
-                    state.current_call = None;
                 }
                 Instruction::CallFunction(name, arg_count) => {
-                    state.current_call = Some(name);
-
                     // super is a special function reserved for super-ing into blocks.
                     if *name == "super" {
                         if *arg_count != 0 {
@@ -578,16 +571,12 @@ impl<'env> Vm<'env> {
                             format!("{name} is unknown"),
                         ));
                     }
-
-                    state.current_call = None;
                 }
                 Instruction::CallMethod(name, arg_count) => {
-                    state.current_call = Some(name);
                     let args = stack.slice_top(*arg_count);
                     a = ctx_ok!(args[0].call_method(state, name, &args[1..]));
                     stack.drop_top(*arg_count);
                     stack.push(a);
-                    state.current_call = None;
                 }
                 Instruction::CallObject(arg_count) => {
                     let args = stack.slice_top(*arg_count);
@@ -602,13 +591,9 @@ impl<'env> Vm<'env> {
                     stack.pop();
                 }
                 Instruction::FastSuper => {
-                    // Note that we don't store 'current_call' here since it
-                    // would only be visible (and unused) internally.
                     ctx_ok!(self.perform_super(state, out, false));
                 }
                 Instruction::FastRecurse => {
-                    // Note that we don't store 'current_call' here since it
-                    // would only be visible (and unused) internally.
                     recurse_loop!(false);
                 }
                 // Explanation on the behavior of `LoadBlocks` and rendering of
