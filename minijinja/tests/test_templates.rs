@@ -108,7 +108,10 @@ fn test_vm_block_fragments() {
         } else {
             let template = env.get_template(filename).unwrap();
 
-            match template.render_block("fragment", &ctx) {
+            match template
+                .eval_to_module(&ctx)
+                .and_then(|mut x| x.render_block("fragment"))
+            {
                 Ok(mut rendered) => {
                     rendered.push('\n');
                     rendered
@@ -447,7 +450,11 @@ fn test_block_fragments() {
     let tmpl = env.get_template("demo").unwrap();
 
     let rv_a = tmpl.render(()).unwrap();
-    let rv_b = tmpl.render_block("foo", ()).unwrap();
+    let rv_b = tmpl
+        .eval_to_module(())
+        .unwrap()
+        .render_block("foo")
+        .unwrap();
 
     assert_eq!(rv_a, "I am outside the fragmentfooSo am I!");
     assert_eq!(rv_b, "foo");

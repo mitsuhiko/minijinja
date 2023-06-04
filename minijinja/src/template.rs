@@ -96,31 +96,6 @@ impl<'env> Template<'env> {
             .map(|_| rv)
     }
 
-    /// Renders the template block into a string.
-    ///
-    /// This method works like [`render`](Self::render) but it only renders a specific
-    /// block in the template.  The first argument is the name of the block.  This is a
-    /// shortcut to the same method on a [`TemplateModule`].  For more information and
-    /// more specific uses, see [`eval_to_module`](Self::eval_to_module).
-    ///
-    /// This renders only the block `hi` in the template:
-    ///
-    /// ```
-    /// # use minijinja::{Environment, context};
-    /// # let mut env = Environment::new();
-    /// # env.add_template("hello", "{% block hi %}Hello {{ name }}!{% endblock %}").unwrap();
-    /// let tmpl = env.get_template("hello").unwrap();
-    /// println!("{}", tmpl.render_block("hi", context!(name => "John")).unwrap());
-    /// ```
-    ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
-    /// efficiently passed to render.  It does not undergo actual serialization.
-    #[cfg(feature = "multi_template")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
-    pub fn render_block<S: Serialize>(&self, block: &str, ctx: S) -> Result<String, Error> {
-        ok!(self.eval_to_module(ctx)).render_block(block)
-    }
-
     /// Renders the template into a [`io::Write`].
     ///
     /// This works exactly like [`render`](Self::render) but instead writes the template
@@ -154,7 +129,10 @@ impl<'env> Template<'env> {
     ///
     /// This evaluates the template, discards the output and stores the final
     /// state in the evaluated module.  From there global variables or blocks
-    /// can be accessed.
+    /// can be accessed.  What this does is quite similar to how the engine
+    /// interally works with tempaltes that are extended or imported from.
+    ///
+    /// For more information see [`TemplateModule`].
     pub fn eval_to_module<S: Serialize>(&self, ctx: S) -> Result<TemplateModule<'_, 'env>, Error> {
         let root = Value::from_serializable(&ctx);
         let mut out = Output::null();
@@ -231,19 +209,16 @@ impl<'env> Template<'env> {
     }
 }
 
-/// Represents an evaluated template module.
+/// Represents an evaluated template as module.
 ///
 /// The engine internally sometimes treats templates as modules.  This happens
 /// for instance for template inheritance or when importing global variables or
-/// macros to other templates.  In the VM modules are virtual and never actually
-/// created, however for some advanced use cases the same logic is exposed via
-/// this type.
+/// macros.  In the VM modules are virtual and never actually created, however
+/// for some advanced use cases the same logic is exposed via this type.
 ///
 /// This lets you call macros or blocks of a template from outside of the
-/// template evaluation.
-///
-/// Because template modules hold mutable states, most of the methods take
-/// `&mut self`.
+/// template evaluation.  Because template modules hold mutable states, some
+/// of the methods take `&mut self`.
 pub struct TemplateModule<'template: 'env, 'env> {
     template: &'template Template<'env>,
     state: State<'template, 'env>,
@@ -255,20 +230,29 @@ impl<'template, 'env> TemplateModule<'template, 'env> {
         self.template
     }
 
-    /// Renders a block with the given name.
+    /// Renders a block with the given name into a string.
+    ///
+    /// This method works like [`render`](Template::render) but it only renders a specific
+    /// block in the template.  The first argument is the name of the block.
+    ///
+    /// This renders only the block `hi` in the template:
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// # fn test() -> Result<(), minijinja::Error> {
+    /// # let mut env = Environment::new();
+    /// # env.add_template("hello", "{% block hi %}Hello {{ name }}!{% endblock %}")?;
+    /// let tmpl = env.get_template("hello")?;
+    /// let rv = tmpl
+    ///     .eval_to_module(context!(name => "John"))?
+    ///     .render_block("hi")?;
+    /// println!("{}", rv);
+    /// # Ok(()) }
+    /// ```
     ///
     /// Note that rendering a block is a stateful operation.  If an error
     /// is returned the module has to be re-created as the internal state
     /// can end up corrupted.
-    ///
-    /// ```
-    /// # use minijinja::{Environment, context};
-    /// # let mut env = Environment::new();
-    /// # env.add_template("hello", "{% block hi %}Hello {{ name }}!{% endblock %}").unwrap();
-    /// let tmpl = env.get_template("hello").unwrap();
-    /// let mut module = tmpl.eval_to_module(context!(name => "John")).unwrap();
-    /// println!("{}", module.render_block("hi").unwrap());
-    /// ```
     #[cfg(feature = "multi_template")]
     #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
     pub fn render_block(&mut self, block: &str) -> Result<String, Error> {
