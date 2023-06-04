@@ -446,8 +446,8 @@ fn test_block_fragments() {
     .unwrap();
     let tmpl = env.get_template("demo").unwrap();
 
-    let rv_a = tmpl.render(&()).unwrap();
-    let rv_b = tmpl.render_block("foo", &()).unwrap();
+    let rv_a = tmpl.render(()).unwrap();
+    let rv_b = tmpl.render_block("foo", ()).unwrap();
 
     assert_eq!(rv_a, "I am outside the fragmentfooSo am I!");
     assert_eq!(rv_b, "foo");
