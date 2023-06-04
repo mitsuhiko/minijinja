@@ -230,6 +230,11 @@ impl<'template, 'env> TemplateModule<'template, 'env> {
         self.template
     }
 
+    /// Returns the [`State`] of the module.
+    pub fn state(&self) -> &State<'template, 'env> {
+        &self.state
+    }
+
     /// Renders a block with the given name into a string.
     ///
     /// This method works like [`render`](Template::render) but it only renders a specific
