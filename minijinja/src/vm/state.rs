@@ -76,6 +76,7 @@ impl<'vm, 'env> State<'vm, 'env> {
     }
 
     /// Creates an empty state for an environment.
+    #[allow(unused)]
     pub(crate) fn new_for_env(env: &'env Environment) -> State<'env, 'env> {
         State::new(
             env,
