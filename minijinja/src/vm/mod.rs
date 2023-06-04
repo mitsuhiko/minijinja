@@ -43,9 +43,9 @@ pub struct Vm<'env> {
     env: &'env Environment<'env>,
 }
 
-fn prepare_blocks<'env, 'vm>(
-    blocks: &'vm BTreeMap<&'env str, Instructions<'env>>,
-) -> BTreeMap<&'env str, BlockStack<'vm, 'env>> {
+fn prepare_blocks<'env, 'template>(
+    blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
+) -> BTreeMap<&'env str, BlockStack<'template, 'env>> {
     blocks
         .iter()
         .map(|(name, instr)| (*name, BlockStack::new(instr)))
@@ -97,14 +97,14 @@ impl<'env> Vm<'env> {
     }
 
     /// Evaluates the template as module
-    pub fn eval_to_module<'vm>(
+    pub fn eval_to_module<'template>(
         &self,
-        instructions: &'vm Instructions<'env>,
+        instructions: &'template Instructions<'env>,
         root: Value,
-        blocks: &'vm BTreeMap<&'env str, Instructions<'env>>,
+        blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
         out: &mut Output,
         auto_escape: AutoEscape,
-    ) -> Result<State<'vm, 'env>, Error> {
+    ) -> Result<State<'template, 'env>, Error> {
         let _guard = value_optimization();
         let mut state = State::new(
             self.env,
