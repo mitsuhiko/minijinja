@@ -4,6 +4,10 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0
 
+- Added `Value::call`, `Value::call_method` and `Template::new_state`.  The
+  combination of these APIs makes it possible to call values which was
+  previously not possible.  (#272)
+
 - Added `Template::eval_to_module` and `TemplateModule`.  This replaces the
   functionality of the previous `Template::render_block` which is now available
   via the `TemplateModule`.  This functionality is closer to how how Jinja2
