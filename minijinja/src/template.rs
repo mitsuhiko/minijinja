@@ -218,7 +218,9 @@ impl<'env> Template<'env> {
 ///
 /// This lets you call macros or blocks of a template from outside of the
 /// template evaluation.  Because template modules hold mutable states, some
-/// of the methods take `&mut self`.
+/// of the methods take `&mut self`.  The template module internally retains the
+/// state of the execution and provides ways to extract some information from
+/// it.
 pub struct TemplateModule<'template: 'env, 'env> {
     template: &'template Template<'env>,
     state: State<'template, 'env>,
@@ -282,11 +284,6 @@ impl<'template, 'env> TemplateModule<'template, 'env> {
             .map_err(|err| wrapper.take_err(err))
     }
 
-    /// Looks up a globally set variable in the template scope.
-    pub fn get_global(&self, name: &str) -> Option<Value> {
-        self.state.ctx.current_locals().get(name).cloned()
-    }
-
     /// Looks up a global macro and invokes it.
     ///
     /// This looks up a value like [`get_global`](Self::get_global) does and
@@ -295,11 +292,16 @@ impl<'template, 'env> TemplateModule<'template, 'env> {
     /// trigger a call.
     #[cfg(feature = "macros")]
     #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-    pub fn invoke_macro(&self, name: &'template str, args: &[Value]) -> Result<String, Error> {
+    pub fn invoke_macro(&self, name: &str, args: &[Value]) -> Result<String, Error> {
         let f = ok!(self
             .get_global(name)
             .ok_or_else(|| Error::new(ErrorKind::UnknownFunction, "macro not found")));
         f.call(&self.state, args).map(Into::into)
+    }
+
+    /// Looks up a globally set variable in the template scope.
+    pub fn get_global(&self, name: &str) -> Option<Value> {
+        self.state.ctx.current_locals().get(name).cloned()
     }
 }
 
