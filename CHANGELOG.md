@@ -4,6 +4,12 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0
 
+- Added `Template::eval_to_module` and `TemplateModule`.  This replaces the
+  functionality of the previous `Template::render_block` which is now available
+  via the `TemplateModule`.  This functionality is closer to how how Jinja2
+  functions and leaves room for future expansion.  It also adds support for
+  accessing globals and macros from a template.  (#271)
+
 - Removed support for `State::current_call`.  This property wasn't too useful
   and unreliable.  Supporting it properly for nested invocations would require
   calls to take a mutable state or use interior mutability which did not seem
