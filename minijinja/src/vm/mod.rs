@@ -43,7 +43,7 @@ pub struct Vm<'env> {
     env: &'env Environment<'env>,
 }
 
-fn prepare_blocks<'env, 'template>(
+pub(crate) fn prepare_blocks<'env, 'template>(
     blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
 ) -> BTreeMap<&'env str, BlockStack<'template, 'env>> {
     blocks

@@ -625,7 +625,19 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 /// ```
 ///
 /// If for whatever reason you need a value again you can use [`Into`] to
-/// convert it back into a [`Value`].
+/// convert it back into a [`Value`].  This is particularly useful when performing
+/// calls into values.  To create a [`Kwargs`] object from scratch you can use
+/// [`FromIterator`]:
+///
+/// ```
+/// use minijinja::value::{Value, Kwargs};
+/// let kwargs = Kwargs::from_iter([
+///     ("foo", Value::from(true)),
+///     ("bar", Value::from(42)),
+/// ]);
+/// let value = Value::from(kwargs);
+/// assert!(value.is_kwargs());
+/// ```
 #[derive(Debug, Clone)]
 pub struct Kwargs {
     values: Arc<ValueMap>,
@@ -758,6 +770,28 @@ impl Kwargs {
             }
         }
         Ok(())
+    }
+}
+
+impl FromIterator<(String, Value)> for Kwargs {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (String, Value)>,
+    {
+        Kwargs::new(Arc::new(
+            iter.into_iter().map(|(k, v)| (Key::from(k), v)).collect(),
+        ))
+    }
+}
+
+impl<'a> FromIterator<(&'a str, Value)> for Kwargs {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (&'a str, Value)>,
+    {
+        Kwargs::new(Arc::new(
+            iter.into_iter().map(|(k, v)| (Key::from(k), v)).collect(),
+        ))
     }
 }
 

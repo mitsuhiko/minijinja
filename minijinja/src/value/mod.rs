@@ -916,7 +916,38 @@ impl Value {
     }
 
     /// Calls the value directly.
-    pub(crate) fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    ///
+    /// If the value holds a function or macro, this invokes it.  Note that in
+    /// MiniJinja there is a separate namespace for methods on objects and callable
+    /// items.  To call methods (which should be a rather rare occurrence) you
+    /// have to use [`call_method`](Self::call_method).
+    ///
+    /// The `args` slice is for the arguments of the function call.  To pass
+    /// keyword arguments use the [`Kwargs`](crate::value::Kwargs) type.
+    ///
+    /// Usually the state is already available when it's useful to call this method,
+    /// but when it's not available you can get a fresh template state straight
+    /// from the [`Template`](crate::Template) via [`new_state`](crate::Template::new_state).
+    ///
+    /// ```
+    /// # use minijinja::{Environment, value::{Value, Kwargs}};
+    /// # let mut env = Environment::new();
+    /// # env.add_template("foo", "").unwrap();
+    /// # let tmpl = env.get_template("foo").unwrap();
+    /// # let state = tmpl.new_state(); let state = &state;
+    /// let func = Value::from_function(|v: i64, kwargs: Kwargs| {
+    ///     v * kwargs.get::<i64>("mult").unwrap_or(1)
+    /// });
+    /// let rv = func.call(
+    ///     state,
+    ///     &[
+    ///         Value::from(42),
+    ///         Value::from(Kwargs::from_iter([("mult", Value::from(2))])),
+    ///     ],
+    /// ).unwrap();
+    /// assert_eq!(rv, Value::from(84));
+    /// ```
+    pub fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         if let ValueRepr::Dynamic(ref dy) = self.0 {
             dy.call(state, args)
         } else {
@@ -928,12 +959,10 @@ impl Value {
     }
 
     /// Calls a method on the value.
-    pub(crate) fn call_method(
-        &self,
-        state: &State,
-        name: &str,
-        args: &[Value],
-    ) -> Result<Value, Error> {
+    ///
+    /// The name of the method is `name`, the arguments passed are in the `args`
+    /// slice.
+    pub fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         match self.0 {
             ValueRepr::Dynamic(ref dy) => return dy.call_method(state, name, args),
             ValueRepr::Map(ref map, _) => {

@@ -21,6 +21,12 @@ use crate::vm::fuel::FuelTracker;
 /// variables of the engine, the current auto escaping behavior as well as the
 /// auto escape flag.
 ///
+/// In some testing scenarios or more advanced use cases you might need to get
+/// a [`State`].  The state is managed as part of the template execution but the
+/// initial state can be retrieved via [`Template::new_state`](crate::Template::new_state)
+/// or [`TemplateModule::state`](crate::TemplateModule::state).  The most
+/// common way to get hold of the state however is via functions of filters.
+///
 /// **Notes on lifetimes:** the state object exposes some of the internal
 /// lifetimes through the type.  You should always elide these lifetimes
 /// as there might be lifetimes added or removed between releases.
@@ -76,7 +82,7 @@ impl<'template, 'env> State<'template, 'env> {
     }
 
     /// Creates an empty state for an environment.
-    #[allow(unused)]
+    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn new_for_env(env: &'env Environment) -> State<'env, 'env> {
         State::new(
             env,

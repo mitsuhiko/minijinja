@@ -255,6 +255,7 @@ pub struct Instructions<'source> {
     source: &'source str,
 }
 
+#[cfg(any(test, feature = "testutils"))]
 pub(crate) static EMPTY_INSTRUCTIONS: Instructions<'static> = Instructions {
     instructions: Vec::new(),
     line_infos: Vec::new(),

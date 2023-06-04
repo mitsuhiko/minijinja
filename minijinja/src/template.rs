@@ -13,7 +13,7 @@ use crate::error::{attach_basic_debug_info, Error};
 use crate::output::{Output, WriteWrapper};
 use crate::utils::AutoEscape;
 use crate::value::{self, Value};
-use crate::vm::Vm;
+use crate::vm::{prepare_blocks, Vm};
 use crate::{ErrorKind, State};
 
 /// Represents a handle to a template.
@@ -188,6 +188,17 @@ impl<'env> Template<'env> {
         }
     }
 
+    /// Creates an empty [`State`] for this template.
+    pub fn new_state(&self) -> State<'_, 'env> {
+        State::new(
+            self.env,
+            Default::default(),
+            self.initial_auto_escape,
+            &self.compiled.instructions,
+            prepare_blocks(&self.compiled.blocks),
+        )
+    }
+
     /// Returns the root instructions.
     #[cfg(feature = "multi_template")]
     pub(crate) fn instructions(&self) -> &'env Instructions<'env> {
@@ -287,15 +298,13 @@ impl<'template, 'env> TemplateModule<'template, 'env> {
             .map_err(|err| wrapper.take_err(err))
     }
 
-    /// Looks up a global macro and invokes it.
+    /// Looks up a global macro and calls it.
     ///
     /// This looks up a value like [`get_global`](Self::get_global) does and
-    /// invokes it.  It's not possible to call values directly under normal
-    /// circumstances as the state is not available that is necessary to
-    /// trigger a call.
+    /// calls it with the module's [`state`](Self::state) and the passed args.
     #[cfg(feature = "macros")]
     #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-    pub fn invoke_macro(&self, name: &str, args: &[Value]) -> Result<String, Error> {
+    pub fn call_macro(&self, name: &str, args: &[Value]) -> Result<String, Error> {
         let f = ok!(self
             .get_global(name)
             .ok_or_else(|| Error::new(ErrorKind::UnknownFunction, "macro not found")));

@@ -3,7 +3,8 @@ use std::fmt;
 use std::sync::Arc;
 
 use insta::assert_snapshot;
-use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
+use minijinja::value::{Kwargs, Object, ObjectKind, SeqObject, StructObject, Value};
+use minijinja::Environment;
 
 #[test]
 fn test_sort() {
@@ -238,4 +239,20 @@ fn test_value_cmp() {
     assert_eq!(Value::from(&[1][..]), Value::from(&[1][..]));
     assert_ne!(Value::from(&[1][..]), Value::from(&[2][..]));
     assert_eq!(Value::UNDEFINED, Value::UNDEFINED);
+}
+
+#[test]
+fn test_call_kwargs() {
+    let mut env = Environment::new();
+    env.add_template("foo", "").unwrap();
+    let tmpl = env.get_template("foo").unwrap();
+    let state = tmpl.new_state();
+    let val = Value::from_function(|kwargs: Kwargs| kwargs.get::<i32>("foo"));
+    let rv = val
+        .call(
+            &state,
+            &[Kwargs::from_iter([("foo", Value::from(42))]).into()],
+        )
+        .unwrap();
+    assert_eq!(rv, Value::from(42));
 }
