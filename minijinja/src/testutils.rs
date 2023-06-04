@@ -1,8 +1,7 @@
 //! Utilities for unit testing.
 //!
-//! MiniJinja intentionally hides some unstable internal API.  However this hiding can be a
-//! hindrance when doing unittests.  For this reason this module optionally exposes some
-//! common utilities to test filters, tests, formatters and global functions.
+//! This module optionally exposes some common utilities to test filters, tests, formatters
+//! and global functions.
 //!
 //! All these functions generally assume that the filter, test or else was first registered
 //! on the environment before it's invoked.  While some filters can be invoked without being
