@@ -49,12 +49,6 @@ impl StateRef {
         with_state(|state| Ok(state.current_block().map(|x| x.into())))
     }
 
-    /// Returns the current call
-    #[getter]
-    pub fn get_current_call(&self) -> PyResult<Option<String>> {
-        with_state(|state| Ok(state.current_call().map(|x| x.into())))
-    }
-
     /// Looks up a variable in the context
     #[pyo3(text_signature = "(self, name)")]
     pub fn lookup(&self, name: &str) -> PyResult<Py<PyAny>> {

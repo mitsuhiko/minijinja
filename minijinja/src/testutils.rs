@@ -65,8 +65,7 @@ pub fn format(env: &Environment, value: Value) -> Result<String, Error> {
 /// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "testutils")))]
 pub fn apply_filter(env: &Environment, filter: &str, args: &[Value]) -> Result<Value, Error> {
-    let mut state = State::new_for_env(env);
-    state.current_call = Some(filter);
+    let state = State::new_for_env(env);
     match env.get_filter(filter) {
         Some(filter) => filter.apply_to(&state, args),
         None => Err(Error::from(ErrorKind::UnknownFilter)),
@@ -83,8 +82,7 @@ pub fn apply_filter(env: &Environment, filter: &str, args: &[Value]) -> Result<V
 /// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "testutils")))]
 pub fn perform_test(env: &Environment, test: &str, args: &[Value]) -> Result<bool, Error> {
-    let mut state = State::new_for_env(env);
-    state.current_call = Some(test);
+    let state = State::new_for_env(env);
     match env.get_test(test) {
         Some(test) => test.perform(&state, args),
         None => Err(Error::from(ErrorKind::UnknownTest)),
@@ -101,8 +99,7 @@ pub fn perform_test(env: &Environment, test: &str, args: &[Value]) -> Result<boo
 /// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "testutils")))]
 pub fn invoke_global(env: &Environment, func: &str, args: &[Value]) -> Result<Value, Error> {
-    let mut state = State::new_for_env(env);
-    state.current_call = Some(func);
+    let state = State::new_for_env(env);
     match env.globals.get(func) {
         Some(func) => func.call(&state, args),
         None => Err(Error::from(ErrorKind::UnknownFunction)),
