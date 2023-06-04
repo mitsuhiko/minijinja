@@ -101,8 +101,6 @@ impl<'env> Template<'env> {
     /// This works exactly like [`render`](Self::render) but instead writes the template
     /// as it's evaluating into a [`io::Write`].
     ///
-    /// This renders only the block `hi` in the template:
-    ///
     /// ```
     /// # use minijinja::{Environment, context};
     /// # let mut env = Environment::new();
