@@ -7,7 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Removed support for `State::current_call`.  This property wasn't too useful
   and unreliable.  Supporting it properly for nested invocations would require
   calls to take a mutable state or use interior mutability which did not seem
-  reasonable for this.
+  reasonable for this.  (#269)
 
 ## 0.34.0
 
