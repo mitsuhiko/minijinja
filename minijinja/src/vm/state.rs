@@ -82,7 +82,7 @@ impl<'template, 'env> State<'template, 'env> {
     }
 
     /// Creates an empty state for an environment.
-    #[cfg(feature = "testutils")]
+    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn new_for_env(env: &'env Environment) -> State<'env, 'env> {
         State::new(
             env,
