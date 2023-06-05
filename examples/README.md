@@ -9,6 +9,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [autoreload](autoreload): shows how to use auto reloading.
 * [build-script](build-script): Demonstrates how to generate Rust code with MiniJinja in build scripts.
 * [debug](debug): contains an example showing the built-in `debug()` function.
+* [dsl](dsl): shows how to use MiniJinja has a DSL.
 * [dynamic-context](dynamic-context): demonstrates how to use dynamic objects as template context.
 * [dynamic-objects](dynamic-objects): demonstrates how to use dynamic objects in templates.
 * [error](error): shows the built-in error reporting support.
@@ -29,6 +30,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [render-value](render-value): Demonstrates how `Value` can be passed as `Serialize` as context.
 * [source](source): Demonstrates how to load templates from disk with the `source` feature.
 * [stack-ref](stack-ref): Shows how the `minijinja-stack-ref` crate can be used to reference stack values.
+* [template-module](template-module): Demonstrates what can be done with template module objects.
 * [wasm-yew](wasm-yew): Shows how to use MiniJinja with WASM in the browser.
 
 ## Third-party Examples

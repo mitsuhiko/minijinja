@@ -478,8 +478,8 @@ fn test_module() {
             variable => 23
         })
         .unwrap();
-    assert_eq!(module.get_global("range"), None);
-    assert_eq!(module.get_global("global"), Some(Value::from(23 * 2)));
+    assert_eq!(module.get_export("range"), None);
+    assert_eq!(module.get_export("global"), Some(Value::from(23 * 2)));
     assert_eq!(module.call_macro("something", &[]).unwrap(), "46");
     assert_eq!(module.render_block("baz").unwrap(), "[46]");
 }

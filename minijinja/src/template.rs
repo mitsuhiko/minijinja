@@ -189,6 +189,10 @@ impl<'env> Template<'env> {
     }
 
     /// Creates an empty [`State`] for this template.
+    ///
+    /// It's very rare that you need to actually do this but it can be useful when
+    /// testing values or working with macros or other callable objects from outside
+    /// the template environment.
     pub fn new_state(&self) -> State<'_, 'env> {
         State::new(
             self.env,
@@ -230,6 +234,7 @@ impl<'env> Template<'env> {
 /// of the methods take `&mut self`.  The template module internally retains the
 /// state of the execution and provides ways to extract some information from
 /// it.
+#[derive(Debug)]
 pub struct TemplateModule<'template: 'env, 'env> {
     template: &'template Template<'env>,
     state: State<'template, 'env>,
@@ -300,20 +305,25 @@ impl<'template, 'env> TemplateModule<'template, 'env> {
 
     /// Looks up a global macro and calls it.
     ///
-    /// This looks up a value like [`get_global`](Self::get_global) does and
+    /// This looks up a value like [`get_export`](Self::get_export) does and
     /// calls it with the module's [`state`](Self::state) and the passed args.
     #[cfg(feature = "macros")]
     #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
     pub fn call_macro(&self, name: &str, args: &[Value]) -> Result<String, Error> {
         let f = ok!(self
-            .get_global(name)
+            .get_export(name)
             .ok_or_else(|| Error::new(ErrorKind::UnknownFunction, "macro not found")));
         f.call(&self.state, args).map(Into::into)
     }
 
     /// Looks up a globally set variable in the template scope.
-    pub fn get_global(&self, name: &str) -> Option<Value> {
+    pub fn get_export(&self, name: &str) -> Option<Value> {
         self.state.ctx.current_locals().get(name).cloned()
+    }
+
+    /// Returns a list of all exports.
+    pub fn exports(&self) -> Vec<&str> {
+        self.state.ctx.current_locals().keys().copied().collect()
     }
 }
 
