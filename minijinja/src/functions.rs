@@ -228,7 +228,7 @@ mod builtins {
     use std::collections::BTreeMap;
 
     use crate::error::ErrorKind;
-    use crate::value::ValueKind;
+    use crate::value::{MapType, ValueRepr};
 
     /// Returns a range.
     ///
@@ -290,12 +290,10 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn dict(value: Value) -> Result<Value, Error> {
-        if value.is_undefined() {
-            Ok(Value::from(BTreeMap::<bool, Value>::new()))
-        } else if value.kind() != ValueKind::Map {
-            Err(Error::from(ErrorKind::InvalidOperation))
-        } else {
-            Ok(value)
+        match value.0 {
+            ValueRepr::Undefined => Ok(Value::from(BTreeMap::<bool, Value>::new())),
+            ValueRepr::Map(map, _) => Ok(Value(ValueRepr::Map(map, MapType::Normal))),
+            _ => Err(Error::from(ErrorKind::InvalidOperation)),
         }
     }
 

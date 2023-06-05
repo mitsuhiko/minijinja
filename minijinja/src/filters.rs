@@ -1142,7 +1142,8 @@ mod builtins {
         let mut rv = Vec::with_capacity(value.len().unwrap_or(0));
 
         // attribute mapping
-        let (args, kwargs) = Kwargs::from_args(&args);
+        let (args, kwargs): (&[Value], Kwargs) = crate::value::from_args(&args)?;
+
         if let Some(attr) = ok!(kwargs.get::<Option<Value>>("attribute")) {
             if !args.is_empty() {
                 return Err(Error::from(ErrorKind::TooManyArguments));
