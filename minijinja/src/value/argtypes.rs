@@ -168,7 +168,7 @@ pub trait ArgType<'a> {
 
     #[doc(hidden)]
     #[inline(always)]
-    fn is_kwargs_handler() -> bool {
+    fn is_trailing() -> bool {
         false
     }
 }
@@ -182,10 +182,11 @@ macro_rules! tuple_impls {
 
             fn from_values(state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
                 #![allow(non_snake_case, unused)]
-
-                // special case: the last type is Kwargs and we have at least one value.
-                // In that case we need to read from end to start.
-                if $rest_name::is_kwargs_handler() && !values.is_empty() {
+                // special case: the last type is marked trailing (eg: for Kwargs) and we have at
+                // least one value.  In that case we need to read it first before going to the rest
+                // of the arguments.  This is needed to support from_args::<(&[Value], Kwargs)>
+                // or similar.
+                if $rest_name::is_trailing() && !values.is_empty() {
                     let ($rest_name, offset) = ok!($rest_name::from_state_and_values(state, values, values.len() - 1));
                     let values = &values[..values.len() - offset];
                     let mut idx = 0;
@@ -193,11 +194,10 @@ macro_rules! tuple_impls {
                         let ($name, offset) = ok!($name::from_state_and_values(state, values, idx));
                         idx += offset;
                     )*
-                    idx += offset;
                     if values.get(idx).is_some() {
                         Err(Error::from(ErrorKind::TooManyArguments))
                     } else {
-                        Ok(( $($name,)* $rest_name,))
+                        Ok(($($name,)* $rest_name,))
                     }
                 // regular handling of arguments
                 } else {
@@ -211,7 +211,7 @@ macro_rules! tuple_impls {
                     if values.get(idx).is_some() {
                         Err(Error::from(ErrorKind::TooManyArguments))
                     } else {
-                        Ok(( $($name,)* $rest_name,))
+                        Ok(($($name,)* $rest_name,))
                     }
                 }
             }
@@ -733,7 +733,7 @@ impl<'a> ArgType<'a> for Kwargs {
         Ok((Kwargs::new(Default::default()), 0))
     }
 
-    fn is_kwargs_handler() -> bool {
+    fn is_trailing() -> bool {
         true
     }
 }
