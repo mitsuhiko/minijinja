@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0
 
+- `Output` no longer reveals if it's discarding in the public API.
+
 - Added `Value::call`, `Value::call_method` and `Template::new_state`.  The
   combination of these APIs makes it possible to call values which was
   previously not possible.  (#272)
