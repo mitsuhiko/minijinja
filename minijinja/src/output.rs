@@ -41,9 +41,12 @@ impl<'a> Output<'a> {
 
     /// Creates a null output that writes nowhere.
     pub(crate) fn null() -> Self {
+        // The null writer also has a single entry on the discarding capture
+        // stack.  In fact, `w` is more or less useless here as we always
+        // shadow it.  This is done so that `is_discarding` returns true.
         Self {
             w: NullWriter::get_mut(),
-            capture_stack: Vec::new(),
+            capture_stack: vec![None],
         }
     }
 
