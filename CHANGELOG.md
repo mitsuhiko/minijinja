@@ -4,6 +4,9 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0
 
+- Removed `Kwargs::from_args` as this can now be expressed with just
+  `from_args`.  #273
+
 - `Output` no longer reveals if it's discarding in the public API.
 
 - Added `Value::call`, `Value::call_method` and `Template::new_state`.  The
@@ -20,6 +23,53 @@ All notable changes to MiniJinja are documented here.
   and unreliable.  Supporting it properly for nested invocations would require
   calls to take a mutable state or use interior mutability which did not seem
   reasonable for this.  (#269)
+
+### Breaking Changes
+
+- `Kwargs::from_args` was removed as API.
+
+    Before:
+
+    ```rust
+    // just split
+    let (args, kwargs) = Kwargs::from_args(values);
+
+    // split and parse
+    let (args, kwargs) = Kwargs::from_args(values);
+    let (a, b): (i32, i32) = from_args(args)?;
+    ```
+
+    After:
+
+    ```rust
+    // just split
+    let (args, kwargs): (&[Value], Kwargs) = from_args(values)?;
+
+    // split and parse
+    let (a, b, kwargs): (i32, i32, Kwargs) = from_args(values)?;
+    ```
+
+- `Template::render_block` and `Template::render_block_to_write` were
+  replaced with the API of the same name on the `TemplateModule`.
+
+    Before:
+
+    ```rust
+    let rv = tmpl.render_block("name", ctx)?;
+    ```
+
+    After:
+
+    ```rust
+    let rv = tmpl.eval_to_module(ctx)?.render_block("name")?;
+    ```
+
+- `Output::is_discarding` was removed without replacement.  This is
+  an implementation detail and was incorrectly exposed.
+
+- `State::current_call` was removed without replacement.  This information
+  was unreliably maintained in the engine and caused issues with recursive
+  calls.
 
 ## 0.34.0
 
