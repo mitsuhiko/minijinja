@@ -165,6 +165,12 @@ pub trait ArgType<'a> {
     ) -> Result<(Self::Output, usize), Error> {
         Self::from_state_and_value(state, values.get(offset))
     }
+
+    #[doc(hidden)]
+    #[inline(always)]
+    fn is_kwargs_handler() -> bool {
+        false
+    }
 }
 
 macro_rules! tuple_impls {
@@ -176,17 +182,37 @@ macro_rules! tuple_impls {
 
             fn from_values(state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
                 #![allow(non_snake_case, unused)]
-                let mut idx = 0;
-                $(
-                    let ($name, offset) = ok!($name::from_state_and_value(state, values.get(idx)));
+
+                // special case: the last type is Kwargs and we have at least one value.
+                // In that case we need to read from end to start.
+                if $rest_name::is_kwargs_handler() && !values.is_empty() {
+                    let ($rest_name, offset) = ok!($rest_name::from_state_and_values(state, values, values.len() - 1));
+                    let values = &values[..values.len() - offset];
+                    let mut idx = 0;
+                    $(
+                        let ($name, offset) = ok!($name::from_state_and_values(state, values, idx));
+                        idx += offset;
+                    )*
                     idx += offset;
-                )*
-                let ($rest_name, offset) = ok!($rest_name::from_state_and_values(state, values, idx));
-                idx += offset;
-                if values.get(idx).is_some() {
-                    Err(Error::from(ErrorKind::TooManyArguments))
+                    if values.get(idx).is_some() {
+                        Err(Error::from(ErrorKind::TooManyArguments))
+                    } else {
+                        Ok(( $($name,)* $rest_name,))
+                    }
+                // regular handling of arguments
                 } else {
-                    Ok(( $($name,)* $rest_name,))
+                    let mut idx = 0;
+                    $(
+                        let ($name, offset) = ok!($name::from_state_and_values(state, values, idx));
+                        idx += offset;
+                    )*
+                    let ($rest_name, offset) = ok!($rest_name::from_state_and_values(state, values, idx));
+                    idx += offset;
+                    if values.get(idx).is_some() {
+                        Err(Error::from(ErrorKind::TooManyArguments))
+                    } else {
+                        Ok(( $($name,)* $rest_name,))
+                    }
                 }
             }
         }
@@ -534,6 +560,27 @@ impl<'a> ArgType<'a> for &Value {
     }
 }
 
+impl<'a> ArgType<'a> for &[Value] {
+    type Output = &'a [Value];
+
+    #[inline(always)]
+    fn from_value(value: Option<&'a Value>) -> Result<&'a [Value], Error> {
+        match value {
+            Some(value) => Ok(std::slice::from_ref(value)),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
+        }
+    }
+
+    fn from_state_and_values(
+        _state: Option<&'a State>,
+        values: &'a [Value],
+        offset: usize,
+    ) -> Result<(&'a [Value], usize), Error> {
+        let args = values.get(offset..).unwrap_or_default();
+        Ok((args, args.len()))
+    }
+}
+
 /// Utility type to capture remaining arguments.
 ///
 /// In some cases you might want to have a variadic function.  In that case
@@ -638,6 +685,19 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 /// let value = Value::from(kwargs);
 /// assert!(value.is_kwargs());
 /// ```
+///
+/// When working with [`Rest`] you can use [`from_args`] to split all arguments into
+/// positional arguments and keyword arguments:
+///
+/// ```
+/// # use minijinja::value::{Value, Rest, Kwargs, from_args};
+/// # use minijinja::Error;
+/// fn my_func(args: Rest<Value>) -> Result<Value, Error> {
+///     let (args, kwargs) = from_args::<(&[Value], Kwargs)>(&args)?;
+///     // do something with args and kwargs
+/// # todo!()
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Kwargs {
     values: Arc<ValueMap>,
@@ -672,6 +732,10 @@ impl<'a> ArgType<'a> for Kwargs {
         }
         Ok((Kwargs::new(Default::default()), 0))
     }
+
+    fn is_kwargs_handler() -> bool {
+        true
+    }
 }
 
 impl Kwargs {
@@ -680,27 +744,6 @@ impl Kwargs {
             values: map,
             used: RefCell::new(HashSet::new()),
         }
-    }
-
-    /// Split off kwargs from args.
-    ///
-    /// This is useful when [`Rest`] is used to consume all arguments:
-    ///
-    /// ```rust
-    /// # use minijinja::value::{Value, Rest, Kwargs};
-    /// fn my_func(args: Rest<Value>) -> Value {
-    ///     let (args, kwargs) = Kwargs::from_args(&args);
-    ///     // do something with args and kwargs
-    /// # todo!()
-    /// }
-    /// ```
-    pub fn from_args(args: &[Value]) -> (&[Value], Kwargs) {
-        if let Some(value) = args.last() {
-            if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
-                return (&args[..args.len() - 1], Kwargs::new(map.clone()));
-            }
-        }
-        (args, Kwargs::new(Default::default()))
     }
 
     /// Get a single argument from the kwargs but don't mark it as used.
@@ -901,4 +944,20 @@ fn test_as_f64() {
     let v = Value::from(42.5);
     let f: f64 = v.try_into().unwrap();
     assert_eq!(f, 42.5);
+}
+
+#[test]
+fn test_split_kwargs() {
+    let args = [
+        Value::from(42),
+        Value::from(true),
+        Value::from(Kwargs::from_iter([
+            ("foo", Value::from(1)),
+            ("bar", Value::from(2)),
+        ])),
+    ];
+    let (args, kwargs) = from_args::<(&[Value], Kwargs)>(&args).unwrap();
+    assert_eq!(args, &[Value::from(42), Value::from(true)]);
+    assert_eq!(kwargs.get::<Value>("foo").unwrap(), Value::from(1));
+    assert_eq!(kwargs.get::<Value>("bar").unwrap(), Value::from(2));
 }
