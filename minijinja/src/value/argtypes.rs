@@ -63,11 +63,10 @@ pub trait FunctionArgs<'a> {
 /// implementing [`Object::call_method`](crate::value::Object::call_method).
 ///
 /// ```
-/// use minijinja::value::from_args;
+/// # use minijinja::value::from_args;
 /// # use minijinja::value::Value;
 /// # fn foo() -> Result<(), minijinja::Error> {
 /// # let args = vec![Value::from("foo"), Value::from(42i64)]; let args = &args[..];
-///
 /// // args is &[Value]
 /// let (string, num): (&str, i64) = from_args(args)?;
 /// # Ok(()) } fn main() { foo().unwrap(); }
@@ -75,6 +74,19 @@ pub trait FunctionArgs<'a> {
 ///
 /// Note that only value conversions are supported which means that `&State` is not
 /// a valid conversion type.
+///
+/// You can also use this function to split positional and keyword arguments ([`Kwargs`]):
+///
+/// ```
+/// # use minijinja::value::{Value, Rest, Kwargs, from_args};
+/// # use minijinja::Error;
+/// # fn foo() -> Result<(), minijinja::Error> {
+/// # let args = vec![Value::from("foo"), Value::from(42i64)]; let args = &args[..];
+/// // args is &[Value], kwargs is Kwargs
+/// let (args, kwargs): (&[Value], Kwargs) = from_args(args)?;
+/// # Ok(())
+/// # } fn main() { foo().unwrap(); }
+/// ```
 #[inline(always)]
 pub fn from_args<'a, Args>(values: &'a [Value]) -> Result<Args, Error>
 where
