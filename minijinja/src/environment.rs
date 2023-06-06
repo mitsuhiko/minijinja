@@ -218,7 +218,7 @@ impl<'source> Environment<'source> {
     /// let rv = tmpl.render(context! { name => "World" });
     /// println!("{}", rv.unwrap());
     /// ```
-    pub fn template_from_named_string(
+    pub fn template_from_named_str(
         &self,
         name: &'source str,
         source: &'source str,
@@ -238,13 +238,10 @@ impl<'source> Environment<'source> {
 
     /// Loads a template from a string, with name `<string>`.
     ///
-    /// This is a shortcut to [`template_from_named_string`](Self::template_from_named_string)
+    /// This is a shortcut to [`template_from_named_str`](Self::template_from_named_str)
     /// with name set to `<string>`.
-    pub fn template_from_string(
-        &self,
-        source: &'source str,
-    ) -> Result<Template<'_, 'source>, Error> {
-        self.template_from_named_string("<string>", source)
+    pub fn template_from_str(&self, source: &'source str) -> Result<Template<'_, 'source>, Error> {
+        self.template_from_named_str("<string>", source)
     }
 
     /// Parses and renders a template from a string in one go.
@@ -252,7 +249,7 @@ impl<'source> Environment<'source> {
     /// In some cases you really only need a template to be rendered once from
     /// a string and returned.  The internal name of the template is `<string>`.
     ///
-    /// This is an alias for [`template_from_string`](Self::template_from_string) paired with
+    /// This is an alias for [`template_from_str`](Self::template_from_str) paired with
     /// [`render`](Template::render).
     ///
     /// **Note on values:** The [`Value`] type implements `Serialize` and can be
@@ -260,14 +257,14 @@ impl<'source> Environment<'source> {
     pub fn render_str<S: Serialize>(&self, source: &str, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _eval.
-        ok!(self.template_from_string(source)).render(ctx)
+        ok!(self.template_from_str(source)).render(ctx)
     }
 
     /// Parses and renders a template from a string in one go with name.
     ///
     /// Like [`render_str`](Self::render_str), but provide a name for the
     /// template to be used instead of the default `<string>`.  This is an
-    /// alias for [`template_from_named_string`](Self::template_from_named_string) paired with
+    /// alias for [`template_from_named_str`](Self::template_from_named_str) paired with
     /// [`render`](Template::render).
     ///
     /// ```
@@ -289,7 +286,7 @@ impl<'source> Environment<'source> {
         source: &str,
         ctx: S,
     ) -> Result<String, Error> {
-        ok!(self.template_from_named_string(name, source)).render(ctx)
+        ok!(self.template_from_named_str(name, source)).render(ctx)
     }
 
     /// Sets a new function to select the default auto escaping.

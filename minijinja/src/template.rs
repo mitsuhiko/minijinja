@@ -205,7 +205,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// Returns the instructions and blocks if the template is loaded from the
     /// environment.
     ///
-    /// For templates loaded via `from_string` on the environment this API contract
+    /// For templates loaded as string on the environment this API contract
     /// cannot be upheld because the template might not live long enough.  However
     /// this functionality is only needed for template extensions in which case the
     /// template cannot be loaded anyways so the error is purely hypothetical.
