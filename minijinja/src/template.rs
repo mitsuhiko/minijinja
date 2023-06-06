@@ -1,4 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
+use std::ops::Deref;
+use std::sync::Arc;
 use std::{fmt, io};
 
 use serde::Serialize;
@@ -23,14 +25,14 @@ use crate::{ErrorKind, State};
 /// this handle.  Such a template can be cheaply copied as it only holds references.
 ///
 /// To render the [`render`](Template::render) method can be used.
-#[derive(Copy, Clone)]
-pub struct Template<'env> {
+#[derive(Clone)]
+pub struct Template<'env: 'source, 'source> {
     env: &'env Environment<'env>,
-    compiled: &'env CompiledTemplate<'env>,
+    compiled: CompiledTemplateRef<'env, 'source>,
     initial_auto_escape: AutoEscape,
 }
 
-impl<'env> fmt::Debug for Template<'env> {
+impl<'env, 'source> fmt::Debug for Template<'env, 'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("Template");
         ds.field("name", &self.name());
@@ -44,12 +46,12 @@ impl<'env> fmt::Debug for Template<'env> {
     }
 }
 
-impl<'env> Template<'env> {
+impl<'env, 'source> Template<'env, 'source> {
     pub(crate) fn new(
         env: &'env Environment<'env>,
-        compiled: &'env CompiledTemplate<'env>,
+        compiled: CompiledTemplateRef<'env, 'source>,
         initial_auto_escape: AutoEscape,
-    ) -> Template<'env> {
+    ) -> Template<'env, 'source> {
         Template {
             env,
             compiled,
@@ -142,10 +144,7 @@ impl<'env> Template<'env> {
             &mut out,
             self.initial_auto_escape,
         ));
-        Ok(TemplateModule {
-            template: self,
-            state,
-        })
+        Ok(TemplateModule { state })
     }
 
     fn _eval(&self, root: Value, out: &mut Output) -> Result<Option<Value>, Error> {
@@ -203,16 +202,24 @@ impl<'env> Template<'env> {
         )
     }
 
-    /// Returns the root instructions.
+    /// Returns the instructions and blocks if the template is loaded from the
+    /// environment.
+    ///
+    /// For templates loaded as string on the environment this API contract
+    /// cannot be upheld because the template might not live long enough.  However
+    /// this functionality is only needed for template extensions in which case the
+    /// template cannot be loaded anyways so the error is purely hypothetical.
     #[cfg(feature = "multi_template")]
-    pub(crate) fn instructions(&self) -> &'env Instructions<'env> {
-        &self.compiled.instructions
-    }
-
-    /// Returns the blocks.
-    #[cfg(feature = "multi_template")]
-    pub(crate) fn blocks(&self) -> &'env BTreeMap<&'env str, Instructions<'env>> {
-        &self.compiled.blocks
+    pub(crate) fn instructions_and_blocks(
+        &self,
+    ) -> Option<(
+        &'env Instructions<'env>,
+        &'env BTreeMap<&'env str, Instructions<'env>>,
+    )> {
+        match self.compiled {
+            CompiledTemplateRef::Borrowed(x) => Some((&x.instructions, &x.blocks)),
+            CompiledTemplateRef::Owned(_) => None,
+        }
     }
 
     /// Returns the initial auto escape setting.
@@ -236,16 +243,10 @@ impl<'env> Template<'env> {
 /// it.
 #[derive(Debug)]
 pub struct TemplateModule<'template: 'env, 'env> {
-    template: &'template Template<'env>,
     state: State<'template, 'env>,
 }
 
 impl<'template, 'env> TemplateModule<'template, 'env> {
-    /// Returns a reference to the [`Template`] behind the module.
-    pub fn template(&self) -> &'template Template<'env> {
-        self.template
-    }
-
     /// Returns the [`State`] of the module.
     pub fn state(&self) -> &State<'template, 'env> {
         &self.state
@@ -324,6 +325,23 @@ impl<'template, 'env> TemplateModule<'template, 'env> {
     /// Returns a list of all exports.
     pub fn exports(&self) -> Vec<&str> {
         self.state.ctx.current_locals().keys().copied().collect()
+    }
+}
+
+#[derive(Clone)]
+pub(crate) enum CompiledTemplateRef<'env: 'source, 'source> {
+    Owned(Arc<CompiledTemplate<'source>>),
+    Borrowed(&'env CompiledTemplate<'source>),
+}
+
+impl<'env, 'source> Deref for CompiledTemplateRef<'env, 'source> {
+    type Target = CompiledTemplate<'source>;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            CompiledTemplateRef::Owned(ref x) => x,
+            CompiledTemplateRef::Borrowed(x) => x,
+        }
     }
 }
 

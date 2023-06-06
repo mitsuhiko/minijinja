@@ -11,10 +11,10 @@ use crate::compiler::parser::parse_expr;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::expression::Expression;
 use crate::output::Output;
-use crate::template::{CompiledTemplate, Template};
+use crate::template::{CompiledTemplate, CompiledTemplateRef, Template};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
 use crate::value::{FunctionArgs, FunctionResult, Value};
-use crate::vm::{State, Vm};
+use crate::vm::State;
 use crate::{defaults, filters, functions, tests};
 
 type TemplateMap<'source> = BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>;
@@ -191,7 +191,7 @@ impl<'source> Environment<'source> {
     /// let tmpl = env.get_template("hello.txt").unwrap();
     /// println!("{}", tmpl.render(context!{ name => "World" }).unwrap());
     /// ```
-    pub fn get_template(&self, name: &str) -> Result<Template<'_>, Error> {
+    pub fn get_template(&self, name: &str) -> Result<Template<'_, '_>, Error> {
         let compiled = match &self.templates {
             Source::Borrowed(ref map, _) => {
                 ok!(map.get(name).ok_or_else(|| Error::new_not_found(name)))
@@ -201,9 +201,47 @@ impl<'source> Environment<'source> {
         };
         Ok(Template::new(
             self,
-            compiled,
+            CompiledTemplateRef::Borrowed(compiled),
             self.initial_auto_escape(name),
         ))
+    }
+
+    /// Loads a template from a string.
+    ///
+    /// In some cases you really only need to work with (eg: render) a template to be
+    /// rendered once only.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// let env = Environment::new();
+    /// let tmpl = env.template_from_named_str("template_name", "Hello {{ name }}").unwrap();
+    /// let rv = tmpl.render(context! { name => "World" });
+    /// println!("{}", rv.unwrap());
+    /// ```
+    pub fn template_from_named_str(
+        &self,
+        name: &'source str,
+        source: &'source str,
+    ) -> Result<Template<'_, 'source>, Error> {
+        Ok(Template::new(
+            self,
+            CompiledTemplateRef::Owned(Arc::new(ok!(
+                CompiledTemplate::from_name_and_source_with_syntax(
+                    name,
+                    source,
+                    self._syntax_config().clone(),
+                )
+            ))),
+            self.initial_auto_escape(name),
+        ))
+    }
+
+    /// Loads a template from a string, with name `<string>`.
+    ///
+    /// This is a shortcut to [`template_from_named_str`](Self::template_from_named_str)
+    /// with name set to `<string>`.
+    pub fn template_from_str(&self, source: &'source str) -> Result<Template<'_, 'source>, Error> {
+        self.template_from_named_str("<string>", source)
     }
 
     /// Parses and renders a template from a string in one go.
@@ -211,25 +249,23 @@ impl<'source> Environment<'source> {
     /// In some cases you really only need a template to be rendered once from
     /// a string and returned.  The internal name of the template is `<string>`.
     ///
-    /// ```
-    /// # use minijinja::{Environment, context};
-    /// let env = Environment::new();
-    /// let rv = env.render_str("Hello {{ name }}", context! { name => "World" });
-    /// println!("{}", rv.unwrap());
-    /// ```
+    /// This is an alias for [`template_from_str`](Self::template_from_str) paired with
+    /// [`render`](Template::render).
     ///
     /// **Note on values:** The [`Value`] type implements `Serialize` and can be
     /// efficiently passed to render.  It does not undergo actual serialization.
     pub fn render_str<S: Serialize>(&self, source: &str, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _eval.
-        self._render_str("<string>", source, Value::from_serializable(&ctx))
+        ok!(self.template_from_str(source)).render(ctx)
     }
 
     /// Parses and renders a template from a string in one go with name.
     ///
     /// Like [`render_str`](Self::render_str), but provide a name for the
-    /// template to be used instead of the default `<string>`.
+    /// template to be used instead of the default `<string>`.  This is an
+    /// alias for [`template_from_named_str`](Self::template_from_named_str) paired with
+    /// [`render`](Template::render).
     ///
     /// ```
     /// # use minijinja::{Environment, context};
@@ -237,7 +273,7 @@ impl<'source> Environment<'source> {
     /// let rv = env.render_named_str(
     ///     "template_name",
     ///     "Hello {{ name }}",
-    ///     context! { name => "World" }
+    ///     context!{ name => "World" }
     /// );
     /// println!("{}", rv.unwrap());
     /// ```
@@ -250,27 +286,7 @@ impl<'source> Environment<'source> {
         source: &str,
         ctx: S,
     ) -> Result<String, Error> {
-        // reduce total amount of code faling under mono morphization into
-        // this function, and share the rest in _eval.
-        self._render_str(name, source, Value::from_serializable(&ctx))
-    }
-
-    fn _render_str(&self, name: &str, source: &str, root: Value) -> Result<String, Error> {
-        let compiled = ok!(CompiledTemplate::from_name_and_source_with_syntax(
-            name,
-            source,
-            self._syntax_config().clone()
-        ));
-        let mut rv = String::with_capacity(compiled.buffer_size_hint);
-        Vm::new(self)
-            .eval(
-                &compiled.instructions,
-                root,
-                &compiled.blocks,
-                &mut Output::with_string(&mut rv),
-                self.initial_auto_escape(name),
-            )
-            .map(|_| rv)
+        ok!(self.template_from_named_str(name, source)).render(ctx)
     }
 
     /// Sets a new function to select the default auto escaping.
