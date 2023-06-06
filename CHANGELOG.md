@@ -4,8 +4,11 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0
 
+- Added `Environment::template_from_str` and `Environment::template_from_named_str`
+  to compile templates for temporary use.  (#274)
+
 - Removed `Kwargs::from_args` as this can now be expressed with just
-  `from_args`.  #273
+  `from_args`.  (#273)
 
 - `Output` no longer reveals if it's discarding in the public API.
 
