@@ -4,6 +4,11 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0
 
+- Removed `Source` and the `source` feature.  The replacement is the new `loader`
+  feature and the functionality of the source is moved directly into the
+  `Environment`.  This also adds `Environment::clear_templates` to unload
+  all already loaded templates.  (#275)
+
 - Added `Environment::template_from_str` and `Environment::template_from_named_str`
   to compile templates for temporary use.  (#274)
 
@@ -73,6 +78,28 @@ All notable changes to MiniJinja are documented here.
 - `State::current_call` was removed without replacement.  This information
   was unreliably maintained in the engine and caused issues with recursive
   calls.
+
+- `Environment::source`, `Environment::set_source` and the `Source` type
+  together with the `source` feature were removed.  The replacement is the
+  new `loader` feature which adds the `add_template_owned` and `set_loader`
+  APIs.
+
+    Before:
+
+    ```rust
+    let mut source = Source::with_loader(|name| ...);
+    source.add_template("foo", "...").unwrap();
+    let mut env = Environment::new();
+    env.set_source(source);
+    ```
+
+    After:
+
+    ```rust
+    let mut env = Environment::new();
+    env.set_loader(|name| ...);
+    env.add_template_owned("foo", "...").unwrap();
+    ```
 
 ## 0.34.0
 

@@ -3,9 +3,7 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::Mutex;
 
 use minijinja::value::{Rest, Value};
-use minijinja::{
-    context, escape_formatter, AutoEscape, Error, Source, State, Syntax, UndefinedBehavior,
-};
+use minijinja::{context, escape_formatter, AutoEscape, Error, State, Syntax, UndefinedBehavior};
 use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -366,8 +364,8 @@ impl Environment {
         let mut inner = self.inner.lock().unwrap();
         inner.loader = callback.clone();
 
-        let mut source = if let Some(callback) = callback {
-            Source::with_loader(move |name| {
+        if let Some(callback) = callback {
+            inner.env.set_loader(move |name| {
                 Python::with_gil(|py| {
                     let callback = callback.as_ref(py);
                     let rv = callback
@@ -380,11 +378,7 @@ impl Environment {
                     }
                 })
             })
-        } else {
-            Source::new()
-        };
-        source.set_syntax(Syntax::default()).map_err(to_py_error)?;
-        inner.env.set_source(source);
+        }
 
         Ok(())
     }
@@ -397,12 +391,12 @@ impl Environment {
 
     /// Triggers a reload of the templates.
     pub fn reload(&self) -> PyResult<()> {
-        let loader = self.inner.lock().unwrap().loader.as_ref().cloned();
-        if let Some(loader) = loader {
-            Python::with_gil(|py| self.set_loader(Some(loader.as_ref(py))))
-        } else {
-            Ok(())
+        let mut inner = self.inner.lock().unwrap();
+        let loader = inner.loader.as_ref().cloned();
+        if loader.is_some() {
+            inner.env.clear_templates();
         }
+        Ok(())
     }
 
     /// Can be used to instruct the environment to automatically reload templates
@@ -480,22 +474,20 @@ impl Environment {
     /// Manually adds a template to the environment.
     pub fn add_template(&self, name: &str, source: &str) -> PyResult<()> {
         let mut inner = self.inner.lock().unwrap();
-        if inner.env.source().is_none() {
-            inner.env.set_source(Source::new());
-        }
         inner
             .env
-            .source_mut()
-            .unwrap()
-            .add_template(name, source)
+            .add_template_owned(name, source)
             .map_err(to_py_error)
     }
 
     /// Removes a loaded template.
     pub fn remove_template(&self, name: &str) {
-        if let Some(source) = self.inner.lock().unwrap().env.source_mut() {
-            source.remove_template(name);
-        }
+        self.inner.lock().unwrap().env.remove_template(name);
+    }
+
+    /// Clears all loaded templates.
+    pub fn clear_templates(&self) {
+        self.inner.lock().unwrap().env.clear_templates();
     }
 
     /// Renders a template looked up from the loader.

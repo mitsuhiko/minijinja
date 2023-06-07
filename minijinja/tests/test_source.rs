@@ -1,15 +1,13 @@
-#![cfg(feature = "source")]
+#![cfg(feature = "loader")]
 
-use minijinja::{Environment, Source};
+use minijinja::Environment;
 
 use similar_asserts::assert_eq;
 
 fn create_env() -> Environment<'static> {
-    let mut source = Source::new();
-    let template = String::from("Hello World!");
-    source.add_template("hello", template).unwrap();
     let mut env = Environment::new();
-    env.set_source(source);
+    let template = String::from("Hello World!");
+    env.add_template_owned("hello", template).unwrap();
     env
 }
 
@@ -22,14 +20,13 @@ fn test_basic() {
 
 #[test]
 fn test_dynamic() {
-    let mut source = Source::with_loader(|name| match name {
+    let mut env = Environment::new();
+    let template = String::from("Hello World 2!");
+    env.add_template_owned("hello2", template).unwrap();
+    env.set_loader(|name| match name {
         "hello" => Ok(Some("Hello World!".into())),
         _ => Ok(None),
     });
-    let template = String::from("Hello World 2!");
-    source.add_template("hello2", template).unwrap();
-    let mut env = Environment::new();
-    env.set_source(source);
     let t = env.get_template("hello").unwrap();
     assert_eq!(t.render(()).unwrap(), "Hello World!");
     let t = env.get_template("hello2").unwrap();

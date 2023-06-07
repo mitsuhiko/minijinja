@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::mem;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -143,7 +143,7 @@ impl<'env> Vm<'env> {
                 auto_escape: state.auto_escape(),
                 instructions,
                 blocks: BTreeMap::default(),
-                loaded_templates: BTreeSet::new(),
+                loaded_templates: Default::default(),
                 #[cfg(feature = "macros")]
                 macros: state.macros.clone(),
                 #[cfg(feature = "fuel")]

@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
 use std::io;
+use std::mem;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,23 +19,14 @@ use similar_asserts::assert_eq;
 
 type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<String, Error> + Send + Sync;
 
-/// Utility for dynamic template loading.
+/// Internal utility for dynamic template loading.
 ///
 /// Because an [`Environment`](crate::Environment) holds a reference to the
 /// source lifetime it borrows templates from, it becomes very inconvenient when
 /// it is shared. This object provides a solution for such cases. First templates
-/// are loaded into the source, then it can be set as the "source" for an
-/// environment decouping the lifetimes.  Note that once a source has been added
-/// to an environment methods such as
-/// [`Environment::add_template`](crate::Environment::add_template) must no
-/// longer be used as otherwise the same lifetime concern arises.
-///
-/// Alternatively sources can also be used to implement completely dynamic template
-/// lookups by using [`with_loader`](Source::with_loader) in which case templates
-/// are loaded on first use.
+/// are loaded into the source to decouple the lifetimes from the environment.
 #[derive(Clone)]
-#[cfg_attr(docsrs, doc(cfg(feature = "source")))]
-pub struct Source {
+pub(crate) struct Source {
     backing: SourceBacking,
 }
 
@@ -46,14 +38,19 @@ enum SourceBacking {
         syntax: SyntaxConfig,
     },
     Static {
-        templates: HashMap<String, Arc<LoadedTemplate>>,
+        templates: BTreeMap<String, Arc<LoadedTemplate>>,
         syntax: SyntaxConfig,
     },
 }
 
 impl Default for Source {
     fn default() -> Source {
-        Source::new()
+        Source {
+            backing: SourceBacking::Static {
+                templates: Default::default(),
+                syntax: Default::default(),
+            },
+        }
     }
 }
 
@@ -87,32 +84,8 @@ impl fmt::Debug for LoadedTemplate {
 }
 
 impl Source {
-    /// Creates an empty source.
-    ///
-    /// ```rust
-    /// # use minijinja::{Source, Environment};
-    /// fn create_env() -> Environment<'static> {
-    ///     let mut env = Environment::new();
-    ///     let mut source = Source::new();
-    ///     source.add_template("index.html", "...").unwrap();
-    ///     env.set_source(source);
-    ///     env
-    /// }
-    /// ```
-    pub fn new() -> Source {
-        Source {
-            backing: SourceBacking::Static {
-                templates: HashMap::new(),
-                syntax: Default::default(),
-            },
-        }
-    }
-
     /// Sets the syntax for the source.
-    ///
-    /// See [`Syntax`](crate::Syntax) for more information.
     #[cfg(feature = "custom_syntax")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
     pub fn set_syntax(&mut self, new_syntax: crate::custom_syntax::Syntax) -> Result<(), Error> {
         match self.backing {
             SourceBacking::Dynamic { ref mut syntax, .. }
@@ -123,13 +96,6 @@ impl Source {
         Ok(())
     }
 
-    /// Returns the current syntax.
-    #[cfg(feature = "custom_syntax")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
-    pub fn syntax(&self) -> &crate::custom_syntax::Syntax {
-        &self._syntax_config().syntax
-    }
-
     pub(crate) fn _syntax_config(&self) -> &SyntaxConfig {
         match &self.backing {
             SourceBacking::Dynamic { ref syntax, .. }
@@ -137,35 +103,26 @@ impl Source {
         }
     }
 
-    /// Creates a source with a dynamic loader.
-    ///
-    /// When a source was created with the loader, the source gains the ability
-    /// to dynamically load templates.  The loader is invoked with the name of
-    /// the template.  If this template exists `Ok(Some(template_source))` has
-    /// to be returned, otherwise `Ok(None)`.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use minijinja::{Source, Environment};
-    /// fn create_env() -> Environment<'static> {
-    ///     let mut env = Environment::new();
-    ///     env.set_source(Source::with_loader(|name| {
-    ///         if name == "layout.html" {
-    ///             Ok(Some("...".into()))
-    ///         } else {
-    ///             Ok(None)
-    ///         }
-    ///     }));
-    ///     env
-    /// }
-    /// ```
-    pub fn with_loader<F>(f: F) -> Source
+    /// Reconfigures the source with a new loader.
+    pub fn set_loader<F>(&mut self, f: F)
     where
         F: Fn(&str) -> Result<Option<String>, Error> + Send + Sync + 'static,
     {
-        Source {
-            backing: SourceBacking::Dynamic {
+        // Simple case: we already have dynamic backing, swap out the loader
+        if let SourceBacking::Dynamic { ref mut loader, .. } = self.backing {
+            *loader = Arc::new(move |name| match ok!(f(name)) {
+                Some(rv) => Ok(rv),
+                None => Err(Error::new_not_found(name)),
+            });
+
+        // complex case: we need to migrate static backing to dynamic backing.
+        // This requires some swapping hackery
+        } else if let SourceBacking::Static {
+            templates: old_templates,
+            syntax: old_syntax,
+        } = mem::replace(
+            &mut self.backing,
+            SourceBacking::Dynamic {
                 templates: MemoMap::new(),
                 loader: Arc::new(move |name| match ok!(f(name)) {
                     Some(rv) => Ok(rv),
@@ -173,41 +130,21 @@ impl Source {
                 }),
                 syntax: Default::default(),
             },
-        }
-    }
-
-    /// Creates a source that loads on demand from a given directory.
-    ///
-    /// This creates a source with a dynamic loader which looks up templates in the
-    /// given directory.  Templates that start with a dot (`.`) or are contained in
-    /// a folder starting with a dot cannot be loaded.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use minijinja::{Source, Environment};
-    /// fn create_env() -> Environment<'static> {
-    ///     let mut env = Environment::new();
-    ///     env.set_source(Source::from_path("path/to/templates"));
-    ///     env
-    /// }
-    /// ```
-    pub fn from_path<P: AsRef<Path>>(dir: P) -> Source {
-        let dir = dir.as_ref().to_path_buf();
-        Source::with_loader(move |name| {
-            let path = match safe_join(&dir, name) {
-                Some(path) => path,
-                None => return Ok(None),
-            };
-            match fs::read_to_string(path) {
-                Ok(result) => Ok(Some(result)),
-                Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
-                Err(err) => Err(
-                    Error::new(ErrorKind::InvalidOperation, "could not read template")
-                        .with_source(err),
-                ),
+        ) {
+            if let SourceBacking::Dynamic {
+                ref templates,
+                ref mut syntax,
+                ..
+            } = self.backing
+            {
+                for (key, value) in old_templates.into_iter() {
+                    templates.insert(key, value);
+                }
+                *syntax = old_syntax;
+            } else {
+                unreachable!();
             }
-        })
+        }
     }
 
     /// Adds a new template into the source.
@@ -289,6 +226,17 @@ impl Source {
                 .ok_or_else(|| Error::new_not_found(name)),
         }
     }
+
+    pub fn clear_templates(&mut self) {
+        match &mut self.backing {
+            SourceBacking::Dynamic { templates, .. } => {
+                templates.clear();
+            }
+            SourceBacking::Static { templates, .. } => {
+                templates.clear();
+            }
+        }
+    }
 }
 
 fn safe_join(base: &Path, template: &str) -> Option<PathBuf> {
@@ -302,24 +250,57 @@ fn safe_join(base: &Path, template: &str) -> Option<PathBuf> {
     Some(rv)
 }
 
+/// Helper to load templates from a given directory.
+///
+/// This creates a dynamic loader which looks up templates in the
+/// given directory.  Templates that start with a dot (`.`) or are contained in
+/// a folder starting with a dot cannot be loaded.
+///
+/// # Example
+///
+/// ```rust
+/// # use minijinja::{path_loader, Environment};
+/// fn create_env() -> Environment<'static> {
+///     let mut env = Environment::new();
+///     env.set_loader(path_loader("path/to/templates"));
+///     env
+/// }
+/// ```
+#[cfg_attr(docsrs, doc(cfg(feature = "loader")))]
+pub fn path_loader<'x, P: AsRef<Path> + 'x>(
+    dir: P,
+) -> impl for<'a> Fn(&'a str) -> Result<Option<String>, Error> + Send + Sync + 'static {
+    let dir = dir.as_ref().to_path_buf();
+    move |name| {
+        let path = match safe_join(&dir, name) {
+            Some(path) => path,
+            None => return Ok(None),
+        };
+        match fs::read_to_string(path) {
+            Ok(result) => Ok(Some(result)),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
+            Err(err) => Err(
+                Error::new(ErrorKind::InvalidOperation, "could not read template").with_source(err),
+            ),
+        }
+    }
+}
+
 #[test]
 fn test_source_replace_static() {
-    let mut source = Source::new();
-    source.add_template("a", "1").unwrap();
-    source.add_template("a", "2").unwrap();
     let mut env = crate::Environment::new();
-    env.set_source(source);
+    env.add_template_owned("a", "1").unwrap();
+    env.add_template_owned("a", "2").unwrap();
     let rv = env.get_template("a").unwrap().render(()).unwrap();
     assert_eq!(rv, "2");
 }
 
 #[test]
 fn test_source_replace_dynamic() {
-    let mut source = Source::with_loader(|_| Ok(None));
-    source.add_template("a", "1").unwrap();
-    source.add_template("a", "2").unwrap();
     let mut env = crate::Environment::new();
-    env.set_source(source);
+    env.add_template("a", "1").unwrap();
+    env.add_template("a", "2").unwrap();
+    env.set_loader(|_| Ok(None));
     let rv = env.get_template("a").unwrap().render(()).unwrap();
     assert_eq!(rv, "2");
 }

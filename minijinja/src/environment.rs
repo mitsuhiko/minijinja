@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -19,19 +20,28 @@ use crate::{defaults, filters, functions, tests};
 
 type TemplateMap<'source> = BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>;
 
-#[derive(Clone)]
-enum Source<'source> {
-    Borrowed(TemplateMap<'source>, SyntaxConfig),
-    #[cfg(feature = "source")]
-    Owned(crate::source::Source),
+/// Internal container that holds either a source or the map of
+/// templates directly if there is no source.
+#[derive(Clone, Default)]
+struct TemplateStore<'source> {
+    #[cfg(feature = "loader")]
+    source: crate::source::Source,
+    #[cfg(not(feature = "loader"))]
+    map: TemplateMap<'source>,
+    #[cfg(not(feature = "loader"))]
+    syntax_config: SyntaxConfig,
+    _marker: PhantomData<TemplateMap<'source>>,
 }
 
-impl<'source> fmt::Debug for Source<'source> {
+impl<'source> fmt::Debug for TemplateStore<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Borrowed(tmpls, _) => fmt::Debug::fmt(&BTreeMapKeysDebug(tmpls), f),
-            #[cfg(feature = "source")]
-            Self::Owned(arg0) => fmt::Debug::fmt(arg0, f),
+        #[cfg(feature = "loader")]
+        {
+            self.source.fmt(f)
+        }
+        #[cfg(not(feature = "loader"))]
+        {
+            BTreeMapKeysDebug(&self.map).fmt(f)
         }
     }
 }
@@ -47,13 +57,6 @@ type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + 
 /// The environment holds references to the source the templates were created from.
 /// This makes it very inconvenient to pass around unless the templates are static
 /// strings.
-#[cfg_attr(
-    feature = "source",
-    doc = "
-For situations where you want to load dynamic templates and share the
-environment it's recommended to turn on the `source` feature and to use the
-[`Source`](crate::source::Source) type with the environment."
-)]
 ///
 /// There are generally two ways to construct an environment:
 ///
@@ -63,7 +66,7 @@ environment it's recommended to turn on the `source` feature and to use the
 /// * [`Environment::empty`] creates a completely blank environment.
 #[derive(Clone)]
 pub struct Environment<'source> {
-    templates: Source<'source>,
+    templates: TemplateStore<'source>,
     filters: BTreeMap<Cow<'source, str>, filters::BoxedFilter>,
     tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
     pub(crate) globals: BTreeMap<Cow<'source, str>, Value>,
@@ -102,7 +105,7 @@ impl<'source> Environment<'source> {
     /// [`empty`](Environment::empty) method.
     pub fn new() -> Environment<'source> {
         Environment {
-            templates: Source::Borrowed(Default::default(), Default::default()),
+            templates: TemplateStore::default(),
             filters: defaults::get_builtin_filters(),
             tests: defaults::get_builtin_tests(),
             globals: defaults::get_globals(),
@@ -122,7 +125,7 @@ impl<'source> Environment<'source> {
     /// logic for auto escaping configured.
     pub fn empty() -> Environment<'source> {
         Environment {
-            templates: Source::Borrowed(Default::default(), Default::default()),
+            templates: TemplateStore::default(),
             filters: Default::default(),
             tests: Default::default(),
             globals: Default::default(),
@@ -142,39 +145,114 @@ impl<'source> Environment<'source> {
     /// it.  To look up a loaded template use the [`get_template`](Self::get_template)
     /// method.
     ///
+    /// ```
+    /// # use minijinja::Environment;
+    /// let mut env = Environment::new();
+    /// env.add_template("index.html", "Hello {{ name }}!").unwrap();
+    /// ```
+    ///
     /// Note that there are situations where the interface of this method is
     /// too restrictive.  For instance the environment itself does not permit
     /// any form of sensible dynamic template loading.
     #[cfg_attr(
-        feature = "source",
-        doc = "To address this restriction use [`set_source`](Self::set_source)."
+        feature = "loader",
+        doc = "To address this restriction use [`add_template_owned`](Self::add_template_owned)."
     )]
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
-        match self.templates {
-            Source::Borrowed(ref mut map, ref syntax) => {
-                let compiled_template = ok!(CompiledTemplate::from_name_and_source_with_syntax(
-                    name,
-                    source,
-                    syntax.clone()
-                ));
-                map.insert(name, Arc::new(compiled_template));
-                Ok(())
-            }
-            #[cfg(feature = "source")]
-            Source::Owned(ref mut src) => src.add_template(name, source),
+        #[cfg(feature = "loader")]
+        {
+            self.templates.source.add_template(name, source)
         }
+        #[cfg(not(feature = "loader"))]
+        {
+            let compiled_template = ok!(CompiledTemplate::from_name_and_source_with_syntax(
+                name,
+                source,
+                self.templates.syntax_config.clone()
+            ));
+            self.templates.map.insert(name, Arc::new(compiled_template));
+            Ok(())
+        }
+    }
+
+    /// Adds a template without without borrowing.
+    ///
+    /// This lets you place an owned [`String`] in the environment rather than the
+    /// borrowed `&str`.
+    ///
+    /// ```
+    /// # use minijinja::Environment;
+    /// let mut env = Environment::new();
+    /// env.add_template_owned("index.html", "Hello {{ name }}!").unwrap();
+    /// ```
+    #[cfg(feature = "loader")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "loader")))]
+    pub fn add_template_owned<N, S>(&mut self, name: N, source: S) -> Result<(), Error>
+    where
+        N: Into<String>,
+        S: Into<String>,
+    {
+        self.templates.source.add_template(name, source)
+    }
+
+    /// Register a template loader as source of templates.
+    ///
+    /// When a template loader is registered, the environment gains the ability
+    /// to dynamically load templates.  The loader is invoked with the name of
+    /// the template.  If this template exists `Ok(Some(template_source))` has
+    /// to be returned, otherwise `Ok(None)`.  Once a template has been loaded
+    /// it's stored on the environment.  This means the loader is only invoked
+    /// once per template name.
+    ///
+    /// For loading templates from the file system, you can use the
+    /// [`path_loader`](crate::path_loader) function.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use minijinja::Environment;
+    /// fn create_env() -> Environment<'static> {
+    ///     let mut env = Environment::new();
+    ///     env.set_loader(|name| {
+    ///         if name == "layout.html" {
+    ///             Ok(Some("...".into()))
+    ///         } else {
+    ///             Ok(None)
+    ///         }
+    ///     });
+    ///     env
+    /// }
+    /// ```
+    #[cfg(feature = "loader")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "loader")))]
+    pub fn set_loader<F>(&mut self, f: F)
+    where
+        F: Fn(&str) -> Result<Option<String>, Error> + Send + Sync + 'static,
+    {
+        self.templates.source.set_loader(f);
     }
 
     /// Removes a template by name.
     pub fn remove_template(&mut self, name: &str) {
-        match self.templates {
-            Source::Borrowed(ref mut map, _) => {
-                map.remove(name);
-            }
-            #[cfg(feature = "source")]
-            Source::Owned(ref mut source) => {
-                source.remove_template(name);
-            }
+        #[cfg(not(feature = "loader"))]
+        {
+            self.templates.map.remove(name);
+        }
+        #[cfg(feature = "loader")]
+        {
+            self.templates.source.remove_template(name);
+        }
+    }
+
+    /// Removes all stored templates.
+    pub fn clear_templates(&mut self) {
+        #[cfg(not(feature = "loader"))]
+        {
+            self.templates.map.clear();
+        }
+        #[cfg(feature = "loader")]
+        {
+            self.templates.source.clear_templates();
         }
     }
 
@@ -192,13 +270,19 @@ impl<'source> Environment<'source> {
     /// println!("{}", tmpl.render(context!{ name => "World" }).unwrap());
     /// ```
     pub fn get_template(&self, name: &str) -> Result<Template<'_, '_>, Error> {
-        let compiled = match &self.templates {
-            Source::Borrowed(ref map, _) => {
-                ok!(map.get(name).ok_or_else(|| Error::new_not_found(name)))
+        let compiled = ok!({
+            #[cfg(feature = "loader")]
+            {
+                self.templates.source.get_compiled_template(name)
             }
-            #[cfg(feature = "source")]
-            Source::Owned(source) => ok!(source.get_compiled_template(name)),
-        };
+            #[cfg(not(feature = "loader"))]
+            {
+                self.templates
+                    .map
+                    .get(name)
+                    .ok_or_else(|| Error::new_not_found(name))
+            }
+        });
         Ok(Template::new(
             self,
             CompiledTemplateRef::Borrowed(compiled),
@@ -244,22 +328,6 @@ impl<'source> Environment<'source> {
         self.template_from_named_str("<string>", source)
     }
 
-    /// Parses and renders a template from a string in one go.
-    ///
-    /// In some cases you really only need a template to be rendered once from
-    /// a string and returned.  The internal name of the template is `<string>`.
-    ///
-    /// This is an alias for [`template_from_str`](Self::template_from_str) paired with
-    /// [`render`](Template::render).
-    ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
-    /// efficiently passed to render.  It does not undergo actual serialization.
-    pub fn render_str<S: Serialize>(&self, source: &str, ctx: S) -> Result<String, Error> {
-        // reduce total amount of code faling under mono morphization into
-        // this function, and share the rest in _eval.
-        ok!(self.template_from_str(source)).render(ctx)
-    }
-
     /// Parses and renders a template from a string in one go with name.
     ///
     /// Like [`render_str`](Self::render_str), but provide a name for the
@@ -287,6 +355,22 @@ impl<'source> Environment<'source> {
         ctx: S,
     ) -> Result<String, Error> {
         ok!(self.template_from_named_str(name, source)).render(ctx)
+    }
+
+    /// Parses and renders a template from a string in one go.
+    ///
+    /// In some cases you really only need a template to be rendered once from
+    /// a string and returned.  The internal name of the template is `<string>`.
+    ///
+    /// This is an alias for [`template_from_str`](Self::template_from_str) paired with
+    /// [`render`](Template::render).
+    ///
+    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// efficiently passed to render.  It does not undergo actual serialization.
+    pub fn render_str<S: Serialize>(&self, source: &str, ctx: S) -> Result<String, Error> {
+        // reduce total amount of code faling under mono morphization into
+        // this function, and share the rest in _eval.
+        ok!(self.template_from_str(source)).render(ctx)
     }
 
     /// Sets a new function to select the default auto escaping.
@@ -430,12 +514,15 @@ impl<'source> Environment<'source> {
     #[cfg(feature = "custom_syntax")]
     #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
     pub fn set_syntax(&mut self, syntax: crate::custom_syntax::Syntax) -> Result<(), Error> {
-        match self.templates {
-            Source::Borrowed(_, ref mut syn) => *syn = ok!(syntax.compile()),
-            #[cfg(feature = "source")]
-            Source::Owned(ref mut source) => ok!(source.set_syntax(syntax)),
-        };
-        Ok(())
+        #[cfg(feature = "loader")]
+        {
+            self.templates.source.set_syntax(syntax)
+        }
+        #[cfg(not(feature = "loader"))]
+        {
+            self.templates.syntax_config = ok!(syntax.compile());
+            Ok(())
+        }
     }
 
     /// Returns the current syntax.
@@ -446,48 +533,13 @@ impl<'source> Environment<'source> {
     }
 
     fn _syntax_config(&self) -> &SyntaxConfig {
-        match self.templates {
-            Source::Borrowed(_, ref syn) => syn,
-            #[cfg(feature = "source")]
-            Source::Owned(ref source) => source._syntax_config(),
+        #[cfg(feature = "loader")]
+        {
+            self.templates.source._syntax_config()
         }
-    }
-
-    /// Sets the template source for the environment.
-    ///
-    /// This helps when working with dynamically loaded templates.  The
-    /// [`Source`](crate::source::Source) is consulted by the environment to
-    /// look up templates that are requested.  The source has the capabilities
-    /// to load templates with fewer lifetime restrictions and can also
-    /// load templates dynamically at runtime as requested.
-    ///
-    /// When a source is set already loaded templates in the environment are
-    /// discarded and replaced with the templates from the source.
-    ///
-    /// For more information see [`Source`](crate::source::Source).
-    #[cfg(feature = "source")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
-    pub fn set_source(&mut self, source: crate::source::Source) {
-        self.templates = Source::Owned(source);
-    }
-
-    /// Returns the currently set source.
-    #[cfg(feature = "source")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
-    pub fn source(&self) -> Option<&crate::source::Source> {
-        match self.templates {
-            Source::Borrowed(..) => None,
-            Source::Owned(ref source) => Some(source),
-        }
-    }
-
-    /// Returns the currently set source as mutable reference.
-    #[cfg(feature = "source")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "source")))]
-    pub fn source_mut(&mut self) -> Option<&mut crate::source::Source> {
-        match self.templates {
-            Source::Borrowed(..) => None,
-            Source::Owned(ref mut source) => Some(source),
+        #[cfg(not(feature = "loader"))]
+        {
+            &self.templates.syntax_config
         }
     }
 

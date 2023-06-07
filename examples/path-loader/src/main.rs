@@ -1,9 +1,9 @@
-use minijinja::{context, Environment, Source};
+use minijinja::{context, path_loader, Environment};
 use once_cell::sync::Lazy;
 
 static ENV: Lazy<Environment<'static>> = Lazy::new(|| {
     let mut env = Environment::new();
-    env.set_source(Source::from_path("templates"));
+    env.set_loader(path_loader("templates"));
     env
 });
 

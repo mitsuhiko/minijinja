@@ -82,6 +82,7 @@ impl<'a> Output<'a> {
 
     /// Returns `true` if the output is discarding.
     #[inline(always)]
+    #[allow(unused)]
     pub(crate) fn is_discarding(&self) -> bool {
         matches!(self.capture_stack.last(), Some(None))
     }

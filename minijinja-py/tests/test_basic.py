@@ -111,10 +111,10 @@ def test_loader():
     assert called == ["index.html", "other.html"]
     env.loader = my_loader
     assert env.render_template("index.html") == "Hello from index.html"
-    assert called == ["index.html", "other.html", "index.html"]
+    assert called == ["index.html", "other.html"]
     env.reload()
     assert env.render_template("index.html") == "Hello from index.html"
-    assert called == ["index.html", "other.html", "index.html", "index.html"]
+    assert called == ["index.html", "other.html", "index.html"]
 
 
 def test_loader_reload():
