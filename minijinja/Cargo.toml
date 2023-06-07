@@ -48,10 +48,6 @@ internal_debug = []
 unstable_machinery = ["internal_debug"]
 unstable_machinery_serde = ["unstable_machinery", "serde/derive"]
 
-# Incorrectly named features to be removed in 1.x
-multi-template = ["multi_template"]
-adjacent-loop-items = ["adjacent_loop_items"]
-
 [dependencies]
 aho-corasick = { version = "1.0", default-features = false, optional = true }
 serde = "1.0.130"
