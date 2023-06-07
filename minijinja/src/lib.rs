@@ -208,10 +208,10 @@ pub mod value;
 pub mod testutils;
 
 #[cfg(feature = "loader")]
-mod source;
+mod loader;
 
 #[cfg(feature = "loader")]
-pub use source::path_loader;
+pub use loader::path_loader;
 
 #[cfg(feature = "custom_syntax")]
 mod custom_syntax;
