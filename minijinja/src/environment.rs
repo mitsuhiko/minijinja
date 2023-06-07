@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -17,34 +16,6 @@ use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
 use crate::value::{FunctionArgs, FunctionResult, Value};
 use crate::vm::State;
 use crate::{defaults, filters, functions, tests};
-
-type TemplateMap<'source> = BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>;
-
-/// Internal container that holds either a source or the map of
-/// templates directly if there is no source.
-#[derive(Clone, Default)]
-struct TemplateStore<'source> {
-    #[cfg(feature = "loader")]
-    source: crate::source::Source,
-    #[cfg(not(feature = "loader"))]
-    map: TemplateMap<'source>,
-    #[cfg(not(feature = "loader"))]
-    syntax_config: SyntaxConfig,
-    _marker: PhantomData<TemplateMap<'source>>,
-}
-
-impl<'source> fmt::Debug for TemplateStore<'source> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        #[cfg(feature = "loader")]
-        {
-            self.source.fmt(f)
-        }
-        #[cfg(not(feature = "loader"))]
-        {
-            BTreeMapKeysDebug(&self.map).fmt(f)
-        }
-    }
-}
 
 type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
 type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + Sync + Send;
@@ -66,7 +37,7 @@ type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + 
 /// * [`Environment::empty`] creates a completely blank environment.
 #[derive(Clone)]
 pub struct Environment<'source> {
-    templates: TemplateStore<'source>,
+    templates: Source<'source>,
     filters: BTreeMap<Cow<'source, str>, filters::BoxedFilter>,
     tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
     pub(crate) globals: BTreeMap<Cow<'source, str>, Value>,
@@ -105,7 +76,7 @@ impl<'source> Environment<'source> {
     /// [`empty`](Environment::empty) method.
     pub fn new() -> Environment<'source> {
         Environment {
-            templates: TemplateStore::default(),
+            templates: Source::default(),
             filters: defaults::get_builtin_filters(),
             tests: defaults::get_builtin_tests(),
             globals: defaults::get_globals(),
@@ -125,7 +96,7 @@ impl<'source> Environment<'source> {
     /// logic for auto escaping configured.
     pub fn empty() -> Environment<'source> {
         Environment {
-            templates: TemplateStore::default(),
+            templates: Source::default(),
             filters: Default::default(),
             tests: Default::default(),
             globals: Default::default(),
@@ -159,20 +130,7 @@ impl<'source> Environment<'source> {
         doc = "To address this restriction use [`add_template_owned`](Self::add_template_owned)."
     )]
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
-        #[cfg(feature = "loader")]
-        {
-            self.templates.source.add_template(name, source)
-        }
-        #[cfg(not(feature = "loader"))]
-        {
-            let compiled_template = ok!(CompiledTemplate::from_name_and_source_with_syntax(
-                name,
-                source,
-                self.templates.syntax_config.clone()
-            ));
-            self.templates.map.insert(name, Arc::new(compiled_template));
-            Ok(())
-        }
+        self.templates.add_template(name, source)
     }
 
     /// Adds a template without without borrowing.
@@ -189,10 +147,10 @@ impl<'source> Environment<'source> {
     #[cfg_attr(docsrs, doc(cfg(feature = "loader")))]
     pub fn add_template_owned<N, S>(&mut self, name: N, source: S) -> Result<(), Error>
     where
-        N: Into<String>,
-        S: Into<String>,
+        N: Into<Cow<'source, str>>,
+        S: Into<Cow<'source, str>>,
     {
-        self.templates.source.add_template(name, source)
+        self.templates.add_template(name, source)
     }
 
     /// Register a template loader as source of templates.
@@ -229,19 +187,12 @@ impl<'source> Environment<'source> {
     where
         F: Fn(&str) -> Result<Option<String>, Error> + Send + Sync + 'static,
     {
-        self.templates.source.set_loader(f);
+        self.templates.set_loader(f);
     }
 
     /// Removes a template by name.
     pub fn remove_template(&mut self, name: &str) {
-        #[cfg(not(feature = "loader"))]
-        {
-            self.templates.map.remove(name);
-        }
-        #[cfg(feature = "loader")]
-        {
-            self.templates.source.remove_template(name);
-        }
+        self.templates.remove_template(name);
     }
 
     /// Removes all stored templates.
@@ -250,14 +201,7 @@ impl<'source> Environment<'source> {
     /// the loader to "reload" templates.  By calling this method one can trigger
     /// a reload.
     pub fn clear_templates(&mut self) {
-        #[cfg(not(feature = "loader"))]
-        {
-            self.templates.map.clear();
-        }
-        #[cfg(feature = "loader")]
-        {
-            self.templates.source.clear_templates();
-        }
+        self.templates.clear_templates();
     }
 
     /// Fetches a template by name.
@@ -275,19 +219,7 @@ impl<'source> Environment<'source> {
     /// println!("{}", tmpl.render(context!{ name => "World" }).unwrap());
     /// ```
     pub fn get_template(&self, name: &str) -> Result<Template<'_, '_>, Error> {
-        let compiled = ok!({
-            #[cfg(feature = "loader")]
-            {
-                self.templates.source.get_compiled_template(name)
-            }
-            #[cfg(not(feature = "loader"))]
-            {
-                self.templates
-                    .map
-                    .get(name)
-                    .ok_or_else(|| Error::new_not_found(name))
-            }
-        });
+        let compiled = ok!(self.templates.get_compiled_template(name));
         Ok(Template::new(
             self,
             CompiledTemplateRef::Borrowed(compiled),
@@ -519,15 +451,8 @@ impl<'source> Environment<'source> {
     #[cfg(feature = "custom_syntax")]
     #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
     pub fn set_syntax(&mut self, syntax: crate::custom_syntax::Syntax) -> Result<(), Error> {
-        #[cfg(feature = "loader")]
-        {
-            self.templates.source.set_syntax(syntax)
-        }
-        #[cfg(not(feature = "loader"))]
-        {
-            self.templates.syntax_config = ok!(syntax.compile());
-            Ok(())
-        }
+        self.templates.syntax_config = ok!(syntax.compile());
+        Ok(())
     }
 
     /// Returns the current syntax.
@@ -538,14 +463,7 @@ impl<'source> Environment<'source> {
     }
 
     fn _syntax_config(&self) -> &SyntaxConfig {
-        #[cfg(feature = "loader")]
-        {
-            self.templates.source._syntax_config()
-        }
-        #[cfg(not(feature = "loader"))]
-        {
-            &self.templates.syntax_config
-        }
+        &self.templates.syntax_config
     }
 
     /// Compiles an expression.
@@ -679,3 +597,62 @@ impl<'source> Environment<'source> {
         }
     }
 }
+
+#[cfg(not(feature = "loader"))]
+mod basic_source {
+    use super::*;
+
+    #[derive(Clone, Default)]
+    pub struct BasicSource<'source> {
+        pub syntax_config: SyntaxConfig,
+        map: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
+    }
+
+    impl<'source> fmt::Debug for BasicSource<'source> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            BTreeMapKeysDebug(&self.map).fmt(f)
+        }
+    }
+
+    impl<'source> BasicSource<'source> {
+        pub fn add_template(
+            &mut self,
+            name: &'source str,
+            source: &'source str,
+        ) -> Result<(), Error> {
+            self.map.insert(
+                name,
+                Arc::new(ok!(CompiledTemplate::from_name_and_source_with_syntax(
+                    name,
+                    source,
+                    self.syntax_config.clone()
+                ))),
+            );
+            Ok(())
+        }
+
+        pub fn remove_template(&mut self, name: &str) {
+            self.map.remove(name);
+        }
+
+        pub fn clear_templates(&mut self) {
+            self.map.clear();
+        }
+
+        pub fn get_compiled_template(
+            &self,
+            name: &str,
+        ) -> Result<&CompiledTemplate<'source>, Error> {
+            self.map
+                .get(name)
+                .map(|x| &**x)
+                .ok_or_else(|| Error::new_not_found(name))
+        }
+    }
+}
+
+#[cfg(not(feature = "loader"))]
+use self::basic_source::BasicSource as Source;
+
+#[cfg(feature = "loader")]
+use crate::loader::LoaderSource as Source;

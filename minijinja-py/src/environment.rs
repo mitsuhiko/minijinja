@@ -472,7 +472,7 @@ impl Environment {
     }
 
     /// Manually adds a template to the environment.
-    pub fn add_template(&self, name: &str, source: &str) -> PyResult<()> {
+    pub fn add_template(&self, name: String, source: String) -> PyResult<()> {
         let mut inner = self.inner.lock().unwrap();
         inner
             .env
