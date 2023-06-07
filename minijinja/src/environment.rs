@@ -600,11 +600,7 @@ impl<'source> Environment<'source> {
 
 #[cfg(not(feature = "loader"))]
 mod basic_source {
-    use super::{CompiledTemplate, Error, SyntaxConfig};
-    use crate::utils::BTreeMapKeysDebug;
-    use std::collections::BTreeMap;
-    use std::fmt;
-    use std::sync::Arc;
+    use super::*;
 
     #[derive(Clone, Default)]
     pub struct BasicSource<'source> {
