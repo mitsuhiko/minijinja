@@ -245,6 +245,10 @@ impl<'source> Environment<'source> {
     }
 
     /// Removes all stored templates.
+    ///
+    /// This method is mainly useful when combined with a loader as it causes
+    /// the loader to "reload" templates.  By calling this method one can trigger
+    /// a reload.
     pub fn clear_templates(&mut self) {
         #[cfg(not(feature = "loader"))]
         {
@@ -260,7 +264,8 @@ impl<'source> Environment<'source> {
     ///
     /// This requires that the template has been loaded with
     /// [`add_template`](Environment::add_template) beforehand.  If the template was
-    /// not loaded an error of kind `TemplateNotFound` is returned.
+    /// not loaded an error of kind `TemplateNotFound` is returned.  If a loaded was
+    /// added to the engine this can also dynamically load templates.
     ///
     /// ```
     /// # use minijinja::{Environment, context};
