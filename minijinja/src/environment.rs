@@ -244,6 +244,18 @@ impl<'source> Environment<'source> {
         }
     }
 
+    /// Removes all stored templates.
+    pub fn clear_templates(&mut self) {
+        #[cfg(not(feature = "loader"))]
+        {
+            self.templates.map.clear();
+        }
+        #[cfg(feature = "loader")]
+        {
+            self.templates.source.clear_templates();
+        }
+    }
+
     /// Fetches a template by name.
     ///
     /// This requires that the template has been loaded with

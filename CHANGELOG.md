@@ -6,7 +6,8 @@ All notable changes to MiniJinja are documented here.
 
 - Removed `Source` and the `source` feature.  The replacement is the new `loader`
   feature and the functionality of the source is moved directly into the
-  `Environment`.  (#275)
+  `Environment`.  This also adds `Environment::clear_templates` to unload
+  all already loaded templates.  (#275)
 
 - Added `Environment::template_from_str` and `Environment::template_from_named_str`
   to compile templates for temporary use.  (#274)

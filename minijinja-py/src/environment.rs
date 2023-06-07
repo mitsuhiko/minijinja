@@ -391,12 +391,12 @@ impl Environment {
 
     /// Triggers a reload of the templates.
     pub fn reload(&self) -> PyResult<()> {
-        let loader = self.inner.lock().unwrap().loader.as_ref().cloned();
-        if let Some(loader) = loader {
-            Python::with_gil(|py| self.set_loader(Some(loader.as_ref(py))))
-        } else {
-            Ok(())
+        let mut inner = self.inner.lock().unwrap();
+        let loader = inner.loader.as_ref().cloned();
+        if loader.is_some() {
+            inner.env.clear_templates();
         }
+        Ok(())
     }
 
     /// Can be used to instruct the environment to automatically reload templates
@@ -483,6 +483,11 @@ impl Environment {
     /// Removes a loaded template.
     pub fn remove_template(&self, name: &str) {
         self.inner.lock().unwrap().env.remove_template(name);
+    }
+
+    /// Clears all loaded templates.
+    pub fn clear_templates(&self) {
+        self.inner.lock().unwrap().env.clear_templates();
     }
 
     /// Renders a template looked up from the loader.

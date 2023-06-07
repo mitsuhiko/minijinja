@@ -226,6 +226,17 @@ impl Source {
                 .ok_or_else(|| Error::new_not_found(name)),
         }
     }
+
+    pub fn clear_templates(&mut self) {
+        match &mut self.backing {
+            SourceBacking::Dynamic { templates, .. } => {
+                templates.clear();
+            }
+            SourceBacking::Static { templates, .. } => {
+                templates.clear();
+            }
+        }
+    }
 }
 
 fn safe_join(base: &Path, template: &str) -> Option<PathBuf> {
