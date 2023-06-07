@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::sync::Arc;
 
 use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
@@ -75,7 +74,7 @@ impl<'template, 'env> State<'template, 'env> {
             blocks,
             loaded_templates: BTreeSet::new(),
             #[cfg(feature = "macros")]
-            macros: Arc::new(Vec::new()),
+            macros: Default::default(),
             #[cfg(feature = "fuel")]
             fuel_tracker: env.fuel().map(FuelTracker::new),
         }

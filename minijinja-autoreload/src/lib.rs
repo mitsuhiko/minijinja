@@ -20,13 +20,13 @@
 //! ```
 //! # fn test() -> Result<(), minijinja::Error> {
 //! use minijinja_autoreload::AutoReloader;
-//! use minijinja::{Source, Environment};
+//! use minijinja::{Environment, path_loader};
 //!
 //! let reloader = AutoReloader::new(|notifier| {
-//!     let mut env = Environment::new();
 //!     let template_path = "path/to/templates";
+//!     let mut env = Environment::new();
+//!     env.set_loader(path_loader(template_path));
 //!     notifier.watch_path(template_path, true);
-//!     env.set_source(Source::from_path(template_path));
 //!     Ok(env)
 //! });
 //!

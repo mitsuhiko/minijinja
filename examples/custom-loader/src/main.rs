@@ -1,12 +1,12 @@
 use std::fs;
 
-use minijinja::{context, Environment, Error, ErrorKind, Source};
+use minijinja::{context, Environment, Error, ErrorKind};
 
 fn main() {
     let mut env = Environment::new();
     let template_path = std::env::current_dir().unwrap().join("templates");
 
-    env.set_source(Source::with_loader(move |name| {
+    env.set_loader(move |name| {
         let pieces = name.split('/');
         let mut path = template_path.clone();
         for piece in pieces {
@@ -30,7 +30,7 @@ fn main() {
                 }
             }
         }
-    }));
+    });
 
     let tmpl = env.get_template("hello.txt").unwrap();
     println!(

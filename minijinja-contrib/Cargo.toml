@@ -18,5 +18,5 @@ rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 minijinja = { version = "0.34.0", path = "../minijinja", default-features = false }
 
 [dev-dependencies]
-minijinja = { version = "0.34.0", path = "../minijinja", features = ["source"] }
+minijinja = { version = "0.34.0", path = "../minijinja", features = ["loader"] }
 similar-asserts = "1.4.2"

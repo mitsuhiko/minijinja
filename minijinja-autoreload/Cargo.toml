@@ -23,4 +23,4 @@ minijinja = { version = "0.34.0", path = "../minijinja", default-features = fals
 notify = { version = "5.0.0", optional = true, default-features = false, features = ["macos_fsevent"] }
 
 [dev-dependencies]
-minijinja = { version = "0.34.0", path = "../minijinja", features = ["source"] }
+minijinja = { version = "0.34.0", path = "../minijinja", features = ["loader"] }

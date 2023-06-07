@@ -71,9 +71,8 @@ loss of information.
 
 MiniJinja's Python bindings inherit the underlying behavior of how MiniJinja loads
 templates.  Templates are loaded on first use and then cached.  The templates are
-loaded via a "source" (called `loader` in MiniJinja's Python bindings).  To trigger
-a reload you can call `env.reload()` or alternatively set `env.reload_before_render`
-to `True`.
+loaded via a loader.  To trigger a reload you can call `env.reload()` or
+alternatively set `env.reload_before_render` to `True`.
 
 ```python
 def my_loader(name):

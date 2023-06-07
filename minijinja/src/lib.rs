@@ -159,7 +159,7 @@
 //!
 //! - `fuel`: enables the `fuel` feature which makes the engine track fuel consumption which
 //!   can be used to better protect against expensive templates.
-//! - `source`: enables the `Source` type which helps with dynamic loading of templates.
+//! - `loader`: enables owned and dynamic template loading of templates.
 //! - `speedups`: enables all speedups, in particular it turns on the `v_htmlescape` dependency
 //!   for faster HTML escapling.
 //! - `json`: When enabled the `tojson` filter is added as builtin filter as well as
@@ -207,8 +207,11 @@ pub mod value;
 #[cfg_attr(docsrs, doc(cfg(feature = "testutils")))]
 pub mod testutils;
 
-#[cfg(feature = "source")]
+#[cfg(feature = "loader")]
 mod source;
+
+#[cfg(feature = "loader")]
+pub use source::path_loader;
 
 #[cfg(feature = "custom_syntax")]
 mod custom_syntax;
@@ -226,9 +229,6 @@ pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
 
 #[cfg(feature = "custom_syntax")]
 pub use self::custom_syntax::Syntax;
-
-#[cfg(feature = "source")]
-pub use self::source::Source;
 
 pub use self::macros::__context;
 pub use self::vm::State;

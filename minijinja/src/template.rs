@@ -15,8 +15,7 @@ use crate::error::{attach_basic_debug_info, Error};
 use crate::output::{Output, WriteWrapper};
 use crate::utils::AutoEscape;
 use crate::value::{self, Value};
-use crate::vm::{prepare_blocks, Vm};
-use crate::{ErrorKind, State};
+use crate::vm::{prepare_blocks, State, Vm};
 
 /// Represents a handle to a template.
 ///
@@ -311,9 +310,10 @@ impl<'template, 'env> TemplateModule<'template, 'env> {
     #[cfg(feature = "macros")]
     #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
     pub fn call_macro(&self, name: &str, args: &[Value]) -> Result<String, Error> {
-        let f = ok!(self
-            .get_export(name)
-            .ok_or_else(|| Error::new(ErrorKind::UnknownFunction, "macro not found")));
+        let f = ok!(self.get_export(name).ok_or_else(|| Error::new(
+            crate::error::ErrorKind::UnknownFunction,
+            "macro not found"
+        )));
         f.call(&self.state, args).map(Into::into)
     }
 
