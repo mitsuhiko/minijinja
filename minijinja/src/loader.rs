@@ -22,7 +22,7 @@ type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<Option<String>, Error> + Send 
 /// Internal utility for dynamic template loading.
 ///
 /// Because an [`Environment`](crate::Environment) holds a reference to the
-/// source lifetime it borrows tnemplates from, it becomes very inconvenient when
+/// source lifetime it borrows templates from, it becomes very inconvenient when
 /// it is shared. This object provides a solution for such cases. First templates
 /// are loaded into the source to decouple the lifetimes from the environment.
 #[derive(Clone, Default)]
