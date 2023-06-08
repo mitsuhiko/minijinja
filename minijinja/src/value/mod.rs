@@ -436,11 +436,6 @@ impl Default for Value {
 /// same functionality.  There is no guarantee that a string will be interned
 /// as there are heuristics involved for it.  Additionally the string interning
 /// will only work during the template engine execution (eg: within filters etc.).
-///
-/// ```
-/// use minijinja::value::{intern, Value};
-/// let val = Value::from(intern("my_key"));
-/// ```
 pub fn intern(s: &str) -> Arc<String> {
     if let Key::String(ref s) = Key::make_string_key(s) {
         s.clone()

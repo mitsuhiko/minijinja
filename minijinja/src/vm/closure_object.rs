@@ -3,7 +3,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 
 use crate::key::{Key, StaticKey};
-use crate::value::{intern, Object, ObjectKind, StructObject, Value};
+use crate::value::{Object, ObjectKind, StructObject, Value};
 
 /// Utility to enclose values for macros.
 ///
@@ -54,8 +54,11 @@ impl StructObject for Closure {
             .lock()
             .unwrap()
             .keys()
-            .filter_map(|x| x.as_str())
-            .map(intern)
+            .filter_map(|x| match x {
+                Key::String(s) => Some(s.clone()),
+                Key::Str(s) => Some(Arc::new(s.to_string())),
+                _ => None,
+            })
             .collect()
     }
 

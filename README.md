@@ -73,15 +73,6 @@ fn main() {
 If you are stuck with `MiniJinja`, have suggestions or need help, you can use the
 [GitHub Discussions](https://github.com/mitsuhiko/minijinja/discussions).
 
-## Minimum Rust Version
-
-MiniJinja's development version requires Rust 1.61 due to limitations with
-HRTBs in older Rust versions.
-
-MiniJinja 0.20 supports Rust versions down to 1.45.  It is possible to write
-code that is compatible with both 0.20 and newer versions of MiniJinja which
-should make it possible to defer the upgrade to later.
-
 ## Related Crates
 
 * [minijinja-autoreload](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-autoreload): provides

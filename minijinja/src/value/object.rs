@@ -457,10 +457,9 @@ pub trait StructObject: Send + Sync {
     /// Returns a vector of field names.
     ///
     /// This should be implemented if [`static_fields`](Self::static_fields) cannot
-    /// be implemented due to lifetime restrictions.  To avoid unnecessary
-    /// allocations of the fields themselves it's recommended to use the
-    /// [`intern`] function.  The default implementation converts the return value
-    /// of [`static_fields`](Self::static_fields) into a compatible format automatically.
+    /// be implemented due to lifetime restrictions.  The default implementation
+    /// converts the return value of [`static_fields`](Self::static_fields) into
+    /// a compatible format automatically.
     fn fields(&self) -> Vec<Arc<String>> {
         self.static_fields()
             .into_iter()
