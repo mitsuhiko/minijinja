@@ -46,7 +46,7 @@ fn execute() -> Result<(), Box<dyn Error>> {
     };
 
     if cli.disassemble || !cli.dump_ast {
-        let tmpl = CompiledTemplate::from_name_and_source(&filename, &source)?;
+        let tmpl = CompiledTemplate::new(&filename, &source, Default::default())?;
         for (block_name, instructions) in tmpl.blocks.iter() {
             print_instructions(instructions, block_name);
         }
