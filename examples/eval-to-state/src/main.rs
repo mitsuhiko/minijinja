@@ -15,8 +15,8 @@ fn main() {
         })
         .unwrap();
 
-    println!("block 'title': {:?}", state.render_block("title").unwrap());
-    println!("  block 'body': {:?}", state.render_block("body").unwrap());
+    println!("Block 'title': {:?}", state.render_block("title").unwrap());
+    println!("Block 'body': {:?}", state.render_block("body").unwrap());
     println!(
         "Macro 'utility': {:?}",
         state.call_macro("utility", &[]).unwrap()
