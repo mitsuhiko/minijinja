@@ -457,7 +457,7 @@ fn test_block_fragments() {
 }
 
 #[test]
-fn test_module() {
+fn test_state() {
     let mut env = Environment::new();
     env.add_template(
         "foo.html",
@@ -474,7 +474,8 @@ fn test_module() {
             variable => 23
         })
         .unwrap();
-    assert_eq!(state.lookup("range"), None);
+    assert!(state.lookup("range").is_some());
+    assert!(state.exports().contains(&"range"));
     assert_eq!(state.lookup("global"), Some(Value::from(23 * 2)));
     assert_eq!(state.call_macro("something", &[]).unwrap(), "46");
     assert_eq!(state.render_block("baz").unwrap(), "[46]");
