@@ -98,8 +98,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ///
     /// This can be used to inspect the [`State`] of the template post evaluation
     /// for instance to get fuel consumption numbers or to access globally set
-    /// variables.  This functionality is only available when rendering to
-    /// strings and not to [`io::Write`].
+    /// variables.
     ///
     /// ```
     /// # use minijinja::{Environment, context, value::Value};
@@ -130,7 +129,8 @@ impl<'env, 'source> Template<'env, 'source> {
     /// Renders the template into an [`io::Write`].
     ///
     /// This works exactly like [`render`](Self::render) but instead writes the template
-    /// as it's evaluating into an [`io::Write`].
+    /// as it's evaluating into an [`io::Write`].  It also returns the [`State`] like
+    /// [`render_and_return_state`](Self::render_and_return_state) does.
     ///
     /// ```
     /// # use minijinja::{Environment, context};
@@ -144,13 +144,17 @@ impl<'env, 'source> Template<'env, 'source> {
     ///
     /// **Note on values:** The [`Value`] type implements `Serialize` and can be
     /// efficiently passed to render.  It does not undergo actual serialization.
-    pub fn render_to_write<S: Serialize, W: io::Write>(&self, ctx: S, w: W) -> Result<(), Error> {
+    pub fn render_to_write<S: Serialize, W: io::Write>(
+        &self,
+        ctx: S,
+        w: W,
+    ) -> Result<State<'_, 'env>, Error> {
         let mut wrapper = WriteWrapper { w, err: None };
         self._eval(
             Value::from_serializable(&ctx),
             &mut Output::with_write(&mut wrapper),
         )
-        .map(|_| ())
+        .map(|(_, state)| state)
         .map_err(|err| wrapper.take_err(err))
     }
 

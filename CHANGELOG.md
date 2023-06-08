@@ -5,7 +5,8 @@ All notable changes to MiniJinja are documented here.
 ## 1.0.0
 
 - Added `Template::render_and_return_state` to render a template and return the
-  resulting `State` to permit introspection.
+  resulting `State` to permit introspection.  `Template::render_to_write` now
+  also returns the `State`.
 
 - Added `State::fuel_levels` to introspect fuel consumption when the fuel feature
   is in use.

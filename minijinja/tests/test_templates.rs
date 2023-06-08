@@ -483,7 +483,7 @@ fn test_state() {
 
 #[test]
 #[allow(unused_mut)]
-fn test_render_and_return_module() {
+fn test_render_and_return_state() {
     let mut env = Environment::new();
     #[cfg(feature = "fuel")]
     {
@@ -502,4 +502,17 @@ fn test_render_and_return_module() {
     {
         assert_eq!(state.fuel_levels(), Some((26, 74)));
     }
+}
+
+#[test]
+fn test_render_to_write_state() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{% set foo = 42 %}{% macro bar() %}x{% endmacro %}root")
+        .unwrap();
+    let mut out = Vec::<u8>::new();
+    let state = tmpl.render_to_write((), &mut out).unwrap();
+    assert_eq!(String::from_utf8_lossy(&out), "root");
+    assert_eq!(state.lookup("foo"), Some(Value::from(42)));
+    assert_eq!(state.call_macro("bar", &[]).ok().as_deref(), Some("x"));
 }
