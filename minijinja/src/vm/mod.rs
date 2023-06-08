@@ -697,14 +697,7 @@ impl<'env> Vm<'env> {
                 }
             };
 
-            let (new_instructions, new_blocks) =
-                ok!(tmpl.instructions_and_blocks().ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::BadInclude,
-                        "cannot include non registered templates",
-                    )
-                }));
-
+            let (new_instructions, new_blocks) = ok!(tmpl.instructions_and_blocks());
             let old_escape = mem::replace(&mut state.auto_escape, tmpl.initial_auto_escape());
             let old_instructions = mem::replace(&mut state.instructions, new_instructions);
             let old_blocks = mem::replace(&mut state.blocks, prepare_blocks(new_blocks));
@@ -824,12 +817,7 @@ impl<'env> Vm<'env> {
             ));
         }
         let tmpl = ok!(self.env.get_template(name));
-        let (new_instructions, new_blocks) = ok!(tmpl.instructions_and_blocks().ok_or_else(|| {
-            Error::new(
-                ErrorKind::InvalidOperation,
-                "cannot extend templates not registered with the environment",
-            )
-        }));
+        let (new_instructions, new_blocks) = ok!(tmpl.instructions_and_blocks());
         state.loaded_templates.insert(new_instructions.name());
         for (name, instr) in new_blocks.iter() {
             state

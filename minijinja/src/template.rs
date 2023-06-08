@@ -205,19 +205,27 @@ impl<'env, 'source> Template<'env, 'source> {
     /// environment.
     ///
     /// For templates loaded as string on the environment this API contract
-    /// cannot be upheld because the template might not live long enough.  However
-    /// this functionality is only needed for template extensions in which case the
-    /// template cannot be loaded anyways so the error is purely hypothetical.
+    /// cannot be upheld because the template might not live long enough.  Under
+    /// normal cirumstances however such a template object would never make it
+    /// to the callers of this API as this API is used for including or extending,
+    /// both of which should only ever get access to a template from the environment
+    /// which holds a borrowed ref.
     #[cfg(feature = "multi_template")]
     pub(crate) fn instructions_and_blocks(
         &self,
-    ) -> Option<(
-        &'env Instructions<'env>,
-        &'env BTreeMap<&'env str, Instructions<'env>>,
-    )> {
+    ) -> Result<
+        (
+            &'env Instructions<'env>,
+            &'env BTreeMap<&'env str, Instructions<'env>>,
+        ),
+        Error,
+    > {
         match self.compiled {
-            CompiledTemplateRef::Borrowed(x) => Some((&x.instructions, &x.blocks)),
-            CompiledTemplateRef::Owned(_) => None,
+            CompiledTemplateRef::Borrowed(x) => Ok((&x.instructions, &x.blocks)),
+            CompiledTemplateRef::Owned(_) => Err(Error::new(
+                crate::ErrorKind::InvalidOperation,
+                "cannot extend or include template not borrowed from environment",
+            )),
         }
     }
 
@@ -370,28 +378,16 @@ impl<'env> fmt::Debug for CompiledTemplate<'env> {
 }
 
 impl<'source> CompiledTemplate<'source> {
-    /// Creates a compiled template from name and source.
-    #[cfg(feature = "unstable_machinery")]
-    pub fn from_name_and_source(
-        name: &'source str,
-        source: &'source str,
-    ) -> Result<CompiledTemplate<'source>, Error> {
-        Self::from_name_and_source_with_syntax(name, source, Default::default())
-    }
-
     /// Creates a compiled template from name and source using the given settings.
-    pub fn from_name_and_source_with_syntax(
+    pub fn new(
         name: &'source str,
         source: &'source str,
         syntax: SyntaxConfig,
     ) -> Result<CompiledTemplate<'source>, Error> {
-        attach_basic_debug_info(
-            Self::_from_name_settings_and_source_with_syntax_impl(name, source, syntax),
-            source,
-        )
+        attach_basic_debug_info(Self::_new_impl(name, source, syntax), source)
     }
 
-    fn _from_name_settings_and_source_with_syntax_impl(
+    fn _new_impl(
         name: &'source str,
         source: &'source str,
         syntax: SyntaxConfig,

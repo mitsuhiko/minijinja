@@ -26,14 +26,14 @@ type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<Option<String>, Error> + Send 
 /// it is shared. This object provides a solution for such cases. First templates
 /// are loaded into the source to decouple the lifetimes from the environment.
 #[derive(Clone, Default)]
-pub(crate) struct LoaderSource<'source> {
+pub(crate) struct LoaderStore<'source> {
     pub syntax_config: SyntaxConfig,
     loader: Option<Arc<LoadFunc>>,
     owned_templates: MemoMap<Arc<str>, Arc<LoadedTemplate>>,
     borrowed_templates: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
 }
 
-impl<'source> fmt::Debug for LoaderSource<'source> {
+impl<'source> fmt::Debug for LoaderStore<'source> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut l = f.debug_list();
         for key in self.owned_templates.keys() {
@@ -62,15 +62,8 @@ impl fmt::Debug for LoadedTemplate {
     }
 }
 
-impl<'source> LoaderSource<'source> {
-    pub fn set_loader<F>(&mut self, f: F)
-    where
-        F: Fn(&str) -> Result<Option<String>, Error> + Send + Sync + 'static,
-    {
-        self.loader = Some(Arc::new(f));
-    }
-
-    pub fn add_template<N, S>(&mut self, name: N, source: S) -> Result<(), Error>
+impl<'source> LoaderStore<'source> {
+    pub fn insert<N, S>(&mut self, name: N, source: S) -> Result<(), Error>
     where
         N: Into<Cow<'source, str>>,
         S: Into<Cow<'source, str>>,
@@ -80,7 +73,7 @@ impl<'source> LoaderSource<'source> {
                 self.owned_templates.remove(name);
                 self.borrowed_templates.insert(
                     name,
-                    Arc::new(ok!(CompiledTemplate::from_name_and_source_with_syntax(
+                    Arc::new(ok!(CompiledTemplate::new(
                         name,
                         source,
                         self.syntax_config.clone()
@@ -100,35 +93,17 @@ impl<'source> LoaderSource<'source> {
         Ok(())
     }
 
-    fn make_owned_template(
-        &self,
-        name: Arc<str>,
-        source: String,
-    ) -> Result<Arc<LoadedTemplate>, Error> {
-        LoadedTemplate::try_new(
-            (name, source.into_boxed_str()),
-            |(name, source)| -> Result<_, Error> {
-                CompiledTemplate::from_name_and_source_with_syntax(
-                    name,
-                    source,
-                    self.syntax_config.clone(),
-                )
-            },
-        )
-        .map(Arc::new)
-    }
-
-    pub fn remove_template(&mut self, name: &str) {
+    pub fn remove(&mut self, name: &str) {
         self.borrowed_templates.remove(name);
         self.owned_templates.remove(name);
     }
 
-    pub fn clear_templates(&mut self) {
+    pub fn clear(&mut self) {
         self.borrowed_templates.clear();
         self.owned_templates.clear();
     }
 
-    pub fn get_compiled_template(&self, name: &str) -> Result<&CompiledTemplate<'_>, Error> {
+    pub fn get(&self, name: &str) -> Result<&CompiledTemplate<'_>, Error> {
         if let Some(rv) = self.borrowed_templates.get(name) {
             Ok(&**rv)
         } else {
@@ -144,6 +119,27 @@ impl<'source> LoaderSource<'source> {
                 })
                 .map(|x| x.borrow_dependent())
         }
+    }
+
+    pub fn set_loader<F>(&mut self, f: F)
+    where
+        F: Fn(&str) -> Result<Option<String>, Error> + Send + Sync + 'static,
+    {
+        self.loader = Some(Arc::new(f));
+    }
+
+    fn make_owned_template(
+        &self,
+        name: Arc<str>,
+        source: String,
+    ) -> Result<Arc<LoadedTemplate>, Error> {
+        LoadedTemplate::try_new(
+            (name, source.into_boxed_str()),
+            |(name, source)| -> Result<_, Error> {
+                CompiledTemplate::new(name, source, self.syntax_config.clone())
+            },
+        )
+        .map(Arc::new)
     }
 }
 
