@@ -29,7 +29,7 @@ type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<Option<String>, Error> + Send 
 pub(crate) struct LoaderSource<'source> {
     pub syntax_config: SyntaxConfig,
     loader: Option<Arc<LoadFunc>>,
-    owned_templates: MemoMap<String, Arc<LoadedTemplate>>,
+    owned_templates: MemoMap<Arc<str>, Arc<LoadedTemplate>>,
     borrowed_templates: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
 }
 
@@ -50,7 +50,7 @@ impl<'source> fmt::Debug for LoaderSource<'source> {
 
 self_cell! {
     struct LoadedTemplate {
-        owner: (String, String),
+        owner: (Arc<str>, Box<str>),
         #[covariant]
         dependent: CompiledTemplate,
     }
@@ -75,36 +75,47 @@ impl<'source> LoaderSource<'source> {
         N: Into<Cow<'source, str>>,
         S: Into<Cow<'source, str>>,
     {
-        let syntax = self.syntax_config.clone();
         match (source.into(), name.into()) {
             (Cow::Borrowed(source), Cow::Borrowed(name)) => {
                 self.owned_templates.remove(name);
                 self.borrowed_templates.insert(
                     name,
                     Arc::new(ok!(CompiledTemplate::from_name_and_source_with_syntax(
-                        name, source, syntax
+                        name,
+                        source,
+                        self.syntax_config.clone()
                     ))),
                 );
             }
             (source, name) => {
                 self.borrowed_templates.remove(&name as &str);
-                self.owned_templates.replace(name.to_string(), {
-                    let owner = (name.to_string(), source.to_string());
-                    Arc::new(ok!(LoadedTemplate::try_new(
-                        owner,
-                        |(name, source)| -> Result<_, Error> {
-                            CompiledTemplate::from_name_and_source_with_syntax(
-                                name.as_str(),
-                                source,
-                                syntax,
-                            )
-                        }
-                    )))
-                });
+                let name: Arc<str> = name.into();
+                self.owned_templates.replace(
+                    name.clone(),
+                    ok!(self.make_owned_template(name, source.to_string())),
+                );
             }
         }
 
         Ok(())
+    }
+
+    fn make_owned_template(
+        &self,
+        name: Arc<str>,
+        source: String,
+    ) -> Result<Arc<LoadedTemplate>, Error> {
+        LoadedTemplate::try_new(
+            (name, source.into_boxed_str()),
+            |(name, source)| -> Result<_, Error> {
+                CompiledTemplate::from_name_and_source_with_syntax(
+                    name,
+                    source,
+                    self.syntax_config.clone(),
+                )
+            },
+        )
+        .map(Arc::new)
     }
 
     pub fn remove_template(&mut self, name: &str) {
@@ -119,32 +130,20 @@ impl<'source> LoaderSource<'source> {
 
     pub fn get_compiled_template(&self, name: &str) -> Result<&CompiledTemplate<'_>, Error> {
         if let Some(rv) = self.borrowed_templates.get(name) {
-            return Ok(&**rv);
-        }
-
-        let tmpl = self
-            .owned_templates
-            .get_or_try_insert(name, || -> Result<_, Error> {
-                let syntax = self.syntax_config.clone();
-                let loader_result = match self.loader {
-                    Some(ref loader) => ok!(loader(name)),
-                    None => None,
-                }
-                .ok_or_else(|| Error::new_not_found(name));
-                let owner = (name.to_owned(), ok!(loader_result));
-                let tmpl = ok!(LoadedTemplate::try_new(
-                    owner,
-                    |(name, source)| -> Result<_, Error> {
-                        CompiledTemplate::from_name_and_source_with_syntax(
-                            name.as_str(),
-                            source,
-                            syntax,
-                        )
+            Ok(&**rv)
+        } else {
+            let name: Arc<str> = name.into();
+            self.owned_templates
+                .get_or_try_insert(&name.clone(), || -> Result<_, Error> {
+                    let loader_result = match self.loader {
+                        Some(ref loader) => ok!(loader(&name)),
+                        None => None,
                     }
-                ));
-                Ok(Arc::new(tmpl))
-            });
-        Ok(ok!(tmpl).borrow_dependent())
+                    .ok_or_else(|| Error::new_not_found(&name));
+                    self.make_owned_template(name, ok!(loader_result))
+                })
+                .map(|x| x.borrow_dependent())
+        }
     }
 }
 
