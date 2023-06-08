@@ -23,7 +23,7 @@ use crate::vm::fuel::FuelTracker;
 /// In some testing scenarios or more advanced use cases you might need to get
 /// a [`State`].  The state is managed as part of the template execution but the
 /// initial state can be retrieved via [`Template::new_state`](crate::Template::new_state)
-/// or [`TemplateModule::state`](crate::TemplateModule::state).  The most
+/// or [`Module::state`](crate::Module::state).  The most
 /// common way to get hold of the state however is via functions of filters.
 ///
 /// **Notes on lifetimes:** the state object exposes some of the internal

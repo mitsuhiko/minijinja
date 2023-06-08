@@ -21,9 +21,9 @@ All notable changes to MiniJinja are documented here.
   combination of these APIs makes it possible to call values which was
   previously not possible.  (#272)
 
-- Added `Template::eval_to_module` and `TemplateModule`.  This replaces the
+- Added `Template::eval_to_module` and `Module`.  This replaces the
   functionality of the previous `Template::render_block` which is now available
-  via the `TemplateModule`.  This functionality is closer to how how Jinja2
+  via the `Module`.  This functionality is closer to how how Jinja2
   functions and leaves room for future expansion.  It also adds support for
   accessing globals and macros from a template.  (#271)
 
@@ -58,7 +58,7 @@ All notable changes to MiniJinja are documented here.
     ```
 
 - `Template::render_block` and `Template::render_block_to_write` were
-  replaced with the API of the same name on the `TemplateModule`.
+  replaced with the API of the same name on the `Module`.
 
     Before:
 

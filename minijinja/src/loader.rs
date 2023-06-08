@@ -63,12 +63,16 @@ impl fmt::Debug for LoadedTemplate {
 }
 
 impl<'source> LoaderStore<'source> {
-    pub fn insert<N, S>(&mut self, name: N, source: S) -> Result<(), Error>
-    where
-        N: Into<Cow<'source, str>>,
-        S: Into<Cow<'source, str>>,
-    {
-        match (source.into(), name.into()) {
+    pub fn insert(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
+        self.insert_cow(Cow::Borrowed(name), Cow::Borrowed(source))
+    }
+
+    pub fn insert_cow(
+        &mut self,
+        name: Cow<'source, str>,
+        source: Cow<'source, str>,
+    ) -> Result<(), Error> {
+        match (source, name) {
             (Cow::Borrowed(source), Cow::Borrowed(name)) => {
                 self.owned_templates.remove(name);
                 self.borrowed_templates.insert(

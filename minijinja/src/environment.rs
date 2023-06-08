@@ -110,7 +110,7 @@ impl<'source> Environment<'source> {
         }
     }
 
-    /// Loads a template from a string.
+    /// Loads a template from a string into the environment.
     ///
     /// The `name` parameter defines the name of the template which identifies
     /// it.  To look up a loaded template use the [`get_template`](Self::get_template)
@@ -123,8 +123,8 @@ impl<'source> Environment<'source> {
     /// ```
     ///
     /// Note that there are situations where the interface of this method is
-    /// too restrictive.  For instance the environment itself does not permit
-    /// any form of sensible dynamic template loading.
+    /// too restrictive as you need to hold on to the strings for the lifetime
+    /// of the environment.
     #[cfg_attr(
         feature = "loader",
         doc = "To address this restriction use [`add_template_owned`](Self::add_template_owned)."
@@ -136,13 +136,16 @@ impl<'source> Environment<'source> {
     /// Adds a template without without borrowing.
     ///
     /// This lets you place an owned [`String`] in the environment rather than the
-    /// borrowed `&str`.
+    /// borrowed `&str` without having to worry about lifetimes.
     ///
     /// ```
     /// # use minijinja::Environment;
     /// let mut env = Environment::new();
-    /// env.add_template_owned("index.html", "Hello {{ name }}!").unwrap();
+    /// env.add_template_owned("index.html".to_string(), "Hello {{ name }}!".to_string()).unwrap();
     /// ```
+    ///
+    /// **Note**: the name is a bit of a misnomer as this API also allows to borrow too as
+    /// the parameters are actually [`Cow`].
     #[cfg(feature = "loader")]
     #[cfg_attr(docsrs, doc(cfg(feature = "loader")))]
     pub fn add_template_owned<N, S>(&mut self, name: N, source: S) -> Result<(), Error>
@@ -150,7 +153,7 @@ impl<'source> Environment<'source> {
         N: Into<Cow<'source, str>>,
         S: Into<Cow<'source, str>>,
     {
-        self.templates.insert(name, source)
+        self.templates.insert_cow(name.into(), source.into())
     }
 
     /// Register a template loader as source of templates.

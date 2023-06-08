@@ -124,15 +124,15 @@ impl<'env, 'source> Template<'env, 'source> {
         .map_err(|err| wrapper.take_err(err))
     }
 
-    /// Evaluates the template into a [`TemplateModule`].
+    /// Evaluates the template into a [`Module`].
     ///
     /// This evaluates the template, discards the output and stores the final
     /// state in the evaluated module.  From there global variables or blocks
     /// can be accessed.  What this does is quite similar to how the engine
     /// interally works with tempaltes that are extended or imported from.
     ///
-    /// For more information see [`TemplateModule`].
-    pub fn eval_to_module<S: Serialize>(&self, ctx: S) -> Result<TemplateModule<'_, 'env>, Error> {
+    /// For more information see [`Module`].
+    pub fn eval_to_module<S: Serialize>(&self, ctx: S) -> Result<Module<'_, 'env>, Error> {
         let root = Value::from_serializable(&ctx);
         let mut out = Output::null();
         let vm = Vm::new(self.env);
@@ -143,7 +143,7 @@ impl<'env, 'source> Template<'env, 'source> {
             &mut out,
             self.initial_auto_escape,
         ));
-        Ok(TemplateModule { state })
+        Ok(Module { state })
     }
 
     fn _eval(&self, root: Value, out: &mut Output) -> Result<Option<Value>, Error> {
@@ -249,11 +249,11 @@ impl<'env, 'source> Template<'env, 'source> {
 /// state of the execution and provides ways to extract some information from
 /// it.
 #[derive(Debug)]
-pub struct TemplateModule<'template: 'env, 'env> {
+pub struct Module<'template: 'env, 'env> {
     state: State<'template, 'env>,
 }
 
-impl<'template, 'env> TemplateModule<'template, 'env> {
+impl<'template, 'env> Module<'template, 'env> {
     /// Returns the [`State`] of the module.
     pub fn state(&self) -> &State<'template, 'env> {
         &self.state
