@@ -155,26 +155,29 @@
 //!   - `deserialization`: when removed this disables deserialization support for
 //!     the [`Value`](crate::value::Value) type.
 //!
-//! There are some additional features that can be enabled:
+//! There are some additional features that provide extra functionality:
 //!
 //! - `fuel`: enables the `fuel` feature which makes the engine track fuel consumption which
 //!   can be used to better protect against expensive templates.
 //! - `loader`: enables owned and dynamic template loading of templates.
-//! - `speedups`: enables all speedups, in particular it turns on the `v_htmlescape` dependency
-//!   for faster HTML escapling.
+//! - `custom_syntax`: when this feature is enabled, custom delimiters are supported by
+//!   the parser.
+//! - `preserve_order`: When enable the internal value implementation uses an indexmap
+//!   which preserves the original order of maps and structs.
 //! - `json`: When enabled the `tojson` filter is added as builtin filter as well as
 //!   the ability to auto escape via `AutoEscape::Json`.
 //! - `urlencode`: When enabled the `urlencode` filter is added as builtin filter.
-//! - `preserve_order`: When enable the internal value implementation uses an indexmap
-//!   which preserves the original order of maps and structs.
+//!
+//! Performance and memory related features:
+//!
+//! - `speedups`: enables all speedups, in particular it turns on the `v_htmlescape` dependency
+//!   for faster HTML escapling.
 //! - `key_interning`: if this feature is enabled the automatic string interning in
 //!   the value type is enabled.  This feature used to be turned on by default but
 //!   has negative performance effects in newer versions of MiniJinja since a lot of
 //!   the previous uses of key interning are no longer needed.  Enabling it however
 //!   cuts down on memory usage slightly in certain scenarios by interning all string
 //!   keys used in dynamic map values.
-//! - `custom_syntax`: when this feature is enabled, custom delimiters are supported by
-//!   the parser.
 //!
 //! </details>
 #![allow(clippy::cognitive_complexity)]
