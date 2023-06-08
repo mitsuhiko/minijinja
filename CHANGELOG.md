@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## 1.0.0
+## 1.0.0-alpha.1
 
 - Removed `testutils` feature.  New replacement APIs are directly available
   on the `State`.
