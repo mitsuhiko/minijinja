@@ -4,6 +4,12 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0
 
+- Added `Template::render_and_return_state` to render a template and return the
+  resulting `State` to permit introspection.
+
+- Added `State::fuel_levels` to introspect fuel consumption when the fuel feature
+  is in use.
+
 - Removed `Source` and the `source` feature.  The replacement is the new `loader`
   feature and the functionality of the source is moved directly into the
   `Environment`.  This also adds `Environment::clear_templates` to unload

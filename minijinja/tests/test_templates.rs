@@ -475,7 +475,7 @@ fn test_state() {
         })
         .unwrap();
     assert!(state.lookup("range").is_some());
-    assert!(state.exports().contains(&"range"));
+    assert!(!state.exports().contains(&"range"));
     assert_eq!(state.lookup("global"), Some(Value::from(23 * 2)));
     assert_eq!(state.call_macro("something", &[]).unwrap(), "46");
     assert_eq!(state.render_block("baz").unwrap(), "[46]");
