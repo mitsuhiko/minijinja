@@ -429,6 +429,9 @@ impl<'source> Environment<'source> {
     /// (`None`).  To turn on fuel set something like `Some(50000)` which will
     /// allow 50.000 instructions to execute before running out of fuel.
     ///
+    /// To find out how much fuel is consumed, you can access the fuel levels
+    /// from the [`State`](crate::State).
+    ///
     /// Fuel consumed per-render.
     #[cfg(feature = "fuel")]
     #[cfg_attr(docsrs, doc(cfg(feature = "fuel")))]

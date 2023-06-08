@@ -89,6 +89,7 @@ impl<'env, 'source> Expression<'env, 'source> {
             &mut Output::null(),
             crate::AutoEscape::None,
         ))
+        .0
         .expect("expression evaluation did not leave value on stack"))
     }
 }

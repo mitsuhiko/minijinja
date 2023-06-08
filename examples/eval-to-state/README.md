@@ -1,6 +1,6 @@
-# template-module
+# eval-to-state
 
-An example that shows how to use `eval_to_module` and the resulting `Module`
+An example that shows how to use `eval_to_state` and the resulting `State`
 object.  Together these APIs can be used to render single blocks, invoke macros,
 access exports of a template and more.
 

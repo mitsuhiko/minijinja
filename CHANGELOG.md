@@ -4,6 +4,12 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0
 
+- Added `Template::render_and_return_state` to render a template and return the
+  resulting `State` to permit introspection.
+
+- Added `State::fuel_levels` to introspect fuel consumption when the fuel feature
+  is in use.
+
 - Removed `Source` and the `source` feature.  The replacement is the new `loader`
   feature and the functionality of the source is moved directly into the
   `Environment`.  This also adds `Environment::clear_templates` to unload
@@ -21,11 +27,10 @@ All notable changes to MiniJinja are documented here.
   combination of these APIs makes it possible to call values which was
   previously not possible.  (#272)
 
-- Added `Template::eval_to_module` and `Module`.  This replaces the
-  functionality of the previous `Template::render_block` which is now available
-  via the `Module`.  This functionality is closer to how how Jinja2
-  functions and leaves room for future expansion.  It also adds support for
-  accessing globals and macros from a template.  (#271)
+- Added `Template::eval_to_state`.  This replaces the functionality of the
+  previous `Template::render_block` which is now available via `State`.
+  It also adds support for accessing globals and macros from a template
+  via the `State`.  (#271)
 
 - Removed support for `State::current_call`.  This property wasn't too useful
   and unreliable.  Supporting it properly for nested invocations would require
@@ -75,8 +80,8 @@ some minor exceptions be rather trivial changes.
     ```
 
 - `Template::render_block` and `Template::render_block_to_write` were
-  replaced with APIs of the same name on the `Module` returned by
-  `Template::eval_to_module`:
+  replaced with APIs of the same name on the `State` returned by
+  `Template::eval_to_state` or `Template::render_and_return_state`:
 
     Old:
 
@@ -87,7 +92,7 @@ some minor exceptions be rather trivial changes.
     New:
 
     ```rust
-    let rv = tmpl.eval_to_module(ctx)?.render_block("name")?;
+    let rv = tmpl.eval_to_state(ctx)?.render_block("name")?;
     ```
 
 - `Kwargs::from_args` was removed as API as it's no longer necessary since

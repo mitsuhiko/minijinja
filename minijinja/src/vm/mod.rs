@@ -74,37 +74,18 @@ impl<'env> Vm<'env> {
         Vm { env }
     }
 
-    /// Evaluates the given inputs
-    pub fn eval(
-        &self,
-        instructions: &Instructions<'env>,
-        root: Value,
-        blocks: &BTreeMap<&'env str, Instructions<'env>>,
-        out: &mut Output,
-        auto_escape: AutoEscape,
-    ) -> Result<Option<Value>, Error> {
-        let _guard = value_optimization();
-        self.eval_state(
-            &mut State::new(
-                self.env,
-                Context::new(ok!(Frame::new_checked(root))),
-                auto_escape,
-                instructions,
-                prepare_blocks(blocks),
-            ),
-            out,
-        )
-    }
-
-    /// Evaluates the template as module
-    pub fn eval_to_module<'template>(
+    /// Evaluates the given inputs.
+    ///
+    /// It returns both the last value left on the stack as well as the state
+    /// at the end of the evaluation.
+    pub fn eval<'template>(
         &self,
         instructions: &'template Instructions<'env>,
         root: Value,
         blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
         out: &mut Output,
         auto_escape: AutoEscape,
-    ) -> Result<State<'template, 'env>, Error> {
+    ) -> Result<(Option<Value>, State<'template, 'env>), Error> {
         let _guard = value_optimization();
         let mut state = State::new(
             self.env,
@@ -113,8 +94,7 @@ impl<'env> Vm<'env> {
             instructions,
             prepare_blocks(blocks),
         );
-        self.eval_state(&mut state, out)?;
-        Ok(state)
+        self.eval_state(&mut state, out).map(|x| (x, state))
     }
 
     /// Evaluate a macro in a state.

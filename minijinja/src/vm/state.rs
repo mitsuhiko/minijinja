@@ -22,9 +22,8 @@ use crate::vm::fuel::FuelTracker;
 ///
 /// In some testing scenarios or more advanced use cases you might need to get
 /// a [`State`].  The state is managed as part of the template execution but the
-/// initial state can be retrieved via [`Template::new_state`](crate::Template::new_state)
-/// or [`Module::state`](crate::Module::state).  The most
-/// common way to get hold of the state however is via functions of filters.
+/// initial state can be retrieved via [`Template::new_state`](crate::Template::new_state).
+/// The most common way to get hold of the state however is via functions of filters.
 ///
 /// **Notes on lifetimes:** the state object exposes some of the internal
 /// lifetimes through the type.  You should always elide these lifetimes
@@ -125,6 +124,98 @@ impl<'template, 'env> State<'template, 'env> {
     #[inline(always)]
     pub fn lookup(&self, name: &str) -> Option<Value> {
         self.ctx.load(self.env, name)
+    }
+
+    /// Looks up a global macro and calls it.
+    ///
+    /// This looks up a value as [`lookup`](Self::lookup) does and calls it
+    /// with the passed args.
+    #[cfg(feature = "macros")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+    pub fn call_macro(&self, name: &str, args: &[Value]) -> Result<String, Error> {
+        let f = ok!(self.lookup(name).ok_or_else(|| Error::new(
+            crate::error::ErrorKind::UnknownFunction,
+            "macro not found"
+        )));
+        f.call(self, args).map(Into::into)
+    }
+
+    /// Renders a block with the given name into a string.
+    ///
+    /// This method works like [`Template::render`](crate::Template::render) but
+    /// it only renders a specific block in the template.  The first argument is
+    /// the name of the block.
+    ///
+    /// This renders only the block `hi` in the template:
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// # fn test() -> Result<(), minijinja::Error> {
+    /// # let mut env = Environment::new();
+    /// # env.add_template("hello", "{% block hi %}Hello {{ name }}!{% endblock %}")?;
+    /// let tmpl = env.get_template("hello")?;
+    /// let rv = tmpl
+    ///     .eval_to_state(context!(name => "John"))?
+    ///     .render_block("hi")?;
+    /// println!("{}", rv);
+    /// # Ok(()) }
+    /// ```
+    ///
+    /// Note that rendering a block is a stateful operation.  If an error
+    /// is returned the module has to be re-created as the internal state
+    /// can end up corrupted.  This also means you can only render blocks
+    /// if you have a mutable reference to the state which is not possible
+    /// from within filters or similar.
+    #[cfg(feature = "multi_template")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
+    pub fn render_block(&mut self, block: &str) -> Result<String, Error> {
+        let mut buf = String::new();
+        crate::vm::Vm::new(self.env)
+            .call_block(
+                block,
+                self,
+                &mut crate::output::Output::with_string(&mut buf),
+            )
+            .map(|_| buf)
+    }
+
+    /// Renders a block with the given name into a [`io::Write`](std::io::Write).
+    ///
+    /// For details see [`render_block`](Self::render_block).
+    #[cfg(feature = "multi_template")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
+    pub fn render_block_to_write<W>(&mut self, block: &str, w: W) -> Result<(), Error>
+    where
+        W: std::io::Write,
+    {
+        let mut wrapper = crate::output::WriteWrapper { w, err: None };
+        crate::vm::Vm::new(self.env)
+            .call_block(
+                block,
+                self,
+                &mut crate::output::Output::with_write(&mut wrapper),
+            )
+            .map(|_| ())
+            .map_err(|err| wrapper.take_err(err))
+    }
+
+    /// Returns a list of the names of all exports (top-level variables).
+    pub fn exports(&self) -> Vec<&str> {
+        self.ctx.exports().keys().copied().collect()
+    }
+
+    /// Returns the fuel levels.
+    ///
+    /// When the fuel feature is enabled, during evaluation the template will keep
+    /// track of how much fuel it has consumed.  If the fuel tracker is turned on
+    /// the returned value will be `Some((consumed, remaining))`.  If fuel tracking
+    /// is not enabled, `None` is returned instead.
+    #[cfg(feature = "fuel")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fuel")))]
+    pub fn fuel_levels(&self) -> Option<(u64, u64)> {
+        self.fuel_tracker
+            .as_ref()
+            .map(|x| (x.consumed(), x.remaining()))
     }
 
     #[cfg(feature = "debug")]

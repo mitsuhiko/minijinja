@@ -109,7 +109,7 @@ fn test_vm_block_fragments() {
             let template = env.get_template(filename).unwrap();
 
             match template
-                .eval_to_module(&ctx)
+                .eval_to_state(&ctx)
                 .and_then(|mut x| x.render_block("fragment"))
             {
                 Ok(mut rendered) => {
@@ -450,18 +450,14 @@ fn test_block_fragments() {
     let tmpl = env.get_template("demo").unwrap();
 
     let rv_a = tmpl.render(()).unwrap();
-    let rv_b = tmpl
-        .eval_to_module(())
-        .unwrap()
-        .render_block("foo")
-        .unwrap();
+    let rv_b = tmpl.eval_to_state(()).unwrap().render_block("foo").unwrap();
 
     assert_eq!(rv_a, "I am outside the fragmentfooSo am I!");
     assert_eq!(rv_b, "foo");
 }
 
 #[test]
-fn test_module() {
+fn test_state() {
     let mut env = Environment::new();
     env.add_template(
         "foo.html",
@@ -473,13 +469,37 @@ fn test_module() {
     )
     .unwrap();
     let template = env.get_template("foo.html").unwrap();
-    let mut module = template
-        .eval_to_module(context! {
+    let mut state = template
+        .eval_to_state(context! {
             variable => 23
         })
         .unwrap();
-    assert_eq!(module.get_export("range"), None);
-    assert_eq!(module.get_export("global"), Some(Value::from(23 * 2)));
-    assert_eq!(module.call_macro("something", &[]).unwrap(), "46");
-    assert_eq!(module.render_block("baz").unwrap(), "[46]");
+    assert!(state.lookup("range").is_some());
+    assert!(!state.exports().contains(&"range"));
+    assert_eq!(state.lookup("global"), Some(Value::from(23 * 2)));
+    assert_eq!(state.call_macro("something", &[]).unwrap(), "46");
+    assert_eq!(state.render_block("baz").unwrap(), "[46]");
+}
+
+#[test]
+#[allow(unused_mut)]
+fn test_render_and_return_module() {
+    let mut env = Environment::new();
+    #[cfg(feature = "fuel")]
+    {
+        env.set_fuel(Some(100));
+    }
+    let tmpl = env
+        .template_from_str("{% for x in range(3) %}Hello {{ name }}!\n{% endfor %}{% set x = 1 %}")
+        .unwrap();
+    let (rv, state) = tmpl
+        .render_and_return_state(context! { name => "Foo" })
+        .unwrap();
+    assert_eq!(rv, "Hello Foo!\nHello Foo!\nHello Foo!\n");
+    assert_eq!(state.lookup("x"), Some(Value::from(1)));
+
+    #[cfg(feature = "fuel")]
+    {
+        assert_eq!(state.fuel_levels(), Some((26, 74)));
+    }
 }
