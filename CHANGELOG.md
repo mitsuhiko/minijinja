@@ -4,6 +4,9 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0
 
+- Removed `testutils` feature.  New replacement APIs are directly available
+  on the `State`.
+
 - Added `Template::render_and_return_state` to render a template and return the
   resulting `State` to permit introspection.  `Template::render_to_write` now
   also returns the `State`.
@@ -118,6 +121,52 @@ some minor exceptions be rather trivial changes.
 
     // split and parse
     let (a, b, kwargs): (i32, i32, Kwargs) = from_args(values)?;
+    ```
+
+- The `testutils` feature and `testutils` module were removed.  Instead you
+  can now directly create an empty `State` and use the methods provided
+  to invoke filters.
+
+    Before:
+
+    ```rust
+    let env = Environment::new();
+    let rv = apply_filter(&env, "upper", &["hello world".into()]).unwrap();
+    ```
+
+    After:
+
+    ```rust
+    let env = Environment::new();
+    let rv = env.empty_state().apply_filter("upper", &["hello world".into()]).unwrap();
+    ```
+
+    Before:
+
+    ```rust
+    let env = Environment::new();
+    let rv = perform_test(&env, "even", &[42.into()]).unwrap();
+    ```
+
+    After:
+
+    ```rust
+    let env = Environment::new();
+    let rv = env.empty_state().perform_test("even", &[42.into()]).unwrap();
+    ```
+
+    Before:
+
+    ```rust
+    let env = Environment::new();
+    let rv = format(&env, 42.into()).unwrap();
+    ```
+
+    After:
+
+    ```rust
+    let env = Environment::new();
+    let rv = env.empty_state().format(42.into()).unwrap();
     ```
 
 - `State::current_call` was removed without replacement.  This information

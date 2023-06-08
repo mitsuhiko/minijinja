@@ -4,6 +4,7 @@ use std::fmt;
 use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
+use crate::output::Output;
 use crate::utils::{AutoEscape, UndefinedBehavior};
 use crate::value::{ArgType, Value};
 use crate::vm::context::Context;
@@ -80,7 +81,6 @@ impl<'template, 'env> State<'template, 'env> {
     }
 
     /// Creates an empty state for an environment.
-    #[cfg(any(test, feature = "testutils"))]
     pub(crate) fn new_for_env(env: &'env Environment) -> State<'env, 'env> {
         State::new(
             env,
@@ -171,11 +171,7 @@ impl<'template, 'env> State<'template, 'env> {
     pub fn render_block(&mut self, block: &str) -> Result<String, Error> {
         let mut buf = String::new();
         crate::vm::Vm::new(self.env)
-            .call_block(
-                block,
-                self,
-                &mut crate::output::Output::with_string(&mut buf),
-            )
+            .call_block(block, self, &mut Output::with_string(&mut buf))
             .map(|_| buf)
     }
 
@@ -190,11 +186,7 @@ impl<'template, 'env> State<'template, 'env> {
     {
         let mut wrapper = crate::output::WriteWrapper { w, err: None };
         crate::vm::Vm::new(self.env)
-            .call_block(
-                block,
-                self,
-                &mut crate::output::Output::with_write(&mut wrapper),
-            )
+            .call_block(block, self, &mut Output::with_write(&mut wrapper))
             .map(|_| ())
             .map_err(|err| wrapper.take_err(err))
     }
@@ -202,6 +194,56 @@ impl<'template, 'env> State<'template, 'env> {
     /// Returns a list of the names of all exports (top-level variables).
     pub fn exports(&self) -> Vec<&str> {
         self.ctx.exports().keys().copied().collect()
+    }
+
+    /// Invokes a filter with some arguments.
+    ///
+    /// ```
+    /// # use minijinja::Environment;
+    /// # let mut env = Environment::new();
+    /// # let tmpl = env.template_from_str("").unwrap();
+    /// # let state = tmpl.new_state();
+    /// let rv = state.apply_filter("upper", &["hello world".into()]).unwrap();
+    /// assert_eq!(rv.as_str(), Some("HELLO WORLD"));
+    /// ```
+    pub fn apply_filter(&self, filter: &str, args: &[Value]) -> Result<Value, Error> {
+        match self.env.get_filter(filter) {
+            Some(filter) => filter.apply_to(self, args),
+            None => Err(Error::from(ErrorKind::UnknownFilter)),
+        }
+    }
+
+    /// Invokes a test function on a value.
+    ///
+    /// ```
+    /// # use minijinja::Environment;
+    /// # let mut env = Environment::new();
+    /// # let tmpl = env.template_from_str("").unwrap();
+    /// # let state = tmpl.new_state();
+    /// let rv = state.perform_test("even", &[42i32.into()]).unwrap();
+    /// assert!(rv);
+    /// ```
+    pub fn perform_test(&self, test: &str, args: &[Value]) -> Result<bool, Error> {
+        match self.env.get_test(test) {
+            Some(test) => test.perform(self, args),
+            None => Err(Error::from(ErrorKind::UnknownTest)),
+        }
+    }
+
+    /// Formats a value to a string using the formatter on the environment.
+    ///
+    /// ```
+    /// # use minijinja::{value::Value, Environment};
+    /// # let mut env = Environment::new();
+    /// # let tmpl = env.template_from_str("").unwrap();
+    /// # let state = tmpl.new_state();
+    /// let rv = state.format(Value::from(42)).unwrap();
+    /// assert_eq!(rv, "42");
+    /// ```
+    pub fn format(&self, value: Value) -> Result<String, Error> {
+        let mut rv = String::new();
+        let mut out = Output::with_string(&mut rv);
+        self.env.format(&value, self, &mut out).map(|_| rv)
     }
 
     /// Returns the fuel levels.

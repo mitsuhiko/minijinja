@@ -261,7 +261,7 @@ mod builtins {
     use std::mem;
 
     #[cfg(test)]
-    use {crate::testutils::apply_filter, similar_asserts::assert_eq};
+    use similar_asserts::assert_eq;
 
     /// Converts a value to uppercase.
     ///
@@ -1205,7 +1205,9 @@ mod builtins {
         let mut env = crate::Environment::new();
         env.add_filter("test", test);
         assert_eq!(
-            apply_filter(&env, "test", &[Value::from(23), Value::from(42)]).unwrap(),
+            env.empty_state()
+                .apply_filter("test", &[Value::from(23), Value::from(42)])
+                .unwrap(),
             Value::from(65)
         );
     }
@@ -1219,17 +1221,17 @@ mod builtins {
         let mut env = crate::Environment::new();
         env.add_filter("sum", sum);
         assert_eq!(
-            apply_filter(
-                &env,
-                "sum",
-                &[
-                    Value::from(1),
-                    Value::from(2),
-                    Value::from(3),
-                    Value::from(4)
-                ][..]
-            )
-            .unwrap(),
+            env.empty_state()
+                .apply_filter(
+                    "sum",
+                    &[
+                        Value::from(1),
+                        Value::from(2),
+                        Value::from(3),
+                        Value::from(4)
+                    ][..]
+                )
+                .unwrap(),
             Value::from(1 + 2 + 3 + 4)
         );
     }
@@ -1248,26 +1250,29 @@ mod builtins {
 
         let mut env = crate::Environment::new();
         env.add_filter("add", add);
+        let state = env.empty_state();
         assert_eq!(
-            apply_filter(&env, "add", &[Value::from(23), Value::from(42)][..]).unwrap(),
+            state
+                .apply_filter("add", &[Value::from(23), Value::from(42)][..])
+                .unwrap(),
             Value::from(65)
         );
         assert_eq!(
-            apply_filter(
-                &env,
-                "add",
-                &[Value::from(23), Value::from(42), Value::UNDEFINED][..]
-            )
-            .unwrap(),
+            state
+                .apply_filter(
+                    "add",
+                    &[Value::from(23), Value::from(42), Value::UNDEFINED][..]
+                )
+                .unwrap(),
             Value::from(65)
         );
         assert_eq!(
-            apply_filter(
-                &env,
-                "add",
-                &[Value::from(23), Value::from(42), Value::from(1)][..]
-            )
-            .unwrap(),
+            state
+                .apply_filter(
+                    "add",
+                    &[Value::from(23), Value::from(42), Value::from(1)][..]
+                )
+                .unwrap(),
             Value::from(66)
         );
     }
@@ -1285,19 +1290,19 @@ mod builtins {
         let mut env = crate::Environment::new();
         env.add_filter("upper", upper);
         env.add_filter("sum", sum);
+        let state = env.empty_state();
 
         assert_eq!(
-            apply_filter(&env, "upper", &[Value::from("Hello World!")]).unwrap(),
+            state
+                .apply_filter("upper", &[Value::from("Hello World!")])
+                .unwrap(),
             Value::from("HELLO WORLD!")
         );
 
         assert_eq!(
-            apply_filter(
-                &env,
-                "sum",
-                &[Value::from(vec![Value::from(1), Value::from(2)])]
-            )
-            .unwrap(),
+            state
+                .apply_filter("sum", &[Value::from(vec![Value::from(1), Value::from(2)])])
+                .unwrap(),
             Value::from(3)
         );
     }
@@ -1314,13 +1319,14 @@ mod builtins {
 
         let mut env = crate::Environment::new();
         env.add_filter("connect", connect);
+        let state = env.empty_state();
         assert_eq!(
-            apply_filter(
-                &env,
-                "connect",
-                &[Value::from(vec![Value::from("HELLO"), Value::from(42)])]
-            )
-            .unwrap(),
+            state
+                .apply_filter(
+                    "connect",
+                    &[Value::from(vec![Value::from("HELLO"), Value::from(42)])]
+                )
+                .unwrap(),
             Value::from("HELLO42")
         );
     }
