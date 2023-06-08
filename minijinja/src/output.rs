@@ -13,7 +13,7 @@ pub enum CaptureMode {
     Discard,
 }
 
-/// An abstraction over [`Write`](std::fmt::Write) for the rendering.
+/// An abstraction over [`fmt::Write`](std::fmt::Write) for the rendering.
 ///
 /// This is a utility type used in the engine which can be written into like one
 /// can write into an [`std::fmt::Write`] value.  It's primarily used internally

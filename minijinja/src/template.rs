@@ -127,10 +127,10 @@ impl<'env, 'source> Template<'env, 'source> {
             .map(|(_, state)| (rv, state))
     }
 
-    /// Renders the template into a [`io::Write`].
+    /// Renders the template into an [`io::Write`].
     ///
     /// This works exactly like [`render`](Self::render) but instead writes the template
-    /// as it's evaluating into a [`io::Write`].
+    /// as it's evaluating into an [`io::Write`].
     ///
     /// ```
     /// # use minijinja::{Environment, context};

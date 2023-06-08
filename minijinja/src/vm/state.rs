@@ -179,7 +179,7 @@ impl<'template, 'env> State<'template, 'env> {
             .map(|_| buf)
     }
 
-    /// Renders a block with the given name into a [`io::Write`](std::io::Write).
+    /// Renders a block with the given name into an [`io::Write`](std::io::Write).
     ///
     /// For details see [`render_block`](Self::render_block).
     #[cfg(feature = "multi_template")]
