@@ -1204,9 +1204,8 @@ mod builtins {
 
         let mut env = crate::Environment::new();
         env.add_filter("test", test);
-        let state = State::new_for_env(&env);
         assert_eq!(
-            state
+            env.empty_state()
                 .apply_filter("test", &[Value::from(23), Value::from(42)])
                 .unwrap(),
             Value::from(65)
@@ -1221,9 +1220,8 @@ mod builtins {
 
         let mut env = crate::Environment::new();
         env.add_filter("sum", sum);
-        let state = State::new_for_env(&env);
         assert_eq!(
-            state
+            env.empty_state()
                 .apply_filter(
                     "sum",
                     &[
@@ -1252,7 +1250,7 @@ mod builtins {
 
         let mut env = crate::Environment::new();
         env.add_filter("add", add);
-        let state = State::new_for_env(&env);
+        let state = env.empty_state();
         assert_eq!(
             state
                 .apply_filter("add", &[Value::from(23), Value::from(42)][..])
