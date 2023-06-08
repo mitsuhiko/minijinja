@@ -1,4 +1,4 @@
-DOC_FEATURES=loader,json,urlencode,testutils,custom_syntax
+DOC_FEATURES=loader,json,urlencode,custom_syntax
 TEST_FEATURES=unstable_machinery,builtins,loader,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax
 
 .PHONY: all
