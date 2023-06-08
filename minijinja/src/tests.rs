@@ -451,12 +451,10 @@ mod builtins {
 
         let mut env = crate::Environment::new();
         env.add_test("test", test);
-        assert!(crate::testutils::perform_test(
-            &env,
-            "test",
-            &[Value::from(23), Value::from(23)][..]
-        )
-        .unwrap());
+        let state = env.empty_state();
+        assert!(state
+            .perform_test("test", &[Value::from(23), Value::from(23)][..])
+            .unwrap());
     }
 }
 

@@ -25,7 +25,6 @@ deserialization = []
 debug = []
 loader = ["self_cell", "memo-map"]
 unicode = ["unicode-ident"]
-testutils = []
 custom_syntax = ["dep:aho-corasick"]
 
 # Speedups

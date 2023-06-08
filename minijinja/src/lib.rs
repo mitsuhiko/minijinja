@@ -206,10 +206,6 @@ pub mod syntax;
 pub mod tests;
 pub mod value;
 
-#[cfg(any(test, feature = "testutils"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "testutils")))]
-pub mod testutils;
-
 #[cfg(feature = "loader")]
 mod loader;
 
