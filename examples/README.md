@@ -14,6 +14,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [dynamic-context](dynamic-context): demonstrates how to use dynamic objects as template context.
 * [dynamic-objects](dynamic-objects): demonstrates how to use dynamic objects in templates.
 * [error](error): shows the built-in error reporting support.
+* [eval-to-state](eval-to-state): Demonstrates what can be done with evaluating to state.
 * [expr](expr): demonstrates the expression evaluation support.
 * [filters](filters): Shows how to write and use custom filters and global functions.
 * [generate-yaml](generate-yaml): renders YAML files from Jinja templates.
@@ -30,7 +31,6 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [render-template](render-template): CLI app that renders templates from string.
 * [render-value](render-value): Demonstrates how `Value` can be passed as `Serialize` as context.
 * [stack-ref](stack-ref): Shows how the `minijinja-stack-ref` crate can be used to reference stack values.
-* [template-module](template-module): Demonstrates what can be done with template module objects.
 * [wasm-yew](wasm-yew): Shows how to use MiniJinja with WASM in the browser.
 
 ## Third-party Examples

@@ -288,10 +288,10 @@ impl<'env> Context<'env> {
         self.stack.pop().unwrap()
     }
 
-    /// Returns the current locals.
+    /// Returns the root locals (exports)
     #[track_caller]
-    pub fn current_locals(&self) -> &Locals<'env> {
-        &self.stack.last().unwrap().locals
+    pub fn exports(&self) -> &Locals<'env> {
+        &self.stack.first().unwrap().locals
     }
 
     /// Returns the current locals mutably.
