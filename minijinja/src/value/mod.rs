@@ -894,6 +894,19 @@ impl Value {
                     _ => return None,
                 },
             },
+            ValueRepr::String(ref s, _) => {
+                if let Key::I64(idx) = key {
+                    let idx = some!(isize::try_from(idx).ok());
+                    let idx = if idx < 0 {
+                        some!(s.chars().count().checked_sub(-idx as usize))
+                    } else {
+                        idx as usize
+                    };
+                    return s.chars().nth(idx).map(Value::from);
+                } else {
+                    return None;
+                }
+            }
             _ => return None,
         };
 
