@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.0-alpha.2
+
+- Added support for indexing into strings.  (#149)
+
 ## 1.0.0-alpha.1
 
 - Removed `testutils` feature.  New replacement APIs are directly available
