@@ -258,6 +258,11 @@ impl Error {
         self.repr.kind
     }
 
+    /// Returns the error detail
+    pub fn detail(&self) -> Option<&str> {
+        self.repr.detail.as_deref()
+    }
+
     /// Returns the filename of the template that caused the error.
     pub fn name(&self) -> Option<&str> {
         self.repr.name.as_deref()
@@ -272,13 +277,22 @@ impl Error {
         }
     }
 
-    /// Returns the line number where the error occurred.
+    /// Returns the span where the error occurred.
     #[cfg(feature = "debug")]
-    pub(crate) fn span(&self) -> Option<Span> {
+    pub fn span(&self) -> Option<Span> {
         self.repr.span
     }
 
-    /// Returns the template debug information is available.
+    /// Returns the template source if available.
+    #[cfg(feature = "debug")]
+    pub fn source(&self) -> Option<&str> {
+        self.repr
+            .debug_info
+            .as_ref()
+            .and_then(|info| info.template_source.as_deref())
+    }
+
+    /// Returns the template debug information if available.
     ///
     /// The debug info snapshot is only embedded into the error if the debug
     /// mode is enabled on the environment
