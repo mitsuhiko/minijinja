@@ -278,10 +278,10 @@ impl Error {
     /// used to better visualize where the error is coming from.  By indexing into
     /// the template source one ends up with the source of the failing expression.
     ///
-    /// Note that debug mode ([`Environment::set_debug`]) needs to be enabled,
-    /// and the `debug` feature must be turned on.  The engine usually keeps track
-    /// of spans in all cases, but there is no absolute guarantee that it is
-    /// able to provide a range in all error cases.
+    /// Note that debug mode ([`Environment::set_debug`](crate::Environment::set_debug))
+    /// needs to be enabled, and the `debug` feature must be turned on.  The engine
+    /// usually keeps track of spans in all cases, but there is no absolute guarantee
+    /// that it is able to provide a range in all error cases.
     ///
     /// ```
     /// # use minijinja::{Error, Environment, context};
