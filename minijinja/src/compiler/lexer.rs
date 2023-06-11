@@ -33,6 +33,7 @@ struct TokenizerState<'s> {
     failed: bool,
     current_line: u32,
     current_col: u32,
+    current_offset: u32,
 }
 
 fn find_start_marker_memchr(a: &str) -> Option<(usize, bool)> {
@@ -190,22 +191,25 @@ impl<'s> TokenizerState<'s> {
                 _ => self.current_col += 1,
             }
         }
+        self.current_offset += bytes as u32;
         self.rest = new_rest;
         skipped
     }
 
     #[inline(always)]
-    fn loc(&self) -> (u32, u32) {
-        (self.current_line, self.current_col)
+    fn loc(&self) -> (u32, u32, u32) {
+        (self.current_line, self.current_col, self.current_offset)
     }
 
-    fn span(&self, start: (u32, u32)) -> Span {
-        let (start_line, start_col) = start;
+    fn span(&self, start: (u32, u32, u32)) -> Span {
+        let (start_line, start_col, start_offset) = start;
         Span {
             start_line,
             start_col,
+            start_offset,
             end_line: self.current_line,
             end_col: self.current_col,
+            end_offset: self.current_offset,
         }
     }
 
@@ -337,6 +341,7 @@ pub fn tokenize(
         failed: false,
         current_line: 1,
         current_col: 0,
+        current_offset: 0,
     };
     let mut trim_leading_whitespace = false;
 

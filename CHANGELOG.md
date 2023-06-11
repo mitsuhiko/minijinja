@@ -6,6 +6,9 @@ All notable changes to MiniJinja are documented here.
 
 - Added support for indexing into strings.  (#149)
 
+- Added `Error::template_source` and `Error::range` to better support
+  rendering of errors outside of the built-in debug printing.
+
 ## 1.0.0-alpha.1
 
 - Removed `testutils` feature.  New replacement APIs are directly available

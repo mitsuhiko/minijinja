@@ -129,6 +129,7 @@ impl<'a> TokenStream<'a> {
     pub fn expand_span(&self, mut span: Span) -> Span {
         span.end_line = self.last_span.end_line;
         span.end_col = self.last_span.end_col;
+        span.end_offset = self.last_span.end_offset;
         span
     }
 
