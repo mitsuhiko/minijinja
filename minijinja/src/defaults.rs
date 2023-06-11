@@ -89,6 +89,8 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::Boxe
         rv.insert("selectattr".into(), BoxedFilter::new(filters::selectattr));
         rv.insert("rejectattr".into(), BoxedFilter::new(filters::rejectattr));
         rv.insert("map".into(), BoxedFilter::new(filters::map));
+        rv.insert("unique".into(), BoxedFilter::new(filters::unique));
+        rv.insert("pprint".into(), BoxedFilter::new(filters::pprint));
 
         #[cfg(feature = "json")]
         {
@@ -148,6 +150,10 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
         rv.insert("ge".into(), is_ge.clone());
         rv.insert(">=".into(), is_ge);
         rv.insert("in".into(), BoxedTest::new(tests::is_in));
+        rv.insert("true".into(), BoxedTest::new(tests::is_true));
+        rv.insert("false".into(), BoxedTest::new(tests::is_false));
+        rv.insert("filter".into(), BoxedTest::new(tests::is_filter));
+        rv.insert("test".into(), BoxedTest::new(tests::is_test));
     }
     rv
 }

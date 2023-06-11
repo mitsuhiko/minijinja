@@ -1196,6 +1196,49 @@ mod builtins {
         Ok(rv)
     }
 
+    /// Returns a list of unique items from the given iterable.
+    ///
+    /// Returns a list of unique items from the given iterable.
+    ///
+    /// ```jinja
+    /// {{ ['foo', 'bar', 'foobar', 'FooBar']|unique|list }}
+    ///   -> ['foo', 'bar', 'foobar']
+    /// ```
+    ///
+    /// The unique items are yielded in the same order as their first occurrence
+    /// in the iterable passed to the filter.  The filter will not detect
+    /// duplicate objects or arrays, only primitives such as strings or numbers.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn unique(values: Vec<Value>) -> Value {
+        use std::collections::BTreeSet;
+
+        let mut rv = Vec::new();
+        let mut seen = BTreeSet::new();
+
+        for item in values {
+            if let Ok(key) = item.clone().try_into_key() {
+                if !seen.contains(&key) {
+                    seen.insert(key);
+                    rv.push(item.clone());
+                }
+            } else {
+                rv.push(item.clone());
+            }
+        }
+
+        Value::from(rv)
+    }
+
+    /// Pretty print a variable.
+    ///
+    /// This is useful for debugging as it better shows what's inside an object.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn pprint(value: &Value) -> String {
+        format!("{:#?}", value)
+    }
+
     #[test]
     fn test_basics() {
         fn test(a: u32, b: u32) -> Result<u32, Error> {
