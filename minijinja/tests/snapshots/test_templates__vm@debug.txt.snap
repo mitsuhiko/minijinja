@@ -3,7 +3,6 @@ source: minijinja/tests/test_templates.rs
 description: "{% with f = range %}{% for x in f(upper) %}{{ debug() }}{% endfor %}{% endwith %}"
 info:
   upper: 1
-input_file: minijinja/tests/inputs/debug.txt
 ---
 State {
     name: "debug.txt",
@@ -87,6 +86,7 @@ State {
             "map",
             "max",
             "min",
+            "pprint",
             "reject",
             "rejectattr",
             "replace",
@@ -100,6 +100,7 @@ State {
             "title",
             "tojson",
             "trim",
+            "unique",
             "upper",
             "urlencode",
         ],
