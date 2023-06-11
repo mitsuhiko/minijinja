@@ -258,6 +258,11 @@ impl Error {
         self.repr.kind
     }
 
+    /// Returns the error detail
+    pub fn detail(&self) -> Option<&str> {
+        self.repr.detail.as_deref()
+    }
+
     /// Returns the filename of the template that caused the error.
     pub fn name(&self) -> Option<&str> {
         self.repr.name.as_deref()
