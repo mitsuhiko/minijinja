@@ -259,6 +259,9 @@ impl Error {
     }
 
     /// Returns the error detail
+    ///
+    /// The detail is an error message that provides further details about
+    /// the error kind.
     pub fn detail(&self) -> Option<&str> {
         self.repr.detail.as_deref()
     }

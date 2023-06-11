@@ -13,8 +13,10 @@ All notable changes to MiniJinja are documented here.
 
 - Added support for indexing into strings.  (#149)
 
+- Added `Error::detail` which returns the detail help string.  (#289)
+
 - Added `Error::template_source` and `Error::range` to better support
-  rendering of errors outside of the built-in debug printing.
+  rendering of errors outside of the built-in debug printing.  (#286)
 
 ## 1.0.0-alpha.1
 
