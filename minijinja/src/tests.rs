@@ -442,6 +442,50 @@ mod builtins {
             .unwrap_or(false)
     }
 
+    /// Checks if a value is `true`.
+    ///
+    /// ```jinja
+    /// {% if value is true %}...{% endif %}
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_true(value: &Value) -> bool {
+        matches!(value.0, crate::value::ValueRepr::Bool(true))
+    }
+
+    /// Checks if a value is `false`.
+    ///
+    /// ```jinja
+    /// {% if value is false %}...{% endif %}
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_false(value: &Value) -> bool {
+        matches!(value.0, crate::value::ValueRepr::Bool(false))
+    }
+
+    /// Checks if a filter with a given name is available.
+    ///
+    /// ```jinja
+    /// {% if 'tojson' is filter %}...{% endif %}
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_filter(state: &State, name: &str) -> bool {
+        state.env.get_filter(name).is_some()
+    }
+
+    /// Checks if a test with a given name is available.
+    ///
+    /// ```jinja
+    /// {% if 'greaterthan' is test %}...{% endif %}
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_test(state: &State, name: &str) -> bool {
+        state.env.get_test(name).is_some()
+    }
+
     #[test]
     fn test_basics() {
         fn test(_: &State, a: u32, b: u32) -> bool {

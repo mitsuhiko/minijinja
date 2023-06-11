@@ -1206,7 +1206,8 @@ mod builtins {
     /// ```
     ///
     /// The unique items are yielded in the same order as their first occurrence
-    /// in the iterable passed to the filter.
+    /// in the iterable passed to the filter.  The filter will not detect
+    /// duplicate objects or arrays, only primitives such as strings or numbers.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
     pub fn unique(values: Vec<Value>) -> Value {

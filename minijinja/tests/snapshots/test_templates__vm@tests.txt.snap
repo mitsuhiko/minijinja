@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_templates.rs
-description: "even: {{ two is even }}\nodd: {{ two is odd }}\nundefined: {{ two is undefined }}\ndefined: {{ two is defined }}\nundefined2: {{ ohwell is undefined }}\ndefined2: {{ ohwell is defined }}\nnone: {{ none is none }}\nnot-none: {{ 42 is not none }}\nnumber-int: {{ two is number }}\nnumber-float: {{ two_dot_two is number }}\nnot-seq: {{ two is sequence }}\nseq: {{ seq is sequence }}\nnot-map: {{ two is mapping }}\nmap: {{ map is mapping }}\nstring: {{ string is string }}\nnot-string: {{ mapping is string }}\nstarts-with-a: {{ string is startingwith('a') }}\nends-with-ha: {{ string is endingwith('ha') }}\nnot-safe: {{ \"foo\" is safe }}\nsafe: {{ \"foo\"|escape is safe }}"
+description: "even: {{ two is even }}\nodd: {{ two is odd }}\nundefined: {{ two is undefined }}\ndefined: {{ two is defined }}\nundefined2: {{ ohwell is undefined }}\ndefined2: {{ ohwell is defined }}\nnone: {{ none is none }}\nnot-none: {{ 42 is not none }}\nnumber-int: {{ two is number }}\nnumber-float: {{ two_dot_two is number }}\nnot-seq: {{ two is sequence }}\nseq: {{ seq is sequence }}\nnot-map: {{ two is mapping }}\nmap: {{ map is mapping }}\nstring: {{ string is string }}\nnot-string: {{ mapping is string }}\nstarts-with-a: {{ string is startingwith('a') }}\nends-with-ha: {{ string is endingwith('ha') }}\nnot-safe: {{ \"foo\" is safe }}\nsafe: {{ \"foo\"|escape is safe }}\nis-true: {{ true is true }} | {{ 42 is true }}\nis-false: {{ false is false }} | {{ 0 is false }}\nis-filter: {{ 'escape' is filter }} | {{ 'unknown-filter' is filter }}\nis-test: {{ 'safe' is test }} | {{ 'unknown-test' is test }}"
 info:
   map:
     foo: bar
@@ -11,7 +11,6 @@ info:
   string: aha
   two: 2
   two_dot_two: 2.2
-input_file: minijinja/tests/inputs/tests.txt
 ---
 even: true
 odd: false
@@ -33,4 +32,8 @@ starts-with-a: true
 ends-with-ha: true
 not-safe: false
 safe: true
+is-true: true | false
+is-false: true | false
+is-filter: true | false
+is-test: true | false
 

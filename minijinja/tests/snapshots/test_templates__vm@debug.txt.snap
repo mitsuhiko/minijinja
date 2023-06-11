@@ -45,6 +45,8 @@ State {
             "equalto",
             "escaped",
             "even",
+            "false",
+            "filter",
             "ge",
             "greaterthan",
             "gt",
@@ -61,6 +63,8 @@ State {
             "sequence",
             "startingwith",
             "string",
+            "test",
+            "true",
             "undefined",
         ],
         filters: [
