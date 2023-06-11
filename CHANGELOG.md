@@ -4,6 +4,9 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0-alpha.2
 
+- Added tests `true`, `false`, `filter`, `test` and filters
+  `pprint` and `unique`.  (#287)
+
 - Added support for indexing into strings.  (#149)
 
 - Added `Error::template_source` and `Error::range` to better support

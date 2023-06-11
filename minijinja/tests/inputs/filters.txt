@@ -97,3 +97,5 @@ map-attr: {{ [dict(a=1), dict(a=2), {}]|map(attribute='a', default=None) }}
 map-attr-deep: {{ [dict(a=[1]), dict(a=[2]), dict(a=[])]|map(attribute='a.0', default=None) }}
 map-attr-int: {{ [[1], [1, 2]]|map(attribute=1, default=999) }}
 attr-filter: {{ map|attr("a") }}
+unique-filter: {{ [1, 1, 1, 4, 3, 0, 0, 5]|unique }}
+pprint-filter: {{ objects|pprint }}
