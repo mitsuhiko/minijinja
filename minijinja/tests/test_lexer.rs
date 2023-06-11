@@ -1,40 +1,7 @@
 #![cfg(feature = "unstable_machinery")]
-use minijinja::machinery::{tokenize, Span};
+use minijinja::machinery::tokenize;
 
 use std::fmt::Write;
-
-fn lookup_span(source: &str, span: Span) -> &str {
-    let mut col = 0;
-    let mut line = 1;
-    let mut span_start = None;
-
-    for (idx, c) in source.char_indices() {
-        match span_start {
-            Some(span_start) if span.end_line == line && span.end_col == col => {
-                return &source[span_start..idx];
-            }
-            None if span.start_line == line && span.start_col == col => {
-                span_start = Some(idx);
-            }
-            _ => {}
-        }
-
-        if c == '\n' {
-            line += 1;
-            col = 0;
-        } else {
-            col += 1;
-        }
-    }
-
-    if let Some(span_start) = span_start {
-        if span.end_line == line && span.end_col == col {
-            return &source[span_start..];
-        }
-    }
-
-    panic!("span {span:?} out of range")
-}
 
 #[test]
 fn test_lexer() {
@@ -48,7 +15,9 @@ fn test_lexer() {
         }, {
             let mut stringified = String::new();
             for (token, span) in tokens.unwrap() {
-                let token_source = lookup_span(&contents, span);
+                let token_source = contents
+                    .get(span.start_offset as usize..span.end_offset as usize)
+                    .unwrap();
                 writeln!(stringified, "{token:?}").unwrap();
                 writeln!(stringified, "  {token_source:?}").unwrap();
             }

@@ -272,6 +272,41 @@ impl Error {
         }
     }
 
+    /// Returns the byte range of where the error occurred if available.
+    ///
+    /// In combination with [`template_source`](Self::template_source) this can be
+    /// used to better visualize where the error is coming from.  By indexing into
+    /// the template source one ends up with the source of the failing expression.
+    ///
+    /// Note that debug mode ([`Environment::set_debug`]) needs to be enabled,
+    /// and the `debug` feature must be turned on.  The engine usually keeps track
+    /// of spans in all cases, but there is no absolute guarantee that it is
+    /// able to provide a range in all error cases.
+    ///
+    /// ```
+    /// # use minijinja::{Error, Environment, context};
+    /// # let mut env = Environment::new();
+    /// # env.set_debug(true);
+    /// let tmpl = env.template_from_str("Hello {{ foo + bar }}!").unwrap();
+    /// let err = tmpl.render(context!(foo => "a string", bar => 0)).unwrap_err();
+    /// let src = err.template_source().unwrap();
+    /// assert_eq!(&src[err.range().unwrap()], "foo + bar");
+    /// ```
+    #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
+    pub fn range(&self) -> Option<std::ops::Range<usize>> {
+        self.repr
+            .span
+            .map(|x| x.start_offset as usize..x.end_offset as usize)
+    }
+
+    /// Returns the template source if available.
+    #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
+    pub fn template_source(&self) -> Option<&str> {
+        self.debug_info().and_then(|x| x.source())
+    }
+
     /// Returns the line number where the error occurred.
     #[cfg(feature = "debug")]
     pub(crate) fn span(&self) -> Option<Span> {
@@ -284,7 +319,6 @@ impl Error {
     /// mode is enabled on the environment
     /// ([`Environment::set_debug`](crate::Environment::set_debug)).
     #[cfg(feature = "debug")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
     pub(crate) fn debug_info(&self) -> Option<&crate::debug::DebugInfo> {
         self.repr.debug_info.as_ref()
     }
