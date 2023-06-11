@@ -4,6 +4,10 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0-alpha.2
 
+- The `include` block now supports `with context` and `without context`
+  modifiers but they are ignored.  This is mostly helpful to render some
+  Jinja2 templates that depend on this functionality.  (#288)
+
 - Added tests `true`, `false`, `filter`, `test` and filters
   `pprint` and `unique`.  (#287)
 

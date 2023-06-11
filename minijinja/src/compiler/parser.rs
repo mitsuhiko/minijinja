@@ -906,8 +906,18 @@ impl<'a> Parser<'a> {
     #[cfg(feature = "multi_template")]
     fn parse_include(&mut self) -> Result<ast::Include<'a>, Error> {
         let name = ok!(self.parse_expr());
+
+        // with/without context is without meaning in MiniJinja, but for syntax
+        // compatibility it's supported.
+        if skip_token!(self, Token::Ident("without" | "with")) {
+            expect_token!(self, Token::Ident("context"), "missing keyword");
+        }
+
         let ignore_missing = if skip_token!(self, Token::Ident("ignore")) {
             expect_token!(self, Token::Ident("missing"), "missing keyword");
+            if skip_token!(self, Token::Ident("without" | "with")) {
+                expect_token!(self, Token::Ident("context"), "missing keyword");
+            }
             true
         } else {
             false
