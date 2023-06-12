@@ -303,7 +303,6 @@ impl<'a> From<Key<'a>> for Value {
         match val {
             Key::Bool(val) => val.into(),
             Key::I64(val) => val.into(),
-            Key::Char(val) => val.into(),
             Key::String(val) => ValueRepr::String(val, StringType::Normal).into(),
             Key::Str(val) => val.into(),
         }
@@ -384,6 +383,13 @@ impl From<u128> for Value {
     }
 }
 
+impl From<char> for Value {
+    #[inline(always)]
+    fn from(val: char) -> Self {
+        ValueRepr::String(Arc::new(val.to_string()), StringType::Normal).into()
+    }
+}
+
 value_from!(bool, Bool);
 value_from!(u8, U64);
 value_from!(u16, U64);
@@ -395,7 +401,6 @@ value_from!(i32, I64);
 value_from!(i64, I64);
 value_from!(f32, F64);
 value_from!(f64, F64);
-value_from!(char, Char);
 value_from!(Arc<Vec<u8>>, Bytes);
 value_from!(Arc<Vec<Value>>, Seq);
 value_from!(Arc<dyn Object>, Dynamic);
@@ -468,7 +473,12 @@ primitive_try_from!(bool, {
     ValueRepr::Bool(val) => val,
 });
 primitive_try_from!(char, {
-    ValueRepr::Char(val) => val,
+    ValueRepr::String(ref val, _) => {
+        let mut char_iter = val.chars();
+        ok!(char_iter.next().filter(|_| char_iter.next().is_none()).ok_or_else(|| {
+            unsupported_conversion(ValueKind::String, "non single character string")
+        }))
+    },
 });
 primitive_try_from!(f32, {
     ValueRepr::U64(val) => val as f32,

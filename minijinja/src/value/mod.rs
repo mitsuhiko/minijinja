@@ -286,7 +286,6 @@ pub(crate) enum ValueRepr {
     U64(u64),
     I64(i64),
     F64(f64),
-    Char(char),
     None,
     Invalid(Arc<String>),
     U128(Packed<u128>),
@@ -306,7 +305,6 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::U64(val) => fmt::Debug::fmt(val, f),
             ValueRepr::I64(val) => fmt::Debug::fmt(val, f),
             ValueRepr::F64(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::Char(val) => fmt::Debug::fmt(val, f),
             ValueRepr::None => write!(f, "None"),
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
@@ -335,7 +333,6 @@ impl PartialEq for Value {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
-                Some(ops::CoerceResult::Char(a, b)) => a == b,
                 None => {
                     if let (Some(a), Some(b)) = (self.as_seq(), other.as_seq()) {
                         a.iter().eq(b.iter())
@@ -360,7 +357,6 @@ impl PartialOrd for Value {
                 Some(ops::CoerceResult::F64(a, b)) => a.partial_cmp(&b),
                 Some(ops::CoerceResult::I128(a, b)) => a.partial_cmp(&b),
                 Some(ops::CoerceResult::Str(a, b)) => a.partial_cmp(b),
-                Some(ops::CoerceResult::Char(a, b)) => a.partial_cmp(&b),
                 None => None,
             },
         }
@@ -393,7 +389,6 @@ impl fmt::Display for Value {
                     write!(f, "{num}")
                 }
             }
-            ValueRepr::Char(val) => write!(f, "{val}"),
             ValueRepr::None => write!(f, "none"),
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
@@ -586,7 +581,6 @@ impl Value {
             ValueRepr::Undefined => ValueKind::Undefined,
             ValueRepr::Bool(_) => ValueKind::Bool,
             ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::F64(_) => ValueKind::Number,
-            ValueRepr::Char(_) => ValueKind::Char,
             ValueRepr::None => ValueKind::None,
             ValueRepr::I128(_) => ValueKind::Number,
             ValueRepr::String(..) => ValueKind::String,
@@ -633,7 +627,6 @@ impl Value {
             ValueRepr::I64(x) => x != 0,
             ValueRepr::I128(x) => x.0 != 0,
             ValueRepr::F64(x) => x != 0.0,
-            ValueRepr::Char(x) => x != '\x00',
             ValueRepr::String(ref x, _) => !x.is_empty(),
             ValueRepr::Bytes(ref x) => !x.is_empty(),
             ValueRepr::None | ValueRepr::Undefined | ValueRepr::Invalid(_) => false,
@@ -1001,7 +994,6 @@ impl Value {
             ValueRepr::I128(v) => TryFrom::try_from(v.0)
                 .map(Key::I64)
                 .map_err(|_| ErrorKind::NonKey.into()),
-            ValueRepr::Char(c) => Ok(Key::Char(c)),
             ValueRepr::String(ref s, _) => Ok(Key::String(s.clone())),
             _ => Err(ErrorKind::NonKey.into()),
         }
@@ -1102,7 +1094,6 @@ impl Serialize for Value {
             ValueRepr::U64(u) => serializer.serialize_u64(u),
             ValueRepr::I64(i) => serializer.serialize_i64(i),
             ValueRepr::F64(f) => serializer.serialize_f64(f),
-            ValueRepr::Char(c) => serializer.serialize_char(c),
             ValueRepr::None | ValueRepr::Undefined | ValueRepr::Invalid(_) => {
                 serializer.serialize_unit()
             }
@@ -1301,6 +1292,16 @@ fn test_dynamic_object_roundtrip() {
 
     assert_eq!(x_value.to_string(), "65");
     assert_eq!(x_clone.to_string(), "65");
+}
+
+#[test]
+fn test_string_char() {
+    let val = Value::from('a');
+    assert_eq!(char::try_from(val).unwrap(), 'a');
+    let val = Value::from("a");
+    assert_eq!(char::try_from(val).unwrap(), 'a');
+    let val = Value::from("wat");
+    assert!(char::try_from(val).is_err());
 }
 
 #[test]

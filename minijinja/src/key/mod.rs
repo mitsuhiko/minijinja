@@ -19,7 +19,6 @@ mod serialize;
 pub enum Key<'a> {
     Bool(bool),
     I64(i64),
-    Char(char),
     String(Arc<String>),
     Str(&'a str),
 }
@@ -31,7 +30,6 @@ impl<'a> fmt::Debug for Key<'a> {
         match self {
             Self::Bool(val) => fmt::Debug::fmt(val, f),
             Self::I64(val) => fmt::Debug::fmt(val, f),
-            Self::Char(val) => fmt::Debug::fmt(val, f),
             Self::String(val) => fmt::Debug::fmt(val, f),
             Self::Str(val) => fmt::Debug::fmt(val, f),
         }
@@ -42,7 +40,6 @@ impl<'a> fmt::Debug for Key<'a> {
 enum InternalKeyRef<'a> {
     Bool(bool),
     I64(i64),
-    Char(char),
     Str(&'a str),
 }
 
@@ -70,7 +67,6 @@ impl<'a> Key<'a> {
         match *self {
             Key::Bool(x) => InternalKeyRef::Bool(x),
             Key::I64(x) => InternalKeyRef::I64(x),
-            Key::Char(x) => InternalKeyRef::Char(x),
             Key::String(ref x) => InternalKeyRef::Str(x.as_str()),
             Key::Str(x) => InternalKeyRef::Str(x),
         }
@@ -101,7 +97,6 @@ impl<'a> Key<'a> {
                     Err(ErrorKind::NonKey.into())
                 }
             }
-            ValueRepr::Char(c) => Ok(Key::Char(c)),
             ValueRepr::String(ref s, _) => Ok(Key::Str(s)),
             _ => Err(ErrorKind::NonKey.into()),
         }
@@ -143,7 +138,6 @@ impl<'a> fmt::Display for Key<'a> {
         match self {
             Key::Bool(val) => write!(f, "{val}"),
             Key::I64(val) => write!(f, "{val}"),
-            Key::Char(val) => write!(f, "{val}"),
             Key::String(val) => write!(f, "{val}"),
             Key::Str(val) => write!(f, "{val}"),
         }
@@ -169,7 +163,6 @@ key_from!(i8, I64);
 key_from!(i16, I64);
 key_from!(i32, I64);
 key_from!(i64, I64);
-key_from!(char, Char);
 
 impl TryFrom<u64> for StaticKey {
     type Error = TryFromIntError;

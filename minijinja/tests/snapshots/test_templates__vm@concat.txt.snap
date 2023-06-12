@@ -1,10 +1,11 @@
 ---
 source: minijinja/tests/test_templates.rs
-description: "{{ a ~ b }}"
+description: "{{ a ~ b }}\n{{ a + b }}\n{{ a[0] + a[1:] }}"
 info:
   a: foo
   b: bar
-input_file: minijinja/tests/inputs/concat.txt
 ---
 foobar
+foobar
+foo
 

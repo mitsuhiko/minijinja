@@ -38,7 +38,7 @@ safe: <
 list-length: 3
 list-from-list: [1, 2, 3]
 list-from-map: ["a", "c"]
-list-from-word: ['B', 'i', 'r', 'd']
+list-from-word: ["B", "i", "r", "d"]
 list-from-undefined: []
 bool-empty-string: false
 bool-non-empty-string: true
