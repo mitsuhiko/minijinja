@@ -1,4 +1,5 @@
-#![cfg(feature = "builtins")]
+use similar_asserts::assert_eq;
+
 use minijinja::filters::indent;
 
 #[test]

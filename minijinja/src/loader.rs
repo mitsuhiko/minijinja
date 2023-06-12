@@ -14,9 +14,6 @@ use crate::compiler::lexer::SyntaxConfig;
 use crate::error::{Error, ErrorKind};
 use crate::template::CompiledTemplate;
 
-#[cfg(test)]
-use similar_asserts::assert_eq;
-
 type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<Option<String>, Error> + Send + Sync;
 
 /// Internal utility for dynamic template loading.
@@ -147,7 +144,8 @@ impl<'source> LoaderStore<'source> {
     }
 }
 
-fn safe_join(base: &Path, template: &str) -> Option<PathBuf> {
+/// Safely joins two paths.
+pub fn safe_join(base: &Path, template: &str) -> Option<PathBuf> {
     let mut rv = base.to_path_buf();
     for segment in template.split('/') {
         if segment.starts_with('.') || segment.contains('\\') {
@@ -194,32 +192,20 @@ pub fn path_loader<'x, P: AsRef<Path> + 'x>(
     }
 }
 
-#[test]
-fn test_source_replace_static() {
-    let mut env = crate::Environment::new();
-    env.add_template_owned("a", "1").unwrap();
-    env.add_template_owned("a", "2").unwrap();
-    let rv = env.get_template("a").unwrap().render(()).unwrap();
-    assert_eq!(rv, "2");
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_source_replace_dynamic() {
-    let mut env = crate::Environment::new();
-    env.add_template("a", "1").unwrap();
-    env.add_template("a", "2").unwrap();
-    env.set_loader(|_| Ok(None));
-    let rv = env.get_template("a").unwrap().render(()).unwrap();
-    assert_eq!(rv, "2");
-}
+    use similar_asserts::assert_eq;
 
-#[test]
-fn test_safe_join() {
-    assert_eq!(
-        safe_join(Path::new("foo"), "bar/baz"),
-        Some(PathBuf::from("foo").join("bar").join("baz"))
-    );
-    assert_eq!(safe_join(Path::new("foo"), ".bar/baz"), None);
-    assert_eq!(safe_join(Path::new("foo"), "bar/.baz"), None);
-    assert_eq!(safe_join(Path::new("foo"), "bar/../baz"), None);
+    #[test]
+    fn test_safe_join() {
+        assert_eq!(
+            safe_join(Path::new("foo"), "bar/baz"),
+            Some(PathBuf::from("foo").join("bar").join("baz"))
+        );
+        assert_eq!(safe_join(Path::new("foo"), ".bar/baz"), None);
+        assert_eq!(safe_join(Path::new("foo"), "bar/.baz"), None);
+        assert_eq!(safe_join(Path::new("foo"), "bar/../baz"), None);
+    }
 }

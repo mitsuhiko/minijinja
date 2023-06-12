@@ -1,6 +1,3 @@
-#[cfg(test)]
-use similar_asserts::assert_eq;
-
 // `ok!` and `some!` are less bloaty alternatives to the standard library's try operator (`?`).
 // Since we do not need type conversions in this crate we can fall back to much easier match
 // patterns that compile faster and produce less bloaty code.
@@ -185,26 +182,4 @@ macro_rules! render {
     ) => {
         $crate::render!(in $crate::__context::thread_local_env(), $tmpl, $($key $(=> $value)? ,)*)
     }
-}
-
-#[test]
-fn test_context() {
-    use crate::value::Value;
-    let var1 = 23;
-    let ctx = context!(var1, var2 => 42);
-    assert_eq!(ctx.get_attr("var1").unwrap(), Value::from(23));
-    assert_eq!(ctx.get_attr("var2").unwrap(), Value::from(42));
-}
-
-#[test]
-fn test_render() {
-    let env = crate::Environment::new();
-    let rv = render!(in env, "Hello {{ name }}!", name => "World");
-    assert_eq!(rv, "Hello World!");
-
-    let rv = render!("Hello {{ name }}!", name => "World");
-    assert_eq!(rv, "Hello World!");
-
-    let rv = render!("Hello World!");
-    assert_eq!(rv, "Hello World!");
 }
