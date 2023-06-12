@@ -485,21 +485,6 @@ mod builtins {
     pub fn is_test(state: &State, name: &str) -> bool {
         state.env.get_test(name).is_some()
     }
-
-    #[test]
-    fn test_basics() {
-        fn test(_: &State, a: u32, b: u32) -> bool {
-            assert_eq!(a, 23);
-            a == b
-        }
-
-        let mut env = crate::Environment::new();
-        env.add_test("test", test);
-        let state = env.empty_state();
-        assert!(state
-            .perform_test("test", &[Value::from(23), Value::from(23)][..])
-            .unwrap());
-    }
 }
 
 #[cfg(feature = "builtins")]

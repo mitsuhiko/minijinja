@@ -291,72 +291,79 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
     Ok(Value::from(rv))
 }
 
-#[test]
-fn test_adding() {
-    let err = add(&Value::from("a"), &Value::from(42)).unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "invalid operation: tried to use + operator on unsupported types string and number"
-    );
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    assert_eq!(
-        add(&Value::from(1), &Value::from(2)).unwrap(),
-        Value::from(3)
-    );
-    assert_eq!(
-        add(&Value::from("foo"), &Value::from("bar")).unwrap(),
-        Value::from("foobar")
-    );
-}
+    use similar_asserts::assert_eq;
 
-#[test]
-fn test_subtracting() {
-    let err = sub(&Value::from("a"), &Value::from(42)).unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "invalid operation: tried to use - operator on unsupported types string and number"
-    );
+    #[test]
+    fn test_adding() {
+        let err = add(&Value::from("a"), &Value::from(42)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid operation: tried to use + operator on unsupported types string and number"
+        );
 
-    let err = sub(&Value::from("foo"), &Value::from("bar")).unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "invalid operation: tried to use - operator on unsupported types string and string"
-    );
+        assert_eq!(
+            add(&Value::from(1), &Value::from(2)).unwrap(),
+            Value::from(3)
+        );
+        assert_eq!(
+            add(&Value::from("foo"), &Value::from("bar")).unwrap(),
+            Value::from("foobar")
+        );
+    }
 
-    assert_eq!(
-        sub(&Value::from(2), &Value::from(1)).unwrap(),
-        Value::from(1)
-    );
-}
+    #[test]
+    fn test_subtracting() {
+        let err = sub(&Value::from("a"), &Value::from(42)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid operation: tried to use - operator on unsupported types string and number"
+        );
 
-#[test]
-fn test_dividing() {
-    let err = div(&Value::from("a"), &Value::from(42)).unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "invalid operation: tried to use / operator on unsupported types string and number"
-    );
+        let err = sub(&Value::from("foo"), &Value::from("bar")).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid operation: tried to use - operator on unsupported types string and string"
+        );
 
-    let err = div(&Value::from("foo"), &Value::from("bar")).unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "invalid operation: tried to use / operator on unsupported types string and string"
-    );
+        assert_eq!(
+            sub(&Value::from(2), &Value::from(1)).unwrap(),
+            Value::from(1)
+        );
+    }
 
-    assert_eq!(
-        div(&Value::from(100), &Value::from(2)).unwrap(),
-        Value::from(50.0)
-    );
-}
+    #[test]
+    fn test_dividing() {
+        let err = div(&Value::from("a"), &Value::from(42)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid operation: tried to use / operator on unsupported types string and number"
+        );
 
-#[test]
-fn test_concat() {
-    assert_eq!(
-        string_concat(Value::from("foo"), &Value::from(42)),
-        Value::from("foo42")
-    );
-    assert_eq!(
-        string_concat(Value::from(23), &Value::from(42)),
-        Value::from("2342")
-    );
+        let err = div(&Value::from("foo"), &Value::from("bar")).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid operation: tried to use / operator on unsupported types string and string"
+        );
+
+        assert_eq!(
+            div(&Value::from(100), &Value::from(2)).unwrap(),
+            Value::from(50.0)
+        );
+    }
+
+    #[test]
+    fn test_concat() {
+        assert_eq!(
+            string_concat(Value::from("foo"), &Value::from(42)),
+            Value::from("foo42")
+        );
+        assert_eq!(
+            string_concat(Value::from(23), &Value::from(42)),
+            Value::from("2342")
+        );
+    }
 }

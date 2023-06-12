@@ -3,8 +3,10 @@ use std::fmt;
 use std::sync::Arc;
 
 use insta::assert_snapshot;
-use minijinja::value::{Kwargs, Object, ObjectKind, SeqObject, StructObject, Value};
-use minijinja::Environment;
+use similar_asserts::assert_eq;
+
+use minijinja::value::{Kwargs, Object, ObjectKind, Rest, SeqObject, StructObject, Value};
+use minijinja::{Environment, Error};
 
 #[test]
 fn test_sort() {
@@ -255,4 +257,139 @@ fn test_call_kwargs() {
         )
         .unwrap();
     assert_eq!(rv, Value::from(42));
+}
+
+#[test]
+fn test_filter_basics() {
+    fn test(a: u32, b: u32) -> Result<u32, Error> {
+        Ok(a + b)
+    }
+
+    let mut env = Environment::new();
+    env.add_filter("test", test);
+    assert_eq!(
+        env.empty_state()
+            .apply_filter("test", &[Value::from(23), Value::from(42)])
+            .unwrap(),
+        Value::from(65)
+    );
+}
+
+#[test]
+fn test_rest_args() {
+    fn sum(val: u32, rest: Rest<u32>) -> u32 {
+        rest.iter().fold(val, |a, b| a + b)
+    }
+
+    let mut env = Environment::new();
+    env.add_filter("sum", sum);
+    assert_eq!(
+        env.empty_state()
+            .apply_filter(
+                "sum",
+                &[
+                    Value::from(1),
+                    Value::from(2),
+                    Value::from(3),
+                    Value::from(4)
+                ][..]
+            )
+            .unwrap(),
+        Value::from(1 + 2 + 3 + 4)
+    );
+}
+
+#[test]
+fn test_optional_args() {
+    fn add(val: u32, a: u32, b: Option<u32>) -> Result<u32, Error> {
+        // ensure we really get our value as first argument
+        assert_eq!(val, 23);
+        let mut sum = val + a;
+        if let Some(b) = b {
+            sum += b;
+        }
+        Ok(sum)
+    }
+
+    let mut env = crate::Environment::new();
+    env.add_filter("add", add);
+    let state = env.empty_state();
+    assert_eq!(
+        state
+            .apply_filter("add", &[Value::from(23), Value::from(42)][..])
+            .unwrap(),
+        Value::from(65)
+    );
+    assert_eq!(
+        state
+            .apply_filter(
+                "add",
+                &[Value::from(23), Value::from(42), Value::UNDEFINED][..]
+            )
+            .unwrap(),
+        Value::from(65)
+    );
+    assert_eq!(
+        state
+            .apply_filter(
+                "add",
+                &[Value::from(23), Value::from(42), Value::from(1)][..]
+            )
+            .unwrap(),
+        Value::from(66)
+    );
+}
+
+#[test]
+fn test_values_in_vec() {
+    fn upper(value: &str) -> String {
+        value.to_uppercase()
+    }
+
+    fn sum(value: Vec<i64>) -> i64 {
+        value.into_iter().sum::<i64>()
+    }
+
+    let mut env = Environment::new();
+    env.add_filter("upper", upper);
+    env.add_filter("sum", sum);
+    let state = env.empty_state();
+
+    assert_eq!(
+        state
+            .apply_filter("upper", &[Value::from("Hello World!")])
+            .unwrap(),
+        Value::from("HELLO WORLD!")
+    );
+
+    assert_eq!(
+        state
+            .apply_filter("sum", &[Value::from(vec![Value::from(1), Value::from(2)])])
+            .unwrap(),
+        Value::from(3)
+    );
+}
+
+#[test]
+fn test_seq_object_borrow() {
+    fn connect(values: &dyn SeqObject) -> String {
+        let mut rv = String::new();
+        for item in values.iter() {
+            rv.push_str(&item.to_string())
+        }
+        rv
+    }
+
+    let mut env = Environment::new();
+    env.add_filter("connect", connect);
+    let state = env.empty_state();
+    assert_eq!(
+        state
+            .apply_filter(
+                "connect",
+                &[Value::from(vec![Value::from("HELLO"), Value::from(42)])]
+            )
+            .unwrap(),
+        Value::from("HELLO42")
+    );
 }

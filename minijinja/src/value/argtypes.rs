@@ -962,28 +962,33 @@ impl From<usize> for Value {
     }
 }
 
-#[test]
-fn test_as_f64() {
-    let v = Value::from(42u32);
-    let f: f64 = v.try_into().unwrap();
-    assert_eq!(f, 42.0);
-    let v = Value::from(42.5);
-    let f: f64 = v.try_into().unwrap();
-    assert_eq!(f, 42.5);
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_split_kwargs() {
-    let args = [
-        Value::from(42),
-        Value::from(true),
-        Value::from(Kwargs::from_iter([
-            ("foo", Value::from(1)),
-            ("bar", Value::from(2)),
-        ])),
-    ];
-    let (args, kwargs) = from_args::<(&[Value], Kwargs)>(&args).unwrap();
-    assert_eq!(args, &[Value::from(42), Value::from(true)]);
-    assert_eq!(kwargs.get::<Value>("foo").unwrap(), Value::from(1));
-    assert_eq!(kwargs.get::<Value>("bar").unwrap(), Value::from(2));
+    #[test]
+    fn test_as_f64() {
+        let v = Value::from(42u32);
+        let f: f64 = v.try_into().unwrap();
+        assert_eq!(f, 42.0);
+        let v = Value::from(42.5);
+        let f: f64 = v.try_into().unwrap();
+        assert_eq!(f, 42.5);
+    }
+
+    #[test]
+    fn test_split_kwargs() {
+        let args = [
+            Value::from(42),
+            Value::from(true),
+            Value::from(Kwargs::from_iter([
+                ("foo", Value::from(1)),
+                ("bar", Value::from(2)),
+            ])),
+        ];
+        let (args, kwargs) = from_args::<(&[Value], Kwargs)>(&args).unwrap();
+        assert_eq!(args, &[Value::from(42), Value::from(true)]);
+        assert_eq!(kwargs.get::<Value>("foo").unwrap(), Value::from(1));
+        assert_eq!(kwargs.get::<Value>("bar").unwrap(), Value::from(2));
+    }
 }

@@ -8,9 +8,6 @@ use crate::error::{Error, ErrorKind};
 use crate::value::{OwnedValueIterator, StringType, Value, ValueKind, ValueRepr};
 use crate::Output;
 
-#[cfg(test)]
-use similar_asserts::assert_eq;
-
 /// internal marker to seal up some trait methods
 pub struct SealedMarker;
 
@@ -326,17 +323,24 @@ impl<F: FnOnce()> Drop for OnDrop<F> {
     }
 }
 
-#[test]
-fn test_html_escape() {
-    let input = "<>&\"'/";
-    let output = HtmlEscape(input).to_string();
-    assert_eq!(output, "&lt;&gt;&amp;&quot;&#x27;&#x2f;");
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_unescape() {
-    assert_eq!(unescape(r"foo\u2603bar").unwrap(), "foo\u{2603}bar");
-    assert_eq!(unescape(r"\t\b\f\r\n\\\/").unwrap(), "\t\x08\x0c\r\n\\/");
-    assert_eq!(unescape("foobarbaz").unwrap(), "foobarbaz");
-    assert_eq!(unescape(r"\ud83d\udca9").unwrap(), "💩");
+    use similar_asserts::assert_eq;
+
+    #[test]
+    fn test_html_escape() {
+        let input = "<>&\"'/";
+        let output = HtmlEscape(input).to_string();
+        assert_eq!(output, "&lt;&gt;&amp;&quot;&#x27;&#x2f;");
+    }
+
+    #[test]
+    fn test_unescape() {
+        assert_eq!(unescape(r"foo\u2603bar").unwrap(), "foo\u{2603}bar");
+        assert_eq!(unescape(r"\t\b\f\r\n\\\/").unwrap(), "\t\x08\x0c\r\n\\/");
+        assert_eq!(unescape("foobarbaz").unwrap(), "foobarbaz");
+        assert_eq!(unescape(r"\ud83d\udca9").unwrap(), "💩");
+    }
 }

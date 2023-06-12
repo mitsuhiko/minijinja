@@ -2,9 +2,6 @@ use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
 use crate::utils::{memchr, memstr, unescape};
 
-#[cfg(test)]
-use similar_asserts::assert_eq;
-
 #[cfg(feature = "custom_syntax")]
 pub use crate::custom_syntax::SyntaxConfig;
 
@@ -573,93 +570,100 @@ pub fn tokenize(
     })
 }
 
-#[test]
-fn test_find_marker() {
-    let syntax = SyntaxConfig::default();
-    assert!(find_start_marker("{", &syntax).is_none());
-    assert!(find_start_marker("foo", &syntax).is_none());
-    assert!(find_start_marker("foo {", &syntax).is_none());
-    assert_eq!(find_start_marker("foo {{", &syntax), Some((4, false)));
-    assert_eq!(find_start_marker("foo {{-", &syntax), Some((4, true)));
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-#[cfg(feature = "custom_syntax")]
-fn test_find_marker_custom_syntax() {
-    use crate::Syntax;
+    use similar_asserts::assert_eq;
 
-    let syntax = Syntax {
-        block_start: "%{".into(),
-        block_end: "}%".into(),
-        variable_start: "[[".into(),
-        variable_end: "]]".into(),
-        comment_start: "/*".into(),
-        comment_end: "*/".into(),
-    };
-
-    let syntax_config = syntax.compile().expect("failed to create syntax config");
-
-    assert_eq!(find_start_marker("%{", &syntax_config), Some((0, false)));
-    assert!(find_start_marker("/", &syntax_config).is_none());
-    assert!(find_start_marker("foo [", &syntax_config).is_none());
-    assert_eq!(
-        find_start_marker("foo /*", &syntax_config),
-        Some((4, false))
-    );
-    assert_eq!(
-        find_start_marker("foo [[-", &syntax_config),
-        Some((4, true))
-    );
-}
-
-#[test]
-fn test_is_basic_tag() {
-    assert_eq!(skip_basic_tag(" raw %}", "raw", "%}"), Some((7, false)));
-    assert_eq!(skip_basic_tag(" raw %}", "endraw", "%}"), None);
-    assert_eq!(skip_basic_tag("  raw  %}", "raw", "%}"), Some((9, false)));
-    assert_eq!(skip_basic_tag("-  raw  -%}", "raw", "%}"), Some((11, true)));
-}
-
-#[test]
-fn test_basic_identifiers() {
-    fn assert_ident(s: &str) {
-        match tokenize(s, true, Default::default()).next() {
-            Some(Ok((Token::Ident(ident), _))) if ident == s => {}
-            _ => panic!("did not get a matching token result: {s:?}"),
-        }
+    #[test]
+    fn test_find_marker() {
+        let syntax = SyntaxConfig::default();
+        assert!(find_start_marker("{", &syntax).is_none());
+        assert!(find_start_marker("foo", &syntax).is_none());
+        assert!(find_start_marker("foo {", &syntax).is_none());
+        assert_eq!(find_start_marker("foo {{", &syntax), Some((4, false)));
+        assert_eq!(find_start_marker("foo {{-", &syntax), Some((4, true)));
     }
 
-    fn assert_not_ident(s: &str) {
-        let res = tokenize(s, true, Default::default()).collect::<Result<Vec<_>, _>>();
-        if let Ok(tokens) = res {
-            if let &[(Token::Ident(_), _)] = &tokens[..] {
-                panic!("got a single ident for {s:?}")
+    #[test]
+    #[cfg(feature = "custom_syntax")]
+    fn test_find_marker_custom_syntax() {
+        use crate::Syntax;
+
+        let syntax = Syntax {
+            block_start: "%{".into(),
+            block_end: "}%".into(),
+            variable_start: "[[".into(),
+            variable_end: "]]".into(),
+            comment_start: "/*".into(),
+            comment_end: "*/".into(),
+        };
+
+        let syntax_config = syntax.compile().expect("failed to create syntax config");
+
+        assert_eq!(find_start_marker("%{", &syntax_config), Some((0, false)));
+        assert!(find_start_marker("/", &syntax_config).is_none());
+        assert!(find_start_marker("foo [", &syntax_config).is_none());
+        assert_eq!(
+            find_start_marker("foo /*", &syntax_config),
+            Some((4, false))
+        );
+        assert_eq!(
+            find_start_marker("foo [[-", &syntax_config),
+            Some((4, true))
+        );
+    }
+
+    #[test]
+    fn test_is_basic_tag() {
+        assert_eq!(skip_basic_tag(" raw %}", "raw", "%}"), Some((7, false)));
+        assert_eq!(skip_basic_tag(" raw %}", "endraw", "%}"), None);
+        assert_eq!(skip_basic_tag("  raw  %}", "raw", "%}"), Some((9, false)));
+        assert_eq!(skip_basic_tag("-  raw  -%}", "raw", "%}"), Some((11, true)));
+    }
+
+    #[test]
+    fn test_basic_identifiers() {
+        fn assert_ident(s: &str) {
+            match tokenize(s, true, Default::default()).next() {
+                Some(Ok((Token::Ident(ident), _))) if ident == s => {}
+                _ => panic!("did not get a matching token result: {s:?}"),
             }
         }
-    }
 
-    assert_ident("foo_bar_baz");
-    assert_ident("_foo_bar_baz");
-    assert_ident("_42world");
-    assert_ident("_world42");
-    assert_ident("world42");
-    assert_not_ident("42world");
+        fn assert_not_ident(s: &str) {
+            let res = tokenize(s, true, Default::default()).collect::<Result<Vec<_>, _>>();
+            if let Ok(tokens) = res {
+                if let &[(Token::Ident(_), _)] = &tokens[..] {
+                    panic!("got a single ident for {s:?}")
+                }
+            }
+        }
 
-    #[cfg(feature = "unicode")]
-    {
-        assert_ident("foo");
-        assert_ident("föö");
-        assert_ident("き");
-        assert_ident("_");
-        assert_not_ident("1a");
-        assert_not_ident("a-");
-        assert_not_ident("🐍a");
-        assert_not_ident("a🐍🐍");
-        assert_ident("ᢅ");
-        assert_ident("ᢆ");
-        assert_ident("℘");
-        assert_ident("℮");
-        assert_not_ident("·");
-        assert_ident("a·");
+        assert_ident("foo_bar_baz");
+        assert_ident("_foo_bar_baz");
+        assert_ident("_42world");
+        assert_ident("_world42");
+        assert_ident("world42");
+        assert_not_ident("42world");
+
+        #[cfg(feature = "unicode")]
+        {
+            assert_ident("foo");
+            assert_ident("föö");
+            assert_ident("き");
+            assert_ident("_");
+            assert_not_ident("1a");
+            assert_not_ident("a-");
+            assert_not_ident("🐍a");
+            assert_not_ident("a🐍🐍");
+            assert_ident("ᢅ");
+            assert_ident("ᢆ");
+            assert_ident("℘");
+            assert_ident("℮");
+            assert_not_ident("·");
+            assert_ident("a·");
+        }
     }
 }

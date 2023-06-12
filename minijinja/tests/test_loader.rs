@@ -37,3 +37,22 @@ fn test_dynamic() {
         "template not found: template \"missing\" does not exist"
     );
 }
+
+#[test]
+fn test_source_replace_static() {
+    let mut env = Environment::new();
+    env.add_template_owned("a", "1").unwrap();
+    env.add_template_owned("a", "2").unwrap();
+    let rv = env.get_template("a").unwrap().render(()).unwrap();
+    assert_eq!(rv, "2");
+}
+
+#[test]
+fn test_source_replace_dynamic() {
+    let mut env = Environment::new();
+    env.add_template("a", "1").unwrap();
+    env.add_template("a", "2").unwrap();
+    env.set_loader(|_| Ok(None));
+    let rv = env.get_template("a").unwrap().render(()).unwrap();
+    assert_eq!(rv, "2");
+}
