@@ -6,6 +6,9 @@ All notable changes to MiniJinja are documented here.
 
 - Marked `ErrorKind` as `#[non_exhaustive]`.
 
+- Correctly handle coercing of characters and strings.  `"w" == "w"[0]` is
+  now evaluating to `true` as one would expect.
+
 ## 1.0.0-alpha.2
 
 - The `include` block now supports `with context` and `without context`
