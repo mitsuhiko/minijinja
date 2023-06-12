@@ -97,6 +97,7 @@ impl fmt::Debug for Error {
 
 /// An enum describing the error kind.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ErrorKind {
     /// A non primitive value was encountered where one was expected.
     NonPrimitive,

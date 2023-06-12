@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.0-alpha.3
+
+- Marked `ErrorKind` as `#[non_exhaustive]`.
+
 ## 1.0.0-alpha.2
 
 - The `include` block now supports `with context` and `without context`
