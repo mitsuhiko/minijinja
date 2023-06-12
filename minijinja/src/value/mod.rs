@@ -335,6 +335,7 @@ impl PartialEq for Value {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
+                Some(ops::CoerceResult::Char(a, b)) => a == b,
                 None => {
                     if let (Some(a), Some(b)) = (self.as_seq(), other.as_seq()) {
                         a.iter().eq(b.iter())
@@ -359,6 +360,7 @@ impl PartialOrd for Value {
                 Some(ops::CoerceResult::F64(a, b)) => a.partial_cmp(&b),
                 Some(ops::CoerceResult::I128(a, b)) => a.partial_cmp(&b),
                 Some(ops::CoerceResult::Str(a, b)) => a.partial_cmp(b),
+                Some(ops::CoerceResult::Char(a, b)) => a.partial_cmp(&b),
                 None => None,
             },
         }

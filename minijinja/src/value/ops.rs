@@ -7,6 +7,7 @@ use crate::value::{Arc, ObjectKind, SeqObject, Value, ValueKind, ValueRepr};
 pub enum CoerceResult<'a> {
     I128(i128, i128),
     F64(f64, f64),
+    Char(char, char),
     Str(&'a str, &'a str),
 }
 
@@ -28,6 +29,25 @@ pub fn coerce<'x>(a: &'x Value, b: &'x Value) -> Option<CoerceResult<'x>> {
         (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
         (ValueRepr::U128(a), ValueRepr::U128(b)) => {
             Some(CoerceResult::I128(a.0 as i128, b.0 as i128))
+        }
+        (ValueRepr::Char(a), ValueRepr::Char(b)) => Some(CoerceResult::Char(*a, *b)),
+        (ValueRepr::Char(a), ValueRepr::String(b, _)) => {
+            let mut chars = b.chars();
+            let b = some!(chars.next());
+            if chars.next().is_none() {
+                Some(CoerceResult::Char(*a, b))
+            } else {
+                None
+            }
+        }
+        (ValueRepr::String(a, _), ValueRepr::Char(b)) => {
+            let mut chars = a.chars();
+            let a = some!(chars.next());
+            if chars.next().is_none() {
+                Some(CoerceResult::Char(a, *b))
+            } else {
+                None
+            }
         }
         (ValueRepr::String(a, _), ValueRepr::String(b, _)) => Some(CoerceResult::Str(a, b)),
         (ValueRepr::I64(a), ValueRepr::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
