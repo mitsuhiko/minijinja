@@ -42,7 +42,13 @@ impl<'de> Visitor<'de> for KeyVisitor {
     visit_key_primitive!(visit_u16, u16, I64);
     visit_key_primitive!(visit_u32, u32, I64);
     visit_key_primitive!(visit_u64, u64, I64);
-    visit_key_primitive!(visit_char, char, Char);
+
+    fn visit_char<E>(self, v: char) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Key::from(v.to_string()))
+    }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where

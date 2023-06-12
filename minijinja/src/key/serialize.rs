@@ -37,7 +37,6 @@ impl<'a> Serialize for Key<'a> {
         match *self {
             Key::Bool(b) => serializer.serialize_bool(b),
             Key::I64(i) => serializer.serialize_i64(i),
-            Key::Char(c) => serializer.serialize_char(c),
             Key::String(ref s) => serializer.serialize_str(s),
             Key::Str(s) => serializer.serialize_str(s),
         }
@@ -118,7 +117,7 @@ impl Serializer for KeySerializer {
     }
 
     fn serialize_char(self, v: char) -> Result<StaticKey, InvalidKey> {
-        Ok(Key::Char(v))
+        Ok(Key::from(v.to_string()))
     }
 
     fn serialize_str(self, value: &str) -> Result<StaticKey, InvalidKey> {

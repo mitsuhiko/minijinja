@@ -107,7 +107,7 @@ impl Serializer for ValueSerializer {
     }
 
     fn serialize_char(self, v: char) -> Result<Value, InvalidValue> {
-        Ok(ValueRepr::Char(v).into())
+        Ok(ValueRepr::String(Arc::new(v.to_string()), StringType::Normal).into())
     }
 
     fn serialize_str(self, value: &str) -> Result<Value, InvalidValue> {
