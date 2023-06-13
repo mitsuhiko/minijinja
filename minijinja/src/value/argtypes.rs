@@ -192,43 +192,38 @@ macro_rules! tuple_impls {
         {
             type Output = ($($name::Output,)* $rest_name::Output ,);
 
-            fn from_values(state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
+            fn from_values(state: Option<&'a State>, mut values: &'a [Value]) -> Result<Self::Output, Error> {
                 #![allow(non_snake_case, unused)]
                 $( let $name; )*
-                let $rest_name;
+                let mut $rest_name = None;
                 let mut idx = 0;
 
                 // special case: the last type is marked trailing (eg: for Kwargs) and we have at
                 // least one value.  In that case we need to read it first before going to the rest
                 // of the arguments.  This is needed to support from_args::<(&[Value], Kwargs)>
                 // or similar.
-                let too_many = if $rest_name::is_trailing() && !values.is_empty() {
+                let rest_first = $rest_name::is_trailing() && !values.is_empty();
+                if rest_first {
                     let (val, offset) = ok!($rest_name::from_state_and_values(state, values, values.len() - 1));
-                    $rest_name = val;
-                    let values = &values[..values.len() - offset];
-                    $(
-                        let (val, offset) = ok!($name::from_state_and_values(state, values, idx));
-                        $name = val;
-                        idx += offset;
-                    )*
-                    values.get(idx).is_some()
-                // regular handling of arguments
-                } else {
-                    $(
-                        let (val, offset) = ok!($name::from_state_and_values(state, values, idx));
-                        $name = val;
-                        idx += offset;
-                    )*
-                    let (val, offset) = ok!($rest_name::from_state_and_values(state, values, idx));
-                    $rest_name = val;
+                    $rest_name = Some(val);
+                    values = &values[..values.len() - offset];
+                }
+                $(
+                    let (val, offset) = ok!($name::from_state_and_values(state, values, idx));
+                    $name = val;
                     idx += offset;
-                    values.get(idx).is_some()
-                };
+                )*
 
-                if too_many {
+                if !rest_first {
+                    let (val, offset) = ok!($rest_name::from_state_and_values(state, values, idx));
+                    $rest_name = Some(val);
+                    idx += offset;
+                }
+
+                if values.get(idx).is_some() {
                     Err(Error::from(ErrorKind::TooManyArguments))
                 } else {
-                    Ok(($($name,)* $rest_name,))
+                    Ok(($($name,)* unsafe { $rest_name.unwrap_unchecked() },))
                 }
             }
         }
