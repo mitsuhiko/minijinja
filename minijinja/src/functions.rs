@@ -202,10 +202,10 @@ impl fmt::Debug for BoxedFunction {
         #[cfg(feature = "debug")]
         {
             if !self.1.is_empty() {
-                return write!(f, "{}", self.1);
+                return f.write_str(self.1);
             }
         }
-        write!(f, "function")
+        f.write_str("function")
     }
 }
 

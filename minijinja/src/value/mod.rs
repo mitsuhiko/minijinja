@@ -231,7 +231,7 @@ pub enum ValueKind {
 
 impl fmt::Display for ValueKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ty = match *self {
+        f.write_str(match *self {
             ValueKind::Undefined => "undefined",
             ValueKind::None => "none",
             ValueKind::Bool => "bool",
@@ -241,8 +241,7 @@ impl fmt::Display for ValueKind {
             ValueKind::Bytes => "bytes",
             ValueKind::Seq => "sequence",
             ValueKind::Map => "map",
-        };
-        write!(f, "{ty}")
+        })
     }
 }
 
@@ -297,12 +296,12 @@ pub(crate) enum ValueRepr {
 impl fmt::Debug for ValueRepr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ValueRepr::Undefined => write!(f, "Undefined"),
+            ValueRepr::Undefined => f.write_str("Undefined"),
             ValueRepr::Bool(val) => fmt::Debug::fmt(val, f),
             ValueRepr::U64(val) => fmt::Debug::fmt(val, f),
             ValueRepr::I64(val) => fmt::Debug::fmt(val, f),
             ValueRepr::F64(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::None => write!(f, "None"),
+            ValueRepr::None => f.write_str("None"),
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
@@ -370,12 +369,12 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
             ValueRepr::Undefined => Ok(()),
-            ValueRepr::Bool(val) => write!(f, "{val}"),
-            ValueRepr::U64(val) => write!(f, "{val}"),
-            ValueRepr::I64(val) => write!(f, "{val}"),
+            ValueRepr::Bool(val) => val.fmt(f),
+            ValueRepr::U64(val) => val.fmt(f),
+            ValueRepr::I64(val) => val.fmt(f),
             ValueRepr::F64(val) => {
                 if val.is_nan() {
-                    write!(f, "NaN")
+                    f.write_str("NaN")
                 } else if val.is_infinite() {
                     write!(f, "{}inf", if val.is_sign_negative() { "-" } else { "" })
                 } else {
@@ -386,30 +385,30 @@ impl fmt::Display for Value {
                     write!(f, "{num}")
                 }
             }
-            ValueRepr::None => write!(f, "none"),
+            ValueRepr::None => f.write_str("none"),
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
             ValueRepr::String(val, _) => write!(f, "{val}"),
             ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
             ValueRepr::Seq(values) => {
-                ok!(write!(f, "["));
+                ok!(f.write_str("["));
                 for (idx, val) in values.iter().enumerate() {
                     if idx > 0 {
-                        ok!(write!(f, ", "));
+                        ok!(f.write_str(", "));
                     }
                     ok!(write!(f, "{val:?}"));
                 }
-                write!(f, "]")
+                f.write_str("]")
             }
             ValueRepr::Map(m, _) => {
-                ok!(write!(f, "{{"));
+                ok!(f.write_str("{"));
                 for (idx, (key, val)) in m.iter().enumerate() {
                     if idx > 0 {
-                        ok!(write!(f, ", "));
+                        ok!(f.write_str(", "));
                     }
                     ok!(write!(f, "{key:?}: {val:?}"));
                 }
-                write!(f, "}}")
+                f.write_str("}")
             }
             ValueRepr::U128(val) => write!(f, "{}", { val.0 }),
             ValueRepr::Dynamic(x) => write!(f, "{x}"),

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -12,15 +13,6 @@ const RESERVED_NAMES: [&str; 8] = [
     "true", "True", "false", "False", "none", "None", "loop", "self",
 ];
 
-macro_rules! syntax_error {
-    ($msg:expr) => {{
-        return Err(Error::new(ErrorKind::SyntaxError, $msg));
-    }};
-    ($msg:expr, $($tt:tt)*) => {{
-        return Err(Error::new(ErrorKind::SyntaxError, format!($msg, $($tt)*)));
-    }};
-}
-
 fn unexpected<D: fmt::Display>(unexpected: D, expected: &str) -> Error {
     Error::new(
         ErrorKind::SyntaxError,
@@ -34,6 +26,19 @@ fn unexpected_eof(expected: &str) -> Error {
 
 fn make_const(value: Value, span: Span) -> ast::Expr<'static> {
     ast::Expr::Const(Spanned::new(ast::Const { value }, span))
+}
+
+fn syntax_error(msg: Cow<'static, str>) -> Error {
+    Error::new(ErrorKind::SyntaxError, msg)
+}
+
+macro_rules! syntax_error {
+    ($msg:expr) => {{
+        return Err(syntax_error(Cow::Borrowed($msg)));
+    }};
+    ($msg:expr, $($tt:tt)*) => {{
+        return Err(syntax_error(Cow::Owned(format!($msg, $($tt)*))));
+    }};
 }
 
 macro_rules! expect_token {
@@ -71,13 +76,13 @@ macro_rules! matches_token {
 
 macro_rules! skip_token {
     ($p:expr, $match:pat) => {
-        if matches_token!($p, $match) {
-            // we can ignore the error as matches_token! would already
-            // have created it.
-            let _ = $p.stream.next();
-            true
-        } else {
-            false
+        match $p.stream.current() {
+            Err(err) => return Err(err),
+            Ok(Some(($match, _))) => {
+                let _ = $p.stream.next();
+                true
+            }
+            _ => false,
         }
     };
 }
@@ -205,10 +210,9 @@ macro_rules! with_recursion_guard {
     ($parser:expr, $expr:expr) => {{
         $parser.depth += 1;
         if $parser.depth > MAX_RECURSION {
-            return Err(Error::new(
-                ErrorKind::SyntaxError,
+            return Err(syntax_error(Cow::Borrowed(
                 "template exceeds maximum recursion limits",
-            ));
+            )));
         }
         let rv = $expr;
         $parser.depth -= 1;
@@ -382,7 +386,7 @@ impl<'a> Parser<'a> {
                             ast::GetItem {
                                 expr,
                                 subscript_expr: ok!(start.ok_or_else(|| {
-                                    Error::new(ErrorKind::SyntaxError, "empty subscript")
+                                    syntax_error(Cow::Borrowed("empty subscript"))
                                 })),
                             },
                             self.stream.expand_span(span),
@@ -492,10 +496,9 @@ impl<'a> Parser<'a> {
                     kwargs.push((var.id, ok!(self.parse_expr_noif())));
                 }
                 _ if !kwargs.is_empty() => {
-                    return Err(Error::new(
-                        ErrorKind::SyntaxError,
+                    return Err(syntax_error(Cow::Borrowed(
                         "non-keyword arg after keyword arg",
-                    ));
+                    )));
                 }
                 _ => {
                     args.push(expr);
@@ -637,37 +640,37 @@ impl<'a> Parser<'a> {
             };
         }
 
-        Ok(match token {
-            Token::Ident("for") => ast::Stmt::ForLoop(respan!(ok!(self.parse_for_stmt()))),
-            Token::Ident("if") => ast::Stmt::IfCond(respan!(ok!(self.parse_if_cond()))),
-            Token::Ident("with") => ast::Stmt::WithBlock(respan!(ok!(self.parse_with_block()))),
-            Token::Ident("set") => match ok!(self.parse_set()) {
+        let ident = match token {
+            Token::Ident(ident) => ident,
+            token => syntax_error!("unknown {}, expected statement", token),
+        };
+
+        Ok(match ident {
+            "for" => ast::Stmt::ForLoop(respan!(ok!(self.parse_for_stmt()))),
+            "if" => ast::Stmt::IfCond(respan!(ok!(self.parse_if_cond()))),
+            "with" => ast::Stmt::WithBlock(respan!(ok!(self.parse_with_block()))),
+            "set" => match ok!(self.parse_set()) {
                 SetParseResult::Set(rv) => ast::Stmt::Set(respan!(rv)),
                 SetParseResult::SetBlock(rv) => ast::Stmt::SetBlock(respan!(rv)),
             },
-            Token::Ident("autoescape") => {
-                ast::Stmt::AutoEscape(respan!(ok!(self.parse_auto_escape())))
-            }
-            Token::Ident("filter") => {
-                ast::Stmt::FilterBlock(respan!(ok!(self.parse_filter_block())))
-            }
+            "autoescape" => ast::Stmt::AutoEscape(respan!(ok!(self.parse_auto_escape()))),
+            "filter" => ast::Stmt::FilterBlock(respan!(ok!(self.parse_filter_block()))),
             #[cfg(feature = "multi_template")]
-            Token::Ident("block") => ast::Stmt::Block(respan!(ok!(self.parse_block()))),
+            "block" => ast::Stmt::Block(respan!(ok!(self.parse_block()))),
             #[cfg(feature = "multi_template")]
-            Token::Ident("extends") => ast::Stmt::Extends(respan!(ok!(self.parse_extends()))),
+            "extends" => ast::Stmt::Extends(respan!(ok!(self.parse_extends()))),
             #[cfg(feature = "multi_template")]
-            Token::Ident("include") => ast::Stmt::Include(respan!(ok!(self.parse_include()))),
+            "include" => ast::Stmt::Include(respan!(ok!(self.parse_include()))),
             #[cfg(feature = "multi_template")]
-            Token::Ident("import") => ast::Stmt::Import(respan!(ok!(self.parse_import()))),
+            "import" => ast::Stmt::Import(respan!(ok!(self.parse_import()))),
             #[cfg(feature = "multi_template")]
-            Token::Ident("from") => ast::Stmt::FromImport(respan!(ok!(self.parse_from_import()))),
+            "from" => ast::Stmt::FromImport(respan!(ok!(self.parse_from_import()))),
             #[cfg(feature = "macros")]
-            Token::Ident("macro") => ast::Stmt::Macro(respan!(ok!(self.parse_macro()))),
+            "macro" => ast::Stmt::Macro(respan!(ok!(self.parse_macro()))),
             #[cfg(feature = "macros")]
-            Token::Ident("call") => ast::Stmt::CallBlock(respan!(ok!(self.parse_call_block()))),
-            Token::Ident("do") => ast::Stmt::Do(respan!(ok!(self.parse_do()))),
-            Token::Ident(name) => syntax_error!("unknown statement {}", name),
-            token => syntax_error!("unknown {}, expected statement", token),
+            "call" => ast::Stmt::CallBlock(respan!(ok!(self.parse_call_block()))),
+            "do" => ast::Stmt::Do(respan!(ok!(self.parse_do()))),
+            name => syntax_error!("unknown statement {}", name),
         })
     }
 
@@ -886,7 +889,7 @@ impl<'a> Parser<'a> {
             )));
         }
 
-        filter.ok_or_else(|| Error::new(ErrorKind::SyntaxError, "expected a filter"))
+        filter.ok_or_else(|| syntax_error(Cow::Borrowed("expected a filter")))
     }
 
     fn parse_filter_block(&mut self) -> Result<ast::FilterBlock<'a>, Error> {

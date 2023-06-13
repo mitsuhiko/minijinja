@@ -16,7 +16,7 @@ impl std::error::Error for InvalidValue {}
 
 impl fmt::Display for InvalidValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        self.0.fmt(f)
     }
 }
 

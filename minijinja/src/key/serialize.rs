@@ -13,7 +13,7 @@ impl std::error::Error for InvalidKey {}
 
 impl fmt::Display for InvalidKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "invalid key")
+        f.write_str("invalid key")
     }
 }
 

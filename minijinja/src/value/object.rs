@@ -529,14 +529,14 @@ pub struct SimpleSeqObject<T>(pub T);
 
 impl<T: SeqObject + 'static> fmt::Display for SimpleSeqObject<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        ok!(write!(f, "["));
+        ok!(f.write_str("["));
         for (idx, val) in (&self.0 as &dyn SeqObject).iter().enumerate() {
             if idx > 0 {
-                ok!(write!(f, ", "));
+                ok!(f.write_str(", "));
             }
             ok!(write!(f, "{val:?}"));
         }
-        write!(f, "]")
+        f.write_str("]")
     }
 }
 
@@ -559,15 +559,15 @@ pub struct SimpleStructObject<T>(pub T);
 
 impl<T: StructObject + 'static> fmt::Display for SimpleStructObject<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        ok!(write!(f, "{{"));
+        ok!(f.write_str("{"));
         for (idx, field) in self.0.fields().iter().enumerate() {
             if idx > 0 {
-                ok!(write!(f, ", "));
+                ok!(f.write_str(", "));
             }
             let val = self.0.get_field(field).unwrap_or(Value::UNDEFINED);
             ok!(write!(f, "{field:?}: {val:?}"));
         }
-        write!(f, "}}")
+        f.write_str("}")
     }
 }
 
