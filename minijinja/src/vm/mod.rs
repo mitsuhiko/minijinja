@@ -9,8 +9,10 @@ use crate::compiler::instructions::{
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
-use crate::utils::{AutoEscape, UndefinedBehavior};
-use crate::value::{ops, value_map_with_capacity, value_optimization, MapType, Value, ValueRepr};
+use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
+use crate::value::{
+    ops, value_map_with_capacity, value_optimization, KeyRef, MapType, Value, ValueRepr,
+};
 use crate::vm::context::{Context, Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
@@ -315,8 +317,8 @@ impl<'env> Vm<'env> {
                     let mut map = value_map_with_capacity(*pair_count);
                     for _ in 0..*pair_count {
                         let value = stack.pop();
-                        let key = ctx_ok!(stack.pop().try_into_key());
-                        map.insert(key, value);
+                        let key = stack.pop();
+                        map.insert(KeyRef::Value(key), value);
                     }
                     stack.push(Value(ValueRepr::Map(map.into(), MapType::Normal)))
                 }
@@ -324,13 +326,13 @@ impl<'env> Vm<'env> {
                     let mut map = value_map_with_capacity(*pair_count);
                     for _ in 0..*pair_count {
                         let value = stack.pop();
-                        let key = stack.pop().try_into_key().unwrap();
-                        map.insert(key, value);
+                        let key = stack.pop();
+                        map.insert(KeyRef::Value(key), value);
                     }
                     stack.push(Value(ValueRepr::Map(map.into(), MapType::Kwargs)))
                 }
                 Instruction::BuildList(count) => {
-                    let mut v = Vec::with_capacity(*count);
+                    let mut v = Vec::with_capacity(untrusted_size_hint(*count));
                     for _ in 0..*count {
                         v.push(stack.pop());
                     }
@@ -617,7 +619,7 @@ impl<'env> Vm<'env> {
                     let locals = state.ctx.current_locals_mut();
                     let mut module = value_map_with_capacity(locals.len());
                     for (key, value) in locals.iter() {
-                        module.insert((*key).into(), value.clone());
+                        module.insert(KeyRef::Value(Value::from(*key)), value.clone());
                     }
                     stack.push(Value(ValueRepr::Map(module.into(), MapType::Normal)));
                 }
@@ -941,7 +943,7 @@ impl<'env> Vm<'env> {
         Arc::make_mut(&mut state.macros).push((state.instructions, offset));
         stack.push(Value::from_object(Macro {
             data: Arc::new(MacroData {
-                name: Arc::new(name.to_string()),
+                name: Arc::from(name.to_string()),
                 arg_spec,
                 macro_ref_id,
                 closure,

@@ -1,8 +1,7 @@
 use std::convert::{TryFrom, TryInto};
-use std::fmt::Write;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Arc, ObjectKind, SeqObject, Value, ValueKind, ValueRepr};
+use crate::value::{KeyRef, ObjectKind, SeqObject, Value, ValueKind, ValueRepr};
 
 pub enum CoerceResult<'a> {
     I128(i128, i128),
@@ -10,7 +9,7 @@ pub enum CoerceResult<'a> {
     Str(&'a str, &'a str),
 }
 
-fn as_f64(value: &Value) -> Option<f64> {
+pub(crate) fn as_f64(value: &Value) -> Option<f64> {
     Some(match value.0 {
         ValueRepr::Bool(x) => x as i64 as f64,
         ValueRepr::U64(x) => x as f64,
@@ -248,17 +247,8 @@ pub fn neg(val: &Value) -> Result<Value, Error> {
 }
 
 /// Attempts a string concatenation.
-pub fn string_concat(mut left: Value, right: &Value) -> Value {
-    match left.0 {
-        // if we're a string and we have a single reference to it, we can
-        // directly append into ourselves and reconstruct the value
-        ValueRepr::String(ref mut s, _) => {
-            write!(Arc::make_mut(s), "{right}").ok();
-            left
-        }
-        // otherwise we use format! to concat the two values
-        _ => Value::from(format!("{left}{right}")),
-    }
+pub fn string_concat(left: Value, right: &Value) -> Value {
+    Value::from(format!("{left}{right}"))
 }
 
 /// Implements a containment operation on values.
@@ -277,11 +267,7 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
     } else if let Some(seq) = container.as_seq() {
         seq.iter().any(|item| &item == value)
     } else if let ValueRepr::Map(ref map, _) = container.0 {
-        let key = match value.clone().try_into_key() {
-            Ok(key) => key,
-            Err(_) => return Ok(Value::from(false)),
-        };
-        map.get(&key).is_some()
+        map.get(&KeyRef::Value(value.clone())).is_some()
     } else {
         return Err(Error::new(
             ErrorKind::InvalidOperation,

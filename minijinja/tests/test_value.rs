@@ -1,5 +1,4 @@
 use std::fmt;
-use std::sync::Arc;
 
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
@@ -189,13 +188,6 @@ fn test_builtin_seq_objects() {
         val => Value::from_seq_object(&["foo", "bar"][..]),
     );
     assert_snapshot!(rv, @r###"["foo", "bar"]"###);
-}
-
-#[test]
-fn test_value_string_interop() {
-    let s = Arc::new(String::from("Hello"));
-    let v = Value::from(s);
-    assert_eq!(v.as_str(), Some("Hello"));
 }
 
 #[test]
@@ -390,5 +382,22 @@ fn test_seq_object_borrow() {
             )
             .unwrap(),
         Value::from("HELLO42")
+    );
+}
+
+#[test]
+fn test_complex_key() {
+    let value = Value::from_iter([
+        (Value::from_iter([0u32, 0u32]), "origin"),
+        (Value::from_iter([0u32, 1u32]), "right"),
+    ]);
+
+    assert_eq!(
+        value.get_item(&Value::from_iter([0, 0])).ok(),
+        Some(Value::from("origin"))
+    );
+    assert_eq!(
+        value.get_item(&Value::from_iter([0, 42])).ok(),
+        Some(Value::UNDEFINED)
     );
 }

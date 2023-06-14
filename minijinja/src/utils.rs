@@ -21,6 +21,12 @@ pub fn memstr(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         .position(|window| window == needle)
 }
 
+/// Helper for dealing with untrusted size hints.
+#[inline(always)]
+pub(crate) fn untrusted_size_hint(value: usize) -> usize {
+    value.min(1024)
+}
+
 fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
     if matches!(
         value.kind(),

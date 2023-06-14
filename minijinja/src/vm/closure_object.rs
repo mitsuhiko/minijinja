@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use crate::key::{Key, StaticKey};
 use crate::value::{Object, ObjectKind, StructObject, Value};
 
 /// Utility to enclose values for macros.
@@ -10,24 +9,21 @@ use crate::value::{Object, ObjectKind, StructObject, Value};
 /// See `closure` on the [`Frame`] for how it's used.
 #[derive(Debug, Default)]
 pub(crate) struct Closure {
-    values: Mutex<BTreeMap<StaticKey, Value>>,
+    values: Mutex<BTreeMap<Arc<str>, Value>>,
 }
 
 impl Closure {
     /// Stores a value by key in the closure.
     pub fn store(&self, key: &str, value: Value) {
-        self.values
-            .lock()
-            .unwrap()
-            .insert(StaticKey::from(key), value);
+        self.values.lock().unwrap().insert(Arc::from(key), value);
     }
 
     /// Upset a value into the closure.
     #[cfg(feature = "macros")]
     pub fn store_if_missing<F: FnOnce() -> Value>(&self, key: &str, f: F) {
         let mut values = self.values.lock().unwrap();
-        if !values.contains_key(&Key::Str(key)) {
-            values.insert(key.into(), f());
+        if !values.contains_key(key) {
+            values.insert(Arc::from(key), f());
         }
     }
 }
@@ -49,20 +45,11 @@ impl Object for Closure {
 }
 
 impl StructObject for Closure {
-    fn fields(&self) -> Vec<Arc<String>> {
-        self.values
-            .lock()
-            .unwrap()
-            .keys()
-            .filter_map(|x| match x {
-                Key::String(s) => Some(s.clone()),
-                Key::Str(s) => Some(Arc::new(s.to_string())),
-                _ => None,
-            })
-            .collect()
+    fn fields(&self) -> Vec<Arc<str>> {
+        self.values.lock().unwrap().keys().cloned().collect()
     }
 
     fn get_field(&self, name: &str) -> Option<Value> {
-        self.values.lock().unwrap().get(&Key::Str(name)).cloned()
+        self.values.lock().unwrap().get(name).cloned()
     }
 }

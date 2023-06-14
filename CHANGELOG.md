@@ -7,6 +7,10 @@ All notable changes to MiniJinja are documented here.
 - `Value` now implements `Ord`.  This also improves the ability of the engine
   to sort more complex values in filters.  (#295)
 
+- `Arc<String>` was replaced with `Arc<str>` in some of the public APIs where
+  this shined through.  Support for more complex key types in maps was added.
+  You can now have tuple keys for instance.  (#297)
+
 ## 1.0.0-alpha.3
 
 - Removed `char` as a value type.  Characters are nor represented as strings

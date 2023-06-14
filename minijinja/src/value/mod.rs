@@ -106,6 +106,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -113,9 +114,9 @@ use serde::ser::{Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind};
 use crate::functions;
-use crate::key::{Key, StaticKey};
 use crate::utils::OnDrop;
 use crate::value::object::{SimpleSeqObject, SimpleStructObject};
+use crate::value::ops::as_f64;
 use crate::value::serialize::transform;
 use crate::vm::State;
 
@@ -125,19 +126,22 @@ pub use crate::value::object::{Object, ObjectKind, SeqObject, SeqObjectIter, Str
 mod argtypes;
 #[cfg(feature = "deserialization")]
 mod deserialize;
+mod keyref;
 mod object;
 pub(crate) mod ops;
 mod serialize;
+
+pub(crate) use crate::value::keyref::KeyRef;
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
 const VALUE_HANDLE_MARKER: &str = "\x01__minijinja_ValueHandle";
 
 #[cfg(feature = "preserve_order")]
-pub(crate) type ValueMap = indexmap::IndexMap<StaticKey, Value>;
+pub(crate) type ValueMap = indexmap::IndexMap<KeyRef<'static>, Value>;
 
 #[cfg(not(feature = "preserve_order"))]
-pub(crate) type ValueMap = std::collections::BTreeMap<StaticKey, Value>;
+pub(crate) type ValueMap = std::collections::BTreeMap<KeyRef<'static>, Value>;
 
 #[inline(always)]
 pub(crate) fn value_map_with_capacity(capacity: usize) -> ValueMap {
@@ -148,7 +152,7 @@ pub(crate) fn value_map_with_capacity(capacity: usize) -> ValueMap {
     }
     #[cfg(feature = "preserve_order")]
     {
-        ValueMap::with_capacity(capacity)
+        ValueMap::with_capacity(crate::utils::untrusted_size_hint(capacity))
     }
 }
 
@@ -181,16 +185,20 @@ pub fn serializing_for_value() -> bool {
     INTERNAL_SERIALIZATION.with(|flag| flag.get())
 }
 
-/// When key interning is enabled while the returned token is held keys are
-/// interned in a map, freed at the end of the section.
-#[cfg(feature = "key_interning")]
-pub(crate) use crate::key::key_interning::use_string_cache as value_optimization;
-
-/// Without key interning this is a dummy drop.
-#[cfg(not(feature = "key_interning"))]
+/// Enables value optimizations.
+///
+/// If `key_interning` is enabled, this turns on that feature, otherwise
+/// it becomes a noop.
 #[inline(always)]
 pub(crate) fn value_optimization() -> impl Drop {
-    OnDrop::new(|| {})
+    #[cfg(feature = "key_interning")]
+    {
+        crate::value::keyref::key_interning::use_string_cache()
+    }
+    #[cfg(not(feature = "key_interning"))]
+    {
+        OnDrop::new(|| {})
+    }
 }
 
 fn mark_internal_serialization() -> impl Drop {
@@ -283,10 +291,10 @@ pub(crate) enum ValueRepr {
     I64(i64),
     F64(f64),
     None,
-    Invalid(Arc<String>),
+    Invalid(Arc<str>),
     U128(Packed<u128>),
     I128(Packed<i128>),
-    String(Arc<String>, StringType),
+    String(Arc<str>, StringType),
     Bytes(Arc<Vec<u8>>),
     Seq(Arc<Vec<Value>>),
     Map(Arc<ValueMap>, MapType),
@@ -310,6 +318,51 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
             ValueRepr::Map(val, _) => fmt::Debug::fmt(val, f),
             ValueRepr::Dynamic(val) => fmt::Debug::fmt(val, f),
+        }
+    }
+}
+
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match &self.0 {
+            ValueRepr::None | ValueRepr::Undefined => 0u8.hash(state),
+            ValueRepr::String(ref s, _) => s.hash(state),
+            ValueRepr::Bool(b) => b.hash(state),
+            ValueRepr::Invalid(s) => s.hash(state),
+            ValueRepr::Bytes(b) => b.hash(state),
+            ValueRepr::Seq(b) => b.hash(state),
+            ValueRepr::Map(m, _) => m.iter().for_each(|(k, v)| {
+                k.hash(state);
+                v.hash(state);
+            }),
+            ValueRepr::Dynamic(d) => match d.kind() {
+                ObjectKind::Plain => 0u8.hash(state),
+                ObjectKind::Seq(s) => s.iter().for_each(|x| x.hash(state)),
+                ObjectKind::Struct(s) => {
+                    if let Some(fields) = s.static_fields() {
+                        fields.iter().for_each(|k| {
+                            k.hash(state);
+                            s.get_field(k).hash(state);
+                        });
+                    } else {
+                        s.fields().iter().for_each(|k| {
+                            k.hash(state);
+                            s.get_field(k).hash(state);
+                        });
+                    }
+                }
+            },
+            ValueRepr::U64(_)
+            | ValueRepr::I64(_)
+            | ValueRepr::F64(_)
+            | ValueRepr::U128(_)
+            | ValueRepr::I128(_) => {
+                if let Ok(val) = i64::try_from(self.clone()) {
+                    val.hash(state)
+                } else {
+                    as_f64(self).map(|x| x.to_bits()).hash(state)
+                }
+            }
         }
     }
 }
@@ -472,11 +525,14 @@ impl Default for Value {
 /// same functionality.  There is no guarantee that a string will be interned
 /// as there are heuristics involved for it.  Additionally the string interning
 /// will only work during the template engine execution (eg: within filters etc.).
-pub fn intern(s: &str) -> Arc<String> {
-    if let Key::String(ref s) = Key::make_string_key(s) {
-        s.clone()
-    } else {
-        unreachable!()
+pub fn intern(s: &str) -> Arc<str> {
+    #[cfg(feature = "key_interning")]
+    {
+        crate::value::keyref::key_interning::try_intern(s)
+    }
+    #[cfg(not(feature = "key_interning"))]
+    {
+        Arc::from(s.to_string())
     }
 }
 
@@ -525,7 +581,7 @@ impl Value {
     /// let val = Value::from_safe_string("<em>note</em>".into());
     /// ```
     pub fn from_safe_string(value: String) -> Value {
-        ValueRepr::String(Arc::new(value), StringType::Safe).into()
+        ValueRepr::String(Arc::from(value), StringType::Safe).into()
     }
 
     /// Creates a value from a dynamic object.
@@ -697,7 +753,7 @@ impl Value {
     /// If the value is a string, return it.
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
-            ValueRepr::String(ref s, _) => Some(s.as_str()),
+            ValueRepr::String(ref s, _) => Some(s as &str),
             _ => None,
         }
     }
@@ -785,7 +841,7 @@ impl Value {
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
         Ok(match self.0 {
             ValueRepr::Undefined => return Err(Error::from(ErrorKind::UndefinedError)),
-            ValueRepr::Map(ref items, _) => items.get(&Key::Str(key)).cloned(),
+            ValueRepr::Map(ref items, _) => items.get(&KeyRef::Str(key)).cloned(),
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Struct(s) => s.get_field(key),
                 ObjectKind::Plain | ObjectKind::Seq(_) => None,
@@ -803,7 +859,7 @@ impl Value {
     /// also not be created.
     pub(crate) fn get_attr_fast(&self, key: &str) -> Option<Value> {
         match self.0 {
-            ValueRepr::Map(ref items, _) => items.get(&Key::Str(key)).cloned(),
+            ValueRepr::Map(ref items, _) => items.get(&KeyRef::Str(key)).cloned(),
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Struct(s) => s.get_field(key),
                 ObjectKind::Plain | ObjectKind::Seq(_) => None,
@@ -914,7 +970,7 @@ impl Value {
     }
 
     pub(crate) fn get_item_opt(&self, key: &Value) -> Option<Value> {
-        let key = some!(Key::from_borrowed_value(key).ok());
+        let key = KeyRef::Value(key.clone());
 
         let seq = match self.0 {
             ValueRepr::Map(ref items, _) => return items.get(&key).cloned(),
@@ -922,14 +978,16 @@ impl Value {
             ValueRepr::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Plain => return None,
                 ObjectKind::Seq(s) => s,
-                ObjectKind::Struct(s) => match key {
-                    Key::String(ref key) => return s.get_field(key),
-                    Key::Str(key) => return s.get_field(key),
-                    _ => return None,
-                },
+                ObjectKind::Struct(s) => {
+                    return if let Some(key) = key.as_str() {
+                        s.get_field(key)
+                    } else {
+                        None
+                    };
+                }
             },
             ValueRepr::String(ref s, _) => {
-                if let Key::I64(idx) = key {
+                if let Some(idx) = key.as_i64() {
                     let idx = some!(isize::try_from(idx).ok());
                     let idx = if idx < 0 {
                         some!(s.chars().count().checked_sub(-idx as usize))
@@ -944,7 +1002,7 @@ impl Value {
             _ => return None,
         };
 
-        if let Key::I64(idx) = key {
+        if let Some(idx) = key.as_i64() {
             let idx = some!(isize::try_from(idx).ok());
             let idx = if idx < 0 {
                 some!(seq.item_count().checked_sub(-idx as usize))
@@ -1008,7 +1066,7 @@ impl Value {
         match self.0 {
             ValueRepr::Dynamic(ref dy) => return dy.call_method(state, name, args),
             ValueRepr::Map(ref map, _) => {
-                if let Some(value) = map.get(&Key::Str(name)) {
+                if let Some(value) = map.get(&KeyRef::Str(name)) {
                     return value.call(state, args);
                 }
             }
@@ -1018,24 +1076,6 @@ impl Value {
             ErrorKind::InvalidOperation,
             format!("object has no method named {name}"),
         ))
-    }
-
-    pub(crate) fn try_into_key(self) -> Result<StaticKey, Error> {
-        match self.0 {
-            ValueRepr::Bool(val) => Ok(Key::Bool(val)),
-            ValueRepr::U64(v) => TryFrom::try_from(v)
-                .map(Key::I64)
-                .map_err(|_| ErrorKind::NonKey.into()),
-            ValueRepr::U128(v) => TryFrom::try_from(v.0)
-                .map(Key::I64)
-                .map_err(|_| ErrorKind::NonKey.into()),
-            ValueRepr::I64(v) => Ok(Key::I64(v)),
-            ValueRepr::I128(v) => TryFrom::try_from(v.0)
-                .map(Key::I64)
-                .map_err(|_| ErrorKind::NonKey.into()),
-            ValueRepr::String(ref s, _) => Ok(Key::String(s.clone())),
-            _ => Err(ErrorKind::NonKey.into()),
-        }
     }
 
     /// Iterates over the value without holding a reference.
@@ -1170,7 +1210,7 @@ impl Serialize for Value {
                     } else {
                         for k in s.fields() {
                             let v = s.get_field(&k).unwrap_or(Value::UNDEFINED);
-                            ok!(map.serialize_entry(k.as_str(), &v));
+                            ok!(map.serialize_entry(&*k as &str, &v));
                         }
                     }
                     map.end()
@@ -1225,13 +1265,13 @@ impl fmt::Debug for OwnedValueIterator {
 
 enum ValueIteratorState {
     Empty,
-    Chars(usize, Arc<String>),
+    Chars(usize, Arc<str>),
     Seq(usize, Arc<Vec<Value>>),
     StaticStr(usize, &'static [&'static str]),
-    ArcStr(usize, Vec<Arc<String>>),
+    ArcStr(usize, Vec<Arc<str>>),
     DynSeq(usize, Arc<dyn Object>),
     #[cfg(not(feature = "preserve_order"))]
-    Map(Option<StaticKey>, Arc<ValueMap>),
+    Map(Option<KeyRef<'static>>, Arc<ValueMap>),
     #[cfg(feature = "preserve_order")]
     Map(usize, Arc<ValueMap>),
 }
@@ -1241,7 +1281,7 @@ impl ValueIteratorState {
         match self {
             ValueIteratorState::Empty => None,
             ValueIteratorState::Chars(offset, ref s) => {
-                s.as_str()[*offset..].chars().next().map(|c| {
+                (s as &str)[*offset..].chars().next().map(|c| {
                     *offset += c.len_utf8();
                     Value::from(c)
                 })
@@ -1274,7 +1314,7 @@ impl ValueIteratorState {
             #[cfg(feature = "preserve_order")]
             ValueIteratorState::Map(idx, map) => map.get_index(*idx).map(|x| {
                 *idx += 1;
-                Value::from(x.0.clone())
+                Value::from(x.0)
             }),
             #[cfg(not(feature = "preserve_order"))]
             ValueIteratorState::Map(ptr, map) => {
