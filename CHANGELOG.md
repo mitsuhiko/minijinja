@@ -13,7 +13,7 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.0-alpha.3
 
-- Removed `char` as a value type.  Characters are nor represented as strings
+- Removed `char` as a value type.  Characters are now represented as strings
   instead.  This solves a bunch of Jinja2 incompatibilities that resulted by
   indexing into strings.  (#292)
 
