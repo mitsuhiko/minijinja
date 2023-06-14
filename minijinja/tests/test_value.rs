@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::fmt;
 use std::sync::Arc;
 
@@ -19,7 +18,7 @@ fn test_sort() {
         Value::from(99i128),
         Value::from(1000f32),
     ];
-    v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+    v.sort();
     insta::assert_debug_snapshot!(&v, @r###"
     [
         false,

@@ -253,7 +253,6 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::key::Key;
     use crate::value::{Kwargs, ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::cmp::Ordering;
@@ -361,11 +360,7 @@ mod builtins {
                 .to_ascii_lowercase()
                 .cmp(&b.to_string().to_ascii_lowercase());
         }
-        match (Key::from_borrowed_value(a), Key::from_borrowed_value(b)) {
-            (Ok(a), Ok(b)) => a.partial_cmp(&b),
-            _ => a.partial_cmp(b),
-        }
-        .unwrap_or(Ordering::Less)
+        a.cmp(b)
     }
 
     /// Dict sorting functionality.
@@ -656,9 +651,7 @@ mod builtins {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
-        Ok(iter
-            .min_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less))
-            .unwrap_or(Value::UNDEFINED))
+        Ok(iter.min().unwrap_or(Value::UNDEFINED))
     }
 
     /// Returns the largest item from the list.
@@ -667,9 +660,7 @@ mod builtins {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
-        Ok(iter
-            .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Less))
-            .unwrap_or(Value::UNDEFINED))
+        Ok(iter.max().unwrap_or(Value::UNDEFINED))
     }
 
     /// Returns the sorted version of the given list.
