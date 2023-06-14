@@ -325,6 +325,7 @@ impl PartialEq for Value {
             (ValueRepr::Undefined, ValueRepr::Undefined) => true,
             (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a == b,
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
+            (ValueRepr::Map(ref a, _), ValueRepr::Map(ref b, _)) => a.iter().eq(b.iter()),
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
@@ -332,6 +333,20 @@ impl PartialEq for Value {
                 None => {
                     if let (Some(a), Some(b)) = (self.as_seq(), other.as_seq()) {
                         a.iter().eq(b.iter())
+                    } else if let (Some(a), Some(b)) = (self.as_struct(), other.as_struct()) {
+                        if let (Some(static_a), Some(static_b)) =
+                            (a.static_fields(), b.static_fields())
+                        {
+                            static_a
+                                .iter()
+                                .map(|x| (x, a.get_field(x)))
+                                .eq(static_b.iter().map(|x| (x, b.get_field(x))))
+                        } else {
+                            a.fields()
+                                .iter()
+                                .map(|x| (x, a.get_field(x)))
+                                .eq(b.fields().iter().map(|x| (x, b.get_field(x))))
+                        }
                     } else {
                         false
                     }
@@ -348,14 +363,42 @@ impl PartialOrd for Value {
         match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => Some(Ordering::Equal),
             (ValueRepr::Undefined, ValueRepr::Undefined) => Some(Ordering::Equal),
+            (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a.partial_cmp(b),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.partial_cmp(b),
+            (ValueRepr::Map(ref a, _), ValueRepr::Map(ref b, _)) => a.iter().partial_cmp(b.iter()),
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a.partial_cmp(&b),
                 Some(ops::CoerceResult::I128(a, b)) => a.partial_cmp(&b),
                 Some(ops::CoerceResult::Str(a, b)) => a.partial_cmp(b),
-                None => None,
+                None => {
+                    if let (Some(a), Some(b)) = (self.as_seq(), other.as_seq()) {
+                        a.iter().partial_cmp(b.iter())
+                    } else if let (Some(a), Some(b)) = (self.as_struct(), other.as_struct()) {
+                        if let (Some(static_a), Some(static_b)) =
+                            (a.static_fields(), b.static_fields())
+                        {
+                            static_a
+                                .iter()
+                                .map(|x| (x, a.get_field(x)))
+                                .partial_cmp(static_b.iter().map(|x| (x, b.get_field(x))))
+                        } else {
+                            a.fields()
+                                .iter()
+                                .map(|x| (x, a.get_field(x)))
+                                .partial_cmp(b.fields().iter().map(|x| (x, b.get_field(x))))
+                        }
+                    } else {
+                        None
+                    }
+                }
             },
         }
+    }
+}
+
+impl Ord for Value {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Less)
     }
 }
 

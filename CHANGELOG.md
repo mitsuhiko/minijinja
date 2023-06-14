@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.0-alpha.4
+
+- `Value` now implements `Ord`.  This also improves the ability of the engine
+  to sort more complex values in filters.  (#295)
+
 ## 1.0.0-alpha.3
 
 - Removed `char` as a value type.  Characters are nor represented as strings
