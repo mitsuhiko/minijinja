@@ -1314,7 +1314,7 @@ impl ValueIteratorState {
             #[cfg(feature = "preserve_order")]
             ValueIteratorState::Map(idx, map) => map.get_index(*idx).map(|x| {
                 *idx += 1;
-                Value::from(x.0)
+                x.0.as_value()
             }),
             #[cfg(not(feature = "preserve_order"))]
             ValueIteratorState::Map(ptr, map) => {

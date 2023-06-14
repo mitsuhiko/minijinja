@@ -31,30 +31,10 @@ impl<'a> KeyRef<'a> {
             KeyRef::Str(_) => None,
         }
     }
-}
 
-impl<'a> From<&'a Value> for KeyRef<'a> {
-    fn from(value: &'a Value) -> Self {
-        if let Some(s) = value.as_str() {
-            KeyRef::Str(s)
-        } else {
-            KeyRef::Value(value.clone())
-        }
-    }
-}
-
-impl<'a> From<KeyRef<'a>> for Value {
-    fn from(value: KeyRef<'a>) -> Self {
-        match value {
-            KeyRef::Value(v) => v,
-            KeyRef::Str(s) => Value::from(intern(s)),
-        }
-    }
-}
-
-impl<'a> From<&'a KeyRef<'a>> for Value {
-    fn from(value: &'a KeyRef<'a>) -> Self {
-        match value {
+    /// Return this as value.
+    pub fn as_value(&self) -> Value {
+        match self {
             KeyRef::Value(v) => v.clone(),
             KeyRef::Str(s) => Value::from(intern(s)),
         }
@@ -87,7 +67,7 @@ impl<'a> PartialEq for KeyRef<'a> {
         if let (Some(a), Some(b)) = (self.as_str(), other.as_str()) {
             a.eq(b)
         } else {
-            Value::from(self).eq(&Value::from(other))
+            self.as_value().eq(&other.as_value())
         }
     }
 }
@@ -99,7 +79,7 @@ impl<'a> PartialOrd for KeyRef<'a> {
         if let (Some(a), Some(b)) = (self.as_str(), other.as_str()) {
             a.partial_cmp(b)
         } else {
-            Value::from(self).partial_cmp(&Value::from(other))
+            self.as_value().partial_cmp(&other.as_value())
         }
     }
 }
@@ -109,7 +89,7 @@ impl<'a> Ord for KeyRef<'a> {
         if let (Some(a), Some(b)) = (self.as_str(), other.as_str()) {
             a.cmp(b)
         } else {
-            Value::from(self).cmp(&Value::from(other))
+            self.as_value().cmp(&other.as_value())
         }
     }
 }
@@ -119,7 +99,7 @@ impl<'a> Hash for KeyRef<'a> {
         if let Some(s) = self.as_str() {
             s.hash(state)
         } else {
-            Value::from(self).hash(state)
+            self.as_value().hash(state)
         }
     }
 }

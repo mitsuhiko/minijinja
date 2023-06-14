@@ -295,9 +295,7 @@ impl From<()> for Value {
 
 impl<V: Into<Value>> FromIterator<V> for Value {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
-        let vec = iter.into_iter().map(|v| v.into()).collect();
-
-        ValueRepr::Seq(Arc::new(vec)).into()
+        ValueRepr::Seq(Arc::new(iter.into_iter().map(Into::into).collect())).into()
     }
 }
 
@@ -307,16 +305,13 @@ impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
             .into_iter()
             .map(|(k, v)| (KeyRef::Value(k.into()), v.into()))
             .collect();
-
         ValueRepr::Map(Arc::new(map), MapType::Normal).into()
     }
 }
 
 impl<K: Into<Value>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
     fn from(val: BTreeMap<K, V>) -> Self {
-        val.into_iter()
-            .map(|(k, v)| (KeyRef::Value(k.into()), v.into()))
-            .collect()
+        val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
     }
 }
 
