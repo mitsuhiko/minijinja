@@ -23,8 +23,7 @@ macro_rules! some {
 /// Hidden utility module for the [`context!`](crate::context!) macro.
 #[doc(hidden)]
 pub mod __context {
-    use crate::key::Key;
-    use crate::value::{MapType, Value, ValueMap, ValueRepr};
+    use crate::value::{KeyRef, MapType, Value, ValueMap, ValueRepr};
     use crate::Environment;
     use std::rc::Rc;
     use std::sync::Arc;
@@ -41,7 +40,7 @@ pub mod __context {
 
     #[inline(always)]
     pub fn add(ctx: &mut ValueMap, key: &'static str, value: Value) {
-        ctx.insert(Key::Str(key), value);
+        ctx.insert(KeyRef::Str(key), value);
     }
 
     #[inline(always)]

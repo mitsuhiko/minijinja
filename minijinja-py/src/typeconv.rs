@@ -31,7 +31,7 @@ impl StructObject for DictLikeObject {
         })
     }
 
-    fn fields(&self) -> Vec<Arc<String>> {
+    fn fields(&self) -> Vec<Arc<str>> {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
             inner.keys().iter().map(|x| x.to_string().into()).collect()

@@ -460,7 +460,7 @@ pub trait StructObject: Send + Sync {
     /// be implemented due to lifetime restrictions.  The default implementation
     /// converts the return value of [`static_fields`](Self::static_fields) into
     /// a compatible format automatically.
-    fn fields(&self) -> Vec<Arc<String>> {
+    fn fields(&self) -> Vec<Arc<str>> {
         self.static_fields()
             .into_iter()
             .flat_map(|fields| fields.iter().copied().map(intern))
@@ -492,7 +492,7 @@ impl<T: StructObject> StructObject for Arc<T> {
     }
 
     #[inline]
-    fn fields(&self) -> Vec<Arc<String>> {
+    fn fields(&self) -> Vec<Arc<str>> {
         T::fields(self)
     }
 
@@ -514,7 +514,7 @@ impl<'a, T: StructObject + ?Sized> StructObject for &'a T {
     }
 
     #[inline]
-    fn fields(&self) -> Vec<Arc<String>> {
+    fn fields(&self) -> Vec<Arc<str>> {
         T::fields(self)
     }
 

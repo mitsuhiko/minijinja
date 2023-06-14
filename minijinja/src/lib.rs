@@ -194,7 +194,6 @@ mod defaults;
 mod environment;
 mod error;
 mod expression;
-mod key;
 mod output;
 mod template;
 mod utils;

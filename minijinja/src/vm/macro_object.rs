@@ -3,16 +3,17 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::key::Key;
 use crate::output::Output;
 use crate::utils::AutoEscape;
-use crate::value::{MapType, Object, ObjectKind, StringType, StructObject, Value, ValueRepr};
+use crate::value::{
+    KeyRef, MapType, Object, ObjectKind, StringType, StructObject, Value, ValueRepr,
+};
 use crate::vm::state::State;
 use crate::vm::Vm;
 
 pub(crate) struct MacroData {
-    pub name: Arc<String>,
-    pub arg_spec: Vec<Arc<String>>,
+    pub name: Arc<str>,
+    pub arg_spec: Vec<Arc<str>>,
     // because values need to be 'static, we can't hold a reference to the
     // instructions that declared the macro.  Instead of that we place the
     // reference to the macro instruction (and the jump offset) in the
@@ -61,7 +62,7 @@ impl Object for Macro {
         let mut arg_values = Vec::with_capacity(self.data.arg_spec.len());
         for (idx, name) in self.data.arg_spec.iter().enumerate() {
             let kwarg = match kwargs {
-                Some(kwargs) => kwargs.get(&Key::Str(name)),
+                Some(kwargs) => kwargs.get(&KeyRef::Str(name)),
                 _ => None,
             };
             arg_values.push(match (args.get(idx), kwarg) {
@@ -84,7 +85,7 @@ impl Object for Macro {
             kwargs_used.insert("caller");
             Some(
                 kwargs
-                    .and_then(|x| x.get(&Key::Str("caller")).cloned())
+                    .and_then(|x| x.get(&KeyRef::Str("caller")).cloned())
                     .unwrap_or(Value::UNDEFINED),
             )
         } else {

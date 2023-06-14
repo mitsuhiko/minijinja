@@ -8,7 +8,7 @@ use minijinja::{Environment, Error, ErrorKind};
 /// A copy-on-write object that holds an assembled query.
 #[derive(Debug, Clone)]
 pub struct Query {
-    table: Arc<String>,
+    table: Arc<str>,
     filters: Arc<HashMap<String, Value>>,
     limit: Option<usize>,
     offset: Option<usize>,
@@ -24,7 +24,7 @@ impl Query {
     /// Creates an empty query object for a specific table.
     fn new(table: String) -> Self {
         Query {
-            table: Arc::new(table),
+            table: Arc::from(table),
             filters: Default::default(),
             limit: None,
             offset: None,

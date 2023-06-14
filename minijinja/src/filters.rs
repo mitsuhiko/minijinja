@@ -1205,13 +1205,9 @@ mod builtins {
         let mut seen = BTreeSet::new();
 
         for item in values {
-            if let Ok(key) = item.clone().try_into_key() {
-                if !seen.contains(&key) {
-                    seen.insert(key);
-                    rv.push(item.clone());
-                }
-            } else {
+            if !seen.contains(&item) {
                 rv.push(item.clone());
+                seen.insert(item);
             }
         }
 

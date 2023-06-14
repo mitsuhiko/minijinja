@@ -338,7 +338,7 @@ impl<T: StructObject + Send + Sync + 'static + ?Sized> StructObject for StackHan
         self.with(|val| val.static_fields())
     }
 
-    fn fields(&self) -> Vec<Arc<String>> {
+    fn fields(&self) -> Vec<Arc<str>> {
         self.with(|val| val.fields())
     }
 
@@ -413,7 +413,7 @@ impl<T: Object + ?Sized> StructObject for StackHandleProxy<T> {
             .with(|val| unwrap_kind!(val, ObjectKind::Struct).get_field(name))
     }
 
-    fn fields(&self) -> Vec<Arc<String>> {
+    fn fields(&self) -> Vec<Arc<str>> {
         self.0
             .with(|val| unwrap_kind!(val, ObjectKind::Struct).fields())
     }

@@ -5,10 +5,10 @@ use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut};
 
 use crate::error::{Error, ErrorKind};
-use crate::key::{Key, StaticKey};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
-    Arc, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, ValueMap, ValueRepr,
+    Arc, KeyRef, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, ValueMap,
+    ValueRepr,
 };
 use crate::vm::State;
 
@@ -265,14 +265,14 @@ impl<'a> From<&'a [u8]> for Value {
 impl<'a> From<&'a str> for Value {
     #[inline(always)]
     fn from(val: &'a str) -> Self {
-        ValueRepr::String(Arc::new(val.into()), StringType::Normal).into()
+        ValueRepr::String(Arc::from(val.to_string()), StringType::Normal).into()
     }
 }
 
 impl From<String> for Value {
     #[inline(always)]
     fn from(val: String) -> Self {
-        ValueRepr::String(Arc::new(val), StringType::Normal).into()
+        ValueRepr::String(Arc::from(val), StringType::Normal).into()
     }
 }
 
@@ -293,17 +293,6 @@ impl From<()> for Value {
     }
 }
 
-impl<'a> From<Key<'a>> for Value {
-    fn from(val: Key) -> Self {
-        match val {
-            Key::Bool(val) => val.into(),
-            Key::I64(val) => val.into(),
-            Key::String(val) => ValueRepr::String(val, StringType::Normal).into(),
-            Key::Str(val) => val.into(),
-        }
-    }
-}
-
 impl<V: Into<Value>> FromIterator<V> for Value {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
         let vec = iter.into_iter().map(|v| v.into()).collect();
@@ -312,24 +301,26 @@ impl<V: Into<Value>> FromIterator<V> for Value {
     }
 }
 
-impl<K: Into<StaticKey>, V: Into<Value>> FromIterator<(K, V)> for Value {
+impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let map = iter
             .into_iter()
-            .map(|(k, v)| (k.into(), v.into()))
+            .map(|(k, v)| (KeyRef::Value(k.into()), v.into()))
             .collect();
 
         ValueRepr::Map(Arc::new(map), MapType::Normal).into()
     }
 }
 
-impl<K: Into<StaticKey>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
+impl<K: Into<Value>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
     fn from(val: BTreeMap<K, V>) -> Self {
-        val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
+        val.into_iter()
+            .map(|(k, v)| (KeyRef::Value(k.into()), v.into()))
+            .collect()
     }
 }
 
-impl<K: Into<StaticKey>, V: Into<Value>> From<HashMap<K, V>> for Value {
+impl<K: Into<Value>, V: Into<Value>> From<HashMap<K, V>> for Value {
     fn from(val: HashMap<K, V>) -> Self {
         val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
     }
@@ -347,8 +338,8 @@ impl<T: Object> From<Arc<T>> for Value {
     }
 }
 
-impl From<Arc<String>> for Value {
-    fn from(value: Arc<String>) -> Self {
+impl From<Arc<str>> for Value {
+    fn from(value: Arc<str>) -> Self {
         Value(ValueRepr::String(value, StringType::Normal))
     }
 }
@@ -381,7 +372,7 @@ impl From<u128> for Value {
 impl From<char> for Value {
     #[inline(always)]
     fn from(val: char) -> Self {
-        ValueRepr::String(Arc::new(val.to_string()), StringType::Normal).into()
+        ValueRepr::String(Arc::from(val.to_string()), StringType::Normal).into()
     }
 }
 
@@ -561,7 +552,7 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
     fn from_value(value: Option<&'a Value>) -> Result<Cow<'a, str>, Error> {
         match value {
             Some(value) => Ok(match value.0 {
-                ValueRepr::String(ref s, _) => Cow::Borrowed(s.as_str()),
+                ValueRepr::String(ref s, _) => Cow::Borrowed(s as &str),
                 _ => Cow::Owned(value.to_string()),
             }),
             None => Err(Error::from(ErrorKind::MissingArgument)),
@@ -772,7 +763,7 @@ impl Kwargs {
     where
         T: ArgType<'a, Output = T>,
     {
-        T::from_value(self.values.get(&Key::Str(key)))
+        T::from_value(self.values.get(&KeyRef::Str(key)))
     }
 
     /// Gets a single argument from the kwargs and marks it as used.
@@ -807,7 +798,7 @@ impl Kwargs {
 
     /// Checks if a keyword argument exists.
     pub fn has(&self, key: &str) -> bool {
-        self.values.contains_key(&Key::Str(key))
+        self.values.contains_key(&KeyRef::Str(key))
     }
 
     /// Iterates over all passed keyword arguments.
@@ -843,7 +834,9 @@ impl FromIterator<(String, Value)> for Kwargs {
         T: IntoIterator<Item = (String, Value)>,
     {
         Kwargs::new(Arc::new(
-            iter.into_iter().map(|(k, v)| (Key::from(k), v)).collect(),
+            iter.into_iter()
+                .map(|(k, v)| (KeyRef::Value(Value::from(k)), v))
+                .collect(),
         ))
     }
 }
@@ -854,7 +847,9 @@ impl<'a> FromIterator<(&'a str, Value)> for Kwargs {
         T: IntoIterator<Item = (&'a str, Value)>,
     {
         Kwargs::new(Arc::new(
-            iter.into_iter().map(|(k, v)| (Key::from(k), v)).collect(),
+            iter.into_iter()
+                .map(|(k, v)| (KeyRef::Value(Value::from(k)), v))
+                .collect(),
         ))
     }
 }
