@@ -32,6 +32,93 @@ fn test_sort() {
 }
 
 #[test]
+fn test_sort_different_types() {
+    let mut v = vec![
+        Value::from(100u64),
+        Value::from("bar"),
+        Value::from(1),
+        Value::from_iter([1, 2]),
+        Value::from(80u32),
+        Value::from(30i16),
+        Value::from_iter([("a", 3)]),
+        Value::from_iter([("a", 2)]),
+        Value::from_iter([("b", 0)]),
+        Value::from_iter([("b", 3)]),
+        Value::from_iter([0, 2]),
+        Value::from(true),
+        Value::UNDEFINED,
+        Value::from("zzz"),
+        Value::from(false),
+        Value::from(-100),
+        Value::from(-50.0f64),
+        Value::from(-75.0f32),
+        Value::from(99i128),
+        Value::from(1000f32),
+        Value::from_iter([0, 1]),
+        Value::from_iter([1, 1]),
+        Value::from("foo"),
+        Value::from(()),
+        Value::from(0),
+        Value::from(-f64::INFINITY),
+        Value::from(f64::NAN),
+        Value::from(f64::INFINITY),
+    ];
+    v.sort();
+    insta::assert_debug_snapshot!(&v, @r###"
+    [
+        Undefined,
+        None,
+        -inf,
+        -100,
+        -75.0,
+        -50.0,
+        false,
+        0,
+        true,
+        1,
+        30,
+        80,
+        99,
+        100,
+        1000.0,
+        inf,
+        NaN,
+        "bar",
+        "foo",
+        "zzz",
+        [
+            0,
+            1,
+        ],
+        [
+            0,
+            2,
+        ],
+        [
+            1,
+            1,
+        ],
+        [
+            1,
+            2,
+        ],
+        {
+            "a": 3,
+        },
+        {
+            "a": 2,
+        },
+        {
+            "b": 0,
+        },
+        {
+            "b": 3,
+        },
+    ]
+    "###);
+}
+
+#[test]
 fn test_safe_string_roundtrip() {
     let v = Value::from_safe_string("<b>HTML</b>".into());
     let v2 = Value::from_serializable(&v);
