@@ -260,13 +260,6 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
                     unreachable!()
                 }
             }
-            ValueKind::Char => {
-                if let Ok(rv) = TryInto::<char>::try_into(value.clone()) {
-                    Ok(rv.into_py(py))
-                } else {
-                    unreachable!()
-                }
-            }
             ValueKind::String => {
                 if value.is_safe() {
                     Ok(mark_string_safe(py, value.as_str().unwrap())?)

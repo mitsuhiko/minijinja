@@ -225,8 +225,6 @@ pub enum ValueKind {
     Bool,
     /// The value is a number of a supported type.
     Number,
-    /// The value is a character.
-    Char,
     /// The value is a string.
     String,
     /// The value is a byte array.
@@ -244,7 +242,6 @@ impl fmt::Display for ValueKind {
             ValueKind::None => "none",
             ValueKind::Bool => "bool",
             ValueKind::Number => "number",
-            ValueKind::Char => "char",
             ValueKind::String => "string",
             ValueKind::Bytes => "bytes",
             ValueKind::Seq => "sequence",
@@ -378,7 +375,6 @@ impl PartialEq for Value {
             (ValueRepr::Undefined, ValueRepr::Undefined) => true,
             (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a == b,
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
-            (ValueRepr::Map(ref a, _), ValueRepr::Map(ref b, _)) => a.iter().eq(b.iter()),
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
@@ -413,19 +409,33 @@ impl Eq for Value {}
 
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (&self.0, &other.0) {
-            (ValueRepr::None, ValueRepr::None) => Some(Ordering::Equal),
-            (ValueRepr::Undefined, ValueRepr::Undefined) => Some(Ordering::Equal),
-            (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a.partial_cmp(b),
-            (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.partial_cmp(b),
-            (ValueRepr::Map(ref a, _), ValueRepr::Map(ref b, _)) => a.iter().partial_cmp(b.iter()),
+        Some(self.cmp(other))
+    }
+}
+
+fn f64_total_cmp(left: f64, right: f64) -> Ordering {
+    // this is taken from f64::total_cmp on newer rust versions
+    let mut left = left.to_bits() as i64;
+    let mut right = right.to_bits() as i64;
+    left ^= (((left >> 63) as u64) >> 1) as i64;
+    right ^= (((right >> 63) as u64) >> 1) as i64;
+    left.cmp(&right)
+}
+
+impl Ord for Value {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let value_ordering = match (&self.0, &other.0) {
+            (ValueRepr::None, ValueRepr::None) => Ordering::Equal,
+            (ValueRepr::Undefined, ValueRepr::Undefined) => Ordering::Equal,
+            (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a.cmp(b),
+            (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.cmp(b),
             _ => match ops::coerce(self, other) {
-                Some(ops::CoerceResult::F64(a, b)) => a.partial_cmp(&b),
-                Some(ops::CoerceResult::I128(a, b)) => a.partial_cmp(&b),
-                Some(ops::CoerceResult::Str(a, b)) => a.partial_cmp(b),
+                Some(ops::CoerceResult::F64(a, b)) => f64_total_cmp(a, b),
+                Some(ops::CoerceResult::I128(a, b)) => a.cmp(&b),
+                Some(ops::CoerceResult::Str(a, b)) => a.cmp(b),
                 None => {
                     if let (Some(a), Some(b)) = (self.as_seq(), other.as_seq()) {
-                        a.iter().partial_cmp(b.iter())
+                        a.iter().cmp(b.iter())
                     } else if let (Some(a), Some(b)) = (self.as_struct(), other.as_struct()) {
                         if let (Some(static_a), Some(static_b)) =
                             (a.static_fields(), b.static_fields())
@@ -433,25 +443,20 @@ impl PartialOrd for Value {
                             static_a
                                 .iter()
                                 .map(|x| (x, a.get_field(x)))
-                                .partial_cmp(static_b.iter().map(|x| (x, b.get_field(x))))
+                                .cmp(static_b.iter().map(|x| (x, b.get_field(x))))
                         } else {
                             a.fields()
                                 .iter()
                                 .map(|x| (x, a.get_field(x)))
-                                .partial_cmp(b.fields().iter().map(|x| (x, b.get_field(x))))
+                                .cmp(b.fields().iter().map(|x| (x, b.get_field(x))))
                         }
                     } else {
-                        None
+                        Ordering::Equal
                     }
                 }
             },
-        }
-    }
-}
-
-impl Ord for Value {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Less)
+        };
+        value_ordering.then((self.kind() as usize).cmp(&(other.kind() as usize)))
     }
 }
 
@@ -1320,7 +1325,7 @@ impl ValueIteratorState {
             ValueIteratorState::Map(ptr, map) => {
                 if let Some(current) = ptr.take() {
                     let next = map.range(&current..).nth(1).map(|x| x.0.clone());
-                    let rv = Value::from(current);
+                    let rv = current.as_value();
                     *ptr = next;
                     Some(rv)
                 } else {
