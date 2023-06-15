@@ -353,12 +353,17 @@ mod builtins {
     }
 
     fn sort_helper(a: &Value, b: &Value, case_sensitive: bool) -> Ordering {
-        if !case_sensitive && (a.kind() == ValueKind::String || b.kind() == ValueKind::String) {
-            // TODO: optional unicode support
-            return a
-                .to_string()
-                .to_ascii_lowercase()
-                .cmp(&b.to_string().to_ascii_lowercase());
+        if !case_sensitive {
+            if let (Some(a), Some(b)) = (a.as_str(), b.as_str()) {
+                #[cfg(feature = "unicode")]
+                {
+                    return unicase::UniCase::new(a).cmp(&unicase::UniCase::new(b));
+                }
+                #[cfg(not(feature = "unicode"))]
+                {
+                    return a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase());
+                }
+            }
         }
         a.cmp(b)
     }

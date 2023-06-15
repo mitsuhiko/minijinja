@@ -65,6 +65,8 @@ sort: {{ other_list|sort }}
 sort-reverse: {{ other_list|sort(reverse=true) }}
 sort-case-insensitive: {{ ["B", "a", "C", "z"]|sort }}
 sort-case-sensitive: {{ ["B", "a", "C", "z"]|sort(case_sensitive=true) }}
+sort-case-insensitive-mixed: {{ [0, 1, "true", "false", "True", "False", true, false]|sort }}
+sort-case-sensitive-mixed: {{ [0, 1, "true", "false", "True", "False", true, false]|sort(case_sensitive=true) }}
 sort-attribute {{ objects|sort(attribute="name") }}
 d: {{ undefined|d == "" }}
 json: {{ map|tojson }}
