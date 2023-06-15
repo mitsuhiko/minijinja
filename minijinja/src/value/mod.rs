@@ -382,19 +382,14 @@ impl PartialEq for Value {
                 None => {
                     if let (Some(a), Some(b)) = (self.as_seq(), other.as_seq()) {
                         a.iter().eq(b.iter())
-                    } else if let (Some(a), Some(b)) = (self.as_struct(), other.as_struct()) {
-                        if let (Some(static_a), Some(static_b)) =
-                            (a.static_fields(), b.static_fields())
-                        {
-                            static_a
-                                .iter()
-                                .map(|x| (x, a.get_field(x)))
-                                .eq(static_b.iter().map(|x| (x, b.get_field(x))))
+                    } else if self.kind() == ValueKind::Map && other.kind() == ValueKind::Map {
+                        if self.len() != other.len() {
+                            return false;
+                        }
+                        if let Ok(mut iter) = self.try_iter() {
+                            iter.all(|x| self.get_item_opt(&x) == other.get_item_opt(&x))
                         } else {
-                            a.fields()
-                                .iter()
-                                .map(|x| (x, a.get_field(x)))
-                                .eq(b.fields().iter().map(|x| (x, b.get_field(x))))
+                            false
                         }
                     } else {
                         false
@@ -436,19 +431,12 @@ impl Ord for Value {
                 None => {
                     if let (Some(a), Some(b)) = (self.as_seq(), other.as_seq()) {
                         a.iter().cmp(b.iter())
-                    } else if let (Some(a), Some(b)) = (self.as_struct(), other.as_struct()) {
-                        if let (Some(static_a), Some(static_b)) =
-                            (a.static_fields(), b.static_fields())
-                        {
-                            static_a
-                                .iter()
-                                .map(|x| (x, a.get_field(x)))
-                                .cmp(static_b.iter().map(|x| (x, b.get_field(x))))
+                    } else if self.kind() == ValueKind::Map && other.kind() == ValueKind::Map {
+                        if let (Ok(a), Ok(b)) = (self.try_iter(), other.try_iter()) {
+                            a.map(|k| (k.clone(), self.get_item_opt(&k)))
+                                .cmp(b.map(|k| (k.clone(), other.get_item_opt(&k))))
                         } else {
-                            a.fields()
-                                .iter()
-                                .map(|x| (x, a.get_field(x)))
-                                .cmp(b.fields().iter().map(|x| (x, b.get_field(x))))
+                            Ordering::Equal
                         }
                     } else {
                         Ordering::Equal

@@ -103,10 +103,10 @@ fn test_sort_different_types() {
             2,
         ],
         {
-            "a": 3,
+            "a": 2,
         },
         {
-            "a": 2,
+            "a": 3,
         },
         {
             "b": 0,
