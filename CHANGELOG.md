@@ -7,80 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Support unicode sorting for filters when the `unicode` feature is enabled.
   This also fixes confusing behavior when mixed types were sorted.  (#299)
 
-## 1.0.0-alpha.4
-
-- `Value` now implements `Ord`.  This also improves the ability of the engine
-  to sort more complex values in filters.  (#295)
-
-- `Arc<String>` was replaced with `Arc<str>` in some of the public APIs where
-  this shined through.  Support for more complex key types in maps was added.
-  You can now have tuple keys for instance.  (#297)
-
-## 1.0.0-alpha.3
-
-- Removed `char` as a value type.  Characters are now represented as strings
-  instead.  This solves a bunch of Jinja2 incompatibilities that resulted by
-  indexing into strings.  (#292)
-
-- Marked `ErrorKind` as `#[non_exhaustive]`.
-
-- Correctly handle coercing of characters and strings.  `"w" == "w"[0]` is
-  now evaluating to `true` as one would expect.
-
-## 1.0.0-alpha.2
-
-- The `include` block now supports `with context` and `without context`
-  modifiers but they are ignored.  This is mostly helpful to render some
-  Jinja2 templates that depend on this functionality.  (#288)
-
-- Added tests `true`, `false`, `filter`, `test` and filters
-  `pprint` and `unique`.  (#287)
-
-- Added support for indexing into strings.  (#149)
-
-- Added `Error::detail` which returns the detail help string.  (#289)
-
-- Added `Error::template_source` and `Error::range` to better support
-  rendering of errors outside of the built-in debug printing.  (#286)
-
-## 1.0.0-alpha.1
-
-- Removed `testutils` feature.  New replacement APIs are directly available
-  on the `State`.
-
-- Added `Template::render_and_return_state` to render a template and return the
-  resulting `State` to permit introspection.  `Template::render_to_write` now
-  also returns the `State`.
-
-- Added `State::fuel_levels` to introspect fuel consumption when the fuel feature
-  is in use.
-
-- Removed `Source` and the `source` feature.  The replacement is the new `loader`
-  feature and the functionality of the source is moved directly into the
-  `Environment`.  This also adds `Environment::clear_templates` to unload
-  all already loaded templates.  (#275)
-
-- Added `Environment::template_from_str` and `Environment::template_from_named_str`
-  to compile templates for temporary use.  (#274)
-
-- Removed `Kwargs::from_args` as this can now be expressed with just
-  `from_args`.  (#273)
-
-- `Output` no longer reveals if it's discarding in the public API.
-
-- Added `Value::call`, `Value::call_method` and `Template::new_state`.  The
-  combination of these APIs makes it possible to call values which was
-  previously not possible.  (#272)
-
-- Added `Template::eval_to_state`.  This replaces the functionality of the
-  previous `Template::render_block` which is now available via `State`.
-  It also adds support for accessing globals and macros from a template
-  via the `State`.  (#271)
-
-- Removed support for `State::current_call`.  This property wasn't too useful
-  and unreliable.  Supporting it properly for nested invocations would require
-  calls to take a mutable state or use interior mutability which did not seem
-  reasonable for this.  (#269)
+**Note:** This also includes all the changes in the different 1.0.0 alphas.
 
 ### Breaking Changes
 
@@ -210,6 +137,11 @@ some minor exceptions be rather trivial changes.
     let rv = env.empty_state().format(42.into()).unwrap();
     ```
 
+- `intern` and some APIs that use `Arc<String>` now use `Arc<str>`.  This
+  means that for instance `StructObject::fields` returns `Arc<str>` instead
+  of `Arc<String>`.  All the type conversions that previously accepted
+  `Arc<String>` now only support `Arc<str>`.
+
 - `State::current_call` was removed without replacement.  This information
   was unreliably maintained in the engine and caused issues with recursive
   calls.  If you have a need for this API please reach out on the issue
@@ -218,6 +150,81 @@ some minor exceptions be rather trivial changes.
 - `Output::is_discarding` was removed without replacement.  This is
   an implementation detail and was unintentionally exposed.  You should not
   write code that depends on the internal state of the `Output`.
+
+## 1.0.0-alpha.4
+
+- `Value` now implements `Ord`.  This also improves the ability of the engine
+  to sort more complex values in filters.  (#295)
+
+- `Arc<String>` was replaced with `Arc<str>` in some of the public APIs where
+  this shined through.  Support for more complex key types in maps was added.
+  You can now have tuple keys for instance.  (#297)
+
+## 1.0.0-alpha.3
+
+- Removed `char` as a value type.  Characters are now represented as strings
+  instead.  This solves a bunch of Jinja2 incompatibilities that resulted by
+  indexing into strings.  (#292)
+
+- Marked `ErrorKind` as `#[non_exhaustive]`.
+
+- Correctly handle coercing of characters and strings.  `"w" == "w"[0]` is
+  now evaluating to `true` as one would expect.
+
+## 1.0.0-alpha.2
+
+- The `include` block now supports `with context` and `without context`
+  modifiers but they are ignored.  This is mostly helpful to render some
+  Jinja2 templates that depend on this functionality.  (#288)
+
+- Added tests `true`, `false`, `filter`, `test` and filters
+  `pprint` and `unique`.  (#287)
+
+- Added support for indexing into strings.  (#149)
+
+- Added `Error::detail` which returns the detail help string.  (#289)
+
+- Added `Error::template_source` and `Error::range` to better support
+  rendering of errors outside of the built-in debug printing.  (#286)
+
+## 1.0.0-alpha.1
+
+- Removed `testutils` feature.  New replacement APIs are directly available
+  on the `State`.
+
+- Added `Template::render_and_return_state` to render a template and return the
+  resulting `State` to permit introspection.  `Template::render_to_write` now
+  also returns the `State`.
+
+- Added `State::fuel_levels` to introspect fuel consumption when the fuel feature
+  is in use.
+
+- Removed `Source` and the `source` feature.  The replacement is the new `loader`
+  feature and the functionality of the source is moved directly into the
+  `Environment`.  This also adds `Environment::clear_templates` to unload
+  all already loaded templates.  (#275)
+
+- Added `Environment::template_from_str` and `Environment::template_from_named_str`
+  to compile templates for temporary use.  (#274)
+
+- Removed `Kwargs::from_args` as this can now be expressed with just
+  `from_args`.  (#273)
+
+- `Output` no longer reveals if it's discarding in the public API.
+
+- Added `Value::call`, `Value::call_method` and `Template::new_state`.  The
+  combination of these APIs makes it possible to call values which was
+  previously not possible.  (#272)
+
+- Added `Template::eval_to_state`.  This replaces the functionality of the
+  previous `Template::render_block` which is now available via `State`.
+  It also adds support for accessing globals and macros from a template
+  via the `State`.  (#271)
+
+- Removed support for `State::current_call`.  This property wasn't too useful
+  and unreliable.  Supporting it properly for nested invocations would require
+  calls to take a mutable state or use interior mutability which did not seem
+  reasonable for this.  (#269)
 
 ## 0.34.0
 
