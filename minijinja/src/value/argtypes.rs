@@ -223,6 +223,8 @@ macro_rules! tuple_impls {
                 if values.get(idx).is_some() {
                     Err(Error::from(ErrorKind::TooManyArguments))
                 } else {
+                    // SAFETY: this is safe because both no batter what `rest_first` is set to
+                    // either way the variable is set.
                     Ok(($($name,)* unsafe { $rest_name.unwrap_unchecked() },))
                 }
             }

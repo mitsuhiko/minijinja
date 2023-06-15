@@ -195,6 +195,7 @@ impl<'a> fmt::Display for HtmlEscape<'a> {
                 macro_rules! escaping_body {
                     ($quote:expr) => {{
                         if start < i {
+                            // SAFETY: this is safe because we only push valid utf-8 bytes over
                             ok!(f.write_str(unsafe {
                                 std::str::from_utf8_unchecked(&bytes[start..i])
                             }));
@@ -217,6 +218,7 @@ impl<'a> fmt::Display for HtmlEscape<'a> {
             }
 
             if start < bytes.len() {
+                // SAFETY: this is safe because we only push valid utf-8 bytes over
                 f.write_str(unsafe { std::str::from_utf8_unchecked(&bytes[start..]) })
             } else {
                 Ok(())
