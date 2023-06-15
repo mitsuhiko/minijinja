@@ -338,6 +338,17 @@ fn test_call_kwargs() {
 }
 
 #[test]
+fn test_return_none() {
+    let env = Environment::empty();
+    let val = Value::from_function(|| -> Result<(), Error> { Ok(()) });
+    let rv = val.call(&env.empty_state(), &[][..]).unwrap();
+    assert!(rv.is_none());
+    let val = Value::from_function(|| ());
+    let rv = val.call(&env.empty_state(), &[][..]).unwrap();
+    assert!(rv.is_none());
+}
+
+#[test]
 fn test_filter_basics() {
     fn test(a: u32, b: u32) -> Result<u32, Error> {
         Ok(a + b)

@@ -15,7 +15,9 @@
 //!
 //! ```
 //! # use minijinja::value::Value;
-//! let value = Value::from(42);
+//! let int_value = Value::from(42);
+//! let none_value = Value::from(());
+//! let true_value = Value::from(true);
 //! ```
 //!
 //! Or via the [`FromIterator`] trait:
@@ -28,6 +30,10 @@
 //! // collection into a map
 //! let value: Value = [("key", "value")].into_iter().collect();
 //! ```
+//!
+//! The special [`Undefined`](Value::UNDEFINED) value also exists but does not
+//! have a rust equivalent.  It can be created via the [`UNDEFINED`](Value::UNDEFINED)
+//! constant.
 //!
 //! MiniJinja will however create values via an indirection via [`serde`] when
 //! a template is rendered or an expression is evaluated.  This can also be
@@ -531,7 +537,10 @@ pub fn intern(s: &str) -> Arc<str> {
 
 #[allow(clippy::len_without_is_empty)]
 impl Value {
-    /// The undefined value
+    /// The undefined value.
+    ///
+    /// This constant exists because the undefined type does not exist in Rust
+    /// and this is the only way to construct it.
     pub const UNDEFINED: Value = Value(ValueRepr::Undefined);
 
     /// Creates a value from something that can be serialized.
