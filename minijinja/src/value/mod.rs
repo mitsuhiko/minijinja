@@ -546,6 +546,9 @@ impl Value {
     /// The undefined value
     pub const UNDEFINED: Value = Value(ValueRepr::Undefined);
 
+    /// The none value
+    pub const NONE: Value = Value(ValueRepr::None);
+
     /// Creates a value from something that can be serialized.
     ///
     /// This is the method that MiniJinja will generally use whenever a serializable
