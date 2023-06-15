@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.0
+
+- Support unicode sorting for filters when the `unicode` feature is enabled.
+  This also fixes confusing behavior when mixed types were sorted.  (#299)
+
 ## 1.0.0-alpha.4
 
 - `Value` now implements `Ord`.  This also improves the ability of the engine
