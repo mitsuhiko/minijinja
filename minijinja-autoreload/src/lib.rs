@@ -90,10 +90,12 @@ impl AutoReloader {
     pub fn acquire_env(&self) -> Result<EnvironmentGuard<'_>, Error> {
         let mut mutex_guard = self.cached_env.lock().unwrap();
         if mutex_guard.is_none() || self.notifier.should_reload() {
-            *mutex_guard = Some(
-                self.notifier
-                    .perform_reload(|notifier| (self.env_creator)(notifier))?,
-            );
+            let weak_notifier = self.notifier.prepare_and_mark_reload()?;
+            if mutex_guard.is_none() || !self.notifier.fast_reload() {
+                *mutex_guard = Some((self.env_creator)(weak_notifier)?);
+            } else {
+                mutex_guard.as_mut().unwrap().clear_templates();
+            }
         }
         Ok(EnvironmentGuard { mutex_guard })
     }
@@ -140,6 +142,7 @@ enum NotifierImplHandle {
 struct NotifierImpl {
     should_reload: bool,
     should_reload_callback: Option<Box<dyn Fn() -> bool + Send + Sync + 'static>>,
+    fast_reload: bool,
     #[cfg(feature = "watch-fs")]
     fs_watcher: Option<notify::RecommendedWatcher>,
     #[cfg(feature = "watch-fs")]
@@ -157,6 +160,22 @@ impl Notifier {
     pub fn request_reload(&self) {
         if let Some(handle) = self.handle() {
             handle.lock().unwrap().should_reload = true;
+        }
+    }
+
+    /// Enables or disables fast reload.
+    ///
+    /// By default fast reload is disabled which causes the entire environment to
+    /// be recreated.  When fast reload is enabled, then on reload
+    /// [`clear_templates`](minijinja::Environment::clear_templates) is called.
+    /// This will only work if a loader was added to the environment as the loader
+    /// will then cause templates to be loaded again.
+    ///
+    /// When fast reloading is enabled, the environment creation function is
+    /// only called once.
+    pub fn set_fast_reload(&self, yes: bool) {
+        if let Some(handle) = self.handle() {
+            handle.lock().unwrap().fast_reload = yes;
         }
     }
 
@@ -235,6 +254,15 @@ impl Notifier {
         }
     }
 
+    fn fast_reload(&self) -> bool {
+        let handle = match self.handle() {
+            Some(handle) => handle,
+            None => return false,
+        };
+        let inner = handle.lock().unwrap();
+        inner.fast_reload
+    }
+
     fn should_reload(&self) -> bool {
         let handle = match self.handle() {
             Some(handle) => handle,
@@ -280,24 +308,20 @@ impl Notifier {
             }));
     }
 
-    fn perform_reload<F>(&self, f: F) -> Result<Environment<'static>, Error>
-    where
-        F: FnOnce(Notifier) -> Result<Environment<'static>, Error>,
-    {
+    fn prepare_and_mark_reload(&self) -> Result<Notifier, Error> {
         let handle = self.handle().expect("notifier unexpectedly went away");
         #[cfg(feature = "watch-fs")]
         {
             let mut locked_handle = handle.lock().unwrap();
-            if !locked_handle.persistent_fs_watcher {
+            if !locked_handle.persistent_fs_watcher && !locked_handle.fast_reload {
                 locked_handle.fs_watcher.take();
             }
         }
         let weak_notifier = Notifier {
             handle: NotifierImplHandle::Weak(Arc::downgrade(&handle)),
         };
-        let rv = f(weak_notifier)?;
         handle.lock().unwrap().should_reload = false;
-        Ok(rv)
+        Ok(weak_notifier)
     }
 
     fn weak(&self) -> Notifier {

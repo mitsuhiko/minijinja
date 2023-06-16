@@ -9,6 +9,10 @@ All notable changes to MiniJinja are documented here.
 
 - Added `json5` as file extension for JSON formatter.
 
+- The autoreload crate now supports fast reloading by just clearning the
+  already templates.  This is enabled via `set_fast_reload` on the
+  `Notifier`.
+
 **Note:** This also includes all the changes in the different 1.0.0 alphas.
 
 ### Breaking Changes
