@@ -18,14 +18,14 @@ pub(crate) fn no_auto_escape(_: &str) -> AutoEscape {
 /// * [`Html`](AutoEscape::Html): `.html`, `.htm`, `.xml`
 #[cfg_attr(
     feature = "json",
-    doc = r" * [`Json`](AutoEscape::Json): `.json`, `.js`, `.yml`"
+    doc = r" * [`Json`](AutoEscape::Json): `.json`, `.json5`, `.js`, `.yaml`, `.yml`"
 )]
 /// * [`None`](AutoEscape::None): _all others_
 pub fn default_auto_escape_callback(name: &str) -> AutoEscape {
     match name.rsplit('.').next() {
         Some("html" | "htm" | "xml") => AutoEscape::Html,
         #[cfg(feature = "json")]
-        Some("json" | "js" | "yaml" | "yml") => AutoEscape::Json,
+        Some("json" | "json5" | "js" | "yaml" | "yml") => AutoEscape::Json,
         _ => AutoEscape::None,
     }
 }

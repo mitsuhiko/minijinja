@@ -40,7 +40,7 @@ pub struct Environment<'source> {
     templates: TemplateStore<'source>,
     filters: BTreeMap<Cow<'source, str>, filters::BoxedFilter>,
     tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
-    pub(crate) globals: BTreeMap<Cow<'source, str>, Value>,
+    globals: BTreeMap<Cow<'source, str>, Value>,
     default_auto_escape: Arc<AutoEscapeFunc>,
     undefined_behavior: UndefinedBehavior,
     formatter: Arc<FormatterFunc>,
@@ -559,14 +559,14 @@ impl<'source> Environment<'source> {
         self.globals.insert(name.into(), value.into());
     }
 
-    /// Returns an empty [`State`] for testing purposes and similar.
-    pub fn empty_state(&self) -> State<'_, '_> {
-        State::new_for_env(self)
-    }
-
     /// Removes a global function or variable by name.
     pub fn remove_global(&mut self, name: &str) {
         self.globals.remove(name);
+    }
+
+    /// Returns an empty [`State`] for testing purposes and similar.
+    pub fn empty_state(&self) -> State<'_, '_> {
+        State::new_for_env(self)
     }
 
     /// Looks up a function.

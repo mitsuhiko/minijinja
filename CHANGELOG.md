@@ -7,6 +7,8 @@ All notable changes to MiniJinja are documented here.
 - Support unicode sorting for filters when the `unicode` feature is enabled.
   This also fixes confusing behavior when mixed types were sorted.  (#299)
 
+- Added `json5` as file extension for JSON formatter.
+
 **Note:** This also includes all the changes in the different 1.0.0 alphas.
 
 ### Breaking Changes
