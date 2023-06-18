@@ -130,6 +130,8 @@ impl<'env> Vm<'env> {
                 macros: state.macros.clone(),
                 #[cfg(feature = "fuel")]
                 fuel_tracker: state.fuel_tracker.clone(),
+                #[cfg(feature = "track_used_variables")]
+                used_variables: Default::default(),
             },
             out,
             Stack::from(args),

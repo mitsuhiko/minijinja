@@ -26,6 +26,7 @@ debug = []
 loader = ["self_cell", "memo-map"]
 unicode = ["unicode-ident", "unicase"]
 custom_syntax = ["dep:aho-corasick"]
+track_used_variables = []
 
 # Speedups
 key_interning = []

@@ -9,6 +9,11 @@ use crate::utils::{AutoEscape, UndefinedBehavior};
 use crate::value::{ArgType, Value};
 use crate::vm::context::Context;
 
+#[cfg(feature = "track_used_variables")]
+use std::cell::RefCell;
+#[cfg(feature = "track_used_variables")]
+use std::collections::HashSet;
+
 #[cfg(feature = "fuel")]
 use crate::vm::fuel::FuelTracker;
 
@@ -42,6 +47,8 @@ pub struct State<'template, 'env> {
     pub(crate) macros: std::sync::Arc<Vec<(&'template Instructions<'env>, usize)>>,
     #[cfg(feature = "fuel")]
     pub(crate) fuel_tracker: Option<std::sync::Arc<FuelTracker>>,
+    #[cfg(feature = "track_used_variables")]
+    pub(crate) used_variables: RefCell<HashSet<String>>,
 }
 
 impl<'template, 'env> fmt::Debug for State<'template, 'env> {
@@ -77,6 +84,8 @@ impl<'template, 'env> State<'template, 'env> {
             macros: Default::default(),
             #[cfg(feature = "fuel")]
             fuel_tracker: env.fuel().map(FuelTracker::new),
+            #[cfg(feature = "track_used_variables")]
+            used_variables: Default::default(),
         }
     }
 
@@ -123,7 +132,15 @@ impl<'template, 'env> State<'template, 'env> {
     /// Looks up a variable by name in the context.
     #[inline(always)]
     pub fn lookup(&self, name: &str) -> Option<Value> {
+        #[cfg(feature = "track_used_variables")]
+        self.used_variables.borrow_mut().insert(name.to_string());
         self.ctx.load(self.env, name)
+    }
+
+    /// Retrieve names of all variables that were used during execution
+    #[cfg(feature = "track_used_variables")]
+    pub fn tracked_loads(&self) -> HashSet<String> {
+        self.used_variables.borrow().clone()
     }
 
     /// Looks up a global macro and calls it.
