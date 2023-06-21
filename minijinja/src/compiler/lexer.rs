@@ -401,20 +401,28 @@ pub fn tokenize(
                             // raw blocks require some special handling.  If we are at the beginning of a raw
                             // block we want to skip everything until {% endraw %} completely ignoring iterior
                             // syntax and emit the entire raw block as TemplateData.
-                            if let Some((mut ptr, _)) =
+                            if let Some((raw, trim_start)) =
                                 skip_basic_tag(&state.rest[skip..], "raw", block_end)
                             {
-                                ptr += skip;
+                                state.advance(raw + skip);
+                                let mut ptr = 0;
                                 while let Some(block) =
                                     memstr(&state.rest.as_bytes()[ptr..], block_start.as_bytes())
                                 {
                                     ptr += block + block_start.len();
-                                    if let Some((endraw, trim)) =
+                                    let trim_end = state.rest.as_bytes().get(ptr) == Some(&b'-');
+                                    if let Some((endraw, trim_next)) =
                                         skip_basic_tag(&state.rest[ptr..], "endraw", block_end)
                                     {
-                                        let result = &state.rest[..ptr + endraw];
+                                        let mut result = &state.rest[..ptr - block_start.len()];
+                                        if trim_start {
+                                            result = result.trim_start();
+                                        }
+                                        if trim_end {
+                                            result = result.trim_end();
+                                        }
                                         state.advance(ptr + endraw);
-                                        trim_leading_whitespace = trim;
+                                        trim_leading_whitespace = trim_next;
                                         return Some(Ok((
                                             Token::TemplateData(result),
                                             state.span(old_loc),
