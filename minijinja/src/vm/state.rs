@@ -139,7 +139,7 @@ impl<'template, 'env> State<'template, 'env> {
 
     /// Retrieve names of all variables that were used during execution
     #[cfg(feature = "track_used_variables")]
-    pub fn tracked_loads(&self) -> HashSet<String> {
+    pub fn used_variables(&self) -> HashSet<String> {
         self.used_variables.borrow().clone()
     }
 
