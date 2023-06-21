@@ -2,6 +2,12 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.1
+
+- Fixed a bug that caused `{% raw %}` blocks to accidentally not skip the
+  surrounding tags, causing `{% raw %}` and `{% endraw %}` to show up in
+  output.  (#307)
+
 ## 1.0.0
 
 - Support unicode sorting for filters when the `unicode` feature is enabled.
