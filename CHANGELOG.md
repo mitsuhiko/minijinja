@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.2
+
+- Added `TryFrom` and `ArgType` for `Arc<str>`.
+
 ## 1.0.1
 
 - Fixed a bug that caused `{% raw %}` blocks to accidentally not skip the

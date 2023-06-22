@@ -491,6 +491,31 @@ impl<'a> ArgType<'a> for &str {
     }
 }
 
+impl TryFrom<Value> for Arc<str> {
+    type Error = Error;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value.0 {
+            ValueRepr::String(x, _) => Ok(x),
+            _ => Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "value is not a string",
+            )),
+        }
+    }
+}
+
+impl<'a> ArgType<'a> for Arc<str> {
+    type Output = Arc<str>;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+        match value {
+            Some(value) => TryFrom::try_from(value.clone()),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
+        }
+    }
+}
+
 impl<'a> ArgType<'a> for &[u8] {
     type Output = &'a [u8];
 
