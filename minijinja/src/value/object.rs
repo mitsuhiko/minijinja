@@ -427,6 +427,50 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// let value = Value::from_object(Point(1.0, 2.5, 3.0));
 /// ```
+///
+/// # Struct As context
+///
+/// Structs can also be used as template rendering context.  This has a lot of
+/// benefits as it means that the serialization overhead can be largely to
+/// completely avoided.  This means that even if templates take hundreds of
+/// values, MiniJinja does not spend time eagerly converting them into values.
+///
+/// Here is a very basic example of how a template can be rendered with a dynamic
+/// context.  Note that the implementation of [`fields`](Self::fields) is optional
+/// for this to work.  It's in fact not used by the engine during rendering but
+/// it is necessary for the [`debug()`](crate::functions::debug) function to be
+/// able to show which values exist in the context.
+///
+/// ```
+/// # fn main() -> Result<(), minijinja::Error> {
+/// # use minijinja::Environment;
+/// use minijinja::value::{Value, StructObject};
+///
+/// pub struct DynamicContext {
+///     magic: i32,
+/// }
+///
+/// impl StructObject for DynamicContext {
+///     fn get_field(&self, field: &str) -> Option<Value> {
+///         match field {
+///             "pid" => Some(Value::from(std::process::id())),
+///             "env" => Some(Value::from_iter(std::env::vars())),
+///             "magic" => Some(Value::from(self.magic)),
+///             _ => None,
+///         }
+///     }
+/// }
+///
+/// # let env = Environment::new();
+/// let tmpl = env.template_from_str("HOME={{ env.HOME }}; PID={{ pid }}; MAGIG={{ magic }}")?;
+/// let ctx = Value::from_struct_object(DynamicContext { magic: 42 });
+/// let rv = tmpl.render(ctx)?;
+/// # Ok(()) }
+/// ```
+///
+/// One thing of note here is that in the above example `env` would be re-created every
+/// time the template needs it.  A better implementation would cache the value after it
+/// was created first.
 pub trait StructObject: Send + Sync {
     /// Invoked by the engine to get a field of a struct.
     ///

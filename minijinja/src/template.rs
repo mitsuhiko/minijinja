@@ -75,6 +75,11 @@ impl<'env, 'source> Template<'env, 'source> {
     /// can either create your own struct and derive `Serialize` for it or the
     /// [`context!`](crate::context) macro can be used to create an ad-hoc context.
     ///
+    /// For very large contexts and to avoid the overhead of serialization of
+    /// potentially unused values, you might consider using a dynamic
+    /// [`StructObject`](crate::value::StructObject) as value.  For more
+    /// information see [Struct as Context](crate::value::StructObject#struct-as-context).
+    ///
     /// ```
     /// # use minijinja::{Environment, context};
     /// # let mut env = Environment::new();
