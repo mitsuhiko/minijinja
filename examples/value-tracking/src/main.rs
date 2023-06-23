@@ -42,20 +42,24 @@ pub fn track_context(ctx: Value) -> (Value, Arc<Mutex<HashSet<String>>>) {
     )
 }
 
+static TEMPLATE: &str = r#"
+{%- set locally_set = 'a-value' -%}
+name={{ name }}
+undefined_value={{ undefined_value }}
+global={{ global }}
+locally_set={{ locally_set }}
+"#;
+
 fn main() {
     let mut env = Environment::new();
     env.add_global("global", true);
-    let template = env
-        .template_from_str(
-            "name={{ name }}; undefined_value={{ undefined_value }}; global={{ global }}",
-        )
-        .unwrap();
+    let template = env.template_from_str(TEMPLATE).unwrap();
 
     let (ctx, resolved) = track_context(context! {
         name => "John",
         unused => 42
     });
 
-    println!("rendered: {}", template.render(ctx).unwrap());
+    println!("{}", template.render(ctx).unwrap());
     println!("resolved: {:?}", resolved.lock().unwrap());
 }
