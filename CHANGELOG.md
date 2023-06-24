@@ -5,6 +5,8 @@ All notable changes to MiniJinja are documented here.
 ## 1.0.2
 
 - Added `TryFrom` and `ArgType` for `Arc<str>`.
+- Added `datetimeformat`, `dateformat`, `timeformat` and `now()` to the
+  contrib crate.  (#309)
 
 ## 1.0.1
 

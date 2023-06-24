@@ -1,6 +1,15 @@
 //! MiniJinja-Contrib is a utility crate for [MiniJinja](https://github.com/mitsuhiko/minijinja)
 //! that adds support for certain utilities that are too specific for the MiniJinja core.  This is
 //! usually because they provide functionality that Jinja2 itself does not have.
+//!
+//! To add all of these to an environment you can use the [`add_to_environment`] function.
+//!
+//! ```
+//! use minijinja::Environment;
+//!
+//! let mut env = Environment::new();
+//! minijinja_contrib::add_to_environment(&mut env);
+//! ```
 
 use minijinja::Environment;
 
