@@ -3,6 +3,12 @@ use std::convert::TryFrom;
 use minijinja::value::Value;
 use minijinja::{Error, ErrorKind};
 
+#[cfg(feature = "datetime")]
+mod datetime;
+
+#[cfg(feature = "datetime")]
+pub use self::datetime::*;
+
 /// Returns a plural suffix if the value is not 1, '1', or an object of
 /// length 1.
 ///

@@ -1,5 +1,4 @@
 use minijinja_contrib::filters::pluralize;
-#[cfg(test)]
 use similar_asserts::assert_eq;
 
 #[test]
