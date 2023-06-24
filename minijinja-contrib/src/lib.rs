@@ -10,6 +10,7 @@
 //! let mut env = Environment::new();
 //! minijinja_contrib::add_to_environment(&mut env);
 //! ```
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use minijinja::Environment;
 
