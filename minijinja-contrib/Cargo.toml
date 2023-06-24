@@ -13,6 +13,7 @@ rust-version = "1.61"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
+all-features = true
 
 [features]
 default = []
