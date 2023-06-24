@@ -72,6 +72,9 @@
 //! this module.  Note though that these functions are not to be
 //! called from Rust code as their exact interface (arguments and return types)
 //! might change from one MiniJinja version to another.
+//!
+//! Some additional filters are available in the
+//! [`minijinja-contrib`](https://crates.io/crates/minijinja-contrib) crate.
 use std::sync::Arc;
 
 use crate::error::Error;

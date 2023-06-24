@@ -14,8 +14,16 @@ rust-version = "1.61"
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
+[features]
+default = []
+datetime = ["time"]
+timezone = ["time-tz"]
+
 [dependencies]
 minijinja = { version = "1.0.1", path = "../minijinja", default-features = false }
+serde = "1.0.164"
+time = { version = "0.3.22", optional = true, features = ["serde", "formatting"] }
+time-tz = { version = "1.0.3", features = ["db"], optional = true }
 
 [dev-dependencies]
 minijinja = { version = "1.0.1", path = "../minijinja", features = ["loader"] }
