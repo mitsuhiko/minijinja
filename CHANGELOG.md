@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.4
+
+- Improved error reporting for missing keyword arguments.
+
 ## 1.0.3
 
 - Republished `1.0.2` with fixed docs.

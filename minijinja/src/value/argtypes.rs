@@ -785,7 +785,12 @@ impl Kwargs {
     where
         T: ArgType<'a, Output = T>,
     {
-        T::from_value(self.values.get(&KeyRef::Str(key)))
+        T::from_value(self.values.get(&KeyRef::Str(key))).map_err(|mut err| {
+            if err.kind() == ErrorKind::MissingArgument && err.detail().is_none() {
+                err.set_detail(format!("missing keyword argument '{}'", key));
+            }
+            err
+        })
     }
 
     /// Gets a single argument from the kwargs and marks it as used.

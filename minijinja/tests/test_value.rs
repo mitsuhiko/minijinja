@@ -338,6 +338,13 @@ fn test_call_kwargs() {
 }
 
 #[test]
+fn test_kwargs_error() {
+    let kwargs = Kwargs::from_iter([("foo", Value::from(42))]);
+    let bar = kwargs.get::<Value>("bar").unwrap_err();
+    assert_eq!(bar.detail(), Some("missing keyword argument 'bar'"));
+}
+
+#[test]
 fn test_return_none() {
     let env = Environment::empty();
     let val = Value::from_function(|| -> Result<(), Error> { Ok(()) });

@@ -267,6 +267,11 @@ impl Error {
         self.repr.detail.as_deref()
     }
 
+    /// Overrides the detail.
+    pub(crate) fn set_detail<D: Into<Cow<'static, str>>>(&mut self, d: D) {
+        self.repr.detail = Some(d.into());
+    }
+
     /// Returns the filename of the template that caused the error.
     pub fn name(&self) -> Option<&str> {
         self.repr.name.as_deref()
