@@ -122,6 +122,65 @@ macro_rules! __context_pair {
     };
 }
 
+/// An utility macro to create arguments for function calls.
+///
+/// This creates a slice of values on the stack which can be
+/// passed to [`call`](crate::value::Value::call),
+/// [`call_method`](crate::value::Value::call_method),
+/// [`apply_filter`](crate::State::apply_filter),
+/// [`perform_test`](crate::State::perform_test) or similar
+/// APIs that take slices of values.
+///
+/// It supports both positional and keyword arguments.
+/// To mark a parameter as keyword argument define it as
+/// `name => value`, otherwise just use `value`.
+///
+/// ```
+/// # use minijinja::{value::Value, args, Environment};
+/// # let env = Environment::default();
+/// # let state = &env.empty_state();
+/// # let value = Value::from(());
+/// value.call(state, args!(1, 2, foo => "bar"));
+/// ```
+///
+/// Note that this like [`context!`](crate::context) goes through
+/// [`Value::from_serializable`](crate::value::Value::from_serializable).
+#[macro_export]
+macro_rules! args {
+    ($($arg:tt)*) => {{
+        let _guard = $crate::__context::value_optimization();
+        let mut args = Vec::<$crate::value::Value>::new();
+        let mut kwargs = Vec::<(&'static str, $crate::value::Value)>::new();
+        $crate::__peel_args!(args, kwargs, [$($arg)*]);
+        if !kwargs.is_empty() {
+            args.push($crate::value::Kwargs::from_iter(kwargs.into_iter()).into());
+        }
+        &{args}
+    }};
+}
+
+/// Utility macro for `args!`
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __peel_args {
+    ($args:ident, $kwargs:ident, []) => {};
+    ($args:ident, $kwargs:ident, [,]) => {};
+    ($args:ident, $kwargs:ident, [$name:ident => $expr:expr]) => {
+        $kwargs.push((stringify!($name), $crate::value::Value::from_serializable(&$expr)));
+    };
+    ($args:ident, $kwargs:ident, [$name:ident => $expr:expr, $($rest:tt)*]) => {
+        $kwargs.push((stringify!($name), $crate::value::Value::from_serializable(&$expr)));
+        $crate::__peel_args!($args, $kwargs, [$($rest)*]);
+    };
+    ($args:ident, $kwargs:ident, [$expr:expr]) => {
+        $args.push($crate::value::Value::from_serializable(&$expr));
+    };
+    ($args:ident, $kwargs:ident, [$expr:expr, $($rest:tt)*]) => {
+        $args.push($crate::value::Value::from_serializable(&$expr));
+        $crate::__peel_args!($args, $kwargs, [$($rest)*]);
+    };
+}
+
 /// A macro similar to [`format!`] but that uses MiniJinja for rendering.
 ///
 /// This can be used to quickly render a MiniJinja template into a string

@@ -4,7 +4,7 @@ use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
 use minijinja::value::{Kwargs, Object, ObjectKind, Rest, SeqObject, StructObject, Value};
-use minijinja::{Environment, Error};
+use minijinja::{args, Environment, Error};
 
 #[test]
 fn test_sort() {
@@ -365,7 +365,7 @@ fn test_filter_basics() {
     env.add_filter("test", test);
     assert_eq!(
         env.empty_state()
-            .apply_filter("test", &[Value::from(23), Value::from(42)])
+            .apply_filter("test", args!(23, 42))
             .unwrap(),
         Value::from(65)
     );
@@ -381,15 +381,7 @@ fn test_rest_args() {
     env.add_filter("sum", sum);
     assert_eq!(
         env.empty_state()
-            .apply_filter(
-                "sum",
-                &[
-                    Value::from(1),
-                    Value::from(2),
-                    Value::from(3),
-                    Value::from(4)
-                ][..]
-            )
+            .apply_filter("sum", args!(1, 2, 3, 4))
             .unwrap(),
         Value::from(1 + 2 + 3 + 4)
     );
@@ -411,27 +403,17 @@ fn test_optional_args() {
     env.add_filter("add", add);
     let state = env.empty_state();
     assert_eq!(
-        state
-            .apply_filter("add", &[Value::from(23), Value::from(42)][..])
-            .unwrap(),
+        state.apply_filter("add", args!(23, 42)).unwrap(),
         Value::from(65)
     );
     assert_eq!(
         state
-            .apply_filter(
-                "add",
-                &[Value::from(23), Value::from(42), Value::UNDEFINED][..]
-            )
+            .apply_filter("add", args!(23, 42, Value::UNDEFINED))
             .unwrap(),
         Value::from(65)
     );
     assert_eq!(
-        state
-            .apply_filter(
-                "add",
-                &[Value::from(23), Value::from(42), Value::from(1)][..]
-            )
-            .unwrap(),
+        state.apply_filter("add", args!(23, 42, 1)).unwrap(),
         Value::from(66)
     );
 }
@@ -452,16 +434,12 @@ fn test_values_in_vec() {
     let state = env.empty_state();
 
     assert_eq!(
-        state
-            .apply_filter("upper", &[Value::from("Hello World!")])
-            .unwrap(),
+        state.apply_filter("upper", args!("Hello World!")).unwrap(),
         Value::from("HELLO WORLD!")
     );
 
     assert_eq!(
-        state
-            .apply_filter("sum", &[Value::from(vec![Value::from(1), Value::from(2)])])
-            .unwrap(),
+        state.apply_filter("sum", args!(vec![1, 2])).unwrap(),
         Value::from(3)
     );
 }
@@ -483,7 +461,7 @@ fn test_seq_object_borrow() {
         state
             .apply_filter(
                 "connect",
-                &[Value::from(vec![Value::from("HELLO"), Value::from(42)])]
+                args!(vec![Value::from("HELLO"), Value::from(42)])
             )
             .unwrap(),
         Value::from("HELLO42")
