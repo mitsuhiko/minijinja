@@ -8,6 +8,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 
 * [autoreload](autoreload): shows how to use auto reloading.
 * [build-script](build-script): Demonstrates how to generate Rust code with MiniJinja in build scripts.
+* [call-block-function](call-block-function): Shows how to use the `{% call %}` block with a custom function.
 * [custom-loader](custom-loader): shows how to load templates dynamically at runtime with a custom loader.
 * [debug](debug): contains an example showing the built-in `debug()` function.
 * [dsl](dsl): shows how to use MiniJinja has a DSL.
