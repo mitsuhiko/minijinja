@@ -1,5 +1,5 @@
 Before the loop
-{% call(it) custom_loop(5) %}
+{%- call(it) custom_loop(5) %}
   Iteration {{ it }}!
-{% endcall %}
+{%- endcall %}
 After the loop
