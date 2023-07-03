@@ -147,37 +147,57 @@ macro_rules! __context_pair {
 /// [`Value::from_serializable`](crate::value::Value::from_serializable).
 #[macro_export]
 macro_rules! args {
-    ($($arg:tt)*) => {{
-        let _guard = $crate::__context::value_optimization();
-        let mut args = Vec::<$crate::value::Value>::new();
-        let mut kwargs = Vec::<(&'static str, $crate::value::Value)>::new();
-        $crate::__peel_args!(args, kwargs, [$($arg)*]);
-        if !kwargs.is_empty() {
-            args.push($crate::value::Kwargs::from_iter(kwargs.into_iter()).into());
-        }
-        &{args}
-    }};
+    () => { &[][..] as &[$crate::value::Value] };
+    ($($arg:tt)*) => { $crate::__args_helper!(branch [[$($arg)*]], [$($arg)*]) };
 }
 
 /// Utility macro for `args!`
 #[macro_export]
 #[doc(hidden)]
-macro_rules! __peel_args {
-    ($args:ident, $kwargs:ident, []) => {};
-    ($args:ident, $kwargs:ident, [,]) => {};
-    ($args:ident, $kwargs:ident, [$name:ident => $expr:expr]) => {
+macro_rules! __args_helper {
+    // branch helper between `args` and `kwargs`.
+    //
+    // It analyzes the first bracket enclosed tt bundle to see if kwargs are
+    // used.  If yes, it uses `kwargs` to handle the second tt
+    // bundle, otherwise it uses `args`.
+    (branch [[]], $args:tt) => { $crate::__args_helper!(args $args) };
+    (branch [[$n:ident => $e:expr]], $args:tt) => { $crate::__args_helper!(kwargs $args) };
+    (branch [[$n:ident => $e:expr, $($r:tt)*]], $args:tt) => { $crate::__args_helper!(kwargs $args) };
+    (branch [[$e:expr]], $args:tt) => { $crate::__args_helper!(args $args) };
+    (branch [[$e:expr, $($rest:tt)*]], $args:tt) => { $crate::__args_helper!(branch [[$($rest)*]], $args) };
+
+    // creates args on the stack
+    (args [$($arg:tt)*]) => {{
+        let mut args = Vec::<$crate::value::Value>::new();
+        $crate::__args_helper!(peel args, args, false, [$($arg)*]);
+        &(&{args})[..]
+    }};
+
+    // creates args with kwargs on the stack
+    (kwargs [$($arg:tt)*]) => {{
+        let mut args = Vec::<$crate::value::Value>::new();
+        let mut kwargs = Vec::<(&str, $crate::value::Value)>::new();
+        $crate::__args_helper!(peel args, kwargs, false, [$($arg)*]);
+        args.push($crate::value::Kwargs::from_iter(kwargs.into_iter()).into());
+        &(&{args})[..]
+    }};
+
+    // Peels a single argument from the arguments and stuffs them into
+    // `$args` or `$kwargs` depending on type.
+    (peel $args:ident, $kwargs:ident, $has_kwargs:ident, []) => {};
+    (peel $args:ident, $kwargs:ident, $has_kwargs:ident, [$name:ident => $expr:expr]) => {
         $kwargs.push((stringify!($name), $crate::value::Value::from_serializable(&$expr)));
     };
-    ($args:ident, $kwargs:ident, [$name:ident => $expr:expr, $($rest:tt)*]) => {
+    (peel $args:ident, $kwargs:ident, $has_kwargs:ident, [$name:ident => $expr:expr, $($rest:tt)*]) => {
         $kwargs.push((stringify!($name), $crate::value::Value::from_serializable(&$expr)));
-        $crate::__peel_args!($args, $kwargs, [$($rest)*]);
+        $crate::__args_helper!(peel $args, $kwargs, true, [$($rest)*]);
     };
-    ($args:ident, $kwargs:ident, [$expr:expr]) => {
+    (peel $args:ident, $kwargs:ident, false, [$expr:expr]) => {
         $args.push($crate::value::Value::from_serializable(&$expr));
     };
-    ($args:ident, $kwargs:ident, [$expr:expr, $($rest:tt)*]) => {
+    (peel $args:ident, $kwargs:ident, false, [$expr:expr, $($rest:tt)*]) => {
         $args.push($crate::value::Value::from_serializable(&$expr));
-        $crate::__peel_args!($args, $kwargs, [$($rest)*]);
+        $crate::__args_helper!(peel $args, $kwargs, false, [$($rest)*]);
     };
 }
 
