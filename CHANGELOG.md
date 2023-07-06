@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.4
 
+- Added the `args!` macro which can be used to create an argument
+  slice on the stack.  (#311)
 - Improved error reporting for missing keyword arguments.
 
 ## 1.0.3
