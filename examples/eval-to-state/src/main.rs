@@ -1,5 +1,4 @@
-use minijinja::value::Value;
-use minijinja::{context, Environment};
+use minijinja::{args, context, Environment};
 
 fn main() {
     let mut env = Environment::new();
@@ -19,7 +18,7 @@ fn main() {
     println!("Block 'body': {:?}", state.render_block("body").unwrap());
     println!(
         "Macro 'utility': {:?}",
-        state.call_macro("utility", &[]).unwrap()
+        state.call_macro("utility", args!()).unwrap()
     );
     println!(
         "Variable 'global_variable': {:?}",
@@ -38,7 +37,7 @@ fn main() {
         state
             .lookup("range")
             .unwrap()
-            .call(&state, &[Value::from(5)])
+            .call(&state, args!(5))
             .unwrap()
     );
 }

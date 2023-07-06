@@ -1049,6 +1049,22 @@ impl Value {
     /// ).unwrap();
     /// assert_eq!(rv, Value::from(84));
     /// ```
+    ///
+    /// With the [`args!`](crate::args) macro creating an argument slice is
+    /// simplified:
+    ///
+    /// ```
+    /// # use minijinja::{Environment, args, value::{Value, Kwargs}};
+    /// # let mut env = Environment::new();
+    /// # env.add_template("foo", "").unwrap();
+    /// # let tmpl = env.get_template("foo").unwrap();
+    /// # let state = tmpl.new_state(); let state = &state;
+    /// let func = Value::from_function(|v: i64, kwargs: Kwargs| {
+    ///     v * kwargs.get::<i64>("mult").unwrap_or(1)
+    /// });
+    /// let rv = func.call(state, args!(42, mult => 2)).unwrap();
+    /// assert_eq!(rv, Value::from(84));
+    /// ```
     pub fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         if let ValueRepr::Dynamic(ref dy) = self.0 {
             dy.call(state, args)
