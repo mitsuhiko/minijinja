@@ -3,41 +3,105 @@ use std::convert::TryFrom;
 use minijinja::value::{Kwargs, Value, ValueKind};
 use minijinja::{Error, ErrorKind, State};
 use serde::de::value::SeqDeserializer;
-use serde::de::IntoDeserializer;
 use serde::Deserialize;
-use time::{format_description, OffsetDateTime};
+use time::format_description::well_known::iso8601::Iso8601;
+use time::{format_description, Date, OffsetDateTime};
 use time_tz::OffsetDateTimeExt;
 
 fn handle_serde_error(err: serde::de::value::Error) -> Error {
-    Error::new(ErrorKind::InvalidOperation, "not a valid date").with_source(err)
+    Error::new(ErrorKind::InvalidOperation, "not a valid date or timestamp").with_source(err)
 }
 
-fn value_to_datetime(value: Value) -> Result<OffsetDateTime, Error> {
-    if let Some(s) = value.as_str() {
-        Ok(OffsetDateTime::deserialize(s.into_deserializer()).map_err(handle_serde_error)?)
+fn value_to_datetime(
+    value: Value,
+    state: &State,
+    kwargs: &Kwargs,
+    allow_date: bool,
+) -> Result<OffsetDateTime, Error> {
+    #[allow(unused_mut)]
+    let (mut datetime, had_time) = if let Some(s) = value.as_str() {
+        match OffsetDateTime::parse(s, &Iso8601::PARSING) {
+            Ok(dt) => (dt, true),
+            Err(original_err) => match Date::parse(s, &Iso8601::PARSING) {
+                Ok(date) => (date.with_hms(0, 0, 0).unwrap().assume_utc(), false),
+                Err(_) => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        "not a valid date or timestamp",
+                    )
+                    .with_source(original_err))
+                }
+            },
+        }
     } else if let Ok(v) = f64::try_from(value.clone()) {
-        OffsetDateTime::from_unix_timestamp_nanos((v * 1e9) as i128)
-            .map_err(|_| Error::new(ErrorKind::InvalidOperation, "date out of range"))
+        (
+            OffsetDateTime::from_unix_timestamp_nanos((v * 1e9) as i128)
+                .map_err(|_| Error::new(ErrorKind::InvalidOperation, "date out of range"))?,
+            true,
+        )
     } else if value.kind() == ValueKind::Seq {
         let mut items = Vec::new();
         for item in value.try_iter()? {
             items.push(i64::try_from(item)?);
         }
-        Ok(
-            OffsetDateTime::deserialize(SeqDeserializer::new(items.into_iter()))
-                .map_err(handle_serde_error)?,
-        )
+        if items.len() == 2 {
+            (
+                Date::deserialize(SeqDeserializer::new(items.into_iter()))
+                    .map_err(handle_serde_error)?
+                    .with_hms(0, 0, 0)
+                    .unwrap()
+                    .assume_utc(),
+                false,
+            )
+        } else {
+            (
+                OffsetDateTime::deserialize(SeqDeserializer::new(items.into_iter()))
+                    .map_err(handle_serde_error)?,
+                true,
+            )
+        }
     } else {
-        Err(Error::new(
+        return Err(Error::new(
             ErrorKind::InvalidOperation,
             "value is not a datetime",
-        ))
+        ));
+    };
+
+    if had_time {
+        #[cfg(feature = "timezone")]
+        {
+            let configured_tz = state.lookup("TIMEZONE");
+            let tzname = kwargs.get::<Option<&str>>("tz")?.unwrap_or_else(|| {
+                configured_tz
+                    .as_ref()
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("original")
+            });
+            if tzname != "original" {
+                let tz = time_tz::timezones::get_by_name(tzname).ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("unknown timezone '{}'", tzname),
+                    )
+                })?;
+                datetime = datetime.to_timezone(tz)
+            };
+        }
+    } else if !allow_date {
+        return Err(Error::new(
+            ErrorKind::InvalidOperation,
+            "filter requires time, but only received a date",
+        ));
     }
+
+    Ok(datetime)
 }
 
 /// Formats a timestamp as date and time.
 ///
-/// The value needs to be a unix timestamp, or a parsable string (via the [`time`] crate).
+/// The value needs to be a unix timestamp, or a parsable string (ISO 8601) or a
+/// format supported by `chrono` or `time`.
+///
 /// The filter accepts two keyword arguments (`format` and `tz`) to influence the format
 /// and the timezone.  The default format is `"medium"`.  The defaults for these keyword
 /// arguments are taken from two global variables in the template context: `DATETIME_FORMAT`
@@ -73,14 +137,8 @@ fn value_to_datetime(value: Value) -> Result<OffsetDateTime, Error> {
 /// feature.
 #[cfg_attr(docsrs, doc(cfg(feature = "datetime")))]
 pub fn datetimeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String, Error> {
-    #[allow(unused_mut)]
-    let mut datetime = value_to_datetime(value)?;
+    let datetime = value_to_datetime(value, state, &kwargs, false)?;
     let configured_format = state.lookup("DATETIME_FORMAT");
-
-    #[cfg(feature = "timezone")]
-    {
-        apply_timezone(state, &kwargs, &mut datetime)?;
-    }
 
     let format = kwargs.get::<Option<&str>>("format")?.unwrap_or_else(|| {
         configured_format
@@ -114,7 +172,9 @@ pub fn datetimeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<Str
 
 /// Formats a timestamp as time.
 ///
-/// The value needs to be a unix timestamp, or a parsable string (via the [`time`] crate).
+/// The value needs to be a unix timestamp, or a parsable string (ISO 8601) or a
+/// format supported by `chrono` or `time`.
+///
 /// The filter accepts two keyword arguments (`format` and `tz`) to influence the format
 /// and the timezone.  The default format is `"medium"`.  The defaults for these keyword
 /// arguments are taken from two global variables in the template context: `TIME_FORMAT`
@@ -149,14 +209,8 @@ pub fn datetimeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<Str
 /// feature.
 #[cfg_attr(docsrs, doc(cfg(feature = "datetime")))]
 pub fn timeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String, Error> {
-    #[allow(unused_mut)]
-    let mut datetime = value_to_datetime(value)?;
+    let datetime = value_to_datetime(value, state, &kwargs, false)?;
     let configured_format = state.lookup("TIME_FORMAT");
-
-    #[cfg(feature = "timezone")]
-    {
-        apply_timezone(state, &kwargs, &mut datetime)?;
-    }
 
     let format = kwargs.get::<Option<&str>>("format")?.unwrap_or_else(|| {
         configured_format
@@ -189,7 +243,10 @@ pub fn timeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String,
 
 /// Formats a timestamp as date.
 ///
-/// The value needs to be a unix timestamp, or a parsable string (via the [`time`] crate).
+/// The value needs to be a unix timestamp, or a parsable string (ISO 8601) or a
+/// format supported by `chrono` or `time`.  If the string does not include time
+/// information, then timezone adjustments are not performed.
+///
 /// The filter accepts two keyword arguments (`format` and `tz`) to influence the format
 /// and the timezone.  The default format is `"medium"`.  The defaults for these keyword
 /// arguments are taken from two global variables in the template context: `DATE_FORMAT`
@@ -223,14 +280,8 @@ pub fn timeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String,
 /// feature.
 #[cfg_attr(docsrs, doc(cfg(feature = "datetime")))]
 pub fn dateformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String, Error> {
-    #[allow(unused_mut)]
-    let mut datetime = value_to_datetime(value)?;
+    let datetime = value_to_datetime(value, state, &kwargs, true)?;
     let configured_format = state.lookup("DATE_FORMAT");
-
-    #[cfg(feature = "timezone")]
-    {
-        apply_timezone(state, &kwargs, &mut datetime)?;
-    }
 
     let format = kwargs.get::<Option<&str>>("format")?.unwrap_or_else(|| {
         configured_format
@@ -256,28 +307,4 @@ pub fn dateformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String,
         .map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "failed to format date").with_source(err)
         })
-}
-
-fn apply_timezone(
-    state: &State,
-    kwargs: &Kwargs,
-    datetime: &mut OffsetDateTime,
-) -> Result<(), Error> {
-    let configured_tz = state.lookup("TIMEZONE");
-    let tzname = kwargs.get::<Option<&str>>("tz")?.unwrap_or_else(|| {
-        configured_tz
-            .as_ref()
-            .and_then(|x| x.as_str())
-            .unwrap_or("original")
-    });
-    if tzname != "original" {
-        let tz = time_tz::timezones::get_by_name(tzname).ok_or_else(|| {
-            Error::new(
-                ErrorKind::InvalidOperation,
-                format!("unknown timezone '{}'", tzname),
-            )
-        })?;
-        *datetime = datetime.to_timezone(tz)
-    };
-    Ok(())
 }

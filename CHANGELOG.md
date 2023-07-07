@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Added the `args!` macro which can be used to create an argument
   slice on the stack.  (#311)
 - Improved error reporting for missing keyword arguments.
+- Added `chrono` support to the time filters in the `minijinja-contrib` crate.
 
 ## 1.0.3
 
