@@ -6,6 +6,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 
 ## List of Examples
 
+* [actix-web-demo](actix-web-demo): shows how to use MiniJinja with actix web.
 * [autoreload](autoreload): shows how to use auto reloading.
 * [build-script](build-script): Demonstrates how to generate Rust code with MiniJinja in build scripts.
 * [call-block-function](call-block-function): Shows how to use the `{% call %}` block with a custom function.
