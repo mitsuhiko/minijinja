@@ -13,7 +13,7 @@ rust-version = "1.61"
 exclude = ["tests"]
 
 [package.metadata.docs.rs]
-features = ["loader", "json", "urlencode", "custom_syntax"]
+features = ["loader", "json", "urlencode", "custom_syntax", "fuel"]
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [features]
