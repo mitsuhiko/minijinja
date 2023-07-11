@@ -1,5 +1,5 @@
-env: {{ env }}
-title: {{ title }}
-skip: {{ true }}
-run: {{ ["bash", "./script.sh"] }}
-yaml_value: {{ yaml|safe }}
+env: ${{ env }}
+title: ${{ title }}
+skip: ${{ true }}
+run: ${{ ["bash", "./script.sh"] }}
+yaml_value: ${{ yaml|safe }}
