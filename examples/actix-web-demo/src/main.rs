@@ -67,14 +67,11 @@ async fn user(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let state = web::Data::new(AppState {
-        env: {
-            let mut env = Environment::new();
-            env.set_loader(path_loader("templates"));
-            env.add_function("url_for", url_for);
-            env
-        },
-    });
+    let mut env = Environment::new();
+    env.set_loader(path_loader("templates"));
+    env.add_function("url_for", url_for);
+
+    let state = web::Data::new(AppState { env });
 
     HttpServer::new(move || {
         App::new()
