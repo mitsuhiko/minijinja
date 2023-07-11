@@ -15,9 +15,12 @@ where
     F: FnOnce() -> R,
 {
     CURRENT_REQUEST.with(|current_req| *current_req.borrow_mut() = Some(req.clone()));
-    let rv = f();
+    let rv = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
     CURRENT_REQUEST.with(|current_req| current_req.borrow_mut().take());
-    rv
+    match rv {
+        Ok(rv) => rv,
+        Err(panic) => std::panic::resume_unwind(panic),
+    }
 }
 
 struct AppState {
@@ -40,10 +43,15 @@ impl AppState {
 /// Helper function that is added to templates to invoke `url_for` on the bound request.
 fn url_for(name: &str, args: Rest<String>) -> Result<Value, Error> {
     CURRENT_REQUEST.with(|current_req| {
-        let current_req = current_req.borrow();
         Ok(current_req
+            .borrow()
             .as_ref()
-            .unwrap()
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidOperation,
+                    "url_for requires an http request",
+                )
+            })?
             .url_for(name, &args[..])
             .map_err(|err| {
                 Error::new(ErrorKind::InvalidOperation, "failed to generate url").with_source(err)
