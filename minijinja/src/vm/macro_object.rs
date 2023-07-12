@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{
-    KeyRef, MapType, Object, ObjectKind, StringType, StructObject, Value, ValueRepr,
+    KeyRef, MapType, Object, ObjectKind, StringType, StructObject, Value, ValueBuf,
 };
 use crate::vm::state::State;
 use crate::vm::Vm;
@@ -48,7 +48,7 @@ impl Object for Macro {
 
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         let (args, kwargs) = match args.last() {
-            Some(Value(ValueRepr::Map(kwargs, MapType::Kwargs))) => {
+            Some(Value(ValueBuf::Map(kwargs, MapType::Kwargs))) => {
                 (&args[..args.len() - 1], Some(kwargs))
             }
             _ => (args, None),
@@ -145,7 +145,7 @@ impl StructObject for Macro {
 
     fn get_field(&self, name: &str) -> Option<Value> {
         match name {
-            "name" => Some(Value(ValueRepr::String(
+            "name" => Some(Value(ValueBuf::String(
                 self.data.name.clone(),
                 StringType::Normal,
             ))),
@@ -153,7 +153,7 @@ impl StructObject for Macro {
                 self.data
                     .arg_spec
                     .iter()
-                    .map(|x| Value(ValueRepr::String(x.clone(), StringType::Normal)))
+                    .map(|x| Value(ValueBuf::String(x.clone(), StringType::Normal)))
                     .collect::<Vec<_>>(),
             )),
             "caller" => Some(Value::from(self.data.caller_reference)),

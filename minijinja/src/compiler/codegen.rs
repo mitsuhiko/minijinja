@@ -367,7 +367,7 @@ impl<'source> CodeGenerator<'source> {
     #[cfg(feature = "macros")]
     fn compile_macro_expression(&mut self, macro_decl: &ast::Spanned<ast::Macro<'source>>) {
         use crate::compiler::instructions::MACRO_CALLER;
-        use crate::value::ValueRepr;
+        use crate::value::ValueBuf;
         self.set_line_from_span(macro_decl.span());
         let instr = self.add(Instruction::Jump(!0));
         let mut defaults_iter = macro_decl.defaults.iter().rev();
@@ -393,7 +393,7 @@ impl<'source> CodeGenerator<'source> {
             self.add(Instruction::Enclose(name));
         }
         self.add(Instruction::GetClosure);
-        self.add(Instruction::LoadConst(Value::from(ValueRepr::Seq(
+        self.add(Instruction::LoadConst(Value::from(ValueBuf::Seq(
             macro_decl
                 .args
                 .iter()
@@ -476,25 +476,31 @@ impl<'source> CodeGenerator<'source> {
 
     fn compile_for_loop(&mut self, for_loop: &ast::Spanned<ast::ForLoop<'source>>) {
         self.set_line_from_span(for_loop.span());
+
+        // filter expressions work like a nested for loop without
+        // the special loop variable. in one loop, the condition is checked and
+        // passing items accumlated into a list. in the second, that list is
+        // iterated over normally
         if let Some(ref filter_expr) = for_loop.filter_expr {
-            // filter expressions work like a nested for loop without
-            // the special loop variable that append into a new list
-            // just outside of the loop.
-            self.add(Instruction::BuildList(0));
+            self.add(Instruction::LoadConst(Value::from(0usize)));
             self.compile_expr(&for_loop.iter);
             self.start_for_loop(false, false);
             self.add(Instruction::DupTop);
             self.compile_assignment(&for_loop.target);
             self.compile_expr(filter_expr);
             self.start_if();
-            self.add(Instruction::ListAppend);
+            self.add(Instruction::Swap);
+            self.add(Instruction::LoadConst(Value::from(1usize)));
+            self.add(Instruction::Add);
             self.start_else();
             self.add(Instruction::DiscardTop);
             self.end_if();
             self.end_for_loop(false);
+            self.add(Instruction::BuildList(None));
         } else {
             self.compile_expr(&for_loop.iter);
         }
+
         self.start_for_loop(true, for_loop.recursive);
         self.compile_assignment(&for_loop.target);
         for node in &for_loop.body {
@@ -630,7 +636,7 @@ impl<'source> CodeGenerator<'source> {
                     for item in &l.items {
                         self.compile_expr(item);
                     }
-                    self.add(Instruction::BuildList(l.items.len()));
+                    self.add(Instruction::BuildList(Some(l.items.len())));
                 }
             }
             ast::Expr::Map(m) => {

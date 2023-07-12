@@ -1,7 +1,7 @@
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
 
-use crate::value::{KeyRef, MapType, Value, ValueMap, ValueRepr};
+use crate::value::{KeyRef, MapType, Value, OwnedValueMap, ValueBuf};
 
 impl<'de> Deserialize<'de> for Value {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -94,10 +94,10 @@ impl<'de> Visitor<'de> for ValueVisitor {
     where
         A: MapAccess<'de>,
     {
-        let mut rv = ValueMap::default();
+        let mut rv = OwnedValueMap::default();
         while let Some((k, v)) = ok!(map.next_entry()) {
             rv.insert(KeyRef::Value(k), v);
         }
-        Ok(Value(ValueRepr::Map(rv.into(), MapType::Normal)))
+        Ok(Value(ValueBuf::Map(rv.into(), MapType::Normal)))
     }
 }

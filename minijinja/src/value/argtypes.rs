@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -7,8 +8,8 @@ use std::ops::{Deref, DerefMut};
 use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
-    Arc, KeyRef, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, ValueMap,
-    ValueRepr,
+    KeyRef, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, OwnedValueMap,
+    ValueBuf,
 };
 use crate::vm::State;
 
@@ -250,9 +251,9 @@ tuple_impls! { A B *C }
 tuple_impls! { A B C *D }
 tuple_impls! { A B C D *E }
 
-impl From<ValueRepr> for Value {
+impl From<ValueBuf> for Value {
     #[inline(always)]
-    fn from(val: ValueRepr) -> Value {
+    fn from(val: ValueBuf) -> Value {
         Value(val)
     }
 }
@@ -260,21 +261,21 @@ impl From<ValueRepr> for Value {
 impl<'a> From<&'a [u8]> for Value {
     #[inline(always)]
     fn from(val: &'a [u8]) -> Self {
-        ValueRepr::Bytes(Arc::new(val.into())).into()
+        ValueBuf::Bytes(Arc::from(val)).into()
     }
 }
 
 impl<'a> From<&'a str> for Value {
     #[inline(always)]
     fn from(val: &'a str) -> Self {
-        ValueRepr::String(Arc::from(val.to_string()), StringType::Normal).into()
+        ValueBuf::String(Arc::from(val.to_string()), StringType::Normal).into()
     }
 }
 
 impl From<String> for Value {
     #[inline(always)]
     fn from(val: String) -> Self {
-        ValueRepr::String(Arc::from(val), StringType::Normal).into()
+        ValueBuf::String(Arc::from(val), StringType::Normal).into()
     }
 }
 
@@ -291,13 +292,13 @@ impl<'a> From<Cow<'a, str>> for Value {
 impl From<()> for Value {
     #[inline(always)]
     fn from(_: ()) -> Self {
-        ValueRepr::None.into()
+        ValueBuf::None.into()
     }
 }
 
 impl<V: Into<Value>> FromIterator<V> for Value {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
-        ValueRepr::Seq(Arc::new(iter.into_iter().map(Into::into).collect())).into()
+        ValueBuf::Seq(iter.into_iter().map(Into::into).collect()).into()
     }
 }
 
@@ -307,7 +308,7 @@ impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
             .into_iter()
             .map(|(k, v)| (KeyRef::Value(k.into()), v.into()))
             .collect();
-        ValueRepr::Map(Arc::new(map), MapType::Normal).into()
+        ValueBuf::Map(Arc::new(map), MapType::Normal).into()
     }
 }
 
@@ -337,7 +338,7 @@ impl<T: Object> From<Arc<T>> for Value {
 
 impl From<Arc<str>> for Value {
     fn from(value: Arc<str>) -> Self {
-        Value(ValueRepr::String(value, StringType::Normal))
+        Value(ValueBuf::String(value, StringType::Normal))
     }
 }
 
@@ -346,7 +347,7 @@ macro_rules! value_from {
         impl From<$src> for Value {
             #[inline(always)]
             fn from(val: $src) -> Self {
-                ValueRepr::$dst(val as _).into()
+                ValueBuf::$dst(val as _).into()
             }
         }
     };
@@ -355,21 +356,21 @@ macro_rules! value_from {
 impl From<i128> for Value {
     #[inline(always)]
     fn from(val: i128) -> Self {
-        ValueRepr::I128(Packed(val)).into()
+        ValueBuf::I128(Packed(val)).into()
     }
 }
 
 impl From<u128> for Value {
     #[inline(always)]
     fn from(val: u128) -> Self {
-        ValueRepr::U128(Packed(val)).into()
+        ValueBuf::U128(Packed(val)).into()
     }
 }
 
 impl From<char> for Value {
     #[inline(always)]
     fn from(val: char) -> Self {
-        ValueRepr::String(Arc::from(val.to_string()), StringType::Normal).into()
+        ValueBuf::String(Arc::from(val.to_string()), StringType::Normal).into()
     }
 }
 
@@ -384,8 +385,8 @@ value_from!(i32, I64);
 value_from!(i64, I64);
 value_from!(f32, F64);
 value_from!(f64, F64);
-value_from!(Arc<Vec<u8>>, Bytes);
-value_from!(Arc<Vec<Value>>, Seq);
+value_from!(Arc<[u8]>, Bytes);
+value_from!(Arc<[Value]>, Seq);
 value_from!(Arc<dyn Object>, Dynamic);
 
 fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {
@@ -429,13 +430,13 @@ macro_rules! primitive_try_from {
 macro_rules! primitive_int_try_from {
     ($ty:ident) => {
         primitive_try_from!($ty, {
-            ValueRepr::Bool(val) => val as usize,
-            ValueRepr::I64(val) => val,
-            ValueRepr::U64(val) => val,
+            ValueBuf::Bool(val) => val as usize,
+            ValueBuf::I64(val) => val,
+            ValueBuf::U64(val) => val,
             // for the intention here see Key::from_borrowed_value
-            ValueRepr::F64(val) if (val as i64 as f64 == val) => val as i64,
-            ValueRepr::I128(val) => val.0,
-            ValueRepr::U128(val) => val.0,
+            ValueBuf::F64(val) if (val as i64 as f64 == val) => val as i64,
+            ValueBuf::I128(val) => val.0,
+            ValueBuf::U128(val) => val.0,
         });
     }
 }
@@ -453,10 +454,10 @@ primitive_int_try_from!(i128);
 primitive_int_try_from!(usize);
 
 primitive_try_from!(bool, {
-    ValueRepr::Bool(val) => val,
+    ValueBuf::Bool(val) => val,
 });
 primitive_try_from!(char, {
-    ValueRepr::String(ref val, _) => {
+    ValueBuf::String(ref val, _) => {
         let mut char_iter = val.chars();
         ok!(char_iter.next().filter(|_| char_iter.next().is_none()).ok_or_else(|| {
             unsupported_conversion(ValueKind::String, "non single character string")
@@ -464,18 +465,18 @@ primitive_try_from!(char, {
     },
 });
 primitive_try_from!(f32, {
-    ValueRepr::U64(val) => val as f32,
-    ValueRepr::I64(val) => val as f32,
-    ValueRepr::U128(val) => val.0 as f32,
-    ValueRepr::I128(val) => val.0 as f32,
-    ValueRepr::F64(val) => val as f32,
+    ValueBuf::U64(val) => val as f32,
+    ValueBuf::I64(val) => val as f32,
+    ValueBuf::U128(val) => val.0 as f32,
+    ValueBuf::I128(val) => val.0 as f32,
+    ValueBuf::F64(val) => val as f32,
 });
 primitive_try_from!(f64, {
-    ValueRepr::U64(val) => val as f64,
-    ValueRepr::I64(val) => val as f64,
-    ValueRepr::U128(val) => val.0 as f64,
-    ValueRepr::I128(val) => val.0 as f64,
-    ValueRepr::F64(val) => val,
+    ValueBuf::U64(val) => val as f64,
+    ValueBuf::I64(val) => val as f64,
+    ValueBuf::U128(val) => val.0 as f64,
+    ValueBuf::I128(val) => val.0 as f64,
+    ValueBuf::F64(val) => val,
 });
 
 impl<'a> ArgType<'a> for &str {
@@ -496,7 +497,7 @@ impl TryFrom<Value> for Arc<str> {
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.0 {
-            ValueRepr::String(x, _) => Ok(x),
+            ValueBuf::String(x, _) => Ok(x),
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "value is not a string",
@@ -574,7 +575,7 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
     fn from_value(value: Option<&'a Value>) -> Result<Cow<'a, str>, Error> {
         match value {
             Some(value) => Ok(match value.0 {
-                ValueRepr::String(ref s, _) => Cow::Borrowed(s as &str),
+                ValueBuf::String(ref s, _) => Cow::Borrowed(s as &str),
                 _ => Cow::Owned(value.to_string()),
             }),
             None => Err(Error::from(ErrorKind::MissingArgument)),
@@ -734,7 +735,7 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 /// ```
 #[derive(Debug, Clone)]
 pub struct Kwargs {
-    values: Arc<ValueMap>,
+    values: Arc<OwnedValueMap>,
     used: RefCell<HashSet<String>>,
 }
 
@@ -744,7 +745,7 @@ impl<'a> ArgType<'a> for Kwargs {
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
             Some(value) => {
-                if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
+                if let ValueBuf::Map(ref map, MapType::Kwargs) = value.0 {
                     Ok(Kwargs::new(map.clone()))
                 } else {
                     Err(Error::from(ErrorKind::MissingArgument))
@@ -760,7 +761,7 @@ impl<'a> ArgType<'a> for Kwargs {
         offset: usize,
     ) -> Result<(Self, usize), Error> {
         if let Some(value) = values.get(offset) {
-            if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
+            if let ValueBuf::Map(ref map, MapType::Kwargs) = value.0 {
                 return Ok((Kwargs::new(map.clone()), 1));
             }
         }
@@ -773,7 +774,7 @@ impl<'a> ArgType<'a> for Kwargs {
 }
 
 impl Kwargs {
-    fn new(map: Arc<ValueMap>) -> Kwargs {
+    fn new(map: Arc<OwnedValueMap>) -> Kwargs {
         Kwargs {
             values: map,
             used: RefCell::new(HashSet::new()),
@@ -883,7 +884,7 @@ impl<'a> FromIterator<(&'a str, Value)> for Kwargs {
 
 impl From<Kwargs> for Value {
     fn from(value: Kwargs) -> Self {
-        Value(ValueRepr::Map(value.values, MapType::Kwargs))
+        Value(ValueBuf::Map(value.values, MapType::Kwargs))
     }
 }
 
@@ -892,8 +893,8 @@ impl TryFrom<Value> for Kwargs {
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.0 {
-            ValueRepr::Undefined => Ok(Kwargs::new(Default::default())),
-            ValueRepr::Map(ref val, MapType::Kwargs) => Ok(Kwargs::new(val.clone())),
+            ValueBuf::Undefined => Ok(Kwargs::new(Default::default())),
+            ValueBuf::Map(ref val, MapType::Kwargs) => Ok(Kwargs::new(val.clone())),
             _ => Err(Error::from(ErrorKind::InvalidOperation)),
         }
     }

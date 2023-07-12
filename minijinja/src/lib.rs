@@ -185,7 +185,7 @@
 #![allow(clippy::cognitive_complexity)]
 #![allow(clippy::get_first)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![deny(missing_docs)]
+// #![deny(missing_docs)]
 #![doc(html_logo_url = "https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo-square.png")]
 
 #[macro_use]

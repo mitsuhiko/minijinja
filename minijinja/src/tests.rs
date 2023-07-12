@@ -450,7 +450,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
     pub fn is_true(value: &Value) -> bool {
-        matches!(value.0, crate::value::ValueRepr::Bool(true))
+        matches!(value.0, crate::value::ValueBuf::Bool(true))
     }
 
     /// Checks if a value is `false`.
@@ -461,7 +461,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
     pub fn is_false(value: &Value) -> bool {
-        matches!(value.0, crate::value::ValueRepr::Bool(false))
+        matches!(value.0, crate::value::ValueBuf::Bool(false))
     }
 
     /// Checks if a filter with a given name is available.

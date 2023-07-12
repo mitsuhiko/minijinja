@@ -23,7 +23,7 @@ macro_rules! some {
 /// Hidden utility module for the [`context!`](crate::context!) macro.
 #[doc(hidden)]
 pub mod __context {
-    use crate::value::{KeyRef, MapType, Value, ValueMap, ValueRepr};
+    use crate::value::{KeyRef, MapType, Value, OwnedValueMap, ValueBuf};
     use crate::Environment;
     use std::rc::Rc;
     use std::sync::Arc;
@@ -34,18 +34,18 @@ pub mod __context {
     }
 
     #[inline(always)]
-    pub fn make() -> ValueMap {
-        ValueMap::default()
+    pub fn make() -> OwnedValueMap {
+        OwnedValueMap::default()
     }
 
     #[inline(always)]
-    pub fn add(ctx: &mut ValueMap, key: &'static str, value: Value) {
+    pub fn add(ctx: &mut OwnedValueMap, key: &'static str, value: Value) {
         ctx.insert(KeyRef::Str(key), value);
     }
 
     #[inline(always)]
-    pub fn build(ctx: ValueMap) -> Value {
-        ValueRepr::Map(Arc::new(ctx), MapType::Normal).into()
+    pub fn build(ctx: OwnedValueMap) -> Value {
+        ValueBuf::Map(Arc::new(ctx), MapType::Normal).into()
     }
 
     pub fn thread_local_env() -> Rc<Environment<'static>> {

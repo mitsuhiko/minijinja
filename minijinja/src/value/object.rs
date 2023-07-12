@@ -155,6 +155,13 @@ pub enum ObjectKind<'a> {
     /// stringified form.
     Plain,
 
+    /// This object is a plain object.
+    ///
+    /// Such an object has no attributes but it might be callable and it
+    /// can be stringified.  When serialized it's serialized in it's
+    /// stringified form.
+    Value(Value),
+
     /// This object is a sequence.
     ///
     /// Requires that the object implements [`SeqObject`].
@@ -267,7 +274,7 @@ impl dyn SeqObject + '_ {
     }
 }
 
-impl<T: SeqObject> SeqObject for Arc<T> {
+impl<T: SeqObject + ?Sized> SeqObject for Arc<T> {
     #[inline]
     fn get_item(&self, idx: usize) -> Option<Value> {
         T::get_item(self, idx)

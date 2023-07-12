@@ -5,7 +5,7 @@ use std::iter::{once, repeat};
 use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{OwnedValueIterator, StringType, Value, ValueKind, ValueRepr};
+use crate::value::{OwnedValueIterator, StringType, Value, ValueKind, ValueBuf};
 use crate::Output;
 
 /// internal marker to seal up some trait methods
@@ -54,7 +54,7 @@ pub fn write_escaped(
     value: &Value,
 ) -> Result<(), Error> {
     // common case of safe strings or strings without auto escaping
-    if let ValueRepr::String(ref s, ty) = value.0 {
+    if let ValueBuf::String(ref s, ty) = value.0 {
         if matches!(ty, StringType::Safe) || matches!(auto_escape, AutoEscape::None) {
             return out.write_str(s).map_err(Error::from);
         }

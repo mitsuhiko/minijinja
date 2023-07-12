@@ -1,7 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{KeyRef, ObjectKind, SeqObject, Value, ValueKind, ValueRepr};
+use crate::value::{KeyRef, ObjectKind, SeqObject, Value, ValueKind, ValueBuf};
 
 pub enum CoerceResult<'a> {
     I128(i128, i128),
@@ -11,12 +11,12 @@ pub enum CoerceResult<'a> {
 
 pub(crate) fn as_f64(value: &Value) -> Option<f64> {
     Some(match value.0 {
-        ValueRepr::Bool(x) => x as i64 as f64,
-        ValueRepr::U64(x) => x as f64,
-        ValueRepr::U128(x) => x.0 as f64,
-        ValueRepr::I64(x) => x as f64,
-        ValueRepr::I128(x) => x.0 as f64,
-        ValueRepr::F64(x) => x,
+        ValueBuf::Bool(x) => x as i64 as f64,
+        ValueBuf::U64(x) => x as f64,
+        ValueBuf::U128(x) => x.0 as f64,
+        ValueBuf::I64(x) => x as f64,
+        ValueBuf::I128(x) => x.0 as f64,
+        ValueBuf::F64(x) => x,
         _ => return None,
     })
 }
@@ -24,18 +24,18 @@ pub(crate) fn as_f64(value: &Value) -> Option<f64> {
 pub fn coerce<'x>(a: &'x Value, b: &'x Value) -> Option<CoerceResult<'x>> {
     match (&a.0, &b.0) {
         // equal mappings are trivial
-        (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
-        (ValueRepr::U128(a), ValueRepr::U128(b)) => {
+        (ValueBuf::U64(a), ValueBuf::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
+        (ValueBuf::U128(a), ValueBuf::U128(b)) => {
             Some(CoerceResult::I128(a.0 as i128, b.0 as i128))
         }
-        (ValueRepr::String(a, _), ValueRepr::String(b, _)) => Some(CoerceResult::Str(a, b)),
-        (ValueRepr::I64(a), ValueRepr::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
-        (ValueRepr::I128(a), ValueRepr::I128(b)) => Some(CoerceResult::I128(a.0, b.0)),
-        (ValueRepr::F64(a), ValueRepr::F64(b)) => Some(CoerceResult::F64(*a, *b)),
+        (ValueBuf::String(a, _), ValueBuf::String(b, _)) => Some(CoerceResult::Str(a, b)),
+        (ValueBuf::I64(a), ValueBuf::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
+        (ValueBuf::I128(a), ValueBuf::I128(b)) => Some(CoerceResult::I128(a.0, b.0)),
+        (ValueBuf::F64(a), ValueBuf::F64(b)) => Some(CoerceResult::F64(*a, *b)),
 
         // are floats involved?
-        (ValueRepr::F64(a), _) => Some(CoerceResult::F64(*a, some!(as_f64(b)))),
-        (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(some!(as_f64(a)), *b)),
+        (ValueBuf::F64(a), _) => Some(CoerceResult::F64(*a, some!(as_f64(b)))),
+        (_, ValueBuf::F64(b)) => Some(CoerceResult::F64(some!(as_f64(a)), *b)),
 
         // everything else goes up to i128
         _ => Some(CoerceResult::I128(
@@ -95,7 +95,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     }
 
     let maybe_seq = match value.0 {
-        ValueRepr::String(..) => {
+        ValueBuf::String(..) => {
             let s = value.as_str().unwrap();
             let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
             return Ok(Value::from(
@@ -106,9 +106,9 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
                     .collect::<String>(),
             ));
         }
-        ValueRepr::Undefined | ValueRepr::None => return Ok(Value::from(Vec::<Value>::new())),
-        ValueRepr::Seq(ref s) => Some(&**s as &dyn SeqObject),
-        ValueRepr::Dynamic(ref dy) => {
+        ValueBuf::Undefined | ValueBuf::None => return Ok(Value::from(Vec::<Value>::new())),
+        ValueBuf::Seq(ref s) => Some(&*s as &dyn SeqObject),
+        ValueBuf::Dynamic(ref dy) => {
             if let ObjectKind::Seq(seq) = dy.kind() {
                 Some(seq)
             } else {
@@ -232,7 +232,7 @@ pub fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 pub fn neg(val: &Value) -> Result<Value, Error> {
     if val.kind() == ValueKind::Number {
         match val.0 {
-            ValueRepr::F64(x) => Ok((-x).into()),
+            ValueBuf::F64(x) => Ok((-x).into()),
             _ => {
                 if let Ok(x) = i128::try_from(val.clone()) {
                     Ok(int_as_value(-x))
@@ -266,7 +266,7 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
         }
     } else if let Some(seq) = container.as_seq() {
         seq.iter().any(|item| &item == value)
-    } else if let ValueRepr::Map(ref map, _) = container.0 {
+    } else if let ValueBuf::Map(ref map, _) = container.0 {
         map.get(&KeyRef::Value(value.clone())).is_some()
     } else {
         return Err(Error::new(

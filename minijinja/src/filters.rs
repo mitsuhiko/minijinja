@@ -256,7 +256,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::value::{Kwargs, ValueKind, ValueRepr};
+    use crate::value::{Kwargs, ValueKind, ValueBuf};
     use std::borrow::Cow;
     use std::cmp::Ordering;
     use std::fmt::Write;
@@ -552,9 +552,9 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn abs(value: Value) -> Result<Value, Error> {
         match value.0 {
-            ValueRepr::I64(x) => Ok(Value::from(x.abs())),
-            ValueRepr::I128(x) => Ok(Value::from(x.0.abs())),
-            ValueRepr::F64(x) => Ok(Value::from(x.abs())),
+            ValueBuf::I64(x) => Ok(Value::from(x.abs())),
+            ValueBuf::I128(x) => Ok(Value::from(x.0.abs())),
+            ValueBuf::F64(x) => Ok(Value::from(x.abs())),
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "cannot round value",
@@ -588,8 +588,8 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn round(value: Value, precision: Option<i32>) -> Result<Value, Error> {
         match value.0 {
-            ValueRepr::I64(_) | ValueRepr::I128(_) => Ok(value),
-            ValueRepr::F64(val) => {
+            ValueBuf::I64(_) | ValueBuf::I128(_) => Ok(value),
+            ValueBuf::F64(val) => {
                 let x = 10f64.powi(precision.unwrap_or(0));
                 Ok(Value::from((x * val).round() / x))
             }
@@ -974,9 +974,9 @@ mod builtins {
             Ok(rv)
         } else {
             match &value.0 {
-                ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
-                ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
-                ValueRepr::String(s, _) => {
+                ValueBuf::None | ValueBuf::Undefined => Ok("".into()),
+                ValueBuf::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
+                ValueBuf::String(s, _) => {
                     Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
                 }
                 _ => Ok(percent_encoding::utf8_percent_encode(&value.to_string(), SET).to_string()),

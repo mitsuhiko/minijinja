@@ -11,7 +11,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::{
-    ops, value_map_with_capacity, value_optimization, KeyRef, MapType, Value, ValueRepr,
+    ops, value_map_with_capacity, value_optimization, KeyRef, MapType, Value, ValueBuf,
 };
 use crate::vm::context::{Context, Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
@@ -249,7 +249,7 @@ impl<'env> Vm<'env> {
             macro_rules! assert_valid {
                 ($expr:expr) => {{
                     let val = $expr;
-                    if let ValueRepr::Invalid(ref err) = val.0 {
+                    if let ValueBuf::Invalid(ref err) = val.0 {
                         bail!(Error::new(ErrorKind::BadSerialization, err.to_string()));
                     }
                     val
@@ -264,6 +264,12 @@ impl<'env> Vm<'env> {
             }
 
             match instr {
+                Instruction::Swap => {
+                    let a = stack.pop();
+                    let b = stack.pop();
+                    stack.push(a);
+                    stack.push(b);
+                }
                 Instruction::EmitRaw(val) => {
                     // this only produces a format error, no need to attach
                     // location information.
@@ -320,7 +326,7 @@ impl<'env> Vm<'env> {
                         let key = stack.pop();
                         map.insert(KeyRef::Value(key), value);
                     }
-                    stack.push(Value(ValueRepr::Map(map.into(), MapType::Normal)))
+                    stack.push(Value(ValueBuf::Map(map.into(), MapType::Normal)))
                 }
                 Instruction::BuildKwargs(pair_count) => {
                     let mut map = value_map_with_capacity(*pair_count);
@@ -329,31 +335,19 @@ impl<'env> Vm<'env> {
                         let key = stack.pop();
                         map.insert(KeyRef::Value(key), value);
                     }
-                    stack.push(Value(ValueRepr::Map(map.into(), MapType::Kwargs)))
+                    stack.push(Value(ValueBuf::Map(map.into(), MapType::Kwargs)))
                 }
-                Instruction::BuildList(count) => {
-                    let mut v = Vec::with_capacity(untrusted_size_hint(*count));
-                    for _ in 0..*count {
+                Instruction::BuildList(n) => {
+                    let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
+                    let mut v = Vec::with_capacity(untrusted_size_hint(count));
+                    for _ in 0..count {
                         v.push(stack.pop());
                     }
                     v.reverse();
-                    stack.push(Value(ValueRepr::Seq(Arc::new(v))));
+                    stack.push(Value(ValueBuf::Seq(Arc::from(v))));
                 }
                 Instruction::UnpackList(count) => {
                     ctx_ok!(self.unpack_list(&mut stack, count));
-                }
-                Instruction::ListAppend => {
-                    a = stack.pop();
-                    // this intentionally only works with actual sequences
-                    if let ValueRepr::Seq(mut v) = stack.pop().0 {
-                        Arc::make_mut(&mut v).push(a);
-                        stack.push(Value(ValueRepr::Seq(v)))
-                    } else {
-                        bail!(Error::new(
-                            ErrorKind::InvalidOperation,
-                            "cannot append to non-list"
-                        ));
-                    }
                 }
                 Instruction::Add => func_binop!(add),
                 Instruction::Sub => func_binop!(sub),
@@ -621,7 +615,7 @@ impl<'env> Vm<'env> {
                     for (key, value) in locals.iter() {
                         module.insert(KeyRef::Value(Value::from(*key)), value.clone());
                     }
-                    stack.push(Value(ValueRepr::Map(module.into(), MapType::Normal)));
+                    stack.push(Value(ValueBuf::Map(module.into(), MapType::Normal)));
                 }
                 #[cfg(feature = "macros")]
                 Instruction::BuildMacro(name, offset, flags) => {
@@ -929,10 +923,10 @@ impl<'env> Vm<'env> {
         use crate::compiler::instructions::MACRO_CALLER;
 
         let arg_spec = match stack.pop().0 {
-            ValueRepr::Seq(args) => args
+            ValueBuf::Seq(args) => args
                 .iter()
                 .map(|value| match &value.0 {
-                    ValueRepr::String(arg, _) => arg.clone(),
+                    ValueBuf::String(arg, _) => arg.clone(),
                     _ => unreachable!(),
                 })
                 .collect(),

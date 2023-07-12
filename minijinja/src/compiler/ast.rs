@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::fmt;
 
 use crate::compiler::tokens::Span;
-use crate::value::{value_map_with_capacity, KeyRef, MapType, Value, ValueRepr};
+use crate::value::{value_map_with_capacity, KeyRef, MapType, Value, ValueBuf};
 
 /// Container for nodes with location info.
 ///
@@ -503,7 +503,7 @@ impl<'a> Kwargs<'a> {
             }
         }
 
-        Some(Value(ValueRepr::Map(rv.into(), MapType::Kwargs)))
+        Some(Value(ValueBuf::Map(rv.into(), MapType::Kwargs)))
     }
 }
 
@@ -530,7 +530,7 @@ impl<'a> Map<'a> {
             }
         }
 
-        Some(Value(ValueRepr::Map(rv.into(), MapType::Normal)))
+        Some(Value(ValueBuf::Map(rv.into(), MapType::Normal)))
     }
 }
 
