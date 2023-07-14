@@ -26,6 +26,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [load-lazy](load-lazy): Demonstrates how to load data lazy on demand.
 * [load-resource](load-resource): Demonstrates how to load files dynamically from disk within templates.
 * [macros](macros): Demonstrates how to use macros and imports.
+* [merge-context](merge-context): Shows how a context can be merged from more than one value.
 * [minimal](minimal): a Hello World example without default features.
 * [path-loader](path-loader): Demonstrates how to load templates from disk with the `loader` feature.
 * [recursive-for](recursive-for): demonstrates the recursive for loop.
