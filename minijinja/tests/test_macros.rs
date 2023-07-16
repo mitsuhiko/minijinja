@@ -12,6 +12,20 @@ fn test_context() {
 }
 
 #[test]
+fn test_context_merge() {
+    let one = context!(a => 1);
+    let two = context!(b => 2, a => 42);
+    let ctx = context![..one, ..two];
+    assert_eq!(ctx.get_attr("a").unwrap(), Value::from(1));
+    assert_eq!(ctx.get_attr("b").unwrap(), Value::from(2));
+
+    let two = context!(b => 2, a => 42);
+    let ctx = context!(a => 1, ..two);
+    assert_eq!(ctx.get_attr("a").unwrap(), Value::from(1));
+    assert_eq!(ctx.get_attr("b").unwrap(), Value::from(2));
+}
+
+#[test]
 fn test_render() {
     let env = Environment::new();
     let rv = render!(in env, "Hello {{ name }}!", name => "World");

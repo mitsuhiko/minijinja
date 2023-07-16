@@ -133,6 +133,7 @@ mod argtypes;
 #[cfg(feature = "deserialization")]
 mod deserialize;
 mod keyref;
+pub(crate) mod merge_object;
 mod object;
 pub(crate) mod ops;
 mod serialize;
