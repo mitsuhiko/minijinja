@@ -1,6 +1,6 @@
 use similar_asserts::assert_eq;
 
-use minijinja::value::{Kwargs, Value};
+use minijinja::value::{Kwargs, StructObject, Value};
 use minijinja::{args, context, render, Environment};
 
 #[test]
@@ -22,6 +22,26 @@ fn test_context_merge() {
     let two = context!(b => 2, a => 42);
     let ctx = context!(a => 1, ..two);
     assert_eq!(ctx.get_attr("a").unwrap(), Value::from(1));
+    assert_eq!(ctx.get_attr("b").unwrap(), Value::from(2));
+}
+
+#[test]
+fn test_context_merge_custom() {
+    struct X;
+    impl StructObject for X {
+        fn get_field(&self, name: &str) -> Option<Value> {
+            match name {
+                "a" => Some(Value::from(1)),
+                "b" => Some(Value::from(2)),
+                _ => None,
+            }
+        }
+    }
+
+    let x = Value::from_struct_object(X);
+    let ctx = context! { a => 42, ..x };
+
+    assert_eq!(ctx.get_attr("a").unwrap(), Value::from(42));
     assert_eq!(ctx.get_attr("b").unwrap(), Value::from(2));
 }
 

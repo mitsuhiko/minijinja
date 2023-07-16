@@ -642,7 +642,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn last(value: Value) -> Result<Value, Error> {
         if let Some(s) = value.as_str() {
-            Ok(s.chars().rev().next().map_or(Value::UNDEFINED, Value::from))
+            Ok(s.chars().next_back().map_or(Value::UNDEFINED, Value::from))
         } else if let Some(seq) = value.as_seq() {
             Ok(seq.iter().last().unwrap_or(Value::UNDEFINED))
         } else {
