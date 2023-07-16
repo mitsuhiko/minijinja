@@ -23,6 +23,7 @@ macro_rules! some {
 /// Hidden utility module for the [`context!`](crate::context!) macro.
 #[doc(hidden)]
 pub mod __context {
+    pub use crate::value::merge_object::MergeObject;
     use crate::value::{KeyRef, MapType, Value, ValueMap, ValueRepr};
     use crate::Environment;
     use std::rc::Rc;
@@ -56,11 +57,11 @@ pub mod __context {
     }
 }
 
-/// Creates a template context with keys and values.
+/// Creates a template context from keys and values or merging in another value.
 ///
 /// ```rust
 /// # use minijinja::context;
-/// let ctx = context! {
+/// let ctx = context!{
 ///     name => "Peter",
 ///     location => "World",
 /// };
@@ -72,7 +73,7 @@ pub mod __context {
 /// ```rust
 /// # use minijinja::context;
 /// let name = "Peter";
-/// let ctx = context! { name };
+/// let ctx = context!{ name };
 /// ```
 ///
 /// The return value is a [`Value`](crate::value::Value).
@@ -90,30 +91,78 @@ pub mod __context {
 ///     ]
 /// };
 /// ```
+///
+/// Additionally the macro supports a second syntax that can merge other
+/// contexts or values.  In that case one or more values need to be
+/// passed with a leading `..` operator.  This is useful to supply extra
+/// values into render in a common place.  The order of precedence is
+/// left to right:
+///
+/// ```rust
+/// # use minijinja::context;
+/// let ctx = context! { a => "A" };
+/// let ctx = context! { ..ctx, ..context! {
+///     b => "B"
+/// }};
+///
+/// // or
+///
+/// let ctx = context! {
+///     a => "A",
+///     ..context! {
+///         b => "B"
+///     }
+/// };
+/// ```
+///
+/// The merge works with an value, not just values created by the `context!`
+/// macro and is performed lazy.  This means it also works with dynamic
+/// [`StructObject`](crate::value::StructObject)s.
 #[macro_export]
 macro_rules! context {
     () => {
         $crate::__context::build($crate::__context::make())
     };
     (
-        $($key:ident $(=> $value:expr)?),* $(,)?
+        $($key:ident $(=> $value:expr)?),*
+        $(, .. $ctx:expr),* $(,)?
     ) => {{
         let _guard = $crate::__context::value_optimization();
         let mut ctx = $crate::__context::make();
         $(
-            $crate::__context_pair!(ctx, $key $(, $value)?);
+            $crate::__context_pair!(ctx, $key $(=> $value)?);
         )*
-        $crate::__context::build(ctx)
-    }}
+        let ctx = $crate::__context::build(ctx);
+        let mut merged_ctx = ::std::vec::Vec::new();
+        $(
+            merged_ctx.push($crate::value::Value::from($ctx));
+        )*;
+        if merged_ctx.is_empty() {
+            ctx
+        } else {
+            merged_ctx.insert(0, ctx);
+            $crate::value::Value::from_struct_object($crate::__context::MergeObject(merged_ctx))
+        }
+    }};
+    (
+        $(.. $ctx:expr),* $(,)?
+    ) => {{
+        let _guard = $crate::__context::value_optimization();
+        let mut ctx = ::std::vec::Vec::new();
+        $(
+            ctx.push($crate::value::Value::from($ctx));
+        )*;
+        $crate::value::Value::from_struct_object($crate::__context::MergeObject(ctx))
+    }};
 }
 
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __context_pair {
     ($ctx:ident, $key:ident) => {{
-        $crate::__context_pair!($ctx, $key, $key);
+        $crate::__context_pair!($ctx, $key => $key);
     }};
-    ($ctx:ident, $key:ident, $value:expr) => {
+    ($ctx:ident, $key:ident => $value:expr) => {
         $crate::__context::add(
             &mut $ctx,
             stringify!($key),

@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.5
+
+- Added the ability to merge multiple values with the `context!`
+  macro.  (#317)
+
 ## 1.0.4
 
 - Added the `args!` macro which can be used to create an argument
