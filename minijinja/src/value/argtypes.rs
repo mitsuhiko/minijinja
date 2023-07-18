@@ -548,7 +548,7 @@ impl<'a, T: ArgType<'a>> ArgType<'a> for Option<T> {
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => {
-                if value.is_undefined() {
+                if value.is_undefined() || value.is_none() {
                     Ok(None)
                 } else {
                     T::from_value(Some(value)).map(Some)
@@ -1007,5 +1007,13 @@ mod tests {
         assert_eq!(args, &[Value::from(42), Value::from(true)]);
         assert_eq!(kwargs.get::<Value>("foo").unwrap(), Value::from(1));
         assert_eq!(kwargs.get::<Value>("bar").unwrap(), Value::from(2));
+    }
+
+    #[test]
+    fn test_optional_none() {
+        let (one,) = from_args::<(Option<i32>,)>(args!(None::<i32>)).unwrap();
+        assert!(one.is_none());
+        let (one,) = from_args::<(Option<i32>,)>(args!(Some(Value::UNDEFINED))).unwrap();
+        assert!(one.is_none());
     }
 }

@@ -1,6 +1,34 @@
+use minijinja::value::Value;
+use minijinja::{args, Environment};
 use similar_asserts::assert_eq;
 
 use minijinja::filters::indent;
+
+#[test]
+fn test_filter_with_non() {
+    fn filter(value: Option<String>) -> String {
+        format!("[{}]", value.unwrap_or_default())
+    }
+
+    let mut env = Environment::new();
+    env.add_filter("filter", filter);
+    let state = env.empty_state();
+
+    let rv = state
+        .apply_filter("filter", args!(Value::UNDEFINED))
+        .unwrap();
+    assert_eq!(rv, Value::from("[]"));
+
+    let rv = state
+        .apply_filter("filter", args!(Value::from(())))
+        .unwrap();
+    assert_eq!(rv, Value::from("[]"));
+
+    let rv = state
+        .apply_filter("filter", args!(Value::from("wat")))
+        .unwrap();
+    assert_eq!(rv, Value::from("[wat]"));
+}
 
 #[test]
 fn test_indent_one_empty_line() {

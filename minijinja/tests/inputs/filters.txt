@@ -96,6 +96,7 @@ select-attr: {{ [dict(active=true, key=1), dict(active=false, key=2)]|selectattr
 reject-attr: {{ [dict(active=true, key=1), dict(active=false, key=2)]|rejectattr("key", "even") }}
 map-maps: {{ [-1, -2, 3, 4, -5]|map("abs") }}
 map-attr: {{ [dict(a=1), dict(a=2), {}]|map(attribute='a', default=None) }}
+map-attr-undefined: {{ [dict(a=1), dict(a=2), {}]|map(attribute='a', default=definitely_undefined) }}
 map-attr-deep: {{ [dict(a=[1]), dict(a=[2]), dict(a=[])]|map(attribute='a.0', default=None) }}
 map-attr-int: {{ [[1], [1, 2]]|map(attribute=1, default=999) }}
 attr-filter: {{ map|attr("a") }}
