@@ -6,6 +6,9 @@ All notable changes to MiniJinja are documented here.
 
 - Added the ability to merge multiple values with the `context!`
   macro.  (#317)
+- `Option<T>` now accepts `none` in filters.  Previously only
+  undefined values were accepted.  This bugfix might have a minor impact
+  on code that relied in this behavior.  (#320)
 
 ## 1.0.4
 
