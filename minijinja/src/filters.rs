@@ -1144,7 +1144,11 @@ mod builtins {
             if !args.is_empty() {
                 return Err(Error::from(ErrorKind::TooManyArguments));
             }
-            let default = ok!(kwargs.get::<Option<Value>>("default"));
+            let default = if kwargs.has("default") {
+                ok!(kwargs.get::<Value>("default"))
+            } else {
+                Value::UNDEFINED
+            };
             for value in ok!(state.undefined_behavior().try_iter(value)) {
                 let sub_val = match attr.as_str() {
                     Some(path) => value.get_path(path),
@@ -1153,17 +1157,13 @@ mod builtins {
                 rv.push(match (sub_val, &default) {
                     (Ok(attr), _) => {
                         if attr.is_undefined() {
-                            if let Some(ref default) = default {
-                                default.clone()
-                            } else {
-                                Value::UNDEFINED
-                            }
+                            default.clone()
                         } else {
                             attr
                         }
                     }
-                    (Err(_), Some(default)) => default.clone(),
-                    (Err(err), None) => return Err(err),
+                    (Err(_), default) if !default.is_undefined() => default.clone(),
+                    (Err(err), _) => return Err(err),
                 });
             }
             ok!(kwargs.assert_all_used());
