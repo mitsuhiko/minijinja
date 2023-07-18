@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 minijinja = { path = "../../minijinja" }
+minijinja-contrib = { path = "../../minijinja-contrib", features = ["datetime"] }

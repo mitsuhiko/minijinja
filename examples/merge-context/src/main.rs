@@ -1,11 +1,33 @@
+use minijinja::value::Value;
 use minijinja::{context, Environment};
+use minijinja_contrib::add_to_environment;
+
+fn render_template(env: &Environment, tmpl: &str, ctx: Value) -> String {
+    let tmpl = env.get_template(tmpl).unwrap();
+    tmpl.render(context! {
+        DATETIME_FORMAT => "full",
+        ..ctx
+    })
+    .unwrap()
+}
 
 fn main() {
-    let env = Environment::new();
-    let ctx = context! { a => "A", ..context! { b => "B" } };
+    let mut env = Environment::new();
+    env.add_template(
+        "template.txt",
+        "Current user: {{ user }}\nCurrent time: {{ now()|datetimeformat }}",
+    )
+    .unwrap();
+    add_to_environment(&mut env);
+
     println!(
         "{}",
-        env.render_str("Two variables: {{ a }} and {{ b }}!", ctx)
-            .unwrap()
+        render_template(
+            &env,
+            "template.txt",
+            context! {
+                user => "John Doe"
+            }
+        )
     );
 }

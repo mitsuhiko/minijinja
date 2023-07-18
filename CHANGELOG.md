@@ -9,6 +9,8 @@ All notable changes to MiniJinja are documented here.
 - `Option<T>` now accepts `none` in filters.  Previously only
   undefined values were accepted.  This bugfix might have a minor impact
   on code that relied in this behavior.  (#320)
+- Fix a compilation error for `minijinja-contrib` if the `timezone`
+  feature is not enabled.
 
 ## 1.0.4
 

@@ -6,12 +6,12 @@ use serde::de::value::SeqDeserializer;
 use serde::Deserialize;
 use time::format_description::well_known::iso8601::Iso8601;
 use time::{format_description, Date, OffsetDateTime};
-use time_tz::OffsetDateTimeExt;
 
 fn handle_serde_error(err: serde::de::value::Error) -> Error {
     Error::new(ErrorKind::InvalidOperation, "not a valid date or timestamp").with_source(err)
 }
 
+#[allow(unused)]
 fn value_to_datetime(
     value: Value,
     state: &State,
@@ -70,6 +70,7 @@ fn value_to_datetime(
     if had_time {
         #[cfg(feature = "timezone")]
         {
+            use time_tz::OffsetDateTimeExt;
             let configured_tz = state.lookup("TIMEZONE");
             let tzname = kwargs.get::<Option<&str>>("tz")?.unwrap_or_else(|| {
                 configured_tz
