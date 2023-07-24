@@ -32,7 +32,7 @@ pub enum ValueBuf {
     I128(Packed<i128>),
     String(Arc<str>, StringType),
     Bytes(Arc<[u8]>),
-    Seq(Arc<[Value]>),
+    Seq(Arc<dyn SeqObject>),
     Map(Arc<OwnedValueMap>, MapType),
     Dynamic(Arc<dyn Object>),
 }
@@ -50,9 +50,21 @@ pub enum ValueBufX<'a> {
     Invalid(ArcCow<'a, str>),
     String(ArcCow<'a, str>, StringType),
     Bytes(ArcCow<'a, [u8]>),
-    Seq(ArcCow<'a, [Value]>),
+    Seq(ArcCow<'a, dyn SeqObject + 'a>),
     Map(ArcCow<'a, ValueMap<'static>>, MapType),
     Dynamic(ArcCow<'a, dyn Object>),
+}
+
+impl<'a> fmt::Debug for dyn SeqObject + 'a {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl<'a> std::hash::Hash for dyn SeqObject + 'a {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.iter().for_each(|v| v.hash(state));
+    }
 }
 
 impl<T: Copy + fmt::Debug> fmt::Debug for Packed<T> {
@@ -62,10 +74,18 @@ impl<T: Copy + fmt::Debug> fmt::Debug for Packed<T> {
     }
 }
 
-#[derive(Debug)]
 pub enum ArcCow<'a, T: ?Sized + 'a> {
     Borrowed(&'a T),
     Owned(Arc<T>),
+}
+
+impl<T: fmt::Debug + ?Sized> fmt::Debug for ArcCow<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Borrowed(arg0) => f.debug_tuple("Borrowed").field(arg0).finish(),
+            Self::Owned(arg0) => f.debug_tuple("Owned").field(arg0).finish(),
+        }
+    }
 }
 
 impl<T: ?Sized> Clone for ArcCow<'_, T> {
@@ -286,7 +306,6 @@ impl Value {
                 ObjectKind::Plain => ValueKind::Map,
                 ObjectKind::Seq(_) => ValueKind::Seq,
                 ObjectKind::Struct(_) => ValueKind::Map,
-                ObjectKind::Value(v) => v.kind(),
             },
         }
     }
@@ -322,13 +341,12 @@ impl Value {
             ValueBuf::String(ref x, _) => !x.is_empty(),
             ValueBuf::Bytes(ref x) => !x.is_empty(),
             ValueBuf::None | ValueBuf::Undefined | ValueBuf::Invalid(_) => false,
-            ValueBuf::Seq(ref x) => !x.is_empty(),
+            ValueBuf::Seq(ref x) => x.item_count() != 0,
             ValueBuf::Map(ref x, _) => !x.is_empty(),
             ValueBuf::Dynamic(ref x) => match x.kind() {
                 ObjectKind::Plain => true,
                 ObjectKind::Seq(s) => s.item_count() != 0,
                 ObjectKind::Struct(s) => s.field_count() != 0,
-                ObjectKind::Value(v) => v.is_true(),
             },
         }
     }
@@ -410,7 +428,7 @@ impl Value {
         match self.0 {
             ValueBuf::String(ref s, _) => Some(s.chars().count()),
             ValueBuf::Map(ref items, _) => Some(items.len()),
-            ValueBuf::Seq(ref items) => Some(items.len()),
+            ValueBuf::Seq(ref items) => Some(items.item_count()),
             ValueBuf::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Plain => None,
                 ObjectKind::Seq(s) => Some(s.item_count()),
@@ -700,7 +718,10 @@ impl Value {
                 ValueIteratorState::Chars(0, Arc::clone(s)),
                 s.chars().count(),
             ),
-            ValueBuf::Seq(ref seq) => (ValueIteratorState::Seq(0, Arc::clone(seq)), seq.len()),
+            ValueBuf::Seq(ref seq) => (
+                ValueIteratorState::DynSeq(0, Arc::clone(seq)),
+                seq.item_count(),
+            ),
             #[cfg(feature = "preserve_order")]
             ValueBuf::Map(ref items, _) => {
                 (ValueIteratorState::Map(0, Arc::clone(items)), items.len())
@@ -716,10 +737,10 @@ impl Value {
             ValueBuf::Dynamic(ref obj) => {
                 match obj.kind() {
                     ObjectKind::Plain => (ValueIteratorState::Empty, 0),
-                    ObjectKind::Seq(s) => (
-                        ValueIteratorState::DynSeq(0, Arc::clone(obj)),
-                        s.item_count(),
-                    ),
+                    ObjectKind::Seq(s) => todo!(),
+                    //     // ValueIteratorState::DynSeq(0, Arc::clone(obj)),
+                    //     s.item_count(),
+                    // ),
                     ObjectKind::Struct(s) => {
                         // the assumption is that structs don't have excessive field counts
                         // and that most iterations go over all fields, so creating a
@@ -995,7 +1016,7 @@ enum ValueIteratorState {
     Seq(usize, Arc<[Value]>),
     StaticStr(usize, &'static [&'static str]),
     ArcStr(usize, Vec<Arc<str>>),
-    DynSeq(usize, Arc<dyn Object>),
+    DynSeq(usize, Arc<dyn SeqObject>),
     #[cfg(not(feature = "preserve_order"))]
     Map(Option<KeyRef<'static>>, Arc<OwnedValueMap>),
     #[cfg(feature = "preserve_order")]
@@ -1027,15 +1048,11 @@ impl ValueIteratorState {
                 *idx += 1;
                 Value::from(x.clone())
             }),
-            ValueIteratorState::DynSeq(idx, obj) => {
-                if let ObjectKind::Seq(seq) = obj.kind() {
-                    seq.get_item(*idx).map(|x| {
-                        *idx += 1;
-                        x
-                    })
-                } else {
-                    unreachable!()
-                }
+            ValueIteratorState::DynSeq(idx, seq) => {
+                seq.get_item(*idx).map(|x| {
+                    *idx += 1;
+                    x
+                })
             }
             #[cfg(feature = "preserve_order")]
             ValueIteratorState::Map(idx, map) => map.get_index(*idx).map(|x| {

@@ -344,7 +344,7 @@ impl<'env> Vm<'env> {
                         v.push(stack.pop());
                     }
                     v.reverse();
-                    stack.push(Value(ValueBuf::Seq(Arc::from(v))));
+                    stack.push(Value(ValueBuf::Seq(Arc::new(v))));
                 }
                 Instruction::UnpackList(count) => {
                     ctx_ok!(self.unpack_list(&mut stack, count));

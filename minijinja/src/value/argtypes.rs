@@ -298,7 +298,8 @@ impl From<()> for Value {
 
 impl<V: Into<Value>> FromIterator<V> for Value {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
-        ValueBuf::Seq(iter.into_iter().map(Into::into).collect()).into()
+        let vec = iter.into_iter().map(Into::into).collect::<Vec<_>>();
+        ValueBuf::Seq(Arc::new(vec)).into()
     }
 }
 
@@ -386,7 +387,8 @@ value_from!(i64, I64);
 value_from!(f32, F64);
 value_from!(f64, F64);
 value_from!(Arc<[u8]>, Bytes);
-value_from!(Arc<[Value]>, Seq);
+// value_from!(Arc<[Value]>, Seq);
+value_from!(Arc<dyn SeqObject>, Seq);
 value_from!(Arc<dyn Object>, Dynamic);
 
 fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {

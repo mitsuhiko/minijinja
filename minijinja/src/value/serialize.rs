@@ -135,7 +135,14 @@ impl Serialize for Value {
             ValueBuf::I128(i) => serializer.serialize_i128(i.0),
             ValueBuf::String(ref s, _) => serializer.serialize_str(s),
             ValueBuf::Bytes(ref b) => serializer.serialize_bytes(b),
-            ValueBuf::Seq(ref elements) => elements.serialize(serializer),
+            ValueBuf::Seq(ref s) => {
+                use serde::ser::SerializeSeq;
+                let mut seq = ok!(serializer.serialize_seq(Some(s.item_count())));
+                for item in s.iter() {
+                    ok!(seq.serialize_element(&item));
+                }
+                seq.end()
+            },
             ValueBuf::Map(ref entries, _) => {
                 use serde::ser::SerializeMap;
                 let mut map = ok!(serializer.serialize_map(Some(entries.len())));
@@ -146,7 +153,6 @@ impl Serialize for Value {
             }
             ValueBuf::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Plain => serializer.serialize_str(&dy.to_string()),
-                ObjectKind::Value(v) => v.serialize(serializer),
                 ObjectKind::Seq(s) => {
                     use serde::ser::SerializeSeq;
                     let mut seq = ok!(serializer.serialize_seq(Some(s.item_count())));
@@ -420,7 +426,7 @@ impl ser::SerializeSeq for SerializeSeq {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::Seq(Arc::from(self.elements)).into())
+        Ok(ValueBuf::Seq(Arc::new(self.elements)).into())
     }
 }
 
@@ -441,7 +447,7 @@ impl ser::SerializeTuple for SerializeTuple {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::Seq(Arc::from(self.elements)).into())
+        Ok(ValueBuf::Seq(Arc::new(self.elements)).into())
     }
 }
 
@@ -462,7 +468,7 @@ impl ser::SerializeTupleStruct for SerializeTupleStruct {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value(ValueBuf::Seq(Arc::from(self.fields))))
+        Ok(Value(ValueBuf::Seq(Arc::new(self.fields))))
     }
 }
 
@@ -487,7 +493,7 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
         let mut map = value_map_with_capacity(1);
         map.insert(
             KeyRef::Str(self.name),
-            Value(ValueBuf::Seq(self.fields.into())),
+            Value(ValueBuf::Seq(Arc::new(self.fields))),
         );
         Ok(Value(ValueBuf::Map(map.into(), MapType::Normal)))
     }
