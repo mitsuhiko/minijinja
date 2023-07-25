@@ -62,7 +62,7 @@ impl Object for Macro {
         let mut arg_values = Vec::with_capacity(self.data.arg_spec.len());
         for (idx, name) in self.data.arg_spec.iter().enumerate() {
             let kwarg = match kwargs {
-                Some(kwargs) => kwargs.get_field(name),
+                Some(kwargs) => kwargs.get_field(&Value::from(name.clone())),
                 _ => None,
             };
             arg_values.push(match (args.get(idx), kwarg) {
@@ -85,7 +85,7 @@ impl Object for Macro {
             kwargs_used.insert("caller");
             Some(
                 kwargs
-                    .and_then(|x| x.get_field("caller"))
+                    .and_then(|x| x.get_field(&"caller".into()))
                     .unwrap_or(Value::UNDEFINED),
             )
         } else {
@@ -94,11 +94,13 @@ impl Object for Macro {
 
         if let Some(kwargs) = kwargs {
             for key in kwargs.fields() {
-                if !kwargs_used.contains(&*key) {
-                    return Err(Error::new(
-                        ErrorKind::TooManyArguments,
-                        format!("unknown keyword argument `{key}`"),
-                    ));
+                if let Some(name) = key.as_str() {
+                    if !kwargs_used.contains(name) {
+                        return Err(Error::new(
+                            ErrorKind::TooManyArguments,
+                            format!("unknown keyword argument `{key}`"),
+                        ));
+                    }
                 }
             }
         }
@@ -143,7 +145,8 @@ impl StructObject for Macro {
         Some(&["name", "arguments", "caller"][..])
     }
 
-    fn get_field(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        let name = key.as_str()?;
         match name {
             "name" => Some(Value(ValueBuf::String(
                 self.data.name.clone(),

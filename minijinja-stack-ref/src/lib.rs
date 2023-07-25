@@ -330,7 +330,7 @@ impl<T: SeqObject + Send + Sync + 'static + ?Sized> SeqObject for StackHandle<T>
 }
 
 impl<T: StructObject + Send + Sync + 'static + ?Sized> StructObject for StackHandle<T> {
-    fn get_field(&self, idx: &str) -> Option<Value> {
+    fn get_field(&self, idx: &Value) -> Option<Value> {
         self.with(|val| val.get_field(idx))
     }
 
@@ -338,7 +338,7 @@ impl<T: StructObject + Send + Sync + 'static + ?Sized> StructObject for StackHan
         self.with(|val| val.static_fields())
     }
 
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(&self) -> Vec<Value> {
         self.with(|val| val.fields())
     }
 
@@ -408,12 +408,12 @@ impl<T: Object + ?Sized> SeqObject for StackHandleProxy<T> {
 }
 
 impl<T: Object + ?Sized> StructObject for StackHandleProxy<T> {
-    fn get_field(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, key: &Value) -> Option<Value> {
         self.0
-            .with(|val| unwrap_kind!(val, ObjectKind::Struct).get_field(name))
+            .with(|val| unwrap_kind!(val, ObjectKind::Struct).get_field(key))
     }
 
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(&self) -> Vec<Value> {
         self.0
             .with(|val| unwrap_kind!(val, ObjectKind::Struct).fields())
     }

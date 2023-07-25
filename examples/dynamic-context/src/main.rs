@@ -7,7 +7,8 @@ use minijinja::Environment;
 struct DynamicContext;
 
 impl StructObject for DynamicContext {
-    fn get_field(&self, field: &str) -> Option<Value> {
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        let field = key.as_str()?;
         Some(match field {
             "pid" => Value::from(std::process::id()),
             "cwd" => Value::from(env::current_dir().unwrap().to_string_lossy()),

@@ -25,9 +25,9 @@ fn test_dynamic_object_roundtrip() {
     }
 
     impl crate::value::object::StructObject for X {
-        fn get_field(&self, name: &str) -> Option<Value> {
-            match name {
-                "value" => Some(Value::from(self.0.load(atomic::Ordering::Relaxed))),
+        fn get_field(&self, key: &Value) -> Option<Value> {
+            match key.as_str() {
+                Some("value") => Some(Value::from(self.0.load(atomic::Ordering::Relaxed))),
                 _ => None,
             }
         }

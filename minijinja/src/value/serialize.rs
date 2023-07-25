@@ -148,13 +148,13 @@ impl Serialize for Value {
                 let mut map = ok!(serializer.serialize_map(None));
                 if let Some(fields) = s.static_fields() {
                     for k in fields {
-                        let v = s.get_field(k).unwrap_or(Value::UNDEFINED);
+                        let v = s.get_field(&Value::from(*k)).unwrap_or(Value::UNDEFINED);
                         ok!(map.serialize_entry(k, &v));
                     }
                 } else {
                     for k in s.fields() {
                         let v = s.get_field(&k).unwrap_or(Value::UNDEFINED);
-                        ok!(map.serialize_entry(&*k as &str, &v));
+                        ok!(map.serialize_entry(&k, &v));
                     }
                 }
                 map.end()
@@ -174,13 +174,13 @@ impl Serialize for Value {
                     let mut map = ok!(serializer.serialize_map(None));
                     if let Some(fields) = s.static_fields() {
                         for k in fields {
-                            let v = s.get_field(k).unwrap_or(Value::UNDEFINED);
+                            let v = s.get_field(&Value::from(*k)).unwrap_or(Value::UNDEFINED);
                             ok!(map.serialize_entry(k, &v));
                         }
                     } else {
                         for k in s.fields() {
                             let v = s.get_field(&k).unwrap_or(Value::UNDEFINED);
-                            ok!(map.serialize_entry(&*k as &str, &v));
+                            ok!(map.serialize_entry(&k, &v));
                         }
                     }
                     map.end()

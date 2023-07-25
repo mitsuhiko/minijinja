@@ -24,14 +24,15 @@ pub struct DictLikeObject {
 }
 
 impl StructObject for DictLikeObject {
-    fn get_field(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        let name = key.as_str()?;
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
             inner.get_item(name).map(to_minijinja_value)
         })
     }
 
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(&self) -> Vec<Value> {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
             inner.keys().iter().map(|x| x.to_string().into()).collect()
@@ -148,7 +149,8 @@ impl SeqObject for DynamicObject {
 }
 
 impl StructObject for DynamicObject {
-    fn get_field(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        let name = key.as_str()?;
         if !is_safe_attr(name) {
             return None;
         }
@@ -240,8 +242,10 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
     } else if let Some(s) = value.as_struct() {
         let rv = PyDict::new(py);
         for field in s.fields().into_iter() {
-            if let Some(value) = s.get_field(&field) {
-                rv.set_item(&field as &str, to_python_value_impl(py, value)?)?;
+            if let Some(name) = field.as_str() {
+                if let Some(value) = s.get_field(&field) {
+                    rv.set_item(name, to_python_value_impl(py, value)?)?;
+                }
             }
         }
         Ok(rv.into())

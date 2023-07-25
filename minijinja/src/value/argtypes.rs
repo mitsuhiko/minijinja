@@ -832,7 +832,7 @@ impl Kwargs {
 
     /// Checks if a keyword argument exists.
     pub fn has(&self, key: &str) -> bool {
-        self.values.get_field(&key).is_some()
+        self.values.get_field(&Value::from(key)).is_some()
     }
 
     /// Iterates over all passed keyword arguments.

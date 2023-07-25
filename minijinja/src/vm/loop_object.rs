@@ -19,7 +19,7 @@ impl fmt::Debug for Loop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("Loop");
         for attr in self.static_fields().unwrap() {
-            s.field(attr, &self.get_field(attr).unwrap());
+            s.field(attr, &self.get_field(&Value::from(*attr)).unwrap());
         }
         s.finish()
     }
@@ -84,7 +84,8 @@ impl StructObject for Loop {
         )
     }
 
-    fn get_field(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        let name = key.as_str()?;
         let idx = self.idx.load(Ordering::Relaxed) as u64;
         // if we never iterated, then all attributes are undefined.
         // this can happen in some rare circumstances where the engine

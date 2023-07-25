@@ -462,9 +462,9 @@ impl Value {
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
         Ok(match self.0 {
             ValueBuf::Undefined => return Err(Error::from(ErrorKind::UndefinedError)),
-            ValueBuf::Map(ref items, _) => items.get_field(key),
+            ValueBuf::Map(ref items, _) => items.get_field(&Value::from(key)),
             ValueBuf::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Struct(s) => s.get_field(key),
+                ObjectKind::Struct(s) => s.get_field(&Value::from(key)),
                 ObjectKind::Plain | ObjectKind::Seq(_) => None,
             },
             _ => None,
@@ -480,9 +480,9 @@ impl Value {
     /// also not be created.
     pub(crate) fn get_attr_fast(&self, key: &str) -> Option<Value> {
         match self.0 {
-            ValueBuf::Map(ref items, _) => items.get_field(key),
+            ValueBuf::Map(ref items, _) => items.get_field(&key.into()),
             ValueBuf::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Struct(s) => s.get_field(key),
+                ObjectKind::Struct(s) => s.get_field(&key.into()),
                 ObjectKind::Plain | ObjectKind::Seq(_) => None,
             },
             _ => None,
@@ -591,17 +591,15 @@ impl Value {
     }
 
     pub(crate) fn get_item_opt(&self, key: &Value) -> Option<Value> {
-        let key = key.clone();
-
         let seq = match self.0 {
-            ValueBuf::Map(ref items, _) => todo!(),
+            ValueBuf::Map(ref items, _) => return items.get_field(key),
             ValueBuf::Seq(ref items) => &*items as &dyn SeqObject,
             ValueBuf::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Plain => return None,
                 ObjectKind::Seq(s) => s,
                 ObjectKind::Struct(s) => {
                     return if let Some(key) = key.as_str() {
-                        s.get_field(key)
+                        s.get_field(&key.into())
                     } else {
                         None
                     };
@@ -703,7 +701,7 @@ impl Value {
         match self.0 {
             ValueBuf::Dynamic(ref dy) => return dy.call_method(state, name, args),
             ValueBuf::Map(ref map, _) => {
-                if let Some(value) = map.get_field(name) {
+                if let Some(value) = map.get_field(&name.into()) {
                     return value.call(state, args);
                 }
             }
@@ -736,7 +734,7 @@ impl Value {
                 } else {
                     let attrs = s.fields();
                     let attr_count = attrs.len();
-                    (ValueIteratorState::ArcStr(0, attrs), attr_count)
+                    (ValueIteratorState::Seq(0, Arc::from(attrs)), attr_count)
                 }
             }
             ValueBuf::Dynamic(ref obj) => {
@@ -755,7 +753,7 @@ impl Value {
                         } else {
                             let attrs = s.fields();
                             let attr_count = attrs.len();
-                            (ValueIteratorState::ArcStr(0, attrs), attr_count)
+                            (ValueIteratorState::Seq(0, Arc::from(attrs)), attr_count)
                         }
                     }
                 }
@@ -947,7 +945,7 @@ impl Hash for Value {
                     if let Some(fields) = s.static_fields() {
                         fields.iter().for_each(|k| {
                             k.hash(state);
-                            s.get_field(k).hash(state);
+                            s.get_field(&Value::from(*k)).hash(state);
                         });
                     } else {
                         s.fields().iter().for_each(|k| {

@@ -45,11 +45,12 @@ impl Object for Closure {
 }
 
 impl StructObject for Closure {
-    fn fields(&self) -> Vec<Arc<str>> {
-        self.values.lock().unwrap().keys().cloned().collect()
+    fn fields(&self) -> Vec<Value> {
+        self.values.lock().unwrap().keys().cloned().map(Value::from).collect()
     }
 
-    fn get_field(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        let name = key.as_str()?;
         self.values.lock().unwrap().get(name).cloned()
     }
 }

@@ -270,16 +270,16 @@ impl dyn SeqObject + '_ {
 /// Iterates over [`StructObject`]
 pub struct StructObjectIter<'a> {
     map: &'a dyn StructObject,
-    keys: std::vec::IntoIter<Arc<str>>,
+    keys: std::vec::IntoIter<Value>,
 }
 
 impl<'a> Iterator for StructObjectIter<'a> {
-    type Item = (Arc<str>, Value);
+    type Item = (Value, Value);
 
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         let key = self.keys.next()?;
-        let value = self.map.get_field(&*key).unwrap_or(Value::UNDEFINED);
+        let value = self.map.get_field(&key).unwrap_or(Value::UNDEFINED);
         Some((key, value))
     }
 
@@ -293,7 +293,7 @@ impl<'a> DoubleEndedIterator for StructObjectIter<'a> {
     #[inline(always)]
     fn next_back(&mut self) -> Option<Self::Item> {
         let key = self.keys.next_back()?;
-        let value = self.map.get_field(&*key).unwrap_or(Value::UNDEFINED);
+        let value = self.map.get_field(&key).unwrap_or(Value::UNDEFINED);
         Some((key, value))
     }
 }
@@ -532,7 +532,7 @@ pub trait StructObject: Send + Sync {
     /// [`State`] nor is there a channel to send out failures as only an option
     /// can be returned.  If you do plan on doing something in field access
     /// that is fallible, instead use a method call.
-    fn get_field(&self, name: &str) -> Option<Value>;
+    fn get_field(&self, key: &Value) -> Option<Value>;
 
     /// If possible returns a static vector of field names.
     ///
@@ -551,10 +551,11 @@ pub trait StructObject: Send + Sync {
     /// be implemented due to lifetime restrictions.  The default implementation
     /// converts the return value of [`static_fields`](Self::static_fields) into
     /// a compatible format automatically.
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(&self) -> Vec<Value> {
         self.static_fields()
             .into_iter()
             .flat_map(|fields| fields.iter().copied().map(intern))
+            .map(Value::from)
             .collect()
     }
 
@@ -573,15 +574,15 @@ pub trait StructObject: Send + Sync {
 
 impl StructObject for OwnedValueMap {
     #[inline]
-    fn get_field(&self, name: &str) -> Option<Value> {
-        self.get(&Value::from(name)).cloned()
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        self.get(key).cloned()
     }
 
     #[inline]
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(&self) -> Vec<Value> {
         // FIXME: Need to take `Value` as key.
         self.keys()
-            .map(|v| intern(v.as_str().unwrap()))
+            .cloned()
             .collect()
     }
 
@@ -599,8 +600,8 @@ impl fmt::Debug for dyn StructObject + '_ {
 
 impl<T: StructObject> StructObject for Arc<T> {
     #[inline]
-    fn get_field(&self, name: &str) -> Option<Value> {
-        T::get_field(self, name)
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        T::get_field(self, key)
     }
 
     #[inline]
@@ -609,7 +610,7 @@ impl<T: StructObject> StructObject for Arc<T> {
     }
 
     #[inline]
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(&self) -> Vec<Value> {
         T::fields(self)
     }
 
@@ -621,8 +622,8 @@ impl<T: StructObject> StructObject for Arc<T> {
 
 impl<'a, T: StructObject + ?Sized> StructObject for &'a T {
     #[inline]
-    fn get_field(&self, name: &str) -> Option<Value> {
-        T::get_field(self, name)
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        T::get_field(self, key)
     }
 
     #[inline]
@@ -631,7 +632,7 @@ impl<'a, T: StructObject + ?Sized> StructObject for &'a T {
     }
 
     #[inline]
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(&self) -> Vec<Value> {
         T::fields(self)
     }
 
