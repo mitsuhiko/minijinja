@@ -133,7 +133,7 @@ use std::mem::transmute;
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
+use minijinja::value::{Object, SeqObject, Value};
 use minijinja::{Error, State};
 
 static STACK_SCOPE_COUNTER: AtomicU64 = AtomicU64::new(0);

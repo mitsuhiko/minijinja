@@ -10,7 +10,6 @@ use crate::error::{Error, ErrorKind};
 use crate::vm::State;
 
 use crate::value::map::{ValueMap, OwnedValueMap};
-use crate::value::keyref::KeyRef;
 use crate::value::object::{SimpleSeqObject, SimpleStructObject};
 use crate::value::ops;
 use crate::value::intern;
@@ -375,6 +374,11 @@ impl Value {
         }
     }
 
+    /// If this is an i64 return it
+    pub fn as_i64(&self) -> Option<i64> {
+        i64::try_from(self.clone()).ok()
+    }
+
     /// Returns the bytes of this value if they exist.
     pub fn as_bytes(&self) -> Option<&[u8]> {
         match &self.0 {
@@ -587,7 +591,7 @@ impl Value {
     }
 
     pub(crate) fn get_item_opt(&self, key: &Value) -> Option<Value> {
-        let key = KeyRef::Value(key.clone());
+        let key = key.clone();
 
         let seq = match self.0 {
             ValueBuf::Map(ref items, _) => todo!(),
@@ -1019,7 +1023,7 @@ enum ValueIteratorState {
     ArcStr(usize, Vec<Arc<str>>),
     DynSeq(usize, Arc<dyn SeqObject>),
     #[cfg(not(feature = "preserve_order"))]
-    Map(Option<KeyRef<'static>>, Arc<OwnedValueMap>),
+    Map(Option<Value>, Arc<OwnedValueMap>),
     #[cfg(feature = "preserve_order")]
     Map(usize, Arc<OwnedValueMap>),
 }
@@ -1058,13 +1062,13 @@ impl ValueIteratorState {
             #[cfg(feature = "preserve_order")]
             ValueIteratorState::Map(idx, map) => map.get_index(*idx).map(|x| {
                 *idx += 1;
-                x.0.as_value()
+                x.0.clone()
             }),
             #[cfg(not(feature = "preserve_order"))]
             ValueIteratorState::Map(ptr, map) => {
                 if let Some(current) = ptr.take() {
-                    let next = map.range(&current..).nth(1).map(|x| x.0.clone());
-                    let rv = current.as_value();
+                    let next = map.get_key_value(&current).map(|x| x.0.clone());
+                    let rv = current;
                     *ptr = next;
                     Some(rv)
                 } else {

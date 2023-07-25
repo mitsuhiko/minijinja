@@ -107,7 +107,7 @@
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
 
-pub(crate) use crate::value::keyref::KeyRef;
+// pub(crate) use crate::value::keyref::KeyRef;
 pub(crate) use crate::value::map::{ValueMap, OwnedValueMap, value_map_with_capacity};
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};

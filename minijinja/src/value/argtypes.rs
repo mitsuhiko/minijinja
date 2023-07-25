@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
-    KeyRef, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, OwnedValueMap,
+    MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, OwnedValueMap,
     ValueBuf,
 };
 use crate::vm::State;
@@ -309,7 +309,7 @@ impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let map = iter
             .into_iter()
-            .map(|(k, v)| (KeyRef::Value(k.into()), v.into()))
+            .map(|(k, v)| (k.into(), v.into()))
             .collect::<OwnedValueMap>();
 
         ValueBuf::Map(Arc::new(map), MapType::Normal).into()
@@ -792,7 +792,7 @@ impl Kwargs {
     where
         T: ArgType<'a, Output = T>,
     {
-        T::from_value(self.values.get(&KeyRef::Str(key))).map_err(|mut err| {
+        T::from_value(self.values.get(&Value::from(key))).map_err(|mut err| {
             if err.kind() == ErrorKind::MissingArgument && err.detail().is_none() {
                 err.set_detail(format!("missing keyword argument '{}'", key));
             }
@@ -869,7 +869,7 @@ impl FromIterator<(String, Value)> for Kwargs {
     {
         Kwargs::new(Arc::new(
             iter.into_iter()
-                .map(|(k, v)| (KeyRef::Value(Value::from(k)), v))
+                .map(|(k, v)| (Value::from(k), v))
                 .collect(),
         ))
     }
@@ -882,7 +882,7 @@ impl<'a> FromIterator<(&'a str, Value)> for Kwargs {
     {
         Kwargs::new(Arc::new(
             iter.into_iter()
-                .map(|(k, v)| (KeyRef::Value(Value::from(k)), v))
+                .map(|(k, v)| (Value::from(k), v))
                 .collect(),
         ))
     }

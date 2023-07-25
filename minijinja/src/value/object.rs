@@ -4,10 +4,8 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{intern, Value};
+use crate::value::{intern, Value, OwnedValueMap};
 use crate::vm::State;
-
-use super::{OwnedValueMap, KeyRef};
 
 /// A utility trait that represents a dynamic object.
 ///
@@ -311,7 +309,7 @@ impl dyn StructObject + '_ {
 
     pub(crate) fn to_map(&self) -> OwnedValueMap {
         self.iter()
-            .map(|(k, v)| (KeyRef::Value(k.into()), v))
+            .map(|(k, v)| (k.into(), v))
             .collect()
     }
 }
@@ -576,7 +574,7 @@ pub trait StructObject: Send + Sync {
 impl StructObject for OwnedValueMap {
     #[inline]
     fn get_field(&self, name: &str) -> Option<Value> {
-        self.get(&KeyRef::Str(name)).cloned()
+        self.get(&Value::from(name)).cloned()
     }
 
     #[inline]

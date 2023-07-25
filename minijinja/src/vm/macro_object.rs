@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{
-    KeyRef, MapType, Object, ObjectKind, StringType, StructObject, Value, ValueBuf,
+    MapType, Object, ObjectKind, StringType, StructObject, Value, ValueBuf,
 };
 use crate::vm::state::State;
 use crate::vm::Vm;

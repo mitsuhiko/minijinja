@@ -11,7 +11,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::{
-    ops, value_map_with_capacity, value_optimization, KeyRef, MapType, Value, ValueBuf,
+    ops, value_map_with_capacity, value_optimization, MapType, Value, ValueBuf,
 };
 use crate::vm::context::{Context, Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
@@ -324,7 +324,7 @@ impl<'env> Vm<'env> {
                     for _ in 0..*pair_count {
                         let value = stack.pop();
                         let key = stack.pop();
-                        map.insert(KeyRef::Value(key), value);
+                        map.insert(key, value);
                     }
                     stack.push(Value(ValueBuf::Map(Arc::new(map), MapType::Normal)))
                 }
@@ -333,7 +333,7 @@ impl<'env> Vm<'env> {
                     for _ in 0..*pair_count {
                         let value = stack.pop();
                         let key = stack.pop();
-                        map.insert(KeyRef::Value(key), value);
+                        map.insert(key, value);
                     }
                     stack.push(Value(ValueBuf::Map(Arc::new(map), MapType::Kwargs)))
                 }
@@ -613,7 +613,7 @@ impl<'env> Vm<'env> {
                     let locals = state.ctx.current_locals_mut();
                     let mut module = value_map_with_capacity(locals.len());
                     for (key, value) in locals.iter() {
-                        module.insert(KeyRef::Value(Value::from(*key)), value.clone());
+                        module.insert(Value::from(*key), value.clone());
                     }
                     stack.push(Value(ValueBuf::Map(Arc::new(module), MapType::Normal)));
                 }

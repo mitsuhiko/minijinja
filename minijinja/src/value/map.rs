@@ -1,10 +1,10 @@
-use crate::value::{KeyRef, Value};
+use crate::value::Value;
 
 #[cfg(feature = "preserve_order")]
-pub(crate) type ValueMap<'a> = indexmap::IndexMap<KeyRef<'a>, Value>;
+pub(crate) type ValueMap<'a> = indexmap::IndexMap<Value, Value>;
 
 #[cfg(not(feature = "preserve_order"))]
-pub(crate) type ValueMap<'a> = std::collections::BTreeMap<KeyRef<'a>, Value>;
+pub(crate) type ValueMap<'a> = std::collections::BTreeMap<Value, Value>;
 
 pub(crate) type OwnedValueMap = ValueMap<'static>;
 
