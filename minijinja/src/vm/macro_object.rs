@@ -62,7 +62,7 @@ impl Object for Macro {
         let mut arg_values = Vec::with_capacity(self.data.arg_spec.len());
         for (idx, name) in self.data.arg_spec.iter().enumerate() {
             let kwarg = match kwargs {
-                Some(kwargs) => kwargs.get(&KeyRef::Str(name)),
+                Some(kwargs) => kwargs.get_field(name),
                 _ => None,
             };
             arg_values.push(match (args.get(idx), kwarg) {
@@ -85,7 +85,7 @@ impl Object for Macro {
             kwargs_used.insert("caller");
             Some(
                 kwargs
-                    .and_then(|x| x.get(&KeyRef::Str("caller")).cloned())
+                    .and_then(|x| x.get_field("caller"))
                     .unwrap_or(Value::UNDEFINED),
             )
         } else {
@@ -93,8 +93,8 @@ impl Object for Macro {
         };
 
         if let Some(kwargs) = kwargs {
-            for key in kwargs.keys().filter_map(|x| x.as_str()) {
-                if !kwargs_used.contains(key) {
+            for key in kwargs.fields() {
+                if !kwargs_used.contains(&*key) {
                     return Err(Error::new(
                         ErrorKind::TooManyArguments,
                         format!("unknown keyword argument `{key}`"),

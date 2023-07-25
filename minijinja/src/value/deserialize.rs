@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
 
@@ -98,6 +100,6 @@ impl<'de> Visitor<'de> for ValueVisitor {
         while let Some((k, v)) = ok!(map.next_entry()) {
             rv.insert(KeyRef::Value(k), v);
         }
-        Ok(Value(ValueBuf::Map(rv.into(), MapType::Normal)))
+        Ok(Value(ValueBuf::Map(Arc::new(rv), MapType::Normal)))
     }
 }

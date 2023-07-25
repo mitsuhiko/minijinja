@@ -33,7 +33,8 @@ pub enum ValueBuf {
     String(Arc<str>, StringType),
     Bytes(Arc<[u8]>),
     Seq(Arc<dyn SeqObject>),
-    Map(Arc<OwnedValueMap>, MapType),
+    Map(Arc<dyn StructObject>, MapType),
+    // Map(Arc<OwnedValueMap>, MapType),
     Dynamic(Arc<dyn Object>),
 }
 
@@ -342,7 +343,7 @@ impl Value {
             ValueBuf::Bytes(ref x) => !x.is_empty(),
             ValueBuf::None | ValueBuf::Undefined | ValueBuf::Invalid(_) => false,
             ValueBuf::Seq(ref x) => x.item_count() != 0,
-            ValueBuf::Map(ref x, _) => !x.is_empty(),
+            ValueBuf::Map(ref x, _) => x.field_count() != 0,
             ValueBuf::Dynamic(ref x) => match x.kind() {
                 ObjectKind::Plain => true,
                 ObjectKind::Seq(s) => s.item_count() != 0,
@@ -427,7 +428,7 @@ impl Value {
     pub fn len(&self) -> Option<usize> {
         match self.0 {
             ValueBuf::String(ref s, _) => Some(s.chars().count()),
-            ValueBuf::Map(ref items, _) => Some(items.len()),
+            ValueBuf::Map(ref items, _) => Some(items.field_count()),
             ValueBuf::Seq(ref items) => Some(items.item_count()),
             ValueBuf::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Plain => None,
@@ -457,7 +458,7 @@ impl Value {
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
         Ok(match self.0 {
             ValueBuf::Undefined => return Err(Error::from(ErrorKind::UndefinedError)),
-            ValueBuf::Map(ref items, _) => items.get(&KeyRef::Str(key)).cloned(),
+            ValueBuf::Map(ref items, _) => items.get_field(key),
             ValueBuf::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Struct(s) => s.get_field(key),
                 ObjectKind::Plain | ObjectKind::Seq(_) => None,
@@ -475,7 +476,7 @@ impl Value {
     /// also not be created.
     pub(crate) fn get_attr_fast(&self, key: &str) -> Option<Value> {
         match self.0 {
-            ValueBuf::Map(ref items, _) => items.get(&KeyRef::Str(key)).cloned(),
+            ValueBuf::Map(ref items, _) => items.get_field(key),
             ValueBuf::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Struct(s) => s.get_field(key),
                 ObjectKind::Plain | ObjectKind::Seq(_) => None,
@@ -589,7 +590,7 @@ impl Value {
         let key = KeyRef::Value(key.clone());
 
         let seq = match self.0 {
-            ValueBuf::Map(ref items, _) => return items.get(&key).cloned(),
+            ValueBuf::Map(ref items, _) => todo!(),
             ValueBuf::Seq(ref items) => &*items as &dyn SeqObject,
             ValueBuf::Dynamic(ref dy) => match dy.kind() {
                 ObjectKind::Plain => return None,
@@ -698,7 +699,7 @@ impl Value {
         match self.0 {
             ValueBuf::Dynamic(ref dy) => return dy.call_method(state, name, args),
             ValueBuf::Map(ref map, _) => {
-                if let Some(value) = map.get(&KeyRef::Str(name)) {
+                if let Some(value) = map.get_field(name) {
                     return value.call(state, args);
                 }
             }
@@ -722,18 +723,18 @@ impl Value {
                 ValueIteratorState::DynSeq(0, Arc::clone(seq)),
                 seq.item_count(),
             ),
-            #[cfg(feature = "preserve_order")]
-            ValueBuf::Map(ref items, _) => {
-                (ValueIteratorState::Map(0, Arc::clone(items)), items.len())
+            ValueBuf::Map(ref s, _) => {
+                // the assumption is that structs don't have excessive field counts
+                // and that most iterations go over all fields, so creating a
+                // temporary vector here is acceptable.
+                if let Some(fields) = s.static_fields() {
+                    (ValueIteratorState::StaticStr(0, fields), fields.len())
+                } else {
+                    let attrs = s.fields();
+                    let attr_count = attrs.len();
+                    (ValueIteratorState::ArcStr(0, attrs), attr_count)
+                }
             }
-            #[cfg(not(feature = "preserve_order"))]
-            ValueBuf::Map(ref items, _) => (
-                ValueIteratorState::Map(
-                    items.iter().next().map(|x| x.0.clone()),
-                    Arc::clone(items),
-                ),
-                items.len(),
-            ),
             ValueBuf::Dynamic(ref obj) => {
                 match obj.kind() {
                     ObjectKind::Plain => (ValueIteratorState::Empty, 0),

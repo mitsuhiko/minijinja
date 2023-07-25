@@ -326,7 +326,7 @@ impl<'env> Vm<'env> {
                         let key = stack.pop();
                         map.insert(KeyRef::Value(key), value);
                     }
-                    stack.push(Value(ValueBuf::Map(map.into(), MapType::Normal)))
+                    stack.push(Value(ValueBuf::Map(Arc::new(map), MapType::Normal)))
                 }
                 Instruction::BuildKwargs(pair_count) => {
                     let mut map = value_map_with_capacity(*pair_count);
@@ -335,7 +335,7 @@ impl<'env> Vm<'env> {
                         let key = stack.pop();
                         map.insert(KeyRef::Value(key), value);
                     }
-                    stack.push(Value(ValueBuf::Map(map.into(), MapType::Kwargs)))
+                    stack.push(Value(ValueBuf::Map(Arc::new(map), MapType::Kwargs)))
                 }
                 Instruction::BuildList(n) => {
                     let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
@@ -615,7 +615,7 @@ impl<'env> Vm<'env> {
                     for (key, value) in locals.iter() {
                         module.insert(KeyRef::Value(Value::from(*key)), value.clone());
                     }
-                    stack.push(Value(ValueBuf::Map(module.into(), MapType::Normal)));
+                    stack.push(Value(ValueBuf::Map(Arc::new(module), MapType::Normal)));
                 }
                 #[cfg(feature = "macros")]
                 Instruction::BuildMacro(name, offset, flags) => {

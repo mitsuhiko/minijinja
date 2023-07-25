@@ -143,11 +143,19 @@ impl Serialize for Value {
                 }
                 seq.end()
             },
-            ValueBuf::Map(ref entries, _) => {
+            ValueBuf::Map(ref s, _) => {
                 use serde::ser::SerializeMap;
-                let mut map = ok!(serializer.serialize_map(Some(entries.len())));
-                for (ref k, ref v) in entries.iter() {
-                    ok!(map.serialize_entry(k, v));
+                let mut map = ok!(serializer.serialize_map(None));
+                if let Some(fields) = s.static_fields() {
+                    for k in fields {
+                        let v = s.get_field(k).unwrap_or(Value::UNDEFINED);
+                        ok!(map.serialize_entry(k, &v));
+                    }
+                } else {
+                    for k in s.fields() {
+                        let v = s.get_field(&k).unwrap_or(Value::UNDEFINED);
+                        ok!(map.serialize_entry(&*k as &str, &v));
+                    }
                 }
                 map.end()
             }
@@ -495,7 +503,7 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
             KeyRef::Str(self.name),
             Value(ValueBuf::Seq(Arc::new(self.fields))),
         );
-        Ok(Value(ValueBuf::Map(map.into(), MapType::Normal)))
+        Ok(Value(ValueBuf::Map(Arc::new(map), MapType::Normal)))
     }
 }
 

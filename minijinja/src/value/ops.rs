@@ -267,7 +267,8 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
     } else if let Some(seq) = container.as_seq() {
         seq.iter().any(|item| &item == value)
     } else if let ValueBuf::Map(ref map, _) = container.0 {
-        map.get(&KeyRef::Value(value.clone())).is_some()
+        todo!()
+        // map.get_field(&KeyRef::Value(value.clone())).is_some()
     } else {
         return Err(Error::new(
             ErrorKind::InvalidOperation,

@@ -13,6 +13,8 @@ use crate::value::{
 };
 use crate::vm::State;
 
+use super::StructObject;
+
 /// A utility trait that represents the return value of functions and filters.
 ///
 /// It's implemented for the following types:
@@ -308,7 +310,8 @@ impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
         let map = iter
             .into_iter()
             .map(|(k, v)| (KeyRef::Value(k.into()), v.into()))
-            .collect();
+            .collect::<OwnedValueMap>();
+
         ValueBuf::Map(Arc::new(map), MapType::Normal).into()
     }
 }
@@ -389,6 +392,7 @@ value_from!(f64, F64);
 value_from!(Arc<[u8]>, Bytes);
 // value_from!(Arc<[Value]>, Seq);
 value_from!(Arc<dyn SeqObject>, Seq);
+// value_from!(Arc<dyn StructObject>, Map);
 value_from!(Arc<dyn Object>, Dynamic);
 
 fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {
@@ -748,12 +752,12 @@ impl<'a> ArgType<'a> for Kwargs {
         match value {
             Some(value) => {
                 if let ValueBuf::Map(ref map, MapType::Kwargs) = value.0 {
-                    Ok(Kwargs::new(map.clone()))
+                    Ok(Kwargs::new(map.to_map().into()))
                 } else {
                     Err(Error::from(ErrorKind::MissingArgument))
                 }
             }
-            None => Ok(Kwargs::new(Default::default())),
+            None => Ok(Kwargs::new(Arc::new(OwnedValueMap::default()))),
         }
     }
 
@@ -764,10 +768,10 @@ impl<'a> ArgType<'a> for Kwargs {
     ) -> Result<(Self, usize), Error> {
         if let Some(value) = values.get(offset) {
             if let ValueBuf::Map(ref map, MapType::Kwargs) = value.0 {
-                return Ok((Kwargs::new(map.clone()), 1));
+                return Ok((Kwargs::new(map.to_map().into()), 1));
             }
         }
-        Ok((Kwargs::new(Default::default()), 0))
+        Ok((Kwargs::new(Arc::new(OwnedValueMap::default())), 0))
     }
 
     fn is_trailing() -> bool {
@@ -828,7 +832,7 @@ impl Kwargs {
 
     /// Checks if a keyword argument exists.
     pub fn has(&self, key: &str) -> bool {
-        self.values.contains_key(&KeyRef::Str(key))
+        self.values.get_field(&key).is_some()
     }
 
     /// Iterates over all passed keyword arguments.
@@ -896,7 +900,7 @@ impl TryFrom<Value> for Kwargs {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.0 {
             ValueBuf::Undefined => Ok(Kwargs::new(Default::default())),
-            ValueBuf::Map(ref val, MapType::Kwargs) => Ok(Kwargs::new(val.clone())),
+            ValueBuf::Map(ref val, MapType::Kwargs) => Ok(Kwargs::new(val.to_map().into())),
             _ => Err(Error::from(ErrorKind::InvalidOperation)),
         }
     }

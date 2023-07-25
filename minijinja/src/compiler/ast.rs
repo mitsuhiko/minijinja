@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 #[cfg(feature = "internal_debug")]
 use std::fmt;
+use std::sync::Arc;
 
 use crate::compiler::tokens::Span;
 use crate::value::{value_map_with_capacity, KeyRef, MapType, Value, ValueBuf};
@@ -503,7 +504,7 @@ impl<'a> Kwargs<'a> {
             }
         }
 
-        Some(Value(ValueBuf::Map(rv.into(), MapType::Kwargs)))
+        Some(Value(ValueBuf::Map(Arc::new(rv), MapType::Kwargs)))
     }
 }
 
@@ -530,7 +531,7 @@ impl<'a> Map<'a> {
             }
         }
 
-        Some(Value(ValueBuf::Map(rv.into(), MapType::Normal)))
+        Some(Value(ValueBuf::Map(Arc::new(rv), MapType::Normal)))
     }
 }
 

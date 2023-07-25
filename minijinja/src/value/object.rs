@@ -7,6 +7,8 @@ use crate::error::{Error, ErrorKind};
 use crate::value::{intern, Value};
 use crate::vm::State;
 
+use super::{OwnedValueMap, KeyRef};
+
 /// A utility trait that represents a dynamic object.
 ///
 /// The engine uses the [`Value`] type to represent values that the engine
@@ -267,6 +269,53 @@ impl dyn SeqObject + '_ {
     }
 }
 
+/// Iterates over [`StructObject`]
+pub struct StructObjectIter<'a> {
+    map: &'a dyn StructObject,
+    keys: std::vec::IntoIter<Arc<str>>,
+}
+
+impl<'a> Iterator for StructObjectIter<'a> {
+    type Item = (Arc<str>, Value);
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        let key = self.keys.next()?;
+        let value = self.map.get_field(&*key).unwrap_or(Value::UNDEFINED);
+        Some((key, value))
+    }
+
+    #[inline(always)]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.keys.size_hint()
+    }
+}
+
+impl<'a> DoubleEndedIterator for StructObjectIter<'a> {
+    #[inline(always)]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let key = self.keys.next_back()?;
+        let value = self.map.get_field(&*key).unwrap_or(Value::UNDEFINED);
+        Some((key, value))
+    }
+}
+
+impl dyn StructObject + '_ {
+    /// Convenient iterator over a [`StructObject`].
+    pub fn iter(&self) -> StructObjectIter<'_> {
+        StructObjectIter {
+            map: self,
+            keys: self.fields().into_iter(),
+        }
+    }
+
+    pub(crate) fn to_map(&self) -> OwnedValueMap {
+        self.iter()
+            .map(|(k, v)| (KeyRef::Value(k.into()), v))
+            .collect()
+    }
+}
+
 impl<T: SeqObject + ?Sized> SeqObject for Arc<T> {
     #[inline]
     fn get_item(&self, idx: usize) -> Option<Value> {
@@ -521,6 +570,32 @@ pub trait StructObject: Send + Sync {
         } else {
             self.fields().len()
         }
+    }
+}
+
+impl StructObject for OwnedValueMap {
+    #[inline]
+    fn get_field(&self, name: &str) -> Option<Value> {
+        self.get(&KeyRef::Str(name)).cloned()
+    }
+
+    #[inline]
+    fn fields(&self) -> Vec<Arc<str>> {
+        // FIXME: Need to take `Value` as key.
+        self.keys()
+            .map(|v| intern(v.as_str().unwrap()))
+            .collect()
+    }
+
+    #[inline]
+    fn field_count(&self) -> usize {
+        self.len()
+    }
+}
+
+impl fmt::Debug for dyn StructObject + '_ {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_map().entries(self.iter()).finish()
     }
 }
 
