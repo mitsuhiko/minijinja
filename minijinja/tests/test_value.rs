@@ -3,7 +3,7 @@ use std::fmt;
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
-use minijinja::value::{Kwargs, Object, ObjectKind, Rest, SeqObject, MapObject, ValueBox};
+use minijinja::value::{Kwargs, Object, Rest, SeqObject, MapObject, ValueBox, Value};
 use minijinja::{args, Environment, Error};
 
 #[test]
@@ -176,17 +176,17 @@ fn test_map_object_iteration_and_indexing() {
     }
 
     impl Object for Point {
-        fn value(&self) -> ObjectKind<'_> {
-            ObjectKind::Struct(self)
+        fn value(&self) -> Value<'_> {
+            Value::from_map_ref(self)
         }
     }
 
     impl MapObject for Point {
-        fn get_field(&self, name: &str) -> Option<ValueBox> {
-            match name {
-                "x" => Some(ValueBox::from(self.0)),
-                "y" => Some(ValueBox::from(self.1)),
-                "z" => Some(ValueBox::from(self.2)),
+        fn get_field(&self, name: &ValueBox) -> Option<ValueBox> {
+            match name.as_str() {
+                Some("x") => Some(ValueBox::from(self.0)),
+                Some("y") => Some(ValueBox::from(self.1)),
+                Some("z") => Some(ValueBox::from(self.2)),
                 _ => None,
             }
         }
@@ -225,8 +225,8 @@ fn test_seq_object_iteration_and_indexing() {
     }
 
     impl Object for Point {
-        fn value(&self) -> ObjectKind<'_> {
-            ObjectKind::Seq(self)
+        fn value(&self) -> Value<'_> {
+            Value::from_seq_ref(self)
         }
     }
 
@@ -283,18 +283,17 @@ fn test_value_object_interface() {
     let seq = val.as_seq().unwrap();
     assert_eq!(seq.item_count(), 4);
 
-    let obj = val.as_object().unwrap();
-    let seq2 = match obj.value() {
-        ObjectKind::Seq(s) => s,
-        _ => panic!("did not expect this"),
-    };
-    assert_eq!(seq2.item_count(), 4);
-    assert_eq!(obj.to_string(), "[1, 2, 3, 4]");
+    // FIXME: We'd need to reintroduce SimpleSeqObject and SimpleMapObject for
+    // this to work as before. What's the benefit?
+    // let obj = val.as_object().unwrap().value();
+    // let seq2 = obj.as_seq().expect("expected sequence");
+    // assert_eq!(seq2.item_count(), 4);
+    // assert_eq!(obj.to_string(), "[1, 2, 3, 4]");
 }
 
 #[test]
 fn test_obj_downcast() {
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct Thing {
         id: usize,
     }

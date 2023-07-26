@@ -161,13 +161,14 @@ fn test_custom_filter() {
 
 #[test]
 fn test_items_and_dictsort_with_structs() {
+    #[derive(Clone)]
     struct MyStruct;
 
     impl MapObject for MyStruct {
-        fn get_field(&self, name: &str) -> Option<ValueBox> {
-            match name {
-                "a" => Some(ValueBox::from("A")),
-                "b" => Some(ValueBox::from("B")),
+        fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
+            match key.as_str() {
+                Some("a") => Some(ValueBox::from("A")),
+                Some("b") => Some(ValueBox::from("B")),
                 _ => None,
             }
         }
@@ -189,13 +190,14 @@ fn test_items_and_dictsort_with_structs() {
 
 #[test]
 fn test_urlencode_with_struct() {
+    #[derive(Clone)]
     struct MyStruct;
 
     impl MapObject for MyStruct {
-        fn get_field(&self, name: &str) -> Option<ValueBox> {
-            match name {
-                "a" => Some(ValueBox::from("a 1")),
-                "b" => Some(ValueBox::from("b 2")),
+        fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
+            match key.as_str() {
+                Some("a") => Some(ValueBox::from("a 1")),
+                Some("b") => Some(ValueBox::from("b 2")),
                 _ => None,
             }
         }

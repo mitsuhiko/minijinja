@@ -31,7 +31,7 @@ use crate::vm::State;
 ///
 /// For examples of how to implement objects refer to [`SeqObject`] and
 /// [`MapObject`].
-pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
+pub trait Object: dyn_clone::DynClone + fmt::Display + fmt::Debug + Any + Sync + Send {
     /// Describes the kind of an object.
     ///
     /// If not implemented behavior for an object is [`ObjectKind::Plain`]
@@ -39,7 +39,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// called or has methods.
     ///
     /// For more information see [`ObjectKind`].
-    fn value<'a>(&'a self) -> Value<'a> {
+    fn value(&self) -> Value<'_> {
         Value::NONE
     }
 
@@ -73,10 +73,6 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
             ErrorKind::InvalidOperation,
             "tried to call non callable object",
         ))
-    }
-
-    fn cloned(&self) -> Arc<dyn Object> {
-        todo!()
     }
 }
 
@@ -121,6 +117,8 @@ impl dyn Object {
         (*self).type_id() == TypeId::of::<T>()
     }
 }
+
+dyn_clone::clone_trait_object!(Object);
 
 impl<T: Object + ?Sized> Object for Arc<T> {
     #[inline]
@@ -218,7 +216,7 @@ impl<T: Object + ?Sized> Object for Arc<T> {
 ///
 /// let value = ValueBox::from_object(Point(1.0, 2.5, 3.0));
 /// ```
-pub trait SeqObject: Send + Sync {
+pub trait SeqObject: dyn_clone::DynClone + Send + Sync {
     /// Looks up an item by index.
     ///
     /// Sequences should provide a value for all items in the range of `0..item_count`
@@ -228,11 +226,9 @@ pub trait SeqObject: Send + Sync {
 
     /// Returns the number of items in the sequence.
     fn item_count(&self) -> usize;
-
-    fn cloned(&self) -> Arc<dyn SeqObject> {
-        todo!()
-    }
 }
+
+dyn_clone::clone_trait_object!(SeqObject);
 
 impl dyn SeqObject + '_ {
     /// Convenient iterator over a [`SeqObject`].
@@ -448,7 +444,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// One thing of note here is that in the above example `env` would be re-created every
 /// time the template needs it.  A better implementation would cache the value after it
 /// was created first.
-pub trait MapObject: Send + Sync {
+pub trait MapObject: dyn_clone::DynClone + Send + Sync {
     /// Invoked by the engine to get a field of a struct.
     ///
     /// Where possible it's a good idea for this to align with the return value
@@ -500,11 +496,9 @@ pub trait MapObject: Send + Sync {
             self.fields().len()
         }
     }
-
-    fn cloned(&self) -> Arc<dyn MapObject> {
-        todo!()
-    }
 }
+
+dyn_clone::clone_trait_object!(MapObject);
 
 impl MapObject for OwnedValueBoxMap {
     #[inline]

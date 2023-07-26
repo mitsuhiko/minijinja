@@ -1,12 +1,25 @@
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, Arc};
 
 use crate::error::{Error, ErrorKind};
 use crate::value::{Object, MapObject, ValueBox, Value};
 use crate::vm::state::State;
 
+#[derive(Clone)]
 pub(crate) struct Loop {
+    pub status: Arc<LoopStatus>,
+}
+
+impl std::ops::Deref for Loop {
+    type Target = LoopStatus;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.status
+    }
+}
+
+pub(crate) struct LoopStatus {
     pub len: usize,
     pub idx: AtomicUsize,
     pub depth: usize,
@@ -26,7 +39,7 @@ impl fmt::Debug for Loop {
 }
 
 impl Object for Loop {
-    fn value<'a>(&'a self) -> Value<'a> {
+    fn value(&self) -> Value<'_> {
         Value::from_map_ref(self)
     }
 

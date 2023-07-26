@@ -25,7 +25,7 @@ pub(crate) struct LoopState {
     // tells us if we need to end capturing.
     pub(crate) current_recursion_jump: Option<(usize, bool)>,
     pub(crate) iterator: OwnedValueIterator,
-    pub(crate) object: Arc<Loop>,
+    pub(crate) object: Loop,
 }
 
 pub(crate) struct Frame<'env> {

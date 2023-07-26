@@ -19,7 +19,7 @@ use crate::value::object::{Object, SeqObject, MapObject};
 
 use super::Value;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum ValueRepr<'a> {
     None,
     Undefined,
@@ -37,6 +37,27 @@ pub enum ValueRepr<'a> {
     Dynamic(ArcCow<'a, dyn Object + 'static>),
 }
 
+impl fmt::Debug for ValueRepr<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValueRepr::Undefined => f.write_str("Undefined"),
+            ValueRepr::Bool(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::U64(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::I64(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::F64(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::None => f.write_str("None"),
+            ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
+            ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
+            ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
+            ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
+            ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Map(val, _) => fmt::Debug::fmt(val, f),
+            ValueRepr::Dynamic(val) => fmt::Debug::fmt(val, f),
+        }
+    }
+}
+
 impl Value<'_> {
     pub fn into_owned(self) -> ValueBox {
         let repr = match self.0 {
@@ -52,15 +73,15 @@ impl Value<'_> {
             ValueRepr::String(v, k) => ValueRepr::String(v.to_owned(), k) ,
             ValueRepr::Bytes(v) => ValueRepr::Bytes(v.to_owned()),
             ValueRepr::Seq(v) => ValueRepr::Seq(match v {
-                ArcCow::Borrowed(v) => ArcCow::Owned(v.cloned().into()),
+                ArcCow::Borrowed(v) => ArcCow::Owned(Arc::from(dyn_clone::clone_box(v))),
                 ArcCow::Owned(v) => ArcCow::Owned(v),
             }),
             ValueRepr::Map(v, k) => ValueRepr::Map(match v {
-                ArcCow::Borrowed(v) => ArcCow::Owned(v.cloned().into()),
+                ArcCow::Borrowed(v) => ArcCow::Owned(Arc::from(dyn_clone::clone_box(v))),
                 ArcCow::Owned(v) => ArcCow::Owned(v),
             }, k),
             ValueRepr::Dynamic(v) => ValueRepr::Dynamic(match v {
-                ArcCow::Borrowed(v) => ArcCow::Owned(v.cloned().into()),
+                ArcCow::Borrowed(v) => ArcCow::Owned(Arc::from(dyn_clone::clone_box(v))),
                 ArcCow::Owned(v) => ArcCow::Owned(v),
             }),
         };
@@ -92,13 +113,6 @@ impl<'a> std::hash::Hash for dyn SeqObject + 'a {
     }
 }
 
-impl<T: Copy + fmt::Debug> fmt::Debug for Packed<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let v = self.0;
-        f.debug_tuple("Packed").field(&v).finish()
-    }
-}
-
 pub enum ArcCow<'a, T: ?Sized + 'a> {
     Borrowed(&'a T),
     Owned(Arc<T>),
@@ -127,10 +141,7 @@ impl<T: fmt::Display + ?Sized> fmt::Display for ArcCow<'_, T> {
 
 impl<T: fmt::Debug + ?Sized> fmt::Debug for ArcCow<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Borrowed(arg0) => f.debug_tuple("Borrowed").field(arg0).finish(),
-            Self::Owned(arg0) => f.debug_tuple("Owned").field(arg0).finish(),
-        }
+        self.deref().fmt(f)
     }
 }
 
@@ -744,24 +755,15 @@ impl Value<'_> {
 
     /// Iterates over the value without holding a reference.
     pub(crate) fn try_iter_owned(&self) -> Result<OwnedValueIterator, Error> {
-        fn make_it_owned(
-            value: &ArcCow<'_, dyn SeqObject + 'static>
-        ) -> ArcCow<'static, dyn SeqObject + 'static> {
-            match value {
-                ArcCow::Borrowed(v) => ArcCow::Owned(v.cloned()),
-                ArcCow::Owned(v) => ArcCow::Owned(v.clone()),
-            }
-        }
-
-        let (iter_state, len) = match self.0 {
+        let (iter_state, len) = match self.clone().into_owned().0 {
             ValueRepr::None | ValueRepr::Undefined => (ValueIteratorState::Empty, 0),
-            ValueRepr::String(ref s, _) =>  {
-                let v: ArcCow<'static, str> = s.to_owned();
-                (ValueIteratorState::Chars(0, v), s.chars().count())
+            ValueRepr::String(s, _) =>  {
+                let len = s.chars().count();
+                (ValueIteratorState::Chars(0, s), len)
             },
-            ValueRepr::Seq(ref seq) => {
-                let v: ArcCow<'static, dyn SeqObject + 'static> = make_it_owned(seq);
-                (ValueIteratorState::DynSeq(0, v), seq.item_count())
+            ValueRepr::Seq(seq) => {
+                let len = seq.item_count();
+                (ValueIteratorState::DynSeq(0, seq), len)
             },
             ValueRepr::Map(ref s, _) => {
                 // the assumption is that structs don't have excessive field counts
@@ -1053,27 +1055,6 @@ impl ValueIteratorState {
         }
     }
 }
-
-// impl fmt::Debug for ValueRepr {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         match self {
-//             ValueRepr::Undefined => f.write_str("Undefined"),
-//             ValueRepr::Bool(val) => fmt::Debug::fmt(val, f),
-//             ValueRepr::U64(val) => fmt::Debug::fmt(val, f),
-//             ValueRepr::I64(val) => fmt::Debug::fmt(val, f),
-//             ValueRepr::F64(val) => fmt::Debug::fmt(val, f),
-//             ValueRepr::None => f.write_str("None"),
-//             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
-//             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-//             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-//             ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
-//             ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
-//             ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
-//             ValueRepr::Map(val, _) => fmt::Debug::fmt(val, f),
-//             ValueRepr::Dynamic(val) => fmt::Debug::fmt(val, f),
-//         }
-//     }
-// }
 
 impl<T: Copy> Clone for Packed<T> {
     fn clone(&self) -> Self {

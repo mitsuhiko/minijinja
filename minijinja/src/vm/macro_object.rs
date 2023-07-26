@@ -23,6 +23,7 @@ pub(crate) struct MacroData {
     pub caller_reference: bool,
 }
 
+#[derive(Clone)]
 pub(crate) struct Macro {
     // the extra level of Arc here is necessary for recursive calls only.
     // For more information have a look at the call() method.

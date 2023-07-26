@@ -14,7 +14,7 @@ use crate::value::{
     ops, value_map_with_capacity, value_optimization, ValueBox, ValueRepr,
 };
 use crate::vm::context::{Context, Frame, LoopState, Stack};
-use crate::vm::loop_object::Loop;
+use crate::vm::loop_object::{Loop, LoopStatus};
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
@@ -875,14 +875,16 @@ impl<'env> Vm<'env> {
                 with_loop_var,
                 recurse_jump_target: if recursive { Some(pc) } else { None },
                 current_recursion_jump,
-                object: Arc::new(Loop {
-                    idx: AtomicUsize::new(!0usize),
-                    len,
-                    depth,
-                    #[cfg(feature = "adjacent_loop_items")]
-                    value_triple: Mutex::new((None, None, iterator.next())),
-                    last_changed_value: Mutex::default(),
-                }),
+                object: Loop {
+                    status: Arc::new(LoopStatus {
+                        idx: AtomicUsize::new(!0usize),
+                        len,
+                        depth,
+                        #[cfg(feature = "adjacent_loop_items")]
+                        value_triple: Mutex::new((None, None, iterator.next())),
+                        last_changed_value: Mutex::default(),
+                    }),
+                },
                 iterator,
             }),
             ..Frame::default()

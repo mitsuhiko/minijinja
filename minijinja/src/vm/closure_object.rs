@@ -7,9 +7,9 @@ use crate::value::{Object, MapObject, ValueBox, Value};
 /// Utility to enclose values for macros.
 ///
 /// See `closure` on the [`Frame`] for how it's used.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct Closure {
-    values: Mutex<BTreeMap<Arc<str>, ValueBox>>,
+    values: Arc<Mutex<BTreeMap<Arc<str>, ValueBox>>>,
 }
 
 impl Closure {
