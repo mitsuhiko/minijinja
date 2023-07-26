@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use crate::value::{Object, ObjectKind, StructObject, Value};
+use crate::value::{Object, StructObject, Value};
 
 /// Utility to enclose values for macros.
 ///
@@ -39,8 +39,9 @@ impl fmt::Display for Closure {
 }
 
 impl Object for Closure {
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Struct(self)
+    fn value(&self) -> Value {
+        todo!()
+        // Value::from_struct_object(*self)
     }
 }
 

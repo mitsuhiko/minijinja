@@ -111,7 +111,7 @@
 pub(crate) use crate::value::map::{ValueMap, OwnedValueMap, value_map_with_capacity};
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
-pub use crate::value::object::{Object, ObjectKind, SeqObject, SeqObjectIter, StructObject};
+pub use crate::value::object::{Object, SeqObject, SeqObjectIter, StructObject};
 pub use crate::value::value::{ValueBuf, ValueCow, ValueKind};
 
 pub(crate) use crate::value::value::{MapType, StringType, Packed, OwnedValueIterator};

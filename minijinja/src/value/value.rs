@@ -10,22 +10,21 @@ use crate::error::{Error, ErrorKind};
 use crate::vm::State;
 
 use crate::value::map::{ValueMap, OwnedValueMap};
-use crate::value::object::{SimpleSeqObject, SimpleStructObject};
 use crate::value::ops;
 use crate::value::intern;
 
 use crate::value::Value;
 use crate::value::argtypes::{FunctionArgs, FunctionResult};
-use crate::value::object::{Object, ObjectKind, SeqObject, StructObject};
+use crate::value::object::{Object, SeqObject, StructObject};
 
 #[derive(Clone)]
 pub enum ValueBuf {
+    None,
     Undefined,
     Bool(bool),
     U64(u64),
     I64(i64),
     F64(f64),
-    None,
     Invalid(Arc<str>),
     U128(Packed<u128>),
     I128(Packed<i128>),
@@ -33,7 +32,6 @@ pub enum ValueBuf {
     Bytes(Arc<[u8]>),
     Seq(Arc<dyn SeqObject>),
     Map(Arc<dyn StructObject>, MapType),
-    // Map(Arc<OwnedValueMap>, MapType),
     Dynamic(Arc<dyn Object>),
 }
 
@@ -51,8 +49,19 @@ pub enum ValueBufX<'a> {
     String(ArcCow<'a, str>, StringType),
     Bytes(ArcCow<'a, [u8]>),
     Seq(ArcCow<'a, dyn SeqObject + 'a>),
-    Map(ArcCow<'a, ValueMap<'static>>, MapType),
+    Map(ArcCow<'a, dyn StructObject + 'a>, MapType),
     Dynamic(ArcCow<'a, dyn Object>),
+}
+
+impl<T: ?Sized> std::ops::Deref for ArcCow<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            ArcCow::Borrowed(v) => v,
+            ArcCow::Owned(v) => &*v,
+        }
+    }
 }
 
 impl<'a> fmt::Debug for dyn SeqObject + 'a {
@@ -186,6 +195,8 @@ impl Value {
     /// and this is the only way to construct it.
     pub const UNDEFINED: Value = Value(ValueBuf::Undefined);
 
+    pub const NONE: Value = Value(ValueBuf::None);
+
     /// Creates a value from a safe string.
     ///
     /// A safe string is one that will bypass auto escaping.  For instance if you
@@ -252,7 +263,7 @@ impl Value {
     /// **Note:** objects created this way cannot be downcasted via
     /// [`downcast_object_ref`](Self::downcast_object_ref).
     pub fn from_seq_object<T: SeqObject + 'static>(value: T) -> Value {
-        Value::from_object(SimpleSeqObject(value))
+        ValueBuf::Seq(Arc::new(value)).into()
     }
 
     /// Creates a value from an owned [`StructObject`].
@@ -263,7 +274,7 @@ impl Value {
     /// **Note:** objects created this way cannot be downcasted via
     /// [`downcast_object_ref`](Self::downcast_object_ref).
     pub fn from_struct_object<T: StructObject + 'static>(value: T) -> Value {
-        Value::from_object(SimpleStructObject(value))
+        ValueBuf::Map(Arc::new(value), MapType::Normal).into()
     }
 
     /// Creates a callable value from a function.
@@ -301,12 +312,7 @@ impl Value {
             ValueBuf::Map(..) => ValueKind::Map,
             // XXX: invalid values report themselves as maps which is a lie
             ValueBuf::Invalid(_) => ValueKind::Map,
-            ValueBuf::Dynamic(ref dy) => match dy.kind() {
-                // XXX: basic objects should probably not report as map
-                ObjectKind::Plain => ValueKind::Map,
-                ObjectKind::Seq(_) => ValueKind::Seq,
-                ObjectKind::Struct(_) => ValueKind::Map,
-            },
+            ValueBuf::Dynamic(ref dy) => dy.value().kind(),
         }
     }
 
@@ -343,11 +349,7 @@ impl Value {
             ValueBuf::None | ValueBuf::Undefined | ValueBuf::Invalid(_) => false,
             ValueBuf::Seq(ref x) => x.item_count() != 0,
             ValueBuf::Map(ref x, _) => x.field_count() != 0,
-            ValueBuf::Dynamic(ref x) => match x.kind() {
-                ObjectKind::Plain => true,
-                ObjectKind::Seq(s) => s.item_count() != 0,
-                ObjectKind::Struct(s) => s.field_count() != 0,
-            },
+            ValueBuf::Dynamic(ref x) => x.value().is_true(),
         }
     }
 
@@ -398,26 +400,21 @@ impl Value {
 
     /// If the value is a sequence it's returned as [`SeqObject`].
     pub fn as_seq(&self) -> Option<&dyn SeqObject> {
-        match self.0 {
-            ValueBuf::Seq(ref v) => return Some(&*v as &dyn SeqObject),
-            ValueBuf::Dynamic(ref dy) => {
-                if let ObjectKind::Seq(seq) = dy.kind() {
-                    return Some(seq);
-                }
-            }
-            _ => {}
-        }
-        None
+        todo!("need ArcCow")
+        // match self.0 {
+        //     ValueBuf::Seq(ref v) => Some(&*v as &dyn SeqObject),
+        //     ValueBuf::Dynamic(ref dy) => dy.kind().as_seq(),
+        //     _ => None
+        // }
     }
 
     /// If the value is a struct, return it as [`StructObject`].
     pub fn as_struct(&self) -> Option<&dyn StructObject> {
-        if let ValueBuf::Dynamic(ref dy) = self.0 {
-            if let ObjectKind::Struct(s) = dy.kind() {
-                return Some(s);
-            }
-        }
-        None
+        todo!("need ArcCow")
+        // match self.0 {
+        //     ValueBuf::Map(ref map, _) => Some(&**map),
+        //     ValueBuf::Dynamic(ref dy) => dy.kind().as_struct(),
+        // }
     }
 
     /// Returns the length of the contained value.
@@ -434,11 +431,7 @@ impl Value {
             ValueBuf::String(ref s, _) => Some(s.chars().count()),
             ValueBuf::Map(ref items, _) => Some(items.field_count()),
             ValueBuf::Seq(ref items) => Some(items.item_count()),
-            ValueBuf::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Plain => None,
-                ObjectKind::Seq(s) => Some(s.item_count()),
-                ObjectKind::Struct(s) => Some(s.field_count()),
-            },
+            ValueBuf::Dynamic(ref dy) => dy.value().len(),
             _ => None,
         }
     }
@@ -463,10 +456,7 @@ impl Value {
         Ok(match self.0 {
             ValueBuf::Undefined => return Err(Error::from(ErrorKind::UndefinedError)),
             ValueBuf::Map(ref items, _) => items.get_field(&Value::from(key)),
-            ValueBuf::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Struct(s) => s.get_field(&Value::from(key)),
-                ObjectKind::Plain | ObjectKind::Seq(_) => None,
-            },
+            ValueBuf::Dynamic(ref dy) => return dy.value().get_attr(key),
             _ => None,
         }
         .unwrap_or(Value::UNDEFINED))
@@ -481,10 +471,7 @@ impl Value {
     pub(crate) fn get_attr_fast(&self, key: &str) -> Option<Value> {
         match self.0 {
             ValueBuf::Map(ref items, _) => items.get_field(&key.into()),
-            ValueBuf::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Struct(s) => s.get_field(&key.into()),
-                ObjectKind::Plain | ObjectKind::Seq(_) => None,
-            },
+            ValueBuf::Dynamic(ref dy) => dy.value().get_attr_fast(key),
             _ => None,
         }
     }
@@ -594,17 +581,7 @@ impl Value {
         let seq = match self.0 {
             ValueBuf::Map(ref items, _) => return items.get_field(key),
             ValueBuf::Seq(ref items) => &*items as &dyn SeqObject,
-            ValueBuf::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Plain => return None,
-                ObjectKind::Seq(s) => s,
-                ObjectKind::Struct(s) => {
-                    return if let Some(key) = key.as_str() {
-                        s.get_field(&key.into())
-                    } else {
-                        None
-                    };
-                }
-            },
+            ValueBuf::Dynamic(ref dy) => return dy.value().get_item_opt(key),
             ValueBuf::String(ref s, _) => {
                 if let Some(idx) = key.as_i64() {
                     let idx = some!(isize::try_from(idx).ok());
@@ -737,27 +714,7 @@ impl Value {
                     (ValueIteratorState::Seq(0, Arc::from(attrs)), attr_count)
                 }
             }
-            ValueBuf::Dynamic(ref obj) => {
-                match obj.kind() {
-                    ObjectKind::Plain => (ValueIteratorState::Empty, 0),
-                    ObjectKind::Seq(s) => todo!(),
-                    //     // ValueIteratorState::DynSeq(0, Arc::clone(obj)),
-                    //     s.item_count(),
-                    // ),
-                    ObjectKind::Struct(s) => {
-                        // the assumption is that structs don't have excessive field counts
-                        // and that most iterations go over all fields, so creating a
-                        // temporary vector here is acceptable.
-                        if let Some(fields) = s.static_fields() {
-                            (ValueIteratorState::StaticStr(0, fields), fields.len())
-                        } else {
-                            let attrs = s.fields();
-                            let attr_count = attrs.len();
-                            (ValueIteratorState::Seq(0, Arc::from(attrs)), attr_count)
-                        }
-                    }
-                }
-            }
+            ValueBuf::Dynamic(ref obj) => return obj.value().try_iter_owned(),
             _ => {
                 return Err(Error::new(
                     ErrorKind::InvalidOperation,
@@ -938,23 +895,7 @@ impl Hash for Value {
                 k.hash(state);
                 v.hash(state);
             }),
-            ValueBuf::Dynamic(d) => match d.kind() {
-                ObjectKind::Plain => 0u8.hash(state),
-                ObjectKind::Seq(s) => s.iter().for_each(|x| x.hash(state)),
-                ObjectKind::Struct(s) => {
-                    if let Some(fields) = s.static_fields() {
-                        fields.iter().for_each(|k| {
-                            k.hash(state);
-                            s.get_field(&Value::from(*k)).hash(state);
-                        });
-                    } else {
-                        s.fields().iter().for_each(|k| {
-                            k.hash(state);
-                            s.get_field(k).hash(state);
-                        });
-                    }
-                }
-            },
+            ValueBuf::Dynamic(d) => d.value().hash(state),
             ValueBuf::U64(_)
             | ValueBuf::I64(_)
             | ValueBuf::F64(_)

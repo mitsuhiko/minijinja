@@ -1,7 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{ObjectKind, SeqObject, Value, ValueKind, ValueBuf};
+use crate::value::{SeqObject, Value, ValueKind, ValueBuf};
 
 pub enum CoerceResult<'a> {
     I128(i128, i128),
@@ -94,6 +94,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         ));
     }
 
+    let kind = value.kind();
     let maybe_seq = match value.0 {
         ValueBuf::String(..) => {
             let s = value.as_str().unwrap();
@@ -107,14 +108,11 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
             ));
         }
         ValueBuf::Undefined | ValueBuf::None => return Ok(Value::from(Vec::<Value>::new())),
-        ValueBuf::Seq(ref s) => Some(&*s as &dyn SeqObject),
-        ValueBuf::Dynamic(ref dy) => {
-            if let ObjectKind::Seq(seq) = dy.kind() {
-                Some(seq)
-            } else {
-                None
-            }
-        }
+        ValueBuf::Seq(s) => Some(s),
+        ValueBuf::Dynamic(dy) => match dy.value().0 {
+            ValueBuf::Seq(s) => Some(s),
+            _ => None
+        },
         _ => None,
     };
 
@@ -131,7 +129,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         }
         None => Err(Error::new(
             ErrorKind::InvalidOperation,
-            format!("value of type {} cannot be sliced", value.kind()),
+            format!("value of type {} cannot be sliced", kind),
         )),
     }
 }

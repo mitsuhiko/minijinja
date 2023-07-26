@@ -8,7 +8,7 @@ use serde::{ser, Serialize, Serializer};
 use crate::utils::{untrusted_size_hint, OnDrop};
 use crate::value::{
     value_map_with_capacity, value_optimization,
-    MapType, Packed, StringType, Value, OwnedValueMap, ValueBuf, ObjectKind,
+    MapType, Packed, StringType, Value, OwnedValueMap, ValueBuf,
 };
 
 // We use in-band signalling to roundtrip some internal values.  This is
@@ -159,33 +159,7 @@ impl Serialize for Value {
                 }
                 map.end()
             }
-            ValueBuf::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Plain => serializer.serialize_str(&dy.to_string()),
-                ObjectKind::Seq(s) => {
-                    use serde::ser::SerializeSeq;
-                    let mut seq = ok!(serializer.serialize_seq(Some(s.item_count())));
-                    for item in s.iter() {
-                        ok!(seq.serialize_element(&item));
-                    }
-                    seq.end()
-                }
-                ObjectKind::Struct(s) => {
-                    use serde::ser::SerializeMap;
-                    let mut map = ok!(serializer.serialize_map(None));
-                    if let Some(fields) = s.static_fields() {
-                        for k in fields {
-                            let v = s.get_field(&Value::from(*k)).unwrap_or(Value::UNDEFINED);
-                            ok!(map.serialize_entry(k, &v));
-                        }
-                    } else {
-                        for k in s.fields() {
-                            let v = s.get_field(&k).unwrap_or(Value::UNDEFINED);
-                            ok!(map.serialize_entry(&k, &v));
-                        }
-                    }
-                    map.end()
-                }
-            },
+            ValueBuf::Dynamic(ref dy) => dy.value().serialize(serializer),
         }
     }
 }

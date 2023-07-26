@@ -176,7 +176,7 @@ fn test_map_object_iteration_and_indexing() {
     }
 
     impl Object for Point {
-        fn kind(&self) -> ObjectKind<'_> {
+        fn value(&self) -> ObjectKind<'_> {
             ObjectKind::Struct(self)
         }
     }
@@ -225,7 +225,7 @@ fn test_seq_object_iteration_and_indexing() {
     }
 
     impl Object for Point {
-        fn kind(&self) -> ObjectKind<'_> {
+        fn value(&self) -> ObjectKind<'_> {
             ObjectKind::Seq(self)
         }
     }
@@ -284,7 +284,7 @@ fn test_value_object_interface() {
     assert_eq!(seq.item_count(), 4);
 
     let obj = val.as_object().unwrap();
-    let seq2 = match obj.kind() {
+    let seq2 = match obj.value() {
         ObjectKind::Seq(s) => s,
         _ => panic!("did not expect this"),
     };

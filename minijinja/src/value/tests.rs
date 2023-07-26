@@ -19,8 +19,9 @@ fn test_dynamic_object_roundtrip() {
     }
 
     impl Object for X {
-        fn kind(&self) -> ObjectKind<'_> {
-            ObjectKind::Struct(self)
+        fn value(&self) -> Value {
+            todo!()
+            // Value::from_struct_object(*self)
         }
     }
 

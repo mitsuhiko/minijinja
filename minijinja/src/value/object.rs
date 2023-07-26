@@ -39,8 +39,8 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// called or has methods.
     ///
     /// For more information see [`ObjectKind`].
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Plain
+    fn value(&self) -> Value {
+        Value::NONE
     }
 
     /// Called when the engine tries to call a method on the object.
@@ -120,8 +120,8 @@ impl dyn Object {
 
 impl<T: Object> Object for Arc<T> {
     #[inline]
-    fn kind(&self) -> ObjectKind<'_> {
-        T::kind(self)
+    fn value(&self) -> Value {
+        T::value(self)
     }
 
     #[inline]
@@ -135,36 +135,36 @@ impl<T: Object> Object for Arc<T> {
     }
 }
 
-/// A kind defines the object's behavior.
-///
-/// When a dynamic [`Object`] is implemented, it can be of one of the kinds
-/// here.  The default behavior will be a [`Plain`](Self::Plain) object which
-/// doesn't do much other than that it can be printed.  For an object to turn
-/// into a [struct](Self::Struct) or [sequence](Self::Seq) the necessary kind
-/// has to be returned with a pointer to itself.
-///
-/// Today object's can have the behavior of structs and sequences but this
-/// might expand in the future.  It does mean that not all types of values can
-/// be represented by objects.
-#[non_exhaustive]
-pub enum ObjectKind<'a> {
-    /// This object is a plain object.
-    ///
-    /// Such an object has no attributes but it might be callable and it
-    /// can be stringified.  When serialized it's serialized in it's
-    /// stringified form.
-    Plain,
-
-    /// This object is a sequence.
-    ///
-    /// Requires that the object implements [`SeqObject`].
-    Seq(&'a dyn SeqObject),
-
-    /// This object is a struct (map with string keys).
-    ///
-    /// Requires that the object implements [`StructObject`].
-    Struct(&'a dyn StructObject),
-}
+// /// A kind defines the object's behavior.
+// ///
+// /// When a dynamic [`Object`] is implemented, it can be of one of the kinds
+// /// here.  The default behavior will be a [`Plain`](Self::Plain) object which
+// /// doesn't do much other than that it can be printed.  For an object to turn
+// /// into a [struct](Self::Struct) or [sequence](Self::Seq) the necessary kind
+// /// has to be returned with a pointer to itself.
+// ///
+// /// Today object's can have the behavior of structs and sequences but this
+// /// might expand in the future.  It does mean that not all types of values can
+// /// be represented by objects.
+// #[non_exhaustive]
+// pub enum ObjectKind<'a> {
+//     /// This object is a plain object.
+//     ///
+//     /// Such an object has no attributes but it might be callable and it
+//     /// can be stringified.  When serialized it's serialized in it's
+//     /// stringified form.
+//     Plain,
+//
+//     /// This object is a sequence.
+//     ///
+//     /// Requires that the object implements [`SeqObject`].
+//     Seq(&'a dyn SeqObject),
+//
+//     /// This object is a struct (map with string keys).
+//     ///
+//     /// Requires that the object implements [`StructObject`].
+//     Struct(&'a dyn StructObject),
+// }
 
 /// Provides the behavior of an [`Object`] holding sequence of values.
 ///
@@ -639,69 +639,5 @@ impl<'a, T: StructObject + ?Sized> StructObject for &'a T {
     #[inline]
     fn field_count(&self) -> usize {
         T::field_count(self)
-    }
-}
-
-#[repr(transparent)]
-pub struct SimpleSeqObject<T>(pub T);
-
-impl<T: SeqObject + 'static> fmt::Display for SimpleSeqObject<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        ok!(f.write_str("["));
-        for (idx, val) in (&self.0 as &dyn SeqObject).iter().enumerate() {
-            if idx > 0 {
-                ok!(f.write_str(", "));
-            }
-            ok!(write!(f, "{val:?}"));
-        }
-        f.write_str("]")
-    }
-}
-
-impl<T: SeqObject + 'static> fmt::Debug for SimpleSeqObject<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list()
-            .entries((&self.0 as &dyn SeqObject).iter())
-            .finish()
-    }
-}
-
-impl<T: SeqObject + 'static> Object for SimpleSeqObject<T> {
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Seq(&self.0)
-    }
-}
-
-#[repr(transparent)]
-pub struct SimpleStructObject<T>(pub T);
-
-impl<T: StructObject + 'static> fmt::Display for SimpleStructObject<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        ok!(f.write_str("{"));
-        for (idx, field) in self.0.fields().iter().enumerate() {
-            if idx > 0 {
-                ok!(f.write_str(", "));
-            }
-            let val = self.0.get_field(field).unwrap_or(Value::UNDEFINED);
-            ok!(write!(f, "{field:?}: {val:?}"));
-        }
-        f.write_str("}")
-    }
-}
-
-impl<T: StructObject + 'static> fmt::Debug for SimpleStructObject<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut m = f.debug_map();
-        for field in self.0.fields() {
-            let value = self.0.get_field(&field).unwrap_or(Value::UNDEFINED);
-            m.entry(&field, &value);
-        }
-        m.finish()
-    }
-}
-
-impl<T: StructObject + 'static> Object for SimpleStructObject<T> {
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Struct(&self.0)
     }
 }

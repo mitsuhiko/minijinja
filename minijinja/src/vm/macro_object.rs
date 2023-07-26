@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{
-    MapType, Object, ObjectKind, StringType, StructObject, Value, ValueBuf,
+    MapType, Object, StringType, StructObject, Value, ValueBuf,
 };
 use crate::vm::state::State;
 use crate::vm::Vm;
@@ -42,8 +42,8 @@ impl fmt::Display for Macro {
 }
 
 impl Object for Macro {
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Struct(self)
+    fn value(&self) -> Value {
+        todo!()
     }
 
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
