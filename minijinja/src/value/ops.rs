@@ -1,7 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{SeqObject, Value, ValueKind, ValueBuf};
+use crate::value::{Value, ValueKind, ValueBuf};
 
 pub enum CoerceResult<'a> {
     I128(i128, i128),

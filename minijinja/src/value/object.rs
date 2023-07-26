@@ -118,7 +118,7 @@ impl dyn Object {
     }
 }
 
-impl<T: Object> Object for Arc<T> {
+impl<T: Object + ?Sized> Object for Arc<T> {
     #[inline]
     fn value(&self) -> Value {
         T::value(self)
@@ -598,7 +598,7 @@ impl fmt::Debug for dyn MapObject + '_ {
     }
 }
 
-impl<T: MapObject> MapObject for Arc<T> {
+impl<T: MapObject + ?Sized> MapObject for Arc<T> {
     #[inline]
     fn get_field(&self, key: &Value) -> Option<Value> {
         T::get_field(self, key)

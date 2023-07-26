@@ -245,12 +245,11 @@ impl Value {
     /// use std::sync::Arc;
     /// let val = Value::from(Arc::new(Thing { id: 42 }));
     /// ```
-    pub fn from_object<T: Object>(value: T) -> Value {
-        Value(ValueBuf::Dynamic(ArcCow::Owned(Arc::new(value))))
-    }
-
-    pub fn from_object_arc<T: Object>(value: Arc<T>) -> Value {
-        Value::from(value)
+    pub fn from_object<T: Object + ?Sized>(value: T) -> Value
+        where T: Into<Arc<T>>
+    {
+        let arc = value.into();
+        Value(ValueBuf::Dynamic(ArcCow::Owned(arc)))
     }
 
     /// Creates a value from an owned [`SeqObject`].
@@ -260,13 +259,11 @@ impl Value {
     ///
     /// **Note:** objects created this way cannot be downcasted via
     /// [`downcast_object_ref`](Self::downcast_object_ref).
-    pub fn from_seq_object<T: SeqObject + 'static>(value: T) -> Value {
-        ValueBuf::Seq(ArcCow::Owned(Arc::new(value))).into()
-    }
-
-    pub fn from_seq_object_arc<T: SeqObject + ?Sized + 'static>(value: Arc<T>) -> Value {
-        todo!()
-        // ValueBuf::Seq(ArcCow::Owned(value as Arc<dyn SeqObject>)).into()
+    pub fn from_seq_object<T: SeqObject + ?Sized + 'static>(value: T) -> Value
+        where T: Into<Arc<T>>
+    {
+        let arc = value.into() as Arc<dyn SeqObject>;
+        ValueBuf::Seq(ArcCow::Owned(arc)).into()
     }
 
     /// Creates a value from an owned [`MapObject`].
@@ -276,21 +273,18 @@ impl Value {
     ///
     /// **Note:** objects created this way cannot be downcasted via
     /// [`downcast_object_ref`](Self::downcast_object_ref).
-    pub fn from_map_object<T: MapObject + 'static>(value: T) -> Value {
-        ValueBuf::Map(ArcCow::Owned(Arc::new(value)), MapType::Normal).into()
+    pub fn from_map_object<T: MapObject + ?Sized + 'static>(value: T) -> Value
+        where T: Into<Arc<T>>
+    {
+        let arc = value.into();
+        ValueBuf::Map(ArcCow::Owned(arc), MapType::Normal).into()
     }
 
-    pub fn from_map_object_arc<T: MapObject + ?Sized + 'static>(value: Arc<T>) -> Value {
-        todo!()
-        // ValueBuf::Map(ArcCow::Owned(value), MapType::Normal).into()
-    }
-
-    pub(crate) fn from_kwargs<T: MapObject + 'static>(value: T) -> Value {
-        ValueBuf::Map(ArcCow::Owned(Arc::new(value)), MapType::Kwargs).into()
-    }
-
-    pub(crate) fn from_kwargs_arc<T: MapObject + 'static>(value: Arc<T>) -> Value {
-        ValueBuf::Map(ArcCow::Owned(value), MapType::Kwargs).into()
+    pub(crate) fn from_kwargs<T: MapObject + ?Sized + 'static>(value: T) -> Value
+        where T: Into<Arc<T>>
+    {
+        let arc = value.into();
+        ValueBuf::Map(ArcCow::Owned(arc), MapType::Kwargs).into()
     }
 
     /// Creates a callable value from a function.

@@ -39,7 +39,7 @@ fn test_dynamic_object_roundtrip() {
     }
 
     let x = Arc::new(X(Default::default()));
-    let x_value = Value::from(x.clone());
+    let x_value = Value::from_object(x.clone());
     x.0.fetch_add(42, atomic::Ordering::Relaxed);
     let x_clone = Value::from_serializable(&x_value);
     x.0.fetch_add(23, atomic::Ordering::Relaxed);

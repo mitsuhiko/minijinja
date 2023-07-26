@@ -629,7 +629,7 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "macros")]
                 Instruction::GetClosure => {
-                    stack.push(Value::from(state.ctx.closure()));
+                    stack.push(Value::from_object(state.ctx.closure()));
                 }
             }
             pc += 1;

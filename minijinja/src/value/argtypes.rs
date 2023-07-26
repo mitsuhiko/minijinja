@@ -8,7 +8,7 @@ use std::ops::{Deref, DerefMut};
 use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
-    MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, OwnedValueMap,
+    MapType, Packed, SeqObject, StringType, Value, ValueKind, OwnedValueMap,
     ValueBuf,
 };
 use crate::vm::State;
@@ -334,12 +334,6 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
     }
 }
 
-impl<T: Object> From<Arc<T>> for Value {
-    fn from(object: Arc<T>) -> Self {
-        Value::from_object_arc(object)
-    }
-}
-
 impl From<Arc<str>> for Value {
     fn from(value: Arc<str>) -> Self {
         Value(ValueBuf::String(value.into(), StringType::Normal))
@@ -375,18 +369,6 @@ impl From<char> for Value {
     #[inline(always)]
     fn from(val: char) -> Self {
         ValueBuf::String(ArcCow::from(val.to_string()), StringType::Normal).into()
-    }
-}
-
-impl From<Arc<dyn SeqObject>> for Value {
-    fn from(value: Arc<dyn SeqObject>) -> Self {
-        Value::from_seq_object_arc(value)
-    }
-}
-
-impl From<Arc<dyn MapObject>> for Value {
-    fn from(value: Arc<dyn MapObject>) -> Self {
-        Value::from_map_object_arc(value)
     }
 }
 
@@ -905,7 +887,7 @@ impl<'a> FromIterator<(&'a str, Value)> for Kwargs {
 
 impl From<Kwargs> for Value {
     fn from(value: Kwargs) -> Self {
-        Value::from_kwargs_arc(value.values)
+        Value::from_kwargs(value.values)
     }
 }
 
