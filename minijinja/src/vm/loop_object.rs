@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Object, StructObject, Value};
+use crate::value::{Object, MapObject, Value};
 use crate::vm::state::State;
 
 pub(crate) struct Loop {
@@ -63,7 +63,7 @@ impl Object for Loop {
     }
 }
 
-impl StructObject for Loop {
+impl MapObject for Loop {
     fn static_fields(&self) -> Option<&'static [&'static str]> {
         Some(
             &[

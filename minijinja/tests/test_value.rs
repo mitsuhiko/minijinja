@@ -3,7 +3,7 @@ use std::fmt;
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
-use minijinja::value::{Kwargs, Object, ObjectKind, Rest, SeqObject, StructObject, Value};
+use minijinja::value::{Kwargs, Object, ObjectKind, Rest, SeqObject, MapObject, Value};
 use minijinja::{args, Environment, Error};
 
 #[test]
@@ -181,7 +181,7 @@ fn test_map_object_iteration_and_indexing() {
         }
     }
 
-    impl StructObject for Point {
+    impl MapObject for Point {
         fn get_field(&self, name: &str) -> Option<Value> {
             match name {
                 "x" => Some(Value::from(self.0)),

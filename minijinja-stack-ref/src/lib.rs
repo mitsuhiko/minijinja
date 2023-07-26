@@ -360,8 +360,8 @@ impl<T: Object + ?Sized> fmt::Display for StackHandle<T> {
 }
 
 impl<T: Object + ?Sized> Object for StackHandle<T> {
-    fn kind(&self) -> ObjectKind<'_> {
-        self.with(|val| match val.kind() {
+    fn value(&self) -> ObjectKind<'_> {
+        self.with(|val| match val.value() {
             ObjectKind::Plain => ObjectKind::Plain,
             ObjectKind::Seq(_) => {
                 ObjectKind::Seq(unsafe { transmute::<_, &StackHandleProxy<T>>(self) })
@@ -483,7 +483,7 @@ impl Scope {
         &'env self,
         value: &'env T,
     ) -> Value {
-        Value::from_struct_object(self.handle(value))
+        Value::from_map_object(self.handle(value))
     }
 }
 

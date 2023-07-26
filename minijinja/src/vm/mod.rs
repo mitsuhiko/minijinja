@@ -11,7 +11,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::{
-    ops, value_map_with_capacity, value_optimization, MapType, Value, ValueBuf,
+    ops, value_map_with_capacity, value_optimization, Value, ValueBuf,
 };
 use crate::vm::context::{Context, Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
@@ -326,7 +326,7 @@ impl<'env> Vm<'env> {
                         let key = stack.pop();
                         map.insert(key, value);
                     }
-                    stack.push(Value(ValueBuf::Map(Arc::new(map), MapType::Normal)))
+                    stack.push(Value::from_map_object(map))
                 }
                 Instruction::BuildKwargs(pair_count) => {
                     let mut map = value_map_with_capacity(*pair_count);
@@ -335,7 +335,7 @@ impl<'env> Vm<'env> {
                         let key = stack.pop();
                         map.insert(key, value);
                     }
-                    stack.push(Value(ValueBuf::Map(Arc::new(map), MapType::Kwargs)))
+                    stack.push(Value::from_kwargs(map))
                 }
                 Instruction::BuildList(n) => {
                     let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
@@ -344,7 +344,7 @@ impl<'env> Vm<'env> {
                         v.push(stack.pop());
                     }
                     v.reverse();
-                    stack.push(Value(ValueBuf::Seq(Arc::new(v))));
+                    stack.push(Value::from_seq_object(v))
                 }
                 Instruction::UnpackList(count) => {
                     ctx_ok!(self.unpack_list(&mut stack, count));
@@ -615,7 +615,7 @@ impl<'env> Vm<'env> {
                     for (key, value) in locals.iter() {
                         module.insert(Value::from(*key), value.clone());
                     }
-                    stack.push(Value(ValueBuf::Map(Arc::new(module), MapType::Normal)));
+                    stack.push(Value::from_map_object(module));
                 }
                 #[cfg(feature = "macros")]
                 Instruction::BuildMacro(name, offset, flags) => {

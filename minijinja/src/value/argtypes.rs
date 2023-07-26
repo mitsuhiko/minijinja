@@ -13,7 +13,7 @@ use crate::value::{
 };
 use crate::vm::State;
 
-use super::StructObject;
+use super::{MapObject, ArcCow};
 
 /// A utility trait that represents the return value of functions and filters.
 ///
@@ -253,9 +253,9 @@ tuple_impls! { A B *C }
 tuple_impls! { A B C *D }
 tuple_impls! { A B C D *E }
 
-impl From<ValueBuf> for Value {
+impl From<ValueBuf<'static>> for Value {
     #[inline(always)]
-    fn from(val: ValueBuf) -> Value {
+    fn from(val: ValueBuf<'static>) -> Value {
         Value(val)
     }
 }
@@ -263,21 +263,21 @@ impl From<ValueBuf> for Value {
 impl<'a> From<&'a [u8]> for Value {
     #[inline(always)]
     fn from(val: &'a [u8]) -> Self {
-        ValueBuf::Bytes(Arc::from(val)).into()
+        ValueBuf::Bytes(ArcCow::from(val)).into()
     }
 }
 
 impl<'a> From<&'a str> for Value {
     #[inline(always)]
     fn from(val: &'a str) -> Self {
-        ValueBuf::String(Arc::from(val.to_string()), StringType::Normal).into()
+        ValueBuf::String(ArcCow::from(val.to_string()), StringType::Normal).into()
     }
 }
 
 impl From<String> for Value {
     #[inline(always)]
     fn from(val: String) -> Self {
-        ValueBuf::String(Arc::from(val), StringType::Normal).into()
+        ValueBuf::String(ArcCow::from(val), StringType::Normal).into()
     }
 }
 
@@ -301,7 +301,7 @@ impl From<()> for Value {
 impl<V: Into<Value>> FromIterator<V> for Value {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
         let vec = iter.into_iter().map(Into::into).collect::<Vec<_>>();
-        ValueBuf::Seq(Arc::new(vec)).into()
+        Value::from_seq_object(vec)
     }
 }
 
@@ -312,7 +312,7 @@ impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
             .map(|(k, v)| (k.into(), v.into()))
             .collect::<OwnedValueMap>();
 
-        ValueBuf::Map(Arc::new(map), MapType::Normal).into()
+        Value::from_map_object(map)
     }
 }
 
@@ -336,13 +336,13 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 
 impl<T: Object> From<Arc<T>> for Value {
     fn from(object: Arc<T>) -> Self {
-        Value::from(object as Arc<dyn Object>)
+        Value::from_object_arc(object)
     }
 }
 
 impl From<Arc<str>> for Value {
     fn from(value: Arc<str>) -> Self {
-        Value(ValueBuf::String(value, StringType::Normal))
+        Value(ValueBuf::String(value.into(), StringType::Normal))
     }
 }
 
@@ -374,7 +374,19 @@ impl From<u128> for Value {
 impl From<char> for Value {
     #[inline(always)]
     fn from(val: char) -> Self {
-        ValueBuf::String(Arc::from(val.to_string()), StringType::Normal).into()
+        ValueBuf::String(ArcCow::from(val.to_string()), StringType::Normal).into()
+    }
+}
+
+impl From<Arc<dyn SeqObject>> for Value {
+    fn from(value: Arc<dyn SeqObject>) -> Self {
+        Value::from_seq_object_arc(value)
+    }
+}
+
+impl From<Arc<dyn MapObject>> for Value {
+    fn from(value: Arc<dyn MapObject>) -> Self {
+        Value::from_map_object_arc(value)
     }
 }
 
@@ -389,11 +401,11 @@ value_from!(i32, I64);
 value_from!(i64, I64);
 value_from!(f32, F64);
 value_from!(f64, F64);
-value_from!(Arc<[u8]>, Bytes);
 // value_from!(Arc<[Value]>, Seq);
-value_from!(Arc<dyn SeqObject>, Seq);
-// value_from!(Arc<dyn StructObject>, Map);
-value_from!(Arc<dyn Object>, Dynamic);
+// value_from!(Arc<[u8]>, Bytes);
+// value_from!(Arc<dyn SeqObject>, Seq);
+// value_from!(Arc<dyn Object>, Dynamic);
+// value_from!(Arc<dyn MapObject>, Map);
 
 fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {
     Error::new(
@@ -503,7 +515,10 @@ impl TryFrom<Value> for Arc<str> {
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.0 {
-            ValueBuf::String(x, _) => Ok(x),
+            ValueBuf::String(x, _) => match x {
+                ArcCow::Borrowed(x) => Ok(Arc::from(x)),
+                ArcCow::Owned(x) => Ok(Arc::from(x)),
+            },
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "value is not a string",
@@ -890,7 +905,7 @@ impl<'a> FromIterator<(&'a str, Value)> for Kwargs {
 
 impl From<Kwargs> for Value {
     fn from(value: Kwargs) -> Self {
-        Value(ValueBuf::Map(value.values, MapType::Kwargs))
+        Value::from_kwargs_arc(value.values)
     }
 }
 

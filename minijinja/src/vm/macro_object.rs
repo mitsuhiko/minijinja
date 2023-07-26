@@ -6,14 +6,14 @@ use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{
-    MapType, Object, StringType, StructObject, Value, ValueBuf,
+    MapType, Object, StringType, MapObject, Value, ValueBuf, ArcCow,
 };
 use crate::vm::state::State;
 use crate::vm::Vm;
 
 pub(crate) struct MacroData {
     pub name: Arc<str>,
-    pub arg_spec: Vec<Arc<str>>,
+    pub arg_spec: Vec<ArcCow<'static, str>>,
     // because values need to be 'static, we can't hold a reference to the
     // instructions that declared the macro.  Instead of that we place the
     // reference to the macro instruction (and the jump offset) in the
@@ -62,7 +62,7 @@ impl Object for Macro {
         let mut arg_values = Vec::with_capacity(self.data.arg_spec.len());
         for (idx, name) in self.data.arg_spec.iter().enumerate() {
             let kwarg = match kwargs {
-                Some(kwargs) => kwargs.get_field(&Value::from(name.clone())),
+                Some(kwargs) => kwargs.get_field(&Value::from(&**name)),
                 _ => None,
             };
             arg_values.push(match (args.get(idx), kwarg) {
@@ -140,7 +140,7 @@ impl Object for Macro {
     }
 }
 
-impl StructObject for Macro {
+impl MapObject for Macro {
     fn static_fields(&self) -> Option<&'static [&'static str]> {
         Some(&["name", "arguments", "caller"][..])
     }
@@ -149,14 +149,14 @@ impl StructObject for Macro {
         let name = key.as_str()?;
         match name {
             "name" => Some(Value(ValueBuf::String(
-                self.data.name.clone(),
+                self.data.name.clone().into(),
                 StringType::Normal,
             ))),
             "arguments" => Some(Value::from(
                 self.data
                     .arg_spec
                     .iter()
-                    .map(|x| Value(ValueBuf::String(x.clone(), StringType::Normal)))
+                    .map(|x| Value(ValueBuf::String(x.clone().into(), StringType::Normal)))
                     .collect::<Vec<_>>(),
             )),
             "caller" => Some(Value::from(self.data.caller_reference)),

@@ -46,7 +46,7 @@ fn load_json(name: &str) -> Option<Value> {
 
 fn main() {
     let mut env = Environment::new();
-    env.add_global("site", Value::from_struct_object(Site::default()));
+    env.add_global("site", Value::from_map_object(Site::default()));
     env.add_template("template.html", include_str!("template.html"))
         .unwrap();
 

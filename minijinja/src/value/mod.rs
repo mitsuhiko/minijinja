@@ -76,13 +76,13 @@
 //! # Dynamic Objects
 //!
 //! Values can also hold "dynamic" objects.  These are objects which implement the
-//! [`Object`] trait and optionally [`SeqObject`] or [`StructObject`]  These can
+//! [`Object`] trait and optionally [`SeqObject`] or [`MapObject`]  These can
 //! be used to implement dynamic functionality such as stateful values and more.
 //! Dynamic objects are internally also used to implement the special `loop`
 //! variable or macros.
 //!
 //! To create a dynamic `Value` object, use [`Value::from_object`],
-//! [`Value::from_seq_object`], [`Value::from_struct_object`] or the `From<Arc<T:
+//! [`Value::from_seq_object`], [`Value::from_map_object`] or the `From<Arc<T:
 //! Object>>` implementations for `Value`:
 //!
 //! ```rust
@@ -111,8 +111,8 @@
 pub(crate) use crate::value::map::{ValueMap, OwnedValueMap, value_map_with_capacity};
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
-pub use crate::value::object::{Object, SeqObject, SeqObjectIter, StructObject};
-pub use crate::value::value::{ValueBuf, ValueCow, ValueKind};
+pub use crate::value::object::{Object, SeqObject, SeqObjectIter, MapObject};
+pub use crate::value::value::{ValueBuf, ArcCow, ValueKind};
 
 pub(crate) use crate::value::value::{MapType, StringType, Packed, OwnedValueIterator};
 
@@ -130,7 +130,7 @@ mod value;
 
 /// Represents a dynamically typed value in the template engine.
 #[derive(Clone)]
-pub struct Value(pub(crate) value::ValueBuf);
+pub struct Value(pub(crate) value::ValueBuf<'static>);
 
 /// Enables value optimizations.
 ///

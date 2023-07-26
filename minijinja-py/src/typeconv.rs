@@ -75,7 +75,7 @@ impl fmt::Display for DynamicObject {
 }
 
 impl Object for DynamicObject {
-    fn kind(&self) -> ObjectKind<'_> {
+    fn value(&self) -> ObjectKind<'_> {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
             if inner.downcast::<PySequence>().is_ok() || self.sequencified.is_some() {
@@ -163,7 +163,7 @@ impl StructObject for DynamicObject {
 
 pub fn to_minijinja_value(value: &PyAny) -> Value {
     if let Ok(dict) = value.downcast::<PyDict>() {
-        Value::from_struct_object(DictLikeObject { inner: dict.into() })
+        Value::from_map_object(DictLikeObject { inner: dict.into() })
     } else if let Ok(tup) = value.downcast::<PyTuple>() {
         Value::from_seq_object(ListLikeObject {
             inner: tup.as_sequence().into(),

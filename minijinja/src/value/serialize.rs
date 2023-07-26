@@ -8,8 +8,10 @@ use serde::{ser, Serialize, Serializer};
 use crate::utils::{untrusted_size_hint, OnDrop};
 use crate::value::{
     value_map_with_capacity, value_optimization,
-    MapType, Packed, StringType, Value, OwnedValueMap, ValueBuf,
+    Packed, StringType, Value, OwnedValueMap, ValueBuf,
 };
+
+use super::ArcCow;
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
@@ -44,7 +46,7 @@ fn mark_internal_serialization() -> impl Drop {
 pub fn transform<T: Serialize>(value: T) -> Value {
     match value.serialize(ValueSerializer) {
         Ok(rv) => rv,
-        Err(invalid) => ValueBuf::Invalid(invalid.0).into(),
+        Err(invalid) => ValueBuf::Invalid(invalid.0.into()).into(),
     }
 }
 
@@ -251,15 +253,15 @@ impl Serializer for ValueSerializer {
     }
 
     fn serialize_char(self, v: char) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::String(Arc::from(v.to_string()), StringType::Normal).into())
+        Ok(ValueBuf::String(ArcCow::from(v.to_string()), StringType::Normal).into())
     }
 
     fn serialize_str(self, value: &str) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::String(Arc::from(value.to_owned()), StringType::Normal).into())
+        Ok(ValueBuf::String(ArcCow::from(value.to_owned()), StringType::Normal).into())
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::Bytes(Arc::from(value)).into())
+        Ok(ValueBuf::Bytes(ArcCow::from(value)).into())
     }
 
     fn serialize_none(self) -> Result<Value, InvalidValue> {
@@ -322,7 +324,7 @@ impl Serializer for ValueSerializer {
     {
         let mut map = value_map_with_capacity(1);
         map.insert(Value::from(variant), transform(value));
-        Ok(ValueBuf::Map(Arc::new(map), MapType::Normal).into())
+        Ok(Value::from_map_object(map))
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, InvalidValue> {
@@ -408,7 +410,7 @@ impl ser::SerializeSeq for SerializeSeq {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::Seq(Arc::new(self.elements)).into())
+        Ok(Value::from_seq_object(self.elements))
     }
 }
 
@@ -429,7 +431,7 @@ impl ser::SerializeTuple for SerializeTuple {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::Seq(Arc::new(self.elements)).into())
+        Ok(Value::from_seq_object(self.elements))
     }
 }
 
@@ -450,7 +452,7 @@ impl ser::SerializeTupleStruct for SerializeTupleStruct {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value(ValueBuf::Seq(Arc::new(self.fields))))
+        Ok(Value::from_seq_object(self.fields))
     }
 }
 
@@ -475,9 +477,9 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
         let mut map = value_map_with_capacity(1);
         map.insert(
             Value::from(self.name),
-            Value(ValueBuf::Seq(Arc::new(self.fields))),
+            Value::from_seq_object(self.fields)
         );
-        Ok(Value(ValueBuf::Map(Arc::new(map), MapType::Normal)))
+        Ok(Value::from_map_object(map))
     }
 }
 
@@ -512,10 +514,7 @@ impl ser::SerializeMap for SerializeMap {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value(ValueBuf::Map(
-            Arc::new(self.entries),
-            MapType::Normal,
-        )))
+        Ok(Value::from_map_object(self.entries))
     }
 
     fn serialize_entry<K: ?Sized, V: ?Sized>(
@@ -555,7 +554,7 @@ impl ser::SerializeStruct for SerializeStruct {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::Map(Arc::new(self.fields), MapType::Normal).into())
+        Ok(Value::from_map_object(self.fields))
     }
 }
 
@@ -582,10 +581,7 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
 
     fn end(self) -> Result<Value, InvalidValue> {
         let mut rv = BTreeMap::new();
-        rv.insert(
-            self.variant,
-            Value::from(ValueBuf::Map(Arc::new(self.map), MapType::Normal)),
-        );
+        rv.insert(self.variant, Value::from_map_object(self.map));
         Ok(rv.into())
     }
 }

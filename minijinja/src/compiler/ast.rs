@@ -2,10 +2,9 @@ use std::ops::Deref;
 
 #[cfg(feature = "internal_debug")]
 use std::fmt;
-use std::sync::Arc;
 
 use crate::compiler::tokens::Span;
-use crate::value::{value_map_with_capacity, MapType, Value, ValueBuf};
+use crate::value::{value_map_with_capacity, Value};
 
 /// Container for nodes with location info.
 ///
@@ -504,7 +503,7 @@ impl<'a> Kwargs<'a> {
             }
         }
 
-        Some(Value(ValueBuf::Map(Arc::new(rv), MapType::Kwargs)))
+        Some(Value::from_kwargs(rv))
     }
 }
 
@@ -531,7 +530,7 @@ impl<'a> Map<'a> {
             }
         }
 
-        Some(Value(ValueBuf::Map(Arc::new(rv), MapType::Normal)))
+        Some(Value::from_map_object(rv))
     }
 }
 

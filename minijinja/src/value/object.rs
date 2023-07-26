@@ -30,7 +30,7 @@ use crate::vm::State;
 /// stringified and methods can be called.
 ///
 /// For examples of how to implement objects refer to [`SeqObject`] and
-/// [`StructObject`].
+/// [`MapObject`].
 pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// Describes the kind of an object.
     ///
@@ -162,8 +162,8 @@ impl<T: Object> Object for Arc<T> {
 //
 //     /// This object is a struct (map with string keys).
 //     ///
-//     /// Requires that the object implements [`StructObject`].
-//     Struct(&'a dyn StructObject),
+//     /// Requires that the object implements [`MapObject`].
+//     Struct(&'a dyn MapObject),
 // }
 
 /// Provides the behavior of an [`Object`] holding sequence of values.
@@ -267,13 +267,13 @@ impl dyn SeqObject + '_ {
     }
 }
 
-/// Iterates over [`StructObject`]
-pub struct StructObjectIter<'a> {
-    map: &'a dyn StructObject,
+/// Iterates over [`MapObject`]
+pub struct MapObjectIter<'a> {
+    map: &'a dyn MapObject,
     keys: std::vec::IntoIter<Value>,
 }
 
-impl<'a> Iterator for StructObjectIter<'a> {
+impl<'a> Iterator for MapObjectIter<'a> {
     type Item = (Value, Value);
 
     #[inline(always)]
@@ -289,7 +289,7 @@ impl<'a> Iterator for StructObjectIter<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for StructObjectIter<'a> {
+impl<'a> DoubleEndedIterator for MapObjectIter<'a> {
     #[inline(always)]
     fn next_back(&mut self) -> Option<Self::Item> {
         let key = self.keys.next_back()?;
@@ -298,10 +298,10 @@ impl<'a> DoubleEndedIterator for StructObjectIter<'a> {
     }
 }
 
-impl dyn StructObject + '_ {
-    /// Convenient iterator over a [`StructObject`].
-    pub fn iter(&self) -> StructObjectIter<'_> {
-        StructObjectIter {
+impl dyn MapObject + '_ {
+    /// Convenient iterator over a [`MapObject`].
+    pub fn iter(&self) -> MapObjectIter<'_> {
+        MapObjectIter {
             map: self,
             keys: self.fields().into_iter(),
         }
@@ -404,16 +404,16 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// For structs which do not need any special method behavior or methods, the
 /// [`Value`] type is capable of automatically constructing a wrapper [`Object`]
-/// by using [`Value::from_struct_object`].  In that case only [`StructObject`]
+/// by using [`Value::from_map_object`].  In that case only [`MapObject`]
 /// needs to be implemented and the value will provide default implementations
 /// for stringification and debug printing.
 ///
 /// ```
-/// use minijinja::value::{Value, StructObject};
+/// use minijinja::value::{Value, MapObject};
 ///
 /// struct Point(f32, f32, f32);
 ///
-/// impl StructObject for Point {
+/// impl MapObject for Point {
 ///     fn get_field(&self, name: &str) -> Option<Value> {
 ///         match name {
 ///             "x" => Some(Value::from(self.0)),
@@ -428,7 +428,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///     }
 /// }
 ///
-/// let value = Value::from_struct_object(Point(1.0, 2.5, 3.0));
+/// let value = Value::from_map_object(Point(1.0, 2.5, 3.0));
 /// ```
 ///
 /// # Full Example
@@ -440,7 +440,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// ```
 /// use std::fmt;
-/// use minijinja::value::{Value, Object, ObjectKind, StructObject};
+/// use minijinja::value::{Value, Object, ObjectKind, MapObject};
 ///
 /// #[derive(Debug, Clone)]
 /// struct Point(f32, f32, f32);
@@ -457,7 +457,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///     }
 /// }
 ///
-/// impl StructObject for Point {
+/// impl MapObject for Point {
 ///     fn get_field(&self, name: &str) -> Option<Value> {
 ///         match name {
 ///             "x" => Some(Value::from(self.0)),
@@ -491,13 +491,13 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// ```
 /// # fn main() -> Result<(), minijinja::Error> {
 /// # use minijinja::Environment;
-/// use minijinja::value::{Value, StructObject};
+/// use minijinja::value::{Value, MapObject};
 ///
 /// pub struct DynamicContext {
 ///     magic: i32,
 /// }
 ///
-/// impl StructObject for DynamicContext {
+/// impl MapObject for DynamicContext {
 ///     fn get_field(&self, field: &str) -> Option<Value> {
 ///         match field {
 ///             "pid" => Some(Value::from(std::process::id())),
@@ -510,7 +510,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// # let env = Environment::new();
 /// let tmpl = env.template_from_str("HOME={{ env.HOME }}; PID={{ pid }}; MAGIG={{ magic }}")?;
-/// let ctx = Value::from_struct_object(DynamicContext { magic: 42 });
+/// let ctx = Value::from_map_object(DynamicContext { magic: 42 });
 /// let rv = tmpl.render(ctx)?;
 /// # Ok(()) }
 /// ```
@@ -518,7 +518,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// One thing of note here is that in the above example `env` would be re-created every
 /// time the template needs it.  A better implementation would cache the value after it
 /// was created first.
-pub trait StructObject: Send + Sync {
+pub trait MapObject: Send + Sync {
     /// Invoked by the engine to get a field of a struct.
     ///
     /// Where possible it's a good idea for this to align with the return value
@@ -572,7 +572,7 @@ pub trait StructObject: Send + Sync {
     }
 }
 
-impl StructObject for OwnedValueMap {
+impl MapObject for OwnedValueMap {
     #[inline]
     fn get_field(&self, key: &Value) -> Option<Value> {
         self.get(key).cloned()
@@ -592,13 +592,13 @@ impl StructObject for OwnedValueMap {
     }
 }
 
-impl fmt::Debug for dyn StructObject + '_ {
+impl fmt::Debug for dyn MapObject + '_ {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map().entries(self.iter()).finish()
     }
 }
 
-impl<T: StructObject> StructObject for Arc<T> {
+impl<T: MapObject> MapObject for Arc<T> {
     #[inline]
     fn get_field(&self, key: &Value) -> Option<Value> {
         T::get_field(self, key)
@@ -620,7 +620,7 @@ impl<T: StructObject> StructObject for Arc<T> {
     }
 }
 
-impl<'a, T: StructObject + ?Sized> StructObject for &'a T {
+impl<'a, T: MapObject + ?Sized> MapObject for &'a T {
     #[inline]
     fn get_field(&self, key: &Value) -> Option<Value> {
         T::get_field(self, key)

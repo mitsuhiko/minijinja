@@ -21,11 +21,11 @@ fn test_dynamic_object_roundtrip() {
     impl Object for X {
         fn value(&self) -> Value {
             todo!()
-            // Value::from_struct_object(*self)
+            // Value::from_map_object(*self)
         }
     }
 
-    impl crate::value::object::StructObject for X {
+    impl crate::value::object::MapObject for X {
         fn get_field(&self, key: &Value) -> Option<Value> {
             match key.as_str() {
                 Some("value") => Some(Value::from(self.0.load(atomic::Ordering::Relaxed))),

@@ -3,40 +3,40 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::functions;
 use crate::error::{Error, ErrorKind};
 use crate::vm::State;
 
-use crate::value::map::{ValueMap, OwnedValueMap};
 use crate::value::ops;
 use crate::value::intern;
 
 use crate::value::Value;
 use crate::value::argtypes::{FunctionArgs, FunctionResult};
-use crate::value::object::{Object, SeqObject, StructObject};
+use crate::value::object::{Object, SeqObject, MapObject};
 
-#[derive(Clone)]
-pub enum ValueBuf {
-    None,
-    Undefined,
-    Bool(bool),
-    U64(u64),
-    I64(i64),
-    F64(f64),
-    Invalid(Arc<str>),
-    U128(Packed<u128>),
-    I128(Packed<i128>),
-    String(Arc<str>, StringType),
-    Bytes(Arc<[u8]>),
-    Seq(Arc<dyn SeqObject>),
-    Map(Arc<dyn StructObject>, MapType),
-    Dynamic(Arc<dyn Object>),
-}
+// #[derive(Clone)]
+// pub enum ValueBuf {
+//     None,
+//     Undefined,
+//     Bool(bool),
+//     U64(u64),
+//     I64(i64),
+//     F64(f64),
+//     Invalid(Arc<str>),
+//     U128(Packed<u128>),
+//     I128(Packed<i128>),
+//     String(Arc<str>, StringType),
+//     Bytes(Arc<[u8]>),
+//     Seq(Arc<dyn SeqObject>),
+//     Map(Arc<dyn MapObject>, MapType),
+//     Dynamic(Arc<dyn Object>),
+// }
 
 #[derive(Debug, Clone)]
-pub enum ValueBufX<'a> {
+pub enum ValueBuf<'a> {
     None,
     Undefined,
     Bool(bool),
@@ -49,7 +49,7 @@ pub enum ValueBufX<'a> {
     String(ArcCow<'a, str>, StringType),
     Bytes(ArcCow<'a, [u8]>),
     Seq(ArcCow<'a, dyn SeqObject + 'a>),
-    Map(ArcCow<'a, dyn StructObject + 'a>, MapType),
+    Map(ArcCow<'a, dyn MapObject + 'a>, MapType),
     Dynamic(ArcCow<'a, dyn Object>),
 }
 
@@ -88,6 +88,18 @@ pub enum ArcCow<'a, T: ?Sized + 'a> {
     Owned(Arc<T>),
 }
 
+impl<'a, 'b, B: ?Sized, A: PartialEq<B> + ?Sized> PartialEq<ArcCow<'b, B>> for ArcCow<'a, A> {
+    fn eq(&self, other: &ArcCow<'b, B>) -> bool {
+        self.deref() == other.deref()
+    }
+}
+
+impl<T: fmt::Display + ?Sized> fmt::Display for ArcCow<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.deref().fmt(f)
+    }
+}
+
 impl<T: fmt::Debug + ?Sized> fmt::Debug for ArcCow<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -107,8 +119,14 @@ impl<T: ?Sized> Clone for ArcCow<'_, T> {
 }
 
 impl<'a, T: ?Sized + 'a> ArcCow<'a, T> {
-    pub fn new(value: &'a T) -> ArcCow<'a, T> {
+    pub fn borrowed(value: &'a T) -> ArcCow<'a, T> {
         ArcCow::Borrowed(value)
+    }
+}
+
+impl<'a, T: 'a> ArcCow<'a, T> {
+    pub fn owned(value: T) -> ArcCow<'a, T> {
+        ArcCow::Owned(Arc::new(value))
     }
 }
 
@@ -116,30 +134,6 @@ impl<'a, V: ?Sized, T: Into<Arc<V>> + ?Sized> From<T> for ArcCow<'a, V> {
     fn from(value: T) -> Self {
         ArcCow::Owned(value.into())
     }
-}
-
-#[derive(Clone)]
-pub enum ValueCow<'a> {
-    Owned(ValueBuf),
-    Borrowed(ValueRef<'a>)
-}
-
-#[derive(Clone)]
-pub enum ValueRef<'a> {
-    Undefined,
-    Bool(bool),
-    U64(u64),
-    I64(i64),
-    F64(f64),
-    None,
-    Invalid(&'a str),
-    U128(Packed<u128>),
-    I128(Packed<i128>),
-    String(&'a str, StringType),
-    Bytes(&'a [u8]),
-    Seq(&'a [ValueCow<'a>]),
-    Map(&'a OwnedValueMap, MapType),
-    Dynamic(&'a dyn Object),
 }
 
 /// Wraps an internal copyable value but marks it as packed.
@@ -208,7 +202,7 @@ impl Value {
     /// let val = Value::from_safe_string("<em>note</em>".into());
     /// ```
     pub fn from_safe_string(value: String) -> Value {
-        ValueBuf::String(Arc::from(value), StringType::Safe).into()
+        ValueBuf::String(ArcCow::from(value), StringType::Safe).into()
     }
 
     /// Creates a value from a dynamic object.
@@ -252,7 +246,11 @@ impl Value {
     /// let val = Value::from(Arc::new(Thing { id: 42 }));
     /// ```
     pub fn from_object<T: Object>(value: T) -> Value {
-        Value::from(Arc::new(value) as Arc<dyn Object>)
+        Value(ValueBuf::Dynamic(ArcCow::Owned(Arc::new(value))))
+    }
+
+    pub fn from_object_arc<T: Object>(value: Arc<T>) -> Value {
+        Value::from(value)
     }
 
     /// Creates a value from an owned [`SeqObject`].
@@ -263,18 +261,36 @@ impl Value {
     /// **Note:** objects created this way cannot be downcasted via
     /// [`downcast_object_ref`](Self::downcast_object_ref).
     pub fn from_seq_object<T: SeqObject + 'static>(value: T) -> Value {
-        ValueBuf::Seq(Arc::new(value)).into()
+        ValueBuf::Seq(ArcCow::Owned(Arc::new(value))).into()
     }
 
-    /// Creates a value from an owned [`StructObject`].
+    pub fn from_seq_object_arc<T: SeqObject + ?Sized + 'static>(value: Arc<T>) -> Value {
+        todo!()
+        // ValueBuf::Seq(ArcCow::Owned(value as Arc<dyn SeqObject>)).into()
+    }
+
+    /// Creates a value from an owned [`MapObject`].
     ///
     /// This is a simplified API for creating dynamic structs
     /// without having to implement the entire [`Object`] protocol.
     ///
     /// **Note:** objects created this way cannot be downcasted via
     /// [`downcast_object_ref`](Self::downcast_object_ref).
-    pub fn from_struct_object<T: StructObject + 'static>(value: T) -> Value {
-        ValueBuf::Map(Arc::new(value), MapType::Normal).into()
+    pub fn from_map_object<T: MapObject + 'static>(value: T) -> Value {
+        ValueBuf::Map(ArcCow::Owned(Arc::new(value)), MapType::Normal).into()
+    }
+
+    pub fn from_map_object_arc<T: MapObject + ?Sized + 'static>(value: Arc<T>) -> Value {
+        todo!()
+        // ValueBuf::Map(ArcCow::Owned(value), MapType::Normal).into()
+    }
+
+    pub(crate) fn from_kwargs<T: MapObject + 'static>(value: T) -> Value {
+        ValueBuf::Map(ArcCow::Owned(Arc::new(value)), MapType::Kwargs).into()
+    }
+
+    pub(crate) fn from_kwargs_arc<T: MapObject + 'static>(value: Arc<T>) -> Value {
+        ValueBuf::Map(ArcCow::Owned(value), MapType::Kwargs).into()
     }
 
     /// Creates a callable value from a function.
@@ -400,21 +416,26 @@ impl Value {
 
     /// If the value is a sequence it's returned as [`SeqObject`].
     pub fn as_seq(&self) -> Option<&dyn SeqObject> {
-        todo!("need ArcCow")
-        // match self.0 {
-        //     ValueBuf::Seq(ref v) => Some(&*v as &dyn SeqObject),
-        //     ValueBuf::Dynamic(ref dy) => dy.kind().as_seq(),
-        //     _ => None
-        // }
+        match self.0 {
+            ValueBuf::Seq(ref v) => Some(&**v),
+            ValueBuf::Dynamic(ref dy) => match dy.value() {
+                Value(ValueBuf::Seq(ArcCow::Borrowed(v))) => Some(v),
+                _ => None
+            }
+            _ => None
+        }
     }
 
-    /// If the value is a struct, return it as [`StructObject`].
-    pub fn as_struct(&self) -> Option<&dyn StructObject> {
-        todo!("need ArcCow")
-        // match self.0 {
-        //     ValueBuf::Map(ref map, _) => Some(&**map),
-        //     ValueBuf::Dynamic(ref dy) => dy.kind().as_struct(),
-        // }
+    /// If the value is a struct, return it as [`MapObject`].
+    pub fn as_struct(&self) -> Option<&dyn MapObject> {
+        match self.0 {
+            ValueBuf::Map(ref v, _) => Some(&**v),
+            ValueBuf::Dynamic(ref dy) => match dy.value() {
+                Value(ValueBuf::Map(ArcCow::Borrowed(v), _)) => Some(v),
+                _ => None
+            }
+            _ => None
+        }
     }
 
     /// Returns the length of the contained value.
@@ -580,7 +601,7 @@ impl Value {
     pub(crate) fn get_item_opt(&self, key: &Value) -> Option<Value> {
         let seq = match self.0 {
             ValueBuf::Map(ref items, _) => return items.get_field(key),
-            ValueBuf::Seq(ref items) => &*items as &dyn SeqObject,
+            ValueBuf::Seq(ref items) => &**items as &dyn SeqObject,
             ValueBuf::Dynamic(ref dy) => return dy.value().get_item_opt(key),
             ValueBuf::String(ref s, _) => {
                 if let Some(idx) = key.as_i64() {
@@ -695,11 +716,11 @@ impl Value {
         let (iter_state, len) = match self.0 {
             ValueBuf::None | ValueBuf::Undefined => (ValueIteratorState::Empty, 0),
             ValueBuf::String(ref s, _) => (
-                ValueIteratorState::Chars(0, Arc::clone(s)),
+                ValueIteratorState::Chars(0, s.clone()),
                 s.chars().count(),
             ),
             ValueBuf::Seq(ref seq) => (
-                ValueIteratorState::DynSeq(0, Arc::clone(seq)),
+                ValueIteratorState::DynSeq(0, seq.clone()),
                 seq.item_count(),
             ),
             ValueBuf::Map(ref s, _) => {
@@ -711,7 +732,7 @@ impl Value {
                 } else {
                     let attrs = s.fields();
                     let attr_count = attrs.len();
-                    (ValueIteratorState::Seq(0, Arc::from(attrs)), attr_count)
+                    (ValueIteratorState::Seq(0, ArcCow::from(attrs)), attr_count)
                 }
             }
             ValueBuf::Dynamic(ref obj) => return obj.value().try_iter_owned(),
@@ -956,15 +977,10 @@ impl fmt::Debug for OwnedValueIterator {
 
 enum ValueIteratorState {
     Empty,
-    Chars(usize, Arc<str>),
-    Seq(usize, Arc<[Value]>),
+    Chars(usize, ArcCow<'static, str>),
+    Seq(usize, ArcCow<'static, [Value]>),
     StaticStr(usize, &'static [&'static str]),
-    ArcStr(usize, Vec<Arc<str>>),
-    DynSeq(usize, Arc<dyn SeqObject>),
-    #[cfg(not(feature = "preserve_order"))]
-    Map(Option<Value>, Arc<OwnedValueMap>),
-    #[cfg(feature = "preserve_order")]
-    Map(usize, Arc<OwnedValueMap>),
+    DynSeq(usize, ArcCow<'static, dyn SeqObject>),
 }
 
 impl ValueIteratorState {
@@ -988,56 +1004,36 @@ impl ValueIteratorState {
                 *idx += 1;
                 Value::from(intern(x))
             }),
-            ValueIteratorState::ArcStr(idx, items) => items.get(*idx).map(|x| {
-                *idx += 1;
-                Value::from(x.clone())
-            }),
             ValueIteratorState::DynSeq(idx, seq) => {
                 seq.get_item(*idx).map(|x| {
                     *idx += 1;
                     x
                 })
             }
-            #[cfg(feature = "preserve_order")]
-            ValueIteratorState::Map(idx, map) => map.get_index(*idx).map(|x| {
-                *idx += 1;
-                x.0.clone()
-            }),
-            #[cfg(not(feature = "preserve_order"))]
-            ValueIteratorState::Map(ptr, map) => {
-                if let Some(current) = ptr.take() {
-                    let next = map.get_key_value(&current).map(|x| x.0.clone());
-                    let rv = current;
-                    *ptr = next;
-                    Some(rv)
-                } else {
-                    None
-                }
-            }
         }
     }
 }
 
-impl fmt::Debug for ValueBuf {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ValueBuf::Undefined => f.write_str("Undefined"),
-            ValueBuf::Bool(val) => fmt::Debug::fmt(val, f),
-            ValueBuf::U64(val) => fmt::Debug::fmt(val, f),
-            ValueBuf::I64(val) => fmt::Debug::fmt(val, f),
-            ValueBuf::F64(val) => fmt::Debug::fmt(val, f),
-            ValueBuf::None => f.write_str("None"),
-            ValueBuf::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
-            ValueBuf::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-            ValueBuf::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-            ValueBuf::String(val, _) => fmt::Debug::fmt(val, f),
-            ValueBuf::Bytes(val) => fmt::Debug::fmt(val, f),
-            ValueBuf::Seq(val) => fmt::Debug::fmt(val, f),
-            ValueBuf::Map(val, _) => fmt::Debug::fmt(val, f),
-            ValueBuf::Dynamic(val) => fmt::Debug::fmt(val, f),
-        }
-    }
-}
+// impl fmt::Debug for ValueBuf {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         match self {
+//             ValueBuf::Undefined => f.write_str("Undefined"),
+//             ValueBuf::Bool(val) => fmt::Debug::fmt(val, f),
+//             ValueBuf::U64(val) => fmt::Debug::fmt(val, f),
+//             ValueBuf::I64(val) => fmt::Debug::fmt(val, f),
+//             ValueBuf::F64(val) => fmt::Debug::fmt(val, f),
+//             ValueBuf::None => f.write_str("None"),
+//             ValueBuf::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
+//             ValueBuf::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
+//             ValueBuf::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
+//             ValueBuf::String(val, _) => fmt::Debug::fmt(val, f),
+//             ValueBuf::Bytes(val) => fmt::Debug::fmt(val, f),
+//             ValueBuf::Seq(val) => fmt::Debug::fmt(val, f),
+//             ValueBuf::Map(val, _) => fmt::Debug::fmt(val, f),
+//             ValueBuf::Dynamic(val) => fmt::Debug::fmt(val, f),
+//         }
+//     }
+// }
 
 impl<T: Copy> Clone for Packed<T> {
     fn clone(&self) -> Self {

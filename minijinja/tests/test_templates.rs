@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{env, fs};
 
-use minijinja::value::{StructObject, Value};
+use minijinja::value::{MapObject, Value};
 use minijinja::{context, Environment, Error, State};
 
 use similar_asserts::assert_eq;
@@ -163,7 +163,7 @@ fn test_custom_filter() {
 fn test_items_and_dictsort_with_structs() {
     struct MyStruct;
 
-    impl StructObject for MyStruct {
+    impl MapObject for MyStruct {
         fn get_field(&self, name: &str) -> Option<Value> {
             match name {
                 "a" => Some(Value::from("A")),
@@ -178,11 +178,11 @@ fn test_items_and_dictsort_with_structs() {
     }
 
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|items }}", x => Value::from_struct_object(MyStruct)),
+        minijinja::render!("{{ x|items }}", x => Value::from_map_object(MyStruct)),
         @r###"[["b", "B"], ["a", "A"]]"###
     );
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|dictsort }}", x => Value::from_struct_object(MyStruct)),
+        minijinja::render!("{{ x|dictsort }}", x => Value::from_map_object(MyStruct)),
         @r###"[["a", "A"], ["b", "B"]]"###
     );
 }
@@ -191,7 +191,7 @@ fn test_items_and_dictsort_with_structs() {
 fn test_urlencode_with_struct() {
     struct MyStruct;
 
-    impl StructObject for MyStruct {
+    impl MapObject for MyStruct {
         fn get_field(&self, name: &str) -> Option<Value> {
             match name {
                 "a" => Some(Value::from("a 1")),
@@ -206,7 +206,7 @@ fn test_urlencode_with_struct() {
     }
 
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|urlencode }}", x => Value::from_struct_object(MyStruct)),
+        minijinja::render!("{{ x|urlencode }}", x => Value::from_map_object(MyStruct)),
         @"a=a%201&b=b%202"
     );
 }

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use crate::value::{Object, StructObject, Value};
+use crate::value::{Object, MapObject, Value};
 
 /// Utility to enclose values for macros.
 ///
@@ -41,11 +41,11 @@ impl fmt::Display for Closure {
 impl Object for Closure {
     fn value(&self) -> Value {
         todo!()
-        // Value::from_struct_object(*self)
+        // Value::from_map_object(*self)
     }
 }
 
-impl StructObject for Closure {
+impl MapObject for Closure {
     fn fields(&self) -> Vec<Value> {
         self.values.lock().unwrap().keys().cloned().map(Value::from).collect()
     }

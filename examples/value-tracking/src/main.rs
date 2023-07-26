@@ -34,7 +34,7 @@ impl StructObject for TrackedContext {
 pub fn track_context(ctx: Value) -> (Value, Arc<Mutex<HashSet<String>>>) {
     let resolved = Arc::new(Mutex::default());
     (
-        Value::from_struct_object(TrackedContext {
+        Value::from_map_object(TrackedContext {
             enclosed: ctx,
             resolved: resolved.clone(),
         }),

@@ -23,10 +23,9 @@ macro_rules! some {
 /// Hidden utility module for the [`context!`](crate::context!) macro.
 #[doc(hidden)]
 pub mod __context {
-    use crate::value::{MapType, Value, OwnedValueMap, ValueBuf};
+    use crate::value::{Value, OwnedValueMap};
     use crate::Environment;
     use std::rc::Rc;
-    use std::sync::Arc;
 
     #[inline(always)]
     pub fn value_optimization() -> impl Drop {
@@ -45,7 +44,7 @@ pub mod __context {
 
     #[inline(always)]
     pub fn build(ctx: OwnedValueMap) -> Value {
-        ValueBuf::Map(Arc::new(ctx), MapType::Normal).into()
+        Value::from_map_object(ctx)
     }
 
     pub fn thread_local_env() -> Rc<Environment<'static>> {

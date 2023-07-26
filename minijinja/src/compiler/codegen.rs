@@ -366,10 +366,8 @@ impl<'source> CodeGenerator<'source> {
 
     #[cfg(feature = "macros")]
     fn compile_macro_expression(&mut self, macro_decl: &ast::Spanned<ast::Macro<'source>>) {
-        use std::sync::Arc;
 
         use crate::compiler::instructions::MACRO_CALLER;
-        use crate::value::ValueBuf;
         self.set_line_from_span(macro_decl.span());
         let instr = self.add(Instruction::Jump(!0));
         let mut defaults_iter = macro_decl.defaults.iter().rev();
@@ -395,7 +393,7 @@ impl<'source> CodeGenerator<'source> {
             self.add(Instruction::Enclose(name));
         }
         self.add(Instruction::GetClosure);
-        self.add(Instruction::LoadConst(Value::from(ValueBuf::Seq(Arc::new(
+        self.add(Instruction::LoadConst(Value::from_seq_object(
             macro_decl
                 .args
                 .iter()
@@ -404,7 +402,7 @@ impl<'source> CodeGenerator<'source> {
                     _ => unreachable!(),
                 })
                 .collect::<Vec<_>>()
-        )))));
+        )));
         let mut flags = 0;
         if caller_reference {
             flags |= MACRO_CALLER;

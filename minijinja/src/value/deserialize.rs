@@ -1,9 +1,7 @@
-use std::sync::Arc;
-
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
 
-use crate::value::{MapType, Value, OwnedValueMap, ValueBuf};
+use crate::value::{Value, OwnedValueMap};
 
 impl<'de> Deserialize<'de> for Value {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -100,6 +98,7 @@ impl<'de> Visitor<'de> for ValueVisitor {
         while let Some((k, v)) = ok!(map.next_entry()) {
             rv.insert(k, v);
         }
-        Ok(Value(ValueBuf::Map(Arc::new(rv), MapType::Normal)))
+
+        Ok(Value::from_map_object(rv))
     }
 }
