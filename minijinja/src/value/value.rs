@@ -17,23 +17,7 @@ use crate::value::Value;
 use crate::value::argtypes::{FunctionArgs, FunctionResult};
 use crate::value::object::{Object, SeqObject, MapObject};
 
-// #[derive(Clone)]
-// pub enum ValueBuf {
-//     None,
-//     Undefined,
-//     Bool(bool),
-//     U64(u64),
-//     I64(i64),
-//     F64(f64),
-//     Invalid(Arc<str>),
-//     U128(Packed<u128>),
-//     I128(Packed<i128>),
-//     String(Arc<str>, StringType),
-//     Bytes(Arc<[u8]>),
-//     Seq(Arc<dyn SeqObject>),
-//     Map(Arc<dyn MapObject>, MapType),
-//     Dynamic(Arc<dyn Object>),
-// }
+use super::ValueRepr;
 
 #[derive(Debug, Clone)]
 pub enum ValueBuf<'a> {
@@ -187,9 +171,9 @@ impl Value {
     ///
     /// This constant exists because the undefined type does not exist in Rust
     /// and this is the only way to construct it.
-    pub const UNDEFINED: Value = Value(ValueBuf::Undefined);
+    pub const UNDEFINED: Value = ValueRepr(ValueBuf::Undefined);
 
-    pub const NONE: Value = Value(ValueBuf::None);
+    pub const NONE: Value = ValueRepr(ValueBuf::None);
 
     /// Creates a value from a safe string.
     ///
@@ -249,7 +233,7 @@ impl Value {
         where T: Into<Arc<T>>
     {
         let arc = value.into();
-        Value(ValueBuf::Dynamic(ArcCow::Owned(arc)))
+        ValueRepr(ValueBuf::Dynamic(ArcCow::Owned(arc)))
     }
 
     /// Creates a value from an owned [`SeqObject`].
@@ -413,7 +397,7 @@ impl Value {
         match self.0 {
             ValueBuf::Seq(ref v) => Some(&**v),
             ValueBuf::Dynamic(ref dy) => match dy.value() {
-                Value(ValueBuf::Seq(ArcCow::Borrowed(v))) => Some(v),
+                ValueRepr(ValueBuf::Seq(ArcCow::Borrowed(v))) => Some(v),
                 _ => None
             }
             _ => None
@@ -425,7 +409,7 @@ impl Value {
         match self.0 {
             ValueBuf::Map(ref v, _) => Some(&**v),
             ValueBuf::Dynamic(ref dy) => match dy.value() {
-                Value(ValueBuf::Map(ArcCow::Borrowed(v), _)) => Some(v),
+                ValueRepr(ValueBuf::Map(ArcCow::Borrowed(v), _)) => Some(v),
                 _ => None
             }
             _ => None
@@ -502,7 +486,7 @@ impl Value {
     /// assert_eq!(value.try_into().ok(), Some(1));
     /// ```
     pub fn get_item_by_index(&self, idx: usize) -> Result<Value, Error> {
-        self.get_item(&Value(ValueBuf::U64(idx as _)))
+        self.get_item(&ValueRepr(ValueBuf::U64(idx as _)))
     }
 
     /// Looks up an item (or attribute) by key.

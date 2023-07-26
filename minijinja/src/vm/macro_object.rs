@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{
-    MapType, Object, StringType, MapObject, Value, ValueBuf, ArcCow,
+    MapType, Object, StringType, MapObject, Value, ValueBuf, ArcCow, ValueRepr,
 };
 use crate::vm::state::State;
 use crate::vm::Vm;
@@ -48,7 +48,7 @@ impl Object for Macro {
 
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         let (args, kwargs) = match args.last() {
-            Some(Value(ValueBuf::Map(kwargs, MapType::Kwargs))) => {
+            Some(ValueRepr(ValueBuf::Map(kwargs, MapType::Kwargs))) => {
                 (&args[..args.len() - 1], Some(kwargs))
             }
             _ => (args, None),
@@ -148,7 +148,7 @@ impl MapObject for Macro {
     fn get_field(&self, key: &Value) -> Option<Value> {
         let name = key.as_str()?;
         match name {
-            "name" => Some(Value(ValueBuf::String(
+            "name" => Some(ValueRepr(ValueBuf::String(
                 self.data.name.clone().into(),
                 StringType::Normal,
             ))),
@@ -156,7 +156,7 @@ impl MapObject for Macro {
                 self.data
                     .arg_spec
                     .iter()
-                    .map(|x| Value(ValueBuf::String(x.clone().into(), StringType::Normal)))
+                    .map(|x| ValueRepr(ValueBuf::String(x.clone().into(), StringType::Normal)))
                     .collect::<Vec<_>>(),
             )),
             "caller" => Some(Value::from(self.data.caller_reference)),

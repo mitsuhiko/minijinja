@@ -128,9 +128,11 @@ pub(crate) mod ops;
 mod serialize;
 mod value;
 
+pub type Value = ValueRepr<'static>;
+
 /// Represents a dynamically typed value in the template engine.
 #[derive(Clone)]
-pub struct Value(pub(crate) value::ValueBuf<'static>);
+pub struct ValueRepr<'a>(pub(crate) value::ValueBuf<'a>);
 
 /// Enables value optimizations.
 ///

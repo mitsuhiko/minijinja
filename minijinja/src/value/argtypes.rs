@@ -13,7 +13,7 @@ use crate::value::{
 };
 use crate::vm::State;
 
-use super::{MapObject, ArcCow};
+use super::{MapObject, ArcCow, ValueRepr};
 
 /// A utility trait that represents the return value of functions and filters.
 ///
@@ -256,7 +256,7 @@ tuple_impls! { A B C D *E }
 impl From<ValueBuf<'static>> for Value {
     #[inline(always)]
     fn from(val: ValueBuf<'static>) -> Value {
-        Value(val)
+        ValueRepr(val)
     }
 }
 
@@ -336,7 +336,7 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 
 impl From<Arc<str>> for Value {
     fn from(value: Arc<str>) -> Self {
-        Value(ValueBuf::String(value.into(), StringType::Normal))
+        ValueRepr(ValueBuf::String(value.into(), StringType::Normal))
     }
 }
 

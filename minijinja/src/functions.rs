@@ -228,7 +228,7 @@ mod builtins {
     use std::collections::BTreeMap;
 
     use crate::error::ErrorKind;
-    use crate::value::{MapType, ValueBuf};
+    use crate::value::{MapType, ValueBuf, ValueRepr};
 
     /// Returns a range.
     ///
@@ -292,7 +292,7 @@ mod builtins {
     pub fn dict(value: Value) -> Result<Value, Error> {
         match value.0 {
             ValueBuf::Undefined => Ok(Value::from(BTreeMap::<bool, Value>::new())),
-            ValueBuf::Map(map, _) => Ok(Value(ValueBuf::Map(map, MapType::Normal))),
+            ValueBuf::Map(map, _) => Ok(ValueRepr(ValueBuf::Map(map, MapType::Normal))),
             _ => Err(Error::from(ErrorKind::InvalidOperation)),
         }
     }
