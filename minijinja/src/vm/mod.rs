@@ -11,7 +11,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::{
-    ops, value_map_with_capacity, value_optimization, Value, ValueBuf,
+    ops, value_map_with_capacity, value_optimization, ValueBox, ValueRepr,
 };
 use crate::vm::context::{Context, Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
@@ -83,11 +83,11 @@ impl<'env> Vm<'env> {
     pub fn eval<'template>(
         &self,
         instructions: &'template Instructions<'env>,
-        root: Value,
+        root: ValueBox,
         blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
         out: &mut Output,
         auto_escape: AutoEscape,
-    ) -> Result<(Option<Value>, State<'template, 'env>), Error> {
+    ) -> Result<(Option<ValueBox>, State<'template, 'env>), Error> {
         let _guard = value_optimization();
         let mut state = State::new(
             self.env,
@@ -106,12 +106,12 @@ impl<'env> Vm<'env> {
         &self,
         instructions: &Instructions<'env>,
         pc: usize,
-        closure: Value,
-        caller: Option<Value>,
+        closure: ValueBox,
+        caller: Option<ValueBox>,
         out: &mut Output,
         state: &State,
-        args: Vec<Value>,
-    ) -> Result<Option<Value>, Error> {
+        args: Vec<ValueBox>,
+    ) -> Result<Option<ValueBox>, Error> {
         let mut ctx = Context::new(Frame::new(closure));
         if let Some(caller) = caller {
             ctx.store("caller", caller);
@@ -143,7 +143,7 @@ impl<'env> Vm<'env> {
         &self,
         state: &mut State<'_, 'env>,
         out: &mut Output,
-    ) -> Result<Option<Value>, Error> {
+    ) -> Result<Option<ValueBox>, Error> {
         self.eval_impl(state, out, Stack::default(), 0)
     }
 
@@ -153,7 +153,7 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         mut stack: Stack,
         mut pc: usize,
-    ) -> Result<Option<Value>, Error> {
+    ) -> Result<Option<ValueBox>, Error> {
         let initial_auto_escape = state.auto_escape;
         let undefined_behavior = state.undefined_behavior();
         let mut auto_escape_stack = vec![];
@@ -225,7 +225,7 @@ impl<'env> Vm<'env> {
                 ($op:tt) => {{
                     b = stack.pop();
                     a = stack.pop();
-                    stack.push(Value::from(a $op b));
+                    stack.push(ValueBox::from(a $op b));
                 }};
             }
 
@@ -249,7 +249,7 @@ impl<'env> Vm<'env> {
             macro_rules! assert_valid {
                 ($expr:expr) => {{
                     let val = $expr;
-                    if let ValueBuf::Invalid(ref err) = val.0 {
+                    if let ValueRepr::Invalid(ref err) = val.0 {
                         bail!(Error::new(ErrorKind::BadSerialization, err.to_string()));
                     }
                     val
@@ -284,7 +284,7 @@ impl<'env> Vm<'env> {
                 Instruction::Lookup(name) => {
                     stack.push(assert_valid!(state
                         .lookup(name)
-                        .unwrap_or(Value::UNDEFINED)));
+                        .unwrap_or(ValueBox::UNDEFINED)));
                 }
                 Instruction::GetAttr(name) => {
                     a = stack.pop();
@@ -326,7 +326,7 @@ impl<'env> Vm<'env> {
                         let key = stack.pop();
                         map.insert(key, value);
                     }
-                    stack.push(Value::from_map_object(map))
+                    stack.push(ValueBox::from_map_object(map))
                 }
                 Instruction::BuildKwargs(pair_count) => {
                     let mut map = value_map_with_capacity(*pair_count);
@@ -335,7 +335,7 @@ impl<'env> Vm<'env> {
                         let key = stack.pop();
                         map.insert(key, value);
                     }
-                    stack.push(Value::from_kwargs(map))
+                    stack.push(ValueBox::from_kwargs(map))
                 }
                 Instruction::BuildList(n) => {
                     let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
@@ -344,7 +344,7 @@ impl<'env> Vm<'env> {
                         v.push(stack.pop());
                     }
                     v.reverse();
-                    stack.push(Value::from_seq_object(v))
+                    stack.push(ValueBox::from_seq_object(v))
                 }
                 Instruction::UnpackList(count) => {
                     ctx_ok!(self.unpack_list(&mut stack, count));
@@ -364,7 +364,7 @@ impl<'env> Vm<'env> {
                 Instruction::Lte => op_binop!(<=),
                 Instruction::Not => {
                     a = stack.pop();
-                    stack.push(Value::from(!a.is_true()));
+                    stack.push(ValueBox::from(!a.is_true()));
                 }
                 Instruction::StringConcat => {
                     a = stack.pop();
@@ -401,7 +401,7 @@ impl<'env> Vm<'env> {
                 #[cfg(feature = "macros")]
                 Instruction::IsUndefined => {
                     a = stack.pop();
-                    stack.push(Value::from(a.is_undefined()));
+                    stack.push(ValueBox::from(a.is_undefined()));
                 }
                 Instruction::PushLoop(flags) => {
                     a = stack.pop();
@@ -435,7 +435,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::PushDidNotIterate => {
                     let l = state.ctx.current_loop().unwrap();
-                    stack.push(Value::from(l.object.idx.load(Ordering::Relaxed) == 0));
+                    stack.push(ValueBox::from(l.object.idx.load(Ordering::Relaxed) == 0));
                 }
                 Instruction::Jump(jump_target) => {
                     pc = *jump_target;
@@ -510,7 +510,7 @@ impl<'env> Vm<'env> {
                     let args = stack.slice_top(*arg_count);
                     let rv = ctx_ok!(test.perform(state, args));
                     stack.drop_top(*arg_count);
-                    stack.push(Value::from(rv));
+                    stack.push(ValueBox::from(rv));
                 }
                 Instruction::CallFunction(name, arg_count) => {
                     // super is a special function reserved for super-ing into blocks.
@@ -613,9 +613,9 @@ impl<'env> Vm<'env> {
                     let locals = state.ctx.current_locals_mut();
                     let mut module = value_map_with_capacity(locals.len());
                     for (key, value) in locals.iter() {
-                        module.insert(Value::from(*key), value.clone());
+                        module.insert(ValueBox::from(*key), value.clone());
                     }
-                    stack.push(Value::from_map_object(module));
+                    stack.push(ValueBox::from_map_object(module));
                 }
                 #[cfg(feature = "macros")]
                 Instruction::BuildMacro(name, offset, flags) => {
@@ -629,7 +629,7 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "macros")]
                 Instruction::GetClosure => {
-                    stack.push(Value::from_object(state.ctx.closure()));
+                    stack.push(ValueBox::from_object(state.ctx.closure()));
                 }
             }
             pc += 1;
@@ -641,7 +641,7 @@ impl<'env> Vm<'env> {
     #[cfg(feature = "multi_template")]
     fn perform_include(
         &self,
-        name: Value,
+        name: ValueBox,
         state: &mut State<'_, 'env>,
         out: &mut Output,
         ignore_missing: bool,
@@ -705,7 +705,7 @@ impl<'env> Vm<'env> {
                 } else {
                     format!(
                         "tried to include one of multiple templates, none of which existed {}",
-                        Value::from(templates_tried)
+                        ValueBox::from(templates_tried)
                     )
                 },
             ))
@@ -719,7 +719,7 @@ impl<'env> Vm<'env> {
         state: &mut State<'_, 'env>,
         out: &mut Output,
         capture: bool,
-    ) -> Result<Value, Error> {
+    ) -> Result<ValueBox, Error> {
         let name = ok!(state.current_block.ok_or_else(|| {
             Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
         }));
@@ -749,7 +749,7 @@ impl<'env> Vm<'env> {
         if capture {
             Ok(out.end_capture(state.auto_escape))
         } else {
-            Ok(Value::UNDEFINED)
+            Ok(ValueBox::UNDEFINED)
         }
     }
 
@@ -774,7 +774,7 @@ impl<'env> Vm<'env> {
     #[cfg(feature = "multi_template")]
     fn load_blocks(
         &self,
-        name: Value,
+        name: ValueBox,
         state: &mut State<'_, 'env>,
     ) -> Result<&'env Instructions<'env>, Error> {
         let name = match name.as_str() {
@@ -811,7 +811,7 @@ impl<'env> Vm<'env> {
         name: &str,
         state: &mut State<'_, 'env>,
         out: &mut Output,
-    ) -> Result<Option<Value>, Error> {
+    ) -> Result<Option<ValueBox>, Error> {
         if let Some((name, block_stack)) = state.blocks.get_key_value(name) {
             let old_block = mem::replace(&mut state.current_block, Some(name));
             let old_instructions =
@@ -832,10 +832,10 @@ impl<'env> Vm<'env> {
 
     fn derive_auto_escape(
         &self,
-        value: Value,
+        value: ValueBox,
         initial_auto_escape: AutoEscape,
     ) -> Result<AutoEscape, Error> {
-        match (value.as_str(), value == Value::from(true)) {
+        match (value.as_str(), value == ValueBox::from(true)) {
             (Some("html"), _) => Ok(AutoEscape::Html),
             #[cfg(feature = "json")]
             (Some("json"), _) => Ok(AutoEscape::Json),
@@ -855,7 +855,7 @@ impl<'env> Vm<'env> {
     fn push_loop(
         &self,
         state: &mut State<'_, 'env>,
-        iterable: Value,
+        iterable: ValueBox,
         flags: u8,
         pc: usize,
         current_recursion_jump: Option<(usize, bool)>,
@@ -923,10 +923,10 @@ impl<'env> Vm<'env> {
         use crate::compiler::instructions::MACRO_CALLER;
 
         let arg_spec = match stack.pop().0 {
-            ValueBuf::Seq(args) => args
+            ValueRepr::Seq(args) => args
                 .iter()
                 .map(|value| match &value.0 {
-                    ValueBuf::String(arg, _) => arg.clone(),
+                    ValueRepr::String(arg, _) => arg.clone(),
                     _ => unreachable!(),
                 })
                 .collect(),
@@ -935,7 +935,7 @@ impl<'env> Vm<'env> {
         let closure = stack.pop();
         let macro_ref_id = state.macros.len();
         Arc::make_mut(&mut state.macros).push((state.instructions, offset));
-        stack.push(Value::from_object(Macro {
+        stack.push(ValueBox::from_object(Macro {
             data: Arc::new(MacroData {
                 name: Arc::from(name.to_string()),
                 arg_spec,

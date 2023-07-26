@@ -6,7 +6,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{
-    MapType, Object, StringType, MapObject, Value, ValueBuf, ArcCow, ValueRepr,
+    MapType, Object, StringType, MapObject, ValueBox, ValueRepr, ArcCow, Value,
 };
 use crate::vm::state::State;
 use crate::vm::Vm;
@@ -19,7 +19,7 @@ pub(crate) struct MacroData {
     // reference to the macro instruction (and the jump offset) in the
     // state under `state.macros`.
     pub macro_ref_id: usize,
-    pub closure: Value,
+    pub closure: ValueBox,
     pub caller_reference: bool,
 }
 
@@ -42,13 +42,13 @@ impl fmt::Display for Macro {
 }
 
 impl Object for Macro {
-    fn value(&self) -> Value {
+    fn value(&self) -> ValueBox {
         todo!()
     }
 
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(&self, state: &State, args: &[ValueBox]) -> Result<ValueBox, Error> {
         let (args, kwargs) = match args.last() {
-            Some(ValueRepr(ValueBuf::Map(kwargs, MapType::Kwargs))) => {
+            Some(Value(ValueRepr::Map(kwargs, MapType::Kwargs))) => {
                 (&args[..args.len() - 1], Some(kwargs))
             }
             _ => (args, None),
@@ -62,7 +62,7 @@ impl Object for Macro {
         let mut arg_values = Vec::with_capacity(self.data.arg_spec.len());
         for (idx, name) in self.data.arg_spec.iter().enumerate() {
             let kwarg = match kwargs {
-                Some(kwargs) => kwargs.get_field(&Value::from(&**name)),
+                Some(kwargs) => kwargs.get_field(&ValueBox::from(&**name)),
                 _ => None,
             };
             arg_values.push(match (args.get(idx), kwarg) {
@@ -77,7 +77,7 @@ impl Object for Macro {
                     kwargs_used.insert(name as &str);
                     kwarg.clone()
                 }
-                (None, None) => Value::UNDEFINED,
+                (None, None) => ValueBox::UNDEFINED,
             });
         }
 
@@ -86,7 +86,7 @@ impl Object for Macro {
             Some(
                 kwargs
                     .and_then(|x| x.get_field(&"caller".into()))
-                    .unwrap_or(Value::UNDEFINED),
+                    .unwrap_or(ValueBox::UNDEFINED),
             )
         } else {
             None
@@ -133,9 +133,9 @@ impl Object for Macro {
         ));
 
         Ok(if !matches!(state.auto_escape(), AutoEscape::None) {
-            Value::from_safe_string(rv)
+            ValueBox::from_safe_string(rv)
         } else {
-            Value::from(rv)
+            ValueBox::from(rv)
         })
     }
 }
@@ -145,21 +145,21 @@ impl MapObject for Macro {
         Some(&["name", "arguments", "caller"][..])
     }
 
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
         let name = key.as_str()?;
         match name {
-            "name" => Some(ValueRepr(ValueBuf::String(
+            "name" => Some(Value(ValueRepr::String(
                 self.data.name.clone().into(),
                 StringType::Normal,
             ))),
-            "arguments" => Some(Value::from(
+            "arguments" => Some(ValueBox::from(
                 self.data
                     .arg_spec
                     .iter()
-                    .map(|x| ValueRepr(ValueBuf::String(x.clone().into(), StringType::Normal)))
+                    .map(|x| Value(ValueRepr::String(x.clone().into(), StringType::Normal)))
                     .collect::<Vec<_>>(),
             )),
-            "caller" => Some(Value::from(self.data.caller_reference)),
+            "caller" => Some(ValueBox::from(self.data.caller_reference)),
             _ => None,
         }
     }

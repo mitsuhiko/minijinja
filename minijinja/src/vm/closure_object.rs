@@ -2,25 +2,25 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use crate::value::{Object, MapObject, Value};
+use crate::value::{Object, MapObject, ValueBox};
 
 /// Utility to enclose values for macros.
 ///
 /// See `closure` on the [`Frame`] for how it's used.
 #[derive(Debug, Default)]
 pub(crate) struct Closure {
-    values: Mutex<BTreeMap<Arc<str>, Value>>,
+    values: Mutex<BTreeMap<Arc<str>, ValueBox>>,
 }
 
 impl Closure {
     /// Stores a value by key in the closure.
-    pub fn store(&self, key: &str, value: Value) {
+    pub fn store(&self, key: &str, value: ValueBox) {
         self.values.lock().unwrap().insert(Arc::from(key), value);
     }
 
     /// Upset a value into the closure.
     #[cfg(feature = "macros")]
-    pub fn store_if_missing<F: FnOnce() -> Value>(&self, key: &str, f: F) {
+    pub fn store_if_missing<F: FnOnce() -> ValueBox>(&self, key: &str, f: F) {
         let mut values = self.values.lock().unwrap();
         if !values.contains_key(key) {
             values.insert(Arc::from(key), f());
@@ -39,18 +39,18 @@ impl fmt::Display for Closure {
 }
 
 impl Object for Closure {
-    fn value(&self) -> Value {
+    fn value(&self) -> ValueBox {
         todo!()
-        // Value::from_map_object(*self)
+        // ValueBox::from_map_object(*self)
     }
 }
 
 impl MapObject for Closure {
-    fn fields(&self) -> Vec<Value> {
-        self.values.lock().unwrap().keys().cloned().map(Value::from).collect()
+    fn fields(&self) -> Vec<ValueBox> {
+        self.values.lock().unwrap().keys().cloned().map(ValueBox::from).collect()
     }
 
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
         let name = key.as_str()?;
         self.values.lock().unwrap().get(name).cloned()
     }

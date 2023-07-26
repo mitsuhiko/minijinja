@@ -6,7 +6,7 @@ use crate::compiler::instructions::{
 };
 use crate::compiler::tokens::Span;
 use crate::output::CaptureMode;
-use crate::value::Value;
+use crate::value::ValueBox;
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -393,12 +393,12 @@ impl<'source> CodeGenerator<'source> {
             self.add(Instruction::Enclose(name));
         }
         self.add(Instruction::GetClosure);
-        self.add(Instruction::LoadConst(Value::from_seq_object(
+        self.add(Instruction::LoadConst(ValueBox::from_seq_object(
             macro_decl
                 .args
                 .iter()
                 .map(|x| match x {
-                    ast::Expr::Var(var) => Value::from(var.id),
+                    ast::Expr::Var(var) => ValueBox::from(var.id),
                     _ => unreachable!(),
                 })
                 .collect::<Vec<_>>()
@@ -481,7 +481,7 @@ impl<'source> CodeGenerator<'source> {
         // passing items accumlated into a list. in the second, that list is
         // iterated over normally
         if let Some(ref filter_expr) = for_loop.filter_expr {
-            self.add(Instruction::LoadConst(Value::from(0usize)));
+            self.add(Instruction::LoadConst(ValueBox::from(0usize)));
             self.compile_expr(&for_loop.iter);
             self.start_for_loop(false, false);
             self.add(Instruction::DupTop);
@@ -489,7 +489,7 @@ impl<'source> CodeGenerator<'source> {
             self.compile_expr(filter_expr);
             self.start_if();
             self.add(Instruction::Swap);
-            self.add(Instruction::LoadConst(Value::from(1usize)));
+            self.add(Instruction::LoadConst(ValueBox::from(1usize)));
             self.add(Instruction::Add);
             self.start_else();
             self.add(Instruction::DiscardTop);
@@ -550,17 +550,17 @@ impl<'source> CodeGenerator<'source> {
                 if let Some(ref start) = s.start {
                     self.compile_expr(start);
                 } else {
-                    self.add(Instruction::LoadConst(Value::from(0)));
+                    self.add(Instruction::LoadConst(ValueBox::from(0)));
                 }
                 if let Some(ref stop) = s.stop {
                     self.compile_expr(stop);
                 } else {
-                    self.add(Instruction::LoadConst(Value::from(())));
+                    self.add(Instruction::LoadConst(ValueBox::from(())));
                 }
                 if let Some(ref step) = s.step {
                     self.compile_expr(step);
                 } else {
-                    self.add(Instruction::LoadConst(Value::from(1)));
+                    self.add(Instruction::LoadConst(ValueBox::from(1)));
                 }
                 self.add(Instruction::Slice);
                 self.pop_span();
@@ -585,7 +585,7 @@ impl<'source> CodeGenerator<'source> {
                 if let Some(ref false_expr) = i.false_expr {
                     self.compile_expr(false_expr);
                 } else {
-                    self.add(Instruction::LoadConst(Value::UNDEFINED));
+                    self.add(Instruction::LoadConst(ValueBox::UNDEFINED));
                 }
                 self.end_if();
             }
@@ -657,7 +657,7 @@ impl<'source> CodeGenerator<'source> {
                 } else {
                     self.set_line_from_span(m.span());
                     for (key, value) in &m.pairs {
-                        self.add(Instruction::LoadConst(Value::from(*key)));
+                        self.add(Instruction::LoadConst(ValueBox::from(*key)));
                         self.compile_expr(value);
                     }
                     self.add(Instruction::BuildKwargs(m.pairs.len()));
@@ -729,10 +729,10 @@ impl<'source> CodeGenerator<'source> {
             if let ast::Expr::Kwargs(ref m) = arg {
                 self.set_line_from_span(m.span());
                 for (key, value) in &m.pairs {
-                    self.add(Instruction::LoadConst(Value::from(*key)));
+                    self.add(Instruction::LoadConst(ValueBox::from(*key)));
                     self.compile_expr(value);
                 }
-                self.add(Instruction::LoadConst(Value::from("caller")));
+                self.add(Instruction::LoadConst(ValueBox::from("caller")));
                 self.compile_macro_expression(caller);
                 self.add(Instruction::BuildKwargs(m.pairs.len() + 1));
                 injected_caller = true;
@@ -744,7 +744,7 @@ impl<'source> CodeGenerator<'source> {
         // if there are no keyword args so far, create a new kwargs object
         // and add caller to that.
         if !injected_caller {
-            self.add(Instruction::LoadConst(Value::from("caller")));
+            self.add(Instruction::LoadConst(ValueBox::from("caller")));
             self.compile_macro_expression(caller);
             self.add(Instruction::BuildKwargs(1));
             args.len() + 1

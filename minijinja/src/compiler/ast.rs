@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::fmt;
 
 use crate::compiler::tokens::Span;
-use crate::value::{value_map_with_capacity, Value};
+use crate::value::{value_map_with_capacity, ValueBox};
 
 /// Container for nodes with location info.
 ///
@@ -348,7 +348,7 @@ pub struct Var<'a> {
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Const {
-    pub value: Value,
+    pub value: ValueBox,
 }
 
 /// Represents a slice.
@@ -468,7 +468,7 @@ pub struct List<'a> {
 }
 
 impl<'a> List<'a> {
-    pub fn as_const(&self) -> Option<Value> {
+    pub fn as_const(&self) -> Option<ValueBox> {
         if !self.items.iter().all(|x| matches!(x, Expr::Const(_))) {
             return None;
         }
@@ -491,7 +491,7 @@ pub struct Kwargs<'a> {
 }
 
 impl<'a> Kwargs<'a> {
-    pub fn as_const(&self) -> Option<Value> {
+    pub fn as_const(&self) -> Option<ValueBox> {
         if !self.pairs.iter().all(|x| matches!(x.1, Expr::Const(_))) {
             return None;
         }
@@ -499,11 +499,11 @@ impl<'a> Kwargs<'a> {
         let mut rv = value_map_with_capacity(self.pairs.len());
         for (key, value) in &self.pairs {
             if let Expr::Const(value) = value {
-                rv.insert(Value::from(*key), value.value.clone());
+                rv.insert(ValueBox::from(*key), value.value.clone());
             }
         }
 
-        Some(Value::from_kwargs(rv))
+        Some(ValueBox::from_kwargs(rv))
     }
 }
 
@@ -516,7 +516,7 @@ pub struct Map<'a> {
 }
 
 impl<'a> Map<'a> {
-    pub fn as_const(&self) -> Option<Value> {
+    pub fn as_const(&self) -> Option<ValueBox> {
         if !self.keys.iter().all(|x| matches!(x, Expr::Const(_)))
             || !self.values.iter().all(|x| matches!(x, Expr::Const(_)))
         {
@@ -530,7 +530,7 @@ impl<'a> Map<'a> {
             }
         }
 
-        Some(Value::from_map_object(rv))
+        Some(ValueBox::from_map_object(rv))
     }
 }
 

@@ -4,17 +4,17 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{intern, Value, OwnedValueMap};
+use crate::value::{intern, ValueBox, OwnedValueBoxMap};
 use crate::vm::State;
 
 /// A utility trait that represents a dynamic object.
 ///
-/// The engine uses the [`Value`] type to represent values that the engine
+/// The engine uses the [`ValueBox`] type to represent values that the engine
 /// knows about.  Most of these values are primitives such as integers, strings
 /// or maps.  However it is also possible to expose custom types without
 /// undergoing a serialization step to the engine.  For this to work a type
 /// needs to implement the [`Object`] trait and be wrapped in a value with
-/// [`Value::from_object`](crate::value::Value::from_object). The ownership of
+/// [`ValueBox::from_object`](crate::value::Value::from_object). The ownership of
 /// the object will then move into the value type.
 //
 /// The engine uses reference counted objects with interior mutability in the
@@ -39,8 +39,8 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// called or has methods.
     ///
     /// For more information see [`ObjectKind`].
-    fn value(&self) -> Value {
-        Value::NONE
+    fn value(&self) -> ValueBox {
+        ValueBox::NONE
     }
 
     /// Called when the engine tries to call a method on the object.
@@ -50,7 +50,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     ///
     /// To convert the arguments into arguments use the
     /// [`from_args`](crate::value::from_args) function.
-    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(&self, state: &State, name: &str, args: &[ValueBox]) -> Result<ValueBox, Error> {
         let _state = state;
         let _args = args;
         Err(Error::new(
@@ -66,7 +66,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     ///
     /// To convert the arguments into arguments use the
     /// [`from_args`](crate::value::from_args) function.
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(&self, state: &State, args: &[ValueBox]) -> Result<ValueBox, Error> {
         let _state = state;
         let _args = args;
         Err(Error::new(
@@ -74,17 +74,21 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
             "tried to call non callable object",
         ))
     }
+
+    fn cloned(&self) -> Arc<dyn Object> {
+        todo!()
+    }
 }
 
 impl dyn Object {
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
     ///
-    /// This is basically the "reverse" of [`from_object`](Value::from_object).
+    /// This is basically the "reverse" of [`from_object`](ValueBox::from_object).
     ///
     /// # Example
     ///
     /// ```rust
-    /// # use minijinja::value::{Value, Object};
+    /// # use minijinja::value::{ValueBox, Object};
     /// use std::fmt;
     ///
     /// #[derive(Debug)]
@@ -100,7 +104,7 @@ impl dyn Object {
     ///
     /// impl Object for Thing {}
     ///
-    /// let x_value = Value::from_object(Thing { id: 42 });
+    /// let x_value = ValueBox::from_object(Thing { id: 42 });
     /// let value_as_obj = x_value.as_object().unwrap();
     /// let thing = value_as_obj.downcast_ref::<Thing>().unwrap();
     /// assert_eq!(thing.id, 42);
@@ -120,17 +124,17 @@ impl dyn Object {
 
 impl<T: Object + ?Sized> Object for Arc<T> {
     #[inline]
-    fn value(&self) -> Value {
+    fn value(&self) -> ValueBox {
         T::value(self)
     }
 
     #[inline]
-    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(&self, state: &State, name: &str, args: &[ValueBox]) -> Result<ValueBox, Error> {
         T::call_method(self, state, name, args)
     }
 
     #[inline]
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(&self, state: &State, args: &[ValueBox]) -> Result<ValueBox, Error> {
         T::call(self, state, args)
     }
 }
@@ -173,23 +177,23 @@ impl<T: Object + ?Sized> Object for Arc<T> {
 ///
 /// # Simplified Example
 ///
-/// For sequences which do not need any special method behavior, the [`Value`]
+/// For sequences which do not need any special method behavior, the [`ValueBox`]
 /// type is capable of automatically constructing a wrapper [`Object`] by using
-/// [`Value::from_seq_object`].  In that case only [`SeqObject`] needs to be
+/// [`ValueBox::from_seq_object`].  In that case only [`SeqObject`] needs to be
 /// implemented and the value will provide default implementations for
 /// stringification and debug printing.
 ///
 /// ```
-/// use minijinja::value::{Value, SeqObject};
+/// use minijinja::value::{ValueBox, SeqObject};
 ///
 /// struct Point(f32, f32, f32);
 ///
 /// impl SeqObject for Point {
-///     fn get_item(&self, idx: usize) -> Option<Value> {
+///     fn get_item(&self, idx: usize) -> Option<ValueBox> {
 ///         match idx {
-///             0 => Some(Value::from(self.0)),
-///             1 => Some(Value::from(self.1)),
-///             2 => Some(Value::from(self.2)),
+///             0 => Some(ValueBox::from(self.0)),
+///             1 => Some(ValueBox::from(self.1)),
+///             2 => Some(ValueBox::from(self.2)),
 ///             _ => None,
 ///         }
 ///     }
@@ -199,7 +203,7 @@ impl<T: Object + ?Sized> Object for Arc<T> {
 ///     }
 /// }
 ///
-/// let value = Value::from_seq_object(Point(1.0, 2.5, 3.0));
+/// let value = ValueBox::from_seq_object(Point(1.0, 2.5, 3.0));
 /// ```
 ///
 /// # Full Example
@@ -211,7 +215,7 @@ impl<T: Object + ?Sized> Object for Arc<T> {
 ///
 /// ```
 /// use std::fmt;
-/// use minijinja::value::{Value, Object, ObjectKind, SeqObject};
+/// use minijinja::value::{ValueBox, Object, ObjectKind, SeqObject};
 ///
 /// #[derive(Debug, Clone)]
 /// struct Point(f32, f32, f32);
@@ -229,11 +233,11 @@ impl<T: Object + ?Sized> Object for Arc<T> {
 /// }
 ///
 /// impl SeqObject for Point {
-///     fn get_item(&self, idx: usize) -> Option<Value> {
+///     fn get_item(&self, idx: usize) -> Option<ValueBox> {
 ///         match idx {
-///             0 => Some(Value::from(self.0)),
-///             1 => Some(Value::from(self.1)),
-///             2 => Some(Value::from(self.2)),
+///             0 => Some(ValueBox::from(self.0)),
+///             1 => Some(ValueBox::from(self.1)),
+///             2 => Some(ValueBox::from(self.2)),
 ///             _ => None,
 ///         }
 ///     }
@@ -243,7 +247,7 @@ impl<T: Object + ?Sized> Object for Arc<T> {
 ///     }
 /// }
 ///
-/// let value = Value::from_object(Point(1.0, 2.5, 3.0));
+/// let value = ValueBox::from_object(Point(1.0, 2.5, 3.0));
 /// ```
 pub trait SeqObject: Send + Sync {
     /// Looks up an item by index.
@@ -251,10 +255,14 @@ pub trait SeqObject: Send + Sync {
     /// Sequences should provide a value for all items in the range of `0..item_count`
     /// but the engine will assume that items within the range are `Undefined`
     /// if `None` is returned.
-    fn get_item(&self, idx: usize) -> Option<Value>;
+    fn get_item(&self, idx: usize) -> Option<ValueBox>;
 
     /// Returns the number of items in the sequence.
     fn item_count(&self) -> usize;
+
+    fn cloned(&self) -> Arc<dyn SeqObject> {
+        todo!()
+    }
 }
 
 impl dyn SeqObject + '_ {
@@ -267,56 +275,9 @@ impl dyn SeqObject + '_ {
     }
 }
 
-/// Iterates over [`MapObject`]
-pub struct MapObjectIter<'a> {
-    map: &'a dyn MapObject,
-    keys: std::vec::IntoIter<Value>,
-}
-
-impl<'a> Iterator for MapObjectIter<'a> {
-    type Item = (Value, Value);
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        let key = self.keys.next()?;
-        let value = self.map.get_field(&key).unwrap_or(Value::UNDEFINED);
-        Some((key, value))
-    }
-
-    #[inline(always)]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.keys.size_hint()
-    }
-}
-
-impl<'a> DoubleEndedIterator for MapObjectIter<'a> {
-    #[inline(always)]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let key = self.keys.next_back()?;
-        let value = self.map.get_field(&key).unwrap_or(Value::UNDEFINED);
-        Some((key, value))
-    }
-}
-
-impl dyn MapObject + '_ {
-    /// Convenient iterator over a [`MapObject`].
-    pub fn iter(&self) -> MapObjectIter<'_> {
-        MapObjectIter {
-            map: self,
-            keys: self.fields().into_iter(),
-        }
-    }
-
-    pub(crate) fn to_map(&self) -> OwnedValueMap {
-        self.iter()
-            .map(|(k, v)| (k.into(), v))
-            .collect()
-    }
-}
-
 impl<T: SeqObject + ?Sized> SeqObject for Arc<T> {
     #[inline]
-    fn get_item(&self, idx: usize) -> Option<Value> {
+    fn get_item(&self, idx: usize) -> Option<ValueBox> {
         T::get_item(self, idx)
     }
 
@@ -328,7 +289,7 @@ impl<T: SeqObject + ?Sized> SeqObject for Arc<T> {
 
 impl<'a, T: SeqObject + ?Sized> SeqObject for &'a T {
     #[inline]
-    fn get_item(&self, idx: usize) -> Option<Value> {
+    fn get_item(&self, idx: usize) -> Option<ValueBox> {
         T::get_item(self, idx)
     }
 
@@ -338,9 +299,9 @@ impl<'a, T: SeqObject + ?Sized> SeqObject for &'a T {
     }
 }
 
-impl<T: Into<Value> + Send + Sync + Clone> SeqObject for [T] {
+impl<T: Into<ValueBox> + Send + Sync + Clone> SeqObject for [T] {
     #[inline(always)]
-    fn get_item(&self, idx: usize) -> Option<Value> {
+    fn get_item(&self, idx: usize) -> Option<ValueBox> {
         self.get(idx).cloned().map(Into::into)
     }
 
@@ -350,9 +311,9 @@ impl<T: Into<Value> + Send + Sync + Clone> SeqObject for [T] {
     }
 }
 
-impl<T: Into<Value> + Send + Sync + Clone> SeqObject for Vec<T> {
+impl<T: Into<ValueBox> + Send + Sync + Clone> SeqObject for Vec<T> {
     #[inline(always)]
-    fn get_item(&self, idx: usize) -> Option<Value> {
+    fn get_item(&self, idx: usize) -> Option<ValueBox> {
         self.get(idx).cloned().map(Into::into)
     }
 
@@ -369,13 +330,13 @@ pub struct SeqObjectIter<'a> {
 }
 
 impl<'a> Iterator for SeqObjectIter<'a> {
-    type Item = Value;
+    type Item = ValueBox;
 
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         self.range
             .next()
-            .map(|idx| self.seq.get_item(idx).unwrap_or(Value::UNDEFINED))
+            .map(|idx| self.seq.get_item(idx).unwrap_or(ValueBox::UNDEFINED))
     }
 
     #[inline(always)]
@@ -389,7 +350,7 @@ impl<'a> DoubleEndedIterator for SeqObjectIter<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.range
             .next_back()
-            .map(|idx| self.seq.get_item(idx).unwrap_or(Value::UNDEFINED))
+            .map(|idx| self.seq.get_item(idx).unwrap_or(ValueBox::UNDEFINED))
     }
 }
 
@@ -403,22 +364,22 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// # Simplified Example
 ///
 /// For structs which do not need any special method behavior or methods, the
-/// [`Value`] type is capable of automatically constructing a wrapper [`Object`]
-/// by using [`Value::from_map_object`].  In that case only [`MapObject`]
+/// [`ValueBox`] type is capable of automatically constructing a wrapper [`Object`]
+/// by using [`ValueBox::from_map_object`].  In that case only [`MapObject`]
 /// needs to be implemented and the value will provide default implementations
 /// for stringification and debug printing.
 ///
 /// ```
-/// use minijinja::value::{Value, MapObject};
+/// use minijinja::value::{ValueBox, MapObject};
 ///
 /// struct Point(f32, f32, f32);
 ///
 /// impl MapObject for Point {
-///     fn get_field(&self, name: &str) -> Option<Value> {
+///     fn get_field(&self, name: &str) -> Option<ValueBox> {
 ///         match name {
-///             "x" => Some(Value::from(self.0)),
-///             "y" => Some(Value::from(self.1)),
-///             "z" => Some(Value::from(self.2)),
+///             "x" => Some(ValueBox::from(self.0)),
+///             "y" => Some(ValueBox::from(self.1)),
+///             "z" => Some(ValueBox::from(self.2)),
 ///             _ => None,
 ///         }
 ///     }
@@ -428,7 +389,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///     }
 /// }
 ///
-/// let value = Value::from_map_object(Point(1.0, 2.5, 3.0));
+/// let value = ValueBox::from_map_object(Point(1.0, 2.5, 3.0));
 /// ```
 ///
 /// # Full Example
@@ -440,7 +401,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// ```
 /// use std::fmt;
-/// use minijinja::value::{Value, Object, ObjectKind, MapObject};
+/// use minijinja::value::{ValueBox, Object, ObjectKind, MapObject};
 ///
 /// #[derive(Debug, Clone)]
 /// struct Point(f32, f32, f32);
@@ -458,11 +419,11 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// }
 ///
 /// impl MapObject for Point {
-///     fn get_field(&self, name: &str) -> Option<Value> {
+///     fn get_field(&self, name: &str) -> Option<ValueBox> {
 ///         match name {
-///             "x" => Some(Value::from(self.0)),
-///             "y" => Some(Value::from(self.1)),
-///             "z" => Some(Value::from(self.2)),
+///             "x" => Some(ValueBox::from(self.0)),
+///             "y" => Some(ValueBox::from(self.1)),
+///             "z" => Some(ValueBox::from(self.2)),
 ///             _ => None,
 ///         }
 ///     }
@@ -472,7 +433,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///     }
 /// }
 ///
-/// let value = Value::from_object(Point(1.0, 2.5, 3.0));
+/// let value = ValueBox::from_object(Point(1.0, 2.5, 3.0));
 /// ```
 ///
 /// # Struct As context
@@ -491,18 +452,18 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// ```
 /// # fn main() -> Result<(), minijinja::Error> {
 /// # use minijinja::Environment;
-/// use minijinja::value::{Value, MapObject};
+/// use minijinja::value::{ValueBox, MapObject};
 ///
 /// pub struct DynamicContext {
 ///     magic: i32,
 /// }
 ///
 /// impl MapObject for DynamicContext {
-///     fn get_field(&self, field: &str) -> Option<Value> {
+///     fn get_field(&self, field: &str) -> Option<ValueBox> {
 ///         match field {
-///             "pid" => Some(Value::from(std::process::id())),
-///             "env" => Some(Value::from_iter(std::env::vars())),
-///             "magic" => Some(Value::from(self.magic)),
+///             "pid" => Some(ValueBox::from(std::process::id())),
+///             "env" => Some(ValueBox::from_iter(std::env::vars())),
+///             "magic" => Some(ValueBox::from(self.magic)),
 ///             _ => None,
 ///         }
 ///     }
@@ -510,7 +471,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// # let env = Environment::new();
 /// let tmpl = env.template_from_str("HOME={{ env.HOME }}; PID={{ pid }}; MAGIG={{ magic }}")?;
-/// let ctx = Value::from_map_object(DynamicContext { magic: 42 });
+/// let ctx = ValueBox::from_map_object(DynamicContext { magic: 42 });
 /// let rv = tmpl.render(ctx)?;
 /// # Ok(()) }
 /// ```
@@ -532,7 +493,7 @@ pub trait MapObject: Send + Sync {
     /// [`State`] nor is there a channel to send out failures as only an option
     /// can be returned.  If you do plan on doing something in field access
     /// that is fallible, instead use a method call.
-    fn get_field(&self, key: &Value) -> Option<Value>;
+    fn get_field(&self, key: &ValueBox) -> Option<ValueBox>;
 
     /// If possible returns a static vector of field names.
     ///
@@ -551,11 +512,11 @@ pub trait MapObject: Send + Sync {
     /// be implemented due to lifetime restrictions.  The default implementation
     /// converts the return value of [`static_fields`](Self::static_fields) into
     /// a compatible format automatically.
-    fn fields(&self) -> Vec<Value> {
+    fn fields(&self) -> Vec<ValueBox> {
         self.static_fields()
             .into_iter()
             .flat_map(|fields| fields.iter().copied().map(intern))
-            .map(Value::from)
+            .map(ValueBox::from)
             .collect()
     }
 
@@ -570,17 +531,21 @@ pub trait MapObject: Send + Sync {
             self.fields().len()
         }
     }
+
+    fn cloned(&self) -> Arc<dyn MapObject> {
+        todo!()
+    }
 }
 
-impl MapObject for OwnedValueMap {
+impl MapObject for OwnedValueBoxMap {
     #[inline]
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
         self.get(key).cloned()
     }
 
     #[inline]
-    fn fields(&self) -> Vec<Value> {
-        // FIXME: Need to take `Value` as key.
+    fn fields(&self) -> Vec<ValueBox> {
+        // FIXME: Need to take `ValueBox` as key.
         self.keys()
             .cloned()
             .collect()
@@ -600,7 +565,7 @@ impl fmt::Debug for dyn MapObject + '_ {
 
 impl<T: MapObject + ?Sized> MapObject for Arc<T> {
     #[inline]
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
         T::get_field(self, key)
     }
 
@@ -610,7 +575,7 @@ impl<T: MapObject + ?Sized> MapObject for Arc<T> {
     }
 
     #[inline]
-    fn fields(&self) -> Vec<Value> {
+    fn fields(&self) -> Vec<ValueBox> {
         T::fields(self)
     }
 
@@ -622,7 +587,7 @@ impl<T: MapObject + ?Sized> MapObject for Arc<T> {
 
 impl<'a, T: MapObject + ?Sized> MapObject for &'a T {
     #[inline]
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
         T::get_field(self, key)
     }
 
@@ -632,12 +597,59 @@ impl<'a, T: MapObject + ?Sized> MapObject for &'a T {
     }
 
     #[inline]
-    fn fields(&self) -> Vec<Value> {
+    fn fields(&self) -> Vec<ValueBox> {
         T::fields(self)
     }
 
     #[inline]
     fn field_count(&self) -> usize {
         T::field_count(self)
+    }
+}
+
+/// Iterates over [`MapObject`]
+pub struct MapObjectIter<'a> {
+    map: &'a dyn MapObject,
+    keys: std::vec::IntoIter<ValueBox>,
+}
+
+impl<'a> Iterator for MapObjectIter<'a> {
+    type Item = (ValueBox, ValueBox);
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        let key = self.keys.next()?;
+        let value = self.map.get_field(&key).unwrap_or(ValueBox::UNDEFINED);
+        Some((key, value))
+    }
+
+    #[inline(always)]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.keys.size_hint()
+    }
+}
+
+impl<'a> DoubleEndedIterator for MapObjectIter<'a> {
+    #[inline(always)]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let key = self.keys.next_back()?;
+        let value = self.map.get_field(&key).unwrap_or(ValueBox::UNDEFINED);
+        Some((key, value))
+    }
+}
+
+impl dyn MapObject + '_ {
+    /// Convenient iterator over a [`MapObject`].
+    pub fn iter(&self) -> MapObjectIter<'_> {
+        MapObjectIter {
+            map: self,
+            keys: self.fields().into_iter(),
+        }
+    }
+
+    pub(crate) fn to_map(&self) -> OwnedValueBoxMap {
+        self.iter()
+            .map(|(k, v)| (k.into(), v))
+            .collect()
     }
 }

@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Object, MapObject, Value};
+use crate::value::{Object, MapObject, ValueBox};
 use crate::vm::state::State;
 
 pub(crate) struct Loop {
@@ -11,48 +11,48 @@ pub(crate) struct Loop {
     pub idx: AtomicUsize,
     pub depth: usize,
     #[cfg(feature = "adjacent_loop_items")]
-    pub value_triple: Mutex<(Option<Value>, Option<Value>, Option<Value>)>,
-    pub last_changed_value: Mutex<Option<Vec<Value>>>,
+    pub value_triple: Mutex<(Option<ValueBox>, Option<ValueBox>, Option<ValueBox>)>,
+    pub last_changed_value: Mutex<Option<Vec<ValueBox>>>,
 }
 
 impl fmt::Debug for Loop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("Loop");
         for attr in self.static_fields().unwrap() {
-            s.field(attr, &self.get_field(&Value::from(*attr)).unwrap());
+            s.field(attr, &self.get_field(&ValueBox::from(*attr)).unwrap());
         }
         s.finish()
     }
 }
 
 impl Object for Loop {
-    fn value(&self) -> Value {
+    fn value(&self) -> ValueBox {
         todo!()
     }
 
-    fn call(&self, _state: &State, _args: &[Value]) -> Result<Value, Error> {
+    fn call(&self, _state: &State, _args: &[ValueBox]) -> Result<ValueBox, Error> {
         Err(Error::new(
             ErrorKind::InvalidOperation,
             "loop cannot be called if reassigned to different variable",
         ))
     }
 
-    fn call_method(&self, _state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(&self, _state: &State, name: &str, args: &[ValueBox]) -> Result<ValueBox, Error> {
         if name == "changed" {
             let mut last_changed_value = self.last_changed_value.lock().unwrap();
             let value = args.to_owned();
             let changed = last_changed_value.as_ref() != Some(&value);
             if changed {
                 *last_changed_value = Some(value);
-                Ok(Value::from(true))
+                Ok(ValueBox::from(true))
             } else {
-                Ok(Value::from(false))
+                Ok(ValueBox::from(false))
             }
         } else if name == "cycle" {
             let idx = self.idx.load(Ordering::Relaxed);
             match args.get(idx % args.len()) {
                 Some(arg) => Ok(arg.clone()),
-                None => Ok(Value::UNDEFINED),
+                None => Ok(ValueBox::UNDEFINED),
             }
         } else {
             Err(Error::new(
@@ -84,26 +84,26 @@ impl MapObject for Loop {
         )
     }
 
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
         let name = key.as_str()?;
         let idx = self.idx.load(Ordering::Relaxed) as u64;
         // if we never iterated, then all attributes are undefined.
         // this can happen in some rare circumstances where the engine
         // did not manage to iterate
         if idx == !0 {
-            return Some(Value::UNDEFINED);
+            return Some(ValueBox::UNDEFINED);
         }
         let len = self.len as u64;
         match name {
-            "index0" => Some(Value::from(idx)),
-            "index" => Some(Value::from(idx + 1)),
-            "length" => Some(Value::from(len)),
-            "revindex" => Some(Value::from(len.saturating_sub(idx))),
-            "revindex0" => Some(Value::from(len.saturating_sub(idx).saturating_sub(1))),
-            "first" => Some(Value::from(idx == 0)),
-            "last" => Some(Value::from(len == 0 || idx == len - 1)),
-            "depth" => Some(Value::from(self.depth + 1)),
-            "depth0" => Some(Value::from(self.depth)),
+            "index0" => Some(ValueBox::from(idx)),
+            "index" => Some(ValueBox::from(idx + 1)),
+            "length" => Some(ValueBox::from(len)),
+            "revindex" => Some(ValueBox::from(len.saturating_sub(idx))),
+            "revindex0" => Some(ValueBox::from(len.saturating_sub(idx).saturating_sub(1))),
+            "first" => Some(ValueBox::from(idx == 0)),
+            "last" => Some(ValueBox::from(len == 0 || idx == len - 1)),
+            "depth" => Some(ValueBox::from(self.depth + 1)),
+            "depth0" => Some(ValueBox::from(self.depth)),
             #[cfg(feature = "adjacent_loop_items")]
             "previtem" => Some(
                 self.value_triple
@@ -111,7 +111,7 @@ impl MapObject for Loop {
                     .unwrap()
                     .0
                     .clone()
-                    .unwrap_or(Value::UNDEFINED),
+                    .unwrap_or(ValueBox::UNDEFINED),
             ),
             #[cfg(feature = "adjacent_loop_items")]
             "nextitem" => Some(
@@ -120,7 +120,7 @@ impl MapObject for Loop {
                     .unwrap()
                     .2
                     .clone()
-                    .unwrap_or(Value::UNDEFINED),
+                    .unwrap_or(ValueBox::UNDEFINED),
             ),
             _ => None,
         }

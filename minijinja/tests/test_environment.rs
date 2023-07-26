@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use similar_asserts::assert_eq;
 
-use minijinja::value::Value;
+use minijinja::value::ValueBox;
 use minijinja::Environment;
 
 #[test]
@@ -12,7 +12,7 @@ fn test_basic() {
         .unwrap();
     let t = env.get_template("test").unwrap();
     let mut ctx = BTreeMap::new();
-    ctx.insert("seq", Value::from((0..3).collect::<Vec<_>>()));
+    ctx.insert("seq", ValueBox::from((0..3).collect::<Vec<_>>()));
     let rv = t.render(ctx).unwrap();
     assert_eq!(rv, "[0][1][2]");
 }
@@ -24,7 +24,7 @@ fn test_expression() {
     let mut ctx = BTreeMap::new();
     ctx.insert("foo", 42);
     ctx.insert("bar", 23);
-    assert_eq!(expr.eval(&ctx).unwrap(), Value::from(65));
+    assert_eq!(expr.eval(&ctx).unwrap(), ValueBox::from(65));
 }
 
 #[test]
@@ -78,7 +78,7 @@ fn test_clone() {
 #[test]
 fn test_globals() {
     let mut env = Environment::new();
-    env.add_global("a", Value::from(42));
+    env.add_global("a", ValueBox::from(42));
     env.add_template("test", "{{ a }}").unwrap();
     let tmpl = env.get_template("test").unwrap();
     assert_eq!(tmpl.render(()).unwrap(), "42");

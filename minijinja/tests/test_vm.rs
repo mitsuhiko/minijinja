@@ -2,7 +2,7 @@
 use std::collections::BTreeMap;
 
 use minijinja::machinery::{make_string_output, CodeGenerator, Instruction, Instructions, Vm};
-use minijinja::value::Value;
+use minijinja::value::ValueBox;
 use minijinja::{AutoEscape, Environment, Error};
 
 use similar_asserts::assert_eq;
@@ -14,7 +14,7 @@ pub fn simple_eval<S: serde::Serialize>(
     let env = Environment::new();
     let empty_blocks = BTreeMap::new();
     let vm = Vm::new(&env);
-    let root = Value::from_serializable(&ctx);
+    let root = ValueBox::from_serializable(&ctx);
     let mut rv = String::new();
     let mut output = make_string_output(&mut rv);
     vm.eval(
@@ -30,7 +30,7 @@ pub fn simple_eval<S: serde::Serialize>(
 #[test]
 fn test_loop() {
     let mut ctx = std::collections::BTreeMap::new();
-    ctx.insert("items", Value::from((1..=9).collect::<Vec<_>>()));
+    ctx.insert("items", ValueBox::from((1..=9).collect::<Vec<_>>()));
 
     let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::Lookup("items"));
@@ -48,7 +48,7 @@ fn test_loop() {
 fn test_if() {
     for &(val, expectation) in [(true, "true"), (false, "false")].iter() {
         let mut ctx = std::collections::BTreeMap::new();
-        ctx.insert("cond", Value::from(val));
+        ctx.insert("cond", ValueBox::from(val));
 
         let mut c = CodeGenerator::new("<unknown>", "");
         c.add(Instruction::Lookup("cond"));
@@ -67,8 +67,8 @@ fn test_if() {
 #[test]
 fn test_if_branches() {
     let mut ctx = std::collections::BTreeMap::new();
-    ctx.insert("false", Value::from(false));
-    ctx.insert("nil", Value::from(()));
+    ctx.insert("false", ValueBox::from(false));
+    ctx.insert("nil", ValueBox::from(()));
 
     let mut c = CodeGenerator::new("<unknown>", "");
     c.add(Instruction::Lookup("false"));
@@ -93,9 +93,9 @@ fn test_basic() {
     let mut user = std::collections::BTreeMap::new();
     user.insert("name", "Peter");
     let mut ctx = std::collections::BTreeMap::new();
-    ctx.insert("user", Value::from(user));
-    ctx.insert("a", Value::from(42));
-    ctx.insert("b", Value::from(23));
+    ctx.insert("user", ValueBox::from(user));
+    ctx.insert("a", ValueBox::from(42));
+    ctx.insert("b", ValueBox::from(23));
 
     let mut i = Instructions::new("", "");
     i.add(Instruction::EmitRaw("Hello "));
@@ -123,8 +123,8 @@ fn test_error_info() {
     c.add(Instruction::Add);
 
     let mut ctx = std::collections::BTreeMap::new();
-    ctx.insert("a_string", Value::from("foo"));
-    ctx.insert("an_int", Value::from(42));
+    ctx.insert("a_string", ValueBox::from("foo"));
+    ctx.insert("an_int", ValueBox::from(42));
 
     let err = simple_eval(&c.finish().0, ctx).unwrap_err();
     assert_eq!(err.name(), Some("hello.html"));
@@ -134,8 +134,8 @@ fn test_error_info() {
 #[test]
 fn test_op_eq() {
     let mut c = CodeGenerator::new("hello.html", "");
-    c.add(Instruction::LoadConst(Value::from(1)));
-    c.add(Instruction::LoadConst(Value::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
     c.add(Instruction::Eq);
     c.add(Instruction::Emit);
 
@@ -143,8 +143,8 @@ fn test_op_eq() {
     assert_eq!(output, "true");
 
     let mut c = CodeGenerator::new("hello.html", "");
-    c.add(Instruction::LoadConst(Value::from(1)));
-    c.add(Instruction::LoadConst(Value::from(2)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(2)));
     c.add(Instruction::Eq);
     c.add(Instruction::Emit);
 
@@ -155,8 +155,8 @@ fn test_op_eq() {
 #[test]
 fn test_op_ne() {
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(1)));
-    c.add(Instruction::LoadConst(Value::from("foo")));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from("foo")));
     c.add(Instruction::Ne);
     c.add(Instruction::Emit);
 
@@ -164,8 +164,8 @@ fn test_op_ne() {
     assert_eq!(output, "true");
 
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from("foo")));
-    c.add(Instruction::LoadConst(Value::from("foo")));
+    c.add(Instruction::LoadConst(ValueBox::from("foo")));
+    c.add(Instruction::LoadConst(ValueBox::from("foo")));
     c.add(Instruction::Ne);
     c.add(Instruction::Emit);
 
@@ -176,8 +176,8 @@ fn test_op_ne() {
 #[test]
 fn test_op_lt() {
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(1)));
-    c.add(Instruction::LoadConst(Value::from(2)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(2)));
     c.add(Instruction::Lt);
     c.add(Instruction::Emit);
 
@@ -185,8 +185,8 @@ fn test_op_lt() {
     assert_eq!(output, "true");
 
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(2)));
-    c.add(Instruction::LoadConst(Value::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(2)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
     c.add(Instruction::Lt);
     c.add(Instruction::Emit);
 
@@ -197,8 +197,8 @@ fn test_op_lt() {
 #[test]
 fn test_op_gt() {
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(1)));
-    c.add(Instruction::LoadConst(Value::from(2)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(2)));
     c.add(Instruction::Gt);
     c.add(Instruction::Emit);
 
@@ -206,8 +206,8 @@ fn test_op_gt() {
     assert_eq!(output, "false");
 
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(2)));
-    c.add(Instruction::LoadConst(Value::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(2)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
     c.add(Instruction::Gt);
     c.add(Instruction::Emit);
 
@@ -218,8 +218,8 @@ fn test_op_gt() {
 #[test]
 fn test_op_lte() {
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(1)));
-    c.add(Instruction::LoadConst(Value::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
     c.add(Instruction::Lte);
     c.add(Instruction::Emit);
 
@@ -227,8 +227,8 @@ fn test_op_lte() {
     assert_eq!(output, "true");
 
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(2)));
-    c.add(Instruction::LoadConst(Value::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(2)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
     c.add(Instruction::Lte);
     c.add(Instruction::Emit);
 
@@ -239,8 +239,8 @@ fn test_op_lte() {
 #[test]
 fn test_op_gte() {
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(1)));
-    c.add(Instruction::LoadConst(Value::from(2)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(2)));
     c.add(Instruction::Gte);
     c.add(Instruction::Emit);
 
@@ -248,8 +248,8 @@ fn test_op_gte() {
     assert_eq!(output, "false");
 
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(1)));
-    c.add(Instruction::LoadConst(Value::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
+    c.add(Instruction::LoadConst(ValueBox::from(1)));
     c.add(Instruction::Gte);
     c.add(Instruction::Emit);
 
@@ -260,7 +260,7 @@ fn test_op_gte() {
 #[test]
 fn test_op_not() {
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(0)));
+    c.add(Instruction::LoadConst(ValueBox::from(0)));
     c.add(Instruction::Not);
     c.add(Instruction::Emit);
 
@@ -268,7 +268,7 @@ fn test_op_not() {
     assert_eq!(output, "true");
 
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(true)));
+    c.add(Instruction::LoadConst(ValueBox::from(true)));
     c.add(Instruction::Not);
     c.add(Instruction::Emit);
 
@@ -279,8 +279,8 @@ fn test_op_not() {
 #[test]
 fn test_string_concat() {
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from("foo")));
-    c.add(Instruction::LoadConst(Value::from(42)));
+    c.add(Instruction::LoadConst(ValueBox::from("foo")));
+    c.add(Instruction::LoadConst(ValueBox::from(42)));
     c.add(Instruction::StringConcat);
     c.add(Instruction::Emit);
 
@@ -291,7 +291,7 @@ fn test_string_concat() {
 #[test]
 fn test_unpacking() {
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from(vec!["bar", "foo"])));
+    c.add(Instruction::LoadConst(ValueBox::from(vec!["bar", "foo"])));
     c.add(Instruction::UnpackList(2));
     c.add(Instruction::StringConcat);
     c.add(Instruction::Emit);
@@ -303,10 +303,10 @@ fn test_unpacking() {
 #[test]
 fn test_call_object() {
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::LoadConst(Value::from_function(|a: u64| {
+    c.add(Instruction::LoadConst(ValueBox::from_function(|a: u64| {
         42 + a
     })));
-    c.add(Instruction::LoadConst(Value::from(23i32)));
+    c.add(Instruction::LoadConst(ValueBox::from(23i32)));
     c.add(Instruction::CallObject(2));
     c.add(Instruction::Emit);
 

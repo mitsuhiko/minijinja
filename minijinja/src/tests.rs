@@ -57,10 +57,10 @@ use std::sync::Arc;
 
 use crate::error::Error;
 use crate::utils::SealedMarker;
-use crate::value::{ArgType, FunctionArgs, Value};
+use crate::value::{ArgType, FunctionArgs, ValueBox};
 use crate::vm::State;
 
-type TestFunc = dyn Fn(&State, &[Value]) -> Result<bool, Error> + Sync + Send + 'static;
+type TestFunc = dyn Fn(&State, &[ValueBox]) -> Result<bool, Error> + Sync + Send + 'static;
 
 #[derive(Clone)]
 pub(crate) struct BoxedTest(Arc<TestFunc>);
@@ -192,7 +192,7 @@ impl BoxedTest {
     }
 
     /// Applies the filter to a value and argument.
-    pub fn perform(&self, state: &State, args: &[Value]) -> Result<bool, Error> {
+    pub fn perform(&self, state: &State, args: &[ValueBox]) -> Result<bool, Error> {
         (self.0)(state, args)
     }
 }
@@ -202,7 +202,7 @@ impl BoxedTest {
 /// ```jinja
 /// {{ 42 is undefined }} -> false
 /// ```
-pub fn is_undefined(v: Value) -> bool {
+pub fn is_undefined(v: ValueBox) -> bool {
     v.is_undefined()
 }
 
@@ -211,7 +211,7 @@ pub fn is_undefined(v: Value) -> bool {
 /// ```jinja
 /// {{ 42 is defined }} -> true
 /// ```
-pub fn is_defined(v: Value) -> bool {
+pub fn is_defined(v: ValueBox) -> bool {
     !v.is_undefined()
 }
 
@@ -220,7 +220,7 @@ pub fn is_defined(v: Value) -> bool {
 /// ```jinja
 /// {{ none is none }} -> true
 /// ```
-pub fn is_none(v: Value) -> bool {
+pub fn is_none(v: ValueBox) -> bool {
     v.is_none()
 }
 
@@ -231,7 +231,7 @@ pub fn is_none(v: Value) -> bool {
 /// ```
 ///
 /// This filter is also registered with the `escaped` alias.
-pub fn is_safe(v: Value) -> bool {
+pub fn is_safe(v: ValueBox) -> bool {
     v.is_safe()
 }
 
@@ -250,7 +250,7 @@ mod builtins {
     /// {{ 41 is odd }} -> true
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_odd(v: Value) -> bool {
+    pub fn is_odd(v: ValueBox) -> bool {
         i128::try_from(v).ok().map_or(false, |x| x % 2 != 0)
     }
 
@@ -260,7 +260,7 @@ mod builtins {
     /// {{ 42 is even }} -> true
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_even(v: Value) -> bool {
+    pub fn is_even(v: ValueBox) -> bool {
         i128::try_from(v).ok().map_or(false, |x| x % 2 == 0)
     }
 
@@ -271,7 +271,7 @@ mod builtins {
     /// {{ "42" is number }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_number(v: Value) -> bool {
+    pub fn is_number(v: ValueBox) -> bool {
         matches!(v.kind(), ValueKind::Number)
     }
 
@@ -282,7 +282,7 @@ mod builtins {
     /// {{ 42 is string }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_string(v: Value) -> bool {
+    pub fn is_string(v: ValueBox) -> bool {
         matches!(v.kind(), ValueKind::String)
     }
 
@@ -293,7 +293,7 @@ mod builtins {
     /// {{ 42 is sequence }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_sequence(v: Value) -> bool {
+    pub fn is_sequence(v: ValueBox) -> bool {
         matches!(v.kind(), ValueKind::Seq)
     }
 
@@ -304,7 +304,7 @@ mod builtins {
     /// {{ [1, 2, 3] is mapping }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_mapping(v: Value) -> bool {
+    pub fn is_mapping(v: ValueBox) -> bool {
         matches!(v.kind(), ValueKind::Map)
     }
 
@@ -342,7 +342,7 @@ mod builtins {
     /// By default aliased to `equalto` and `==`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_eq(value: &Value, other: &Value) -> bool {
+    pub fn is_eq(value: &ValueBox, other: &ValueBox) -> bool {
         *value == *other
     }
 
@@ -358,7 +358,7 @@ mod builtins {
     /// By default aliased to `!=`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_ne(value: &Value, other: &Value) -> bool {
+    pub fn is_ne(value: &ValueBox, other: &ValueBox) -> bool {
         *value != *other
     }
 
@@ -374,7 +374,7 @@ mod builtins {
     /// By default aliased to `lessthan` and `<`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_lt(value: &Value, other: &Value) -> bool {
+    pub fn is_lt(value: &ValueBox, other: &ValueBox) -> bool {
         *value < *other
     }
 
@@ -390,7 +390,7 @@ mod builtins {
     /// By default aliased to `<=`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_le(value: &Value, other: &Value) -> bool {
+    pub fn is_le(value: &ValueBox, other: &ValueBox) -> bool {
         *value <= *other
     }
 
@@ -406,7 +406,7 @@ mod builtins {
     /// By default aliased to `greaterthan` and `>`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_gt(value: &Value, other: &Value) -> bool {
+    pub fn is_gt(value: &ValueBox, other: &ValueBox) -> bool {
         *value > *other
     }
 
@@ -422,7 +422,7 @@ mod builtins {
     /// By default aliased to `>=`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_ge(value: &Value, other: &Value) -> bool {
+    pub fn is_ge(value: &ValueBox, other: &ValueBox) -> bool {
         *value >= *other
     }
 
@@ -436,7 +436,7 @@ mod builtins {
     /// This is useful when combined with [`select`](crate::filters::select).
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_in(value: &Value, other: &Value) -> bool {
+    pub fn is_in(value: &ValueBox, other: &ValueBox) -> bool {
         crate::value::ops::contains(other, value)
             .map(|value| value.is_true())
             .unwrap_or(false)
@@ -449,8 +449,8 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_true(value: &Value) -> bool {
-        matches!(value.0, crate::value::ValueBuf::Bool(true))
+    pub fn is_true(value: &ValueBox) -> bool {
+        matches!(value.0, crate::value::ValueRepr::Bool(true))
     }
 
     /// Checks if a value is `false`.
@@ -460,8 +460,8 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_false(value: &Value) -> bool {
-        matches!(value.0, crate::value::ValueBuf::Bool(false))
+    pub fn is_false(value: &ValueBox) -> bool {
+        matches!(value.0, crate::value::ValueRepr::Bool(false))
     }
 
     /// Checks if a filter with a given name is available.

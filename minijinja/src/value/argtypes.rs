@@ -8,34 +8,34 @@ use std::ops::{Deref, DerefMut};
 use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
-    MapType, Packed, SeqObject, StringType, Value, ValueKind, OwnedValueMap,
-    ValueBuf,
+    MapType, Packed, SeqObject, StringType, ValueBox, ValueKind, OwnedValueBoxMap,
+    ValueRepr,
 };
 use crate::vm::State;
 
-use super::{MapObject, ArcCow, ValueRepr};
+use super::{MapObject, ArcCow, Value};
 
 /// A utility trait that represents the return value of functions and filters.
 ///
 /// It's implemented for the following types:
 ///
-/// * `Rv` where `Rv` implements `Into<Value>`
-/// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
+/// * `Rv` where `Rv` implements `Into<ValueBox>`
+/// * `Result<Rv, Error>` where `Rv` implements `Into<ValueBox>`
 ///
 /// The equivalent for test functions is [`TestResult`](crate::tests::TestResult).
 pub trait FunctionResult {
     #[doc(hidden)]
-    fn into_result(self) -> Result<Value, Error>;
+    fn into_result(self) -> Result<ValueBox, Error>;
 }
 
-impl<I: Into<Value>> FunctionResult for Result<I, Error> {
-    fn into_result(self) -> Result<Value, Error> {
+impl<I: Into<ValueBox>> FunctionResult for Result<I, Error> {
+    fn into_result(self) -> Result<ValueBox, Error> {
         self.map(Into::into)
     }
 }
 
-impl<I: Into<Value>> FunctionResult for I {
-    fn into_result(self) -> Result<Value, Error> {
+impl<I: Into<ValueBox>> FunctionResult for I {
+    fn into_result(self) -> Result<ValueBox, Error> {
         Ok(self.into())
     }
 }
@@ -56,7 +56,7 @@ pub trait FunctionArgs<'a> {
 
     /// Converts to function arguments from a slice of values.
     #[doc(hidden)]
-    fn from_values(state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error>;
+    fn from_values(state: Option<&'a State>, values: &'a [ValueBox]) -> Result<Self::Output, Error>;
 }
 
 /// Utility function to convert a slice of values into arguments.
@@ -67,10 +67,10 @@ pub trait FunctionArgs<'a> {
 ///
 /// ```
 /// # use minijinja::value::from_args;
-/// # use minijinja::value::Value;
+/// # use minijinja::value::ValueBox;
 /// # fn foo() -> Result<(), minijinja::Error> {
-/// # let args = vec![Value::from("foo"), Value::from(42i64)]; let args = &args[..];
-/// // args is &[Value]
+/// # let args = vec![ValueBox::from("foo"), ValueBox::from(42i64)]; let args = &args[..];
+/// // args is &[ValueBox]
 /// let (string, num): (&str, i64) = from_args(args)?;
 /// # Ok(()) } fn main() { foo().unwrap(); }
 /// ```
@@ -81,17 +81,17 @@ pub trait FunctionArgs<'a> {
 /// You can also use this function to split positional and keyword arguments ([`Kwargs`]):
 ///
 /// ```
-/// # use minijinja::value::{Value, Rest, Kwargs, from_args};
+/// # use minijinja::value::{ValueBox, Rest, Kwargs, from_args};
 /// # use minijinja::Error;
 /// # fn foo() -> Result<(), minijinja::Error> {
-/// # let args = vec![Value::from("foo"), Value::from(42i64)]; let args = &args[..];
-/// // args is &[Value], kwargs is Kwargs
-/// let (args, kwargs): (&[Value], Kwargs) = from_args(args)?;
+/// # let args = vec![ValueBox::from("foo"), ValueBox::from(42i64)]; let args = &args[..];
+/// // args is &[ValueBox], kwargs is Kwargs
+/// let (args, kwargs): (&[ValueBox], Kwargs) = from_args(args)?;
 /// # Ok(())
 /// # } fn main() { foo().unwrap(); }
 /// ```
 #[inline(always)]
-pub fn from_args<'a, Args>(values: &'a [Value]) -> Result<Args, Error>
+pub fn from_args<'a, Args>(values: &'a [ValueBox]) -> Result<Args, Error>
 where
     Args: FunctionArgs<'a, Output = Args>,
 {
@@ -111,7 +111,7 @@ where
 /// * bool: [`bool`]
 /// * string: [`String`], [`&str`], `Cow<'_, str>`, [`char`]
 /// * bytes: [`&[u8]`][`slice`]
-/// * values: [`Value`], `&Value`
+/// * values: [`ValueBox`], `&ValueBox`
 /// * vectors: [`Vec<T>`]
 /// * sequences: [`&dyn SeqObject`](crate::value::SeqObject)
 ///
@@ -145,10 +145,10 @@ pub trait ArgType<'a> {
     type Output;
 
     #[doc(hidden)]
-    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error>;
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Self::Output, Error>;
 
     #[doc(hidden)]
-    fn from_value_owned(_value: Value) -> Result<Self::Output, Error> {
+    fn from_value_owned(_value: ValueBox) -> Result<Self::Output, Error> {
         Err(Error::new(
             ErrorKind::InvalidOperation,
             "type conversion is not legal in this situation (implicit borrow)",
@@ -158,7 +158,7 @@ pub trait ArgType<'a> {
     #[doc(hidden)]
     fn from_state_and_value(
         state: Option<&'a State>,
-        value: Option<&'a Value>,
+        value: Option<&'a ValueBox>,
     ) -> Result<(Self::Output, usize), Error> {
         if value.map_or(false, |x| x.is_undefined())
             && state.map_or(false, |x| {
@@ -175,7 +175,7 @@ pub trait ArgType<'a> {
     #[inline(always)]
     fn from_state_and_values(
         state: Option<&'a State>,
-        values: &'a [Value],
+        values: &'a [ValueBox],
         offset: usize,
     ) -> Result<(Self::Output, usize), Error> {
         Self::from_state_and_value(state, values.get(offset))
@@ -195,7 +195,7 @@ macro_rules! tuple_impls {
         {
             type Output = ($($name::Output,)* $rest_name::Output ,);
 
-            fn from_values(state: Option<&'a State>, mut values: &'a [Value]) -> Result<Self::Output, Error> {
+            fn from_values(state: Option<&'a State>, mut values: &'a [ValueBox]) -> Result<Self::Output, Error> {
                 #![allow(non_snake_case, unused)]
                 $( let $name; )*
                 let mut $rest_name = None;
@@ -203,7 +203,7 @@ macro_rules! tuple_impls {
 
                 // special case: the last type is marked trailing (eg: for Kwargs) and we have at
                 // least one value.  In that case we need to read it first before going to the rest
-                // of the arguments.  This is needed to support from_args::<(&[Value], Kwargs)>
+                // of the arguments.  This is needed to support from_args::<(&[ValueBox], Kwargs)>
                 // or similar.
                 let rest_first = $rest_name::is_trailing() && !values.is_empty();
                 if rest_first {
@@ -238,7 +238,7 @@ macro_rules! tuple_impls {
 impl<'a> FunctionArgs<'a> for () {
     type Output = ();
 
-    fn from_values(_state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
+    fn from_values(_state: Option<&'a State>, values: &'a [ValueBox]) -> Result<Self::Output, Error> {
         if values.is_empty() {
             Ok(())
         } else {
@@ -253,35 +253,35 @@ tuple_impls! { A B *C }
 tuple_impls! { A B C *D }
 tuple_impls! { A B C D *E }
 
-impl From<ValueBuf<'static>> for Value {
+impl From<ValueRepr<'static>> for ValueBox {
     #[inline(always)]
-    fn from(val: ValueBuf<'static>) -> Value {
-        ValueRepr(val)
+    fn from(val: ValueRepr<'static>) -> ValueBox {
+        Value(val)
     }
 }
 
-impl<'a> From<&'a [u8]> for Value {
+impl<'a> From<&'a [u8]> for ValueBox {
     #[inline(always)]
     fn from(val: &'a [u8]) -> Self {
-        ValueBuf::Bytes(ArcCow::from(val)).into()
+        ValueRepr::Bytes(ArcCow::from(val)).into()
     }
 }
 
-impl<'a> From<&'a str> for Value {
+impl<'a> From<&'a str> for ValueBox {
     #[inline(always)]
     fn from(val: &'a str) -> Self {
-        ValueBuf::String(ArcCow::from(val.to_string()), StringType::Normal).into()
+        ValueRepr::String(ArcCow::from(val.to_string()), StringType::Normal).into()
     }
 }
 
-impl From<String> for Value {
+impl From<String> for ValueBox {
     #[inline(always)]
     fn from(val: String) -> Self {
-        ValueBuf::String(ArcCow::from(val), StringType::Normal).into()
+        ValueRepr::String(ArcCow::from(val), StringType::Normal).into()
     }
 }
 
-impl<'a> From<Cow<'a, str>> for Value {
+impl<'a> From<Cow<'a, str>> for ValueBox {
     #[inline(always)]
     fn from(val: Cow<'a, str>) -> Self {
         match val {
@@ -291,84 +291,84 @@ impl<'a> From<Cow<'a, str>> for Value {
     }
 }
 
-impl From<()> for Value {
+impl From<()> for ValueBox {
     #[inline(always)]
     fn from(_: ()) -> Self {
-        ValueBuf::None.into()
+        ValueRepr::None.into()
     }
 }
 
-impl<V: Into<Value>> FromIterator<V> for Value {
+impl<V: Into<ValueBox>> FromIterator<V> for ValueBox {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
         let vec = iter.into_iter().map(Into::into).collect::<Vec<_>>();
-        Value::from_seq_object(vec)
+        ValueBox::from_seq_object(vec)
     }
 }
 
-impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
+impl<K: Into<ValueBox>, V: Into<ValueBox>> FromIterator<(K, V)> for ValueBox {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let map = iter
             .into_iter()
             .map(|(k, v)| (k.into(), v.into()))
-            .collect::<OwnedValueMap>();
+            .collect::<OwnedValueBoxMap>();
 
-        Value::from_map_object(map)
+        ValueBox::from_map_object(map)
     }
 }
 
-impl<K: Into<Value>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
+impl<K: Into<ValueBox>, V: Into<ValueBox>> From<BTreeMap<K, V>> for ValueBox {
     fn from(val: BTreeMap<K, V>) -> Self {
         val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
     }
 }
 
-impl<K: Into<Value>, V: Into<Value>> From<HashMap<K, V>> for Value {
+impl<K: Into<ValueBox>, V: Into<ValueBox>> From<HashMap<K, V>> for ValueBox {
     fn from(val: HashMap<K, V>) -> Self {
         val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
     }
 }
 
-impl<T: Into<Value>> From<Vec<T>> for Value {
+impl<T: Into<ValueBox>> From<Vec<T>> for ValueBox {
     fn from(val: Vec<T>) -> Self {
         val.into_iter().map(|v| v.into()).collect()
     }
 }
 
-impl From<Arc<str>> for Value {
+impl From<Arc<str>> for ValueBox {
     fn from(value: Arc<str>) -> Self {
-        ValueRepr(ValueBuf::String(value.into(), StringType::Normal))
+        Value(ValueRepr::String(value.into(), StringType::Normal))
     }
 }
 
 macro_rules! value_from {
     ($src:ty, $dst:ident) => {
-        impl From<$src> for Value {
+        impl From<$src> for ValueBox {
             #[inline(always)]
             fn from(val: $src) -> Self {
-                ValueBuf::$dst(val as _).into()
+                ValueRepr::$dst(val as _).into()
             }
         }
     };
 }
 
-impl From<i128> for Value {
+impl From<i128> for ValueBox {
     #[inline(always)]
     fn from(val: i128) -> Self {
-        ValueBuf::I128(Packed(val)).into()
+        ValueRepr::I128(Packed(val)).into()
     }
 }
 
-impl From<u128> for Value {
+impl From<u128> for ValueBox {
     #[inline(always)]
     fn from(val: u128) -> Self {
-        ValueBuf::U128(Packed(val)).into()
+        ValueRepr::U128(Packed(val)).into()
     }
 }
 
-impl From<char> for Value {
+impl From<char> for ValueBox {
     #[inline(always)]
     fn from(val: char) -> Self {
-        ValueBuf::String(ArcCow::from(val.to_string()), StringType::Normal).into()
+        ValueRepr::String(ArcCow::from(val.to_string()), StringType::Normal).into()
     }
 }
 
@@ -383,7 +383,7 @@ value_from!(i32, I64);
 value_from!(i64, I64);
 value_from!(f32, F64);
 value_from!(f64, F64);
-// value_from!(Arc<[Value]>, Seq);
+// value_from!(Arc<[ValueBox]>, Seq);
 // value_from!(Arc<[u8]>, Bytes);
 // value_from!(Arc<dyn SeqObject>, Seq);
 // value_from!(Arc<dyn Object>, Dynamic);
@@ -400,10 +400,10 @@ macro_rules! primitive_try_from {
     ($ty:ident, {
         $($pat:pat $(if $if_expr:expr)? => $expr:expr,)*
     }) => {
-        impl TryFrom<Value> for $ty {
+        impl TryFrom<Value<'_>> for $ty {
             type Error = Error;
 
-            fn try_from(value: Value) -> Result<Self, Self::Error> {
+            fn try_from(value: Value<'_>) -> Result<Self, Self::Error> {
                 match value.0 {
                     $($pat $(if $if_expr)? => TryFrom::try_from($expr).ok(),)*
                     _ => None
@@ -413,14 +413,14 @@ macro_rules! primitive_try_from {
 
         impl<'a> ArgType<'a> for $ty {
             type Output = Self;
-            fn from_value(value: Option<&Value>) -> Result<Self, Error> {
+            fn from_value(value: Option<&ValueBox>) -> Result<Self, Error> {
                 match value {
                     Some(value) => TryFrom::try_from(value.clone()),
                     None => Err(Error::from(ErrorKind::MissingArgument))
                 }
             }
 
-            fn from_value_owned(value: Value) -> Result<Self, Error> {
+            fn from_value_owned(value: ValueBox) -> Result<Self, Error> {
                 TryFrom::try_from(value)
             }
         }
@@ -430,13 +430,13 @@ macro_rules! primitive_try_from {
 macro_rules! primitive_int_try_from {
     ($ty:ident) => {
         primitive_try_from!($ty, {
-            ValueBuf::Bool(val) => val as usize,
-            ValueBuf::I64(val) => val,
-            ValueBuf::U64(val) => val,
+            ValueRepr::Bool(val) => val as usize,
+            ValueRepr::I64(val) => val,
+            ValueRepr::U64(val) => val,
             // for the intention here see Key::from_borrowed_value
-            ValueBuf::F64(val) if (val as i64 as f64 == val) => val as i64,
-            ValueBuf::I128(val) => val.0,
-            ValueBuf::U128(val) => val.0,
+            ValueRepr::F64(val) if (val as i64 as f64 == val) => val as i64,
+            ValueRepr::I128(val) => val.0,
+            ValueRepr::U128(val) => val.0,
         });
     }
 }
@@ -454,10 +454,10 @@ primitive_int_try_from!(i128);
 primitive_int_try_from!(usize);
 
 primitive_try_from!(bool, {
-    ValueBuf::Bool(val) => val,
+    ValueRepr::Bool(val) => val,
 });
 primitive_try_from!(char, {
-    ValueBuf::String(ref val, _) => {
+    ValueRepr::String(ref val, _) => {
         let mut char_iter = val.chars();
         ok!(char_iter.next().filter(|_| char_iter.next().is_none()).ok_or_else(|| {
             unsupported_conversion(ValueKind::String, "non single character string")
@@ -465,24 +465,24 @@ primitive_try_from!(char, {
     },
 });
 primitive_try_from!(f32, {
-    ValueBuf::U64(val) => val as f32,
-    ValueBuf::I64(val) => val as f32,
-    ValueBuf::U128(val) => val.0 as f32,
-    ValueBuf::I128(val) => val.0 as f32,
-    ValueBuf::F64(val) => val as f32,
+    ValueRepr::U64(val) => val as f32,
+    ValueRepr::I64(val) => val as f32,
+    ValueRepr::U128(val) => val.0 as f32,
+    ValueRepr::I128(val) => val.0 as f32,
+    ValueRepr::F64(val) => val as f32,
 });
 primitive_try_from!(f64, {
-    ValueBuf::U64(val) => val as f64,
-    ValueBuf::I64(val) => val as f64,
-    ValueBuf::U128(val) => val.0 as f64,
-    ValueBuf::I128(val) => val.0 as f64,
-    ValueBuf::F64(val) => val,
+    ValueRepr::U64(val) => val as f64,
+    ValueRepr::I64(val) => val as f64,
+    ValueRepr::U128(val) => val.0 as f64,
+    ValueRepr::I128(val) => val.0 as f64,
+    ValueRepr::F64(val) => val,
 });
 
 impl<'a> ArgType<'a> for &str {
     type Output = &'a str;
 
-    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => value
                 .as_str()
@@ -492,12 +492,12 @@ impl<'a> ArgType<'a> for &str {
     }
 }
 
-impl TryFrom<Value> for Arc<str> {
+impl TryFrom<ValueBox> for Arc<str> {
     type Error = Error;
 
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
+    fn try_from(value: ValueBox) -> Result<Self, Self::Error> {
         match value.0 {
-            ValueBuf::String(x, _) => match x {
+            ValueRepr::String(x, _) => match x {
                 ArcCow::Borrowed(x) => Ok(Arc::from(x)),
                 ArcCow::Owned(x) => Ok(Arc::from(x)),
             },
@@ -512,7 +512,7 @@ impl TryFrom<Value> for Arc<str> {
 impl<'a> ArgType<'a> for Arc<str> {
     type Output = Arc<str>;
 
-    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => TryFrom::try_from(value.clone()),
             None => Err(Error::from(ErrorKind::MissingArgument)),
@@ -523,7 +523,7 @@ impl<'a> ArgType<'a> for Arc<str> {
 impl<'a> ArgType<'a> for &[u8] {
     type Output = &'a [u8];
 
-    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => value
                 .as_bytes()
@@ -536,7 +536,7 @@ impl<'a> ArgType<'a> for &[u8] {
 impl<'a> ArgType<'a> for &dyn SeqObject {
     type Output = &'a dyn SeqObject;
 
-    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => value
                 .as_seq()
@@ -549,7 +549,7 @@ impl<'a> ArgType<'a> for &dyn SeqObject {
 impl<'a, T: ArgType<'a>> ArgType<'a> for Option<T> {
     type Output = Option<T::Output>;
 
-    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Self::Output, Error> {
         match value {
             Some(value) => {
                 if value.is_undefined() {
@@ -562,7 +562,7 @@ impl<'a, T: ArgType<'a>> ArgType<'a> for Option<T> {
         }
     }
 
-    fn from_value_owned(value: Value) -> Result<Self::Output, Error> {
+    fn from_value_owned(value: ValueBox) -> Result<Self::Output, Error> {
         if value.is_undefined() || value.is_none() {
             Ok(None)
         } else {
@@ -575,10 +575,10 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
     type Output = Cow<'a, str>;
 
     #[inline(always)]
-    fn from_value(value: Option<&'a Value>) -> Result<Cow<'a, str>, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Cow<'a, str>, Error> {
         match value {
             Some(value) => Ok(match value.0 {
-                ValueBuf::String(ref s, _) => Cow::Borrowed(s as &str),
+                ValueRepr::String(ref s, _) => Cow::Borrowed(s as &str),
                 _ => Cow::Owned(value.to_string()),
             }),
             None => Err(Error::from(ErrorKind::MissingArgument)),
@@ -586,11 +586,11 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
     }
 }
 
-impl<'a> ArgType<'a> for &Value {
-    type Output = &'a Value;
+impl<'a> ArgType<'a> for &ValueBox {
+    type Output = &'a ValueBox;
 
     #[inline(always)]
-    fn from_value(value: Option<&'a Value>) -> Result<&'a Value, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<&'a ValueBox, Error> {
         match value {
             Some(value) => Ok(value),
             None => Err(Error::from(ErrorKind::MissingArgument)),
@@ -598,11 +598,11 @@ impl<'a> ArgType<'a> for &Value {
     }
 }
 
-impl<'a> ArgType<'a> for &[Value] {
-    type Output = &'a [Value];
+impl<'a> ArgType<'a> for &[ValueBox] {
+    type Output = &'a [ValueBox];
 
     #[inline(always)]
-    fn from_value(value: Option<&'a Value>) -> Result<&'a [Value], Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<&'a [ValueBox], Error> {
         match value {
             Some(value) => Ok(std::slice::from_ref(value)),
             None => Err(Error::from(ErrorKind::MissingArgument)),
@@ -611,9 +611,9 @@ impl<'a> ArgType<'a> for &[Value] {
 
     fn from_state_and_values(
         _state: Option<&'a State>,
-        values: &'a [Value],
+        values: &'a [ValueBox],
         offset: usize,
-    ) -> Result<(&'a [Value], usize), Error> {
+    ) -> Result<(&'a [ValueBox], usize), Error> {
         let args = values.get(offset..).unwrap_or_default();
         Ok((args, args.len()))
     }
@@ -658,7 +658,7 @@ impl<T> DerefMut for Rest<T> {
 impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
     type Output = Self;
 
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Self, Error> {
         Ok(Rest(ok!(value
             .iter()
             .map(|v| T::from_value(Some(v)))
@@ -667,7 +667,7 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 
     fn from_state_and_values(
         _state: Option<&'a State>,
-        values: &'a [Value],
+        values: &'a [ValueBox],
         offset: usize,
     ) -> Result<(Self, usize), Error> {
         let args = values.get(offset..).unwrap_or_default();
@@ -692,10 +692,10 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 /// Here an example of a function modifying values in different ways.
 ///
 /// ```
-/// use minijinja::value::{Value, Kwargs};
+/// use minijinja::value::{ValueBox, Kwargs};
 /// use minijinja::Error;
 ///
-/// fn modify(mut values: Vec<Value>, options: Kwargs) -> Result<Vec<Value>, Error> {
+/// fn modify(mut values: Vec<ValueBox>, options: Kwargs) -> Result<Vec<ValueBox>, Error> {
 ///     // get pulls a parameter of any type.  Same as from_args.  For optional
 ///     // boolean values the type inference is particularly convenient.
 ///     if let Some(true) = options.get("reverse")? {
@@ -710,17 +710,17 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 /// ```
 ///
 /// If for whatever reason you need a value again you can use [`Into`] to
-/// convert it back into a [`Value`].  This is particularly useful when performing
+/// convert it back into a [`ValueBox`].  This is particularly useful when performing
 /// calls into values.  To create a [`Kwargs`] object from scratch you can use
 /// [`FromIterator`]:
 ///
 /// ```
-/// use minijinja::value::{Value, Kwargs};
+/// use minijinja::value::{ValueBox, Kwargs};
 /// let kwargs = Kwargs::from_iter([
-///     ("foo", Value::from(true)),
-///     ("bar", Value::from(42)),
+///     ("foo", ValueBox::from(true)),
+///     ("bar", ValueBox::from(42)),
 /// ]);
-/// let value = Value::from(kwargs);
+/// let value = ValueBox::from(kwargs);
 /// assert!(value.is_kwargs());
 /// ```
 ///
@@ -728,47 +728,47 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 /// positional arguments and keyword arguments:
 ///
 /// ```
-/// # use minijinja::value::{Value, Rest, Kwargs, from_args};
+/// # use minijinja::value::{ValueBox, Rest, Kwargs, from_args};
 /// # use minijinja::Error;
-/// fn my_func(args: Rest<Value>) -> Result<Value, Error> {
-///     let (args, kwargs) = from_args::<(&[Value], Kwargs)>(&args)?;
+/// fn my_func(args: Rest<ValueBox>) -> Result<ValueBox, Error> {
+///     let (args, kwargs) = from_args::<(&[ValueBox], Kwargs)>(&args)?;
 ///     // do something with args and kwargs
 /// # todo!()
 /// }
 /// ```
 #[derive(Debug, Clone)]
 pub struct Kwargs {
-    values: Arc<OwnedValueMap>,
+    values: Arc<OwnedValueBoxMap>,
     used: RefCell<HashSet<String>>,
 }
 
 impl<'a> ArgType<'a> for Kwargs {
     type Output = Self;
 
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Self, Error> {
         match value {
             Some(value) => {
-                if let ValueBuf::Map(ref map, MapType::Kwargs) = value.0 {
+                if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
                     Ok(Kwargs::new(map.to_map().into()))
                 } else {
                     Err(Error::from(ErrorKind::MissingArgument))
                 }
             }
-            None => Ok(Kwargs::new(Arc::new(OwnedValueMap::default()))),
+            None => Ok(Kwargs::new(Arc::new(OwnedValueBoxMap::default()))),
         }
     }
 
     fn from_state_and_values(
         _state: Option<&'a State>,
-        values: &'a [Value],
+        values: &'a [ValueBox],
         offset: usize,
     ) -> Result<(Self, usize), Error> {
         if let Some(value) = values.get(offset) {
-            if let ValueBuf::Map(ref map, MapType::Kwargs) = value.0 {
+            if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
                 return Ok((Kwargs::new(map.to_map().into()), 1));
             }
         }
-        Ok((Kwargs::new(Arc::new(OwnedValueMap::default())), 0))
+        Ok((Kwargs::new(Arc::new(OwnedValueBoxMap::default())), 0))
     }
 
     fn is_trailing() -> bool {
@@ -777,7 +777,7 @@ impl<'a> ArgType<'a> for Kwargs {
 }
 
 impl Kwargs {
-    fn new(map: Arc<OwnedValueMap>) -> Kwargs {
+    fn new(map: Arc<OwnedValueBoxMap>) -> Kwargs {
         Kwargs {
             values: map,
             used: RefCell::new(HashSet::new()),
@@ -789,7 +789,7 @@ impl Kwargs {
     where
         T: ArgType<'a, Output = T>,
     {
-        T::from_value(self.values.get(&Value::from(key))).map_err(|mut err| {
+        T::from_value(self.values.get(&ValueBox::from(key))).map_err(|mut err| {
             if err.kind() == ErrorKind::MissingArgument && err.detail().is_none() {
                 err.set_detail(format!("missing keyword argument '{}'", key));
             }
@@ -829,7 +829,7 @@ impl Kwargs {
 
     /// Checks if a keyword argument exists.
     pub fn has(&self, key: &str) -> bool {
-        self.values.get_field(&Value::from(key)).is_some()
+        self.values.get_field(&ValueBox::from(key)).is_some()
     }
 
     /// Iterates over all passed keyword arguments.
@@ -859,68 +859,68 @@ impl Kwargs {
     }
 }
 
-impl FromIterator<(String, Value)> for Kwargs {
+impl FromIterator<(String, ValueBox)> for Kwargs {
     fn from_iter<T>(iter: T) -> Self
     where
-        T: IntoIterator<Item = (String, Value)>,
+        T: IntoIterator<Item = (String, ValueBox)>,
     {
         Kwargs::new(Arc::new(
             iter.into_iter()
-                .map(|(k, v)| (Value::from(k), v))
+                .map(|(k, v)| (ValueBox::from(k), v))
                 .collect(),
         ))
     }
 }
 
-impl<'a> FromIterator<(&'a str, Value)> for Kwargs {
+impl<'a> FromIterator<(&'a str, ValueBox)> for Kwargs {
     fn from_iter<T>(iter: T) -> Self
     where
-        T: IntoIterator<Item = (&'a str, Value)>,
+        T: IntoIterator<Item = (&'a str, ValueBox)>,
     {
         Kwargs::new(Arc::new(
             iter.into_iter()
-                .map(|(k, v)| (Value::from(k), v))
+                .map(|(k, v)| (ValueBox::from(k), v))
                 .collect(),
         ))
     }
 }
 
-impl From<Kwargs> for Value {
+impl From<Kwargs> for ValueBox {
     fn from(value: Kwargs) -> Self {
-        Value::from_kwargs(value.values)
+        ValueBox::from_kwargs(value.values)
     }
 }
 
-impl TryFrom<Value> for Kwargs {
+impl TryFrom<ValueBox> for Kwargs {
     type Error = Error;
 
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
+    fn try_from(value: ValueBox) -> Result<Self, Self::Error> {
         match value.0 {
-            ValueBuf::Undefined => Ok(Kwargs::new(Default::default())),
-            ValueBuf::Map(ref val, MapType::Kwargs) => Ok(Kwargs::new(val.to_map().into())),
+            ValueRepr::Undefined => Ok(Kwargs::new(Default::default())),
+            ValueRepr::Map(ref val, MapType::Kwargs) => Ok(Kwargs::new(val.to_map().into())),
             _ => Err(Error::from(ErrorKind::InvalidOperation)),
         }
     }
 }
 
-impl<'a> ArgType<'a> for Value {
+impl<'a> ArgType<'a> for ValueBox {
     type Output = Self;
 
     fn from_state_and_value(
         _state: Option<&'a State>,
-        value: Option<&'a Value>,
+        value: Option<&'a ValueBox>,
     ) -> Result<(Self::Output, usize), Error> {
         Ok((ok!(Self::from_value(value)), 1))
     }
 
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Self, Error> {
         match value {
             Some(value) => Ok(value.clone()),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
 
-    fn from_value_owned(value: Value) -> Result<Self, Error> {
+    fn from_value_owned(value: ValueBox) -> Result<Self, Error> {
         Ok(value)
     }
 }
@@ -928,14 +928,14 @@ impl<'a> ArgType<'a> for Value {
 impl<'a> ArgType<'a> for String {
     type Output = Self;
 
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Self, Error> {
         match value {
             Some(value) => Ok(value.to_string()),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
 
-    fn from_value_owned(value: Value) -> Result<Self, Error> {
+    fn from_value_owned(value: ValueBox) -> Result<Self, Error> {
         Ok(value.to_string())
     }
 }
@@ -943,7 +943,7 @@ impl<'a> ArgType<'a> for String {
 impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
     type Output = Vec<T>;
 
-    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+    fn from_value(value: Option<&'a ValueBox>) -> Result<Self, Error> {
         match value {
             None => Ok(Vec::new()),
             Some(value) => {
@@ -959,7 +959,7 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
         }
     }
 
-    fn from_value_owned(value: Value) -> Result<Self, Error> {
+    fn from_value_owned(value: ValueBox) -> Result<Self, Error> {
         let seq = ok!(value
             .as_seq()
             .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not a sequence") }));
@@ -971,15 +971,15 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
     }
 }
 
-impl From<Value> for String {
-    fn from(val: Value) -> Self {
+impl From<ValueBox> for String {
+    fn from(val: ValueBox) -> Self {
         val.to_string()
     }
 }
 
-impl From<usize> for Value {
+impl From<usize> for ValueBox {
     fn from(val: usize) -> Self {
-        Value::from(val as u64)
+        ValueBox::from(val as u64)
     }
 }
 
@@ -989,10 +989,10 @@ mod tests {
 
     #[test]
     fn test_as_f64() {
-        let v = Value::from(42u32);
+        let v = ValueBox::from(42u32);
         let f: f64 = v.try_into().unwrap();
         assert_eq!(f, 42.0);
-        let v = Value::from(42.5);
+        let v = ValueBox::from(42.5);
         let f: f64 = v.try_into().unwrap();
         assert_eq!(f, 42.5);
     }
@@ -1000,16 +1000,16 @@ mod tests {
     #[test]
     fn test_split_kwargs() {
         let args = [
-            Value::from(42),
-            Value::from(true),
-            Value::from(Kwargs::from_iter([
-                ("foo", Value::from(1)),
-                ("bar", Value::from(2)),
+            ValueBox::from(42),
+            ValueBox::from(true),
+            ValueBox::from(Kwargs::from_iter([
+                ("foo", ValueBox::from(1)),
+                ("bar", ValueBox::from(2)),
             ])),
         ];
-        let (args, kwargs) = from_args::<(&[Value], Kwargs)>(&args).unwrap();
-        assert_eq!(args, &[Value::from(42), Value::from(true)]);
-        assert_eq!(kwargs.get::<Value>("foo").unwrap(), Value::from(1));
-        assert_eq!(kwargs.get::<Value>("bar").unwrap(), Value::from(2));
+        let (args, kwargs) = from_args::<(&[ValueBox], Kwargs)>(&args).unwrap();
+        assert_eq!(args, &[ValueBox::from(42), ValueBox::from(true)]);
+        assert_eq!(kwargs.get::<ValueBox>("foo").unwrap(), ValueBox::from(1));
+        assert_eq!(kwargs.get::<ValueBox>("bar").unwrap(), ValueBox::from(2));
     }
 }

@@ -1,7 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Value, ValueKind, ValueBuf};
+use crate::value::{ValueBox, ValueKind, ValueRepr};
 
 pub enum CoerceResult<'a> {
     I128(i128, i128),
@@ -9,33 +9,33 @@ pub enum CoerceResult<'a> {
     Str(&'a str, &'a str),
 }
 
-pub(crate) fn as_f64(value: &Value) -> Option<f64> {
+pub(crate) fn as_f64(value: &ValueBox) -> Option<f64> {
     Some(match value.0 {
-        ValueBuf::Bool(x) => x as i64 as f64,
-        ValueBuf::U64(x) => x as f64,
-        ValueBuf::U128(x) => x.0 as f64,
-        ValueBuf::I64(x) => x as f64,
-        ValueBuf::I128(x) => x.0 as f64,
-        ValueBuf::F64(x) => x,
+        ValueRepr::Bool(x) => x as i64 as f64,
+        ValueRepr::U64(x) => x as f64,
+        ValueRepr::U128(x) => x.0 as f64,
+        ValueRepr::I64(x) => x as f64,
+        ValueRepr::I128(x) => x.0 as f64,
+        ValueRepr::F64(x) => x,
         _ => return None,
     })
 }
 
-pub fn coerce<'x>(a: &'x Value, b: &'x Value) -> Option<CoerceResult<'x>> {
+pub fn coerce<'x>(a: &'x ValueBox, b: &'x ValueBox) -> Option<CoerceResult<'x>> {
     match (&a.0, &b.0) {
         // equal mappings are trivial
-        (ValueBuf::U64(a), ValueBuf::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
-        (ValueBuf::U128(a), ValueBuf::U128(b)) => {
+        (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
+        (ValueRepr::U128(a), ValueRepr::U128(b)) => {
             Some(CoerceResult::I128(a.0 as i128, b.0 as i128))
         }
-        (ValueBuf::String(a, _), ValueBuf::String(b, _)) => Some(CoerceResult::Str(a, b)),
-        (ValueBuf::I64(a), ValueBuf::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
-        (ValueBuf::I128(a), ValueBuf::I128(b)) => Some(CoerceResult::I128(a.0, b.0)),
-        (ValueBuf::F64(a), ValueBuf::F64(b)) => Some(CoerceResult::F64(*a, *b)),
+        (ValueRepr::String(a, _), ValueRepr::String(b, _)) => Some(CoerceResult::Str(a, b)),
+        (ValueRepr::I64(a), ValueRepr::I64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
+        (ValueRepr::I128(a), ValueRepr::I128(b)) => Some(CoerceResult::I128(a.0, b.0)),
+        (ValueRepr::F64(a), ValueRepr::F64(b)) => Some(CoerceResult::F64(*a, *b)),
 
         // are floats involved?
-        (ValueBuf::F64(a), _) => Some(CoerceResult::F64(*a, some!(as_f64(b)))),
-        (_, ValueBuf::F64(b)) => Some(CoerceResult::F64(some!(as_f64(a)), *b)),
+        (ValueRepr::F64(a), _) => Some(CoerceResult::F64(*a, some!(as_f64(b)))),
+        (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(some!(as_f64(a)), *b)),
 
         // everything else goes up to i128
         _ => Some(CoerceResult::I128(
@@ -71,7 +71,7 @@ fn get_offset_and_len<F: FnOnce() -> usize>(
     }
 }
 
-pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Value, Error> {
+pub fn slice(value: ValueBox, start: ValueBox, stop: ValueBox, step: ValueBox) -> Result<ValueBox, Error> {
     let start: i64 = if start.is_none() {
         0
     } else {
@@ -96,10 +96,10 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
 
     let kind = value.kind();
     let maybe_seq = match value.0 {
-        ValueBuf::String(..) => {
+        ValueRepr::String(..) => {
             let s = value.as_str().unwrap();
             let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
-            return Ok(Value::from(
+            return Ok(ValueBox::from(
                 s.chars()
                     .skip(start)
                     .take(len)
@@ -107,10 +107,10 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
                     .collect::<String>(),
             ));
         }
-        ValueBuf::Undefined | ValueBuf::None => return Ok(Value::from(Vec::<Value>::new())),
-        ValueBuf::Seq(s) => Some(s),
-        ValueBuf::Dynamic(dy) => match dy.value().0 {
-            ValueBuf::Seq(s) => Some(s),
+        ValueRepr::Undefined | ValueRepr::None => return Ok(ValueBox::from(Vec::<ValueBox>::new())),
+        ValueRepr::Seq(s) => Some(s),
+        ValueRepr::Dynamic(dy) => match dy.value().0 {
+            ValueRepr::Seq(s) => Some(s),
             _ => None
         },
         _ => None,
@@ -119,7 +119,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     match maybe_seq {
         Some(seq) => {
             let (start, len) = get_offset_and_len(start, stop, || seq.item_count());
-            Ok(Value::from(
+            Ok(ValueBox::from(
                 seq.iter()
                     .skip(start)
                     .take(len)
@@ -134,7 +134,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     }
 }
 
-fn int_as_value(val: i128) -> Value {
+fn int_as_value(val: i128) -> ValueBox {
     if val as i64 as i128 == val {
         (val as i64).into()
     } else {
@@ -142,7 +142,7 @@ fn int_as_value(val: i128) -> Value {
     }
 }
 
-fn impossible_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
+fn impossible_op(op: &str, lhs: &ValueBox, rhs: &ValueBox) -> Error {
     Error::new(
         ErrorKind::InvalidOperation,
         format!(
@@ -154,7 +154,7 @@ fn impossible_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
     )
 }
 
-fn failed_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
+fn failed_op(op: &str, lhs: &ValueBox, rhs: &ValueBox) -> Error {
     Error::new(
         ErrorKind::InvalidOperation,
         format!("unable to calculate {lhs} {op} {rhs}"),
@@ -163,7 +163,7 @@ fn failed_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
 
 macro_rules! math_binop {
     ($name:ident, $int:ident, $float:tt) => {
-        pub fn $name(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+        pub fn $name(lhs: &ValueBox, rhs: &ValueBox) -> Result<ValueBox, Error> {
             match coerce(lhs, rhs) {
                 Some(CoerceResult::I128(a, b)) => match a.$int(b) {
                     Some(val) => Ok(int_as_value(val)),
@@ -176,11 +176,11 @@ macro_rules! math_binop {
     }
 }
 
-pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+pub fn add(lhs: &ValueBox, rhs: &ValueBox) -> Result<ValueBox, Error> {
     match coerce(lhs, rhs) {
         Some(CoerceResult::I128(a, b)) => Ok(int_as_value(a.wrapping_add(b))),
         Some(CoerceResult::F64(a, b)) => Ok((a + b).into()),
-        Some(CoerceResult::Str(a, b)) => Ok(Value::from([a, b].concat())),
+        Some(CoerceResult::Str(a, b)) => Ok(ValueBox::from([a, b].concat())),
         _ => Err(impossible_op("+", lhs, rhs)),
     }
 }
@@ -189,8 +189,8 @@ math_binop!(sub, checked_sub, -);
 math_binop!(mul, checked_mul, *);
 math_binop!(rem, checked_rem_euclid, %);
 
-pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
+pub fn div(lhs: &ValueBox, rhs: &ValueBox) -> Result<ValueBox, Error> {
+    fn do_it(lhs: &ValueBox, rhs: &ValueBox) -> Option<ValueBox> {
         let a = some!(as_f64(lhs));
         let b = some!(as_f64(rhs));
         Some((a / b).into())
@@ -198,7 +198,7 @@ pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     do_it(lhs, rhs).ok_or_else(|| impossible_op("/", lhs, rhs))
 }
 
-pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+pub fn int_div(lhs: &ValueBox, rhs: &ValueBox) -> Result<ValueBox, Error> {
     match coerce(lhs, rhs) {
         Some(CoerceResult::I128(a, b)) => {
             if b != 0 {
@@ -213,7 +213,7 @@ pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 }
 
 /// Implements a binary `pow` operation on values.
-pub fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+pub fn pow(lhs: &ValueBox, rhs: &ValueBox) -> Result<ValueBox, Error> {
     match coerce(lhs, rhs) {
         Some(CoerceResult::I128(a, b)) => {
             match TryFrom::try_from(b).ok().and_then(|b| a.checked_pow(b)) {
@@ -227,10 +227,10 @@ pub fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 }
 
 /// Implements an unary `neg` operation on value.
-pub fn neg(val: &Value) -> Result<Value, Error> {
+pub fn neg(val: &ValueBox) -> Result<ValueBox, Error> {
     if val.kind() == ValueKind::Number {
         match val.0 {
-            ValueBuf::F64(x) => Ok((-x).into()),
+            ValueRepr::F64(x) => Ok((-x).into()),
             _ => {
                 if let Ok(x) = i128::try_from(val.clone()) {
                     Ok(int_as_value(-x))
@@ -245,16 +245,16 @@ pub fn neg(val: &Value) -> Result<Value, Error> {
 }
 
 /// Attempts a string concatenation.
-pub fn string_concat(left: Value, right: &Value) -> Value {
-    Value::from(format!("{left}{right}"))
+pub fn string_concat(left: ValueBox, right: &ValueBox) -> ValueBox {
+    ValueBox::from(format!("{left}{right}"))
 }
 
 /// Implements a containment operation on values.
-pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
+pub fn contains(container: &ValueBox, value: &ValueBox) -> Result<ValueBox, Error> {
     // Special case where if the container is undefined, it cannot hold
     // values.  For strict containment checks the vm has a special case.
     if container.is_undefined() {
-        return Ok(Value::from(false));
+        return Ok(ValueBox::from(false));
     }
     let rv = if let Some(s) = container.as_str() {
         if let Some(s2) = value.as_str() {
@@ -264,7 +264,7 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
         }
     } else if let Some(seq) = container.as_seq() {
         seq.iter().any(|item| &item == value)
-    } else if let ValueBuf::Map(ref map, _) = container.0 {
+    } else if let ValueRepr::Map(ref map, _) = container.0 {
         map.get_field(&value).is_some()
     } else {
         return Err(Error::new(
@@ -272,7 +272,7 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
             "cannot perform a containment check on this value",
         ));
     };
-    Ok(Value::from(rv))
+    Ok(ValueBox::from(rv))
 }
 
 #[cfg(test)]
@@ -283,71 +283,71 @@ mod tests {
 
     #[test]
     fn test_adding() {
-        let err = add(&Value::from("a"), &Value::from(42)).unwrap_err();
+        let err = add(&ValueBox::from("a"), &ValueBox::from(42)).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: tried to use + operator on unsupported types string and number"
         );
 
         assert_eq!(
-            add(&Value::from(1), &Value::from(2)).unwrap(),
-            Value::from(3)
+            add(&ValueBox::from(1), &ValueBox::from(2)).unwrap(),
+            ValueBox::from(3)
         );
         assert_eq!(
-            add(&Value::from("foo"), &Value::from("bar")).unwrap(),
-            Value::from("foobar")
+            add(&ValueBox::from("foo"), &ValueBox::from("bar")).unwrap(),
+            ValueBox::from("foobar")
         );
     }
 
     #[test]
     fn test_subtracting() {
-        let err = sub(&Value::from("a"), &Value::from(42)).unwrap_err();
+        let err = sub(&ValueBox::from("a"), &ValueBox::from(42)).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: tried to use - operator on unsupported types string and number"
         );
 
-        let err = sub(&Value::from("foo"), &Value::from("bar")).unwrap_err();
+        let err = sub(&ValueBox::from("foo"), &ValueBox::from("bar")).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: tried to use - operator on unsupported types string and string"
         );
 
         assert_eq!(
-            sub(&Value::from(2), &Value::from(1)).unwrap(),
-            Value::from(1)
+            sub(&ValueBox::from(2), &ValueBox::from(1)).unwrap(),
+            ValueBox::from(1)
         );
     }
 
     #[test]
     fn test_dividing() {
-        let err = div(&Value::from("a"), &Value::from(42)).unwrap_err();
+        let err = div(&ValueBox::from("a"), &ValueBox::from(42)).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: tried to use / operator on unsupported types string and number"
         );
 
-        let err = div(&Value::from("foo"), &Value::from("bar")).unwrap_err();
+        let err = div(&ValueBox::from("foo"), &ValueBox::from("bar")).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: tried to use / operator on unsupported types string and string"
         );
 
         assert_eq!(
-            div(&Value::from(100), &Value::from(2)).unwrap(),
-            Value::from(50.0)
+            div(&ValueBox::from(100), &ValueBox::from(2)).unwrap(),
+            ValueBox::from(50.0)
         );
     }
 
     #[test]
     fn test_concat() {
         assert_eq!(
-            string_concat(Value::from("foo"), &Value::from(42)),
-            Value::from("foo42")
+            string_concat(ValueBox::from("foo"), &ValueBox::from(42)),
+            ValueBox::from("foo42")
         );
         assert_eq!(
-            string_concat(Value::from(23), &Value::from(42)),
-            Value::from("2342")
+            string_concat(ValueBox::from(23), &ValueBox::from(42)),
+            ValueBox::from("2342")
         );
     }
 }

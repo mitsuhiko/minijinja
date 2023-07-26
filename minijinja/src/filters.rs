@@ -55,10 +55,10 @@
 //! ```
 //! # use minijinja::Environment;
 //! # let mut env = Environment::new();
-//! use minijinja::value::Value;
+//! use minijinja::value::ValueBox;
 //! use minijinja::State;
 //!
-//! fn append_template(state: &State, value: &Value) -> String {
+//! fn append_template(state: &State, value: &ValueBox) -> String {
 //!     format!("{}-{}", value, state.name())
 //! }
 //!
@@ -79,11 +79,11 @@ use std::sync::Arc;
 
 use crate::error::Error;
 use crate::utils::{write_escaped, SealedMarker};
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
+use crate::value::{ArgType, FunctionArgs, FunctionResult, ValueBox};
 use crate::vm::State;
 use crate::{AutoEscape, Output};
 
-type FilterFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
+type FilterFunc = dyn Fn(&State, &[ValueBox]) -> Result<ValueBox, Error> + Sync + Send + 'static;
 
 #[derive(Clone)]
 pub(crate) struct BoxedFilter(Arc<FilterFunc>);
@@ -98,8 +98,8 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 ///
 /// A filter can return any of the following types:
 ///
-/// * `Rv` where `Rv` implements `Into<Value>`
-/// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
+/// * `Rv` where `Rv` implements `Into<ValueBox>`
+/// * `Result<Rv, Error>` where `Rv` implements `Into<ValueBox>`
 ///
 /// Filters accept one mandatory parameter which is the value the filter is
 /// applied to and up to 4 extra parameters.  The extra parameters can be
@@ -202,14 +202,14 @@ impl BoxedFilter {
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        BoxedFilter(Arc::new(move |state, args| -> Result<Value, Error> {
+        BoxedFilter(Arc::new(move |state, args| -> Result<ValueBox, Error> {
             f.apply_to(ok!(Args::from_values(Some(state), args)), SealedMarker)
                 .into_result()
         }))
     }
 
     /// Applies the filter to a value and argument.
-    pub fn apply_to(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    pub fn apply_to(&self, state: &State, args: &[ValueBox]) -> Result<ValueBox, Error> {
         (self.0)(state, args)
     }
 }
@@ -217,8 +217,8 @@ impl BoxedFilter {
 /// Marks a value as safe.  This converts it into a string.
 ///
 /// When a value is marked as safe, no further auto escaping will take place.
-pub fn safe(v: String) -> Value {
-    Value::from_safe_string(v)
+pub fn safe(v: String) -> ValueBox {
+    ValueBox::from_safe_string(v)
 }
 
 /// Escapes a string.  By default to HTML.
@@ -227,7 +227,7 @@ pub fn safe(v: String) -> Value {
 /// this filter escapes with the format that is native to the format or HTML
 /// otherwise.  This means that if the auto escape setting is set to
 /// `Json` for instance then this filter will serialize to JSON instead.
-pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
+pub fn escape(state: &State, v: ValueBox) -> Result<ValueBox, Error> {
     if v.is_safe() {
         return Ok(v);
     }
@@ -248,7 +248,7 @@ pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
     };
     let mut out = Output::with_string(&mut rv);
     ok!(write_escaped(&mut out, auto_escape, &v));
-    Ok(Value::from_safe_string(rv))
+    Ok(ValueBox::from_safe_string(rv))
 }
 
 #[cfg(feature = "builtins")]
@@ -256,7 +256,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::value::{Kwargs, ValueKind, ValueBuf};
+    use crate::value::{Kwargs, ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::cmp::Ordering;
     use std::fmt::Write;
@@ -346,7 +346,7 @@ mod builtins {
     /// <p>Search results: {{ results|length }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn length(v: Value) -> Result<usize, Error> {
+    pub fn length(v: ValueBox) -> Result<usize, Error> {
         v.len().ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidOperation,
@@ -355,7 +355,7 @@ mod builtins {
         })
     }
 
-    fn sort_helper(a: &Value, b: &Value, case_sensitive: bool) -> Ordering {
+    fn sort_helper(a: &ValueBox, b: &ValueBox, case_sensitive: bool) -> Ordering {
         if !case_sensitive {
             if let (Some(a), Some(b)) = (a.as_str(), b.as_str()) {
                 #[cfg(feature = "unicode")]
@@ -381,12 +381,12 @@ mod builtins {
     /// * `by`: set to `"value"` to sort by value. Defaults to `"key"`.
     /// * `reverse`: set to `true` to sort in reverse.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn dictsort(v: Value, kwargs: Kwargs) -> Result<Value, Error> {
+    pub fn dictsort(v: ValueBox, kwargs: Kwargs) -> Result<ValueBox, Error> {
         if v.kind() == ValueKind::Map {
             let mut rv = Vec::with_capacity(v.len().unwrap_or(0));
             let iter = ok!(v.try_iter());
             for key in iter {
-                let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
+                let value = v.get_item(&key).unwrap_or(ValueBox::UNDEFINED);
                 rv.push((key, value));
             }
             let by_value = match ok!(kwargs.get("by")) {
@@ -408,9 +408,9 @@ mod builtins {
                 rv.reverse();
             }
             ok!(kwargs.assert_all_used());
-            Ok(Value::from(
+            Ok(ValueBox::from(
                 rv.into_iter()
-                    .map(|(k, v)| Value::from(vec![k, v]))
+                    .map(|(k, v)| ValueBox::from(vec![k, v]))
                     .collect::<Vec<_>>(),
             ))
         } else {
@@ -439,15 +439,15 @@ mod builtins {
     /// </dl>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn items(v: Value) -> Result<Value, Error> {
+    pub fn items(v: ValueBox) -> Result<ValueBox, Error> {
         if v.kind() == ValueKind::Map {
             let mut rv = Vec::with_capacity(v.len().unwrap_or(0));
             let iter = ok!(v.try_iter());
             for key in iter {
-                let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
-                rv.push(Value::from(vec![key, value]));
+                let value = v.get_item(&key).unwrap_or(ValueBox::UNDEFINED);
+                rv.push(ValueBox::from(vec![key, value]));
             }
-            Ok(Value::from(rv))
+            Ok(ValueBox::from(rv))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -464,11 +464,11 @@ mod builtins {
     /// {% endfor %}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn reverse(v: Value) -> Result<Value, Error> {
+    pub fn reverse(v: ValueBox) -> Result<ValueBox, Error> {
         if let Some(s) = v.as_str() {
-            Ok(Value::from(s.chars().rev().collect::<String>()))
+            Ok(ValueBox::from(s.chars().rev().collect::<String>()))
         } else if let Some(seq) = v.as_seq() {
-            Ok(Value::from(seq.iter().rev().collect::<Vec<_>>()))
+            Ok(ValueBox::from(seq.iter().rev().collect::<Vec<_>>()))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -491,7 +491,7 @@ mod builtins {
 
     /// Joins a sequence by a character
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn join(val: Value, joiner: Option<Cow<'_, str>>) -> Result<String, Error> {
+    pub fn join(val: ValueBox, joiner: Option<Cow<'_, str>>) -> Result<String, Error> {
         if val.is_undefined() || val.is_none() {
             return Ok(String::new());
         }
@@ -535,9 +535,9 @@ mod builtins {
     /// <p>{{ my_variable|default("my_variable was not defined") }}</p>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn default(value: Value, other: Option<Value>) -> Value {
+    pub fn default(value: ValueBox, other: Option<ValueBox>) -> ValueBox {
         if value.is_undefined() {
-            other.unwrap_or_else(|| Value::from(""))
+            other.unwrap_or_else(|| ValueBox::from(""))
         } else {
             value
         }
@@ -550,11 +550,11 @@ mod builtins {
     ///   -> |2 - 4| = 2
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn abs(value: Value) -> Result<Value, Error> {
+    pub fn abs(value: ValueBox) -> Result<ValueBox, Error> {
         match value.0 {
-            ValueBuf::I64(x) => Ok(Value::from(x.abs())),
-            ValueBuf::I128(x) => Ok(Value::from(x.0.abs())),
-            ValueBuf::F64(x) => Ok(Value::from(x.abs())),
+            ValueRepr::I64(x) => Ok(ValueBox::from(x.abs())),
+            ValueRepr::I128(x) => Ok(ValueBox::from(x.0.abs())),
+            ValueRepr::F64(x) => Ok(ValueBox::from(x.abs())),
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "cannot round value",
@@ -572,7 +572,7 @@ mod builtins {
     /// {{ value['key'] == value|attr('key') }} -> true
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn attr(value: Value, key: &Value) -> Result<Value, Error> {
+    pub fn attr(value: ValueBox, key: &ValueBox) -> Result<ValueBox, Error> {
         value.get_item(key)
     }
 
@@ -586,12 +586,12 @@ mod builtins {
     ///   -> 43.0
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn round(value: Value, precision: Option<i32>) -> Result<Value, Error> {
+    pub fn round(value: ValueBox, precision: Option<i32>) -> Result<ValueBox, Error> {
         match value.0 {
-            ValueBuf::I64(_) | ValueBuf::I128(_) => Ok(value),
-            ValueBuf::F64(val) => {
+            ValueRepr::I64(_) | ValueRepr::I128(_) => Ok(value),
+            ValueRepr::F64(val) => {
                 let x = 10f64.powi(precision.unwrap_or(0));
-                Ok(Value::from((x * val).round() / x))
+                Ok(ValueBox::from((x * val).round() / x))
             }
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -611,11 +611,11 @@ mod builtins {
     /// </dl>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn first(value: Value) -> Result<Value, Error> {
+    pub fn first(value: ValueBox) -> Result<ValueBox, Error> {
         if let Some(s) = value.as_str() {
-            Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
+            Ok(s.chars().next().map_or(ValueBox::UNDEFINED, ValueBox::from))
         } else if let Some(s) = value.as_seq() {
-            Ok(s.get_item(0).unwrap_or(Value::UNDEFINED))
+            Ok(s.get_item(0).unwrap_or(ValueBox::UNDEFINED))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -640,11 +640,11 @@ mod builtins {
     /// {% endwith %}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn last(value: Value) -> Result<Value, Error> {
+    pub fn last(value: ValueBox) -> Result<ValueBox, Error> {
         if let Some(s) = value.as_str() {
-            Ok(s.chars().rev().next().map_or(Value::UNDEFINED, Value::from))
+            Ok(s.chars().rev().next().map_or(ValueBox::UNDEFINED, ValueBox::from))
         } else if let Some(seq) = value.as_seq() {
-            Ok(seq.iter().last().unwrap_or(Value::UNDEFINED))
+            Ok(seq.iter().last().unwrap_or(ValueBox::UNDEFINED))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -655,20 +655,20 @@ mod builtins {
 
     /// Returns the smallest item from the list.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn min(state: &State, value: Value) -> Result<Value, Error> {
+    pub fn min(state: &State, value: ValueBox) -> Result<ValueBox, Error> {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
-        Ok(iter.min().unwrap_or(Value::UNDEFINED))
+        Ok(iter.min().unwrap_or(ValueBox::UNDEFINED))
     }
 
     /// Returns the largest item from the list.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn max(state: &State, value: Value) -> Result<Value, Error> {
+    pub fn max(state: &State, value: ValueBox) -> Result<ValueBox, Error> {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
-        Ok(iter.max().unwrap_or(Value::UNDEFINED))
+        Ok(iter.max().unwrap_or(ValueBox::UNDEFINED))
     }
 
     /// Returns the sorted version of the given list.
@@ -688,7 +688,7 @@ mod builtins {
     /// {{ users|sort(attribute="age", reverse=true) }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn sort(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
+    pub fn sort(state: &State, value: ValueBox, kwargs: Kwargs) -> Result<ValueBox, Error> {
         let mut items = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }))
@@ -706,7 +706,7 @@ mod builtins {
             items.reverse();
         }
         ok!(kwargs.assert_all_used());
-        Ok(Value::from(items))
+        Ok(ValueBox::from(items))
     }
 
     /// Converts the input value into a list.
@@ -716,11 +716,11 @@ mod builtins {
     /// string this returns the characters.  If the value is undefined
     /// an empty list is returned.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn list(state: &State, value: Value) -> Result<Value, Error> {
+    pub fn list(state: &State, value: ValueBox) -> Result<ValueBox, Error> {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
-        Ok(Value::from(iter.collect::<Vec<_>>()))
+        Ok(ValueBox::from(iter.collect::<Vec<_>>()))
     }
 
     /// Converts the value into a boolean value.
@@ -728,7 +728,7 @@ mod builtins {
     /// This behaves the same as the if statement does with regards to
     /// handling of boolean values.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn bool(value: Value) -> bool {
+    pub fn bool(value: ValueBox) -> bool {
         value.is_true()
     }
 
@@ -755,10 +755,10 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn slice(
         state: &State,
-        value: Value,
+        value: ValueBox,
         count: usize,
-        fill_with: Option<Value>,
-    ) -> Result<Value, Error> {
+        fill_with: Option<ValueBox>,
+    ) -> Result<ValueBox, Error> {
         if count == 0 {
             return Err(Error::new(ErrorKind::InvalidOperation, "count cannot be 0"));
         }
@@ -781,15 +781,15 @@ mod builtins {
                 if slice >= slices_with_extra {
                     let mut tmp = tmp.to_vec();
                     tmp.push(filler.clone());
-                    rv.push(Value::from(tmp));
+                    rv.push(ValueBox::from(tmp));
                     continue;
                 }
             }
 
-            rv.push(Value::from(tmp.to_vec()));
+            rv.push(ValueBox::from(tmp.to_vec()));
         }
 
-        Ok(Value::from(rv))
+        Ok(ValueBox::from(rv))
     }
 
     /// Batch items.
@@ -812,10 +812,10 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn batch(
         state: &State,
-        value: Value,
+        value: ValueBox,
         count: usize,
-        fill_with: Option<Value>,
-    ) -> Result<Value, Error> {
+        fill_with: Option<ValueBox>,
+    ) -> Result<ValueBox, Error> {
         if count == 0 {
             return Err(Error::new(ErrorKind::InvalidOperation, "count cannot be 0"));
         }
@@ -824,7 +824,7 @@ mod builtins {
 
         for item in ok!(state.undefined_behavior().try_iter(value)) {
             if tmp.len() == count {
-                rv.push(Value::from(mem::replace(
+                rv.push(ValueBox::from(mem::replace(
                     &mut tmp,
                     Vec::with_capacity(count),
                 )));
@@ -838,10 +838,10 @@ mod builtins {
                     tmp.push(filler.clone());
                 }
             }
-            rv.push(Value::from(tmp));
+            rv.push(ValueBox::from(tmp));
         }
 
-        Ok(Value::from(rv))
+        Ok(ValueBox::from(rv))
     }
 
     /// Dumps a value to JSON.
@@ -861,7 +861,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "json"))))]
     #[cfg(feature = "json")]
-    pub fn tojson(value: Value, pretty: Option<bool>) -> Result<Value, Error> {
+    pub fn tojson(value: ValueBox, pretty: Option<bool>) -> Result<ValueBox, Error> {
         if pretty.unwrap_or(false) {
             serde_json::to_string_pretty(&value)
         } else {
@@ -882,11 +882,11 @@ mod builtins {
                     _ => rv.push(c),
                 }
             }
-            Value::from_safe_string(rv)
+            ValueBox::from_safe_string(rv)
         })
     }
 
-    /// indents Value with spaces
+    /// indents ValueBox with spaces
     ///
     /// The first optional parameter to the filter can be set to `true` to
     /// indent the first line. The parameter defaults to false.
@@ -898,8 +898,8 @@ mod builtins {
     /// example:
     ///   config:
     /// {{ global_conifg|indent(2) }} #does not indent first line
-    /// {{ global_config|indent(2,true) }} #indent whole Value with two spaces
-    /// {{ global_config|indent(2,true,true)}} #indent whole Value and all Blank Lines value
+    /// {{ global_config|indent(2,true) }} #indent whole ValueBox with two spaces
+    /// {{ global_config|indent(2,true,true)}} #indent whole ValueBox and all Blank Lines value
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
     #[cfg(feature = "builtins")]
@@ -948,7 +948,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "urlencode"))))]
     #[cfg(feature = "urlencode")]
-    pub fn urlencode(value: Value) -> Result<String, Error> {
+    pub fn urlencode(value: ValueBox) -> Result<String, Error> {
         const SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
             .remove(b'/')
             .remove(b'.')
@@ -974,9 +974,9 @@ mod builtins {
             Ok(rv)
         } else {
             match &value.0 {
-                ValueBuf::None | ValueBuf::Undefined => Ok("".into()),
-                ValueBuf::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
-                ValueBuf::String(s, _) => {
+                ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
+                ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
+                ValueRepr::String(s, _) => {
                     Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
                 }
                 _ => Ok(percent_encoding::utf8_percent_encode(&value.to_string(), SET).to_string()),
@@ -988,11 +988,11 @@ mod builtins {
     fn select_or_reject(
         state: &State,
         invert: bool,
-        value: Value,
+        value: ValueBox,
         attr: Option<Cow<'_, str>>,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
-    ) -> Result<Vec<Value>, Error> {
+        args: crate::value::Rest<ValueBox>,
+    ) -> Result<Vec<ValueBox>, Error> {
         let mut rv = vec![];
         let test = if let Some(test_name) = test_name {
             Some(ok!(state
@@ -1039,10 +1039,10 @@ mod builtins {
     #[cfg(feature = "builtins")]
     pub fn select(
         state: &State,
-        value: Value,
+        value: ValueBox,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
-    ) -> Result<Vec<Value>, Error> {
+        args: crate::value::Rest<ValueBox>,
+    ) -> Result<Vec<ValueBox>, Error> {
         select_or_reject(state, false, value, None, test_name, args)
     }
 
@@ -1059,11 +1059,11 @@ mod builtins {
     #[cfg(feature = "builtins")]
     pub fn selectattr(
         state: &State,
-        value: Value,
+        value: ValueBox,
         attr: Cow<'_, str>,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
-    ) -> Result<Vec<Value>, Error> {
+        args: crate::value::Rest<ValueBox>,
+    ) -> Result<Vec<ValueBox>, Error> {
         select_or_reject(state, false, value, Some(attr), test_name, args)
     }
 
@@ -1074,10 +1074,10 @@ mod builtins {
     #[cfg(feature = "builtins")]
     pub fn reject(
         state: &State,
-        value: Value,
+        value: ValueBox,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
-    ) -> Result<Vec<Value>, Error> {
+        args: crate::value::Rest<ValueBox>,
+    ) -> Result<Vec<ValueBox>, Error> {
         select_or_reject(state, true, value, None, test_name, args)
     }
 
@@ -1094,11 +1094,11 @@ mod builtins {
     #[cfg(feature = "builtins")]
     pub fn rejectattr(
         state: &State,
-        value: Value,
+        value: ValueBox,
         attr: Cow<'_, str>,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
-    ) -> Result<Vec<Value>, Error> {
+        args: crate::value::Rest<ValueBox>,
+    ) -> Result<Vec<ValueBox>, Error> {
         select_or_reject(state, true, value, Some(attr), test_name, args)
     }
 
@@ -1132,19 +1132,19 @@ mod builtins {
     #[cfg(feature = "builtins")]
     pub fn map(
         state: &State,
-        value: Value,
-        args: crate::value::Rest<Value>,
-    ) -> Result<Vec<Value>, Error> {
+        value: ValueBox,
+        args: crate::value::Rest<ValueBox>,
+    ) -> Result<Vec<ValueBox>, Error> {
         let mut rv = Vec::with_capacity(value.len().unwrap_or(0));
 
         // attribute mapping
-        let (args, kwargs): (&[Value], Kwargs) = crate::value::from_args(&args)?;
+        let (args, kwargs): (&[ValueBox], Kwargs) = crate::value::from_args(&args)?;
 
-        if let Some(attr) = ok!(kwargs.get::<Option<Value>>("attribute")) {
+        if let Some(attr) = ok!(kwargs.get::<Option<ValueBox>>("attribute")) {
             if !args.is_empty() {
                 return Err(Error::from(ErrorKind::TooManyArguments));
             }
-            let default = ok!(kwargs.get::<Option<Value>>("default"));
+            let default = ok!(kwargs.get::<Option<ValueBox>>("default"));
             for value in ok!(state.undefined_behavior().try_iter(value)) {
                 let sub_val = match attr.as_str() {
                     Some(path) => value.get_path(path),
@@ -1156,7 +1156,7 @@ mod builtins {
                             if let Some(ref default) = default {
                                 default.clone()
                             } else {
-                                Value::UNDEFINED
+                                ValueBox::UNDEFINED
                             }
                         } else {
                             attr
@@ -1206,7 +1206,7 @@ mod builtins {
     /// duplicate objects or arrays, only primitives such as strings or numbers.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn unique(values: Vec<Value>) -> Value {
+    pub fn unique(values: Vec<ValueBox>) -> ValueBox {
         use std::collections::BTreeSet;
 
         let mut rv = Vec::new();
@@ -1219,7 +1219,7 @@ mod builtins {
             }
         }
 
-        Value::from(rv)
+        ValueBox::from(rv)
     }
 
     /// Pretty print a variable.
@@ -1227,7 +1227,7 @@ mod builtins {
     /// This is useful for debugging as it better shows what's inside an object.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn pprint(value: &Value) -> String {
+    pub fn pprint(value: &ValueBox) -> String {
         format!("{:#?}", value)
     }
 }

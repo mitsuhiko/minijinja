@@ -2,7 +2,7 @@ use std::{fmt, io};
 
 use crate::error::{Error, ErrorKind};
 use crate::utils::AutoEscape;
-use crate::value::Value;
+use crate::value::ValueBox;
 
 /// How should output be captured?
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -59,15 +59,15 @@ impl<'a> Output<'a> {
     }
 
     /// Ends capturing and returns the captured string as value.
-    pub(crate) fn end_capture(&mut self, auto_escape: AutoEscape) -> Value {
+    pub(crate) fn end_capture(&mut self, auto_escape: AutoEscape) -> ValueBox {
         if let Some(captured) = self.capture_stack.pop().unwrap() {
             if !matches!(auto_escape, AutoEscape::None) {
-                Value::from_safe_string(captured)
+                ValueBox::from_safe_string(captured)
             } else {
-                Value::from(captured)
+                ValueBox::from(captured)
             }
         } else {
-            Value::UNDEFINED
+            ValueBox::UNDEFINED
         }
     }
 

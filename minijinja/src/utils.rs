@@ -5,7 +5,7 @@ use std::iter::{once, repeat};
 use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{OwnedValueIterator, StringType, Value, ValueKind, ValueBuf};
+use crate::value::{OwnedValueIterator, StringType, ValueBox, ValueKind, ValueRepr};
 use crate::Output;
 
 /// internal marker to seal up some trait methods
@@ -27,7 +27,7 @@ pub(crate) fn untrusted_size_hint(value: usize) -> usize {
     value.min(1024)
 }
 
-fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
+fn write_with_html_escaping(out: &mut Output, value: &ValueBox) -> fmt::Result {
     if matches!(
         value.kind(),
         ValueKind::Undefined | ValueKind::None | ValueKind::Bool | ValueKind::Number
@@ -51,10 +51,10 @@ fn invalid_autoescape(name: &str) -> Result<(), Error> {
 pub fn write_escaped(
     out: &mut Output,
     auto_escape: AutoEscape,
-    value: &Value,
+    value: &ValueBox,
 ) -> Result<(), Error> {
     // common case of safe strings or strings without auto escaping
-    if let ValueBuf::String(ref s, ty) = value.0 {
+    if let ValueRepr::String(ref s, ty) = value.0 {
         if matches!(ty, StringType::Safe) || matches!(auto_escape, AutoEscape::None) {
             return out.write_str(s).map_err(Error::from);
         }
@@ -121,7 +121,7 @@ pub enum UndefinedBehavior {
     ///
     /// * **printing:** allowed (returns empty string)
     /// * **iteration:** allowed (returns empty array)
-    /// * **attribute access of undefined values:** allowed (returns [`undefined`](Value::UNDEFINED))
+    /// * **attribute access of undefined values:** allowed (returns [`undefined`](ValueBox::UNDEFINED))
     Chainable,
     /// Complains very quickly about undefined values.
     ///
@@ -145,10 +145,10 @@ impl UndefinedBehavior {
     /// `parent_was_undefined` is set to `true`, the undefined was created by looking up
     /// a missing attribute on an undefined value.  If `false` the undefined was created by
     /// looing up a missing attribute on a defined value.
-    pub(crate) fn handle_undefined(self, parent_was_undefined: bool) -> Result<Value, Error> {
+    pub(crate) fn handle_undefined(self, parent_was_undefined: bool) -> Result<ValueBox, Error> {
         match (self, parent_was_undefined) {
             (UndefinedBehavior::Lenient, false) | (UndefinedBehavior::Chainable, _) => {
-                Ok(Value::UNDEFINED)
+                Ok(ValueBox::UNDEFINED)
             }
             (UndefinedBehavior::Lenient, true) | (UndefinedBehavior::Strict, _) => {
                 Err(Error::from(ErrorKind::UndefinedError))
@@ -161,13 +161,13 @@ impl UndefinedBehavior {
     /// If the value is undefined, then iteration fails if the behavior is set to strict,
     /// otherwise it succeeds with an empty iteration.  This is also internally used in the
     /// engine to convert values to lists.
-    pub(crate) fn try_iter(self, value: Value) -> Result<OwnedValueIterator, Error> {
+    pub(crate) fn try_iter(self, value: ValueBox) -> Result<OwnedValueIterator, Error> {
         self.assert_iterable(&value)
             .and_then(|_| value.try_iter_owned())
     }
 
     /// Are we strict on iteration?
-    pub(crate) fn assert_iterable(self, value: &Value) -> Result<(), Error> {
+    pub(crate) fn assert_iterable(self, value: &ValueBox) -> Result<(), Error> {
         if matches!(self, UndefinedBehavior::Strict) && value.is_undefined() {
             Err(Error::from(ErrorKind::UndefinedError))
         } else {

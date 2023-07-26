@@ -3,19 +3,19 @@ use std::fmt;
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
-use minijinja::value::{Kwargs, Object, ObjectKind, Rest, SeqObject, MapObject, Value};
+use minijinja::value::{Kwargs, Object, ObjectKind, Rest, SeqObject, MapObject, ValueBox};
 use minijinja::{args, Environment, Error};
 
 #[test]
 fn test_sort() {
     let mut v = vec![
-        Value::from(100u64),
-        Value::from(80u32),
-        Value::from(30i16),
-        Value::from(true),
-        Value::from(false),
-        Value::from(99i128),
-        Value::from(1000f32),
+        ValueBox::from(100u64),
+        ValueBox::from(80u32),
+        ValueBox::from(30i16),
+        ValueBox::from(true),
+        ValueBox::from(false),
+        ValueBox::from(99i128),
+        ValueBox::from(1000f32),
     ];
     v.sort();
     insta::assert_debug_snapshot!(&v, @r###"
@@ -34,34 +34,34 @@ fn test_sort() {
 #[test]
 fn test_sort_different_types() {
     let mut v = vec![
-        Value::from(100u64),
-        Value::from("bar"),
-        Value::from(1),
-        Value::from_iter([1, 2]),
-        Value::from(80u32),
-        Value::from(30i16),
-        Value::from_iter([("a", 3)]),
-        Value::from_iter([("a", 2)]),
-        Value::from_iter([("b", 0)]),
-        Value::from_iter([("b", 3)]),
-        Value::from_iter([0, 2]),
-        Value::from(true),
-        Value::UNDEFINED,
-        Value::from("zzz"),
-        Value::from(false),
-        Value::from(-100),
-        Value::from(-50.0f64),
-        Value::from(-75.0f32),
-        Value::from(99i128),
-        Value::from(1000f32),
-        Value::from_iter([0, 1]),
-        Value::from_iter([1, 1]),
-        Value::from("foo"),
-        Value::from(()),
-        Value::from(0),
-        Value::from(-f64::INFINITY),
-        Value::from(f64::NAN),
-        Value::from(f64::INFINITY),
+        ValueBox::from(100u64),
+        ValueBox::from("bar"),
+        ValueBox::from(1),
+        ValueBox::from_iter([1, 2]),
+        ValueBox::from(80u32),
+        ValueBox::from(30i16),
+        ValueBox::from_iter([("a", 3)]),
+        ValueBox::from_iter([("a", 2)]),
+        ValueBox::from_iter([("b", 0)]),
+        ValueBox::from_iter([("b", 3)]),
+        ValueBox::from_iter([0, 2]),
+        ValueBox::from(true),
+        ValueBox::UNDEFINED,
+        ValueBox::from("zzz"),
+        ValueBox::from(false),
+        ValueBox::from(-100),
+        ValueBox::from(-50.0f64),
+        ValueBox::from(-75.0f32),
+        ValueBox::from(99i128),
+        ValueBox::from(1000f32),
+        ValueBox::from_iter([0, 1]),
+        ValueBox::from_iter([1, 1]),
+        ValueBox::from("foo"),
+        ValueBox::from(()),
+        ValueBox::from(0),
+        ValueBox::from(-f64::INFINITY),
+        ValueBox::from(f64::NAN),
+        ValueBox::from(f64::INFINITY),
     ];
     v.sort();
     insta::assert_debug_snapshot!(&v, @r###"
@@ -120,8 +120,8 @@ fn test_sort_different_types() {
 
 #[test]
 fn test_safe_string_roundtrip() {
-    let v = Value::from_safe_string("<b>HTML</b>".into());
-    let v2 = Value::from_serializable(&v);
+    let v = ValueBox::from_safe_string("<b>HTML</b>".into());
+    let v2 = ValueBox::from_serializable(&v);
     assert!(v.is_safe());
     assert!(v2.is_safe());
     assert_eq!(v.to_string(), v2.to_string());
@@ -129,8 +129,8 @@ fn test_safe_string_roundtrip() {
 
 #[test]
 fn test_undefined_roundtrip() {
-    let v = Value::UNDEFINED;
-    let v2 = Value::from_serializable(&v);
+    let v = ValueBox::UNDEFINED;
+    let v2 = ValueBox::from_serializable(&v);
     assert!(v.is_undefined());
     assert!(v2.is_undefined());
 }
@@ -138,29 +138,29 @@ fn test_undefined_roundtrip() {
 #[test]
 fn test_value_serialization() {
     // make sure if we serialize to json we get regular values
-    assert_eq!(serde_json::to_string(&Value::UNDEFINED).unwrap(), "null");
+    assert_eq!(serde_json::to_string(&ValueBox::UNDEFINED).unwrap(), "null");
     assert_eq!(
-        serde_json::to_string(&Value::from_safe_string("foo".to_string())).unwrap(),
+        serde_json::to_string(&ValueBox::from_safe_string("foo".to_string())).unwrap(),
         "\"foo\""
     );
 }
 
 #[test]
 fn test_float_to_string() {
-    assert_eq!(Value::from(42.4242f64).to_string(), "42.4242");
-    assert_eq!(Value::from(42.0f32).to_string(), "42.0");
+    assert_eq!(ValueBox::from(42.4242f64).to_string(), "42.4242");
+    assert_eq!(ValueBox::from(42.0f32).to_string(), "42.0");
 }
 
 #[test]
 fn test_value_as_bytes() {
-    assert_eq!(Value::from("foo").as_bytes(), Some(&b"foo"[..]));
-    assert_eq!(Value::from(&b"foo"[..]).as_bytes(), Some(&b"foo"[..]));
+    assert_eq!(ValueBox::from("foo").as_bytes(), Some(&b"foo"[..]));
+    assert_eq!(ValueBox::from(&b"foo"[..]).as_bytes(), Some(&b"foo"[..]));
 }
 
 #[test]
 fn test_value_by_index() {
-    let val = Value::from(vec![1u32, 2, 3]);
-    assert_eq!(val.get_item_by_index(0).unwrap(), Value::from(1));
+    let val = ValueBox::from(vec![1u32, 2, 3]);
+    assert_eq!(val.get_item_by_index(0).unwrap(), ValueBox::from(1));
     assert!(val.get_item_by_index(4).unwrap().is_undefined());
 }
 
@@ -182,11 +182,11 @@ fn test_map_object_iteration_and_indexing() {
     }
 
     impl MapObject for Point {
-        fn get_field(&self, name: &str) -> Option<Value> {
+        fn get_field(&self, name: &str) -> Option<ValueBox> {
             match name {
-                "x" => Some(Value::from(self.0)),
-                "y" => Some(Value::from(self.1)),
-                "z" => Some(Value::from(self.2)),
+                "x" => Some(ValueBox::from(self.0)),
+                "y" => Some(ValueBox::from(self.1)),
+                "z" => Some(ValueBox::from(self.2)),
                 _ => None,
             }
         }
@@ -198,7 +198,7 @@ fn test_map_object_iteration_and_indexing() {
 
     let rv = minijinja::render!(
         "{% for key in point %}{{ key }}: {{ point[key] }}\n{% endfor %}",
-        point => Value::from_object(Point(1, 2, 3))
+        point => ValueBox::from_object(Point(1, 2, 3))
     );
     assert_snapshot!(rv, @r###"
     x: 1
@@ -208,7 +208,7 @@ fn test_map_object_iteration_and_indexing() {
 
     let rv = minijinja::render!(
         "{{ [point.x, point.z, point.missing_attribute] }}",
-        point => Value::from_object(Point(1, 2, 3))
+        point => ValueBox::from_object(Point(1, 2, 3))
     );
     assert_snapshot!(rv, @r###"[1, 3, Undefined]"###);
 }
@@ -231,11 +231,11 @@ fn test_seq_object_iteration_and_indexing() {
     }
 
     impl SeqObject for Point {
-        fn get_item(&self, index: usize) -> Option<Value> {
+        fn get_item(&self, index: usize) -> Option<ValueBox> {
             match index {
-                0 => Some(Value::from(self.0)),
-                1 => Some(Value::from(self.1)),
-                2 => Some(Value::from(self.2)),
+                0 => Some(ValueBox::from(self.0)),
+                1 => Some(ValueBox::from(self.1)),
+                2 => Some(ValueBox::from(self.2)),
                 _ => None,
             }
         }
@@ -247,7 +247,7 @@ fn test_seq_object_iteration_and_indexing() {
 
     let rv = minijinja::render!(
         "{% for value in point %}{{ loop.index0 }}: {{ value }}\n{% endfor %}",
-        point => Value::from_object(Point(1, 2, 3))
+        point => ValueBox::from_object(Point(1, 2, 3))
     );
     assert_snapshot!(rv, @r###"
     0: 1
@@ -257,7 +257,7 @@ fn test_seq_object_iteration_and_indexing() {
 
     let rv = minijinja::render!(
         "{{ [point[0], point[2], point[42]] }}",
-        point => Value::from_object(Point(1, 2, 3))
+        point => ValueBox::from_object(Point(1, 2, 3))
     );
     assert_snapshot!(rv, @r###"[1, 3, Undefined]"###);
 }
@@ -266,20 +266,20 @@ fn test_seq_object_iteration_and_indexing() {
 fn test_builtin_seq_objects() {
     let rv = minijinja::render!(
         "{{ val }}",
-        val => Value::from_seq_object(vec![true, false]),
+        val => ValueBox::from_seq_object(vec![true, false]),
     );
     assert_snapshot!(rv, @r###"[true, false]"###);
 
     let rv = minijinja::render!(
         "{{ val }}",
-        val => Value::from_seq_object(&["foo", "bar"][..]),
+        val => ValueBox::from_seq_object(&["foo", "bar"][..]),
     );
     assert_snapshot!(rv, @r###"["foo", "bar"]"###);
 }
 
 #[test]
 fn test_value_object_interface() {
-    let val = Value::from_seq_object(vec![1u32, 2, 3, 4]);
+    let val = ValueBox::from_seq_object(vec![1u32, 2, 3, 4]);
     let seq = val.as_seq().unwrap();
     assert_eq!(seq.item_count(), 4);
 
@@ -307,7 +307,7 @@ fn test_obj_downcast() {
 
     impl Object for Thing {}
 
-    let x_value = Value::from_object(Thing { id: 42 });
+    let x_value = ValueBox::from_object(Thing { id: 42 });
     let value_as_obj = x_value.as_object().unwrap();
     assert!(value_as_obj.is::<Thing>());
     let thing = value_as_obj.downcast_ref::<Thing>().unwrap();
@@ -316,9 +316,9 @@ fn test_obj_downcast() {
 
 #[test]
 fn test_value_cmp() {
-    assert_eq!(Value::from(&[1][..]), Value::from(&[1][..]));
-    assert_ne!(Value::from(&[1][..]), Value::from(&[2][..]));
-    assert_eq!(Value::UNDEFINED, Value::UNDEFINED);
+    assert_eq!(ValueBox::from(&[1][..]), ValueBox::from(&[1][..]));
+    assert_ne!(ValueBox::from(&[1][..]), ValueBox::from(&[2][..]));
+    assert_eq!(ValueBox::UNDEFINED, ValueBox::UNDEFINED);
 }
 
 #[test]
@@ -327,30 +327,30 @@ fn test_call_kwargs() {
     env.add_template("foo", "").unwrap();
     let tmpl = env.get_template("foo").unwrap();
     let state = tmpl.new_state();
-    let val = Value::from_function(|kwargs: Kwargs| kwargs.get::<i32>("foo"));
+    let val = ValueBox::from_function(|kwargs: Kwargs| kwargs.get::<i32>("foo"));
     let rv = val
         .call(
             &state,
-            &[Kwargs::from_iter([("foo", Value::from(42))]).into()],
+            &[Kwargs::from_iter([("foo", ValueBox::from(42))]).into()],
         )
         .unwrap();
-    assert_eq!(rv, Value::from(42));
+    assert_eq!(rv, ValueBox::from(42));
 }
 
 #[test]
 fn test_kwargs_error() {
-    let kwargs = Kwargs::from_iter([("foo", Value::from(42))]);
-    let bar = kwargs.get::<Value>("bar").unwrap_err();
+    let kwargs = Kwargs::from_iter([("foo", ValueBox::from(42))]);
+    let bar = kwargs.get::<ValueBox>("bar").unwrap_err();
     assert_eq!(bar.detail(), Some("missing keyword argument 'bar'"));
 }
 
 #[test]
 fn test_return_none() {
     let env = Environment::empty();
-    let val = Value::from_function(|| -> Result<(), Error> { Ok(()) });
+    let val = ValueBox::from_function(|| -> Result<(), Error> { Ok(()) });
     let rv = val.call(&env.empty_state(), &[][..]).unwrap();
     assert!(rv.is_none());
-    let val = Value::from_function(|| ());
+    let val = ValueBox::from_function(|| ());
     let rv = val.call(&env.empty_state(), &[][..]).unwrap();
     assert!(rv.is_none());
 }
@@ -367,7 +367,7 @@ fn test_filter_basics() {
         env.empty_state()
             .apply_filter("test", args!(23, 42))
             .unwrap(),
-        Value::from(65)
+        ValueBox::from(65)
     );
 }
 
@@ -383,7 +383,7 @@ fn test_rest_args() {
         env.empty_state()
             .apply_filter("sum", args!(1, 2, 3, 4))
             .unwrap(),
-        Value::from(1 + 2 + 3 + 4)
+        ValueBox::from(1 + 2 + 3 + 4)
     );
 }
 
@@ -404,17 +404,17 @@ fn test_optional_args() {
     let state = env.empty_state();
     assert_eq!(
         state.apply_filter("add", args!(23, 42)).unwrap(),
-        Value::from(65)
+        ValueBox::from(65)
     );
     assert_eq!(
         state
-            .apply_filter("add", args!(23, 42, Value::UNDEFINED))
+            .apply_filter("add", args!(23, 42, ValueBox::UNDEFINED))
             .unwrap(),
-        Value::from(65)
+        ValueBox::from(65)
     );
     assert_eq!(
         state.apply_filter("add", args!(23, 42, 1)).unwrap(),
-        Value::from(66)
+        ValueBox::from(66)
     );
 }
 
@@ -435,12 +435,12 @@ fn test_values_in_vec() {
 
     assert_eq!(
         state.apply_filter("upper", args!("Hello World!")).unwrap(),
-        Value::from("HELLO WORLD!")
+        ValueBox::from("HELLO WORLD!")
     );
 
     assert_eq!(
         state.apply_filter("sum", args!(vec![1, 2])).unwrap(),
-        Value::from(3)
+        ValueBox::from(3)
     );
 }
 
@@ -461,26 +461,26 @@ fn test_seq_object_borrow() {
         state
             .apply_filter(
                 "connect",
-                args!(vec![Value::from("HELLO"), Value::from(42)])
+                args!(vec![ValueBox::from("HELLO"), ValueBox::from(42)])
             )
             .unwrap(),
-        Value::from("HELLO42")
+        ValueBox::from("HELLO42")
     );
 }
 
 #[test]
 fn test_complex_key() {
-    let value = Value::from_iter([
-        (Value::from_iter([0u32, 0u32]), "origin"),
-        (Value::from_iter([0u32, 1u32]), "right"),
+    let value = ValueBox::from_iter([
+        (ValueBox::from_iter([0u32, 0u32]), "origin"),
+        (ValueBox::from_iter([0u32, 1u32]), "right"),
     ]);
 
     assert_eq!(
-        value.get_item(&Value::from_iter([0, 0])).ok(),
-        Some(Value::from("origin"))
+        value.get_item(&ValueBox::from_iter([0, 0])).ok(),
+        Some(ValueBox::from("origin"))
     );
     assert_eq!(
-        value.get_item(&Value::from_iter([0, 42])).ok(),
-        Some(Value::UNDEFINED)
+        value.get_item(&ValueBox::from_iter([0, 42])).ok(),
+        Some(ValueBox::UNDEFINED)
     );
 }

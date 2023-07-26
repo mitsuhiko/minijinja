@@ -9,51 +9,51 @@
 //! filter to take a [`String`](std::string::String).  However for some more
 //! advanced use cases it's useful to know that this type exists.
 //!
-//! # Converting Values
+//! # Converting ValueBoxs
 //!
-//! Values are typically created via the [`From`] trait:
+//! ValueBoxs are typically created via the [`From`] trait:
 //!
 //! ```
-//! # use minijinja::value::Value;
-//! let int_value = Value::from(42);
-//! let none_value = Value::from(());
-//! let true_value = Value::from(true);
+//! # use minijinja::value::ValueBox;
+//! let int_value = ValueBox::from(42);
+//! let none_value = ValueBox::from(());
+//! let true_value = ValueBox::from(true);
 //! ```
 //!
 //! Or via the [`FromIterator`] trait:
 //!
 //! ```
-//! # use minijinja::value::Value;
+//! # use minijinja::value::ValueBox;
 //! // collection into a sequence
-//! let value: Value = (1..10).into_iter().collect();
+//! let value: ValueBox = (1..10).into_iter().collect();
 //!
 //! // collection into a map
-//! let value: Value = [("key", "value")].into_iter().collect();
+//! let value: ValueBox = [("key", "value")].into_iter().collect();
 //! ```
 //!
-//! The special [`Undefined`](Value::UNDEFINED) value also exists but does not
-//! have a rust equivalent.  It can be created via the [`UNDEFINED`](Value::UNDEFINED)
+//! The special [`Undefined`](ValueBox::UNDEFINED) value also exists but does not
+//! have a rust equivalent.  It can be created via the [`UNDEFINED`](ValueBox::UNDEFINED)
 //! constant.
 //!
 //! MiniJinja will however create values via an indirection via [`serde`] when
 //! a template is rendered or an expression is evaluated.  This can also be
-//! triggered manually by using the [`Value::from_serializable`] method:
+//! triggered manually by using the [`ValueBox::from_serializable`] method:
 //!
 //! ```
-//! # use minijinja::value::Value;
-//! let value = Value::from_serializable(&[1, 2, 3]);
+//! # use minijinja::value::ValueBox;
+//! let value = ValueBox::from_serializable(&[1, 2, 3]);
 //! ```
 //!
 //! To to into the inverse directly the various [`TryFrom`](std::convert::TryFrom)
 //! implementations can be used:
 //!
 //! ```
-//! # use minijinja::value::Value;
+//! # use minijinja::value::ValueBox;
 //! use std::convert::TryFrom;
-//! let v = u64::try_from(Value::from(42)).unwrap();
+//! let v = u64::try_from(ValueBox::from(42)).unwrap();
 //! ```
 //!
-//! # Value Function Arguments
+//! # ValueBox Function Arguments
 //!
 //! [Filters](crate::filters) and [tests](crate::tests) can take values as arguments
 //! but optionally also rust types directly.  This conversion for function arguments
@@ -61,7 +61,7 @@
 //!
 //! # Memory Management
 //!
-//! Values are immutable objects which are internally reference counted which
+//! ValueBoxs are immutable objects which are internally reference counted which
 //! means they can be copied relatively cheaply.  Special care must be taken
 //! so that cycles are not created to avoid causing memory leaks.
 //!
@@ -70,24 +70,24 @@
 //! MiniJinja inherits the general desire to be clever about escaping.  For this
 //! prupose a value will (when auto escaping is enabled) always be escaped.  To
 //! prevent this behavior the [`safe`](crate::filters::safe) filter can be used
-//! in the template.  Outside of templates the [`Value::from_safe_string`] method
+//! in the template.  Outside of templates the [`ValueBox::from_safe_string`] method
 //! can be used to achieve the same result.
 //!
 //! # Dynamic Objects
 //!
-//! Values can also hold "dynamic" objects.  These are objects which implement the
+//! ValueBoxs can also hold "dynamic" objects.  These are objects which implement the
 //! [`Object`] trait and optionally [`SeqObject`] or [`MapObject`]  These can
 //! be used to implement dynamic functionality such as stateful values and more.
 //! Dynamic objects are internally also used to implement the special `loop`
 //! variable or macros.
 //!
-//! To create a dynamic `Value` object, use [`Value::from_object`],
-//! [`Value::from_seq_object`], [`Value::from_map_object`] or the `From<Arc<T:
-//! Object>>` implementations for `Value`:
+//! To create a dynamic `ValueBox` object, use [`ValueBox::from_object`],
+//! [`ValueBox::from_seq_object`], [`ValueBox::from_map_object`] or the `From<Arc<T:
+//! Object>>` implementations for `ValueBox`:
 //!
 //! ```rust
 //! # use std::sync::Arc;
-//! # use minijinja::value::{Value, Object};
+//! # use minijinja::value::{ValueBox, Object};
 //! #[derive(Debug)]
 //! struct Foo;
 //!
@@ -99,20 +99,20 @@
 //!     /* implementation */
 //! }
 //!
-//! let value = Value::from_object(Foo);
-//! let value = Value::from(Arc::new(Foo));
-//! let value = Value::from(Arc::new(Foo) as Arc<dyn Object>);
+//! let value = ValueBox::from_object(Foo);
+//! let value = ValueBox::from(Arc::new(Foo));
+//! let value = ValueBox::from(Arc::new(Foo) as Arc<dyn Object>);
 //! ```
 
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
 
 // pub(crate) use crate::value::keyref::KeyRef;
-pub(crate) use crate::value::map::{OwnedValueMap, value_map_with_capacity};
+pub(crate) use crate::value::map::{OwnedValueBoxMap, value_map_with_capacity};
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
 pub use crate::value::object::{Object, SeqObject, SeqObjectIter, MapObject};
-pub use crate::value::value::{ValueBuf, ArcCow, ValueKind};
+pub use crate::value::value::{ValueRepr, ArcCow, ValueKind};
 
 pub(crate) use crate::value::value::{MapType, StringType, Packed, OwnedValueIterator};
 
@@ -128,11 +128,11 @@ pub(crate) mod ops;
 mod serialize;
 mod value;
 
-pub type Value = ValueRepr<'static>;
+pub type ValueBox = Value<'static>;
 
 /// Represents a dynamically typed value in the template engine.
 #[derive(Clone)]
-pub struct ValueRepr<'a>(pub(crate) value::ValueBuf<'a>);
+pub struct Value<'a>(pub(crate) value::ValueRepr<'a>);
 
 /// Enables value optimizations.
 ///

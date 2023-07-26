@@ -23,7 +23,7 @@ macro_rules! some {
 /// Hidden utility module for the [`context!`](crate::context!) macro.
 #[doc(hidden)]
 pub mod __context {
-    use crate::value::{Value, OwnedValueMap};
+    use crate::value::{ValueBox, OwnedValueBoxMap};
     use crate::Environment;
     use std::rc::Rc;
 
@@ -33,18 +33,18 @@ pub mod __context {
     }
 
     #[inline(always)]
-    pub fn make() -> OwnedValueMap {
-        OwnedValueMap::default()
+    pub fn make() -> OwnedValueBoxMap {
+        OwnedValueBoxMap::default()
     }
 
     #[inline(always)]
-    pub fn add(ctx: &mut OwnedValueMap, key: &'static str, value: Value) {
+    pub fn add(ctx: &mut OwnedValueBoxMap, key: &'static str, value: ValueBox) {
         ctx.insert(key.into(), value);
     }
 
     #[inline(always)]
-    pub fn build(ctx: OwnedValueMap) -> Value {
-        Value::from_map_object(ctx)
+    pub fn build(ctx: OwnedValueBoxMap) -> ValueBox {
+        ValueBox::from_map_object(ctx)
     }
 
     pub fn thread_local_env() -> Rc<Environment<'static>> {
@@ -74,7 +74,7 @@ pub mod __context {
 /// let ctx = context! { name };
 /// ```
 ///
-/// The return value is a [`Value`](crate::value::Value).
+/// The return value is a [`ValueBox`](crate::value::Value).
 ///
 /// Note that [`context!`](crate::context!) can also be used recursively if you need to
 /// create nested objects:
@@ -138,12 +138,12 @@ macro_rules! __context_pair {
 /// # use minijinja::{value::Value, args, Environment};
 /// # let env = Environment::default();
 /// # let state = &env.empty_state();
-/// # let value = Value::from(());
+/// # let value = ValueBox::from(());
 /// value.call(state, args!(1, 2, foo => "bar"));
 /// ```
 ///
 /// Note that this like [`context!`](crate::context) goes through
-/// [`Value::from_serializable`](crate::value::Value::from_serializable).
+/// [`ValueBox::from_serializable`](crate::value::Value::from_serializable).
 #[macro_export]
 macro_rules! args {
     () => { &[][..] as &[$crate::value::Value] };

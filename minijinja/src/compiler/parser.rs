@@ -6,7 +6,7 @@ use crate::compiler::ast::{self, Spanned};
 use crate::compiler::lexer::{tokenize, SyntaxConfig};
 use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
-use crate::value::Value;
+use crate::value::ValueBox;
 
 const MAX_RECURSION: usize = 150;
 const RESERVED_NAMES: [&str; 8] = [
@@ -24,7 +24,7 @@ fn unexpected_eof(expected: &str) -> Error {
     unexpected("end of input", expected)
 }
 
-fn make_const(value: Value, span: Span) -> ast::Expr<'static> {
+fn make_const(value: ValueBox, span: Span) -> ast::Expr<'static> {
     ast::Expr::Const(Spanned::new(ast::Const { value }, span))
 }
 
@@ -524,7 +524,7 @@ impl<'a> Parser<'a> {
         let (token, span) = expect_token!(self, "expression");
         macro_rules! const_val {
             ($expr:expr) => {
-                make_const(Value::from($expr), span)
+                make_const(ValueBox::from($expr), span)
             };
         }
 

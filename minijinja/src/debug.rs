@@ -3,17 +3,17 @@ use std::fmt;
 
 use crate::compiler::tokens::Span;
 use crate::error::ErrorKind;
-use crate::value::Value;
+use crate::value::ValueBox;
 
 /// This is a snapshot of the debug information.
 #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
 #[derive(Default)]
 pub(crate) struct DebugInfo {
     pub(crate) template_source: Option<String>,
-    pub(crate) referenced_locals: BTreeMap<String, Value>,
+    pub(crate) referenced_locals: BTreeMap<String, ValueBox>,
 }
 
-struct VarPrinter<'x>(&'x BTreeMap<String, Value>);
+struct VarPrinter<'x>(&'x BTreeMap<String, ValueBox>);
 
 impl<'x> fmt::Debug for VarPrinter<'x> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

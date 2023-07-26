@@ -13,12 +13,12 @@ use crate::expression::Expression;
 use crate::output::Output;
 use crate::template::{CompiledTemplate, CompiledTemplateRef, Template};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
-use crate::value::{FunctionArgs, FunctionResult, Value};
+use crate::value::{FunctionArgs, FunctionResult, ValueBox};
 use crate::vm::State;
 use crate::{defaults, filters, functions, tests};
 
 type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
-type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + Sync + Send;
+type FormatterFunc = dyn Fn(&mut Output, &State, &ValueBox) -> Result<(), Error> + Sync + Send;
 
 /// An abstraction that holds the engine configuration.
 ///
@@ -40,7 +40,7 @@ pub struct Environment<'source> {
     templates: TemplateStore<'source>,
     filters: BTreeMap<Cow<'source, str>, filters::BoxedFilter>,
     tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
-    globals: BTreeMap<Cow<'source, str>, Value>,
+    globals: BTreeMap<Cow<'source, str>, ValueBox>,
     default_auto_escape: Arc<AutoEscapeFunc>,
     undefined_behavior: UndefinedBehavior,
     formatter: Arc<FormatterFunc>,
@@ -284,7 +284,7 @@ impl<'source> Environment<'source> {
     /// println!("{}", rv.unwrap());
     /// ```
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// **Note on values:** The [`ValueBox`] type implements `Serialize` and can be
     /// efficiently passed to render.  It does not undergo actual serialization.
     pub fn render_named_str<S: Serialize>(
         &self,
@@ -303,7 +303,7 @@ impl<'source> Environment<'source> {
     /// This is an alias for [`template_from_str`](Self::template_from_str) paired with
     /// [`render`](Template::render).
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// **Note on values:** The [`ValueBox`] type implements `Serialize` and can be
     /// efficiently passed to render.  It does not undergo actual serialization.
     pub fn render_str<S: Serialize>(&self, source: &str, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
@@ -340,7 +340,7 @@ impl<'source> Environment<'source> {
 
     /// Changes the undefined behavior.
     ///
-    /// This changes the runtime behavior of [`undefined`](Value::UNDEFINED) values in
+    /// This changes the runtime behavior of [`undefined`](ValueBox::UNDEFINED) values in
     /// the template engine.  For more information see [`UndefinedBehavior`].  The
     /// default is [`UndefinedBehavior::Lenient`].
     pub fn set_undefined_behavior(&mut self, behavior: UndefinedBehavior) {
@@ -375,14 +375,14 @@ impl<'source> Environment<'source> {
     /// # use minijinja::Environment;
     /// # let mut env = Environment::new();
     /// use minijinja::escape_formatter;
-    /// use minijinja::value::Value;
+    /// use minijinja::value::ValueBox;
     ///
     /// env.set_formatter(|out, state, value| {
     ///     escape_formatter(
     ///         out,
     ///         state,
     ///         if value.is_none() {
-    ///             &Value::UNDEFINED
+    ///             &ValueBox::UNDEFINED
     ///         } else {
     ///             value
     ///         },
@@ -392,7 +392,7 @@ impl<'source> Environment<'source> {
     /// ```
     pub fn set_formatter<F>(&mut self, f: F)
     where
-        F: Fn(&mut Output, &State, &Value) -> Result<(), Error> + 'static + Sync + Send,
+        F: Fn(&mut Output, &State, &ValueBox) -> Result<(), Error> + 'static + Sync + Send,
     {
         self.formatter = Arc::new(f);
     }
@@ -547,14 +547,14 @@ impl<'source> Environment<'source> {
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.add_global(name.into(), Value::from_function(f))
+        self.add_global(name.into(), ValueBox::from_function(f))
     }
 
     /// Adds a global variable.
     pub fn add_global<N, V>(&mut self, name: N, value: V)
     where
         N: Into<Cow<'source, str>>,
-        V: Into<Value>,
+        V: Into<ValueBox>,
     {
         self.globals.insert(name.into(), value.into());
     }
@@ -570,7 +570,7 @@ impl<'source> Environment<'source> {
     }
 
     /// Looks up a function.
-    pub(crate) fn get_global(&self, name: &str) -> Option<Value> {
+    pub(crate) fn get_global(&self, name: &str) -> Option<ValueBox> {
         self.globals.get(name).cloned()
     }
 
@@ -595,7 +595,7 @@ impl<'source> Environment<'source> {
     /// here.
     pub(crate) fn format(
         &self,
-        value: &Value,
+        value: &ValueBox,
         state: &State,
         out: &mut Output,
     ) -> Result<(), Error> {

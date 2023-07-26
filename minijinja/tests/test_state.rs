@@ -1,10 +1,10 @@
-use minijinja::value::Value;
+use minijinja::value::ValueBox;
 use minijinja::{Environment, State};
 
 #[test]
 fn test_state_lookup_global() {
     let mut env = Environment::new();
-    env.add_function("lookup_global", |state: &State| -> Value {
+    env.add_function("lookup_global", |state: &State| -> ValueBox {
         state.lookup("the_global").unwrap_or_default()
     });
     env.add_global("the_global", true);

@@ -53,7 +53,7 @@
 //! ```
 //!
 //! If a function wants to disambiugate between a value passed as keyword argument or not,
-//! the the [`Value::is_kwargs`] can be used which returns `true` if a value represents
+//! the the [`ValueBox::is_kwargs`] can be used which returns `true` if a value represents
 //! keyword arguments as opposed to just a map.  A more convenient way to work with keyword
 //! arguments is the [`Kwargs`](crate::value::Kwargs) type.
 //!
@@ -69,10 +69,10 @@ use std::sync::Arc;
 
 use crate::error::Error;
 use crate::utils::SealedMarker;
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, Value};
+use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, ValueBox};
 use crate::vm::State;
 
-type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
+type FuncFunc = dyn Fn(&State, &[ValueBox]) -> Result<ValueBox, Error> + Sync + Send + 'static;
 
 /// A boxed function.
 #[derive(Clone)]
@@ -89,8 +89,8 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 ///
 /// A function can return any of the following types:
 ///
-/// * `Rv` where `Rv` implements `Into<Value>`
-/// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
+/// * `Rv` where `Rv` implements `Into<ValueBox>`
+/// * `Result<Rv, Error>` where `Rv` implements `Into<ValueBox>`
 ///
 /// The parameters can be marked optional by using `Option<T>`.  The last
 /// argument can also use [`Rest<T>`](crate::value::Rest) to capture the
@@ -177,7 +177,7 @@ impl BoxedFunction {
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFunction(
-            Arc::new(move |state, args| -> Result<Value, Error> {
+            Arc::new(move |state, args| -> Result<ValueBox, Error> {
                 f.invoke(ok!(Args::from_values(Some(state), args)), SealedMarker)
                     .into_result()
             }),
@@ -187,13 +187,13 @@ impl BoxedFunction {
     }
 
     /// Invokes the function.
-    pub fn invoke(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    pub fn invoke(&self, state: &State, args: &[ValueBox]) -> Result<ValueBox, Error> {
         (self.0)(state, args)
     }
 
     /// Creates a value from a boxed function.
-    pub fn to_value(&self) -> Value {
-        Value::from_object(self.clone())
+    pub fn to_value(&self) -> ValueBox {
+        ValueBox::from_object(self.clone())
     }
 }
 
@@ -216,7 +216,7 @@ impl fmt::Display for BoxedFunction {
 }
 
 impl Object for BoxedFunction {
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(&self, state: &State, args: &[ValueBox]) -> Result<ValueBox, Error> {
         self.invoke(state, args)
     }
 }
@@ -228,7 +228,7 @@ mod builtins {
     use std::collections::BTreeMap;
 
     use crate::error::ErrorKind;
-    use crate::value::{MapType, ValueBuf, ValueRepr};
+    use crate::value::{MapType, ValueRepr, Value};
 
     /// Returns a range.
     ///
@@ -289,10 +289,10 @@ mod builtins {
     /// )|tojson }};</script>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn dict(value: Value) -> Result<Value, Error> {
+    pub fn dict(value: ValueBox) -> Result<ValueBox, Error> {
         match value.0 {
-            ValueBuf::Undefined => Ok(Value::from(BTreeMap::<bool, Value>::new())),
-            ValueBuf::Map(map, _) => Ok(ValueRepr(ValueBuf::Map(map, MapType::Normal))),
+            ValueRepr::Undefined => Ok(ValueBox::from(BTreeMap::<bool, ValueBox>::new())),
+            ValueRepr::Map(map, _) => Ok(Value(ValueRepr::Map(map, MapType::Normal))),
             _ => Err(Error::from(ErrorKind::InvalidOperation)),
         }
     }

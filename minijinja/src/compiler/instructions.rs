@@ -3,7 +3,7 @@ use std::fmt;
 
 use crate::compiler::tokens::Span;
 use crate::output::CaptureMode;
-use crate::value::Value;
+use crate::value::ValueBox;
 
 /// This loop has the loop var.
 pub const LOOP_FLAG_WITH_LOOP_VAR: u8 = 1;
@@ -49,7 +49,7 @@ pub enum Instruction<'source> {
     Slice,
 
     /// Loads a constant value.
-    LoadConst(Value),
+    LoadConst(ValueBox),
 
     /// Builds a map of the last n pairs on the stack.
     BuildMap(usize),

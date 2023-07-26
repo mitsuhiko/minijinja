@@ -1,19 +1,19 @@
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
 
-use crate::value::{Value, OwnedValueMap};
+use crate::value::{ValueBox, OwnedValueBoxMap};
 
-impl<'de> Deserialize<'de> for Value {
+impl<'de> Deserialize<'de> for ValueBox {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let visitor = ValueVisitor;
+        let visitor = ValueBoxVisitor;
         deserializer.deserialize_any(visitor)
     }
 }
 
-struct ValueVisitor;
+struct ValueBoxVisitor;
 
 macro_rules! visit_value_primitive {
     ($name:ident, $ty:ty) => {
@@ -21,13 +21,13 @@ macro_rules! visit_value_primitive {
         where
             E: serde::de::Error,
         {
-            Ok(Value::from(v))
+            Ok(ValueBox::from(v))
         }
     };
 }
 
-impl<'de> Visitor<'de> for ValueVisitor {
-    type Value = Value;
+impl<'de> Visitor<'de> for ValueBoxVisitor {
+    type Value = ValueBox;
 
     fn expecting(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         fmt.write_str("any MiniJinja compatible value")
@@ -55,7 +55,7 @@ impl<'de> Visitor<'de> for ValueVisitor {
     where
         E: de::Error,
     {
-        Ok(Value::from(()))
+        Ok(ValueBox::from(()))
     }
 
     fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -69,7 +69,7 @@ impl<'de> Visitor<'de> for ValueVisitor {
     where
         E: de::Error,
     {
-        Ok(Value::from(()))
+        Ok(ValueBox::from(()))
     }
 
     fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
@@ -83,22 +83,22 @@ impl<'de> Visitor<'de> for ValueVisitor {
     where
         A: SeqAccess<'de>,
     {
-        let mut rv = Vec::<Value>::new();
+        let mut rv = Vec::<ValueBox>::new();
         while let Some(e) = ok!(visitor.next_element()) {
             rv.push(e);
         }
-        Ok(Value::from(rv))
+        Ok(ValueBox::from(rv))
     }
 
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
         A: MapAccess<'de>,
     {
-        let mut rv = OwnedValueMap::default();
+        let mut rv = OwnedValueBoxMap::default();
         while let Some((k, v)) = ok!(map.next_entry()) {
             rv.insert(k, v);
         }
 
-        Ok(Value::from_map_object(rv))
+        Ok(ValueBox::from_map_object(rv))
     }
 }

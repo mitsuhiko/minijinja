@@ -6,7 +6,7 @@ use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::{AutoEscape, UndefinedBehavior};
-use crate::value::{ArgType, Value};
+use crate::value::{ArgType, ValueBox};
 use crate::vm::context::Context;
 
 #[cfg(feature = "fuel")]
@@ -122,7 +122,7 @@ impl<'template, 'env> State<'template, 'env> {
 
     /// Looks up a variable by name in the context.
     #[inline(always)]
-    pub fn lookup(&self, name: &str) -> Option<Value> {
+    pub fn lookup(&self, name: &str) -> Option<ValueBox> {
         self.ctx.load(self.env, name)
     }
 
@@ -132,7 +132,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// with the passed args.
     #[cfg(feature = "macros")]
     #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-    pub fn call_macro(&self, name: &str, args: &[Value]) -> Result<String, Error> {
+    pub fn call_macro(&self, name: &str, args: &[ValueBox]) -> Result<String, Error> {
         let f = ok!(self.lookup(name).ok_or_else(|| Error::new(
             crate::error::ErrorKind::UnknownFunction,
             "macro not found"
@@ -206,7 +206,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// let rv = state.apply_filter("upper", &["hello world".into()]).unwrap();
     /// assert_eq!(rv.as_str(), Some("HELLO WORLD"));
     /// ```
-    pub fn apply_filter(&self, filter: &str, args: &[Value]) -> Result<Value, Error> {
+    pub fn apply_filter(&self, filter: &str, args: &[ValueBox]) -> Result<ValueBox, Error> {
         match self.env.get_filter(filter) {
             Some(filter) => filter.apply_to(self, args),
             None => Err(Error::from(ErrorKind::UnknownFilter)),
@@ -223,7 +223,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// let rv = state.perform_test("even", &[42i32.into()]).unwrap();
     /// assert!(rv);
     /// ```
-    pub fn perform_test(&self, test: &str, args: &[Value]) -> Result<bool, Error> {
+    pub fn perform_test(&self, test: &str, args: &[ValueBox]) -> Result<bool, Error> {
         match self.env.get_test(test) {
             Some(test) => test.perform(self, args),
             None => Err(Error::from(ErrorKind::UnknownTest)),
@@ -237,10 +237,10 @@ impl<'template, 'env> State<'template, 'env> {
     /// # let mut env = Environment::new();
     /// # let tmpl = env.template_from_str("").unwrap();
     /// # let state = tmpl.new_state();
-    /// let rv = state.format(Value::from(42)).unwrap();
+    /// let rv = state.format(ValueBox::from(42)).unwrap();
     /// assert_eq!(rv, "42");
     /// ```
-    pub fn format(&self, value: Value) -> Result<String, Error> {
+    pub fn format(&self, value: ValueBox) -> Result<String, Error> {
         let mut rv = String::new();
         let mut out = Output::with_string(&mut rv);
         self.env.format(&value, self, &mut out).map(|_| rv)
@@ -280,7 +280,7 @@ impl<'template, 'env> State<'template, 'env> {
 impl<'a> ArgType<'a> for &State<'_, '_> {
     type Output = &'a State<'a, 'a>;
 
-    fn from_value(_value: Option<&'a Value>) -> Result<Self::Output, Error> {
+    fn from_value(_value: Option<&'a ValueBox>) -> Result<Self::Output, Error> {
         Err(Error::new(
             ErrorKind::InvalidOperation,
             "cannot use state type in this position",
@@ -289,7 +289,7 @@ impl<'a> ArgType<'a> for &State<'_, '_> {
 
     fn from_state_and_value(
         state: Option<&'a State>,
-        _value: Option<&'a Value>,
+        _value: Option<&'a ValueBox>,
     ) -> Result<(Self::Output, usize), Error> {
         match state {
             None => Err(Error::new(ErrorKind::InvalidOperation, "state unavailable")),

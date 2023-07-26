@@ -8,14 +8,14 @@ use serde::{ser, Serialize, Serializer};
 use crate::utils::{untrusted_size_hint, OnDrop};
 use crate::value::{
     value_map_with_capacity, value_optimization,
-    Packed, StringType, Value, OwnedValueMap, ValueBuf,
+    Packed, StringType, ValueBox, OwnedValueBoxMap, ValueRepr,
 };
 
 use super::ArcCow;
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
-const VALUE_HANDLE_MARKER: &str = "\x01__minijinja_ValueHandle";
+const VALUE_HANDLE_MARKER: &str = "\x01__minijinja_ValueBoxHandle";
 
 thread_local! {
     static INTERNAL_SERIALIZATION: Cell<bool> = Cell::new(false);
@@ -23,7 +23,7 @@ thread_local! {
     // This should be an AtomicU64 but sadly 32bit targets do not necessarily have
     // AtomicU64 available.
     static LAST_VALUE_HANDLE: Cell<u32> = Cell::new(0);
-    static VALUE_HANDLES: RefCell<BTreeMap<u32, Value>> = RefCell::new(BTreeMap::new());
+    static VALUE_HANDLES: RefCell<BTreeMap<u32, ValueBox>> = RefCell::new(BTreeMap::new());
 }
 
 fn mark_internal_serialization() -> impl Drop {
@@ -43,22 +43,22 @@ fn mark_internal_serialization() -> impl Drop {
 ///
 /// This neither fails nor panics.  For objects that cannot be represented
 /// the value might be represented as a half broken error object.
-pub fn transform<T: Serialize>(value: T) -> Value {
-    match value.serialize(ValueSerializer) {
+pub fn transform<T: Serialize>(value: T) -> ValueBox {
+    match value.serialize(ValueBoxSerializer) {
         Ok(rv) => rv,
-        Err(invalid) => ValueBuf::Invalid(invalid.0.into()).into(),
+        Err(invalid) => ValueRepr::Invalid(invalid.0.into()).into(),
     }
 }
 
-/// Function that returns true when serialization for [`Value`] is taking place.
+/// Function that returns true when serialization for [`ValueBox`] is taking place.
 ///
-/// MiniJinja internally creates [`Value`] objects from all values passed to the
+/// MiniJinja internally creates [`ValueBox`] objects from all values passed to the
 /// engine.  It does this by going through the regular serde serialization trait.
 /// In some cases users might want to customize the serialization specifically for
 /// MiniJinja because they want to tune the object for the template engine
 /// independently of what is normally serialized to disk.
 ///
-/// This function returns `true` when MiniJinja is serializing to [`Value`] and
+/// This function returns `true` when MiniJinja is serializing to [`ValueBox`] and
 /// `false` otherwise.  You can call this within your own [`Serialize`]
 /// implementation to change the output format.
 ///
@@ -70,7 +70,7 @@ pub fn serializing_for_value() -> bool {
     INTERNAL_SERIALIZATION.with(|flag| flag.get())
 }
 
-impl Value {
+impl ValueBox {
     /// Creates a value from something that can be serialized.
     ///
     /// This is the method that MiniJinja will generally use whenever a serializable
@@ -83,8 +83,8 @@ impl Value {
     /// For more information see [`serializing_for_value`].
     ///
     /// ```
-    /// # use minijinja::value::Value;
-    /// let val = Value::from_serializable(&vec![1, 2, 3]);
+    /// # use minijinja::value::ValueBox;
+    /// let val = ValueBox::from_serializable(&vec![1, 2, 3]);
     /// ```
     ///
     /// This method does not fail but it might return a value that is not valid.  Such
@@ -94,14 +94,14 @@ impl Value {
     /// engine today.  This is for instance the case for when keys are used in hash maps
     /// that the engine cannot deal with.  Invalid values are considered an implementation
     /// detail.  There is currently no API to validate a value.
-    pub fn from_serializable<T: Serialize>(value: &T) -> Value {
+    pub fn from_serializable<T: Serialize>(value: &T) -> ValueBox {
         let _serialization_guard = mark_internal_serialization();
         let _optimization_guard = value_optimization();
         transform(value)
     }
 }
 
-impl Serialize for Value {
+impl Serialize for ValueBox {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -126,18 +126,18 @@ impl Serialize for Value {
         }
 
         match self.0 {
-            ValueBuf::Bool(b) => serializer.serialize_bool(b),
-            ValueBuf::U64(u) => serializer.serialize_u64(u),
-            ValueBuf::I64(i) => serializer.serialize_i64(i),
-            ValueBuf::F64(f) => serializer.serialize_f64(f),
-            ValueBuf::None | ValueBuf::Undefined | ValueBuf::Invalid(_) => {
+            ValueRepr::Bool(b) => serializer.serialize_bool(b),
+            ValueRepr::U64(u) => serializer.serialize_u64(u),
+            ValueRepr::I64(i) => serializer.serialize_i64(i),
+            ValueRepr::F64(f) => serializer.serialize_f64(f),
+            ValueRepr::None | ValueRepr::Undefined | ValueRepr::Invalid(_) => {
                 serializer.serialize_unit()
             }
-            ValueBuf::U128(u) => serializer.serialize_u128(u.0),
-            ValueBuf::I128(i) => serializer.serialize_i128(i.0),
-            ValueBuf::String(ref s, _) => serializer.serialize_str(s),
-            ValueBuf::Bytes(ref b) => serializer.serialize_bytes(b),
-            ValueBuf::Seq(ref s) => {
+            ValueRepr::U128(u) => serializer.serialize_u128(u.0),
+            ValueRepr::I128(i) => serializer.serialize_i128(i.0),
+            ValueRepr::String(ref s, _) => serializer.serialize_str(s),
+            ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
+            ValueRepr::Seq(ref s) => {
                 use serde::ser::SerializeSeq;
                 let mut seq = ok!(serializer.serialize_seq(Some(s.item_count())));
                 for item in s.iter() {
@@ -145,52 +145,52 @@ impl Serialize for Value {
                 }
                 seq.end()
             },
-            ValueBuf::Map(ref s, _) => {
+            ValueRepr::Map(ref s, _) => {
                 use serde::ser::SerializeMap;
                 let mut map = ok!(serializer.serialize_map(None));
                 if let Some(fields) = s.static_fields() {
                     for k in fields {
-                        let v = s.get_field(&Value::from(*k)).unwrap_or(Value::UNDEFINED);
+                        let v = s.get_field(&ValueBox::from(*k)).unwrap_or(ValueBox::UNDEFINED);
                         ok!(map.serialize_entry(k, &v));
                     }
                 } else {
                     for k in s.fields() {
-                        let v = s.get_field(&k).unwrap_or(Value::UNDEFINED);
+                        let v = s.get_field(&k).unwrap_or(ValueBox::UNDEFINED);
                         ok!(map.serialize_entry(&k, &v));
                     }
                 }
                 map.end()
             }
-            ValueBuf::Dynamic(ref dy) => dy.value().serialize(serializer),
+            ValueRepr::Dynamic(ref dy) => dy.value().serialize(serializer),
         }
     }
 }
 
 #[derive(Debug)]
-pub struct InvalidValue(Arc<str>);
+pub struct InvalidValueBox(Arc<str>);
 
-impl std::error::Error for InvalidValue {}
+impl std::error::Error for InvalidValueBox {}
 
-impl fmt::Display for InvalidValue {
+impl fmt::Display for InvalidValueBox {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl serde::ser::Error for InvalidValue {
+impl serde::ser::Error for InvalidValueBox {
     fn custom<T>(msg: T) -> Self
     where
         T: fmt::Display,
     {
-        InvalidValue(Arc::from(msg.to_string()))
+        InvalidValueBox(Arc::from(msg.to_string()))
     }
 }
 
-pub struct ValueSerializer;
+pub struct ValueBoxSerializer;
 
-impl Serializer for ValueSerializer {
-    type Ok = Value;
-    type Error = InvalidValue;
+impl Serializer for ValueBoxSerializer {
+    type Ok = ValueBox;
+    type Error = InvalidValueBox;
 
     type SerializeSeq = SerializeSeq;
     type SerializeTuple = SerializeTuple;
@@ -200,87 +200,87 @@ impl Serializer for ValueSerializer {
     type SerializeStruct = SerializeStruct;
     type SerializeStructVariant = SerializeStructVariant;
 
-    fn serialize_bool(self, v: bool) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::Bool(v).into())
+    fn serialize_bool(self, v: bool) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::Bool(v).into())
     }
 
-    fn serialize_i8(self, v: i8) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::I64(v as i64).into())
+    fn serialize_i8(self, v: i8) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::I64(v as i64).into())
     }
 
-    fn serialize_i16(self, v: i16) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::I64(v as i64).into())
+    fn serialize_i16(self, v: i16) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::I64(v as i64).into())
     }
 
-    fn serialize_i32(self, v: i32) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::I64(v as i64).into())
+    fn serialize_i32(self, v: i32) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::I64(v as i64).into())
     }
 
-    fn serialize_i64(self, v: i64) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::I64(v).into())
+    fn serialize_i64(self, v: i64) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::I64(v).into())
     }
 
-    fn serialize_i128(self, v: i128) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::I128(Packed(v)).into())
+    fn serialize_i128(self, v: i128) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::I128(Packed(v)).into())
     }
 
-    fn serialize_u8(self, v: u8) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::U64(v as u64).into())
+    fn serialize_u8(self, v: u8) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::U64(v as u64).into())
     }
 
-    fn serialize_u16(self, v: u16) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::U64(v as u64).into())
+    fn serialize_u16(self, v: u16) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::U64(v as u64).into())
     }
 
-    fn serialize_u32(self, v: u32) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::U64(v as u64).into())
+    fn serialize_u32(self, v: u32) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::U64(v as u64).into())
     }
 
-    fn serialize_u64(self, v: u64) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::U64(v).into())
+    fn serialize_u64(self, v: u64) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::U64(v).into())
     }
 
-    fn serialize_u128(self, v: u128) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::U128(Packed(v)).into())
+    fn serialize_u128(self, v: u128) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::U128(Packed(v)).into())
     }
 
-    fn serialize_f32(self, v: f32) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::F64(v as f64).into())
+    fn serialize_f32(self, v: f32) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::F64(v as f64).into())
     }
 
-    fn serialize_f64(self, v: f64) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::F64(v).into())
+    fn serialize_f64(self, v: f64) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::F64(v).into())
     }
 
-    fn serialize_char(self, v: char) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::String(ArcCow::from(v.to_string()), StringType::Normal).into())
+    fn serialize_char(self, v: char) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::String(ArcCow::from(v.to_string()), StringType::Normal).into())
     }
 
-    fn serialize_str(self, value: &str) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::String(ArcCow::from(value.to_owned()), StringType::Normal).into())
+    fn serialize_str(self, value: &str) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::String(ArcCow::from(value.to_owned()), StringType::Normal).into())
     }
 
-    fn serialize_bytes(self, value: &[u8]) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::Bytes(ArcCow::from(value)).into())
+    fn serialize_bytes(self, value: &[u8]) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::Bytes(ArcCow::from(value)).into())
     }
 
-    fn serialize_none(self) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::None.into())
+    fn serialize_none(self) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::None.into())
     }
 
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Value, InvalidValue>
+    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<ValueBox, InvalidValueBox>
     where
         T: Serialize,
     {
         Ok(transform(value))
     }
 
-    fn serialize_unit(self) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::None.into())
+    fn serialize_unit(self) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::None.into())
     }
 
-    fn serialize_unit_struct(self, _name: &'static str) -> Result<Value, InvalidValue> {
-        Ok(ValueBuf::None.into())
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueRepr::None.into())
     }
 
     fn serialize_unit_variant(
@@ -288,7 +288,7 @@ impl Serializer for ValueSerializer {
         name: &'static str,
         variant_index: u32,
         variant: &'static str,
-    ) -> Result<Value, InvalidValue> {
+    ) -> Result<ValueBox, InvalidValueBox> {
         if name == VALUE_HANDLE_MARKER && variant == VALUE_HANDLE_MARKER {
             Ok(VALUE_HANDLES.with(|handles| {
                 let mut handles = handles.borrow_mut();
@@ -297,7 +297,7 @@ impl Serializer for ValueSerializer {
                     .expect("value handle not in registry")
             }))
         } else {
-            Ok(Value::from(variant))
+            Ok(ValueBox::from(variant))
         }
     }
 
@@ -305,7 +305,7 @@ impl Serializer for ValueSerializer {
         self,
         _name: &'static str,
         value: &T,
-    ) -> Result<Value, InvalidValue>
+    ) -> Result<ValueBox, InvalidValueBox>
     where
         T: Serialize,
     {
@@ -318,22 +318,22 @@ impl Serializer for ValueSerializer {
         _variant_index: u32,
         variant: &'static str,
         value: &T,
-    ) -> Result<Value, InvalidValue>
+    ) -> Result<ValueBox, InvalidValueBox>
     where
         T: Serialize,
     {
         let mut map = value_map_with_capacity(1);
-        map.insert(Value::from(variant), transform(value));
-        Ok(Value::from_map_object(map))
+        map.insert(ValueBox::from(variant), transform(value));
+        Ok(ValueBox::from_map_object(map))
     }
 
-    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, InvalidValue> {
+    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, InvalidValueBox> {
         Ok(SerializeSeq {
             elements: Vec::with_capacity(untrusted_size_hint(len.unwrap_or(0))),
         })
     }
 
-    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, InvalidValue> {
+    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, InvalidValueBox> {
         Ok(SerializeTuple {
             elements: Vec::with_capacity(untrusted_size_hint(len)),
         })
@@ -343,7 +343,7 @@ impl Serializer for ValueSerializer {
         self,
         _name: &'static str,
         len: usize,
-    ) -> Result<Self::SerializeTupleStruct, InvalidValue> {
+    ) -> Result<Self::SerializeTupleStruct, InvalidValueBox> {
         Ok(SerializeTupleStruct {
             fields: Vec::with_capacity(untrusted_size_hint(len)),
         })
@@ -355,14 +355,14 @@ impl Serializer for ValueSerializer {
         _variant_index: u32,
         variant: &'static str,
         len: usize,
-    ) -> Result<Self::SerializeTupleVariant, InvalidValue> {
+    ) -> Result<Self::SerializeTupleVariant, InvalidValueBox> {
         Ok(SerializeTupleVariant {
             name: variant,
             fields: Vec::with_capacity(untrusted_size_hint(len)),
         })
     }
 
-    fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, InvalidValue> {
+    fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, InvalidValueBox> {
         Ok(SerializeMap {
             entries: value_map_with_capacity(len.unwrap_or(0)),
             key: None,
@@ -373,7 +373,7 @@ impl Serializer for ValueSerializer {
         self,
         _name: &'static str,
         len: usize,
-    ) -> Result<Self::SerializeStruct, InvalidValue> {
+    ) -> Result<Self::SerializeStruct, InvalidValueBox> {
         Ok(SerializeStruct {
             fields: value_map_with_capacity(len),
         })
@@ -385,7 +385,7 @@ impl Serializer for ValueSerializer {
         _variant_index: u32,
         variant: &'static str,
         len: usize,
-    ) -> Result<Self::SerializeStructVariant, InvalidValue> {
+    ) -> Result<Self::SerializeStructVariant, InvalidValueBox> {
         Ok(SerializeStructVariant {
             variant,
             map: value_map_with_capacity(len),
@@ -394,14 +394,14 @@ impl Serializer for ValueSerializer {
 }
 
 pub struct SerializeSeq {
-    elements: Vec<Value>,
+    elements: Vec<ValueBox>,
 }
 
 impl ser::SerializeSeq for SerializeSeq {
-    type Ok = Value;
-    type Error = InvalidValue;
+    type Ok = ValueBox;
+    type Error = InvalidValueBox;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValue>
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValueBox>
     where
         T: Serialize,
     {
@@ -409,20 +409,20 @@ impl ser::SerializeSeq for SerializeSeq {
         Ok(())
     }
 
-    fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value::from_seq_object(self.elements))
+    fn end(self) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueBox::from_seq_object(self.elements))
     }
 }
 
 pub struct SerializeTuple {
-    elements: Vec<Value>,
+    elements: Vec<ValueBox>,
 }
 
 impl ser::SerializeTuple for SerializeTuple {
-    type Ok = Value;
-    type Error = InvalidValue;
+    type Ok = ValueBox;
+    type Error = InvalidValueBox;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValue>
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValueBox>
     where
         T: Serialize,
     {
@@ -430,20 +430,20 @@ impl ser::SerializeTuple for SerializeTuple {
         Ok(())
     }
 
-    fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value::from_seq_object(self.elements))
+    fn end(self) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueBox::from_seq_object(self.elements))
     }
 }
 
 pub struct SerializeTupleStruct {
-    fields: Vec<Value>,
+    fields: Vec<ValueBox>,
 }
 
 impl ser::SerializeTupleStruct for SerializeTupleStruct {
-    type Ok = Value;
-    type Error = InvalidValue;
+    type Ok = ValueBox;
+    type Error = InvalidValueBox;
 
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValue>
+    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValueBox>
     where
         T: Serialize,
     {
@@ -451,21 +451,21 @@ impl ser::SerializeTupleStruct for SerializeTupleStruct {
         Ok(())
     }
 
-    fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value::from_seq_object(self.fields))
+    fn end(self) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueBox::from_seq_object(self.fields))
     }
 }
 
 pub struct SerializeTupleVariant {
     name: &'static str,
-    fields: Vec<Value>,
+    fields: Vec<ValueBox>,
 }
 
 impl ser::SerializeTupleVariant for SerializeTupleVariant {
-    type Ok = Value;
-    type Error = InvalidValue;
+    type Ok = ValueBox;
+    type Error = InvalidValueBox;
 
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValue>
+    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValueBox>
     where
         T: Serialize,
     {
@@ -473,37 +473,37 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
         Ok(())
     }
 
-    fn end(self) -> Result<Value, InvalidValue> {
+    fn end(self) -> Result<ValueBox, InvalidValueBox> {
         let mut map = value_map_with_capacity(1);
         map.insert(
-            Value::from(self.name),
-            Value::from_seq_object(self.fields)
+            ValueBox::from(self.name),
+            ValueBox::from_seq_object(self.fields)
         );
-        Ok(Value::from_map_object(map))
+        Ok(ValueBox::from_map_object(map))
     }
 }
 
 pub struct SerializeMap {
-    entries: OwnedValueMap,
-    key: Option<Value>,
+    entries: OwnedValueBoxMap,
+    key: Option<ValueBox>,
 }
 
 impl ser::SerializeMap for SerializeMap {
-    type Ok = Value;
-    type Error = InvalidValue;
+    type Ok = ValueBox;
+    type Error = InvalidValueBox;
 
-    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), InvalidValue>
+    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), InvalidValueBox>
     where
         T: Serialize,
     {
-        match key.serialize(ValueSerializer) {
+        match key.serialize(ValueBoxSerializer) {
             Ok(key) => self.key = Some(key),
             Err(_) => self.key = None,
         }
         Ok(())
     }
 
-    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValue>
+    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValueBox>
     where
         T: Serialize,
     {
@@ -513,20 +513,20 @@ impl ser::SerializeMap for SerializeMap {
         Ok(())
     }
 
-    fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value::from_map_object(self.entries))
+    fn end(self) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueBox::from_map_object(self.entries))
     }
 
     fn serialize_entry<K: ?Sized, V: ?Sized>(
         &mut self,
         key: &K,
         value: &V,
-    ) -> Result<(), InvalidValue>
+    ) -> Result<(), InvalidValueBox>
     where
         K: Serialize,
         V: Serialize,
     {
-        if let Ok(key) = key.serialize(ValueSerializer) {
+        if let Ok(key) = key.serialize(ValueBoxSerializer) {
             self.entries.insert(key, transform(value));
         }
         Ok(())
@@ -534,54 +534,54 @@ impl ser::SerializeMap for SerializeMap {
 }
 
 pub struct SerializeStruct {
-    fields: OwnedValueMap,
+    fields: OwnedValueBoxMap,
 }
 
 impl ser::SerializeStruct for SerializeStruct {
-    type Ok = Value;
-    type Error = InvalidValue;
+    type Ok = ValueBox;
+    type Error = InvalidValueBox;
 
     fn serialize_field<T: ?Sized>(
         &mut self,
         key: &'static str,
         value: &T,
-    ) -> Result<(), InvalidValue>
+    ) -> Result<(), InvalidValueBox>
     where
         T: Serialize,
     {
-        self.fields.insert(Value::from(key), transform(value));
+        self.fields.insert(ValueBox::from(key), transform(value));
         Ok(())
     }
 
-    fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value::from_map_object(self.fields))
+    fn end(self) -> Result<ValueBox, InvalidValueBox> {
+        Ok(ValueBox::from_map_object(self.fields))
     }
 }
 
 pub struct SerializeStructVariant {
     variant: &'static str,
-    map: OwnedValueMap,
+    map: OwnedValueBoxMap,
 }
 
 impl ser::SerializeStructVariant for SerializeStructVariant {
-    type Ok = Value;
-    type Error = InvalidValue;
+    type Ok = ValueBox;
+    type Error = InvalidValueBox;
 
     fn serialize_field<T: ?Sized>(
         &mut self,
         key: &'static str,
         value: &T,
-    ) -> Result<(), InvalidValue>
+    ) -> Result<(), InvalidValueBox>
     where
         T: Serialize,
     {
-        self.map.insert(Value::from(key), transform(value));
+        self.map.insert(ValueBox::from(key), transform(value));
         Ok(())
     }
 
-    fn end(self) -> Result<Value, InvalidValue> {
+    fn end(self) -> Result<ValueBox, InvalidValueBox> {
         let mut rv = BTreeMap::new();
-        rv.insert(self.variant, Value::from_map_object(self.map));
+        rv.insert(self.variant, ValueBox::from_map_object(self.map));
         Ok(rv.into())
     }
 }

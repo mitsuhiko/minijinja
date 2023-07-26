@@ -5,11 +5,11 @@ use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::value::{OwnedValueIterator, Value, ValueBuf};
+use crate::value::{OwnedValueIterator, ValueBox, ValueRepr};
 use crate::vm::closure_object::Closure;
 use crate::vm::loop_object::Loop;
 
-type Locals<'env> = BTreeMap<&'env str, Value>;
+type Locals<'env> = BTreeMap<&'env str, ValueBox>;
 
 /// The maximum recursion in the VM.  Normally each stack frame
 /// adds one to this counter (eg: every time a frame is added).
@@ -30,7 +30,7 @@ pub(crate) struct LoopState {
 
 pub(crate) struct Frame<'env> {
     pub(crate) locals: Locals<'env>,
-    pub(crate) ctx: Value,
+    pub(crate) ctx: ValueBox,
     pub(crate) current_loop: Option<LoopState>,
 
     // normally a frame does not carry a closure, but it can when a macro is
@@ -43,13 +43,13 @@ pub(crate) struct Frame<'env> {
 
 impl<'env> Default for Frame<'env> {
     fn default() -> Frame<'env> {
-        Frame::new(Value::UNDEFINED)
+        Frame::new(ValueBox::UNDEFINED)
     }
 }
 
 impl<'env> Frame<'env> {
     /// Creates a new frame with the given context and no validation
-    pub fn new(ctx: Value) -> Frame<'env> {
+    pub fn new(ctx: ValueBox) -> Frame<'env> {
         Frame {
             locals: Locals::new(),
             ctx,
@@ -59,8 +59,8 @@ impl<'env> Frame<'env> {
     }
 
     /// Creates a new frame with the given context and validates the the value is not invalid
-    pub fn new_checked(root: Value) -> Result<Frame<'env>, Error> {
-        if let ValueBuf::Invalid(ref err) = root.0 {
+    pub fn new_checked(root: ValueBox) -> Result<Frame<'env>, Error> {
+        if let ValueRepr::Invalid(ref err) = root.0 {
             Err(Error::new(ErrorKind::BadSerialization, err.to_string()))
         } else {
             Ok(Frame::new(root))
@@ -89,7 +89,7 @@ impl<'env> fmt::Debug for Frame<'env> {
 
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 pub(crate) struct Stack {
-    values: Vec<Value>,
+    values: Vec<ValueBox>,
 }
 
 impl Default for Stack {
@@ -101,16 +101,16 @@ impl Default for Stack {
 }
 
 impl Stack {
-    pub fn push(&mut self, arg: Value) {
+    pub fn push(&mut self, arg: ValueBox) {
         self.values.push(arg);
     }
 
     #[track_caller]
-    pub fn pop(&mut self) -> Value {
+    pub fn pop(&mut self) -> ValueBox {
         self.values.pop().unwrap()
     }
 
-    pub fn slice_top(&mut self, n: usize) -> &[Value] {
+    pub fn slice_top(&mut self, n: usize) -> &[ValueBox] {
         &self.values[self.values.len() - n..]
     }
 
@@ -118,18 +118,18 @@ impl Stack {
         self.values.truncate(self.values.len() - n);
     }
 
-    pub fn try_pop(&mut self) -> Option<Value> {
+    pub fn try_pop(&mut self) -> Option<ValueBox> {
         self.values.pop()
     }
 
     #[track_caller]
-    pub fn peek(&self) -> &Value {
+    pub fn peek(&self) -> &ValueBox {
         self.values.last().unwrap()
     }
 }
 
-impl From<Vec<Value>> for Stack {
-    fn from(values: Vec<Value>) -> Stack {
+impl From<Vec<ValueBox>> for Stack {
+    fn from(values: Vec<ValueBox>) -> Stack {
         Stack { values }
     }
 }
@@ -202,7 +202,7 @@ impl<'env> Context<'env> {
     }
 
     /// Stores a variable in the context.
-    pub fn store(&mut self, key: &'env str, value: Value) {
+    pub fn store(&mut self, key: &'env str, value: ValueBox) {
         let top = self.stack.last_mut().unwrap();
         if let Some(ref closure) = top.closure {
             closure.store(key, value.clone());
@@ -218,7 +218,7 @@ impl<'env> Context<'env> {
     #[cfg(feature = "macros")]
     pub fn enclose(&mut self, env: &Environment, key: &str) {
         self.closure()
-            .store_if_missing(key, || self.load(env, key).unwrap_or(Value::UNDEFINED));
+            .store_if_missing(key, || self.load(env, key).unwrap_or(ValueBox::UNDEFINED));
     }
 
     /// Loads the closure and returns it.
@@ -251,7 +251,7 @@ impl<'env> Context<'env> {
     }
 
     /// Looks up a variable in the context.
-    pub fn load(&self, env: &Environment, key: &str) -> Option<Value> {
+    pub fn load(&self, env: &Environment, key: &str) -> Option<ValueBox> {
         for frame in self.stack.iter().rev() {
             // look at locals first
             if let Some(value) = frame.locals.get(key) {
@@ -261,7 +261,7 @@ impl<'env> Context<'env> {
             // if we are a loop, check if we are looking up the special loop var.
             if let Some(ref l) = frame.current_loop {
                 if l.with_loop_var && key == "loop" {
-                    return Some(Value::from_object(l.object.clone()));
+                    return Some(ValueBox::from_object(l.object.clone()));
                 }
             }
 

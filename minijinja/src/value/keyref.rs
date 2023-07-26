@@ -4,13 +4,13 @@
 //
 // use serde::Serialize;
 //
-// use crate::value::{intern, Value};
+// use crate::value::{intern, ValueBox};
 //
 // /// Internal abstraction over keys
 // #[derive(Clone)]
 // pub enum NOKeyRef<'a> {
 //     /// The key is a value
-//     Value(Value),
+//     ValueBox(ValueBox),
 //     /// The key is a string slice
 //     Str(&'a str),
 // }
@@ -33,10 +33,10 @@
 //     }
 //
 //     /// Return this as value.
-//     pub fn as_value(&self) -> Value {
+//     pub fn as_value(&self) -> ValueBox {
 //         match self {
 //             KeyRef::Value(v) => v.clone(),
-//             KeyRef::Str(s) => Value::from(intern(s)),
+//             KeyRef::Str(s) => ValueBox::from(intern(s)),
 //         }
 //     }
 // }

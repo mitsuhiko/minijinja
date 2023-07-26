@@ -19,16 +19,16 @@ fn test_dynamic_object_roundtrip() {
     }
 
     impl Object for X {
-        fn value(&self) -> Value {
+        fn value(&self) -> ValueBox {
             todo!()
-            // Value::from_map_object(*self)
+            // ValueBox::from_map_object(*self)
         }
     }
 
     impl crate::value::object::MapObject for X {
-        fn get_field(&self, key: &Value) -> Option<Value> {
+        fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
             match key.as_str() {
-                Some("value") => Some(Value::from(self.0.load(atomic::Ordering::Relaxed))),
+                Some("value") => Some(ValueBox::from(self.0.load(atomic::Ordering::Relaxed))),
                 _ => None,
             }
         }
@@ -39,9 +39,9 @@ fn test_dynamic_object_roundtrip() {
     }
 
     let x = Arc::new(X(Default::default()));
-    let x_value = Value::from_object(x.clone());
+    let x_value = ValueBox::from_object(x.clone());
     x.0.fetch_add(42, atomic::Ordering::Relaxed);
-    let x_clone = Value::from_serializable(&x_value);
+    let x_clone = ValueBox::from_serializable(&x_value);
     x.0.fetch_add(23, atomic::Ordering::Relaxed);
 
     assert_eq!(x_value.to_string(), "65");
@@ -50,16 +50,16 @@ fn test_dynamic_object_roundtrip() {
 
 #[test]
 fn test_string_char() {
-    let val = Value::from('a');
+    let val = ValueBox::from('a');
     assert_eq!(char::try_from(val).unwrap(), 'a');
-    let val = Value::from("a");
+    let val = ValueBox::from("a");
     assert_eq!(char::try_from(val).unwrap(), 'a');
-    let val = Value::from("wat");
+    let val = ValueBox::from("wat");
     assert!(char::try_from(val).is_err());
 }
 
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn test_sizes() {
-    assert_eq!(std::mem::size_of::<Value>(), 24);
+    assert_eq!(std::mem::size_of::<ValueBox>(), 24);
 }

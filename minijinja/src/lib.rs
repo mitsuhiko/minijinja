@@ -155,7 +155,7 @@
 //!   - `debug`: if this feature is removed some debug functionality of the engine is
 //!     removed as well.  This mainly affects the quality of error reporting.
 //!   - `deserialization`: when removed this disables deserialization support for
-//!     the [`Value`](crate::value::Value) type.
+//!     the [`ValueBox`](crate::value::Value) type.
 //!
 //! There are some additional features that provide extra functionality:
 //!

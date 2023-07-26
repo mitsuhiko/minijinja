@@ -6,7 +6,7 @@ use crate::filters::{self, BoxedFilter};
 use crate::output::Output;
 use crate::tests::{self, BoxedTest};
 use crate::utils::{write_escaped, AutoEscape};
-use crate::value::Value;
+use crate::value::ValueBox;
 use crate::vm::State;
 
 pub(crate) fn no_auto_escape(_: &str) -> AutoEscape {
@@ -44,7 +44,7 @@ pub fn default_auto_escape_callback(name: &str) -> AutoEscape {
 )]
 /// * [`None`](AutoEscape::None): no escaping
 /// * [`Custom(..)`](AutoEscape::Custom): results in an error
-pub fn escape_formatter(out: &mut Output, state: &State, value: &Value) -> Result<(), Error> {
+pub fn escape_formatter(out: &mut Output, state: &State, value: &ValueBox) -> Result<(), Error> {
     write_escaped(out, state.auto_escape(), value)
 }
 
@@ -158,7 +158,7 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
     rv
 }
 
-pub(crate) fn get_globals() -> BTreeMap<Cow<'static, str>, Value> {
+pub(crate) fn get_globals() -> BTreeMap<Cow<'static, str>, ValueBox> {
     #[allow(unused_mut)]
     let mut rv = BTreeMap::new();
     #[cfg(feature = "builtins")]

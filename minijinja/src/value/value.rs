@@ -13,14 +13,14 @@ use crate::vm::State;
 use crate::value::ops;
 use crate::value::intern;
 
-use crate::value::Value;
+use crate::value::ValueBox;
 use crate::value::argtypes::{FunctionArgs, FunctionResult};
 use crate::value::object::{Object, SeqObject, MapObject};
 
-use super::ValueRepr;
+use super::Value;
 
 #[derive(Debug, Clone)]
-pub enum ValueBuf<'a> {
+pub enum ValueRepr<'a> {
     None,
     Undefined,
     Bool(bool),
@@ -32,9 +32,41 @@ pub enum ValueBuf<'a> {
     Invalid(ArcCow<'a, str>),
     String(ArcCow<'a, str>, StringType),
     Bytes(ArcCow<'a, [u8]>),
-    Seq(ArcCow<'a, dyn SeqObject + 'a>),
-    Map(ArcCow<'a, dyn MapObject + 'a>, MapType),
-    Dynamic(ArcCow<'a, dyn Object>),
+    Seq(ArcCow<'a, dyn SeqObject + 'static>),
+    Map(ArcCow<'a, dyn MapObject + 'static>, MapType),
+    Dynamic(ArcCow<'a, dyn Object + 'static>),
+}
+
+impl Value<'_> {
+    pub fn into_owned(self) -> ValueBox {
+        let repr = match self.0 {
+            ValueRepr::None => ValueRepr::None,
+            ValueRepr::Undefined => ValueRepr::Undefined,
+            ValueRepr::Bool(v) => ValueRepr::Bool(v),
+            ValueRepr::U64(v) => ValueRepr::U64(v),
+            ValueRepr::I64(v) => ValueRepr::I64(v),
+            ValueRepr::F64(v) => ValueRepr::F64(v),
+            ValueRepr::U128(v) => ValueRepr::U128(v),
+            ValueRepr::I128(v) => ValueRepr::I128(v),
+            ValueRepr::Invalid(v) => ValueRepr::Invalid(v.to_owned()),
+            ValueRepr::String(v, k) => ValueRepr::String(v.to_owned(), k) ,
+            ValueRepr::Bytes(v) => ValueRepr::Bytes(v.to_owned()),
+            ValueRepr::Seq(v) => ValueRepr::Seq(match v {
+                ArcCow::Borrowed(v) => ArcCow::Owned(v.cloned().into()),
+                ArcCow::Owned(v) => ArcCow::Owned(v),
+            }),
+            ValueRepr::Map(v, k) => ValueRepr::Map(match v {
+                ArcCow::Borrowed(v) => ArcCow::Owned(v.cloned().into()),
+                ArcCow::Owned(v) => ArcCow::Owned(v),
+            }, k),
+            ValueRepr::Dynamic(v) => ValueRepr::Dynamic(match v {
+                ArcCow::Borrowed(v) => ArcCow::Owned(v.cloned().into()),
+                ArcCow::Owned(v) => ArcCow::Owned(v),
+            }),
+        };
+
+        Value(repr)
+    }
 }
 
 impl<T: ?Sized> std::ops::Deref for ArcCow<'_, T> {
@@ -70,6 +102,15 @@ impl<T: Copy + fmt::Debug> fmt::Debug for Packed<T> {
 pub enum ArcCow<'a, T: ?Sized + 'a> {
     Borrowed(&'a T),
     Owned(Arc<T>),
+}
+
+impl<T: ?Sized> ArcCow<'_, T> where for<'a> Arc<T>: From<&'a T> {
+    pub fn to_owned(&self) -> ArcCow<'static, T> {
+        match self {
+            ArcCow::Borrowed(v) => ArcCow::Owned(Arc::from(v)),
+            ArcCow::Owned(v) => ArcCow::Owned(v.clone()),
+        }
+    }
 }
 
 impl<'a, 'b, B: ?Sized, A: PartialEq<B> + ?Sized> PartialEq<ArcCow<'b, B>> for ArcCow<'a, A> {
@@ -166,14 +207,14 @@ pub enum ValueKind {
 }
 
 #[allow(clippy::len_without_is_empty)]
-impl Value {
+impl Value<'_> {
     /// The undefined value.
     ///
     /// This constant exists because the undefined type does not exist in Rust
     /// and this is the only way to construct it.
-    pub const UNDEFINED: Value = ValueRepr(ValueBuf::Undefined);
+    pub const UNDEFINED: ValueBox = Value(ValueRepr::Undefined);
 
-    pub const NONE: Value = ValueRepr(ValueBuf::None);
+    pub const NONE: ValueBox = Value(ValueRepr::None);
 
     /// Creates a value from a safe string.
     ///
@@ -182,11 +223,11 @@ impl Value {
     /// supply the `|safe` filter, you can use a value of this type instead.
     ///
     /// ```
-    /// # use minijinja::value::Value;
-    /// let val = Value::from_safe_string("<em>note</em>".into());
+    /// # use minijinja::value::ValueBox;
+    /// let val = ValueBox::from_safe_string("<em>note</em>".into());
     /// ```
-    pub fn from_safe_string(value: String) -> Value {
-        ValueBuf::String(ArcCow::from(value), StringType::Safe).into()
+    pub fn from_safe_string(value: String) -> ValueBox {
+        ValueRepr::String(ArcCow::from(value), StringType::Safe).into()
     }
 
     /// Creates a value from a dynamic object.
@@ -194,7 +235,7 @@ impl Value {
     /// For more information see [`Object`].
     ///
     /// ```rust
-    /// # use minijinja::value::{Value, Object};
+    /// # use minijinja::value::{ValueBox, Object};
     /// use std::fmt;
     ///
     /// #[derive(Debug)]
@@ -210,14 +251,14 @@ impl Value {
     ///
     /// impl Object for Thing {}
     ///
-    /// let val = Value::from_object(Thing { id: 42 });
+    /// let val = ValueBox::from_object(Thing { id: 42 });
     /// ```
     ///
     /// Objects are internally reference counted.  If you want to hold on to the
     /// `Arc` you can directly create the value from an arc'ed object:
     ///
     /// ```rust
-    /// # use minijinja::value::{Value, Object};
+    /// # use minijinja::value::{ValueBox, Object};
     /// # #[derive(Debug)]
     /// # struct Thing { id: usize };
     /// # impl std::fmt::Display for Thing {
@@ -227,13 +268,13 @@ impl Value {
     /// # }
     /// # impl Object for Thing {}
     /// use std::sync::Arc;
-    /// let val = Value::from(Arc::new(Thing { id: 42 }));
+    /// let val = ValueBox::from(Arc::new(Thing { id: 42 }));
     /// ```
-    pub fn from_object<T: Object + ?Sized>(value: T) -> Value
+    pub fn from_object<T: Object + ?Sized>(value: T) -> ValueBox
         where T: Into<Arc<T>>
     {
         let arc = value.into();
-        ValueRepr(ValueBuf::Dynamic(ArcCow::Owned(arc)))
+        Value(ValueRepr::Dynamic(ArcCow::Owned(arc)))
     }
 
     /// Creates a value from an owned [`SeqObject`].
@@ -243,11 +284,11 @@ impl Value {
     ///
     /// **Note:** objects created this way cannot be downcasted via
     /// [`downcast_object_ref`](Self::downcast_object_ref).
-    pub fn from_seq_object<T: SeqObject + ?Sized + 'static>(value: T) -> Value
+    pub fn from_seq_object<T: SeqObject + ?Sized + 'static>(value: T) -> ValueBox
         where T: Into<Arc<T>>
     {
         let arc = value.into() as Arc<dyn SeqObject>;
-        ValueBuf::Seq(ArcCow::Owned(arc)).into()
+        ValueRepr::Seq(ArcCow::Owned(arc)).into()
     }
 
     /// Creates a value from an owned [`MapObject`].
@@ -257,27 +298,27 @@ impl Value {
     ///
     /// **Note:** objects created this way cannot be downcasted via
     /// [`downcast_object_ref`](Self::downcast_object_ref).
-    pub fn from_map_object<T: MapObject + ?Sized + 'static>(value: T) -> Value
+    pub fn from_map_object<T: MapObject + ?Sized + 'static>(value: T) -> ValueBox
         where T: Into<Arc<T>>
     {
         let arc = value.into();
-        ValueBuf::Map(ArcCow::Owned(arc), MapType::Normal).into()
+        ValueRepr::Map(ArcCow::Owned(arc), MapType::Normal).into()
     }
 
-    pub(crate) fn from_kwargs<T: MapObject + ?Sized + 'static>(value: T) -> Value
+    pub(crate) fn from_kwargs<T: MapObject + ?Sized + 'static>(value: T) -> ValueBox
         where T: Into<Arc<T>>
     {
         let arc = value.into();
-        ValueBuf::Map(ArcCow::Owned(arc), MapType::Kwargs).into()
+        ValueRepr::Map(ArcCow::Owned(arc), MapType::Kwargs).into()
     }
 
     /// Creates a callable value from a function.
     ///
     /// ```
-    /// # use minijinja::value::Value;
-    /// let pow = Value::from_function(|a: u32| a * a);
+    /// # use minijinja::value::ValueBox;
+    /// let pow = ValueBox::from_function(|a: u32| a * a);
     /// ```
-    pub fn from_function<F, Rv, Args>(f: F) -> Value
+    pub fn from_function<F, Rv, Args>(f: F) -> ValueBox
     where
         // the crazy bounds here exist to enable borrowing in closures
         F: functions::Function<Rv, Args>
@@ -294,19 +335,19 @@ impl Value {
     /// perform operations on it.
     pub fn kind(&self) -> ValueKind {
         match self.0 {
-            ValueBuf::Undefined => ValueKind::Undefined,
-            ValueBuf::Bool(_) => ValueKind::Bool,
-            ValueBuf::U64(_) | ValueBuf::I64(_) | ValueBuf::F64(_) => ValueKind::Number,
-            ValueBuf::None => ValueKind::None,
-            ValueBuf::I128(_) => ValueKind::Number,
-            ValueBuf::String(..) => ValueKind::String,
-            ValueBuf::Bytes(_) => ValueKind::Bytes,
-            ValueBuf::U128(_) => ValueKind::Number,
-            ValueBuf::Seq(_) => ValueKind::Seq,
-            ValueBuf::Map(..) => ValueKind::Map,
+            ValueRepr::Undefined => ValueKind::Undefined,
+            ValueRepr::Bool(_) => ValueKind::Bool,
+            ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::F64(_) => ValueKind::Number,
+            ValueRepr::None => ValueKind::None,
+            ValueRepr::I128(_) => ValueKind::Number,
+            ValueRepr::String(..) => ValueKind::String,
+            ValueRepr::Bytes(_) => ValueKind::Bytes,
+            ValueRepr::U128(_) => ValueKind::Number,
+            ValueRepr::Seq(_) => ValueKind::Seq,
+            ValueRepr::Map(..) => ValueKind::Map,
             // XXX: invalid values report themselves as maps which is a lie
-            ValueBuf::Invalid(_) => ValueKind::Map,
-            ValueBuf::Dynamic(ref dy) => dy.value().kind(),
+            ValueRepr::Invalid(_) => ValueKind::Map,
+            ValueRepr::Dynamic(ref dy) => dy.value().kind(),
         }
     }
 
@@ -316,56 +357,56 @@ impl Value {
     pub fn is_number(&self) -> bool {
         matches!(
             self.0,
-            ValueBuf::U64(_)
-                | ValueBuf::I64(_)
-                | ValueBuf::F64(_)
-                | ValueBuf::I128(_)
-                | ValueBuf::U128(_)
+            ValueRepr::U64(_)
+                | ValueRepr::I64(_)
+                | ValueRepr::F64(_)
+                | ValueRepr::I128(_)
+                | ValueRepr::U128(_)
         )
     }
 
     /// Returns `true` if the map represents keyword arguments.
     pub fn is_kwargs(&self) -> bool {
-        matches!(self.0, ValueBuf::Map(_, MapType::Kwargs))
+        matches!(self.0, ValueRepr::Map(_, MapType::Kwargs))
     }
 
     /// Is this value true?
     pub fn is_true(&self) -> bool {
         match self.0 {
-            ValueBuf::Bool(val) => val,
-            ValueBuf::U64(x) => x != 0,
-            ValueBuf::U128(x) => x.0 != 0,
-            ValueBuf::I64(x) => x != 0,
-            ValueBuf::I128(x) => x.0 != 0,
-            ValueBuf::F64(x) => x != 0.0,
-            ValueBuf::String(ref x, _) => !x.is_empty(),
-            ValueBuf::Bytes(ref x) => !x.is_empty(),
-            ValueBuf::None | ValueBuf::Undefined | ValueBuf::Invalid(_) => false,
-            ValueBuf::Seq(ref x) => x.item_count() != 0,
-            ValueBuf::Map(ref x, _) => x.field_count() != 0,
-            ValueBuf::Dynamic(ref x) => x.value().is_true(),
+            ValueRepr::Bool(val) => val,
+            ValueRepr::U64(x) => x != 0,
+            ValueRepr::U128(x) => x.0 != 0,
+            ValueRepr::I64(x) => x != 0,
+            ValueRepr::I128(x) => x.0 != 0,
+            ValueRepr::F64(x) => x != 0.0,
+            ValueRepr::String(ref x, _) => !x.is_empty(),
+            ValueRepr::Bytes(ref x) => !x.is_empty(),
+            ValueRepr::None | ValueRepr::Undefined | ValueRepr::Invalid(_) => false,
+            ValueRepr::Seq(ref x) => x.item_count() != 0,
+            ValueRepr::Map(ref x, _) => x.field_count() != 0,
+            ValueRepr::Dynamic(ref x) => x.value().is_true(),
         }
     }
 
     /// Returns `true` if this value is safe.
     pub fn is_safe(&self) -> bool {
-        matches!(&self.0, ValueBuf::String(_, StringType::Safe))
+        matches!(&self.0, ValueRepr::String(_, StringType::Safe))
     }
 
     /// Returns `true` if this value is undefined.
     pub fn is_undefined(&self) -> bool {
-        matches!(&self.0, ValueBuf::Undefined)
+        matches!(&self.0, ValueRepr::Undefined)
     }
 
     /// Returns `true` if this value is none.
     pub fn is_none(&self) -> bool {
-        matches!(&self.0, ValueBuf::None)
+        matches!(&self.0, ValueRepr::None)
     }
 
     /// If the value is a string, return it.
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
-            ValueBuf::String(ref s, _) => Some(s as &str),
+            ValueRepr::String(ref s, _) => Some(s as &str),
             _ => None,
         }
     }
@@ -378,8 +419,8 @@ impl Value {
     /// Returns the bytes of this value if they exist.
     pub fn as_bytes(&self) -> Option<&[u8]> {
         match &self.0 {
-            ValueBuf::String(ref s, _) => Some(s.as_bytes()),
-            ValueBuf::Bytes(ref b) => Some(&b[..]),
+            ValueRepr::String(ref s, _) => Some(s.as_bytes()),
+            ValueRepr::Bytes(ref b) => Some(&b[..]),
             _ => None,
         }
     }
@@ -387,7 +428,7 @@ impl Value {
     /// If the value is an object, it's returned as [`Object`].
     pub fn as_object(&self) -> Option<&dyn Object> {
         match self.0 {
-            ValueBuf::Dynamic(ref dy) => Some(&**dy as &dyn Object),
+            ValueRepr::Dynamic(ref dy) => Some(&**dy as &dyn Object),
             _ => None,
         }
     }
@@ -395,9 +436,9 @@ impl Value {
     /// If the value is a sequence it's returned as [`SeqObject`].
     pub fn as_seq(&self) -> Option<&dyn SeqObject> {
         match self.0 {
-            ValueBuf::Seq(ref v) => Some(&**v),
-            ValueBuf::Dynamic(ref dy) => match dy.value() {
-                ValueRepr(ValueBuf::Seq(ArcCow::Borrowed(v))) => Some(v),
+            ValueRepr::Seq(ref v) => Some(&**v),
+            ValueRepr::Dynamic(ref dy) => match dy.value() {
+                Value(ValueRepr::Seq(ArcCow::Borrowed(v))) => Some(v),
                 _ => None
             }
             _ => None
@@ -407,9 +448,9 @@ impl Value {
     /// If the value is a struct, return it as [`MapObject`].
     pub fn as_struct(&self) -> Option<&dyn MapObject> {
         match self.0 {
-            ValueBuf::Map(ref v, _) => Some(&**v),
-            ValueBuf::Dynamic(ref dy) => match dy.value() {
-                ValueRepr(ValueBuf::Map(ArcCow::Borrowed(v), _)) => Some(v),
+            ValueRepr::Map(ref v, _) => Some(&**v),
+            ValueRepr::Dynamic(ref dy) => match dy.value() {
+                Value(ValueRepr::Map(ArcCow::Borrowed(v), _)) => Some(v),
                 _ => None
             }
             _ => None
@@ -418,19 +459,19 @@ impl Value {
 
     /// Returns the length of the contained value.
     ///
-    /// Values without a length will return `None`.
+    /// ValueBoxs without a length will return `None`.
     ///
     /// ```
-    /// # use minijinja::value::Value;
-    /// let seq = Value::from(vec![1, 2, 3, 4]);
+    /// # use minijinja::value::ValueBox;
+    /// let seq = ValueBox::from(vec![1, 2, 3, 4]);
     /// assert_eq!(seq.len(), Some(4));
     /// ```
     pub fn len(&self) -> Option<usize> {
         match self.0 {
-            ValueBuf::String(ref s, _) => Some(s.chars().count()),
-            ValueBuf::Map(ref items, _) => Some(items.field_count()),
-            ValueBuf::Seq(ref items) => Some(items.item_count()),
-            ValueBuf::Dynamic(ref dy) => dy.value().len(),
+            ValueRepr::String(ref s, _) => Some(s.chars().count()),
+            ValueRepr::Map(ref items, _) => Some(items.field_count()),
+            ValueRepr::Seq(ref items) => Some(items.item_count()),
+            ValueRepr::Dynamic(ref dy) => dy.value().len(),
             _ => None,
         }
     }
@@ -442,7 +483,7 @@ impl Value {
     /// that has attributes.
     ///
     /// ```
-    /// # use minijinja::value::Value;
+    /// # use minijinja::value::ValueBox;
     /// # fn test() -> Result<(), minijinja::Error> {
     /// let ctx = minijinja::context! {
     ///     foo => "Foo"
@@ -451,14 +492,14 @@ impl Value {
     /// assert_eq!(value.to_string(), "Foo");
     /// # Ok(()) }
     /// ```
-    pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
+    pub fn get_attr(&self, key: &str) -> Result<ValueBox, Error> {
         Ok(match self.0 {
-            ValueBuf::Undefined => return Err(Error::from(ErrorKind::UndefinedError)),
-            ValueBuf::Map(ref items, _) => items.get_field(&Value::from(key)),
-            ValueBuf::Dynamic(ref dy) => return dy.value().get_attr(key),
+            ValueRepr::Undefined => return Err(Error::from(ErrorKind::UndefinedError)),
+            ValueRepr::Map(ref items, _) => items.get_field(&ValueBox::from(key)),
+            ValueRepr::Dynamic(ref dy) => return dy.value().get_attr(key),
             _ => None,
         }
-        .unwrap_or(Value::UNDEFINED))
+        .unwrap_or(ValueBox::UNDEFINED))
     }
 
     /// Alternative lookup strategy without error handling exclusively for context
@@ -467,10 +508,10 @@ impl Value {
     /// The main difference is that the return value will be `None` if the value is
     /// unable to look up the key rather than returning `Undefined` and errors will
     /// also not be created.
-    pub(crate) fn get_attr_fast(&self, key: &str) -> Option<Value> {
+    pub(crate) fn get_attr_fast(&self, key: &str) -> Option<ValueBox> {
         match self.0 {
-            ValueBuf::Map(ref items, _) => items.get_field(&key.into()),
-            ValueBuf::Dynamic(ref dy) => dy.value().get_attr_fast(key),
+            ValueRepr::Map(ref items, _) => items.get_field(&key.into()),
+            ValueRepr::Dynamic(ref dy) => dy.value().get_attr_fast(key),
             _ => None,
         }
     }
@@ -480,13 +521,13 @@ impl Value {
     /// This is a shortcut for [`get_item`](Self::get_item).
     ///
     /// ```
-    /// # use minijinja::value::Value;
-    /// let seq = Value::from(vec![0u32, 1, 2]);
+    /// # use minijinja::value::ValueBox;
+    /// let seq = ValueBox::from(vec![0u32, 1, 2]);
     /// let value = seq.get_item_by_index(1).unwrap();
     /// assert_eq!(value.try_into().ok(), Some(1));
     /// ```
-    pub fn get_item_by_index(&self, idx: usize) -> Result<Value, Error> {
-        self.get_item(&ValueRepr(ValueBuf::U64(idx as _)))
+    pub fn get_item_by_index(&self, idx: usize) -> Result<ValueBox, Error> {
+        self.get_item(&Value(ValueRepr::U64(idx as _)))
     }
 
     /// Looks up an item (or attribute) by key.
@@ -497,18 +538,18 @@ impl Value {
     /// [`UNDEFINED`](Self::UNDEFINED) when an invalid key is looked up.
     ///
     /// ```
-    /// # use minijinja::value::Value;
+    /// # use minijinja::value::ValueBox;
     /// let ctx = minijinja::context! {
     ///     foo => "Foo",
     /// };
-    /// let value = ctx.get_item(&Value::from("foo")).unwrap();
+    /// let value = ctx.get_item(&ValueBox::from("foo")).unwrap();
     /// assert_eq!(value.to_string(), "Foo");
     /// ```
-    pub fn get_item(&self, key: &Value) -> Result<Value, Error> {
-        if let ValueBuf::Undefined = self.0 {
+    pub fn get_item(&self, key: &ValueBox) -> Result<ValueBox, Error> {
+        if let ValueRepr::Undefined = self.0 {
             Err(Error::from(ErrorKind::UndefinedError))
         } else {
-            Ok(self.get_item_opt(key).unwrap_or(Value::UNDEFINED))
+            Ok(self.get_item_opt(key).unwrap_or(ValueBox::UNDEFINED))
         }
     }
 
@@ -522,9 +563,9 @@ impl Value {
     /// * [`ValueKind::None`] / [`ValueKind::Undefined`]: the iterator is empty.
     ///
     /// ```
-    /// # use minijinja::value::Value;
+    /// # use minijinja::value::ValueBox;
     /// # fn test() -> Result<(), minijinja::Error> {
-    /// let value = Value::from({
+    /// let value = ValueBox::from({
     ///     let mut m = std::collections::BTreeMap::new();
     ///     m.insert("foo", 42);
     ///     m.insert("bar", 23);
@@ -552,7 +593,7 @@ impl Value {
     /// # Example
     ///
     /// ```rust
-    /// # use minijinja::value::{Value, Object};
+    /// # use minijinja::value::{ValueBox, Object};
     /// use std::fmt;
     ///
     /// #[derive(Debug)]
@@ -568,7 +609,7 @@ impl Value {
     ///
     /// impl Object for Thing {}
     ///
-    /// let x_value = Value::from_object(Thing { id: 42 });
+    /// let x_value = ValueBox::from_object(Thing { id: 42 });
     /// let thing = x_value.downcast_object_ref::<Thing>().unwrap();
     /// assert_eq!(thing.id, 42);
     /// ```
@@ -576,12 +617,12 @@ impl Value {
         self.as_object().and_then(|x| x.downcast_ref())
     }
 
-    pub(crate) fn get_item_opt(&self, key: &Value) -> Option<Value> {
+    pub(crate) fn get_item_opt(&self, key: &ValueBox) -> Option<ValueBox> {
         let seq = match self.0 {
-            ValueBuf::Map(ref items, _) => return items.get_field(key),
-            ValueBuf::Seq(ref items) => &**items as &dyn SeqObject,
-            ValueBuf::Dynamic(ref dy) => return dy.value().get_item_opt(key),
-            ValueBuf::String(ref s, _) => {
+            ValueRepr::Map(ref items, _) => return items.get_field(key),
+            ValueRepr::Seq(ref items) => &**items as &dyn SeqObject,
+            ValueRepr::Dynamic(ref dy) => return dy.value().get_item_opt(key),
+            ValueRepr::String(ref s, _) => {
                 if let Some(idx) = key.as_i64() {
                     let idx = some!(isize::try_from(idx).ok());
                     let idx = if idx < 0 {
@@ -589,7 +630,7 @@ impl Value {
                     } else {
                         idx as usize
                     };
-                    return s.chars().nth(idx).map(Value::from);
+                    return s.chars().nth(idx).map(ValueBox::from);
                 } else {
                     return None;
                 }
@@ -625,41 +666,41 @@ impl Value {
     /// from the [`Template`](crate::Template) via [`new_state`](crate::Template::new_state).
     ///
     /// ```
-    /// # use minijinja::{Environment, value::{Value, Kwargs}};
+    /// # use minijinja::{Environment, value::{ValueBox, Kwargs}};
     /// # let mut env = Environment::new();
     /// # env.add_template("foo", "").unwrap();
     /// # let tmpl = env.get_template("foo").unwrap();
     /// # let state = tmpl.new_state(); let state = &state;
-    /// let func = Value::from_function(|v: i64, kwargs: Kwargs| {
+    /// let func = ValueBox::from_function(|v: i64, kwargs: Kwargs| {
     ///     v * kwargs.get::<i64>("mult").unwrap_or(1)
     /// });
     /// let rv = func.call(
     ///     state,
     ///     &[
-    ///         Value::from(42),
-    ///         Value::from(Kwargs::from_iter([("mult", Value::from(2))])),
+    ///         ValueBox::from(42),
+    ///         ValueBox::from(Kwargs::from_iter([("mult", ValueBox::from(2))])),
     ///     ],
     /// ).unwrap();
-    /// assert_eq!(rv, Value::from(84));
+    /// assert_eq!(rv, ValueBox::from(84));
     /// ```
     ///
     /// With the [`args!`](crate::args) macro creating an argument slice is
     /// simplified:
     ///
     /// ```
-    /// # use minijinja::{Environment, args, value::{Value, Kwargs}};
+    /// # use minijinja::{Environment, args, value::{ValueBox, Kwargs}};
     /// # let mut env = Environment::new();
     /// # env.add_template("foo", "").unwrap();
     /// # let tmpl = env.get_template("foo").unwrap();
     /// # let state = tmpl.new_state(); let state = &state;
-    /// let func = Value::from_function(|v: i64, kwargs: Kwargs| {
+    /// let func = ValueBox::from_function(|v: i64, kwargs: Kwargs| {
     ///     v * kwargs.get::<i64>("mult").unwrap_or(1)
     /// });
     /// let rv = func.call(state, args!(42, mult => 2)).unwrap();
-    /// assert_eq!(rv, Value::from(84));
+    /// assert_eq!(rv, ValueBox::from(84));
     /// ```
-    pub fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
-        if let ValueBuf::Dynamic(ref dy) = self.0 {
+    pub fn call(&self, state: &State, args: &[ValueBox]) -> Result<ValueBox, Error> {
+        if let ValueRepr::Dynamic(ref dy) = self.0 {
             dy.call(state, args)
         } else {
             Err(Error::new(
@@ -673,10 +714,10 @@ impl Value {
     ///
     /// The name of the method is `name`, the arguments passed are in the `args`
     /// slice.
-    pub fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    pub fn call_method(&self, state: &State, name: &str, args: &[ValueBox]) -> Result<ValueBox, Error> {
         match self.0 {
-            ValueBuf::Dynamic(ref dy) => return dy.call_method(state, name, args),
-            ValueBuf::Map(ref map, _) => {
+            ValueRepr::Dynamic(ref dy) => return dy.call_method(state, name, args),
+            ValueRepr::Map(ref map, _) => {
                 if let Some(value) = map.get_field(&name.into()) {
                     return value.call(state, args);
                 }
@@ -691,17 +732,26 @@ impl Value {
 
     /// Iterates over the value without holding a reference.
     pub(crate) fn try_iter_owned(&self) -> Result<OwnedValueIterator, Error> {
+        fn make_it_owned(
+            value: &ArcCow<'_, dyn SeqObject + 'static>
+        ) -> ArcCow<'static, dyn SeqObject + 'static> {
+            match value {
+                ArcCow::Borrowed(v) => ArcCow::Owned(v.cloned()),
+                ArcCow::Owned(v) => ArcCow::Owned(v.clone()),
+            }
+        }
+
         let (iter_state, len) = match self.0 {
-            ValueBuf::None | ValueBuf::Undefined => (ValueIteratorState::Empty, 0),
-            ValueBuf::String(ref s, _) => (
-                ValueIteratorState::Chars(0, s.clone()),
-                s.chars().count(),
-            ),
-            ValueBuf::Seq(ref seq) => (
-                ValueIteratorState::DynSeq(0, seq.clone()),
-                seq.item_count(),
-            ),
-            ValueBuf::Map(ref s, _) => {
+            ValueRepr::None | ValueRepr::Undefined => (ValueIteratorState::Empty, 0),
+            ValueRepr::String(ref s, _) =>  {
+                let v: ArcCow<'static, str> = s.to_owned();
+                (ValueIteratorState::Chars(0, v), s.chars().count())
+            },
+            ValueRepr::Seq(ref seq) => {
+                let v: ArcCow<'static, dyn SeqObject + 'static> = make_it_owned(seq);
+                (ValueIteratorState::DynSeq(0, v), seq.item_count())
+            },
+            ValueRepr::Map(ref s, _) => {
                 // the assumption is that structs don't have excessive field counts
                 // and that most iterations go over all fields, so creating a
                 // temporary vector here is acceptable.
@@ -713,7 +763,7 @@ impl Value {
                     (ValueIteratorState::Seq(0, ArcCow::from(attrs)), attr_count)
                 }
             }
-            ValueBuf::Dynamic(ref obj) => return obj.value().try_iter_owned(),
+            ValueRepr::Dynamic(ref obj) => return obj.value().try_iter_owned(),
             _ => {
                 return Err(Error::new(
                     ErrorKind::InvalidOperation,
@@ -725,7 +775,7 @@ impl Value {
     }
 
     #[cfg(feature = "builtins")]
-    pub(crate) fn get_path(&self, path: &str) -> Result<Value, Error> {
+    pub(crate) fn get_path(&self, path: &str) -> Result<ValueBox, Error> {
         let mut rv = self.clone();
         for part in path.split('.') {
             if let Ok(num) = part.parse::<usize>() {
@@ -734,23 +784,23 @@ impl Value {
                 rv = ok!(rv.get_attr(part));
             }
         }
-        Ok(rv)
+        Ok(rv.into_owned())
     }
 }
 
-impl Default for Value {
-    fn default() -> Value {
-        ValueBuf::Undefined.into()
+impl Default for ValueBox {
+    fn default() -> ValueBox {
+        ValueRepr::Undefined.into()
     }
 }
 
-impl PartialEq for Value {
+impl PartialEq for ValueBox {
     fn eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
-            (ValueBuf::None, ValueBuf::None) => true,
-            (ValueBuf::Undefined, ValueBuf::Undefined) => true,
-            (ValueBuf::String(ref a, _), ValueBuf::String(ref b, _)) => a == b,
-            (ValueBuf::Bytes(a), ValueBuf::Bytes(b)) => a == b,
+            (ValueRepr::None, ValueRepr::None) => true,
+            (ValueRepr::Undefined, ValueRepr::Undefined) => true,
+            (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a == b,
+            (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
@@ -776,15 +826,15 @@ impl PartialEq for Value {
     }
 }
 
-impl Eq for Value {}
+impl Eq for ValueBox {}
 
-impl PartialOrd for Value {
+impl PartialOrd for ValueBox {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Value {
+impl Ord for ValueBox {
     fn cmp(&self, other: &Self) -> Ordering {
         fn f64_total_cmp(left: f64, right: f64) -> Ordering {
             // this is taken from f64::total_cmp on newer rust versions
@@ -796,10 +846,10 @@ impl Ord for Value {
         }
 
         let value_ordering = match (&self.0, &other.0) {
-            (ValueBuf::None, ValueBuf::None) => Ordering::Equal,
-            (ValueBuf::Undefined, ValueBuf::Undefined) => Ordering::Equal,
-            (ValueBuf::String(ref a, _), ValueBuf::String(ref b, _)) => a.cmp(b),
-            (ValueBuf::Bytes(a), ValueBuf::Bytes(b)) => a.cmp(b),
+            (ValueRepr::None, ValueRepr::None) => Ordering::Equal,
+            (ValueRepr::Undefined, ValueRepr::Undefined) => Ordering::Equal,
+            (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a.cmp(b),
+            (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.cmp(b),
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => f64_total_cmp(a, b),
                 Some(ops::CoerceResult::I128(a, b)) => a.cmp(&b),
@@ -824,20 +874,20 @@ impl Ord for Value {
     }
 }
 
-impl fmt::Debug for Value {
+impl fmt::Debug for ValueBox {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         fmt::Debug::fmt(&self.0, f)
     }
 }
 
-impl fmt::Display for Value {
+impl fmt::Display for ValueBox {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
-            ValueBuf::Undefined => Ok(()),
-            ValueBuf::Bool(val) => val.fmt(f),
-            ValueBuf::U64(val) => val.fmt(f),
-            ValueBuf::I64(val) => val.fmt(f),
-            ValueBuf::F64(val) => {
+            ValueRepr::Undefined => Ok(()),
+            ValueRepr::Bool(val) => val.fmt(f),
+            ValueRepr::U64(val) => val.fmt(f),
+            ValueRepr::I64(val) => val.fmt(f),
+            ValueRepr::F64(val) => {
                 if val.is_nan() {
                     f.write_str("NaN")
                 } else if val.is_infinite() {
@@ -850,12 +900,12 @@ impl fmt::Display for Value {
                     write!(f, "{num}")
                 }
             }
-            ValueBuf::None => f.write_str("none"),
-            ValueBuf::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
-            ValueBuf::I128(val) => write!(f, "{}", { val.0 }),
-            ValueBuf::String(val, _) => write!(f, "{val}"),
-            ValueBuf::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
-            ValueBuf::Seq(values) => {
+            ValueRepr::None => f.write_str("none"),
+            ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
+            ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
+            ValueRepr::String(val, _) => write!(f, "{val}"),
+            ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
+            ValueRepr::Seq(values) => {
                 ok!(f.write_str("["));
                 for (idx, val) in values.iter().enumerate() {
                     if idx > 0 {
@@ -865,7 +915,7 @@ impl fmt::Display for Value {
                 }
                 f.write_str("]")
             }
-            ValueBuf::Map(m, _) => {
+            ValueRepr::Map(m, _) => {
                 ok!(f.write_str("{"));
                 for (idx, (key, val)) in m.iter().enumerate() {
                     if idx > 0 {
@@ -875,31 +925,31 @@ impl fmt::Display for Value {
                 }
                 f.write_str("}")
             }
-            ValueBuf::U128(val) => write!(f, "{}", { val.0 }),
-            ValueBuf::Dynamic(x) => write!(f, "{x}"),
+            ValueRepr::U128(val) => write!(f, "{}", { val.0 }),
+            ValueRepr::Dynamic(x) => write!(f, "{x}"),
         }
     }
 }
 
-impl Hash for Value {
+impl Hash for ValueBox {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match &self.0 {
-            ValueBuf::None | ValueBuf::Undefined => 0u8.hash(state),
-            ValueBuf::String(ref s, _) => s.hash(state),
-            ValueBuf::Bool(b) => b.hash(state),
-            ValueBuf::Invalid(s) => s.hash(state),
-            ValueBuf::Bytes(b) => b.hash(state),
-            ValueBuf::Seq(b) => b.hash(state),
-            ValueBuf::Map(m, _) => m.iter().for_each(|(k, v)| {
+            ValueRepr::None | ValueRepr::Undefined => 0u8.hash(state),
+            ValueRepr::String(ref s, _) => s.hash(state),
+            ValueRepr::Bool(b) => b.hash(state),
+            ValueRepr::Invalid(s) => s.hash(state),
+            ValueRepr::Bytes(b) => b.hash(state),
+            ValueRepr::Seq(b) => b.hash(state),
+            ValueRepr::Map(m, _) => m.iter().for_each(|(k, v)| {
                 k.hash(state);
                 v.hash(state);
             }),
-            ValueBuf::Dynamic(d) => d.value().hash(state),
-            ValueBuf::U64(_)
-            | ValueBuf::I64(_)
-            | ValueBuf::F64(_)
-            | ValueBuf::U128(_)
-            | ValueBuf::I128(_) => {
+            ValueRepr::Dynamic(d) => d.value().hash(state),
+            ValueRepr::U64(_)
+            | ValueRepr::I64(_)
+            | ValueRepr::F64(_)
+            | ValueRepr::U128(_)
+            | ValueRepr::I128(_) => {
                 if let Ok(val) = i64::try_from(self.clone()) {
                     val.hash(state)
                 } else {
@@ -912,12 +962,12 @@ impl Hash for Value {
 
 /// Iterates over a value.
 pub struct ValueIter<'a> {
-    _marker: PhantomData<&'a Value>,
+    _marker: PhantomData<&'a ValueBox>,
     inner: OwnedValueIterator,
 }
 
 impl<'a> Iterator for ValueIter<'a> {
-    type Item = Value;
+    type Item = ValueBox;
 
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
@@ -931,7 +981,7 @@ pub(crate) struct OwnedValueIterator {
 }
 
 impl Iterator for OwnedValueIterator {
-    type Item = Value;
+    type Item = ValueBox;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter_state.advance_state().map(|x| {
@@ -956,19 +1006,19 @@ impl fmt::Debug for OwnedValueIterator {
 enum ValueIteratorState {
     Empty,
     Chars(usize, ArcCow<'static, str>),
-    Seq(usize, ArcCow<'static, [Value]>),
+    Seq(usize, ArcCow<'static, [ValueBox]>),
     StaticStr(usize, &'static [&'static str]),
     DynSeq(usize, ArcCow<'static, dyn SeqObject>),
 }
 
 impl ValueIteratorState {
-    fn advance_state(&mut self) -> Option<Value> {
+    fn advance_state(&mut self) -> Option<ValueBox> {
         match self {
             ValueIteratorState::Empty => None,
             ValueIteratorState::Chars(offset, ref s) => {
                 (s as &str)[*offset..].chars().next().map(|c| {
                     *offset += c.len_utf8();
-                    Value::from(c)
+                    ValueBox::from(c)
                 })
             }
             ValueIteratorState::Seq(idx, items) => items
@@ -980,7 +1030,7 @@ impl ValueIteratorState {
                 .cloned(),
             ValueIteratorState::StaticStr(idx, items) => items.get(*idx).map(|x| {
                 *idx += 1;
-                Value::from(intern(x))
+                ValueBox::from(intern(x))
             }),
             ValueIteratorState::DynSeq(idx, seq) => {
                 seq.get_item(*idx).map(|x| {
@@ -992,23 +1042,23 @@ impl ValueIteratorState {
     }
 }
 
-// impl fmt::Debug for ValueBuf {
+// impl fmt::Debug for ValueRepr {
 //     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 //         match self {
-//             ValueBuf::Undefined => f.write_str("Undefined"),
-//             ValueBuf::Bool(val) => fmt::Debug::fmt(val, f),
-//             ValueBuf::U64(val) => fmt::Debug::fmt(val, f),
-//             ValueBuf::I64(val) => fmt::Debug::fmt(val, f),
-//             ValueBuf::F64(val) => fmt::Debug::fmt(val, f),
-//             ValueBuf::None => f.write_str("None"),
-//             ValueBuf::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
-//             ValueBuf::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-//             ValueBuf::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-//             ValueBuf::String(val, _) => fmt::Debug::fmt(val, f),
-//             ValueBuf::Bytes(val) => fmt::Debug::fmt(val, f),
-//             ValueBuf::Seq(val) => fmt::Debug::fmt(val, f),
-//             ValueBuf::Map(val, _) => fmt::Debug::fmt(val, f),
-//             ValueBuf::Dynamic(val) => fmt::Debug::fmt(val, f),
+//             ValueRepr::Undefined => f.write_str("Undefined"),
+//             ValueRepr::Bool(val) => fmt::Debug::fmt(val, f),
+//             ValueRepr::U64(val) => fmt::Debug::fmt(val, f),
+//             ValueRepr::I64(val) => fmt::Debug::fmt(val, f),
+//             ValueRepr::F64(val) => fmt::Debug::fmt(val, f),
+//             ValueRepr::None => f.write_str("None"),
+//             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
+//             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
+//             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
+//             ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
+//             ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
+//             ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
+//             ValueRepr::Map(val, _) => fmt::Debug::fmt(val, f),
+//             ValueRepr::Dynamic(val) => fmt::Debug::fmt(val, f),
 //         }
 //     }
 // }

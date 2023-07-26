@@ -1,6 +1,6 @@
 #![cfg(feature = "unstable_machinery")]
 use minijinja::machinery::{CodeGenerator, Instruction};
-use minijinja::value::Value;
+use minijinja::value::ValueBox;
 
 #[test]
 fn test_for_loop() {
@@ -51,8 +51,8 @@ fn test_bool_ops() {
 fn test_const() {
     let mut c = CodeGenerator::new("<unknown>", "");
 
-    c.add(Instruction::LoadConst(Value::from("a")));
-    c.add(Instruction::LoadConst(Value::from(42)));
+    c.add(Instruction::LoadConst(ValueBox::from("a")));
+    c.add(Instruction::LoadConst(ValueBox::from(42)));
     c.add(Instruction::StringConcat);
 
     insta::assert_debug_snapshot!(&c.finish());

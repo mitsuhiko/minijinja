@@ -14,7 +14,7 @@ use crate::environment::Environment;
 use crate::error::{attach_basic_debug_info, Error};
 use crate::output::{Output, WriteWrapper};
 use crate::utils::AutoEscape;
-use crate::value::{self, Value};
+use crate::value::{self, ValueBox};
 use crate::vm::{prepare_blocks, State, Vm};
 
 /// Represents a handle to a template.
@@ -91,12 +91,12 @@ impl<'env, 'source> Template<'env, 'source> {
     /// To render a single block use [`eval_to_state`](Self::eval_to_state) in
     /// combination with [`State::render_block`].
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// **Note on values:** The [`ValueBox`] type implements `Serialize` and can be
     /// efficiently passed to render.  It does not undergo actual serialization.
     pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _render.
-        self._render(Value::from_serializable(&ctx)).map(|x| x.0)
+        self._render(ValueBox::from_serializable(&ctx)).map(|x| x.0)
     }
 
     /// Like [`render`](Self::render) but also return the evaluated [`State`].
@@ -111,10 +111,10 @@ impl<'env, 'source> Template<'env, 'source> {
     /// let tmpl = env.template_from_str("{% set x = 42 %}Hello {{ what }}!").unwrap();
     /// let (rv, state) = tmpl.render_and_return_state(context!{ what => "World" }).unwrap();
     /// assert_eq!(rv, "Hello World!");
-    /// assert_eq!(state.lookup("x"), Some(Value::from(42)));
+    /// assert_eq!(state.lookup("x"), Some(ValueBox::from(42)));
     /// ```
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// **Note on values:** The [`ValueBox`] type implements `Serialize` and can be
     /// efficiently passed to render.  It does not undergo actual serialization.
     pub fn render_and_return_state<S: Serialize>(
         &self,
@@ -122,10 +122,10 @@ impl<'env, 'source> Template<'env, 'source> {
     ) -> Result<(String, State<'_, 'env>), Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _render.
-        self._render(Value::from_serializable(&ctx))
+        self._render(ValueBox::from_serializable(&ctx))
     }
 
-    fn _render(&self, root: Value) -> Result<(String, State<'_, 'env>), Error> {
+    fn _render(&self, root: ValueBox) -> Result<(String, State<'_, 'env>), Error> {
         let mut rv = String::with_capacity(self.compiled.buffer_size_hint);
         self._eval(root, &mut Output::with_string(&mut rv))
             .map(|(_, state)| (rv, state))
@@ -147,7 +147,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// tmpl.render_to_write(context!(name => "John"), &mut stdout()).unwrap();
     /// ```
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
+    /// **Note on values:** The [`ValueBox`] type implements `Serialize` and can be
     /// efficiently passed to render.  It does not undergo actual serialization.
     pub fn render_to_write<S: Serialize, W: io::Write>(
         &self,
@@ -156,7 +156,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ) -> Result<State<'_, 'env>, Error> {
         let mut wrapper = WriteWrapper { w, err: None };
         self._eval(
-            Value::from_serializable(&ctx),
+            ValueBox::from_serializable(&ctx),
             &mut Output::with_write(&mut wrapper),
         )
         .map(|(_, state)| state)
@@ -187,7 +187,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ///
     /// For more information see [`State`].
     pub fn eval_to_state<S: Serialize>(&self, ctx: S) -> Result<State<'_, 'env>, Error> {
-        let root = Value::from_serializable(&ctx);
+        let root = ValueBox::from_serializable(&ctx);
         let mut out = Output::null();
         let vm = Vm::new(self.env);
         let state = ok!(vm.eval(
@@ -203,9 +203,9 @@ impl<'env, 'source> Template<'env, 'source> {
 
     fn _eval(
         &self,
-        root: Value,
+        root: ValueBox,
         out: &mut Output,
-    ) -> Result<(Option<Value>, State<'_, 'env>), Error> {
+    ) -> Result<(Option<ValueBox>, State<'_, 'env>), Error> {
         Vm::new(self.env).eval(
             &self.compiled.instructions,
             root,

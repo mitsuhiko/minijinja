@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{env, fs};
 
-use minijinja::value::{MapObject, Value};
+use minijinja::value::{MapObject, ValueBox};
 use minijinja::{context, Environment, Error, State};
 
 use similar_asserts::assert_eq;
@@ -164,10 +164,10 @@ fn test_items_and_dictsort_with_structs() {
     struct MyStruct;
 
     impl MapObject for MyStruct {
-        fn get_field(&self, name: &str) -> Option<Value> {
+        fn get_field(&self, name: &str) -> Option<ValueBox> {
             match name {
-                "a" => Some(Value::from("A")),
-                "b" => Some(Value::from("B")),
+                "a" => Some(ValueBox::from("A")),
+                "b" => Some(ValueBox::from("B")),
                 _ => None,
             }
         }
@@ -178,11 +178,11 @@ fn test_items_and_dictsort_with_structs() {
     }
 
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|items }}", x => Value::from_map_object(MyStruct)),
+        minijinja::render!("{{ x|items }}", x => ValueBox::from_map_object(MyStruct)),
         @r###"[["b", "B"], ["a", "A"]]"###
     );
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|dictsort }}", x => Value::from_map_object(MyStruct)),
+        minijinja::render!("{{ x|dictsort }}", x => ValueBox::from_map_object(MyStruct)),
         @r###"[["a", "A"], ["b", "B"]]"###
     );
 }
@@ -192,10 +192,10 @@ fn test_urlencode_with_struct() {
     struct MyStruct;
 
     impl MapObject for MyStruct {
-        fn get_field(&self, name: &str) -> Option<Value> {
+        fn get_field(&self, name: &str) -> Option<ValueBox> {
             match name {
-                "a" => Some(Value::from("a 1")),
-                "b" => Some(Value::from("b 2")),
+                "a" => Some(ValueBox::from("a 1")),
+                "b" => Some(ValueBox::from("b 2")),
                 _ => None,
             }
         }
@@ -206,7 +206,7 @@ fn test_urlencode_with_struct() {
     }
 
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|urlencode }}", x => Value::from_map_object(MyStruct)),
+        minijinja::render!("{{ x|urlencode }}", x => ValueBox::from_map_object(MyStruct)),
         @"a=a%201&b=b%202"
     );
 }
@@ -278,12 +278,12 @@ fn test_auto_escaping() {
     // JSON
     #[cfg(feature = "json")]
     {
-        use minijinja::value::Value;
+        use minijinja::value::ValueBox;
         let tmpl = env.get_template("index.js").unwrap();
         let rv = tmpl.render(context!(var => "foo\"bar'baz")).unwrap();
         insta::assert_snapshot!(rv, @r###""foo\"bar'baz""###);
         let rv = tmpl
-            .render(context!(var => [Value::from(true), Value::from("<foo>"), Value::from(())]))
+            .render(context!(var => [ValueBox::from(true), ValueBox::from("<foo>"), ValueBox::from(())]))
             .unwrap();
         insta::assert_snapshot!(rv, @r###"[true,"<foo>",null]"###);
     }
@@ -314,7 +314,7 @@ fn test_loop_changed() {
 struct Bad {
     a: i32,
     #[serde(flatten)]
-    more: Value,
+    more: ValueBox,
 }
 
 #[test]
@@ -322,7 +322,7 @@ struct Bad {
 fn test_flattening() {
     let ctx = Bad {
         a: 42,
-        more: Value::from(BTreeMap::from([("b", 23)])),
+        more: ValueBox::from(BTreeMap::from([("b", 23)])),
     };
 
     let env = Environment::new();
@@ -333,7 +333,7 @@ fn test_flattening() {
 fn test_flattening_sub_item_good() {
     let bad = Bad {
         a: 42,
-        more: Value::from(BTreeMap::from([("b", 23)])),
+        more: ValueBox::from(BTreeMap::from([("b", 23)])),
     };
 
     let ctx = context!(bad, good => "good");
@@ -349,7 +349,7 @@ fn test_flattening_sub_item_good() {
 fn test_flattening_sub_item_bad_lookup() {
     let bad = Bad {
         a: 42,
-        more: Value::from(BTreeMap::from([("b", 23)])),
+        more: ValueBox::from(BTreeMap::from([("b", 23)])),
     };
 
     let ctx = context!(bad, good => "good");
@@ -364,7 +364,7 @@ fn test_flattening_sub_item_bad_lookup() {
 fn test_flattening_sub_item_bad_attr() {
     let bad = Bad {
         a: 42,
-        more: Value::from(BTreeMap::from([("b", 23)])),
+        more: ValueBox::from(BTreeMap::from([("b", 23)])),
     };
 
     let ctx = context!(good => context!(bad));
@@ -379,7 +379,7 @@ fn test_flattening_sub_item_bad_attr() {
 fn test_flattening_sub_item_shielded_print() {
     let bad = Bad {
         a: 42,
-        more: Value::from(BTreeMap::from([("b", 23)])),
+        more: ValueBox::from(BTreeMap::from([("b", 23)])),
     };
 
     let ctx = context!(good => context!(bad));
@@ -476,7 +476,7 @@ fn test_state() {
         .unwrap();
     assert!(state.lookup("range").is_some());
     assert!(!state.exports().contains(&"range"));
-    assert_eq!(state.lookup("global"), Some(Value::from(23 * 2)));
+    assert_eq!(state.lookup("global"), Some(ValueBox::from(23 * 2)));
     assert_eq!(state.call_macro("something", &[]).unwrap(), "46");
     assert_eq!(state.render_block("baz").unwrap(), "[46]");
 }
@@ -496,7 +496,7 @@ fn test_render_and_return_state() {
         .render_and_return_state(context! { name => "Foo" })
         .unwrap();
     assert_eq!(rv, "Hello Foo!\nHello Foo!\nHello Foo!\n");
-    assert_eq!(state.lookup("x"), Some(Value::from(1)));
+    assert_eq!(state.lookup("x"), Some(ValueBox::from(1)));
 
     #[cfg(feature = "fuel")]
     {
@@ -513,6 +513,6 @@ fn test_render_to_write_state() {
     let mut out = Vec::<u8>::new();
     let state = tmpl.render_to_write((), &mut out).unwrap();
     assert_eq!(String::from_utf8_lossy(&out), "root");
-    assert_eq!(state.lookup("foo"), Some(Value::from(42)));
+    assert_eq!(state.lookup("foo"), Some(ValueBox::from(42)));
     assert_eq!(state.call_macro("bar", &[]).ok().as_deref(), Some("x"));
 }
