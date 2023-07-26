@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use minijinja::value::Value;
+use minijinja::value::ValueBox;
 use minijinja::{Error, ErrorKind};
 
 #[cfg(feature = "datetime")]
@@ -28,7 +28,7 @@ pub use self::datetime::*;
 /// ```jinja
 /// {{ platypuses|length }} platypus{{ platypuses|pluralize(None, "es") }}.
 /// ```
-pub fn pluralize(v: Value, singular: Option<Value>, plural: Option<Value>) -> Result<Value, Error> {
+pub fn pluralize(v: ValueBox, singular: Option<ValueBox>, plural: Option<ValueBox>) -> Result<ValueBox, Error> {
     let is_singular = match v.len() {
         Some(val) => val == 1,
         None => match i64::try_from(v.clone()) {
@@ -47,13 +47,13 @@ pub fn pluralize(v: Value, singular: Option<Value>, plural: Option<Value>) -> Re
     };
 
     let (rv, default) = if is_singular {
-        (singular.unwrap_or(Value::UNDEFINED), "")
+        (singular.unwrap_or(ValueBox::UNDEFINED), "")
     } else {
-        (plural.unwrap_or(Value::UNDEFINED), "s")
+        (plural.unwrap_or(ValueBox::UNDEFINED), "s")
     };
 
     if rv.is_undefined() || rv.is_none() {
-        Ok(Value::from(default))
+        Ok(ValueBox::from(default))
     } else {
         Ok(rv)
     }

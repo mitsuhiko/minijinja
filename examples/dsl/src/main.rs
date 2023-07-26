@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
-use minijinja::value::{from_args, Kwargs, Object, Value};
+use minijinja::value::{from_args, Kwargs, Object, ValueBox};
 use minijinja::{Environment, Error, ErrorKind};
 
 /// A copy-on-write object that holds an assembled query.
 #[derive(Debug, Clone)]
 pub struct Query {
     table: Arc<str>,
-    filters: Arc<HashMap<String, Value>>,
+    filters: Arc<HashMap<String, ValueBox>>,
     limit: Option<usize>,
     offset: Option<usize>,
 }
@@ -36,7 +36,7 @@ impl Query {
         let mut rv = self.clone();
         let filters_mut = Arc::make_mut(&mut rv.filters);
         for arg in kwargs.args() {
-            filters_mut.insert(arg.to_string(), kwargs.get::<Value>(arg).unwrap());
+            filters_mut.insert(arg.to_string(), kwargs.get::<ValueBox>(arg).unwrap());
         }
         rv
     }
@@ -62,20 +62,20 @@ impl Object for Query {
         &self,
         _state: &minijinja::State,
         name: &str,
-        args: &[Value],
-    ) -> Result<Value, minijinja::Error> {
+        args: &[ValueBox],
+    ) -> Result<ValueBox, minijinja::Error> {
         match name {
             "filter" => {
                 let (kwargs,) = from_args(args)?;
-                Ok(Value::from_object(self.filter(kwargs)))
+                Ok(ValueBox::from_object(self.filter(kwargs)))
             }
             "limit" => {
                 let (limit,) = from_args(args)?;
-                Ok(Value::from_object(self.limit(limit)))
+                Ok(ValueBox::from_object(self.limit(limit)))
             }
             "offset" => {
                 let (offset,) = from_args(args)?;
-                Ok(Value::from_object(self.offset(offset)))
+                Ok(ValueBox::from_object(self.offset(offset)))
             }
             _ => Err(minijinja::Error::new(
                 minijinja::ErrorKind::UnknownMethod,
@@ -85,13 +85,13 @@ impl Object for Query {
     }
 }
 
-/// Like [`Query::new`] but wraps it in a [`Value`].
-fn query(table: String) -> Value {
-    Value::from_object(Query::new(table))
+/// Like [`Query::new`] but wraps it in a [`ValueBox`].
+fn query(table: String) -> ValueBox {
+    ValueBox::from_object(Query::new(table))
 }
 
-/// Utility function to extract a [`Query`] out of a [`Value`].
-fn value_as_query(obj: &Value) -> Result<&Query, Error> {
+/// Utility function to extract a [`Query`] out of a [`ValueBox`].
+fn value_as_query(obj: &ValueBox) -> Result<&Query, Error> {
     obj.downcast_object_ref::<Query>().ok_or_else(|| {
         Error::new(
             ErrorKind::InvalidOperation,
@@ -101,18 +101,18 @@ fn value_as_query(obj: &Value) -> Result<&Query, Error> {
 }
 
 /// Filters a query by some keyword arguments as filter function.
-fn filter_filter(obj: &Value, kwargs: Kwargs) -> Result<Value, Error> {
-    Ok(Value::from_object(value_as_query(obj)?.filter(kwargs)))
+fn filter_filter(obj: &ValueBox, kwargs: Kwargs) -> Result<ValueBox, Error> {
+    Ok(ValueBox::from_object(value_as_query(obj)?.filter(kwargs)))
 }
 
 /// Applies a limit to a query as filter function.
-fn limit_filter(obj: &Value, limit: usize) -> Result<Value, Error> {
-    Ok(Value::from_object(value_as_query(obj)?.limit(limit)))
+fn limit_filter(obj: &ValueBox, limit: usize) -> Result<ValueBox, Error> {
+    Ok(ValueBox::from_object(value_as_query(obj)?.limit(limit)))
 }
 
 /// Applies an offset to a query as filter function.
-fn offset_filter(obj: &Value, offset: usize) -> Result<Value, Error> {
-    Ok(Value::from_object(value_as_query(obj)?.offset(offset)))
+fn offset_filter(obj: &ValueBox, offset: usize) -> Result<ValueBox, Error> {
+    Ok(ValueBox::from_object(value_as_query(obj)?.offset(offset)))
 }
 
 fn main() {

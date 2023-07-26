@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use minijinja::value::{Kwargs, Value, ValueKind};
+use minijinja::value::{Kwargs, ValueBox, ValueBoxKind};
 use minijinja::{Error, ErrorKind, State};
 use serde::de::value::SeqDeserializer;
 use serde::Deserialize;
@@ -13,7 +13,7 @@ fn handle_serde_error(err: serde::de::value::Error) -> Error {
 }
 
 fn value_to_datetime(
-    value: Value,
+    value: ValueBox,
     state: &State,
     kwargs: &Kwargs,
     allow_date: bool,
@@ -39,7 +39,7 @@ fn value_to_datetime(
                 .map_err(|_| Error::new(ErrorKind::InvalidOperation, "date out of range"))?,
             true,
         )
-    } else if value.kind() == ValueKind::Seq {
+    } else if value.kind() == ValueBoxKind::Seq {
         let mut items = Vec::new();
         for item in value.try_iter()? {
             items.push(i64::try_from(item)?);
@@ -136,7 +136,7 @@ fn value_to_datetime(
 /// This filter requires the `datetime` feature, the timezone support requires the `timezone`
 /// feature.
 #[cfg_attr(docsrs, doc(cfg(feature = "datetime")))]
-pub fn datetimeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String, Error> {
+pub fn datetimeformat(state: &State, value: ValueBox, kwargs: Kwargs) -> Result<String, Error> {
     let datetime = value_to_datetime(value, state, &kwargs, false)?;
     let configured_format = state.lookup("DATETIME_FORMAT");
 
@@ -208,7 +208,7 @@ pub fn datetimeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<Str
 /// This filter requires the `datetime` feature, the timezone support requires the `timezone`
 /// feature.
 #[cfg_attr(docsrs, doc(cfg(feature = "datetime")))]
-pub fn timeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String, Error> {
+pub fn timeformat(state: &State, value: ValueBox, kwargs: Kwargs) -> Result<String, Error> {
     let datetime = value_to_datetime(value, state, &kwargs, false)?;
     let configured_format = state.lookup("TIME_FORMAT");
 
@@ -279,7 +279,7 @@ pub fn timeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String,
 /// This filter requires the `datetime` feature, the timezone support requires the `timezone`
 /// feature.
 #[cfg_attr(docsrs, doc(cfg(feature = "datetime")))]
-pub fn dateformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String, Error> {
+pub fn dateformat(state: &State, value: ValueBox, kwargs: Kwargs) -> Result<String, Error> {
     let datetime = value_to_datetime(value, state, &kwargs, true)?;
     let configured_format = state.lookup("DATE_FORMAT");
 

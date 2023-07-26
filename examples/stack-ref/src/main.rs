@@ -1,6 +1,6 @@
 use std::{env, fmt};
 
-use minijinja::value::{Object, StructObject, Value};
+use minijinja::value::{Object, StructObject, ValueBox};
 use minijinja::{context, Environment, Error, ErrorKind, State};
 use minijinja_stack_ref::{reborrow, scope};
 
@@ -19,10 +19,10 @@ impl StructObject for Config {
         Some(&["manifest_dir", "version", "nested"][..])
     }
 
-    fn get_field(&self, field: &str) -> Option<Value> {
+    fn get_field(&self, field: &str) -> Option<ValueBox> {
         match field {
-            "manifest_dir" => Some(Value::from(self.manifest_dir)),
-            "version" => Some(Value::from(self.version)),
+            "manifest_dir" => Some(ValueBox::from(self.manifest_dir)),
+            "version" => Some(ValueBox::from(self.version)),
             "nested" => Some(reborrow(self, |slf, scope| {
                 scope.struct_object_ref(&slf.nested)
             })),
@@ -36,9 +36,9 @@ impl StructObject for NestedConfig {
         Some(&["active"][..])
     }
 
-    fn get_field(&self, field: &str) -> Option<Value> {
+    fn get_field(&self, field: &str) -> Option<ValueBox> {
         match field {
-            "active" => Some(Value::from(self.active)),
+            "active" => Some(ValueBox::from(self.active)),
             _ => None,
         }
     }
@@ -54,9 +54,9 @@ impl fmt::Display for Utils {
 }
 
 impl Object for Utils {
-    fn call_method(&self, _state: &State, name: &str, _args: &[Value]) -> Result<Value, Error> {
+    fn call_method(&self, _state: &State, name: &str, _args: &[ValueBox]) -> Result<ValueBox, Error> {
         match name {
-            "get_cwd" => Ok(Value::from(env::current_dir().unwrap().to_string_lossy())),
+            "get_cwd" => Ok(ValueBox::from(env::current_dir().unwrap().to_string_lossy())),
             _ => Err(Error::from(ErrorKind::UnknownMethod)),
         }
     }

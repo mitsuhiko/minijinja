@@ -1,10 +1,10 @@
 use std::env;
 use std::fs;
 
-use minijinja::value::Value;
+use minijinja::value::ValueBox;
 use minijinja::{Environment, Error, ErrorKind};
 
-fn load_data(filename: &str) -> Result<Value, Error> {
+fn load_data(filename: &str) -> Result<ValueBox, Error> {
     let mut rv = env::current_dir().unwrap().join("src");
     for segment in filename.split('/') {
         if segment.starts_with('.') || segment.contains('\\') {
@@ -17,7 +17,7 @@ fn load_data(filename: &str) -> Result<Value, Error> {
     })?;
     let parsed: serde_json::Value = serde_json::from_slice(&contents[..])
         .map_err(|err| Error::new(ErrorKind::InvalidOperation, "invalid JSON").with_source(err))?;
-    Ok(Value::from_serializable(&parsed))
+    Ok(ValueBox::from_serializable(&parsed))
 }
 
 fn main() {

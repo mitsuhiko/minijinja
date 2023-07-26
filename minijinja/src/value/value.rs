@@ -270,7 +270,7 @@ impl Value<'_> {
     /// use std::sync::Arc;
     /// let val = ValueBox::from(Arc::new(Thing { id: 42 }));
     /// ```
-    pub fn from_object<T: Object + ?Sized>(value: T) -> ValueBox
+    pub fn from_object<'a, T: Object + ?Sized + 'a>(value: T) -> Value<'a>
         where T: Into<Arc<T>>
     {
         let arc = value.into();

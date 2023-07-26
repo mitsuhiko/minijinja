@@ -14,7 +14,7 @@
 //! runtime for MiniJinja objects.  One first needs to create a [`Scope`] with
 //! the [`scope`] function.  It invokes a callback to which a scope is passed
 //! which in turn then provides functionality to create
-//! [`Value`](minijinja::value::Value)s to those borrowed values such as the
+//! [`ValueBox`](minijinja::value::Value)s to those borrowed values such as the
 //! [`object_ref`](crate::Scope::object_ref) method.
 //!
 //! # Example
@@ -22,7 +22,7 @@
 //! This example demonstrates how to pass borrowed information into a template:
 //!
 //! ```
-//! use minijinja::value::{StructObject, Value};
+//! use minijinja::value::{StructObject, ValueBox};
 //! use minijinja::{context, Environment};
 //! use minijinja_stack_ref::scope;
 //!
@@ -31,9 +31,9 @@
 //! }
 //!
 //! impl StructObject for State {
-//!     fn get_field(&self, field: &str) -> Option<Value> {
+//!     fn get_field(&self, field: &str) -> Option<ValueBox> {
 //!         match field {
-//!             "version" => Some(Value::from(self.version)),
+//!             "version" => Some(ValueBox::from(self.version)),
 //!             _ => None,
 //!         }
 //!     }
@@ -70,7 +70,7 @@
 //! from within an referenced object:
 //!
 //! ```
-//! use minijinja::value::{StructObject, Value};
+//! use minijinja::value::{StructObject, ValueBox};
 //! use minijinja::{context, Environment};
 //! use minijinja_stack_ref::{reborrow, scope};
 //!
@@ -83,16 +83,16 @@
 //! }
 //!
 //! impl StructObject for Config {
-//!     fn get_field(&self, field: &str) -> Option<Value> {
+//!     fn get_field(&self, field: &str) -> Option<ValueBox> {
 //!         match field {
-//!             "version" => Some(Value::from(self.version)),
+//!             "version" => Some(ValueBox::from(self.version)),
 //!             _ => None,
 //!         }
 //!     }
 //! }
 //!
 //! impl StructObject for State {
-//!     fn get_field(&self, field: &str) -> Option<Value> {
+//!     fn get_field(&self, field: &str) -> Option<ValueBox> {
 //!         match field {
 //!             // return a reference to the inner config through reborrowing
 //!             "config" => Some(reborrow(self, |slf, scope| {
@@ -133,7 +133,7 @@ use std::mem::transmute;
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use minijinja::value::{Object, SeqObject, Value};
+use minijinja::value::{Object, SeqObject, ValueBox};
 use minijinja::{Error, State};
 
 static STACK_SCOPE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -177,10 +177,10 @@ impl Drop for ResetHandleOnDrop {
 /// value that is currently referenced by a [`StackHandle`], this utility can be
 /// used to reborrow `&self` with the lifetime of the scope.
 ///
-/// This lets code return a [`Value`] that borrows into a field of `&self`.
+/// This lets code return a [`ValueBox`] that borrows into a field of `&self`.
 ///
 /// ```
-/// use minijinja::value::{Value, StructObject};
+/// use minijinja::value::{ValueBox, StructObject};
 /// use minijinja_stack_ref::{reborrow, scope};
 ///
 /// struct MyObject {
@@ -188,7 +188,7 @@ impl Drop for ResetHandleOnDrop {
 /// }
 ///
 /// impl StructObject for MyObject {
-///     fn get_field(&self, field: &str) -> Option<Value> {
+///     fn get_field(&self, field: &str) -> Option<ValueBox> {
 ///         match field {
 ///             "values" => Some(reborrow(self, |slf, scope| {
 ///                 scope.seq_object_ref(&slf.values[..])
@@ -211,7 +211,7 @@ impl Drop for ResetHandleOnDrop {
 /// This function panics if the passed object is not currently interacted with
 /// or not created via the [`Scope`].  In other words this function can only be
 /// used within object methods of [`Object`], [`SeqObject`] or [`StructObject`]
-/// of an object that has been put into a [`Value`] via a [`Scope`].
+/// of an object that has been put into a [`ValueBox`] via a [`Scope`].
 ///
 /// To check if reborrowing is possible, [`can_reborrow`] can be used instead.
 pub fn reborrow<T: ?Sized, R>(obj: &T, f: for<'a> fn(&'a T, &'a Scope) -> R) -> R {
@@ -258,7 +258,7 @@ pub fn reborrow<T: ?Sized, R>(obj: &T, f: for<'a> fn(&'a T, &'a Scope) -> R) -> 
 /// `true`, then [`reborrow`] will not panic.
 ///
 /// ```
-/// use minijinja::value::{Value, StructObject};
+/// use minijinja::value::{ValueBox, StructObject};
 /// use minijinja_stack_ref::{reborrow, can_reborrow, scope};
 ///
 /// struct MyObject {
@@ -266,14 +266,14 @@ pub fn reborrow<T: ?Sized, R>(obj: &T, f: for<'a> fn(&'a T, &'a Scope) -> R) -> 
 /// }
 ///
 /// impl StructObject for MyObject {
-///     fn get_field(&self, field: &str) -> Option<Value> {
+///     fn get_field(&self, field: &str) -> Option<ValueBox> {
 ///         match field {
 ///             "values" => if can_reborrow(self) {
 ///                 Some(reborrow(self, |slf, scope| {
 ///                     scope.seq_object_ref(&slf.values[..])
 ///                 }))
 ///             } else {
-///                 Some(Value::from_serializable(&self.values))
+///                 Some(ValueBox::from_serializable(&self.values))
 ///             },
 ///             _ => None
 ///         }
@@ -320,7 +320,7 @@ impl<T: ?Sized> StackHandle<T> {
 }
 
 impl<T: SeqObject + Send + Sync + 'static + ?Sized> SeqObject for StackHandle<T> {
-    fn get_item(&self, idx: usize) -> Option<Value> {
+    fn get_item(&self, idx: usize) -> Option<ValueBox> {
         self.with(|val| val.get_item(idx))
     }
 
@@ -330,7 +330,7 @@ impl<T: SeqObject + Send + Sync + 'static + ?Sized> SeqObject for StackHandle<T>
 }
 
 impl<T: StructObject + Send + Sync + 'static + ?Sized> StructObject for StackHandle<T> {
-    fn get_field(&self, idx: &Value) -> Option<Value> {
+    fn get_field(&self, idx: &ValueBox) -> Option<ValueBox> {
         self.with(|val| val.get_field(idx))
     }
 
@@ -338,7 +338,7 @@ impl<T: StructObject + Send + Sync + 'static + ?Sized> StructObject for StackHan
         self.with(|val| val.static_fields())
     }
 
-    fn fields(&self) -> Vec<Value> {
+    fn fields(&self) -> Vec<ValueBox> {
         self.with(|val| val.fields())
     }
 
@@ -373,11 +373,11 @@ impl<T: Object + ?Sized> Object for StackHandle<T> {
         })
     }
 
-    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(&self, state: &State, name: &str, args: &[ValueBox]) -> Result<ValueBox, Error> {
         self.with(|val| val.call_method(state, name, args))
     }
 
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(&self, state: &State, args: &[ValueBox]) -> Result<ValueBox, Error> {
         self.with(|val| val.call(state, args))
     }
 }
@@ -396,7 +396,7 @@ macro_rules! unwrap_kind {
 }
 
 impl<T: Object + ?Sized> SeqObject for StackHandleProxy<T> {
-    fn get_item(&self, idx: usize) -> Option<Value> {
+    fn get_item(&self, idx: usize) -> Option<ValueBox> {
         self.0
             .with(|val| unwrap_kind!(val, ObjectKind::Seq).get_item(idx))
     }
@@ -408,12 +408,12 @@ impl<T: Object + ?Sized> SeqObject for StackHandleProxy<T> {
 }
 
 impl<T: Object + ?Sized> StructObject for StackHandleProxy<T> {
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
         self.0
             .with(|val| unwrap_kind!(val, ObjectKind::Struct).get_field(key))
     }
 
-    fn fields(&self) -> Vec<Value> {
+    fn fields(&self) -> Vec<ValueBox> {
         self.0
             .with(|val| unwrap_kind!(val, ObjectKind::Struct).fields())
     }
@@ -459,31 +459,31 @@ impl Scope {
         }
     }
 
-    /// Creates a [`Value`] from a borrowed [`Object`].
+    /// Creates a [`ValueBox`] from a borrowed [`Object`].
     ///
-    /// This is equivalent to `Value::from_object(self.handle(value))`.
-    pub fn object_ref<'env, T: Object + ?Sized>(&'env self, value: &'env T) -> Value {
-        Value::from_object(self.handle(value))
+    /// This is equivalent to `ValueBox::from_object(self.handle(value))`.
+    pub fn object_ref<'env, T: Object + ?Sized>(&'env self, value: &'env T) -> ValueBox {
+        ValueBox::from_object(self.handle(value))
     }
 
-    /// Creates a [`Value`] from a borrowed [`SeqObject`].
+    /// Creates a [`ValueBox`] from a borrowed [`SeqObject`].
     ///
-    /// This is equivalent to `Value::from_seq_object(self.handle(value))`.
+    /// This is equivalent to `ValueBox::from_seq_object(self.handle(value))`.
     pub fn seq_object_ref<'env, T: SeqObject + 'static + ?Sized>(
         &'env self,
         value: &'env T,
-    ) -> Value {
-        Value::from_seq_object(self.handle(value))
+    ) -> ValueBox {
+        ValueBox::from_seq_object(self.handle(value))
     }
 
-    /// Creates a [`Value`] from a borrowed [`StructObject`].
+    /// Creates a [`ValueBox`] from a borrowed [`StructObject`].
     ///
-    /// This is equivalent to `Value::from_struct_object(self.handle(value))`.
+    /// This is equivalent to `ValueBox::from_struct_object(self.handle(value))`.
     pub fn struct_object_ref<'env, T: StructObject + 'static + ?Sized>(
         &'env self,
         value: &'env T,
-    ) -> Value {
-        Value::from_map_object(self.handle(value))
+    ) -> ValueBox {
+        ValueBox::from_map_object(self.handle(value))
     }
 }
 

@@ -1,11 +1,11 @@
 use std::iter::FromIterator;
 
-use minijinja::value::{Kwargs, Value};
+use minijinja::value::{Kwargs, ValueBox};
 use minijinja::{args, Environment, Error, ErrorKind, State};
 
 fn custom_loop(state: &State, num: i64, kwargs: Kwargs) -> Result<String, Error> {
     let mut rv = String::new();
-    let caller = kwargs.get::<Value>("caller")?;
+    let caller = kwargs.get::<ValueBox>("caller")?;
     kwargs.assert_all_used()?;
     for it in 0..num {
         let rendered = caller.call(state, args!(it => it + 1))?;

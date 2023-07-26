@@ -1,6 +1,6 @@
 # render-value
 
-An example that shows that a `Value` can be used directly as context.
+An example that shows that a `ValueBox` can be used directly as context.
 
 ```console
 $ cargo run

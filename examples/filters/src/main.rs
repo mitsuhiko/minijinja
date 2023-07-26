@@ -1,4 +1,4 @@
-use minijinja::value::Value;
+use minijinja::value::ValueBox;
 use minijinja::{context, Environment};
 
 fn slugify(value: String) -> String {
@@ -9,7 +9,7 @@ fn slugify(value: String) -> String {
         .join("-")
 }
 
-fn get_nav() -> Value {
+fn get_nav() -> ValueBox {
     vec![
         context! { href => "/", title => "Index" },
         context! { href => "/downloads", title => "Downloads" },

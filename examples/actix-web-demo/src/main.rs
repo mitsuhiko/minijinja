@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use actix_web::http::header::ContentType;
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
-use minijinja::value::{Rest, Value};
+use minijinja::value::{Rest, ValueBox};
 use minijinja::{context, path_loader, Environment, Error, ErrorKind};
 
 thread_local! {
@@ -29,7 +29,7 @@ struct AppState {
 
 impl AppState {
     /// Helper function to render a template to an HTTP response with a bound request.
-    pub fn render_template(&self, name: &str, req: &HttpRequest, ctx: Value) -> HttpResponse {
+    pub fn render_template(&self, name: &str, req: &HttpRequest, ctx: ValueBox) -> HttpResponse {
         with_bound_req(req, || {
             let tmpl = self.env.get_template(name).unwrap();
             let rv = tmpl.render(ctx).unwrap();
@@ -41,7 +41,7 @@ impl AppState {
 }
 
 /// Helper function that is added to templates to invoke `url_for` on the bound request.
-fn url_for(name: &str, args: Rest<String>) -> Result<Value, Error> {
+fn url_for(name: &str, args: Rest<String>) -> Result<ValueBox, Error> {
     CURRENT_REQUEST.with(|current_req| {
         Ok(current_req
             .borrow()

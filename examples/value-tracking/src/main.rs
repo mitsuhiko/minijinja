@@ -1,16 +1,16 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{StructObject, Value, ValueKind};
+use minijinja::value::{StructObject, ValueBox, ValueBoxKind};
 use minijinja::{context, Environment};
 
 struct TrackedContext {
-    enclosed: Value,
+    enclosed: ValueBox,
     resolved: Arc<Mutex<HashSet<String>>>,
 }
 
 impl StructObject for TrackedContext {
-    fn get_field(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, name: &str) -> Option<ValueBox> {
         let mut resolved = self.resolved.lock().unwrap();
         if !resolved.contains(name) {
             resolved.insert(name.to_string());
@@ -22,7 +22,7 @@ impl StructObject for TrackedContext {
     }
 
     fn fields(&self) -> Vec<Arc<str>> {
-        if self.enclosed.kind() == ValueKind::Map {
+        if self.enclosed.kind() == ValueBoxKind::Map {
             if let Ok(keys) = self.enclosed.try_iter() {
                 return keys.filter_map(|x| Arc::<str>::try_from(x).ok()).collect();
             }
@@ -31,10 +31,10 @@ impl StructObject for TrackedContext {
     }
 }
 
-pub fn track_context(ctx: Value) -> (Value, Arc<Mutex<HashSet<String>>>) {
+pub fn track_context(ctx: ValueBox) -> (ValueBox, Arc<Mutex<HashSet<String>>>) {
     let resolved = Arc::new(Mutex::default());
     (
-        Value::from_map_object(TrackedContext {
+        ValueBox::from_map_object(TrackedContext {
             enclosed: ctx,
             resolved: resolved.clone(),
         }),

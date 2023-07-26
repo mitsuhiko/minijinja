@@ -1,18 +1,18 @@
 use std::collections::HashMap;
 use std::env;
 
-use minijinja::value::{StructObject, Value};
+use minijinja::value::{StructObject, ValueBox};
 use minijinja::Environment;
 
 struct DynamicContext;
 
 impl StructObject for DynamicContext {
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
         let field = key.as_str()?;
         Some(match field {
-            "pid" => Value::from(std::process::id()),
-            "cwd" => Value::from(env::current_dir().unwrap().to_string_lossy()),
-            "env" => Value::from(
+            "pid" => ValueBox::from(std::process::id()),
+            "cwd" => ValueBox::from(env::current_dir().unwrap().to_string_lossy()),
+            "env" => ValueBox::from(
                 env::vars()
                     .filter(|(k, _)| k.starts_with("CARGO_") || k.starts_with("RUST_"))
                     .collect::<HashMap<String, String>>(),
@@ -35,7 +35,7 @@ fn main() {
         "{}",
         env.render_str(
             include_str!("template.txt"),
-            Value::from_struct_object(DynamicContext)
+            ValueBox::from_struct_object(DynamicContext)
         )
         .unwrap()
     );

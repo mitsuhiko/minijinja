@@ -114,7 +114,7 @@ some minor exceptions be rather trivial changes.
 
     ```rust
     // just split
-    let (args, kwargs): (&[Value], Kwargs) = from_args(values)?;
+    let (args, kwargs): (&[ValueBox], Kwargs) = from_args(values)?;
 
     // split and parse
     let (a, b, kwargs): (i32, i32, Kwargs) = from_args(values)?;
@@ -182,7 +182,7 @@ some minor exceptions be rather trivial changes.
 
 ## 1.0.0-alpha.4
 
-- `Value` now implements `Ord`.  This also improves the ability of the engine
+- `ValueBox` now implements `Ord`.  This also improves the ability of the engine
   to sort more complex values in filters.  (#295)
 
 - `Arc<String>` was replaced with `Arc<str>` in some of the public APIs where
@@ -241,7 +241,7 @@ some minor exceptions be rather trivial changes.
 
 - `Output` no longer reveals if it's discarding in the public API.
 
-- Added `Value::call`, `Value::call_method` and `Template::new_state`.  The
+- Added `ValueBox::call`, `ValueBox::call_method` and `Template::new_state`.  The
   combination of these APIs makes it possible to call values which was
   previously not possible.  (#272)
 
@@ -273,8 +273,8 @@ some minor exceptions be rather trivial changes.
 
 ## 0.32.0
 
-- Added `Value::is_number`. (#240)
-- `TryFrom` for `Value` now converts integers to `f32` and `f64`.
+- Added `ValueBox::is_number`. (#240)
+- `TryFrom` for `ValueBox` now converts integers to `f32` and `f64`.
 - Added the new `custom_syntax` feature which allows custom delimiters
   to be configured. (#245)
 - Added `Kwargs` abstraction to easier handle keyword arguments.
@@ -294,7 +294,7 @@ some minor exceptions be rather trivial changes.
 ## 0.31.0
 
 - Changed the closure behavior of macros to match the one of Jinja2. (#233)
-- `Value::from_serializable` will no longer panic on invalid values.  Instead
+- `ValueBox::from_serializable` will no longer panic on invalid values.  Instead
   the error is deferred to runtime which makes working with objects possible
   that are only partially valid for the runtime environment. (#234)
 
@@ -344,7 +344,7 @@ some minor exceptions be rather trivial changes.
 
 ## 0.30.1
 
-- Changed `add_global` to perform `Into<Value>` implicitly.
+- Changed `add_global` to perform `Into<ValueBox>` implicitly.
 - Added `source_mut` to retrieve a mutable reference to the source.
 - Improved Python bindings by adding support for template reloading, better
   documentation, error reporting.
@@ -364,7 +364,7 @@ some minor exceptions be rather trivial changes.
 - Added fuel tracking support.
 - Added `none` test. (#185)
 - Improved various issues with whitespace trimming. (#187)
-- `Value::default` now returns `Undefined` rather than `None`.
+- `ValueBox::default` now returns `Undefined` rather than `None`.
 - Added support for `loop.previtem` and `loop.nextitem`. (#188)
 
 ## 0.28.0
@@ -382,9 +382,9 @@ some minor exceptions be rather trivial changes.
   item. (#150)
 - Introduced revamped object model with `SeqObject` and `StructObject`. (#148)
 - `Object` now directly exposes `downcast_ref` and `is`.
-- Removed `Value::as_slice`
-- Introduced `Value::as_seq` and `Value::as_struct`.
-- Introduced `Value::from_seq_object` and `Value::from_struct_object`.
+- Removed `ValueBox::as_slice`
+- Introduced `ValueBox::as_seq` and `ValueBox::as_struct`.
+- Introduced `ValueBox::from_seq_object` and `ValueBox::from_struct_object`.
 - Added the ability for function arguments to be of type `&dyn SeqObject`.
 - Renamed `Iter` to `ValueIter`.
 - Added `Environment::render_named_str`. (#149)
@@ -427,11 +427,11 @@ some minor exceptions be rather trivial changes.
 - Catch divisions by zero.
 - Correctly render `inf` floats.
 - Enforce a maximum recursion depth during parsing.
-- Added `Value::try_iter` to iterate over maps and sequences. (#132)
+- Added `ValueBox::try_iter` to iterate over maps and sequences. (#132)
 
 ## 0.23.0
 
-- Added `Value::from_function`. (#121)
+- Added `ValueBox::from_function`. (#121)
 - Fixed incorrect location information with blocks.
 - Fixed broken nested `super()` calls.
 - Improve error reporting for failures in blocks and trying to
@@ -439,7 +439,7 @@ some minor exceptions be rather trivial changes.
 - Performance improvements.
 - Added support for `{% import %}` / `{% from .. import .. %}`
   and `{% macro %}`.  (#123)
-- Added `Value::is_kwargs` which disambiugates if an object passed
+- Added `ValueBox::is_kwargs` which disambiugates if an object passed
   to a function or filter is a normal object or if it represents
   keyword arguments.
 - Added the ability to call functions stored on objects.
@@ -471,7 +471,7 @@ some minor exceptions be rather trivial changes.
   from outside the crate by sealed the traits.  (#113)
 - Added support for remaining arguments with `Rest`.  (#114)
 - Filters, tests and functions can now borrow arguments.  (#115)
-- Added `Value::as_slice` and `Value::get_get_item_by_index`.
+- Added `ValueBox::as_slice` and `ValueBox::get_get_item_by_index`.
 - Added support for span error reporting. (#118)
 - Greatly improved handling of nested errors. (#119)
 - `ImpossibleOperation` is now `InvalidOperation`.
@@ -500,9 +500,9 @@ some minor exceptions be rather trivial changes.
 
 - The `meta` API is gone without replacement.
 - `Object::call_method` and `Object::call` now take the arguments
-  as `&[Value]` instead of `Vec<Value>`.
+  as `&[ValueBox]` instead of `Vec<ValueBox>`.
 - `Object::call_method`, `Object::call` and `FunctionArgs::from_values`
-  now take the arguments as `&[Value]` instead of `Vec<Value>`.
+  now take the arguments as `&[ValueBox]` instead of `Vec<ValueBox>`.
 - The error object used to implement `PartialEq` but this was implemented
   by comparing the error kind instead.  Explicitly use the `.kind()`
   method of the error if you want the same behavior.
@@ -593,7 +593,7 @@ some minor exceptions be rather trivial changes.
   into `builtins`.
 - Added `value::serializing_for_value` to check if serialization is taking place
   for MiniJinja.
-- The `Value` type now supports deserialization.  This feature can be disabled
+- The `ValueBox` type now supports deserialization.  This feature can be disabled
   by removing the default `deserialization` feature.
 - Removed optional `memchr` dependency as it does not appear to be useful.
 
@@ -681,7 +681,7 @@ some minor exceptions be rather trivial changes.
 - Added dictsort filter.
 - Introduced a new trait `ArgType` to handle argument conversions for filters
   and tests so optional arguments can exist.
-- Renamed `ValueArgs` trait to `FunctionArgs`.
+- Renamed `ValueBoxArgs` trait to `FunctionArgs`.
 - Added `reverse` filter.
 - Added `trim` filter.
 - Added `join` filter.

@@ -2,7 +2,7 @@ use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::Mutex;
 
-use minijinja::value::{Rest, Value};
+use minijinja::value::{Rest, ValueBox};
 use minijinja::{context, escape_formatter, AutoEscape, Error, State, Syntax, UndefinedBehavior};
 use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyRuntimeError;
@@ -155,7 +155,7 @@ impl Environment {
         let callback: Py<PyAny> = callback.into();
         self.inner.lock().unwrap().env.add_filter(
             name.to_string(),
-            move |state: &State, args: Rest<Value>| -> Result<Value, Error> {
+            move |state: &State, args: Rest<ValueBox>| -> Result<ValueBox, Error> {
                 Python::with_gil(|py| {
                     bind_state(state, || {
                         let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), &args)
@@ -187,7 +187,7 @@ impl Environment {
         let callback: Py<PyAny> = callback.into();
         self.inner.lock().unwrap().env.add_test(
             name.to_string(),
-            move |state: &State, args: Rest<Value>| -> Result<bool, Error> {
+            move |state: &State, args: Rest<ValueBox>| -> Result<bool, Error> {
                 Python::with_gil(|py| {
                     bind_state(state, || {
                         let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), &args)
@@ -214,7 +214,7 @@ impl Environment {
         let callback: Py<PyAny> = callback.into();
         self.inner.lock().unwrap().env.add_function(
             name.to_string(),
-            move |state: &State, args: Rest<Value>| -> Result<Value, Error> {
+            move |state: &State, args: Rest<ValueBox>| -> Result<ValueBox, Error> {
                 Python::with_gil(|py| {
                     bind_state(state, || {
                         let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), &args)
@@ -507,7 +507,7 @@ impl Environment {
             let inner = slf.inner.lock().unwrap();
             let tmpl = inner.env.get_template(template_name).map_err(to_py_error)?;
             let ctx = ctx
-                .map(|ctx| Value::from_map_object(DictLikeObject { inner: ctx.into() }))
+                .map(|ctx| ValueBox::from_map_object(DictLikeObject { inner: ctx.into() }))
                 .unwrap_or_else(|| context!());
             tmpl.render(ctx).map_err(to_py_error)
         })
@@ -526,7 +526,7 @@ impl Environment {
     ) -> PyResult<String> {
         bind_environment(slf.as_ptr(), || {
             let ctx = ctx
-                .map(|ctx| Value::from_map_object(DictLikeObject { inner: ctx.into() }))
+                .map(|ctx| ValueBox::from_map_object(DictLikeObject { inner: ctx.into() }))
                 .unwrap_or_else(|| context!());
             slf.inner
                 .lock()
@@ -551,7 +551,7 @@ impl Environment {
                 .compile_expression(expression)
                 .map_err(to_py_error)?;
             let ctx = ctx
-                .map(|ctx| Value::from_map_object(DictLikeObject { inner: ctx.into() }))
+                .map(|ctx| ValueBox::from_map_object(DictLikeObject { inner: ctx.into() }))
                 .unwrap_or_else(|| context!());
             to_python_value(expr.eval(ctx).map_err(to_py_error)?)
         })

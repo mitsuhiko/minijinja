@@ -4,12 +4,12 @@ use std::fs;
 use std::sync::Mutex;
 
 use minijinja::value::StructObject;
-use minijinja::value::Value;
+use minijinja::value::ValueBox;
 use minijinja::Environment;
 
 #[derive(Default, Debug)]
 struct Site {
-    cache: Mutex<BTreeMap<String, Value>>,
+    cache: Mutex<BTreeMap<String, ValueBox>>,
 }
 
 impl StructObject for Site {
@@ -19,7 +19,7 @@ impl StructObject for Site {
     ///
     /// If that is necessary, use `call_method()` instead which is able to
     /// both access interpreter state and fail.
-    fn get_field(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, name: &str) -> Option<ValueBox> {
         let mut cache = self.cache.lock().unwrap();
         if let Some(rv) = cache.get(name) {
             return Some(rv.clone());
@@ -30,7 +30,7 @@ impl StructObject for Site {
     }
 }
 
-fn load_json(name: &str) -> Option<Value> {
+fn load_json(name: &str) -> Option<ValueBox> {
     let mut rv = env::current_dir().unwrap().join("src");
     for segment in name.split('/') {
         if segment.starts_with('.') || segment.contains('\\') {
@@ -41,12 +41,12 @@ fn load_json(name: &str) -> Option<Value> {
     rv.set_extension("json");
     let contents = fs::read(&rv).ok()?;
     let parsed: serde_json::Value = serde_json::from_slice(&contents[..]).ok()?;
-    Some(Value::from_serializable(&parsed))
+    Some(ValueBox::from_serializable(&parsed))
 }
 
 fn main() {
     let mut env = Environment::new();
-    env.add_global("site", Value::from_map_object(Site::default()));
+    env.add_global("site", ValueBox::from_map_object(Site::default()));
     env.add_template("template.html", include_str!("template.html"))
         .unwrap();
 

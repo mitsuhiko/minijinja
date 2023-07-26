@@ -2,12 +2,12 @@
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use minijinja::value::{from_args, Object, SeqObject, Value};
+use minijinja::value::{from_args, Object, SeqObject, ValueBox};
 use minijinja::{Environment, Error, State};
 
 #[derive(Debug)]
 struct Cycler {
-    values: Vec<Value>,
+    values: Vec<ValueBox>,
     idx: AtomicUsize,
 }
 
@@ -18,7 +18,7 @@ impl fmt::Display for Cycler {
 }
 
 impl Object for Cycler {
-    fn call(&self, _state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(&self, _state: &State, args: &[ValueBox]) -> Result<ValueBox, Error> {
         // we don't want any args
         from_args(args)?;
         let idx = self.idx.fetch_add(1, Ordering::Relaxed);
@@ -26,8 +26,8 @@ impl Object for Cycler {
     }
 }
 
-fn make_cycler(_state: &State, args: Vec<Value>) -> Result<Value, Error> {
-    Ok(Value::from_object(Cycler {
+fn make_cycler(_state: &State, args: Vec<ValueBox>) -> Result<ValueBox, Error> {
+    Ok(ValueBox::from_object(Cycler {
         values: args,
         idx: AtomicUsize::new(0),
     }))
@@ -43,11 +43,11 @@ impl fmt::Display for Magic {
 }
 
 impl Object for Magic {
-    fn call_method(&self, _state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(&self, _state: &State, name: &str, args: &[ValueBox]) -> Result<ValueBox, Error> {
         if name == "make_class" {
             // single string argument
             let (tag,): (&str,) = from_args(args)?;
-            Ok(Value::from(format!("magic-{tag}")))
+            Ok(ValueBox::from(format!("magic-{tag}")))
         } else {
             Err(Error::new(
                 minijinja::ErrorKind::UnknownMethod,
@@ -60,8 +60,8 @@ impl Object for Magic {
 struct SimpleDynamicSeq;
 
 impl SeqObject for SimpleDynamicSeq {
-    fn get_item(&self, idx: usize) -> Option<Value> {
-        ['a', 'b', 'c', 'd'].get(idx).copied().map(Value::from)
+    fn get_item(&self, idx: usize) -> Option<ValueBox> {
+        ['a', 'b', 'c', 'd'].get(idx).copied().map(ValueBox::from)
     }
 
     fn item_count(&self) -> usize {
@@ -72,8 +72,8 @@ impl SeqObject for SimpleDynamicSeq {
 fn main() {
     let mut env = Environment::new();
     env.add_function("cycler", make_cycler);
-    env.add_global("magic", Value::from_object(Magic));
-    env.add_global("seq", Value::from_seq_object(SimpleDynamicSeq));
+    env.add_global("magic", ValueBox::from_object(Magic));
+    env.add_global("seq", ValueBox::from_seq_object(SimpleDynamicSeq));
     env.add_template("template.html", include_str!("template.html"))
         .unwrap();
 

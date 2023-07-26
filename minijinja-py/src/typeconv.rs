@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value, ValueKind};
+use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, ValueBox, ValueBoxKind};
 use minijinja::{AutoEscape, Error, State};
 
 use once_cell::sync::OnceCell;
@@ -24,7 +24,7 @@ pub struct DictLikeObject {
 }
 
 impl StructObject for DictLikeObject {
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
         let name = key.as_str()?;
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
@@ -32,7 +32,7 @@ impl StructObject for DictLikeObject {
         })
     }
 
-    fn fields(&self) -> Vec<Value> {
+    fn fields(&self) -> Vec<ValueBox> {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
             inner.keys().iter().map(|x| x.to_string().into()).collect()
@@ -45,7 +45,7 @@ struct ListLikeObject {
 }
 
 impl SeqObject for ListLikeObject {
-    fn get_item(&self, idx: usize) -> Option<Value> {
+    fn get_item(&self, idx: usize) -> Option<ValueBox> {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
             inner.get_item(idx).ok().map(to_minijinja_value)
@@ -86,8 +86,8 @@ impl Object for DynamicObject {
         })
     }
 
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
-        Python::with_gil(|py| -> Result<Value, Error> {
+    fn call(&self, state: &State, args: &[ValueBox]) -> Result<ValueBox, Error> {
+        Python::with_gil(|py| -> Result<ValueBox, Error> {
             bind_state(state, || {
                 let inner = self.inner.as_ref(py);
                 let (py_args, py_kwargs) =
@@ -99,14 +99,14 @@ impl Object for DynamicObject {
         })
     }
 
-    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(&self, state: &State, name: &str, args: &[ValueBox]) -> Result<ValueBox, Error> {
         if !is_safe_attr(name) {
             return Err(Error::new(
                 minijinja::ErrorKind::InvalidOperation,
                 "insecure method call",
             ));
         }
-        Python::with_gil(|py| -> Result<Value, Error> {
+        Python::with_gil(|py| -> Result<ValueBox, Error> {
             bind_state(state, || {
                 let inner = self.inner.as_ref(py);
                 let (py_args, py_kwargs) =
@@ -122,7 +122,7 @@ impl Object for DynamicObject {
 }
 
 impl SeqObject for DynamicObject {
-    fn get_item(&self, idx: usize) -> Option<Value> {
+    fn get_item(&self, idx: usize) -> Option<ValueBox> {
         Python::with_gil(|py| {
             if let Some(ref seq) = self.sequencified {
                 return seq.get(idx).map(|x| to_minijinja_value(x.as_ref(py)));
@@ -149,7 +149,7 @@ impl SeqObject for DynamicObject {
 }
 
 impl StructObject for DynamicObject {
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(&self, key: &ValueBox) -> Option<ValueBox> {
         let name = key.as_str()?;
         if !is_safe_attr(name) {
             return None;
@@ -161,25 +161,25 @@ impl StructObject for DynamicObject {
     }
 }
 
-pub fn to_minijinja_value(value: &PyAny) -> Value {
+pub fn to_minijinja_value(value: &PyAny) -> ValueBox {
     if let Ok(dict) = value.downcast::<PyDict>() {
-        Value::from_map_object(DictLikeObject { inner: dict.into() })
+        ValueBox::from_map_object(DictLikeObject { inner: dict.into() })
     } else if let Ok(tup) = value.downcast::<PyTuple>() {
-        Value::from_seq_object(ListLikeObject {
+        ValueBox::from_seq_object(ListLikeObject {
             inner: tup.as_sequence().into(),
         })
     } else if let Ok(list) = value.downcast::<PyList>() {
-        Value::from_seq_object(ListLikeObject {
+        ValueBox::from_seq_object(ListLikeObject {
             inner: list.as_sequence().into(),
         })
     } else if value.is_none() {
-        Value::from(())
+        ValueBox::from(())
     } else if let Ok(val) = value.extract::<bool>() {
-        Value::from(val)
+        ValueBox::from(val)
     } else if let Ok(val) = value.extract::<i64>() {
-        Value::from(val)
+        ValueBox::from(val)
     } else if let Ok(val) = value.extract::<f64>() {
-        Value::from(val)
+        ValueBox::from(val)
     } else if let Ok(val) = value.extract::<&str>() {
         if let Ok(to_html) = value.getattr("__html__") {
             if to_html.is_callable() {
@@ -187,12 +187,12 @@ pub fn to_minijinja_value(value: &PyAny) -> Value {
                 // report the swallowed error of __html__.
                 if let Ok(html) = to_html.call0() {
                     if let Ok(val) = html.extract::<&str>() {
-                        return Value::from_safe_string(val.into());
+                        return ValueBox::from_safe_string(val.into());
                     }
                 }
             }
         }
-        Value::from(val)
+        ValueBox::from(val)
     } else {
         let mut sequencified = None;
         if let Ok(iter) = value.iter() {
@@ -202,14 +202,14 @@ pub fn to_minijinja_value(value: &PyAny) -> Value {
             }
             sequencified = Some(seq);
         }
-        Value::from_object(DynamicObject {
+        ValueBox::from_object(DynamicObject {
             inner: value.into(),
             sequencified,
         })
     }
 }
 
-pub fn to_python_value(value: Value) -> PyResult<Py<PyAny>> {
+pub fn to_python_value(value: ValueBox) -> PyResult<Py<PyAny>> {
     Python::with_gil(|py| to_python_value_impl(py, value))
 }
 
@@ -221,7 +221,7 @@ fn mark_string_safe(py: Python<'_>, value: &str) -> PyResult<Py<PyAny>> {
     mark_safe.call1(py, PyTuple::new(py, [value]))
 }
 
-fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
+fn to_python_value_impl(py: Python<'_>, value: ValueBox) -> PyResult<Py<PyAny>> {
     // if we are holding a true dynamic object, we want to allow bidirectional
     // conversion.  That means that when passing the object back to Python we
     // extract the retained raw Python reference.
@@ -251,9 +251,9 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
         Ok(rv.into())
     } else {
         match value.kind() {
-            ValueKind::Undefined | ValueKind::None => Ok(().into_py(py)),
-            ValueKind::Bool => Ok(value.is_true().into_py(py)),
-            ValueKind::Number => {
+            ValueBoxKind::Undefined | ValueBoxKind::None => Ok(().into_py(py)),
+            ValueBoxKind::Bool => Ok(value.is_true().into_py(py)),
+            ValueBoxKind::Number => {
                 if let Ok(rv) = TryInto::<i64>::try_into(value.clone()) {
                     Ok(rv.into_py(py))
                 } else if let Ok(rv) = TryInto::<u64>::try_into(value.clone()) {
@@ -264,17 +264,17 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
                     unreachable!()
                 }
             }
-            ValueKind::String => {
+            ValueBoxKind::String => {
                 if value.is_safe() {
                     Ok(mark_string_safe(py, value.as_str().unwrap())?)
                 } else {
                     Ok(value.as_str().unwrap().into_py(py))
                 }
             }
-            ValueKind::Bytes => Ok(value.as_bytes().unwrap().into_py(py)),
+            ValueBoxKind::Bytes => Ok(value.as_bytes().unwrap().into_py(py)),
             // this should be covered above
-            ValueKind::Seq => unreachable!(),
-            ValueKind::Map => {
+            ValueBoxKind::Seq => unreachable!(),
+            ValueBoxKind::Map => {
                 let rv = PyDict::new(py);
                 if let Ok(iter) = value.try_iter() {
                     for k in iter {
@@ -295,7 +295,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
 pub fn to_python_args<'py>(
     py: Python<'py>,
     callback: &PyAny,
-    args: &[Value],
+    args: &[ValueBox],
 ) -> PyResult<(&'py PyTuple, Option<&'py PyDict>)> {
     let mut py_args = Vec::new();
     let mut py_kwargs = None;
