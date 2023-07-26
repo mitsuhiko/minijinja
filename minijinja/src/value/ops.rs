@@ -1,7 +1,9 @@
 use std::convert::{TryFrom, TryInto};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{ValueBox, ValueKind, ValueRepr};
+use crate::value::{Value, ValueBox, ValueKind, ValueRepr};
+
+use super::SeqObject;
 
 pub enum CoerceResult<'a> {
     I128(i128, i128),
@@ -9,7 +11,7 @@ pub enum CoerceResult<'a> {
     Str(&'a str, &'a str),
 }
 
-pub(crate) fn as_f64(value: &ValueBox) -> Option<f64> {
+pub(crate) fn as_f64(value: &Value<'_>) -> Option<f64> {
     Some(match value.0 {
         ValueRepr::Bool(x) => x as i64 as f64,
         ValueRepr::U64(x) => x as f64,
@@ -21,7 +23,7 @@ pub(crate) fn as_f64(value: &ValueBox) -> Option<f64> {
     })
 }
 
-pub fn coerce<'x>(a: &'x ValueBox, b: &'x ValueBox) -> Option<CoerceResult<'x>> {
+pub fn coerce<'x>(a: &'x Value<'_>, b: &'x Value<'_>) -> Option<CoerceResult<'x>> {
     match (&a.0, &b.0) {
         // equal mappings are trivial
         (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
@@ -71,6 +73,17 @@ fn get_offset_and_len<F: FnOnce() -> usize>(
     }
 }
 
+fn slice_seq(seq: &dyn SeqObject, start: i64, stop: Option<i64>, step: usize) -> ValueBox {
+    let (start, len) = get_offset_and_len(start, stop, || seq.item_count());
+    ValueBox::from(
+        seq.iter()
+            .skip(start)
+            .take(len)
+            .step_by(step)
+            .collect::<Vec<_>>(),
+    )
+}
+
 pub fn slice(value: ValueBox, start: ValueBox, stop: ValueBox, step: ValueBox) -> Result<ValueBox, Error> {
     let start: i64 = if start.is_none() {
         0
@@ -95,42 +108,30 @@ pub fn slice(value: ValueBox, start: ValueBox, stop: ValueBox, step: ValueBox) -
     }
 
     let kind = value.kind();
-    let maybe_seq = match value.0 {
+    let error = Err(Error::new(
+        ErrorKind::InvalidOperation,
+        format!("value of type {} cannot be sliced", kind),
+    ));
+
+    match value.0 {
         ValueRepr::String(..) => {
             let s = value.as_str().unwrap();
             let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
-            return Ok(ValueBox::from(
+            Ok(ValueBox::from(
                 s.chars()
                     .skip(start)
                     .take(len)
                     .step_by(step)
                     .collect::<String>(),
-            ));
-        }
-        ValueRepr::Undefined | ValueRepr::None => return Ok(ValueBox::from(Vec::<ValueBox>::new())),
-        ValueRepr::Seq(s) => Some(s),
-        ValueRepr::Dynamic(dy) => match dy.value().0 {
-            ValueRepr::Seq(s) => Some(s),
-            _ => None
-        },
-        _ => None,
-    };
-
-    match maybe_seq {
-        Some(seq) => {
-            let (start, len) = get_offset_and_len(start, stop, || seq.item_count());
-            Ok(ValueBox::from(
-                seq.iter()
-                    .skip(start)
-                    .take(len)
-                    .step_by(step)
-                    .collect::<Vec<_>>(),
             ))
         }
-        None => Err(Error::new(
-            ErrorKind::InvalidOperation,
-            format!("value of type {} cannot be sliced", kind),
-        )),
+        ValueRepr::Undefined | ValueRepr::None => Ok(ValueBox::from(Vec::<ValueBox>::new())),
+        ValueRepr::Seq(s) => Ok(slice_seq(&*s, start, stop, step)),
+        ValueRepr::Dynamic(dy) => match dy.value().0 {
+            ValueRepr::Seq(s) => Ok(slice_seq(&*s, start, stop, step)),
+            _ => return error,
+        }
+        _ => return error,
     }
 }
 

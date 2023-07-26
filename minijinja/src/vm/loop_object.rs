@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Object, MapObject, ValueBox};
+use crate::value::{Object, MapObject, ValueBox, Value};
 use crate::vm::state::State;
 
 pub(crate) struct Loop {
@@ -26,8 +26,8 @@ impl fmt::Debug for Loop {
 }
 
 impl Object for Loop {
-    fn value(&self) -> ValueBox {
-        todo!()
+    fn value<'a>(&'a self) -> Value<'a> {
+        Value::from_map_ref(self)
     }
 
     fn call(&self, _state: &State, _args: &[ValueBox]) -> Result<ValueBox, Error> {

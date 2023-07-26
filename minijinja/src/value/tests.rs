@@ -19,9 +19,8 @@ fn test_dynamic_object_roundtrip() {
     }
 
     impl Object for X {
-        fn value(&self) -> ValueBox {
-            todo!()
-            // ValueBox::from_map_object(*self)
+        fn value<'a>(&'a self) -> Value<'a> {
+            Value::from_map_ref(self)
         }
     }
 

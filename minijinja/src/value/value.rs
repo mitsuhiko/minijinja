@@ -288,7 +288,14 @@ impl Value<'_> {
         where T: Into<Arc<T>>
     {
         let arc = value.into() as Arc<dyn SeqObject>;
-        ValueRepr::Seq(ArcCow::Owned(arc)).into()
+        Value(ValueRepr::Seq(ArcCow::Owned(arc)))
+    }
+
+    pub fn from_seq_ref<'a, T: SeqObject + ?Sized + 'static>(value: &'a T) -> Value<'a>
+        where T: Into<Arc<T>>
+    {
+        let arc = ArcCow::Borrowed(value as &dyn SeqObject);
+        Value(ValueRepr::Seq(arc))
     }
 
     /// Creates a value from an owned [`MapObject`].
@@ -301,15 +308,20 @@ impl Value<'_> {
     pub fn from_map_object<T: MapObject + ?Sized + 'static>(value: T) -> ValueBox
         where T: Into<Arc<T>>
     {
-        let arc = value.into();
-        ValueRepr::Map(ArcCow::Owned(arc), MapType::Normal).into()
+        ValueRepr::Map(ArcCow::Owned(value.into()), MapType::Normal).into()
+    }
+
+    pub fn from_map_ref<'a, T: MapObject + ?Sized + 'static>(value: &'a T) -> Value<'a>
+        where T: Into<Arc<T>>
+    {
+        let arc = ArcCow::Borrowed(value as &dyn MapObject);
+        Value(ValueRepr::Map(arc, MapType::Normal))
     }
 
     pub(crate) fn from_kwargs<T: MapObject + ?Sized + 'static>(value: T) -> ValueBox
         where T: Into<Arc<T>>
     {
-        let arc = value.into();
-        ValueRepr::Map(ArcCow::Owned(arc), MapType::Kwargs).into()
+        Value(ValueRepr::Map(ArcCow::Owned(value.into()), MapType::Kwargs))
     }
 
     /// Creates a callable value from a function.
@@ -788,13 +800,13 @@ impl Value<'_> {
     }
 }
 
-impl Default for ValueBox {
+impl Default for Value<'_> {
     fn default() -> ValueBox {
-        ValueRepr::Undefined.into()
+        Value::UNDEFINED
     }
 }
 
-impl PartialEq for ValueBox {
+impl PartialEq for Value<'_> {
     fn eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => true,
@@ -826,15 +838,15 @@ impl PartialEq for ValueBox {
     }
 }
 
-impl Eq for ValueBox {}
+impl Eq for Value<'_> {}
 
-impl PartialOrd for ValueBox {
+impl PartialOrd for Value<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for ValueBox {
+impl Ord for Value<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         fn f64_total_cmp(left: f64, right: f64) -> Ordering {
             // this is taken from f64::total_cmp on newer rust versions
@@ -874,13 +886,13 @@ impl Ord for ValueBox {
     }
 }
 
-impl fmt::Debug for ValueBox {
+impl fmt::Debug for Value<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         fmt::Debug::fmt(&self.0, f)
     }
 }
 
-impl fmt::Display for ValueBox {
+impl fmt::Display for Value<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
             ValueRepr::Undefined => Ok(()),
@@ -931,7 +943,7 @@ impl fmt::Display for ValueBox {
     }
 }
 
-impl Hash for ValueBox {
+impl Hash for Value<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match &self.0 {
             ValueRepr::None | ValueRepr::Undefined => 0u8.hash(state),

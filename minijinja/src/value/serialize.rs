@@ -8,7 +8,7 @@ use serde::{ser, Serialize, Serializer};
 use crate::utils::{untrusted_size_hint, OnDrop};
 use crate::value::{
     value_map_with_capacity, value_optimization,
-    Packed, StringType, ValueBox, OwnedValueBoxMap, ValueRepr,
+    Packed, StringType, Value, ValueBox, OwnedValueBoxMap, ValueRepr,
 };
 
 use super::ArcCow;
@@ -101,7 +101,7 @@ impl ValueBox {
     }
 }
 
-impl Serialize for ValueBox {
+impl Serialize for Value<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -117,7 +117,8 @@ impl Serialize for ValueBox {
                 x.set(rv);
                 rv
             });
-            VALUE_HANDLES.with(|handles| handles.borrow_mut().insert(handle, self.clone()));
+            let val = self.clone().into_owned();
+            VALUE_HANDLES.with(|handles| handles.borrow_mut().insert(handle, val));
             return serializer.serialize_unit_variant(
                 VALUE_HANDLE_MARKER,
                 handle,

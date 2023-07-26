@@ -42,8 +42,8 @@ impl fmt::Display for Macro {
 }
 
 impl Object for Macro {
-    fn value(&self) -> ValueBox {
-        todo!()
+    fn value<'a>(&'a self) -> Value<'a> {
+        Value::from_map_ref(self)
     }
 
     fn call(&self, state: &State, args: &[ValueBox]) -> Result<ValueBox, Error> {

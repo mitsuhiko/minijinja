@@ -4,7 +4,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{intern, ValueBox, OwnedValueBoxMap};
+use crate::value::{intern, Value, ValueBox, OwnedValueBoxMap};
 use crate::vm::State;
 
 /// A utility trait that represents a dynamic object.
@@ -39,8 +39,8 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// called or has methods.
     ///
     /// For more information see [`ObjectKind`].
-    fn value(&self) -> ValueBox {
-        ValueBox::NONE
+    fn value<'a>(&'a self) -> Value<'a> {
+        Value::NONE
     }
 
     /// Called when the engine tries to call a method on the object.
@@ -124,7 +124,7 @@ impl dyn Object {
 
 impl<T: Object + ?Sized> Object for Arc<T> {
     #[inline]
-    fn value(&self) -> ValueBox {
+    fn value<'a>(&'a self) -> Value<'a> {
         T::value(self)
     }
 
@@ -138,37 +138,6 @@ impl<T: Object + ?Sized> Object for Arc<T> {
         T::call(self, state, args)
     }
 }
-
-// /// A kind defines the object's behavior.
-// ///
-// /// When a dynamic [`Object`] is implemented, it can be of one of the kinds
-// /// here.  The default behavior will be a [`Plain`](Self::Plain) object which
-// /// doesn't do much other than that it can be printed.  For an object to turn
-// /// into a [struct](Self::Struct) or [sequence](Self::Seq) the necessary kind
-// /// has to be returned with a pointer to itself.
-// ///
-// /// Today object's can have the behavior of structs and sequences but this
-// /// might expand in the future.  It does mean that not all types of values can
-// /// be represented by objects.
-// #[non_exhaustive]
-// pub enum ObjectKind<'a> {
-//     /// This object is a plain object.
-//     ///
-//     /// Such an object has no attributes but it might be callable and it
-//     /// can be stringified.  When serialized it's serialized in it's
-//     /// stringified form.
-//     Plain,
-//
-//     /// This object is a sequence.
-//     ///
-//     /// Requires that the object implements [`SeqObject`].
-//     Seq(&'a dyn SeqObject),
-//
-//     /// This object is a struct (map with string keys).
-//     ///
-//     /// Requires that the object implements [`MapObject`].
-//     Struct(&'a dyn MapObject),
-// }
 
 /// Provides the behavior of an [`Object`] holding sequence of values.
 ///
