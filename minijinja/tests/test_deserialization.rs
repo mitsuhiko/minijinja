@@ -4,11 +4,33 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use similar_asserts::assert_eq;
 
-use minijinja::value::Value;
+use minijinja::value::{SeqObject, StructObject, Value};
 
 #[test]
 fn test_seq() {
     let v = Vec::<i32>::deserialize(Value::from(vec![1, 2, 3])).unwrap();
+    assert_eq!(v, vec![1, 2, 3]);
+}
+
+#[test]
+fn test_seq_object() {
+    struct X;
+
+    impl SeqObject for X {
+        fn get_item(&self, idx: usize) -> Option<Value> {
+            if idx < 3 {
+                Some(Value::from(idx + 1))
+            } else {
+                None
+            }
+        }
+
+        fn item_count(&self) -> usize {
+            3
+        }
+    }
+
+    let v = Vec::<i32>::deserialize(Value::from_seq_object(X)).unwrap();
     assert_eq!(v, vec![1, 2, 3]);
 }
 
@@ -22,6 +44,30 @@ fn test_map() {
     assert_eq!(
         v,
         BTreeMap::from_iter([("foo".to_string(), 1), ("bar".to_string(), 2)])
+    );
+}
+
+#[test]
+fn test_struct_object() {
+    struct X;
+
+    impl StructObject for X {
+        fn get_field(&self, name: &str) -> Option<Value> {
+            match name {
+                "a" => Some(Value::from(1)),
+                "b" => Some(Value::from(2)),
+                _ => None,
+            }
+        }
+        fn static_fields(&self) -> Option<&'static [&'static str]> {
+            Some(&["a", "b"])
+        }
+    }
+
+    let v = BTreeMap::<String, i32>::deserialize(Value::from_struct_object(X)).unwrap();
+    assert_eq!(
+        v,
+        BTreeMap::from_iter([("a".to_string(), 1), ("b".to_string(), 2)])
     );
 }
 

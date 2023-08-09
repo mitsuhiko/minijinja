@@ -430,6 +430,9 @@ fn value_to_unexpected(value: &Value) -> de::Unexpected {
     }
 }
 
+/// When the `deserialization` feature is enabled, the MiniJinja error type
+/// can be used as serde deserialization error.
+#[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
 impl de::Error for Error {
     fn custom<T>(msg: T) -> Self
     where
