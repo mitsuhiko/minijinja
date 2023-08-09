@@ -138,6 +138,9 @@ mod object;
 pub(crate) mod ops;
 mod serialize;
 
+#[cfg(feature = "deserialization")]
+pub use self::deserialize::{ValueDeserializer, ViaDeserialize};
+
 pub(crate) use crate::value::keyref::KeyRef;
 
 // We use in-band signalling to roundtrip some internal values.  This is
