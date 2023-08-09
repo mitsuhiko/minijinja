@@ -37,6 +37,7 @@ fn main() {
     // Second example shows how you can deserialize directly from a value
     let point = Point { x: -1.0, y: 1.0 };
     let point_value = Value::from_serializable(&point);
+    println!("Point serialized as value: {}", point_value);
     let point_again = Point::deserialize(point_value).unwrap();
     println!("Point deserialization: {:?}", point_again);
 }
