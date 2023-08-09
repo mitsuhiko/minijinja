@@ -56,14 +56,20 @@
 //! ```
 //!
 //! The inverse of that operation is to pass a value directly as serializer to
-//! a type that supports deserialization:
+//! a type that supports deserialization.  This requires the `deserialization`
+//! feature.
 //!
-//! ```
-//! # use minijinja::value::Value;
-//! use serde::Deserialize;
-//! let value = Value::from(vec![1, 2, 3]);
-//! let vec = Vec::<i32>::deserialize(value).unwrap();
-//! ```
+#![cfg_attr(
+    feature = "deserialization",
+    doc = r"
+```
+# use minijinja::value::Value;
+use serde::Deserialize;
+let value = Value::from(vec![1, 2, 3]);
+let vec = Vec::<i32>::deserialize(value).unwrap();
+```
+"
+)]
 //!
 //! # Value Function Arguments
 //!
