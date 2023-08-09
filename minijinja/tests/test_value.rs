@@ -488,7 +488,7 @@ fn test_complex_key() {
 #[test]
 #[cfg(feature = "deserialization")]
 fn test_deserialize() {
-    use serde::{de::IntoDeserializer, Deserialize};
+    use serde::Deserialize;
 
     #[derive(Deserialize, Debug, PartialEq, Eq)]
     struct Point {
@@ -497,7 +497,7 @@ fn test_deserialize() {
     }
 
     let point_value = Value::from_iter([("x", Value::from(42)), ("y", Value::from(-23))]);
-    let point = Point::deserialize(point_value.into_deserializer()).unwrap();
+    let point = Point::deserialize(point_value).unwrap();
 
     assert_eq!(point, Point { x: 42, y: -23 });
 }

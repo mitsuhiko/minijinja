@@ -139,7 +139,7 @@ pub(crate) mod ops;
 mod serialize;
 
 #[cfg(feature = "deserialization")]
-pub use self::deserialize::{ValueDeserializer, ViaDeserialize};
+pub use self::deserialize::ViaDeserialize;
 
 pub(crate) use crate::value::keyref::KeyRef;
 
@@ -570,6 +570,11 @@ impl Value {
     /// engine today.  This is for instance the case for when keys are used in hash maps
     /// that the engine cannot deal with.  Invalid values are considered an implementation
     /// detail.  There is currently no API to validate a value.
+    ///
+    /// If the `deserialization` feature is enabled then the inverse of this method
+    /// is to use the [`Value`] type as serializer.  You can pass a value into the
+    /// [`deserialize`](serde::Deserialize::deserialize) method of a type that supports
+    /// serde deserialization.
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
         let _serialization_guard = mark_internal_serialization();
         let _optimization_guard = value_optimization();

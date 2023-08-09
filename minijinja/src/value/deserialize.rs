@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
-use serde::de::{self, IntoDeserializer, MapAccess, SeqAccess, Visitor};
+use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{forward_to_deserialize_any, Deserialize};
 
 use crate::value::{ArgType, KeyRef, MapType, Value, ValueKind, ValueMap, ValueRepr};
@@ -14,22 +14,6 @@ impl<'de> Deserialize<'de> for Value {
     {
         let visitor = ValueVisitor;
         deserializer.deserialize_any(visitor)
-    }
-}
-
-impl<'de> de::IntoDeserializer<'de, Error> for Value {
-    type Deserializer = ValueDeserializer<Error>;
-
-    fn into_deserializer(self) -> Self::Deserializer {
-        ValueDeserializer::new(self)
-    }
-}
-
-impl<'de, 'v> de::IntoDeserializer<'de, Error> for &'v Value {
-    type Deserializer = ValueDeserializer<Error>;
-
-    fn into_deserializer(self) -> Self::Deserializer {
-        ValueDeserializer::new(self.clone())
     }
 }
 
@@ -151,7 +135,7 @@ impl<'a, T: Deserialize<'a>> ArgType<'a> for ViaDeserialize<T> {
 
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
         match value {
-            Some(value) => T::deserialize(value.into_deserializer()).map(ViaDeserialize),
+            Some(value) => T::deserialize(value).map(ViaDeserialize),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
@@ -171,23 +155,13 @@ impl<T> DerefMut for ViaDeserialize<T> {
     }
 }
 
-/// A deserializer for value objects.
-///
-/// This deserializer is enabled by the `deserialization` feature and can be used to
-/// convert a [`Value`] into other objects via [`Deserialize`](serde::Deserialize).
-/// It's returned by the [`into_deserializer`](serde::de::IntoDeserializer::into_deserializer) trait method.
-///
-/// For argument types the [`ViaDeserialize`] type is available which uses this
-/// behind the scenes for argument types.
-#[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
-pub struct ValueDeserializer<E> {
+struct ValueDeserializer<E> {
     value: Value,
     error: PhantomData<fn() -> E>,
 }
 
 impl<E> ValueDeserializer<E> {
-    /// Creates a new deserializer for a value.
-    pub fn new(value: Value) -> ValueDeserializer<E> {
+    fn new(value: Value) -> ValueDeserializer<E> {
         ValueDeserializer {
             value,
             error: PhantomData,
@@ -462,5 +436,55 @@ impl de::Error for Error {
         T: std::fmt::Display,
     {
         Error::new(ErrorKind::BadSerialization, msg.to_string())
+    }
+}
+
+impl<'de> de::Deserializer<'de> for Value {
+    type Error = Error;
+
+    fn deserialize_any<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        ValueDeserializer::new(self).deserialize_any(visitor)
+    }
+
+    fn deserialize_option<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        ValueDeserializer::new(self).deserialize_option(visitor)
+    }
+
+    fn deserialize_enum<V: de::Visitor<'de>>(
+        self,
+        name: &'static str,
+        variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error> {
+        ValueDeserializer::new(self).deserialize_enum(name, variants, visitor)
+    }
+
+    fn deserialize_newtype_struct<V: de::Visitor<'de>>(
+        self,
+        name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error> {
+        ValueDeserializer::new(self).deserialize_newtype_struct(name, visitor)
+    }
+
+    forward_to_deserialize_any! {
+        bool u8 u16 u32 u64 i8 i16 i32 i64 f32 f64 char str string unit
+        seq bytes byte_buf map unit_struct
+        tuple_struct struct tuple ignored_any identifier
+    }
+}
+
+impl<'de, 'v> de::Deserializer<'de> for &'v Value {
+    type Error = Error;
+
+    fn deserialize_any<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        ValueDeserializer::new(self.clone()).deserialize_any(visitor)
+    }
+
+    forward_to_deserialize_any! {
+        bool u8 u16 u32 u64 i8 i16 i32 i64 f32 f64 char str string unit
+        seq bytes byte_buf map unit_struct
+        tuple_struct struct tuple ignored_any identifier
+        option enum newtype_struct
     }
 }
