@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.6
+
+- Re-report `Value` directly from the crate root for convenience.
+
 ## 1.0.5
 
 - Added the ability to merge multiple values with the `context!`
