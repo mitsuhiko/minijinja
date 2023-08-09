@@ -1,0 +1,2 @@
+Path: {{ path }}
+Parent: {{ path|dirname }}

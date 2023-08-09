@@ -484,3 +484,46 @@ fn test_complex_key() {
         Some(Value::UNDEFINED)
     );
 }
+
+#[test]
+#[cfg(feature = "deserialization")]
+fn test_deserialize() {
+    use serde::Deserialize;
+
+    #[derive(Deserialize, Debug, PartialEq, Eq)]
+    struct Point {
+        x: i32,
+        y: i32,
+    }
+
+    let point_value = Value::from_iter([("x", Value::from(42)), ("y", Value::from(-23))]);
+    let point = Point::deserialize(point_value).unwrap();
+
+    assert_eq!(point, Point { x: 42, y: -23 });
+}
+
+#[test]
+#[cfg(feature = "deserialization")]
+fn test_via_deserialize() {
+    use minijinja::value::ViaDeserialize;
+    use serde::Deserialize;
+
+    #[derive(Deserialize, Debug, PartialEq, Eq)]
+    struct Point {
+        x: i32,
+        y: i32,
+    }
+
+    fn foo(point: ViaDeserialize<Point>) -> String {
+        format!("{}, {}", point.x, point.y)
+    }
+
+    let point_value = Value::from_iter([("x", Value::from(42)), ("y", Value::from(-23))]);
+
+    let mut env = Environment::new();
+    env.add_filter("foo", foo);
+    let state = env.empty_state();
+
+    let rv = state.apply_filter("foo", args![point_value]).unwrap();
+    assert_eq!(rv.to_string(), "42, -23");
+}

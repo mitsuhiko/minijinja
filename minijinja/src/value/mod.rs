@@ -9,7 +9,7 @@
 //! filter to take a [`String`](std::string::String).  However for some more
 //! advanced use cases it's useful to know that this type exists.
 //!
-//! # Converting Values
+//! # Basic Value Conversions
 //!
 //! Values are typically created via the [`From`] trait:
 //!
@@ -31,19 +31,6 @@
 //! let value: Value = [("key", "value")].into_iter().collect();
 //! ```
 //!
-//! The special [`Undefined`](Value::UNDEFINED) value also exists but does not
-//! have a rust equivalent.  It can be created via the [`UNDEFINED`](Value::UNDEFINED)
-//! constant.
-//!
-//! MiniJinja will however create values via an indirection via [`serde`] when
-//! a template is rendered or an expression is evaluated.  This can also be
-//! triggered manually by using the [`Value::from_serializable`] method:
-//!
-//! ```
-//! # use minijinja::value::Value;
-//! let value = Value::from_serializable(&[1, 2, 3]);
-//! ```
-//!
 //! To to into the inverse directly the various [`TryFrom`](std::convert::TryFrom)
 //! implementations can be used:
 //!
@@ -52,6 +39,37 @@
 //! use std::convert::TryFrom;
 //! let v = u64::try_from(Value::from(42)).unwrap();
 //! ```
+//!
+//! The special [`Undefined`](Value::UNDEFINED) value also exists but does not
+//! have a rust equivalent.  It can be created via the [`UNDEFINED`](Value::UNDEFINED)
+//! constant.
+//!
+//! # Serde Conversions
+//!
+//! MiniJinja will usually however create values via an indirection via [`serde`] when
+//! a template is rendered or an expression is evaluated.  This can also be
+//! triggered manually by using the [`Value::from_serializable`] method:
+//!
+//! ```
+//! # use minijinja::value::Value;
+//! let value = Value::from_serializable(&[1, 2, 3]);
+//! ```
+//!
+//! The inverse of that operation is to pass a value directly as serializer to
+//! a type that supports deserialization.  This requires the `deserialization`
+//! feature.
+//!
+#![cfg_attr(
+    feature = "deserialization",
+    doc = r"
+```
+# use minijinja::value::Value;
+use serde::Deserialize;
+let value = Value::from(vec![1, 2, 3]);
+let vec = Vec::<i32>::deserialize(value).unwrap();
+```
+"
+)]
 //!
 //! # Value Function Arguments
 //!
@@ -137,6 +155,9 @@ pub(crate) mod merge_object;
 mod object;
 pub(crate) mod ops;
 mod serialize;
+
+#[cfg(feature = "deserialization")]
+pub use self::deserialize::ViaDeserialize;
 
 pub(crate) use crate::value::keyref::KeyRef;
 
@@ -567,6 +588,11 @@ impl Value {
     /// engine today.  This is for instance the case for when keys are used in hash maps
     /// that the engine cannot deal with.  Invalid values are considered an implementation
     /// detail.  There is currently no API to validate a value.
+    ///
+    /// If the `deserialization` feature is enabled then the inverse of this method
+    /// is to use the [`Value`] type as serializer.  You can pass a value into the
+    /// [`deserialize`](serde::Deserialize::deserialize) method of a type that supports
+    /// serde deserialization.
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
         let _serialization_guard = mark_internal_serialization();
         let _optimization_guard = value_optimization();

@@ -111,6 +111,9 @@ where
 /// * values: [`Value`], `&Value`
 /// * vectors: [`Vec<T>`]
 /// * sequences: [`&dyn SeqObject`](crate::value::SeqObject)
+/// * serde deserializable: [`ViaDeserialize<T>`](crate::value::deserialize::ViaDeserialize)
+/// * keyword arguments: [`Kwargs`]
+/// * leftover arguments: [`Rest<T>`]
 ///
 /// The type is also implemented for optional values (`Option<T>`) which is used
 /// to encode optional parameters to filters, functions or tests.  Additionally

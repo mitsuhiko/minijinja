@@ -15,6 +15,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [dsl](dsl): shows how to use MiniJinja has a DSL.
 * [dynamic-context](dynamic-context): demonstrates how to use dynamic objects as template context.
 * [dynamic-objects](dynamic-objects): demonstrates how to use dynamic objects in templates.
+* [deserialize](deserialize): demonstrates how you can deserialize directly from a value.
 * [error](error): shows the built-in error reporting support.
 * [eval-to-state](eval-to-state): Demonstrates what can be done with evaluating to state.
 * [expr](expr): demonstrates the expression evaluation support.

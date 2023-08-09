@@ -5,6 +5,9 @@ All notable changes to MiniJinja are documented here.
 ## 1.0.6
 
 - Re-report `Value` directly from the crate root for convenience.
+- It's now possible to `deserialize` from a `Value`.  Additionally the
+  `ViaDeserialize<T>` argument type was added to support value conversions
+  via serde as argument type.  #325
 
 ## 1.0.5
 
