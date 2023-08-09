@@ -9,7 +9,7 @@
 //! filter to take a [`String`](std::string::String).  However for some more
 //! advanced use cases it's useful to know that this type exists.
 //!
-//! # Converting Values
+//! # Basic Value Conversions
 //!
 //! Values are typically created via the [`From`] trait:
 //!
@@ -31,11 +31,22 @@
 //! let value: Value = [("key", "value")].into_iter().collect();
 //! ```
 //!
+//! To to into the inverse directly the various [`TryFrom`](std::convert::TryFrom)
+//! implementations can be used:
+//!
+//! ```
+//! # use minijinja::value::Value;
+//! use std::convert::TryFrom;
+//! let v = u64::try_from(Value::from(42)).unwrap();
+//! ```
+//!
 //! The special [`Undefined`](Value::UNDEFINED) value also exists but does not
 //! have a rust equivalent.  It can be created via the [`UNDEFINED`](Value::UNDEFINED)
 //! constant.
 //!
-//! MiniJinja will however create values via an indirection via [`serde`] when
+//! # Serde Conversions
+//!
+//! MiniJinja will usually however create values via an indirection via [`serde`] when
 //! a template is rendered or an expression is evaluated.  This can also be
 //! triggered manually by using the [`Value::from_serializable`] method:
 //!
@@ -44,13 +55,14 @@
 //! let value = Value::from_serializable(&[1, 2, 3]);
 //! ```
 //!
-//! To to into the inverse directly the various [`TryFrom`](std::convert::TryFrom)
-//! implementations can be used:
+//! The inverse of that operation is to pass a value directly as serializer to
+//! a type that supports deserialization:
 //!
 //! ```
 //! # use minijinja::value::Value;
-//! use std::convert::TryFrom;
-//! let v = u64::try_from(Value::from(42)).unwrap();
+//! use serde::Deserialize;
+//! let value = Value::from(vec![1, 2, 3]);
+//! let vec = Vec::<i32>::deserialize(value).unwrap();
 //! ```
 //!
 //! # Value Function Arguments
