@@ -127,6 +127,9 @@ pub enum ErrorKind {
     UndefinedError,
     /// Not able to serialize this value.
     BadSerialization,
+    /// Not able to deserialize this value.
+    #[cfg(feature = "deserialization")]
+    CannotDeserialize,
     /// An error happened in an include.
     BadInclude,
     /// An error happened in a super block.
@@ -167,6 +170,8 @@ impl ErrorKind {
             ErrorKind::EvalBlock => "could not render block",
             ErrorKind::CannotUnpack => "cannot unpack",
             ErrorKind::WriteFailure => "failed to write output",
+            #[cfg(feature = "deserialization")]
+            ErrorKind::CannotDeserialize => "cannot deserialize",
             #[cfg(feature = "fuel")]
             ErrorKind::OutOfFuel => "engine ran out of fuel",
             #[cfg(feature = "custom_syntax")]

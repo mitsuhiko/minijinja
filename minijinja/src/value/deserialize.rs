@@ -435,7 +435,7 @@ impl de::Error for Error {
     where
         T: std::fmt::Display,
     {
-        Error::new(ErrorKind::BadSerialization, msg.to_string())
+        Error::new(ErrorKind::CannotDeserialize, msg.to_string())
     }
 }
 
