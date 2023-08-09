@@ -227,6 +227,9 @@ pub use self::output::Output;
 pub use self::template::Template;
 pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
 
+/// Re-export for convenience.
+pub use self::value::Value;
+
 #[cfg(feature = "custom_syntax")]
 pub use self::custom_syntax::Syntax;
 
