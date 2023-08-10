@@ -157,7 +157,7 @@ pub fn datetimeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<Str
                 "long" => "[month repr:long] [day padding:none] [year] [hour]:[minute]:[second]",
                 "full" => "[weekday], [month repr:long] [day padding:none] [year] [hour]:[minute]:[second].[subsecond]",
                 "iso" => {
-                    "[year]-[month]-[day]T[hour]:[minute]:[second]+[offset_hour]:[offset_minute]"
+                    "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]"
                 }
                 "unix" => "[unix_timestamp]",
                 other => other,
@@ -228,7 +228,7 @@ pub fn timeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String,
                 "long" => "[hour]:[minute]:[second]",
                 "full" => "[hour]:[minute]:[second].[subsecond]",
                 "iso" => {
-                    "[year]-[month]-[day]T[hour]:[minute]:[second]+[offset_hour]:[offset_minute]"
+                    "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]"
                 }
                 "unix" => "[unix_timestamp]",
                 other => other,

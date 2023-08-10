@@ -45,6 +45,21 @@ fn test_datetimeformat() {
 }
 
 #[test]
+fn test_datetimeformat_iso_negative() {
+    let mut env = minijinja::Environment::new();
+    env.add_global("TIMEZONE", "America/Chicago");
+    minijinja_contrib::add_to_environment(&mut env);
+
+    let expr = env
+        .compile_expression("1687624642.5|datetimeformat(format='iso')")
+        .unwrap();
+    assert_eq!(
+        expr.eval(()).unwrap().to_string(),
+        "2023-06-24T11:37:22-05:00"
+    )
+}
+
+#[test]
 fn test_datetimeformat_time_rs() {
     let mut env = minijinja::Environment::new();
     env.add_global("TIMEZONE", "Europe/Vienna");
