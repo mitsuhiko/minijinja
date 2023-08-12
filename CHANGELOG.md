@@ -2,6 +2,12 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.7
+
+- The default auto-escape detection now accepts `.html.j2` as alias for
+  `.html` as well as for all other choices.  In general `.j2` as an extension
+  is now generally supported.
+
 ## 1.0.6
 
 - Fixed iso datetime formatting not handling negative offsets correctly.  #327

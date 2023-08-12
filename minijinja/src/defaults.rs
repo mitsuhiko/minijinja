@@ -21,8 +21,11 @@ pub(crate) fn no_auto_escape(_: &str) -> AutoEscape {
     doc = r" * [`Json`](AutoEscape::Json): `.json`, `.json5`, `.js`, `.yaml`, `.yml`"
 )]
 /// * [`None`](AutoEscape::None): _all others_
+///
+/// Additionally `.j2` as final extension is ignored. So `.html.j2` is the
+/// considered the same as `.html`.
 pub fn default_auto_escape_callback(name: &str) -> AutoEscape {
-    match name.rsplit('.').next() {
+    match name.strip_suffix(".j2").unwrap_or(name).rsplit('.').next() {
         Some("html" | "htm" | "xml") => AutoEscape::Html,
         #[cfg(feature = "json")]
         Some("json" | "json5" | "js" | "yaml" | "yml") => AutoEscape::Json,
@@ -179,4 +182,33 @@ pub(crate) fn get_globals() -> BTreeMap<Cow<'static, str>, Value> {
     }
 
     rv
+}
+
+#[cfg(test)]
+mod unit_tests {
+    use super::*;
+
+    use similar_asserts::assert_eq;
+
+    #[test]
+    fn test_default_uto_escape() {
+        assert_eq!(default_auto_escape_callback("foo.html"), AutoEscape::Html);
+        assert_eq!(
+            default_auto_escape_callback("foo.html.j2"),
+            AutoEscape::Html
+        );
+        assert_eq!(default_auto_escape_callback("foo.htm"), AutoEscape::Html);
+        assert_eq!(default_auto_escape_callback("foo.htm.j2"), AutoEscape::Html);
+        assert_eq!(default_auto_escape_callback("foo.txt"), AutoEscape::None);
+        assert_eq!(default_auto_escape_callback("foo.txt.j2"), AutoEscape::None);
+
+        #[cfg(feature = "json")]
+        {
+            assert_eq!(default_auto_escape_callback("foo.yaml"), AutoEscape::Json);
+            assert_eq!(
+                default_auto_escape_callback("foo.json.j2"),
+                AutoEscape::Json
+            );
+        }
+    }
 }
