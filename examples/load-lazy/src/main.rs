@@ -3,8 +3,7 @@ use std::env;
 use std::fs;
 use std::sync::Mutex;
 
-use minijinja::value::StructObject;
-use minijinja::value::Value;
+use minijinja::value::{StructObject, Value};
 use minijinja::Environment;
 
 #[derive(Default, Debug)]

@@ -1,8 +1,7 @@
 use std::env;
 use std::fs;
 
-use minijinja::value::Value;
-use minijinja::{Environment, Error, ErrorKind};
+use minijinja::{Environment, Error, ErrorKind, Value};
 
 fn load_data(filename: &str) -> Result<Value, Error> {
     let mut rv = env::current_dir().unwrap().join("src");

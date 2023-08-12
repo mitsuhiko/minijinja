@@ -1,5 +1,4 @@
-use minijinja::value::Value;
-use minijinja::{context, Environment};
+use minijinja::{context, Environment, Value};
 use minijinja_contrib::add_to_environment;
 
 fn render_template(env: &Environment, tmpl: &str, ctx: Value) -> String {

@@ -1,5 +1,4 @@
-use minijinja::value::Value;
-use minijinja::{context, Environment};
+use minijinja::{context, Environment, Value};
 
 fn main() {
     let env = Environment::new();
