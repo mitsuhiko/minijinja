@@ -197,10 +197,13 @@ impl<'template, 'env> State<'template, 'env> {
         self.ctx.exports().keys().copied().collect()
     }
 
-    /// Fetches a template by name.
+    /// Fetches a template by name with path joining.
     ///
     /// This works like [`Environment::get_template`] with the difference that the lookup
-    /// undergoes path joining.
+    /// undergoes path joining.  If the environment has a configured path joining callback,
+    /// it will be invoked with the name of the current template as parent template.
+    ///
+    /// For more information see [`Environment::set_path_join_callback`].
     pub fn get_template(&self, name: &str) -> Result<Template<'env, 'env>, Error> {
         self.env
             .get_template(&self.env.join_template_path(name, self.name()))
