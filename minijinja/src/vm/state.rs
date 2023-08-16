@@ -5,6 +5,7 @@ use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::output::Output;
+use crate::template::Template;
 use crate::utils::{AutoEscape, UndefinedBehavior};
 use crate::value::{ArgType, Value};
 use crate::vm::context::Context;
@@ -194,6 +195,15 @@ impl<'template, 'env> State<'template, 'env> {
     /// Returns a list of the names of all exports (top-level variables).
     pub fn exports(&self) -> Vec<&str> {
         self.ctx.exports().keys().copied().collect()
+    }
+
+    /// Fetches a template by name.
+    ///
+    /// This works like [`Environment::get_template`] with the difference that the lookup
+    /// undergoes path joining.
+    pub fn get_template(&self, name: &str) -> Result<Template<'env, 'env>, Error> {
+        self.env
+            .get_template(&self.env.join_template_path(name, self.name()))
     }
 
     /// Invokes a filter with some arguments.

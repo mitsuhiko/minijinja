@@ -4,6 +4,11 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.7
 
+- Added `Environment::set_path_join_callback` and `State::get_template`
+  to support path joining.  This is for greater compatibility with Jinja2
+  where path joining was overridable.  With this you can configure the
+  engine so that paths used by `include` or `extends` can be relative to
+  the current template.  #328
 - The default auto-escape detection now accepts `.html.j2` as alias for
   `.html` as well as for all other choices.  In general `.j2` as an extension
   is now generally supported.

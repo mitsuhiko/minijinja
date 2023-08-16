@@ -91,3 +91,25 @@ fn test_template_removal() {
     env.remove_template("test");
     assert!(env.get_template("test").is_err());
 }
+
+#[test]
+fn test_path_join() {
+    let mut env = Environment::new();
+    env.add_template("x/a/foo.txt", "{% include '../b/bar.txt' %}")
+        .unwrap();
+    env.add_template("x/b/bar.txt", "bar.txt").unwrap();
+    env.set_path_join_callback(|name, parent| {
+        let mut rv = parent.split('/').collect::<Vec<_>>();
+        rv.pop();
+        name.split('/').for_each(|segment| match segment {
+            "." => {}
+            ".." => {
+                rv.pop();
+            }
+            other => rv.push(other),
+        });
+        rv.join("/").into()
+    });
+    let t = env.get_template("x/a/foo.txt").unwrap();
+    assert_eq!(t.render(()).unwrap(), "bar.txt");
+}
