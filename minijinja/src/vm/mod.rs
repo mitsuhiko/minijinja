@@ -667,7 +667,7 @@ impl<'env> Vm<'env> {
                     "template name was not a string",
                 )
             }));
-            let tmpl = match self.env.get_template(name) {
+            let tmpl = match state.get_template(name) {
                 Ok(tmpl) => tmpl,
                 Err(err) => {
                     if err.kind() == ErrorKind::TemplateNotFound {
@@ -798,7 +798,7 @@ impl<'env> Vm<'env> {
                 format!("cycle in template inheritance. {name:?} was referenced more than once"),
             ));
         }
-        let tmpl = ok!(self.env.get_template(name));
+        let tmpl = ok!(state.get_template(name));
         let (new_instructions, new_blocks) = ok!(tmpl.instructions_and_blocks());
         state.loaded_templates.insert(new_instructions.name());
         for (name, instr) in new_blocks.iter() {

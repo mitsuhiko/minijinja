@@ -19,6 +19,7 @@ use crate::{defaults, filters, functions, tests};
 
 type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
 type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + Sync + Send;
+type PathJoinFunc = dyn for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Sync + Send;
 
 /// An abstraction that holds the engine configuration.
 ///
@@ -42,6 +43,7 @@ pub struct Environment<'source> {
     tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
     globals: BTreeMap<Cow<'source, str>, Value>,
     default_auto_escape: Arc<AutoEscapeFunc>,
+    path_join_callback: Option<Arc<PathJoinFunc>>,
     undefined_behavior: UndefinedBehavior,
     formatter: Arc<FormatterFunc>,
     #[cfg(feature = "debug")]
@@ -81,6 +83,7 @@ impl<'source> Environment<'source> {
             tests: defaults::get_builtin_tests(),
             globals: defaults::get_globals(),
             default_auto_escape: Arc::new(defaults::default_auto_escape_callback),
+            path_join_callback: None,
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
             #[cfg(feature = "debug")]
@@ -101,6 +104,7 @@ impl<'source> Environment<'source> {
             tests: Default::default(),
             globals: Default::default(),
             default_auto_escape: Arc::new(defaults::no_auto_escape),
+            path_join_callback: None,
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
             #[cfg(feature = "debug")]
@@ -196,6 +200,36 @@ impl<'source> Environment<'source> {
     /// Removes a template by name.
     pub fn remove_template(&mut self, name: &str) {
         self.templates.remove(name);
+    }
+
+    /// Sets a callback to join template paths.
+    ///
+    /// By default this returns the template path unchanged, but it can be used
+    /// to implement relative path resolution between templates.  The first
+    /// argument to the callback is the name of the template to be loaded, the
+    /// second argument is the parent path.
+    ///
+    /// The following example demonstrates how a basic path joining algorithm
+    /// can be implemented.
+    ///
+    /// ```
+    /// # let mut env = minijinja::Environment::new();
+    /// env.set_path_join_callback(|name, parent| {
+    ///     let mut rv = parent.split('/').collect::<Vec<_>>();
+    ///     rv.pop();
+    ///     name.split('/').for_each(|segment| match segment {
+    ///         "." => {}
+    ///         ".." => { rv.pop(); }
+    ///         _ => { rv.push(segment); }
+    ///     });
+    ///     rv.join("/").into()
+    /// });
+    /// ```
+    pub fn set_path_join_callback<F>(&mut self, f: F)
+    where
+        F: for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Send + Sync + 'static,
+    {
+        self.path_join_callback = Some(Arc::new(f));
     }
 
     /// Removes all stored templates.
@@ -603,6 +637,14 @@ impl<'source> Environment<'source> {
             Err(Error::from(ErrorKind::UndefinedError))
         } else {
             (self.formatter)(out, state, value)
+        }
+    }
+
+    /// Performs a template path join.
+    pub(crate) fn join_template_path<'s>(&self, name: &'s str, parent: &'s str) -> Cow<'s, str> {
+        match self.path_join_callback {
+            Some(ref cb) => cb(name, parent),
+            None => Cow::Borrowed(name),
         }
     }
 }
