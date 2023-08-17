@@ -257,6 +257,13 @@ pub mod machinery {
 
     use crate::Output;
 
+    /// Returns a reference to a [`CompiledTemplate`] from a [`Template`].
+    pub fn get_compiled_template<'x, 'env>(
+        tmpl: &'x crate::Template<'env, 'env>,
+    ) -> &'x CompiledTemplate<'env> {
+        &tmpl.compiled
+    }
+
     /// Creates an [`Output`] that writes into a string.
     pub fn make_string_output(s: &mut String) -> Output<'_> {
         Output::with_string(s)

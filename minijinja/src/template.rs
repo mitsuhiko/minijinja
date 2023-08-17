@@ -27,7 +27,7 @@ use crate::vm::{prepare_blocks, State, Vm};
 #[derive(Clone)]
 pub struct Template<'env: 'source, 'source> {
     env: &'env Environment<'env>,
-    compiled: CompiledTemplateRef<'env, 'source>,
+    pub(crate) compiled: CompiledTemplateRef<'env, 'source>,
     initial_auto_escape: AutoEscape,
 }
 
