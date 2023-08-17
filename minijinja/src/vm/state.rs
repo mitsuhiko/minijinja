@@ -77,6 +77,7 @@ impl<'template, 'env> State<'template, 'env> {
         blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
     ) -> State<'template, 'env> {
         State {
+            #[cfg(feature = "macros")]
             id: STATE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             env,
             ctx,
