@@ -2,13 +2,16 @@
 
 [![Build Status](https://github.com/mitsuhiko/minijinja/workflows/Tests/badge.svg?branch=main)](https://github.com/mitsuhiko/minijinja/actions?query=workflow%3ATests)
 [![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
-[![Crates.io](https://img.shields.io/crates/d/minijinja-contrib.svg)](https://crates.io/crates/minijinja-contrib)
+[![Crates.io](https://img.shields.io/crates/d/minijinja-cli.svg)](https://crates.io/crates/minijinja-cli)
 [![rustc 1.61.0](https://img.shields.io/badge/rust-1.61%2B-orange.svg)](https://img.shields.io/badge/rust-1.61%2B-orange.svg)
-[![Documentation](https://docs.rs/minijinja-contrib/badge.svg)](https://docs.rs/minijinja-contrib)
 
 `minijinja-cli`` is a command line executable that uses 
 [MiniJinja](https://github.com/mitsuhiko/minijinja) to render Jinja2 templates
 directly from the command line to stdout.
+
+```
+cargo install minijinja-cli
+```
 
 ```
 minijinja-cli my-template.j2 data.json
