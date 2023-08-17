@@ -45,6 +45,7 @@ powered by a WASM build of MiniJinja.
 * [Descriptive errors](https://github.com/mitsuhiko/minijinja/tree/main/examples/error)
 * [Compiles to WebAssembly](https://github.com/mitsuhiko/minijinja-playground/blob/main/src/lib.rs)
 * [Works with Python](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py)
+* Comes with a handy [CLI](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli)
 
 ## Example Template
 

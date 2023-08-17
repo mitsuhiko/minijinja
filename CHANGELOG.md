@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.7
 
+- Added `minijinja-cli` which lets you render and debug templates from
+  the command line.  #331
 - Macros called with the wrong state will no longer panic.  #330
 - Debug output of `Value::UNDEFINED` and `Value::from(())` is now
   `undefined` and `none` rather than `Undefined` and `None`.  This was
