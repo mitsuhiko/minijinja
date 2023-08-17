@@ -1,6 +1,6 @@
 [package]
 name = "minijinja-cli"
-version = "1.0.7"
+version = "1.0.6"
 edition = "2021"
 
 [features]
