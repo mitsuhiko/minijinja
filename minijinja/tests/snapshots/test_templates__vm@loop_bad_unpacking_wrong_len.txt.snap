@@ -43,7 +43,7 @@ Referenced variables: {
         last: false,
         depth: 1,
         depth0: 0,
-        previtem: Undefined,
+        previtem: undefined,
         nextitem: [
             2,
             3,

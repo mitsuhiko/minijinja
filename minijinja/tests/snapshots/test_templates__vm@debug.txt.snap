@@ -3,6 +3,7 @@ source: minijinja/tests/test_templates.rs
 description: "{% with f = range %}{% for x in f(upper) %}{{ debug() }}{% endfor %}{% endwith %}"
 info:
   upper: 1
+input_file: minijinja/tests/inputs/debug.txt
 ---
 State {
     name: "debug.txt",
@@ -20,8 +21,8 @@ State {
             last: true,
             depth: 1,
             depth0: 0,
-            previtem: Undefined,
-            nextitem: Undefined,
+            previtem: undefined,
+            nextitem: undefined,
         },
         "f": minijinja::functions::builtins::range,
         "upper": 1,

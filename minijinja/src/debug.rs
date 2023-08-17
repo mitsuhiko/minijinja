@@ -63,7 +63,9 @@ pub(super) fn render_debug_info(
             writeln!(f, "{:>4} | {}", idx + 1, line).unwrap();
         }
 
-        writeln!(f, "{:>4} > {}", idx + 1, lines[idx].1).unwrap();
+        if let Some(line) = lines.get(idx) {
+            writeln!(f, "{:>4} > {}", idx + 1, line.1).unwrap();
+        }
         if let Some(span) = span {
             if span.start_line == span.end_line {
                 ok!(writeln!(

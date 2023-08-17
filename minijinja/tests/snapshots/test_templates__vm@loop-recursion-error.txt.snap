@@ -34,7 +34,7 @@ Referenced variables: {
         last: false,
         depth: 500,
         depth0: 499,
-        previtem: Undefined,
+        previtem: undefined,
         nextitem: 2,
     },
     seq: [

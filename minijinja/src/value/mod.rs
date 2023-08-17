@@ -329,12 +329,12 @@ pub(crate) enum ValueRepr {
 impl fmt::Debug for ValueRepr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ValueRepr::Undefined => f.write_str("Undefined"),
+            ValueRepr::Undefined => f.write_str("undefined"),
             ValueRepr::Bool(val) => fmt::Debug::fmt(val, f),
             ValueRepr::U64(val) => fmt::Debug::fmt(val, f),
             ValueRepr::I64(val) => fmt::Debug::fmt(val, f),
             ValueRepr::F64(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::None => f.write_str("None"),
+            ValueRepr::None => f.write_str("none"),
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),

@@ -4,8 +4,8 @@ description: "{% macro foo(a, b, c, d) %}{{ [a, b, c, d] }}{% endmacro -%}\n{{ f
 info: {}
 input_file: minijinja/tests/inputs/macro_kwargs.txt
 ---
-[1, 2, 3, Undefined]
-[{"blub": "blah"}, Undefined, Undefined, Undefined]
-[1, 2, 3, Undefined]
+[1, 2, 3, undefined]
+[{"blub": "blah"}, undefined, undefined, undefined]
+[1, 2, 3, undefined]
 [1, 2, 3, 4]
 

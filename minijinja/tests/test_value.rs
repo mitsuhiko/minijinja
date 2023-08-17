@@ -66,8 +66,8 @@ fn test_sort_different_types() {
     v.sort();
     insta::assert_debug_snapshot!(&v, @r###"
     [
-        Undefined,
-        None,
+        undefined,
+        none,
         -inf,
         -100,
         -75.0,
@@ -210,7 +210,7 @@ fn test_map_object_iteration_and_indexing() {
         "{{ [point.x, point.z, point.missing_attribute] }}",
         point => Value::from_object(Point(1, 2, 3))
     );
-    assert_snapshot!(rv, @r###"[1, 3, Undefined]"###);
+    assert_snapshot!(rv, @"[1, 3, undefined]");
 }
 
 #[test]
@@ -259,7 +259,7 @@ fn test_seq_object_iteration_and_indexing() {
         "{{ [point[0], point[2], point[42]] }}",
         point => Value::from_object(Point(1, 2, 3))
     );
-    assert_snapshot!(rv, @r###"[1, 3, Undefined]"###);
+    assert_snapshot!(rv, @"[1, 3, undefined]");
 }
 
 #[test]

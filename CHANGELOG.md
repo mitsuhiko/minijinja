@@ -4,6 +4,10 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.7
 
+- Debug output of `Value::UNDEFINED` and `Value::from(())` is now
+  `undefined` and `none` rather than `Undefined` and `None`.  This was
+  an accidental inconsistency.
+- Fixed a potential panic in debug error printing.
 - Added `Environment::set_path_join_callback` and `State::get_template`
   to support path joining.  This is for greater compatibility with Jinja2
   where path joining was overridable.  With this you can configure the
