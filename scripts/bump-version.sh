@@ -13,5 +13,6 @@ perl -pi -e "s/^version = \".*?\"/version = \"$NEW_VERSION\"/" minijinja/Cargo.t
 perl -pi -e "s/^version = \".*?\"/version = \"$NEW_VERSION\"/" minijinja-*/Cargo.toml
 perl -pi -e "s/^(minijinja.*?)version = \".*?\"/\$1version = \"$NEW_VERSION\"/" examples/*/Cargo.toml
 perl -pi -e "s/^(minijinja.*?)version = \".*?\"/\$1version = \"$NEW_VERSION\"/" minijinja-*/Cargo.toml
+perl -pi -e "s/^(minijinja.*?)version = \".*?\"/\$1version = \"=$NEW_VERSION\"/" minijinja-cli/Cargo.toml
 
 cargo check --all
