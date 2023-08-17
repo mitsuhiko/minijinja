@@ -1,7 +1,7 @@
 use similar_asserts::assert_eq;
 
 use minijinja::value::{Kwargs, StructObject, Value};
-use minijinja::{args, context, render, Environment};
+use minijinja::{args, context, render, Environment, ErrorKind};
 
 #[test]
 fn test_context() {
@@ -91,4 +91,26 @@ fn test_args() {
     assert_eq!(kwargs.get::<i32>("foo").unwrap(), 42);
     assert_eq!(kwargs.get::<i32>("bar").unwrap(), 23);
     assert_eq!(type_name_of_val(args), "[minijinja::value::Value]");
+}
+
+#[test]
+fn test_macro_passing() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{% macro m(a) %}{{ a }}{% endmacro %}")
+        .unwrap();
+    let (_, state) = tmpl.render_and_return_state(()).unwrap();
+    let m = state.lookup("m").unwrap();
+    assert_eq!(m.get_attr("name").unwrap().as_str(), Some("m"));
+    let rv = m.call(&state, args!(42)).unwrap();
+    assert_eq!(rv.as_str(), Some("42"));
+
+    // if we call the macro on an empty state it errors
+    let empty_state = env.empty_state();
+    let err = m.call(&empty_state, args!(42)).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::InvalidOperation);
+    assert_eq!(
+        err.detail(),
+        Some("cannot call this macro. template state went away.")
+    );
 }

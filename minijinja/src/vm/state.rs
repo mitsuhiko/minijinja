@@ -13,6 +13,14 @@ use crate::vm::context::Context;
 #[cfg(feature = "fuel")]
 use crate::vm::fuel::FuelTracker;
 
+/// When macros are used, the state carries an `id` counter.  Whenever a state is
+/// created, the counter is incremented.  This exists because macros can keep a reference
+/// to instructions from another state by index.  Without this counter it would
+/// be possible for a macro to be called with a different state (different id)
+/// which mean we likely panic.
+#[cfg(feature = "macros")]
+static STATE_ID: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+
 /// Provides access to the current execution state of the engine.
 ///
 /// A read only reference is passed to filter functions and similar objects to
@@ -39,6 +47,8 @@ pub struct State<'template, 'env> {
     pub(crate) blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
     #[allow(unused)]
     pub(crate) loaded_templates: BTreeSet<&'env str>,
+    #[cfg(feature = "macros")]
+    pub(crate) id: isize,
     #[cfg(feature = "macros")]
     pub(crate) macros: std::sync::Arc<Vec<(&'template Instructions<'env>, usize)>>,
     #[cfg(feature = "fuel")]
@@ -67,6 +77,8 @@ impl<'template, 'env> State<'template, 'env> {
         blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
     ) -> State<'template, 'env> {
         State {
+            #[cfg(feature = "macros")]
+            id: STATE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             env,
             ctx,
             current_block: None,

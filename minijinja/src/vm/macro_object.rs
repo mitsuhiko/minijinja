@@ -19,6 +19,7 @@ pub(crate) struct MacroData {
     // reference to the macro instruction (and the jump offset) in the
     // state under `state.macros`.
     pub macro_ref_id: usize,
+    pub state_id: isize,
     pub closure: Value,
     pub caller_reference: bool,
 }
@@ -47,6 +48,14 @@ impl Object for Macro {
     }
 
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+        // we can only call macros that point to loaded template state.
+        if state.id != self.data.state_id {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "cannot call this macro. template state went away.",
+            ));
+        }
+
         let (args, kwargs) = match args.last() {
             Some(Value(ValueRepr::Map(kwargs, MapType::Kwargs))) => {
                 (&args[..args.len() - 1], Some(kwargs))
