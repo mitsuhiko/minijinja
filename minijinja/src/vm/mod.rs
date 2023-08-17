@@ -127,6 +127,8 @@ impl<'env> Vm<'env> {
                 blocks: BTreeMap::default(),
                 loaded_templates: Default::default(),
                 #[cfg(feature = "macros")]
+                id: state.id,
+                #[cfg(feature = "macros")]
                 macros: state.macros.clone(),
                 #[cfg(feature = "fuel")]
                 fuel_tracker: state.fuel_tracker.clone(),
@@ -946,6 +948,7 @@ impl<'env> Vm<'env> {
                 name: Arc::from(name.to_string()),
                 arg_spec,
                 macro_ref_id,
+                state_id: state.id,
                 closure,
                 caller_reference: (flags & MACRO_CALLER) != 0,
             }),
