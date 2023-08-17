@@ -4,6 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.7
 
+- Macros called with the wrong state will no longer panic.  #330
 - Debug output of `Value::UNDEFINED` and `Value::from(())` is now
   `undefined` and `none` rather than `Undefined` and `None`.  This was
   an accidental inconsistency.
