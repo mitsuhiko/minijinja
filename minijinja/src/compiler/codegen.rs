@@ -120,7 +120,7 @@ impl<'source> CodeGenerator<'source> {
     fn finish_subgenerator(&mut self, sub: CodeGenerator<'source>) -> Instructions<'source> {
         self.current_line = sub.current_line;
         let (instructions, blocks) = sub.finish();
-        self.blocks.extend(blocks.into_iter());
+        self.blocks.extend(blocks);
         instructions
     }
 

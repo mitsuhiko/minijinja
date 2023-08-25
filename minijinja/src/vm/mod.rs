@@ -185,6 +185,8 @@ impl<'env> Vm<'env> {
             }};
         }
 
+        // looks nicer nice way
+        #[allow(clippy::while_let_loop)]
         loop {
             let instr = match state.instructions.get(pc) {
                 Some(instr) => instr,

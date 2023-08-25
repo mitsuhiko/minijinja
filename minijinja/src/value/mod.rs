@@ -304,7 +304,7 @@ pub(crate) struct Packed<T: Copy>(pub T);
 
 impl<T: Copy> Clone for Packed<T> {
     fn clone(&self) -> Self {
-        Self(self.0)
+        *self
     }
 }
 
