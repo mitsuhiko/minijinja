@@ -197,6 +197,19 @@ impl<'source> Environment<'source> {
         self.templates.set_loader(f);
     }
 
+    /// Preserve the trailing newline when rendering templates.
+    ///
+    /// The default is `false`, which causes a single newline, if present, to be
+    /// stripped from the end of the template.
+    pub fn set_keep_trailing_newline(&mut self, yes: bool) {
+        self.templates.keep_trailing_newline = yes;
+    }
+
+    /// Returns the value of the trailing newline preservation flag.
+    pub fn keep_trailing_newline(&self) -> bool {
+        self.templates.keep_trailing_newline
+    }
+
     /// Removes a template by name.
     pub fn remove_template(&mut self, name: &str) {
         self.templates.remove(name);
@@ -287,6 +300,7 @@ impl<'source> Environment<'source> {
                 name,
                 source,
                 self._syntax_config().clone(),
+                self.keep_trailing_newline(),
             )))),
             self.initial_auto_escape(name),
         ))
@@ -656,6 +670,7 @@ mod basic_store {
     #[derive(Clone, Default)]
     pub struct BasicStore<'source> {
         pub syntax_config: SyntaxConfig,
+        pub keep_trailing_newline: bool,
         map: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
     }
 
@@ -672,7 +687,8 @@ mod basic_store {
                 Arc::new(ok!(CompiledTemplate::new(
                     name,
                     source,
-                    self.syntax_config.clone()
+                    self.syntax_config.clone(),
+                    self.keep_trailing_newline
                 ))),
             );
             Ok(())

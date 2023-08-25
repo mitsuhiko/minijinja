@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.7
 
+- Added support for `keep_trailing_newlines` which allows you to disable
+  the automatic trimming of trailing newlines.  #334
 - Added `minijinja-cli` which lets you render and debug templates from
   the command line.  #331
 - Macros called with the wrong state will no longer panic.  #330
