@@ -239,6 +239,7 @@ impl<'env, 'source> Template<'env, 'source> {
             self.compiled.instructions.source(),
             self.name(),
             self.compiled.syntax.clone(),
+            true,
         ) {
             Ok(ast) => find_undeclared(&ast, nested),
             Err(_) => HashSet::new(),
@@ -342,19 +343,29 @@ impl<'source> CompiledTemplate<'source> {
         name: &'source str,
         source: &'source str,
         syntax: SyntaxConfig,
+        keep_trailing_newline: bool,
     ) -> Result<CompiledTemplate<'source>, Error> {
-        attach_basic_debug_info(Self::_new_impl(name, source, syntax), source)
+        attach_basic_debug_info(
+            Self::_new_impl(name, source, syntax, keep_trailing_newline),
+            source,
+        )
     }
 
     fn _new_impl(
         name: &'source str,
         source: &'source str,
         syntax: SyntaxConfig,
+        keep_trailing_newline: bool,
     ) -> Result<CompiledTemplate<'source>, Error> {
         // the parser/compiler combination can create constants in which case
         // we can probably benefit from the value optimization a bit.
         let _guard = value::value_optimization();
-        let ast = ok!(parse_with_syntax(source, name, syntax.clone()));
+        let ast = ok!(parse_with_syntax(
+            source,
+            name,
+            syntax.clone(),
+            keep_trailing_newline
+        ));
         let mut gen = CodeGenerator::new(name, source);
         gen.compile_stmt(&ast);
         let buffer_size_hint = gen.buffer_size_hint();

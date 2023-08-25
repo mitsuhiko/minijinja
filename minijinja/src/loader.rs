@@ -25,6 +25,7 @@ type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<Option<String>, Error> + Send 
 #[derive(Clone, Default)]
 pub(crate) struct LoaderStore<'source> {
     pub syntax_config: SyntaxConfig,
+    pub keep_trailing_newline: bool,
     loader: Option<Arc<LoadFunc>>,
     owned_templates: MemoMap<Arc<str>, Arc<LoadedTemplate>>,
     borrowed_templates: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
@@ -77,7 +78,8 @@ impl<'source> LoaderStore<'source> {
                     Arc::new(ok!(CompiledTemplate::new(
                         name,
                         source,
-                        self.syntax_config.clone()
+                        self.syntax_config.clone(),
+                        self.keep_trailing_newline
                     ))),
                 );
             }
@@ -137,7 +139,12 @@ impl<'source> LoaderStore<'source> {
         LoadedTemplate::try_new(
             (name, source.into_boxed_str()),
             |(name, source)| -> Result<_, Error> {
-                CompiledTemplate::new(name, source, self.syntax_config.clone())
+                CompiledTemplate::new(
+                    name,
+                    source,
+                    self.syntax_config.clone(),
+                    self.keep_trailing_newline,
+                )
             },
         )
         .map(Arc::new)

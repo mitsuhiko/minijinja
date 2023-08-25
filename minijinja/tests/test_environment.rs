@@ -113,3 +113,25 @@ fn test_path_join() {
     let t = env.get_template("x/a/foo.txt").unwrap();
     assert_eq!(t.render(()).unwrap(), "bar.txt");
 }
+
+#[test]
+fn test_keep_trailing_newlines() {
+    let mut env = Environment::new();
+    env.add_template("foo.txt", "blub\r\n").unwrap();
+    assert_eq!(env.render_str("blub\r\n", ()).unwrap(), "blub");
+
+    env.set_keep_trailing_newline(true);
+    env.add_template("foo_keep.txt", "blub\r\n").unwrap();
+    assert_eq!(
+        env.get_template("foo.txt").unwrap().render(()).unwrap(),
+        "blub"
+    );
+    assert_eq!(
+        env.get_template("foo_keep.txt")
+            .unwrap()
+            .render(())
+            .unwrap(),
+        "blub\r\n"
+    );
+    assert_eq!(env.render_str("blub\r\n", ()).unwrap(), "blub\r\n");
+}
