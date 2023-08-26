@@ -897,9 +897,9 @@ mod builtins {
     /// ```jinja
     /// example:
     ///   config:
-    /// {{ global_conifg|indent(2) }} #does not indent first line
-    /// {{ global_config|indent(2,true) }} #indent whole Value with two spaces
-    /// {{ global_config|indent(2,true,true)}} #indent whole Value and all Blank Lines value
+    /// {{ global_conifg|indent(2) }}          # does not indent first line
+    /// {{ global_config|indent(2,true) }}     # indent whole Value with two spaces
+    /// {{ global_config|indent(2,true,true)}} # indent whole Value and all blank lines
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
     #[cfg(feature = "builtins")]
@@ -910,14 +910,17 @@ mod builtins {
         indent_blank_lines: Option<bool>,
     ) -> String {
         fn strip_trailing_newline(input: &mut String) {
-            if let Some(stripped) = input.strip_suffix(&['\r', '\n'][..]) {
-                input.truncate(stripped.len());
+            if input.ends_with('\n') {
+                input.truncate(input.len() - 1);
+            }
+            if input.ends_with('\r') {
+                input.truncate(input.len() - 1);
             }
         }
 
         strip_trailing_newline(&mut value);
-
-        let mut output: String = String::new();
+        let indent_with = " ".repeat(width);
+        let mut output = String::new();
         let mut iterator = value.split('\n');
         if !indent_first_line.unwrap_or(false) {
             output.push_str(iterator.next().unwrap());
@@ -926,10 +929,10 @@ mod builtins {
         for line in iterator {
             if line.is_empty() {
                 if indent_blank_lines.unwrap_or(false) {
-                    output.push_str(&" ".repeat(width));
+                    output.push_str(&indent_with);
                 }
             } else {
-                output.push_str(format!("{}{}", " ".repeat(width), line).as_str());
+                write!(output, "{}{}", indent_with, line).ok();
             }
             output.push('\n');
         }
