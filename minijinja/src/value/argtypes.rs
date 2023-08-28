@@ -680,6 +680,83 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
     }
 }
 
+/// A utility type that retains the information if a string is safe.
+///
+/// This can be used as an alternative to `String` or similar.  It accepts any
+/// string (or stringifies on demand) but also retains the information if the
+/// value is escaped.  A filter can use this to change behavior.
+///
+/// Because it derefs into `str` it provides all the same methods as a regular
+/// `str`.
+pub struct MaybeSafeStr(Arc<str>, bool);
+
+impl Deref for MaybeSafeStr {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl MaybeSafeStr {
+    /// Creates a maybe safe string.
+    pub fn new_safe<I: Into<Arc<str>>>(val: I) -> MaybeSafeStr {
+        MaybeSafeStr(val.into(), true)
+    }
+
+    /// Returns true if this string is escaped (safe).
+    pub fn is_safe_string(&self) -> bool {
+        self.1
+    }
+}
+
+impl From<Arc<str>> for MaybeSafeStr {
+    fn from(value: Arc<str>) -> Self {
+        MaybeSafeStr(value, false)
+    }
+}
+
+impl From<String> for MaybeSafeStr {
+    fn from(value: String) -> Self {
+        MaybeSafeStr(Arc::from(value), false)
+    }
+}
+
+impl<'a> From<&'a str> for MaybeSafeStr {
+    fn from(value: &'a str) -> Self {
+        MaybeSafeStr(Arc::from(value), false)
+    }
+}
+
+impl From<MaybeSafeStr> for String {
+    fn from(value: MaybeSafeStr) -> Self {
+        value.0.to_string()
+    }
+}
+
+impl From<MaybeSafeStr> for Arc<str> {
+    fn from(value: MaybeSafeStr) -> Self {
+        value.0.clone()
+    }
+}
+
+impl<'a> ArgType<'a> for MaybeSafeStr {
+    type Output = Self;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            Some(value) => match value.0 {
+                ValueRepr::String(ref val, StringType::Normal) => {
+                    Ok(MaybeSafeStr(val.clone(), false))
+                }
+                ValueRepr::String(ref val, StringType::Safe) => Ok(MaybeSafeStr(val.clone(), true)),
+                _ => Ok(MaybeSafeStr(Arc::from(value.to_string()), false)),
+            },
+            None => Err(Error::from(ErrorKind::MissingArgument)),
+        }
+    }
+}
+
 /// Utility to accept keyword arguments.
 ///
 /// Keyword arguments are represented as regular values as the last argument
