@@ -17,25 +17,32 @@ fn dirname(path: ViaDeserialize<PathBuf>) -> String {
     }
 }
 
+fn point_as_tuple(point: ViaDeserialize<Point>) -> Value {
+    Value::from(vec![point.x, point.y])
+}
+
 fn main() {
     let mut env = Environment::new();
-    env.add_template("path.txt", include_str!("path.txt"))
+    env.add_template("example.txt", include_str!("example.txt"))
         .unwrap();
     env.add_filter("dirname", dirname);
+    env.add_filter("point_as_tuple", point_as_tuple);
+
+    let point = Point { x: -1.0, y: 1.0 };
 
     // First example: shows ViaDeserialize
-    let template = env.get_template("path.txt").unwrap();
+    let template = env.get_template("example.txt").unwrap();
     println!(
         "{}",
         template
             .render(context! {
                 path => std::env::current_dir().unwrap(),
+                point => point,
             })
             .unwrap()
     );
 
     // Second example shows how you can deserialize directly from a value
-    let point = Point { x: -1.0, y: 1.0 };
     let point_value = Value::from_serializable(&point);
     println!("Point serialized as value: {}", point_value);
     let point_again = Point::deserialize(point_value).unwrap();
