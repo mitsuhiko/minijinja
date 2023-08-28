@@ -1197,10 +1197,8 @@ mod builtins {
 
     /// Returns a list of unique items from the given iterable.
     ///
-    /// Returns a list of unique items from the given iterable.
-    ///
     /// ```jinja
-    /// {{ ['foo', 'bar', 'foobar', 'FooBar']|unique|list }}
+    /// {{ ['foo', 'bar', 'foobar', 'foobar']|unique|list }}
     ///   -> ['foo', 'bar', 'foobar']
     /// ```
     ///
