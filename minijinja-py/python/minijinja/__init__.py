@@ -29,6 +29,8 @@ class Environment(_lowlevel.Environment):
         fuel=None,
         undefined_behavior=None,
         auto_escape_callback=None,
+        path_join_callback=None,
+        keep_trailing_newline=False,
         finalizer=None,
         reload_before_render=False,
         block_start_string="{%",
@@ -59,6 +61,10 @@ class Environment(_lowlevel.Environment):
         self.debug = debug
         if auto_escape_callback is not None:
             self.auto_escape_callback = auto_escape_callback
+        if path_join_callback is not None:
+            self.path_join_callback = path_join_callback
+        if keep_trailing_newline:
+            self.keep_trailing_newline = True
         if finalizer is not None:
             self.finalizer = finalizer
         if undefined_behavior is not None:

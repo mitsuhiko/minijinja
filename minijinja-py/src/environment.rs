@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::Mutex;
@@ -57,6 +58,7 @@ struct Inner {
     loader: Option<Py<PyAny>>,
     auto_escape_callback: Option<Py<PyAny>>,
     finalizer_callback: Option<Py<PyAny>>,
+    path_join_callback: Option<Py<PyAny>>,
     syntax: Option<Syntax>,
 }
 
@@ -77,6 +79,7 @@ impl Environment {
                 loader: None,
                 auto_escape_callback: None,
                 finalizer_callback: None,
+                path_join_callback: None,
                 syntax: None,
             }),
             reload_before_render: AtomicBool::new(false),
@@ -389,6 +392,36 @@ impl Environment {
         self.inner.lock().unwrap().loader.clone()
     }
 
+    /// Sets a new path join callback.
+    #[setter]
+    pub fn set_path_join_callback(&self, callback: &PyAny) -> PyResult<()> {
+        if !callback.is_callable() {
+            return Err(PyRuntimeError::new_err("expected callback"));
+        }
+        let callback: Py<PyAny> = callback.into();
+        let mut inner = self.inner.lock().unwrap();
+        inner.path_join_callback = Some(callback.clone());
+        inner.env.set_path_join_callback(move |name, parent| {
+            Python::with_gil(|py| {
+                let callback = callback.as_ref(py);
+                match callback.call1(PyTuple::new(py, [name, parent])) {
+                    Ok(rv) => Cow::Owned(rv.to_string()),
+                    Err(err) => {
+                        report_unraisable(py, err);
+                        Cow::Borrowed(name)
+                    }
+                }
+            })
+        });
+        Ok(())
+    }
+
+    /// Returns the current path join callback.
+    #[getter]
+    pub fn get_path_join_callback(&self) -> Option<Py<PyAny>> {
+        self.inner.lock().unwrap().path_join_callback.clone()
+    }
+
     /// Triggers a reload of the templates.
     pub fn reload(&self) -> PyResult<()> {
         let mut inner = self.inner.lock().unwrap();
@@ -469,6 +502,23 @@ impl Environment {
     #[getter]
     pub fn get_comment_end_string(&self) -> String {
         syntax_getter!(self, comment_end, "#}")
+    }
+
+    /// Configures the trailing newline trimming feature.
+    #[setter]
+    pub fn set_keep_trailing_newline(&self, yes: bool) -> PyResult<()> {
+        self.inner
+            .lock()
+            .unwrap()
+            .env
+            .set_keep_trailing_newline(yes);
+        Ok(())
+    }
+
+    /// Returns the current value of the trailing newline trimming flag.
+    #[getter]
+    pub fn get_keep_trailing_newline(&self) -> PyResult<bool> {
+        Ok(self.inner.lock().unwrap().env.keep_trailing_newline())
     }
 
     /// Manually adds a template to the environment.
