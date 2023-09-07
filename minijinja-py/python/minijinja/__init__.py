@@ -148,10 +148,28 @@ class TemplateError(RuntimeError):
             return self._info.name
 
     @property
+    def detail(self):
+        """The detail error message of the error."""
+        if self._info is not None:
+            return self._info.detail
+
+    @property
     def line(self):
         """The line of the error."""
         if self._info is not None:
             return self._info.line
+
+    @property
+    def range(self):
+        """The range of the error."""
+        if self._info is not None:
+            return self._info.range
+
+    @property
+    def template_source(self):
+        """The template source of the error."""
+        if self._info is not None:
+            return self._info.template_source
 
     def __str__(self):
         if self._info is not None:

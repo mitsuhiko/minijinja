@@ -238,6 +238,9 @@ def test_error():
         assert "1 > 1 +" in str(e)
         assert e.line == 1
         assert e.kind == "SyntaxError"
+        assert e.range == (2, 3)
+        assert e.template_source == "1 +"
+        assert "unexpected end of input" in e.detail
     else:
         assert False, "expected error"
 
