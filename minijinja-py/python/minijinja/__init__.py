@@ -29,6 +29,8 @@ class Environment(_lowlevel.Environment):
         fuel=None,
         undefined_behavior=None,
         auto_escape_callback=None,
+        path_join_callback=None,
+        keep_trailing_newline=False,
         finalizer=None,
         reload_before_render=False,
         block_start_string="{%",
@@ -59,6 +61,10 @@ class Environment(_lowlevel.Environment):
         self.debug = debug
         if auto_escape_callback is not None:
             self.auto_escape_callback = auto_escape_callback
+        if path_join_callback is not None:
+            self.path_join_callback = path_join_callback
+        if keep_trailing_newline:
+            self.keep_trailing_newline = True
         if finalizer is not None:
             self.finalizer = finalizer
         if undefined_behavior is not None:
@@ -142,10 +148,28 @@ class TemplateError(RuntimeError):
             return self._info.name
 
     @property
+    def detail(self):
+        """The detail error message of the error."""
+        if self._info is not None:
+            return self._info.detail
+
+    @property
     def line(self):
         """The line of the error."""
         if self._info is not None:
             return self._info.line
+
+    @property
+    def range(self):
+        """The range of the error."""
+        if self._info is not None:
+            return self._info.range
+
+    @property
+    def template_source(self):
+        """The template source of the error."""
+        if self._info is not None:
+            return self._info.template_source
 
     def __str__(self):
         if self._info is not None:

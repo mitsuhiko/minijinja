@@ -36,8 +36,23 @@ impl ErrorInfo {
     }
 
     #[getter]
+    pub fn get_range(&self) -> Option<(usize, usize)> {
+        self.err.range().map(|x| (x.start, x.end))
+    }
+
+    #[getter]
+    pub fn get_template_source(&self) -> Option<&str> {
+        self.err.template_source()
+    }
+
+    #[getter]
     pub fn get_description(&self) -> String {
         format!("{}", self.err)
+    }
+
+    #[getter]
+    pub fn get_detail(&self) -> Option<&str> {
+        self.err.detail()
     }
 
     #[getter]

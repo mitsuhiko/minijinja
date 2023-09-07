@@ -1,5 +1,6 @@
 import binascii
 import pytest
+import posixpath
 
 from _pytest.unraisableexception import catch_unraisable_exception
 from minijinja import Environment, TemplateError, safe, pass_state
@@ -237,6 +238,9 @@ def test_error():
         assert "1 > 1 +" in str(e)
         assert e.line == 1
         assert e.kind == "SyntaxError"
+        assert e.range == (2, 3)
+        assert e.template_source == "1 +"
+        assert "unexpected end of input" in e.detail
     else:
         assert False, "expected error"
 
@@ -252,3 +256,27 @@ def test_custom_syntax():
     )
     rv = env.render_str('[% if true %]{value}[% endif %]/* nothing */', value=42)
     assert rv == '42'
+
+
+def test_path_join():
+    def join_path(name, parent):
+        return posixpath.join(posixpath.dirname(parent), name)
+    env = Environment(
+        path_join_callback=join_path,
+        templates={
+            "foo/bar.txt": "{% include 'baz.txt' %}",
+            "foo/baz.txt": "I am baz!",
+        }
+    )
+
+    with catch_unraisable_exception() as cm:
+        rv = env.render_template("foo/bar.txt")
+        assert rv == "I am baz!"
+        assert cm.unraisable is None
+
+
+def test_keep_trailing_newline():
+    env = Environment(keep_trailing_newline=False)
+    assert env.render_str("foo\n") == "foo"
+    env = Environment(keep_trailing_newline=True)
+    assert env.render_str("foo\n") == "foo\n"
