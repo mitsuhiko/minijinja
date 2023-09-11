@@ -1,4 +1,4 @@
-use minijinja::value::Value;
+use minijinja::value::{MaybeSafeStr, Value};
 use minijinja::{args, Environment};
 use similar_asserts::assert_eq;
 
@@ -33,20 +33,26 @@ fn test_filter_with_non() {
 #[test]
 fn test_indent_one_empty_line() {
     let teststring = String::from("\n");
-    assert_eq!(indent(teststring, 2, None, None), String::from(""));
+    assert_eq!(
+        indent(teststring.into(), 2, None, None).to_string(),
+        String::from("")
+    );
 }
 
 #[test]
 fn test_indent_one_line() {
     let teststring = String::from("test\n");
-    assert_eq!(indent(teststring, 2, None, None), String::from("test"));
+    assert_eq!(
+        indent(teststring.into(), 2, None, None).to_string(),
+        String::from("test")
+    );
 }
 
 #[test]
 fn test_indent() {
     let teststring = String::from("test\ntest1\n\ntest2\n");
     assert_eq!(
-        indent(teststring, 2, None, None),
+        indent(teststring.into(), 2, None, None).to_string(),
         String::from("test\n  test1\n\n  test2")
     );
 }
@@ -55,7 +61,7 @@ fn test_indent() {
 fn test_indent_with_indented_first_line() {
     let teststring = String::from("test\ntest1\n\ntest2\n");
     assert_eq!(
-        indent(teststring, 2, Some(true), None),
+        indent(teststring.into(), 2, Some(true), None).to_string(),
         String::from("  test\n  test1\n\n  test2")
     );
 }
@@ -64,7 +70,7 @@ fn test_indent_with_indented_first_line() {
 fn test_indent_with_indented_blank_line() {
     let teststring = String::from("test\ntest1\n\ntest2\n");
     assert_eq!(
-        indent(teststring, 2, None, Some(true)),
+        indent(teststring.into(), 2, None, Some(true)).to_string(),
         String::from("test\n  test1\n  \n  test2")
     );
 }
@@ -73,7 +79,18 @@ fn test_indent_with_indented_blank_line() {
 fn test_indent_with_all_indented() {
     let teststring = String::from("test\ntest1\n\ntest2\n");
     assert_eq!(
-        indent(teststring, 2, Some(true), Some(true)),
+        indent(teststring.into(), 2, Some(true), Some(true)).to_string(),
         String::from("  test\n  test1\n  \n  test2")
     );
+}
+
+#[test]
+fn test_indent_escaping() {
+    let x = MaybeSafeStr::new_safe("<strong>Foo</strong>\n<i>bar</i>");
+    let v = indent(x, 2, None, None);
+    assert!(v.is_safe());
+    assert_eq!(
+        v.to_string(),
+        String::from("<strong>Foo</strong>\n  <i>bar</i>")
+    )
 }

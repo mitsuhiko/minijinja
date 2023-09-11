@@ -144,7 +144,9 @@ use crate::value::ops::as_f64;
 use crate::value::serialize::transform;
 use crate::vm::State;
 
-pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
+pub use crate::value::argtypes::{
+    from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, MaybeSafeStr, Rest,
+};
 pub use crate::value::object::{Object, ObjectKind, SeqObject, SeqObjectIter, StructObject};
 
 mod argtypes;

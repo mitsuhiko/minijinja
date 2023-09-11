@@ -904,21 +904,20 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
     #[cfg(feature = "builtins")]
     pub fn indent(
-        mut value: String,
+        value: crate::value::MaybeSafeStr,
         width: usize,
         indent_first_line: Option<bool>,
         indent_blank_lines: Option<bool>,
-    ) -> String {
-        fn strip_trailing_newline(input: &mut String) {
-            if input.ends_with('\n') {
-                input.truncate(input.len() - 1);
-            }
-            if input.ends_with('\r') {
-                input.truncate(input.len() - 1);
-            }
+    ) -> Value {
+        let is_safe = value.is_safe_string();
+        let mut value = &value as &str;
+        if value.ends_with('\n') {
+            value = &value[..value.len() - 1];
+        }
+        if value.ends_with('\r') {
+            value = &value[..value.len() - 1];
         }
 
-        strip_trailing_newline(&mut value);
         let indent_with = " ".repeat(width);
         let mut output = String::new();
         let mut iterator = value.split('\n');
@@ -936,8 +935,16 @@ mod builtins {
             }
             output.push('\n');
         }
-        strip_trailing_newline(&mut output);
-        output
+
+        if output.ends_with('\n') {
+            output.truncate(output.len() - 1);
+        }
+
+        if is_safe {
+            Value::from_safe_string(output)
+        } else {
+            Value::from(output)
+        }
     }
 
     /// URL encodes a value.
