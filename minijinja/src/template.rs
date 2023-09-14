@@ -212,8 +212,7 @@ impl<'env, 'source> Template<'env, 'source> {
         Ok(state)
     }
 
-    #[doc(hidden)]
-    pub fn _eval(
+    fn _eval(
         &self,
         root: Value,
         out: &mut Output,
