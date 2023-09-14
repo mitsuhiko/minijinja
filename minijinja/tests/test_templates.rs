@@ -516,3 +516,12 @@ fn test_render_to_write_state() {
     assert_eq!(state.lookup("foo"), Some(Value::from(42)));
     assert_eq!(state.call_macro("bar", &[]).ok().as_deref(), Some("x"));
 }
+
+#[test]
+fn test_render_and_return_value() {
+    let env = Environment::new();
+    let tmpl = env.template_from_str("{{ 1 + 2 }}").unwrap();
+    let (rendered, value) = tmpl.render_and_return_value(Value::UNDEFINED).unwrap();
+    assert_eq!(rendered, "3");
+    assert_eq!(value.unwrap().kind(), minijinja::value::ValueKind::Number);
+}

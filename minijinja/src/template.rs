@@ -125,6 +125,17 @@ impl<'env, 'source> Template<'env, 'source> {
         self._render(Value::from_serializable(&ctx))
     }
 
+    /// Like [`render`](Self::render) but also return the evaluated [`Value`].
+    pub fn render_and_return_value<S: Serialize>(
+        &self,
+        ctx: S,
+    ) -> Result<(String, Option<Value>), Error> {
+        let root = Value::from_serializable(&ctx);
+        let mut rv = String::with_capacity(self.compiled.buffer_size_hint);
+        self._eval(root, &mut Output::with_string(&mut rv))
+            .map(|(value, _state)| (rv, value))
+    }
+
     fn _render(&self, root: Value) -> Result<(String, State<'_, 'env>), Error> {
         let mut rv = String::with_capacity(self.compiled.buffer_size_hint);
         self._eval(root, &mut Output::with_string(&mut rv))
@@ -201,7 +212,8 @@ impl<'env, 'source> Template<'env, 'source> {
         Ok(state)
     }
 
-    fn _eval(
+    #[doc(hidden)]
+    pub fn _eval(
         &self,
         root: Value,
         out: &mut Output,
