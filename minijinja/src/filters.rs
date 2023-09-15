@@ -557,7 +557,7 @@ mod builtins {
             ValueRepr::F64(x) => Ok(Value::from(x.abs())),
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
-                "cannot round value",
+                "cannot get absolute value",
             )),
         }
     }
