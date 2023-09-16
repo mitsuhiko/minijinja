@@ -79,7 +79,12 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
 impl dyn Object {
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
     ///
-    /// This is basically the "reverse" of [`from_object`](Value::from_object).
+    /// This is basically the "reverse" of [`from_object`](Value::from_object),
+    /// [`from_seq_object`](Value::from_seq_object) and [`from_struct_object`](Value::from_struct_object).
+    ///
+    /// Because this method works also for objects that only implement [`StructObject`]
+    /// and [`SeqObject`] these methods do not actually use trait bounds that are
+    /// restricted to `Object`.
     ///
     /// # Example
     ///
@@ -105,16 +110,55 @@ impl dyn Object {
     /// let thing = value_as_obj.downcast_ref::<Thing>().unwrap();
     /// assert_eq!(thing.id, 42);
     /// ```
-    pub fn downcast_ref<T: Object>(&self) -> Option<&T> {
-        self.is::<T>().then(|| {
-            // SAFETY: `is` ensures this type cast is correct
-            unsafe { &*(self as *const dyn Object as *const T) }
-        })
+    ///
+    /// It also works with [`SeqObject`] or [`StructObject`]:
+    ///
+    /// ```rust
+    /// # use minijinja::value::{Value, SeqObject};
+    ///
+    /// struct Thing {
+    ///     id: usize,
+    /// }
+    ///
+    /// impl SeqObject for Thing {
+    ///     fn get_item(&self, idx: usize) -> Option<Value> {
+    ///         (idx < 3).then(|| Value::from(idx))
+    ///     }
+    ///     fn item_count(&self) -> usize {
+    ///         3
+    ///     }
+    /// }
+    ///
+    /// let x_value = Value::from_seq_object(Thing { id: 42 });
+    /// let value_as_obj = x_value.as_object().unwrap();
+    /// let thing = value_as_obj.downcast_ref::<Thing>().unwrap();
+    /// assert_eq!(thing.id, 42);
+    /// ```
+    pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
+        let type_id = (*self).type_id();
+        if type_id == TypeId::of::<T>() {
+            // SAFETY: type type id check ensures this type cast is correct
+            return Some(unsafe { &*(self as *const dyn Object as *const T) });
+        } else if type_id == TypeId::of::<SimpleSeqObject<T>>() {
+            // SAFETY: type type id check ensures this type cast is correct
+            let wrapper = unsafe { &*(self as *const dyn Object as *const SimpleSeqObject<T>) };
+            return Some(&wrapper.0);
+        } else if type_id == TypeId::of::<SimpleStructObject<T>>() {
+            // SAFETY: type type id check ensures this type cast is correct
+            let wrapper = unsafe { &*(self as *const dyn Object as *const SimpleStructObject<T>) };
+            return Some(&wrapper.0);
+        }
+        None
     }
 
     /// Checks if the object is of a specific type.
-    pub fn is<T: Object>(&self) -> bool {
-        (*self).type_id() == TypeId::of::<T>()
+    ///
+    /// For details of this operation see [`downcast_ref`](Self::downcast_ref).
+    pub fn is<T: 'static>(&self) -> bool {
+        let type_id = (*self).type_id();
+        type_id == TypeId::of::<T>()
+            || type_id == TypeId::of::<SimpleSeqObject<T>>()
+            || type_id == TypeId::of::<SimpleStructObject<T>>()
     }
 }
 
