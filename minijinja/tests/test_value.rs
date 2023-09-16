@@ -315,6 +315,49 @@ fn test_obj_downcast() {
 }
 
 #[test]
+fn test_seq_object_downcast() {
+    struct Thing {
+        moo: i32,
+    }
+
+    impl SeqObject for Thing {
+        fn get_item(&self, idx: usize) -> Option<Value> {
+            if idx < 3 {
+                Some(Value::from(idx))
+            } else {
+                None
+            }
+        }
+
+        fn item_count(&self) -> usize {
+            3
+        }
+    }
+
+    let obj = Value::from_seq_object(Thing { moo: 42 });
+
+    let seq = obj.downcast_object_ref::<Thing>().unwrap();
+    assert_eq!(seq.moo, 42);
+}
+
+#[test]
+fn test_struct_object_downcast() {
+    struct Thing {
+        moo: i32,
+    }
+
+    impl StructObject for Thing {
+        fn get_field(&self, name: &str) -> Option<Value> {
+            None
+        }
+    }
+
+    let obj = Value::from_struct_object(Thing { moo: 42 });
+    let seq = obj.downcast_object_ref::<Thing>().unwrap();
+    assert_eq!(seq.moo, 42);
+}
+
+#[test]
 fn test_value_cmp() {
     assert_eq!(Value::from(&[1][..]), Value::from(&[1][..]));
     assert_ne!(Value::from(&[1][..]), Value::from(&[2][..]));
