@@ -661,9 +661,6 @@ impl Value {
     ///
     /// This is a simplified API for creating dynamic sequences
     /// without having to implement the entire [`Object`] protocol.
-    ///
-    /// **Note:** objects created this way cannot be downcasted via
-    /// [`downcast_object_ref`](Self::downcast_object_ref).
     pub fn from_seq_object<T: SeqObject + 'static>(value: T) -> Value {
         Value::from_object(SimpleSeqObject(value))
     }
@@ -672,9 +669,6 @@ impl Value {
     ///
     /// This is a simplified API for creating dynamic structs
     /// without having to implement the entire [`Object`] protocol.
-    ///
-    /// **Note:** objects created this way cannot be downcasted via
-    /// [`downcast_object_ref`](Self::downcast_object_ref).
     pub fn from_struct_object<T: StructObject + 'static>(value: T) -> Value {
         Value::from_object(SimpleStructObject(value))
     }
@@ -967,8 +961,9 @@ impl Value {
 
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
     ///
-    /// This is basically the "reverse" of [`from_object`](Self::from_object).  It's also
-    /// a shortcut for [`downcast_ref`](trait.Object.html#method.downcast_ref)
+    /// This is basically the "reverse" of [`from_object`](Self::from_object),
+    /// [`from_seq_object`](Self::from_seq_object) and [`from_struct_object`](Self::from_struct_object).
+    /// It's also a shortcut for [`downcast_ref`](trait.Object.html#method.downcast_ref)
     /// on the return value of [`as_object`](Self::as_object).
     ///
     /// # Example
@@ -994,7 +989,30 @@ impl Value {
     /// let thing = x_value.downcast_object_ref::<Thing>().unwrap();
     /// assert_eq!(thing.id, 42);
     /// ```
-    pub fn downcast_object_ref<T: Object>(&self) -> Option<&T> {
+    ///
+    /// It also works with [`SeqObject`] or [`StructObject`]:
+    ///
+    /// ```rust
+    /// # use minijinja::value::{Value, SeqObject};
+    ///
+    /// struct Thing {
+    ///     id: usize,
+    /// }
+    ///
+    /// impl SeqObject for Thing {
+    ///     fn get_item(&self, idx: usize) -> Option<Value> {
+    ///         (idx < 3).then(|| Value::from(idx))
+    ///     }
+    ///     fn item_count(&self) -> usize {
+    ///         3
+    ///     }
+    /// }
+    ///
+    /// let x_value = Value::from_seq_object(Thing { id: 42 });
+    /// let thing = x_value.downcast_object_ref::<Thing>().unwrap();
+    /// assert_eq!(thing.id, 42);
+    /// ```
+    pub fn downcast_object_ref<T: 'static>(&self) -> Option<&T> {
         self.as_object().and_then(|x| x.downcast_ref())
     }
 
