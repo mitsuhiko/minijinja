@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.8
 
+- Overflowing additions on very large integers now fails rather than
+  silently wrapping around.  #350
 - Fixed a few overflow panics: dividing integers with an overflow and
   related overflows in the `abs` and `neg` filter.  #347
 
