@@ -4,6 +4,10 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.8
 
+- Relatex the trait bounds of `Value::downcast_object_ref` /
+  `Object::downcast_ref` / `Object::is` and added support for downcasting
+  of types that were directly created with `Value::from_seq_object`
+  and `Value::from_struct_object`.  #349
 - Fixed a few overflow panics: dividing integers with an overflow and
   related overflows in the `abs` and `neg` filter.  #347
 
