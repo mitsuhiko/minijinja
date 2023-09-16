@@ -180,7 +180,10 @@ macro_rules! math_binop {
 
 pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     match coerce(lhs, rhs) {
-        Some(CoerceResult::I128(a, b)) => Ok(int_as_value(a.wrapping_add(b))),
+        Some(CoerceResult::I128(a, b)) => a
+            .checked_add(b)
+            .ok_or_else(|| failed_op("+", lhs, rhs))
+            .map(int_as_value),
         Some(CoerceResult::F64(a, b)) => Ok((a + b).into()),
         Some(CoerceResult::Str(a, b)) => Ok(Value::from([a, b].concat())),
         _ => Err(impossible_op("+", lhs, rhs)),
@@ -308,6 +311,12 @@ mod tests {
         assert_eq!(
             add(&Value::from("foo"), &Value::from("bar")).unwrap(),
             Value::from("foobar")
+        );
+
+        let err = add(&Value::from(i128::MAX), &Value::from(1)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid operation: unable to calculate 170141183460469231731687303715884105727 + 1"
         );
     }
 
