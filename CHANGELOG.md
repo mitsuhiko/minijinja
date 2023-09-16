@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.8
+
+- Fix a panic when dividing integers with an overflow.  #347
+
 ## 1.0.7
 
 - Added support for `keep_trailing_newlines` which allows you to disable
