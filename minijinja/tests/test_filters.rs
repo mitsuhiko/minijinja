@@ -2,7 +2,7 @@ use minijinja::value::Value;
 use minijinja::{args, Environment};
 use similar_asserts::assert_eq;
 
-use minijinja::filters::indent;
+use minijinja::filters::{abs, indent};
 
 #[test]
 fn test_filter_with_non() {
@@ -76,4 +76,12 @@ fn test_indent_with_all_indented() {
         indent(teststring, 2, Some(true), Some(true)),
         String::from("  test\n  test1\n  \n  test2")
     );
+}
+
+#[test]
+fn test_abs_overflow() {
+    let ok = abs(Value::from(i64::MIN)).unwrap();
+    assert_eq!(ok, Value::from(-(i64::MIN as i128)));
+    let err = abs(Value::from(i128::MIN)).unwrap_err();
+    assert_eq!(err.to_string(), "invalid operation: overflow on abs");
 }

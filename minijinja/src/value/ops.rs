@@ -237,7 +237,9 @@ pub fn neg(val: &Value) -> Result<Value, Error> {
             ValueRepr::F64(x) => Ok((-x).into()),
             _ => {
                 if let Ok(x) = i128::try_from(val.clone()) {
-                    Ok(int_as_value(-x))
+                    x.checked_mul(-1)
+                        .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "overflow"))
+                        .map(int_as_value)
                 } else {
                     Err(Error::from(ErrorKind::InvalidOperation))
                 }
@@ -284,6 +286,12 @@ mod tests {
     use super::*;
 
     use similar_asserts::assert_eq;
+
+    #[test]
+    fn test_neg() {
+        let err = neg(&Value::from(i128::MIN)).unwrap_err();
+        assert_eq!(err.to_string(), "invalid operation: overflow");
+    }
 
     #[test]
     fn test_adding() {
