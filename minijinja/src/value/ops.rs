@@ -204,7 +204,9 @@ pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     match coerce(lhs, rhs) {
         Some(CoerceResult::I128(a, b)) => {
             if b != 0 {
-                Ok(int_as_value(a.div_euclid(b)))
+                a.checked_div_euclid(b)
+                    .ok_or_else(|| failed_op("//", lhs, rhs))
+                    .map(int_as_value)
             } else {
                 Err(failed_op("//", lhs, rhs))
             }
@@ -235,7 +237,9 @@ pub fn neg(val: &Value) -> Result<Value, Error> {
             ValueRepr::F64(x) => Ok((-x).into()),
             _ => {
                 if let Ok(x) = i128::try_from(val.clone()) {
-                    Ok(int_as_value(-x))
+                    x.checked_mul(-1)
+                        .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "overflow"))
+                        .map(int_as_value)
                 } else {
                     Err(Error::from(ErrorKind::InvalidOperation))
                 }
@@ -282,6 +286,12 @@ mod tests {
     use super::*;
 
     use similar_asserts::assert_eq;
+
+    #[test]
+    fn test_neg() {
+        let err = neg(&Value::from(i128::MIN)).unwrap_err();
+        assert_eq!(err.to_string(), "invalid operation: overflow");
+    }
 
     #[test]
     fn test_adding() {
@@ -338,6 +348,12 @@ mod tests {
         assert_eq!(
             div(&Value::from(100), &Value::from(2)).unwrap(),
             Value::from(50.0)
+        );
+
+        let err = int_div(&Value::from(i128::MIN), &Value::from(-1i128)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid operation: unable to calculate -170141183460469231731687303715884105728 // -1"
         );
     }
 

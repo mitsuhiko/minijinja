@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.8
+
+- Fixed a few overflow panics: dividing integers with an overflow and
+  related overflows in the `abs` and `neg` filter.  #347
+
 ## 1.0.7
 
 - Added support for `keep_trailing_newlines` which allows you to disable
