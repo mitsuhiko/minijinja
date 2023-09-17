@@ -552,6 +552,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn abs(value: Value) -> Result<Value, Error> {
         match value.0 {
+            ValueRepr::U64(_) | ValueRepr::U128(_) => Ok(value),
             ValueRepr::I64(x) => match x.checked_abs() {
                 Some(rv) => Ok(Value::from(rv)),
                 None => Ok(Value::from((x as i128).abs())), // this cannot overflow
@@ -595,14 +596,16 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn round(value: Value, precision: Option<i32>) -> Result<Value, Error> {
         match value.0 {
-            ValueRepr::I64(_) | ValueRepr::I128(_) => Ok(value),
+            ValueRepr::I64(_) | ValueRepr::I128(_) | ValueRepr::U64(_) | ValueRepr::U128(_) => {
+                Ok(value)
+            }
             ValueRepr::F64(val) => {
                 let x = 10f64.powi(precision.unwrap_or(0));
                 Ok(Value::from((x * val).round() / x))
             }
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
-                "cannot round value",
+                format!("cannot round value ({})", value.kind()),
             )),
         }
     }

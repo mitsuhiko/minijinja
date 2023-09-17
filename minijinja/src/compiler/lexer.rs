@@ -228,16 +228,17 @@ impl<'s> TokenizerState<'s> {
         let mut state = State::Integer;
         let mut num_len = self
             .rest
-            .chars()
+            .as_bytes()
+            .iter()
             .take_while(|&c| c.is_ascii_digit())
             .count();
-        for c in self.rest.chars().skip(num_len) {
+        for c in self.rest.as_bytes()[num_len..].iter().copied() {
             state = match (c, state) {
-                ('.', State::Integer) => State::Fraction,
-                ('E' | 'e', State::Integer | State::Fraction) => State::Exponent,
-                ('+' | '-', State::Exponent) => State::ExponentSign,
-                ('0'..='9', State::Exponent) => State::ExponentSign,
-                ('0'..='9', state) => state,
+                (b'.', State::Integer) => State::Fraction,
+                (b'E' | b'e', State::Integer | State::Fraction) => State::Exponent,
+                (b'+' | b'-', State::Exponent) => State::ExponentSign,
+                (b'0'..=b'9', State::Exponent) => State::ExponentSign,
+                (b'0'..=b'9', state) => state,
                 _ => break,
             };
             num_len += 1;
@@ -250,9 +251,11 @@ impl<'s> TokenizerState<'s> {
                 num.parse()
                     .map(Token::Float)
                     .map_err(|_| self.syntax_error("invalid float"))
+            } else if let Ok(int) = num.parse() {
+                Ok(Token::Int(int))
             } else {
                 num.parse()
-                    .map(Token::Int)
+                    .map(Token::Int128)
                     .map_err(|_| self.syntax_error("invalid integer"))
             }),
             self.span(old_loc),

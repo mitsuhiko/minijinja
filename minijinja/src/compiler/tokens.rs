@@ -25,7 +25,9 @@ pub enum Token<'a> {
     /// An allocated string.
     String(String),
     /// An integer (limited to i64)
-    Int(i64),
+    Int(u64),
+    /// A large integer
+    Int128(u128),
     /// A float
     Float(f64),
     /// A plus (`+`) operator.
@@ -92,7 +94,7 @@ impl<'a> fmt::Display for Token<'a> {
             Token::BlockEnd => f.write_str("end of block"),
             Token::Ident(_) => f.write_str("identifier"),
             Token::Str(_) | Token::String(_) => f.write_str("string"),
-            Token::Int(_) => f.write_str("integer"),
+            Token::Int(_) | Token::Int128(_) => f.write_str("integer"),
             Token::Float(_) => f.write_str("float"),
             Token::Plus => f.write_str("`+`"),
             Token::Minus => f.write_str("`-`"),

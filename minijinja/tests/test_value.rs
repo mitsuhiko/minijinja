@@ -347,7 +347,7 @@ fn test_struct_object_downcast() {
     }
 
     impl StructObject for Thing {
-        fn get_field(&self, name: &str) -> Option<Value> {
+        fn get_field(&self, _name: &str) -> Option<Value> {
             None
         }
     }

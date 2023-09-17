@@ -3,6 +3,8 @@ use std::convert::{TryFrom, TryInto};
 use crate::error::{Error, ErrorKind};
 use crate::value::{KeyRef, ObjectKind, SeqObject, Value, ValueKind, ValueRepr};
 
+const MIN_I128_AS_POS_U128: u128 = 170141183460469231731687303715884105728;
+
 pub enum CoerceResult<'a> {
     I128(i128, i128),
     F64(f64, f64),
@@ -238,6 +240,11 @@ pub fn neg(val: &Value) -> Result<Value, Error> {
     if val.kind() == ValueKind::Number {
         match val.0 {
             ValueRepr::F64(x) => Ok((-x).into()),
+            // special case for the largest i128 that can still be
+            // represented.
+            ValueRepr::U128(x) if x.0 == MIN_I128_AS_POS_U128 => {
+                Ok(Value::from(MIN_I128_AS_POS_U128))
+            }
             _ => {
                 if let Ok(x) = i128::try_from(val.clone()) {
                     x.checked_mul(-1)

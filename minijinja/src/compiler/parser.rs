@@ -536,6 +536,7 @@ impl<'a> Parser<'a> {
             Token::Str(val) => Ok(const_val!(val)),
             Token::String(val) => Ok(const_val!(val)),
             Token::Int(val) => Ok(const_val!(val)),
+            Token::Int128(val) => Ok(const_val!(val)),
             Token::Float(val) => Ok(const_val!(val)),
             Token::ParenOpen => self.parse_tuple_or_expression(span),
             Token::BracketOpen => self.parse_list_expr(span),
