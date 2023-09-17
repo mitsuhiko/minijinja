@@ -6,6 +6,7 @@ use crate::compiler::instructions::{
 };
 use crate::compiler::tokens::Span;
 use crate::output::CaptureMode;
+use crate::value::ops::neg;
 use crate::value::Value;
 
 #[cfg(test)]
@@ -562,11 +563,25 @@ impl<'source> CodeGenerator<'source> {
             }
             ast::Expr::UnaryOp(c) => {
                 self.set_line_from_span(c.span());
-                self.compile_expr(&c.expr);
                 match c.op {
-                    ast::UnaryOpKind::Not => self.add(Instruction::Not),
-                    ast::UnaryOpKind::Neg => self.add_with_span(Instruction::Neg, c.span()),
-                };
+                    ast::UnaryOpKind::Not => {
+                        self.compile_expr(&c.expr);
+                        self.add(Instruction::Not);
+                    }
+                    ast::UnaryOpKind::Neg => {
+                        // common case: negative numbers.  In that case we
+                        // directly negate them if this is possible without
+                        // an error.
+                        if let ast::Expr::Const(ref c) = c.expr {
+                            if let Ok(negated) = neg(&c.value) {
+                                self.add(Instruction::LoadConst(negated));
+                                return;
+                            }
+                        }
+                        self.compile_expr(&c.expr);
+                        self.add_with_span(Instruction::Neg, c.span());
+                    }
+                }
             }
             ast::Expr::BinOp(c) => {
                 self.compile_bin_op(c);
