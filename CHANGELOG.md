@@ -4,6 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.8
 
+- Large integer literals in templates are now correctly handled.  #353
 - Relax the trait bounds of `Value::downcast_object_ref` /
   `Object::downcast_ref` / `Object::is` and added support for downcasting
   of types that were directly created with `Value::from_seq_object`
