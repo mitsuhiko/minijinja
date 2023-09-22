@@ -99,6 +99,13 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 ///
 /// For a list of built-in functions see [`functions`](crate::functions).
 ///
+/// **Note:** this trait cannot be implemented and only exists drive the
+/// functionality of [`add_function`](crate::Environment::add_function)
+/// and [`from_function`](crate::value::Value::from_function).  If you want
+/// to implement a custom callable, you can directly implement
+/// [`Object::call`](crate::value::Object::call) which is what the engine
+/// actually uses internally.
+///
 /// # Basic Example
 ///
 /// ```rust

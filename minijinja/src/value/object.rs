@@ -153,7 +153,7 @@ impl dyn Object {
 
     /// Checks if the object is of a specific type.
     ///
-    /// For details of this operation see [`downcast_ref`](Self::downcast_ref).
+    /// For details of this operation see [`downcast_ref`](#method.downcast_ref).
     pub fn is<T: 'static>(&self) -> bool {
         let type_id = (*self).type_id();
         type_id == TypeId::of::<T>()

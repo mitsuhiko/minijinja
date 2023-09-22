@@ -258,7 +258,7 @@ pub mod machinery {
 
     use crate::Output;
 
-    /// Returns a reference to a [`CompiledTemplate`] from a [`Template`].
+    /// Returns a reference to a [`CompiledTemplate`] from a [`Template`](crate::Template).
     pub fn get_compiled_template<'x, 'env>(
         tmpl: &'x crate::Template<'env, 'env>,
     ) -> &'x CompiledTemplate<'env> {
