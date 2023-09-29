@@ -313,3 +313,27 @@ fn test_call_object() {
     let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "65");
 }
+
+#[test]
+#[cfg(feature = "stacker")]
+fn test_deep_recursion() {
+    let mut env = Environment::new();
+    env.set_recursion_limit(70000);
+    let tmpl = env
+        .template_from_str(
+            r#"
+        {%- macro foo(i) -%}
+            {%- if i < 10000 %}{{ i }}|{{ foo(i + 1) }}{%- endif -%}
+        {%- endmacro -%}
+        {{- foo(0) -}}
+    "#,
+        )
+        .unwrap();
+    let rv = tmpl.render(()).unwrap();
+    let pieces = rv
+        .split('|')
+        .filter(|x| !x.is_empty())
+        .map(|x| x.parse::<u32>().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(pieces, (0..10000).collect::<Vec<_>>());
+}
