@@ -21,6 +21,13 @@ type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
 type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + Sync + Send;
 type PathJoinFunc = dyn for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Sync + Send;
 
+/// The maximum recursion in the VM.  Normally each stack frame
+/// adds one to this counter (eg: every time a frame is added).
+/// However in some situations more depth is pushed if the cost
+/// of the stack frame is higher.  Raising this above this limit
+/// requires enabling the `stacker` feature.
+const MAX_RECURSION: usize = 500;
+
 /// An abstraction that holds the engine configuration.
 ///
 /// This object holds the central configuration state for templates.  It is also
@@ -50,6 +57,7 @@ pub struct Environment<'source> {
     debug: bool,
     #[cfg(feature = "fuel")]
     fuel: Option<u64>,
+    recursion_limit: usize,
 }
 
 impl<'source> Default for Environment<'source> {
@@ -90,6 +98,7 @@ impl<'source> Environment<'source> {
             debug: cfg!(debug_assertions),
             #[cfg(feature = "fuel")]
             fuel: None,
+            recursion_limit: MAX_RECURSION,
         }
     }
 
@@ -111,6 +120,7 @@ impl<'source> Environment<'source> {
             debug: cfg!(debug_assertions),
             #[cfg(feature = "fuel")]
             fuel: None,
+            recursion_limit: MAX_RECURSION,
         }
     }
 
@@ -516,6 +526,39 @@ impl<'source> Environment<'source> {
 
     fn _syntax_config(&self) -> &SyntaxConfig {
         &self.templates.syntax_config
+    }
+
+    /// Reconfigures the runtime recursion limit.
+    ///
+    /// This defaults to `500`.  Raising it above that level requires the `stacker`
+    /// feature to be enabled.  Otherwise the limit is silently capped at that safe
+    /// maximum.  Note that the maximum is not necessarily safe if the thread uses
+    /// a lot of stack space already, it's just a value that was validated once to
+    /// provide basic protection.
+    ///
+    /// Every operation that requires recursion in MiniJinja increments an internal
+    /// recursion counter.  The actual cost attributed to that recursion depends on
+    /// the cost of the operation.  If statements and for loops for instance only
+    /// increase the counter by 1, whereas template includes and macros might increase
+    /// it to 10 or more.
+    ///
+    /// **Note on stack growth:** even if the stacker feature is enabled it does not
+    /// mean that in all cases stack can grow to the limits desired.  For instance in
+    /// WASM the maximum limits are additionally enforced by the runtime.
+    pub fn set_recursion_limit(&mut self, level: usize) {
+        #[cfg(not(feature = "stacker"))]
+        {
+            self.recursion_limit = level.min(MAX_RECURSION);
+        }
+        #[cfg(feature = "stacker")]
+        {
+            self.recursion_limit = level;
+        }
+    }
+
+    /// Returns the current max recursion limit.
+    pub fn recursion_limit(&self) -> usize {
+        self.recursion_limit
     }
 
     /// Compiles an expression.

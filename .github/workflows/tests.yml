@@ -58,6 +58,8 @@ jobs:
         with:
           toolchain: 1.61.0
           targets: armv5te-unknown-linux-gnueabi
+      - name: Install Cross Deps
+        run: sudo apt-get install -y gcc-arm-linux-gnueabi libc6-dev-armel-cross
       - name: Check
         run: cargo check --all-features -p minijinja --target armv5te-unknown-linux-gnueabi
 
@@ -97,10 +99,9 @@ jobs:
           targets: wasm32-wasi
       - name: Install WasmTime
         run: |
-          curl https://wasmtime.dev/install.sh -sSf | bash
-          curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/v4.0.0/wasmtime-v4.0.0-x86_64-linux.tar.xz
-          tar xvf wasmtime-v4.0.0-x86_64-linux.tar.xz
-          echo `pwd`/wasmtime-v4.0.0-x86_64-linux >> $GITHUB_PATH
+          curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/v13.0.0/wasmtime-v13.0.0-x86_64-linux.tar.xz
+          tar xvf wasmtime-v13.0.0-x86_64-linux.tar.xz
+          echo `pwd`/wasmtime-v13.0.0-x86_64-linux >> $GITHUB_PATH
       - name: Test
         run: make wasi-test
 

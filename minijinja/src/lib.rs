@@ -173,6 +173,9 @@
 //!
 //! Performance and memory related features:
 //!
+//! - `stacker`: enables automatic stack growth which permits much larger levels of recursion
+//!   at runtime.  This does not affect the maximum recursion at parsing time which is always
+//!   limited.
 //! - `speedups`: enables all speedups, in particular it turns on the `v_htmlescape` dependency
 //!   for faster HTML escapling.
 //! - `key_interning`: if this feature is enabled the automatic string interning in

@@ -11,12 +11,6 @@ use crate::vm::loop_object::Loop;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
 
-/// The maximum recursion in the VM.  Normally each stack frame
-/// adds one to this counter (eg: every time a frame is added).
-/// However in some situations more depth is pushed if the cost
-/// of the stack frame is higher.
-const MAX_RECURSION: usize = 500;
-
 pub(crate) struct LoopState {
     pub(crate) with_loop_var: bool,
     pub(crate) recurse_jump_target: Option<usize>,
@@ -137,6 +131,7 @@ impl From<Vec<Value>> for Stack {
 pub(crate) struct Context<'env> {
     stack: Vec<Frame<'env>>,
     outer_stack_depth: usize,
+    recursion_limit: usize,
 }
 
 impl<'env> fmt::Debug for Context<'env> {
@@ -184,19 +179,19 @@ impl<'env> fmt::Debug for Context<'env> {
     }
 }
 
-impl<'env> Default for Context<'env> {
-    fn default() -> Context<'env> {
+impl<'env> Context<'env> {
+    /// Creates an empty context.
+    pub fn new(recursion_limit: usize) -> Context<'env> {
         Context {
             stack: Vec::with_capacity(32),
             outer_stack_depth: 0,
+            recursion_limit,
         }
     }
-}
 
-impl<'env> Context<'env> {
     /// Creates a context
-    pub fn new(frame: Frame<'env>) -> Context<'env> {
-        let mut rv = Context::default();
+    pub fn new_with_frame(frame: Frame<'env>, recursion_limit: usize) -> Context<'env> {
+        let mut rv = Context::new(recursion_limit);
         rv.stack.push(frame);
         rv
     }
@@ -330,7 +325,7 @@ impl<'env> Context<'env> {
     }
 
     fn check_depth(&self) -> Result<(), Error> {
-        if self.depth() > MAX_RECURSION {
+        if self.depth() > self.recursion_limit {
             return Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "recursion limit exceeded",

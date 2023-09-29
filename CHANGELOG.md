@@ -2,6 +2,13 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.9
+
+- Added a new `stacker` feature which allows raising of the recursion
+  limits.  It enables monitoring of the call stack via [stacker](https://crates.io/crates/stacker)
+  and automatically acquires additional memory when the call stack
+  runs out of space.  #354
+
 ## 1.0.8
 
 - Large integer literals in templates are now correctly handled.  #353

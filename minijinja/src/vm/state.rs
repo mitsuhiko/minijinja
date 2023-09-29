@@ -97,7 +97,7 @@ impl<'template, 'env> State<'template, 'env> {
     pub(crate) fn new_for_env(env: &'env Environment) -> State<'env, 'env> {
         State::new(
             env,
-            Context::default(),
+            Context::new(env.recursion_limit()),
             AutoEscape::None,
             &crate::compiler::instructions::EMPTY_INSTRUCTIONS,
             BTreeMap::new(),

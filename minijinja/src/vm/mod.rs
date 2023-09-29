@@ -13,13 +13,14 @@ use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::{
     ops, value_map_with_capacity, value_optimization, KeyRef, MapType, Value, ValueRepr,
 };
-use crate::vm::context::{Context, Frame, LoopState, Stack};
+use crate::vm::context::{Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
 use crate::vm::macro_object::{Macro, MacroData};
 
+pub(crate) use crate::vm::context::Context;
 pub use crate::vm::state::State;
 
 mod closure_object;
@@ -91,7 +92,7 @@ impl<'env> Vm<'env> {
         let _guard = value_optimization();
         let mut state = State::new(
             self.env,
-            Context::new(ok!(Frame::new_checked(root))),
+            Context::new_with_frame(ok!(Frame::new_checked(root)), self.env.recursion_limit()),
             auto_escape,
             instructions,
             prepare_blocks(blocks),
@@ -112,12 +113,12 @@ impl<'env> Vm<'env> {
         state: &State,
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
-        let mut ctx = Context::new(Frame::new(closure));
+        let mut ctx = Context::new_with_frame(Frame::new(closure), self.env.recursion_limit());
         if let Some(caller) = caller {
             ctx.store("caller", caller);
         }
         ok!(ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST));
-        self.eval_impl(
+        self.do_eval(
             &mut State {
                 env: self.env,
                 ctx,
@@ -146,9 +147,30 @@ impl<'env> Vm<'env> {
         state: &mut State<'_, 'env>,
         out: &mut Output,
     ) -> Result<Option<Value>, Error> {
-        self.eval_impl(state, out, Stack::default(), 0)
+        self.do_eval(state, out, Stack::default(), 0)
     }
 
+    /// Performs the actual evaluation, optinally with stack growth functionality.
+    fn do_eval(
+        &self,
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
+        stack: Stack,
+        pc: usize,
+    ) -> Result<Option<Value>, Error> {
+        #[cfg(feature = "stacker")]
+        {
+            stacker::maybe_grow(32 * 1024, 1024 * 1024, || {
+                self.eval_impl(state, out, stack, pc)
+            })
+        }
+        #[cfg(not(feature = "stacker"))]
+        {
+            self.eval_impl(state, out, stack, pc)
+        }
+    }
+
+    #[inline]
     fn eval_impl(
         &self,
         state: &mut State<'_, 'env>,

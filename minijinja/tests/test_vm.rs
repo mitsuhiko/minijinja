@@ -313,3 +313,33 @@ fn test_call_object() {
     let output = simple_eval(&c.finish().0, ()).unwrap();
     assert_eq!(output, "65");
 }
+
+#[test]
+#[cfg(feature = "stacker")]
+fn test_deep_recursion() {
+    use minijinja::context;
+
+    let mut env = Environment::new();
+    let limit = if cfg!(target_arch = "wasm32") {
+        1000
+    } else {
+        10000
+    };
+    env.set_recursion_limit(limit * 7);
+    let tmpl = env
+        .template_from_str(
+            r#"
+        {%- macro foo(i) -%}
+            {%- if i < limit %}{{ i }}|{{ foo(i + 1) }}{%- endif -%}
+        {%- endmacro -%}
+        {{- foo(0) -}}
+    "#,
+        )
+        .unwrap();
+    let rv = tmpl.render(context!(limit)).unwrap();
+    let pieces = rv
+        .split('|')
+        .filter_map(|x| x.parse::<usize>().ok())
+        .collect::<Vec<_>>();
+    assert_eq!(pieces, (0..limit).collect::<Vec<_>>());
+}

@@ -15,7 +15,7 @@ use crate::error::{attach_basic_debug_info, Error};
 use crate::output::{Output, WriteWrapper};
 use crate::utils::AutoEscape;
 use crate::value::{self, Value};
-use crate::vm::{prepare_blocks, State, Vm};
+use crate::vm::{prepare_blocks, Context, State, Vm};
 
 /// Represents a handle to a template.
 ///
@@ -254,7 +254,7 @@ impl<'env, 'source> Template<'env, 'source> {
     pub fn new_state(&self) -> State<'_, 'env> {
         State::new(
             self.env,
-            Default::default(),
+            Context::new(self.env.recursion_limit()),
             self.initial_auto_escape,
             &self.compiled.instructions,
             prepare_blocks(&self.compiled.blocks),
