@@ -541,6 +541,10 @@ impl<'source> Environment<'source> {
     /// the cost of the operation.  If statements and for loops for instance only
     /// increase the counter by 1, whereas template includes and macros might increase
     /// it to 10 or more.
+    ///
+    /// **Note on stack growth:** even if the stacker feature is enabled it does not
+    /// mean that in all cases stack can grow to the limits desired.  For instance in
+    /// WASM the maximum limits are additionally enforced by the runtime.
     pub fn set_recursion_limit(&mut self, level: usize) {
         #[cfg(not(feature = "stacker"))]
         {

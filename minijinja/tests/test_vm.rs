@@ -317,23 +317,29 @@ fn test_call_object() {
 #[test]
 #[cfg(feature = "stacker")]
 fn test_deep_recursion() {
+    use minijinja::context;
+
     let mut env = Environment::new();
-    env.set_recursion_limit(70000);
+    let limit = if cfg!(target_arch = "wasm32") {
+        1000
+    } else {
+        10000
+    };
+    env.set_recursion_limit(limit * 7);
     let tmpl = env
         .template_from_str(
             r#"
         {%- macro foo(i) -%}
-            {%- if i < 10000 %}{{ i }}|{{ foo(i + 1) }}{%- endif -%}
+            {%- if i < limit %}{{ i }}|{{ foo(i + 1) }}{%- endif -%}
         {%- endmacro -%}
         {{- foo(0) -}}
     "#,
         )
         .unwrap();
-    let rv = tmpl.render(()).unwrap();
+    let rv = tmpl.render(context!(limit)).unwrap();
     let pieces = rv
         .split('|')
-        .filter(|x| !x.is_empty())
-        .map(|x| x.parse::<u32>().unwrap())
+        .filter_map(|x| x.parse::<usize>().ok())
         .collect::<Vec<_>>();
-    assert_eq!(pieces, (0..10000).collect::<Vec<_>>());
+    assert_eq!(pieces, (0..limit).collect::<Vec<_>>());
 }
