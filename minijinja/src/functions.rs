@@ -321,8 +321,8 @@ mod builtins {
 
     /// Output the specified value.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn println(value: &Value) -> String {
-        format!("{value:#?}")
+    pub fn println(value: &Value) {
+        println!("{value:#?}");
     }
 
     /// Returns `true` if the given pattern matches a prefix of this
