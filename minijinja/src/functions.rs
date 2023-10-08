@@ -235,7 +235,7 @@ mod builtins {
     use std::collections::BTreeMap;
 
     use crate::error::ErrorKind;
-    use crate::value::{MapType, ValueRepr};
+    use crate::value::{MapType, Rest, ValueRepr};
 
     /// Returns a range.
     ///
@@ -304,19 +304,27 @@ mod builtins {
         }
     }
 
-    /// Outputs the current context stringified.
+    /// Outputs the current context or the arguments stringified.
     ///
     /// This is a useful function to quickly figure out the state of affairs
     /// in a template.  It emits a stringified debug dump of the current
     /// engine state including the layers of the context, the current block
-    /// and auto escaping setting.
+    /// and auto escaping setting.  The exact output is not defined and might
+    /// change from one version of Jinja2 to the next.
     ///
     /// ```jinja
     /// <pre>{{ debug() }}</pre>
+    /// <pre>{{ debug(variable1, variable2) }}</pre>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn debug(state: &State) -> String {
-        format!("{state:#?}")
+    pub fn debug(state: &State, args: Rest<Value>) -> String {
+        if args.is_empty() {
+            format!("{state:#?}")
+        } else if args.len() == 1 {
+            format!("{:#?}", args.0[0])
+        } else {
+            format!("{:#?}", &args.0[..])
+        }
     }
 }
 
