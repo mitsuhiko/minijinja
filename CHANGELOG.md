@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.9
 
+- The `debug` function in templates can now also be used to print out
+  the debug output of a variable.  #356
 - Added a new `stacker` feature which allows raising of the recursion
   limits.  It enables monitoring of the call stack via [stacker](https://crates.io/crates/stacker)
   and automatically acquires additional memory when the call stack
