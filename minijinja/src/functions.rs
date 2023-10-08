@@ -324,6 +324,15 @@ mod builtins {
     pub fn println(value: &Value) -> String {
         format!("{value:#?}")
     }
+
+    /// Returns `true` if the given pattern matches a prefix of this
+    /// string slice.
+    ///
+    /// Returns `false` if it does not.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn starts_with(source: &str, pat: &str) -> bool {
+        source.starts_with(pat)
+    }
 }
 
 #[cfg(feature = "builtins")]
