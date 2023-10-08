@@ -831,7 +831,7 @@ impl<'env> Vm<'env> {
             state
                 .blocks
                 .entry(name)
-                .or_insert_with(BlockStack::default)
+                .or_default()
                 .append_instructions(instr);
         }
         Ok(new_instructions)
