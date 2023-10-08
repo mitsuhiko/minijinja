@@ -76,11 +76,7 @@ impl<'a> Eq for KeyRef<'a> {}
 
 impl<'a> PartialOrd for KeyRef<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if let (Some(a), Some(b)) = (self.as_str(), other.as_str()) {
-            a.partial_cmp(b)
-        } else {
-            self.as_value().partial_cmp(&other.as_value())
-        }
+        Some(self.cmp(other))
     }
 }
 
