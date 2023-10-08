@@ -179,6 +179,10 @@ pub(crate) fn get_globals() -> BTreeMap<Cow<'static, str>, Value> {
             "debug".into(),
             BoxedFunction::new(functions::debug).to_value(),
         );
+        rv.insert(
+            "println".into(),
+            BoxedFunction::new(functions::println).to_value(),
+        );
     }
 
     rv

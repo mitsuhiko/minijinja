@@ -318,6 +318,12 @@ mod builtins {
     pub fn debug(state: &State) -> String {
         format!("{state:#?}")
     }
+
+    /// Output the specified value.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn println(value: &Value) -> String {
+        format!("{value:#?}")
+    }
 }
 
 #[cfg(feature = "builtins")]
