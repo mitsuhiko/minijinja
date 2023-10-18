@@ -23,6 +23,7 @@ use crate::vm::macro_object::Macro;
 pub(crate) use crate::vm::context::Context;
 pub use crate::vm::state::State;
 
+#[cfg(feature = "macros")]
 mod closure_object;
 mod context;
 #[cfg(feature = "fuel")]
@@ -131,6 +132,8 @@ impl<'env> Vm<'env> {
                 id: state.id,
                 #[cfg(feature = "macros")]
                 macros: state.macros.clone(),
+                #[cfg(feature = "macros")]
+                closure_tracker: state.closure_tracker.clone(),
                 #[cfg(feature = "fuel")]
                 fuel_tracker: state.fuel_tracker.clone(),
             },
@@ -661,7 +664,11 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "macros")]
                 Instruction::GetClosure => {
-                    stack.push(Value::from(state.ctx.closure()));
+                    // Whenever the closure is fetched with this op-code
+                    // it's added to the closure tracker to break cycles later.
+                    let closure = state.ctx.closure();
+                    state.closure_tracker.track_closure(closure.clone());
+                    stack.push(Value::from(closure));
                 }
             }
             pc += 1;

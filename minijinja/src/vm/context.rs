@@ -6,8 +6,10 @@ use std::sync::Arc;
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::value::{OwnedValueIterator, Value, ValueRepr};
-use crate::vm::closure_object::Closure;
 use crate::vm::loop_object::Loop;
+
+#[cfg(feature = "macros")]
+use crate::vm::closure_object::Closure;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
 
@@ -32,6 +34,7 @@ pub(crate) struct Frame<'env> {
     // duplicated into the closure.  Macros declared on that level, then share
     // the closure object to enclose the parent values.  This emulates the
     // behavior of closures in Jinja2.
+    #[cfg(feature = "macros")]
     pub(crate) closure: Option<Arc<Closure>>,
 }
 
@@ -48,6 +51,7 @@ impl<'env> Frame<'env> {
             locals: Locals::new(),
             ctx,
             current_loop: None,
+            #[cfg(feature = "macros")]
             closure: None,
         }
     }
@@ -179,20 +183,6 @@ impl<'env> fmt::Debug for Context<'env> {
     }
 }
 
-#[cfg(feature = "macros")]
-impl<'env> Drop for Context<'env> {
-    fn drop(&mut self) {
-        // ensure cycles between functions and their closures are
-        // broken.  This is necessary because a function holds a
-        // reference to itself via the closure.
-        for frame in self.stack.iter_mut() {
-            if let Some(closure) = frame.closure.take() {
-                closure.clear();
-            }
-        }
-    }
-}
-
 impl<'env> Context<'env> {
     /// Creates an empty context.
     pub fn new(recursion_limit: usize) -> Context<'env> {
@@ -213,8 +203,11 @@ impl<'env> Context<'env> {
     /// Stores a variable in the context.
     pub fn store(&mut self, key: &'env str, value: Value) {
         let top = self.stack.last_mut().unwrap();
-        if let Some(ref closure) = top.closure {
-            closure.store(key, value.clone());
+        #[cfg(feature = "macros")]
+        {
+            if let Some(ref closure) = top.closure {
+                closure.store(key, value.clone());
+            }
         }
         top.locals.insert(key, value);
     }

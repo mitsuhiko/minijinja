@@ -139,17 +139,31 @@ fn test_no_leak() {
     let ctx = context! {
         x => Value::from_struct_object(X(dropped.clone())),
     };
-    let rv = Environment::empty()
+    let mut env = Environment::new();
+    env.add_template("x", "{% macro meh() %}{{ x }}{{ meh }}{% endmacro %}")
+        .unwrap();
+    let rv = env
         .render_str(
             r#"
+        {%- from 'x' import meh %}
+        {{- meh() }}
         {%- set closure = x %}
         {%- macro foo() %}{{ foo }}{{ closure }}{% endmacro %}
         {{- foo() -}}
+
+        {%- for y in range(3) %}
+            {%- set closure = x %}
+            {%- macro foo() %}{{ foo }}{{ closure }}{% endmacro %}
+            {{- foo() -}}
+        {%- endfor -%}
     "#,
             ctx,
         )
         .unwrap();
 
     assert!(dropped.load(std::sync::atomic::Ordering::Relaxed));
-    assert_eq!(rv, "<macro foo>{}");
+    assert_eq!(
+        rv,
+        "{}<macro meh><macro foo>{}<macro foo>{}<macro foo>{}<macro foo>{}"
+    );
 }
