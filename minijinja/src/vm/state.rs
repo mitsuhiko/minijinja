@@ -230,6 +230,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// ```
     /// # use minijinja::Environment;
     /// # let mut env = Environment::new();
+    /// # env.add_filter("upper", |x: &str| x.to_uppercase());
     /// # let tmpl = env.template_from_str("").unwrap();
     /// # let state = tmpl.new_state();
     /// let rv = state.apply_filter("upper", &["hello world".into()]).unwrap();
@@ -247,6 +248,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// ```
     /// # use minijinja::Environment;
     /// # let mut env = Environment::new();
+    /// # env.add_test("even", |x: i32| x % 2 == 0);
     /// # let tmpl = env.template_from_str("").unwrap();
     /// # let state = tmpl.new_state();
     /// let rv = state.perform_test("even", &[42i32.into()]).unwrap();

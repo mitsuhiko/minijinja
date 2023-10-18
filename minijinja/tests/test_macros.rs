@@ -1,3 +1,4 @@
+#![cfg(feature = "macros")]
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 

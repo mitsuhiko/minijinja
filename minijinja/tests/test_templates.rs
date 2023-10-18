@@ -1,3 +1,9 @@
+#![cfg(all(
+    feature = "multi-template",
+    feature = "macros",
+    feature = "builtins",
+    feature = "adjacent_loop_items"
+))]
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{env, fs};

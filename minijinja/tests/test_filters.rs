@@ -1,3 +1,4 @@
+#![cfg(feature = "builtins")]
 use minijinja::value::Value;
 use minijinja::{args, Environment};
 use similar_asserts::assert_eq;

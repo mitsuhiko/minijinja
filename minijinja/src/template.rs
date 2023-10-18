@@ -174,12 +174,10 @@ impl<'env, 'source> Template<'env, 'source> {
     /// # use minijinja::{Environment, context};
     /// # fn test() -> Result<(), minijinja::Error> {
     /// # let mut env = Environment::new();
-    /// # env.add_template("hello", "{% block hi %}Hello {{ name }}!{% endblock %}")?;
+    /// # env.add_template("hello", "")?;
     /// let tmpl = env.get_template("hello")?;
-    /// let rv = tmpl
-    ///     .eval_to_state(context!(name => "John"))?
-    ///     .render_block("hi")?;
-    /// println!("{}", rv);
+    /// let state = tmpl.eval_to_state(context!(name => "John"))?;
+    /// println!("{:?}", state.exports());
     /// # Ok(()) }
     /// ```
     ///

@@ -93,6 +93,7 @@ fn test_template_removal() {
 }
 
 #[test]
+#[cfg(feature = "multi_template")]
 fn test_path_join() {
     let mut env = Environment::new();
     env.add_template("x/a/foo.txt", "{% include '../b/bar.txt' %}")

@@ -1,3 +1,4 @@
+#![cfg(feature = "builtins")]
 use minijinja::{render, Environment, ErrorKind, State, UndefinedBehavior};
 
 use similar_asserts::assert_eq;
