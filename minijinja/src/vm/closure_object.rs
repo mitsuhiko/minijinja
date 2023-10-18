@@ -26,6 +26,14 @@ impl Closure {
             values.insert(Arc::from(key), f());
         }
     }
+
+    /// Clears the closure.
+    ///
+    /// This is required to break cycles.
+    #[cfg(feature = "macros")]
+    pub fn clear(&self) {
+        self.values.lock().unwrap().clear();
+    }
 }
 
 impl fmt::Display for Closure {

@@ -179,6 +179,20 @@ impl<'env> fmt::Debug for Context<'env> {
     }
 }
 
+#[cfg(feature = "macros")]
+impl<'env> Drop for Context<'env> {
+    fn drop(&mut self) {
+        // ensure cycles between functions and their closures are
+        // broken.  This is necessary because a function holds a
+        // reference to itself via the closure.
+        for frame in self.stack.iter_mut() {
+            if let Some(closure) = frame.closure.take() {
+                closure.clear();
+            }
+        }
+    }
+}
+
 impl<'env> Context<'env> {
     /// Creates an empty context.
     pub fn new(recursion_limit: usize) -> Context<'env> {

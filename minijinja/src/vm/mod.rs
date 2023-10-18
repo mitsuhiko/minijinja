@@ -18,7 +18,7 @@ use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
-use crate::vm::macro_object::{Macro, MacroData};
+use crate::vm::macro_object::Macro;
 
 pub(crate) use crate::vm::context::Context;
 pub use crate::vm::state::State;
@@ -968,14 +968,12 @@ impl<'env> Vm<'env> {
         let macro_ref_id = state.macros.len();
         Arc::make_mut(&mut state.macros).push((state.instructions, offset));
         stack.push(Value::from_object(Macro {
-            data: Arc::new(MacroData {
-                name: Arc::from(name.to_string()),
-                arg_spec,
-                macro_ref_id,
-                state_id: state.id,
-                closure,
-                caller_reference: (flags & MACRO_CALLER) != 0,
-            }),
+            name: Arc::from(name.to_string()),
+            arg_spec,
+            macro_ref_id,
+            state_id: state.id,
+            closure,
+            caller_reference: (flags & MACRO_CALLER) != 0,
         }));
     }
 }
