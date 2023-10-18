@@ -1,3 +1,6 @@
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+
 use similar_asserts::assert_eq;
 
 use minijinja::value::{Kwargs, StructObject, Value};
@@ -112,5 +115,55 @@ fn test_macro_passing() {
     assert_eq!(
         err.detail(),
         Some("cannot call this macro. template state went away.")
+    );
+}
+
+#[test]
+fn test_no_leak() {
+    let dropped = Arc::new(AtomicBool::new(false));
+
+    struct X(Arc<AtomicBool>);
+
+    impl StructObject for X {
+        fn get_field(&self, _name: &str) -> Option<Value> {
+            None
+        }
+    }
+
+    impl Drop for X {
+        fn drop(&mut self) {
+            self.0.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    let ctx = context! {
+        x => Value::from_struct_object(X(dropped.clone())),
+    };
+    let mut env = Environment::new();
+    env.add_template("x", "{% macro meh() %}{{ x }}{{ meh }}{% endmacro %}")
+        .unwrap();
+    let rv = env
+        .render_str(
+            r#"
+        {%- from 'x' import meh %}
+        {{- meh() }}
+        {%- set closure = x %}
+        {%- macro foo() %}{{ foo }}{{ closure }}{% endmacro %}
+        {{- foo() -}}
+
+        {%- for y in range(3) %}
+            {%- set closure = x %}
+            {%- macro foo() %}{{ foo }}{{ closure }}{% endmacro %}
+            {{- foo() -}}
+        {%- endfor -%}
+    "#,
+            ctx,
+        )
+        .unwrap();
+
+    assert!(dropped.load(std::sync::atomic::Ordering::Relaxed));
+    assert_eq!(
+        rv,
+        "{}<macro meh><macro foo>{}<macro foo>{}<macro foo>{}<macro foo>{}"
     );
 }

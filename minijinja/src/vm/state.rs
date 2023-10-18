@@ -51,6 +51,8 @@ pub struct State<'template, 'env> {
     pub(crate) id: isize,
     #[cfg(feature = "macros")]
     pub(crate) macros: std::sync::Arc<Vec<(&'template Instructions<'env>, usize)>>,
+    #[cfg(feature = "macros")]
+    pub(crate) closure_tracker: std::sync::Arc<crate::vm::closure_object::ClosureTracker>,
     #[cfg(feature = "fuel")]
     pub(crate) fuel_tracker: Option<std::sync::Arc<FuelTracker>>,
 }
@@ -88,6 +90,8 @@ impl<'template, 'env> State<'template, 'env> {
             loaded_templates: BTreeSet::new(),
             #[cfg(feature = "macros")]
             macros: Default::default(),
+            #[cfg(feature = "macros")]
+            closure_tracker: Default::default(),
             #[cfg(feature = "fuel")]
             fuel_tracker: env.fuel().map(FuelTracker::new),
         }

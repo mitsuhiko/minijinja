@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## 1.0.9
 
+- Fixed a memory leak involving macros.  Previously using macros was
+  leaking memory due to an undetected cycle.  #359
 - The `debug` function in templates can now also be used to print out
   the debug output of a variable.  #356
 - Added a new `stacker` feature which allows raising of the recursion

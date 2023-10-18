@@ -18,11 +18,12 @@ use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
-use crate::vm::macro_object::{Macro, MacroData};
+use crate::vm::macro_object::Macro;
 
 pub(crate) use crate::vm::context::Context;
 pub use crate::vm::state::State;
 
+#[cfg(feature = "macros")]
 mod closure_object;
 mod context;
 #[cfg(feature = "fuel")]
@@ -131,6 +132,8 @@ impl<'env> Vm<'env> {
                 id: state.id,
                 #[cfg(feature = "macros")]
                 macros: state.macros.clone(),
+                #[cfg(feature = "macros")]
+                closure_tracker: state.closure_tracker.clone(),
                 #[cfg(feature = "fuel")]
                 fuel_tracker: state.fuel_tracker.clone(),
             },
@@ -661,7 +664,11 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "macros")]
                 Instruction::GetClosure => {
-                    stack.push(Value::from(state.ctx.closure()));
+                    // Whenever the closure is fetched with this op-code
+                    // it's added to the closure tracker to break cycles later.
+                    let closure = state.ctx.closure();
+                    state.closure_tracker.track_closure(closure.clone());
+                    stack.push(Value::from(closure));
                 }
             }
             pc += 1;
@@ -709,10 +716,18 @@ impl<'env> Vm<'env> {
             let old_escape = mem::replace(&mut state.auto_escape, tmpl.initial_auto_escape());
             let old_instructions = mem::replace(&mut state.instructions, new_instructions);
             let old_blocks = mem::replace(&mut state.blocks, prepare_blocks(new_blocks));
-            let old_closure = state.ctx.take_closure();
             ok!(state.ctx.incr_depth(INCLUDE_RECURSION_COST));
-            let rv = self.eval_state(state, out);
-            state.ctx.reset_closure(old_closure);
+            let rv;
+            #[cfg(feature = "macros")]
+            {
+                let old_closure = state.ctx.take_closure();
+                rv = self.eval_state(state, out);
+                state.ctx.reset_closure(old_closure);
+            }
+            #[cfg(not(feature = "macros"))]
+            {
+                rv = self.eval_state(state, out);
+            }
             state.ctx.decr_depth(INCLUDE_RECURSION_COST);
             state.auto_escape = old_escape;
             state.instructions = old_instructions;
@@ -968,14 +983,12 @@ impl<'env> Vm<'env> {
         let macro_ref_id = state.macros.len();
         Arc::make_mut(&mut state.macros).push((state.instructions, offset));
         stack.push(Value::from_object(Macro {
-            data: Arc::new(MacroData {
-                name: Arc::from(name.to_string()),
-                arg_spec,
-                macro_ref_id,
-                state_id: state.id,
-                closure,
-                caller_reference: (flags & MACRO_CALLER) != 0,
-            }),
+            name: Arc::from(name.to_string()),
+            arg_spec,
+            macro_ref_id,
+            state_id: state.id,
+            closure,
+            caller_reference: (flags & MACRO_CALLER) != 0,
         }));
     }
 }

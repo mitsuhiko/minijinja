@@ -60,6 +60,8 @@ jobs:
           targets: armv5te-unknown-linux-gnueabi
       - name: Install Cross Deps
         run: sudo apt-get install -y gcc-arm-linux-gnueabi libc6-dev-armel-cross
+      - name: Restore Cargo.lock
+        run: cp Cargo.lock.msrv Cargo.lock
       - name: Check
         run: cargo check --all-features -p minijinja --target armv5te-unknown-linux-gnueabi
 
@@ -72,6 +74,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.61.0
+      - name: Restore Cargo.lock
+        run: cp Cargo.lock.msrv Cargo.lock
       - name: Check
         run: cargo check --no-default-features -p minijinja --features fuel
 
@@ -84,6 +88,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.61.0
+      - name: Restore Cargo.lock
+        run: cp Cargo.lock.msrv Cargo.lock
       - name: Test
         run: make test
 
