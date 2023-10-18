@@ -241,13 +241,13 @@ impl<'env> Context<'env> {
     /// This means that if you override a variable referenced by a macro after
     /// including in the parent template, it will not override the value seen by
     /// the macro.
-    #[cfg(feature = "multi_template")]
+    #[cfg(all(feature = "multi_template", feature = "macros"))]
     pub fn take_closure(&mut self) -> Option<Arc<Closure>> {
         self.stack.last_mut().unwrap().closure.take()
     }
 
     /// Puts the closure back.
-    #[cfg(feature = "multi_template")]
+    #[cfg(all(feature = "multi_template", feature = "macros"))]
     pub fn reset_closure(&mut self, closure: Option<Arc<Closure>>) {
         self.stack.last_mut().unwrap().closure = closure;
     }

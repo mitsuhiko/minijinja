@@ -716,10 +716,18 @@ impl<'env> Vm<'env> {
             let old_escape = mem::replace(&mut state.auto_escape, tmpl.initial_auto_escape());
             let old_instructions = mem::replace(&mut state.instructions, new_instructions);
             let old_blocks = mem::replace(&mut state.blocks, prepare_blocks(new_blocks));
-            let old_closure = state.ctx.take_closure();
             ok!(state.ctx.incr_depth(INCLUDE_RECURSION_COST));
-            let rv = self.eval_state(state, out);
-            state.ctx.reset_closure(old_closure);
+            let rv;
+            #[cfg(feature = "macros")]
+            {
+                let old_closure = state.ctx.take_closure();
+                rv = self.eval_state(state, out);
+                state.ctx.reset_closure(old_closure);
+            }
+            #[cfg(not(feature = "macros"))]
+            {
+                rv = self.eval_state(state, out);
+            }
             state.ctx.decr_depth(INCLUDE_RECURSION_COST);
             state.auto_escape = old_escape;
             state.instructions = old_instructions;
