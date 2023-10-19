@@ -10,25 +10,21 @@ use crate::value::{Object, ObjectKind, StructObject, Value};
 /// caused by closures on teardown of the state.  Whenever a closure is
 /// exposed to the engine it's also passed to the [`track_closure`] function.
 #[derive(Default)]
-pub struct ClosureTracker {
-    closures: Mutex<BTreeMap<usize, Arc<Closure>>>,
+pub(crate) struct ClosureTracker {
+    closures: Mutex<Vec<Arc<Closure>>>,
 }
 
 impl ClosureTracker {
     /// This accepts a closure as value and registers it in the
     /// tracker for cycle breaking.
-    ///
-    /// This only registers each closure once.
     pub(crate) fn track_closure(&self, closure: Arc<Closure>) {
-        let ptr = &closure as &Closure;
-        let id = ptr as *const _ as usize;
-        self.closures.lock().unwrap().insert(id, closure);
+        self.closures.lock().unwrap().push(closure);
     }
 }
 
 impl Drop for ClosureTracker {
     fn drop(&mut self) {
-        for closure in self.closures.lock().unwrap().values() {
+        for closure in self.closures.lock().unwrap().iter() {
             closure.clear();
         }
     }

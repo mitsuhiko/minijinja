@@ -219,17 +219,20 @@ impl<'env> Context<'env> {
     /// unfortunate downside is that this has to be done with a `Mutex`.
     #[cfg(feature = "macros")]
     pub fn enclose(&mut self, env: &Environment, key: &str) {
-        self.closure()
+        self.stack
+            .last_mut()
+            .unwrap()
+            .closure
+            .as_mut()
+            .unwrap()
+            .clone()
             .store_if_missing(key, || self.load(env, key).unwrap_or(Value::UNDEFINED));
     }
 
     /// Loads the closure and returns it.
     #[cfg(feature = "macros")]
-    pub fn closure(&mut self) -> Arc<Closure> {
-        let top = self.stack.last_mut().unwrap();
-        top.closure
-            .get_or_insert_with(|| Arc::new(Closure::default()))
-            .clone()
+    pub fn closure(&mut self) -> Option<&Arc<Closure>> {
+        self.stack.last_mut().unwrap().closure.as_ref()
     }
 
     /// Temporarily takes the closure.
@@ -247,7 +250,7 @@ impl<'env> Context<'env> {
     }
 
     /// Puts the closure back.
-    #[cfg(all(feature = "multi_template", feature = "macros"))]
+    #[cfg(feature = "macros")]
     pub fn reset_closure(&mut self, closure: Option<Arc<Closure>>) {
         self.stack.last_mut().unwrap().closure = closure;
     }
