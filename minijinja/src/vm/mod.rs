@@ -18,7 +18,7 @@ use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
-use crate::vm::macro_object::Macro;
+use crate::vm::{closure_object::Closure, macro_object::Macro};
 
 pub(crate) use crate::vm::context::Context;
 pub use crate::vm::state::State;
@@ -660,15 +660,24 @@ impl<'env> Vm<'env> {
                 Instruction::Return => break,
                 #[cfg(feature = "macros")]
                 Instruction::Enclose(name) => {
+                    // the first time we enclose a value, we need to create a closure
+                    // and store it on the context, and add it to the closure tracker
+                    // for cycle breaking.
+                    if state.ctx.closure().is_none() {
+                        let closure = Arc::new(Closure::default());
+                        state.closure_tracker.track_closure(closure.clone());
+                        state.ctx.reset_closure(Some(closure));
+                    }
                     state.ctx.enclose(state.env, name);
                 }
                 #[cfg(feature = "macros")]
                 Instruction::GetClosure => {
-                    // Whenever the closure is fetched with this op-code
-                    // it's added to the closure tracker to break cycles later.
-                    let closure = state.ctx.closure();
-                    state.closure_tracker.track_closure(closure.clone());
-                    stack.push(Value::from(closure));
+                    stack.push(
+                        state
+                            .ctx
+                            .closure()
+                            .map_or(Value::UNDEFINED, |x| Value::from(x.clone())),
+                    );
                 }
             }
             pc += 1;
