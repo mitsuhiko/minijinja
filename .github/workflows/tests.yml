@@ -2,6 +2,10 @@ name: Tests
 
 on: [push, pull_request]
 
+env:
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
 jobs:
   test-latest:
     name: Test on Latest Stable
@@ -9,6 +13,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -23,6 +28,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
@@ -54,6 +60,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.61.0
@@ -71,6 +78,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.61.0
@@ -85,6 +93,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.61.0
@@ -99,6 +108,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
@@ -117,6 +127,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
