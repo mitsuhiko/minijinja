@@ -87,8 +87,8 @@
 //!
 //! let mut env = Environment::new();
 //! env.add_filter("repeat", str::repeat);
-//! env.add_template("hefti", "{{ 'Na '|repeat(3) }} {{ name }}!").unwrap();
-//! let tmpl = env.get_template("hefti").unwrap();
+//! env.add_template("hello", "{{ 'Na '|repeat(3) }} {{ name }}!").unwrap();
+//! let tmpl = env.get_template("hello").unwrap();
 //! println!("{}", tmpl.render(context!(name => "Batman")).unwrap());
 //! ```
 //!
