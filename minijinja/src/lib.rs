@@ -146,7 +146,7 @@
 //!     the `loop` object no longer exist.  Removing this feature can provide faster
 //!     template execution when a lot of loops are involved.
 //!   - `unicode`: when added unicode identifiers are supported and the `sort`
-//!     filter's case insensitive comparising changes to using unicode and not
+//!     filter's case insensitive comparision changes to using unicode and not
 //!     ASCII rules.  Without this features only ASCII identifiers can be used
 //!     for variable names and attributes.
 //!
@@ -177,7 +177,7 @@
 //!   at runtime.  This does not affect the maximum recursion at parsing time which is always
 //!   limited.
 //! - `speedups`: enables all speedups, in particular it turns on the `v_htmlescape` dependency
-//!   for faster HTML escapling.
+//!   for faster HTML escaping.
 //! - `key_interning`: if this feature is enabled the automatic string interning in
 //!   the value type is enabled.  This feature used to be turned on by default but
 //!   has negative performance effects in newer versions of MiniJinja since a lot of

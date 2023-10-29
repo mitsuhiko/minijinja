@@ -144,7 +144,7 @@ impl UndefinedBehavior {
     /// The flag indicates if this is the first or second level of undefined value.  If
     /// `parent_was_undefined` is set to `true`, the undefined was created by looking up
     /// a missing attribute on an undefined value.  If `false` the undefined was created by
-    /// looing up a missing attribute on a defined value.
+    /// looking up a missing attribute on a defined value.
     pub(crate) fn handle_undefined(self, parent_was_undefined: bool) -> Result<Value, Error> {
         match (self, parent_was_undefined) {
             (UndefinedBehavior::Lenient, false) | (UndefinedBehavior::Chainable, _) => {

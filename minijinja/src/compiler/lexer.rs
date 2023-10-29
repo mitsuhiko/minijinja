@@ -402,7 +402,7 @@ pub fn tokenize(
                         }
                         Some((StartMarker::Block, skip)) => {
                             // raw blocks require some special handling.  If we are at the beginning of a raw
-                            // block we want to skip everything until {% endraw %} completely ignoring iterior
+                            // block we want to skip everything until {% endraw %} completely ignoring interior
                             // syntax and emit the entire raw block as TemplateData.
                             if let Some((raw, trim_start)) =
                                 skip_basic_tag(&state.rest[skip..], "raw", block_end)
