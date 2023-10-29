@@ -86,7 +86,7 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //! # HTML Escaping
 //!
 //! MiniJinja inherits the general desire to be clever about escaping.  For this
-//! prupose a value will (when auto escaping is enabled) always be escaped.  To
+//! purpose a value will (when auto escaping is enabled) always be escaped.  To
 //! prevent this behavior the [`safe`](crate::filters::safe) filter can be used
 //! in the template.  Outside of templates the [`Value::from_safe_string`] method
 //! can be used to achieve the same result.

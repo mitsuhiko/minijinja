@@ -153,7 +153,7 @@ impl<'env> Vm<'env> {
         self.do_eval(state, out, Stack::default(), 0)
     }
 
-    /// Performs the actual evaluation, optinally with stack growth functionality.
+    /// Performs the actual evaluation, optionally with stack growth functionality.
     fn do_eval(
         &self,
         state: &mut State<'_, 'env>,

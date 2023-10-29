@@ -56,7 +56,7 @@ impl<'env> Frame<'env> {
         }
     }
 
-    /// Creates a new frame with the given context and validates the the value is not invalid
+    /// Creates a new frame with the given context and validates the value is not invalid
     pub fn new_checked(root: Value) -> Result<Frame<'env>, Error> {
         if let ValueRepr::Invalid(ref err) = root.0 {
             Err(Error::new(ErrorKind::BadSerialization, err.to_string()))

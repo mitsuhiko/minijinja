@@ -500,7 +500,7 @@ some minor exceptions be rather trivial changes.
 - Performance improvements.
 - Added support for `{% import %}` / `{% from .. import .. %}`
   and `{% macro %}`.  (#123)
-- Added `Value::is_kwargs` which disambiugates if an object passed
+- Added `Value::is_kwargs` which disambiguates if an object passed
   to a function or filter is a normal object or if it represents
   keyword arguments.
 - Added the ability to call functions stored on objects.
@@ -582,7 +582,7 @@ some minor exceptions be rather trivial changes.
 - Add missing escape support for single quotes (`'`).  (#81) 
 - Added support for newlines in string literals.  (#85)
 - Added support for block assignment syntax.  (#86)
-- Added string concatenatino with `+` for Jinja compat.  (#87)
+- Added string concatenation with `+` for Jinja compat.  (#87)
 - Enable debug mode by default in debug builds.  (#88)
 - Added `render!` macro and `render_str`.  (#89)
 - Fixed an issue where trailing whitespace removal did not work on blocks.  (#90)

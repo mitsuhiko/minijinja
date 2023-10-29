@@ -179,12 +179,12 @@ impl<'source> CodeGenerator<'source> {
         self.end_condition(self.next_instruction());
     }
 
-    /// Starts a short cirquited bool block.
+    /// Starts a short-circuited bool block.
     pub fn start_sc_bool(&mut self) {
         self.pending_block.push(PendingBlock::ScBool(vec![]));
     }
 
-    /// Emits a short circuited bool operator.
+    /// Emits a short-circuited bool operator.
     pub fn sc_bool(&mut self, and: bool) {
         if let Some(PendingBlock::ScBool(ref mut instructions)) = self.pending_block.last_mut() {
             instructions.push(self.instructions.add(if and {
@@ -197,7 +197,7 @@ impl<'source> CodeGenerator<'source> {
         }
     }
 
-    /// Ends a short circuited bool block.
+    /// Ends a short-circuited bool block.
     pub fn end_sc_bool(&mut self) {
         let end = self.next_instruction();
         if let Some(PendingBlock::ScBool(instructions)) = self.pending_block.pop() {

@@ -395,7 +395,7 @@
 //! **Feature:** `multi_template` (included by default)
 //!  
 //! The `include` tag is useful to include a template and return the rendered contents of that file
-//! into the current namespace::
+//! into the current namespace:
 //!  
 //! ```jinja
 //! {% include 'header.html' %}

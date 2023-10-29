@@ -70,7 +70,7 @@ impl fmt::Debug for Error {
         }
         ok!(err.finish());
 
-        // so this is a bit questionablem, but because of how commonly errors are just
+        // so this is a bit questionable, but because of how commonly errors are just
         // unwrapped i think it's sensible to spit out the debug info following the
         // error struct dump.
         #[cfg(feature = "debug")]

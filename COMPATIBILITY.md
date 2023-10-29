@@ -25,7 +25,7 @@ The most significant differences are documented here:
 MiniJinja does not implement _any_ Python methods.  In particular this means
 you cannot do `x.items()` to iterate over items.  For this particular case
 both Jinja2 and MiniJinja now support `|items` for iteration instead.  Other
-methods are rareful useful and filters should be used instead.
+methods are rarely useful and filters should be used instead.
 
 ### Tuples
 

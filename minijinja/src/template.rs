@@ -168,7 +168,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// This evaluates the template, discards the output and returns the final
     /// `State` for introspection.  From there global variables or blocks
     /// can be accessed.  What this does is quite similar to how the engine
-    /// interally works with tempaltes that are extended or imported from.
+    /// internally works with templates that are extended or imported from.
     ///
     /// ```
     /// # use minijinja::{Environment, context};
@@ -264,7 +264,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ///
     /// For templates loaded as string on the environment this API contract
     /// cannot be upheld because the template might not live long enough.  Under
-    /// normal cirumstances however such a template object would never make it
+    /// normal circumstances however such a template object would never make it
     /// to the callers of this API as this API is used for including or extending,
     /// both of which should only ever get access to a template from the environment
     /// which holds a borrowed ref.
