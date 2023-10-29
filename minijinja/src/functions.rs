@@ -95,7 +95,7 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 /// The parameters can be marked optional by using `Option<T>`.  The last
 /// argument can also use [`Rest<T>`](crate::value::Rest) to capture the
 /// remaining arguments.  All types are supported for which
-/// [`ArgType`](crate::value::ArgType) is implemented.
+/// [`ArgType`] is implemented.
 ///
 /// For a list of built-in functions see [`functions`](crate::functions).
 ///
@@ -103,8 +103,7 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 /// functionality of [`add_function`](crate::Environment::add_function)
 /// and [`from_function`](crate::value::Value::from_function).  If you want
 /// to implement a custom callable, you can directly implement
-/// [`Object::call`](crate::value::Object::call) which is what the engine
-/// actually uses internally.
+/// [`Object::call`] which is what the engine actually uses internally.
 ///
 /// # Basic Example
 ///
