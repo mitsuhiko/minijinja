@@ -13,9 +13,8 @@
 //! This crate provides a solution to this issue by moving lifetime checks to the
 //! runtime for MiniJinja objects.  One first needs to create a [`Scope`] with
 //! the [`scope`] function.  It invokes a callback to which a scope is passed
-//! which in turn then provides functionality to create
-//! [`Value`](minijinja::value::Value)s to those borrowed values such as the
-//! [`object_ref`](crate::Scope::object_ref) method.
+//! which in turn then provides functionality to create [`Value`]s to those
+//! borrowed values such as the [`object_ref`](crate::Scope::object_ref) method.
 //!
 //! # Example
 //!

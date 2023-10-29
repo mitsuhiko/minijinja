@@ -48,9 +48,8 @@
 //! # Accessing State
 //!
 //! In some cases it can be necessary to access the execution [`State`].  Since a borrowed
-//! state implements [`ArgType`](crate::value::ArgType) it's possible to add a
-//! parameter that holds the state.  For instance the following filter appends
-//! the current template name to the string:
+//! state implements [`ArgType`] it's possible to add a parameter that holds the state.
+//! For instance the following filter appends the current template name to the string:
 //!
 //! ```
 //! # use minijinja::Environment;
@@ -105,7 +104,7 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// applied to and up to 4 extra parameters.  The extra parameters can be
 /// marked optional by using `Option<T>`.  The last argument can also use
 /// [`Rest<T>`](crate::value::Rest) to capture the remaining arguments.  All
-/// types are supported for which [`ArgType`](crate::value::ArgType) is implemented.
+/// types are supported for which [`ArgType`] is implemented.
 ///
 /// For a list of built-in filters see [`filters`](crate::filters).
 ///

@@ -1070,7 +1070,7 @@ impl Value {
     /// have to use [`call_method`](Self::call_method).
     ///
     /// The `args` slice is for the arguments of the function call.  To pass
-    /// keyword arguments use the [`Kwargs`](crate::value::Kwargs) type.
+    /// keyword arguments use the [`Kwargs`] type.
     ///
     /// Usually the state is already available when it's useful to call this method,
     /// but when it's not available you can get a fresh template state straight
