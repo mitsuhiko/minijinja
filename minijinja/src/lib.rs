@@ -146,7 +146,7 @@
 //!     the `loop` object no longer exist.  Removing this feature can provide faster
 //!     template execution when a lot of loops are involved.
 //!   - `unicode`: when added unicode identifiers are supported and the `sort`
-//!     filter's case insensitive comparision changes to using unicode and not
+//!     filter's case insensitive comparison changes to using unicode and not
 //!     ASCII rules.  Without this features only ASCII identifiers can be used
 //!     for variable names and attributes.
 //!
