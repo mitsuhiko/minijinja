@@ -147,7 +147,7 @@ impl<'source> Environment<'source> {
         self.templates.insert(name, source)
     }
 
-    /// Adds a template without without borrowing.
+    /// Adds a template without borrowing.
     ///
     /// This lets you place an owned [`String`] in the environment rather than the
     /// borrowed `&str` without having to worry about lifetimes.
