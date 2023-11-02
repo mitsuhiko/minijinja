@@ -528,7 +528,7 @@ some minor exceptions be rather trivial changes.
 - Added custom formatters.
 - Restructured engine internals for greater clarity.
 - Added support for rendering to `io::Write`.  (#111)
-- Make it impossible to implement `Fitler`, `Test` or `Function`
+- Make it impossible to implement `Filter`, `Test` or `Function`
   from outside the crate by sealed the traits.  (#113)
 - Added support for remaining arguments with `Rest`.  (#114)
 - Filters, tests and functions can now borrow arguments.  (#115)

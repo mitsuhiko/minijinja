@@ -44,7 +44,7 @@ pub fn run(mut env: Environment, ctx: Value) -> Result<(), Error> {
                         println!("Commands:");
                         println!(".quit / .exit  quit the REPL");
                         println!(".help          shows this help");
-                        println!(".set x=expr    set variable x to the evaluted expression");
+                        println!(".set x=expr    set variable x to the evaluated expression");
                         println!(".unset x       unsets variable x");
                         println!(".render tmpl   renders the given template source");
                     }

@@ -147,7 +147,7 @@ env.add_filter("add_a_variable", my_filter)
 ## Runtime Behavior
 
 MiniJinja uses it's own runtime model which is not matching the Python
-runtime model.  As a result there are clear gaps in beahvior between the
+runtime model.  As a result there are clear gaps in behavior between the
 two and only limited effort is made to bridge them.  For instance you will
 be able to call some methods of types, but for instance builtins such as
 dicts and lists do not expose their methods on the MiniJinja side.  This
