@@ -1,5 +1,5 @@
 #![cfg(all(
-    feature = "multi-template",
+    feature = "multi_template",
     feature = "macros",
     feature = "builtins",
     feature = "adjacent_loop_items"

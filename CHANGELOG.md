@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.10
+
+- Added `int` and `float` filters.  #372
+
 ## 1.0.9
 
 - Fixed a memory leak involving macros.  Previously using macros was
