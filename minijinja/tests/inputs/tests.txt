@@ -22,6 +22,10 @@ none: {{ none is none }}
 not-none: {{ 42 is not none }}
 number-int: {{ two is number }}
 number-float: {{ two_dot_two is number }}
+integer-int: {{ 42 is integer }}
+integer-float: {{ 42.0 is integer }}
+float-int: {{ 42 is float }}
+float-float: {{ 42.0 is float }}
 not-seq: {{ two is sequence }}
 seq: {{ seq is sequence }}
 not-map: {{ two is mapping }}

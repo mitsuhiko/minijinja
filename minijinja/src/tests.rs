@@ -275,6 +275,34 @@ mod builtins {
         matches!(v.kind(), ValueKind::Number)
     }
 
+    /// Checks if this value is an integer.
+    ///
+    /// ```jinja
+    /// {{ 42 is integer }} -> true
+    /// {{ 42.0 is integer }} -> false
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn is_integer(v: Value) -> bool {
+        matches!(
+            v.0,
+            crate::value::ValueRepr::U64(_)
+                | crate::value::ValueRepr::I64(_)
+                | crate::value::ValueRepr::U128(_)
+                | crate::value::ValueRepr::I128(_)
+        )
+    }
+
+    /// Checks if this value is a float
+    ///
+    /// ```jinja
+    /// {{ 42 is float }} -> false
+    /// {{ 42.0 is float }} -> true
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn is_float(v: Value) -> bool {
+        matches!(v.0, crate::value::ValueRepr::F64(_))
+    }
+
     /// Checks if this value is a string.
     ///
     /// ```jinja
