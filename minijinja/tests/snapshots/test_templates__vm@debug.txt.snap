@@ -53,6 +53,7 @@ State {
             "greaterthan",
             "gt",
             "in",
+            "int",
             "integer",
             "le",
             "lessthan",
