@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## 1.0.10
 
 - Added `int` and `float` filters.  #372
+- Added `integer` and `float` tests.  #373
 
 ## 1.0.9
 

@@ -124,6 +124,7 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
         rv.insert("even".into(), BoxedTest::new(tests::is_even));
         rv.insert("number".into(), BoxedTest::new(tests::is_number));
         rv.insert("integer".into(), BoxedTest::new(tests::is_integer));
+        rv.insert("int".into(), BoxedTest::new(tests::is_integer));
         rv.insert("float".into(), BoxedTest::new(tests::is_float));
         rv.insert("string".into(), BoxedTest::new(tests::is_string));
         rv.insert("sequence".into(), BoxedTest::new(tests::is_sequence));
