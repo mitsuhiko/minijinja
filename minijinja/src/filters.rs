@@ -255,6 +255,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
+    use crate::value::ops::as_f64;
     use crate::value::{Kwargs, ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::cmp::Ordering;
@@ -566,6 +567,75 @@ mod builtins {
                 ErrorKind::InvalidOperation,
                 "cannot get absolute value",
             )),
+        }
+    }
+
+    /// Converts a value into an integer.
+    ///
+    /// ```jinja
+    /// {{ "42"|int == 42 }} -> true
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn int(value: Value) -> Result<Value, Error> {
+        match &value.0 {
+            ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(0)),
+            ValueRepr::Bool(x) => Ok(Value::from(*x as u64)),
+            ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::U128(_) | ValueRepr::I128(_) => {
+                Ok(value)
+            }
+            ValueRepr::F64(v) => {
+                let x = *v as i128;
+                if x as f64 == *v {
+                    Ok(Value::from(x))
+                } else {
+                    Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("cannot convert float {} to integer", v),
+                    ))
+                }
+            }
+            ValueRepr::String(s, _) => s
+                .parse::<i128>()
+                .map(Value::from)
+                .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
+            ValueRepr::Bytes(_)
+            | ValueRepr::Seq(_)
+            | ValueRepr::Map(_, _)
+            | ValueRepr::Dynamic(_) => Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!("cannot convert {} to integer", value.kind()),
+            )),
+            ValueRepr::Invalid(ref x) => Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!("invalid value: {}", x),
+            )),
+        }
+    }
+
+    /// Converts a value into a float.
+    ///
+    /// ```jinja
+    /// {{ "42.5"|float == 42.5 }} -> true
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn float(value: Value) -> Result<Value, Error> {
+        match &value.0 {
+            ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(0.0)),
+            ValueRepr::Bool(x) => Ok(Value::from(*x as u64 as f64)),
+            ValueRepr::String(s, _) => s
+                .parse::<f64>()
+                .map(Value::from)
+                .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
+            ValueRepr::Invalid(ref x) => Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!("invalid value: {}", x),
+            )),
+            _ => as_f64(&value).map(Value::from).ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("cannot convert {} to float", value.kind()),
+                )
+            }),
         }
     }
 
