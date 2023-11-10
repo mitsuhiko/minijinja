@@ -8,6 +8,7 @@ All notable changes to MiniJinja are documented here.
 - Added `integer` and `float` tests.  #373
 - Fixed an issue that caused the CLI not to run when the `repl` feature
   was disabled.  #374
+- Added `-n` / `--no-newline` option to CLI.  #375
 
 ## 1.0.9
 

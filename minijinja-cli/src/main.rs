@@ -203,6 +203,7 @@ fn make_command() -> Command {
                 .action(ArgAction::Append),
             arg!(--strict "disallow undefined variables in templates"),
             arg!(--"no-include" "Disallow includes and extending"),
+            arg!(--"no-newline" "Do not output a newline"),
             arg!(--env "Pass environment variables as ENV to the template"),
             arg!(-E --expr <EXPR> "Evaluates an expression instead"),
             arg!(--"expr-out" <MODE> "Sets the expression output mode")
@@ -256,6 +257,8 @@ fn execute() -> Result<i32, Error> {
         None
     };
 
+    let no_newline = matches.get_flag("no-newline");
+
     let env = create_env(&matches, cwd, allowed_template, stdin_used);
 
     if let Some(expr) = matches.get_one::<String>("expr") {
@@ -305,7 +308,12 @@ fn execute() -> Result<i32, Error> {
             repl::run(env, ctx)?;
         }
     } else {
-        println!("{}", env.get_template(&template)?.render(ctx)?);
+        let result = env.get_template(&template)?.render(ctx)?;
+        if no_newline {
+            print!("{result}");
+        } else {
+            println!("{result}");
+        }
     }
 
     Ok(0)
