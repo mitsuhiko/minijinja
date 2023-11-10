@@ -6,6 +6,8 @@ All notable changes to MiniJinja are documented here.
 
 - Added `int` and `float` filters.  #372
 - Added `integer` and `float` tests.  #373
+- Fixed an issue that caused the CLI not to run when the `repl` feature
+  was disabled.  #374
 
 ## 1.0.9
 
