@@ -302,7 +302,7 @@ fn execute() -> Result<i32, Error> {
             }
             _ => unreachable!(),
         }
-    } else if matches.get_flag("repl") {
+    } else if cfg!(feature = "repl") && matches.get_flag("repl") {
         #[cfg(feature = "repl")]
         {
             repl::run(env, ctx)?;
