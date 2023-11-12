@@ -102,6 +102,21 @@ jobs:
       - name: Test
         run: make test
 
+  test-no-lock:
+    name: Test on Latest (No Lock)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mozilla-actions/sccache-action@v0.0.3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - name: Remove Cargo.lock
+        run: rm Cargo.lock
+      - name: Test
+        run: make test
+
   test-wasi:
     name: Test on WASI
     runs-on: ubuntu-latest
