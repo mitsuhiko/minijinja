@@ -2,10 +2,6 @@ name: Tests
 
 on: [push, pull_request]
 
-env:
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
-
 jobs:
   test-latest:
     name: Test on Latest Stable
@@ -13,10 +9,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
+      - uses: Swatinem/rust-cache@v2
       - name: Check
         run: make check
       - name: Test
@@ -28,10 +24,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
+      - uses: Swatinem/rust-cache@v2
       - name: Check
         run: make check
       - name: Test
@@ -60,11 +56,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.61.0
           targets: armv5te-unknown-linux-gnueabi
+      - uses: Swatinem/rust-cache@v2
       - name: Install Cross Deps
         run: sudo apt-get install -y gcc-arm-linux-gnueabi libc6-dev-armel-cross
       - name: Restore Cargo.lock
@@ -78,10 +74,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.61.0
+      - uses: Swatinem/rust-cache@v2
       - name: Restore Cargo.lock
         run: cp Cargo.lock.msrv Cargo.lock
       - name: Check
@@ -93,10 +89,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.61.0
+      - uses: Swatinem/rust-cache@v2
       - name: Restore Cargo.lock
         run: cp Cargo.lock.msrv Cargo.lock
       - name: Test
@@ -108,10 +104,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
+      - uses: Swatinem/rust-cache@v2
       - name: Remove Cargo.lock
         run: rm Cargo.lock
       - name: Test
@@ -123,11 +119,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
           targets: wasm32-wasi
+      - uses: Swatinem/rust-cache@v2
       - name: Install WasmTime
         run: |
           curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/v13.0.0/wasmtime-v13.0.0-x86_64-linux.tar.xz
@@ -142,9 +138,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
+      - uses: Swatinem/rust-cache@v2
       - name: Test
         run: make python-test
