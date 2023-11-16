@@ -2,17 +2,13 @@ name: Clippy
 
 on: [push, pull_request]
 
-env:
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
-
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-      - uses: mozilla-actions/sccache-action@v0.0.3
+      - uses: Swatinem/rust-cache@v2
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
