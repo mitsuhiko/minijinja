@@ -185,6 +185,12 @@
 //!   cuts down on memory usage slightly in certain scenarios by interning all string
 //!   keys used in dynamic map values.
 //!
+//! Internals:
+//!
+//! - `unstable_machinery`: exposes an unstable internal API (no semver guarantees) to parse
+//!   templates and interact with the engine internals.  If you need this functionality, please
+//!   leave some feedback on GitHub.
+//!
 //! </details>
 #![allow(clippy::cognitive_complexity)]
 #![allow(clippy::get_first)]
