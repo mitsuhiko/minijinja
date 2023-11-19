@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.11
+
+- Added `Environment::compile_expression_owned` to allow compiled expressions
+  to be held without requiring a reference.  #383
+
 ## 1.0.10
 
 - Added `int` and `float` filters.  #372

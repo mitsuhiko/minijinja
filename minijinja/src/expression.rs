@@ -36,7 +36,13 @@ use crate::vm::Vm;
 /// ```
 pub struct Expression<'env, 'source> {
     env: &'env Environment<'source>,
-    instructions: Instructions<'source>,
+    instr: ExpressionBacking<'source>,
+}
+
+enum ExpressionBacking<'source> {
+    Borrowed(Instructions<'source>),
+    #[cfg(feature = "loader")]
+    Owned(crate::loader::OwnedInstructions),
 }
 
 impl<'env, 'source> fmt::Debug for Expression<'env, 'source> {
@@ -52,7 +58,29 @@ impl<'env, 'source> Expression<'env, 'source> {
         env: &'env Environment<'source>,
         instructions: Instructions<'source>,
     ) -> Expression<'env, 'source> {
-        Expression { env, instructions }
+        Expression {
+            env,
+            instr: ExpressionBacking::Borrowed(instructions),
+        }
+    }
+
+    #[cfg(feature = "loader")]
+    pub(crate) fn new_owned(
+        env: &'env Environment<'source>,
+        instructions: crate::loader::OwnedInstructions,
+    ) -> Expression<'env, 'source> {
+        Expression {
+            env,
+            instr: ExpressionBacking::Owned(instructions),
+        }
+    }
+
+    fn instructions(&self) -> &Instructions<'_> {
+        match self.instr {
+            ExpressionBacking::Borrowed(ref x) => x,
+            #[cfg(feature = "loader")]
+            ExpressionBacking::Owned(ref x) => x.borrow_dependent(),
+        }
     }
 
     /// Evaluates the expression with some context.
@@ -69,7 +97,7 @@ impl<'env, 'source> Expression<'env, 'source> {
     /// This works the same as
     /// [`Template::undeclared_variables`](crate::Template::undeclared_variables).
     pub fn undeclared_variables(&self, nested: bool) -> HashSet<String> {
-        match parse_expr(self.instructions.source(), SyntaxConfig::default()) {
+        match parse_expr(self.instructions().source(), SyntaxConfig::default()) {
             Ok(expr) => find_undeclared(
                 &ast::Stmt::EmitExpr(ast::Spanned::new(
                     ast::EmitExpr { expr },
@@ -83,7 +111,7 @@ impl<'env, 'source> Expression<'env, 'source> {
 
     fn _eval(&self, root: Value) -> Result<Value, Error> {
         Ok(ok!(Vm::new(self.env).eval(
-            &self.instructions,
+            self.instructions(),
             root,
             &BTreeMap::new(),
             &mut Output::null(),
