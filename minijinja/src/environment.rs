@@ -6,6 +6,7 @@ use std::sync::Arc;
 use serde::Serialize;
 
 use crate::compiler::codegen::CodeGenerator;
+use crate::compiler::instructions::Instructions;
 use crate::compiler::lexer::SyntaxConfig;
 use crate::compiler::parser::parse_expr;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
@@ -568,15 +569,35 @@ impl<'source> Environment<'source> {
     /// be used as a minimal scripting language.  For more information and an
     /// example see [`Expression`].
     pub fn compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
-        attach_basic_debug_info(self._compile_expression(expr), expr)
+        self._compile_expression(expr)
+            .map(|instr| Expression::new(self, instr))
     }
 
-    fn _compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
-        let ast = ok!(parse_expr(expr, self._syntax_config().clone()));
-        let mut gen = CodeGenerator::new("<expression>", expr);
-        gen.compile_expr(&ast);
-        let (instructions, _) = gen.finish();
-        Ok(Expression::new(self, instructions))
+    /// Compiles an expression without capturing the lifetime.
+    ///
+    /// This works exactly like [`compile_expression`](Self::compile_expression) but
+    /// lets you pass an owned string without capturing the lifetime.
+    #[cfg(feature = "loader")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "loader")))]
+    pub fn compile_expression_owned<E>(&self, expr: E) -> Result<Expression<'_, 'source>, Error>
+    where
+        E: Into<Cow<'source, str>>,
+    {
+        crate::loader::OwnedInstructions::try_new(Box::from(expr.into()), |expr| {
+            self._compile_expression(expr)
+        })
+        .map(|instr| Expression::new_owned(self, instr))
+    }
+
+    fn _compile_expression<'expr>(&self, expr: &'expr str) -> Result<Instructions<'expr>, Error> {
+        attach_basic_debug_info(
+            parse_expr(expr, self._syntax_config().clone()).map(|ast| {
+                let mut gen = CodeGenerator::new("<expression>", expr);
+                gen.compile_expr(&ast);
+                gen.finish().0
+            }),
+            expr,
+        )
     }
 
     /// Adds a new filter function.

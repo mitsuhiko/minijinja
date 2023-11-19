@@ -10,6 +10,7 @@ use std::sync::Arc;
 use memo_map::MemoMap;
 use self_cell::self_cell;
 
+use crate::compiler::instructions::Instructions;
 use crate::compiler::lexer::SyntaxConfig;
 use crate::error::{Error, ErrorKind};
 use crate::template::CompiledTemplate;
@@ -51,6 +52,14 @@ self_cell! {
         owner: (Arc<str>, Box<str>),
         #[covariant]
         dependent: CompiledTemplate,
+    }
+}
+
+self_cell! {
+    pub(crate) struct OwnedInstructions {
+        owner: Box<str>,
+        #[covariant]
+        dependent: Instructions,
     }
 }
 

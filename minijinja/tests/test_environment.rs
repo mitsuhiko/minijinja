@@ -28,6 +28,19 @@ fn test_expression() {
 }
 
 #[test]
+#[cfg(feature = "loader")]
+fn test_expression_owned() {
+    let env = Environment::new();
+    let expr: minijinja::Expression<'_, 'static> = env
+        .compile_expression_owned("foo + bar".to_string())
+        .unwrap();
+    let mut ctx = BTreeMap::new();
+    ctx.insert("foo", 42);
+    ctx.insert("bar", 23);
+    assert_eq!(expr.eval(&ctx).unwrap(), Value::from(65));
+}
+
+#[test]
 fn test_expression_bug() {
     let env = Environment::new();
     assert!(env.compile_expression("42.blahadsf()").is_err());
