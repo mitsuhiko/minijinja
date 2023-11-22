@@ -17,6 +17,30 @@ use crate::utils::AutoEscape;
 use crate::value::{self, Value};
 use crate::vm::{prepare_blocks, Context, State, Vm};
 
+/// Callback for auto escape determination
+pub type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
+
+/// Internal struct that holds template loading level config values.
+#[derive(Clone)]
+pub struct TemplateConfig {
+    /// The syntax used for the template.
+    pub syntax_config: SyntaxConfig,
+    /// Controls the retaining of the final newline.
+    pub keep_trailing_newline: bool,
+    /// The callback that determines the initial auto escaping for templates.
+    pub default_auto_escape: Arc<AutoEscapeFunc>,
+}
+
+impl TemplateConfig {
+    pub(crate) fn new(default_auto_escape: Arc<AutoEscapeFunc>) -> TemplateConfig {
+        TemplateConfig {
+            syntax_config: SyntaxConfig::default(),
+            keep_trailing_newline: false,
+            default_auto_escape,
+        }
+    }
+}
+
 /// Represents a handle to a template.
 ///
 /// Templates are stored in the [`Environment`] as bytecode instructions.  With the
@@ -28,7 +52,6 @@ use crate::vm::{prepare_blocks, Context, State, Vm};
 pub struct Template<'env: 'source, 'source> {
     env: &'env Environment<'env>,
     pub(crate) compiled: CompiledTemplateRef<'env, 'source>,
-    initial_auto_escape: AutoEscape,
 }
 
 impl<'env, 'source> fmt::Debug for Template<'env, 'source> {
@@ -40,7 +63,7 @@ impl<'env, 'source> fmt::Debug for Template<'env, 'source> {
             ds.field("instructions", &self.compiled.instructions);
             ds.field("blocks", &self.compiled.blocks);
         }
-        ds.field("initial_auto_escape", &self.initial_auto_escape);
+        ds.field("initial_auto_escape", &self.compiled.initial_auto_escape);
         ds.finish()
     }
 }
@@ -49,13 +72,8 @@ impl<'env, 'source> Template<'env, 'source> {
     pub(crate) fn new(
         env: &'env Environment<'env>,
         compiled: CompiledTemplateRef<'env, 'source>,
-        initial_auto_escape: AutoEscape,
     ) -> Template<'env, 'source> {
-        Template {
-            env,
-            compiled,
-            initial_auto_escape,
-        }
+        Template { env, compiled }
     }
 
     /// Returns the name of the template.
@@ -193,7 +211,7 @@ impl<'env, 'source> Template<'env, 'source> {
             root,
             &self.compiled.blocks,
             &mut out,
-            self.initial_auto_escape,
+            self.compiled.initial_auto_escape,
         ))
         .1;
         Ok(state)
@@ -209,7 +227,7 @@ impl<'env, 'source> Template<'env, 'source> {
             root,
             &self.compiled.blocks,
             out,
-            self.initial_auto_escape,
+            self.compiled.initial_auto_escape,
         )
     }
 
@@ -236,7 +254,7 @@ impl<'env, 'source> Template<'env, 'source> {
         match parse_with_syntax(
             self.compiled.instructions.source(),
             self.name(),
-            self.compiled.syntax.clone(),
+            self.compiled.syntax_config.clone(),
             true,
         ) {
             Ok(ast) => find_undeclared(&ast, nested),
@@ -253,7 +271,7 @@ impl<'env, 'source> Template<'env, 'source> {
         State::new(
             self.env,
             Context::new(self.env.recursion_limit()),
-            self.initial_auto_escape,
+            self.compiled.initial_auto_escape,
             &self.compiled.instructions,
             prepare_blocks(&self.compiled.blocks),
         )
@@ -290,7 +308,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// Returns the initial auto escape setting.
     #[cfg(feature = "multi_template")]
     pub(crate) fn initial_auto_escape(&self) -> AutoEscape {
-        self.initial_auto_escape
+        self.compiled.initial_auto_escape
     }
 }
 
@@ -320,7 +338,9 @@ pub struct CompiledTemplate<'source> {
     /// Optional size hint for string rendering.
     pub buffer_size_hint: usize,
     /// The syntax config that created it.
-    pub syntax: SyntaxConfig,
+    pub syntax_config: SyntaxConfig,
+    /// The initial setting of auto escaping.
+    pub initial_auto_escape: AutoEscape,
 }
 
 impl<'env> fmt::Debug for CompiledTemplate<'env> {
@@ -340,20 +360,15 @@ impl<'source> CompiledTemplate<'source> {
     pub fn new(
         name: &'source str,
         source: &'source str,
-        syntax: SyntaxConfig,
-        keep_trailing_newline: bool,
+        config: &TemplateConfig,
     ) -> Result<CompiledTemplate<'source>, Error> {
-        attach_basic_debug_info(
-            Self::_new_impl(name, source, syntax, keep_trailing_newline),
-            source,
-        )
+        attach_basic_debug_info(Self::_new_impl(name, source, config), source)
     }
 
     fn _new_impl(
         name: &'source str,
         source: &'source str,
-        syntax: SyntaxConfig,
-        keep_trailing_newline: bool,
+        config: &TemplateConfig,
     ) -> Result<CompiledTemplate<'source>, Error> {
         // the parser/compiler combination can create constants in which case
         // we can probably benefit from the value optimization a bit.
@@ -361,8 +376,8 @@ impl<'source> CompiledTemplate<'source> {
         let ast = ok!(parse_with_syntax(
             source,
             name,
-            syntax.clone(),
-            keep_trailing_newline
+            config.syntax_config.clone(),
+            config.keep_trailing_newline
         ));
         let mut gen = CodeGenerator::new(name, source);
         gen.compile_stmt(&ast);
@@ -372,7 +387,8 @@ impl<'source> CompiledTemplate<'source> {
             instructions,
             blocks,
             buffer_size_hint,
-            syntax,
+            syntax_config: config.syntax_config.clone(),
+            initial_auto_escape: (config.default_auto_escape)(name),
         })
     }
 }

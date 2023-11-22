@@ -12,13 +12,12 @@ use crate::compiler::parser::parse_expr;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::expression::Expression;
 use crate::output::Output;
-use crate::template::{CompiledTemplate, CompiledTemplateRef, Template};
+use crate::template::{CompiledTemplate, CompiledTemplateRef, Template, TemplateConfig};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
 use crate::value::{FunctionArgs, FunctionResult, Value};
 use crate::vm::State;
 use crate::{defaults, filters, functions, tests};
 
-type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
 type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + Sync + Send;
 type PathJoinFunc = dyn for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Sync + Send;
 
@@ -50,7 +49,6 @@ pub struct Environment<'source> {
     filters: BTreeMap<Cow<'source, str>, filters::BoxedFilter>,
     tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
     globals: BTreeMap<Cow<'source, str>, Value>,
-    default_auto_escape: Arc<AutoEscapeFunc>,
     path_join_callback: Option<Arc<PathJoinFunc>>,
     undefined_behavior: UndefinedBehavior,
     formatter: Arc<FormatterFunc>,
@@ -87,11 +85,12 @@ impl<'source> Environment<'source> {
     /// [`empty`](Environment::empty) method.
     pub fn new() -> Environment<'source> {
         Environment {
-            templates: TemplateStore::default(),
+            templates: TemplateStore::new(TemplateConfig::new(Arc::new(
+                defaults::default_auto_escape_callback,
+            ))),
             filters: defaults::get_builtin_filters(),
             tests: defaults::get_builtin_tests(),
             globals: defaults::get_globals(),
-            default_auto_escape: Arc::new(defaults::default_auto_escape_callback),
             path_join_callback: None,
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
@@ -109,11 +108,10 @@ impl<'source> Environment<'source> {
     /// logic for auto escaping configured.
     pub fn empty() -> Environment<'source> {
         Environment {
-            templates: TemplateStore::default(),
+            templates: TemplateStore::new(TemplateConfig::new(Arc::new(defaults::no_auto_escape))),
             filters: Default::default(),
             tests: Default::default(),
             globals: Default::default(),
-            default_auto_escape: Arc::new(defaults::no_auto_escape),
             path_join_callback: None,
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
@@ -213,12 +211,12 @@ impl<'source> Environment<'source> {
     /// The default is `false`, which causes a single newline, if present, to be
     /// stripped from the end of the template.
     pub fn set_keep_trailing_newline(&mut self, yes: bool) {
-        self.templates.keep_trailing_newline = yes;
+        self.templates.template_config.keep_trailing_newline = yes;
     }
 
     /// Returns the value of the trailing newline preservation flag.
     pub fn keep_trailing_newline(&self) -> bool {
-        self.templates.keep_trailing_newline
+        self.templates.template_config.keep_trailing_newline
     }
 
     /// Removes a template by name.
@@ -281,11 +279,7 @@ impl<'source> Environment<'source> {
     /// ```
     pub fn get_template(&self, name: &str) -> Result<Template<'_, '_>, Error> {
         let compiled = ok!(self.templates.get(name));
-        Ok(Template::new(
-            self,
-            CompiledTemplateRef::Borrowed(compiled),
-            self.initial_auto_escape(name),
-        ))
+        Ok(Template::new(self, CompiledTemplateRef::Borrowed(compiled)))
     }
 
     /// Loads a template from a string.
@@ -310,10 +304,8 @@ impl<'source> Environment<'source> {
             CompiledTemplateRef::Owned(Arc::new(ok!(CompiledTemplate::new(
                 name,
                 source,
-                self._syntax_config().clone(),
-                self.keep_trailing_newline(),
+                &self.templates.template_config,
             )))),
-            self.initial_auto_escape(name),
         ))
     }
 
@@ -394,7 +386,7 @@ impl<'source> Environment<'source> {
     where
         F: Fn(&str) -> AutoEscape + 'static + Sync + Send,
     {
-        self.default_auto_escape = Arc::new(f);
+        self.templates.template_config.default_auto_escape = Arc::new(f);
     }
 
     /// Changes the undefined behavior.
@@ -514,7 +506,7 @@ impl<'source> Environment<'source> {
     #[cfg(feature = "custom_syntax")]
     #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
     pub fn set_syntax(&mut self, syntax: crate::custom_syntax::Syntax) -> Result<(), Error> {
-        self.templates.syntax_config = ok!(syntax.compile());
+        self.templates.template_config.syntax_config = ok!(syntax.compile());
         Ok(())
     }
 
@@ -526,7 +518,7 @@ impl<'source> Environment<'source> {
     }
 
     fn _syntax_config(&self) -> &SyntaxConfig {
-        &self.templates.syntax_config
+        &self.templates.template_config.syntax_config
     }
 
     /// Reconfigures the runtime recursion limit.
@@ -697,7 +689,7 @@ impl<'source> Environment<'source> {
     }
 
     pub(crate) fn initial_auto_escape(&self, name: &str) -> AutoEscape {
-        (self.default_auto_escape)(name)
+        (self.templates.template_config.default_auto_escape)(name)
     }
 
     /// Formats a value into the final format.
@@ -729,12 +721,13 @@ impl<'source> Environment<'source> {
 
 #[cfg(not(feature = "loader"))]
 mod basic_store {
+    use crate::template::TemplateConfig;
+
     use super::*;
 
-    #[derive(Clone, Default)]
-    pub struct BasicStore<'source> {
-        pub syntax_config: SyntaxConfig,
-        pub keep_trailing_newline: bool,
+    #[derive(Clone)]
+    pub(crate) struct BasicStore<'source> {
+        pub template_config: TemplateConfig,
         map: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
     }
 
@@ -745,14 +738,20 @@ mod basic_store {
     }
 
     impl<'source> BasicStore<'source> {
+        pub fn new(template_config: TemplateConfig) -> BasicStore<'source> {
+            BasicStore {
+                template_config,
+                map: BTreeMap::default(),
+            }
+        }
+
         pub fn insert(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
             self.map.insert(
                 name,
                 Arc::new(ok!(CompiledTemplate::new(
                     name,
                     source,
-                    self.syntax_config.clone(),
-                    self.keep_trailing_newline
+                    &self.template_config
                 ))),
             );
             Ok(())

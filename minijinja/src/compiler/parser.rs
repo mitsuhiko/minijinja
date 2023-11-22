@@ -100,8 +100,9 @@ struct TokenStream<'a> {
 
 impl<'a> TokenStream<'a> {
     /// Tokenize a template
-    pub fn new(source: &'a str, in_expr: bool, syntax: SyntaxConfig) -> TokenStream<'a> {
-        let mut iter = Box::new(tokenize(source, in_expr, syntax)) as Box<dyn Iterator<Item = _>>;
+    pub fn new(source: &'a str, in_expr: bool, syntax_config: SyntaxConfig) -> TokenStream<'a> {
+        let mut iter =
+            Box::new(tokenize(source, in_expr, syntax_config)) as Box<dyn Iterator<Item = _>>;
         let current = iter.next();
         TokenStream {
             iter,
@@ -221,9 +222,9 @@ macro_rules! with_recursion_guard {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(source: &'a str, in_expr: bool, syntax: SyntaxConfig) -> Parser<'a> {
+    pub fn new(source: &'a str, in_expr: bool, syntax_config: SyntaxConfig) -> Parser<'a> {
         Parser {
-            stream: TokenStream::new(source, in_expr, syntax),
+            stream: TokenStream::new(source, in_expr, syntax_config),
             in_macro: false,
             blocks: BTreeSet::new(),
             depth: 0,
@@ -1115,7 +1116,7 @@ pub fn parse<'source>(source: &'source str, filename: &str) -> Result<ast::Stmt<
 pub fn parse_with_syntax<'source>(
     source: &'source str,
     filename: &str,
-    syntax: SyntaxConfig,
+    syntax_config: SyntaxConfig,
     keep_trailing_newline: bool,
 ) -> Result<ast::Stmt<'source>, Error> {
     // we want to chop off a single newline at the end.  This means that a template
@@ -1132,7 +1133,7 @@ pub fn parse_with_syntax<'source>(
         }
     }
 
-    let mut parser = Parser::new(source, false, syntax);
+    let mut parser = Parser::new(source, false, syntax_config);
     parser.parse().map_err(|mut err| {
         if err.line().is_none() {
             err.set_filename_and_span(filename, parser.stream.last_span())
@@ -1142,8 +1143,8 @@ pub fn parse_with_syntax<'source>(
 }
 
 /// Parses an expression
-pub fn parse_expr(source: &str, syntax: SyntaxConfig) -> Result<ast::Expr<'_>, Error> {
-    let mut parser = Parser::new(source, true, syntax);
+pub fn parse_expr(source: &str, syntax_config: SyntaxConfig) -> Result<ast::Expr<'_>, Error> {
+    let mut parser = Parser::new(source, true, syntax_config);
     parser
         .parse_expr()
         .and_then(|result| {
