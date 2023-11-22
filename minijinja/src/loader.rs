@@ -11,9 +11,9 @@ use memo_map::MemoMap;
 use self_cell::self_cell;
 
 use crate::compiler::instructions::Instructions;
-use crate::compiler::lexer::SyntaxConfig;
 use crate::error::{Error, ErrorKind};
 use crate::template::CompiledTemplate;
+use crate::template::TemplateConfig;
 
 type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<Option<String>, Error> + Send + Sync;
 
@@ -23,10 +23,9 @@ type LoadFunc = dyn for<'a> Fn(&'a str) -> Result<Option<String>, Error> + Send 
 /// source lifetime it borrows templates from, it becomes very inconvenient when
 /// it is shared. This object provides a solution for such cases. First templates
 /// are loaded into the source to decouple the lifetimes from the environment.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(crate) struct LoaderStore<'source> {
-    pub syntax_config: SyntaxConfig,
-    pub keep_trailing_newline: bool,
+    pub template_config: TemplateConfig,
     loader: Option<Arc<LoadFunc>>,
     owned_templates: MemoMap<Arc<str>, Arc<LoadedTemplate>>,
     borrowed_templates: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
@@ -70,6 +69,15 @@ impl fmt::Debug for LoadedTemplate {
 }
 
 impl<'source> LoaderStore<'source> {
+    pub fn new(template_config: TemplateConfig) -> LoaderStore<'source> {
+        LoaderStore {
+            template_config,
+            loader: None,
+            owned_templates: MemoMap::default(),
+            borrowed_templates: BTreeMap::default(),
+        }
+    }
+
     pub fn insert(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
         self.insert_cow(Cow::Borrowed(name), Cow::Borrowed(source))
     }
@@ -87,8 +95,7 @@ impl<'source> LoaderStore<'source> {
                     Arc::new(ok!(CompiledTemplate::new(
                         name,
                         source,
-                        self.syntax_config.clone(),
-                        self.keep_trailing_newline
+                        &self.template_config
                     ))),
                 );
             }
@@ -148,12 +155,7 @@ impl<'source> LoaderStore<'source> {
         LoadedTemplate::try_new(
             (name, source.into_boxed_str()),
             |(name, source)| -> Result<_, Error> {
-                CompiledTemplate::new(
-                    name,
-                    source,
-                    self.syntax_config.clone(),
-                    self.keep_trailing_newline,
-                )
+                CompiledTemplate::new(name, source, &self.template_config)
             },
         )
         .map(Arc::new)
