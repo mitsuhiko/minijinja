@@ -22,7 +22,7 @@ impl StructObject for DynamicContext {
 
     /// This implementation is not needed for the example.  However
     /// returning known keys here has the benefit that `{{ debug() }}`
-    /// can how the context.
+    /// can show the context.
     fn static_fields(&self) -> Option<&'static [&'static str]> {
         Some(&["pid", "cwd", "env"])
     }
