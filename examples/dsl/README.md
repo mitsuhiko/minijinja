@@ -1,6 +1,6 @@
-# dsl
+# Domain Specific Language (DSL) Example
 
-Shows how to use MiniJinja as a DSL.  It demonstrates primarily the use of expressions with
+Shows how to use MiniJinja as a Domain Specific Language (DSL).  It demonstrates primarily the use of expressions with
 custom objects to implement a simple query builder.  The script takes one argument which is
 the query expression.  The environment defines a single function `query` which returns a
 query object with the following methods:
