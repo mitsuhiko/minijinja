@@ -16,7 +16,7 @@ use crate::compiler::tokens::Span;
 ///
 /// # Example
 ///
-/// Here is an example of you might want to render errors:
+/// Here is an example of how you might want to render errors:
 ///
 /// ```rust
 /// # let mut env = minijinja::Environment::new();

@@ -506,7 +506,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// }
 ///
 /// # let env = Environment::new();
-/// let tmpl = env.template_from_str("HOME={{ env.HOME }}; PID={{ pid }}; MAGIG={{ magic }}")?;
+/// let tmpl = env.template_from_str("HOME={{ env.HOME }}; PID={{ pid }}; MAGIC={{ magic }}")?;
 /// let ctx = Value::from_struct_object(DynamicContext { magic: 42 });
 /// let rv = tmpl.render(ctx)?;
 /// # Ok(()) }
