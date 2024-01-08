@@ -6,6 +6,8 @@ All notable changes to MiniJinja are documented here.
 
 - Added `Environment::compile_expression_owned` to allow compiled expressions
   to be held without requiring a reference.  #383
+- Added `minijinja-embed` crate which provides a simple way to embed templates
+  directly in the binary.  #392
 
 ## 1.0.10
 
