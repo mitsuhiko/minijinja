@@ -886,6 +886,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
 
 [[package]]
+name = "embedding"
+version = "0.1.0"
+dependencies = [
+ "minijinja",
+ "minijinja-embed",
+]
+
+[[package]]
 name = "encode_unicode"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1902,6 +1910,10 @@ dependencies = [
  "time",
  "time-tz",
 ]
+
+[[package]]
+name = "minijinja-embed"
+version = "1.0.10"
 
 [[package]]
 name = "minijinja-py"
