@@ -1855,7 +1855,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "aho-corasick",
  "indexmap 1.9.3",
@@ -1874,7 +1874,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-autoreload"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "minijinja",
  "notify",
@@ -1882,7 +1882,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-cli"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "anyhow",
  "ciborium",
@@ -1901,7 +1901,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-contrib"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "chrono",
  "minijinja",
@@ -1913,11 +1913,11 @@ dependencies = [
 
 [[package]]
 name = "minijinja-embed"
-version = "1.0.10"
+version = "1.0.11"
 
 [[package]]
 name = "minijinja-py"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "minijinja",
  "once_cell",
@@ -1926,7 +1926,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-stack-ref"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "minijinja",
 ]
