@@ -1040,11 +1040,14 @@ mod builtins {
 
         if value.kind() == ValueKind::Map {
             let mut rv = String::new();
-            for (idx, k) in ok!(value.try_iter()).enumerate() {
-                if idx > 0 {
+            for k in ok!(value.try_iter()) {
+                let v = ok!(value.get_item(&k));
+                if v.is_none() || v.is_undefined() {
+                    continue;
+                }
+                if !rv.is_empty() {
                     rv.push('&');
                 }
-                let v = ok!(value.get_item(&k));
                 write!(
                     rv,
                     "{}={}",
