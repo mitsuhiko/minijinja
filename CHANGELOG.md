@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## 1.0.12
 
 - The `urlencode` filter now correctly skips over none and undefined.  #394
+- The `dict` function now supports merging in of extra arguments.  #395
 
 ## 1.0.11
 

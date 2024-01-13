@@ -231,10 +231,8 @@ impl Object for BoxedFunction {
 mod builtins {
     use super::*;
 
-    use std::collections::BTreeMap;
-
     use crate::error::ErrorKind;
-    use crate::value::{MapType, Rest, ValueRepr};
+    use crate::value::{MapType, ObjectKind, Rest, ValueMap, ValueRepr};
 
     /// Returns a range.
     ///
@@ -294,13 +292,47 @@ mod builtins {
     ///   API_URL_PREFIX="/api"
     /// )|tojson }};</script>
     /// ```
+    ///
+    /// Additionally this can be used to merge objects by passing extra keyword
+    /// arguments:
+    ///
+    /// ```jinja
+    /// {% set new_dict = dict(old_dict, extra_value=2) %}
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn dict(value: Value) -> Result<Value, Error> {
-        match value.0 {
-            ValueRepr::Undefined => Ok(Value::from(BTreeMap::<bool, Value>::new())),
-            ValueRepr::Map(map, _) => Ok(Value(ValueRepr::Map(map, MapType::Normal))),
-            _ => Err(Error::from(ErrorKind::InvalidOperation)),
+    pub fn dict(value: Option<Value>, update_with: crate::value::Kwargs) -> Result<Value, Error> {
+        let mut rv = match value {
+            None => Arc::new(ValueMap::default()),
+            Some(value) => match value.0 {
+                ValueRepr::Undefined => Arc::new(ValueMap::default()),
+                ValueRepr::Map(map, _) => map,
+                ValueRepr::Dynamic(ref dynamic) => match dynamic.kind() {
+                    ObjectKind::Plain => Arc::new(ValueMap::default()),
+                    ObjectKind::Seq(_) => return Err(Error::from(ErrorKind::InvalidOperation)),
+                    ObjectKind::Struct(s) => {
+                        let mut rv = ValueMap::default();
+                        for field in s.fields() {
+                            if let Some(value) = s.get_field(&field) {
+                                rv.insert(crate::value::KeyRef::Value(Value::from(field)), value);
+                            }
+                        }
+                        Arc::new(rv)
+                    }
+                },
+                _ => return Err(Error::from(ErrorKind::InvalidOperation)),
+            },
+        };
+
+        if !update_with.values.is_empty() {
+            Arc::make_mut(&mut rv).extend(
+                update_with
+                    .values
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone())),
+            );
         }
+
+        Ok(Value(ValueRepr::Map(rv, MapType::Normal)))
     }
 
     /// Outputs the current context or the arguments stringified.

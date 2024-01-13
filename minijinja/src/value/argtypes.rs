@@ -737,7 +737,7 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 /// ```
 #[derive(Debug, Clone)]
 pub struct Kwargs {
-    values: Arc<ValueMap>,
+    pub(crate) values: Arc<ValueMap>,
     used: RefCell<HashSet<String>>,
 }
 
