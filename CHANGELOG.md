@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.12
+
+- The `urlencode` filter now correctly skips over none and undefined.  #394
+
 ## 1.0.11
 
 - Added `Environment::compile_expression_owned` to allow compiled expressions
