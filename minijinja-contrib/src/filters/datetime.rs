@@ -6,7 +6,6 @@ use serde::de::value::SeqDeserializer;
 use serde::Deserialize;
 use time::format_description::well_known::iso8601::Iso8601;
 use time::{format_description, Date, OffsetDateTime, PrimitiveDateTime};
-use time_tz::PrimitiveDateTimeExt;
 
 fn handle_serde_error(err: serde::de::value::Error) -> Error {
     Error::new(ErrorKind::InvalidOperation, "not a valid date or timestamp").with_source(err)
@@ -103,6 +102,7 @@ fn value_to_datetime(
     Ok(datetime)
 }
 
+#[allow(unused)]
 fn attach_timezone_to_primitive_datetime(
     state: &State<'_, '_>,
     kwargs: &Kwargs,
@@ -113,7 +113,10 @@ fn attach_timezone_to_primitive_datetime(
     {
         if let Some(tz) = get_timezone(state, kwargs)? {
             *timezone_already_handled = true;
-            Ok((dt.assume_timezone(tz).unwrap_first(), true))
+            Ok((
+                time_tz::PrimitiveDateTimeExt::assume_timezone(&dt, tz).unwrap_first(),
+                true,
+            ))
         } else {
             Ok((dt.assume_utc(), true))
         }
@@ -124,6 +127,7 @@ fn attach_timezone_to_primitive_datetime(
     }
 }
 
+#[cfg(feature = "timezone")]
 fn get_timezone(
     state: &State<'_, '_>,
     kwargs: &Kwargs,
