@@ -42,6 +42,7 @@ run-tests:
 	@cd minijinja; cargo check --no-default-features --features=debug
 	@cd minijinja-autoreload; cargo test
 	@cd minijinja-contrib; cargo test
+	@cd minijinja-contrib; cargo test --all-features
 	@cd minijinja-stack-ref; cargo test
 
 .PHONY: check
