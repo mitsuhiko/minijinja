@@ -1,6 +1,7 @@
 #![cfg(all(feature = "datetime", feature = "timezone"))]
 use minijinja::context;
 use similar_asserts::assert_eq;
+use time::format_description::well_known::Iso8601;
 
 #[test]
 fn test_datetimeformat() {
@@ -177,6 +178,33 @@ fn test_dateformat_chrono_rs() {
             .unwrap()
             .to_string(),
         "2024-07-06"
+    );
+}
+
+#[test]
+fn test_datetime_format_naive() {
+    let mut env = minijinja::Environment::new();
+    minijinja_contrib::add_to_environment(&mut env);
+
+    let d = time::Date::from_calendar_date(2024, time::Month::January, 18)
+        .unwrap()
+        .with_hms(0, 1, 2)
+        .unwrap();
+
+    let expr = env
+        .compile_expression("d|datetimeformat(format=format, tz='Europe/Brussels')")
+        .unwrap();
+    assert_eq!(
+        expr.eval(
+            context!(d => d.format(&Iso8601::DATE_TIME).unwrap().to_string(), format => "iso")
+        )
+        .unwrap()
+        .to_string(),
+        "2024-01-18T00:01:02+01:00"
+    );
+    assert_eq!(
+        expr.eval(context!(d, format => "iso")).unwrap().to_string(),
+        "2024-01-18T00:01:02+01:00"
     );
 }
 
