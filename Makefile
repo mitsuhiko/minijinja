@@ -12,12 +12,17 @@ build:
 doc:
 	@cd minijinja; RUSTC_BOOTSTRAP=1 RUSTDOCFLAGS="--cfg=docsrs --html-in-header doc-header.html" cargo doc -p minijinja -p minijinja-autoreload -p minijinja-stack-ref -p minijinja-contrib --no-deps --features=$(DOC_FEATURES)
 
-.PHONY: test
-test:
+.PHONY: test-msrv
+test-msrv:
 	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES)
 	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES),preserve_order,key_interning,unicode
 	@echo "CARGO TEST ALL FEATURES"
 	@cd minijinja; cargo test --all-features
+
+.PHONY: test
+test: test-msrv
+	@echo "CARGO TEST MINIJINJA-CONTRIB ALL FEATURES"
+	@cd minijinja-contrib; cargo test --all-features
 
 .PHONY: wasi-test
 wasi-test:
@@ -63,6 +68,12 @@ check:
 	@echo "check minijinja-autoreload:"
 	@cd minijinja-autoreload; cargo check
 	@cd minijinja-autoreload; cargo check --no-default-features
+	@echo "check minijinja-contrib:"
+	@cd minijinja-contrib; cargo check
+	@cd minijinja-contrib; cargo check --all-features
+	@cd minijinja-contrib; cargo check --no-default-features
+	@echo "check minijinja-stack-ref:"
+	@cd minijinja-stack-ref; cargo check
 
 .PHONY: format
 format:

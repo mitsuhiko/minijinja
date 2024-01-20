@@ -5,7 +5,7 @@ use minijinja::{Error, ErrorKind, State};
 use serde::de::value::SeqDeserializer;
 use serde::Deserialize;
 use time::format_description::well_known::iso8601::Iso8601;
-use time::{format_description, Date, OffsetDateTime};
+use time::{format_description, Date, OffsetDateTime, PrimitiveDateTime};
 
 fn handle_serde_error(err: serde::de::value::Error) -> Error {
     Error::new(ErrorKind::InvalidOperation, "not a valid date or timestamp").with_source(err)
@@ -18,19 +18,30 @@ fn value_to_datetime(
     kwargs: &Kwargs,
     allow_date: bool,
 ) -> Result<OffsetDateTime, Error> {
+    #[allow(unused)]
+    let mut timezone_already_handled = false;
+
     #[allow(unused_mut)]
     let (mut datetime, had_time) = if let Some(s) = value.as_str() {
         match OffsetDateTime::parse(s, &Iso8601::PARSING) {
             Ok(dt) => (dt, true),
-            Err(original_err) => match Date::parse(s, &Iso8601::PARSING) {
-                Ok(date) => (date.with_hms(0, 0, 0).unwrap().assume_utc(), false),
-                Err(_) => {
-                    return Err(Error::new(
-                        ErrorKind::InvalidOperation,
-                        "not a valid date or timestamp",
-                    )
-                    .with_source(original_err))
-                }
+            Err(original_err) => match PrimitiveDateTime::parse(s, &Iso8601::PARSING) {
+                Ok(dt) => attach_timezone_to_primitive_datetime(
+                    state,
+                    kwargs,
+                    &mut timezone_already_handled,
+                    dt,
+                )?,
+                Err(_) => match Date::parse(s, &Iso8601::PARSING) {
+                    Ok(date) => (date.with_hms(0, 0, 0).unwrap().assume_utc(), false),
+                    Err(_) => {
+                        return Err(Error::new(
+                            ErrorKind::InvalidOperation,
+                            "not a valid date or timestamp",
+                        )
+                        .with_source(original_err))
+                    }
+                },
             },
         }
     } else if let Ok(v) = f64::try_from(value.clone()) {
@@ -53,6 +64,10 @@ fn value_to_datetime(
                     .assume_utc(),
                 false,
             )
+        } else if items.len() == 6 {
+            let dt = PrimitiveDateTime::deserialize(SeqDeserializer::new(items.into_iter()))
+                .map_err(handle_serde_error)?;
+            attach_timezone_to_primitive_datetime(state, kwargs, &mut timezone_already_handled, dt)?
         } else {
             (
                 OffsetDateTime::deserialize(SeqDeserializer::new(items.into_iter()))
@@ -70,23 +85,12 @@ fn value_to_datetime(
     if had_time {
         #[cfg(feature = "timezone")]
         {
-            use time_tz::OffsetDateTimeExt;
-            let configured_tz = state.lookup("TIMEZONE");
-            let tzname = kwargs.get::<Option<&str>>("tz")?.unwrap_or_else(|| {
-                configured_tz
-                    .as_ref()
-                    .and_then(|x| x.as_str())
-                    .unwrap_or("original")
-            });
-            if tzname != "original" {
-                let tz = time_tz::timezones::get_by_name(tzname).ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidOperation,
-                        format!("unknown timezone '{}'", tzname),
-                    )
-                })?;
-                datetime = datetime.to_timezone(tz)
-            };
+            if !timezone_already_handled {
+                if let Some(tz) = get_timezone(state, kwargs)? {
+                    use time_tz::OffsetDateTimeExt;
+                    datetime = datetime.to_timezone(tz);
+                }
+            }
         }
     } else if !allow_date {
         return Err(Error::new(
@@ -96,6 +100,57 @@ fn value_to_datetime(
     }
 
     Ok(datetime)
+}
+
+#[allow(unused)]
+fn attach_timezone_to_primitive_datetime(
+    state: &State<'_, '_>,
+    kwargs: &Kwargs,
+    timezone_already_handled: &mut bool,
+    dt: PrimitiveDateTime,
+) -> Result<(OffsetDateTime, bool), Error> {
+    #[cfg(feature = "timezone")]
+    {
+        if let Some(tz) = get_timezone(state, kwargs)? {
+            *timezone_already_handled = true;
+            Ok((
+                time_tz::PrimitiveDateTimeExt::assume_timezone(&dt, tz).unwrap_first(),
+                true,
+            ))
+        } else {
+            Ok((dt.assume_utc(), true))
+        }
+    }
+    #[cfg(not(feature = "timezone"))]
+    {
+        Ok((dt.assume_utc(), true))
+    }
+}
+
+#[cfg(feature = "timezone")]
+fn get_timezone(
+    state: &State<'_, '_>,
+    kwargs: &Kwargs,
+) -> Result<Option<&'static time_tz::Tz>, Error> {
+    let configured_tz = state.lookup("TIMEZONE");
+    let tzname = kwargs.get::<Option<&str>>("tz")?.unwrap_or_else(|| {
+        configured_tz
+            .as_ref()
+            .and_then(|x| x.as_str())
+            .unwrap_or("original")
+    });
+    if tzname != "original" {
+        Ok(Some(time_tz::timezones::get_by_name(tzname).ok_or_else(
+            || {
+                Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("unknown timezone '{}'", tzname),
+                )
+            },
+        )?))
+    } else {
+        Ok(None)
+    }
 }
 
 /// Formats a timestamp as date and time.

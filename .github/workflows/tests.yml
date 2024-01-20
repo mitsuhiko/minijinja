@@ -96,7 +96,7 @@ jobs:
       - name: Restore Cargo.lock
         run: cp Cargo.lock.msrv Cargo.lock
       - name: Test
-        run: make test
+        run: make test-msrv
 
   test-no-lock:
     name: Test on Latest (No Lock)

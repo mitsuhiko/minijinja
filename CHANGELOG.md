@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 - The `urlencode` filter now correctly skips over none and undefined.  #394
 - The `dict` function now supports merging in of extra arguments.  #395
+- Added support for primitive datetimes in the contrib module.  #398
 
 ## 1.0.11
 
