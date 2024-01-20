@@ -64,6 +64,12 @@ check:
 	@echo "check minijinja-autoreload:"
 	@cd minijinja-autoreload; cargo check
 	@cd minijinja-autoreload; cargo check --no-default-features
+	@echo "check minijinja-contrib:"
+	@cd minijinja-contrib; cargo check
+	@cd minijinja-contrib; cargo check --all-features
+	@cd minijinja-contrib; cargo check --no-default-features
+	@echo "check minijinja-stack-ref:"
+	@cd minijinja-stack-ref; cargo check
 
 .PHONY: format
 format:
