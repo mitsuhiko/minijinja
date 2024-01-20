@@ -167,7 +167,7 @@ dependencies = [
  "serde_urlencoded",
  "smallvec",
  "socket2",
- "time 0.3.10",
+ "time 0.3.22",
  "url",
 ]
 
@@ -680,7 +680,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e859cd57d0710d9e06c381b550c06e76992472a8c6d527aecd2fc673dcc231fb"
 dependencies = [
  "percent-encoding",
- "time 0.3.10",
+ "time 0.3.22",
  "version_check",
 ]
 
@@ -930,14 +930,6 @@ name = "either"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90e5c1c8368803113bf0c9584fc495a58b86dc8a29edbf8fe877d21d9507e797"
-
-[[package]]
-name = "embedding"
-version = "0.1.0"
-dependencies = [
- "minijinja",
- "minijinja-embed",
-]
 
 [[package]]
 name = "encode_unicode"
@@ -1795,7 +1787,7 @@ dependencies = [
  "pest_derive",
  "regex",
  "serde",
- "time 0.3.10",
+ "time 0.3.22",
 ]
 
 [[package]]
@@ -1820,7 +1812,7 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "regex",
- "time 0.3.10",
+ "time 0.3.22",
  "unicode-segmentation",
 ]
 
@@ -1940,7 +1932,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "1.0.11"
+version = "1.0.10"
 dependencies = [
  "aho-corasick 1.0.0",
  "indexmap 1.9.2",
@@ -1959,7 +1951,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-autoreload"
-version = "1.0.11"
+version = "1.0.10"
 dependencies = [
  "minijinja",
  "notify",
@@ -1967,7 +1959,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-cli"
-version = "1.0.11"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "ciborium",
@@ -1986,23 +1978,19 @@ dependencies = [
 
 [[package]]
 name = "minijinja-contrib"
-version = "1.0.11"
+version = "1.0.10"
 dependencies = [
  "chrono",
  "minijinja",
  "serde",
  "similar-asserts",
- "time 0.3.10",
+ "time 0.3.22",
  "time-tz",
 ]
 
 [[package]]
-name = "minijinja-embed"
-version = "1.0.11"
-
-[[package]]
 name = "minijinja-py"
-version = "1.0.11"
+version = "1.0.10"
 dependencies = [
  "minijinja",
  "once_cell",
@@ -2011,7 +1999,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-stack-ref"
-version = "1.0.11"
+version = "1.0.10"
 dependencies = [
  "minijinja",
 ]
@@ -2114,15 +2102,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fac9e2da13b5eb447a6ce3d392f23a29d8694bff781bf03a16cd9ac8697593b"
 dependencies = [
  "hermit-abi 0.2.6",
- "libc",
-]
-
-[[package]]
-name = "num_threads"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2819ce041d2ee131036f4fc9d6ae7ae125a3a40e97ba64d04fe799ad9dabbb44"
-dependencies = [
  "libc",
 ]
 
@@ -3097,22 +3076,30 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.10"
+version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82501a4c1c0330d640a6e176a3d6a204f5ec5237aca029029d21864a902e27b0"
+checksum = "ea9e1b3cf1243ae005d9e74085d4d542f3125458f3a81af210d901dcd7411efd"
 dependencies = [
  "itoa",
- "libc",
- "num_threads",
  "serde",
+ "time-core",
  "time-macros",
 ]
 
 [[package]]
-name = "time-macros"
-version = "0.2.4"
+name = "time-core"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42657b1a6f4d817cda8e7a0ace261fe0cc946cf3a80314390b22cc61ae080792"
+checksum = "7300fbefb4dadc1af235a9cef3737cea692a9d97e1b9cbcd4ebdae6f8868e6fb"
+
+[[package]]
+name = "time-macros"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "372950940a5f07bf38dbe211d7283c9e6d7327df53794992d293e534c733d09b"
+dependencies = [
+ "time-core",
+]
 
 [[package]]
 name = "time-tz"
@@ -3126,7 +3113,7 @@ dependencies = [
  "phf_codegen",
  "serde",
  "serde-xml-rs",
- "time 0.3.10",
+ "time 0.3.22",
 ]
 
 [[package]]
