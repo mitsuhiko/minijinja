@@ -6,12 +6,12 @@ use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{
-    KeyRef, MapType, Object, ObjectKind, StringType, StructObject, Value, ValueRepr,
+    MapType, Object, StringType, MapObject, Value, ValueRepr,
 };
 use crate::vm::state::State;
 use crate::vm::Vm;
 
-pub(crate) struct Macro {
+pub(crate) struct MacroData {
     pub name: Arc<str>,
     pub arg_spec: Vec<Arc<str>>,
     // because values need to be 'static, we can't hold a reference to the
@@ -22,6 +22,13 @@ pub(crate) struct Macro {
     pub state_id: isize,
     pub closure: Value,
     pub caller_reference: bool,
+}
+
+#[derive(Clone)]
+pub(crate) struct Macro {
+    // the extra level of Arc here is necessary for recursive calls only.
+    // For more information have a look at the call() method.
+    pub data: Arc<MacroData>,
 }
 
 impl fmt::Debug for Macro {
@@ -36,9 +43,17 @@ impl fmt::Display for Macro {
     }
 }
 
+impl std::ops::Deref for Macro {
+    type Target = MacroData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
 impl Object for Macro {
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Struct(self)
+    fn value(&self) -> Value {
+        Value::from_map_object(self.clone())
     }
 
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
@@ -65,7 +80,7 @@ impl Object for Macro {
         let mut arg_values = Vec::with_capacity(self.arg_spec.len());
         for (idx, name) in self.arg_spec.iter().enumerate() {
             let kwarg = match kwargs {
-                Some(kwargs) => kwargs.get(&KeyRef::Str(name)),
+                Some(kwargs) => kwargs.get_field(&Value::from(name.clone())),
                 _ => None,
             };
             arg_values.push(match (args.get(idx), kwarg) {
@@ -88,7 +103,7 @@ impl Object for Macro {
             kwargs_used.insert("caller");
             Some(
                 kwargs
-                    .and_then(|x| x.get(&KeyRef::Str("caller")).cloned())
+                    .and_then(|x| x.get_field(&Value::from("caller")))
                     .unwrap_or(Value::UNDEFINED),
             )
         } else {
@@ -96,12 +111,14 @@ impl Object for Macro {
         };
 
         if let Some(kwargs) = kwargs {
-            for key in kwargs.keys().filter_map(|x| x.as_str()) {
-                if !kwargs_used.contains(key) {
-                    return Err(Error::new(
-                        ErrorKind::TooManyArguments,
-                        format!("unknown keyword argument `{key}`"),
-                    ));
+            for key in kwargs.fields() {
+                if let Some(name) = key.as_str() {
+                    if !kwargs_used.contains(name) {
+                        return Err(Error::new(
+                            ErrorKind::TooManyArguments,
+                            format!("unknown keyword argument `{key}`"),
+                        ));
+                    }
                 }
             }
         }
@@ -141,12 +158,13 @@ impl Object for Macro {
     }
 }
 
-impl StructObject for Macro {
+impl MapObject for Macro {
     fn static_fields(&self) -> Option<&'static [&'static str]> {
         Some(&["name", "arguments", "caller"][..])
     }
 
-    fn get_field(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        let name = key.as_str()?;
         match name {
             "name" => Some(Value(ValueRepr::String(
                 self.name.clone(),

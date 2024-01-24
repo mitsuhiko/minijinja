@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use crate::value::{Object, ObjectKind, StructObject, Value};
+use crate::value::{Object, MapObject, Value};
 
 /// Closure cycle breaker utility.
 ///
@@ -33,7 +33,7 @@ impl Drop for ClosureTracker {
 /// Utility to enclose values for macros.
 ///
 /// See `closure` on the [`Frame`] for how it's used.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct Closure {
     values: Arc<Mutex<BTreeMap<Arc<str>, Value>>>,
 }
@@ -72,17 +72,17 @@ impl fmt::Display for Closure {
 }
 
 impl Object for Closure {
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Struct(self)
+    fn value(&self) -> Value {
+        Value::from_map_object(self.clone())
     }
 }
 
-impl StructObject for Closure {
-    fn fields(&self) -> Vec<Arc<str>> {
-        self.values.lock().unwrap().keys().cloned().collect()
+impl MapObject for Closure {
+    fn fields(&self) -> Vec<Value> {
+        self.values.lock().unwrap().keys().cloned().map(Value::from).collect()
     }
 
-    fn get_field(&self, name: &str) -> Option<Value> {
-        self.values.lock().unwrap().get(name).cloned()
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        self.values.lock().unwrap().get(key.as_str()?).cloned()
     }
 }

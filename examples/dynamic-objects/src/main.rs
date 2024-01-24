@@ -57,6 +57,7 @@ impl Object for Magic {
     }
 }
 
+#[derive(Clone)]
 struct SimpleDynamicSeq;
 
 impl SeqObject for SimpleDynamicSeq {

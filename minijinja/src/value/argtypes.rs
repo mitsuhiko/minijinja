@@ -7,8 +7,8 @@ use std::ops::{Deref, DerefMut};
 use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
-    Arc, KeyRef, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, ValueMap,
-    ValueRepr,
+    Arc, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, ValueMap,
+    ValueRepr, MapObject,
 };
 use crate::vm::State;
 
@@ -300,7 +300,8 @@ impl From<()> for Value {
 
 impl<V: Into<Value>> FromIterator<V> for Value {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
-        ValueRepr::Seq(Arc::new(iter.into_iter().map(Into::into).collect())).into()
+        let vec = iter.into_iter().map(Into::into).collect::<Vec<_>>();
+        Value::from_seq_object(vec)
     }
 }
 
@@ -308,9 +309,10 @@ impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let map = iter
             .into_iter()
-            .map(|(k, v)| (KeyRef::Value(k.into()), v.into()))
-            .collect();
-        ValueRepr::Map(Arc::new(map), MapType::Normal).into()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect::<ValueMap>();
+
+        Value::from_map_object(map)
     }
 }
 
@@ -335,6 +337,12 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 impl<T: Object> From<Arc<T>> for Value {
     fn from(object: Arc<T>) -> Self {
         Value::from(object as Arc<dyn Object>)
+    }
+}
+
+impl From<Arc<dyn MapObject>> for Value {
+    fn from(object: Arc<dyn MapObject>) -> Self {
+        Value(ValueRepr::Map(object, MapType::Normal))
     }
 }
 
@@ -390,6 +398,7 @@ value_from!(f64, F64);
 value_from!(Arc<Vec<u8>>, Bytes);
 value_from!(Arc<Vec<Value>>, Seq);
 value_from!(Arc<dyn Object>, Dynamic);
+value_from!(Arc<dyn SeqObject>, Seq);
 
 fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {
     Error::new(
@@ -532,8 +541,8 @@ impl<'a> ArgType<'a> for &[u8] {
     }
 }
 
-impl<'a> ArgType<'a> for &dyn SeqObject {
-    type Output = &'a dyn SeqObject;
+impl<'a> ArgType<'a> for Arc<dyn SeqObject> {
+    type Output = Arc<dyn SeqObject>;
 
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
         match value {
@@ -748,7 +757,7 @@ impl<'a> ArgType<'a> for Kwargs {
         match value {
             Some(value) => {
                 if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
-                    Ok(Kwargs::new(map.clone()))
+                    Ok(Kwargs::new(map.to_map().into()))
                 } else {
                     Err(Error::from(ErrorKind::MissingArgument))
                 }
@@ -764,7 +773,7 @@ impl<'a> ArgType<'a> for Kwargs {
     ) -> Result<(Self, usize), Error> {
         if let Some(value) = values.get(offset) {
             if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
-                return Ok((Kwargs::new(map.clone()), 1));
+                return Ok((Kwargs::new(map.to_map().into()), 1));
             }
         }
         Ok((Kwargs::new(Default::default()), 0))
@@ -788,7 +797,7 @@ impl Kwargs {
     where
         T: ArgType<'a, Output = T>,
     {
-        T::from_value(self.values.get(&KeyRef::Str(key))).map_err(|mut err| {
+        T::from_value(self.values.get(&Value::from(key))).map_err(|mut err| {
             if err.kind() == ErrorKind::MissingArgument && err.detail().is_none() {
                 err.set_detail(format!("missing keyword argument '{}'", key));
             }
@@ -828,7 +837,7 @@ impl Kwargs {
 
     /// Checks if a keyword argument exists.
     pub fn has(&self, key: &str) -> bool {
-        self.values.contains_key(&KeyRef::Str(key))
+        self.values.contains_key(&Value::from(key))
     }
 
     /// Iterates over all passed keyword arguments.
@@ -865,7 +874,7 @@ impl FromIterator<(String, Value)> for Kwargs {
     {
         Kwargs::new(Arc::new(
             iter.into_iter()
-                .map(|(k, v)| (KeyRef::Value(Value::from(k)), v))
+                .map(|(k, v)| (Value::from(k), v))
                 .collect(),
         ))
     }
@@ -878,7 +887,7 @@ impl<'a> FromIterator<(&'a str, Value)> for Kwargs {
     {
         Kwargs::new(Arc::new(
             iter.into_iter()
-                .map(|(k, v)| (KeyRef::Value(Value::from(k)), v))
+                .map(|(k, v)| (Value::from(k), v))
                 .collect(),
         ))
     }
@@ -896,7 +905,7 @@ impl TryFrom<Value> for Kwargs {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.0 {
             ValueRepr::Undefined => Ok(Kwargs::new(Default::default())),
-            ValueRepr::Map(ref val, MapType::Kwargs) => Ok(Kwargs::new(val.clone())),
+            ValueRepr::Map(ref val, MapType::Kwargs) => Ok(Kwargs::new(val.to_map().into())),
             _ => Err(Error::from(ErrorKind::InvalidOperation)),
         }
     }

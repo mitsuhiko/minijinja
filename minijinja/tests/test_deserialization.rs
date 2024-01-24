@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use similar_asserts::assert_eq;
 
-use minijinja::value::{SeqObject, StructObject, Value};
+use minijinja::value::{SeqObject, MapObject, Value};
 
 #[test]
 fn test_seq() {
@@ -14,6 +14,7 @@ fn test_seq() {
 
 #[test]
 fn test_seq_object() {
+    #[derive(Clone)]
     struct X;
 
     impl SeqObject for X {
@@ -49,11 +50,12 @@ fn test_map() {
 
 #[test]
 fn test_struct_object() {
+    #[derive(Clone)]
     struct X;
 
-    impl StructObject for X {
-        fn get_field(&self, name: &str) -> Option<Value> {
-            match name {
+    impl MapObject for X {
+        fn get_field(&self, name: &Value) -> Option<Value> {
+            match name.as_str()? {
                 "a" => Some(Value::from(1)),
                 "b" => Some(Value::from(2)),
                 _ => None,
@@ -64,7 +66,7 @@ fn test_struct_object() {
         }
     }
 
-    let v = BTreeMap::<String, i32>::deserialize(Value::from_struct_object(X)).unwrap();
+    let v = BTreeMap::<String, i32>::deserialize(Value::from_map_object(X)).unwrap();
     assert_eq!(
         v,
         BTreeMap::from_iter([("a".to_string(), 1), ("b".to_string(), 2)])

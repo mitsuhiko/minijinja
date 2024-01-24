@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{StructObject, Value, ValueKind};
+use minijinja::value::{MapObject, Value, ValueKind};
 use minijinja::{context, Environment};
 
 struct TrackedContext {
@@ -9,7 +9,7 @@ struct TrackedContext {
     resolved: Arc<Mutex<HashSet<String>>>,
 }
 
-impl StructObject for TrackedContext {
+impl MapObject for TrackedContext {
     fn get_field(&self, name: &str) -> Option<Value> {
         let mut resolved = self.resolved.lock().unwrap();
         if !resolved.contains(name) {
@@ -34,7 +34,7 @@ impl StructObject for TrackedContext {
 pub fn track_context(ctx: Value) -> (Value, Arc<Mutex<HashSet<String>>>) {
     let resolved = Arc::new(Mutex::default());
     (
-        Value::from_struct_object(TrackedContext {
+        Value::from_map_object(TrackedContext {
             enclosed: ctx,
             resolved: resolved.clone(),
         }),

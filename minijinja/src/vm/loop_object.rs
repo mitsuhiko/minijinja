@@ -1,12 +1,25 @@
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, Arc};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Object, ObjectKind, StructObject, Value};
+use crate::value::{Object, MapObject, Value};
 use crate::vm::state::State;
 
+#[derive(Clone)]
 pub(crate) struct Loop {
+    pub status: Arc<LoopStatus>,
+}
+
+impl std::ops::Deref for Loop {
+    type Target = LoopStatus;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.status
+    }
+}
+
+pub(crate) struct LoopStatus {
     pub len: usize,
     pub idx: AtomicUsize,
     pub depth: usize,
@@ -19,15 +32,15 @@ impl fmt::Debug for Loop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = f.debug_struct("Loop");
         for attr in self.static_fields().unwrap() {
-            s.field(attr, &self.get_field(attr).unwrap());
+            s.field(attr, &self.get_field(&Value::from(*attr)).unwrap());
         }
         s.finish()
     }
 }
 
 impl Object for Loop {
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Struct(self)
+    fn value(&self) -> Value {
+        Value::from_map_object(self.clone())
     }
 
     fn call(&self, _state: &State, _args: &[Value]) -> Result<Value, Error> {
@@ -63,7 +76,7 @@ impl Object for Loop {
     }
 }
 
-impl StructObject for Loop {
+impl MapObject for Loop {
     fn static_fields(&self) -> Option<&'static [&'static str]> {
         Some(
             &[
@@ -84,7 +97,8 @@ impl StructObject for Loop {
         )
     }
 
-    fn get_field(&self, name: &str) -> Option<Value> {
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        let name = key.as_str()?;
         let idx = self.idx.load(Ordering::Relaxed) as u64;
         // if we never iterated, then all attributes are undefined.
         // this can happen in some rare circumstances where the engine

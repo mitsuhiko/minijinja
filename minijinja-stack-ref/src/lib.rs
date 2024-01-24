@@ -132,7 +132,7 @@ use std::mem::transmute;
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value};
+use minijinja::value::{Object, ObjectKind, SeqObject, MapObject, Value};
 use minijinja::{Error, State};
 
 static STACK_SCOPE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -157,6 +157,13 @@ thread_local! {
 pub struct StackHandle<T: ?Sized> {
     ptr: *const T,
     id: u64,
+}
+
+// FIXME: Is this ok?
+impl<T: ?Sized> Clone for StackHandle<T> {
+    fn clone(&self) -> Self {
+        Self { ptr: self.ptr.clone(), id: self.id.clone() }
+    }
 }
 
 unsafe impl<T: Send + ?Sized> Send for StackHandle<T> {}
@@ -328,7 +335,7 @@ impl<T: SeqObject + Send + Sync + 'static + ?Sized> SeqObject for StackHandle<T>
     }
 }
 
-impl<T: StructObject + Send + Sync + 'static + ?Sized> StructObject for StackHandle<T> {
+impl<T: MapObject + Send + Sync + 'static + ?Sized> MapObject for StackHandle<T> {
     fn get_field(&self, idx: &str) -> Option<Value> {
         self.with(|val| val.get_field(idx))
     }
@@ -359,17 +366,18 @@ impl<T: Object + ?Sized> fmt::Display for StackHandle<T> {
 }
 
 impl<T: Object + ?Sized> Object for StackHandle<T> {
-    fn kind(&self) -> ObjectKind<'_> {
-        self.with(|val| match val.kind() {
-            ObjectKind::Plain => ObjectKind::Plain,
-            ObjectKind::Seq(_) => {
-                ObjectKind::Seq(unsafe { transmute::<_, &StackHandleProxy<T>>(self) })
-            }
-            ObjectKind::Struct(_) => {
-                ObjectKind::Struct(unsafe { transmute::<_, &StackHandleProxy<T>>(self) })
-            }
-            _ => unimplemented!(),
-        })
+    fn value(&self) -> Value {
+        todo!()
+        // self.with(|val| match val.value() {
+        //     ObjectKind::Plain => ObjectKind::Plain,
+        //     ObjectKind::Seq(_) => {
+        //         ObjectKind::Seq(unsafe { transmute::<_, &StackHandleProxy<T>>(self) })
+        //     }
+        //     ObjectKind::Struct(_) => {
+        //         ObjectKind::Struct(unsafe { transmute::<_, &StackHandleProxy<T>>(self) })
+        //     }
+        //     _ => unimplemented!(),
+        // })
     }
 
     fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
@@ -384,9 +392,16 @@ impl<T: Object + ?Sized> Object for StackHandle<T> {
 #[repr(transparent)]
 struct StackHandleProxy<T: Object + ?Sized>(StackHandle<T>);
 
+// FIXME: Is this correct?
+impl<T: Object + ?Sized> Clone for StackHandleProxy<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 macro_rules! unwrap_kind {
-    ($val:expr, $pat:path) => {
-        if let $pat(rv) = $val.kind() {
+    ($val:expr) => {
+        if let Some(rv) = $val {
             rv
         } else {
             unreachable!("object changed shape")
@@ -397,29 +412,32 @@ macro_rules! unwrap_kind {
 impl<T: Object + ?Sized> SeqObject for StackHandleProxy<T> {
     fn get_item(&self, idx: usize) -> Option<Value> {
         self.0
-            .with(|val| unwrap_kind!(val, ObjectKind::Seq).get_item(idx))
+            .with(|val| unwrap_kind!(val.value().as_seq()).get_item(idx))
     }
 
     fn item_count(&self) -> usize {
         self.0
-            .with(|val| unwrap_kind!(val, ObjectKind::Seq).item_count())
+            .with(|val| unwrap_kind!(val.value().as_seq()).item_count())
     }
 }
 
-impl<T: Object + ?Sized> StructObject for StackHandleProxy<T> {
+impl<T: Object + ?Sized> MapObject for StackHandleProxy<T> {
     fn get_field(&self, name: &str) -> Option<Value> {
-        self.0
-            .with(|val| unwrap_kind!(val, ObjectKind::Struct).get_field(name))
+        todo!()
+        // self.0
+        //     .with(|val| unwrap_kind!(val, ObjectKind::Struct).get_field(name))
     }
 
     fn fields(&self) -> Vec<Arc<str>> {
-        self.0
-            .with(|val| unwrap_kind!(val, ObjectKind::Struct).fields())
+        todo!()
+        // self.0
+        //     .with(|val| unwrap_kind!(val, ObjectKind::Struct).fields())
     }
 
     fn field_count(&self) -> usize {
-        self.0
-            .with(|val| unwrap_kind!(val, ObjectKind::Struct).field_count())
+        todo!()
+        // self.0
+        //     .with(|val| unwrap_kind!(val, ObjectKind::Struct).field_count())
     }
 }
 
@@ -477,12 +495,12 @@ impl Scope {
 
     /// Creates a [`Value`] from a borrowed [`StructObject`].
     ///
-    /// This is equivalent to `Value::from_struct_object(self.handle(value))`.
-    pub fn struct_object_ref<'env, T: StructObject + 'static + ?Sized>(
+    /// This is equivalent to `Value::from_map_object(self.handle(value))`.
+    pub fn struct_object_ref<'env, T: MapObject + 'static + ?Sized>(
         &'env self,
         value: &'env T,
     ) -> Value {
-        Value::from_struct_object(self.handle(value))
+        Value::from_map_object(self.handle(value))
     }
 }
 

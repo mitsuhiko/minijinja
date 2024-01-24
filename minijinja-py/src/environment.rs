@@ -557,7 +557,7 @@ impl Environment {
             let inner = slf.inner.lock().unwrap();
             let tmpl = inner.env.get_template(template_name).map_err(to_py_error)?;
             let ctx = ctx
-                .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
+                .map(|ctx| Value::from_map_object(DictLikeObject { inner: ctx.into() }))
                 .unwrap_or_else(|| context!());
             tmpl.render(ctx).map_err(to_py_error)
         })
@@ -576,7 +576,7 @@ impl Environment {
     ) -> PyResult<String> {
         bind_environment(slf.as_ptr(), || {
             let ctx = ctx
-                .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
+                .map(|ctx| Value::from_map_object(DictLikeObject { inner: ctx.into() }))
                 .unwrap_or_else(|| context!());
             slf.inner
                 .lock()
@@ -601,7 +601,7 @@ impl Environment {
                 .compile_expression(expression)
                 .map_err(to_py_error)?;
             let ctx = ctx
-                .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
+                .map(|ctx| Value::from_map_object(DictLikeObject { inner: ctx.into() }))
                 .unwrap_or_else(|| context!());
             to_python_value(expr.eval(ctx).map_err(to_py_error)?)
         })

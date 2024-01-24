@@ -1,6 +1,6 @@
 use std::{env, fmt};
 
-use minijinja::value::{Object, StructObject, Value};
+use minijinja::value::{Object, MapObject, Value};
 use minijinja::{context, Environment, Error, ErrorKind, State};
 use minijinja_stack_ref::{reborrow, scope};
 
@@ -14,7 +14,7 @@ struct Config {
     nested: NestedConfig,
 }
 
-impl StructObject for Config {
+impl MapObject for Config {
     fn static_fields(&self) -> Option<&'static [&'static str]> {
         Some(&["manifest_dir", "version", "nested"][..])
     }
@@ -31,7 +31,7 @@ impl StructObject for Config {
     }
 }
 
-impl StructObject for NestedConfig {
+impl MapObject for NestedConfig {
     fn static_fields(&self) -> Option<&'static [&'static str]> {
         Some(&["active"][..])
     }

@@ -1,25 +1,28 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use crate::value::object::StructObject;
+use crate::value::object::MapObject;
 use crate::value::Value;
 
 /// Utility struct used by [`context!`](crate::context) to merge
 /// multiple values.
+#[derive(Clone)]
 pub struct MergeObject(pub Vec<Value>);
 
-impl StructObject for MergeObject {
-    fn get_field(&self, field: &str) -> Option<Value> {
+impl MapObject for MergeObject {
+    fn get_field(&self, field: &Value) -> Option<Value> {
         for val in &self.0 {
-            match val.get_attr(field) {
-                Ok(val) if !val.is_undefined() => return Some(val),
-                _ => {}
+            if let Some(key) = field.as_str() {
+                match val.get_attr(key) {
+                    Ok(val) if !val.is_undefined() => return Some(val),
+                    _ => {}
+                }
             }
         }
         None
     }
 
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(&self) -> Vec<Value> {
         let mut seen = BTreeSet::new();
         let mut rv = Vec::new();
         for val in &self.0 {
@@ -29,7 +32,7 @@ impl StructObject for MergeObject {
                     if let Ok(s) = s {
                         if !seen.contains(&s) {
                             seen.insert(s.clone());
-                            rv.push(s);
+                            rv.push(s.into());
                         }
                     }
                 }

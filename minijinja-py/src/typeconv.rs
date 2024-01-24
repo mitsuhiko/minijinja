@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value, ValueKind};
+use minijinja::value::{Object, SeqObject, MapObject, Value, ValueKind};
 use minijinja::{AutoEscape, Error, State};
 
 use once_cell::sync::OnceCell;
@@ -19,11 +19,12 @@ fn is_safe_attr(name: &str) -> bool {
     !name.starts_with('_')
 }
 
+#[derive(Clone)]
 pub struct DictLikeObject {
     pub inner: Py<PyDict>,
 }
 
-impl StructObject for DictLikeObject {
+impl MapObject for DictLikeObject {
     fn get_field(&self, name: &str) -> Option<Value> {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
@@ -39,6 +40,7 @@ impl StructObject for DictLikeObject {
     }
 }
 
+#[derive(Clone)]
 struct ListLikeObject {
     inner: Py<PySequence>,
 }
@@ -56,6 +58,7 @@ impl SeqObject for ListLikeObject {
     }
 }
 
+#[derive(Clone)]
 struct DynamicObject {
     inner: Py<PyAny>,
     sequencified: Option<Vec<Py<PyAny>>>,
@@ -74,15 +77,16 @@ impl fmt::Display for DynamicObject {
 }
 
 impl Object for DynamicObject {
-    fn kind(&self) -> ObjectKind<'_> {
-        Python::with_gil(|py| {
-            let inner = self.inner.as_ref(py);
-            if inner.downcast::<PySequence>().is_ok() || self.sequencified.is_some() {
-                ObjectKind::Seq(self)
-            } else {
-                ObjectKind::Struct(self)
-            }
-        })
+    fn value(&self) -> Value {
+        todo!()
+        // Python::with_gil(|py| {
+        //     let inner = self.inner.as_ref(py);
+        //     if inner.downcast::<PySequence>().is_ok() || self.sequencified.is_some() {
+        //         ObjectKind::Seq(self)
+        //     } else {
+        //         ObjectKind::Struct(self)
+        //     }
+        // })
     }
 
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
@@ -147,7 +151,7 @@ impl SeqObject for DynamicObject {
     }
 }
 
-impl StructObject for DynamicObject {
+impl MapObject for DynamicObject {
     fn get_field(&self, name: &str) -> Option<Value> {
         if !is_safe_attr(name) {
             return None;
@@ -161,7 +165,7 @@ impl StructObject for DynamicObject {
 
 pub fn to_minijinja_value(value: &PyAny) -> Value {
     if let Ok(dict) = value.downcast::<PyDict>() {
-        Value::from_struct_object(DictLikeObject { inner: dict.into() })
+        Value::from_map_object(DictLikeObject { inner: dict.into() })
     } else if let Ok(tup) = value.downcast::<PyTuple>() {
         Value::from_seq_object(ListLikeObject {
             inner: tup.as_sequence().into(),
@@ -237,7 +241,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
             }
         }
         Ok(rv.into())
-    } else if let Some(s) = value.as_struct() {
+    } else if let Some(s) = value.as_map() {
         let rv = PyDict::new(py);
         for field in s.fields().into_iter() {
             if let Some(value) = s.get_field(&field) {

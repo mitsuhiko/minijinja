@@ -11,10 +11,10 @@ use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::{
-    ops, value_map_with_capacity, value_optimization, KeyRef, MapType, Value, ValueRepr,
+    ops, value_map_with_capacity, value_optimization, Value, ValueRepr,
 };
 use crate::vm::context::{Frame, LoopState, Stack};
-use crate::vm::loop_object::Loop;
+use crate::vm::loop_object::{Loop, LoopStatus};
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
@@ -293,6 +293,12 @@ impl<'env> Vm<'env> {
             }
 
             match instr {
+                Instruction::Swap => {
+                    let a = stack.pop();
+                    let b = stack.pop();
+                    stack.push(a);
+                    stack.push(b);
+                }
                 Instruction::EmitRaw(val) => {
                     // this only produces a format error, no need to attach
                     // location information.
@@ -347,42 +353,30 @@ impl<'env> Vm<'env> {
                     for _ in 0..*pair_count {
                         let value = stack.pop();
                         let key = stack.pop();
-                        map.insert(KeyRef::Value(key), value);
+                        map.insert(key, value);
                     }
-                    stack.push(Value(ValueRepr::Map(map.into(), MapType::Normal)))
+                    stack.push(Value::from_map_object(map))
                 }
                 Instruction::BuildKwargs(pair_count) => {
                     let mut map = value_map_with_capacity(*pair_count);
                     for _ in 0..*pair_count {
                         let value = stack.pop();
                         let key = stack.pop();
-                        map.insert(KeyRef::Value(key), value);
+                        map.insert(key, value);
                     }
-                    stack.push(Value(ValueRepr::Map(map.into(), MapType::Kwargs)))
+                    stack.push(Value::from_kwargs(map))
                 }
-                Instruction::BuildList(count) => {
-                    let mut v = Vec::with_capacity(untrusted_size_hint(*count));
-                    for _ in 0..*count {
+                Instruction::BuildList(n) => {
+                    let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
+                    let mut v = Vec::with_capacity(untrusted_size_hint(count));
+                    for _ in 0..count {
                         v.push(stack.pop());
                     }
                     v.reverse();
-                    stack.push(Value(ValueRepr::Seq(Arc::new(v))));
+                    stack.push(Value::from_seq_object(v))
                 }
                 Instruction::UnpackList(count) => {
                     ctx_ok!(self.unpack_list(&mut stack, count));
-                }
-                Instruction::ListAppend => {
-                    a = stack.pop();
-                    // this intentionally only works with actual sequences
-                    if let ValueRepr::Seq(mut v) = stack.pop().0 {
-                        Arc::make_mut(&mut v).push(a);
-                        stack.push(Value(ValueRepr::Seq(v)))
-                    } else {
-                        bail!(Error::new(
-                            ErrorKind::InvalidOperation,
-                            "cannot append to non-list"
-                        ));
-                    }
                 }
                 Instruction::Add => func_binop!(add),
                 Instruction::Sub => func_binop!(sub),
@@ -648,9 +642,9 @@ impl<'env> Vm<'env> {
                     let locals = state.ctx.current_locals_mut();
                     let mut module = value_map_with_capacity(locals.len());
                     for (key, value) in locals.iter() {
-                        module.insert(KeyRef::Value(Value::from(*key)), value.clone());
+                        module.insert(Value::from(*key), value.clone());
                     }
-                    stack.push(Value(ValueRepr::Map(module.into(), MapType::Normal)));
+                    stack.push(Value::from_map_object(module));
                 }
                 #[cfg(feature = "macros")]
                 Instruction::BuildMacro(name, offset, flags) => {
@@ -697,8 +691,9 @@ impl<'env> Vm<'env> {
         use crate::value::SeqObject;
 
         let single_name_slice = std::slice::from_ref(&name);
-        let choices = name
-            .as_seq()
+        let seq = name.as_seq();
+        let choices = seq.as_ref()
+            .map(|d| &**d as &dyn SeqObject)
             .unwrap_or(&single_name_slice as &dyn SeqObject);
 
         let mut templates_tried = vec![];
@@ -932,12 +927,14 @@ impl<'env> Vm<'env> {
                 recurse_jump_target: if recursive { Some(pc) } else { None },
                 current_recursion_jump,
                 object: Arc::new(Loop {
-                    idx: AtomicUsize::new(!0usize),
-                    len,
-                    depth,
-                    #[cfg(feature = "adjacent_loop_items")]
-                    value_triple: Mutex::new((None, None, iterator.next())),
-                    last_changed_value: Mutex::default(),
+                    status: Arc::new(LoopStatus {
+                        idx: AtomicUsize::new(!0usize),
+                        len,
+                        depth,
+                        #[cfg(feature = "adjacent_loop_items")]
+                        value_triple: Mutex::new((None, None, iterator.next())),
+                        last_changed_value: Mutex::default(),
+                    }),
                 }),
                 iterator,
             }),
@@ -976,7 +973,7 @@ impl<'env> Vm<'env> {
         name: &str,
         flags: u8,
     ) {
-        use crate::compiler::instructions::MACRO_CALLER;
+        use crate::{compiler::instructions::MACRO_CALLER, vm::macro_object::MacroData};
 
         let arg_spec = match stack.pop().0 {
             ValueRepr::Seq(args) => args
@@ -992,12 +989,14 @@ impl<'env> Vm<'env> {
         let macro_ref_id = state.macros.len();
         Arc::make_mut(&mut state.macros).push((state.instructions, offset));
         stack.push(Value::from_object(Macro {
-            name: Arc::from(name.to_string()),
-            arg_spec,
-            macro_ref_id,
-            state_id: state.id,
-            closure,
-            caller_reference: (flags & MACRO_CALLER) != 0,
+            data: Arc::new(MacroData {
+                name: Arc::from(name.to_string()),
+                arg_spec,
+                macro_ref_id,
+                state_id: state.id,
+                closure,
+                caller_reference: (flags & MACRO_CALLER) != 0,
+            }),
         }));
     }
 }

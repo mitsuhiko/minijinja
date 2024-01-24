@@ -1,10 +1,12 @@
 use std::any::{Any, TypeId};
+use std::borrow::Borrow;
 use std::fmt;
 use std::ops::Range;
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{intern, Value};
+use crate::value::{intern, Value, ValueMap};
 use crate::vm::State;
 
 /// A utility trait that represents a dynamic object.
@@ -30,7 +32,7 @@ use crate::vm::State;
 /// stringified and methods can be called.
 ///
 /// For examples of how to implement objects refer to [`SeqObject`] and
-/// [`StructObject`].
+/// [`MapObject`].
 pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// Describes the kind of an object.
     ///
@@ -39,8 +41,8 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// called or has methods.
     ///
     /// For more information see [`ObjectKind`].
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Plain
+    fn value(&self) -> Value {
+        Value::from(())
     }
 
     /// Called when the engine tries to call a method on the object.
@@ -80,9 +82,9 @@ impl dyn Object {
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
     ///
     /// This is basically the "reverse" of [`from_object`](Value::from_object),
-    /// [`from_seq_object`](Value::from_seq_object) and [`from_struct_object`](Value::from_struct_object).
+    /// [`from_seq_object`](Value::from_seq_object) and [`from_map_object`](Value::from_map_object).
     ///
-    /// Because this method works also for objects that only implement [`StructObject`]
+    /// Because this method works also for objects that only implement [`MapObject`]
     /// and [`SeqObject`] these methods do not actually use trait bounds that are
     /// restricted to `Object`.
     ///
@@ -111,11 +113,12 @@ impl dyn Object {
     /// assert_eq!(thing.id, 42);
     /// ```
     ///
-    /// It also works with [`SeqObject`] or [`StructObject`]:
+    /// It also works with [`SeqObject`] or [`MapObject`]:
     ///
     /// ```rust
     /// # use minijinja::value::{Value, SeqObject};
     ///
+    /// #[derive(Clone)]
     /// struct Thing {
     ///     id: usize,
     /// }
@@ -124,6 +127,7 @@ impl dyn Object {
     ///     fn get_item(&self, idx: usize) -> Option<Value> {
     ///         (idx < 3).then(|| Value::from(idx))
     ///     }
+    ///
     ///     fn item_count(&self) -> usize {
     ///         3
     ///     }
@@ -139,15 +143,30 @@ impl dyn Object {
         if type_id == TypeId::of::<T>() {
             // SAFETY: type type id check ensures this type cast is correct
             return Some(unsafe { &*(self as *const dyn Object as *const T) });
-        } else if type_id == TypeId::of::<SimpleSeqObject<T>>() {
-            // SAFETY: type type id check ensures this type cast is correct
-            let wrapper = unsafe { &*(self as *const dyn Object as *const SimpleSeqObject<T>) };
-            return Some(&wrapper.0);
-        } else if type_id == TypeId::of::<SimpleStructObject<T>>() {
-            // SAFETY: type type id check ensures this type cast is correct
-            let wrapper = unsafe { &*(self as *const dyn Object as *const SimpleStructObject<T>) };
-            return Some(&wrapper.0);
         }
+
+        if type_id == TypeId::of::<Arc<dyn SeqObject>>() {
+            let inner = unsafe {
+                &*(self as *const dyn Object as *const Arc<dyn SeqObject>)
+            };
+
+            if SeqObject::type_id(&**inner) == TypeId::of::<T>() {
+                // SAFETY: type type id check ensures this type cast is correct
+                return Some(unsafe { &*(&**inner as *const dyn SeqObject as *const T) });
+            }
+        }
+
+        if type_id == TypeId::of::<Arc<dyn MapObject>>() {
+            let inner = unsafe {
+                &*(self as *const dyn Object as *const Arc<dyn MapObject>)
+            };
+
+            if MapObject::type_id(&**inner) == TypeId::of::<T>() {
+                // SAFETY: type type id check ensures this type cast is correct
+                return Some(unsafe { &*(&**inner as *const dyn MapObject as *const T) });
+            }
+        }
+
         None
     }
 
@@ -157,15 +176,13 @@ impl dyn Object {
     pub fn is<T: 'static>(&self) -> bool {
         let type_id = (*self).type_id();
         type_id == TypeId::of::<T>()
-            || type_id == TypeId::of::<SimpleSeqObject<T>>()
-            || type_id == TypeId::of::<SimpleStructObject<T>>()
     }
 }
 
 impl<T: Object> Object for Arc<T> {
     #[inline]
-    fn kind(&self) -> ObjectKind<'_> {
-        T::kind(self)
+    fn value(&self) -> Value {
+        T::value(self)
     }
 
     #[inline]
@@ -177,37 +194,6 @@ impl<T: Object> Object for Arc<T> {
     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         T::call(self, state, args)
     }
-}
-
-/// A kind defines the object's behavior.
-///
-/// When a dynamic [`Object`] is implemented, it can be of one of the kinds
-/// here.  The default behavior will be a [`Plain`](Self::Plain) object which
-/// doesn't do much other than that it can be printed.  For an object to turn
-/// into a [struct](Self::Struct) or [sequence](Self::Seq) the necessary kind
-/// has to be returned with a pointer to itself.
-///
-/// Today object's can have the behavior of structs and sequences but this
-/// might expand in the future.  It does mean that not all types of values can
-/// be represented by objects.
-#[non_exhaustive]
-pub enum ObjectKind<'a> {
-    /// This object is a plain object.
-    ///
-    /// Such an object has no attributes but it might be callable and it
-    /// can be stringified.  When serialized it's serialized in it's
-    /// stringified form.
-    Plain,
-
-    /// This object is a sequence.
-    ///
-    /// Requires that the object implements [`SeqObject`].
-    Seq(&'a dyn SeqObject),
-
-    /// This object is a struct (map with string keys).
-    ///
-    /// Requires that the object implements [`StructObject`].
-    Struct(&'a dyn StructObject),
 }
 
 /// Provides the behavior of an [`Object`] holding sequence of values.
@@ -226,6 +212,7 @@ pub enum ObjectKind<'a> {
 /// ```
 /// use minijinja::value::{Value, SeqObject};
 ///
+/// #[derive(Clone)]
 /// struct Point(f32, f32, f32);
 ///
 /// impl SeqObject for Point {
@@ -255,7 +242,7 @@ pub enum ObjectKind<'a> {
 ///
 /// ```
 /// use std::fmt;
-/// use minijinja::value::{Value, Object, ObjectKind, SeqObject};
+/// use minijinja::value::{Value, Object, SeqObject};
 ///
 /// #[derive(Debug, Clone)]
 /// struct Point(f32, f32, f32);
@@ -267,8 +254,8 @@ pub enum ObjectKind<'a> {
 /// }
 ///
 /// impl Object for Point {
-///     fn kind(&self) -> ObjectKind<'_> {
-///         ObjectKind::Seq(self)
+///     fn value(&self) -> Value {
+///         Value::from_seq_object(self.clone())
 ///     }
 /// }
 ///
@@ -289,7 +276,7 @@ pub enum ObjectKind<'a> {
 ///
 /// let value = Value::from_object(Point(1.0, 2.5, 3.0));
 /// ```
-pub trait SeqObject: Send + Sync {
+pub trait SeqObject: dyn_clone::DynClone + Send + Sync {
     /// Looks up an item by index.
     ///
     /// Sequences should provide a value for all items in the range of `0..item_count`
@@ -299,7 +286,15 @@ pub trait SeqObject: Send + Sync {
 
     /// Returns the number of items in the sequence.
     fn item_count(&self) -> usize;
+
+    /// .
+    #[doc(hidden)]
+    fn type_id(&self) -> TypeId where Self: Any {
+        <Self as Any>::type_id(self)
+    }
 }
+
+dyn_clone::clone_trait_object!(SeqObject);
 
 impl dyn SeqObject + '_ {
     /// Convenient iterator over a [`SeqObject`].
@@ -308,6 +303,18 @@ impl dyn SeqObject + '_ {
             seq: self,
             range: 0..self.item_count(),
         }
+    }
+}
+
+impl<'a> fmt::Debug for dyn SeqObject + 'a {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl<'a> std::hash::Hash for dyn SeqObject + 'a {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.iter().for_each(|v| v.hash(state));
     }
 }
 
@@ -401,18 +408,19 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// For structs which do not need any special method behavior or methods, the
 /// [`Value`] type is capable of automatically constructing a wrapper [`Object`]
-/// by using [`Value::from_struct_object`].  In that case only [`StructObject`]
+/// by using [`Value::from_map_object`].  In that case only [`MapObject`]
 /// needs to be implemented and the value will provide default implementations
 /// for stringification and debug printing.
 ///
 /// ```
-/// use minijinja::value::{Value, StructObject};
+/// use minijinja::value::{Value, MapObject};
 ///
+/// #[derive(Clone)]
 /// struct Point(f32, f32, f32);
 ///
-/// impl StructObject for Point {
-///     fn get_field(&self, name: &str) -> Option<Value> {
-///         match name {
+/// impl MapObject for Point {
+///     fn get_field(&self, key: &Value) -> Option<Value> {
+///         match key.as_str()? {
 ///             "x" => Some(Value::from(self.0)),
 ///             "y" => Some(Value::from(self.1)),
 ///             "z" => Some(Value::from(self.2)),
@@ -425,7 +433,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///     }
 /// }
 ///
-/// let value = Value::from_struct_object(Point(1.0, 2.5, 3.0));
+/// let value = Value::from_map_object(Point(1.0, 2.5, 3.0));
 /// ```
 ///
 /// # Full Example
@@ -437,7 +445,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// ```
 /// use std::fmt;
-/// use minijinja::value::{Value, Object, ObjectKind, StructObject};
+/// use minijinja::value::{Value, Object, MapObject};
 ///
 /// #[derive(Debug, Clone)]
 /// struct Point(f32, f32, f32);
@@ -449,14 +457,14 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// }
 ///
 /// impl Object for Point {
-///     fn kind(&self) -> ObjectKind<'_> {
-///         ObjectKind::Struct(self)
+///     fn value(&self) -> Value {
+///         Value::from_map_object(self.clone())
 ///     }
 /// }
 ///
-/// impl StructObject for Point {
-///     fn get_field(&self, name: &str) -> Option<Value> {
-///         match name {
+/// impl MapObject for Point {
+///     fn get_field(&self, key: &Value) -> Option<Value> {
+///         match key.as_str()? {
 ///             "x" => Some(Value::from(self.0)),
 ///             "y" => Some(Value::from(self.1)),
 ///             "z" => Some(Value::from(self.2)),
@@ -488,15 +496,16 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// ```
 /// # fn main() -> Result<(), minijinja::Error> {
 /// # use minijinja::Environment;
-/// use minijinja::value::{Value, StructObject};
+/// use minijinja::value::{Value, MapObject};
 ///
+/// #[derive(Clone)]
 /// pub struct DynamicContext {
 ///     magic: i32,
 /// }
 ///
-/// impl StructObject for DynamicContext {
-///     fn get_field(&self, field: &str) -> Option<Value> {
-///         match field {
+/// impl MapObject for DynamicContext {
+///     fn get_field(&self, key: &Value) -> Option<Value> {
+///         match key.as_str()? {
 ///             "pid" => Some(Value::from(std::process::id())),
 ///             "env" => Some(Value::from_iter(std::env::vars())),
 ///             "magic" => Some(Value::from(self.magic)),
@@ -507,7 +516,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// # let env = Environment::new();
 /// let tmpl = env.template_from_str("HOME={{ env.HOME }}; PID={{ pid }}; MAGIC={{ magic }}")?;
-/// let ctx = Value::from_struct_object(DynamicContext { magic: 42 });
+/// let ctx = Value::from_map_object(DynamicContext { magic: 42 });
 /// let rv = tmpl.render(ctx)?;
 /// # Ok(()) }
 /// ```
@@ -515,7 +524,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// One thing of note here is that in the above example `env` would be re-created every
 /// time the template needs it.  A better implementation would cache the value after it
 /// was created first.
-pub trait StructObject: Send + Sync {
+pub trait MapObject: dyn_clone::DynClone + Send + Sync {
     /// Invoked by the engine to get a field of a struct.
     ///
     /// Where possible it's a good idea for this to align with the return value
@@ -529,7 +538,7 @@ pub trait StructObject: Send + Sync {
     /// [`State`] nor is there a channel to send out failures as only an option
     /// can be returned.  If you do plan on doing something in field access
     /// that is fallible, instead use a method call.
-    fn get_field(&self, name: &str) -> Option<Value>;
+    fn get_field(&self, key: &Value) -> Option<Value>;
 
     /// If possible returns a static vector of field names.
     ///
@@ -548,10 +557,11 @@ pub trait StructObject: Send + Sync {
     /// be implemented due to lifetime restrictions.  The default implementation
     /// converts the return value of [`static_fields`](Self::static_fields) into
     /// a compatible format automatically.
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(&self) -> Vec<Value> {
         self.static_fields()
             .into_iter()
             .flat_map(|fields| fields.iter().copied().map(intern))
+            .map(Value::from)
             .collect()
     }
 
@@ -566,12 +576,45 @@ pub trait StructObject: Send + Sync {
             self.fields().len()
         }
     }
+
+    #[doc(hidden)]
+    fn type_id(&self) -> TypeId where Self: Any {
+        <Self as Any>::type_id(self)
+    }
 }
 
-impl<T: StructObject> StructObject for Arc<T> {
+dyn_clone::clone_trait_object!(MapObject);
+
+impl MapObject for ValueMap {
     #[inline]
-    fn get_field(&self, name: &str) -> Option<Value> {
-        T::get_field(self, name)
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        let v = self.get(key)?;
+        Some(v.clone())
+    }
+
+    #[inline]
+    fn fields(&self) -> Vec<Value> {
+        self.keys()
+            .cloned()
+            .collect()
+    }
+
+    #[inline]
+    fn field_count(&self) -> usize {
+        self.len()
+    }
+}
+
+impl fmt::Debug for dyn MapObject + '_ {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_map().entries(self.iter()).finish()
+    }
+}
+
+impl<T: MapObject> MapObject for Arc<T> {
+    #[inline]
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        T::get_field(self, key)
     }
 
     #[inline]
@@ -580,7 +623,7 @@ impl<T: StructObject> StructObject for Arc<T> {
     }
 
     #[inline]
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(&self) -> Vec<Value> {
         T::fields(self)
     }
 
@@ -590,10 +633,10 @@ impl<T: StructObject> StructObject for Arc<T> {
     }
 }
 
-impl<'a, T: StructObject + ?Sized> StructObject for &'a T {
+impl<'a, T: MapObject + ?Sized> MapObject for &'a T {
     #[inline]
-    fn get_field(&self, name: &str) -> Option<Value> {
-        T::get_field(self, name)
+    fn get_field(&self, key: &Value) -> Option<Value> {
+        T::get_field(self, key)
     }
 
     #[inline]
@@ -602,7 +645,7 @@ impl<'a, T: StructObject + ?Sized> StructObject for &'a T {
     }
 
     #[inline]
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(&self) -> Vec<Value> {
         T::fields(self)
     }
 
@@ -612,66 +655,95 @@ impl<'a, T: StructObject + ?Sized> StructObject for &'a T {
     }
 }
 
-#[repr(transparent)]
-pub struct SimpleSeqObject<T>(pub T);
+/// Iterates over [`MapObject`]
+pub struct MapObjectIter<'a> {
+    map: &'a dyn MapObject,
+    keys: std::vec::IntoIter<Value>,
+}
 
-impl<T: SeqObject + 'static> fmt::Display for SimpleSeqObject<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        ok!(f.write_str("["));
-        for (idx, val) in (&self.0 as &dyn SeqObject).iter().enumerate() {
-            if idx > 0 {
-                ok!(f.write_str(", "));
-            }
-            ok!(write!(f, "{val:?}"));
+impl<'a> Iterator for MapObjectIter<'a> {
+    type Item = (Value, Value);
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        let key = self.keys.next()?;
+        let value = self.map.get_field(&key).unwrap_or(Value::UNDEFINED);
+        Some((key, value))
+    }
+
+    #[inline(always)]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.keys.size_hint()
+    }
+}
+
+impl<'a> DoubleEndedIterator for MapObjectIter<'a> {
+    #[inline(always)]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let key = self.keys.next_back()?;
+        let value = self.map.get_field(&key).unwrap_or(Value::UNDEFINED);
+        Some((key, value))
+    }
+}
+
+impl dyn MapObject + '_ {
+    /// Convenient iterator over a [`MapObject`].
+    pub fn iter(&self) -> MapObjectIter<'_> {
+        MapObjectIter {
+            map: self,
+            keys: self.fields().into_iter(),
         }
-        f.write_str("]")
+    }
+
+    pub(crate) fn to_map(&self) -> ValueMap {
+        self.iter().collect()
     }
 }
 
-impl<T: SeqObject + 'static> fmt::Debug for SimpleSeqObject<T> {
+impl<K, V> MapObject for HashMap<K, V>
+    where K: Borrow<str> + AsRef<str> + PartialEq + Eq + std::hash::Hash + Clone + Send + Sync,
+          V: Into<Value> + Clone + Send + Sync
+{
+    fn get_field<'a>(&'a self, key: &Value) -> Option<Value> {
+        let key = key.as_str()?;
+        self.get(key).map(|v| v.clone().into())
+    }
+
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        None
+    }
+
+    fn fields(&self) -> Vec<Value> {
+        self.keys()
+            .map(|k| k.as_ref().into())
+            .collect()
+    }
+
+    fn field_count(&self) -> usize {
+        self.len()
+    }
+}
+
+impl fmt::Display for dyn SeqObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list()
-            .entries((&self.0 as &dyn SeqObject).iter())
-            .finish()
+        <Self as fmt::Debug>::fmt(self, f)
     }
 }
 
-impl<T: SeqObject + 'static> Object for SimpleSeqObject<T> {
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Seq(&self.0)
-    }
-}
-
-#[repr(transparent)]
-pub struct SimpleStructObject<T>(pub T);
-
-impl<T: StructObject + 'static> fmt::Display for SimpleStructObject<T> {
+impl fmt::Display for dyn MapObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        ok!(f.write_str("{"));
-        for (idx, field) in self.0.fields().iter().enumerate() {
-            if idx > 0 {
-                ok!(f.write_str(", "));
-            }
-            let val = self.0.get_field(field).unwrap_or(Value::UNDEFINED);
-            ok!(write!(f, "{field:?}: {val:?}"));
-        }
-        f.write_str("}")
+        <Self as fmt::Debug>::fmt(self, f)
     }
 }
 
-impl<T: StructObject + 'static> fmt::Debug for SimpleStructObject<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut m = f.debug_map();
-        for field in self.0.fields() {
-            let value = self.0.get_field(&field).unwrap_or(Value::UNDEFINED);
-            m.entry(&field, &value);
-        }
-        m.finish()
+impl Object for Arc<dyn SeqObject> {
+    fn value(&self) -> Value {
+        Value::from(self.clone())
     }
 }
 
-impl<T: StructObject + 'static> Object for SimpleStructObject<T> {
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Struct(&self.0)
+impl Object for Arc<dyn MapObject> {
+    fn value(&self) -> Value {
+        Value::from(self.clone())
     }
 }

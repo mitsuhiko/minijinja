@@ -5,7 +5,7 @@ use serde::{ser, Serialize, Serializer};
 
 use crate::utils::untrusted_size_hint;
 use crate::value::{
-    value_map_with_capacity, Arc, KeyRef, MapType, Packed, StringType, Value, ValueMap, ValueRepr,
+    value_map_with_capacity, Arc, MapType, Packed, StringType, Value, ValueMap, ValueRepr,
     VALUE_HANDLES, VALUE_HANDLE_MARKER,
 };
 
@@ -177,7 +177,7 @@ impl Serializer for ValueSerializer {
         T: Serialize,
     {
         let mut map = value_map_with_capacity(1);
-        map.insert(KeyRef::Str(variant), transform(value));
+        map.insert(variant.into(), transform(value));
         Ok(ValueRepr::Map(Arc::new(map), MapType::Normal).into())
     }
 
@@ -330,10 +330,10 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
     fn end(self) -> Result<Value, InvalidValue> {
         let mut map = value_map_with_capacity(1);
         map.insert(
-            KeyRef::Str(self.name),
-            Value(ValueRepr::Seq(self.fields.into())),
+            self.name.into(),
+            Value::from_seq_object(self.fields),
         );
-        Ok(Value(ValueRepr::Map(map.into(), MapType::Normal)))
+        Ok(Value::from_map_object(map))
     }
 }
 
@@ -362,7 +362,7 @@ impl ser::SerializeMap for SerializeMap {
         T: Serialize,
     {
         if let Some(key) = self.key.take() {
-            self.entries.insert(KeyRef::Value(key), transform(value));
+            self.entries.insert(key, transform(value));
         }
         Ok(())
     }
@@ -384,7 +384,7 @@ impl ser::SerializeMap for SerializeMap {
         V: Serialize,
     {
         if let Ok(key) = key.serialize(ValueSerializer) {
-            self.entries.insert(KeyRef::Value(key), transform(value));
+            self.entries.insert(key, transform(value));
         }
         Ok(())
     }
@@ -406,7 +406,7 @@ impl ser::SerializeStruct for SerializeStruct {
     where
         T: Serialize,
     {
-        self.fields.insert(KeyRef::Str(key), transform(value));
+        self.fields.insert(key.into(), transform(value));
         Ok(())
     }
 
@@ -432,7 +432,7 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
     where
         T: Serialize,
     {
-        self.map.insert(KeyRef::Str(key), transform(value));
+        self.map.insert(key.into(), transform(value));
         Ok(())
     }
 

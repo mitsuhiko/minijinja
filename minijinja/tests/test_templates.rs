@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{env, fs};
 
-use minijinja::value::{StructObject, Value};
+use minijinja::value::{MapObject, Value};
 use minijinja::{context, Environment, Error, State};
 
 use similar_asserts::assert_eq;
@@ -167,13 +167,14 @@ fn test_custom_filter() {
 
 #[test]
 fn test_items_and_dictsort_with_structs() {
+    #[derive(Clone)]
     struct MyStruct;
 
-    impl StructObject for MyStruct {
-        fn get_field(&self, name: &str) -> Option<Value> {
-            match name {
-                "a" => Some(Value::from("A")),
-                "b" => Some(Value::from("B")),
+    impl MapObject for MyStruct {
+        fn get_field(&self, name: &Value) -> Option<Value> {
+            match name.as_str() {
+                Some("a") => Some(Value::from("A")),
+                Some("b") => Some(Value::from("B")),
                 _ => None,
             }
         }
@@ -184,24 +185,25 @@ fn test_items_and_dictsort_with_structs() {
     }
 
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|items }}", x => Value::from_struct_object(MyStruct)),
+        minijinja::render!("{{ x|items }}", x => Value::from_map_object(MyStruct)),
         @r###"[["b", "B"], ["a", "A"]]"###
     );
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|dictsort }}", x => Value::from_struct_object(MyStruct)),
+        minijinja::render!("{{ x|dictsort }}", x => Value::from_map_object(MyStruct)),
         @r###"[["a", "A"], ["b", "B"]]"###
     );
 }
 
 #[test]
 fn test_urlencode_with_struct() {
+    #[derive(Clone)]
     struct MyStruct;
 
-    impl StructObject for MyStruct {
-        fn get_field(&self, name: &str) -> Option<Value> {
-            match name {
-                "a" => Some(Value::from("a 1")),
-                "b" => Some(Value::from("b 2")),
+    impl MapObject for MyStruct {
+        fn get_field(&self, name: &Value) -> Option<Value> {
+            match name.as_str() {
+                Some("a") => Some(Value::from("a 1")),
+                Some("b") => Some(Value::from("b 2")),
                 _ => None,
             }
         }
@@ -212,7 +214,7 @@ fn test_urlencode_with_struct() {
     }
 
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|urlencode }}", x => Value::from_struct_object(MyStruct)),
+        minijinja::render!("{{ x|urlencode }}", x => Value::from_map_object(MyStruct)),
         @"a=a%201&b=b%202"
     );
 }

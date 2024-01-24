@@ -1,9 +1,10 @@
 use std::fmt;
+use std::sync::Arc;
 
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
-use minijinja::value::{Kwargs, Object, ObjectKind, Rest, SeqObject, StructObject, Value};
+use minijinja::value::{Kwargs, Object, Rest, SeqObject, MapObject, Value};
 use minijinja::{args, Environment, Error};
 
 #[test]
@@ -176,17 +177,17 @@ fn test_map_object_iteration_and_indexing() {
     }
 
     impl Object for Point {
-        fn kind(&self) -> ObjectKind<'_> {
-            ObjectKind::Struct(self)
+        fn value(&self) -> Value {
+            Value::from_map_object(self.clone())
         }
     }
 
-    impl StructObject for Point {
-        fn get_field(&self, name: &str) -> Option<Value> {
-            match name {
-                "x" => Some(Value::from(self.0)),
-                "y" => Some(Value::from(self.1)),
-                "z" => Some(Value::from(self.2)),
+    impl MapObject for Point {
+        fn get_field(&self, key: &Value) -> Option<Value> {
+            match key.as_str() {
+                Some("x") => Some(Value::from(self.0)),
+                Some("y") => Some(Value::from(self.1)),
+                Some("z") => Some(Value::from(self.2)),
                 _ => None,
             }
         }
@@ -225,8 +226,8 @@ fn test_seq_object_iteration_and_indexing() {
     }
 
     impl Object for Point {
-        fn kind(&self) -> ObjectKind<'_> {
-            ObjectKind::Seq(self)
+        fn value(&self) -> Value {
+            Value::from_seq_object(self.clone())
         }
     }
 
@@ -284,8 +285,9 @@ fn test_value_object_interface() {
     assert_eq!(seq.item_count(), 4);
 
     let obj = val.as_object().unwrap();
-    let seq2 = match obj.kind() {
-        ObjectKind::Seq(s) => s,
+    let val = obj.value();
+    let seq2 = match val.as_seq() {
+        Some(s) => s,
         _ => panic!("did not expect this"),
     };
     assert_eq!(seq2.item_count(), 4);
@@ -316,6 +318,7 @@ fn test_obj_downcast() {
 
 #[test]
 fn test_seq_object_downcast() {
+    #[derive(Clone)]
     struct Thing {
         moo: i32,
     }
@@ -342,17 +345,18 @@ fn test_seq_object_downcast() {
 
 #[test]
 fn test_struct_object_downcast() {
+    #[derive(Clone)]
     struct Thing {
         moo: i32,
     }
 
-    impl StructObject for Thing {
-        fn get_field(&self, _name: &str) -> Option<Value> {
+    impl MapObject for Thing {
+        fn get_field(&self, _name: &Value) -> Option<Value> {
             None
         }
     }
 
-    let obj = Value::from_struct_object(Thing { moo: 42 });
+    let obj = Value::from_map_object(Thing { moo: 42 });
     let seq = obj.downcast_object_ref::<Thing>().unwrap();
     assert_eq!(seq.moo, 42);
 }
@@ -489,7 +493,7 @@ fn test_values_in_vec() {
 
 #[test]
 fn test_seq_object_borrow() {
-    fn connect(values: &dyn SeqObject) -> String {
+    fn connect(values: Arc<dyn SeqObject>) -> String {
         let mut rv = String::new();
         for item in values.iter() {
             rv.push_str(&item.to_string())
