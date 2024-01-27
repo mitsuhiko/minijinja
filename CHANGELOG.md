@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.13
+
+- `minijinja-cli` now supports an `-o` or `--output` parameter to write
+  into a target file.  #405
+
 ## 1.0.12
 
 - The `urlencode` filter now correctly skips over none and undefined.  #394
