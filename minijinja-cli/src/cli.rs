@@ -38,6 +38,9 @@ pub(super) fn make_command() -> Command {
             #[cfg(feature = "repl")]
             arg!(--repl "starts the repl with the given data")
                 .conflicts_with_all(["expr", "template"]),
+            arg!(-o --output <FILENAME> "path tot he output file")
+                .default_value("-")
+                .value_parser(value_parser!(PathBuf)),
             arg!(template: [TEMPLATE] "path to the input template").default_value("-"),
             arg!(data: [DATA] "path to the data file").value_parser(value_parser!(PathBuf)),
         ])

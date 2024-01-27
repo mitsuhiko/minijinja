@@ -1,10 +1,11 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::{fs, io};
 
-use anyhow::{bail, Context, Error};
+use anyhow::{anyhow, bail, Context, Error};
 use clap::ArgMatches;
 use minijinja::machinery::{get_compiled_template, parse, tokenize, Instructions};
 use minijinja::{
@@ -14,17 +15,61 @@ use minijinja::{
 #[cfg(feature = "repl")]
 mod repl;
 
+const STDIN_STDOUT: &str = "-";
 mod cli;
-
-const STDIN: &str = "-";
 
 #[cfg(not(feature = "json5"))]
 use serde_json as preferred_json;
 #[cfg(feature = "json5")]
 use serde_json5 as preferred_json;
 
+struct Output {
+    temp: Option<(PathBuf, tempfile::NamedTempFile)>,
+}
+
+impl Output {
+    pub fn new(filename: &Path) -> Result<Output, Error> {
+        Ok(Output {
+            temp: if filename == Path::new(STDIN_STDOUT) {
+                None
+            } else {
+                let filename = std::env::current_dir()?.join(filename);
+                let ntf = tempfile::NamedTempFile::new_in(
+                    filename
+                        .parent()
+                        .ok_or_else(|| anyhow!("cannot write to root"))?,
+                )?;
+                Some((filename.to_path_buf(), ntf))
+            },
+        })
+    }
+
+    pub fn commit(&mut self) -> Result<(), Error> {
+        if let Some((filename, temp)) = self.temp.take() {
+            temp.persist(filename)?;
+        }
+        Ok(())
+    }
+}
+
+impl Write for Output {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self.temp {
+            Some((_, ref mut out)) => out.write(buf),
+            None => std::io::stdout().write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self.temp {
+            Some((_, ref mut out)) => out.flush(),
+            None => std::io::stdout().flush(),
+        }
+    }
+}
+
 fn load_data(format: &str, path: &Path) -> Result<(BTreeMap<String, Value>, bool), Error> {
-    let (contents, stdin_used) = if path == Path::new(STDIN) {
+    let (contents, stdin_used) = if path == Path::new(STDIN_STDOUT) {
         (
             io::read_to_string(io::stdin()).context("unable to read data from stdin")?,
             true,
@@ -127,7 +172,7 @@ fn create_env(
         UndefinedBehavior::Lenient
     });
     env.set_path_join_callback(move |name, parent| {
-        let p = if parent == STDIN {
+        let p = if parent == STDIN_STDOUT {
             cwd.join(name)
         } else {
             Path::new(parent)
@@ -149,7 +194,7 @@ fn create_env(
             }
         }
 
-        if name == STDIN {
+        if name == STDIN_STDOUT {
             if stdin_used_for_data {
                 return Err(MError::new(
                     ErrorKind::InvalidOperation,
@@ -207,7 +252,7 @@ fn execute() -> Result<i32, Error> {
     let cwd = std::env::current_dir()?;
     let ctx = context!(..defines, ..base);
     let template = match matches.get_one::<String>("template").unwrap().as_str() {
-        STDIN => Cow::Borrowed(STDIN),
+        STDIN_STDOUT => Cow::Borrowed(STDIN_STDOUT),
         rel_name => Cow::Owned(cwd.join(rel_name).to_string_lossy().to_string()),
     };
     let allowed_template = if matches.get_flag("no-include") {
@@ -215,6 +260,7 @@ fn execute() -> Result<i32, Error> {
     } else {
         None
     };
+    let mut output = Output::new(matches.get_one::<PathBuf>("output").unwrap())?;
 
     let no_newline = matches.get_flag("no-newline");
 
@@ -223,9 +269,9 @@ fn execute() -> Result<i32, Error> {
     if let Some(expr) = matches.get_one::<String>("expr") {
         let rv = env.compile_expression(expr)?.eval(ctx)?;
         match matches.get_one::<String>("expr-out").unwrap().as_str() {
-            "print" => println!("{}", rv),
-            "json" => println!("{}", serde_json::to_string(&rv)?),
-            "json-pretty" => println!("{}", serde_json::to_string_pretty(&rv)?),
+            "print" => writeln!(&mut output, "{}", rv)?,
+            "json" => writeln!(&mut output, "{}", serde_json::to_string(&rv)?)?,
+            "json-pretty" => writeln!(&mut output, "{}", serde_json::to_string_pretty(&rv)?)?,
             "status" => {
                 return Ok(if let Ok(n) = i32::try_from(rv.clone()) {
                     n
@@ -241,23 +287,23 @@ fn execute() -> Result<i32, Error> {
         match dump.as_str() {
             "ast" => {
                 let tmpl = env.get_template(&template)?;
-                println!("{:#?}", parse(tmpl.source(), tmpl.name())?);
+                writeln!(&mut output, "{:#?}", parse(tmpl.source(), tmpl.name())?)?;
             }
             "tokens" => {
                 let tmpl = env.get_template(&template)?;
                 let tokens: Result<Vec<_>, _> =
                     tokenize(tmpl.source(), false, Default::default()).collect();
                 for (token, _) in tokens? {
-                    println!("{:?}", token);
+                    writeln!(&mut output, "{:?}", token)?;
                 }
             }
             "instructions" => {
                 let tmpl = env.get_template(&template)?;
                 let ctmpl = get_compiled_template(&tmpl);
                 for (block_name, instructions) in ctmpl.blocks.iter() {
-                    print_instructions(instructions, block_name);
+                    print_instructions(&mut output, instructions, block_name)?;
                 }
-                print_instructions(&ctmpl.instructions, "<root>");
+                print_instructions(&mut output, &ctmpl.instructions, "<root>")?;
             }
             _ => unreachable!(),
         }
@@ -269,24 +315,30 @@ fn execute() -> Result<i32, Error> {
     } else {
         let result = env.get_template(&template)?.render(ctx)?;
         if no_newline {
-            print!("{result}");
+            write!(&mut output, "{result}")?;
         } else {
-            println!("{result}");
+            writeln!(&mut output, "{result}")?;
         }
     }
 
+    output.commit()?;
     Ok(0)
 }
 
-fn print_instructions(instructions: &Instructions, block_name: &str) {
-    println!("Block: {block_name:?}");
+fn print_instructions(
+    output: &mut Output,
+    instructions: &Instructions,
+    block_name: &str,
+) -> Result<(), Error> {
+    writeln!(output, "Block: {block_name:?}")?;
     for idx in 0.. {
         if let Some(instruction) = instructions.get(idx) {
-            println!("  {idx:4}: {instruction:?}");
+            writeln!(output, "  {idx:4}: {instruction:?}")?;
         } else {
             break;
         }
     }
+    Ok(())
 }
 
 pub fn print_error(err: &Error) {
