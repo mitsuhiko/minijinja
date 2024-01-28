@@ -38,6 +38,8 @@ pub(super) fn make_command() -> Command {
             #[cfg(feature = "repl")]
             arg!(--repl "starts the repl with the given data")
                 .conflicts_with_all(["expr", "template"]),
+            #[cfg(feature = "completions")]
+            arg!(--"generate-completion" <SHELL> "generate a completion script for the given shell"),
             arg!(-o --output <FILENAME> "path tot he output file")
                 .default_value("-")
                 .value_parser(value_parser!(PathBuf)),
