@@ -71,6 +71,10 @@ can be set to stdin at once.
     prints internals of the template.  Possible options are `tokens` to see the output
     of the tokenizer, `ast` to see the AST after parsing, and `instructions` to inspect
     the compiled bytecode.
+- `-o`, `--output` `<FILENAME>`:
+    writes the output to a filename rather than stdout.
+- `--generate-completion` `<SHELL>`:
+    generate the completions for the given shell.
 - `--version`:
     prints the version.
 - `--help`:
@@ -143,6 +147,11 @@ selected when the defaults are turned off:
 * `json5`: enables JSON5 support (instead of JSON)
 * `querystring`: enables querystring support
 * `datetime`: enables the date and time filters and `now()` function
+* `completions`: enables the generation of completions
+
+Additionally if the `ASSET_OUT_DIR` environment variable is set during
+compilation manpage (and optionally completions) are generated into that
+folder.
 
 ## Sponsor
 

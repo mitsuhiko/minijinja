@@ -247,7 +247,7 @@ fn generate_completions(shell: &str) -> Result<i32, Error> {
         "powershell" => gen!(clap_complete::Shell::PowerShell),
         "nushell" => gen!(clap_complete_nushell::Nushell),
         "fig" => gen!(clap_complete_fig::Fig),
-        _ => bail!("unknown shell '{}'", shell),
+        _ => unreachable!(),
     };
 
     Ok(0)
