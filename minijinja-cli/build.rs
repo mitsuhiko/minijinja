@@ -1,10 +1,5 @@
 use std::fs::create_dir_all;
 
-use clap::ValueEnum;
-use clap_complete::Shell;
-use clap_complete_fig::Fig;
-use clap_complete_nushell::Nushell;
-
 pub mod cli {
     include!("src/cli.rs");
 }
@@ -17,6 +12,7 @@ fn main() -> std::io::Result<()> {
         None => return Ok(()),
     };
 
+    #[allow(unused_mut)]
     let mut cli = cli::make_command();
 
     let man = clap_mangen::Man::new(cli.clone());
@@ -27,14 +23,29 @@ fn main() -> std::io::Result<()> {
     create_dir_all(&man_out_dir)?;
     std::fs::write(man_out_dir.join("minijinja-cli.1"), man_buffer)?;
 
-    let completions_out_dir = out_dir.as_path().join("completions");
-    create_dir_all(&completions_out_dir)?;
+    #[cfg(feature = "completions")]
+    {
+        use clap::ValueEnum;
 
-    for shell in Shell::value_variants() {
-        clap_complete::generate_to(*shell, &mut cli, "minijinja-cli", &completions_out_dir)?;
+        let completions_out_dir = out_dir.as_path().join("completions");
+        create_dir_all(&completions_out_dir)?;
+
+        for shell in clap_complete::Shell::value_variants() {
+            clap_complete::generate_to(*shell, &mut cli, "minijinja-cli", &completions_out_dir)?;
+        }
+        clap_complete::generate_to(
+            clap_complete_nushell::Nushell,
+            &mut cli,
+            "minijinja-cli",
+            &completions_out_dir,
+        )?;
+        clap_complete::generate_to(
+            clap_complete_fig::Fig,
+            &mut cli,
+            "minijinja-cli",
+            &completions_out_dir,
+        )?;
     }
-    clap_complete::generate_to(Nushell, &mut cli, "minijinja-cli", &completions_out_dir)?;
-    clap_complete::generate_to(Fig, &mut cli, "minijinja-cli", &completions_out_dir)?;
 
     Ok(())
 }

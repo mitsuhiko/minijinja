@@ -226,8 +226,42 @@ fn create_env(
     env
 }
 
+#[cfg(feature = "completions")]
+fn generate_completions(shell: &str) -> Result<i32, Error> {
+    macro_rules! gen {
+        ($shell:expr) => {
+            clap_complete::generate(
+                $shell,
+                &mut cli::make_command(),
+                "minijinja-cli",
+                &mut std::io::stdout(),
+            )
+        };
+    }
+
+    match shell {
+        "bash" => gen!(clap_complete::Shell::Bash),
+        "zsh" => gen!(clap_complete::Shell::Zsh),
+        "elvish" => gen!(clap_complete::Shell::Elvish),
+        "fish" => gen!(clap_complete::Shell::Fish),
+        "powershell" => gen!(clap_complete::Shell::PowerShell),
+        "nushell" => gen!(clap_complete_nushell::Nushell),
+        "fig" => gen!(clap_complete_fig::Fig),
+        _ => unreachable!(),
+    };
+
+    Ok(0)
+}
+
 fn execute() -> Result<i32, Error> {
     let matches = cli::make_command().get_matches();
+
+    #[cfg(feature = "completions")]
+    {
+        if let Some(shell) = matches.get_one::<String>("generate-completion") {
+            return generate_completions(shell);
+        }
+    }
 
     let format = matches.get_one::<String>("format").unwrap();
     let (base, stdin_used) = if let Some(data) = matches.get_one::<PathBuf>("data") {
