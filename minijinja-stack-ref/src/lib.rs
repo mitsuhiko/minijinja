@@ -128,11 +128,10 @@ use std::collections::HashSet;
 use std::ffi::c_void;
 use std::fmt;
 use std::marker::PhantomData;
-use std::mem::transmute;
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use minijinja::value::{Object, ObjectKind, SeqObject, MapObject, Value};
+use minijinja::value::{Object, SeqObject, MapObject, Value};
 use minijinja::{Error, State};
 
 static STACK_SCOPE_COUNTER: AtomicU64 = AtomicU64::new(0);

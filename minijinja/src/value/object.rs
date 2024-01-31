@@ -276,7 +276,7 @@ impl<T: Object> Object for Arc<T> {
 ///
 /// let value = Value::from_object(Point(1.0, 2.5, 3.0));
 /// ```
-pub trait SeqObject: dyn_clone::DynClone + Send + Sync {
+pub trait SeqObject: Send + Sync {
     /// Looks up an item by index.
     ///
     /// Sequences should provide a value for all items in the range of `0..item_count`
@@ -293,8 +293,6 @@ pub trait SeqObject: dyn_clone::DynClone + Send + Sync {
         <Self as Any>::type_id(self)
     }
 }
-
-dyn_clone::clone_trait_object!(SeqObject);
 
 impl dyn SeqObject + '_ {
     /// Convenient iterator over a [`SeqObject`].
@@ -524,7 +522,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// One thing of note here is that in the above example `env` would be re-created every
 /// time the template needs it.  A better implementation would cache the value after it
 /// was created first.
-pub trait MapObject: dyn_clone::DynClone + Send + Sync {
+pub trait MapObject: Send + Sync {
     /// Invoked by the engine to get a field of a struct.
     ///
     /// Where possible it's a good idea for this to align with the return value
@@ -582,8 +580,6 @@ pub trait MapObject: dyn_clone::DynClone + Send + Sync {
         <Self as Any>::type_id(self)
     }
 }
-
-dyn_clone::clone_trait_object!(MapObject);
 
 impl MapObject for ValueMap {
     #[inline]
