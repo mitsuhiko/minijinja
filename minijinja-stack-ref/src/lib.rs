@@ -227,7 +227,7 @@ pub fn reborrow<T: ?Sized, R>(obj: &T, f: for<'a> fn(&'a T, &'a Scope) -> R) -> 
             }
         };
 
-        if handle.ptr != obj as *const T {
+        if !std::ptr::eq(handle.ptr, obj as *const T) {
             panic!(
                 "cannot reborrow &{} as it's not held in an active stack handle ({:?} != {:?})",
                 std::any::type_name::<T>(),
@@ -288,7 +288,7 @@ pub fn can_reborrow<T: ?Sized>(obj: &T) -> bool {
             None => return false,
         };
 
-        if handle.ptr != obj as *const T {
+        if !std::ptr::eq(handle.ptr, obj as *const T) {
             return false;
         }
 
