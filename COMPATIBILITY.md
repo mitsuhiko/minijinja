@@ -129,6 +129,15 @@ useful.
 
 `raw` has feature parity with Jinja2.
 
+### `{% continue %}`
+
+`continue` is not supported. You can, however, filter a sequence during
+iteration to skip items.
+
+### `{% break %}`
+
+`break` is not supported.
+
 ## Expressions
 
 Most expressions are supported from Jinja2.  The main difference for expressions
