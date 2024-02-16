@@ -116,6 +116,7 @@ impl dyn Object {
     /// It also works with [`SeqObject`] or [`MapObject`]:
     ///
     /// ```rust
+    /// # use std::sync::Arc;
     /// # use minijinja::value::{Value, SeqObject};
     ///
     /// #[derive(Clone)]
@@ -124,11 +125,11 @@ impl dyn Object {
     /// }
     ///
     /// impl SeqObject for Thing {
-    ///     fn get_item(&self, idx: usize) -> Option<Value> {
+    ///     fn get_item(self: &Arc<Self>, idx: usize) -> Option<Value> {
     ///         (idx < 3).then(|| Value::from(idx))
     ///     }
     ///
-    ///     fn item_count(&self) -> usize {
+    ///     fn item_count(self: &Arc<Self>) -> usize {
     ///         3
     ///     }
     /// }
@@ -145,15 +146,13 @@ impl dyn Object {
             return Some(unsafe { &*(self as *const dyn Object as *const T) });
         }
 
-        if type_id == TypeId::of::<Arc<dyn SeqObject>>() {
+        if type_id == TypeId::of::<AnySeqObject>() {
             let inner = unsafe {
-                &*(self as *const dyn Object as *const Arc<dyn SeqObject>)
+                &*(self as *const dyn Object as *const AnySeqObject)
             };
 
-            if SeqObject::type_id(&**inner) == TypeId::of::<T>() {
-                // SAFETY: type type id check ensures this type cast is correct
-                return Some(unsafe { &*(&**inner as *const dyn SeqObject as *const T) });
-            }
+            let arc = inner.downcast::<T>()?;
+            return Some(&*arc);
         }
 
         if type_id == TypeId::of::<AnyMapObject>() {
@@ -208,13 +207,14 @@ impl<T: Object> Object for Arc<T> {
 /// stringification and debug printing.
 ///
 /// ```
+/// use std::sync::Arc;
 /// use minijinja::value::{Value, SeqObject};
 ///
 /// #[derive(Clone)]
 /// struct Point(f32, f32, f32);
 ///
 /// impl SeqObject for Point {
-///     fn get_item(&self, idx: usize) -> Option<Value> {
+///     fn get_item(self: &Arc<Self>, idx: usize) -> Option<Value> {
 ///         match idx {
 ///             0 => Some(Value::from(self.0)),
 ///             1 => Some(Value::from(self.1)),
@@ -223,7 +223,7 @@ impl<T: Object> Object for Arc<T> {
 ///         }
 ///     }
 ///
-///     fn item_count(&self) -> usize {
+///     fn item_count(self: &Arc<Self>) -> usize {
 ///         3
 ///     }
 /// }
@@ -240,6 +240,7 @@ impl<T: Object> Object for Arc<T> {
 ///
 /// ```
 /// use std::fmt;
+/// use std::sync::Arc;
 /// use minijinja::value::{Value, Object, SeqObject};
 ///
 /// #[derive(Debug, Clone)]
@@ -258,7 +259,7 @@ impl<T: Object> Object for Arc<T> {
 /// }
 ///
 /// impl SeqObject for Point {
-///     fn get_item(&self, idx: usize) -> Option<Value> {
+///     fn get_item(self: &Arc<Self>, idx: usize) -> Option<Value> {
 ///         match idx {
 ///             0 => Some(Value::from(self.0)),
 ///             1 => Some(Value::from(self.1)),
@@ -267,104 +268,83 @@ impl<T: Object> Object for Arc<T> {
 ///         }
 ///     }
 ///
-///     fn item_count(&self) -> usize {
+///     fn item_count(self: &Arc<Self>) -> usize {
 ///         3
 ///     }
 /// }
 ///
 /// let value = Value::from_object(Point(1.0, 2.5, 3.0));
 /// ```
-pub trait SeqObject: Send + Sync {
+pub trait SeqObject {
     /// Looks up an item by index.
     ///
     /// Sequences should provide a value for all items in the range of `0..item_count`
     /// but the engine will assume that items within the range are `Undefined`
     /// if `None` is returned.
-    fn get_item(&self, idx: usize) -> Option<Value>;
+    fn get_item(self: &Arc<Self>, idx: usize) -> Option<Value>;
 
     /// Returns the number of items in the sequence.
-    fn item_count(&self) -> usize;
+    fn item_count(self: &Arc<Self>) -> usize;
+}
 
-    /// .
-    #[doc(hidden)]
-    fn type_id(&self) -> TypeId where Self: Any {
-        <Self as Any>::type_id(self)
+type_erase! {
+    pub trait SeqObject: Send + Sync => AnySeqObject(AnySeqObjectVT) {
+        fn get_item(&self, idx: usize) -> Option<Value>;
+        fn item_count(&self) -> usize;
     }
 }
 
-impl dyn SeqObject + '_ {
-    /// Convenient iterator over a [`SeqObject`].
-    pub fn iter(&self) -> SeqObjectIter<'_> {
-        SeqObjectIter {
-            seq: self,
-            range: 0..self.item_count(),
-        }
-    }
-}
+// impl<T: SeqObject> SeqObject for Arc<T> {
+//     #[inline]
+//     fn get_item(self: &Arc<Self>, idx: usize) -> Option<Value> {
+//         T::get_item(self, idx)
+//     }
+//
+//     #[inline]
+//     fn item_count(&self) -> usize {
+//         T::item_count(self)
+//     }
+// }
+//
+// impl<'a, T: SeqObject + ?Sized> SeqObject for &'a T {
+//     #[inline]
+//     fn get_item(&self, idx: usize) -> Option<Value> {
+//         T::get_item(self, idx)
+//     }
+//
+//     #[inline]
+//     fn item_count(&self) -> usize {
+//         T::item_count(self)
+//     }
+// }
 
-impl<'a> fmt::Debug for dyn SeqObject + 'a {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_list().entries(self.iter()).finish()
-    }
-}
+// impl<T: Into<Value> + Send + Sync + Clone> SeqObject for [T] {
+//     #[inline(always)]
+//     fn get_item(self: &Arc<Self>, idx: usize) -> Option<Value> {
+//         self.get(idx).cloned().map(Into::into)
+//     }
+//
+//     #[inline(always)]
+//     fn item_count(self: &Arc<Self>) -> usize {
+//         self.len()
+//     }
+// }
 
-impl<'a> std::hash::Hash for dyn SeqObject + 'a {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.iter().for_each(|v| v.hash(state));
-    }
-}
-
-impl<T: SeqObject> SeqObject for Arc<T> {
-    #[inline]
-    fn get_item(&self, idx: usize) -> Option<Value> {
-        T::get_item(self, idx)
-    }
-
-    #[inline]
-    fn item_count(&self) -> usize {
-        T::item_count(self)
-    }
-}
-
-impl<'a, T: SeqObject + ?Sized> SeqObject for &'a T {
-    #[inline]
-    fn get_item(&self, idx: usize) -> Option<Value> {
-        T::get_item(self, idx)
-    }
-
-    #[inline]
-    fn item_count(&self) -> usize {
-        T::item_count(self)
-    }
-}
-
-impl<T: Into<Value> + Send + Sync + Clone> SeqObject for [T] {
+impl<T: Into<Value> + Clone> SeqObject for Vec<T> {
     #[inline(always)]
-    fn get_item(&self, idx: usize) -> Option<Value> {
+    fn get_item(self: &Arc<Self>, idx: usize) -> Option<Value> {
         self.get(idx).cloned().map(Into::into)
     }
 
     #[inline(always)]
-    fn item_count(&self) -> usize {
-        self.len()
-    }
-}
-
-impl<T: Into<Value> + Send + Sync + Clone> SeqObject for Vec<T> {
-    #[inline(always)]
-    fn get_item(&self, idx: usize) -> Option<Value> {
-        self.get(idx).cloned().map(Into::into)
-    }
-
-    #[inline(always)]
-    fn item_count(&self) -> usize {
+    fn item_count(self: &Arc<Self>) -> usize {
         self.len()
     }
 }
 
 /// Iterates over [`SeqObject`]
 pub struct SeqObjectIter<'a> {
-    seq: &'a dyn SeqObject,
+    seq: &'a AnySeqObject,
     range: Range<usize>,
 }
 
@@ -394,6 +374,46 @@ impl<'a> DoubleEndedIterator for SeqObjectIter<'a> {
 }
 
 impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
+
+impl AnySeqObject {
+    /// Convenient iterator over a [`SeqObject`].
+    pub fn iter(&self) -> SeqObjectIter<'_> {
+        SeqObjectIter {
+            seq: self,
+            range: 0..self.item_count(),
+        }
+    }
+}
+
+impl fmt::Debug for AnySeqObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl std::hash::Hash for AnySeqObject {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.iter().for_each(|v| v.hash(state));
+    }
+}
+
+impl fmt::Display for AnySeqObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <Self as fmt::Debug>::fmt(self, f)
+    }
+}
+
+impl Object for AnySeqObject {
+    fn value(&self) -> Value {
+        Value::from(self.clone())
+    }
+}
+
+impl<T: SeqObject + Send + Sync + 'static> From<Arc<T>> for AnySeqObject {
+    fn from(value: Arc<T>) -> Self {
+        AnySeqObject::new(value)
+    }
+}
 
 /// Provides the behavior of an [`Object`] holding a struct.
 ///
@@ -577,6 +597,15 @@ pub trait MapObject {
     }
 }
 
+type_erase! {
+    pub trait MapObject: Send + Sync => AnyMapObject(AnyMapObjectVT) {
+        fn get_field(&self, key: &Value) -> Option<Value>;
+        fn static_fields(&self) -> Option<&'static [&'static str]>;
+        fn fields(&self) -> Vec<Value>;
+        fn field_count(&self) -> usize;
+    }
+}
+
 impl MapObject for ValueMap {
     #[inline]
     fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
@@ -652,27 +681,6 @@ impl<K, V> MapObject for HashMap<K, V>
     }
 }
 
-impl fmt::Display for dyn SeqObject {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <Self as fmt::Debug>::fmt(self, f)
-    }
-}
-
-impl Object for Arc<dyn SeqObject> {
-    fn value(&self) -> Value {
-        Value::from(self.clone())
-    }
-}
-
-type_erase! {
-    pub trait MapObject: Send + Sync => AnyMapObject(AnyMapObjectVT) {
-        fn get_field(&self, key: &Value) -> Option<Value>;
-        fn static_fields(&self) -> Option<&'static [&'static str]>;
-        fn fields(&self) -> Vec<Value>;
-        fn field_count(&self) -> usize;
-    }
-}
-
 impl<T: MapObject + Send + Sync + 'static> From<Arc<T>> for AnyMapObject {
     fn from(value: Arc<T>) -> Self {
         AnyMapObject::new(value)
@@ -710,26 +718,3 @@ impl AnyMapObject {
         self.iter().collect()
     }
 }
-//
-// impl<'a, T: MapObject + ?Sized> MapObject for &'a T {
-//     #[inline]
-//     fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
-//         T::get_field(self, key)
-//     }
-//
-//     #[inline]
-//     fn static_fields(self: &Arc<Self>) -> Option<&'static [&'static str]> {
-//         T::static_fields(self)
-//     }
-//
-//     #[inline]
-//     fn fields(self: &Arc<Self>) -> Vec<Value> {
-//         T::fields(self)
-//     }
-//
-//     #[inline]
-//     fn field_count(self: &Arc<Self>) -> usize {
-//         T::field_count(self)
-//     }
-// }
-//

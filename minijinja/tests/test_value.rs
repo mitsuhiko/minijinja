@@ -4,7 +4,7 @@ use std::sync::Arc;
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
-use minijinja::value::{Kwargs, Object, Rest, SeqObject, MapObject, Value};
+use minijinja::value::{AnySeqObject, Kwargs, MapObject, Object, Rest, SeqObject, Value};
 use minijinja::{args, Environment, Error};
 
 #[test]
@@ -232,7 +232,7 @@ fn test_seq_object_iteration_and_indexing() {
     }
 
     impl SeqObject for Point {
-        fn get_item(&self, index: usize) -> Option<Value> {
+        fn get_item(self: &Arc<Self>, index: usize) -> Option<Value> {
             match index {
                 0 => Some(Value::from(self.0)),
                 1 => Some(Value::from(self.1)),
@@ -241,7 +241,7 @@ fn test_seq_object_iteration_and_indexing() {
             }
         }
 
-        fn item_count(&self) -> usize {
+        fn item_count(self: &Arc<Self>) -> usize {
             3
         }
     }
@@ -273,7 +273,7 @@ fn test_builtin_seq_objects() {
 
     let rv = minijinja::render!(
         "{{ val }}",
-        val => Value::from_seq_object(&["foo", "bar"][..]),
+        val => Value::from_seq_object(vec!["foo", "bar"]),
     );
     assert_snapshot!(rv, @r###"["foo", "bar"]"###);
 }
@@ -324,7 +324,7 @@ fn test_seq_object_downcast() {
     }
 
     impl SeqObject for Thing {
-        fn get_item(&self, idx: usize) -> Option<Value> {
+        fn get_item(self: &Arc<Self>, idx: usize) -> Option<Value> {
             if idx < 3 {
                 Some(Value::from(idx))
             } else {
@@ -332,7 +332,7 @@ fn test_seq_object_downcast() {
             }
         }
 
-        fn item_count(&self) -> usize {
+        fn item_count(self: &Arc<Self>) -> usize {
             3
         }
     }
@@ -493,7 +493,7 @@ fn test_values_in_vec() {
 
 #[test]
 fn test_seq_object_borrow() {
-    fn connect(values: Arc<dyn SeqObject>) -> String {
+    fn connect(values: AnySeqObject) -> String {
         let mut rv = String::new();
         for item in values.iter() {
             rv.push_str(&item.to_string())

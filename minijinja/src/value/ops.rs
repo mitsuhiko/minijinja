@@ -1,7 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{SeqObject, Value, ValueKind, ValueRepr};
+use crate::value::{AnySeqObject, Value, ValueKind, ValueRepr};
 
 const MIN_I128_AS_POS_U128: u128 = 170141183460469231731687303715884105728;
 
@@ -73,7 +73,7 @@ fn get_offset_and_len<F: FnOnce() -> usize>(
     }
 }
 
-fn slice_seq(seq: &dyn SeqObject, start: i64, stop: Option<i64>, step: usize) -> Value {
+fn slice_seq(seq: &AnySeqObject, start: i64, stop: Option<i64>, step: usize) -> Value {
     let (start, len) = get_offset_and_len(start, stop, || seq.item_count());
     Value::from(
         seq.iter()
@@ -126,9 +126,9 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
             ))
         }
         ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
-        ValueRepr::Seq(s) => Ok(slice_seq(&*s, start, stop, step)),
+        ValueRepr::Seq(s) => Ok(slice_seq(&s, start, stop, step)),
         ValueRepr::Dynamic(dy) => match dy.value().0 {
-            ValueRepr::Seq(s) => Ok(slice_seq(&*s, start, stop, step)),
+            ValueRepr::Seq(s) => Ok(slice_seq(&s, start, stop, step)),
             _ => return error,
         }
         _ => return error,

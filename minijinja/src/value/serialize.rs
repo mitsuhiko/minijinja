@@ -264,7 +264,7 @@ impl ser::SerializeSeq for SerializeSeq {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(ValueRepr::Seq(Arc::new(self.elements)).into())
+        Ok(Value::from_seq_object(self.elements))
     }
 }
 
@@ -285,7 +285,7 @@ impl ser::SerializeTuple for SerializeTuple {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(ValueRepr::Seq(Arc::new(self.elements)).into())
+        Ok(Value::from_seq_object(self.elements))
     }
 }
 
@@ -306,7 +306,7 @@ impl ser::SerializeTupleStruct for SerializeTupleStruct {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value(ValueRepr::Seq(Arc::new(self.fields))))
+        Ok(Value::from_seq_object(self.fields))
     }
 }
 

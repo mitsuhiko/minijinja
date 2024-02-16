@@ -401,7 +401,7 @@ impl<'source> CodeGenerator<'source> {
                     ast::Expr::Var(var) => Value::from(var.id),
                     _ => unreachable!(),
                 })
-                .collect::<Vec<_>>()
+                .collect::<Vec<Value>>()
         )));
         let mut flags = 0;
         if caller_reference {

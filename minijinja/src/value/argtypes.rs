@@ -7,8 +7,8 @@ use std::ops::{Deref, DerefMut};
 use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
-    Arc, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, ValueMap,
-    ValueRepr, AnyMapObject,
+    Arc, MapType, Object, Packed, StringType, Value, ValueKind, ValueMap,
+    ValueRepr, AnyMapObject, AnySeqObject,
 };
 use crate::vm::State;
 
@@ -300,7 +300,7 @@ impl From<()> for Value {
 
 impl<V: Into<Value>> FromIterator<V> for Value {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
-        let vec = iter.into_iter().map(Into::into).collect::<Vec<_>>();
+        let vec = iter.into_iter().map(Into::into).collect::<Vec<Value>>();
         Value::from_seq_object(vec)
     }
 }
@@ -396,9 +396,8 @@ value_from!(i64, I64);
 value_from!(f32, F64);
 value_from!(f64, F64);
 value_from!(Arc<Vec<u8>>, Bytes);
-value_from!(Arc<Vec<Value>>, Seq);
 value_from!(Arc<dyn Object>, Dynamic);
-value_from!(Arc<dyn SeqObject>, Seq);
+value_from!(AnySeqObject, Seq);
 
 fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {
     Error::new(
@@ -541,8 +540,8 @@ impl<'a> ArgType<'a> for &[u8] {
     }
 }
 
-impl<'a> ArgType<'a> for Arc<dyn SeqObject> {
-    type Output = Arc<dyn SeqObject>;
+impl<'a> ArgType<'a> for AnySeqObject {
+    type Output = AnySeqObject;
 
     fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
         match value {

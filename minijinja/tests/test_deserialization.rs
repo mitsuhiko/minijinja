@@ -18,7 +18,7 @@ fn test_seq_object() {
     struct X;
 
     impl SeqObject for X {
-        fn get_item(&self, idx: usize) -> Option<Value> {
+        fn get_item(self: &Arc<Self>, idx: usize) -> Option<Value> {
             if idx < 3 {
                 Some(Value::from(idx + 1))
             } else {
@@ -26,7 +26,7 @@ fn test_seq_object() {
             }
         }
 
-        fn item_count(&self) -> usize {
+        fn item_count(self: &Arc<Self>) -> usize {
             3
         }
     }

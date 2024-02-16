@@ -145,7 +145,7 @@ use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
 pub use crate::value::object::{Object, SeqObject, SeqObjectIter, MapObject};
-pub use crate::value::object::{AnyMapObject};
+pub use crate::value::object::{AnyMapObject, AnySeqObject};
 
 #[macro_use]
 mod type_erase;
@@ -322,7 +322,7 @@ pub(crate) enum ValueRepr {
     // FIXME: Make Cow<'static, str>?
     String(Arc<str>, StringType),
     Bytes(Arc<Vec<u8>>),
-    Seq(Arc<dyn SeqObject>),
+    Seq(AnySeqObject),
     Map(AnyMapObject, MapType),
     Dynamic(Arc<dyn Object>),
 }
@@ -643,17 +643,15 @@ impl Value {
     }
 
     /// Creates a value from an owned [`SeqObject`].
-    ///
-    /// This is a simplified API for creating dynamic sequences
-    /// without having to implement the entire [`Object`] protocol.
-    // pub fn from_seq_object<T: SeqObject + 'static>(value: T) -> Value
-    //     Value(ValueRepr::Seq(Arc::new(value)))
-    // }
-
-    pub fn from_seq_object<T: SeqObject + ?Sized + 'static>(value: T) -> Value
-        where T: Into<Arc<T>>
+    pub fn from_seq_object<T>(value: T) -> Value
+        where T: SeqObject + Send + Sync + 'static,
     {
-        Value(ValueRepr::Seq(value.into() as Arc<dyn SeqObject>))
+        Value(ValueRepr::Seq(Arc::new(value).into()))
+    }
+
+    /// Creates a value from an owned [`SeqObject`].
+    pub fn from_any_seq_object<T: Into<AnySeqObject>>(value: T) -> Value {
+        Value(ValueRepr::Seq(value.into()))
     }
 
     /// Creates a value from an owned [`MapObject`].
@@ -805,7 +803,7 @@ impl Value {
     }
 
     /// If the value is a sequence it's returned as [`SeqObject`].
-    pub fn as_seq(&self) -> Option<Arc<dyn SeqObject>> {
+    pub fn as_seq(&self) -> Option<AnySeqObject> {
         match self.0 {
             ValueRepr::Seq(ref v) => Some(v.clone()),
             ValueRepr::Dynamic(ref dy) => dy.value().as_seq(),
@@ -984,6 +982,7 @@ impl Value {
     /// It also works with [`SeqObject`] or [`MapObject`]:
     ///
     /// ```rust
+    /// # use std::sync::Arc;
     /// # use minijinja::value::{Value, SeqObject};
     ///
     /// #[derive(Clone)]
@@ -992,10 +991,10 @@ impl Value {
     /// }
     ///
     /// impl SeqObject for Thing {
-    ///     fn get_item(&self, idx: usize) -> Option<Value> {
+    ///     fn get_item(self: &Arc<Self>, idx: usize) -> Option<Value> {
     ///         (idx < 3).then(|| Value::from(idx))
     ///     }
-    ///     fn item_count(&self) -> usize {
+    ///     fn item_count(self: &Arc<Self>) -> usize {
     ///         3
     ///     }
     /// }
@@ -1012,7 +1011,7 @@ impl Value {
         let seq = match self.0 {
             ValueRepr::Map(ref items, _) => return items.get_field(key),
             ValueRepr::Dynamic(ref dy) => return dy.value().get_item_opt(key),
-            ValueRepr::Seq(ref items) => &**items as &dyn SeqObject,
+            ValueRepr::Seq(ref items) => items,
             ValueRepr::String(ref s, _) => {
                 if let Some(idx) = key.as_i64() {
                     let idx = some!(isize::try_from(idx).ok());
@@ -1142,7 +1141,7 @@ impl Value {
                 } else {
                     let attrs = s.fields();
                     let attr_count = attrs.len();
-                    (ValueIteratorState::DynSeq(0, Arc::new(attrs)), attr_count)
+                    (ValueIteratorState::DynSeq(0, Arc::new(attrs).into()), attr_count)
                 }
             }
             ValueRepr::Dynamic(ref obj) => return obj.value().try_iter_owned(),
@@ -1282,7 +1281,7 @@ enum ValueIteratorState {
     Empty,
     Chars(usize, Arc<str>),
     StaticStr(usize, &'static [&'static str]),
-    DynSeq(usize, Arc<dyn SeqObject>),
+    DynSeq(usize, AnySeqObject),
 }
 
 impl ValueIteratorState {

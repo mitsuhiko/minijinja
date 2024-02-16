@@ -688,16 +688,16 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         ignore_missing: bool,
     ) -> Result<(), Error> {
-        use crate::value::SeqObject;
-
-        let single_name_slice = std::slice::from_ref(&name);
         let seq = name.as_seq();
-        let choices = seq.as_ref()
-            .map(|d| &**d as &dyn SeqObject)
-            .unwrap_or(&single_name_slice as &dyn SeqObject);
+        let choices = seq
+            .as_ref()
+            .map(|d| d.iter())
+            .into_iter()
+            .flatten()
+            .chain(seq.is_none().then(|| name.clone()).into_iter());
 
         let mut templates_tried = vec![];
-        for choice in choices.iter() {
+        for choice in choices {
             let name = ok!(choice.as_str().ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
