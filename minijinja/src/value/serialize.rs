@@ -5,7 +5,7 @@ use serde::{ser, Serialize, Serializer};
 
 use crate::utils::untrusted_size_hint;
 use crate::value::{
-    value_map_with_capacity, Arc, MapType, Packed, StringType, Value, ValueMap, ValueRepr,
+    value_map_with_capacity, Arc, Packed, StringType, Value, ValueMap, ValueRepr,
     VALUE_HANDLES, VALUE_HANDLE_MARKER,
 };
 
@@ -178,7 +178,7 @@ impl Serializer for ValueSerializer {
     {
         let mut map = value_map_with_capacity(1);
         map.insert(variant.into(), transform(value));
-        Ok(ValueRepr::Map(Arc::new(map), MapType::Normal).into())
+        Ok(Value::from_map_object(map))
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, InvalidValue> {
@@ -368,10 +368,7 @@ impl ser::SerializeMap for SerializeMap {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value(ValueRepr::Map(
-            Arc::new(self.entries),
-            MapType::Normal,
-        )))
+        Ok(Value::from_map_object(self.entries))
     }
 
     fn serialize_entry<K: ?Sized, V: ?Sized>(
@@ -411,7 +408,7 @@ impl ser::SerializeStruct for SerializeStruct {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(ValueRepr::Map(Arc::new(self.fields), MapType::Normal).into())
+        Ok(Value::from_map_object(self.fields))
     }
 }
 
@@ -438,10 +435,7 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
 
     fn end(self) -> Result<Value, InvalidValue> {
         let mut rv = BTreeMap::new();
-        rv.insert(
-            self.variant,
-            Value::from(ValueRepr::Map(Arc::new(self.map), MapType::Normal)),
-        );
+        rv.insert(self.variant, Value::from_map_object(self.map));
         Ok(rv.into())
     }
 }

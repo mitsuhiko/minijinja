@@ -6,6 +6,7 @@ use crate::error::{Error, ErrorKind};
 use crate::value::{Object, MapObject, Value};
 use crate::vm::state::State;
 
+// TODO: Remove this wrapper once everything gives `&Arc<Self>`.
 #[derive(Clone)]
 pub(crate) struct Loop {
     pub status: Arc<LoopStatus>,
@@ -77,6 +78,16 @@ impl Object for Loop {
 }
 
 impl MapObject for Loop {
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        Loop::static_fields(&self)
+    }
+
+    fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        Loop::get_field(&self, key)
+    }
+}
+
+impl Loop {
     fn static_fields(&self) -> Option<&'static [&'static str]> {
         Some(
             &[

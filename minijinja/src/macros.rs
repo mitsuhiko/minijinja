@@ -46,7 +46,7 @@ pub mod __context {
 
     #[inline(always)]
     pub fn build(ctx: ValueMap) -> Value {
-        ValueRepr::Map(Arc::new(ctx), MapType::Normal).into()
+        Value::from_map_object(ctx)
     }
 
     pub fn thread_local_env() -> Rc<Environment<'static>> {

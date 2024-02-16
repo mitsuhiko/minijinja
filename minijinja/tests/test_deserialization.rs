@@ -1,5 +1,5 @@
 #![cfg(feature = "deserialization")]
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 use similar_asserts::assert_eq;
@@ -54,7 +54,7 @@ fn test_struct_object() {
     struct X;
 
     impl MapObject for X {
-        fn get_field(&self, name: &Value) -> Option<Value> {
+        fn get_field(self: &Arc<Self>, name: &Value) -> Option<Value> {
             match name.as_str()? {
                 "a" => Some(Value::from(1)),
                 "b" => Some(Value::from(2)),

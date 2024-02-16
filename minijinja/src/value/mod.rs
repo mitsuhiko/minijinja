@@ -145,7 +145,10 @@ use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
 pub use crate::value::object::{Object, SeqObject, SeqObjectIter, MapObject};
+pub use crate::value::object::{AnyMapObject};
 
+#[macro_use]
+mod type_erase;
 mod argtypes;
 #[cfg(feature = "deserialization")]
 mod deserialize;
@@ -320,7 +323,7 @@ pub(crate) enum ValueRepr {
     String(Arc<str>, StringType),
     Bytes(Arc<Vec<u8>>),
     Seq(Arc<dyn SeqObject>),
-    Map(Arc<dyn MapObject>, MapType),
+    Map(AnyMapObject, MapType),
     Dynamic(Arc<dyn Object>),
 }
 
@@ -657,14 +660,17 @@ impl Value {
     ///
     /// This is a simplified API for creating dynamic structs
     /// without having to implement the entire [`Object`] protocol.
-    pub fn from_map_object<T: MapObject + ?Sized + 'static>(value: T) -> Value
-        where T: Into<Arc<T>>
+    pub fn from_map_object<T, O>(value: T) -> Value
+        where T: Into<Arc<O>>,
+              O: MapObject + Send + Sync + 'static
     {
-        Value(ValueRepr::Map(value.into() as Arc<dyn MapObject>, MapType::Normal))
+        Value(ValueRepr::Map(value.into().into(), MapType::Normal))
     }
 
-    pub(crate) fn from_kwargs<T: MapObject + 'static>(value: T) -> Value {
-        Value(ValueRepr::Map(Arc::new(value), MapType::Kwargs))
+    pub(crate) fn from_kwargs<T>(value: Arc<T>) -> Value
+        where T: MapObject + Send + Sync + 'static
+    {
+        Value(ValueRepr::Map(value.into(), MapType::Kwargs))
     }
 
     /// Creates a callable value from a function.
@@ -759,6 +765,14 @@ impl Value {
     }
 
     /// If the value is a string, return it.
+    pub fn to_str(&self) -> Option<Arc<str>> {
+        match &self.0 {
+            ValueRepr::String(ref s, _) => Some(s.clone()),
+            _ => None,
+        }
+    }
+
+    /// If the value is a string, return it.
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Some(s as &str),
@@ -800,7 +814,7 @@ impl Value {
     }
 
     /// If the value is a struct, return it as [`MapObject`].
-    pub fn as_map(&self) -> Option<Arc<dyn MapObject>> {
+    pub fn as_map(&self) -> Option<AnyMapObject> {
         match self.0 {
             ValueRepr::Map(ref v, _) => Some(v.clone()),
             ValueRepr::Dynamic(ref dy) => dy.value().as_map(),
@@ -1321,7 +1335,7 @@ mod tests {
         }
 
         impl crate::value::object::MapObject for X {
-            fn get_field(&self, name: &Value) -> Option<Value> {
+            fn get_field(self: &Arc<Self>, name: &Value) -> Option<Value> {
                 match name.as_str() {
                     Some("value") => Some(Value::from(self.0.load(atomic::Ordering::Relaxed))),
                     _ => None,

@@ -156,15 +156,13 @@ impl dyn Object {
             }
         }
 
-        if type_id == TypeId::of::<Arc<dyn MapObject>>() {
+        if type_id == TypeId::of::<AnyMapObject>() {
             let inner = unsafe {
-                &*(self as *const dyn Object as *const Arc<dyn MapObject>)
+                &*(self as *const dyn Object as *const AnyMapObject)
             };
 
-            if MapObject::type_id(&**inner) == TypeId::of::<T>() {
-                // SAFETY: type type id check ensures this type cast is correct
-                return Some(unsafe { &*(&**inner as *const dyn MapObject as *const T) });
-            }
+            let arc = inner.downcast::<T>()?;
+            return Some(&*arc);
         }
 
         None
@@ -411,13 +409,14 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// for stringification and debug printing.
 ///
 /// ```
+/// use std::sync::Arc;
 /// use minijinja::value::{Value, MapObject};
 ///
 /// #[derive(Clone)]
 /// struct Point(f32, f32, f32);
 ///
 /// impl MapObject for Point {
-///     fn get_field(&self, key: &Value) -> Option<Value> {
+///     fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
 ///         match key.as_str()? {
 ///             "x" => Some(Value::from(self.0)),
 ///             "y" => Some(Value::from(self.1)),
@@ -443,6 +442,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 ///
 /// ```
 /// use std::fmt;
+/// use std::sync::Arc;
 /// use minijinja::value::{Value, Object, MapObject};
 ///
 /// #[derive(Debug, Clone)]
@@ -461,7 +461,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// }
 ///
 /// impl MapObject for Point {
-///     fn get_field(&self, key: &Value) -> Option<Value> {
+///     fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
 ///         match key.as_str()? {
 ///             "x" => Some(Value::from(self.0)),
 ///             "y" => Some(Value::from(self.1)),
@@ -494,6 +494,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// ```
 /// # fn main() -> Result<(), minijinja::Error> {
 /// # use minijinja::Environment;
+/// use std::sync::Arc;
 /// use minijinja::value::{Value, MapObject};
 ///
 /// #[derive(Clone)]
@@ -502,7 +503,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// }
 ///
 /// impl MapObject for DynamicContext {
-///     fn get_field(&self, key: &Value) -> Option<Value> {
+///     fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
 ///         match key.as_str()? {
 ///             "pid" => Some(Value::from(std::process::id())),
 ///             "env" => Some(Value::from_iter(std::env::vars())),
@@ -522,7 +523,7 @@ impl<'a> ExactSizeIterator for SeqObjectIter<'a> {}
 /// One thing of note here is that in the above example `env` would be re-created every
 /// time the template needs it.  A better implementation would cache the value after it
 /// was created first.
-pub trait MapObject: Send + Sync {
+pub trait MapObject {
     /// Invoked by the engine to get a field of a struct.
     ///
     /// Where possible it's a good idea for this to align with the return value
@@ -536,7 +537,7 @@ pub trait MapObject: Send + Sync {
     /// [`State`] nor is there a channel to send out failures as only an option
     /// can be returned.  If you do plan on doing something in field access
     /// that is fallible, instead use a method call.
-    fn get_field(&self, key: &Value) -> Option<Value>;
+    fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value>;
 
     /// If possible returns a static vector of field names.
     ///
@@ -555,7 +556,7 @@ pub trait MapObject: Send + Sync {
     /// be implemented due to lifetime restrictions.  The default implementation
     /// converts the return value of [`static_fields`](Self::static_fields) into
     /// a compatible format automatically.
-    fn fields(&self) -> Vec<Value> {
+    fn fields(self: &Arc<Self>) -> Vec<Value> {
         self.static_fields()
             .into_iter()
             .flat_map(|fields| fields.iter().copied().map(intern))
@@ -567,93 +568,38 @@ pub trait MapObject: Send + Sync {
     ///
     /// The default implementation uses [`fields`](Self::fields) and
     /// [`static_fields`](Self::static_fields) automatically.
-    fn field_count(&self) -> usize {
+    fn field_count(self: &Arc<Self>) -> usize {
         if let Some(fields) = self.static_fields() {
             fields.len()
         } else {
             self.fields().len()
         }
     }
-
-    #[doc(hidden)]
-    fn type_id(&self) -> TypeId where Self: Any {
-        <Self as Any>::type_id(self)
-    }
 }
 
 impl MapObject for ValueMap {
     #[inline]
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let v = self.get(key)?;
         Some(v.clone())
     }
 
     #[inline]
-    fn fields(&self) -> Vec<Value> {
+    fn fields(self: &Arc<Self>) -> Vec<Value> {
         self.keys()
             .cloned()
             .collect()
     }
 
     #[inline]
-    fn field_count(&self) -> usize {
+    fn field_count(self: &Arc<Self>) -> usize {
         self.len()
-    }
-}
-
-impl fmt::Debug for dyn MapObject + '_ {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_map().entries(self.iter()).finish()
-    }
-}
-
-impl<T: MapObject> MapObject for Arc<T> {
-    #[inline]
-    fn get_field(&self, key: &Value) -> Option<Value> {
-        T::get_field(self, key)
-    }
-
-    #[inline]
-    fn static_fields(&self) -> Option<&'static [&'static str]> {
-        T::static_fields(self)
-    }
-
-    #[inline]
-    fn fields(&self) -> Vec<Value> {
-        T::fields(self)
-    }
-
-    #[inline]
-    fn field_count(&self) -> usize {
-        T::field_count(self)
-    }
-}
-
-impl<'a, T: MapObject + ?Sized> MapObject for &'a T {
-    #[inline]
-    fn get_field(&self, key: &Value) -> Option<Value> {
-        T::get_field(self, key)
-    }
-
-    #[inline]
-    fn static_fields(&self) -> Option<&'static [&'static str]> {
-        T::static_fields(self)
-    }
-
-    #[inline]
-    fn fields(&self) -> Vec<Value> {
-        T::fields(self)
-    }
-
-    #[inline]
-    fn field_count(&self) -> usize {
-        T::field_count(self)
     }
 }
 
 /// Iterates over [`MapObject`]
 pub struct MapObjectIter<'a> {
-    map: &'a dyn MapObject,
+    map: &'a AnyMapObject,
     keys: std::vec::IntoIter<Value>,
 }
 
@@ -682,7 +628,76 @@ impl<'a> DoubleEndedIterator for MapObjectIter<'a> {
     }
 }
 
-impl dyn MapObject + '_ {
+impl<K, V> MapObject for HashMap<K, V>
+    where K: Borrow<str> + AsRef<str> + PartialEq + Eq + std::hash::Hash + Clone + Send + Sync,
+          V: Into<Value> + Clone + Send + Sync
+{
+    fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        let key = key.as_str()?;
+        self.get(key).map(|v| v.clone().into())
+    }
+
+    fn static_fields(&self) -> Option<&'static [&'static str]> {
+        None
+    }
+
+    fn fields(self: &Arc<Self>) -> Vec<Value> {
+        self.keys()
+            .map(|k| k.as_ref().into())
+            .collect()
+    }
+
+    fn field_count(self: &Arc<Self>) -> usize {
+        self.len()
+    }
+}
+
+impl fmt::Display for dyn SeqObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <Self as fmt::Debug>::fmt(self, f)
+    }
+}
+
+impl Object for Arc<dyn SeqObject> {
+    fn value(&self) -> Value {
+        Value::from(self.clone())
+    }
+}
+
+type_erase! {
+    pub trait MapObject: Send + Sync => AnyMapObject(AnyMapObjectVT) {
+        fn get_field(&self, key: &Value) -> Option<Value>;
+        fn static_fields(&self) -> Option<&'static [&'static str]>;
+        fn fields(&self) -> Vec<Value>;
+        fn field_count(&self) -> usize;
+    }
+}
+
+impl<T: MapObject + Send + Sync + 'static> From<Arc<T>> for AnyMapObject {
+    fn from(value: Arc<T>) -> Self {
+        AnyMapObject::new(value)
+    }
+}
+
+impl fmt::Debug for AnyMapObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_map().entries(self.iter()).finish()
+    }
+}
+
+impl fmt::Display for AnyMapObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <Self as fmt::Debug>::fmt(self, f)
+    }
+}
+
+impl Object for AnyMapObject {
+    fn value(&self) -> Value {
+        Value::from(self.clone())
+    }
+}
+
+impl AnyMapObject {
     /// Convenient iterator over a [`MapObject`].
     pub fn iter(&self) -> MapObjectIter<'_> {
         MapObjectIter {
@@ -695,51 +710,26 @@ impl dyn MapObject + '_ {
         self.iter().collect()
     }
 }
-
-impl<K, V> MapObject for HashMap<K, V>
-    where K: Borrow<str> + AsRef<str> + PartialEq + Eq + std::hash::Hash + Clone + Send + Sync,
-          V: Into<Value> + Clone + Send + Sync
-{
-    fn get_field<'a>(&'a self, key: &Value) -> Option<Value> {
-        let key = key.as_str()?;
-        self.get(key).map(|v| v.clone().into())
-    }
-
-    fn static_fields(&self) -> Option<&'static [&'static str]> {
-        None
-    }
-
-    fn fields(&self) -> Vec<Value> {
-        self.keys()
-            .map(|k| k.as_ref().into())
-            .collect()
-    }
-
-    fn field_count(&self) -> usize {
-        self.len()
-    }
-}
-
-impl fmt::Display for dyn SeqObject {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <Self as fmt::Debug>::fmt(self, f)
-    }
-}
-
-impl fmt::Display for dyn MapObject {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <Self as fmt::Debug>::fmt(self, f)
-    }
-}
-
-impl Object for Arc<dyn SeqObject> {
-    fn value(&self) -> Value {
-        Value::from(self.clone())
-    }
-}
-
-impl Object for Arc<dyn MapObject> {
-    fn value(&self) -> Value {
-        Value::from(self.clone())
-    }
-}
+//
+// impl<'a, T: MapObject + ?Sized> MapObject for &'a T {
+//     #[inline]
+//     fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
+//         T::get_field(self, key)
+//     }
+//
+//     #[inline]
+//     fn static_fields(self: &Arc<Self>) -> Option<&'static [&'static str]> {
+//         T::static_fields(self)
+//     }
+//
+//     #[inline]
+//     fn fields(self: &Arc<Self>) -> Vec<Value> {
+//         T::fields(self)
+//     }
+//
+//     #[inline]
+//     fn field_count(self: &Arc<Self>) -> usize {
+//         T::field_count(self)
+//     }
+// }
+//

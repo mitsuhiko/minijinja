@@ -6,6 +6,7 @@
 ))]
 use std::collections::BTreeMap;
 use std::fmt::Write;
+use std::sync::Arc;
 use std::{env, fs};
 
 use minijinja::value::{MapObject, Value};
@@ -171,7 +172,7 @@ fn test_items_and_dictsort_with_structs() {
     struct MyStruct;
 
     impl MapObject for MyStruct {
-        fn get_field(&self, name: &Value) -> Option<Value> {
+        fn get_field(self: &Arc<Self>, name: &Value) -> Option<Value> {
             match name.as_str() {
                 Some("a") => Some(Value::from("A")),
                 Some("b") => Some(Value::from("B")),
@@ -200,7 +201,7 @@ fn test_urlencode_with_struct() {
     struct MyStruct;
 
     impl MapObject for MyStruct {
-        fn get_field(&self, name: &Value) -> Option<Value> {
+        fn get_field(self: &Arc<Self>, name: &Value) -> Option<Value> {
             match name.as_str() {
                 Some("a") => Some(Value::from("a 1")),
                 Some("b") => Some(Value::from("b 2")),

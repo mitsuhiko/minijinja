@@ -25,14 +25,14 @@ pub struct DictLikeObject {
 }
 
 impl MapObject for DictLikeObject {
-    fn get_field(&self, name: &str) -> Option<Value> {
+    fn get_field(self: &Arc<Self>, name: &str) -> Option<Value> {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
             inner.get_item(name).map(to_minijinja_value)
         })
     }
 
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn fields(self: &Arc<Self>) -> Vec<Arc<str>> {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
             inner.keys().iter().map(|x| x.to_string().into()).collect()

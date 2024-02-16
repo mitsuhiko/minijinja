@@ -364,7 +364,7 @@ impl<'env> Vm<'env> {
                         let key = stack.pop();
                         map.insert(key, value);
                     }
-                    stack.push(Value::from_kwargs(map))
+                    stack.push(Value::from_kwargs(Arc::new(map)))
                 }
                 Instruction::BuildList(n) => {
                     let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());

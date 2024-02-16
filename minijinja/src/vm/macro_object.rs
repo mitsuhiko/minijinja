@@ -163,7 +163,7 @@ impl MapObject for Macro {
         Some(&["name", "arguments", "caller"][..])
     }
 
-    fn get_field(&self, key: &Value) -> Option<Value> {
+    fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let name = key.as_str()?;
         match name {
             "name" => Some(Value(ValueRepr::String(

@@ -10,7 +10,7 @@ use crate::value::Value;
 pub struct MergeObject(pub Vec<Value>);
 
 impl MapObject for MergeObject {
-    fn get_field(&self, field: &Value) -> Option<Value> {
+    fn get_field(self: &Arc<Self>, field: &Value) -> Option<Value> {
         for val in &self.0 {
             if let Some(key) = field.as_str() {
                 match val.get_attr(key) {
@@ -22,7 +22,7 @@ impl MapObject for MergeObject {
         None
     }
 
-    fn fields(&self) -> Vec<Value> {
+    fn fields(self: &Arc<Self>) -> Vec<Value> {
         let mut seen = BTreeSet::new();
         let mut rv = Vec::new();
         for val in &self.0 {

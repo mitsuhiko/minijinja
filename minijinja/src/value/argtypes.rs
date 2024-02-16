@@ -8,7 +8,7 @@ use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
     Arc, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, ValueMap,
-    ValueRepr, MapObject,
+    ValueRepr, AnyMapObject,
 };
 use crate::vm::State;
 
@@ -16,7 +16,7 @@ use crate::vm::State;
 ///
 /// It's implemented for the following types:
 ///
-/// * `Rv` where `Rv` implements `Into<Value>`
+/// * `Rv` where `Rv` implements `Into<AnyMapObject>`
 /// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
 ///
 /// The equivalent for test functions is [`TestResult`](crate::tests::TestResult).
@@ -340,8 +340,8 @@ impl<T: Object> From<Arc<T>> for Value {
     }
 }
 
-impl From<Arc<dyn MapObject>> for Value {
-    fn from(object: Arc<dyn MapObject>) -> Self {
+impl From<AnyMapObject> for Value {
+    fn from(object: AnyMapObject) -> Self {
         Value(ValueRepr::Map(object, MapType::Normal))
     }
 }
@@ -895,7 +895,7 @@ impl<'a> FromIterator<(&'a str, Value)> for Kwargs {
 
 impl From<Kwargs> for Value {
     fn from(value: Kwargs) -> Self {
-        Value(ValueRepr::Map(value.values, MapType::Kwargs))
+        Value::from_kwargs(value.values)
     }
 }
 

@@ -183,7 +183,7 @@ fn test_map_object_iteration_and_indexing() {
     }
 
     impl MapObject for Point {
-        fn get_field(&self, key: &Value) -> Option<Value> {
+        fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
             match key.as_str() {
                 Some("x") => Some(Value::from(self.0)),
                 Some("y") => Some(Value::from(self.1)),
@@ -351,7 +351,7 @@ fn test_struct_object_downcast() {
     }
 
     impl MapObject for Thing {
-        fn get_field(&self, _name: &Value) -> Option<Value> {
+        fn get_field(self: &Arc<Self>, _name: &Value) -> Option<Value> {
             None
         }
     }

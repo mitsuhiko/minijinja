@@ -35,7 +35,7 @@ fn test_context_merge_custom() {
     struct X;
 
     impl MapObject for X {
-        fn get_field(&self, name: &Value) -> Option<Value> {
+        fn get_field(self: &Arc<Self>, name: &Value) -> Option<Value> {
             match name.as_str()? {
                 "a" => Some(Value::from(1)),
                 "b" => Some(Value::from(2)),
@@ -129,7 +129,7 @@ fn test_no_leak() {
     struct X(Arc<AtomicBool>);
 
     impl MapObject for X {
-        fn get_field(&self, _name: &Value) -> Option<Value> {
+        fn get_field(self: &Arc<Self>, _name: &Value) -> Option<Value> {
             None
         }
     }
