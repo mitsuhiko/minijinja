@@ -33,9 +33,9 @@ impl Drop for ClosureTracker {
 /// Utility to enclose values for macros.
 ///
 /// See `closure` on the [`Frame`] for how it's used.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub(crate) struct Closure {
-    values: Arc<Mutex<BTreeMap<Arc<str>, Value>>>,
+    values: Mutex<BTreeMap<Arc<str>, Value>>,
 }
 
 impl Closure {

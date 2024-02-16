@@ -6,21 +6,7 @@ use crate::error::{Error, ErrorKind};
 use crate::value::{Object, MapObject, Value};
 use crate::vm::state::State;
 
-// TODO: Remove this wrapper once everything gives `&Arc<Self>`.
-#[derive(Clone)]
 pub(crate) struct Loop {
-    pub status: Arc<LoopStatus>,
-}
-
-impl std::ops::Deref for Loop {
-    type Target = LoopStatus;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.status
-    }
-}
-
-pub(crate) struct LoopStatus {
     pub len: usize,
     pub idx: AtomicUsize,
     pub depth: usize,

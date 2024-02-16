@@ -14,11 +14,11 @@ use crate::value::{
     ops, value_map_with_capacity, value_optimization, Value, ValueRepr,
 };
 use crate::vm::context::{Frame, LoopState, Stack};
-use crate::vm::loop_object::{Loop, LoopStatus};
+use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
-use crate::vm::{closure_object::Closure, macro_object::Macro};
+use crate::vm::{closure_object::Closure};
 
 pub(crate) use crate::vm::context::Context;
 pub use crate::vm::state::State;
@@ -927,14 +927,12 @@ impl<'env> Vm<'env> {
                 recurse_jump_target: if recursive { Some(pc) } else { None },
                 current_recursion_jump,
                 object: Arc::new(Loop {
-                    status: Arc::new(LoopStatus {
-                        idx: AtomicUsize::new(!0usize),
-                        len,
-                        depth,
-                        #[cfg(feature = "adjacent_loop_items")]
-                        value_triple: Mutex::new((None, None, iterator.next())),
-                        last_changed_value: Mutex::default(),
-                    }),
+                    idx: AtomicUsize::new(!0usize),
+                    len,
+                    depth,
+                    #[cfg(feature = "adjacent_loop_items")]
+                    value_triple: Mutex::new((None, None, iterator.next())),
+                    last_changed_value: Mutex::default(),
                 }),
                 iterator,
             }),
@@ -973,7 +971,7 @@ impl<'env> Vm<'env> {
         name: &str,
         flags: u8,
     ) {
-        use crate::{compiler::instructions::MACRO_CALLER, vm::macro_object::MacroData};
+        use crate::{compiler::instructions::MACRO_CALLER, vm::macro_object::Macro};
 
         let arg_spec = match stack.pop().0 {
             ValueRepr::Seq(args) => args
@@ -989,14 +987,12 @@ impl<'env> Vm<'env> {
         let macro_ref_id = state.macros.len();
         Arc::make_mut(&mut state.macros).push((state.instructions, offset));
         stack.push(Value::from_object(Macro {
-            data: Arc::new(MacroData {
-                name: Arc::from(name.to_string()),
-                arg_spec,
-                macro_ref_id,
-                state_id: state.id,
-                closure,
-                caller_reference: (flags & MACRO_CALLER) != 0,
-            }),
+            name: Arc::from(name.to_string()),
+            arg_spec,
+            macro_ref_id,
+            state_id: state.id,
+            closure,
+            caller_reference: (flags & MACRO_CALLER) != 0,
         }));
     }
 }

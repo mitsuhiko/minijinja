@@ -11,7 +11,7 @@ use crate::value::{
 use crate::vm::state::State;
 use crate::vm::Vm;
 
-pub(crate) struct MacroData {
+pub(crate) struct Macro {
     pub name: Arc<str>,
     pub arg_spec: Vec<Arc<str>>,
     // because values need to be 'static, we can't hold a reference to the
@@ -22,13 +22,6 @@ pub(crate) struct MacroData {
     pub state_id: isize,
     pub closure: Value,
     pub caller_reference: bool,
-}
-
-#[derive(Clone)]
-pub(crate) struct Macro {
-    // the extra level of Arc here is necessary for recursive calls only.
-    // For more information have a look at the call() method.
-    pub data: Arc<MacroData>,
 }
 
 impl fmt::Debug for Macro {
@@ -42,15 +35,6 @@ impl fmt::Display for Macro {
         write!(f, "<macro {}>", self.name)
     }
 }
-
-impl std::ops::Deref for Macro {
-    type Target = MacroData;
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
 impl Object for Macro {
     fn value(self: &Arc<Self>) -> Value {
         Value::from_any_map_object(self.clone())
