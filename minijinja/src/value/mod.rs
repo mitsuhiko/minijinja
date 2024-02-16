@@ -105,7 +105,7 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //!
 //! ```rust
 //! # use std::sync::Arc;
-//! # use minijinja::value::{Value, Object};
+//! # use minijinja::value::{Value, Object, AnyObject};
 //! #[derive(Debug)]
 //! struct Foo;
 //!
@@ -119,7 +119,7 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //!
 //! let value = Value::from_object(Foo);
 //! let value = Value::from(Arc::new(Foo));
-//! let value = Value::from(Arc::new(Foo) as Arc<dyn Object>);
+//! let value = Value::from(AnyObject::from(Arc::new(Foo)));
 //! ```
 
 // this module is based on the content module in insta which in turn is based
@@ -145,7 +145,7 @@ use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
 pub use crate::value::object::{Object, SeqObject, SeqObjectIter, MapObject};
-pub use crate::value::object::{AnyMapObject, AnySeqObject};
+pub use crate::value::object::{AnyObject, AnyMapObject, AnySeqObject};
 
 #[macro_use]
 mod type_erase;
@@ -324,7 +324,7 @@ pub(crate) enum ValueRepr {
     Bytes(Arc<Vec<u8>>),
     Seq(AnySeqObject),
     Map(AnyMapObject, MapType),
-    Dynamic(Arc<dyn Object>),
+    Dynamic(AnyObject),
 }
 
 impl fmt::Debug for ValueRepr {
@@ -638,8 +638,8 @@ impl Value {
     /// use std::sync::Arc;
     /// let val = Value::from(Arc::new(Thing { id: 42 }));
     /// ```
-    pub fn from_object<T: Object>(value: T) -> Value {
-        Value::from(Arc::new(value) as Arc<dyn Object>)
+    pub fn from_object<T: Object + Send + Sync + 'static>(value: T) -> Value {
+        Value::from(Arc::new(value))
     }
 
     /// Creates a value from an owned [`SeqObject`].
@@ -658,11 +658,15 @@ impl Value {
     ///
     /// This is a simplified API for creating dynamic structs
     /// without having to implement the entire [`Object`] protocol.
-    pub fn from_map_object<T, O>(value: T) -> Value
-        where T: Into<Arc<O>>,
-              O: MapObject + Send + Sync + 'static
+    pub fn from_map_object<T>(value: T) -> Value
+        where T: MapObject + Send + Sync + 'static
     {
-        Value(ValueRepr::Map(value.into().into(), MapType::Normal))
+        Value(ValueRepr::Map(Arc::new(value).into(), MapType::Normal))
+    }
+
+    /// Creates a value from an owned [`MapObject`].
+    pub fn from_any_map_object<T: Into<AnyMapObject>>(value: T) -> Value {
+        Value(ValueRepr::Map(value.into(), MapType::Normal))
     }
 
     pub(crate) fn from_kwargs<T>(value: Arc<T>) -> Value
@@ -793,11 +797,11 @@ impl Value {
     }
 
     /// If the value is an object, it's returned as [`Object`].
-    pub fn as_object(&self) -> Option<&dyn Object> {
+    pub fn as_object(&self) -> Option<AnyObject> {
         match self.0 {
-            ValueRepr::Dynamic(ref dy) => Some(&**dy as &dyn Object),
-            ValueRepr::Seq(ref dy) => Some(&*dy as &dyn Object),
-            ValueRepr::Map(ref dy, _) => Some(&*dy as &dyn Object),
+            ValueRepr::Dynamic(ref dy) => Some(dy.clone()),
+            ValueRepr::Seq(ref dy) => Some(Arc::new(dy.clone()).into()),
+            ValueRepr::Map(ref dy, _) => Some(Arc::new(dy.clone()).into()),
             _ => None,
         }
     }
@@ -985,7 +989,6 @@ impl Value {
     /// # use std::sync::Arc;
     /// # use minijinja::value::{Value, SeqObject};
     ///
-    /// #[derive(Clone)]
     /// struct Thing {
     ///     id: usize,
     /// }
@@ -1004,7 +1007,12 @@ impl Value {
     /// assert_eq!(thing.id, 42);
     /// ```
     pub fn downcast_object_ref<T: 'static>(&self) -> Option<&T> {
-        self.as_object().and_then(|x| x.downcast_ref())
+        match self.0 {
+            ValueRepr::Seq(ref o) => o.downcast(),
+            ValueRepr::Map(ref o, _) => o.downcast(),
+            ValueRepr::Dynamic(ref o) => o.downcast_ref(),
+            _ => None
+        }
     }
 
     pub(crate) fn get_item_opt(&self, key: &Value) -> Option<Value> {
@@ -1328,8 +1336,8 @@ mod tests {
         }
 
         impl Object for X {
-            fn value(&self) -> Value {
-                Value::from_map_object(self.clone())
+            fn value(self: &Arc<Self>) -> Value {
+                Value::from_any_map_object(self.clone())
             }
         }
 

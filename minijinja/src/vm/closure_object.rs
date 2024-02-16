@@ -72,8 +72,8 @@ impl fmt::Display for Closure {
 }
 
 impl Object for Closure {
-    fn value(&self) -> Value {
-        Value::from_map_object(self.clone())
+    fn value(self: &Arc<Self>) -> Value {
+        Value::from_any_map_object(self.clone())
     }
 }
 

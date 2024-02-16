@@ -8,7 +8,7 @@ use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
     Arc, MapType, Object, Packed, StringType, Value, ValueKind, ValueMap,
-    ValueRepr, AnyMapObject, AnySeqObject,
+    ValueRepr, AnyObject, AnyMapObject, AnySeqObject,
 };
 use crate::vm::State;
 
@@ -334,9 +334,9 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
     }
 }
 
-impl<T: Object> From<Arc<T>> for Value {
+impl<T: Object + Send + Sync + 'static> From<Arc<T>> for Value {
     fn from(object: Arc<T>) -> Self {
-        Value::from(object as Arc<dyn Object>)
+        Value(ValueRepr::Dynamic(object.into()))
     }
 }
 
@@ -396,7 +396,7 @@ value_from!(i64, I64);
 value_from!(f32, F64);
 value_from!(f64, F64);
 value_from!(Arc<Vec<u8>>, Bytes);
-value_from!(Arc<dyn Object>, Dynamic);
+value_from!(AnyObject, Dynamic);
 value_from!(AnySeqObject, Seq);
 
 fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {

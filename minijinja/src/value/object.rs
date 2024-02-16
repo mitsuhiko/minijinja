@@ -1,9 +1,8 @@
-use std::any::{Any, TypeId};
-use std::borrow::Borrow;
 use std::fmt;
-use std::ops::Range;
+use std::ops::{Deref, Range};
 use std::sync::Arc;
 use std::collections::HashMap;
+use std::borrow::Borrow;
 
 use crate::error::{Error, ErrorKind};
 use crate::value::{intern, Value, ValueMap};
@@ -33,7 +32,7 @@ use crate::vm::State;
 ///
 /// For examples of how to implement objects refer to [`SeqObject`] and
 /// [`MapObject`].
-pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
+pub trait Object: fmt::Display + fmt::Debug {
     /// Describes the kind of an object.
     ///
     /// If not implemented behavior for an object is [`ObjectKind::Plain`]
@@ -41,7 +40,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// called or has methods.
     ///
     /// For more information see [`ObjectKind`].
-    fn value(&self) -> Value {
+    fn value(self: &Arc<Self>) -> Value {
         Value::from(())
     }
 
@@ -52,7 +51,12 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     ///
     /// To convert the arguments into arguments use the
     /// [`from_args`](crate::value::from_args) function.
-    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(
+        self: &Arc<Self>,
+        state: &State,
+        name: &str,
+        args: &[Value]
+    ) -> Result<Value, Error> {
         let _state = state;
         let _args = args;
         Err(Error::new(
@@ -68,7 +72,7 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     ///
     /// To convert the arguments into arguments use the
     /// [`from_args`](crate::value::from_args) function.
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
         let _state = state;
         let _args = args;
         Err(Error::new(
@@ -78,7 +82,23 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     }
 }
 
-impl dyn Object {
+type_erase! {
+    pub trait Object: Send + Sync => AnyObject(AnyObjectVT) {
+        fn value(&self) -> Value;
+        fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error>;
+        fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error>;
+
+        impl fmt::Display {
+            fn fmt[display](&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+        }
+
+        impl fmt::Debug {
+            fn fmt[debug](&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+        }
+    }
+}
+
+impl AnyObject {
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
     ///
     /// This is basically the "reverse" of [`from_object`](Value::from_object),
@@ -140,28 +160,16 @@ impl dyn Object {
     /// assert_eq!(thing.id, 42);
     /// ```
     pub fn downcast_ref<T: 'static>(&self) -> Option<&T> {
-        let type_id = (*self).type_id();
-        if type_id == TypeId::of::<T>() {
-            // SAFETY: type type id check ensures this type cast is correct
-            return Some(unsafe { &*(self as *const dyn Object as *const T) });
-        }
-
-        if type_id == TypeId::of::<AnySeqObject>() {
-            let inner = unsafe {
-                &*(self as *const dyn Object as *const AnySeqObject)
-            };
-
-            let arc = inner.downcast::<T>()?;
+        if let Some(arc) = self.downcast::<T>() {
             return Some(&*arc);
         }
 
-        if type_id == TypeId::of::<AnyMapObject>() {
-            let inner = unsafe {
-                &*(self as *const dyn Object as *const AnyMapObject)
-            };
+        if let Some(obj) = self.downcast::<AnySeqObject>() {
+            return obj.downcast::<T>();
+        }
 
-            let arc = inner.downcast::<T>()?;
-            return Some(&*arc);
+        if let Some(obj) = self.downcast::<AnyMapObject>() {
+            return obj.downcast::<T>();
         }
 
         None
@@ -171,27 +179,26 @@ impl dyn Object {
     ///
     /// For details of this operation see [`downcast_ref`](#method.downcast_ref).
     pub fn is<T: 'static>(&self) -> bool {
-        let type_id = (*self).type_id();
-        type_id == TypeId::of::<T>()
+        self.downcast_ref::<T>().is_some()
     }
 }
 
-impl<T: Object> Object for Arc<T> {
-    #[inline]
-    fn value(&self) -> Value {
-        T::value(self)
-    }
-
-    #[inline]
-    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
-        T::call_method(self, state, name, args)
-    }
-
-    #[inline]
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
-        T::call(self, state, args)
-    }
-}
+// impl<T: Object> Object for Arc<T> {
+//     #[inline]
+//     fn value(&self) -> Value {
+//         T::value(self)
+//     }
+//
+//     #[inline]
+//     fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+//         T::call_method(self, state, name, args)
+//     }
+//
+//     #[inline]
+//     fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+//         T::call(self, state, args)
+//     }
+// }
 
 /// Provides the behavior of an [`Object`] holding sequence of values.
 ///
@@ -243,7 +250,7 @@ impl<T: Object> Object for Arc<T> {
 /// use std::sync::Arc;
 /// use minijinja::value::{Value, Object, SeqObject};
 ///
-/// #[derive(Debug, Clone)]
+/// #[derive(Debug)]
 /// struct Point(f32, f32, f32);
 ///
 /// impl fmt::Display for Point {
@@ -253,8 +260,8 @@ impl<T: Object> Object for Arc<T> {
 /// }
 ///
 /// impl Object for Point {
-///     fn value(&self) -> Value {
-///         Value::from_seq_object(self.clone())
+///     fn value(self: &Arc<Self>) -> Value {
+///         Value::from_any_seq_object(self.clone())
 ///     }
 /// }
 ///
@@ -404,14 +411,8 @@ impl fmt::Display for AnySeqObject {
 }
 
 impl Object for AnySeqObject {
-    fn value(&self) -> Value {
-        Value::from(self.clone())
-    }
-}
-
-impl<T: SeqObject + Send + Sync + 'static> From<Arc<T>> for AnySeqObject {
-    fn from(value: Arc<T>) -> Self {
-        AnySeqObject::new(value)
+    fn value(self: &Arc<Self>) -> Value {
+        Value::from_any_seq_object(self.deref().clone())
     }
 }
 
@@ -475,8 +476,8 @@ impl<T: SeqObject + Send + Sync + 'static> From<Arc<T>> for AnySeqObject {
 /// }
 ///
 /// impl Object for Point {
-///     fn value(&self) -> Value {
-///         Value::from_map_object(self.clone())
+///     fn value(self: &Arc<Self>) -> Value {
+///         Value::from_any_map_object(self.clone())
 ///     }
 /// }
 ///
@@ -681,12 +682,6 @@ impl<K, V> MapObject for HashMap<K, V>
     }
 }
 
-impl<T: MapObject + Send + Sync + 'static> From<Arc<T>> for AnyMapObject {
-    fn from(value: Arc<T>) -> Self {
-        AnyMapObject::new(value)
-    }
-}
-
 impl fmt::Debug for AnyMapObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map().entries(self.iter()).finish()
@@ -700,8 +695,8 @@ impl fmt::Display for AnyMapObject {
 }
 
 impl Object for AnyMapObject {
-    fn value(&self) -> Value {
-        Value::from(self.clone())
+    fn value(self: &Arc<Self>) -> Value {
+        Value::from_any_map_object(self.deref().clone())
     }
 }
 

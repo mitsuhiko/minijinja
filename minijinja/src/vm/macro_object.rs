@@ -52,11 +52,11 @@ impl std::ops::Deref for Macro {
 }
 
 impl Object for Macro {
-    fn value(&self) -> Value {
-        Value::from_map_object(self.clone())
+    fn value(self: &Arc<Self>) -> Value {
+        Value::from_any_map_object(self.clone())
     }
 
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
         // we can only call macros that point to loaded template state.
         if state.id != self.state_id {
             return Err(Error::new(

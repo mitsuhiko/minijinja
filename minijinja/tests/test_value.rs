@@ -177,8 +177,8 @@ fn test_map_object_iteration_and_indexing() {
     }
 
     impl Object for Point {
-        fn value(&self) -> Value {
-            Value::from_map_object(self.clone())
+        fn value(self: &Arc<Self>) -> Value {
+            Value::from_any_map_object(self.clone())
         }
     }
 
@@ -226,8 +226,8 @@ fn test_seq_object_iteration_and_indexing() {
     }
 
     impl Object for Point {
-        fn value(&self) -> Value {
-            Value::from_seq_object(self.clone())
+        fn value(self: &Arc<Self>) -> Value {
+            Value::from_any_seq_object(self.clone())
         }
     }
 
@@ -310,7 +310,7 @@ fn test_obj_downcast() {
     impl Object for Thing {}
 
     let x_value = Value::from_object(Thing { id: 42 });
-    let value_as_obj = x_value.as_object().unwrap();
+    let value_as_obj = dbg!(x_value.as_object()).unwrap();
     assert!(value_as_obj.is::<Thing>());
     let thing = value_as_obj.downcast_ref::<Thing>().unwrap();
     assert_eq!(thing.id, 42);

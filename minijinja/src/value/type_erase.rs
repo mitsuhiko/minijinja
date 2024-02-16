@@ -1,9 +1,20 @@
 macro_rules! type_erase {
     ($v:vis trait $T:ident $(: $($B:ident $(+)?)*)? => $E:ident($VT:ident) {
-        $(fn $f:ident(&self $(, $p:ident : $t:ty),*) $(-> $R:ty)?;)*
+        $(fn $f:ident(&self $(, $p:ident : $t:ty $(,)?)*) $(-> $R:ty)?;)*
+
+        $(
+            impl $S:path {
+                $(
+                    fn $f_:ident[$f1:ident](
+                        &self $(, $p_:ident : $t_:ty $(,)?)*
+                    ) $(-> $R_:ty)?;
+                )*
+            }
+        )*
     }) => {
         struct $VT {
             $($f: fn(*const (), $($p : $t),*) $(-> $R)?,)*
+            $($($f1: fn(*const (), $($p_ : $t_),*) $(-> $R_)?,)*)*
             type_id: fn() -> core::any::TypeId,
             drop: fn(*const ()),
         }
@@ -22,12 +33,20 @@ macro_rules! type_erase {
                 let vtable = &$VT {
                     $(
                         $f: |ptr, $($p),*| unsafe {
-                            let arc = std::sync::Arc::from_raw(ptr as *const T);
-                            let v = T::$f(&arc, $($p),*);
+                            let arc: Arc<T> = std::sync::Arc::from_raw(ptr as *const T);
+                            let v = <T as $T>::$f(&arc, $($p),*);
                             std::mem::forget(arc);
                             v
                         },
                     )*
+                    $($(
+                        $f1: |ptr, $($p_),*| unsafe {
+                            let arc: Arc<T> = std::sync::Arc::from_raw(ptr as *const T);
+                            let v = <T as $S>::$f_(&*arc, $($p_),*);
+                            std::mem::forget(arc);
+                            v
+                        },
+                    )*)*
                     type_id: || {
                         core::any::TypeId::of::<T>()
                     },
@@ -47,13 +66,10 @@ macro_rules! type_erase {
             )*
 
             /// Downcast to `T` if `self` holds a `T`.
-            $v fn downcast<T: 'static>(&self) -> Option<&std::sync:: Arc<T>> {
-                if (self.vtable.type_id)() == TypeId::of::<T>() {
+            $v fn downcast<T: 'static>(&self) -> Option<&T> {
+                if (self.vtable.type_id)() == core::any::TypeId::of::<T>() {
                     unsafe {
-                        let arc = std::sync::Arc::from_raw(self.ptr as *const T);
-                        let reference: &'static std::sync::Arc<T> = std::mem::transmute(&arc);
-                        std::mem::forget(arc);
-                        return Some(reference);
+                        return Some(&*(self.ptr as *const T));
                     }
                 }
 
@@ -79,6 +95,22 @@ macro_rules! type_erase {
                 (self.vtable.drop)(self.ptr);
             }
         }
+
+        impl<T: $T $($(+ $B)*)? + 'static> From<Arc<T>> for $E {
+            fn from(value: Arc<T>) -> Self {
+                $E::new(value)
+            }
+        }
+
+        $(
+            impl $S for $E {
+                $(
+                    fn $f_(&self, $($p_: $t_),*) $(-> $R_)? {
+                        (self.vtable.$f1)(self.ptr, $($p_),*)
+                    }
+                )*
+            }
+        )*
 
         $($(unsafe impl $B for $E { })*)?
     };

@@ -249,7 +249,7 @@ impl fmt::Display for BoxedFunction {
 }
 
 impl Object for BoxedFunction {
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
         self.invoke(state, args)
     }
 }

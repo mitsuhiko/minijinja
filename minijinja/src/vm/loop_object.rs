@@ -40,18 +40,18 @@ impl fmt::Debug for Loop {
 }
 
 impl Object for Loop {
-    fn value(&self) -> Value {
-        Value::from_map_object(self.clone())
+    fn value(self: &Arc<Self>) -> Value {
+        Value::from_any_map_object(self.clone())
     }
 
-    fn call(&self, _state: &State, _args: &[Value]) -> Result<Value, Error> {
+    fn call(self: &Arc<Self>, _state: &State, _args: &[Value]) -> Result<Value, Error> {
         Err(Error::new(
             ErrorKind::InvalidOperation,
             "loop cannot be called if reassigned to different variable",
         ))
     }
 
-    fn call_method(&self, _state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(self: &Arc<Self>, _state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         if name == "changed" {
             let mut last_changed_value = self.last_changed_value.lock().unwrap();
             let value = args.to_owned();

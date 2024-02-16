@@ -24,10 +24,9 @@ macro_rules! some {
 #[doc(hidden)]
 pub mod __context {
     pub use crate::value::merge_object::MergeObject;
-    use crate::value::{MapType, Value, ValueMap, ValueRepr};
+    use crate::value::{Value, ValueMap};
     use crate::Environment;
     use std::rc::Rc;
-    use std::sync::Arc;
 
     #[inline(always)]
     pub fn value_optimization() -> impl Drop {
