@@ -40,32 +40,34 @@
 //! env.add_function("include_file", include_file);
 //! ```
 //!
-//! # Arguments in Custom Functions
-//!
-//! All arguments in custom functions must implement the [`ArgType`] trait.
-//! Standard types, such as `String`, `i32`, `bool`, `f64`, etc, already implement this trait.
-//! There are also helper types that will make it easier to extract an arguments with custom types.
-//! The [`ViaDeserialize<T>`](crate::value::ViaDeserialize) type, for instance, can accept any
-//! type `T` that implements the `Deserialize` trait from `serde`.
-//!
-//! ```rust
-//! # use minijinja::Environment;
-//! # use serde::Deserialize;
-//! # let mut env = Environment::new();
-//! use minijinja::value::ViaDeserialize;
-//!
-//! #[derive(Deserialize)]
-//! struct Person {
-//!     name: String,
-//!     age: i32,
-//! }
-//!
-//! fn is_adult(person: ViaDeserialize<Person>) -> bool {
-//!     person.age >= 18
-//! }
-//!
-//! env.add_function("is_adult", is_adult);
-//! ```
+#![cfg_attr(feature = "deserialization", doc=r#"
+# Arguments in Custom Functions
+
+All arguments in custom functions must implement the [`ArgType`] trait.
+Standard types, such as `String`, `i32`, `bool`, `f64`, etc, already implement this trait.
+There are also helper types that will make it easier to extract an arguments with custom types.
+The [`ViaDeserialize<T>`](crate::value::ViaDeserialize) type, for instance, can accept any
+type `T` that implements the `Deserialize` trait from `serde`.
+
+```rust
+# use minijinja::Environment;
+# use serde::Deserialize;
+# let mut env = Environment::new();
+use minijinja::value::ViaDeserialize;
+
+#[derive(Deserialize)]
+struct Person {
+    name: String,
+    age: i32,
+}
+
+fn is_adult(person: ViaDeserialize<Person>) -> bool {
+    person.age >= 18
+}
+
+env.add_function("is_adult", is_adult);
+```
+"#)]
 //!
 //! # Note on Keyword Arguments
 //!
