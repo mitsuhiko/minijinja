@@ -40,7 +40,9 @@
 //! env.add_function("include_file", include_file);
 //! ```
 //!
-#![cfg_attr(feature = "deserialization", doc=r#"
+#![cfg_attr(
+    feature = "deserialization",
+    doc = r#"
 # Arguments in Custom Functions
 
 All arguments in custom functions must implement the [`ArgType`] trait.
@@ -67,7 +69,8 @@ fn is_adult(person: ViaDeserialize<Person>) -> bool {
 
 env.add_function("is_adult", is_adult);
 ```
-"#)]
+"#
+)]
 //!
 //! # Note on Keyword Arguments
 //!
