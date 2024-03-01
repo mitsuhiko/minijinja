@@ -62,7 +62,9 @@ jobs:
           targets: armv5te-unknown-linux-gnueabi
       - uses: Swatinem/rust-cache@v2
       - name: Install Cross Deps
-        run: sudo apt-get install -y gcc-arm-linux-gnueabi libc6-dev-armel-cross
+        run: |
+          sudo apt-get update --fix-missing
+          sudo apt-get install -y gcc-arm-linux-gnueabi libc6-dev-armel-cross
       - name: Restore Cargo.lock
         run: cp Cargo.lock.msrv Cargo.lock
       - name: Check
