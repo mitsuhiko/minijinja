@@ -210,6 +210,9 @@ impl<'source> Environment<'source> {
     ///
     /// The default is `false`, which causes a single newline, if present, to be
     /// stripped from the end of the template.
+    ///
+    /// This setting is used whenever a template is loaded into the environment.
+    /// Changing it at a later point only affects future templates loaded.
     pub fn set_keep_trailing_newline(&mut self, yes: bool) {
         self.templates.template_config.keep_trailing_newline = yes;
     }
@@ -364,7 +367,7 @@ impl<'source> Environment<'source> {
 
     /// Sets a new function to select the default auto escaping.
     ///
-    /// This function is invoked when templates are loaded from the environment
+    /// This function is invoked when templates are loaded into the environment
     /// to determine the default auto escaping behavior.  The function is
     /// invoked with the name of the template and can make an initial auto
     /// escaping decision based on that.  The default implementation
@@ -499,8 +502,8 @@ impl<'source> Environment<'source> {
 
     /// Sets the syntax for the environment.
     ///
-    /// Note that when `source` is used, the syntax is held on the underlying source
-    /// which means that the actual source needs to have it's syntax changed.
+    /// This setting is used whenever a template is loaded into the environment.
+    /// Changing it at a later point only affects future templates loaded.
     ///
     /// See [`Syntax`](crate::Syntax) for more information.
     #[cfg(feature = "custom_syntax")]
