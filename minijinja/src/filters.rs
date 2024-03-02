@@ -54,14 +54,52 @@
 //! ```
 //! # use minijinja::Environment;
 //! # let mut env = Environment::new();
-//! use minijinja::value::Value;
-//! use minijinja::State;
+//! use minijinja::{Value, State};
 //!
 //! fn append_template(state: &State, value: &Value) -> String {
 //!     format!("{}-{}", value, state.name())
 //! }
 //!
-//! env.add_filter("appendTemplate", append_template);
+//! env.add_filter("append_template", append_template);
+//! ```
+//!
+//! # Filter configuration
+//!
+//! The recommended pattern for filters to change their behavior is to leverage global
+//! variables in the template.  For instance take a filter that performs date formatting.
+//! You might want to change the default time format format on a per-template basis
+//! without having to update every filter invocation.  In this case the recommended
+//! pattern is to reserve upper case variables and look them up in the filter:
+//!
+//! ```
+//! # use minijinja::Environment;
+//! # let mut env = Environment::new();
+//! # fn format_unix_timestamp(_: f64, _: &str) -> String { "".into() }
+//! use minijinja::State;
+//!
+//! fn timeformat(state: &State, ts: f64) -> String {
+//!     let configured_format = state.lookup("TIME_FORMAT");
+//!     let format = configured_format
+//!         .as_ref()
+//!         .and_then(|x| x.as_str())
+//!         .unwrap_or("HH:MM:SS");
+//!     format_unix_timestamp(ts, format)
+//! }
+//!
+//! env.add_filter("timeformat", timeformat);
+//! ```
+//!
+//! This then later lets a user override the default either by using
+//! [`add_global`](crate::Environment::add_global) or by passing it with the
+//! [`context!`] macro or similar.
+//!
+//! ```
+//! # use minijinja::context;
+//! # let other_variables = context!{};
+//! let ctx = context! {
+//!     TIME_FORMAT => "HH:MM",
+//!     ..other_variables
+//! };
 //! ```
 //!
 //! # Built-in Filters
