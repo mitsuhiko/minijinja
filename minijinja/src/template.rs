@@ -95,8 +95,8 @@ impl<'env, 'source> Template<'env, 'source> {
     ///
     /// For very large contexts and to avoid the overhead of serialization of
     /// potentially unused values, you might consider using a dynamic
-    /// [`StructObject`](crate::value::StructObject) as value.  For more
-    /// information see [Struct as Context](crate::value::StructObject#struct-as-context).
+    /// [`MapObject`](crate::value::MapObject) as value.  For more
+    /// information see [Struct as Context](crate::value::MapObject#struct-as-context).
     ///
     /// ```
     /// # use minijinja::{Environment, context};

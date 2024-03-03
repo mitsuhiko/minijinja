@@ -3,7 +3,7 @@ use std::env;
 use std::fs;
 use std::sync::Mutex;
 
-use minijinja::value::{StructObject, Value};
+use minijinja::value::{MapObject, Value};
 use minijinja::Environment;
 
 #[derive(Default, Debug)]
@@ -11,7 +11,7 @@ struct Site {
     cache: Mutex<BTreeMap<String, Value>>,
 }
 
-impl StructObject for Site {
+impl MapObject for Site {
     /// This loads a file on attribute access.  Note that attribute access
     /// can neither access the state nor return failures as such it can at
     /// max turn into an undefined object.
@@ -45,7 +45,7 @@ fn load_json(name: &str) -> Option<Value> {
 
 fn main() {
     let mut env = Environment::new();
-    env.add_global("site", Value::from_struct_object(Site::default()));
+    env.add_global("site", Value::from_map_object(Site::default()));
     env.add_template("template.html", include_str!("template.html"))
         .unwrap();
 

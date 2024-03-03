@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use minijinja::value::{StructObject, Value, ValueKind};
+use minijinja::value::{MapObject, Value, ValueKind};
 use minijinja::{context, Environment};
 
 struct SelfReferentialContext {
     ctx: Value,
 }
 
-impl StructObject for SelfReferentialContext {
+impl MapObject for SelfReferentialContext {
     fn get_field(&self, name: &str) -> Option<Value> {
         if name == "CONTEXT" {
             return Some(self.ctx.clone());
@@ -26,7 +26,7 @@ impl StructObject for SelfReferentialContext {
 }
 
 pub fn make_self_referential(ctx: Value) -> Value {
-    Value::from_struct_object(SelfReferentialContext { ctx })
+    Value::from_map_object(SelfReferentialContext { ctx })
 }
 
 static TEMPLATE: &str = r#"

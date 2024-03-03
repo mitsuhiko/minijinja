@@ -10,15 +10,13 @@ use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
-use crate::value::{
-    ops, value_map_with_capacity, value_optimization, KeyRef, MapType, Value, ValueRepr,
-};
+use crate::value::{ops, value_map_with_capacity, value_optimization, Value, ValueRepr};
 use crate::vm::context::{Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
-use crate::vm::{closure_object::Closure, macro_object::Macro};
+use crate::vm::closure_object::Closure;
 
 pub(crate) use crate::vm::context::Context;
 pub use crate::vm::state::State;
@@ -293,6 +291,12 @@ impl<'env> Vm<'env> {
             }
 
             match instr {
+                Instruction::Swap => {
+                    let a = stack.pop();
+                    let b = stack.pop();
+                    stack.push(a);
+                    stack.push(b);
+                }
                 Instruction::EmitRaw(val) => {
                     // this only produces a format error, no need to attach
                     // location information.
@@ -347,42 +351,30 @@ impl<'env> Vm<'env> {
                     for _ in 0..*pair_count {
                         let value = stack.pop();
                         let key = stack.pop();
-                        map.insert(KeyRef::Value(key), value);
+                        map.insert(key, value);
                     }
-                    stack.push(Value(ValueRepr::Map(map.into(), MapType::Normal)))
+                    stack.push(Value::from_map_object(map))
                 }
                 Instruction::BuildKwargs(pair_count) => {
                     let mut map = value_map_with_capacity(*pair_count);
                     for _ in 0..*pair_count {
                         let value = stack.pop();
                         let key = stack.pop();
-                        map.insert(KeyRef::Value(key), value);
+                        map.insert(key, value);
                     }
-                    stack.push(Value(ValueRepr::Map(map.into(), MapType::Kwargs)))
+                    stack.push(Value::from_kwargs(Arc::new(map)))
                 }
-                Instruction::BuildList(count) => {
-                    let mut v = Vec::with_capacity(untrusted_size_hint(*count));
-                    for _ in 0..*count {
+                Instruction::BuildList(n) => {
+                    let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
+                    let mut v = Vec::with_capacity(untrusted_size_hint(count));
+                    for _ in 0..count {
                         v.push(stack.pop());
                     }
                     v.reverse();
-                    stack.push(Value(ValueRepr::Seq(Arc::new(v))));
+                    stack.push(Value::from_seq_object(v))
                 }
                 Instruction::UnpackList(count) => {
                     ctx_ok!(self.unpack_list(&mut stack, count));
-                }
-                Instruction::ListAppend => {
-                    a = stack.pop();
-                    // this intentionally only works with actual sequences
-                    if let ValueRepr::Seq(mut v) = stack.pop().0 {
-                        Arc::make_mut(&mut v).push(a);
-                        stack.push(Value(ValueRepr::Seq(v)))
-                    } else {
-                        bail!(Error::new(
-                            ErrorKind::InvalidOperation,
-                            "cannot append to non-list"
-                        ));
-                    }
                 }
                 Instruction::Add => func_binop!(add),
                 Instruction::Sub => func_binop!(sub),
@@ -648,9 +640,9 @@ impl<'env> Vm<'env> {
                     let locals = state.ctx.current_locals_mut();
                     let mut module = value_map_with_capacity(locals.len());
                     for (key, value) in locals.iter() {
-                        module.insert(KeyRef::Value(Value::from(*key)), value.clone());
+                        module.insert(Value::from(*key), value.clone());
                     }
-                    stack.push(Value(ValueRepr::Map(module.into(), MapType::Normal)));
+                    stack.push(Value::from_map_object(module));
                 }
                 #[cfg(feature = "macros")]
                 Instruction::BuildMacro(name, offset, flags) => {
@@ -694,15 +686,16 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         ignore_missing: bool,
     ) -> Result<(), Error> {
-        use crate::value::SeqObject;
-
-        let single_name_slice = std::slice::from_ref(&name);
-        let choices = name
-            .as_seq()
-            .unwrap_or(&single_name_slice as &dyn SeqObject);
+        let seq = name.as_seq();
+        let choices = seq
+            .as_ref()
+            .map(|d| d.iter())
+            .into_iter()
+            .flatten()
+            .chain(seq.is_none().then(|| name.clone()).into_iter());
 
         let mut templates_tried = vec![];
-        for choice in choices.iter() {
+        for choice in choices {
             let name = ok!(choice.as_str().ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
@@ -976,7 +969,7 @@ impl<'env> Vm<'env> {
         name: &str,
         flags: u8,
     ) {
-        use crate::compiler::instructions::MACRO_CALLER;
+        use crate::{compiler::instructions::MACRO_CALLER, vm::macro_object::Macro};
 
         let arg_spec = match stack.pop().0 {
             ValueRepr::Seq(args) => args
