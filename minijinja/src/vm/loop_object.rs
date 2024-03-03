@@ -1,9 +1,9 @@
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Mutex, Arc};
+use std::sync::{Arc, Mutex};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Object, MapObject, Value};
+use crate::value::{MapObject, Object, Value};
 use crate::vm::state::State;
 
 pub(crate) struct Loop {
@@ -37,7 +37,12 @@ impl Object for Loop {
         ))
     }
 
-    fn call_method(self: &Arc<Self>, _state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(
+        self: &Arc<Self>,
+        _state: &State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, Error> {
         if name == "changed" {
             let mut last_changed_value = self.last_changed_value.lock().unwrap();
             let value = args.to_owned();

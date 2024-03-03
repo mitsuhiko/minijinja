@@ -144,8 +144,8 @@ use crate::value::serialize::transform;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
-pub use crate::value::object::{Object, SeqObject, SeqObjectIter, MapObject};
-pub use crate::value::object::{AnyObject, AnyMapObject, AnySeqObject};
+pub use crate::value::object::{AnyMapObject, AnyObject, AnySeqObject};
+pub use crate::value::object::{MapObject, Object, SeqObject, SeqObjectIter};
 
 #[macro_use]
 mod type_erase;
@@ -644,7 +644,8 @@ impl Value {
 
     /// Creates a value from an owned [`SeqObject`].
     pub fn from_seq_object<T>(value: T) -> Value
-        where T: SeqObject + Send + Sync + 'static,
+    where
+        T: SeqObject + Send + Sync + 'static,
     {
         Value(ValueRepr::Seq(Arc::new(value).into()))
     }
@@ -659,7 +660,8 @@ impl Value {
     /// This is a simplified API for creating dynamic structs
     /// without having to implement the entire [`Object`] protocol.
     pub fn from_map_object<T>(value: T) -> Value
-        where T: MapObject + Send + Sync + 'static
+    where
+        T: MapObject + Send + Sync + 'static,
     {
         Value(ValueRepr::Map(Arc::new(value).into(), MapType::Normal))
     }
@@ -670,7 +672,8 @@ impl Value {
     }
 
     pub(crate) fn from_kwargs<T>(value: Arc<T>) -> Value
-        where T: MapObject + Send + Sync + 'static
+    where
+        T: MapObject + Send + Sync + 'static,
     {
         Value(ValueRepr::Map(value.into(), MapType::Kwargs))
     }
@@ -1011,7 +1014,7 @@ impl Value {
             ValueRepr::Seq(ref o) => o.downcast(),
             ValueRepr::Map(ref o, _) => o.downcast(),
             ValueRepr::Dynamic(ref o) => o.downcast_ref(),
-            _ => None
+            _ => None,
         }
     }
 
@@ -1139,7 +1142,7 @@ impl Value {
             ValueRepr::Seq(ref seq) => {
                 let len = seq.item_count();
                 (ValueIteratorState::DynSeq(0, seq.clone()), len)
-            },
+            }
             ValueRepr::Map(ref s, _) => {
                 // the assumption is that structs don't have excessive field counts
                 // and that most iterations go over all fields, so creating a
@@ -1149,7 +1152,10 @@ impl Value {
                 } else {
                     let attrs = s.fields();
                     let attr_count = attrs.len();
-                    (ValueIteratorState::DynSeq(0, Arc::new(attrs).into()), attr_count)
+                    (
+                        ValueIteratorState::DynSeq(0, Arc::new(attrs).into()),
+                        attr_count,
+                    )
                 }
             }
             ValueRepr::Dynamic(ref obj) => return obj.value().try_iter_owned(),
@@ -1220,7 +1226,7 @@ impl Serialize for Value {
                     ok!(seq.serialize_element(&item));
                 }
                 seq.end()
-            },
+            }
             ValueRepr::Map(ref s, _) => {
                 use serde::ser::SerializeMap;
                 let mut map = ok!(serializer.serialize_map(None));
@@ -1306,12 +1312,10 @@ impl ValueIteratorState {
                 *idx += 1;
                 Value::from(intern(x))
             }),
-            ValueIteratorState::DynSeq(idx, seq) => {
-                seq.get_item(*idx).map(|x| {
-                    *idx += 1;
-                    x
-                })
-            }
+            ValueIteratorState::DynSeq(idx, seq) => seq.get_item(*idx).map(|x| {
+                *idx += 1;
+                x
+            }),
         }
     }
 }

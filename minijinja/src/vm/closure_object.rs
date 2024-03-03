@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use crate::value::{Object, MapObject, Value};
+use crate::value::{MapObject, Object, Value};
 
 /// Closure cycle breaker utility.
 ///
@@ -79,7 +79,13 @@ impl Object for Closure {
 
 impl MapObject for Closure {
     fn fields(self: &Arc<Self>) -> Vec<Value> {
-        self.values.lock().unwrap().keys().cloned().map(Value::from).collect()
+        self.values
+            .lock()
+            .unwrap()
+            .keys()
+            .cloned()
+            .map(Value::from)
+            .collect()
     }
 
     fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {

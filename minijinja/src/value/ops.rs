@@ -130,7 +130,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         ValueRepr::Dynamic(dy) => match dy.value().0 {
             ValueRepr::Seq(s) => Ok(slice_seq(&s, start, stop, step)),
             _ => return error,
-        }
+        },
         _ => return error,
     }
 }

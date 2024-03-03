@@ -5,9 +5,7 @@ use std::sync::Arc;
 use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::AutoEscape;
-use crate::value::{
-    MapType, Object, StringType, MapObject, Value, ValueRepr,
-};
+use crate::value::{MapObject, MapType, Object, StringType, Value, ValueRepr};
 use crate::vm::state::State;
 use crate::vm::Vm;
 

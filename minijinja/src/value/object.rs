@@ -1,8 +1,8 @@
+use std::borrow::Borrow;
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::{Deref, Range};
 use std::sync::Arc;
-use std::collections::HashMap;
-use std::borrow::Borrow;
 
 use crate::error::{Error, ErrorKind};
 use crate::value::{intern, Value, ValueMap};
@@ -55,7 +55,7 @@ pub trait Object: fmt::Display + fmt::Debug {
         self: &Arc<Self>,
         state: &State,
         name: &str,
-        args: &[Value]
+        args: &[Value],
     ) -> Result<Value, Error> {
         let _state = state;
         let _args = args;
@@ -616,9 +616,7 @@ impl MapObject for ValueMap {
 
     #[inline]
     fn fields(self: &Arc<Self>) -> Vec<Value> {
-        self.keys()
-            .cloned()
-            .collect()
+        self.keys().cloned().collect()
     }
 
     #[inline]
@@ -659,8 +657,9 @@ impl<'a> DoubleEndedIterator for MapObjectIter<'a> {
 }
 
 impl<K, V> MapObject for HashMap<K, V>
-    where K: Borrow<str> + AsRef<str> + PartialEq + Eq + std::hash::Hash + Clone + Send + Sync,
-          V: Into<Value> + Clone + Send + Sync
+where
+    K: Borrow<str> + AsRef<str> + PartialEq + Eq + std::hash::Hash + Clone + Send + Sync,
+    V: Into<Value> + Clone + Send + Sync,
 {
     fn get_field(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let key = key.as_str()?;
@@ -672,9 +671,7 @@ impl<K, V> MapObject for HashMap<K, V>
     }
 
     fn fields(self: &Arc<Self>) -> Vec<Value> {
-        self.keys()
-            .map(|k| k.as_ref().into())
-            .collect()
+        self.keys().map(|k| k.as_ref().into()).collect()
     }
 
     fn field_count(self: &Arc<Self>) -> usize {

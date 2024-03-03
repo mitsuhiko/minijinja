@@ -7,8 +7,8 @@ use std::ops::{Deref, DerefMut};
 use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
-    Arc, MapType, Object, Packed, StringType, Value, ValueKind, ValueMap,
-    ValueRepr, AnyObject, AnyMapObject, AnySeqObject,
+    AnyMapObject, AnyObject, AnySeqObject, Arc, MapType, Object, Packed, StringType, Value,
+    ValueKind, ValueMap, ValueRepr,
 };
 use crate::vm::State;
 
@@ -872,9 +872,7 @@ impl FromIterator<(String, Value)> for Kwargs {
         T: IntoIterator<Item = (String, Value)>,
     {
         Kwargs::new(Arc::new(
-            iter.into_iter()
-                .map(|(k, v)| (Value::from(k), v))
-                .collect(),
+            iter.into_iter().map(|(k, v)| (Value::from(k), v)).collect(),
         ))
     }
 }
@@ -885,9 +883,7 @@ impl<'a> FromIterator<(&'a str, Value)> for Kwargs {
         T: IntoIterator<Item = (&'a str, Value)>,
     {
         Kwargs::new(Arc::new(
-            iter.into_iter()
-                .map(|(k, v)| (Value::from(k), v))
-                .collect(),
+            iter.into_iter().map(|(k, v)| (Value::from(k), v)).collect(),
         ))
     }
 }

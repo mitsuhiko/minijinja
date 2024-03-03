@@ -131,7 +131,7 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use minijinja::value::{Object, SeqObject, MapObject, Value};
+use minijinja::value::{MapObject, Object, SeqObject, Value};
 use minijinja::{Error, State};
 
 static STACK_SCOPE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -161,7 +161,10 @@ pub struct StackHandle<T: ?Sized> {
 // FIXME: Is this ok?
 impl<T: ?Sized> Clone for StackHandle<T> {
     fn clone(&self) -> Self {
-        Self { ptr: self.ptr.clone(), id: self.id.clone() }
+        Self {
+            ptr: self.ptr.clone(),
+            id: self.id.clone(),
+        }
     }
 }
 

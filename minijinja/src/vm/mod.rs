@@ -10,15 +10,13 @@ use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
-use crate::value::{
-    ops, value_map_with_capacity, value_optimization, Value, ValueRepr,
-};
+use crate::value::{ops, value_map_with_capacity, value_optimization, Value, ValueRepr};
 use crate::vm::context::{Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
-use crate::vm::{closure_object::Closure};
+use crate::vm::closure_object::Closure;
 
 pub(crate) use crate::vm::context::Context;
 pub use crate::vm::state::State;

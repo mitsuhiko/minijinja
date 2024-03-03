@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use serde::{Deserialize, Serialize};
 use similar_asserts::assert_eq;
 
-use minijinja::value::{SeqObject, MapObject, Value};
+use minijinja::value::{MapObject, SeqObject, Value};
 
 #[test]
 fn test_seq() {

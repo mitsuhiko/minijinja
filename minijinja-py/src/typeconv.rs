@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{Object, SeqObject, MapObject, Value, ValueKind};
+use minijinja::value::{MapObject, Object, SeqObject, Value, ValueKind};
 use minijinja::{AutoEscape, Error, State};
 
 use once_cell::sync::OnceCell;

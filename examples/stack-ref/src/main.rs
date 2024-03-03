@@ -1,6 +1,6 @@
 use std::{env, fmt};
 
-use minijinja::value::{Object, MapObject, Value};
+use minijinja::value::{MapObject, Object, Value};
 use minijinja::{context, Environment, Error, ErrorKind, State};
 use minijinja_stack_ref::{reborrow, scope};
 

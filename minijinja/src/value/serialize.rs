@@ -5,8 +5,8 @@ use serde::{ser, Serialize, Serializer};
 
 use crate::utils::untrusted_size_hint;
 use crate::value::{
-    value_map_with_capacity, Arc, Packed, StringType, Value, ValueMap, ValueRepr,
-    VALUE_HANDLES, VALUE_HANDLE_MARKER,
+    value_map_with_capacity, Arc, Packed, StringType, Value, ValueMap, ValueRepr, VALUE_HANDLES,
+    VALUE_HANDLE_MARKER,
 };
 
 #[derive(Debug)]
@@ -329,10 +329,7 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
 
     fn end(self) -> Result<Value, InvalidValue> {
         let mut map = value_map_with_capacity(1);
-        map.insert(
-            self.name.into(),
-            Value::from_seq_object(self.fields),
-        );
+        map.insert(self.name.into(), Value::from_seq_object(self.fields));
         Ok(Value::from_map_object(map))
     }
 }
