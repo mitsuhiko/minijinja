@@ -264,7 +264,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::value::{Kwargs, MapType, ObjectKind, Rest, ValueKind, ValueMap, ValueRepr};
+    use crate::value::{MapType, ObjectKind, Rest, ValueKind, ValueMap, ValueRepr};
 
     /// Returns a range.
     ///
