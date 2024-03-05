@@ -31,6 +31,7 @@ State {
         globals: {
             "debug": minijinja::functions::builtins::debug,
             "dict": minijinja::functions::builtins::dict,
+            "namespace": minijinja::functions::builtins::namespace,
             "range": minijinja::functions::builtins::range,
         },
         tests: [

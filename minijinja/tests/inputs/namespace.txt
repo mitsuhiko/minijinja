@@ -1,0 +1,13 @@
+{
+}
+---
+{%- set ns = namespace() %}
+{%- set ns.foo = 0 %}
+{%- for count in range(10) %}
+  {%- set ns.foo = ns.foo + count %}
+{%- endfor %}
+{{- ns }}
+---
+{% set ns.foo = namespace() %}
+{%- set ns.foo.bar = 42 %}
+{{- ns }}

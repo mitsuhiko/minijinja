@@ -152,6 +152,7 @@ mod argtypes;
 mod deserialize;
 mod keyref;
 pub(crate) mod merge_object;
+pub(crate) mod namespace_object;
 mod object;
 pub(crate) mod ops;
 mod serialize;

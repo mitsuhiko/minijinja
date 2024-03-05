@@ -389,6 +389,12 @@ mod builtins {
             format!("{:#?}", &args.0[..])
         }
     }
+
+    /// Returns a new namespace.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn namespace() -> Value {
+        Value::from_struct_object(crate::value::namespace_object::Namespace::default())
+    }
 }
 
 #[cfg(feature = "builtins")]

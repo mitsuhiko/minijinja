@@ -681,7 +681,18 @@ impl<'a> Parser<'a> {
         if RESERVED_NAMES.contains(&id) {
             syntax_error!("cannot assign to reserved variable name {}", id);
         }
-        Ok(ast::Expr::Var(ast::Spanned::new(ast::Var { id }, span)))
+        let mut rv = ast::Expr::Var(ast::Spanned::new(ast::Var { id }, span));
+        while skip_token!(self, Token::Dot) {
+            let (attr, span) = expect_token!(self, Token::Ident(name) => name, "identifier");
+            rv = ast::Expr::GetAttr(ast::Spanned::new(
+                ast::GetAttr {
+                    expr: rv,
+                    name: attr,
+                },
+                span,
+            ));
+        }
+        Ok(rv)
     }
 
     fn parse_assignment(&mut self) -> Result<ast::Expr<'a>, Error> {
