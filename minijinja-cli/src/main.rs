@@ -376,18 +376,16 @@ fn print_instructions(
 }
 
 pub fn print_error(err: &Error) {
+    eprintln!("error: {err}");
     if let Some(err) = err.downcast_ref::<MError>() {
-        eprintln!("template error: {err:#}");
-    } else {
-        eprintln!("error: {err}");
+        eprintln!("{}", err.display_debug_info());
     }
     let mut source_opt = err.source();
     while let Some(source) = source_opt {
         eprintln!();
+        eprintln!("caused by: {source}");
         if let Some(source) = source.downcast_ref::<MError>() {
-            eprintln!("caused by template error: {source:#}");
-        } else {
-            eprintln!("caused by: {source}");
+            eprintln!("{}", source.display_debug_info());
         }
         source_opt = source.source();
     }
