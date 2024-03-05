@@ -130,7 +130,7 @@ fn load_data(
             }
             .with_context(|| {
                 format!(
-                    "unable to select {:?} in {:?} from {}",
+                    "unable to select {:?} in {:?} (value was {})",
                     part,
                     selector,
                     data.kind()
@@ -410,14 +410,18 @@ fn print_instructions(
 pub fn print_error(err: &Error) {
     eprintln!("error: {err}");
     if let Some(err) = err.downcast_ref::<MError>() {
-        eprintln!("{}", err.display_debug_info());
+        if err.name().is_some() {
+            eprintln!("{}", err.display_debug_info());
+        }
     }
     let mut source_opt = err.source();
     while let Some(source) = source_opt {
         eprintln!();
         eprintln!("caused by: {source}");
         if let Some(source) = source.downcast_ref::<MError>() {
-            eprintln!("{}", source.display_debug_info());
+            if source.name().is_some() {
+                eprintln!("{}", source.display_debug_info());
+            }
         }
         source_opt = source.source();
     }
