@@ -11,3 +11,9 @@
 {% set ns.foo = namespace() %}
 {%- set ns.foo.bar = 42 %}
 {{- ns }}
+---
+{% set ns = namespace(found=true) %}
+{{- ns }}
+---
+{% set ns = namespace({"found": true}) %}
+{{- ns }}

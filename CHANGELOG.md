@@ -10,6 +10,9 @@ All notable changes to MiniJinja are documented here.
 - Added support for `Error::display_debug_info` which displays just the
   debug info, same way as alternative display on the error does.  #420
 
+- Added the `namspace()` function from Jinja2 and the ability to assign
+  to it via `{% set %}`.  #422
+
 ## 1.0.12
 
 - The `urlencode` filter now correctly skips over none and undefined.  #394

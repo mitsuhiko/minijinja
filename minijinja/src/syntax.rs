@@ -504,6 +504,24 @@
 //! {% set title | upper %}Title of the page{% endset %}
 //! ```
 //!
+//! More complex use cases can be handled using namespace objects which allow
+//! propagating of changes across scopes:
+//!
+//! ```jinja
+//! {% set ns = namespace(found=false) %}
+//! {% for item in items %}
+//!   {% if item.check_something() %}
+//!     {% set ns.found = true %}
+//!   {% endif %}
+//!   * {{ item.title }}
+//! {% endfor %}
+//! Found item having something: {{ ns.found }}
+//! ```
+//!
+//! Note that the `obj.attr` notation in the set tag is only allowed for namespace
+//! objects; attempting to assign an attribute on any other object will cause
+//! an error.
+//!
 //! ## `{% filter %}`
 //!
 //! Filter sections allow you to apply regular [filters](crate::filters) on a
