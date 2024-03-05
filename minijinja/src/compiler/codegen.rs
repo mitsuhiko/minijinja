@@ -525,6 +525,11 @@ impl<'source> CodeGenerator<'source> {
                 }
                 self.pop_span();
             }
+            ast::Expr::GetAttr(attr) => {
+                self.push_span(attr.span());
+                self.compile_expr(&attr.expr);
+                self.add(Instruction::SetAttr(attr.name));
+            }
             _ => unreachable!(),
         }
     }

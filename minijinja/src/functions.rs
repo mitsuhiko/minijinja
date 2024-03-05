@@ -264,7 +264,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::value::{MapType, ObjectKind, Rest, ValueMap, ValueRepr};
+    use crate::value::{MapType, ObjectKind, Rest, ValueKind, ValueMap, ValueRepr};
 
     /// Returns a range.
     ///
@@ -388,6 +388,39 @@ mod builtins {
         } else {
             format!("{:#?}", &args.0[..])
         }
+    }
+
+    /// Creates a new container that allows attribute assignment using the `{% set %}` tag.
+    ///
+    /// ```jinja
+    /// {% set ns = namespace() %}
+    /// {% set ns.foo = 'bar' %}
+    /// ```
+    ///
+    /// The main purpose of this is to allow carrying a value from within a loop body
+    /// to an outer scope. Initial values can be provided as a dict, as keyword arguments,
+    /// or both (same behavior as [`dict`]).
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn namespace(defaults: Option<Value>) -> Result<Value, Error> {
+        let ns = crate::value::namespace_object::Namespace::default();
+        if let Some(defaults) = defaults {
+            if defaults.kind() == ValueKind::Map {
+                for key in ok!(defaults.try_iter()) {
+                    if let Some(key) = key.as_str() {
+                        ns.set_field(key, ok!(defaults.get_attr(key)));
+                    }
+                }
+            } else {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!(
+                        "expected object or keyword arguments, got {}",
+                        defaults.kind()
+                    ),
+                ));
+            }
+        }
+        Ok(Value::from_struct_object(ns))
     }
 }
 

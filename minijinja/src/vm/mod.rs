@@ -10,6 +10,7 @@ use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
+use crate::value::namespace_object::Namespace;
 use crate::value::{
     ops, value_map_with_capacity, value_optimization, KeyRef, MapType, Value, ValueRepr,
 };
@@ -320,6 +321,18 @@ impl<'env> Vm<'env> {
                         Some(value) => assert_valid!(value),
                         None => ctx_ok!(undefined_behavior.handle_undefined(a.is_undefined())),
                     });
+                }
+                Instruction::SetAttr(name) => {
+                    b = stack.pop();
+                    a = stack.pop();
+                    if let Some(ns) = b.as_object().and_then(|x| x.downcast_ref::<Namespace>()) {
+                        ns.set_field(name, a);
+                    } else {
+                        bail!(Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!("can only assign to namespaces, not {}", b.kind())
+                        ));
+                    }
                 }
                 Instruction::GetItem => {
                     a = stack.pop();

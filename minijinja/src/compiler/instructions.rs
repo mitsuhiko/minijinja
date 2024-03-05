@@ -42,6 +42,9 @@ pub enum Instruction<'source> {
     /// Looks up an attribute.
     GetAttr(&'source str),
 
+    /// Sets an attribute.
+    SetAttr(&'source str),
+
     /// Looks up an item.
     GetItem,
 
