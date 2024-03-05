@@ -11,6 +11,7 @@ use minijinja::machinery::{get_compiled_template, parse, tokenize, Instructions}
 use minijinja::{
     context, AutoEscape, Environment, Error as MError, ErrorKind, UndefinedBehavior, Value,
 };
+use serde::Deserialize;
 
 #[cfg(feature = "repl")]
 mod repl;
@@ -68,7 +69,11 @@ impl Write for Output {
     }
 }
 
-fn load_data(format: &str, path: &Path) -> Result<(BTreeMap<String, Value>, bool), Error> {
+fn load_data(
+    format: &str,
+    path: &Path,
+    selector: Option<&str>,
+) -> Result<(BTreeMap<String, Value>, bool), Error> {
     let (contents, stdin_used) = if path == Path::new(STDIN_STDOUT) {
         (
             io::read_to_string(io::stdin()).context("unable to read data from stdin")?,
@@ -103,7 +108,7 @@ fn load_data(format: &str, path: &Path) -> Result<(BTreeMap<String, Value>, bool
         format
     };
 
-    let data = match format {
+    let mut data: Value = match format {
         "json" => preferred_json::from_str(&contents)?,
         #[cfg(feature = "querystring")]
         "querystring" => serde_qs::from_str(&contents)?,
@@ -115,7 +120,30 @@ fn load_data(format: &str, path: &Path) -> Result<(BTreeMap<String, Value>, bool
         "cbor" => ciborium::from_reader(contents.as_bytes())?,
         _ => unreachable!(),
     };
-    Ok((data, stdin_used))
+
+    if let Some(selector) = selector {
+        for part in selector.split('.') {
+            data = if let Ok(idx) = part.parse::<usize>() {
+                data.get_item_by_index(idx)
+            } else {
+                data.get_attr(part)
+            }
+            .with_context(|| {
+                format!(
+                    "unable to select {:?} in {:?} (value was {})",
+                    part,
+                    selector,
+                    data.kind()
+                )
+            })?
+            .clone();
+        }
+    }
+
+    Ok((
+        Deserialize::deserialize(data).context("failed to interpret input data as object")?,
+        stdin_used,
+    ))
 }
 
 fn interpret_raw_value(s: &str) -> Result<Value, Error> {
@@ -265,7 +293,11 @@ fn execute() -> Result<i32, Error> {
 
     let format = matches.get_one::<String>("format").unwrap();
     let (base, stdin_used) = if let Some(data) = matches.get_one::<PathBuf>("data") {
-        load_data(format, data)?
+        load_data(
+            format,
+            data,
+            matches.get_one::<String>("select").map(|x| x.as_str()),
+        )?
     } else {
         (Default::default(), false)
     };
@@ -378,14 +410,18 @@ fn print_instructions(
 pub fn print_error(err: &Error) {
     eprintln!("error: {err}");
     if let Some(err) = err.downcast_ref::<MError>() {
-        eprintln!("{}", err.display_debug_info());
+        if err.name().is_some() {
+            eprintln!("{}", err.display_debug_info());
+        }
     }
     let mut source_opt = err.source();
     while let Some(source) = source_opt {
         eprintln!();
         eprintln!("caused by: {source}");
         if let Some(source) = source.downcast_ref::<MError>() {
-            eprintln!("{}", source.display_debug_info());
+            if source.name().is_some() {
+                eprintln!("{}", source.display_debug_info());
+            }
         }
         source_opt = source.source();
     }
