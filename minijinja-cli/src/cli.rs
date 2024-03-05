@@ -49,9 +49,10 @@ pub(super) fn make_command() -> Command {
                     "powershell",
                     "zsh",
                 ]),
-            arg!(-o --output <FILENAME> "path tot he output file")
+            arg!(-o --output <FILENAME> "path to the output file")
                 .default_value("-")
                 .value_parser(value_parser!(PathBuf)),
+            arg!(--select <SELECTOR> "select a path of the input data"),
             arg!(template: [TEMPLATE] "path to the input template").default_value("-"),
             arg!(data: [DATA] "path to the data file").value_parser(value_parser!(PathBuf)),
         ])
