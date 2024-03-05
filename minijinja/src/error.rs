@@ -75,19 +75,9 @@ impl fmt::Debug for Error {
         // error struct dump.
         #[cfg(feature = "debug")]
         {
-            if !f.alternate() {
-                if let Some(info) = self.debug_info() {
-                    ok!(writeln!(f));
-                    ok!(crate::debug::render_debug_info(
-                        f,
-                        self.name(),
-                        self.kind(),
-                        self.line(),
-                        self.span(),
-                        info,
-                    ));
-                    ok!(writeln!(f));
-                }
+            if !f.alternate() && self.debug_info().is_some() {
+                ok!(writeln!(f));
+                ok!(writeln!(f, "{}", self.display_debug_info()));
             }
         }
 
@@ -200,17 +190,8 @@ impl fmt::Display for Error {
         }
         #[cfg(feature = "debug")]
         {
-            if f.alternate() {
-                if let Some(info) = self.debug_info() {
-                    ok!(crate::debug::render_debug_info(
-                        f,
-                        self.name(),
-                        self.kind(),
-                        self.line(),
-                        self.span(),
-                        info,
-                    ));
-                }
+            if f.alternate() && self.debug_info().is_some() {
+                ok!(write!(f, "{}", self.display_debug_info()));
             }
         }
         Ok(())
@@ -317,6 +298,37 @@ impl Error {
         self.repr
             .span
             .map(|x| x.start_offset as usize..x.end_offset as usize)
+    }
+
+    /// Helper function that renders all known debug info on format.
+    ///
+    /// This method returns an object that when formatted prints out the debug information
+    /// that is contained on that error.  Normally this is automatically rendered when the
+    /// error is displayed but in some cases you might want to decide for yourself when and
+    /// how to display that information.
+    #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
+    pub fn display_debug_info(&self) -> impl fmt::Display + '_ {
+        struct Proxy<'a>(&'a Error);
+
+        impl<'a> fmt::Display for Proxy<'a> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                if let Some(info) = self.0.debug_info() {
+                    crate::debug::render_debug_info(
+                        f,
+                        self.0.name(),
+                        self.0.kind(),
+                        self.0.line(),
+                        self.0.span(),
+                        info,
+                    )
+                } else {
+                    Ok(())
+                }
+            }
+        }
+
+        Proxy(self)
     }
 
     /// Returns the template source if available.
