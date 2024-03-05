@@ -7,6 +7,9 @@ All notable changes to MiniJinja are documented here.
 - `minijinja-cli` now supports an `-o` or `--output` parameter to write
   into a target file.  #405
 
+- Added support for `Error::display_debug_info` which displays just the
+  debug info, same way as alternative display on the error does.  #420
+
 ## 1.0.12
 
 - The `urlencode` filter now correctly skips over none and undefined.  #394
