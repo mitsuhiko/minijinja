@@ -142,6 +142,7 @@ enum NotifierImplHandle {
 struct NotifierImpl {
     should_reload: bool,
     should_reload_callback: Option<Box<dyn Fn() -> bool + Send + Sync + 'static>>,
+    on_should_reload_callback: Option<Box<dyn Fn() + Send + Sync + 'static>>,
     fast_reload: bool,
     #[cfg(feature = "watch-fs")]
     fs_watcher: Option<notify::RecommendedWatcher>,
@@ -160,6 +161,10 @@ impl Notifier {
     pub fn request_reload(&self) {
         if let Some(handle) = self.handle() {
             handle.lock().unwrap().should_reload = true;
+
+            if let Some(callback) = handle.lock().unwrap().on_should_reload_callback.as_ref() {
+                callback();
+            }
         }
     }
 
@@ -192,6 +197,25 @@ impl Notifier {
     {
         if let Some(handle) = self.handle() {
             handle.lock().unwrap().should_reload_callback = Some(Box::new(f));
+        }
+    }
+
+    /// Registers a callback that is invoked when the environment should reload.
+    ///
+    /// The callback is called in these scenarios:
+    ///  - A reload was requested via [`request_reload`](Self::request_reload)
+    ///  - The callback set via [`set_callback`](Self::set_callback) returned `true`
+    ///
+    /// When the feature `watch-fs` is enabled, the callback is also invoked when
+    /// a change is detected in a watched file path.
+    ///
+    /// **NOTE**: This callback is invoked **before** the environment is reloaded.
+    pub fn set_on_should_reload_callback<F>(&self, f: F)
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        if let Some(handle) = self.handle() {
+            handle.lock().unwrap().on_should_reload_callback = Some(Box::new(f));
         }
     }
 
@@ -269,7 +293,24 @@ impl Notifier {
             None => return false,
         };
         let inner = handle.lock().unwrap();
-        inner.should_reload || inner.should_reload_callback.as_ref().map_or(false, |x| x())
+
+        // Early return if we already know we should reload so that
+        // `should_reload_callback` isn't polled unnecessarily and
+        // `on_should_reload_callback` isn't called twice.
+        // (It should've been called already when setting `should_reload`.)
+        if inner.should_reload {
+            return true;
+        }
+
+        let should_reload = inner.should_reload_callback.as_ref().map_or(false, |x| x());
+
+        if should_reload {
+            if let Some(callback) = inner.on_should_reload_callback.as_ref() {
+                callback();
+            }
+        }
+
+        should_reload
     }
 
     #[cfg(feature = "watch-fs")]
@@ -301,6 +342,12 @@ impl Notifier {
                     ) {
                         if let Some(inner) = weak_handle.upgrade() {
                             inner.lock().unwrap().should_reload = true;
+
+                            if let Some(callback) =
+                                inner.lock().unwrap().on_should_reload_callback.as_ref()
+                            {
+                                callback();
+                            }
                         }
                     }
                 })
