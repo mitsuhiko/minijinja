@@ -449,6 +449,7 @@ fn value_to_unexpected(value: &Value) -> de::Unexpected {
             super::ObjectKind::Plain => de::Unexpected::Other("plain object"),
             super::ObjectKind::Seq(_) => de::Unexpected::Seq,
             super::ObjectKind::Struct(_) => de::Unexpected::Map,
+            super::ObjectKind::Iterator(_) => de::Unexpected::Other("iterator"),
         },
     }
 }

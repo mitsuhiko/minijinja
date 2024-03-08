@@ -340,7 +340,9 @@ mod builtins {
                 ValueRepr::Map(map, _) => map,
                 ValueRepr::Dynamic(ref dynamic) => match dynamic.kind() {
                     ObjectKind::Plain => Arc::new(ValueMap::default()),
-                    ObjectKind::Seq(_) => return Err(Error::from(ErrorKind::InvalidOperation)),
+                    ObjectKind::Seq(_) | ObjectKind::Iterator(_) => {
+                        return Err(Error::from(ErrorKind::InvalidOperation))
+                    }
                     ObjectKind::Struct(s) => {
                         let mut rv = ValueMap::default();
                         for field in s.fields() {
