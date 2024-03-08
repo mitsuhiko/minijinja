@@ -934,8 +934,7 @@ impl<'env> Vm<'env> {
         // for an iterator where the lower and upper bound are matching we can
         // consider them to have ExactSizeIterator semantics.  We do however not
         // expect ExactSizeIterator bounds themselves to support iteration by
-        // other means.  In MiniJinja 1.x the bound does exist, but the system
-        // itself also permits iteration over unknown iterables.
+        // other means.
         let len = match iterator.size_hint() {
             (lower, Some(upper)) if lower == upper => Some(lower),
             _ => None,

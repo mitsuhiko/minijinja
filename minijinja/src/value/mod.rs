@@ -1319,8 +1319,6 @@ impl Iterator for OwnedValueIterator {
     }
 }
 
-impl ExactSizeIterator for OwnedValueIterator {}
-
 impl fmt::Debug for OwnedValueIterator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ValueIterator").finish()
