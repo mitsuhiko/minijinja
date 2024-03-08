@@ -13,6 +13,10 @@ All notable changes to MiniJinja are documented here.
 - Added the `namspace()` function from Jinja2 and the ability to assign
   to it via `{% set %}`.  #422
 
+- `minijinja-autoreload` now supports `on_should_reload_callback` which
+  lets one register a callback to be called just before an auto reload
+  should be performed.  #424
+
 ## 1.0.12
 
 - The `urlencode` filter now correctly skips over none and undefined.  #394
