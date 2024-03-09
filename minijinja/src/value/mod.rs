@@ -604,6 +604,17 @@ impl Value {
 
     /// Creates a value from an iterator.
     ///
+    /// This takes an iterator (yielding values that can be turned into a [`Value`])
+    /// and returns a value that can be iterated over.  Today this value looks a bit like
+    /// a sequence (and will pretend to be one) but this is misleading.  Such values are
+    /// actually objects implementing [`IteratorObject`] but due to backwards
+    /// compatibility reasons it's not possible to give them a distinct type.
+    ///
+    /// Iterators that implement [`ExactSizeIterator`] or have a matching lower and upper
+    /// bound on the [`Iterator::size_hint`] report a known `loop.length`.  Iterators that
+    /// do not fulfill these requirements will not.  The same is true for `revindex` and
+    /// similar properties.
+    ///
     /// ```
     /// # use minijinja::value::Value;
     /// let val = Value::from_iterator(0..10);

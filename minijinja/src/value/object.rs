@@ -210,6 +210,10 @@ pub enum ObjectKind<'a> {
     Struct(&'a dyn StructObject),
 
     /// This object is an iterator that yields new values.
+    ///
+    /// Requires that the object implements [`IteratorObject`].  It's not
+    /// recommended to implement this, instead one should directly pass
+    /// iterators to [`Value::from_iterator`].
     Iterator(&'a dyn IteratorObject),
 }
 
