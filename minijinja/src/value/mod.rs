@@ -634,7 +634,7 @@ impl Value {
         I: Iterator<Item = T> + Send + Sync + 'static,
         T: Into<Value> + 'static,
     {
-        Value::from_object(SimpleIteratorObject(Mutex::new(iter)))
+        Value::from_object(SimpleIteratorObject(Mutex::new(iter.fuse())))
     }
 
     /// Creates a value from a safe string.
