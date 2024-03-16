@@ -27,6 +27,9 @@ pub(super) fn make_command() -> Command {
             arg!(--strict "disallow undefined variables in templates"),
             arg!(--"no-include" "Disallow includes and extending"),
             arg!(--"no-newline" "Do not output a newline"),
+            arg!(--"safe-path" <PATH>... "Only allow includes from this path. Can be used multiple times.")
+                .conflicts_with("no-include")
+                .value_parser(value_parser!(PathBuf)),
             arg!(--env "Pass environment variables as ENV to the template"),
             arg!(-E --expr <EXPR> "Evaluates an expression instead"),
             arg!(--"expr-out" <MODE> "Sets the expression output mode")
