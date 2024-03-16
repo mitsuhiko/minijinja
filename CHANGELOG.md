@@ -6,19 +6,17 @@ All notable changes to MiniJinja are documented here.
 
 - `minijinja-cli` now supports an `-o` or `--output` parameter to write
   into a target file.  #405
-
 - `minijinja-cli` now accepts the `--safe-path` parameter to disallow
   includes or extends from paths not explicitly allowlisted.  #432
-
 - Added support for `Error::display_debug_info` which displays just the
   debug info, same way as alternative display on the error does.  #420
-
 - Added the `namspace()` function from Jinja2 and the ability to assign
   to it via `{% set %}`.  #422
-
 - `minijinja-autoreload` now supports `on_should_reload_callback` which
   lets one register a callback to be called just before an auto reload
   should be performed.  #424
+- Added support for `Value::from_iterator`, `IteratorObject` and
+  `ObjectKind::Iterator`.  #426
 
 ## 1.0.12
 

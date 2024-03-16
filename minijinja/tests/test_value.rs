@@ -4,7 +4,7 @@ use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
 use minijinja::value::{Kwargs, Object, ObjectKind, Rest, SeqObject, StructObject, Value};
-use minijinja::{args, Environment, Error};
+use minijinja::{args, context, render, Environment, Error};
 
 #[test]
 fn test_sort() {
@@ -509,6 +509,41 @@ fn test_seq_object_borrow() {
             .unwrap(),
         Value::from("HELLO42")
     );
+}
+
+#[test]
+fn test_iterator() {
+    let value = Value::from_iterator(0..10);
+    assert_eq!(value.to_string(), "<iterator>");
+    let rv = render!(
+        "{% for item in iter %}[{{ item }}]{% endfor %}",
+        iter => value
+    );
+    assert_snapshot!(rv, @"[0][1][2][3][4][5][6][7][8][9]");
+
+    let rv = render!(
+        "{% for item in iter %}- {{ item }}: {{ loop.index }} / {{ loop.length }}\n{% endfor %}",
+        iter => Value::from_iterator('a'..'f')
+    );
+    assert_snapshot!(rv, @r###"
+    - a: 1 / 5
+    - b: 2 / 5
+    - c: 3 / 5
+    - d: 4 / 5
+    - e: 5 / 5
+    "###);
+
+    let rv = render!(
+        "{% for item in iter %}- {{ item }}: {{ loop.index }} / {{ loop.length|default('?') }}\n{% endfor %}",
+     iter => Value::from_iterator((0..10).filter(|x| x % 2 == 0))
+    );
+    assert_snapshot!(rv, @r###"
+    - 0: 1 / ?
+    - 2: 2 / ?
+    - 4: 3 / ?
+    - 6: 4 / ?
+    - 8: 5 / ?
+    "###);
 }
 
 #[test]

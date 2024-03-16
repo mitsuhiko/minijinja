@@ -211,6 +211,11 @@
 //! - `loop.changed(...args)`: Returns true if the passed values have changed since the last time it was called with the same arguments.
 //! - `loop.cycle(...args)`: Returns a value from the passed sequence in a cycle.
 //!
+//! A special note on iterators: in the current version of MiniJinja, some sequences are actually
+//! lazy iterators.  They behave a bit like sequences not not entirely.  They can be iterated over,
+//! will happily serialize once into a a list etc.  However when iterating over an actual iterator,
+//! `last`, `revindex` and `revindex0` will always be undefined.
+//!
 //! Within a for-loop, it’s possible to cycle among a list of strings/variables each time through
 //! the loop by using the special `loop.cycle` helper:
 //!

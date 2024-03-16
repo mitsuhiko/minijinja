@@ -1,7 +1,7 @@
 use std::any::{Any, TypeId};
 use std::fmt;
 use std::ops::Range;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::error::{Error, ErrorKind};
 use crate::value::{intern, Value};
@@ -208,6 +208,13 @@ pub enum ObjectKind<'a> {
     ///
     /// Requires that the object implements [`StructObject`].
     Struct(&'a dyn StructObject),
+
+    /// This object is an iterator that yields new values.
+    ///
+    /// Requires that the object implements [`IteratorObject`].  It's not
+    /// recommended to implement this, instead one should directly pass
+    /// iterators to [`Value::from_iterator`].
+    Iterator(&'a dyn IteratorObject),
 }
 
 /// Provides the behavior of an [`Object`] holding sequence of values.
@@ -673,5 +680,75 @@ impl<T: StructObject + 'static> fmt::Debug for SimpleStructObject<T> {
 impl<T: StructObject + 'static> Object for SimpleStructObject<T> {
     fn kind(&self) -> ObjectKind<'_> {
         ObjectKind::Struct(&self.0)
+    }
+}
+
+/// Represents a dynamic iterable.
+///
+/// Iterators need to use interior mutability to function.
+pub trait IteratorObject: Send + Sync {
+    /// Produces the next value from the iterator.
+    fn next_value(&self) -> Option<Value>;
+
+    /// Returns the exact size of the iterator if known.
+    ///
+    /// An iterator must only return the length if it's known and correct.
+    /// The default implementation returns `None`.  If the length is
+    /// provided then `loop.revindex` and `loop.length` will return the
+    /// correct information.
+    fn iterator_len(&self) -> Option<usize> {
+        None
+    }
+}
+
+pub(crate) struct SimpleIteratorObject<I, T>(pub Mutex<I>)
+where
+    I: Iterator<Item = T> + Send + Sync + 'static,
+    T: Into<Value> + 'static;
+
+impl<I, T> fmt::Debug for SimpleIteratorObject<I, T>
+where
+    I: Iterator<Item = T> + Send + Sync + 'static,
+    T: Into<Value> + 'static,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Iterator").finish()
+    }
+}
+
+impl<I, T> fmt::Display for SimpleIteratorObject<I, T>
+where
+    I: Iterator<Item = T> + Send + Sync + 'static,
+    T: Into<Value> + 'static,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<iterator>")
+    }
+}
+
+impl<I, T> Object for SimpleIteratorObject<I, T>
+where
+    I: Iterator<Item = T> + Send + Sync + 'static,
+    T: Into<Value> + 'static,
+{
+    fn kind(&self) -> ObjectKind<'_> {
+        ObjectKind::Iterator(self)
+    }
+}
+
+impl<I, T> IteratorObject for SimpleIteratorObject<I, T>
+where
+    I: Iterator<Item = T> + Send + Sync,
+    T: Into<Value>,
+{
+    fn next_value(&self) -> Option<Value> {
+        self.0.lock().unwrap().next().map(Into::into)
+    }
+
+    fn iterator_len(&self) -> Option<usize> {
+        match self.0.lock().unwrap().size_hint() {
+            (lower, Some(upper)) if lower == upper => Some(lower),
+            _ => None,
+        }
     }
 }

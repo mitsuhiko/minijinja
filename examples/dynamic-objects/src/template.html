@@ -5,3 +5,7 @@
   {%- endfor %}
   </ul>
 {%- endwith %}
+
+{%- for item in real_iter %}
+  - {{ item }} ({{ loop.index }} from {{ loop.length|default("?") }})
+{%- endfor %}
