@@ -24,11 +24,21 @@
 //!
 //! ```
 //! # use minijinja::value::Value;
+//!
 //! // collection into a sequence
 //! let value: Value = (1..10).into_iter().collect();
 //!
 //! // collection into a map
 //! let value: Value = [("key", "value")].into_iter().collect();
+//! ```
+//!
+//! For certain types of iterators (`Send` + `Sync` + `'static`) it's also
+//! possible to make the value lazily iterate over the value by using the
+//! `Value::from_iterator` function instead:
+//!
+//! ```
+//! # use minijinja::value::Value;
+//! let value: Value = Value::from_iterator(1..10);
 //! ```
 //!
 //! To to into the inverse directly the various [`TryFrom`](std::convert::TryFrom)
