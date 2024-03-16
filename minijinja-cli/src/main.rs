@@ -165,6 +165,7 @@ fn create_env(
     matches: &ArgMatches,
     cwd: PathBuf,
     allowed_template: Option<String>,
+    safe_paths: Vec<PathBuf>,
     stdin_used_for_data: bool,
 ) -> Environment<'static> {
     let mut env = Environment::new();
@@ -241,6 +242,14 @@ fn create_env(
                 })?);
             }
             return Ok(stdin.clone());
+        }
+
+        let fs_name = Path::new(name);
+        if !safe_paths.is_empty() && !safe_paths.iter().any(|x| fs_name.starts_with(x)) {
+            return Err(MError::new(
+                ErrorKind::InvalidOperation,
+                "Cannot include template from non-trusted path",
+            ));
         }
 
         match fs::read_to_string(name) {
@@ -326,11 +335,16 @@ fn execute() -> Result<i32, Error> {
     } else {
         None
     };
+    let safe_paths = matches
+        .get_many::<PathBuf>("safe-path")
+        .unwrap_or_default()
+        .map(|x| x.canonicalize().unwrap_or_else(|_| x.clone()))
+        .collect::<Vec<_>>();
     let mut output = Output::new(matches.get_one::<PathBuf>("output").unwrap())?;
 
     let no_newline = matches.get_flag("no-newline");
 
-    let env = create_env(&matches, cwd, allowed_template, stdin_used);
+    let env = create_env(&matches, cwd, allowed_template, safe_paths, stdin_used);
 
     if let Some(expr) = matches.get_one::<String>("expr") {
         let rv = env.compile_expression(expr)?.eval(ctx)?;
