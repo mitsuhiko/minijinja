@@ -227,19 +227,18 @@ impl<'s> TokenizerState<'s> {
 
         let old_loc = self.loc();
 
-        let explicit_radix = match self.rest.as_bytes().get(..2) {
-            Some(b"0b" | b"0B") => Some(2),
-            Some(b"0o" | b"0O") => Some(8),
-            Some(b"0x" | b"0X") => Some(16),
-            _ => None,
+        let radix = match self.rest.as_bytes().get(..2) {
+            Some(b"0b" | b"0B") => 2,
+            Some(b"0o" | b"0O") => 8,
+            Some(b"0x" | b"0X") => 16,
+            _ => 10,
         };
 
-        let (radix, mut state) = match explicit_radix {
-            Some(radix) => {
-                self.advance(2);
-                (radix, State::RadixInteger)
-            }
-            None => (10, State::Integer),
+        let mut state = if radix == 10 {
+            State::Integer
+        } else {
+            self.advance(2);
+            State::RadixInteger
         };
 
         let mut num_len = self
