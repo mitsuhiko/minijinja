@@ -80,7 +80,8 @@
 //! - `"Hello World"`: Everything between two double or single quotes is a string. They are
 //!   useful whenever you need a string in the template (e.g. as arguments to function calls
 //!   and filters, or just to extend or include a template).
-//! - `42`: Integers are whole numbers without a decimal part.
+//! - `42`: Integers are whole numbers without a decimal part.  They can be prefixed with
+//!   `0b` to indicate binary, `0o` to indicate octal and `0x` to indicate hexadecimal.
 //! - `42.0`: Floating point numbers can be written using a `.` as a decimal mark.
 //! - `['list', 'of', 'objects']`: Everything between two brackets is a list. Lists are useful
 //!   for storing sequential data to be iterated over.

@@ -218,6 +218,7 @@ impl<'s> TokenizerState<'s> {
     fn eat_number(&mut self) -> Result<(Token<'s>, Span), Error> {
         #[derive(Copy, Clone)]
         enum State {
+            RadixInteger, // 0x10
             Integer,      // 123
             Fraction,     // .123
             Exponent,     // E | e
@@ -225,7 +226,21 @@ impl<'s> TokenizerState<'s> {
         }
 
         let old_loc = self.loc();
-        let mut state = State::Integer;
+
+        let radix = match self.rest.as_bytes().get(..2) {
+            Some(b"0b" | b"0B") => 2,
+            Some(b"0o" | b"0O") => 8,
+            Some(b"0x" | b"0X") => 16,
+            _ => 10,
+        };
+
+        let mut state = if radix == 10 {
+            State::Integer
+        } else {
+            self.advance(2);
+            State::RadixInteger
+        };
+
         let mut num_len = self
             .rest
             .as_bytes()
@@ -239,11 +254,12 @@ impl<'s> TokenizerState<'s> {
                 (b'+' | b'-', State::Exponent) => State::ExponentSign,
                 (b'0'..=b'9', State::Exponent) => State::ExponentSign,
                 (b'0'..=b'9', state) => state,
+                (b'a'..=b'f' | b'A'..=b'F', State::RadixInteger) if radix == 16 => state,
                 _ => break,
             };
             num_len += 1;
         }
-        let is_float = !matches!(state, State::Integer);
+        let is_float = !matches!(state, State::Integer | State::RadixInteger);
 
         let num = self.advance(num_len);
         Ok((
@@ -251,10 +267,10 @@ impl<'s> TokenizerState<'s> {
                 num.parse()
                     .map(Token::Float)
                     .map_err(|_| self.syntax_error("invalid float"))
-            } else if let Ok(int) = num.parse() {
+            } else if let Ok(int) = u64::from_str_radix(num, radix) {
                 Ok(Token::Int(int))
             } else {
-                num.parse()
+                u128::from_str_radix(num, radix)
                     .map(Token::Int128)
                     .map_err(|_| self.syntax_error("invalid integer"))
             }),

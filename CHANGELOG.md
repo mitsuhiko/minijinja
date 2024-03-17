@@ -17,6 +17,8 @@ All notable changes to MiniJinja are documented here.
   should be performed.  #424
 - Added support for `Value::from_iterator`, `IteratorObject` and
   `ObjectKind::Iterator`.  #426
+- Added support for `0b`/`0o`/`0x` prefixed integer literals for
+  binary, octal and hexadecimal notation.  #433
 
 ## 1.0.12
 

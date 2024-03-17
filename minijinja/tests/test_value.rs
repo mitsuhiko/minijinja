@@ -4,7 +4,7 @@ use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
 use minijinja::value::{Kwargs, Object, ObjectKind, Rest, SeqObject, StructObject, Value};
-use minijinja::{args, context, render, Environment, Error};
+use minijinja::{args, render, Environment, Error};
 
 #[test]
 fn test_sort() {
