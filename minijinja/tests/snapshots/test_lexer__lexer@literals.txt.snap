@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_lexer.rs
-description: "{{ true }}\n{{ false }}\n{{ null }}\n{{ 1.0 }}\n{{ 2 }}\n{{ [1, 2, 3] }}\n{{ {\"foo\": \"bar\"} }}\n{{ -9223372036854775808 }}\n{{ -170141183460469231731687303715884105728 }}\n{{ 170141183460469231731687303715884105727 }}\n{{ 340282366920938463463374607431768211455 }}"
+description: "{{ true }}\n{{ false }}\n{{ null }}\n{{ 1.0 }}\n{{ 2 }}\n{{ [1, 2, 3] }}\n{{ {\"foo\": \"bar\"} }}\n{{ -9223372036854775808 }}\n{{ -170141183460469231731687303715884105728 }}\n{{ 170141183460469231731687303715884105727 }}\n{{ 340282366920938463463374607431768211455 }}\n{{ 0b1111 }}\n{{ 0B1001 }}\n{{ 0o777 }}\n{{ 0O777 }}\n{{ 0xdeadbeef }}\n{{ 0XDEADBEEF }}"
 input_file: minijinja/tests/lexer-inputs/literals.txt
 ---
 VariableStart
@@ -115,4 +115,51 @@ VariableEnd
   "}}"
 TemplateData("\n")
   "\n"
-
+VariableStart
+  "{{"
+Int(15)
+  "0b1111"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+Int(9)
+  "0B1001"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+Int(511)
+  "0o777"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+Int(511)
+  "0O777"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+Int(3735928559)
+  "0xdeadbeef"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+Int(3735928559)
+  "0XDEADBEEF"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
