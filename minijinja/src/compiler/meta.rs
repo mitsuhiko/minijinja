@@ -43,8 +43,7 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
         nested_out: None,
         assigned: vec![Default::default()],
     };
-    m.args.iter().for_each(|arg| track_assign(arg, &mut state));
-    m.body.iter().for_each(|node| track_walk(node, &mut state));
+    tracker_visit_macro(m, &mut state);
     state.out
 }
 
@@ -71,6 +70,15 @@ fn tracker_visit_expr_opt<'a>(expr: &Option<ast::Expr<'a>>, state: &mut Assignme
     if let Some(expr) = expr {
         tracker_visit_expr(expr, state);
     }
+}
+
+#[cfg(feature = "macros")]
+fn tracker_visit_macro<'a>(m: &ast::Macro<'a>, state: &mut AssignmentTracker<'a>) {
+    m.args.iter().for_each(|arg| track_assign(arg, state));
+    m.defaults
+        .iter()
+        .for_each(|expr| tracker_visit_expr(expr, state));
+    m.body.iter().for_each(|node| track_walk(node, state));
 }
 
 fn tracker_visit_expr<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a>) {
@@ -247,9 +255,17 @@ fn track_walk<'a>(node: &ast::Stmt<'a>, state: &mut AssignmentTracker<'a>) {
         #[cfg(feature = "macros")]
         ast::Stmt::Macro(stmt) => {
             state.assign(stmt.name);
+            tracker_visit_macro(stmt, state);
         }
         #[cfg(feature = "macros")]
-        ast::Stmt::CallBlock(_) => {}
+        ast::Stmt::CallBlock(stmt) => {
+            tracker_visit_expr(&stmt.call.expr, state);
+            stmt.call
+                .args
+                .iter()
+                .for_each(|x| tracker_visit_expr(x, state));
+            tracker_visit_macro(&stmt.macro_decl, state);
+        }
         ast::Stmt::Do(stmt) => {
             tracker_visit_expr(&stmt.call.expr, state);
             stmt.call

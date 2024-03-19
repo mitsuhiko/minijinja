@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.14
+
+- Fixed a bug with broken closure handling when working with nested
+  `{% macro %}` or `{% call %}` blocks.  #435
+
 ## 1.0.13
 
 - `minijinja-cli` now supports an `-o` or `--output` parameter to write
