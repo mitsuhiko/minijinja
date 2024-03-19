@@ -2,6 +2,7 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
+use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
 use minijinja::value::{Kwargs, StructObject, Value};
@@ -167,4 +168,46 @@ fn test_no_leak() {
         rv,
         "{}<macro meh><macro foo>{}<macro foo>{}<macro foo>{}<macro foo>{}"
     );
+}
+
+/// https://github.com/mitsuhiko/minijinja/issues/434
+#[test]
+fn test_nested_macro_bug() {
+    let rv = render!(
+        r#"
+    {% set a = 42 %}
+    {% macro m1(var) -%}
+      {{ var }}
+    {%- endmacro %}
+    
+    {% macro m2(x=a) -%}
+      {{ m1(x) }}
+    {%- endmacro %}
+    
+    {{ m2() }}
+    "#
+    );
+    assert_snapshot!(rv.trim(), @"42");
+}
+
+/// https://github.com/mitsuhiko/minijinja/issues/434
+#[test]
+fn test_caller_bug() {
+    let rv = render!(
+        r#"
+    {% set a = 42 %}
+    {% set b = 23 %}
+
+    {% macro m1(var) -%}
+      {{ caller(var) }}
+    {%- endmacro %}
+    
+    {% macro m2(x=a) -%}
+      {% call(var) m1(x) %}{{ var }}|{{ b }}{% endcall %}
+    {%- endmacro %}
+    
+    {{ m2() }}
+    "#
+    );
+    assert_snapshot!(rv.trim(), @"42|23");
 }
