@@ -20,6 +20,8 @@ use crate::{defaults, filters, functions, tests};
 
 type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + Sync + Send;
 type PathJoinFunc = dyn for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Sync + Send;
+type UnknownMethodFunc =
+    dyn Fn(&State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send;
 
 /// The maximum recursion in the VM.  Normally each stack frame
 /// adds one to this counter (eg: every time a frame is added).
@@ -50,6 +52,7 @@ pub struct Environment<'source> {
     tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
     globals: BTreeMap<Cow<'source, str>, Value>,
     path_join_callback: Option<Arc<PathJoinFunc>>,
+    pub(crate) unknown_method_callback: Option<Arc<UnknownMethodFunc>>,
     undefined_behavior: UndefinedBehavior,
     formatter: Arc<FormatterFunc>,
     #[cfg(feature = "debug")]
@@ -92,6 +95,7 @@ impl<'source> Environment<'source> {
             tests: defaults::get_builtin_tests(),
             globals: defaults::get_globals(),
             path_join_callback: None,
+            unknown_method_callback: None,
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
             #[cfg(feature = "debug")]
@@ -113,6 +117,7 @@ impl<'source> Environment<'source> {
             tests: Default::default(),
             globals: Default::default(),
             path_join_callback: None,
+            unknown_method_callback: None,
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
             #[cfg(feature = "debug")]
@@ -255,6 +260,42 @@ impl<'source> Environment<'source> {
         F: for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Send + Sync + 'static,
     {
         self.path_join_callback = Some(Arc::new(f));
+    }
+
+    /// Sets a callback invoked for unknown methods on objects.
+    ///
+    /// This registers a function with the environment that is invoked when invoking a method
+    /// on a value results in a [`UnknownMethod`](crate::ErrorKind::UnknownMethod) error.
+    /// In that case the callback is invoked with [`State`], the [`Value`], the name of
+    /// the method as `&str` as well as all arguments in a slice.
+    ///
+    /// This for instance implements a `.items()` method that invokes the `|items` filter:
+    ///
+    /// ```rust
+    /// use minijinja::value::{ValueKind, from_args};
+    /// use minijinja::{Error, ErrorKind};
+    /// # let mut env = minijinja::Environment::new();
+    ///
+    /// env.set_unknown_method_callback(|state, value, method, args| {
+    ///     if value.kind() == ValueKind::Map && method == "items" {
+    ///         let _: () = from_args(args)?;
+    ///         state.apply_filter("items", &[value.clone()])
+    ///     } else {
+    ///         Err(Error::new(
+    ///             ErrorKind::UnknownMethod,
+    ///             "object has no method named {name}",
+    ///         ))
+    ///     }
+    /// });
+    /// ```
+    ///
+    /// This can be used to increase the compatibility with Jinja2 templates that might
+    /// call Python methods on objects which are not available in minijinja.
+    pub fn set_unknown_method_callback<F>(&mut self, f: F)
+    where
+        F: Fn(&State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send + 'static,
+    {
+        self.unknown_method_callback = Some(Arc::new(f));
     }
 
     /// Removes all stored templates.

@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
+use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
-use minijinja::value::Value;
-use minijinja::Environment;
+use minijinja::value::{from_args, Value, ValueKind};
+use minijinja::{Environment, Error, ErrorKind};
 
 #[test]
 fn test_basic() {
@@ -148,4 +149,23 @@ fn test_keep_trailing_newlines() {
         "blub\r\n"
     );
     assert_eq!(env.render_str("blub\r\n", ()).unwrap(), "blub\r\n");
+}
+
+#[test]
+fn test_unknown_method_callback() {
+    let mut env = Environment::new();
+    env.set_unknown_method_callback(|_state, value, method, args| {
+        if value.kind() == ValueKind::Map && method == "items" {
+            let _: () = from_args(args)?;
+            minijinja::filters::items(value.clone())
+        } else {
+            Err(Error::new(
+                ErrorKind::UnknownMethod,
+                "object has no method named {name}",
+            ))
+        }
+    });
+
+    let rv = env.render_str("{{ {'x': 42}.items() }}", ()).unwrap();
+    assert_snapshot!(rv, @r###"[["x", 42]]"###);
 }
