@@ -6,6 +6,9 @@ All notable changes to MiniJinja are documented here.
 
 - Resolved a compiler warning for Rust 1.77.  #440
 
+- Fixed an incorrect error case in `call_method`.  Now `UnknownMethod`
+  is returned instead of `InvalidOperation` correctly. #439
+
 ## 1.0.14
 
 - Fixed a bug with broken closure handling when working with nested

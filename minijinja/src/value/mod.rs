@@ -1176,7 +1176,7 @@ impl Value {
             _ => {}
         }
         Err(Error::new(
-            ErrorKind::InvalidOperation,
+            ErrorKind::UnknownMethod,
             format!("object has no method named {name}"),
         ))
     }
