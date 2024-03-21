@@ -46,7 +46,8 @@ pub trait Object: fmt::Display + fmt::Debug + Any + Sync + Send {
     /// Called when the engine tries to call a method on the object.
     ///
     /// It's the responsibility of the implementer to ensure that an
-    /// error is generated if an invalid method is invoked.
+    /// error is generated if an invalid method is invoked.  If the method
+    /// is not known an [`ErrorKind::UnknownMethod`] error must be returned.
     ///
     /// To convert the arguments into arguments use the
     /// [`from_args`](crate::value::from_args) function.
