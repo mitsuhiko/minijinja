@@ -1166,6 +1166,20 @@ impl Value {
     /// The name of the method is `name`, the arguments passed are in the `args`
     /// slice.
     pub fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+        match self._call_method(state, name, args) {
+            Ok(rv) => Ok(rv),
+            Err(err) => {
+                if err.kind() == ErrorKind::UnknownMethod {
+                    if let Some(ref callback) = state.env().unknown_method_callback {
+                        return callback(state, self, name, args);
+                    }
+                }
+                Err(err)
+            }
+        }
+    }
+
+    fn _call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         match self.0 {
             ValueRepr::Dynamic(ref dy) => return dy.call_method(state, name, args),
             ValueRepr::Map(ref map, _) => {
