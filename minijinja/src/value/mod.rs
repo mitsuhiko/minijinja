@@ -198,11 +198,11 @@ pub(crate) fn value_map_with_capacity(capacity: usize) -> ValueMap {
 }
 
 thread_local! {
-    static INTERNAL_SERIALIZATION: Cell<bool> = Cell::new(false);
+    static INTERNAL_SERIALIZATION: Cell<bool> = const { Cell::new(false) };
 
     // This should be an AtomicU64 but sadly 32bit targets do not necessarily have
     // AtomicU64 available.
-    static LAST_VALUE_HANDLE: Cell<u32> = Cell::new(0);
+    static LAST_VALUE_HANDLE: Cell<u32> = const { Cell::new(0) };
     static VALUE_HANDLES: RefCell<BTreeMap<u32, Value>> = RefCell::new(BTreeMap::new());
 }
 

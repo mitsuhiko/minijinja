@@ -9,7 +9,7 @@ use pyo3::types::PyTuple;
 static TEMPLATE_ERROR: OnceCell<Py<PyAny>> = OnceCell::new();
 
 thread_local! {
-    static STASHED_ERROR: RefCell<Option<PyErr>> = RefCell::new(None);
+    static STASHED_ERROR: RefCell<Option<PyErr>> = const { RefCell::new(None) };
 }
 
 /// Provides information about a template error from the runtime.
