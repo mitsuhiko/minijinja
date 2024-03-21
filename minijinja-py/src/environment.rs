@@ -17,7 +17,7 @@ use crate::typeconv::{
 };
 
 thread_local! {
-    static CURRENT_ENV: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
+    static CURRENT_ENV: AtomicPtr<c_void> = const { AtomicPtr::new(std::ptr::null_mut()) };
 }
 
 macro_rules! syntax_setter {

@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.15
+
+- Resolved a compiler warning for Rust 1.77.  #440
+
 ## 1.0.14
 
 - Fixed a bug with broken closure handling when working with nested

@@ -1,3 +1,4 @@
+use std::ptr::addr_of_mut;
 use std::{fmt, io};
 
 use crate::error::{Error, ErrorKind};
@@ -124,7 +125,7 @@ impl NullWriter {
     pub fn get_mut() -> &'static mut NullWriter {
         static mut NULL_WRITER: NullWriter = NullWriter;
         // SAFETY: this is safe as the null writer is a ZST
-        unsafe { &mut NULL_WRITER }
+        unsafe { &mut *addr_of_mut!(NULL_WRITER) }
     }
 }
 

@@ -8,7 +8,7 @@ use crate::environment::{with_environment, Environment};
 use crate::typeconv::to_python_value;
 
 thread_local! {
-    static CURRENT_STATE: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
+    static CURRENT_STATE: AtomicPtr<c_void> = const { AtomicPtr::new(std::ptr::null_mut()) };
 }
 
 /// A reference to the current state.
