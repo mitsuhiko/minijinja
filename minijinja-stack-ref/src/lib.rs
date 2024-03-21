@@ -139,7 +139,7 @@ static STACK_SCOPE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 thread_local! {
     static STACK_SCOPE_IS_VALID: RefCell<HashSet<u64>> = RefCell::default();
-    static CURRENT_HANDLE: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
+    static CURRENT_HANDLE: AtomicPtr<c_void> = const { AtomicPtr::new(std::ptr::null_mut()) };
 }
 
 /// A handle to an enclosed value.
