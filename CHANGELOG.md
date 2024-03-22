@@ -5,10 +5,8 @@ All notable changes to MiniJinja are documented here.
 ## 1.0.15
 
 - Resolved a compiler warning for Rust 1.77.  #440
-
 - Fixed an incorrect error case in `call_method`.  Now `UnknownMethod`
   is returned instead of `InvalidOperation` correctly. #439
-
 - Added `Environment::set_unknown_method_callback` which allows a user
   to intercept method calls on primitives.  The motivation here is that
   this can be used to implement python like methods to improve the
