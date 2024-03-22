@@ -82,7 +82,9 @@
 //!   and filters, or just to extend or include a template).
 //! - `42`: Integers are whole numbers without a decimal part.  They can be prefixed with
 //!   `0b` to indicate binary, `0o` to indicate octal and `0x` to indicate hexadecimal.
+//!   Underscores are tolerated (and ignored) everywhere a digit is except in the last place.
 //! - `42.0`: Floating point numbers can be written using a `.` as a decimal mark.
+//!   Underscores are tolerated (and ignored) everywhere a digit is except in the last place.
 //! - `['list', 'of', 'objects']`: Everything between two brackets is a list. Lists are useful
 //!   for storing sequential data to be iterated over.
 //!   for compatibility with Jinja2 `('list', 'of', 'objects')` is also allowed.

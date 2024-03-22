@@ -245,7 +245,7 @@ impl<'s> TokenizerState<'s> {
             .rest
             .as_bytes()
             .iter()
-            .take_while(|&c| c.is_ascii_digit())
+            .take_while(|&c| c.is_ascii_digit() || *c == b'_')
             .count();
         for c in self.rest.as_bytes()[num_len..].iter().copied() {
             state = match (c, state) {
@@ -255,22 +255,31 @@ impl<'s> TokenizerState<'s> {
                 (b'0'..=b'9', State::Exponent) => State::ExponentSign,
                 (b'0'..=b'9', state) => state,
                 (b'a'..=b'f' | b'A'..=b'F', State::RadixInteger) if radix == 16 => state,
+                (
+                    b'_',
+                    State::RadixInteger | State::Integer | State::Fraction | State::Exponent,
+                ) => state,
                 _ => break,
             };
             num_len += 1;
         }
         let is_float = !matches!(state, State::Integer | State::RadixInteger);
 
-        let num = self.advance(num_len);
+        if num_len > 0 && self.rest.as_bytes()[num_len - 1] == b'_' {
+            return Result::Err(self.syntax_error("'_' may not occur at end of number"));
+        }
+
+        let num = self.advance(num_len).replace('_', "");
+
         Ok((
             ok!(if is_float {
                 num.parse()
                     .map(Token::Float)
                     .map_err(|_| self.syntax_error("invalid float"))
-            } else if let Ok(int) = u64::from_str_radix(num, radix) {
+            } else if let Ok(int) = u64::from_str_radix(&num, radix) {
                 Ok(Token::Int(int))
             } else {
-                u128::from_str_radix(num, radix)
+                u128::from_str_radix(&num, radix)
                     .map(Token::Int128)
                     .map_err(|_| self.syntax_error("invalid integer"))
             }),

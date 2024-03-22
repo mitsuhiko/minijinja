@@ -11,6 +11,7 @@ All notable changes to MiniJinja are documented here.
   to intercept method calls on primitives.  The motivation here is that
   this can be used to implement python like methods to improve the
   compatibility with Jinja2 Python templates.  #441
+- Tolerate underscores in number literals. #443
 
 ## 1.0.14
 
