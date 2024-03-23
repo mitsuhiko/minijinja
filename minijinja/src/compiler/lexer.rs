@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
 use crate::utils::{memchr, memstr, unescape};
@@ -245,8 +247,9 @@ impl<'s> TokenizerState<'s> {
             .rest
             .as_bytes()
             .iter()
-            .take_while(|&c| c.is_ascii_digit() || *c == b'_')
+            .take_while(|&c| c.is_ascii_digit())
             .count();
+        let mut has_underscore = false;
         for c in self.rest.as_bytes()[num_len..].iter().copied() {
             state = match (c, state) {
                 (b'.', State::Integer) => State::Fraction,
@@ -255,21 +258,23 @@ impl<'s> TokenizerState<'s> {
                 (b'0'..=b'9', State::Exponent) => State::ExponentSign,
                 (b'0'..=b'9', state) => state,
                 (b'a'..=b'f' | b'A'..=b'F', State::RadixInteger) if radix == 16 => state,
-                (
-                    b'_',
-                    State::RadixInteger | State::Integer | State::Fraction | State::Exponent,
-                ) => state,
+                (b'_', _) => {
+                    has_underscore = true;
+                    state
+                }
                 _ => break,
             };
             num_len += 1;
         }
         let is_float = !matches!(state, State::Integer | State::RadixInteger);
 
-        if num_len > 0 && self.rest.as_bytes()[num_len - 1] == b'_' {
-            return Result::Err(self.syntax_error("'_' may not occur at end of number"));
+        let mut num = Cow::Borrowed(self.advance(num_len));
+        if has_underscore {
+            if num.ends_with('_') {
+                return Err(self.syntax_error("'_' may not occur at end of number"));
+            }
+            num = Cow::Owned(num.replace('_', ""));
         }
-
-        let num = self.advance(num_len).replace('_', "");
 
         Ok((
             ok!(if is_float {

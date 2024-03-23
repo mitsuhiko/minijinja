@@ -20,3 +20,7 @@
 {{ 0xdeadbeef }}
 {{ 0XDEADBEEF }}
 {{ 0XDEAD_BEEF }}
+{{ 1e2 }}
+{{ 1e_2 }}
+{{ 1_1e+_2 }}
+{{ 1_1e-_2 }}
