@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.16
+
+- Tolerate underscores in number literals.  #443
+
 ## 1.0.15
 
 - Resolved a compiler warning for Rust 1.77.  #440
@@ -11,7 +15,6 @@ All notable changes to MiniJinja are documented here.
   to intercept method calls on primitives.  The motivation here is that
   this can be used to implement python like methods to improve the
   compatibility with Jinja2 Python templates.  #441
-- Tolerate underscores in number literals. #443
 
 ## 1.0.14
 
