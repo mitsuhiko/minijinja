@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
-use crate::compiler::lexer::SyntaxConfig;
+use crate::compiler::lexer::{SyntaxConfig, WhitespaceConfig};
 use crate::compiler::meta::find_undeclared;
 use crate::compiler::parser::parse_with_syntax;
 use crate::environment::Environment;
@@ -25,8 +25,8 @@ pub type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
 pub struct TemplateConfig {
     /// The syntax used for the template.
     pub syntax_config: SyntaxConfig,
-    /// Controls the retaining of the final newline.
-    pub keep_trailing_newline: bool,
+    /// Controls whitespace behavior.
+    pub whitespace_config: WhitespaceConfig,
     /// The callback that determines the initial auto escaping for templates.
     pub default_auto_escape: Arc<AutoEscapeFunc>,
 }
@@ -35,7 +35,7 @@ impl TemplateConfig {
     pub(crate) fn new(default_auto_escape: Arc<AutoEscapeFunc>) -> TemplateConfig {
         TemplateConfig {
             syntax_config: SyntaxConfig::default(),
-            keep_trailing_newline: false,
+            whitespace_config: WhitespaceConfig::default(),
             default_auto_escape,
         }
     }
@@ -255,7 +255,8 @@ impl<'env, 'source> Template<'env, 'source> {
             self.compiled.instructions.source(),
             self.name(),
             self.compiled.syntax_config.clone(),
-            true,
+            // TODO: this is not entirely great, but good enough for this use case.
+            Default::default(),
         ) {
             Ok(ast) => find_undeclared(&ast, nested),
             Err(_) => HashSet::new(),
@@ -377,7 +378,7 @@ impl<'source> CompiledTemplate<'source> {
             source,
             name,
             config.syntax_config.clone(),
-            config.keep_trailing_newline
+            config.whitespace_config
         ));
         let mut gen = CodeGenerator::new(name, source);
         gen.compile_stmt(&ast);
