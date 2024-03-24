@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use crate::value::{Object, ObjectKind, StructObject, Value};
+use crate::value::{Enumeration, Object, Value};
 
 /// Closure cycle breaker utility.
 ///
@@ -35,7 +35,7 @@ impl Drop for ClosureTracker {
 /// See `closure` on the [`Frame`] for how it's used.
 #[derive(Debug, Default)]
 pub(crate) struct Closure {
-    values: Arc<Mutex<BTreeMap<Arc<str>, Value>>>,
+    values: Mutex<BTreeMap<Arc<str>, Value>>,
 }
 
 impl Closure {
@@ -72,17 +72,13 @@ impl fmt::Display for Closure {
 }
 
 impl Object for Closure {
-    fn kind(&self) -> ObjectKind<'_> {
-        ObjectKind::Struct(self)
-    }
-}
-
-impl StructObject for Closure {
-    fn fields(&self) -> Vec<Arc<str>> {
-        self.values.lock().unwrap().keys().cloned().collect()
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        self.values.lock().unwrap().get(key.as_str()?).cloned()
     }
 
-    fn get_field(&self, name: &str) -> Option<Value> {
-        self.values.lock().unwrap().get(name).cloned()
+    fn enumeration(self: &Arc<Self>) -> Enumeration {
+        let values = self.values.lock().unwrap();
+        let keys = values.keys().cloned().map(Value::from);
+        Enumeration::Values(keys.collect())
     }
 }

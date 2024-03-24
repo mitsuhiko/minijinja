@@ -1,22 +1,21 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::convert::TryFrom;
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
-use crate::value::{
-    Arc, KeyRef, MapType, Object, Packed, SeqObject, StringType, Value, ValueKind, ValueMap,
-    ValueRepr,
-};
+use crate::value::{DynObject, Packed, StringType, Value, ValueKind, ValueMap, ValueRepr};
 use crate::vm::State;
+
+use super::Object;
 
 /// A utility trait that represents the return value of functions and filters.
 ///
 /// It's implemented for the following types:
 ///
-/// * `Rv` where `Rv` implements `Into<Value>`
+/// * `Rv` where `Rv` implements `Into<AnyMapObject>`
 /// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
 ///
 /// The equivalent for test functions is [`TestResult`](crate::tests::TestResult).
@@ -298,19 +297,23 @@ impl From<()> for Value {
     }
 }
 
+// FIXME: Make this efficient.
 impl<V: Into<Value>> FromIterator<V> for Value {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
-        ValueRepr::Seq(Arc::new(iter.into_iter().map(Into::into).collect())).into()
+        let vec = iter.into_iter().map(Into::into).collect::<Vec<Value>>();
+        Value::from_object(vec)
     }
 }
 
+// FIXME: Make this efficient.
 impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let map = iter
             .into_iter()
-            .map(|(k, v)| (KeyRef::Value(k.into()), v.into()))
-            .collect();
-        ValueRepr::Map(Arc::new(map), MapType::Normal).into()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect::<ValueMap>();
+
+        Value::from_object(map)
     }
 }
 
@@ -328,13 +331,9 @@ impl<K: Into<Value>, V: Into<Value>> From<HashMap<K, V>> for Value {
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(val: Vec<T>) -> Self {
-        val.into_iter().map(|v| v.into()).collect()
-    }
-}
+        let values = val.into_iter().map(|v| v.into()).collect::<Vec<_>>();
 
-impl<T: Object> From<Arc<T>> for Value {
-    fn from(object: Arc<T>) -> Self {
-        Value::from(object as Arc<dyn Object>)
+        Value::from_object(values)
     }
 }
 
@@ -388,8 +387,7 @@ value_from!(i64, I64);
 value_from!(f32, F64);
 value_from!(f64, F64);
 value_from!(Arc<Vec<u8>>, Bytes);
-value_from!(Arc<Vec<Value>>, Seq);
-value_from!(Arc<dyn Object>, Dynamic);
+value_from!(DynObject, Object);
 
 fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {
     Error::new(
@@ -527,19 +525,6 @@ impl<'a> ArgType<'a> for &[u8] {
             Some(value) => value
                 .as_bytes()
                 .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "value is not in bytes")),
-            None => Err(Error::from(ErrorKind::MissingArgument)),
-        }
-    }
-}
-
-impl<'a> ArgType<'a> for &dyn SeqObject {
-    type Output = &'a dyn SeqObject;
-
-    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
-        match value {
-            Some(value) => value
-                .as_seq()
-                .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "value is not a sequence")),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
@@ -737,8 +722,53 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 /// ```
 #[derive(Debug, Clone)]
 pub struct Kwargs {
-    pub(crate) values: Arc<ValueMap>,
+    pub(crate) values: Arc<KwargsValues>,
     used: RefCell<HashSet<String>>,
+}
+
+#[repr(transparent)]
+#[derive(Default, Debug)]
+pub(crate) struct KwargsValues(ValueMap);
+
+impl Deref for KwargsValues {
+    type Target = ValueMap;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl KwargsValues {
+    fn as_value_map<'a>(self: &'a Arc<Self>) -> &'a Arc<ValueMap> {
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+impl Object for KwargsValues {
+    fn repr(self: &Arc<Self>) -> super::ObjectRepr {
+        self.as_value_map().repr()
+    }
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        self.as_value_map().get_value(key)
+    }
+
+    fn enumeration(self: &Arc<Self>) -> super::Enumeration {
+        self.as_value_map().enumeration()
+    }
+
+    fn call(
+        self: &Arc<Self>,
+        state: &State<'_, '_>,
+        method: Option<&str>,
+        args: &[Value],
+    ) -> crate::error::Result<Value> {
+        self.as_value_map().call(state, method, args)
+    }
+
+    fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.as_value_map().render(f)
+    }
 }
 
 impl<'a> ArgType<'a> for Kwargs {
@@ -746,13 +776,10 @@ impl<'a> ArgType<'a> for Kwargs {
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
-            Some(value) => {
-                if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
-                    Ok(Kwargs::new(map.clone()))
-                } else {
-                    Err(Error::from(ErrorKind::MissingArgument))
-                }
-            }
+            Some(value) => value
+                .as_object()
+                .and_then(|obj| obj.as_kwargs())
+                .ok_or_else(|| Error::from(ErrorKind::MissingArgument)),
             None => Ok(Kwargs::new(Default::default())),
         }
     }
@@ -762,12 +789,14 @@ impl<'a> ArgType<'a> for Kwargs {
         values: &'a [Value],
         offset: usize,
     ) -> Result<(Self, usize), Error> {
-        if let Some(value) = values.get(offset) {
-            if let ValueRepr::Map(ref map, MapType::Kwargs) = value.0 {
-                return Ok((Kwargs::new(map.clone()), 1));
-            }
-        }
-        Ok((Kwargs::new(Default::default()), 0))
+        let args = values
+            .get(offset)
+            .and_then(|value| value.as_object())
+            .and_then(|obj| obj.as_kwargs())
+            .map(|kwargs| (kwargs, 1))
+            .unwrap_or_else(|| (Kwargs::new(Default::default()), 0));
+
+        Ok(args)
     }
 
     fn is_trailing() -> bool {
@@ -775,8 +804,20 @@ impl<'a> ArgType<'a> for Kwargs {
     }
 }
 
+impl DynObject {
+    pub(crate) fn as_kwargs(&self) -> Option<Kwargs> {
+        self.downcast::<KwargsValues>().map(Kwargs::new)
+    }
+}
+
+impl Value {
+    pub(crate) fn kwargs(map: ValueMap) -> Value {
+        Value::from_object(KwargsValues(map))
+    }
+}
+
 impl Kwargs {
-    fn new(map: Arc<ValueMap>) -> Kwargs {
+    fn new(map: Arc<KwargsValues>) -> Kwargs {
         Kwargs {
             values: map,
             used: RefCell::new(HashSet::new()),
@@ -788,7 +829,7 @@ impl Kwargs {
     where
         T: ArgType<'a, Output = T>,
     {
-        T::from_value(self.values.get(&KeyRef::Str(key))).map_err(|mut err| {
+        T::from_value(self.values.get(&Value::from(key))).map_err(|mut err| {
             if err.kind() == ErrorKind::MissingArgument && err.detail().is_none() {
                 err.set_detail(format!("missing keyword argument '{}'", key));
             }
@@ -828,7 +869,7 @@ impl Kwargs {
 
     /// Checks if a keyword argument exists.
     pub fn has(&self, key: &str) -> bool {
-        self.values.contains_key(&KeyRef::Str(key))
+        self.values.contains_key(&Value::from(key))
     }
 
     /// Iterates over all passed keyword arguments.
@@ -863,11 +904,9 @@ impl FromIterator<(String, Value)> for Kwargs {
     where
         T: IntoIterator<Item = (String, Value)>,
     {
-        Kwargs::new(Arc::new(
-            iter.into_iter()
-                .map(|(k, v)| (KeyRef::Value(Value::from(k)), v))
-                .collect(),
-        ))
+        Kwargs::new(Arc::new(KwargsValues(
+            iter.into_iter().map(|(k, v)| (Value::from(k), v)).collect(),
+        )))
     }
 }
 
@@ -876,17 +915,15 @@ impl<'a> FromIterator<(&'a str, Value)> for Kwargs {
     where
         T: IntoIterator<Item = (&'a str, Value)>,
     {
-        Kwargs::new(Arc::new(
-            iter.into_iter()
-                .map(|(k, v)| (KeyRef::Value(Value::from(k)), v))
-                .collect(),
-        ))
+        Kwargs::new(Arc::new(KwargsValues(
+            iter.into_iter().map(|(k, v)| (Value::from(k), v)).collect(),
+        )))
     }
 }
 
 impl From<Kwargs> for Value {
     fn from(value: Kwargs) -> Self {
-        Value(ValueRepr::Map(value.values, MapType::Kwargs))
+        Value::from_dyn_object(value.values)
     }
 }
 
@@ -896,7 +933,9 @@ impl TryFrom<Value> for Kwargs {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.0 {
             ValueRepr::Undefined => Ok(Kwargs::new(Default::default())),
-            ValueRepr::Map(ref val, MapType::Kwargs) => Ok(Kwargs::new(val.clone())),
+            ValueRepr::Object(obj) => obj
+                .as_kwargs()
+                .ok_or_else(|| Error::from(ErrorKind::InvalidOperation)),
             _ => Err(Error::from(ErrorKind::InvalidOperation)),
         }
     }
@@ -947,10 +986,10 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
             None => Ok(Vec::new()),
             Some(value) => {
                 let seq = ok!(value
-                    .as_seq()
+                    .as_object()
                     .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not a sequence") }));
                 let mut rv = Vec::new();
-                for value in seq.iter() {
+                for value in seq.values() {
                     rv.push(ok!(T::from_value_owned(value)));
                 }
                 Ok(rv)
@@ -960,13 +999,29 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
 
     fn from_value_owned(value: Value) -> Result<Self, Error> {
         let seq = ok!(value
-            .as_seq()
+            .as_object()
             .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not a sequence") }));
         let mut rv = Vec::new();
-        for value in seq.iter() {
+        for value in seq.values() {
             rv.push(ok!(T::from_value_owned(value)));
         }
         Ok(rv)
+    }
+}
+
+impl<'a> ArgType<'a> for DynObject {
+    type Output = Self;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        value
+            .ok_or_else(|| Error::from(ErrorKind::MissingArgument))
+            .and_then(|v| Self::from_value_owned(v.clone()))
+    }
+
+    fn from_value_owned(value: Value) -> Result<Self, Error> {
+        value
+            .as_object()
+            .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "not an object"))
     }
 }
 

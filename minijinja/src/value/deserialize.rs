@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use serde::de::{self, MapAccess, SeqAccess, Visitor};
 use serde::{forward_to_deserialize_any, Deserialize};
 
-use crate::value::{ArgType, KeyRef, MapType, Value, ValueKind, ValueMap, ValueRepr};
+use crate::value::{ArgType, ObjectRepr, Value, ValueKind, ValueMap, ValueRepr};
 use crate::{Error, ErrorKind};
 
 impl<'de> Deserialize<'de> for Value {
@@ -99,9 +99,9 @@ impl<'de> Visitor<'de> for ValueVisitor {
     {
         let mut rv = ValueMap::default();
         while let Some((k, v)) = ok!(map.next_entry()) {
-            rv.insert(KeyRef::Value(k), v);
+            rv.insert(k, v);
         }
-        Ok(Value(ValueRepr::Map(rv.into(), MapType::Normal)))
+        Ok(Value::from_object(rv))
     }
 }
 
@@ -179,27 +179,18 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
             ValueRepr::String(ref v, _) => visitor.visit_str(v),
             ValueRepr::Undefined | ValueRepr::None => visitor.visit_unit(),
             ValueRepr::Bytes(ref v) => visitor.visit_bytes(v),
-            ValueRepr::Seq(_) | ValueRepr::Map(..) | ValueRepr::Dynamic(_) => {
-                if let Some(s) = self.value.as_seq() {
-                    visitor.visit_seq(de::value::SeqDeserializer::new(
-                        s.iter().map(ValueDeserializer::new),
-                    ))
-                } else if self.value.kind() == ValueKind::Map {
-                    visitor.visit_map(de::value::MapDeserializer::new(
-                        ok!(self.value.try_iter()).map(|k| {
-                            (
-                                ValueDeserializer::new(k.clone()),
-                                ValueDeserializer::new(self.value.get_item(&k).unwrap_or_default()),
-                            )
-                        }),
-                    ))
-                } else {
-                    Err(de::Error::invalid_type(
-                        value_to_unexpected(&self.value),
-                        &"supported value",
-                    ))
+            ValueRepr::Object(o) => match o.repr() {
+                ObjectRepr::Seq => visitor.visit_seq(de::value::SeqDeserializer::new(
+                    o.values().map(ValueDeserializer::new),
+                )),
+                ObjectRepr::Map => {
+                    let iter = o
+                        .iter()
+                        .map(|(k, v)| (ValueDeserializer::new(k), ValueDeserializer::new(v)));
+
+                    visitor.visit_map(de::value::MapDeserializer::new(iter))
                 }
-            }
+            },
         }
     }
 
@@ -313,12 +304,12 @@ impl<'de> de::VariantAccess<'de> for VariantDeserializer {
     where
         V: de::Visitor<'de>,
     {
-        match self.value.as_ref().and_then(|x| x.as_seq()) {
-            Some(seq) => de::Deserializer::deserialize_any(
-                de::value::SeqDeserializer::new(seq.iter().map(ValueDeserializer::new)),
+        match self.value.as_ref().and_then(|x| x.as_object()) {
+            Some(obj) if obj.repr().is_seq() => de::Deserializer::deserialize_any(
+                de::value::SeqDeserializer::new(obj.values().map(ValueDeserializer::new)),
                 visitor,
             ),
-            None => Err(de::Error::invalid_type(
+            _ => Err(de::Error::invalid_type(
                 self.value
                     .as_ref()
                     .map_or(de::Unexpected::Unit, value_to_unexpected),
@@ -443,13 +434,6 @@ fn value_to_unexpected(value: &Value) -> de::Unexpected {
         }
         ValueRepr::String(ref s, _) => de::Unexpected::Str(s),
         ValueRepr::Bytes(ref b) => de::Unexpected::Bytes(b),
-        ValueRepr::Seq(_) => de::Unexpected::Seq,
-        ValueRepr::Map(_, _) => de::Unexpected::Map,
-        ValueRepr::Dynamic(ref d) => match d.kind() {
-            super::ObjectKind::Plain => de::Unexpected::Other("plain object"),
-            super::ObjectKind::Seq(_) => de::Unexpected::Seq,
-            super::ObjectKind::Struct(_) => de::Unexpected::Map,
-            super::ObjectKind::Iterator(_) => de::Unexpected::Other("iterator"),
-        },
+        ValueRepr::Object(..) => de::Unexpected::Other("<dynamic value>"),
     }
 }

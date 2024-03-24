@@ -5,8 +5,8 @@ use serde::{ser, Serialize, Serializer};
 
 use crate::utils::untrusted_size_hint;
 use crate::value::{
-    value_map_with_capacity, Arc, KeyRef, MapType, Packed, StringType, Value, ValueMap, ValueRepr,
-    VALUE_HANDLES, VALUE_HANDLE_MARKER,
+    value_map_with_capacity, Arc, Packed, StringType, Value, ValueMap, ValueRepr, VALUE_HANDLES,
+    VALUE_HANDLE_MARKER,
 };
 
 #[derive(Debug)]
@@ -177,8 +177,8 @@ impl Serializer for ValueSerializer {
         T: Serialize,
     {
         let mut map = value_map_with_capacity(1);
-        map.insert(KeyRef::Str(variant), transform(value));
-        Ok(ValueRepr::Map(Arc::new(map), MapType::Normal).into())
+        map.insert(variant.into(), transform(value));
+        Ok(Value::from_object(map))
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, InvalidValue> {
@@ -264,7 +264,7 @@ impl ser::SerializeSeq for SerializeSeq {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(ValueRepr::Seq(Arc::new(self.elements)).into())
+        Ok(Value::from_object(self.elements))
     }
 }
 
@@ -285,7 +285,7 @@ impl ser::SerializeTuple for SerializeTuple {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(ValueRepr::Seq(Arc::new(self.elements)).into())
+        Ok(Value::from_object(self.elements))
     }
 }
 
@@ -306,7 +306,7 @@ impl ser::SerializeTupleStruct for SerializeTupleStruct {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value(ValueRepr::Seq(Arc::new(self.fields))))
+        Ok(Value::from_object(self.fields))
     }
 }
 
@@ -329,11 +329,8 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
 
     fn end(self) -> Result<Value, InvalidValue> {
         let mut map = value_map_with_capacity(1);
-        map.insert(
-            KeyRef::Str(self.name),
-            Value(ValueRepr::Seq(self.fields.into())),
-        );
-        Ok(Value(ValueRepr::Map(map.into(), MapType::Normal)))
+        map.insert(self.name.into(), Value::from_object(self.fields));
+        Ok(Value::from_object(map))
     }
 }
 
@@ -362,16 +359,13 @@ impl ser::SerializeMap for SerializeMap {
         T: Serialize,
     {
         if let Some(key) = self.key.take() {
-            self.entries.insert(KeyRef::Value(key), transform(value));
+            self.entries.insert(key, transform(value));
         }
         Ok(())
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value(ValueRepr::Map(
-            Arc::new(self.entries),
-            MapType::Normal,
-        )))
+        Ok(Value::from_object(self.entries))
     }
 
     fn serialize_entry<K: ?Sized, V: ?Sized>(
@@ -384,7 +378,7 @@ impl ser::SerializeMap for SerializeMap {
         V: Serialize,
     {
         if let Ok(key) = key.serialize(ValueSerializer) {
-            self.entries.insert(KeyRef::Value(key), transform(value));
+            self.entries.insert(key, transform(value));
         }
         Ok(())
     }
@@ -406,12 +400,12 @@ impl ser::SerializeStruct for SerializeStruct {
     where
         T: Serialize,
     {
-        self.fields.insert(KeyRef::Str(key), transform(value));
+        self.fields.insert(key.into(), transform(value));
         Ok(())
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(ValueRepr::Map(Arc::new(self.fields), MapType::Normal).into())
+        Ok(Value::from_object(self.fields))
     }
 }
 
@@ -432,16 +426,13 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
     where
         T: Serialize,
     {
-        self.map.insert(KeyRef::Str(key), transform(value));
+        self.map.insert(key.into(), transform(value));
         Ok(())
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
         let mut rv = BTreeMap::new();
-        rv.insert(
-            self.variant,
-            Value::from(ValueRepr::Map(Arc::new(self.map), MapType::Normal)),
-        );
+        rv.insert(self.variant, Value::from_object(self.map));
         Ok(rv.into())
     }
 }

@@ -765,8 +765,6 @@ impl<'source> Environment<'source> {
 
 #[cfg(not(feature = "loader"))]
 mod basic_store {
-    use crate::template::TemplateConfig;
-
     use super::*;
 
     #[derive(Clone)]

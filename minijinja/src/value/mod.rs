@@ -37,8 +37,9 @@
 //! `Value::from_iterator` function instead:
 //!
 //! ```
-//! # use minijinja::value::Value;
-//! let value: Value = Value::from_iterator(1..10);
+//! // TODO: Did this create a use-once value?
+//! // # use minijinja::value::Value;
+//! // let value: Value = Value::from_iterator(1..10);
 //! ```
 //!
 //! To to into the inverse directly the various [`TryFrom`](std::convert::TryFrom)
@@ -104,32 +105,27 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //! # Dynamic Objects
 //!
 //! Values can also hold "dynamic" objects.  These are objects which implement the
-//! [`Object`] trait and optionally [`SeqObject`] or [`StructObject`]  These can
+//! [`Object`] trait and optionally [`SeqObject`] or [`MapObject`]  These can
 //! be used to implement dynamic functionality such as stateful values and more.
 //! Dynamic objects are internally also used to implement the special `loop`
 //! variable or macros.
 //!
 //! To create a dynamic `Value` object, use [`Value::from_object`],
-//! [`Value::from_seq_object`], [`Value::from_struct_object`] or the `From<Arc<T:
+//! [`Value::from_object`], [`Value::from_object`] or the `From<Arc<T:
 //! Object>>` implementations for `Value`:
 //!
 //! ```rust
 //! # use std::sync::Arc;
-//! # use minijinja::value::{Value, Object};
+//! # use minijinja::value::{Value, Object, DynObject};
 //! #[derive(Debug)]
 //! struct Foo;
 //!
-//! # impl std::fmt::Display for Foo {
-//! #     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { Ok(()) }
-//! # }
-//! #
 //! impl Object for Foo {
 //!     /* implementation */
 //! }
 //!
 //! let value = Value::from_object(Foo);
-//! let value = Value::from(Arc::new(Foo));
-//! let value = Value::from(Arc::new(Foo) as Arc<dyn Object>);
+//! let value = Value::from_dyn_object(Arc::new(Foo));
 //! ```
 
 // this module is based on the content module in insta which in turn is based
@@ -138,27 +134,25 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use serde::ser::{Serialize, Serializer};
 
-use crate::error::{Error, ErrorKind};
+use crate::error::{Error, ErrorKind, Result};
 use crate::functions;
 use crate::utils::OnDrop;
-use crate::value::object::{SimpleIteratorObject, SimpleSeqObject, SimpleStructObject};
 use crate::value::ops::as_f64;
 use crate::value::serialize::transform;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
-pub use crate::value::object::{
-    IteratorObject, Object, ObjectKind, SeqObject, SeqObjectIter, StructObject,
-};
+pub use crate::value::object::{DynObject, Enumeration, Object, ObjectExt, ObjectRepr};
 
+#[macro_use]
+mod type_erase;
 mod argtypes;
 #[cfg(feature = "deserialization")]
 mod deserialize;
@@ -171,18 +165,17 @@ mod serialize;
 
 #[cfg(feature = "deserialization")]
 pub use self::deserialize::ViaDeserialize;
-
-pub(crate) use crate::value::keyref::KeyRef;
+use self::object::ObjectKeyValueIter;
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
 const VALUE_HANDLE_MARKER: &str = "\x01__minijinja_ValueHandle";
 
 #[cfg(feature = "preserve_order")]
-pub(crate) type ValueMap = indexmap::IndexMap<KeyRef<'static>, Value>;
+pub(crate) type ValueMap = indexmap::IndexMap<Value, Value>;
 
 #[cfg(not(feature = "preserve_order"))]
-pub(crate) type ValueMap = std::collections::BTreeMap<KeyRef<'static>, Value>;
+pub(crate) type ValueMap = std::collections::BTreeMap<Value, Value>;
 
 #[inline(always)]
 pub(crate) fn value_map_with_capacity(capacity: usize) -> ValueMap {
@@ -291,15 +284,6 @@ impl fmt::Display for ValueKind {
     }
 }
 
-/// The type of map
-#[derive(Copy, Clone, Debug)]
-pub(crate) enum MapType {
-    /// A regular map
-    Normal,
-    /// A map representing keyword arguments
-    Kwargs,
-}
-
 /// Type type of string
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum StringType {
@@ -332,11 +316,10 @@ pub(crate) enum ValueRepr {
     Invalid(Arc<str>),
     U128(Packed<u128>),
     I128(Packed<i128>),
+    // FIXME: Make Cow<'static, str>?
     String(Arc<str>, StringType),
     Bytes(Arc<Vec<u8>>),
-    Seq(Arc<Vec<Value>>),
-    Map(Arc<ValueMap>, MapType),
-    Dynamic(Arc<dyn Object>),
+    Object(DynObject),
 }
 
 impl fmt::Debug for ValueRepr {
@@ -353,9 +336,7 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
             ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::Seq(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::Map(val, _) => fmt::Debug::fmt(val, f),
-            ValueRepr::Dynamic(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Object(val) => fmt::Debug::fmt(val, f),
         }
     }
 }
@@ -368,28 +349,7 @@ impl Hash for Value {
             ValueRepr::Bool(b) => b.hash(state),
             ValueRepr::Invalid(s) => s.hash(state),
             ValueRepr::Bytes(b) => b.hash(state),
-            ValueRepr::Seq(b) => b.hash(state),
-            ValueRepr::Map(m, _) => m.iter().for_each(|(k, v)| {
-                k.hash(state);
-                v.hash(state);
-            }),
-            ValueRepr::Dynamic(d) => match d.kind() {
-                ObjectKind::Plain | ObjectKind::Iterator(_) => 0u8.hash(state),
-                ObjectKind::Seq(s) => s.iter().for_each(|x| x.hash(state)),
-                ObjectKind::Struct(s) => {
-                    if let Some(fields) = s.static_fields() {
-                        fields.iter().for_each(|k| {
-                            k.hash(state);
-                            s.get_field(k).hash(state);
-                        });
-                    } else {
-                        s.fields().iter().for_each(|k| {
-                            k.hash(state);
-                            s.get_field(k).hash(state);
-                        });
-                    }
-                }
-            },
+            ValueRepr::Object(d) => d.hash(state),
             ValueRepr::U64(_)
             | ValueRepr::I64(_)
             | ValueRepr::F64(_)
@@ -421,17 +381,15 @@ impl PartialEq for Value {
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
                 None => {
-                    if let (Some(a), Some(b)) = (self.as_seq(), other.as_seq()) {
-                        a.iter().eq(b.iter())
-                    } else if self.kind() == ValueKind::Map && other.kind() == ValueKind::Map {
-                        if self.len() != other.len() {
+                    if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
+                        let (a_keys, b_keys) = (a.enumeration(), b.enumeration());
+                        if a_keys.len() != b_keys.len() {
                             return false;
                         }
-                        if let Ok(mut iter) = self.try_iter() {
-                            iter.all(|x| self.get_item_opt(&x) == other.get_item_opt(&x))
-                        } else {
-                            false
-                        }
+
+                        a_keys
+                            .into_iter()
+                            .all(|key| a.get_value(&key) == b.get_value(&key))
                     } else {
                         false
                     }
@@ -469,20 +427,18 @@ impl Ord for Value {
                 Some(ops::CoerceResult::F64(a, b)) => f64_total_cmp(a, b),
                 Some(ops::CoerceResult::I128(a, b)) => a.cmp(&b),
                 Some(ops::CoerceResult::Str(a, b)) => a.cmp(b),
-                None => {
-                    if let (Some(a), Some(b)) = (self.as_seq(), other.as_seq()) {
-                        a.iter().cmp(b.iter())
-                    } else if self.kind() == ValueKind::Map && other.kind() == ValueKind::Map {
-                        if let (Ok(a), Ok(b)) = (self.try_iter(), other.try_iter()) {
-                            a.map(|k| (k.clone(), self.get_item_opt(&k)))
-                                .cmp(b.map(|k| (k.clone(), other.get_item_opt(&k))))
-                        } else {
-                            Ordering::Equal
-                        }
-                    } else {
-                        Ordering::Equal
-                    }
-                }
+                None => match (self.kind(), other.kind()) {
+                    (ValueKind::Seq, ValueKind::Seq) => match (self.try_iter(), other.try_iter()) {
+                        (Ok(a), Ok(b)) => a.cmp(b),
+                        _ => self.len().cmp(&other.len()),
+                    },
+                    (ValueKind::Map, ValueKind::Map) => match (self.as_object(), other.as_object())
+                    {
+                        (Some(a), Some(b)) => a.iter().cmp(b.iter()),
+                        _ => self.len().cmp(&other.len()),
+                    },
+                    _ => Ordering::Equal,
+                },
             },
         };
         value_ordering.then((self.kind() as usize).cmp(&(other.kind() as usize)))
@@ -520,28 +476,8 @@ impl fmt::Display for Value {
             ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
             ValueRepr::String(val, _) => write!(f, "{val}"),
             ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
-            ValueRepr::Seq(values) => {
-                ok!(f.write_str("["));
-                for (idx, val) in values.iter().enumerate() {
-                    if idx > 0 {
-                        ok!(f.write_str(", "));
-                    }
-                    ok!(write!(f, "{val:?}"));
-                }
-                f.write_str("]")
-            }
-            ValueRepr::Map(m, _) => {
-                ok!(f.write_str("{"));
-                for (idx, (key, val)) in m.iter().enumerate() {
-                    if idx > 0 {
-                        ok!(f.write_str(", "));
-                    }
-                    ok!(write!(f, "{key:?}: {val:?}"));
-                }
-                f.write_str("}")
-            }
             ValueRepr::U128(val) => write!(f, "{}", { val.0 }),
-            ValueRepr::Dynamic(x) => write!(f, "{x}"),
+            ValueRepr::Object(x) => write!(f, "{x}"),
         }
     }
 }
@@ -612,31 +548,6 @@ impl Value {
         transform(value)
     }
 
-    /// Creates a value from an iterator.
-    ///
-    /// This takes an iterator (yielding values that can be turned into a [`Value`])
-    /// and returns a value that can be iterated over.  Today this value looks a bit like
-    /// a sequence (and will pretend to be one) but this is misleading.  Such values are
-    /// actually objects implementing [`IteratorObject`] but due to backwards
-    /// compatibility reasons it's not possible to give them a distinct type.
-    ///
-    /// Iterators that implement [`ExactSizeIterator`] or have a matching lower and upper
-    /// bound on the [`Iterator::size_hint`] report a known `loop.length`.  Iterators that
-    /// do not fulfill these requirements will not.  The same is true for `revindex` and
-    /// similar properties.
-    ///
-    /// ```
-    /// # use minijinja::value::Value;
-    /// let val = Value::from_iterator(0..10);
-    /// ```
-    pub fn from_iterator<I, T>(iter: I) -> Value
-    where
-        I: Iterator<Item = T> + Send + Sync + 'static,
-        T: Into<Value> + 'static,
-    {
-        Value::from_object(SimpleIteratorObject(Mutex::new(iter.fuse())))
-    }
-
     /// Creates a value from a safe string.
     ///
     /// A safe string is one that will bypass auto escaping.  For instance if you
@@ -674,41 +585,82 @@ impl Value {
     ///
     /// let val = Value::from_object(Thing { id: 42 });
     /// ```
-    ///
-    /// Objects are internally reference counted.  If you want to hold on to the
-    /// `Arc` you can directly create the value from an arc'ed object:
-    ///
-    /// ```rust
-    /// # use minijinja::value::{Value, Object};
-    /// # #[derive(Debug)]
-    /// # struct Thing { id: usize };
-    /// # impl std::fmt::Display for Thing {
-    /// #     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    /// #         todo!();
-    /// #     }
-    /// # }
-    /// # impl Object for Thing {}
-    /// use std::sync::Arc;
-    /// let val = Value::from(Arc::new(Thing { id: 42 }));
-    /// ```
-    pub fn from_object<T: Object>(value: T) -> Value {
-        Value::from(Arc::new(value) as Arc<dyn Object>)
+    pub fn from_object<T: Object + Send + Sync + 'static>(value: T) -> Value {
+        Value::from(ValueRepr::Object(DynObject::new(Arc::new(value))))
     }
 
-    /// Creates a value from an owned [`SeqObject`].
-    ///
-    /// This is a simplified API for creating dynamic sequences
-    /// without having to implement the entire [`Object`] protocol.
-    pub fn from_seq_object<T: SeqObject + 'static>(value: T) -> Value {
-        Value::from_object(SimpleSeqObject(value))
+    pub fn from_dyn_object<T: Into<DynObject>>(value: T) -> Value {
+        Value::from(ValueRepr::Object(value.into()))
     }
 
-    /// Creates a value from an owned [`StructObject`].
-    ///
-    /// This is a simplified API for creating dynamic structs
-    /// without having to implement the entire [`Object`] protocol.
-    pub fn from_struct_object<T: StructObject + 'static>(value: T) -> Value {
-        Value::from_object(SimpleStructObject(value))
+    pub fn from_object_iter<T, F>(object: T, maker: F) -> Value
+    where
+        T: Send + Sync + 'static,
+        F: for<'a> Fn(&'a T) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
+            + Send
+            + Sync
+            + 'static,
+    {
+        struct IterObject {
+            iter: Box<dyn Iterator<Item = Value> + Send + Sync + 'static>,
+            _object: DynObject,
+        }
+
+        impl Iterator for IterObject {
+            type Item = Value;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                self.iter.next()
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                self.iter.size_hint()
+            }
+        }
+
+        struct IterObjectMaker<T, F> {
+            maker: F,
+            object: T,
+        }
+
+        impl fmt::Debug for IterObject {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_tuple("IterObject").finish()
+            }
+        }
+
+        impl<T, F> fmt::Debug for IterObjectMaker<T, F> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_struct("IterObjectMaker").finish()
+            }
+        }
+
+        impl<T, F> Object for IterObjectMaker<T, F>
+        where
+            T: Send + Sync + 'static,
+            F: for<'a> Fn(&'a T) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
+                + Send
+                + Sync
+                + 'static,
+        {
+            fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                Some(key.clone())
+            }
+
+            fn enumeration(self: &Arc<Self>) -> Enumeration {
+                let iter: Box<dyn Iterator<Item = Value> + Send + Sync + '_> =
+                    (self.maker)(&self.object);
+                let iter = unsafe { std::mem::transmute(iter) };
+                let _object = DynObject::new(self.clone());
+                Enumeration::Iterator(Box::new(IterObject { iter, _object }))
+            }
+
+            // fn render(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            //         k
+            // }
+        }
+
+        Value::from_object(IterObjectMaker { maker, object })
     }
 
     /// Creates a callable value from a function.
@@ -742,17 +694,11 @@ impl Value {
             ValueRepr::String(..) => ValueKind::String,
             ValueRepr::Bytes(_) => ValueKind::Bytes,
             ValueRepr::U128(_) => ValueKind::Number,
-            ValueRepr::Seq(_) => ValueKind::Seq,
-            ValueRepr::Map(..) => ValueKind::Map,
             // XXX: invalid values report themselves as maps which is a lie
-            ValueRepr::Invalid(_) => ValueKind::Map,
-            ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                // XXX: basic objects should probably not report as map and
-                // iterators should report as a new iterator value type.
-                ObjectKind::Plain => ValueKind::Map,
-                ObjectKind::Seq(_) => ValueKind::Seq,
-                ObjectKind::Iterator(_) => ValueKind::Seq,
-                ObjectKind::Struct(_) => ValueKind::Map,
+            ValueRepr::Invalid(_) => ValueKind::Undefined,
+            ValueRepr::Object(ref obj) => match obj.repr() {
+                ObjectRepr::Map => ValueKind::Map,
+                ObjectRepr::Seq => ValueKind::Seq,
             },
         }
     }
@@ -773,7 +719,7 @@ impl Value {
 
     /// Returns `true` if the map represents keyword arguments.
     pub fn is_kwargs(&self) -> bool {
-        matches!(self.0, ValueRepr::Map(_, MapType::Kwargs))
+        self.as_object().map_or(false, |o| o.as_kwargs().is_some())
     }
 
     /// Is this value true?
@@ -788,13 +734,7 @@ impl Value {
             ValueRepr::String(ref x, _) => !x.is_empty(),
             ValueRepr::Bytes(ref x) => !x.is_empty(),
             ValueRepr::None | ValueRepr::Undefined | ValueRepr::Invalid(_) => false,
-            ValueRepr::Seq(ref x) => !x.is_empty(),
-            ValueRepr::Map(ref x, _) => !x.is_empty(),
-            ValueRepr::Dynamic(ref x) => match x.kind() {
-                ObjectKind::Plain | ObjectKind::Iterator(_) => true,
-                ObjectKind::Seq(s) => s.item_count() != 0,
-                ObjectKind::Struct(s) => s.field_count() != 0,
-            },
+            ValueRepr::Object(ref x) => x.enumeration().len().map_or(false, |x| x != 0),
         }
     }
 
@@ -814,11 +754,29 @@ impl Value {
     }
 
     /// If the value is a string, return it.
+    pub fn to_str(&self) -> Option<Arc<str>> {
+        match &self.0 {
+            ValueRepr::String(ref s, _) => Some(s.clone()),
+            _ => None,
+        }
+    }
+
+    /// If the value is a string, return it.
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Some(s as &str),
             _ => None,
         }
+    }
+
+    /// If this is an i64 return it
+    pub fn as_usize(&self) -> Option<usize> {
+        usize::try_from(self.clone()).ok()
+    }
+
+    /// If this is an i64 return it
+    pub fn as_i64(&self) -> Option<i64> {
+        i64::try_from(self.clone()).ok()
     }
 
     /// Returns the bytes of this value if they exist.
@@ -831,35 +789,11 @@ impl Value {
     }
 
     /// If the value is an object, it's returned as [`Object`].
-    pub fn as_object(&self) -> Option<&dyn Object> {
+    pub fn as_object(&self) -> Option<DynObject> {
         match self.0 {
-            ValueRepr::Dynamic(ref dy) => Some(&**dy as &dyn Object),
+            ValueRepr::Object(ref dy) => Some(dy.clone()),
             _ => None,
         }
-    }
-
-    /// If the value is a sequence it's returned as [`SeqObject`].
-    pub fn as_seq(&self) -> Option<&dyn SeqObject> {
-        match self.0 {
-            ValueRepr::Seq(ref v) => return Some(&**v as &dyn SeqObject),
-            ValueRepr::Dynamic(ref dy) => {
-                if let ObjectKind::Seq(seq) = dy.kind() {
-                    return Some(seq);
-                }
-            }
-            _ => {}
-        }
-        None
-    }
-
-    /// If the value is a struct, return it as [`StructObject`].
-    pub fn as_struct(&self) -> Option<&dyn StructObject> {
-        if let ValueRepr::Dynamic(ref dy) = self.0 {
-            if let ObjectKind::Struct(s) = dy.kind() {
-                return Some(s);
-            }
-        }
-        None
     }
 
     /// Returns the length of the contained value.
@@ -874,13 +808,7 @@ impl Value {
     pub fn len(&self) -> Option<usize> {
         match self.0 {
             ValueRepr::String(ref s, _) => Some(s.chars().count()),
-            ValueRepr::Map(ref items, _) => Some(items.len()),
-            ValueRepr::Seq(ref items) => Some(items.len()),
-            ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Plain | ObjectKind::Iterator(_) => None,
-                ObjectKind::Seq(s) => Some(s.item_count()),
-                ObjectKind::Struct(s) => Some(s.field_count()),
-            },
+            ValueRepr::Object(ref dy) => dy.enumeration().len(),
             _ => None,
         }
     }
@@ -888,7 +816,7 @@ impl Value {
     /// Looks up an attribute by attribute name.
     ///
     /// This this returns [`UNDEFINED`](Self::UNDEFINED) when an invalid key is
-    /// resolved.  An error is returned when if the value does not contain an object
+    /// resolved.  An error is returned if the value does not contain an object
     /// that has attributes.
     ///
     /// ```
@@ -902,16 +830,13 @@ impl Value {
     /// # Ok(()) }
     /// ```
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
-        Ok(match self.0 {
+        let value = match self.0 {
             ValueRepr::Undefined => return Err(Error::from(ErrorKind::UndefinedError)),
-            ValueRepr::Map(ref items, _) => items.get(&KeyRef::Str(key)).cloned(),
-            ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Struct(s) => s.get_field(key),
-                ObjectKind::Plain | ObjectKind::Seq(_) | ObjectKind::Iterator(_) => None,
-            },
+            ValueRepr::Object(ref dy) => dy.get_value(&Value::from(key)),
             _ => None,
-        }
-        .unwrap_or(Value::UNDEFINED))
+        };
+
+        Ok(value.unwrap_or(Value::UNDEFINED))
     }
 
     /// Alternative lookup strategy without error handling exclusively for context
@@ -922,11 +847,7 @@ impl Value {
     /// also not be created.
     pub(crate) fn get_attr_fast(&self, key: &str) -> Option<Value> {
         match self.0 {
-            ValueRepr::Map(ref items, _) => items.get(&KeyRef::Str(key)).cloned(),
-            ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Struct(s) => s.get_field(key),
-                ObjectKind::Plain | ObjectKind::Seq(_) | ObjectKind::Iterator(_) => None,
-            },
+            ValueRepr::Object(ref dy) => dy.get_value(&Value::from(key)),
             _ => None,
         }
     }
@@ -1002,9 +923,10 @@ impl Value {
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
     ///
     /// This is basically the "reverse" of [`from_object`](Self::from_object),
-    /// [`from_seq_object`](Self::from_seq_object) and [`from_struct_object`](Self::from_struct_object).
-    /// It's also a shortcut for [`downcast_ref`](trait.Object.html#method.downcast_ref)
-    /// on the return value of [`as_object`](Self::as_object).
+    /// [`from_object`](Self::from_object) and
+    /// [`from_object`](Self::from_object). It's also a shortcut for
+    /// [`downcast_ref`](trait.Object.html#method.downcast_ref) on the return
+    /// value of [`as_object`](Self::as_object).
     ///
     /// # Example
     ///
@@ -1029,76 +951,41 @@ impl Value {
     /// let thing = x_value.downcast_object_ref::<Thing>().unwrap();
     /// assert_eq!(thing.id, 42);
     /// ```
-    ///
-    /// It also works with [`SeqObject`] or [`StructObject`]:
-    ///
-    /// ```rust
-    /// # use minijinja::value::{Value, SeqObject};
-    ///
-    /// struct Thing {
-    ///     id: usize,
-    /// }
-    ///
-    /// impl SeqObject for Thing {
-    ///     fn get_item(&self, idx: usize) -> Option<Value> {
-    ///         (idx < 3).then(|| Value::from(idx))
-    ///     }
-    ///     fn item_count(&self) -> usize {
-    ///         3
-    ///     }
-    /// }
-    ///
-    /// let x_value = Value::from_seq_object(Thing { id: 42 });
-    /// let thing = x_value.downcast_object_ref::<Thing>().unwrap();
-    /// assert_eq!(thing.id, 42);
-    /// ```
     pub fn downcast_object_ref<T: 'static>(&self) -> Option<&T> {
-        self.as_object().and_then(|x| x.downcast_ref())
+        match self.0 {
+            ValueRepr::Object(ref o) => o.downcast_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn downcast_object<T: 'static>(&self) -> Option<Arc<T>> {
+        match self.0 {
+            ValueRepr::Object(ref o) => o.downcast(),
+            _ => None,
+        }
     }
 
     pub(crate) fn get_item_opt(&self, key: &Value) -> Option<Value> {
-        let key = KeyRef::Value(key.clone());
-
-        let seq = match self.0 {
-            ValueRepr::Map(ref items, _) => return items.get(&key).cloned(),
-            ValueRepr::Seq(ref items) => &**items as &dyn SeqObject,
-            ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Plain | ObjectKind::Iterator(_) => return None,
-                ObjectKind::Seq(s) => s,
-                ObjectKind::Struct(s) => {
-                    return if let Some(key) = key.as_str() {
-                        s.get_field(key)
-                    } else {
-                        None
-                    };
-                }
-            },
-            ValueRepr::String(ref s, _) => {
-                if let Some(idx) = key.as_i64() {
-                    let idx = some!(isize::try_from(idx).ok());
-                    let idx = if idx < 0 {
-                        some!(s.chars().count().checked_sub(-idx as usize))
-                    } else {
-                        idx as usize
-                    };
-                    return s.chars().nth(idx).map(Value::from);
-                } else {
-                    return None;
-                }
+        fn index(value: &Value, len: impl Fn() -> usize) -> Option<usize> {
+            match value.as_i64().and_then(|v| isize::try_from(v).ok()) {
+                Some(i) if i < 0 => len().checked_sub(i.unsigned_abs()),
+                Some(i) => Some(i as usize),
+                None => None,
             }
-            _ => return None,
-        };
+        }
 
-        if let Some(idx) = key.as_i64() {
-            let idx = some!(isize::try_from(idx).ok());
-            let idx = if idx < 0 {
-                some!(seq.item_count().checked_sub(-idx as usize))
-            } else {
-                idx as usize
-            };
-            seq.get_item(idx)
-        } else {
-            None
+        match self.0 {
+            ValueRepr::Object(ref dy) => {
+                let len = dy.enumeration().len();
+                let idx = len.and_then(|n| index(key, || n));
+                let value = idx.map(Value::from);
+                dy.get_value(value.as_ref().unwrap_or(key))
+            }
+            ValueRepr::String(ref s, _) => {
+                let idx = some!(index(key, || s.chars().count()));
+                s.chars().nth(idx).map(Value::from)
+            }
+            _ => None,
         }
     }
 
@@ -1151,8 +1038,8 @@ impl Value {
     /// assert_eq!(rv, Value::from(84));
     /// ```
     pub fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
-        if let ValueRepr::Dynamic(ref dy) = self.0 {
-            dy.call(state, args)
+        if let ValueRepr::Object(ref dy) = self.0 {
+            dy.call(state, None, args)
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -1180,15 +1067,10 @@ impl Value {
     }
 
     fn _call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
-        match self.0 {
-            ValueRepr::Dynamic(ref dy) => return dy.call_method(state, name, args),
-            ValueRepr::Map(ref map, _) => {
-                if let Some(value) = map.get(&KeyRef::Str(name)) {
-                    return value.call(state, args);
-                }
-            }
-            _ => {}
+        if let Some(object) = self.as_object() {
+            return object.call(state, Some(name), args);
         }
+
         Err(Error::new(
             ErrorKind::UnknownMethod,
             format!("object has no method named {name}"),
@@ -1203,45 +1085,9 @@ impl Value {
                 ValueIteratorState::Chars(0, Arc::clone(s)),
                 Some(s.chars().count()),
             ),
-            ValueRepr::Seq(ref seq) => {
-                (ValueIteratorState::Seq(0, Arc::clone(seq)), Some(seq.len()))
-            }
-            #[cfg(feature = "preserve_order")]
-            ValueRepr::Map(ref items, _) => (
-                ValueIteratorState::Map(0, Arc::clone(items)),
-                Some(items.len()),
-            ),
-            #[cfg(not(feature = "preserve_order"))]
-            ValueRepr::Map(ref items, _) => (
-                ValueIteratorState::Map(
-                    items.iter().next().map(|x| x.0.clone()),
-                    Arc::clone(items),
-                ),
-                Some(items.len()),
-            ),
-            ValueRepr::Dynamic(ref obj) => {
-                match obj.kind() {
-                    ObjectKind::Plain => (ValueIteratorState::Empty, Some(0)),
-                    ObjectKind::Seq(s) => (
-                        ValueIteratorState::DynSeq(0, Arc::clone(obj)),
-                        Some(s.item_count()),
-                    ),
-                    ObjectKind::Struct(s) => {
-                        // the assumption is that structs don't have excessive field counts
-                        // and that most iterations go over all fields, so creating a
-                        // temporary vector here is acceptable.
-                        if let Some(fields) = s.static_fields() {
-                            (ValueIteratorState::StaticStr(0, fields), Some(fields.len()))
-                        } else {
-                            let attrs = s.fields();
-                            let attr_count = attrs.len();
-                            (ValueIteratorState::ArcStr(0, attrs), Some(attr_count))
-                        }
-                    }
-                    ObjectKind::Iterator(_) => {
-                        (ValueIteratorState::Iterator(Arc::clone(obj)), None)
-                    }
-                }
+            ValueRepr::Object(ref obj) => {
+                let len = obj.enumeration().len();
+                (ValueIteratorState::Dyn(obj.repr(), obj.iter()), len)
             }
             _ => {
                 return Err(Error::new(
@@ -1250,6 +1096,7 @@ impl Value {
                 ))
             }
         };
+
         Ok(OwnedValueIterator { iter_state, len })
     }
 
@@ -1303,48 +1150,25 @@ impl Serialize for Value {
             ValueRepr::I128(i) => serializer.serialize_i128(i.0),
             ValueRepr::String(ref s, _) => serializer.serialize_str(s),
             ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
-            ValueRepr::Seq(ref elements) => elements.serialize(serializer),
-            ValueRepr::Map(ref entries, _) => {
-                use serde::ser::SerializeMap;
-                let mut map = ok!(serializer.serialize_map(Some(entries.len())));
-                for (ref k, ref v) in entries.iter() {
-                    ok!(map.serialize_entry(k, v));
-                }
-                map.end()
-            }
-            ValueRepr::Dynamic(ref dy) => match dy.kind() {
-                ObjectKind::Plain => serializer.serialize_str(&dy.to_string()),
-                ObjectKind::Seq(s) => {
+            ValueRepr::Object(ref o) => match o.repr() {
+                ObjectRepr::Seq => {
                     use serde::ser::SerializeSeq;
-                    let mut seq = ok!(serializer.serialize_seq(Some(s.item_count())));
-                    for item in s.iter() {
+                    let enumeration = o.enumeration();
+                    let mut seq = ok!(serializer.serialize_seq(enumeration.len()));
+                    for item in o.values() {
                         ok!(seq.serialize_element(&item));
                     }
+
                     seq.end()
                 }
-                ObjectKind::Struct(s) => {
+                ObjectRepr::Map => {
                     use serde::ser::SerializeMap;
                     let mut map = ok!(serializer.serialize_map(None));
-                    if let Some(fields) = s.static_fields() {
-                        for k in fields {
-                            let v = s.get_field(k).unwrap_or(Value::UNDEFINED);
-                            ok!(map.serialize_entry(k, &v));
-                        }
-                    } else {
-                        for k in s.fields() {
-                            let v = s.get_field(&k).unwrap_or(Value::UNDEFINED);
-                            ok!(map.serialize_entry(&*k as &str, &v));
-                        }
+                    for (key, value) in o.iter() {
+                        ok!(map.serialize_entry(&key, &value));
                     }
+
                     map.end()
-                }
-                ObjectKind::Iterator(i) => {
-                    use serde::ser::SerializeSeq;
-                    let mut seq = ok!(serializer.serialize_seq(None));
-                    while let Some(value) = i.next_value() {
-                        ok!(seq.serialize_element(&value));
-                    }
-                    seq.end()
                 }
             },
         }
@@ -1363,6 +1187,10 @@ impl<'a> Iterator for ValueIter<'a> {
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
     }
 }
 
@@ -1384,13 +1212,10 @@ impl Iterator for OwnedValueIterator {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if let ValueIteratorState::Iterator(ref obj) = self.iter_state {
-            if let ObjectKind::Iterator(iter) = obj.kind() {
-                if let Some(len) = iter.iterator_len() {
-                    return (len, Some(len));
-                }
-            }
+        if let ValueIteratorState::Dyn(_, ref iter) = self.iter_state {
+            return iter.size_hint();
         }
+
         (self.len.unwrap_or(0), self.len)
     }
 }
@@ -1404,15 +1229,7 @@ impl fmt::Debug for OwnedValueIterator {
 enum ValueIteratorState {
     Empty,
     Chars(usize, Arc<str>),
-    Seq(usize, Arc<Vec<Value>>),
-    StaticStr(usize, &'static [&'static str]),
-    ArcStr(usize, Vec<Arc<str>>),
-    DynSeq(usize, Arc<dyn Object>),
-    #[cfg(not(feature = "preserve_order"))]
-    Map(Option<KeyRef<'static>>, Arc<ValueMap>),
-    #[cfg(feature = "preserve_order")]
-    Map(usize, Arc<ValueMap>),
-    Iterator(Arc<dyn Object>),
+    Dyn(ObjectRepr, ObjectKeyValueIter),
 }
 
 impl ValueIteratorState {
@@ -1425,54 +1242,8 @@ impl ValueIteratorState {
                     Value::from(c)
                 })
             }
-            ValueIteratorState::Seq(idx, items) => items
-                .get(*idx)
-                .map(|x| {
-                    *idx += 1;
-                    x
-                })
-                .cloned(),
-            ValueIteratorState::StaticStr(idx, items) => items.get(*idx).map(|x| {
-                *idx += 1;
-                Value::from(intern(x))
-            }),
-            ValueIteratorState::ArcStr(idx, items) => items.get(*idx).map(|x| {
-                *idx += 1;
-                Value::from(x.clone())
-            }),
-            ValueIteratorState::DynSeq(idx, obj) => {
-                if let ObjectKind::Seq(seq) = obj.kind() {
-                    seq.get_item(*idx).map(|x| {
-                        *idx += 1;
-                        x
-                    })
-                } else {
-                    unreachable!()
-                }
-            }
-            #[cfg(feature = "preserve_order")]
-            ValueIteratorState::Map(idx, map) => map.get_index(*idx).map(|x| {
-                *idx += 1;
-                x.0.as_value()
-            }),
-            #[cfg(not(feature = "preserve_order"))]
-            ValueIteratorState::Map(ptr, map) => {
-                if let Some(current) = ptr.take() {
-                    let next = map.range(&current..).nth(1).map(|x| x.0.clone());
-                    let rv = current.as_value();
-                    *ptr = next;
-                    Some(rv)
-                } else {
-                    None
-                }
-            }
-            ValueIteratorState::Iterator(obj) => {
-                if let ObjectKind::Iterator(iter) = obj.kind() {
-                    iter.next_value()
-                } else {
-                    unreachable!()
-                }
-            }
+            ValueIteratorState::Dyn(ObjectRepr::Map, iter) => iter.next().map(|kv| kv.0),
+            ValueIteratorState::Dyn(ObjectRepr::Seq, iter) => iter.next().map(|kv| kv.1),
         }
     }
 }
@@ -1487,8 +1258,8 @@ mod tests {
     fn test_dynamic_object_roundtrip() {
         use std::sync::atomic::{self, AtomicUsize};
 
-        #[derive(Debug)]
-        struct X(AtomicUsize);
+        #[derive(Debug, Clone)]
+        struct X(Arc<AtomicUsize>);
 
         impl fmt::Display for X {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1497,26 +1268,24 @@ mod tests {
         }
 
         impl Object for X {
-            fn kind(&self) -> ObjectKind<'_> {
-                ObjectKind::Struct(self)
-            }
-        }
-
-        impl crate::value::object::StructObject for X {
-            fn get_field(&self, name: &str) -> Option<Value> {
-                match name {
+            fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                match key.as_str()? {
                     "value" => Some(Value::from(self.0.load(atomic::Ordering::Relaxed))),
                     _ => None,
                 }
             }
 
-            fn static_fields(&self) -> Option<&'static [&'static str]> {
-                Some(&["value"][..])
+            fn enumeration(self: &Arc<Self>) -> Enumeration {
+                Enumeration::Static(&["value"])
+            }
+
+            fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                fmt::Display::fmt(self, f)
             }
         }
 
         let x = Arc::new(X(Default::default()));
-        let x_value = Value::from(x.clone());
+        let x_value = Value::from_dyn_object(x.clone());
         x.0.fetch_add(42, atomic::Ordering::Relaxed);
         let x_clone = Value::from_serializable(&x_value);
         x.0.fetch_add(23, atomic::Ordering::Relaxed);

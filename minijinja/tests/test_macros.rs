@@ -5,7 +5,7 @@ use std::sync::Arc;
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
-use minijinja::value::{Kwargs, StructObject, Value};
+use minijinja::value::{Kwargs, Object, Value};
 use minijinja::{args, context, render, Environment, ErrorKind};
 
 #[test]
@@ -32,10 +32,12 @@ fn test_context_merge() {
 
 #[test]
 fn test_context_merge_custom() {
+    #[derive(Debug, Clone)]
     struct X;
-    impl StructObject for X {
-        fn get_field(&self, name: &str) -> Option<Value> {
-            match name {
+
+    impl Object for X {
+        fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+            match key.as_str()? {
                 "a" => Some(Value::from(1)),
                 "b" => Some(Value::from(2)),
                 _ => None,
@@ -43,7 +45,7 @@ fn test_context_merge_custom() {
         }
     }
 
-    let x = Value::from_struct_object(X);
+    let x = Value::from_object(X);
     let ctx = context! { a => 42, ..x };
 
     assert_eq!(ctx.get_attr("a").unwrap(), Value::from(42));
@@ -124,10 +126,11 @@ fn test_macro_passing() {
 fn test_no_leak() {
     let dropped = Arc::new(AtomicBool::new(false));
 
+    #[derive(Debug, Clone)]
     struct X(Arc<AtomicBool>);
 
-    impl StructObject for X {
-        fn get_field(&self, _name: &str) -> Option<Value> {
+    impl Object for X {
+        fn get_value(self: &Arc<Self>, _name: &Value) -> Option<Value> {
             None
         }
     }
@@ -139,7 +142,7 @@ fn test_no_leak() {
     }
 
     let ctx = context! {
-        x => Value::from_struct_object(X(dropped.clone())),
+        x => Value::from_object(X(dropped.clone())),
     };
     let mut env = Environment::new();
     env.add_template("x", "{% macro meh() %}{{ x }}{{ meh }}{% endmacro %}")
@@ -179,11 +182,11 @@ fn test_nested_macro_bug() {
     {% macro m1(var) -%}
       {{ var }}
     {%- endmacro %}
-    
+
     {% macro m2(x=a) -%}
       {{ m1(x) }}
     {%- endmacro %}
-    
+
     {{ m2() }}
     "#
     );
@@ -201,11 +204,11 @@ fn test_caller_bug() {
     {% macro m1(var) -%}
       {{ caller(var) }}
     {%- endmacro %}
-    
+
     {% macro m2(x=a) -%}
       {% call(var) m1(x) %}{{ var }}|{{ b }}{% endcall %}
     {%- endmacro %}
-    
+
     {{ m2() }}
     "#
     );
