@@ -1143,12 +1143,8 @@ pub fn parse<'source>(
 }
 
 /// Parses an expression
-pub fn parse_expr(
-    source: &str,
-    syntax_config: SyntaxConfig,
-    whitespace_config: WhitespaceConfig,
-) -> Result<ast::Expr<'_>, Error> {
-    let mut parser = Parser::new(source, true, syntax_config, whitespace_config);
+pub fn parse_expr(source: &str) -> Result<ast::Expr<'_>, Error> {
+    let mut parser = Parser::new(source, true, Default::default(), Default::default());
     parser
         .parse_expr()
         .and_then(|result| {
