@@ -182,6 +182,12 @@ fn create_env(
     if matches.get_flag("env") {
         env.add_global("ENV", Value::from_iter(std::env::vars()));
     }
+    if matches.get_flag("trim-blocks") {
+        env.set_trim_blocks(true);
+    }
+    if matches.get_flag("lstrip-blocks") {
+        env.set_lstrip_blocks(true);
+    }
 
     let autoescape = matches.get_one::<String>("autoescape").unwrap().clone();
     env.set_auto_escape_callback(move |name| match autoescape.as_str() {
@@ -367,7 +373,16 @@ fn execute() -> Result<i32, Error> {
         match dump.as_str() {
             "ast" => {
                 let tmpl = env.get_template(&template)?;
-                writeln!(&mut output, "{:#?}", parse(tmpl.source(), tmpl.name())?)?;
+                writeln!(
+                    &mut output,
+                    "{:#?}",
+                    parse(
+                        tmpl.source(),
+                        tmpl.name(),
+                        Default::default(),
+                        Default::default()
+                    )?
+                )?;
             }
             "tokens" => {
                 let tmpl = env.get_template(&template)?;
