@@ -23,6 +23,6 @@ TemplateData(" blub\nfoo")
   " blub\nfoo"
 TemplateData("baz ")
   "baz "
-TemplateData(" blub\n")
-  " blub\n"
+TemplateData(" blub")
+  " blub"
 
