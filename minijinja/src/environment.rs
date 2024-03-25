@@ -221,7 +221,7 @@ impl<'source> Environment<'source> {
     pub fn set_keep_trailing_newline(&mut self, yes: bool) {
         self.templates
             .template_config
-            .whitespace_config
+            .ws_config
             .keep_trailing_newline = yes;
     }
 
@@ -229,7 +229,7 @@ impl<'source> Environment<'source> {
     pub fn keep_trailing_newline(&self) -> bool {
         self.templates
             .template_config
-            .whitespace_config
+            .ws_config
             .keep_trailing_newline
     }
 
@@ -238,12 +238,12 @@ impl<'source> Environment<'source> {
     /// If this is set to `true` then the first newline after a block is removed
     /// (block, not variable tag!). Defaults to `false`.
     pub fn set_trim_blocks(&mut self, yes: bool) {
-        self.templates.template_config.whitespace_config.trim_blocks = yes;
+        self.templates.template_config.ws_config.trim_blocks = yes;
     }
 
     /// Returns the value of the trim blocks flag.
     pub fn trim_blocks(&self) -> bool {
-        self.templates.template_config.whitespace_config.trim_blocks
+        self.templates.template_config.ws_config.trim_blocks
     }
 
     /// Remove leading spaces and tabs from the start of a line to a block.
@@ -251,18 +251,12 @@ impl<'source> Environment<'source> {
     /// If this is set to `true` then leading spaces and tabs from the start of a line
     /// to the block tag are removed.
     pub fn set_lstrip_blocks(&mut self, yes: bool) {
-        self.templates
-            .template_config
-            .whitespace_config
-            .lstrip_blocks = yes;
+        self.templates.template_config.ws_config.lstrip_blocks = yes;
     }
 
     /// Returns the value of the lstrip blocks flag.
     pub fn lstrip_blocks(&self) -> bool {
-        self.templates
-            .template_config
-            .whitespace_config
-            .lstrip_blocks
+        self.templates.template_config.ws_config.lstrip_blocks
     }
 
     /// Removes a template by name.
@@ -668,7 +662,7 @@ impl<'source> Environment<'source> {
             parse_expr(
                 expr,
                 self._syntax_config().clone(),
-                self.templates.template_config.whitespace_config,
+                self.templates.template_config.ws_config,
             )
             .map(|ast| {
                 let mut gen = CodeGenerator::new("<expression>", expr);

@@ -26,7 +26,7 @@ pub struct TemplateConfig {
     /// The syntax used for the template.
     pub syntax_config: SyntaxConfig,
     /// Controls whitespace behavior.
-    pub whitespace_config: WhitespaceConfig,
+    pub ws_config: WhitespaceConfig,
     /// The callback that determines the initial auto escaping for templates.
     pub default_auto_escape: Arc<AutoEscapeFunc>,
 }
@@ -35,7 +35,7 @@ impl TemplateConfig {
     pub(crate) fn new(default_auto_escape: Arc<AutoEscapeFunc>) -> TemplateConfig {
         TemplateConfig {
             syntax_config: SyntaxConfig::default(),
-            whitespace_config: WhitespaceConfig::default(),
+            ws_config: WhitespaceConfig::default(),
             default_auto_escape,
         }
     }
@@ -378,7 +378,7 @@ impl<'source> CompiledTemplate<'source> {
             source,
             name,
             config.syntax_config.clone(),
-            config.whitespace_config
+            config.ws_config
         ));
         let mut gen = CodeGenerator::new(name, source);
         gen.compile_stmt(&ast);
