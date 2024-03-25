@@ -279,4 +279,10 @@ pub mod machinery {
     pub fn make_string_output(s: &mut String) -> Output<'_> {
         Output::with_string(s)
     }
+
+    /// Creates a syntax config from a given [`Syntax`]
+    #[cfg(feature = "custom_syntax")]
+    pub fn make_syntax_config(syntax: crate::Syntax) -> Result<SyntaxConfig, crate::Error> {
+        syntax.compile()
+    }
 }

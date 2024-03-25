@@ -1,3 +1,5 @@
+{}
+---
 <ul>
 {% for item in sequence %}
     <li>{{ item }}</li>

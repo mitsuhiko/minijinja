@@ -1,8 +1,46 @@
 #![cfg(feature = "unstable_machinery")]
-use minijinja::machinery::{Span, SyntaxConfig, Token, Tokenizer, WhitespaceConfig};
-use minijinja::Error;
+use minijinja::machinery::{
+    make_syntax_config, Span, SyntaxConfig, Token, Tokenizer, WhitespaceConfig,
+};
+use minijinja::{Error, Syntax};
 
 use std::fmt::Write;
+
+use serde::Deserialize;
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct TestSettings {
+    keep_trailing_newline: bool,
+    lstrip_blocks: bool,
+    trim_blocks: bool,
+    markers: Option<[String; 6]>,
+}
+
+impl TestSettings {
+    pub fn into_configs(self) -> (SyntaxConfig, WhitespaceConfig) {
+        (
+            make_syntax_config(if let Some(ref markers) = self.markers {
+                Syntax {
+                    block_start: markers[0].to_string().into(),
+                    block_end: markers[1].to_string().into(),
+                    variable_start: markers[2].to_string().into(),
+                    variable_end: markers[3].to_string().into(),
+                    comment_start: markers[4].to_string().into(),
+                    comment_end: markers[5].to_string().into(),
+                }
+            } else {
+                Syntax::default()
+            })
+            .unwrap(),
+            WhitespaceConfig {
+                keep_trailing_newline: self.keep_trailing_newline,
+                lstrip_blocks: self.lstrip_blocks,
+                trim_blocks: self.trim_blocks,
+            },
+        )
+    }
+}
 
 pub fn tokenize(
     input: &str,
@@ -29,12 +67,16 @@ fn stringify_tokens(tokens: Vec<(Token<'_>, Span)>, contents: &str) -> String {
 fn test_lexer() {
     insta::glob!("lexer-inputs/*.txt", |path| {
         let contents = std::fs::read_to_string(path).unwrap();
-        let tokens = tokenize(&contents, Default::default(), Default::default());
+        let mut iter = contents.splitn(2, "\n---\n");
+        let settings: TestSettings = serde_json::from_str(iter.next().unwrap()).unwrap();
+        let (syntax_config, whitespace_config) = settings.into_configs();
+        let contents = iter.next().unwrap();
+        let tokens = tokenize(contents, syntax_config, whitespace_config);
         insta::with_settings!({
             description => contents.trim_end(),
             omit_expression => true
         }, {
-            let stringified = stringify_tokens(tokens.unwrap(), &contents);
+            let stringified = stringify_tokens(tokens.unwrap(), contents);
             insta::assert_snapshot!(&stringified);
         });
     });
