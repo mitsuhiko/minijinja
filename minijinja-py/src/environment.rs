@@ -521,6 +521,32 @@ impl Environment {
         Ok(self.inner.lock().unwrap().env.keep_trailing_newline())
     }
 
+    /// Configures the trim blocks feature.
+    #[setter]
+    pub fn set_trim_blocks(&self, yes: bool) -> PyResult<()> {
+        self.inner.lock().unwrap().env.set_trim_blocks(yes);
+        Ok(())
+    }
+
+    /// Returns the current value of the trim blocks flag.
+    #[getter]
+    pub fn get_trim_blocks(&self) -> PyResult<bool> {
+        Ok(self.inner.lock().unwrap().env.trim_blocks())
+    }
+
+    /// Configures the lstrip blocks feature.
+    #[setter]
+    pub fn set_lstrip_blocks(&self, yes: bool) -> PyResult<()> {
+        self.inner.lock().unwrap().env.set_lstrip_blocks(yes);
+        Ok(())
+    }
+
+    /// Returns the current value of the lstrip blocks flag.
+    #[getter]
+    pub fn get_lstrip_blocks(&self) -> PyResult<bool> {
+        Ok(self.inner.lock().unwrap().env.lstrip_blocks())
+    }
+
     /// Manually adds a template to the environment.
     pub fn add_template(&self, name: String, source: String) -> PyResult<()> {
         let mut inner = self.inner.lock().unwrap();
