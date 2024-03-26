@@ -6,9 +6,10 @@ resolver = "2"
 [workspace.metadata.dist]
 cargo-dist-version = "0.12.0"
 ci = ["github"]
-installers = []
+installers = ["shell", "powershell"]
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc"]
 pr-run-mode = "plan"
+precise-builds = true
 
 [profile.release]
 debug = true
