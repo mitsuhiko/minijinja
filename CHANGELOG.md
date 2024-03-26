@@ -5,6 +5,11 @@ All notable changes to MiniJinja are documented here.
 ## 1.0.16
 
 - Tolerate underscores in number literals.  #443
+- Added support for `trim_blocks` and `lstrip_blocks` for Jinja2
+  compatibility.  #447
+- Changed API of `unstable_machinery`.  The `tokenize` function is gone
+  and was replaced with the `Tokenizer` struct.  `parse_expr` was added,
+  the `parse` function now takes a `SyntaxConfig` and `WhitespaceConfig`.  #447
 
 ## 1.0.15
 

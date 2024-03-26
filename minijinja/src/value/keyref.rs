@@ -110,7 +110,7 @@ pub mod key_interning {
 
     thread_local! {
         static STRING_KEY_CACHE: RefCell<HashSet<Arc<str>>> = Default::default();
-        static USE_STRING_KEY_CACHE: Cell<bool> = Cell::new(false);
+        static USE_STRING_KEY_CACHE: Cell<bool> = const { Cell::new(false) };
     }
 
     pub fn use_string_cache() -> impl Drop {

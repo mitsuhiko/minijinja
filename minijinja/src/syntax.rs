@@ -26,7 +26,11 @@
 //!   - [`{% do %}`](#-do-)
 //!   - [`{% autoescape %}`](#-autoescape-)
 //!   - [`{% raw %}`](#-raw-)
-//! - [Custom Delimiters](#custom-delimiters)
+#![cfg_attr(
+    feature = "custom_syntax",
+    doc = "- [Custom Delimiters](#custom-delimiters)"
+)]
+//! - [Whitespace Control](#whitespace-control)
 //!
 //! </details>
 //!
@@ -746,3 +750,83 @@ And then a template might look like this instead:
 ```
 "#
 )]
+//! # Whitespace Control
+//!
+//! MiniJinja shares the same behavior with Jinja2 when it comes to
+//! whitespace handling.  By default a single trailing newline is stripped if present
+//! and all other whitespace is returned unchanged.
+//!
+//! If an application configures Jinja to [`trim_blocks`](crate::Environment::set_trim_blocks),
+//! the first newline after a template tag is removed automatically (like in PHP).  The
+//! [`lstrip_blocks`](crate::Environment::set_lstrip_blocks) option can also be set to strip
+//! tabs and spaces from the beginning of a line to the start of a block. (Nothing will be
+//! stripped if there are other characters before the start of the block.)
+//!
+//! With both `trim_blocks` and `lstrip_blocks` enabled, you can put block tags on their
+//! own lines, and the entire block line will be removed when rendered, preserving the
+//! whitespace of the contents.
+//!
+//! For example, without the `trim_blocks` and `lstrip_blocks` options, this template:
+//!
+//! ```jinja
+//! <div>
+//!   {% if True %}
+//!     yay
+//!   {% endif %}
+//! </div>
+//! ```
+//!
+//! gets rendered with blank lines inside the div:
+//!
+//! ```jinja
+//! <div>
+//!
+//!     yay
+//!
+//! </div>
+//! ```
+//!
+//! But with both `trim_blocks` and `lstrip_blocks` enabled, the template block lines
+//! are removed and other whitespace is preserved:
+//!
+//! ```jinja
+//! <div>
+//!     yay
+//! </div>
+//! ````
+//!
+//! You can manually disable the `lstrip_blocks` behavior by putting a plus sign (`+`)
+//! at the start of a block:
+//!
+//! ```jinja
+//! <div>
+//!   {%+ if something %}yay{% endif %}
+//! </div>
+//! ```
+//!
+//! Similarly, you can manually disable the `trim_blocks` behavior by putting a plus
+//! sign (`+`) at the end of a block:
+//!
+//! ```jinja
+//! <div>
+//! {% if something +%}
+//!     yay
+//! {% endif %}
+//! </div>
+//! ```
+//!
+//! You can also strip whitespace in templates by hand. If you add a minus sign (`-`) to the
+//! start or end of a block (e.g. a for tag), a comment, or a variable expression, the
+//! whitespaces before or after that block will be removed:
+//!
+//! ```jinja
+//! {% for item in range(1, 10) -%}
+//! {{ item }}
+//! {%- endfor %}
+//! ```
+//!
+//! This will yield all elements without whitespace between them, in this case
+//! the output would be `123456789`.
+//!
+//! By default, MiniJinja also removes trailing newlines.  To keep single trailing newlines,
+//! configure MiniJinja to [`keep_trailing_newline`](crate::Environment::set_keep_trailing_newline).

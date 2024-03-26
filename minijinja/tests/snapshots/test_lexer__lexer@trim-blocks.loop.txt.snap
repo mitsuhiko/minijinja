@@ -1,7 +1,7 @@
 ---
 source: minijinja/tests/test_lexer.rs
-description: "{% for item in seq -%}\n  {{ item }}{% endfor %}"
-input_file: minijinja/tests/lexer-inputs/block-filter.txt
+description: "{% for item in seq %}\n  {{ item }}\n{% endfor %}"
+input_file: minijinja/tests/lexer-inputs/trim-blocks.loop.txt
 ---
 BlockStart
   "{%"
@@ -14,13 +14,17 @@ Ident("in")
 Ident("seq")
   "seq"
 BlockEnd
-  "-%}"
+  "%}"
+TemplateData("  ")
+  "  "
 VariableStart
   "{{"
 Ident("item")
   "item"
 VariableEnd
   "}}"
+TemplateData("\n")
+  "\n"
 BlockStart
   "{%"
 Ident("endfor")

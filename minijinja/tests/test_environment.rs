@@ -156,7 +156,7 @@ fn test_unknown_method_callback() {
     let mut env = Environment::new();
     env.set_unknown_method_callback(|_state, value, method, args| {
         if value.kind() == ValueKind::Map && method == "items" {
-            let _: () = from_args(args)?;
+            from_args(args)?;
             minijinja::filters::items(value.clone())
         } else {
             Err(Error::new(

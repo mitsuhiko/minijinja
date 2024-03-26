@@ -11,6 +11,6 @@ Ident("name")
   "name"
 VariableEnd
   "}}"
-TemplateData("!\n")
-  "!\n"
+TemplateData("!")
+  "!"
 

@@ -1,3 +1,5 @@
+{}
+---
 {# useless comment #}
 {{ foo.bar[baz].blah }}
 {{ {"foo": "bar"}.test }}

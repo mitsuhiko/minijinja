@@ -1,27 +1,115 @@
 #![cfg(feature = "unstable_machinery")]
-use minijinja::machinery::tokenize;
+use minijinja::machinery::{
+    make_syntax_config, Span, SyntaxConfig, Token, Tokenizer, WhitespaceConfig,
+};
+use minijinja::{Error, Syntax};
 
 use std::fmt::Write;
+
+use serde::Deserialize;
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct TestSettings {
+    keep_trailing_newline: bool,
+    lstrip_blocks: bool,
+    trim_blocks: bool,
+    markers: Option<[String; 6]>,
+}
+
+impl TestSettings {
+    pub fn into_configs(self) -> (SyntaxConfig, WhitespaceConfig) {
+        (
+            make_syntax_config(if let Some(ref markers) = self.markers {
+                Syntax {
+                    block_start: markers[0].to_string().into(),
+                    block_end: markers[1].to_string().into(),
+                    variable_start: markers[2].to_string().into(),
+                    variable_end: markers[3].to_string().into(),
+                    comment_start: markers[4].to_string().into(),
+                    comment_end: markers[5].to_string().into(),
+                }
+            } else {
+                Syntax::default()
+            })
+            .unwrap(),
+            WhitespaceConfig {
+                keep_trailing_newline: self.keep_trailing_newline,
+                lstrip_blocks: self.lstrip_blocks,
+                trim_blocks: self.trim_blocks,
+            },
+        )
+    }
+}
+
+pub fn tokenize(
+    input: &str,
+    syntax_config: SyntaxConfig,
+    whitespace_config: WhitespaceConfig,
+) -> Result<Vec<(Token<'_>, Span)>, Error> {
+    let mut tokenizer = Tokenizer::new(input, false, syntax_config, whitespace_config);
+    std::iter::from_fn(move || tokenizer.next_token().transpose()).collect()
+}
+
+fn stringify_tokens(tokens: Vec<(Token<'_>, Span)>, contents: &str) -> String {
+    let mut stringified = String::new();
+    for (token, span) in tokens {
+        let token_source = contents
+            .get(span.start_offset as usize..span.end_offset as usize)
+            .unwrap();
+        writeln!(stringified, "{token:?}").unwrap();
+        writeln!(stringified, "  {token_source:?}").unwrap();
+    }
+    stringified
+}
 
 #[test]
 fn test_lexer() {
     insta::glob!("lexer-inputs/*.txt", |path| {
         let contents = std::fs::read_to_string(path).unwrap();
-
-        let tokens: Result<Vec<_>, _> = tokenize(&contents, false, Default::default()).collect();
+        let mut iter = contents.splitn(2, "\n---\n");
+        let settings: TestSettings = serde_json::from_str(iter.next().unwrap()).unwrap();
+        let (syntax_config, whitespace_config) = settings.into_configs();
+        let contents = iter.next().unwrap();
+        let tokens = tokenize(contents, syntax_config, whitespace_config);
         insta::with_settings!({
             description => contents.trim_end(),
             omit_expression => true
         }, {
-            let mut stringified = String::new();
-            for (token, span) in tokens.unwrap() {
-                let token_source = contents
-                    .get(span.start_offset as usize..span.end_offset as usize)
-                    .unwrap();
-                writeln!(stringified, "{token:?}").unwrap();
-                writeln!(stringified, "  {token_source:?}").unwrap();
-            }
+            let stringified = stringify_tokens(tokens.unwrap(), contents);
             insta::assert_snapshot!(&stringified);
         });
     });
+}
+
+#[test]
+fn test_trim_blocks() {
+    let input = "{% block foo %}\nbar{% endblock %}";
+    let tokens = tokenize(
+        input,
+        Default::default(),
+        WhitespaceConfig {
+            trim_blocks: true,
+            ..Default::default()
+        },
+    );
+    let stringified = stringify_tokens(tokens.unwrap(), input);
+    insta::assert_snapshot!(&stringified, @r###"
+    BlockStart
+      "{%"
+    Ident("block")
+      "block"
+    Ident("foo")
+      "foo"
+    BlockEnd
+      "%}"
+    TemplateData("bar")
+      "bar"
+    BlockStart
+      "{%"
+    Ident("endblock")
+      "endblock"
+    BlockEnd
+      "%}"
+    "###);
 }

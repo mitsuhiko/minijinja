@@ -7,7 +7,7 @@ use std::{fs, io};
 
 use anyhow::{anyhow, bail, Context, Error};
 use clap::ArgMatches;
-use minijinja::machinery::{get_compiled_template, parse, tokenize, Instructions};
+use minijinja::machinery::{get_compiled_template, parse, Instructions, Tokenizer};
 use minijinja::{
     context, AutoEscape, Environment, Error as MError, ErrorKind, UndefinedBehavior, Value,
 };
@@ -181,6 +181,12 @@ fn create_env(
 
     if matches.get_flag("env") {
         env.add_global("ENV", Value::from_iter(std::env::vars()));
+    }
+    if matches.get_flag("trim-blocks") {
+        env.set_trim_blocks(true);
+    }
+    if matches.get_flag("lstrip-blocks") {
+        env.set_lstrip_blocks(true);
     }
 
     let autoescape = matches.get_one::<String>("autoescape").unwrap().clone();
@@ -367,12 +373,23 @@ fn execute() -> Result<i32, Error> {
         match dump.as_str() {
             "ast" => {
                 let tmpl = env.get_template(&template)?;
-                writeln!(&mut output, "{:#?}", parse(tmpl.source(), tmpl.name())?)?;
+                writeln!(
+                    &mut output,
+                    "{:#?}",
+                    parse(
+                        tmpl.source(),
+                        tmpl.name(),
+                        Default::default(),
+                        Default::default()
+                    )?
+                )?;
             }
             "tokens" => {
                 let tmpl = env.get_template(&template)?;
+                let mut tokenizer =
+                    Tokenizer::new(tmpl.source(), false, Default::default(), Default::default());
                 let tokens: Result<Vec<_>, _> =
-                    tokenize(tmpl.source(), false, Default::default()).collect();
+                    std::iter::from_fn(move || tokenizer.next_token().transpose()).collect();
                 for (token, _) in tokens? {
                     writeln!(&mut output, "{:?}", token)?;
                 }
