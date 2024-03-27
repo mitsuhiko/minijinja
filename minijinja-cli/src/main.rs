@@ -7,7 +7,9 @@ use std::{fs, io};
 
 use anyhow::{anyhow, bail, Context, Error};
 use clap::ArgMatches;
-use minijinja::machinery::{get_compiled_template, parse, Instructions, Tokenizer};
+use minijinja::machinery::{
+    get_compiled_template, parse, tokenize, Instructions, WhitespaceConfig,
+};
 use minijinja::{
     context, AutoEscape, Environment, Error as MError, ErrorKind, UndefinedBehavior, Value,
 };
@@ -386,10 +388,17 @@ fn execute() -> Result<i32, Error> {
             }
             "tokens" => {
                 let tmpl = env.get_template(&template)?;
-                let mut tokenizer =
-                    Tokenizer::new(tmpl.source(), false, Default::default(), Default::default());
-                let tokens: Result<Vec<_>, _> =
-                    std::iter::from_fn(move || tokenizer.next_token().transpose()).collect();
+                let tokens: Result<Vec<_>, _> = tokenize(
+                    tmpl.source(),
+                    false,
+                    Default::default(),
+                    WhitespaceConfig {
+                        lstrip_blocks: matches.get_flag("lstrip-blocks"),
+                        trim_blocks: matches.get_flag("trim-blocks"),
+                        ..Default::default()
+                    },
+                )
+                .collect();
                 for (token, _) in tokens? {
                     writeln!(&mut output, "{:?}", token)?;
                 }
