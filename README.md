@@ -86,6 +86,7 @@ If you are stuck with `MiniJinja`, have suggestions or need help, you can use th
   functionality to pass values from the stack
 * [minijinja-py](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py): makes MiniJinja
   available to Python
+* [minijinja-cli](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli): a command line utility.
 
 ## Similar Projects
 
