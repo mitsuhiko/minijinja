@@ -1,8 +1,8 @@
 #![cfg(feature = "unstable_machinery")]
 use minijinja::machinery::{
-    make_syntax_config, Span, SyntaxConfig, Token, Tokenizer, WhitespaceConfig,
+    make_syntax_config, tokenize, Span, SyntaxConfig, Token, WhitespaceConfig,
 };
-use minijinja::{Error, Syntax};
+use minijinja::Syntax;
 
 use std::fmt::Write;
 
@@ -42,15 +42,6 @@ impl TestSettings {
     }
 }
 
-pub fn tokenize(
-    input: &str,
-    syntax_config: SyntaxConfig,
-    whitespace_config: WhitespaceConfig,
-) -> Result<Vec<(Token<'_>, Span)>, Error> {
-    let mut tokenizer = Tokenizer::new(input, false, syntax_config, whitespace_config);
-    std::iter::from_fn(move || tokenizer.next_token().transpose()).collect()
-}
-
 fn stringify_tokens(tokens: Vec<(Token<'_>, Span)>, contents: &str) -> String {
     let mut stringified = String::new();
     for (token, span) in tokens {
@@ -71,7 +62,8 @@ fn test_lexer() {
         let settings: TestSettings = serde_json::from_str(iter.next().unwrap()).unwrap();
         let (syntax_config, whitespace_config) = settings.into_configs();
         let contents = iter.next().unwrap();
-        let tokens = tokenize(contents, syntax_config, whitespace_config);
+        let tokens: Result<Vec<_>, _> =
+            tokenize(contents, false, syntax_config, whitespace_config).collect();
         insta::with_settings!({
             description => contents.trim_end(),
             omit_expression => true
@@ -85,14 +77,16 @@ fn test_lexer() {
 #[test]
 fn test_trim_blocks() {
     let input = "{% block foo %}\nbar{% endblock %}";
-    let tokens = tokenize(
+    let tokens: Result<Vec<_>, _> = tokenize(
         input,
+        false,
         Default::default(),
         WhitespaceConfig {
             trim_blocks: true,
             ..Default::default()
         },
-    );
+    )
+    .collect();
     let stringified = stringify_tokens(tokens.unwrap(), input);
     insta::assert_snapshot!(&stringified, @r###"
     BlockStart

@@ -746,21 +746,25 @@ impl<'s> Tokenizer<'s> {
     }
 }
 
+/// Utility function to quickly tokenize into an iterator.
+#[allow(unused)]
+pub fn tokenize(
+    input: &str,
+    in_expr: bool,
+    syntax_config: SyntaxConfig,
+    whitespace_config: WhitespaceConfig,
+) -> impl Iterator<Item = Result<(Token<'_>, Span), Error>> {
+    // This function is unused in minijinja itself, it's only used in tests and in the
+    // unstable machinery as a convenient alternative to the tokenizer.
+    let mut tokenizer = Tokenizer::new(input, in_expr, syntax_config, whitespace_config);
+    std::iter::from_fn(move || tokenizer.next_token().transpose())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use similar_asserts::assert_eq;
-
-    pub fn tokenize(
-        input: &str,
-        in_expr: bool,
-        syntax_config: SyntaxConfig,
-    ) -> impl Iterator<Item = Result<(Token<'_>, Span), Error>> {
-        let mut tokenizer =
-            Tokenizer::new(input, in_expr, syntax_config, WhitespaceConfig::default());
-        std::iter::from_fn(move || tokenizer.next_token().transpose())
-    }
 
     #[test]
     fn test_find_marker() {
@@ -838,14 +842,15 @@ mod tests {
     #[test]
     fn test_basic_identifiers() {
         fn assert_ident(s: &str) {
-            match tokenize(s, true, Default::default()).next() {
+            match tokenize(s, true, Default::default(), Default::default()).next() {
                 Some(Ok((Token::Ident(ident), _))) if ident == s => {}
                 _ => panic!("did not get a matching token result: {s:?}"),
             }
         }
 
         fn assert_not_ident(s: &str) {
-            let res = tokenize(s, true, Default::default()).collect::<Result<Vec<_>, _>>();
+            let res = tokenize(s, true, Default::default(), Default::default())
+                .collect::<Result<Vec<_>, _>>();
             if let Ok(tokens) = res {
                 if let &[(Token::Ident(_), _)] = &tokens[..] {
                     panic!("got a single ident for {s:?}")
