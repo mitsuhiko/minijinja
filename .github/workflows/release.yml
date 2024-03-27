@@ -270,6 +270,7 @@ jobs:
     name: Publish to crates.io
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    if: ${{ !github.event.pull_request }}
     steps:
       - uses: actions/checkout@v4
       - uses: swatinem/rust-cache@v2
