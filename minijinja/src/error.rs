@@ -234,7 +234,6 @@ impl Error {
     }
 
     /// Attaches another error as source to this error.
-    #[allow(unused)]
     pub fn with_source<E: std::error::Error + Send + Sync + 'static>(mut self, source: E) -> Self {
         self.repr.source = Some(Box::new(source));
         self

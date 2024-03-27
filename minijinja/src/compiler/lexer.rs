@@ -747,7 +747,7 @@ impl<'s> Tokenizer<'s> {
 }
 
 /// Utility function to quickly tokenize into an iterator.
-#[allow(unused)]
+#[cfg(any(test, feature = "unstable_machinery"))]
 pub fn tokenize(
     input: &str,
     in_expr: bool,
