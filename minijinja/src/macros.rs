@@ -24,10 +24,9 @@ macro_rules! some {
 #[doc(hidden)]
 pub mod __context {
     pub use crate::value::merge_object::MergeObject;
-    use crate::value::{KeyRef, MapType, Value, ValueMap, ValueRepr};
+    use crate::value::{Value, ValueMap};
     use crate::Environment;
     use std::rc::Rc;
-    use std::sync::Arc;
 
     #[inline(always)]
     pub fn value_optimization() -> impl Drop {
@@ -41,12 +40,12 @@ pub mod __context {
 
     #[inline(always)]
     pub fn add(ctx: &mut ValueMap, key: &'static str, value: Value) {
-        ctx.insert(KeyRef::Str(key), value);
+        ctx.insert(key.into(), value);
     }
 
     #[inline(always)]
     pub fn build(ctx: ValueMap) -> Value {
-        ValueRepr::Map(Arc::new(ctx), MapType::Normal).into()
+        Value::from_object(ctx)
     }
 
     pub fn thread_local_env() -> Rc<Environment<'static>> {
@@ -117,7 +116,7 @@ pub mod __context {
 ///
 /// The merge works with an value, not just values created by the `context!`
 /// macro and is performed lazy.  This means it also works with dynamic
-/// [`StructObject`](crate::value::StructObject)s.
+/// [`MapObject`](crate::value::MapObject)s.
 #[macro_export]
 macro_rules! context {
     () => {
@@ -141,7 +140,7 @@ macro_rules! context {
             ctx
         } else {
             merged_ctx.insert(0, ctx);
-            $crate::value::Value::from_struct_object($crate::__context::MergeObject(merged_ctx))
+            $crate::value::Value::from_object($crate::__context::MergeObject(merged_ctx))
         }
     }};
     (
@@ -152,7 +151,7 @@ macro_rules! context {
         $(
             ctx.push($crate::value::Value::from($ctx));
         )*;
-        $crate::value::Value::from_struct_object($crate::__context::MergeObject(ctx))
+        $crate::value::Value::from_object($crate::__context::MergeObject(ctx))
     }};
 }
 

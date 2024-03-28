@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::fmt;
 
 use crate::compiler::tokens::Span;
-use crate::value::{value_map_with_capacity, KeyRef, MapType, Value, ValueRepr};
+use crate::value::{value_map_with_capacity, Value};
 
 /// Container for nodes with location info.
 ///
@@ -479,7 +479,7 @@ impl<'a> List<'a> {
             _ => None,
         });
 
-        Some(sequence.collect())
+        Some(Value::from(sequence.collect::<Vec<_>>()))
     }
 }
 
@@ -499,11 +499,11 @@ impl<'a> Kwargs<'a> {
         let mut rv = value_map_with_capacity(self.pairs.len());
         for (key, value) in &self.pairs {
             if let Expr::Const(value) = value {
-                rv.insert(KeyRef::Value(Value::from(*key)), value.value.clone());
+                rv.insert(Value::from(*key), value.value.clone());
             }
         }
 
-        Some(Value(ValueRepr::Map(rv.into(), MapType::Kwargs)))
+        Some(Value::kwargs(rv))
     }
 }
 
@@ -526,11 +526,11 @@ impl<'a> Map<'a> {
         let mut rv = value_map_with_capacity(self.keys.len());
         for (key, value) in self.keys.iter().zip(self.values.iter()) {
             if let (Expr::Const(maybe_key), Expr::Const(value)) = (key, value) {
-                rv.insert(KeyRef::Value(maybe_key.value.clone()), value.value.clone());
+                rv.insert(maybe_key.value.clone(), value.value.clone());
             }
         }
 
-        Some(Value(ValueRepr::Map(rv.into(), MapType::Normal)))
+        Some(Value::from_object(rv))
     }
 }
 

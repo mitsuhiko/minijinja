@@ -1,7 +1,5 @@
-use std::convert::{TryFrom, TryInto};
-
 use crate::error::{Error, ErrorKind};
-use crate::value::{KeyRef, ObjectKind, SeqObject, Value, ValueKind, ValueRepr};
+use crate::value::{ObjectRepr, Value, ValueKind, ValueRepr};
 
 const MIN_I128_AS_POS_U128: u128 = 170141183460469231731687303715884105728;
 
@@ -96,45 +94,33 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         ));
     }
 
-    let maybe_seq = match value.0 {
+    let kind = value.kind();
+    let error = Err(Error::new(
+        ErrorKind::InvalidOperation,
+        format!("value of type {} cannot be sliced", kind),
+    ));
+
+    match value.0 {
         ValueRepr::String(..) => {
             let s = value.as_str().unwrap();
             let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
-            return Ok(Value::from(
+            Ok(Value::from(
                 s.chars()
                     .skip(start)
                     .take(len)
                     .step_by(step)
                     .collect::<String>(),
-            ));
-        }
-        ValueRepr::Undefined | ValueRepr::None => return Ok(Value::from(Vec::<Value>::new())),
-        ValueRepr::Seq(ref s) => Some(&**s as &dyn SeqObject),
-        ValueRepr::Dynamic(ref dy) => {
-            if let ObjectKind::Seq(seq) = dy.kind() {
-                Some(seq)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    };
-
-    match maybe_seq {
-        Some(seq) => {
-            let (start, len) = get_offset_and_len(start, stop, || seq.item_count());
-            Ok(Value::from(
-                seq.iter()
-                    .skip(start)
-                    .take(len)
-                    .step_by(step)
-                    .collect::<Vec<_>>(),
             ))
         }
-        None => Err(Error::new(
-            ErrorKind::InvalidOperation,
-            format!("value of type {} cannot be sliced", value.kind()),
-        )),
+        ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
+        ValueRepr::Object(obj) => {
+            let len = obj.enumeration().len().unwrap_or_default(); // FIXME: <--
+            let (start, len) = get_offset_and_len(start, stop, || len);
+            Ok(Value::from_object_iter(obj.clone(), move |this| {
+                Box::new(this.values().skip(start).take(len).step_by(step))
+            }))
+        }
+        _ => error,
     }
 }
 
@@ -278,10 +264,11 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
         } else {
             s.contains(&value.to_string())
         }
-    } else if let Some(seq) = container.as_seq() {
-        seq.iter().any(|item| &item == value)
-    } else if let ValueRepr::Map(ref map, _) = container.0 {
-        map.get(&KeyRef::Value(value.clone())).is_some()
+    } else if let ValueRepr::Object(ref obj) = container.0 {
+        match obj.repr() {
+            ObjectRepr::Map => obj.get_value(value).is_some(),
+            ObjectRepr::Seq => obj.values().any(|v| &v == value),
+        }
     } else {
         return Err(Error::new(
             ErrorKind::InvalidOperation,

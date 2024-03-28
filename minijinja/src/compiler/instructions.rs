@@ -61,13 +61,10 @@ pub enum Instruction<'source> {
     BuildKwargs(usize),
 
     /// Builds a list of the last n pairs on the stack.
-    BuildList(usize),
+    BuildList(Option<usize>),
 
     /// Unpacks a list into N stack items.
     UnpackList(usize),
-
-    /// Appends to the list.
-    ListAppend,
 
     /// Add the top two values
     Add,
@@ -197,6 +194,9 @@ pub enum Instruction<'source> {
 
     /// A fast loop recurse instruction without intermediate capturing.
     FastRecurse,
+
+    /// Swaps the top two items in the stack.
+    Swap,
 
     /// Call into a block.
     #[cfg(feature = "multi_template")]

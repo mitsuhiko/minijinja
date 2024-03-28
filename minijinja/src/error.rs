@@ -3,6 +3,8 @@ use std::fmt;
 
 use crate::compiler::tokens::Span;
 
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
 /// Represents template errors.
 ///
 /// If debug mode is enabled a template error contains additional debug
@@ -389,7 +391,7 @@ impl From<fmt::Error> for Error {
     }
 }
 
-pub fn attach_basic_debug_info<T>(rv: Result<T, Error>, source: &str) -> Result<T, Error> {
+pub fn attach_basic_debug_info<T>(rv: Result<T>, source: &str) -> Result<T> {
     #[cfg(feature = "debug")]
     {
         match rv {
