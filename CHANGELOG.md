@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.17
+
+- Added support for `Option<Into<Value>>` as return value from
+  functions.  #452
+
 ## 1.0.16
 
 - Tolerate underscores in number literals.  #443

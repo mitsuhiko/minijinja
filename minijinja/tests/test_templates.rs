@@ -8,8 +8,9 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::{env, fs};
 
+use insta::assert_snapshot;
 use minijinja::value::{StructObject, Value};
-use minijinja::{context, Environment, Error, State};
+use minijinja::{context, render, Environment, Error, State};
 
 use similar_asserts::assert_eq;
 
@@ -521,4 +522,20 @@ fn test_render_to_write_state() {
     assert_eq!(String::from_utf8_lossy(&out), "root");
     assert_eq!(state.lookup("foo"), Some(Value::from(42)));
     assert_eq!(state.call_macro("bar", &[]).ok().as_deref(), Some("x"));
+}
+
+#[test]
+fn test_functions() {
+    assert_snapshot!(
+        render!("{{ f() }}", f => Value::from_function(|| -> i32 { 42 })),
+        @"42"
+    );
+    assert_snapshot!(
+        render!("{{ f() }}", f => Value::from_function(|| -> Option<i32> { None })),
+        @"none"
+    );
+    assert_snapshot!(
+        render!("{{ f() }}", f => Value::from_function(|| -> Result<i32, Error> { Ok(23) })),
+        @"23"
+    );
 }
