@@ -5,7 +5,6 @@ use serde::Serialize;
 
 use crate::compiler::ast;
 use crate::compiler::instructions::Instructions;
-use crate::compiler::lexer::SyntaxConfig;
 use crate::compiler::meta::find_undeclared;
 use crate::compiler::parser::parse_expr;
 use crate::environment::Environment;
@@ -97,7 +96,7 @@ impl<'env, 'source> Expression<'env, 'source> {
     /// This works the same as
     /// [`Template::undeclared_variables`](crate::Template::undeclared_variables).
     pub fn undeclared_variables(&self, nested: bool) -> HashSet<String> {
-        match parse_expr(self.instructions().source(), SyntaxConfig::default()) {
+        match parse_expr(self.instructions().source()) {
             Ok(expr) => find_undeclared(
                 &ast::Stmt::EmitExpr(ast::Spanned::new(
                     ast::EmitExpr { expr },

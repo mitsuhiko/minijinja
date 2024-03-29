@@ -6,6 +6,8 @@ fn do_parse() {
     parse(
         black_box(include_str!("../inputs/all_elements.html")),
         "all_elements.html",
+        Default::default(),
+        Default::default(),
     )
     .unwrap();
 }

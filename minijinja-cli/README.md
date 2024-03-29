@@ -9,9 +9,27 @@
 [MiniJinja](https://github.com/mitsuhiko/minijinja) to render Jinja2 templates
 directly from the command line to stdout.
 
+You can install binaries automatically with the shell installer:
+
+```
+curl -sSfL https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-installer.sh | sh
+```
+
+Or download a binary manually:
+
+- [aarch64-apple-darwin](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-aarch64-apple-darwin.tar.xz) (Apple Silicon macOS)
+- [x86_64-apple-darwin](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-apple-darwin.tar.xz) (Intel macOS)
+- [x86_64-pc-windows-msvc](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-pc-widows-msvc.zip) (x64 Windows)
+- [x86_64-unknown-linux-gnu](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-unknown-linux-gnu.tar.xz) (x64 Linux, GNU)
+- [x86_64-unknown-linux-musl](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-unknown-linux-musl.tar.xz) (x64 Linux, MUSL)
+
+You can also compile it yourself with `cargo`:
+
 ```
 cargo install minijinja-cli
 ```
+
+And then run like this:
 
 ```
 minijinja-cli my-template.j2 data.json

@@ -27,6 +27,4 @@ Ident("endfor")
   "endfor"
 BlockEnd
   "%}"
-TemplateData("\n")
-  "\n"
 
