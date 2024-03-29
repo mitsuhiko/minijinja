@@ -1,14 +1,16 @@
 use std::collections::HashMap;
 use std::env;
+use std::sync::Arc;
 
-use minijinja::value::{StructObject, Value};
+use minijinja::value::{Enumeration, Object, Value};
 use minijinja::Environment;
 
+#[derive(Debug)]
 struct DynamicContext;
 
-impl StructObject for DynamicContext {
-    fn get_field(&self, field: &str) -> Option<Value> {
-        Some(match field {
+impl Object for DynamicContext {
+    fn get_value(self: &Arc<Self>, field: &Value) -> Option<Value> {
+        Some(match field.as_str()? {
             "pid" => Value::from(std::process::id()),
             "cwd" => Value::from(env::current_dir().unwrap().to_string_lossy()),
             "env" => Value::from(
@@ -23,8 +25,8 @@ impl StructObject for DynamicContext {
     /// This implementation is not needed for the example.  However
     /// returning known keys here has the benefit that `{{ debug() }}`
     /// can show the context.
-    fn static_fields(&self) -> Option<&'static [&'static str]> {
-        Some(&["pid", "cwd", "env"])
+    fn enumeration(self: &Arc<Self>) -> Enumeration {
+        Enumeration::Static(&["pid", "cwd", "env"])
     }
 }
 
@@ -34,7 +36,7 @@ fn main() {
         "{}",
         env.render_str(
             include_str!("template.txt"),
-            Value::from_struct_object(DynamicContext)
+            Value::from_object(DynamicContext)
         )
         .unwrap()
     );

@@ -1,32 +1,33 @@
 use std::sync::Arc;
 
-use minijinja::value::{StructObject, Value, ValueKind};
+use minijinja::value::{Enumeration, Object, Value, ValueKind};
 use minijinja::{context, Environment};
 
+#[derive(Debug)]
 struct SelfReferentialContext {
     ctx: Value,
 }
 
-impl StructObject for SelfReferentialContext {
-    fn get_field(&self, name: &str) -> Option<Value> {
-        if name == "CONTEXT" {
+impl Object for SelfReferentialContext {
+    fn get_value(self: &Arc<Self>, name: &Value) -> Option<Value> {
+        if name.as_str() == Some("CONTEXT") {
             return Some(self.ctx.clone());
         }
-        self.ctx.get_attr(name).ok().filter(|x| !x.is_undefined())
+        self.ctx.get_item(name).ok().filter(|x| !x.is_undefined())
     }
 
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn enumeration(self: &Arc<Self>) -> Enumeration {
         if self.ctx.kind() == ValueKind::Map {
             if let Ok(keys) = self.ctx.try_iter() {
-                return keys.filter_map(|x| Arc::<str>::try_from(x).ok()).collect();
+                return Enumeration::Values(keys.collect());
             }
         }
-        Vec::new()
+        Enumeration::Empty
     }
 }
 
 pub fn make_self_referential(ctx: Value) -> Value {
-    Value::from_struct_object(SelfReferentialContext { ctx })
+    Value::from_object(SelfReferentialContext { ctx })
 }
 
 static TEMPLATE: &str = r#"

@@ -1,8 +1,9 @@
 #![allow(clippy::let_unit_value)]
 use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
-use minijinja::value::{from_args, Object, SeqObject, Value};
+use minijinja::value::{from_args, Enumeration, Object, ObjectRepr, Value};
 use minijinja::{Environment, Error, State};
 
 #[derive(Debug)]
@@ -12,7 +13,7 @@ struct Cycler {
 }
 
 impl Object for Cycler {
-    fn call(&self, _state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(self: &Arc<Self>, _state: &State, args: &[Value]) -> Result<Value, Error> {
         // we don't want any args
         from_args(args)?;
         let idx = self.idx.fetch_add(1, Ordering::Relaxed);
@@ -37,7 +38,12 @@ impl fmt::Display for Magic {
 }
 
 impl Object for Magic {
-    fn call_method(&self, _state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(
+        self: &Arc<Self>,
+        _state: &State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, Error> {
         if name == "make_class" {
             // single string argument
             let (tag,): (&str,) = from_args(args)?;
@@ -51,15 +57,21 @@ impl Object for Magic {
     }
 }
 
+#[derive(Debug)]
 struct SimpleDynamicSeq;
 
-impl SeqObject for SimpleDynamicSeq {
-    fn get_item(&self, idx: usize) -> Option<Value> {
+impl Object for SimpleDynamicSeq {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Seq
+    }
+
+    fn get_value(self: &Arc<Self>, idx: &Value) -> Option<Value> {
+        let idx = idx.as_usize()?;
         ['a', 'b', 'c', 'd'].get(idx).copied().map(Value::from)
     }
 
-    fn item_count(&self) -> usize {
-        4
+    fn enumeration(self: &Arc<Self>) -> Enumeration {
+        Enumeration::Range(0..4)
     }
 }
 
@@ -67,8 +79,9 @@ fn main() {
     let mut env = Environment::new();
     env.add_function("cycler", make_cycler);
     env.add_global("magic", Value::from_object(Magic));
-    env.add_global("seq", Value::from_seq_object(SimpleDynamicSeq));
-    env.add_global("real_iter", Value::from_iterator((0..10).chain(20..30)));
+    env.add_global("seq", Value::from_object(SimpleDynamicSeq));
+    // TODO: add this back
+    //env.add_global("real_iter", Value::from_iterator((0..10).chain(20..30)));
     env.add_template("template.html", include_str!("template.html"))
         .unwrap();
 

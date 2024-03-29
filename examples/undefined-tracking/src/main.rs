@@ -1,47 +1,52 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{StructObject, Value, ValueKind};
+use minijinja::value::{Enumeration, Object, Value, ValueKind};
 use minijinja::{context, Environment};
 
+#[derive(Debug)]
 struct TrackedContext {
     enclosed: Value,
     undefined: Arc<Mutex<HashSet<String>>>,
 }
 
-impl StructObject for TrackedContext {
-    fn get_field(&self, name: &str) -> Option<Value> {
-        match self
-            .enclosed
-            .get_attr(name)
-            .ok()
-            .filter(|x| !x.is_undefined())
-        {
-            Some(rv) => Some(rv),
-            None => {
-                let mut undefined = self.undefined.lock().unwrap();
-                if !undefined.contains(name) {
-                    undefined.insert(name.to_string());
+impl Object for TrackedContext {
+    fn get_value(self: &Arc<Self>, name: &Value) -> Option<Value> {
+        if let Some(name) = name.as_str() {
+            match self
+                .enclosed
+                .get_attr(name)
+                .ok()
+                .filter(|x| !x.is_undefined())
+            {
+                Some(rv) => Some(rv),
+                None => {
+                    let mut undefined = self.undefined.lock().unwrap();
+                    if !undefined.contains(name) {
+                        undefined.insert(name.to_string());
+                    }
+                    None
                 }
-                None
             }
+        } else {
+            None
         }
     }
 
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn enumeration(self: &Arc<Self>) -> Enumeration {
         if self.enclosed.kind() == ValueKind::Map {
             if let Ok(keys) = self.enclosed.try_iter() {
-                return keys.filter_map(|x| Arc::<str>::try_from(x).ok()).collect();
+                return Enumeration::Values(keys.collect());
             }
         }
-        Vec::new()
+        Enumeration::Empty
     }
 }
 
 pub fn track_context(ctx: Value) -> (Value, Arc<Mutex<HashSet<String>>>) {
     let undefined = Arc::new(Mutex::default());
     (
-        Value::from_struct_object(TrackedContext {
+        Value::from_object(TrackedContext {
             enclosed: ctx,
             undefined: undefined.clone(),
         }),

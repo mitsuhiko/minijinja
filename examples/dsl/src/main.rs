@@ -53,7 +53,7 @@ impl Query {
 impl Object for Query {
     /// Implements a method dispatch for the query so it can be further reduced.
     fn call_method(
-        &self,
+        self: &Arc<Self>,
         _state: &minijinja::State,
         name: &str,
         args: &[Value],
@@ -76,6 +76,10 @@ impl Object for Query {
                 format!("unknown query filter method {name}"),
             )),
         }
+    }
+
+    fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<Query table={:?}>", self.table)
     }
 }
 

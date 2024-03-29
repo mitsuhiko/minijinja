@@ -1,40 +1,45 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{StructObject, Value, ValueKind};
+use minijinja::value::{Enumeration, Object, Value, ValueKind};
 use minijinja::{context, Environment};
 
+#[derive(Debug)]
 struct TrackedContext {
     enclosed: Value,
     resolved: Arc<Mutex<HashSet<String>>>,
 }
 
-impl StructObject for TrackedContext {
-    fn get_field(&self, name: &str) -> Option<Value> {
+impl Object for TrackedContext {
+    fn get_value(self: &Arc<Self>, name: &Value) -> Option<Value> {
         let mut resolved = self.resolved.lock().unwrap();
-        if !resolved.contains(name) {
-            resolved.insert(name.to_string());
+        if let Some(name) = name.as_str() {
+            if !resolved.contains(name) {
+                resolved.insert(name.to_string());
+            }
+            self.enclosed
+                .get_attr(name)
+                .ok()
+                .filter(|x| !x.is_undefined())
+        } else {
+            None
         }
-        self.enclosed
-            .get_attr(name)
-            .ok()
-            .filter(|x| !x.is_undefined())
     }
 
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn enumeration(self: &Arc<Self>) -> Enumeration {
         if self.enclosed.kind() == ValueKind::Map {
             if let Ok(keys) = self.enclosed.try_iter() {
-                return keys.filter_map(|x| Arc::<str>::try_from(x).ok()).collect();
+                return Enumeration::Values(keys.collect());
             }
         }
-        Vec::new()
+        Enumeration::Empty
     }
 }
 
 pub fn track_context(ctx: Value) -> (Value, Arc<Mutex<HashSet<String>>>) {
     let resolved = Arc::new(Mutex::default());
     (
-        Value::from_struct_object(TrackedContext {
+        Value::from_object(TrackedContext {
             enclosed: ctx,
             resolved: resolved.clone(),
         }),
