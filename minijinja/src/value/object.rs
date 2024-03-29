@@ -241,6 +241,8 @@ impl DynObject {
     }
 
     /// Iterator over the values of an object.
+    // XXX: remove this
+    // see https://github.com/mitsuhiko/minijinja/issues/456
     pub fn values(&self) -> ObjectValueIter {
         ObjectValueIter {
             enumeration: self.enumeration().into_iter(),
@@ -249,6 +251,8 @@ impl DynObject {
     }
 
     /// Iterator over the keys, values of an object.
+    // XXX: make this iterate over keys for maps and values for sequences and iterators.
+    // see https://github.com/mitsuhiko/minijinja/issues/456
     pub fn iter(&self) -> ObjectKeyValueIter {
         ObjectKeyValueIter {
             enumeration: self.enumeration().into_iter(),
