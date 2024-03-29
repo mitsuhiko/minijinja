@@ -1039,7 +1039,7 @@ impl Value {
     /// ```
     pub fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         if let ValueRepr::Object(ref dy) = self.0 {
-            dy.call(state, None, args)
+            dy.call(state, args)
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -1068,7 +1068,7 @@ impl Value {
 
     fn _call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         if let Some(object) = self.as_object() {
-            return object.call(state, Some(name), args);
+            return object.call_method(state, name, args);
         }
 
         Err(Error::new(

@@ -98,19 +98,19 @@ impl Loop {
 }
 
 impl Object for Loop {
-    fn call(
+    fn call(self: &Arc<Self>, _state: &State, _args: &[Value]) -> Result<Value, Error> {
+        Err(Error::new(
+            ErrorKind::InvalidOperation,
+            "loop cannot be called if reassigned to different variable",
+        ))
+    }
+
+    fn call_method(
         self: &Arc<Self>,
         _state: &State,
-        name: Option<&str>,
+        name: &str,
         args: &[Value],
     ) -> Result<Value, Error> {
-        let name = name.ok_or_else(|| {
-            Error::new(
-                ErrorKind::InvalidOperation,
-                "loop cannot be called if reassigned to different variable",
-            )
-        })?;
-
         if name == "changed" {
             let mut last_changed_value = self.last_changed_value.lock().unwrap();
             let value = args.to_owned();

@@ -248,19 +248,7 @@ impl fmt::Debug for BoxedFunction {
 }
 
 impl Object for BoxedFunction {
-    fn call(
-        self: &Arc<Self>,
-        state: &State,
-        method: Option<&str>,
-        args: &[Value],
-    ) -> Result<Value, Error> {
-        if method.is_some() {
-            return Err(Error::new(
-                ErrorKind::InvalidOperation,
-                "cannot call method on function",
-            ));
-        }
-
+    fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
         self.invoke(state, args)
     }
 

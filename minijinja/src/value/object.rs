@@ -29,28 +29,28 @@ pub trait Object: fmt::Debug {
         Enumeration::Empty
     }
 
-    fn call(
+    fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[Value]) -> Result<Value> {
+        let (_, _) = (state, args);
+        Err(Error::new(
+            ErrorKind::InvalidOperation,
+            "object is not callable",
+        ))
+    }
+
+    fn call_method(
         self: &Arc<Self>,
         state: &State<'_, '_>,
-        method: Option<&str>,
+        method: &str,
         args: &[Value],
     ) -> Result<Value> {
-        let (_, _, _) = (state, method, args);
-        if let Some(method) = method {
-            if let Some(value) = self.get_value(&Value::from(method)) {
-                return value.call(state, args);
-            }
-
-            Err(Error::new(
-                ErrorKind::UnknownMethod,
-                "object has no such method",
-            ))
-        } else {
-            Err(Error::new(
-                ErrorKind::InvalidOperation,
-                "object is not callable",
-            ))
+        if let Some(value) = self.get_value(&Value::from(method)) {
+            return value.call(state, args);
         }
+
+        Err(Error::new(
+            ErrorKind::UnknownMethod,
+            "object has no such method",
+        ))
     }
 
     fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -170,7 +170,13 @@ type_erase! {
         fn call(
             &self,
             state: &State<'_, '_>,
-            method: Option<&str>,
+            args: &[Value]
+        ) -> Result<Value>;
+
+        fn call_method(
+            &self,
+            state: &State<'_, '_>,
+            method: &str,
             args: &[Value]
         ) -> Result<Value>;
 
@@ -281,6 +287,7 @@ impl DoubleEndedIterator for ObjectKeyValueIter {
 }
 
 impl Enumeration {
+    /// Returns the length if the object has one.
     pub fn len(&self) -> Option<usize> {
         Some(match self {
             Enumeration::Values(v) => v.len(),
@@ -296,6 +303,11 @@ impl Enumeration {
             Enumeration::Range(v) => v.len(),
             Enumeration::Empty => 0,
         })
+    }
+
+    /// Checks if the object is considered empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == Some(0)
     }
 }
 

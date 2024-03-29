@@ -211,19 +211,7 @@ impl Object for Macro {
         }
     }
 
-    fn call(
-        self: &Arc<Self>,
-        state: &State<'_, '_>,
-        method: Option<&str>,
-        args: &[Value],
-    ) -> Result<Value, Error> {
-        if method.is_some() {
-            return Err(Error::new(
-                ErrorKind::InvalidOperation,
-                "cannot call methods on macro",
-            ));
-        }
-
+    fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
         // we can only call macros that point to loaded template state.
         if state.id != self.state_id {
             return Err(Error::new(

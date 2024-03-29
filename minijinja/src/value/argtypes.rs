@@ -757,15 +757,6 @@ impl Object for KwargsValues {
         self.as_value_map().enumeration()
     }
 
-    fn call(
-        self: &Arc<Self>,
-        state: &State<'_, '_>,
-        method: Option<&str>,
-        args: &[Value],
-    ) -> crate::error::Result<Value> {
-        self.as_value_map().call(state, method, args)
-    }
-
     fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.as_value_map().render(f)
     }
