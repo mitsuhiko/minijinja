@@ -648,6 +648,8 @@ impl Value {
                 ObjectRepr::Seq
             }
 
+            // XXX: this seems very wrong.
+            // see also https://github.com/mitsuhiko/minijinja/issues/453
             fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
                 Some(key.clone())
             }
