@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::fmt;
 use std::sync::{Arc, Mutex};
 
 use crate::value::{Enumeration, Object, Value};
@@ -58,16 +57,6 @@ impl Closure {
     /// This is required to break cycles.
     pub fn clear(&self) {
         self.values.lock().unwrap().clear();
-    }
-}
-
-impl fmt::Display for Closure {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut m = f.debug_map();
-        for (key, value) in self.values.lock().unwrap().iter() {
-            m.entry(&key, &value);
-        }
-        m.finish()
     }
 }
 

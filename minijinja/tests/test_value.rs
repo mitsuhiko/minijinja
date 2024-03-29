@@ -1,4 +1,3 @@
-use std::fmt;
 use std::sync::Arc;
 
 use insta::assert_snapshot;
@@ -170,12 +169,6 @@ fn test_map_object_iteration_and_indexing() {
     #[derive(Debug, Clone)]
     struct Point(i32, i32, i32);
 
-    impl fmt::Display for Point {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "{}, {}, {}", self.0, self.1, self.2)
-        }
-    }
-
     impl Object for Point {
         fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
             match key.as_str()? {
@@ -212,12 +205,6 @@ fn test_map_object_iteration_and_indexing() {
 fn test_seq_object_iteration_and_indexing() {
     #[derive(Debug, Clone)]
     struct Point(i32, i32, i32);
-
-    impl fmt::Display for Point {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "{}, {}, {}", self.0, self.1, self.2)
-        }
-    }
 
     impl Object for Point {
         fn get_value(self: &Arc<Self>, index: &Value) -> Option<Value> {
@@ -279,12 +266,6 @@ fn test_obj_downcast() {
     #[derive(Debug)]
     struct Thing {
         id: usize,
-    }
-
-    impl fmt::Display for Thing {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            fmt::Debug::fmt(self, f)
-        }
     }
 
     impl Object for Thing {}

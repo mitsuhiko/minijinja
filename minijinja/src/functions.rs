@@ -247,12 +247,6 @@ impl fmt::Debug for BoxedFunction {
     }
 }
 
-impl fmt::Display for BoxedFunction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
-
 impl Object for BoxedFunction {
     fn call(
         self: &Arc<Self>,
@@ -268,6 +262,10 @@ impl Object for BoxedFunction {
         }
 
         self.invoke(state, args)
+    }
+
+    fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
     }
 }
 
