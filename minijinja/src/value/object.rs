@@ -11,24 +11,31 @@ use crate::vm::State;
 
 /// A trait that represents a dynamic object.
 pub trait Object: fmt::Debug {
+    /// Indicates the natural representation of an object.
+    ///
+    /// The default implementation returns [`ObjectRepr::Map`].
     fn repr(self: &Arc<Self>) -> ObjectRepr {
-        match self.enumeration() {
-            Enumeration::Values(_) | Enumeration::Empty | Enumeration::Static(_) => ObjectRepr::Map,
-            Enumeration::Iterator(_) | Enumeration::ReversibleIter(_) | Enumeration::Range(_) => {
-                ObjectRepr::Seq
-            }
-        }
+        ObjectRepr::Map
     }
 
+    /// Given a key, looks up the associated value.
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         let _ = key;
         None
     }
 
+    /// Returns the enumeration of the object.
+    ///
+    /// For more information see [`Enumeration`].  The default implementation
+    /// returns the empty enumeration.
     fn enumeration(self: &Arc<Self>) -> Enumeration {
         Enumeration::Empty
     }
 
+    /// The engine calls this to invoke the object itself.
+    ///
+    /// The default implementation returns an
+    /// [`InvalidOperation`](crate::ErrorKind::InvalidOperation) error.
     fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[Value]) -> Result<Value> {
         let (_, _) = (state, args);
         Err(Error::new(
@@ -37,6 +44,13 @@ pub trait Object: fmt::Debug {
         ))
     }
 
+    /// The engine calls this to invoke a method on the object.
+    ///
+    /// The default implementation returns an
+    /// [`UnknownMethod`](crate::ErrorKind::UnknownMethod) error.  When this error
+    /// is returned the engine will invoke the
+    /// [`unknown_method_callback`](crate::Environment::set_unknonw_method_callback) of
+    /// the environment.
     fn call_method(
         self: &Arc<Self>,
         state: &State<'_, '_>,
@@ -370,6 +384,10 @@ impl DoubleEndedIterator for EnumerationIter {
 }
 
 impl<T: Into<Value> + Clone + fmt::Debug> Object for Vec<T> {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Seq
+    }
+
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         self.get(key.as_usize()?).cloned().map(|v| v.into())
     }

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
-use minijinja::value::{DynObject, Enumeration, Kwargs, Object, Rest, Value};
+use minijinja::value::{DynObject, Enumeration, Kwargs, Object, ObjectRepr, Rest, Value};
 use minijinja::{args, Environment, Error};
 
 #[test]
@@ -207,6 +207,10 @@ fn test_seq_object_iteration_and_indexing() {
     struct Point(i32, i32, i32);
 
     impl Object for Point {
+        fn repr(self: &Arc<Self>) -> ObjectRepr {
+            ObjectRepr::Seq
+        }
+
         fn get_value(self: &Arc<Self>, index: &Value) -> Option<Value> {
             match index.as_usize()? {
                 0 => Some(Value::from(self.0)),

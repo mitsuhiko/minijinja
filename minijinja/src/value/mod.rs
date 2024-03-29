@@ -644,6 +644,10 @@ impl Value {
                 + Sync
                 + 'static,
         {
+            fn repr(self: &Arc<Self>) -> ObjectRepr {
+                ObjectRepr::Seq
+            }
+
             fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
                 Some(key.clone())
             }
@@ -655,10 +659,6 @@ impl Value {
                 let _object = DynObject::new(self.clone());
                 Enumeration::Iterator(Box::new(IterObject { iter, _object }))
             }
-
-            // fn render(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            //         k
-            // }
         }
 
         Value::from_object(IterObjectMaker { maker, object })

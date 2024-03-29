@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use serde::{Deserialize, Serialize};
 use similar_asserts::assert_eq;
 
-use minijinja::value::{Enumeration, Object, Value};
+use minijinja::value::{Enumeration, Object, ObjectRepr, Value};
 
 #[test]
 fn test_seq() {
@@ -18,6 +18,10 @@ fn test_seq_object() {
     struct X;
 
     impl Object for X {
+        fn repr(self: &Arc<Self>) -> ObjectRepr {
+            ObjectRepr::Seq
+        }
+
         fn get_value(self: &Arc<Self>, idx: &Value) -> Option<Value> {
             let idx = idx.as_usize()?;
             if idx < 3 {
