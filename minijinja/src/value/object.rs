@@ -67,6 +67,10 @@ pub trait Object: fmt::Debug {
         ))
     }
 
+    /// Formats the object for stringification.
+    ///
+    /// The default implementation is specific to the behavior of
+    /// [`repr`](Self::repr) and usually does not need modification.
     fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         struct DbgRender<'a>(&'a Value);
 
@@ -107,6 +111,7 @@ pub trait Object: fmt::Debug {
 
 /// Provides utility methods for working with objects.
 pub trait ObjectExt: Object + Send + Sync + 'static {
+    /// Creates a new iterator enumeration that projects into the given object.
     fn mapped_enumeration<F>(self: &Arc<Self>, maker: F) -> Enumeration
     where
         F: for<'a> FnOnce(&'a Self) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
@@ -133,6 +138,8 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
         }
 
         let iter: Box<dyn Iterator<Item = Value> + Send + Sync + '_> = maker(self);
+
+        // SAFETY: this is safe because the `IterObject` will keep our object alive.
         let iter = unsafe { std::mem::transmute(iter) };
         let _object = self.clone();
         Enumeration::Iterator(Box::new(IterObject { iter, _object }))
@@ -141,17 +148,32 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
 
 impl<T: Object + Send + Sync + 'static> ObjectExt for T {}
 
+/// Utility type to enumerate an object.
+///
+/// The purpose of this type is to reveal the contents of an object.  Depending
+/// on the shape of the object different values are appropriate.
 #[non_exhaustive]
 pub enum Enumeration {
+    /// An empty object or sequences.
+    Empty,
+    /// A list of known values.
+    ///
+    /// If the object is a sequence these are the values, if the object is a
+    /// map this are actually the keys.
     Values(Vec<Value>),
+    /// A slice of static strings, usually to represent keys.
     Static(&'static [&'static str]),
+    /// A dynamic iterator over some contents.
     Iterator(Box<dyn Iterator<Item = Value> + Send + Sync>),
+    /// A dynamic iterator that also can be reversed.
     ReversibleIter(Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync>),
     Range(Range<usize>),
-    Empty,
 }
 
-pub enum EnumerationIter {
+/// Iterates over an enumeration.
+pub struct EnumerationIter(EnumerationIterRepr);
+
+enum EnumerationIterRepr {
     Values(std::vec::IntoIter<Value>),
     Static(std::slice::Iter<'static, &'static str>),
     Iterator(Box<dyn Iterator<Item = Value> + Send + Sync>),
@@ -160,19 +182,13 @@ pub enum EnumerationIter {
     Empty,
 }
 
+/// Defines the natural representation of this object.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ObjectRepr {
     /// serializes to {...} and over the enumeration, values
     Map,
     /// serializes to [...] over its values
     Seq,
-}
-
-impl ObjectRepr {
-    /// Returns `true` if this object is a sequence.
-    pub fn is_seq(&self) -> bool {
-        matches!(self, ObjectRepr::Seq)
-    }
 }
 
 type_erase! {
@@ -333,14 +349,14 @@ impl IntoIterator for Enumeration {
     type IntoIter = EnumerationIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Enumeration::Values(v) => EnumerationIter::Values(v.into_iter()),
-            Enumeration::Static(v) => EnumerationIter::Static(v.iter()),
-            Enumeration::Iterator(i) => EnumerationIter::Iterator(i),
-            Enumeration::ReversibleIter(i) => EnumerationIter::ReversibleIter(i),
-            Enumeration::Range(i) => EnumerationIter::Range(i),
-            Enumeration::Empty => EnumerationIter::Empty,
-        }
+        EnumerationIter(match self {
+            Enumeration::Values(v) => EnumerationIterRepr::Values(v.into_iter()),
+            Enumeration::Static(v) => EnumerationIterRepr::Static(v.iter()),
+            Enumeration::Iterator(i) => EnumerationIterRepr::Iterator(i),
+            Enumeration::ReversibleIter(i) => EnumerationIterRepr::ReversibleIter(i),
+            Enumeration::Range(i) => EnumerationIterRepr::Range(i),
+            Enumeration::Empty => EnumerationIterRepr::Empty,
+        })
     }
 }
 
@@ -348,37 +364,41 @@ impl Iterator for EnumerationIter {
     type Item = Value;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            EnumerationIter::Values(iter) => iter.next(),
-            EnumerationIter::Static(iter) => iter.next().copied().map(intern).map(Value::from),
-            EnumerationIter::Iterator(iter) => iter.next(),
-            EnumerationIter::ReversibleIter(iter) => iter.next(),
-            EnumerationIter::Range(iter) => iter.next().map(Value::from),
-            EnumerationIter::Empty => None,
+        match &mut self.0 {
+            EnumerationIterRepr::Values(iter) => iter.next(),
+            EnumerationIterRepr::Static(iter) => iter.next().copied().map(intern).map(Value::from),
+            EnumerationIterRepr::Iterator(iter) => iter.next(),
+            EnumerationIterRepr::ReversibleIter(iter) => iter.next(),
+            EnumerationIterRepr::Range(iter) => iter.next().map(Value::from),
+            EnumerationIterRepr::Empty => None,
         }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        match self {
-            EnumerationIter::Values(iter) => iter.size_hint(),
-            EnumerationIter::Static(iter) => iter.size_hint(),
-            EnumerationIter::Iterator(iter) => iter.size_hint(),
-            EnumerationIter::ReversibleIter(iter) => iter.size_hint(),
-            EnumerationIter::Range(iter) => iter.size_hint(),
-            EnumerationIter::Empty => (0, Some(0)),
+        match &self.0 {
+            EnumerationIterRepr::Values(iter) => iter.size_hint(),
+            EnumerationIterRepr::Static(iter) => iter.size_hint(),
+            EnumerationIterRepr::Iterator(iter) => iter.size_hint(),
+            EnumerationIterRepr::ReversibleIter(iter) => iter.size_hint(),
+            EnumerationIterRepr::Range(iter) => iter.size_hint(),
+            EnumerationIterRepr::Empty => (0, Some(0)),
         }
     }
 }
 
+// XXX: this trait implementation is not correct for iterators.
+// Tracked in https://github.com/mitsuhiko/minijinja/issues/455
 impl DoubleEndedIterator for EnumerationIter {
     fn next_back(&mut self) -> Option<Self::Item> {
-        match self {
-            EnumerationIter::Values(iter) => iter.next_back(),
-            EnumerationIter::Static(iter) => iter.next_back().copied().map(intern).map(Value::from),
-            EnumerationIter::Iterator(iter) => iter.next(), // FIXME: ?
-            EnumerationIter::ReversibleIter(iter) => iter.next_back(),
-            EnumerationIter::Range(iter) => iter.next_back().map(Value::from),
-            EnumerationIter::Empty => None,
+        match &mut self.0 {
+            EnumerationIterRepr::Values(iter) => iter.next_back(),
+            EnumerationIterRepr::Static(iter) => {
+                iter.next_back().copied().map(intern).map(Value::from)
+            }
+            EnumerationIterRepr::Iterator(iter) => iter.next(), // FIXME: ?
+            EnumerationIterRepr::ReversibleIter(iter) => iter.next_back(),
+            EnumerationIterRepr::Range(iter) => iter.next_back().map(Value::from),
+            EnumerationIterRepr::Empty => None,
         }
     }
 }
@@ -398,10 +418,6 @@ impl<T: Into<Value> + Clone + fmt::Debug> Object for Vec<T> {
 }
 
 impl Object for ValueMap {
-    fn repr(self: &Arc<Self>) -> ObjectRepr {
-        ObjectRepr::Map
-    }
-
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         self.get(key).cloned()
     }
@@ -425,10 +441,6 @@ where
         + 'static,
     V: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
 {
-    fn repr(self: &Arc<Self>) -> ObjectRepr {
-        ObjectRepr::Map
-    }
-
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         self.get(key.as_str()?).cloned().map(|v| v.into())
     }

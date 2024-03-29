@@ -305,10 +305,12 @@ impl<'de> de::VariantAccess<'de> for VariantDeserializer {
         V: de::Visitor<'de>,
     {
         match self.value.as_ref().and_then(|x| x.as_object()) {
-            Some(obj) if obj.repr().is_seq() => de::Deserializer::deserialize_any(
-                de::value::SeqDeserializer::new(obj.values().map(ValueDeserializer::new)),
-                visitor,
-            ),
+            Some(obj) if matches!(obj.repr(), ObjectRepr::Seq) => {
+                de::Deserializer::deserialize_any(
+                    de::value::SeqDeserializer::new(obj.values().map(ValueDeserializer::new)),
+                    visitor,
+                )
+            }
             _ => Err(de::Error::invalid_type(
                 self.value
                     .as_ref()

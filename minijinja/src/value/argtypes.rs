@@ -9,7 +9,7 @@ use crate::utils::UndefinedBehavior;
 use crate::value::{DynObject, Packed, StringType, Value, ValueKind, ValueMap, ValueRepr};
 use crate::vm::State;
 
-use super::Object;
+use super::{Enumeration, Object};
 
 /// A utility trait that represents the return value of functions and filters.
 ///
@@ -745,20 +745,12 @@ impl KwargsValues {
 }
 
 impl Object for KwargsValues {
-    fn repr(self: &Arc<Self>) -> super::ObjectRepr {
-        self.as_value_map().repr()
-    }
-
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         self.as_value_map().get_value(key)
     }
 
-    fn enumeration(self: &Arc<Self>) -> super::Enumeration {
+    fn enumeration(self: &Arc<Self>) -> Enumeration {
         self.as_value_map().enumeration()
-    }
-
-    fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.as_value_map().render(f)
     }
 }
 

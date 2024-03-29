@@ -149,7 +149,9 @@ use crate::value::serialize::transform;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
-pub use crate::value::object::{DynObject, Enumeration, Object, ObjectExt, ObjectRepr};
+pub use crate::value::object::{
+    DynObject, Enumeration, EnumerationIter, Object, ObjectExt, ObjectRepr,
+};
 
 #[macro_use]
 mod type_erase;
@@ -590,10 +592,15 @@ impl Value {
         Value::from(ValueRepr::Object(DynObject::new(Arc::new(value))))
     }
 
+    /// Like [`from_object`](Self::from_object) but for type erased dynamic objects.
     pub fn from_dyn_object<T: Into<DynObject>>(value: T) -> Value {
         Value::from(ValueRepr::Object(value.into()))
     }
 
+    /// Creates a sequence that iterates over the given value.
+    ///
+    /// The function is invoked to create an iterator which is then turned into
+    /// a sequence or iterator.
     pub fn from_object_iter<T, F>(object: T, maker: F) -> Value
     where
         T: Send + Sync + 'static,
