@@ -505,8 +505,10 @@ mod builtins {
     pub fn reverse(v: Value) -> Result<Value, Error> {
         if let Some(s) = v.as_str() {
             Ok(Value::from(s.chars().rev().collect::<String>()))
-        } else if let Some(seq) = v.as_seq() {
-            Ok(Value::from(seq.iter().rev().collect::<Vec<_>>()))
+        } else if let Some(obj) = v.as_object() {
+            Ok(Value::from_object_iter(obj, |this| {
+                Box::new(this.values().rev())
+            }))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -545,9 +547,9 @@ mod builtins {
                 rv.push(c);
             }
             Ok(rv)
-        } else if let Some(seq) = val.as_seq() {
+        } else if let Some(obj) = val.as_object() {
             let mut rv = String::new();
-            for item in seq.iter() {
+            for item in obj.values() {
                 if !rv.is_empty() {
                     rv.push_str(joiner);
                 }
@@ -636,10 +638,7 @@ mod builtins {
                 .parse::<i128>()
                 .map(Value::from)
                 .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
-            ValueRepr::Bytes(_)
-            | ValueRepr::Seq(_)
-            | ValueRepr::Map(_, _)
-            | ValueRepr::Dynamic(_) => Err(Error::new(
+            ValueRepr::Bytes(_) | ValueRepr::Object(_) => Err(Error::new(
                 ErrorKind::InvalidOperation,
                 format!("cannot convert {} to integer", value.kind()),
             )),
@@ -731,8 +730,9 @@ mod builtins {
     pub fn first(value: Value) -> Result<Value, Error> {
         if let Some(s) = value.as_str() {
             Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
-        } else if let Some(s) = value.as_seq() {
-            Ok(s.get_item(0).unwrap_or(Value::UNDEFINED))
+        } else if let Some(s) = value.as_object() {
+            // FIXME: Seq only?
+            Ok(s.values().next().unwrap_or(Value::UNDEFINED))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -760,8 +760,9 @@ mod builtins {
     pub fn last(value: Value) -> Result<Value, Error> {
         if let Some(s) = value.as_str() {
             Ok(s.chars().next_back().map_or(Value::UNDEFINED, Value::from))
-        } else if let Some(seq) = value.as_seq() {
-            Ok(seq.iter().last().unwrap_or(Value::UNDEFINED))
+        } else if let Some(obj) = value.as_object() {
+            // FIXME: Seq only?
+            Ok(obj.values().next_back().unwrap_or(Value::UNDEFINED))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,

@@ -240,7 +240,6 @@ mod builtins {
     use super::*;
 
     use std::borrow::Cow;
-    use std::convert::TryFrom;
 
     use crate::value::ValueKind;
 

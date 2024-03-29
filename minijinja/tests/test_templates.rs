@@ -6,10 +6,11 @@
 ))]
 use std::collections::BTreeMap;
 use std::fmt::Write;
+use std::sync::Arc;
 use std::{env, fs};
 
 use insta::assert_snapshot;
-use minijinja::value::{StructObject, Value};
+use minijinja::value::{Enumeration, Object, Value};
 use minijinja::{context, render, Environment, Error, State};
 
 use similar_asserts::assert_eq;
@@ -168,52 +169,54 @@ fn test_custom_filter() {
 
 #[test]
 fn test_items_and_dictsort_with_structs() {
+    #[derive(Debug, Clone)]
     struct MyStruct;
 
-    impl StructObject for MyStruct {
-        fn get_field(&self, name: &str) -> Option<Value> {
-            match name {
+    impl Object for MyStruct {
+        fn get_value(self: &Arc<Self>, name: &Value) -> Option<Value> {
+            match name.as_str()? {
                 "a" => Some(Value::from("A")),
                 "b" => Some(Value::from("B")),
                 _ => None,
             }
         }
 
-        fn static_fields(&self) -> Option<&'static [&'static str]> {
-            Some(&["b", "a"][..])
+        fn enumeration(self: &Arc<Self>) -> Enumeration {
+            Enumeration::Static(&["b", "a"])
         }
     }
 
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|items }}", x => Value::from_struct_object(MyStruct)),
+        minijinja::render!("{{ x|items }}", x => Value::from_object(MyStruct)),
         @r###"[["b", "B"], ["a", "A"]]"###
     );
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|dictsort }}", x => Value::from_struct_object(MyStruct)),
+        minijinja::render!("{{ x|dictsort }}", x => Value::from_object(MyStruct)),
         @r###"[["a", "A"], ["b", "B"]]"###
     );
 }
 
 #[test]
 fn test_urlencode_with_struct() {
+    #[derive(Debug, Clone)]
     struct MyStruct;
 
-    impl StructObject for MyStruct {
-        fn get_field(&self, name: &str) -> Option<Value> {
-            match name {
-                "a" => Some(Value::from("a 1")),
-                "b" => Some(Value::from("b 2")),
+    impl Object for MyStruct {
+        fn get_value(self: &Arc<Self>, name: &Value) -> Option<Value> {
+            match name.as_str() {
+                Some("a") => Some(Value::from("a 1")),
+                Some("b") => Some(Value::from("b 2")),
                 _ => None,
             }
         }
 
-        fn static_fields(&self) -> Option<&'static [&'static str]> {
-            Some(&["a", "b"][..])
+        fn enumeration(self: &Arc<Self>) -> Enumeration {
+            Enumeration::Static(&["a", "b"])
         }
     }
 
     insta::assert_snapshot!(
-        minijinja::render!("{{ x|urlencode }}", x => Value::from_struct_object(MyStruct)),
+        minijinja::render!("{{ x|urlencode }}", x => Value::from_object(MyStruct)),
         @"a=a%201&b=b%202"
     );
 }
@@ -436,7 +439,6 @@ fn test_undeclared_variables() {
         ["foo", "bar"].into_iter().map(|x| x.to_string()).collect()
     );
     let undeclared = tmpl.undeclared_variables(true);
-    dbg!(&undeclared);
     assert_eq!(
         undeclared,
         ["foo", "bar.baz", "bar.blub"]

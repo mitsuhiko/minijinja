@@ -11,12 +11,6 @@ struct Cycler {
     idx: AtomicUsize,
 }
 
-impl fmt::Display for Cycler {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "cycler")
-    }
-}
-
 impl Object for Cycler {
     fn call(&self, _state: &State, args: &[Value]) -> Result<Value, Error> {
         // we don't want any args

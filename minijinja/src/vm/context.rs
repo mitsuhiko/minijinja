@@ -266,7 +266,7 @@ impl<'env> Context<'env> {
             // if we are a loop, check if we are looking up the special loop var.
             if let Some(ref l) = frame.current_loop {
                 if l.with_loop_var && key == "loop" {
-                    return Some(Value::from(l.object.clone()));
+                    return Some(Value::from_dyn_object(l.object.clone()));
                 }
             }
 

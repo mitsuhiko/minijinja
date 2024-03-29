@@ -99,7 +99,7 @@ env.add_function("is_adult", is_adult);
 use std::fmt;
 use std::sync::Arc;
 
-use crate::error::Error;
+use crate::error::{Error, ErrorKind};
 use crate::utils::SealedMarker;
 use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, Value};
 use crate::vm::State;
@@ -247,15 +247,25 @@ impl fmt::Debug for BoxedFunction {
     }
 }
 
-impl fmt::Display for BoxedFunction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
-
 impl Object for BoxedFunction {
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(
+        self: &Arc<Self>,
+        state: &State,
+        method: Option<&str>,
+        args: &[Value],
+    ) -> Result<Value, Error> {
+        if method.is_some() {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "cannot call method on function",
+            ));
+        }
+
         self.invoke(state, args)
+    }
+
+    fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
     }
 }
 
@@ -263,8 +273,7 @@ impl Object for BoxedFunction {
 mod builtins {
     use super::*;
 
-    use crate::error::ErrorKind;
-    use crate::value::{MapType, ObjectKind, Rest, ValueKind, ValueMap, ValueRepr};
+    use crate::value::{ObjectRepr, Rest, ValueMap, ValueRepr};
 
     /// Returns a range.
     ///
@@ -334,31 +343,16 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn dict(value: Option<Value>, update_with: crate::value::Kwargs) -> Result<Value, Error> {
         let mut rv = match value {
-            None => Arc::new(ValueMap::default()),
+            None => ValueMap::default(),
             Some(value) => match value.0 {
-                ValueRepr::Undefined => Arc::new(ValueMap::default()),
-                ValueRepr::Map(map, _) => map,
-                ValueRepr::Dynamic(ref dynamic) => match dynamic.kind() {
-                    ObjectKind::Plain => Arc::new(ValueMap::default()),
-                    ObjectKind::Seq(_) | ObjectKind::Iterator(_) => {
-                        return Err(Error::from(ErrorKind::InvalidOperation))
-                    }
-                    ObjectKind::Struct(s) => {
-                        let mut rv = ValueMap::default();
-                        for field in s.fields() {
-                            if let Some(value) = s.get_field(&field) {
-                                rv.insert(crate::value::KeyRef::Value(Value::from(field)), value);
-                            }
-                        }
-                        Arc::new(rv)
-                    }
-                },
+                ValueRepr::Undefined => ValueMap::default(),
+                ValueRepr::Object(obj) if obj.repr() == ObjectRepr::Map => obj.iter().collect(),
                 _ => return Err(Error::from(ErrorKind::InvalidOperation)),
             },
         };
 
         if !update_with.values.is_empty() {
-            Arc::make_mut(&mut rv).extend(
+            rv.extend(
                 update_with
                     .values
                     .iter()
@@ -366,7 +360,7 @@ mod builtins {
             );
         }
 
-        Ok(Value(ValueRepr::Map(rv, MapType::Normal)))
+        Ok(Value::from_object(rv))
     }
 
     /// Outputs the current context or the arguments stringified.
@@ -406,10 +400,10 @@ mod builtins {
     pub fn namespace(defaults: Option<Value>) -> Result<Value, Error> {
         let ns = crate::value::namespace_object::Namespace::default();
         if let Some(defaults) = defaults {
-            if defaults.kind() == ValueKind::Map {
-                for key in ok!(defaults.try_iter()) {
+            if let Some(obj) = defaults.as_object() {
+                for (key, value) in obj.iter() {
                     if let Some(key) = key.as_str() {
-                        ns.set_field(key, ok!(defaults.get_attr(key)));
+                        ns.set_field(key, value);
                     }
                 }
             } else {
@@ -422,7 +416,7 @@ mod builtins {
                 ));
             }
         }
-        Ok(Value::from_struct_object(ns))
+        Ok(Value::from_object(ns))
     }
 }
 
