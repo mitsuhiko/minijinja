@@ -982,6 +982,15 @@ impl From<usize> for Value {
     }
 }
 
+impl<I: Into<Value>> From<Option<I>> for Value {
+    fn from(value: Option<I>) -> Self {
+        match value {
+            Some(value) => value.into(),
+            None => Value::from(()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
