@@ -17,6 +17,12 @@ and fill out the fields in the appropriate provided template.
 When making a feature request, please make it clear what problem you intend to
 solve with the feature and maybe provide some ideas for how to go about that.
 
+## MiniJinja 2
+
+There is a work in progress branch for a new major release of MiniJinja that overhauls
+the object system in the [`minijinja-2`](https://github.com/mitsuhiko/minijinja/tree/minijinja-2)
+branch.
+
 ## Rust toolchain
 MiniJinja targets [Rust 1.61.0](https://blog.rust-lang.org/2022/05/19/Rust-1.61.0.html) as it's MSRV (Minimum Supported Rust Version).
 
