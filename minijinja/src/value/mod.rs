@@ -250,6 +250,7 @@ fn mark_internal_serialization() -> impl Drop {
 
 /// Describes the kind of value.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[non_exhaustive]
 pub enum ValueKind {
     /// The value is undefined
     Undefined,

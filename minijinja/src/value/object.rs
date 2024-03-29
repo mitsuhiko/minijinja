@@ -91,6 +91,7 @@ pub trait Object: fmt::Debug {
     }
 }
 
+/// Provides utility methods for working with objects.
 pub trait ObjectExt: Object + Send + Sync + 'static {
     fn mapped_enumeration<F>(self: &Arc<Self>, maker: F) -> Enumeration
     where
@@ -154,6 +155,7 @@ pub enum ObjectRepr {
 }
 
 impl ObjectRepr {
+    /// Returns `true` if this object is a sequence.
     pub fn is_seq(&self) -> bool {
         matches!(self, ObjectRepr::Seq)
     }
