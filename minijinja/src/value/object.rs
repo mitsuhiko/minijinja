@@ -116,9 +116,49 @@ pub trait Object: fmt::Debug + Send + Sync {
                 }
             }
         } else {
-            write!(f, "{}", std::any::type_name_of_val(self))
+            write!(f, "{}", std::any::type_name::<Self>())
         }
     }
+}
+
+macro_rules! impl_iter_helpers {
+    ($vis:vis $self_ty: ty) => {
+        /// Iterates over an object.
+        $vis fn try_iter(self: $self_ty) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+            if let Some(iter) = self.custom_iter() {
+                Some(iter)
+            } else {
+                let iter = some!(self.clone().enumeration().try_into_iter());
+                Some(match self.repr() {
+                    ObjectRepr::Map => Box::new(iter),
+                    ObjectRepr::Seq => {
+                        let self_clone = self.clone();
+                        Box::new(
+                            iter.map(move |key| self_clone.get_value(&key).unwrap_or_default()),
+                        )
+                    }
+                })
+            }
+        }
+
+        /// Iterate over key and value at once.
+        $vis fn try_iter_pairs(
+            self: $self_ty,
+        ) -> Option<Box<dyn Iterator<Item = (Value, Value)> + Send + Sync>> {
+            if let Some(iter) = self.custom_iter() {
+                Some(Box::new(
+                    iter.enumerate().map(|(idx, item)| (Value::from(idx), item)),
+                ))
+            } else {
+                let iter = some!(self.clone().enumeration().try_into_iter());
+                let self_clone = self.clone();
+                Some(Box::new(iter.map(move |key| {
+                    let value = self_clone.get_value(&key);
+                    (key, value.unwrap_or_default())
+                })))
+            }
+        }
+    };
 }
 
 /// Provides utility methods for working with objects.
@@ -157,44 +197,7 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
         Enumeration::Iterator(Box::new(IterObject { iter, _object }))
     }
 
-    /// Iterates over an object.
-    fn try_iter(self: &Arc<Self>) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
-        if let Some(iter) = self.custom_iter() {
-            Some(iter)
-        } else {
-            let iter = some!(self.clone().enumeration().try_into_iter());
-            Some(match self.repr() {
-                ObjectRepr::Map => Box::new(iter),
-                ObjectRepr::Seq => {
-                    let self_clone = self.clone();
-                    Box::new(iter.map(move |key| self_clone.get_value(&key).unwrap_or_default()))
-                }
-            })
-        }
-    }
-
-    /// Iterate over key and value at once.
-    fn try_iter_pairs(
-        self: &Arc<Self>,
-    ) -> Option<Box<dyn Iterator<Item = (Value, Value)> + Send + Sync>> {
-        if let Some(iter) = self.custom_iter() {
-            Some(Box::new(
-                iter.enumerate().map(|(idx, item)| (Value::from(idx), item)),
-            ))
-        } else {
-            let iter = some!(self.clone().enumeration().try_into_iter());
-            let self_clone = self.clone();
-            Some(match self.repr() {
-                ObjectRepr::Map => Box::new(iter.map(move |key| {
-                    let value = self_clone.get_value(&key);
-                    (key, value.unwrap_or_default())
-                })),
-                ObjectRepr::Seq => {
-                    Box::new(iter.enumerate().map(|(idx, item)| (Value::from(idx), item)))
-                }
-            })
-        }
-    }
+    impl_iter_helpers!(&Arc<Self>);
 }
 
 impl<T: Object + Send + Sync + 'static> ObjectExt for T {}
@@ -296,59 +299,15 @@ impl DynObject {
         self.downcast::<T>().is_some()
     }
 
-    /// Attempt to iterate over the object.
-    pub fn try_iter(&self) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
-        if let Some(iter) = self.custom_iter() {
-            Some(iter)
-        } else {
-            let iter = some!(self.clone().enumeration().try_into_iter());
-            Some(match self.repr() {
-                ObjectRepr::Map => Box::new(iter),
-                ObjectRepr::Seq => {
-                    let self_clone = self.clone();
-                    Box::new(iter.map(move |key| self_clone.get_value(&key).unwrap_or_default()))
-                }
-            })
-        }
-    }
-
-    /// Iterate over key and value at once.
-    pub fn try_iter_pairs(&self) -> Option<Box<dyn Iterator<Item = (Value, Value)> + Send + Sync>> {
-        if let Some(iter) = self.custom_iter() {
-            Some(Box::new(
-                iter.enumerate().map(|(idx, item)| (Value::from(idx), item)),
-            ))
-        } else {
-            let iter = some!(self.clone().enumeration().try_into_iter());
-            let self_clone = self.clone();
-            Some(match self.repr() {
-                ObjectRepr::Map => Box::new(iter.map(move |key| {
-                    let value = self_clone.get_value(&key);
-                    (key, value.unwrap_or_default())
-                })),
-                ObjectRepr::Seq => {
-                    Box::new(iter.enumerate().map(|(idx, item)| (Value::from(idx), item)))
-                }
-            })
-        }
-    }
+    impl_iter_helpers!(pub &Self);
 }
 
 impl Hash for DynObject {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        if let Some(iter) = self.try_iter() {
-            match self.repr() {
-                ObjectRepr::Map => {
-                    for key in iter {
-                        key.hash(state);
-                        self.get_value(&key).hash(state);
-                    }
-                }
-                ObjectRepr::Seq => {
-                    for item in iter {
-                        item.hash(state);
-                    }
-                }
+        if let Some(iter) = self.try_iter_pairs() {
+            for (key, value) in iter {
+                key.hash(state);
+                value.hash(state);
             }
         }
     }

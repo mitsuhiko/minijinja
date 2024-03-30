@@ -517,7 +517,6 @@ fn test_complex_key() {
         (Value::from_iter([0u32, 0u32]), "origin"),
         (Value::from_iter([0u32, 1u32]), "right"),
     ]);
-
     assert_eq!(
         value.get_item(&Value::from_iter([0, 0])).ok(),
         Some(Value::from("origin"))

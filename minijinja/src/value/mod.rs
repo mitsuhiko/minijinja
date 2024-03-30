@@ -385,9 +385,10 @@ impl PartialEq for Value {
                 None => {
                     if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
                         if a.repr() != b.repr() {
-                            return false;
-                        }
-                        if let (Some(ak), Some(bk)) = (a.try_iter_pairs(), b.try_iter_pairs()) {
+                            false
+                        } else if let (Some(ak), Some(bk)) =
+                            (a.try_iter_pairs(), b.try_iter_pairs())
+                        {
                             ak.eq(bk)
                         } else {
                             false
@@ -986,12 +987,15 @@ impl Value {
         }
 
         match self.0 {
-            ValueRepr::Object(ref dy) => {
-                let len = dy.enumeration().len();
-                let idx = len.and_then(|n| index(key, || n));
-                let value = idx.map(Value::from);
-                dy.get_value(value.as_ref().unwrap_or(key))
-            }
+            ValueRepr::Object(ref dy) => match dy.repr() {
+                ObjectRepr::Map => dy.get_value(key),
+                ObjectRepr::Seq => {
+                    let len = dy.enumeration().len();
+                    let idx = len.and_then(|n| index(key, || n));
+                    let value = idx.map(Value::from);
+                    dy.get_value(value.as_ref().unwrap_or(key))
+                }
+            },
             ValueRepr::String(ref s, _) => {
                 let idx = some!(index(key, || s.chars().count()));
                 s.chars().nth(idx).map(Value::from)

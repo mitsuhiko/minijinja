@@ -99,7 +99,7 @@ env.add_function("is_adult", is_adult);
 use std::fmt;
 use std::sync::Arc;
 
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
 use crate::utils::SealedMarker;
 use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, Value};
 use crate::vm::State;
@@ -261,6 +261,7 @@ impl Object for BoxedFunction {
 mod builtins {
     use super::*;
 
+    use crate::error::ErrorKind;
     use crate::value::{ObjectRepr, Rest, ValueMap, ValueRepr};
 
     /// Returns a range.
