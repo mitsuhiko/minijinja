@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 use std::ops::Range;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::error::{Error, ErrorKind, Result};
 use crate::value::{intern, Value, ValueMap, ValueRepr};
@@ -27,9 +27,13 @@ pub trait Object: fmt::Debug + Send + Sync {
     /// Returns the enumeration of the object.
     ///
     /// For more information see [`Enumeration`].  The default implementation
-    /// returns a empty enumeration.
+    /// returns a empty enumeration if the object repr is a map or sequence,
+    /// and `NonEnumerable` for plain objects.
     fn enumeration(self: &Arc<Self>) -> Enumeration {
-        Enumeration::Sized(0)
+        match self.repr() {
+            ObjectRepr::Plain | ObjectRepr::Iterator => Enumeration::NonEnumerable,
+            ObjectRepr::Map | ObjectRepr::Seq => Enumeration::Sized(0),
+        }
     }
 
     /// Overrides the default iteration behavior.
@@ -110,7 +114,7 @@ pub trait Object: fmt::Debug + Send + Sync {
                 }
                 dbg.finish()
             }
-            ObjectRepr::Plain => {
+            ObjectRepr::Plain | ObjectRepr::Iterator => {
                 write!(f, "{self:?}")
             }
         }
@@ -126,7 +130,7 @@ macro_rules! impl_object_helpers {
             } else {
                 let iter = some!(self.clone().enumeration().try_into_iter());
                 Some(match self.repr() {
-                    ObjectRepr::Plain => return None,
+                    ObjectRepr::Plain | ObjectRepr::Iterator => return None,
                     ObjectRepr::Map => Box::new(iter),
                     ObjectRepr::Seq => {
                         let self_clone = self.clone();
@@ -244,6 +248,8 @@ pub enum ObjectRepr {
     Map,
     /// serializes to [...] over its values
     Seq,
+    /// Similar to `Seq` but without indexing
+    Iterator,
 }
 
 type_erase! {
@@ -405,5 +411,59 @@ where
         self.mapped_enumeration(|this| {
             Box::new(this.keys().map(|k| intern(k.as_ref())).map(Value::from))
         })
+    }
+}
+
+pub(crate) struct SimpleIteratorObject<I, T>(pub Mutex<I>)
+where
+    I: Iterator<Item = T> + Send + Sync + 'static,
+    T: Into<Value> + 'static;
+
+impl<I, T> fmt::Debug for SimpleIteratorObject<I, T>
+where
+    I: Iterator<Item = T> + Send + Sync + 'static,
+    T: Into<Value> + 'static,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Iterator").finish()
+    }
+}
+
+impl<I, T> Object for SimpleIteratorObject<I, T>
+where
+    I: Iterator<Item = T> + Send + Sync + 'static,
+    T: Into<Value> + 'static,
+{
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Iterator
+    }
+
+    fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<iterator>")
+    }
+
+    fn custom_iter(self: &Arc<Self>) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+        struct Iter<I, T>(Arc<SimpleIteratorObject<I, T>>)
+        where
+            I: Iterator<Item = T> + Send + Sync + 'static,
+            T: Into<Value> + 'static;
+
+        impl<I, T> Iterator for Iter<I, T>
+        where
+            I: Iterator<Item = T> + Send + Sync + 'static,
+            T: Into<Value> + 'static,
+        {
+            type Item = Value;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                self.0 .0.lock().unwrap().next().map(Into::into)
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                self.0 .0.lock().unwrap().size_hint()
+            }
+        }
+
+        Some(Box::new(Iter(self.clone())))
     }
 }

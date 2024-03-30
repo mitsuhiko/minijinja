@@ -275,7 +275,9 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
         match obj.repr() {
             ObjectRepr::Plain => false,
             ObjectRepr::Map => obj.get_value(value).is_some(),
-            ObjectRepr::Seq => obj.try_iter().into_iter().flatten().any(|v| &v == value),
+            ObjectRepr::Seq | ObjectRepr::Iterator => {
+                obj.try_iter().into_iter().flatten().any(|v| &v == value)
+            }
         }
     } else {
         return Err(Error::new(

@@ -37,9 +37,8 @@
 //! `Value::from_iterator` function instead:
 //!
 //! ```
-//! // TODO: Did this create a use-once value?
-//! // # use minijinja::value::Value;
-//! // let value: Value = Value::from_iterator(1..10);
+//! # use minijinja::value::Value;
+//! let value: Value = Value::from_iterator(1..10);
 //! ```
 //!
 //! To to into the inverse directly the various [`TryFrom`](std::convert::TryFrom)
@@ -136,13 +135,14 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use serde::ser::{Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind, Result};
 use crate::functions;
 use crate::utils::OnDrop;
+use crate::value::object::SimpleIteratorObject;
 use crate::value::ops::as_f64;
 use crate::value::serialize::transform;
 use crate::vm::State;
@@ -268,6 +268,8 @@ pub enum ValueKind {
     Seq,
     /// The value is a key/value mapping.
     Map,
+    /// An iterator
+    Iterator,
     /// A plain object without specific behavior.
     Plain,
 }
@@ -283,6 +285,7 @@ impl fmt::Display for ValueKind {
             ValueKind::Bytes => "bytes",
             ValueKind::Seq => "sequence",
             ValueKind::Map => "map",
+            ValueKind::Iterator => "iterator",
             ValueKind::Plain => "plain object",
         })
     }
@@ -672,6 +675,31 @@ impl Value {
         Value::from_object(FromObjectIter { maker, object })
     }
 
+    /// Creates a value from an iterator.
+    ///
+    /// This takes an iterator (yielding values that can be turned into a [`Value`])
+    /// and returns a value that can be iterated over.  Today this value looks a bit like
+    /// a sequence (and will pretend to be one) but this is misleading.  Such values are
+    /// actually objects implementing [`IteratorObject`] but due to backwards
+    /// compatibility reasons it's not possible to give them a distinct type.
+    ///
+    /// Iterators that implement [`ExactSizeIterator`] or have a matching lower and upper
+    /// bound on the [`Iterator::size_hint`] report a known `loop.length`.  Iterators that
+    /// do not fulfill these requirements will not.  The same is true for `revindex` and
+    /// similar properties.
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// let val = Value::from_iterator(0..10);
+    /// ```
+    pub fn from_iterator<I, T>(iter: I) -> Value
+    where
+        I: Iterator<Item = T> + Send + Sync + 'static,
+        T: Into<Value> + 'static,
+    {
+        Value::from_object(SimpleIteratorObject(Mutex::new(iter.fuse())))
+    }
+
     /// Creates a callable value from a function.
     ///
     /// ```
@@ -708,6 +736,7 @@ impl Value {
             ValueRepr::Object(ref obj) => match obj.repr() {
                 ObjectRepr::Map => ValueKind::Map,
                 ObjectRepr::Seq => ValueKind::Seq,
+                ObjectRepr::Iterator => ValueKind::Iterator,
                 ObjectRepr::Plain => ValueKind::Plain,
             },
         }
@@ -1008,7 +1037,7 @@ impl Value {
 
         match self.0 {
             ValueRepr::Object(ref dy) => match dy.repr() {
-                ObjectRepr::Map | ObjectRepr::Plain => dy.get_value(key),
+                ObjectRepr::Map | ObjectRepr::Plain | ObjectRepr::Iterator => dy.get_value(key),
                 ObjectRepr::Seq => {
                     let len = dy.enumeration().len();
                     let idx = len.and_then(|n| index(key, || n));
@@ -1164,7 +1193,7 @@ impl Serialize for Value {
             ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
             ValueRepr::Object(ref o) => match o.repr() {
                 ObjectRepr::Plain => serializer.serialize_str(&o.to_string()),
-                ObjectRepr::Seq => {
+                ObjectRepr::Seq | ObjectRepr::Iterator => {
                     use serde::ser::SerializeSeq;
                     let enumeration = o.enumeration();
                     let mut seq = ok!(serializer.serialize_seq(enumeration.len()));
