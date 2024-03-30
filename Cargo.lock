@@ -1967,13 +1967,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "minijinja-stack-ref"
-version = "1.0.16"
-dependencies = [
- "minijinja",
-]
-
-[[package]]
 name = "minimal"
 version = "0.1.0"
 dependencies = [
@@ -2909,14 +2902,6 @@ checksum = "05ffd9c0a93b7543e062e759284fcf5f5e3b098501104bfbdde4d404db792871"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "stack-ref"
-version = "0.1.0"
-dependencies = [
- "minijinja",
- "minijinja-stack-ref",
 ]
 
 [[package]]
