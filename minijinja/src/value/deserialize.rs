@@ -180,6 +180,7 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
             ValueRepr::Undefined | ValueRepr::None => visitor.visit_unit(),
             ValueRepr::Bytes(ref v) => visitor.visit_bytes(v),
             ValueRepr::Object(o) => match o.repr() {
+                ObjectRepr::Plain => Err(de::Error::custom("cannot deserialize plain objects")),
                 ObjectRepr::Seq => visitor.visit_seq(de::value::SeqDeserializer::new(
                     o.try_iter()
                         .into_iter()

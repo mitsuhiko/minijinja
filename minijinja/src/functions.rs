@@ -101,7 +101,7 @@ use std::sync::Arc;
 
 use crate::error::Error;
 use crate::utils::SealedMarker;
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, Value};
+use crate::value::{ArgType, Enumeration, FunctionArgs, FunctionResult, Object, ObjectRepr, Value};
 use crate::vm::State;
 
 type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
@@ -248,12 +248,16 @@ impl fmt::Debug for BoxedFunction {
 }
 
 impl Object for BoxedFunction {
-    fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
-        self.invoke(state, args)
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Plain
     }
 
-    fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self:?}")
+    fn enumeration(self: &Arc<Self>) -> Enumeration {
+        Enumeration::NonEnumerable
+    }
+
+    fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
+        self.invoke(state, args)
     }
 }
 

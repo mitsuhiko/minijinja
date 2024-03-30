@@ -95,33 +95,29 @@ pub trait Object: fmt::Debug + Send + Sync {
             }
         }
 
-        if let Some(iter) = self.try_iter() {
-            match self.repr() {
-                ObjectRepr::Map => {
-                    let mut dbg = f.debug_map();
-                    for key in iter {
-                        if let Some(value) = self.get_value(&key) {
-                            dbg.entry(&DbgRender(&key), &DbgRender(&value));
-                        }
-                    }
-
-                    dbg.finish()
+        match self.repr() {
+            ObjectRepr::Map => {
+                let mut dbg = f.debug_map();
+                for (key, value) in self.try_iter_pairs().into_iter().flatten() {
+                    dbg.entry(&DbgRender(&key), &DbgRender(&value));
                 }
-                ObjectRepr::Seq => {
-                    let mut dbg = f.debug_list();
-                    for value in iter {
-                        dbg.entry(&DbgRender(&value));
-                    }
-                    dbg.finish()
-                }
+                dbg.finish()
             }
-        } else {
-            write!(f, "{}", std::any::type_name::<Self>())
+            ObjectRepr::Seq => {
+                let mut dbg = f.debug_list();
+                for value in self.try_iter().into_iter().flatten() {
+                    dbg.entry(&DbgRender(&value));
+                }
+                dbg.finish()
+            }
+            ObjectRepr::Plain => {
+                write!(f, "{self:?}")
+            }
         }
     }
 }
 
-macro_rules! impl_iter_helpers {
+macro_rules! impl_object_helpers {
     ($vis:vis $self_ty: ty) => {
         /// Iterates over an object.
         $vis fn try_iter(self: $self_ty) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
@@ -130,6 +126,7 @@ macro_rules! impl_iter_helpers {
             } else {
                 let iter = some!(self.clone().enumeration().try_into_iter());
                 Some(match self.repr() {
+                    ObjectRepr::Plain => return None,
                     ObjectRepr::Map => Box::new(iter),
                     ObjectRepr::Seq => {
                         let self_clone = self.clone();
@@ -197,7 +194,7 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
         Enumeration::Iterator(Box::new(IterObject { iter, _object }))
     }
 
-    impl_iter_helpers!(&Arc<Self>);
+    impl_object_helpers!(&Arc<Self>);
 }
 
 impl<T: Object + Send + Sync + 'static> ObjectExt for T {}
@@ -242,6 +239,8 @@ enum EnumerationIterRepr {
 /// Defines the natural representation of this object.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ObjectRepr {
+    /// An object that has no reasonable representation.  Usually stringifies.
+    Plain,
     /// serializes to {...} and over the enumeration, values
     Map,
     /// serializes to [...] over its values
@@ -299,7 +298,7 @@ impl DynObject {
         self.downcast::<T>().is_some()
     }
 
-    impl_iter_helpers!(pub &Self);
+    impl_object_helpers!(pub &Self);
 }
 
 impl Hash for DynObject {

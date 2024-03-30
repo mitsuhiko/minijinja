@@ -269,6 +269,8 @@ pub enum ValueKind {
     Seq,
     /// The value is a key/value mapping.
     Map,
+    /// A plain object without specific behavior.
+    Plain,
 }
 
 impl fmt::Display for ValueKind {
@@ -282,6 +284,7 @@ impl fmt::Display for ValueKind {
             ValueKind::Bytes => "bytes",
             ValueKind::Seq => "sequence",
             ValueKind::Map => "map",
+            ValueKind::Plain => "plain object",
         })
     }
 }
@@ -711,6 +714,7 @@ impl Value {
             ValueRepr::Object(ref obj) => match obj.repr() {
                 ObjectRepr::Map => ValueKind::Map,
                 ObjectRepr::Seq => ValueKind::Seq,
+                ObjectRepr::Plain => ValueKind::Plain,
             },
         }
     }
@@ -988,7 +992,7 @@ impl Value {
 
         match self.0 {
             ValueRepr::Object(ref dy) => match dy.repr() {
-                ObjectRepr::Map => dy.get_value(key),
+                ObjectRepr::Map | ObjectRepr::Plain => dy.get_value(key),
                 ObjectRepr::Seq => {
                     let len = dy.enumeration().len();
                     let idx = len.and_then(|n| index(key, || n));
@@ -1173,6 +1177,7 @@ impl Serialize for Value {
             ValueRepr::String(ref s, _) => serializer.serialize_str(s),
             ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
             ValueRepr::Object(ref o) => match o.repr() {
+                ObjectRepr::Plain => serializer.serialize_str(&o.to_string()),
                 ObjectRepr::Seq => {
                     use serde::ser::SerializeSeq;
                     let enumeration = o.enumeration();
