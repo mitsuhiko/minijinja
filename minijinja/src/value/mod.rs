@@ -601,7 +601,7 @@ impl Value {
         Value::from(ValueRepr::Object(value.into()))
     }
 
-    /// Creates a sequence that iterates over the given value.
+    /// Creates an iterator that iterates over the given value.
     ///
     /// The function is invoked to create an iterator which is then turned into
     /// a sequence or iterator.
@@ -613,41 +613,18 @@ impl Value {
             + Sync
             + 'static,
     {
-        struct IterObject {
-            iter: Box<dyn Iterator<Item = Value> + Send + Sync + 'static>,
-            _object: DynObject,
-        }
-
-        impl Iterator for IterObject {
-            type Item = Value;
-
-            fn next(&mut self) -> Option<Self::Item> {
-                self.iter.next()
-            }
-
-            fn size_hint(&self) -> (usize, Option<usize>) {
-                self.iter.size_hint()
-            }
-        }
-
-        struct IterObjectMaker<T, F> {
+        struct FromObjectIter<T, F> {
             maker: F,
             object: T,
         }
 
-        impl fmt::Debug for IterObject {
+        impl<T, F> fmt::Debug for FromObjectIter<T, F> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_tuple("IterObject").finish()
+                f.debug_struct("FromObjectIter").finish()
             }
         }
 
-        impl<T, F> fmt::Debug for IterObjectMaker<T, F> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_struct("IterObjectMaker").finish()
-            }
-        }
-
-        impl<T, F> Object for IterObjectMaker<T, F>
+        impl<T, F> Object for FromObjectIter<T, F>
         where
             T: Send + Sync + 'static,
             F: for<'a> Fn(&'a T) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
@@ -656,25 +633,43 @@ impl Value {
                 + 'static,
         {
             fn repr(self: &Arc<Self>) -> ObjectRepr {
+                // TODO: Change to Iterator
                 ObjectRepr::Seq
             }
 
-            // XXX: this seems very wrong.
-            // see also https://github.com/mitsuhiko/minijinja/issues/453
-            fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-                Some(key.clone())
+            fn enumeration(self: &Arc<Self>) -> Enumeration {
+                Enumeration::NonEnumerable
             }
 
-            fn enumeration(self: &Arc<Self>) -> Enumeration {
+            fn custom_iter(
+                self: &Arc<Self>,
+            ) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+                struct IterWrapper {
+                    iter: Box<dyn Iterator<Item = Value> + Send + Sync + 'static>,
+                    _object: DynObject,
+                }
+
+                impl Iterator for IterWrapper {
+                    type Item = Value;
+
+                    fn next(&mut self) -> Option<Self::Item> {
+                        self.iter.next()
+                    }
+
+                    fn size_hint(&self) -> (usize, Option<usize>) {
+                        self.iter.size_hint()
+                    }
+                }
+
                 let iter: Box<dyn Iterator<Item = Value> + Send + Sync + '_> =
                     (self.maker)(&self.object);
                 let iter = unsafe { std::mem::transmute(iter) };
                 let _object = DynObject::new(self.clone());
-                Enumeration::Iterator(Box::new(IterObject { iter, _object }))
+                Some(Box::new(IterWrapper { iter, _object }))
             }
         }
 
-        Value::from_object(IterObjectMaker { maker, object })
+        Value::from_object(FromObjectIter { maker, object })
     }
 
     /// Creates a callable value from a function.
