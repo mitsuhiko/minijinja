@@ -744,7 +744,7 @@ impl Value {
             ValueRepr::String(ref x, _) => !x.is_empty(),
             ValueRepr::Bytes(ref x) => !x.is_empty(),
             ValueRepr::None | ValueRepr::Undefined | ValueRepr::Invalid(_) => false,
-            ValueRepr::Object(ref x) => x.enumeration().len().map_or(false, |x| x != 0),
+            ValueRepr::Object(ref x) => !x.enumeration().is_empty(),
         }
     }
 
