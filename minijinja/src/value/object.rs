@@ -167,7 +167,8 @@ pub enum Enumeration {
     Iterator(Box<dyn Iterator<Item = Value> + Send + Sync>),
     /// A dynamic iterator that also can be reversed.
     ReversibleIter(Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync>),
-    Range(Range<usize>),
+    /// Iteration is done by calling [`get_value`](Object::get_value) from 0 to `usize`.
+    Sized(usize),
 }
 
 /// Iterates over an enumeration.
@@ -178,7 +179,7 @@ enum EnumerationIterRepr {
     Static(std::slice::Iter<'static, &'static str>),
     Iterator(Box<dyn Iterator<Item = Value> + Send + Sync>),
     ReversibleIter(Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync>),
-    Range(Range<usize>),
+    Sized(Range<usize>),
     Empty,
 }
 
@@ -336,7 +337,7 @@ impl Enumeration {
                 (a, Some(b)) if a == b => a,
                 _ => return None,
             },
-            Enumeration::Range(v) => v.len(),
+            Enumeration::Sized(v) => *v,
             Enumeration::Empty => 0,
         })
     }
@@ -358,7 +359,7 @@ impl IntoIterator for Enumeration {
             Enumeration::Static(v) => EnumerationIterRepr::Static(v.iter()),
             Enumeration::Iterator(i) => EnumerationIterRepr::Iterator(i),
             Enumeration::ReversibleIter(i) => EnumerationIterRepr::ReversibleIter(i),
-            Enumeration::Range(i) => EnumerationIterRepr::Range(i),
+            Enumeration::Sized(i) => EnumerationIterRepr::Sized(0..i),
             Enumeration::Empty => EnumerationIterRepr::Empty,
         })
     }
@@ -373,7 +374,7 @@ impl Iterator for EnumerationIter {
             EnumerationIterRepr::Static(iter) => iter.next().copied().map(intern).map(Value::from),
             EnumerationIterRepr::Iterator(iter) => iter.next(),
             EnumerationIterRepr::ReversibleIter(iter) => iter.next(),
-            EnumerationIterRepr::Range(iter) => iter.next().map(Value::from),
+            EnumerationIterRepr::Sized(iter) => iter.next().map(Value::from),
             EnumerationIterRepr::Empty => None,
         }
     }
@@ -384,7 +385,7 @@ impl Iterator for EnumerationIter {
             EnumerationIterRepr::Static(iter) => iter.size_hint(),
             EnumerationIterRepr::Iterator(iter) => iter.size_hint(),
             EnumerationIterRepr::ReversibleIter(iter) => iter.size_hint(),
-            EnumerationIterRepr::Range(iter) => iter.size_hint(),
+            EnumerationIterRepr::Sized(iter) => iter.size_hint(),
             EnumerationIterRepr::Empty => (0, Some(0)),
         }
     }
@@ -401,7 +402,7 @@ impl DoubleEndedIterator for EnumerationIter {
             }
             EnumerationIterRepr::Iterator(iter) => iter.next(), // FIXME: ?
             EnumerationIterRepr::ReversibleIter(iter) => iter.next_back(),
-            EnumerationIterRepr::Range(iter) => iter.next_back().map(Value::from),
+            EnumerationIterRepr::Sized(iter) => iter.next_back().map(Value::from),
             EnumerationIterRepr::Empty => None,
         }
     }
@@ -417,7 +418,7 @@ impl<T: Into<Value> + Clone + fmt::Debug> Object for Vec<T> {
     }
 
     fn enumeration(self: &Arc<Self>) -> Enumeration {
-        Enumeration::Range(0..self.len())
+        Enumeration::Sized(self.len())
     }
 }
 

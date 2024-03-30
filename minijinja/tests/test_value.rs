@@ -221,7 +221,7 @@ fn test_seq_object_iteration_and_indexing() {
         }
 
         fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::Range(0..3)
+            Enumeration::Sized(3)
         }
     }
 
@@ -298,7 +298,7 @@ fn test_seq_object_downcast() {
         }
 
         fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::Range(0..3)
+            Enumeration::Sized(3)
         }
     }
 

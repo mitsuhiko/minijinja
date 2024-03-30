@@ -32,7 +32,7 @@ fn test_seq_object() {
         }
 
         fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::Range(0..3)
+            Enumeration::Sized(3)
         }
     }
 
