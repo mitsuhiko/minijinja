@@ -456,7 +456,7 @@ fn test_values_in_vec() {
 fn test_seq_object_borrow() {
     fn connect(values: DynObject) -> String {
         let mut rv = String::new();
-        for item in values.values() {
+        for item in values.try_iter().into_iter().flatten() {
             rv.push_str(&item.to_string())
         }
         rv

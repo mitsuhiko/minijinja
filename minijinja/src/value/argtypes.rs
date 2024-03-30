@@ -6,7 +6,9 @@ use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
-use crate::value::{DynObject, Packed, StringType, Value, ValueKind, ValueMap, ValueRepr};
+use crate::value::{
+    DynObject, ObjectRepr, Packed, StringType, Value, ValueKind, ValueMap, ValueRepr,
+};
 use crate::vm::State;
 
 use super::{Enumeration, Object};
@@ -968,11 +970,14 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
         match value {
             None => Ok(Vec::new()),
             Some(value) => {
-                let seq = ok!(value
+                let iter = ok!(value
                     .as_object()
+                    // XXX: needs updating for iterators
+                    .filter(|x| matches!(x.repr(), ObjectRepr::Seq))
+                    .and_then(|x| x.try_iter())
                     .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not a sequence") }));
                 let mut rv = Vec::new();
-                for value in seq.values() {
+                for value in iter {
                     rv.push(ok!(T::from_value_owned(value)));
                 }
                 Ok(rv)
@@ -981,11 +986,14 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
     }
 
     fn from_value_owned(value: Value) -> Result<Self, Error> {
-        let seq = ok!(value
+        let iter = ok!(value
             .as_object()
+            // XXX: needs updating for iterators
+            .filter(|x| matches!(x.repr(), ObjectRepr::Seq))
+            .and_then(|x| x.try_iter())
             .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not a sequence") }));
         let mut rv = Vec::new();
-        for value in seq.values() {
+        for value in iter {
             rv.push(ok!(T::from_value_owned(value)));
         }
         Ok(rv)

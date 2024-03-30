@@ -113,11 +113,18 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
             ))
         }
         ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
-        ValueRepr::Object(obj) => {
-            let len = obj.enumeration().len().unwrap_or_default(); // FIXME: <--
+        ValueRepr::Object(obj) if obj.repr() == ObjectRepr::Seq => {
+            let len = obj.enumeration().len().unwrap_or_default();
             let (start, len) = get_offset_and_len(start, stop, || len);
             Ok(Value::from_object_iter(obj.clone(), move |this| {
-                Box::new(this.values().skip(start).take(len).step_by(step))
+                Box::new(
+                    this.try_iter()
+                        .into_iter()
+                        .flatten()
+                        .skip(start)
+                        .take(len)
+                        .step_by(step),
+                )
             }))
         }
         _ => error,
@@ -267,7 +274,7 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
     } else if let ValueRepr::Object(ref obj) = container.0 {
         match obj.repr() {
             ObjectRepr::Map => obj.get_value(value).is_some(),
-            ObjectRepr::Seq => obj.values().any(|v| &v == value),
+            ObjectRepr::Seq => obj.try_iter().into_iter().flatten().any(|v| &v == value),
         }
     } else {
         return Err(Error::new(

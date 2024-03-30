@@ -334,7 +334,9 @@ mod builtins {
             None => ValueMap::default(),
             Some(value) => match value.0 {
                 ValueRepr::Undefined => ValueMap::default(),
-                ValueRepr::Object(obj) if obj.repr() == ObjectRepr::Map => obj.iter().collect(),
+                ValueRepr::Object(obj) if obj.repr() == ObjectRepr::Map => {
+                    obj.try_iter_pairs().into_iter().flatten().collect()
+                }
                 _ => return Err(Error::from(ErrorKind::InvalidOperation)),
             },
         };
@@ -388,8 +390,12 @@ mod builtins {
     pub fn namespace(defaults: Option<Value>) -> Result<Value, Error> {
         let ns = crate::value::namespace_object::Namespace::default();
         if let Some(defaults) = defaults {
-            if let Some(obj) = defaults.as_object() {
-                for (key, value) in obj.iter() {
+            if let Some(pairs) = defaults
+                .as_object()
+                .filter(|x| matches!(x.repr(), ObjectRepr::Map))
+                .and_then(|x| x.try_iter_pairs())
+            {
+                for (key, value) in pairs {
                     if let Some(key) = key.as_str() {
                         ns.set_field(key, value);
                     }

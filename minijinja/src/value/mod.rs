@@ -167,7 +167,6 @@ mod serialize;
 
 #[cfg(feature = "deserialization")]
 pub use self::deserialize::ViaDeserialize;
-use self::object::ObjectKeyValueIter;
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
@@ -385,14 +384,14 @@ impl PartialEq for Value {
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
                 None => {
                     if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
-                        let (a_keys, b_keys) = (a.enumeration(), b.enumeration());
-                        if a_keys.len() != b_keys.len() {
+                        if a.repr() != b.repr() {
                             return false;
                         }
-
-                        a_keys
-                            .into_iter()
-                            .all(|key| a.get_value(&key) == b.get_value(&key))
+                        if let (Some(ak), Some(bk)) = (a.try_iter_pairs(), b.try_iter_pairs()) {
+                            ak.eq(bk)
+                        } else {
+                            false
+                        }
                     } else {
                         false
                     }
@@ -435,9 +434,11 @@ impl Ord for Value {
                         (Ok(a), Ok(b)) => a.cmp(b),
                         _ => self.len().cmp(&other.len()),
                     },
-                    (ValueKind::Map, ValueKind::Map) => match (self.as_object(), other.as_object())
-                    {
-                        (Some(a), Some(b)) => a.iter().cmp(b.iter()),
+                    (ValueKind::Map, ValueKind::Map) => match (
+                        self.as_object().and_then(|x| x.try_iter_pairs()),
+                        other.as_object().and_then(|x| x.try_iter_pairs()),
+                    ) {
+                        (Some(a), Some(b)) => a.cmp(b),
                         _ => self.len().cmp(&other.len()),
                     },
                     _ => Ordering::Equal,
@@ -1096,8 +1097,15 @@ impl Value {
                 Some(s.chars().count()),
             ),
             ValueRepr::Object(ref obj) => {
-                let len = obj.enumeration().len();
-                (ValueIteratorState::Dyn(obj.repr(), obj.iter()), len)
+                if let Some(iter) = obj.try_iter() {
+                    let len = obj.enumeration().len();
+                    (ValueIteratorState::Dyn(iter), len)
+                } else {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("{} is not iterable", self.kind()),
+                    ));
+                }
             }
             _ => {
                 return Err(Error::new(
@@ -1165,8 +1173,10 @@ impl Serialize for Value {
                     use serde::ser::SerializeSeq;
                     let enumeration = o.enumeration();
                     let mut seq = ok!(serializer.serialize_seq(enumeration.len()));
-                    for item in o.values() {
-                        ok!(seq.serialize_element(&item));
+                    if let Some(iter) = o.try_iter() {
+                        for item in iter {
+                            ok!(seq.serialize_element(&item));
+                        }
                     }
 
                     seq.end()
@@ -1174,8 +1184,10 @@ impl Serialize for Value {
                 ObjectRepr::Map => {
                     use serde::ser::SerializeMap;
                     let mut map = ok!(serializer.serialize_map(None));
-                    for (key, value) in o.iter() {
-                        ok!(map.serialize_entry(&key, &value));
+                    if let Some(iter) = o.try_iter_pairs() {
+                        for (key, value) in iter {
+                            ok!(map.serialize_entry(&key, &value));
+                        }
                     }
 
                     map.end()
@@ -1222,10 +1234,9 @@ impl Iterator for OwnedValueIterator {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if let ValueIteratorState::Dyn(_, ref iter) = self.iter_state {
+        if let ValueIteratorState::Dyn(ref iter) = self.iter_state {
             return iter.size_hint();
         }
-
         (self.len.unwrap_or(0), self.len)
     }
 }
@@ -1239,7 +1250,7 @@ impl fmt::Debug for OwnedValueIterator {
 enum ValueIteratorState {
     Empty,
     Chars(usize, Arc<str>),
-    Dyn(ObjectRepr, ObjectKeyValueIter),
+    Dyn(Box<dyn Iterator<Item = Value> + Send + Sync>),
 }
 
 impl ValueIteratorState {
@@ -1252,8 +1263,7 @@ impl ValueIteratorState {
                     Value::from(c)
                 })
             }
-            ValueIteratorState::Dyn(ObjectRepr::Map, iter) => iter.next().map(|kv| kv.0),
-            ValueIteratorState::Dyn(ObjectRepr::Seq, iter) => iter.next().map(|kv| kv.1),
+            ValueIteratorState::Dyn(iter) => iter.next(),
         }
     }
 }

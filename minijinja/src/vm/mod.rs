@@ -704,7 +704,7 @@ impl<'env> Vm<'env> {
         let obj = name.as_object();
         let choices = obj
             .as_ref()
-            .map(|d| d.values())
+            .and_then(|d| d.try_iter())
             .into_iter()
             .flatten()
             .chain(obj.is_none().then(|| name.clone()));
@@ -969,8 +969,13 @@ impl<'env> Vm<'env> {
 
         match obj.enumeration().len() {
             Some(n) if n == *count => {
-                for item in obj.values().rev() {
-                    stack.push(item);
+                if let Some(iter) = obj.try_iter() {
+                    // TODO: this is dumb
+                    let mut values = iter.collect::<Vec<_>>();
+                    values.reverse();
+                    for value in values {
+                        stack.push(value);
+                    }
                 }
 
                 Ok(())
@@ -999,7 +1004,8 @@ impl<'env> Vm<'env> {
 
         let arg_spec = match stack.pop().0 {
             ValueRepr::Object(args) => args
-                .values()
+                .try_iter()
+                .unwrap()
                 .map(|value| match &value.0 {
                     ValueRepr::String(arg, _) => arg.clone(),
                     _ => unreachable!(),
