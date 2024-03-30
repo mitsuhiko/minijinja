@@ -201,11 +201,13 @@ impl<T: Object + Send + Sync + 'static> ObjectExt for T {}
 
 /// Utility type to enumerate an object.
 ///
-/// The purpose of this type is to reveal the contents of an object.  Depending
-/// on the shape of the object different values are appropriate.  An enumeration
-/// always reveals the indexes or keys of an object.  The user of such an enumeration
-/// must thus call into [`get_value`](Object::get_value) to reveal the associated value
-/// to that key.
+/// The purpose of this type is to reveal the contents of an object by the key.  An
+/// enumeration always reveals the indexes or keys of an object.  The user of
+/// such an enumeration must thus call into [`get_value`](Object::get_value) to
+/// reveal the associated value to that key.
+///
+/// Enumerations are used as the primary method to automatically derive the
+/// iteration behavior of an object.
 #[non_exhaustive]
 pub enum Enumeration {
     /// A list of known values.
@@ -213,13 +215,11 @@ pub enum Enumeration {
     /// If the object is a sequence these are the values, if the object is a
     /// map this are actually the keys.
     Values(Vec<Value>),
-    /// A slice of static strings, usually to represent keys.
+    /// A slice of static string keys.
     Static(&'static [&'static str]),
-    /// A dynamic iterator over some contents.
+    /// A dynamic iterator over keys.
     Iterator(Box<dyn Iterator<Item = Value> + Send + Sync>),
-    /// A dynamic iterator that also can be reversed.
-    ReversibleIter(Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync>),
-    /// Iteration is done by calling [`get_value`](Object::get_value) from 0 to `usize`.
+    /// Indicates indexes from 0 to `usize`.
     Sized(usize),
     /// A non enumerable enumeration.  This fails iteration.
     NonEnumerable,
@@ -232,7 +232,6 @@ enum EnumerationIterRepr {
     Values(std::vec::IntoIter<Value>),
     Static(std::slice::Iter<'static, &'static str>),
     Iterator(Box<dyn Iterator<Item = Value> + Send + Sync>),
-    ReversibleIter(Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync>),
     Sized(Range<usize>),
 }
 
@@ -278,18 +277,6 @@ type_erase! {
     }
 }
 
-/// Iterates over [`Object`]
-pub struct ObjectValueIter {
-    enumeration: EnumerationIter,
-    object: DynObject,
-}
-
-/// Iterates over [`Object`]
-pub struct ObjectKeyValueIter {
-    enumeration: EnumerationIter,
-    object: DynObject,
-}
-
 impl DynObject {
     /// Checks if the object is of a specific type.
     ///
@@ -318,52 +305,6 @@ impl fmt::Display for DynObject {
     }
 }
 
-impl Iterator for ObjectValueIter {
-    type Item = Value;
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        self.object.get_value(&self.enumeration.next()?)
-    }
-
-    #[inline(always)]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.enumeration.size_hint()
-    }
-}
-
-impl DoubleEndedIterator for ObjectValueIter {
-    #[inline(always)]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.object.get_value(&self.enumeration.next_back()?)
-    }
-}
-
-impl Iterator for ObjectKeyValueIter {
-    type Item = (Value, Value);
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        let key = self.enumeration.next()?;
-        let value = self.object.get_value(&key)?;
-        Some((key, value))
-    }
-
-    #[inline(always)]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.enumeration.size_hint()
-    }
-}
-
-impl DoubleEndedIterator for ObjectKeyValueIter {
-    #[inline(always)]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let key = self.enumeration.next_back()?;
-        let value = self.object.get_value(&key)?;
-        Some((key, value))
-    }
-}
-
 impl Enumeration {
     /// Returns the length if the object has one.
     pub fn len(&self) -> Option<usize> {
@@ -371,10 +312,6 @@ impl Enumeration {
             Enumeration::Values(v) => v.len(),
             Enumeration::Static(v) => v.len(),
             Enumeration::Iterator(i) => match i.size_hint() {
-                (a, Some(b)) if a == b => a,
-                _ => return None,
-            },
-            Enumeration::ReversibleIter(i) => match i.size_hint() {
                 (a, Some(b)) if a == b => a,
                 _ => return None,
             },
@@ -394,7 +331,6 @@ impl Enumeration {
             Enumeration::Values(v) => EnumerationIterRepr::Values(v.into_iter()),
             Enumeration::Static(v) => EnumerationIterRepr::Static(v.iter()),
             Enumeration::Iterator(i) => EnumerationIterRepr::Iterator(i),
-            Enumeration::ReversibleIter(i) => EnumerationIterRepr::ReversibleIter(i),
             Enumeration::Sized(i) => EnumerationIterRepr::Sized(0..i),
             Enumeration::NonEnumerable => return None,
         }))
@@ -409,7 +345,6 @@ impl Iterator for EnumerationIter {
             EnumerationIterRepr::Values(iter) => iter.next(),
             EnumerationIterRepr::Static(iter) => iter.next().copied().map(intern).map(Value::from),
             EnumerationIterRepr::Iterator(iter) => iter.next(),
-            EnumerationIterRepr::ReversibleIter(iter) => iter.next(),
             EnumerationIterRepr::Sized(iter) => iter.next().map(Value::from),
         }
     }
@@ -419,24 +354,7 @@ impl Iterator for EnumerationIter {
             EnumerationIterRepr::Values(iter) => iter.size_hint(),
             EnumerationIterRepr::Static(iter) => iter.size_hint(),
             EnumerationIterRepr::Iterator(iter) => iter.size_hint(),
-            EnumerationIterRepr::ReversibleIter(iter) => iter.size_hint(),
             EnumerationIterRepr::Sized(iter) => iter.size_hint(),
-        }
-    }
-}
-
-// XXX: this trait implementation is not correct for iterators.
-// Tracked in https://github.com/mitsuhiko/minijinja/issues/455
-impl DoubleEndedIterator for EnumerationIter {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        match &mut self.0 {
-            EnumerationIterRepr::Values(iter) => iter.next_back(),
-            EnumerationIterRepr::Static(iter) => {
-                iter.next_back().copied().map(intern).map(Value::from)
-            }
-            EnumerationIterRepr::Iterator(iter) => iter.next(), // FIXME: ?
-            EnumerationIterRepr::ReversibleIter(iter) => iter.next_back(),
-            EnumerationIterRepr::Sized(iter) => iter.next_back().map(Value::from),
         }
     }
 }
