@@ -136,7 +136,6 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use serde::ser::{Serialize, Serializer};
@@ -929,11 +928,33 @@ impl Value {
     /// }
     /// # Ok(()) }
     /// ```
-    pub fn try_iter(&self) -> Result<ValueIter<'_>, Error> {
-        self.try_iter_owned().map(|inner| ValueIter {
-            _marker: PhantomData,
-            inner,
-        })
+    pub fn try_iter(&self) -> Result<ValueIter, Error> {
+        let (iter_state, len) = match self.0 {
+            ValueRepr::None | ValueRepr::Undefined => (ValueIteratorState::Empty, Some(0)),
+            ValueRepr::String(ref s, _) => (
+                ValueIteratorState::Chars(0, Arc::clone(s)),
+                Some(s.chars().count()),
+            ),
+            ValueRepr::Object(ref obj) => {
+                if let Some(iter) = obj.try_iter() {
+                    let len = obj.enumeration().len();
+                    (ValueIteratorState::Dyn(iter), len)
+                } else {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("{} is not iterable", self.kind()),
+                    ));
+                }
+            }
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("{} is not iterable", self.kind()),
+                ))
+            }
+        };
+
+        Ok(ValueIter { iter_state, len })
     }
 
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
@@ -1096,36 +1117,6 @@ impl Value {
         ))
     }
 
-    /// Iterates over the value without holding a reference.
-    pub(crate) fn try_iter_owned(&self) -> Result<OwnedValueIterator, Error> {
-        let (iter_state, len) = match self.0 {
-            ValueRepr::None | ValueRepr::Undefined => (ValueIteratorState::Empty, Some(0)),
-            ValueRepr::String(ref s, _) => (
-                ValueIteratorState::Chars(0, Arc::clone(s)),
-                Some(s.chars().count()),
-            ),
-            ValueRepr::Object(ref obj) => {
-                if let Some(iter) = obj.try_iter() {
-                    let len = obj.enumeration().len();
-                    (ValueIteratorState::Dyn(iter), len)
-                } else {
-                    return Err(Error::new(
-                        ErrorKind::InvalidOperation,
-                        format!("{} is not iterable", self.kind()),
-                    ));
-                }
-            }
-            _ => {
-                return Err(Error::new(
-                    ErrorKind::InvalidOperation,
-                    format!("{} is not iterable", self.kind()),
-                ))
-            }
-        };
-
-        Ok(OwnedValueIterator { iter_state, len })
-    }
-
     #[cfg(feature = "builtins")]
     pub(crate) fn get_path(&self, path: &str) -> Result<Value, Error> {
         let mut rv = self.clone();
@@ -1206,31 +1197,13 @@ impl Serialize for Value {
     }
 }
 
-/// Iterates over a value.
-pub struct ValueIter<'a> {
-    _marker: PhantomData<&'a Value>,
-    inner: OwnedValueIterator,
-}
-
-impl<'a> Iterator for ValueIter<'a> {
-    type Item = Value;
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-pub(crate) struct OwnedValueIterator {
+/// Utility to iterate over values.
+pub struct ValueIter {
     iter_state: ValueIteratorState,
     len: Option<usize>,
 }
 
-impl Iterator for OwnedValueIterator {
+impl Iterator for ValueIter {
     type Item = Value;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -1250,7 +1223,7 @@ impl Iterator for OwnedValueIterator {
     }
 }
 
-impl fmt::Debug for OwnedValueIterator {
+impl fmt::Debug for ValueIter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ValueIterator").finish()
     }

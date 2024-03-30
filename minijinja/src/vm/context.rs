@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::value::{OwnedValueIterator, Value, ValueRepr};
+use crate::value::{Value, ValueIter, ValueRepr};
 use crate::vm::loop_object::Loop;
 
 #[cfg(feature = "macros")]
@@ -20,7 +20,7 @@ pub(crate) struct LoopState {
     // first item is the target jump instruction, the second argument
     // tells us if we need to end capturing.
     pub(crate) current_recursion_jump: Option<(usize, bool)>,
-    pub(crate) iterator: OwnedValueIterator,
+    pub(crate) iterator: ValueIter,
     pub(crate) object: Arc<Loop>,
 }
 
