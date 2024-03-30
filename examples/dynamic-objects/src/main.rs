@@ -71,7 +71,7 @@ impl Object for SimpleDynamicSeq {
     }
 
     fn enumeration(self: &Arc<Self>) -> Enumeration {
-        Enumeration::Sized(0..4)
+        Enumeration::Sized(4)
     }
 }
 
