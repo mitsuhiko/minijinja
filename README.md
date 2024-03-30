@@ -82,8 +82,6 @@ If you are stuck with `MiniJinja`, have suggestions or need help, you can use th
   utilities for embedding templates in a binary
 * [minijinja-contrib](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-contrib): provides
   additional utilities too specific for the core
-* [minijinja-stack-ref](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-stack-ref): provides
-  functionality to pass values from the stack
 * [minijinja-py](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py): makes MiniJinja
   available to Python
 * [minijinja-cli](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli): a command line utility.

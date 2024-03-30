@@ -10,7 +10,7 @@ build:
 
 .PHONY: doc
 doc:
-	@cd minijinja; RUSTC_BOOTSTRAP=1 RUSTDOCFLAGS="--cfg=docsrs --html-in-header doc-header.html" cargo doc -p minijinja -p minijinja-autoreload -p minijinja-stack-ref -p minijinja-contrib --no-deps --features=$(DOC_FEATURES)
+	@cd minijinja; RUSTC_BOOTSTRAP=1 RUSTDOCFLAGS="--cfg=docsrs --html-in-header doc-header.html" cargo doc -p minijinja -p minijinja-autoreload -p minijinja-contrib --no-deps --features=$(DOC_FEATURES)
 
 .PHONY: test-msrv
 test-msrv:
@@ -47,7 +47,6 @@ run-tests:
 	@cd minijinja; cargo check --no-default-features --features=debug
 	@cd minijinja-autoreload; cargo test
 	@cd minijinja-contrib; cargo test
-	@cd minijinja-stack-ref; cargo test
 
 .PHONY: check
 check:
@@ -72,8 +71,6 @@ check:
 	@cd minijinja-contrib; cargo check
 	@cd minijinja-contrib; cargo check --all-features
 	@cd minijinja-contrib; cargo check --no-default-features
-	@echo "check minijinja-stack-ref:"
-	@cd minijinja-stack-ref; cargo check
 
 .PHONY: format
 format:
