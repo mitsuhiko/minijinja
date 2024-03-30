@@ -37,7 +37,6 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [render-template](render-template): CLI app that renders templates from string.
 * [render-value](render-value): Demonstrates how `Value` can be passed as `Serialize` as context.
 * [self-referential-context](self-referential-context): Shows a helper that allows self-referential contexts.
-* [stack-ref](stack-ref): Shows how the `minijinja-stack-ref` crate can be used to reference stack values.
 * [undefined-tracking](undefined-tracking): Shows how you can track undefined values.
 * [value-tracking](value-tracking): Shows how you can track values that are referenced at runtime.
 * [wasm-yew](wasm-yew): Shows how to use MiniJinja with WASM in the browser.
