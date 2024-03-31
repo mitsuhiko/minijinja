@@ -108,6 +108,11 @@ impl Stack {
         self.values.pop().unwrap()
     }
 
+    pub fn reverse_top(&mut self, n: usize) {
+        let start = self.values.len() - n;
+        self.values[start..].reverse();
+    }
+
     pub fn slice_top(&mut self, n: usize) -> &[Value] {
         &self.values[self.values.len() - n..]
     }

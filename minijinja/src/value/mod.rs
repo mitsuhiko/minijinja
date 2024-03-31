@@ -1029,16 +1029,14 @@ impl Value {
     /// # Ok(()) }
     /// ```
     pub fn try_iter(&self) -> Result<ValueIter, Error> {
-        let (iter_state, len) = match self.0 {
-            ValueRepr::None | ValueRepr::Undefined => (ValueIteratorState::Empty, Some(0)),
-            ValueRepr::String(ref s, _) => (
-                ValueIteratorState::Chars(0, Arc::clone(s)),
-                Some(s.chars().count()),
-            ),
+        let imp = match self.0 {
+            ValueRepr::None | ValueRepr::Undefined => ValueIterImpl::Empty,
+            ValueRepr::String(ref s, _) => {
+                ValueIterImpl::Chars(0, s.chars().count(), Arc::clone(s))
+            }
             ValueRepr::Object(ref obj) => {
                 if let Some(iter) = obj.try_iter() {
-                    let len = obj.enumeration().len();
-                    (ValueIteratorState::Dyn(iter), len)
+                    ValueIterImpl::Dyn(iter)
                 } else {
                     return Err(Error::new(
                         ErrorKind::InvalidOperation,
@@ -1054,7 +1052,7 @@ impl Value {
             }
         };
 
-        Ok(ValueIter { iter_state, len })
+        Ok(ValueIter { imp })
     }
 
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
@@ -1299,27 +1297,32 @@ impl Serialize for Value {
 
 /// Utility to iterate over values.
 pub struct ValueIter {
-    iter_state: ValueIteratorState,
-    len: Option<usize>,
+    imp: ValueIterImpl,
 }
 
 impl Iterator for ValueIter {
     type Item = Value;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter_state.advance_state().map(|x| {
-            if let Some(ref mut len) = self.len {
-                *len -= 1;
+        match &mut self.imp {
+            ValueIterImpl::Empty => None,
+            ValueIterImpl::Chars(offset, len, ref s) => {
+                (s as &str)[*offset..].chars().next().map(|c| {
+                    *offset += c.len_utf8();
+                    *len -= 1;
+                    Value::from(c)
+                })
             }
-            x
-        })
+            ValueIterImpl::Dyn(iter) => iter.next(),
+        }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if let ValueIteratorState::Dyn(ref iter) = self.iter_state {
-            return iter.size_hint();
+        match self.imp {
+            ValueIterImpl::Empty => (0, Some(0)),
+            ValueIterImpl::Chars(_, len, _) => (0, Some(len)),
+            ValueIterImpl::Dyn(ref iter) => iter.size_hint(),
         }
-        (self.len.unwrap_or(0), self.len)
     }
 }
 
@@ -1329,25 +1332,10 @@ impl fmt::Debug for ValueIter {
     }
 }
 
-enum ValueIteratorState {
+enum ValueIterImpl {
     Empty,
-    Chars(usize, Arc<str>),
+    Chars(usize, usize, Arc<str>),
     Dyn(Box<dyn Iterator<Item = Value> + Send + Sync>),
-}
-
-impl ValueIteratorState {
-    fn advance_state(&mut self) -> Option<Value> {
-        match self {
-            ValueIteratorState::Empty => None,
-            ValueIteratorState::Chars(offset, ref s) => {
-                (s as &str)[*offset..].chars().next().map(|c| {
-                    *offset += c.len_utf8();
-                    Value::from(c)
-                })
-            }
-            ValueIteratorState::Dyn(iter) => iter.next(),
-        }
-    }
 }
 
 #[cfg(test)]

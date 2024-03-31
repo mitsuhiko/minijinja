@@ -12,12 +12,12 @@ input_file: minijinja/tests/inputs/loop_bad_unpacking.txt
 
 Error {
     kind: CannotUnpack,
-    detail: "not a sequence",
+    detail: "value is not iterable",
     name: "loop_bad_unpacking.txt",
     line: 2,
 }
 
-cannot unpack: not a sequence (in loop_bad_unpacking.txt:2)
+cannot unpack: value is not iterable (in loop_bad_unpacking.txt:2)
 --------------------------- loop_bad_unpacking.txt ----------------------------
    1 | <ul>
    2 > {% for a, b in seq %}
@@ -47,4 +47,3 @@ Referenced variables: {
     ],
 }
 -------------------------------------------------------------------------------
-

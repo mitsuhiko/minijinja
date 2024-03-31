@@ -389,7 +389,7 @@ impl<'env> Vm<'env> {
                     stack.push(Value::from_object(v))
                 }
                 Instruction::UnpackList(count) => {
-                    ctx_ok!(self.unpack_list(&mut stack, count));
+                    ctx_ok!(self.unpack_list(&mut stack, *count));
                 }
                 Instruction::Add => func_binop!(add),
                 Instruction::Sub => func_binop!(sub),
@@ -961,33 +961,27 @@ impl<'env> Vm<'env> {
         Ok(())
     }
 
-    fn unpack_list(&self, stack: &mut Stack, count: &usize) -> Result<(), Error> {
+    fn unpack_list(&self, stack: &mut Stack, count: usize) -> Result<(), Error> {
         let top = stack.pop();
-        let obj = ok!(top
+        let iter = ok!(top
             .as_object()
-            .ok_or_else(|| Error::new(ErrorKind::CannotUnpack, "not a sequence")));
+            .and_then(|x| x.try_iter())
+            .ok_or_else(|| Error::new(ErrorKind::CannotUnpack, "value is not iterable")));
 
-        match obj.enumeration().len() {
-            Some(n) if n == *count => {
-                if let Some(iter) = obj.try_iter() {
-                    // TODO: this is dumb
-                    let mut values = iter.collect::<Vec<_>>();
-                    values.reverse();
-                    for value in values {
-                        stack.push(value);
-                    }
-                }
+        let mut n = 0;
+        for item in iter {
+            stack.push(item);
+            n += 1;
+        }
 
-                Ok(())
-            }
-            Some(n) => Err(Error::new(
+        if n == count {
+            stack.reverse_top(n);
+            Ok(())
+        } else {
+            Err(Error::new(
                 ErrorKind::CannotUnpack,
-                format!("sequence of wrong length (expected {}, got {})", *count, n,),
-            )),
-            None => Err(Error::new(
-                ErrorKind::CannotUnpack,
-                "cannot unpack unsized value",
-            )),
+                format!("sequence of wrong length (expected {}, got {})", count, n,),
+            ))
         }
     }
 
