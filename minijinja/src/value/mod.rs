@@ -1084,6 +1084,8 @@ impl Value {
         }
     }
 
+    /// Like [`downcast_object_ref`](Self::downcast_object_ref) but returns
+    /// the actual object.
     pub fn downcast_object<T: 'static>(&self) -> Option<Arc<T>> {
         match self.0 {
             ValueRepr::Object(ref o) => o.downcast(),
