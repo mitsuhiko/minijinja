@@ -36,9 +36,9 @@ impl Object for Macro {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         match key.as_str()? {
             "name" => Some(Value::from(self.name.clone())),
-            "arguments" => Some(Value::from_object_iter(self.clone(), |this| {
-                Box::new(this.arg_spec.iter().cloned().map(Value::from))
-            })),
+            "arguments" => Some(Value::from_iter(
+                self.arg_spec.iter().cloned().map(Value::from),
+            )),
             "caller" => Some(Value::from(self.caller_reference)),
             _ => None,
         }

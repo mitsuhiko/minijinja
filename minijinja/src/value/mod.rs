@@ -142,7 +142,7 @@ use serde::ser::{Serialize, Serializer};
 use crate::error::{Error, ErrorKind, Result};
 use crate::functions;
 use crate::utils::OnDrop;
-use crate::value::object::SimpleIteratorObject;
+use crate::value::object::ValueDbgRender;
 use crate::value::ops::as_f64;
 use crate::value::serialize::transform;
 use crate::vm::State;
@@ -604,10 +604,105 @@ impl Value {
         Value::from(ValueRepr::Object(value.into()))
     }
 
+    /// Creates a value from an iterator.
+    ///
+    /// This takes an iterator (yielding values that can be turned into a [`Value`])
+    /// and returns a value that can be iterated over.  Today this value looks a bit like
+    /// a sequence (and will pretend to be one) but this is misleading.  Such values are
+    /// actually objects implementing [`IteratorObject`] but due to backwards
+    /// compatibility reasons it's not possible to give them a distinct type.
+    ///
+    /// Iterators that implement [`ExactSizeIterator`] or have a matching lower and upper
+    /// bound on the [`Iterator::size_hint`] report a known `loop.length`.  Iterators that
+    /// do not fulfill these requirements will not.  The same is true for `revindex` and
+    /// similar properties.
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// let val = Value::from_iterator(0..10);
+    /// ```
+    ///
+    /// This iterator can only be iterated over once.
+    pub fn from_iterator<I, T>(iter: I) -> Value
+    where
+        I: Iterator<Item = T> + Send + Sync + 'static,
+        T: Into<Value> + 'static,
+    {
+        struct SimpleIteratorObject<I, T>(Mutex<Option<I>>)
+        where
+            I: Iterator<Item = T> + Send + Sync + 'static,
+            T: Into<Value> + 'static;
+
+        impl<I, T> fmt::Debug for SimpleIteratorObject<I, T>
+        where
+            I: Iterator<Item = T> + Send + Sync + 'static,
+            T: Into<Value> + 'static,
+        {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_tuple("<iterator>").finish()
+            }
+        }
+
+        impl<I, T> Object for SimpleIteratorObject<I, T>
+        where
+            I: Iterator<Item = T> + Send + Sync + 'static,
+            T: Into<Value> + 'static,
+        {
+            fn repr(self: &Arc<Self>) -> ObjectRepr {
+                ObjectRepr::Iterator
+            }
+
+            fn custom_iter(
+                self: &Arc<Self>,
+            ) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+                let iter = self.0.lock().unwrap().take();
+
+                struct Iter<I, T>(Option<I>)
+                where
+                    I: Iterator<Item = T> + Send + Sync + 'static,
+                    T: Into<Value> + 'static;
+
+                impl<I, T> Iterator for Iter<I, T>
+                where
+                    I: Iterator<Item = T> + Send + Sync + 'static,
+                    T: Into<Value> + 'static,
+                {
+                    type Item = Value;
+
+                    fn next(&mut self) -> Option<Self::Item> {
+                        match &mut self.0 {
+                            Some(x) => x.next().map(Into::into),
+                            None => None,
+                        }
+                    }
+
+                    fn size_hint(&self) -> (usize, Option<usize>) {
+                        match &self.0 {
+                            Some(x) => x.size_hint(),
+                            None => (0, Some(0)),
+                        }
+                    }
+                }
+
+                Some(Box::new(Iter(iter)))
+            }
+        }
+        Value::from_object(SimpleIteratorObject(Mutex::new(Some(iter.fuse()))))
+    }
+
     /// Creates an iterator that iterates over the given value.
     ///
-    /// The function is invoked to create an iterator which is then turned into
-    /// a sequence or iterator.
+    /// Unlike [`from_iterator`](Self::from_iterator) this returns an iterator
+    /// that can be iterated over multiple times.  Because of this it also will
+    /// render like a sequence when debug printed.
+    ///
+    /// ```rust
+    /// # use minijinja::value::Value;
+    /// let val = Value::from_object_iter(vec![1, 2, 3], |vec| {
+    ///     Box::new(vec.iter().copied().map(Value::from))
+    /// });
+    /// assert_eq!(val.to_string(), "[1, 2, 3]");
+    /// ````
     pub fn from_object_iter<T, F>(object: T, maker: F) -> Value
     where
         T: Send + Sync + 'static,
@@ -636,12 +731,18 @@ impl Value {
                 + 'static,
         {
             fn repr(self: &Arc<Self>) -> ObjectRepr {
-                // TODO: Change to Iterator
-                ObjectRepr::Seq
+                ObjectRepr::Iterator
             }
 
-            fn enumeration(self: &Arc<Self>) -> Enumeration {
-                Enumeration::NonEnumerable
+            fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result
+            where
+                Self: Sized + 'static,
+            {
+                let mut dbg = f.debug_list();
+                for value in self.try_iter().into_iter().flatten() {
+                    dbg.entry(&ValueDbgRender(&value));
+                }
+                dbg.finish()
             }
 
             fn custom_iter(
@@ -673,31 +774,6 @@ impl Value {
         }
 
         Value::from_object(FromObjectIter { maker, object })
-    }
-
-    /// Creates a value from an iterator.
-    ///
-    /// This takes an iterator (yielding values that can be turned into a [`Value`])
-    /// and returns a value that can be iterated over.  Today this value looks a bit like
-    /// a sequence (and will pretend to be one) but this is misleading.  Such values are
-    /// actually objects implementing [`IteratorObject`] but due to backwards
-    /// compatibility reasons it's not possible to give them a distinct type.
-    ///
-    /// Iterators that implement [`ExactSizeIterator`] or have a matching lower and upper
-    /// bound on the [`Iterator::size_hint`] report a known `loop.length`.  Iterators that
-    /// do not fulfill these requirements will not.  The same is true for `revindex` and
-    /// similar properties.
-    ///
-    /// ```
-    /// # use minijinja::value::Value;
-    /// let val = Value::from_iterator(0..10);
-    /// ```
-    pub fn from_iterator<I, T>(iter: I) -> Value
-    where
-        I: Iterator<Item = T> + Send + Sync + 'static,
-        T: Into<Value> + 'static,
-    {
-        Value::from_object(SimpleIteratorObject(Mutex::new(iter.fuse())))
     }
 
     /// Creates a callable value from a function.

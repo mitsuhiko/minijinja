@@ -116,16 +116,14 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         ValueRepr::Object(obj) if obj.repr() == ObjectRepr::Seq => {
             let len = obj.enumeration().len().unwrap_or_default();
             let (start, len) = get_offset_and_len(start, stop, || len);
-            Ok(Value::from_object_iter(obj.clone(), move |this| {
-                Box::new(
-                    this.try_iter()
-                        .into_iter()
-                        .flatten()
-                        .skip(start)
-                        .take(len)
-                        .step_by(step),
-                )
-            }))
+            Ok(Value::from_iter(
+                obj.try_iter()
+                    .into_iter()
+                    .flatten()
+                    .skip(start)
+                    .take(len)
+                    .step_by(step),
+            ))
         }
         _ => error,
     }

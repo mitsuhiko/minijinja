@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 use std::ops::Range;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind, Result};
 use crate::value::{intern, Value, ValueMap, ValueRepr};
@@ -87,30 +87,18 @@ pub trait Object: fmt::Debug + Send + Sync {
     where
         Self: Sized + 'static,
     {
-        struct DbgRender<'a>(&'a Value);
-
-        impl<'a> fmt::Debug for DbgRender<'a> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                if let ValueRepr::Object(ref obj) = self.0 .0 {
-                    obj.render(f)
-                } else {
-                    fmt::Debug::fmt(&self.0, f)
-                }
-            }
-        }
-
         match self.repr() {
             ObjectRepr::Map => {
                 let mut dbg = f.debug_map();
                 for (key, value) in self.try_iter_pairs().into_iter().flatten() {
-                    dbg.entry(&DbgRender(&key), &DbgRender(&value));
+                    dbg.entry(&ValueDbgRender(&key), &ValueDbgRender(&value));
                 }
                 dbg.finish()
             }
             ObjectRepr::Seq => {
                 let mut dbg = f.debug_list();
                 for value in self.try_iter().into_iter().flatten() {
-                    dbg.entry(&DbgRender(&value));
+                    dbg.entry(&ValueDbgRender(&value));
                 }
                 dbg.finish()
             }
@@ -414,56 +402,15 @@ where
     }
 }
 
-pub(crate) struct SimpleIteratorObject<I, T>(pub Mutex<I>)
-where
-    I: Iterator<Item = T> + Send + Sync + 'static,
-    T: Into<Value> + 'static;
+/// Utility type that displays a value in debug except for objects which are rendered.
+pub(crate) struct ValueDbgRender<'a>(pub &'a Value);
 
-impl<I, T> fmt::Debug for SimpleIteratorObject<I, T>
-where
-    I: Iterator<Item = T> + Send + Sync + 'static,
-    T: Into<Value> + 'static,
-{
+impl<'a> fmt::Debug for ValueDbgRender<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Iterator").finish()
-    }
-}
-
-impl<I, T> Object for SimpleIteratorObject<I, T>
-where
-    I: Iterator<Item = T> + Send + Sync + 'static,
-    T: Into<Value> + 'static,
-{
-    fn repr(self: &Arc<Self>) -> ObjectRepr {
-        ObjectRepr::Iterator
-    }
-
-    fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<iterator>")
-    }
-
-    fn custom_iter(self: &Arc<Self>) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
-        struct Iter<I, T>(Arc<SimpleIteratorObject<I, T>>)
-        where
-            I: Iterator<Item = T> + Send + Sync + 'static,
-            T: Into<Value> + 'static;
-
-        impl<I, T> Iterator for Iter<I, T>
-        where
-            I: Iterator<Item = T> + Send + Sync + 'static,
-            T: Into<Value> + 'static,
-        {
-            type Item = Value;
-
-            fn next(&mut self) -> Option<Self::Item> {
-                self.0 .0.lock().unwrap().next().map(Into::into)
-            }
-
-            fn size_hint(&self) -> (usize, Option<usize>) {
-                self.0 .0.lock().unwrap().size_hint()
-            }
+        if let ValueRepr::Object(ref obj) = self.0 .0 {
+            obj.render(f)
+        } else {
+            fmt::Debug::fmt(&self.0, f)
         }
-
-        Some(Box::new(Iter(self.clone())))
     }
 }
