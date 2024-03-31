@@ -569,3 +569,93 @@ fn test_via_deserialize() {
     let rv = state.apply_filter("foo", args![point_value]).unwrap();
     assert_eq!(rv.to_string(), "42, -23");
 }
+
+#[test]
+fn test_seq_custom_iter() {
+    #[derive(Debug)]
+    struct WeirdSeq;
+
+    impl Object for WeirdSeq {
+        fn repr(self: &Arc<Self>) -> ObjectRepr {
+            ObjectRepr::Seq
+        }
+
+        fn enumeration(self: &Arc<Self>) -> Enumeration {
+            Enumeration::NonEnumerable
+        }
+
+        fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+            match key.as_usize() {
+                Some(0) => Some(Value::from(true)),
+                Some(1) => Some(Value::from(false)),
+                _ => None,
+            }
+        }
+
+        fn custom_iter(self: &Arc<Self>) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+            Some(Box::new(('a'..='b').map(Value::from)))
+        }
+    }
+
+    let v = Value::from_object(WeirdSeq);
+    assert_eq!(v.get_item_by_index(0).unwrap(), Value::from(true));
+    assert_eq!(v.get_item_by_index(1).unwrap(), Value::from(false));
+
+    let vec = v.try_iter().unwrap().collect::<Vec<_>>();
+    assert_eq!(vec, vec![Value::from('a'), Value::from('b')]);
+
+    let obj = v.as_object().unwrap();
+    let vec = obj.try_iter_pairs().unwrap().collect::<Vec<_>>();
+    assert_eq!(
+        vec,
+        vec![
+            (Value::from(0), Value::from('a')),
+            (Value::from(1), Value::from('b'))
+        ]
+    );
+}
+
+#[test]
+fn test_map_custom_iter() {
+    #[derive(Debug)]
+    struct WeirdMap;
+
+    impl Object for WeirdMap {
+        fn repr(self: &Arc<Self>) -> ObjectRepr {
+            ObjectRepr::Map
+        }
+
+        fn enumeration(self: &Arc<Self>) -> Enumeration {
+            Enumeration::NonEnumerable
+        }
+
+        fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+            match key.as_str() {
+                Some("a") => Some(Value::from(true)),
+                Some("b") => Some(Value::from(false)),
+                _ => None,
+            }
+        }
+
+        fn custom_iter(self: &Arc<Self>) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+            Some(Box::new(('a'..='b').map(Value::from)))
+        }
+    }
+
+    let v = Value::from_object(WeirdMap);
+    assert_eq!(v.get_attr("a").unwrap(), Value::from(true));
+    assert_eq!(v.get_attr("b").unwrap(), Value::from(false));
+
+    let vec = v.try_iter().unwrap().collect::<Vec<_>>();
+    assert_eq!(vec, vec![Value::from('a'), Value::from('b')]);
+
+    let obj = v.as_object().unwrap();
+    let vec = obj.try_iter_pairs().unwrap().collect::<Vec<_>>();
+    assert_eq!(
+        vec,
+        vec![
+            (Value::from("a"), Value::from(true)),
+            (Value::from("b"), Value::from(false))
+        ]
+    );
+}

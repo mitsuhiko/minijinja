@@ -27,8 +27,8 @@ pub trait Object: fmt::Debug + Send + Sync {
     /// Returns the enumeration of the object.
     ///
     /// For more information see [`Enumeration`].  The default implementation
-    /// returns a empty enumeration if the object repr is a map or sequence,
-    /// and `NonEnumerable` for plain objects.
+    /// returns a empty enumeration if the object repr is a `Map` or `Seq`,
+    /// and `NonEnumerable` for `Plain` objects or `Iterator`s.
     fn enumeration(self: &Arc<Self>) -> Enumeration {
         match self.repr() {
             ObjectRepr::Plain | ObjectRepr::Iterator => Enumeration::NonEnumerable,
@@ -40,6 +40,10 @@ pub trait Object: fmt::Debug + Send + Sync {
     ///
     /// If this returns `None` then the default object iteration as
     /// defined by the object's `repr` and `enumeration` is used.
+    /// When this is implemented it's recommended that the object
+    /// repr is set to [`ObjectRepr::Iterator`].  The engine does
+    /// ensure that it can also be implemented for other object types
+    /// but the behavior can be confusing.
     fn custom_iter(self: &Arc<Self>) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
         None
     }
@@ -134,13 +138,22 @@ macro_rules! impl_object_helpers {
         $vis fn try_iter_pairs(
             self: $self_ty,
         ) -> Option<Box<dyn Iterator<Item = (Value, Value)> + Send + Sync>> {
+            let self_clone = self.clone();
             if let Some(iter) = self.custom_iter() {
+                let repr = self.repr();
                 Some(Box::new(
-                    iter.enumerate().map(|(idx, item)| (Value::from(idx), item)),
+                    iter.enumerate().map(move |(idx, item)| {
+                        match repr {
+                            ObjectRepr::Seq | ObjectRepr::Plain | ObjectRepr::Iterator => (Value::from(idx), item),
+                            ObjectRepr::Map => {
+                                let value = self_clone.get_value(&item);
+                                (item, value.unwrap_or_default())
+                            }
+                        }
+                    })
                 ))
             } else {
                 let iter = some!(self.clone().enumeration().try_into_iter());
-                let self_clone = self.clone();
                 Some(Box::new(iter.map(move |key| {
                     let value = self_clone.get_value(&key);
                     (key, value.unwrap_or_default())
