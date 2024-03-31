@@ -231,7 +231,7 @@ pub enum Enumeration {
 }
 
 /// Iterates over an enumeration.
-pub struct EnumerationIter(EnumerationIterRepr);
+pub(crate) struct EnumerationIter(EnumerationIterRepr);
 
 enum EnumerationIterRepr {
     Values(std::vec::IntoIter<Value>),

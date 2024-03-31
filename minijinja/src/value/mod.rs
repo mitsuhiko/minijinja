@@ -148,9 +148,7 @@ use crate::value::serialize::transform;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
-pub use crate::value::object::{
-    DynObject, Enumeration, EnumerationIter, Object, ObjectExt, ObjectRepr,
-};
+pub use crate::value::object::{DynObject, Enumeration, Object, ObjectExt, ObjectRepr};
 
 #[macro_use]
 mod type_erase;
