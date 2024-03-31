@@ -294,7 +294,7 @@ mod builtins {
 
     use crate::error::ErrorKind;
     use crate::value::ops::as_f64;
-    use crate::value::{Kwargs, ValueKind, ValueRepr};
+    use crate::value::{Kwargs, ObjectRepr, ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::cmp::Ordering;
     use std::fmt::Write;
@@ -505,10 +505,11 @@ mod builtins {
     pub fn reverse(v: Value) -> Result<Value, Error> {
         if let Some(s) = v.as_str() {
             Ok(Value::from(s.chars().rev().collect::<String>()))
-        } else if let Some(obj) = v.as_object() {
-            Ok(Value::from_object_iter(obj, |this| {
-                Box::new(this.values().rev())
-            }))
+        } else if let Some(iter) = v.as_object().and_then(|x| x.try_iter()) {
+            // TODO: support reversible iterators?
+            let mut values = iter.collect::<Vec<_>>();
+            values.reverse();
+            Ok(Value::from_iter(values))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -547,9 +548,9 @@ mod builtins {
                 rv.push(c);
             }
             Ok(rv)
-        } else if let Some(obj) = val.as_object() {
+        } else if let Some(iter) = val.as_object().and_then(|x| x.try_iter()) {
             let mut rv = String::new();
-            for item in obj.values() {
+            for item in iter {
                 if !rv.is_empty() {
                     rv.push_str(joiner);
                 }
@@ -730,9 +731,8 @@ mod builtins {
     pub fn first(value: Value) -> Result<Value, Error> {
         if let Some(s) = value.as_str() {
             Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
-        } else if let Some(s) = value.as_object() {
-            // FIXME: Seq only?
-            Ok(s.values().next().unwrap_or(Value::UNDEFINED))
+        } else if let Some(mut iter) = value.as_object().and_then(|x| x.try_iter()) {
+            Ok(iter.next().unwrap_or(Value::UNDEFINED))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -760,9 +760,15 @@ mod builtins {
     pub fn last(value: Value) -> Result<Value, Error> {
         if let Some(s) = value.as_str() {
             Ok(s.chars().next_back().map_or(Value::UNDEFINED, Value::from))
-        } else if let Some(obj) = value.as_object() {
-            // FIXME: Seq only?
-            Ok(obj.values().next_back().unwrap_or(Value::UNDEFINED))
+        } else if let Some(obj) = value
+            .as_object()
+            .filter(|x| matches!(x.repr(), ObjectRepr::Seq))
+        {
+            Ok(match obj.enumeration().len() {
+                Some(0) | None => None,
+                Some(idx) => obj.get_value(&Value::from(idx - 1)),
+            }
+            .unwrap_or_default())
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,

@@ -4,7 +4,7 @@ use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
 use minijinja::value::{DynObject, Enumeration, Kwargs, Object, ObjectRepr, Rest, Value};
-use minijinja::{args, Environment, Error};
+use minijinja::{args, render, Environment, Error};
 
 #[test]
 fn test_sort() {
@@ -456,7 +456,7 @@ fn test_values_in_vec() {
 fn test_seq_object_borrow() {
     fn connect(values: DynObject) -> String {
         let mut rv = String::new();
-        for item in values.values() {
+        for item in values.try_iter().into_iter().flatten() {
             rv.push_str(&item.to_string())
         }
         rv
@@ -476,40 +476,40 @@ fn test_seq_object_borrow() {
     );
 }
 
-// #[test]
-// fn test_iterator() {
-//     let value = Value::from_iterator(0..10);
-//     assert_eq!(value.to_string(), "<iterator>");
-//     let rv = render!(
-//         "{% for item in iter %}[{{ item }}]{% endfor %}",
-//         iter => value
-//     );
-//     assert_snapshot!(rv, @"[0][1][2][3][4][5][6][7][8][9]");
-//
-//     let rv = render!(
-//         "{% for item in iter %}- {{ item }}: {{ loop.index }} / {{ loop.length }}\n{% endfor %}",
-//         iter => Value::from_iterator('a'..'f')
-//     );
-//     assert_snapshot!(rv, @r###"
-//     - a: 1 / 5
-//     - b: 2 / 5
-//     - c: 3 / 5
-//     - d: 4 / 5
-//     - e: 5 / 5
-//     "###);
-//
-//     let rv = render!(
-//         "{% for item in iter %}- {{ item }}: {{ loop.index }} / {{ loop.length|default('?') }}\n{% endfor %}",
-//      iter => Value::from_iterator((0..10).filter(|x| x % 2 == 0))
-//     );
-//     assert_snapshot!(rv, @r###"
-//     - 0: 1 / ?
-//     - 2: 2 / ?
-//     - 4: 3 / ?
-//     - 6: 4 / ?
-//     - 8: 5 / ?
-//     "###);
-// }
+#[test]
+fn test_iterator() {
+    let value = Value::from_iterator(0..10);
+    assert_eq!(value.to_string(), "<iterator>");
+    let rv = render!(
+        "{% for item in iter %}[{{ item }}]{% endfor %}",
+        iter => value
+    );
+    assert_snapshot!(rv, @"[0][1][2][3][4][5][6][7][8][9]");
+
+    let rv = render!(
+        "{% for item in iter %}- {{ item }}: {{ loop.index }} / {{ loop.length }}\n{% endfor %}",
+        iter => Value::from_iterator('a'..'f')
+    );
+    assert_snapshot!(rv, @r###"
+    - a: 1 / 5
+    - b: 2 / 5
+    - c: 3 / 5
+    - d: 4 / 5
+    - e: 5 / 5
+    "###);
+
+    let rv = render!(
+        "{% for item in iter %}- {{ item }}: {{ loop.index }} / {{ loop.length|default('?') }}\n{% endfor %}",
+     iter => Value::from_iterator((0..10).filter(|x| x % 2 == 0))
+    );
+    assert_snapshot!(rv, @r###"
+    - 0: 1 / ?
+    - 2: 2 / ?
+    - 4: 3 / ?
+    - 6: 4 / ?
+    - 8: 5 / ?
+    "###);
+}
 
 #[test]
 fn test_complex_key() {
@@ -517,7 +517,6 @@ fn test_complex_key() {
         (Value::from_iter([0u32, 0u32]), "origin"),
         (Value::from_iter([0u32, 1u32]), "right"),
     ]);
-
     assert_eq!(
         value.get_item(&Value::from_iter([0, 0])).ok(),
         Some(Value::from("origin"))
@@ -569,4 +568,94 @@ fn test_via_deserialize() {
 
     let rv = state.apply_filter("foo", args![point_value]).unwrap();
     assert_eq!(rv.to_string(), "42, -23");
+}
+
+#[test]
+fn test_seq_custom_iter() {
+    #[derive(Debug)]
+    struct WeirdSeq;
+
+    impl Object for WeirdSeq {
+        fn repr(self: &Arc<Self>) -> ObjectRepr {
+            ObjectRepr::Seq
+        }
+
+        fn enumeration(self: &Arc<Self>) -> Enumeration {
+            Enumeration::NonEnumerable
+        }
+
+        fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+            match key.as_usize() {
+                Some(0) => Some(Value::from(true)),
+                Some(1) => Some(Value::from(false)),
+                _ => None,
+            }
+        }
+
+        fn custom_iter(self: &Arc<Self>) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+            Some(Box::new(('a'..='b').map(Value::from)))
+        }
+    }
+
+    let v = Value::from_object(WeirdSeq);
+    assert_eq!(v.get_item_by_index(0).unwrap(), Value::from(true));
+    assert_eq!(v.get_item_by_index(1).unwrap(), Value::from(false));
+
+    let vec = v.try_iter().unwrap().collect::<Vec<_>>();
+    assert_eq!(vec, vec![Value::from('a'), Value::from('b')]);
+
+    let obj = v.as_object().unwrap();
+    let vec = obj.try_iter_pairs().unwrap().collect::<Vec<_>>();
+    assert_eq!(
+        vec,
+        vec![
+            (Value::from(0), Value::from('a')),
+            (Value::from(1), Value::from('b'))
+        ]
+    );
+}
+
+#[test]
+fn test_map_custom_iter() {
+    #[derive(Debug)]
+    struct WeirdMap;
+
+    impl Object for WeirdMap {
+        fn repr(self: &Arc<Self>) -> ObjectRepr {
+            ObjectRepr::Map
+        }
+
+        fn enumeration(self: &Arc<Self>) -> Enumeration {
+            Enumeration::NonEnumerable
+        }
+
+        fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+            match key.as_str() {
+                Some("a") => Some(Value::from(true)),
+                Some("b") => Some(Value::from(false)),
+                _ => None,
+            }
+        }
+
+        fn custom_iter(self: &Arc<Self>) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+            Some(Box::new(('a'..='b').map(Value::from)))
+        }
+    }
+
+    let v = Value::from_object(WeirdMap);
+    assert_eq!(v.get_attr("a").unwrap(), Value::from(true));
+    assert_eq!(v.get_attr("b").unwrap(), Value::from(false));
+
+    let vec = v.try_iter().unwrap().collect::<Vec<_>>();
+    assert_eq!(vec, vec![Value::from('a'), Value::from('b')]);
+
+    let obj = v.as_object().unwrap();
+    let vec = obj.try_iter_pairs().unwrap().collect::<Vec<_>>();
+    assert_eq!(
+        vec,
+        vec![
+            (Value::from("a"), Value::from(true)),
+            (Value::from("b"), Value::from(false))
+        ]
+    );
 }

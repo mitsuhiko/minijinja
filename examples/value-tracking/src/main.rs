@@ -32,7 +32,7 @@ impl Object for TrackedContext {
                 return Enumeration::Values(keys.collect());
             }
         }
-        Enumeration::Empty
+        Enumeration::Sized(0)
     }
 }
 

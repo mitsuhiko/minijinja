@@ -180,16 +180,21 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
             ValueRepr::Undefined | ValueRepr::None => visitor.visit_unit(),
             ValueRepr::Bytes(ref v) => visitor.visit_bytes(v),
             ValueRepr::Object(o) => match o.repr() {
-                ObjectRepr::Seq => visitor.visit_seq(de::value::SeqDeserializer::new(
-                    o.values().map(ValueDeserializer::new),
-                )),
-                ObjectRepr::Map => {
-                    let iter = o
-                        .iter()
-                        .map(|(k, v)| (ValueDeserializer::new(k), ValueDeserializer::new(v)));
-
-                    visitor.visit_map(de::value::MapDeserializer::new(iter))
+                ObjectRepr::Plain => Err(de::Error::custom("cannot deserialize plain objects")),
+                ObjectRepr::Seq | ObjectRepr::Iterator => {
+                    visitor.visit_seq(de::value::SeqDeserializer::new(
+                        o.try_iter()
+                            .into_iter()
+                            .flatten()
+                            .map(ValueDeserializer::new),
+                    ))
                 }
+                ObjectRepr::Map => visitor.visit_map(de::value::MapDeserializer::new(
+                    o.try_iter_pairs()
+                        .into_iter()
+                        .flatten()
+                        .map(|(k, v)| (ValueDeserializer::new(k), ValueDeserializer::new(v))),
+                )),
             },
         }
     }
@@ -307,7 +312,12 @@ impl<'de> de::VariantAccess<'de> for VariantDeserializer {
         match self.value.as_ref().and_then(|x| x.as_object()) {
             Some(obj) if matches!(obj.repr(), ObjectRepr::Seq) => {
                 de::Deserializer::deserialize_any(
-                    de::value::SeqDeserializer::new(obj.values().map(ValueDeserializer::new)),
+                    de::value::SeqDeserializer::new(
+                        obj.try_iter()
+                            .into_iter()
+                            .flatten()
+                            .map(ValueDeserializer::new),
+                    ),
                     visitor,
                 )
             }

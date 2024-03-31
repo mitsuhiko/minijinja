@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
-use minijinja::value::{from_args, Value, ValueKind};
-use minijinja::{Environment, Error, ErrorKind};
+use minijinja::Environment;
+use minijinja::Value;
 
 #[test]
 fn test_basic() {
@@ -152,7 +152,11 @@ fn test_keep_trailing_newlines() {
 }
 
 #[test]
+#[cfg(feature = "builtins")]
 fn test_unknown_method_callback() {
+    use minijinja::value::{from_args, ValueKind};
+    use minijinja::{Error, ErrorKind};
+
     let mut env = Environment::new();
     env.set_unknown_method_callback(|_state, value, method, args| {
         if value.kind() == ValueKind::Map && method == "items" {

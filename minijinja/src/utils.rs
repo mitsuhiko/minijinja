@@ -5,7 +5,7 @@ use std::iter::{once, repeat};
 use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{OwnedValueIterator, StringType, Value, ValueKind, ValueRepr};
+use crate::value::{StringType, Value, ValueIter, ValueKind, ValueRepr};
 use crate::Output;
 
 /// internal marker to seal up some trait methods
@@ -161,9 +161,8 @@ impl UndefinedBehavior {
     /// If the value is undefined, then iteration fails if the behavior is set to strict,
     /// otherwise it succeeds with an empty iteration.  This is also internally used in the
     /// engine to convert values to lists.
-    pub(crate) fn try_iter(self, value: Value) -> Result<OwnedValueIterator, Error> {
-        self.assert_iterable(&value)
-            .and_then(|_| value.try_iter_owned())
+    pub(crate) fn try_iter(self, value: Value) -> Result<ValueIter, Error> {
+        self.assert_iterable(&value).and_then(|_| value.try_iter())
     }
 
     /// Are we strict on iteration?

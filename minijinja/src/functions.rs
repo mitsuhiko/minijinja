@@ -99,9 +99,9 @@ env.add_function("is_adult", is_adult);
 use std::fmt;
 use std::sync::Arc;
 
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
 use crate::utils::SealedMarker;
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, Value};
+use crate::value::{ArgType, Enumeration, FunctionArgs, FunctionResult, Object, ObjectRepr, Value};
 use crate::vm::State;
 
 type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
@@ -248,12 +248,16 @@ impl fmt::Debug for BoxedFunction {
 }
 
 impl Object for BoxedFunction {
-    fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
-        self.invoke(state, args)
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Plain
     }
 
-    fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self:?}")
+    fn enumeration(self: &Arc<Self>) -> Enumeration {
+        Enumeration::NonEnumerable
+    }
+
+    fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
+        self.invoke(state, args)
     }
 }
 
@@ -261,6 +265,7 @@ impl Object for BoxedFunction {
 mod builtins {
     use super::*;
 
+    use crate::error::ErrorKind;
     use crate::value::{ObjectRepr, Rest, ValueMap, ValueRepr};
 
     /// Returns a range.
@@ -334,7 +339,9 @@ mod builtins {
             None => ValueMap::default(),
             Some(value) => match value.0 {
                 ValueRepr::Undefined => ValueMap::default(),
-                ValueRepr::Object(obj) if obj.repr() == ObjectRepr::Map => obj.iter().collect(),
+                ValueRepr::Object(obj) if obj.repr() == ObjectRepr::Map => {
+                    obj.try_iter_pairs().into_iter().flatten().collect()
+                }
                 _ => return Err(Error::from(ErrorKind::InvalidOperation)),
             },
         };
@@ -388,8 +395,12 @@ mod builtins {
     pub fn namespace(defaults: Option<Value>) -> Result<Value, Error> {
         let ns = crate::value::namespace_object::Namespace::default();
         if let Some(defaults) = defaults {
-            if let Some(obj) = defaults.as_object() {
-                for (key, value) in obj.iter() {
+            if let Some(pairs) = defaults
+                .as_object()
+                .filter(|x| matches!(x.repr(), ObjectRepr::Map))
+                .and_then(|x| x.try_iter_pairs())
+            {
+                for (key, value) in pairs {
                     if let Some(key) = key.as_str() {
                         ns.set_field(key, value);
                     }

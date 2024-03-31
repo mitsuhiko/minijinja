@@ -389,7 +389,7 @@ impl<'env> Vm<'env> {
                     stack.push(Value::from_object(v))
                 }
                 Instruction::UnpackList(count) => {
-                    ctx_ok!(self.unpack_list(&mut stack, count));
+                    ctx_ok!(self.unpack_list(&mut stack, *count));
                 }
                 Instruction::Add => func_binop!(add),
                 Instruction::Sub => func_binop!(sub),
@@ -704,7 +704,7 @@ impl<'env> Vm<'env> {
         let obj = name.as_object();
         let choices = obj
             .as_ref()
-            .map(|d| d.values())
+            .and_then(|d| d.try_iter())
             .into_iter()
             .flatten()
             .chain(obj.is_none().then(|| name.clone()));
@@ -961,28 +961,27 @@ impl<'env> Vm<'env> {
         Ok(())
     }
 
-    fn unpack_list(&self, stack: &mut Stack, count: &usize) -> Result<(), Error> {
+    fn unpack_list(&self, stack: &mut Stack, count: usize) -> Result<(), Error> {
         let top = stack.pop();
-        let obj = ok!(top
+        let iter = ok!(top
             .as_object()
-            .ok_or_else(|| Error::new(ErrorKind::CannotUnpack, "not a sequence")));
+            .and_then(|x| x.try_iter())
+            .ok_or_else(|| Error::new(ErrorKind::CannotUnpack, "value is not iterable")));
 
-        match obj.enumeration().len() {
-            Some(n) if n == *count => {
-                for item in obj.values().rev() {
-                    stack.push(item);
-                }
+        let mut n = 0;
+        for item in iter {
+            stack.push(item);
+            n += 1;
+        }
 
-                Ok(())
-            }
-            Some(n) => Err(Error::new(
+        if n == count {
+            stack.reverse_top(n);
+            Ok(())
+        } else {
+            Err(Error::new(
                 ErrorKind::CannotUnpack,
-                format!("sequence of wrong length (expected {}, got {})", *count, n,),
-            )),
-            None => Err(Error::new(
-                ErrorKind::CannotUnpack,
-                "cannot unpack unsized value",
-            )),
+                format!("sequence of wrong length (expected {}, got {})", count, n,),
+            ))
         }
     }
 
@@ -999,7 +998,8 @@ impl<'env> Vm<'env> {
 
         let arg_spec = match stack.pop().0 {
             ValueRepr::Object(args) => args
-                .values()
+                .try_iter()
+                .unwrap()
                 .map(|value| match &value.0 {
                     ValueRepr::String(arg, _) => arg.clone(),
                     _ => unreachable!(),

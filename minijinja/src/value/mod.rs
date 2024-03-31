@@ -37,9 +37,8 @@
 //! `Value::from_iterator` function instead:
 //!
 //! ```
-//! // TODO: Did this create a use-once value?
-//! // # use minijinja::value::Value;
-//! // let value: Value = Value::from_iterator(1..10);
+//! # use minijinja::value::Value;
+//! let value: Value = Value::from_iterator(1..10);
 //! ```
 //!
 //! To to into the inverse directly the various [`TryFrom`](std::convert::TryFrom)
@@ -136,14 +135,14 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use serde::ser::{Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind, Result};
 use crate::functions;
 use crate::utils::OnDrop;
+use crate::value::object::ValueDbgRender;
 use crate::value::ops::as_f64;
 use crate::value::serialize::transform;
 use crate::vm::State;
@@ -167,7 +166,6 @@ mod serialize;
 
 #[cfg(feature = "deserialization")]
 pub use self::deserialize::ViaDeserialize;
-use self::object::ObjectKeyValueIter;
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
@@ -270,6 +268,10 @@ pub enum ValueKind {
     Seq,
     /// The value is a key/value mapping.
     Map,
+    /// An iterator
+    Iterator,
+    /// A plain object without specific behavior.
+    Plain,
 }
 
 impl fmt::Display for ValueKind {
@@ -283,6 +285,8 @@ impl fmt::Display for ValueKind {
             ValueKind::Bytes => "bytes",
             ValueKind::Seq => "sequence",
             ValueKind::Map => "map",
+            ValueKind::Iterator => "iterator",
+            ValueKind::Plain => "plain object",
         })
     }
 }
@@ -385,14 +389,15 @@ impl PartialEq for Value {
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
                 None => {
                     if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
-                        let (a_keys, b_keys) = (a.enumeration(), b.enumeration());
-                        if a_keys.len() != b_keys.len() {
-                            return false;
+                        if a.repr() != b.repr() {
+                            false
+                        } else if let (Some(ak), Some(bk)) =
+                            (a.try_iter_pairs(), b.try_iter_pairs())
+                        {
+                            ak.eq(bk)
+                        } else {
+                            false
                         }
-
-                        a_keys
-                            .into_iter()
-                            .all(|key| a.get_value(&key) == b.get_value(&key))
                     } else {
                         false
                     }
@@ -435,9 +440,11 @@ impl Ord for Value {
                         (Ok(a), Ok(b)) => a.cmp(b),
                         _ => self.len().cmp(&other.len()),
                     },
-                    (ValueKind::Map, ValueKind::Map) => match (self.as_object(), other.as_object())
-                    {
-                        (Some(a), Some(b)) => a.iter().cmp(b.iter()),
+                    (ValueKind::Map, ValueKind::Map) => match (
+                        self.as_object().and_then(|x| x.try_iter_pairs()),
+                        other.as_object().and_then(|x| x.try_iter_pairs()),
+                    ) {
+                        (Some(a), Some(b)) => a.cmp(b),
                         _ => self.len().cmp(&other.len()),
                     },
                     _ => Ordering::Equal,
@@ -597,10 +604,105 @@ impl Value {
         Value::from(ValueRepr::Object(value.into()))
     }
 
-    /// Creates a sequence that iterates over the given value.
+    /// Creates a value from an iterator.
     ///
-    /// The function is invoked to create an iterator which is then turned into
-    /// a sequence or iterator.
+    /// This takes an iterator (yielding values that can be turned into a [`Value`])
+    /// and returns a value that can be iterated over.  Today this value looks a bit like
+    /// a sequence (and will pretend to be one) but this is misleading.  Such values are
+    /// actually objects implementing [`IteratorObject`] but due to backwards
+    /// compatibility reasons it's not possible to give them a distinct type.
+    ///
+    /// Iterators that implement [`ExactSizeIterator`] or have a matching lower and upper
+    /// bound on the [`Iterator::size_hint`] report a known `loop.length`.  Iterators that
+    /// do not fulfill these requirements will not.  The same is true for `revindex` and
+    /// similar properties.
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// let val = Value::from_iterator(0..10);
+    /// ```
+    ///
+    /// This iterator can only be iterated over once.
+    pub fn from_iterator<I, T>(iter: I) -> Value
+    where
+        I: Iterator<Item = T> + Send + Sync + 'static,
+        T: Into<Value> + 'static,
+    {
+        struct SimpleIteratorObject<I, T>(Mutex<Option<I>>)
+        where
+            I: Iterator<Item = T> + Send + Sync + 'static,
+            T: Into<Value> + 'static;
+
+        impl<I, T> fmt::Debug for SimpleIteratorObject<I, T>
+        where
+            I: Iterator<Item = T> + Send + Sync + 'static,
+            T: Into<Value> + 'static,
+        {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_tuple("<iterator>").finish()
+            }
+        }
+
+        impl<I, T> Object for SimpleIteratorObject<I, T>
+        where
+            I: Iterator<Item = T> + Send + Sync + 'static,
+            T: Into<Value> + 'static,
+        {
+            fn repr(self: &Arc<Self>) -> ObjectRepr {
+                ObjectRepr::Iterator
+            }
+
+            fn custom_iter(
+                self: &Arc<Self>,
+            ) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+                let iter = self.0.lock().unwrap().take();
+
+                struct Iter<I, T>(Option<I>)
+                where
+                    I: Iterator<Item = T> + Send + Sync + 'static,
+                    T: Into<Value> + 'static;
+
+                impl<I, T> Iterator for Iter<I, T>
+                where
+                    I: Iterator<Item = T> + Send + Sync + 'static,
+                    T: Into<Value> + 'static,
+                {
+                    type Item = Value;
+
+                    fn next(&mut self) -> Option<Self::Item> {
+                        match &mut self.0 {
+                            Some(x) => x.next().map(Into::into),
+                            None => None,
+                        }
+                    }
+
+                    fn size_hint(&self) -> (usize, Option<usize>) {
+                        match &self.0 {
+                            Some(x) => x.size_hint(),
+                            None => (0, Some(0)),
+                        }
+                    }
+                }
+
+                Some(Box::new(Iter(iter)))
+            }
+        }
+        Value::from_object(SimpleIteratorObject(Mutex::new(Some(iter.fuse()))))
+    }
+
+    /// Creates an iterator that iterates over the given value.
+    ///
+    /// Unlike [`from_iterator`](Self::from_iterator) this returns an iterator
+    /// that can be iterated over multiple times.  Because of this it also will
+    /// render like a sequence when debug printed.
+    ///
+    /// ```rust
+    /// # use minijinja::value::Value;
+    /// let val = Value::from_object_iter(vec![1, 2, 3], |vec| {
+    ///     Box::new(vec.iter().copied().map(Value::from))
+    /// });
+    /// assert_eq!(val.to_string(), "[1, 2, 3]");
+    /// ````
     pub fn from_object_iter<T, F>(object: T, maker: F) -> Value
     where
         T: Send + Sync + 'static,
@@ -609,41 +711,18 @@ impl Value {
             + Sync
             + 'static,
     {
-        struct IterObject {
-            iter: Box<dyn Iterator<Item = Value> + Send + Sync + 'static>,
-            _object: DynObject,
-        }
-
-        impl Iterator for IterObject {
-            type Item = Value;
-
-            fn next(&mut self) -> Option<Self::Item> {
-                self.iter.next()
-            }
-
-            fn size_hint(&self) -> (usize, Option<usize>) {
-                self.iter.size_hint()
-            }
-        }
-
-        struct IterObjectMaker<T, F> {
+        struct FromObjectIter<T, F> {
             maker: F,
             object: T,
         }
 
-        impl fmt::Debug for IterObject {
+        impl<T, F> fmt::Debug for FromObjectIter<T, F> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_tuple("IterObject").finish()
+                f.debug_struct("FromObjectIter").finish()
             }
         }
 
-        impl<T, F> fmt::Debug for IterObjectMaker<T, F> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_struct("IterObjectMaker").finish()
-            }
-        }
-
-        impl<T, F> Object for IterObjectMaker<T, F>
+        impl<T, F> Object for FromObjectIter<T, F>
         where
             T: Send + Sync + 'static,
             F: for<'a> Fn(&'a T) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
@@ -652,25 +731,49 @@ impl Value {
                 + 'static,
         {
             fn repr(self: &Arc<Self>) -> ObjectRepr {
-                ObjectRepr::Seq
+                ObjectRepr::Iterator
             }
 
-            // XXX: this seems very wrong.
-            // see also https://github.com/mitsuhiko/minijinja/issues/453
-            fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-                Some(key.clone())
+            fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result
+            where
+                Self: Sized + 'static,
+            {
+                let mut dbg = f.debug_list();
+                for value in self.try_iter().into_iter().flatten() {
+                    dbg.entry(&ValueDbgRender(&value));
+                }
+                dbg.finish()
             }
 
-            fn enumeration(self: &Arc<Self>) -> Enumeration {
+            fn custom_iter(
+                self: &Arc<Self>,
+            ) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+                struct IterWrapper {
+                    iter: Box<dyn Iterator<Item = Value> + Send + Sync + 'static>,
+                    _object: DynObject,
+                }
+
+                impl Iterator for IterWrapper {
+                    type Item = Value;
+
+                    fn next(&mut self) -> Option<Self::Item> {
+                        self.iter.next()
+                    }
+
+                    fn size_hint(&self) -> (usize, Option<usize>) {
+                        self.iter.size_hint()
+                    }
+                }
+
                 let iter: Box<dyn Iterator<Item = Value> + Send + Sync + '_> =
                     (self.maker)(&self.object);
                 let iter = unsafe { std::mem::transmute(iter) };
                 let _object = DynObject::new(self.clone());
-                Enumeration::Iterator(Box::new(IterObject { iter, _object }))
+                Some(Box::new(IterWrapper { iter, _object }))
             }
         }
 
-        Value::from_object(IterObjectMaker { maker, object })
+        Value::from_object(FromObjectIter { maker, object })
     }
 
     /// Creates a callable value from a function.
@@ -709,6 +812,8 @@ impl Value {
             ValueRepr::Object(ref obj) => match obj.repr() {
                 ObjectRepr::Map => ValueKind::Map,
                 ObjectRepr::Seq => ValueKind::Seq,
+                ObjectRepr::Iterator => ValueKind::Iterator,
+                ObjectRepr::Plain => ValueKind::Plain,
             },
         }
     }
@@ -923,11 +1028,31 @@ impl Value {
     /// }
     /// # Ok(()) }
     /// ```
-    pub fn try_iter(&self) -> Result<ValueIter<'_>, Error> {
-        self.try_iter_owned().map(|inner| ValueIter {
-            _marker: PhantomData,
-            inner,
-        })
+    pub fn try_iter(&self) -> Result<ValueIter, Error> {
+        let imp = match self.0 {
+            ValueRepr::None | ValueRepr::Undefined => ValueIterImpl::Empty,
+            ValueRepr::String(ref s, _) => {
+                ValueIterImpl::Chars(0, s.chars().count(), Arc::clone(s))
+            }
+            ValueRepr::Object(ref obj) => {
+                if let Some(iter) = obj.try_iter() {
+                    ValueIterImpl::Dyn(iter)
+                } else {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("{} is not iterable", self.kind()),
+                    ));
+                }
+            }
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("{} is not iterable", self.kind()),
+                ))
+            }
+        };
+
+        Ok(ValueIter { imp })
     }
 
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
@@ -985,12 +1110,15 @@ impl Value {
         }
 
         match self.0 {
-            ValueRepr::Object(ref dy) => {
-                let len = dy.enumeration().len();
-                let idx = len.and_then(|n| index(key, || n));
-                let value = idx.map(Value::from);
-                dy.get_value(value.as_ref().unwrap_or(key))
-            }
+            ValueRepr::Object(ref dy) => match dy.repr() {
+                ObjectRepr::Map | ObjectRepr::Plain | ObjectRepr::Iterator => dy.get_value(key),
+                ObjectRepr::Seq => {
+                    let len = dy.enumeration().len();
+                    let idx = len.and_then(|n| index(key, || n));
+                    let value = idx.map(Value::from);
+                    dy.get_value(value.as_ref().unwrap_or(key))
+                }
+            },
             ValueRepr::String(ref s, _) => {
                 let idx = some!(index(key, || s.chars().count()));
                 s.chars().nth(idx).map(Value::from)
@@ -1087,29 +1215,6 @@ impl Value {
         ))
     }
 
-    /// Iterates over the value without holding a reference.
-    pub(crate) fn try_iter_owned(&self) -> Result<OwnedValueIterator, Error> {
-        let (iter_state, len) = match self.0 {
-            ValueRepr::None | ValueRepr::Undefined => (ValueIteratorState::Empty, Some(0)),
-            ValueRepr::String(ref s, _) => (
-                ValueIteratorState::Chars(0, Arc::clone(s)),
-                Some(s.chars().count()),
-            ),
-            ValueRepr::Object(ref obj) => {
-                let len = obj.enumeration().len();
-                (ValueIteratorState::Dyn(obj.repr(), obj.iter()), len)
-            }
-            _ => {
-                return Err(Error::new(
-                    ErrorKind::InvalidOperation,
-                    format!("{} is not iterable", self.kind()),
-                ))
-            }
-        };
-
-        Ok(OwnedValueIterator { iter_state, len })
-    }
-
     #[cfg(feature = "builtins")]
     pub(crate) fn get_path(&self, path: &str) -> Result<Value, Error> {
         let mut rv = self.clone();
@@ -1161,12 +1266,15 @@ impl Serialize for Value {
             ValueRepr::String(ref s, _) => serializer.serialize_str(s),
             ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
             ValueRepr::Object(ref o) => match o.repr() {
-                ObjectRepr::Seq => {
+                ObjectRepr::Plain => serializer.serialize_str(&o.to_string()),
+                ObjectRepr::Seq | ObjectRepr::Iterator => {
                     use serde::ser::SerializeSeq;
                     let enumeration = o.enumeration();
                     let mut seq = ok!(serializer.serialize_seq(enumeration.len()));
-                    for item in o.values() {
-                        ok!(seq.serialize_element(&item));
+                    if let Some(iter) = o.try_iter() {
+                        for item in iter {
+                            ok!(seq.serialize_element(&item));
+                        }
                     }
 
                     seq.end()
@@ -1174,8 +1282,10 @@ impl Serialize for Value {
                 ObjectRepr::Map => {
                     use serde::ser::SerializeMap;
                     let mut map = ok!(serializer.serialize_map(None));
-                    for (key, value) in o.iter() {
-                        ok!(map.serialize_entry(&key, &value));
+                    if let Some(iter) = o.try_iter_pairs() {
+                        for (key, value) in iter {
+                            ok!(map.serialize_entry(&key, &value));
+                        }
                     }
 
                     map.end()
@@ -1185,77 +1295,47 @@ impl Serialize for Value {
     }
 }
 
-/// Iterates over a value.
-pub struct ValueIter<'a> {
-    _marker: PhantomData<&'a Value>,
-    inner: OwnedValueIterator,
+/// Utility to iterate over values.
+pub struct ValueIter {
+    imp: ValueIterImpl,
 }
 
-impl<'a> Iterator for ValueIter<'a> {
-    type Item = Value;
-
-    #[inline(always)]
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-pub(crate) struct OwnedValueIterator {
-    iter_state: ValueIteratorState,
-    len: Option<usize>,
-}
-
-impl Iterator for OwnedValueIterator {
+impl Iterator for ValueIter {
     type Item = Value;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter_state.advance_state().map(|x| {
-            if let Some(ref mut len) = self.len {
-                *len -= 1;
+        match &mut self.imp {
+            ValueIterImpl::Empty => None,
+            ValueIterImpl::Chars(offset, len, ref s) => {
+                (s as &str)[*offset..].chars().next().map(|c| {
+                    *offset += c.len_utf8();
+                    *len -= 1;
+                    Value::from(c)
+                })
             }
-            x
-        })
+            ValueIterImpl::Dyn(iter) => iter.next(),
+        }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if let ValueIteratorState::Dyn(_, ref iter) = self.iter_state {
-            return iter.size_hint();
+        match self.imp {
+            ValueIterImpl::Empty => (0, Some(0)),
+            ValueIterImpl::Chars(_, len, _) => (0, Some(len)),
+            ValueIterImpl::Dyn(ref iter) => iter.size_hint(),
         }
-
-        (self.len.unwrap_or(0), self.len)
     }
 }
 
-impl fmt::Debug for OwnedValueIterator {
+impl fmt::Debug for ValueIter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ValueIterator").finish()
     }
 }
 
-enum ValueIteratorState {
+enum ValueIterImpl {
     Empty,
-    Chars(usize, Arc<str>),
-    Dyn(ObjectRepr, ObjectKeyValueIter),
-}
-
-impl ValueIteratorState {
-    fn advance_state(&mut self) -> Option<Value> {
-        match self {
-            ValueIteratorState::Empty => None,
-            ValueIteratorState::Chars(offset, ref s) => {
-                (s as &str)[*offset..].chars().next().map(|c| {
-                    *offset += c.len_utf8();
-                    Value::from(c)
-                })
-            }
-            ValueIteratorState::Dyn(ObjectRepr::Map, iter) => iter.next().map(|kv| kv.0),
-            ValueIteratorState::Dyn(ObjectRepr::Seq, iter) => iter.next().map(|kv| kv.1),
-        }
-    }
+    Chars(usize, usize, Arc<str>),
+    Dyn(Box<dyn Iterator<Item = Value> + Send + Sync>),
 }
 
 #[cfg(test)]
