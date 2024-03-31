@@ -111,7 +111,7 @@ where
 /// * bytes: [`&[u8]`][`slice`]
 /// * values: [`Value`], `&Value`
 /// * vectors: [`Vec<T>`]
-/// * sequences: [`&dyn SeqObject`](crate::value::SeqObject)
+/// * objects: [`DynObject`]
 /// * serde deserializable: [`ViaDeserialize<T>`](crate::value::deserialize::ViaDeserialize)
 /// * keyword arguments: [`Kwargs`]
 /// * leftover arguments: [`Rest<T>`]

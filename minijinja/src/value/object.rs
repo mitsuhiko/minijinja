@@ -10,6 +10,52 @@ use crate::value::{intern, Value, ValueMap, ValueRepr};
 use crate::vm::State;
 
 /// A trait that represents a dynamic object.
+///
+/// # Map As Context
+///
+/// Map can also be used as template rendering context.  This has a lot of
+/// benefits as it means that the serialization overhead can be largely to
+/// completely avoided.  This means that even if templates take hundreds of
+/// values, MiniJinja does not spend time eagerly converting them into values.
+///
+/// Here is a very basic example of how a template can be rendered with a dynamic
+/// context.  Note that the implementation of [`enumeration`](Self::enumeration)
+/// is optional for this to work.  It's in fact not used by the engine during
+/// rendering but it is necessary for the [`debug()`](crate::functions::debug)
+/// function to be able to show which values exist in the context.
+///
+/// ```
+/// # fn main() -> Result<(), minijinja::Error> {
+/// # use minijinja::Environment;
+/// use std::sync::Arc;
+/// use minijinja::value::{Value, Object};
+///
+/// #[derive(Debug)]
+/// pub struct DynamicContext {
+///     magic: i32,
+/// }
+///
+/// impl Object for DynamicContext {
+///     fn get_value(self: &Arc<Self>, field: &Value) -> Option<Value> {
+///         match field.as_str()? {
+///             "pid" => Some(Value::from(std::process::id())),
+///             "env" => Some(Value::from_iter(std::env::vars())),
+///             "magic" => Some(Value::from(self.magic)),
+///             _ => None,
+///         }
+///     }
+/// }
+///
+/// # let env = Environment::new();
+/// let tmpl = env.template_from_str("HOME={{ env.HOME }}; PID={{ pid }}; MAGIC={{ magic }}")?;
+/// let ctx = Value::from_object(DynamicContext { magic: 42 });
+/// let rv = tmpl.render(ctx)?;
+/// # Ok(()) }
+/// ```
+///
+/// One thing of note here is that in the above example `env` would be re-created every
+/// time the template needs it.  A better implementation would cache the value after it
+/// was created first.
 pub trait Object: fmt::Debug + Send + Sync {
     /// Indicates the natural representation of an object.
     ///
@@ -65,7 +111,7 @@ pub trait Object: fmt::Debug + Send + Sync {
     /// The default implementation returns an
     /// [`UnknownMethod`](crate::ErrorKind::UnknownMethod) error.  When this error
     /// is returned the engine will invoke the
-    /// [`unknown_method_callback`](crate::Environment::set_unknonw_method_callback) of
+    /// [`unknown_method_callback`](crate::Environment::set_unknown_method_callback) of
     /// the environment.
     fn call_method(
         self: &Arc<Self>,

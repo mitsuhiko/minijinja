@@ -116,7 +116,7 @@ pub mod __context {
 ///
 /// The merge works with an value, not just values created by the `context!`
 /// macro and is performed lazy.  This means it also works with dynamic
-/// [`MapObject`](crate::value::MapObject)s.
+/// [`Object`](crate::value::Object)s.
 #[macro_export]
 macro_rules! context {
     () => {
