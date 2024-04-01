@@ -268,17 +268,27 @@ impl<T: Object + Send + Sync + 'static> ObjectExt for T {}
 /// Utility type to enumerate an object.
 #[non_exhaustive]
 pub enum Enumerator {
-    /// A non enumerable enumeration.  This fails iteration.
+    /// A non enumerable enumeration.
+    ///
+    /// This fails iteration and the object has no known length.
     NonEnumerable,
-    /// The empty enumeration
+    /// The empty enumeration.  It yields no elements.
+    ///
+    /// It has a known length of 0.
     Empty,
     /// A slice of static string keys.
+    ///
+    /// This has a known length which is the length of the slice.
     Str(&'static [&'static str]),
-    /// A dynamic iterator over keys.
+    /// A dynamic iterator over keys.  Length is known if the size hint has matching lower and upper bounds.
     Iter(Box<dyn Iterator<Item = Value> + Send + Sync>),
     /// Instructs the engine to yield values by calling `get_value` from 0 to `usize`.
+    ///
+    /// This has a known legth of `usize`.
     Sequential(usize),
     /// A vector of known values to iterate over.
+    ///
+    /// This has a known length which is the length of the vector.
     Values(Vec<Value>),
 }
 
