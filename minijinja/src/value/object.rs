@@ -26,7 +26,7 @@ use crate::vm::State;
 /// struct Point(f32, f32, f32);
 ///
 /// impl Object for Point {
-///     fn get_value(self: &Arc<self>, key: &Value) -> Option<Value> {
+///     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
 ///         match key.as_str()? {
 ///             "x" => Some(Value::from(self.0)),
 ///             "y" => Some(Value::from(self.1)),
@@ -60,11 +60,11 @@ use crate::vm::State;
 /// struct Point(f32, f32, f32);
 ///
 /// impl Object for Point {
-///     fn repr(self: &Arc<self>) -> ObjectRepr {
+///     fn repr(self: &Arc<Self>) -> ObjectRepr {
 ///         ObjectRepr::Seq
 ///     }
 ///
-///     fn get_value(self: &Arc<self>, key: &Value) -> Option<Value> {
+///     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
 ///         match key.as_usize()? {
 ///             0 => Some(Value::from(self.0)),
 ///             1 => Some(Value::from(self.1)),
