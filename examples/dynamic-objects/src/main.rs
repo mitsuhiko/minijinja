@@ -3,7 +3,7 @@ use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use minijinja::value::{from_args, Enumeration, Object, ObjectRepr, Value};
+use minijinja::value::{from_args, Enumerator, Object, ObjectRepr, Value};
 use minijinja::{Environment, Error, State};
 
 #[derive(Debug)]
@@ -70,8 +70,8 @@ impl Object for SimpleDynamicSeq {
         ['a', 'b', 'c', 'd'].get(idx).copied().map(Value::from)
     }
 
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
-        Enumeration::Sized(4)
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Seq(4)
     }
 }
 

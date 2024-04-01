@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use minijinja::value::{Enumeration, Object, Value, ValueKind};
+use minijinja::value::{Enumerator, Object, Value, ValueKind};
 use minijinja::{context, Environment};
 
 #[derive(Debug)]
@@ -16,13 +16,13 @@ impl Object for SelfReferentialContext {
         self.ctx.get_item(name).ok().filter(|x| !x.is_undefined())
     }
 
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
         if self.ctx.kind() == ValueKind::Map {
             if let Ok(keys) = self.ctx.try_iter() {
-                return Enumeration::Values(keys.collect());
+                return Enumerator::Values(keys.collect());
             }
         }
-        Enumeration::Sized(0)
+        Enumerator::Seq(0)
     }
 }
 

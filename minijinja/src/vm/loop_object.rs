@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Enumeration, Object, Value};
+use crate::value::{Enumerator, Object, Value};
 use crate::vm::state::State;
 
 pub(crate) struct Loop {
@@ -135,12 +135,12 @@ impl Object for Loop {
         }
     }
 
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
-        Enumeration::Static(self.keys())
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Str(self.keys())
     }
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.get(key.as_str()?)
+        self.get(some!(key.as_str()))
     }
 
     fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {

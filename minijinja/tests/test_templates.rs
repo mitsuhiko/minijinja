@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use insta::assert_snapshot;
-use minijinja::value::{Enumeration, Object, Value};
+use minijinja::value::{Enumerator, Object, Value};
 use minijinja::{context, render, Environment, Error, State};
 
 use similar_asserts::assert_eq;
@@ -181,8 +181,8 @@ fn test_items_and_dictsort_with_structs() {
             }
         }
 
-        fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::Static(&["b", "a"])
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Str(&["b", "a"])
         }
     }
 
@@ -210,8 +210,8 @@ fn test_urlencode_with_struct() {
             }
         }
 
-        fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::Static(&["a", "b"])
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Str(&["a", "b"])
         }
     }
 

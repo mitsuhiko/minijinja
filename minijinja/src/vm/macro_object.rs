@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::AutoEscape;
-use crate::value::{Enumeration, Object, Value, ValueRepr};
+use crate::value::{Enumerator, Object, Value, ValueRepr};
 use crate::vm::state::State;
 use crate::vm::Vm;
 
@@ -29,19 +29,17 @@ impl fmt::Debug for Macro {
 }
 
 impl Object for Macro {
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
-        Enumeration::Static(&["name", "arguments", "caller"])
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Str(&["name", "arguments", "caller"])
     }
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        match key.as_str()? {
-            "name" => Some(Value::from(self.name.clone())),
-            "arguments" => Some(Value::from_iter(
-                self.arg_spec.iter().cloned().map(Value::from),
-            )),
-            "caller" => Some(Value::from(self.caller_reference)),
-            _ => None,
-        }
+        Some(match some!(key.as_str()) {
+            "name" => Value::from(self.name.clone()),
+            "arguments" => Value::from_iter(self.arg_spec.iter().cloned().map(Value::from)),
+            "caller" => Value::from(self.caller_reference),
+            _ => return None,
+        })
     }
 
     fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[Value]) -> Result<Value, Error> {

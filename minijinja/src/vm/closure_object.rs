@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
-use crate::value::{Enumeration, Object, Value};
+use crate::value::{Enumerator, Object, Value};
 
 /// Closure cycle breaker utility.
 ///
@@ -65,9 +65,9 @@ impl Object for Closure {
         self.values.lock().unwrap().get(key.as_str()?).cloned()
     }
 
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
         let values = self.values.lock().unwrap();
         let keys = values.keys().cloned().map(Value::from);
-        Enumeration::Values(keys.collect())
+        Enumerator::Values(keys.collect())
     }
 }

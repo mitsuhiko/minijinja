@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
-use crate::value::{Enumeration, Object, Value};
+use crate::value::{Enumerator, Object, Value};
 
 /// This object exists for the `namespace` function.
 ///
@@ -15,13 +15,13 @@ pub(crate) struct Namespace {
 
 impl Object for Namespace {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.data.lock().unwrap().get(key.as_str()?).cloned()
+        self.data.lock().unwrap().get(some!(key.as_str())).cloned()
     }
 
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
         let data = self.data.lock().unwrap();
         let keys = data.keys().cloned().map(Value::from);
-        Enumeration::Values(keys.collect())
+        Enumerator::Values(keys.collect())
     }
 }
 

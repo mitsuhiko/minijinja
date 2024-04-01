@@ -3,7 +3,7 @@ use std::sync::Arc;
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
-use minijinja::value::{DynObject, Enumeration, Kwargs, Object, ObjectRepr, Rest, Value};
+use minijinja::value::{DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value};
 use minijinja::{args, render, Environment, Error};
 
 #[test]
@@ -179,8 +179,8 @@ fn test_map_object_iteration_and_indexing() {
             }
         }
 
-        fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::Static(&["x", "y", "z"])
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Str(&["x", "y", "z"])
         }
     }
 
@@ -220,8 +220,8 @@ fn test_seq_object_iteration_and_indexing() {
             }
         }
 
-        fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::Sized(3)
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Seq(3)
         }
     }
 
@@ -261,7 +261,7 @@ fn test_builtin_seq_objects() {
 fn test_value_object_interface() {
     let val = Value::from_object(vec![1u32, 2, 3, 4]);
     let obj = val.as_object().unwrap();
-    assert_eq!(obj.enumeration().len(), Some(4));
+    assert_eq!(obj.len(), Some(4));
     assert_eq!(obj.to_string(), "[1, 2, 3, 4]");
 }
 
@@ -297,8 +297,8 @@ fn test_seq_object_downcast() {
             }
         }
 
-        fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::Sized(3)
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Seq(3)
         }
     }
 
@@ -580,8 +580,8 @@ fn test_seq_custom_iter() {
             ObjectRepr::Seq
         }
 
-        fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::NonEnumerable
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Iter(Box::new(('a'..='b').map(Value::from)))
         }
 
         fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
@@ -590,10 +590,6 @@ fn test_seq_custom_iter() {
                 Some(1) => Some(Value::from(false)),
                 _ => None,
             }
-        }
-
-        fn custom_iter(self: &Arc<Self>) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
-            Some(Box::new(('a'..='b').map(Value::from)))
         }
     }
 
@@ -625,8 +621,8 @@ fn test_map_custom_iter() {
             ObjectRepr::Map
         }
 
-        fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::NonEnumerable
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Iter(Box::new(('a'..='b').map(Value::from)))
         }
 
         fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
@@ -635,10 +631,6 @@ fn test_map_custom_iter() {
                 Some("b") => Some(Value::from(false)),
                 _ => None,
             }
-        }
-
-        fn custom_iter(self: &Arc<Self>) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
-            Some(Box::new(('a'..='b').map(Value::from)))
         }
     }
 

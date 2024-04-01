@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use serde::{Deserialize, Serialize};
 use similar_asserts::assert_eq;
 
-use minijinja::value::{Enumeration, Object, ObjectRepr, Value};
+use minijinja::value::{Enumerator, Object, ObjectRepr, Value};
 
 #[test]
 fn test_seq() {
@@ -31,8 +31,8 @@ fn test_seq_object() {
             }
         }
 
-        fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::Sized(3)
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Seq(3)
         }
     }
 
@@ -67,8 +67,8 @@ fn test_struct_object() {
             }
         }
 
-        fn enumeration(self: &Arc<Self>) -> Enumeration {
-            Enumeration::Static(&["a", "b"])
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Str(&["a", "b"])
         }
     }
 

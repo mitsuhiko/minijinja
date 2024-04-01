@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{Enumeration, Object, Value, ValueKind};
+use minijinja::value::{Enumerator, Object, Value, ValueKind};
 use minijinja::{context, Environment};
 
 #[derive(Debug)]
@@ -26,13 +26,13 @@ impl Object for TrackedContext {
         }
     }
 
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
         if self.enclosed.kind() == ValueKind::Map {
             if let Ok(keys) = self.enclosed.try_iter() {
-                return Enumeration::Values(keys.collect());
+                return Enumerator::Values(keys.collect());
             }
         }
-        Enumeration::Sized(0)
+        Enumerator::Seq(0)
     }
 }
 
