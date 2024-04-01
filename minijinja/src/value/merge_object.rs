@@ -21,7 +21,7 @@ impl Object for MergeObject {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        self.map_enumerator(|this| {
+        self.mapped_enumerator(|this| {
             let mut seen = BTreeSet::new();
             let iter = this
                 .0

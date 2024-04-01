@@ -234,8 +234,8 @@ macro_rules! impl_object_helpers {
 
 /// Provides utility methods for working with objects.
 pub trait ObjectExt: Object + Send + Sync + 'static {
-    /// Creates a new iterator enumeration that projects into the given object.
-    fn map_enumerator<F>(self: &Arc<Self>, maker: F) -> Enumerator
+    /// Creates a new enumeration that projects into the given object.
+    fn mapped_enumerator<F>(self: &Arc<Self>, maker: F) -> Enumerator
     where
         F: for<'a> FnOnce(&'a Self) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
             + Send
@@ -406,7 +406,7 @@ impl Object for ValueMap {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        self.map_enumerator(|this| Box::new(this.keys().cloned()))
+        self.mapped_enumerator(|this| Box::new(this.keys().cloned()))
     }
 }
 
@@ -429,7 +429,7 @@ where
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        self.map_enumerator(|this| {
+        self.mapped_enumerator(|this| {
             Box::new(this.keys().map(|k| intern(k.as_ref())).map(Value::from))
         })
     }
