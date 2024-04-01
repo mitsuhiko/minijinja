@@ -18,7 +18,7 @@ use crate::vm::State;
 /// values, MiniJinja does not spend time eagerly converting them into values.
 ///
 /// Here is a very basic example of how a template can be rendered with a dynamic
-/// context.  Note that the implementation of [`enumeration`](Self::enumeration)
+/// context.  Note that the implementation of [`enumerate`](Self::enumerate)
 /// is optional for this to work.  It's in fact not used by the engine during
 /// rendering but it is necessary for the [`debug()`](crate::functions::debug)
 /// function to be able to show which values exist in the context.
@@ -69,10 +69,10 @@ pub trait Object: fmt::Debug + Send + Sync {
         None
     }
 
-    /// Returns the enumeration of the object.
+    /// Enumerates the object.
     ///
-    /// For more information see [`Enumeration`].  The default implementation
-    /// returns an `Empty` enumeration if the object repr is a `Map` or `Seq`,
+    /// For more information see [`Enumerator`].  The default implementation
+    /// returns an `Empty` enumerator if the object repr is a `Map` or `Seq`,
     /// and `NonEnumerable` for `Plain` objects or `Iterator`s.
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         match self.repr() {
@@ -84,8 +84,9 @@ pub trait Object: fmt::Debug + Send + Sync {
     /// Returns the length of the object.
     ///
     /// By default the length is taken from the `Enumerator`.  This means that in order
-    /// to determine the length, an enumeration is started.  If you this is a problem for
-    /// your uses, you can manually implement this.
+    /// to determine the length, an iteration is started.  If you this is a problem for
+    /// your uses, you can manually implement this.  This might for instance be needed
+    /// if your type can only be iterated over once.
     fn len(self: &Arc<Self>) -> Option<usize> {
         self.enumerate().len()
     }
@@ -161,26 +162,17 @@ pub trait Object: fmt::Debug + Send + Sync {
                 }
                 dbg.finish()
             }
-            ObjectRepr::Seq => {
+            // for either sequences or iterables, a length is needed, otherwise we
+            // don't want to risk iteration during printing and fall back to the
+            // debug print.
+            ObjectRepr::Seq | ObjectRepr::Iterable if self.len().is_some() => {
                 let mut dbg = f.debug_list();
                 for value in self.try_iter().into_iter().flatten() {
                     dbg.entry(&Dbg(&value));
                 }
                 dbg.finish()
             }
-            ObjectRepr::Iterable => {
-                // for iterables with a known length we display this as a sequence by default
-                if self.len().is_some() {
-                    let mut dbg = f.debug_list();
-                    for value in self.try_iter().into_iter().flatten() {
-                        dbg.entry(&Dbg(&value));
-                    }
-                    dbg.finish()
-                } else {
-                    write!(f, "{self:?}")
-                }
-            }
-            ObjectRepr::Plain => {
+            _ => {
                 write!(f, "{self:?}")
             }
         }

@@ -34,14 +34,12 @@ impl Object for Macro {
     }
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        match key.as_str()? {
-            "name" => Some(Value::from(self.name.clone())),
-            "arguments" => Some(Value::from_iter(
-                self.arg_spec.iter().cloned().map(Value::from),
-            )),
-            "caller" => Some(Value::from(self.caller_reference)),
-            _ => None,
-        }
+        Some(match some!(key.as_str()) {
+            "name" => Value::from(self.name.clone()),
+            "arguments" => Value::from_iter(self.arg_spec.iter().cloned().map(Value::from)),
+            "caller" => Value::from(self.caller_reference),
+            _ => return None,
+        })
     }
 
     fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
