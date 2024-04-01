@@ -392,7 +392,7 @@ impl<T: Into<Value> + Clone + Send + Sync + fmt::Debug> Object for Vec<T> {
     }
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.get(key.as_usize()?).cloned().map(|v| v.into())
+        self.get(some!(key.as_usize())).cloned().map(|v| v.into())
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
@@ -425,7 +425,7 @@ where
     V: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
 {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.get(key.as_str()?).cloned().map(|v| v.into())
+        self.get(some!(key.as_str())).cloned().map(|v| v.into())
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {

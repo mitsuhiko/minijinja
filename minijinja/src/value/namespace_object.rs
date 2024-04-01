@@ -15,7 +15,7 @@ pub(crate) struct Namespace {
 
 impl Object for Namespace {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.data.lock().unwrap().get(key.as_str()?).cloned()
+        self.data.lock().unwrap().get(some!(key.as_str())).cloned()
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {

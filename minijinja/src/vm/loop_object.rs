@@ -140,7 +140,7 @@ impl Object for Loop {
     }
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.get(key.as_str()?)
+        self.get(some!(key.as_str()))
     }
 
     fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
