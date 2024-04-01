@@ -11,7 +11,7 @@ use crate::value::{
 };
 use crate::vm::State;
 
-use super::{Enumeration, Object};
+use super::{Enumerator, Object};
 
 /// A utility trait that represents the return value of functions and filters.
 ///
@@ -751,8 +751,8 @@ impl Object for KwargsValues {
         self.as_value_map().get_value(key)
     }
 
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
-        self.as_value_map().enumeration()
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        self.as_value_map().enumerate()
     }
 }
 

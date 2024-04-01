@@ -140,13 +140,12 @@ use serde::ser::{Serialize, Serializer};
 use crate::error::{Error, ErrorKind, Result};
 use crate::functions;
 use crate::utils::OnDrop;
-use crate::value::object::ValueDbgRender;
 use crate::value::ops::as_f64;
 use crate::value::serialize::transform;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest};
-pub use crate::value::object::{DynObject, Enumeration, Object, ObjectExt, ObjectRepr};
+pub use crate::value::object::{DynObject, Enumerator, Object, ObjectExt, ObjectRepr};
 
 #[macro_use]
 mod type_erase;
@@ -264,8 +263,8 @@ pub enum ValueKind {
     Seq,
     /// The value is a key/value mapping.
     Map,
-    /// An iterator
-    Iterator,
+    /// An iterable
+    Iterable,
     /// A plain object without specific behavior.
     Plain,
 }
@@ -281,7 +280,7 @@ impl fmt::Display for ValueKind {
             ValueKind::Bytes => "bytes",
             ValueKind::Seq => "sequence",
             ValueKind::Map => "map",
-            ValueKind::Iterator => "iterator",
+            ValueKind::Iterable => "iterator",
             ValueKind::Plain => "plain object",
         })
     }
@@ -640,12 +639,14 @@ impl Value {
             T: Into<Value> + 'static,
         {
             fn repr(self: &Arc<Self>) -> ObjectRepr {
-                ObjectRepr::Iterator
+                ObjectRepr::Iterable
             }
 
-            fn custom_iter(
-                self: &Arc<Self>,
-            ) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+            fn len(self: &Arc<Self>) -> Option<usize> {
+                None
+            }
+
+            fn enumerate(self: &Arc<Self>) -> Enumerator {
                 let iter = self.0.lock().unwrap().take();
 
                 struct Iter<I, T>(Option<I>)
@@ -675,7 +676,7 @@ impl Value {
                     }
                 }
 
-                Some(Box::new(Iter(iter)))
+                Enumerator::Iter(Box::new(Iter(iter)))
             }
         }
         Value::from_object(SimpleIteratorObject(Mutex::new(Some(iter.fuse()))))
@@ -722,23 +723,10 @@ impl Value {
                 + 'static,
         {
             fn repr(self: &Arc<Self>) -> ObjectRepr {
-                ObjectRepr::Iterator
+                ObjectRepr::Iterable
             }
 
-            fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result
-            where
-                Self: Sized + 'static,
-            {
-                let mut dbg = f.debug_list();
-                for value in self.try_iter().into_iter().flatten() {
-                    dbg.entry(&ValueDbgRender(&value));
-                }
-                dbg.finish()
-            }
-
-            fn custom_iter(
-                self: &Arc<Self>,
-            ) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
+            fn enumerate(self: &Arc<Self>) -> Enumerator {
                 struct IterWrapper {
                     iter: Box<dyn Iterator<Item = Value> + Send + Sync + 'static>,
                     _object: DynObject,
@@ -760,7 +748,7 @@ impl Value {
                     (self.maker)(&self.object);
                 let iter = unsafe { std::mem::transmute(iter) };
                 let _object = DynObject::new(self.clone());
-                Some(Box::new(IterWrapper { iter, _object }))
+                Enumerator::Iter(Box::new(IterWrapper { iter, _object }))
             }
         }
 
@@ -803,7 +791,7 @@ impl Value {
             ValueRepr::Object(ref obj) => match obj.repr() {
                 ObjectRepr::Map => ValueKind::Map,
                 ObjectRepr::Seq => ValueKind::Seq,
-                ObjectRepr::Iterator => ValueKind::Iterator,
+                ObjectRepr::Iterable => ValueKind::Iterable,
                 ObjectRepr::Plain => ValueKind::Plain,
             },
         }
@@ -840,7 +828,7 @@ impl Value {
             ValueRepr::String(ref x, _) => !x.is_empty(),
             ValueRepr::Bytes(ref x) => !x.is_empty(),
             ValueRepr::None | ValueRepr::Undefined | ValueRepr::Invalid(_) => false,
-            ValueRepr::Object(ref x) => !x.enumeration().is_empty(),
+            ValueRepr::Object(ref x) => !x.is_empty(),
         }
     }
 
@@ -914,7 +902,7 @@ impl Value {
     pub fn len(&self) -> Option<usize> {
         match self.0 {
             ValueRepr::String(ref s, _) => Some(s.chars().count()),
-            ValueRepr::Object(ref dy) => dy.enumeration().len(),
+            ValueRepr::Object(ref dy) => dy.len(),
             _ => None,
         }
     }
@@ -1094,9 +1082,9 @@ impl Value {
     }
 
     pub(crate) fn get_item_opt(&self, key: &Value) -> Option<Value> {
-        fn index(value: &Value, len: impl Fn() -> usize) -> Option<usize> {
+        fn index(value: &Value, len: impl Fn() -> Option<usize>) -> Option<usize> {
             match value.as_i64().and_then(|v| isize::try_from(v).ok()) {
-                Some(i) if i < 0 => len().checked_sub(i.unsigned_abs()),
+                Some(i) if i < 0 => some!(len()).checked_sub(i.unsigned_abs()),
                 Some(i) => Some(i as usize),
                 None => None,
             }
@@ -1104,16 +1092,14 @@ impl Value {
 
         match self.0 {
             ValueRepr::Object(ref dy) => match dy.repr() {
-                ObjectRepr::Map | ObjectRepr::Plain | ObjectRepr::Iterator => dy.get_value(key),
+                ObjectRepr::Map | ObjectRepr::Plain | ObjectRepr::Iterable => dy.get_value(key),
                 ObjectRepr::Seq => {
-                    let len = dy.enumeration().len();
-                    let idx = len.and_then(|n| index(key, || n));
-                    let value = idx.map(Value::from);
-                    dy.get_value(value.as_ref().unwrap_or(key))
+                    let idx = index(key, || dy.len()).map(Value::from);
+                    dy.get_value(idx.as_ref().unwrap_or(key))
                 }
             },
             ValueRepr::String(ref s, _) => {
-                let idx = some!(index(key, || s.chars().count()));
+                let idx = some!(index(key, || Some(s.chars().count())));
                 s.chars().nth(idx).map(Value::from)
             }
             _ => None,
@@ -1260,10 +1246,9 @@ impl Serialize for Value {
             ValueRepr::Bytes(ref b) => serializer.serialize_bytes(b),
             ValueRepr::Object(ref o) => match o.repr() {
                 ObjectRepr::Plain => serializer.serialize_str(&o.to_string()),
-                ObjectRepr::Seq | ObjectRepr::Iterator => {
+                ObjectRepr::Seq | ObjectRepr::Iterable => {
                     use serde::ser::SerializeSeq;
-                    let enumeration = o.enumeration();
-                    let mut seq = ok!(serializer.serialize_seq(enumeration.len()));
+                    let mut seq = ok!(serializer.serialize_seq(o.len()));
                     if let Some(iter) = o.try_iter() {
                         for item in iter {
                             ok!(seq.serialize_element(&item));
@@ -1358,8 +1343,8 @@ mod tests {
                 }
             }
 
-            fn enumeration(self: &Arc<Self>) -> Enumeration {
-                Enumeration::Static(&["value"])
+            fn enumerate(self: &Arc<Self>) -> Enumerator {
+                Enumerator::Str(&["value"])
             }
 
             fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {

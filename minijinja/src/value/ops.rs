@@ -114,7 +114,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         }
         ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
         ValueRepr::Object(obj) if obj.repr() == ObjectRepr::Seq => {
-            let len = obj.enumeration().len().unwrap_or_default();
+            let len = obj.len().unwrap_or_default();
             let (start, len) = get_offset_and_len(start, stop, || len);
             Ok(Value::from_iter(
                 obj.try_iter()
@@ -273,7 +273,7 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
         match obj.repr() {
             ObjectRepr::Plain => false,
             ObjectRepr::Map => obj.get_value(value).is_some(),
-            ObjectRepr::Seq | ObjectRepr::Iterator => {
+            ObjectRepr::Seq | ObjectRepr::Iterable => {
                 obj.try_iter().into_iter().flatten().any(|v| &v == value)
             }
         }

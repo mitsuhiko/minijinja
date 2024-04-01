@@ -764,7 +764,7 @@ mod builtins {
             .as_object()
             .filter(|x| matches!(x.repr(), ObjectRepr::Seq))
         {
-            Ok(match obj.enumeration().len() {
+            Ok(match obj.len() {
                 Some(0) | None => None,
                 Some(idx) => obj.get_value(&Value::from(idx - 1)),
             }

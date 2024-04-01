@@ -2,7 +2,6 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
-use std::ops::Range;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind, Result};
@@ -73,25 +72,30 @@ pub trait Object: fmt::Debug + Send + Sync {
     /// Returns the enumeration of the object.
     ///
     /// For more information see [`Enumeration`].  The default implementation
-    /// returns a empty enumeration if the object repr is a `Map` or `Seq`,
+    /// returns an `Empty` enumeration if the object repr is a `Map` or `Seq`,
     /// and `NonEnumerable` for `Plain` objects or `Iterator`s.
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
         match self.repr() {
-            ObjectRepr::Plain | ObjectRepr::Iterator => Enumeration::NonEnumerable,
-            ObjectRepr::Map | ObjectRepr::Seq => Enumeration::Sized(0),
+            ObjectRepr::Plain | ObjectRepr::Iterable => Enumerator::NonEnumerable,
+            ObjectRepr::Map | ObjectRepr::Seq => Enumerator::Empty,
         }
     }
 
-    /// Overrides the default iteration behavior.
+    /// Returns the length of the object.
     ///
-    /// If this returns `None` then the default object iteration as
-    /// defined by the object's `repr` and `enumeration` is used.
-    /// When this is implemented it's recommended that the object
-    /// repr is set to [`ObjectRepr::Iterator`].  The engine does
-    /// ensure that it can also be implemented for other object types
-    /// but the behavior can be confusing.
-    fn custom_iter(self: &Arc<Self>) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
-        None
+    /// By default the length is taken from the `Enumerator`.  This means that in order
+    /// to determine the length, an enumeration is started.  If you this is a problem for
+    /// your uses, you can manually implement this.
+    fn len(self: &Arc<Self>) -> Option<usize> {
+        self.enumerate().len()
+    }
+
+    /// Returns `true` if this object is considered empty.
+    ///
+    /// The default implementation checks if the length of the object is `Some(0)` which
+    /// is the recommended behavior for objects.
+    fn is_empty(self: &Arc<Self>) -> bool {
+        self.len() == Some(0)
     }
 
     /// The engine calls this to invoke the object itself.
@@ -137,22 +141,46 @@ pub trait Object: fmt::Debug + Send + Sync {
     where
         Self: Sized + 'static,
     {
+        struct Dbg<'a>(pub &'a Value);
+
+        impl<'a> fmt::Debug for Dbg<'a> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                if let ValueRepr::Object(ref obj) = self.0 .0 {
+                    obj.render(f)
+                } else {
+                    fmt::Debug::fmt(&self.0, f)
+                }
+            }
+        }
+
         match self.repr() {
             ObjectRepr::Map => {
                 let mut dbg = f.debug_map();
                 for (key, value) in self.try_iter_pairs().into_iter().flatten() {
-                    dbg.entry(&ValueDbgRender(&key), &ValueDbgRender(&value));
+                    dbg.entry(&Dbg(&key), &Dbg(&value));
                 }
                 dbg.finish()
             }
             ObjectRepr::Seq => {
                 let mut dbg = f.debug_list();
                 for value in self.try_iter().into_iter().flatten() {
-                    dbg.entry(&ValueDbgRender(&value));
+                    dbg.entry(&Dbg(&value));
                 }
                 dbg.finish()
             }
-            ObjectRepr::Plain | ObjectRepr::Iterator => {
+            ObjectRepr::Iterable => {
+                // for iterables with a known length we display this as a sequence by default
+                if self.len().is_some() {
+                    let mut dbg = f.debug_list();
+                    for value in self.try_iter().into_iter().flatten() {
+                        dbg.entry(&Dbg(&value));
+                    }
+                    dbg.finish()
+                } else {
+                    write!(f, "{self:?}")
+                }
+            }
+            ObjectRepr::Plain => {
                 write!(f, "{self:?}")
             }
         }
@@ -161,22 +189,26 @@ pub trait Object: fmt::Debug + Send + Sync {
 
 macro_rules! impl_object_helpers {
     ($vis:vis $self_ty: ty) => {
-        /// Iterates over an object.
-        $vis fn try_iter(self: $self_ty) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>> {
-            if let Some(iter) = self.custom_iter() {
-                Some(iter)
-            } else {
-                let iter = some!(self.clone().enumeration().try_into_iter());
-                Some(match self.repr() {
-                    ObjectRepr::Plain | ObjectRepr::Iterator => return None,
-                    ObjectRepr::Map => Box::new(iter),
-                    ObjectRepr::Seq => {
-                        let self_clone = self.clone();
-                        Box::new(
-                            iter.map(move |key| self_clone.get_value(&key).unwrap_or_default()),
-                        )
-                    }
-                })
+        /// Iterates over this object.
+        ///
+        /// If this returns `None` then the default object iteration as defined by
+        /// the object's `enumeration` is used.
+        $vis fn try_iter(self: $self_ty) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>>
+        where
+            Self: 'static,
+        {
+            match self.enumerate() {
+                Enumerator::NonEnumerable => None,
+                Enumerator::Empty => Some(Box::new(None::<Value>.into_iter())),
+                Enumerator::Sequential(l) => {
+                    let self_clone = self.clone();
+                    Some(Box::new((0..l).map(move |idx| {
+                        self_clone.get_value(&Value::from(idx)).unwrap_or_default()
+                    })))
+                }
+                Enumerator::Iter(iter) => Some(iter),
+                Enumerator::Str(s) => Some(Box::new(s.iter().copied().map(intern).map(Value::from))),
+                Enumerator::Values(v) => Some(Box::new(v.into_iter())),
             }
         }
 
@@ -184,27 +216,18 @@ macro_rules! impl_object_helpers {
         $vis fn try_iter_pairs(
             self: $self_ty,
         ) -> Option<Box<dyn Iterator<Item = (Value, Value)> + Send + Sync>> {
+            let iter = some!(self.try_iter());
+            let repr = self.repr();
             let self_clone = self.clone();
-            if let Some(iter) = self.custom_iter() {
-                let repr = self.repr();
-                Some(Box::new(
-                    iter.enumerate().map(move |(idx, item)| {
-                        match repr {
-                            ObjectRepr::Seq | ObjectRepr::Plain | ObjectRepr::Iterator => (Value::from(idx), item),
-                            ObjectRepr::Map => {
-                                let value = self_clone.get_value(&item);
-                                (item, value.unwrap_or_default())
-                            }
-                        }
-                    })
-                ))
-            } else {
-                let iter = some!(self.clone().enumeration().try_into_iter());
-                Some(Box::new(iter.map(move |key| {
-                    let value = self_clone.get_value(&key);
-                    (key, value.unwrap_or_default())
-                })))
-            }
+            Some(Box::new(iter.enumerate().map(move |(idx, item)| {
+                match repr {
+                    ObjectRepr::Map => {
+                        let value = self_clone.get_value(&item);
+                        (item, value.unwrap_or_default())
+                    }
+                    _ => (Value::from(idx), item)
+                }
+            })))
         }
     };
 }
@@ -212,7 +235,7 @@ macro_rules! impl_object_helpers {
 /// Provides utility methods for working with objects.
 pub trait ObjectExt: Object + Send + Sync + 'static {
     /// Creates a new iterator enumeration that projects into the given object.
-    fn mapped_enumeration<F>(self: &Arc<Self>, maker: F) -> Enumeration
+    fn map_enumerator<F>(self: &Arc<Self>, maker: F) -> Enumerator
     where
         F: for<'a> FnOnce(&'a Self) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
             + Send
@@ -242,7 +265,7 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
         // SAFETY: this is safe because the `IterObject` will keep our object alive.
         let iter = unsafe { std::mem::transmute(iter) };
         let _object = self.clone();
-        Enumeration::Iterator(Box::new(IterObject { iter, _object }))
+        Enumerator::Iter(Box::new(IterObject { iter, _object }))
     }
 
     impl_object_helpers!(&Arc<Self>);
@@ -251,39 +274,20 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
 impl<T: Object + Send + Sync + 'static> ObjectExt for T {}
 
 /// Utility type to enumerate an object.
-///
-/// The purpose of this type is to reveal the contents of an object by the key.  An
-/// enumeration always reveals the indexes or keys of an object.  The user of
-/// such an enumeration must thus call into [`get_value`](Object::get_value) to
-/// reveal the associated value to that key.
-///
-/// Enumerations are used as the primary method to automatically derive the
-/// iteration behavior of an object.
 #[non_exhaustive]
-pub enum Enumeration {
-    /// A list of known values.
-    ///
-    /// If the object is a sequence these are the values, if the object is a
-    /// map this are actually the keys.
-    Values(Vec<Value>),
-    /// A slice of static string keys.
-    Static(&'static [&'static str]),
-    /// A dynamic iterator over keys.
-    Iterator(Box<dyn Iterator<Item = Value> + Send + Sync>),
-    /// Indicates indexes from 0 to `usize`.
-    Sized(usize),
+pub enum Enumerator {
     /// A non enumerable enumeration.  This fails iteration.
     NonEnumerable,
-}
-
-/// Iterates over an enumeration.
-pub(crate) struct EnumerationIter(EnumerationIterRepr);
-
-enum EnumerationIterRepr {
-    Values(std::vec::IntoIter<Value>),
-    Static(std::slice::Iter<'static, &'static str>),
-    Iterator(Box<dyn Iterator<Item = Value> + Send + Sync>),
-    Sized(Range<usize>),
+    /// The empty enumeration
+    Empty,
+    /// A slice of static string keys.
+    Str(&'static [&'static str]),
+    /// A dynamic iterator over keys.
+    Iter(Box<dyn Iterator<Item = Value> + Send + Sync>),
+    /// Instructs the engine to yield values by calling `get_value` from 0 to `usize`.
+    Sequential(usize),
+    /// A vector of known values to iterate over.
+    Values(Vec<Value>),
 }
 
 /// Defines the natural representation of this object.
@@ -296,7 +300,7 @@ pub enum ObjectRepr {
     /// serializes to [...] over its values
     Seq,
     /// Similar to `Seq` but without indexing
-    Iterator,
+    Iterable,
 }
 
 type_erase! {
@@ -305,9 +309,11 @@ type_erase! {
 
         fn get_value(&self, key: &Value) -> Option<Value>;
 
-        fn enumeration(&self) -> Enumeration;
+        fn enumerate(&self) -> Enumerator;
 
-        fn custom_iter(&self) -> Option<Box<dyn Iterator<Item = Value> + Send + Sync>>;
+        fn is_empty(&self) -> bool;
+
+        fn len(&self) -> Option<usize>;
 
         fn call(
             &self,
@@ -358,57 +364,25 @@ impl fmt::Display for DynObject {
     }
 }
 
-impl Enumeration {
+impl Enumerator {
     /// Returns the length if the object has one.
     pub fn len(&self) -> Option<usize> {
         Some(match self {
-            Enumeration::Values(v) => v.len(),
-            Enumeration::Static(v) => v.len(),
-            Enumeration::Iterator(i) => match i.size_hint() {
+            Enumerator::Empty => 0,
+            Enumerator::Values(v) => v.len(),
+            Enumerator::Str(v) => v.len(),
+            Enumerator::Iter(i) => match i.size_hint() {
                 (a, Some(b)) if a == b => a,
                 _ => return None,
             },
-            Enumeration::Sized(v) => *v,
-            Enumeration::NonEnumerable => return None,
+            Enumerator::Sequential(v) => *v,
+            Enumerator::NonEnumerable => return None,
         })
     }
 
     /// Checks if the object is considered empty.
     pub fn is_empty(&self) -> bool {
         self.len() == Some(0)
-    }
-
-    /// Converts the enumeration into an iterator if possible.
-    fn try_into_iter(self) -> Option<EnumerationIter> {
-        Some(EnumerationIter(match self {
-            Enumeration::Values(v) => EnumerationIterRepr::Values(v.into_iter()),
-            Enumeration::Static(v) => EnumerationIterRepr::Static(v.iter()),
-            Enumeration::Iterator(i) => EnumerationIterRepr::Iterator(i),
-            Enumeration::Sized(i) => EnumerationIterRepr::Sized(0..i),
-            Enumeration::NonEnumerable => return None,
-        }))
-    }
-}
-
-impl Iterator for EnumerationIter {
-    type Item = Value;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match &mut self.0 {
-            EnumerationIterRepr::Values(iter) => iter.next(),
-            EnumerationIterRepr::Static(iter) => iter.next().copied().map(intern).map(Value::from),
-            EnumerationIterRepr::Iterator(iter) => iter.next(),
-            EnumerationIterRepr::Sized(iter) => iter.next().map(Value::from),
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        match &self.0 {
-            EnumerationIterRepr::Values(iter) => iter.size_hint(),
-            EnumerationIterRepr::Static(iter) => iter.size_hint(),
-            EnumerationIterRepr::Iterator(iter) => iter.size_hint(),
-            EnumerationIterRepr::Sized(iter) => iter.size_hint(),
-        }
     }
 }
 
@@ -421,8 +395,8 @@ impl<T: Into<Value> + Clone + Send + Sync + fmt::Debug> Object for Vec<T> {
         self.get(key.as_usize()?).cloned().map(|v| v.into())
     }
 
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
-        Enumeration::Sized(self.len())
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Sequential(Vec::len(self))
     }
 }
 
@@ -431,8 +405,8 @@ impl Object for ValueMap {
         self.get(key).cloned()
     }
 
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
-        self.mapped_enumeration(|this| Box::new(this.keys().cloned()))
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        self.map_enumerator(|this| Box::new(this.keys().cloned()))
     }
 }
 
@@ -454,22 +428,9 @@ where
         self.get(key.as_str()?).cloned().map(|v| v.into())
     }
 
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
-        self.mapped_enumeration(|this| {
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        self.map_enumerator(|this| {
             Box::new(this.keys().map(|k| intern(k.as_ref())).map(Value::from))
         })
-    }
-}
-
-/// Utility type that displays a value in debug except for objects which are rendered.
-pub(crate) struct ValueDbgRender<'a>(pub &'a Value);
-
-impl<'a> fmt::Debug for ValueDbgRender<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let ValueRepr::Object(ref obj) = self.0 .0 {
-            obj.render(f)
-        } else {
-            fmt::Debug::fmt(&self.0, f)
-        }
     }
 }

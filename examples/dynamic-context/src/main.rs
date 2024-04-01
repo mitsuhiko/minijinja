@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 
-use minijinja::value::{Enumeration, Object, Value};
+use minijinja::value::{Enumerator, Object, Value};
 use minijinja::Environment;
 
 #[derive(Debug)]
@@ -25,8 +25,8 @@ impl Object for DynamicContext {
     /// This implementation is not needed for the example.  However
     /// returning known keys here has the benefit that `{{ debug() }}`
     /// can show the context.
-    fn enumeration(self: &Arc<Self>) -> Enumeration {
-        Enumeration::Static(&["pid", "cwd", "env"])
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Str(&["pid", "cwd", "env"])
     }
 }
 
