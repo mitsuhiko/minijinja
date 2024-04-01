@@ -10,6 +10,77 @@ use crate::vm::State;
 
 /// A trait that represents a dynamic object.
 ///
+/// # Basic Struct
+///
+/// The following example shows how to implement a dynamic object which
+/// represents a struct.  All that's needed is to implement
+/// [`get_value`](Self::get_value) to look up a field by name as well as
+/// [`enumerate`](Self::enumerate) to return an enumerator over the known keys.
+/// The [`repr`](Self::repr) defaults to `Map` so nothing needs to be done here.
+///
+/// ```
+/// use std::sync::Arc;
+/// use minijinja::value::{Value, Object, Enumerator};
+///
+/// #[derive(Debug)]
+/// struct Point(f32, f32, f32);
+///
+/// impl Object for Point {
+///     fn get_value(self: &Arc<self>, key: &Value) -> Option<Value> {
+///         match key.as_str()? {
+///             "x" => Some(Value::from(self.0)),
+///             "y" => Some(Value::from(self.1)),
+///             "z" => Some(Value::from(self.2)),
+///             _ => None,
+///         }
+///     }
+///
+///     fn enumerate(self: &Arc<Self>) -> Enumerator {
+///         Enumerator::Str(&["x", "y", "z"])
+///     }
+/// }
+///
+/// let value = Value::from_object(Point(1.0, 2.5, 3.0));
+/// ```
+///
+/// # Basic Sequence
+///
+/// The following example shows how to implement a dynamic object which
+/// represents a sequence.  All that's needed is to implement
+/// [`repr`](Self::repr) to indicate that this is a sequence,
+/// [`get_value`](Self::get_value) to look up a field by index, and
+/// [`enumerate`](Self::enumerate) to return a sequential enumerator.
+/// This enumerator will automatically call `get_value` from `0..length`.
+///
+/// ```
+/// use std::sync::Arc;
+/// use minijinja::value::{Value, Object, ObjectRepr, Enumerator};
+///
+/// #[derive(Debug)]
+/// struct Point(f32, f32, f32);
+///
+/// impl Object for Point {
+///     fn repr(self: &Arc<self>) -> ObjectRepr {
+///         ObjectRepr::Seq
+///     }
+///
+///     fn get_value(self: &Arc<self>, key: &Value) -> Option<Value> {
+///         match key.as_usize()? {
+///             0 => Some(Value::from(self.0)),
+///             1 => Some(Value::from(self.1)),
+///             2 => Some(Value::from(self.2)),
+///             _ => None,
+///         }
+///     }
+///
+///     fn enumerate(self: &Arc<Self>) -> Enumerator {
+///         Enumerator::Seq(3)
+///     }
+/// }
+///
+/// let value = Value::from_object(Point(1.0, 2.5, 3.0));
+/// ```
+///
 /// # Map As Context
 ///
 /// Map can also be used as template rendering context.  This has a lot of
@@ -192,7 +263,7 @@ macro_rules! impl_object_helpers {
             match self.enumerate() {
                 Enumerator::NonEnumerable => None,
                 Enumerator::Empty => Some(Box::new(None::<Value>.into_iter())),
-                Enumerator::Sequential(l) => {
+                Enumerator::Seq(l) => {
                     let self_clone = self.clone();
                     Some(Box::new((0..l).map(move |idx| {
                         self_clone.get_value(&Value::from(idx)).unwrap_or_default()
@@ -285,7 +356,7 @@ pub enum Enumerator {
     /// Instructs the engine to yield values by calling `get_value` from 0 to `usize`.
     ///
     /// This has a known legth of `usize`.
-    Sequential(usize),
+    Seq(usize),
     /// A vector of known values to iterate over.
     ///
     /// This has a known length which is the length of the vector.
@@ -377,7 +448,7 @@ impl Enumerator {
                 (a, Some(b)) if a == b => a,
                 _ => return None,
             },
-            Enumerator::Sequential(v) => *v,
+            Enumerator::Seq(v) => *v,
             Enumerator::NonEnumerable => return None,
         })
     }
@@ -398,7 +469,7 @@ impl<T: Into<Value> + Clone + Send + Sync + fmt::Debug> Object for Vec<T> {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Sequential(Vec::len(self))
+        Enumerator::Seq(Vec::len(self))
     }
 }
 

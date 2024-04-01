@@ -71,7 +71,7 @@ impl Object for SimpleDynamicSeq {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Sequential(4)
+        Enumerator::Seq(4)
     }
 }
 

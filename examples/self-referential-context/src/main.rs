@@ -22,7 +22,7 @@ impl Object for SelfReferentialContext {
                 return Enumerator::Values(keys.collect());
             }
         }
-        Enumerator::Sequential(0)
+        Enumerator::Seq(0)
     }
 }
 

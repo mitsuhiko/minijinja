@@ -32,7 +32,7 @@ fn test_seq_object() {
         }
 
         fn enumerate(self: &Arc<Self>) -> Enumerator {
-            Enumerator::Sequential(3)
+            Enumerator::Seq(3)
         }
     }
 
