@@ -34,21 +34,11 @@ cannot unpack: sequence of wrong length (expected 2, got 3) (in loop_bad_unpacki
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
     loop: Loop {
-        index0: 0,
-        index: 1,
-        length: 3,
-        revindex: 3,
-        revindex0: 2,
-        first: true,
-        last: false,
-        depth: 1,
-        depth0: 0,
-        previtem: undefined,
-        nextitem: [
-            2,
+        len: Some(
             3,
-            4,
-        ],
+        ),
+        idx: 0,
+        depth: 0,
     },
     seq: [
         [
@@ -69,4 +59,3 @@ Referenced variables: {
     ],
 }
 -------------------------------------------------------------------------------
-

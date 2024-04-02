@@ -21,14 +21,15 @@ macro_rules! type_erase {
         }
 
         /// Typed-erased version of
-        #[doc = stringify!($T)]
+        #[doc = concat!("[`", stringify!($T), "`]")]
         $v struct $E {
             ptr: *const (),
             vtable: &'static $VT,
         }
 
         impl $E {
-            /// Returns a new type-erased `Any`.
+            /// Returns a new boxed, type-erased
+            #[doc = concat!("[`", stringify!($T), "`].")]
             $v fn new<T: $T $($(+ $B)*)? + 'static>(v: std::sync::Arc<T>) -> Self {
                 let ptr = std::sync::Arc::into_raw(v) as *const T as *const ();
                 let vtable = &$VT {
@@ -63,7 +64,9 @@ macro_rules! type_erase {
             }
 
             $(
-                /// Calls the function with the same name in the inner struct.
+                /// Calls
+                #[doc = concat!("[`", stringify!($T), "::", stringify!($f), "`]")]
+                /// on the underlying boxed value.
                 $v fn $f(&self, $($p: $t),*) $(-> $R)? {
                     (self.vtable.$f)(&(), self.ptr, $($p),*)
                 }
@@ -74,7 +77,7 @@ macro_rules! type_erase {
                 (self.vtable.type_name)()
             }
 
-            /// Downcast to `T` if `self` holds a `T`.
+            /// Downcast to `T` if the boxed value holds a `T`.
             $v fn downcast_ref<T: 'static>(&self) -> Option<&T> {
                 if (self.vtable.type_id)() == core::any::TypeId::of::<T>() {
                     unsafe {
@@ -85,7 +88,7 @@ macro_rules! type_erase {
                 None
             }
 
-            /// Downcast to `T` if `self` holds a `T`.
+            /// Downcast to `T` if the boxed value holds a `T`.
             $v fn downcast<T: 'static>(&self) -> Option<Arc<T>> {
                 if (self.vtable.type_id)() == core::any::TypeId::of::<T>() {
                     unsafe {

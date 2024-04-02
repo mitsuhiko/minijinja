@@ -11,7 +11,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::namespace_object::Namespace;
-use crate::value::{ops, value_map_with_capacity, value_optimization, Value, ValueRepr};
+use crate::value::{ops, value_map_with_capacity, value_optimization, Kwargs, Value, ValueRepr};
 use crate::vm::context::{Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
@@ -330,7 +330,7 @@ impl<'env> Vm<'env> {
                     b = stack.pop();
                     a = stack.pop();
                     if let Some(ns) = b.downcast_object_ref::<Namespace>() {
-                        ns.set_field(name, a);
+                        ns.set_value(name, a);
                     } else {
                         bail!(Error::new(
                             ErrorKind::InvalidOperation,
@@ -375,9 +375,7 @@ impl<'env> Vm<'env> {
                         let key = stack.pop();
                         map.insert(key, value);
                     }
-                    // FIXME: look at diff and change all old occurences of
-                    // `MapType::kwargs` to `Value::kwargs`.
-                    stack.push(Value::kwargs(map))
+                    stack.push(Kwargs::wrap(map))
                 }
                 Instruction::BuildList(n) => {
                     let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());

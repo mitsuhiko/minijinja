@@ -25,17 +25,11 @@ invalid operation: recursion limit exceeded (in loop-recursion-error.txt:1)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
     loop: Loop {
-        index0: 0,
-        index: 1,
-        length: 3,
-        revindex: 3,
-        revindex0: 2,
-        first: true,
-        last: false,
-        depth: 500,
-        depth0: 499,
-        previtem: undefined,
-        nextitem: 2,
+        len: Some(
+            3,
+        ),
+        idx: 0,
+        depth: 499,
     },
     seq: [
         1,
@@ -44,4 +38,3 @@ Referenced variables: {
     ],
 }
 -------------------------------------------------------------------------------
-

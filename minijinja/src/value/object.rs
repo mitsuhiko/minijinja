@@ -175,6 +175,9 @@ pub trait Object: fmt::Debug + Send + Sync {
     /// For more information see [`Enumerator`].  The default implementation
     /// returns an `Empty` enumerator if the object repr is a `Map` or `Seq`,
     /// and `NonEnumerable` for `Plain` objects or `Iterator`s.
+    ///
+    /// When wrapping other objects you might want to consider using
+    /// [`ObjectExt::mapped_enumerator`] and [`ObjectExt::mapped_rev_enumerator`].
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         match self.repr() {
             ObjectRepr::Plain | ObjectRepr::Iterable => Enumerator::NonEnumerable,
@@ -328,7 +331,35 @@ macro_rules! impl_object_helpers {
 
 /// Provides utility methods for working with objects.
 pub trait ObjectExt: Object + Send + Sync + 'static {
-    /// Creates a new enumeration that projects into the given object.
+    /// Creates a new iterator enumeration that projects into the given object.
+    ///
+    /// It takes a method that is passed a reference to `self` and is expected
+    /// to return an [`Iterator`].  This iterator is then wrapped in an
+    /// [`Enumerator::Iter`].  This allows one to create an iterator that borrows
+    /// out of the object.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use std::collections::HashMap;
+    /// use std::sync::Arc;
+    /// use minijinja::value::{Value, Object, ObjectExt, Enumerator};
+    ///
+    /// #[derive(Debug)]
+    /// struct CustomMap(HashMap<usize, i64>);
+    ///
+    /// impl Object for CustomMap {
+    ///     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+    ///         self.0.get(&key.as_usize()?).copied().map(Value::from)
+    ///     }
+    ///
+    ///     fn enumerate(self: &Arc<Self>) -> Enumerator {
+    ///         self.mapped_enumerator(|this| {
+    ///             Box::new(this.0.keys().copied().map(Value::from))
+    ///         })
+    ///     }
+    /// }
+    /// ```
     fn mapped_enumerator<F>(self: &Arc<Self>, maker: F) -> Enumerator
     where
         F: for<'a> FnOnce(&'a Self) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
@@ -360,7 +391,36 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
         Enumerator::Iter(Box::new(IterObject { iter, _object }))
     }
 
-    /// Creates a new enumeration that projects into the given object supporting reversing.
+    /// Creates a new reversible iterator enumeration that projects into the given object.
+    ///
+    /// It takes a method that is passed a reference to `self` and is expected
+    /// to return a [`DoubleEndedIterator`].  This iterator is then wrapped in an
+    /// [`Enumerator::RevIter`].  This allows one to create an iterator that borrows
+    /// out of the object and is reversible.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use std::collections::HashMap;
+    /// use std::sync::Arc;
+    /// use std::ops::Range;
+    /// use minijinja::value::{Value, Object, ObjectExt, ObjectRepr, Enumerator};
+    ///
+    /// #[derive(Debug)]
+    /// struct VecView(Vec<usize>);
+    ///
+    /// impl Object for VecView {
+    ///     fn repr(self: &Arc<Self>) -> ObjectRepr {
+    ///         ObjectRepr::Iterable
+    ///     }
+    ///
+    ///     fn enumerate(self: &Arc<Self>) -> Enumerator {
+    ///         self.mapped_enumerator(|this| {
+    ///             Box::new(this.0.iter().cloned().map(Value::from))
+    ///         })
+    ///     }
+    /// }
+    /// ```
     fn mapped_rev_enumerator<F>(self: &Arc<Self>, maker: F) -> Enumerator
     where
         F: for<'a> FnOnce(
@@ -436,6 +496,14 @@ pub enum Enumerator {
 }
 
 /// Defines the natural representation of this object.
+///
+/// An [`ObjectRepr`] is a reduced form of
+/// [`ValueKind`](crate::value::ValueKind) which only contains value which can
+/// be represented by objects.  For instance an object can never be a primitive
+/// and as such those kinds are unavailable.
+///
+/// The representation influences how values are serialized, stringified or
+/// what kind they report.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum ObjectRepr {
@@ -511,7 +579,7 @@ impl fmt::Display for DynObject {
 }
 
 impl Enumerator {
-    /// Returns the length if the object has one.
+    /// Returns the length of the enumerator if known.
     pub fn len(&self) -> Option<usize> {
         Some(match self {
             Enumerator::Empty => 0,
@@ -530,8 +598,8 @@ impl Enumerator {
         })
     }
 
-    /// Checks if the object is considered empty.
-    pub fn is_empty(&self) -> bool {
+    /// Returns `true` if this enumerator is considered empty.
+    pub fn is_empty(self: &Arc<Self>) -> bool {
         self.len() == Some(0)
     }
 }

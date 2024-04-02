@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::AutoEscape;
-use crate::value::{Enumerator, Object, Value, ValueRepr};
+use crate::value::{Enumerator, Kwargs, Object, Value};
 use crate::vm::state::State;
 use crate::vm::Vm;
 
@@ -52,7 +52,7 @@ impl Object for Macro {
         }
 
         let (args, kwargs) = match args.last() {
-            Some(Value(ValueRepr::Object(obj))) => match obj.as_kwargs() {
+            Some(last) => match Kwargs::extract(last) {
                 Some(kwargs) => (&args[..args.len() - 1], Some(kwargs)),
                 None => (args, None),
             },

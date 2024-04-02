@@ -10,34 +10,29 @@ pub struct MergeObject(pub Vec<Value>);
 
 impl Object for MergeObject {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        for val in &self.0 {
-            match val.get_item(key) {
-                Ok(val) if !val.is_undefined() => return Some(val),
-                _ => {}
-            }
-        }
-
-        None
+        self.0
+            .iter()
+            .filter_map(|x| x.get_item_opt(key))
+            .find(|x| !x.is_undefined())
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         self.mapped_enumerator(|this| {
             let mut seen = BTreeSet::new();
-            let iter = this
-                .0
-                .iter()
-                .flat_map(|v| v.try_iter().ok())
-                .flatten()
-                .filter_map(move |v| {
-                    if seen.contains(&v) {
-                        return None;
-                    }
-
-                    seen.insert(v.clone());
-                    Some(v)
-                });
-
-            Box::new(iter)
+            Box::new(
+                this.0
+                    .iter()
+                    .flat_map(|v| v.try_iter().ok())
+                    .flatten()
+                    .filter_map(move |v| {
+                        if seen.contains(&v) {
+                            None
+                        } else {
+                            seen.insert(v.clone());
+                            Some(v)
+                        }
+                    }),
+            )
         })
     }
 }

@@ -29,17 +29,11 @@ unknown test: test reallyEven is unknown (in err_bad_test.txt:2)
 Referenced variables: {
     item: 1,
     loop: Loop {
-        index0: 0,
-        index: 1,
-        length: 3,
-        revindex: 3,
-        revindex0: 2,
-        first: true,
-        last: false,
-        depth: 1,
-        depth0: 0,
-        previtem: undefined,
-        nextitem: 2,
+        len: Some(
+            3,
+        ),
+        idx: 0,
+        depth: 0,
     },
     seq: [
         1,
@@ -48,4 +42,3 @@ Referenced variables: {
     ],
 }
 -------------------------------------------------------------------------------
-

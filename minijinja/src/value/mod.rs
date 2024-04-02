@@ -152,12 +152,13 @@ mod type_erase;
 mod argtypes;
 #[cfg(feature = "deserialization")]
 mod deserialize;
-mod keyref;
 pub(crate) mod merge_object;
 pub(crate) mod namespace_object;
 mod object;
 pub(crate) mod ops;
 mod serialize;
+#[cfg(feature = "key_interning")]
+mod string_interning;
 
 #[cfg(feature = "deserialization")]
 pub use self::deserialize::ViaDeserialize;
@@ -222,7 +223,7 @@ pub fn serializing_for_value() -> bool {
 pub(crate) fn value_optimization() -> impl Drop {
     #[cfg(feature = "key_interning")]
     {
-        crate::value::keyref::key_interning::use_string_cache()
+        crate::value::string_interning::use_string_cache()
     }
     #[cfg(not(feature = "key_interning"))]
     {
@@ -506,7 +507,7 @@ impl Default for Value {
 pub fn intern(s: &str) -> Arc<str> {
     #[cfg(feature = "key_interning")]
     {
-        crate::value::keyref::key_interning::try_intern(s)
+        crate::value::string_interning::try_intern(s)
     }
     #[cfg(not(feature = "key_interning"))]
     {
@@ -839,7 +840,7 @@ impl Value {
 
     /// Returns `true` if the map represents keyword arguments.
     pub fn is_kwargs(&self) -> bool {
-        self.as_object().map_or(false, |o| o.as_kwargs().is_some())
+        Kwargs::extract(self).is_some()
     }
 
     /// Is this value true?
@@ -1268,13 +1269,13 @@ impl Value {
 
     fn _call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         if let Some(object) = self.as_object() {
-            return object.call_method(state, name, args);
+            object.call_method(state, name, args)
+        } else {
+            Err(Error::new(
+                ErrorKind::UnknownMethod,
+                format!("object has no method named {name}"),
+            ))
         }
-
-        Err(Error::new(
-            ErrorKind::UnknownMethod,
-            format!("object has no method named {name}"),
-        ))
     }
 
     #[cfg(feature = "builtins")]

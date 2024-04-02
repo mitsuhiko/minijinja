@@ -757,10 +757,9 @@ impl<'a> ArgType<'a> for Kwargs {
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
-            Some(value) => value
-                .as_object()
-                .and_then(|obj| obj.as_kwargs())
-                .ok_or_else(|| Error::from(ErrorKind::MissingArgument)),
+            Some(value) => {
+                Kwargs::extract(value).ok_or_else(|| Error::from(ErrorKind::MissingArgument))
+            }
             None => Ok(Kwargs::new(Default::default())),
         }
     }
@@ -772,8 +771,7 @@ impl<'a> ArgType<'a> for Kwargs {
     ) -> Result<(Self, usize), Error> {
         let args = values
             .get(offset)
-            .and_then(|value| value.as_object())
-            .and_then(|obj| obj.as_kwargs())
+            .and_then(Kwargs::extract)
             .map(|kwargs| (kwargs, 1))
             .unwrap_or_else(|| (Kwargs::new(Default::default()), 0));
 
@@ -785,24 +783,25 @@ impl<'a> ArgType<'a> for Kwargs {
     }
 }
 
-impl DynObject {
-    pub(crate) fn as_kwargs(&self) -> Option<Kwargs> {
-        self.downcast::<KwargsValues>().map(Kwargs::new)
-    }
-}
-
-impl Value {
-    pub(crate) fn kwargs(map: ValueMap) -> Value {
-        Value::from_object(KwargsValues(map))
-    }
-}
-
 impl Kwargs {
     fn new(map: Arc<KwargsValues>) -> Kwargs {
         Kwargs {
             values: map,
             used: RefCell::new(HashSet::new()),
         }
+    }
+
+    /// Given a value, extracts the kwargs if there are any.
+    pub(crate) fn extract(value: &Value) -> Option<Kwargs> {
+        value
+            .as_object()
+            .and_then(|x| x.downcast::<KwargsValues>())
+            .map(Kwargs::new)
+    }
+
+    /// Wraps a value map into kwargs.
+    pub(crate) fn wrap(map: ValueMap) -> Value {
+        Value::from_object(KwargsValues(map))
     }
 
     /// Get a single argument from the kwargs but don't mark it as used.
@@ -914,9 +913,9 @@ impl TryFrom<Value> for Kwargs {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.0 {
             ValueRepr::Undefined => Ok(Kwargs::new(Default::default())),
-            ValueRepr::Object(obj) => obj
-                .as_kwargs()
-                .ok_or_else(|| Error::from(ErrorKind::InvalidOperation)),
+            ValueRepr::Object(_) => {
+                Kwargs::extract(&value).ok_or_else(|| Error::from(ErrorKind::InvalidOperation))
+            }
             _ => Err(Error::from(ErrorKind::InvalidOperation)),
         }
     }

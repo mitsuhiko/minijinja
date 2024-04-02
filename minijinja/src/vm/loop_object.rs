@@ -17,19 +17,72 @@ pub(crate) struct Loop {
 
 impl fmt::Debug for Loop {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut dbg = f.debug_struct("Loop");
-        for key in self.keys() {
-            if let Some(value) = self.get(key) {
-                dbg.field(key, &value);
-            }
-        }
-
-        dbg.finish()
+        f.debug_struct("Loop")
+            .field("len", &self.len)
+            .field("idx", &self.idx)
+            .field("depth", &self.depth)
+            .finish()
     }
 }
 
-impl Loop {
-    fn get(&self, key: &str) -> Option<Value> {
+impl Object for Loop {
+    fn call(self: &Arc<Self>, _state: &State, _args: &[Value]) -> Result<Value, Error> {
+        Err(Error::new(
+            ErrorKind::InvalidOperation,
+            "loop cannot be called if reassigned to different variable",
+        ))
+    }
+
+    fn call_method(
+        self: &Arc<Self>,
+        _state: &State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, Error> {
+        if name == "changed" {
+            let mut last_changed_value = self.last_changed_value.lock().unwrap();
+            let value = args.to_owned();
+            let changed = last_changed_value.as_ref() != Some(&value);
+            if changed {
+                *last_changed_value = Some(value);
+                Ok(Value::from(true))
+            } else {
+                Ok(Value::from(false))
+            }
+        } else if name == "cycle" {
+            let idx = self.idx.load(Ordering::Relaxed);
+            match args.get(idx % args.len()) {
+                Some(arg) => Ok(arg.clone()),
+                None => Ok(Value::UNDEFINED),
+            }
+        } else {
+            Err(Error::new(
+                ErrorKind::UnknownMethod,
+                format!("loop object has no method named {name}"),
+            ))
+        }
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Str(&[
+            "index0",
+            "index",
+            "length",
+            "revindex",
+            "revindex0",
+            "first",
+            "last",
+            "depth",
+            "depth0",
+            #[cfg(feature = "adjacent_loop_items")]
+            "previtem",
+            #[cfg(feature = "adjacent_loop_items")]
+            "nextitem",
+        ])
+    }
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        let key = some!(key.as_str());
         let idx = self.idx.load(Ordering::Relaxed) as u64;
         // if we never iterated, then all attributes are undefined.
         // this can happen in some rare circumstances where the engine
@@ -76,71 +129,6 @@ impl Loop {
             ),
             _ => None,
         }
-    }
-
-    fn keys(&self) -> &'static [&'static str] {
-        &[
-            "index0",
-            "index",
-            "length",
-            "revindex",
-            "revindex0",
-            "first",
-            "last",
-            "depth",
-            "depth0",
-            #[cfg(feature = "adjacent_loop_items")]
-            "previtem",
-            #[cfg(feature = "adjacent_loop_items")]
-            "nextitem",
-        ]
-    }
-}
-
-impl Object for Loop {
-    fn call(self: &Arc<Self>, _state: &State, _args: &[Value]) -> Result<Value, Error> {
-        Err(Error::new(
-            ErrorKind::InvalidOperation,
-            "loop cannot be called if reassigned to different variable",
-        ))
-    }
-
-    fn call_method(
-        self: &Arc<Self>,
-        _state: &State,
-        name: &str,
-        args: &[Value],
-    ) -> Result<Value, Error> {
-        if name == "changed" {
-            let mut last_changed_value = self.last_changed_value.lock().unwrap();
-            let value = args.to_owned();
-            let changed = last_changed_value.as_ref() != Some(&value);
-            if changed {
-                *last_changed_value = Some(value);
-                Ok(Value::from(true))
-            } else {
-                Ok(Value::from(false))
-            }
-        } else if name == "cycle" {
-            let idx = self.idx.load(Ordering::Relaxed);
-            match args.get(idx % args.len()) {
-                Some(arg) => Ok(arg.clone()),
-                None => Ok(Value::UNDEFINED),
-            }
-        } else {
-            Err(Error::new(
-                ErrorKind::UnknownMethod,
-                format!("loop object has no method named {name}"),
-            ))
-        }
-    }
-
-    fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Str(self.keys())
-    }
-
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.get(some!(key.as_str()))
     }
 
     fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {

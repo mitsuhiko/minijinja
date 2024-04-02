@@ -398,7 +398,7 @@ mod builtins {
             {
                 for (key, value) in pairs {
                     if let Some(key) = key.as_str() {
-                        ns.set_field(key, value);
+                        ns.set_value(key, value);
                     }
                 }
             } else {

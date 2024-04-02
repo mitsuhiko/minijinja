@@ -503,7 +503,7 @@ impl<'a> Kwargs<'a> {
             }
         }
 
-        Some(Value::kwargs(rv))
+        Some(crate::value::Kwargs::wrap(rv))
     }
 }
 

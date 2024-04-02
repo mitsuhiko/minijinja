@@ -26,7 +26,7 @@ impl Object for Namespace {
 }
 
 impl Namespace {
-    pub(crate) fn set_field(&self, key: &str, value: Value) {
+    pub(crate) fn set_value(&self, key: &str, value: Value) {
         self.data.lock().unwrap().insert(key.into(), value);
     }
 }
