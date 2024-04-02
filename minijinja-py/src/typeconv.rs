@@ -19,56 +19,18 @@ fn is_safe_attr(name: &str) -> bool {
     !name.starts_with('_')
 }
 
-#[derive(Debug)]
-pub struct DictLikeObject {
-    pub inner: Py<PyDict>,
+fn is_dictish(val: &PyAny) -> bool {
+    val.hasattr("__getitem__").unwrap_or(false) && val.hasattr("items").unwrap_or(false)
 }
 
-impl Object for DictLikeObject {
-    fn get_value(self: &Arc<Self>, name: &Value) -> Option<Value> {
-        Python::with_gil(|py| {
-            let inner = self.inner.as_ref(py);
-            name.as_str()
-                .and_then(|name| inner.get_item(name).map(to_minijinja_value))
-        })
-    }
-
-    fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Python::with_gil(|py| {
-            let inner = self.inner.as_ref(py);
-            Enumerator::Values(inner.keys().iter().map(|x| x.to_string().into()).collect())
-        })
-    }
+pub struct DynamicObject {
+    pub inner: Py<PyAny>,
 }
 
-#[derive(Debug)]
-struct ListLikeObject {
-    inner: Py<PySequence>,
-}
-
-impl Object for ListLikeObject {
-    fn repr(self: &Arc<Self>) -> ObjectRepr {
-        ObjectRepr::Seq
+impl DynamicObject {
+    pub fn new(inner: Py<PyAny>) -> DynamicObject {
+        DynamicObject { inner }
     }
-
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        Python::with_gil(|py| {
-            let inner = self.inner.as_ref(py);
-            key.as_usize()
-                .and_then(|idx| inner.get_item(idx).ok().map(to_minijinja_value))
-        })
-    }
-
-    fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Seq(Python::with_gil(|py| {
-            self.inner.as_ref(py).len().unwrap_or(0)
-        }))
-    }
-}
-
-struct DynamicObject {
-    inner: Py<PyAny>,
-    sequencified: Option<Vec<Py<PyAny>>>,
 }
 
 impl fmt::Debug for DynamicObject {
@@ -81,10 +43,14 @@ impl Object for DynamicObject {
     fn repr(self: &Arc<Self>) -> ObjectRepr {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
-            if inner.downcast::<PySequence>().is_ok() || self.sequencified.is_some() {
+            if inner.downcast::<PySequence>().is_ok() {
                 ObjectRepr::Seq
-            } else {
+            } else if is_dictish(inner) {
                 ObjectRepr::Map
+            } else if inner.iter().is_ok() {
+                ObjectRepr::Iterable
+            } else {
+                ObjectRepr::Plain
             }
         })
     }
@@ -137,57 +103,45 @@ impl Object for DynamicObject {
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         Python::with_gil(|py| {
-            if let Some(ref seq) = self.sequencified {
-                return seq
-                    .get(key.as_usize()?)
-                    .map(|x| to_minijinja_value(x.as_ref(py)));
-            }
             let inner = self.inner.as_ref(py);
-            if let Ok(seq) = inner.downcast::<PySequence>() {
-                seq.get_item(key.as_usize()?).ok().map(to_minijinja_value)
-            } else if let Some(name) = key.as_str() {
-                if !is_safe_attr(name) {
-                    return None;
+            match inner.get_item(to_python_value_impl(py, key.clone()).ok()?) {
+                Ok(value) => Some(to_minijinja_value(value)),
+                Err(_) => {
+                    if let Some(attr) = key.as_str() {
+                        if is_safe_attr(attr) {
+                            if let Ok(rv) = inner.getattr(attr) {
+                                return Some(to_minijinja_value(rv));
+                            }
+                        }
+                    }
+                    None
                 }
-                Python::with_gil(|py| {
-                    let inner = self.inner.as_ref(py);
-                    inner.getattr(name).map(to_minijinja_value).ok()
-                })
-            } else {
-                None
             }
         })
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         Python::with_gil(|py| {
-            if let Some(ref seq) = self.sequencified {
-                Enumerator::Seq(seq.len())
+            let inner = self.inner.as_ref(py);
+            if inner.downcast::<PySequence>().is_ok() {
+                Enumerator::Seq(inner.len().unwrap_or(0))
+            } else if let Ok(iter) = inner.iter() {
+                Enumerator::Values(
+                    iter.filter_map(|x| match x {
+                        Ok(x) => Some(to_minijinja_value(x)),
+                        Err(_) => None,
+                    })
+                    .collect(),
+                )
             } else {
-                let inner = self.inner.as_ref(py);
-                if inner.downcast::<PySequence>().is_ok() {
-                    Enumerator::Seq(inner.len().unwrap_or(0))
-                } else {
-                    // TODO: list keys
-                    Enumerator::NonEnumerable
-                }
+                Enumerator::NonEnumerable
             }
         })
     }
 }
 
 pub fn to_minijinja_value(value: &PyAny) -> Value {
-    if let Ok(dict) = value.downcast::<PyDict>() {
-        Value::from_object(DictLikeObject { inner: dict.into() })
-    } else if let Ok(tup) = value.downcast::<PyTuple>() {
-        Value::from_object(ListLikeObject {
-            inner: tup.as_sequence().into(),
-        })
-    } else if let Ok(list) = value.downcast::<PyList>() {
-        Value::from_object(ListLikeObject {
-            inner: list.as_sequence().into(),
-        })
-    } else if value.is_none() {
+    if value.is_none() {
         Value::from(())
     } else if let Ok(val) = value.extract::<bool>() {
         Value::from(val)
@@ -209,18 +163,7 @@ pub fn to_minijinja_value(value: &PyAny) -> Value {
         }
         Value::from(val)
     } else {
-        let mut sequencified = None;
-        if let Ok(iter) = value.iter() {
-            let mut seq = Vec::new();
-            for value in iter.flatten() {
-                seq.push(value.into());
-            }
-            sequencified = Some(seq);
-        }
-        Value::from_object(DynamicObject {
-            inner: value.into(),
-            sequencified,
-        })
+        Value::from_object(DynamicObject::new(value.into()))
     }
 }
 
