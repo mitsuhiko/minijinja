@@ -189,7 +189,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
 
     if let Some(obj) = value.as_object() {
         match obj.repr() {
-            ObjectRepr::Plain => Ok(obj.to_string().into_py(py)),
+            ObjectRepr::Plain => return Ok(obj.to_string().into_py(py)),
             ObjectRepr::Map => {
                 let rv = PyDict::new(py);
                 if let Some(pair_iter) = obj.try_iter_pairs() {
@@ -200,7 +200,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
                         )?;
                     }
                 }
-                Ok(rv.into())
+                return Ok(rv.into());
             }
             ObjectRepr::Seq | ObjectRepr::Iterable => {
                 let rv = PyList::empty(py);
@@ -209,37 +209,38 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
                         rv.append(to_python_value_impl(py, value)?)?;
                     }
                 }
-                Ok(rv.into())
+                return Ok(rv.into());
+            }
+            _ => {}
+        }
+    }
+
+    match value.kind() {
+        ValueKind::Undefined | ValueKind::None => Ok(().into_py(py)),
+        ValueKind::Bool => Ok(value.is_true().into_py(py)),
+        ValueKind::Number => {
+            if let Ok(rv) = TryInto::<i64>::try_into(value.clone()) {
+                Ok(rv.into_py(py))
+            } else if let Ok(rv) = TryInto::<u64>::try_into(value.clone()) {
+                Ok(rv.into_py(py))
+            } else if let Ok(rv) = TryInto::<f64>::try_into(value) {
+                Ok(rv.into_py(py))
+            } else {
+                unreachable!()
             }
         }
-    } else {
-        match value.kind() {
-            ValueKind::Undefined | ValueKind::None => Ok(().into_py(py)),
-            ValueKind::Bool => Ok(value.is_true().into_py(py)),
-            ValueKind::Number => {
-                if let Ok(rv) = TryInto::<i64>::try_into(value.clone()) {
-                    Ok(rv.into_py(py))
-                } else if let Ok(rv) = TryInto::<u64>::try_into(value.clone()) {
-                    Ok(rv.into_py(py))
-                } else if let Ok(rv) = TryInto::<f64>::try_into(value) {
-                    Ok(rv.into_py(py))
-                } else {
-                    unreachable!()
-                }
+        ValueKind::String => {
+            if value.is_safe() {
+                Ok(mark_string_safe(py, value.as_str().unwrap())?)
+            } else {
+                Ok(value.as_str().unwrap().into_py(py))
             }
-            ValueKind::String => {
-                if value.is_safe() {
-                    Ok(mark_string_safe(py, value.as_str().unwrap())?)
-                } else {
-                    Ok(value.as_str().unwrap().into_py(py))
-                }
-            }
-            ValueKind::Bytes => Ok(value.as_bytes().unwrap().into_py(py)),
-            kind => Err(to_py_error(minijinja::Error::new(
-                minijinja::ErrorKind::InvalidOperation,
-                format!("object {} cannot roundtrip", kind),
-            ))),
         }
+        ValueKind::Bytes => Ok(value.as_bytes().unwrap().into_py(py)),
+        kind => Err(to_py_error(minijinja::Error::new(
+            minijinja::ErrorKind::InvalidOperation,
+            format!("object {} cannot roundtrip", kind),
+        ))),
     }
 }
 
