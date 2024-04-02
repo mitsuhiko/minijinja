@@ -10,6 +10,9 @@ use crate::vm::State;
 
 /// A trait that represents a dynamic object.
 ///
+/// There is a type erased wrapper of this trait available called
+/// [`DynObject`] which is what the engine actually holds internally.
+///
 /// # Basic Struct
 ///
 /// The following example shows how to implement a dynamic object which
@@ -79,6 +82,33 @@ use crate::vm::State;
 /// }
 ///
 /// let value = Value::from_object(Point(1.0, 2.5, 3.0));
+/// ```
+///
+/// # Iterables
+///
+/// If you have something that is not quite a sequence but is capable of yielding
+/// values over time, you can directly implement an iterable.  This is somewhat
+/// uncommon as you can normally directly use [`Value::make_iterable`].  Here
+/// is how this can be done though:
+///
+/// ```
+/// use std::sync::Arc;
+/// use minijinja::value::{Value, Object, ObjectRepr, Enumerator};
+///
+/// #[derive(Debug)]
+/// struct Range10;
+///
+/// impl Object for Range10 {
+///     fn repr(self: &Arc<Self>) -> ObjectRepr {
+///         ObjectRepr::Iterable
+///     }
+///
+///     fn enumerate(self: &Arc<Self>) -> Enumerator {
+///         Enumerator::Iter(Box::new((1..10).map(Value::from)))
+///     }
+/// }
+///
+/// let value = Value::from_object(Range10);
 /// ```
 ///
 /// # Map As Context
@@ -154,7 +184,7 @@ pub trait Object: fmt::Debug + Send + Sync {
 
     /// Returns the length of the object.
     ///
-    /// By default the length is taken from the `Enumerator`.  This means that in order
+    /// By default the length is taken from [`Enumerator::len`].  This means that in order
     /// to determine the length, an iteration is started.  If you this is a problem for
     /// your uses, you can manually implement this.  This might for instance be needed
     /// if your type can only be iterated over once.
@@ -270,6 +300,7 @@ macro_rules! impl_object_helpers {
                     })))
                 }
                 Enumerator::Iter(iter) => Some(iter),
+                Enumerator::RevIter(iter) => Some(Box::new(iter)),
                 Enumerator::Str(s) => Some(Box::new(s.iter().copied().map(intern).map(Value::from))),
                 Enumerator::Values(v) => Some(Box::new(v.into_iter())),
             }
@@ -323,12 +354,51 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
             }
         }
 
-        let iter: Box<dyn Iterator<Item = Value> + Send + Sync + '_> = maker(self);
-
         // SAFETY: this is safe because the `IterObject` will keep our object alive.
-        let iter = unsafe { std::mem::transmute(iter) };
+        let iter = unsafe { std::mem::transmute(maker(self)) };
         let _object = self.clone();
         Enumerator::Iter(Box::new(IterObject { iter, _object }))
+    }
+
+    /// Creates a new enumeration that projects into the given object supporting reversing.
+    fn mapped_rev_enumerator<F>(self: &Arc<Self>, maker: F) -> Enumerator
+    where
+        F: for<'a> FnOnce(
+                &'a Self,
+            )
+                -> Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync + 'a>
+            + Send
+            + Sync
+            + 'static,
+        Self: Sized,
+    {
+        struct IterObject<T> {
+            iter: Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync + 'static>,
+            _object: Arc<T>,
+        }
+
+        impl<T> Iterator for IterObject<T> {
+            type Item = Value;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                self.iter.next()
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                self.iter.size_hint()
+            }
+        }
+
+        impl<T> DoubleEndedIterator for IterObject<T> {
+            fn next_back(&mut self) -> Option<Self::Item> {
+                self.iter.next_back()
+            }
+        }
+
+        // SAFETY: this is safe because the `IterObject` will keep our object alive.
+        let iter = unsafe { std::mem::transmute(maker(self)) };
+        let _object = self.clone();
+        Enumerator::RevIter(Box::new(IterObject { iter, _object }))
     }
 
     impl_object_helpers!(&Arc<Self>);
@@ -351,8 +421,10 @@ pub enum Enumerator {
     ///
     /// This has a known length which is the length of the slice.
     Str(&'static [&'static str]),
-    /// A dynamic iterator over keys.  Length is known if the size hint has matching lower and upper bounds.
+    /// A dynamic iterator over values.  Length is known if the size hint has matching lower and upper bounds.
     Iter(Box<dyn Iterator<Item = Value> + Send + Sync>),
+    /// Like `Iter` but supports efficient reversing.
+    RevIter(Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync>),
     /// Instructs the engine to yield values by calling `get_value` from 0 to `usize`.
     ///
     /// This has a known legth of `usize`.
@@ -448,6 +520,10 @@ impl Enumerator {
                 (a, Some(b)) if a == b => a,
                 _ => return None,
             },
+            Enumerator::RevIter(i) => match i.size_hint() {
+                (a, Some(b)) if a == b => a,
+                _ => return None,
+            },
             Enumerator::Seq(v) => *v,
             Enumerator::NonEnumerable => return None,
         })
@@ -479,7 +555,7 @@ impl Object for ValueMap {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        self.mapped_enumerator(|this| Box::new(this.keys().cloned()))
+        self.mapped_rev_enumerator(|this| Box::new(this.keys().cloned()))
     }
 }
 

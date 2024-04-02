@@ -80,7 +80,7 @@ fn main() {
     env.add_function("cycler", make_cycler);
     env.add_global("magic", Value::from_object(Magic));
     env.add_global("seq", Value::from_object(SimpleDynamicSeq));
-    env.add_global("real_iter", Value::from_iterator((0..10).chain(20..30)));
+    env.add_global("real_iter", Value::make_iterable(|| (0..10).chain(20..30)));
     env.add_template("template.html", include_str!("template.html"))
         .unwrap();
 

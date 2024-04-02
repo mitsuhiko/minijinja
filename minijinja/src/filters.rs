@@ -294,7 +294,7 @@ mod builtins {
 
     use crate::error::ErrorKind;
     use crate::value::ops::as_f64;
-    use crate::value::{Kwargs, ObjectRepr, ValueKind, ValueRepr};
+    use crate::value::{Kwargs, ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::cmp::Ordering;
     use std::fmt::Write;
@@ -494,7 +494,7 @@ mod builtins {
         }
     }
 
-    /// Reverses a list or string
+    /// Reverses an iterable or string
     ///
     /// ```jinja
     /// {% for user in users|reverse %}
@@ -503,19 +503,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn reverse(v: Value) -> Result<Value, Error> {
-        if let Some(s) = v.as_str() {
-            Ok(Value::from(s.chars().rev().collect::<String>()))
-        } else if let Some(iter) = v.as_object().and_then(|x| x.try_iter()) {
-            // TODO: support reversible iterators?
-            let mut values = iter.collect::<Vec<_>>();
-            values.reverse();
-            Ok(Value::from_iter(values))
-        } else {
-            Err(Error::new(
-                ErrorKind::InvalidOperation,
-                format!("cannot reverse value of type {}", v.kind()),
-            ))
-        }
+        v.reverse()
     }
 
     /// Trims a value
@@ -741,7 +729,7 @@ mod builtins {
         }
     }
 
-    /// Returns the last item from a list.
+    /// Returns the last item from an iterable or string.
     ///
     /// If the list is empty `undefined` is returned.
     ///
@@ -760,15 +748,10 @@ mod builtins {
     pub fn last(value: Value) -> Result<Value, Error> {
         if let Some(s) = value.as_str() {
             Ok(s.chars().next_back().map_or(Value::UNDEFINED, Value::from))
-        } else if let Some(obj) = value
-            .as_object()
-            .filter(|x| matches!(x.repr(), ObjectRepr::Seq))
-        {
-            Ok(match obj.len() {
-                Some(0) | None => None,
-                Some(idx) => obj.get_value(&Value::from(idx - 1)),
-            }
-            .unwrap_or_default())
+        } else if matches!(value.kind(), ValueKind::Seq | ValueKind::Iterable) {
+            let rev = ok!(value.reverse());
+            let mut iter = ok!(rev.try_iter());
+            Ok(iter.next().unwrap_or_default())
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
