@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{Object, ObjectKind, SeqObject, StructObject, Value, ValueKind};
+use minijinja::value::{Enumerator, Object, ObjectRepr, Value, ValueKind};
 use minijinja::{AutoEscape, Error, State};
 
 use once_cell::sync::OnceCell;
@@ -19,40 +19,50 @@ fn is_safe_attr(name: &str) -> bool {
     !name.starts_with('_')
 }
 
+#[derive(Debug)]
 pub struct DictLikeObject {
     pub inner: Py<PyDict>,
 }
 
-impl StructObject for DictLikeObject {
-    fn get_field(&self, name: &str) -> Option<Value> {
+impl Object for DictLikeObject {
+    fn get_value(self: &Arc<Self>, name: &Value) -> Option<Value> {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
-            inner.get_item(name).map(to_minijinja_value)
+            name.as_str()
+                .and_then(|name| inner.get_item(name).map(to_minijinja_value))
         })
     }
 
-    fn fields(&self) -> Vec<Arc<str>> {
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
-            inner.keys().iter().map(|x| x.to_string().into()).collect()
+            Enumerator::Values(inner.keys().iter().map(|x| x.to_string().into()).collect())
         })
     }
 }
 
+#[derive(Debug)]
 struct ListLikeObject {
     inner: Py<PySequence>,
 }
 
-impl SeqObject for ListLikeObject {
-    fn get_item(&self, idx: usize) -> Option<Value> {
+impl Object for ListLikeObject {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Seq
+    }
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
-            inner.get_item(idx).ok().map(to_minijinja_value)
+            key.as_usize()
+                .and_then(|idx| inner.get_item(idx).ok().map(to_minijinja_value))
         })
     }
 
-    fn item_count(&self) -> usize {
-        Python::with_gil(|py| self.inner.as_ref(py).len().unwrap_or(0))
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Seq(Python::with_gil(|py| {
+            self.inner.as_ref(py).len().unwrap_or(0)
+        }))
     }
 }
 
@@ -63,29 +73,30 @@ struct DynamicObject {
 
 impl fmt::Debug for DynamicObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self, f)
-    }
-}
-
-impl fmt::Display for DynamicObject {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         Python::with_gil(|py| write!(f, "{}", self.inner.as_ref(py)))
     }
 }
 
 impl Object for DynamicObject {
-    fn kind(&self) -> ObjectKind<'_> {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
         Python::with_gil(|py| {
             let inner = self.inner.as_ref(py);
             if inner.downcast::<PySequence>().is_ok() || self.sequencified.is_some() {
-                ObjectKind::Seq(self)
+                ObjectRepr::Seq
             } else {
-                ObjectKind::Struct(self)
+                ObjectRepr::Map
             }
         })
     }
 
-    fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result
+    where
+        Self: Sized + 'static,
+    {
+        Python::with_gil(|py| write!(f, "{}", self.inner.as_ref(py)))
+    }
+
+    fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
         Python::with_gil(|py| -> Result<Value, Error> {
             bind_state(state, || {
                 let inner = self.inner.as_ref(py);
@@ -98,7 +109,12 @@ impl Object for DynamicObject {
         })
     }
 
-    fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn call_method(
+        self: &Arc<Self>,
+        state: &State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, Error> {
         if !is_safe_attr(name) {
             return Err(Error::new(
                 minijinja::ErrorKind::InvalidOperation,
@@ -118,56 +134,57 @@ impl Object for DynamicObject {
             })
         })
     }
-}
 
-impl SeqObject for DynamicObject {
-    fn get_item(&self, idx: usize) -> Option<Value> {
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         Python::with_gil(|py| {
             if let Some(ref seq) = self.sequencified {
-                return seq.get(idx).map(|x| to_minijinja_value(x.as_ref(py)));
+                return seq
+                    .get(key.as_usize()?)
+                    .map(|x| to_minijinja_value(x.as_ref(py)));
             }
             let inner = self.inner.as_ref(py);
             if let Ok(seq) = inner.downcast::<PySequence>() {
-                seq.get_item(idx).ok().map(to_minijinja_value)
+                seq.get_item(key.as_usize()?).ok().map(to_minijinja_value)
+            } else if let Some(name) = key.as_str() {
+                if !is_safe_attr(name) {
+                    return None;
+                }
+                Python::with_gil(|py| {
+                    let inner = self.inner.as_ref(py);
+                    inner.getattr(name).map(to_minijinja_value).ok()
+                })
             } else {
                 None
             }
         })
     }
 
-    fn item_count(&self) -> usize {
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
         Python::with_gil(|py| {
             if let Some(ref seq) = self.sequencified {
-                seq.len()
+                Enumerator::Seq(seq.len())
             } else {
                 let inner = self.inner.as_ref(py);
-                inner.len().unwrap_or(0)
+                if inner.downcast::<PySequence>().is_ok() {
+                    Enumerator::Seq(inner.len().unwrap_or(0))
+                } else {
+                    // TODO: list keys
+                    Enumerator::NonEnumerable
+                }
             }
-        })
-    }
-}
-
-impl StructObject for DynamicObject {
-    fn get_field(&self, name: &str) -> Option<Value> {
-        if !is_safe_attr(name) {
-            return None;
-        }
-        Python::with_gil(|py| {
-            let inner = self.inner.as_ref(py);
-            inner.getattr(name).map(to_minijinja_value).ok()
         })
     }
 }
 
 pub fn to_minijinja_value(value: &PyAny) -> Value {
     if let Ok(dict) = value.downcast::<PyDict>() {
-        Value::from_struct_object(DictLikeObject { inner: dict.into() })
+        Value::from_object(DictLikeObject { inner: dict.into() })
     } else if let Ok(tup) = value.downcast::<PyTuple>() {
-        Value::from_seq_object(ListLikeObject {
+        Value::from_object(ListLikeObject {
             inner: tup.as_sequence().into(),
         })
     } else if let Ok(list) = value.downcast::<PyList>() {
-        Value::from_seq_object(ListLikeObject {
+        Value::from_object(ListLikeObject {
             inner: list.as_sequence().into(),
         })
     } else if value.is_none() {
@@ -227,24 +244,31 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
         return Ok(pyobj.inner.clone());
     }
 
-    if let Some(seq) = value.as_seq() {
-        let rv = PyList::empty(py);
-        for idx in 0..seq.item_count() {
-            if let Some(item) = seq.get_item(idx) {
-                rv.append(to_python_value_impl(py, item)?)?;
-            } else {
-                rv.append(py.None())?;
+    if let Some(obj) = value.as_object() {
+        match obj.repr() {
+            ObjectRepr::Plain => todo!(),
+            ObjectRepr::Map => {
+                let rv = PyDict::new(py);
+                if let Some(pair_iter) = obj.try_iter_pairs() {
+                    for (key, value) in pair_iter {
+                        rv.set_item(
+                            to_python_value_impl(py, key)?,
+                            to_python_value_impl(py, value)?,
+                        )?;
+                    }
+                }
+                Ok(rv.into())
+            }
+            ObjectRepr::Seq | ObjectRepr::Iterable => {
+                let rv = PyList::empty(py);
+                if let Some(iter) = obj.try_iter() {
+                    for value in iter {
+                        rv.append(to_python_value_impl(py, value)?)?;
+                    }
+                }
+                Ok(rv.into())
             }
         }
-        Ok(rv.into())
-    } else if let Some(s) = value.as_struct() {
-        let rv = PyDict::new(py);
-        for field in s.fields().into_iter() {
-            if let Some(value) = s.get_field(&field) {
-                rv.set_item(&field as &str, to_python_value_impl(py, value)?)?;
-            }
-        }
-        Ok(rv.into())
     } else {
         match value.kind() {
             ValueKind::Undefined | ValueKind::None => Ok(().into_py(py)),
@@ -268,22 +292,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
                 }
             }
             ValueKind::Bytes => Ok(value.as_bytes().unwrap().into_py(py)),
-            // this should be covered above
-            ValueKind::Seq => unreachable!(),
-            ValueKind::Map => {
-                let rv = PyDict::new(py);
-                if let Ok(iter) = value.try_iter() {
-                    for k in iter {
-                        if let Ok(v) = value.get_item(&k) {
-                            rv.set_item(
-                                to_python_value_impl(py, k)?,
-                                to_python_value_impl(py, v)?,
-                            )?;
-                        }
-                    }
-                }
-                Ok(rv.into())
-            }
+            _ => todo!(),
         }
     }
 }
