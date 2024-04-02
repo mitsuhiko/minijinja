@@ -1,5 +1,4 @@
 #![allow(clippy::let_unit_value)]
-use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -31,12 +30,6 @@ fn make_cycler(_state: &State, args: Vec<Value>) -> Result<Value, Error> {
 #[derive(Debug)]
 struct Magic;
 
-impl fmt::Display for Magic {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "magic")
-    }
-}
-
 impl Object for Magic {
     fn call_method(
         self: &Arc<Self>,
@@ -58,7 +51,7 @@ impl Object for Magic {
 }
 
 #[derive(Debug)]
-struct SimpleDynamicSeq;
+struct SimpleDynamicSeq([char; 4]);
 
 impl Object for SimpleDynamicSeq {
     fn repr(self: &Arc<Self>) -> ObjectRepr {
@@ -66,12 +59,11 @@ impl Object for SimpleDynamicSeq {
     }
 
     fn get_value(self: &Arc<Self>, idx: &Value) -> Option<Value> {
-        let idx = idx.as_usize()?;
-        ['a', 'b', 'c', 'd'].get(idx).copied().map(Value::from)
+        self.0.get(idx.as_usize()?).copied().map(Value::from)
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Seq(4)
+        Enumerator::Seq(self.0.len())
     }
 }
 
@@ -79,7 +71,10 @@ fn main() {
     let mut env = Environment::new();
     env.add_function("cycler", make_cycler);
     env.add_global("magic", Value::from_object(Magic));
-    env.add_global("seq", Value::from_object(SimpleDynamicSeq));
+    env.add_global(
+        "seq",
+        Value::from_object(SimpleDynamicSeq(['a', 'b', 'c', 'd'])),
+    );
     env.add_global("real_iter", Value::make_iterable(|| (0..10).chain(20..30)));
     env.add_template("template.html", include_str!("template.html"))
         .unwrap();

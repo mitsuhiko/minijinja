@@ -78,6 +78,27 @@ macro_rules! type_erase {
             }
 
             /// Downcast to `T` if the boxed value holds a `T`.
+            ///
+            /// This is basically the “reverse” of [`Value::from_object`].
+            ///
+            /// # Example
+            ///
+            /// ```
+            /// # use minijinja::value::{Value, Object};
+            /// use std::fmt;
+            ///
+            /// #[derive(Debug)]
+            /// struct Thing {
+            ///     id: usize,
+            /// }
+            ///
+            /// impl Object for Thing {}
+            ///
+            /// let x_value = Value::from_object(Thing { id: 42 });
+            /// let value_as_obj = x_value.as_object().unwrap();
+            /// let thing = value_as_obj.downcast_ref::<Thing>().unwrap();
+            /// assert_eq!(thing.id, 42);
+            /// ```
             $v fn downcast_ref<T: 'static>(&self) -> Option<&T> {
                 if (self.vtable.type_id)() == core::any::TypeId::of::<T>() {
                     unsafe {
@@ -89,6 +110,8 @@ macro_rules! type_erase {
             }
 
             /// Downcast to `T` if the boxed value holds a `T`.
+            ///
+            /// For details see [`downcast_ref`](Self::downcast_ref).
             $v fn downcast<T: 'static>(&self) -> Option<Arc<T>> {
                 if (self.vtable.type_id)() == core::any::TypeId::of::<T>() {
                     unsafe {

@@ -584,12 +584,6 @@ impl Value {
     ///     id: usize,
     /// }
     ///
-    /// impl fmt::Display for Thing {
-    ///     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    ///         fmt::Debug::fmt(self, f)
-    ///     }
-    /// }
-    ///
     /// impl Object for Thing {}
     ///
     /// let val = Value::from_object(Thing { id: 42 });
@@ -623,61 +617,7 @@ impl Value {
         T: Into<Value> + Send + Sync + 'static,
         F: Fn() -> I + Send + Sync + 'static,
     {
-        struct Iterable<I, T, F>(F)
-        where
-            I: Iterator<Item = T> + Send + Sync + 'static,
-            T: Into<Value> + Send + Sync + 'static,
-            F: Fn() -> I + Send + Sync;
-
-        impl<I, T, F> fmt::Debug for Iterable<I, T, F>
-        where
-            I: Iterator<Item = T> + Send + Sync + 'static,
-            T: Into<Value> + Send + Sync + 'static,
-            F: Fn() -> I + Send + Sync,
-        {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_tuple("<iterator>").finish()
-            }
-        }
-
-        impl<I, T, F> Object for Iterable<I, T, F>
-        where
-            I: Iterator<Item = T> + Send + Sync + 'static,
-            T: Into<Value> + Send + Sync + 'static,
-            F: Fn() -> I + Send + Sync,
-        {
-            fn repr(self: &Arc<Self>) -> ObjectRepr {
-                ObjectRepr::Iterable
-            }
-
-            fn enumerate(self: &Arc<Self>) -> Enumerator {
-                let iter = (self.0)();
-
-                struct Iter<I, T>(I)
-                where
-                    I: Iterator<Item = T> + Send + Sync + 'static,
-                    T: Into<Value> + 'static;
-
-                impl<I, T> Iterator for Iter<I, T>
-                where
-                    I: Iterator<Item = T> + Send + Sync + 'static,
-                    T: Into<Value> + 'static,
-                {
-                    type Item = Value;
-
-                    fn next(&mut self) -> Option<Self::Item> {
-                        self.0.next().map(Into::into)
-                    }
-
-                    fn size_hint(&self) -> (usize, Option<usize>) {
-                        self.0.size_hint()
-                    }
-                }
-
-                Enumerator::Iter(Box::new(Iter(iter)))
-            }
-        }
-        Value::from_object(Iterable(maker))
+        Value::make_object_iterable((), move |_| Box::new(maker().map(Into::into)))
     }
 
     /// Creates an iterable that iterates over the given value.
@@ -1137,12 +1077,6 @@ impl Value {
     ///     id: usize,
     /// }
     ///
-    /// impl fmt::Display for Thing {
-    ///     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    ///         fmt::Debug::fmt(self, f)
-    ///     }
-    /// }
-    ///
     /// impl Object for Thing {}
     ///
     /// let x_value = Value::from_object(Thing { id: 42 });
@@ -1413,12 +1347,6 @@ mod tests {
         #[derive(Debug, Clone)]
         struct X(Arc<AtomicUsize>);
 
-        impl fmt::Display for X {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}", self.0.load(atomic::Ordering::Relaxed))
-            }
-        }
-
         impl Object for X {
             fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
                 match key.as_str()? {
@@ -1432,7 +1360,7 @@ mod tests {
             }
 
             fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                fmt::Display::fmt(self, f)
+                write!(f, "{}", self.0.load(atomic::Ordering::Relaxed))
             }
         }
 

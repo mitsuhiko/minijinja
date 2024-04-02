@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{Enumerator, Object, Value, ValueKind};
+use minijinja::value::{Enumerator, Object, Value};
 use minijinja::{context, Environment};
 
 #[derive(Debug)]
@@ -12,34 +12,26 @@ struct TrackedContext {
 
 impl Object for TrackedContext {
     fn get_value(self: &Arc<Self>, name: &Value) -> Option<Value> {
-        if let Some(name) = name.as_str() {
-            match self
-                .enclosed
-                .get_attr(name)
-                .ok()
-                .filter(|x| !x.is_undefined())
-            {
-                Some(rv) => Some(rv),
-                None => {
-                    let mut undefined = self.undefined.lock().unwrap();
-                    if !undefined.contains(name) {
-                        undefined.insert(name.to_string());
-                    }
-                    None
+        let name = name.as_str()?;
+        self.enclosed
+            .get_attr(name)
+            .ok()
+            .filter(|x| !x.is_undefined())
+            .or_else(|| {
+                let mut undefined = self.undefined.lock().unwrap();
+                if !undefined.contains(name) {
+                    undefined.insert(name.to_string());
                 }
-            }
-        } else {
-            None
-        }
+                None
+            })
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        if self.enclosed.kind() == ValueKind::Map {
-            if let Ok(keys) = self.enclosed.try_iter() {
-                return Enumerator::Values(keys.collect());
-            }
+        if let Some(o) = self.enclosed.as_object() {
+            o.enumerate()
+        } else {
+            Enumerator::NonEnumerable
         }
-        Enumerator::Seq(0)
     }
 }
 

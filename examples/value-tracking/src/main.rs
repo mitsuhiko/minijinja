@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{Enumerator, Object, Value, ValueKind};
+use minijinja::value::{Enumerator, Object, Value};
 use minijinja::{context, Environment};
 
 #[derive(Debug)]
@@ -12,27 +12,23 @@ struct TrackedContext {
 
 impl Object for TrackedContext {
     fn get_value(self: &Arc<Self>, name: &Value) -> Option<Value> {
+        let name = name.as_str()?;
         let mut resolved = self.resolved.lock().unwrap();
-        if let Some(name) = name.as_str() {
-            if !resolved.contains(name) {
-                resolved.insert(name.to_string());
-            }
-            self.enclosed
-                .get_attr(name)
-                .ok()
-                .filter(|x| !x.is_undefined())
-        } else {
-            None
+        if !resolved.contains(name) {
+            resolved.insert(name.to_string());
         }
+        self.enclosed
+            .get_attr(name)
+            .ok()
+            .filter(|x| !x.is_undefined())
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        if self.enclosed.kind() == ValueKind::Map {
-            if let Ok(keys) = self.enclosed.try_iter() {
-                return Enumerator::Values(keys.collect());
-            }
+        if let Some(o) = self.enclosed.as_object() {
+            o.enumerate()
+        } else {
+            Enumerator::NonEnumerable
         }
-        Enumerator::Seq(0)
     }
 }
 
