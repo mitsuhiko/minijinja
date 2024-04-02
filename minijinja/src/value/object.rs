@@ -359,6 +359,49 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
         Enumerator::Iter(Box::new(IterObject { iter, _object }))
     }
 
+    /// Creates a new enumeration that projects into the given object supporting reversing.
+    fn mapped_rev_enumerator<F>(self: &Arc<Self>, maker: F) -> Enumerator
+    where
+        F: for<'a> FnOnce(
+                &'a Self,
+            )
+                -> Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync + 'a>
+            + Send
+            + Sync
+            + 'static,
+        Self: Sized,
+    {
+        struct IterObject<T> {
+            iter: Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync + 'static>,
+            _object: Arc<T>,
+        }
+
+        impl<T> Iterator for IterObject<T> {
+            type Item = Value;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                self.iter.next()
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                self.iter.size_hint()
+            }
+        }
+
+        impl<T> DoubleEndedIterator for IterObject<T> {
+            fn next_back(&mut self) -> Option<Self::Item> {
+                self.iter.next_back()
+            }
+        }
+
+        let iter: Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync + '_> = maker(self);
+
+        // SAFETY: this is safe because the `IterObject` will keep our object alive.
+        let iter = unsafe { std::mem::transmute(iter) };
+        let _object = self.clone();
+        Enumerator::RevIter(Box::new(IterObject { iter, _object }))
+    }
+
     impl_object_helpers!(&Arc<Self>);
 }
 
@@ -513,7 +556,7 @@ impl Object for ValueMap {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        self.mapped_enumerator(|this| Box::new(this.keys().cloned()))
+        self.mapped_rev_enumerator(|this| Box::new(this.keys().cloned()))
     }
 }
 
