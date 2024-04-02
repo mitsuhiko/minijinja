@@ -494,7 +494,7 @@ mod builtins {
         }
     }
 
-    /// Reverses a list or string
+    /// Reverses an iterable or string
     ///
     /// ```jinja
     /// {% for user in users|reverse %}
@@ -503,19 +503,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn reverse(v: Value) -> Result<Value, Error> {
-        if let Some(s) = v.as_str() {
-            Ok(Value::from(s.chars().rev().collect::<String>()))
-        } else if let Some(iter) = v.as_object().and_then(|x| x.try_iter()) {
-            // TODO: support reversible iterators?
-            let mut values = iter.collect::<Vec<_>>();
-            values.reverse();
-            Ok(Value::from_iter(values))
-        } else {
-            Err(Error::new(
-                ErrorKind::InvalidOperation,
-                format!("cannot reverse value of type {}", v.kind()),
-            ))
-        }
+        v.reverse()
     }
 
     /// Trims a value
