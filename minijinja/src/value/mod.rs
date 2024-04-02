@@ -20,11 +20,10 @@
 //! let true_value = Value::from(true);
 //! ```
 //!
-//! Or via the [`FromIterator`] trait:
+//! Or via the [`FromIterator`] trait which can create sequences or maps:
 //!
 //! ```
 //! # use minijinja::value::Value;
-//!
 //! // collection into a sequence
 //! let value: Value = (1..10).into_iter().collect();
 //!
@@ -34,7 +33,8 @@
 //!
 //! For certain types of iterators (`Send` + `Sync` + `'static`) it's also
 //! possible to make the value lazily iterate over the value by using the
-//! `Value::make_iterable` function instead:
+//! `Value::make_iterable` function instead.  Whenever the value requires
+//! iteration, the function is called to create that iterator.
 //!
 //! ```
 //! # use minijinja::value::Value;
@@ -106,7 +106,7 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //! Values can also hold "dynamic" objects.  These are objects which implement the
 //! [`Object`] trait.  These can be used to implement dynamic functionality such
 //! as stateful values and more.  Dynamic objects are internally also used to
-//! implement the special `loop` variable or macros.
+//! implement the special `loop` variable, macros and similar things.
 //!
 //! To create a dynamic `Value` object or [`Value::from_object`],
 //! [`Value::from_dyn_object`]:
