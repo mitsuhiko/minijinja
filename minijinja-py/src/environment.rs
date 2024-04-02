@@ -13,7 +13,7 @@ use pyo3::types::{PyDict, PyTuple};
 use crate::error_support::{report_unraisable, to_minijinja_error, to_py_error};
 use crate::state::bind_state;
 use crate::typeconv::{
-    get_custom_autoescape, to_minijinja_value, to_python_args, to_python_value, DictLikeObject,
+    get_custom_autoescape, to_minijinja_value, to_python_args, to_python_value, DynamicObject,
 };
 
 thread_local! {
@@ -583,7 +583,7 @@ impl Environment {
             let inner = slf.inner.lock().unwrap();
             let tmpl = inner.env.get_template(template_name).map_err(to_py_error)?;
             let ctx = ctx
-                .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
+                .map(|ctx| Value::from_object(DynamicObject::new(ctx.into())))
                 .unwrap_or_else(|| context!());
             tmpl.render(ctx).map_err(to_py_error)
         })
@@ -602,7 +602,7 @@ impl Environment {
     ) -> PyResult<String> {
         bind_environment(slf.as_ptr(), || {
             let ctx = ctx
-                .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
+                .map(|ctx| Value::from_object(DynamicObject::new(ctx.into())))
                 .unwrap_or_else(|| context!());
             slf.inner
                 .lock()
@@ -627,7 +627,7 @@ impl Environment {
                 .compile_expression(expression)
                 .map_err(to_py_error)?;
             let ctx = ctx
-                .map(|ctx| Value::from_struct_object(DictLikeObject { inner: ctx.into() }))
+                .map(|ctx| Value::from_object(DynamicObject::new(ctx.into())))
                 .unwrap_or_else(|| context!());
             to_python_value(expr.eval(ctx).map_err(to_py_error)?)
         })
