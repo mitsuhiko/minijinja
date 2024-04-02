@@ -9,7 +9,7 @@ use once_cell::sync::OnceCell;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PySequence, PyTuple};
 
-use crate::error_support::to_minijinja_error;
+use crate::error_support::{to_minijinja_error, to_py_error};
 use crate::state::{bind_state, StateRef};
 
 static AUTO_ESCAPE_CACHE: Mutex<BTreeMap<String, AutoEscape>> = Mutex::new(BTreeMap::new());
@@ -189,7 +189,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
 
     if let Some(obj) = value.as_object() {
         match obj.repr() {
-            ObjectRepr::Plain => todo!(),
+            ObjectRepr::Plain => Ok(obj.to_string().into_py(py)),
             ObjectRepr::Map => {
                 let rv = PyDict::new(py);
                 if let Some(pair_iter) = obj.try_iter_pairs() {
@@ -235,7 +235,10 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
                 }
             }
             ValueKind::Bytes => Ok(value.as_bytes().unwrap().into_py(py)),
-            _ => todo!(),
+            kind => Err(to_py_error(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                format!("object {} cannot roundtrip", kind),
+            ))),
         }
     }
 }
