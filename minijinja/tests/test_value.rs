@@ -680,3 +680,19 @@ fn test_map_custom_iter() {
         ]
     );
 }
+
+#[test]
+fn test_plain_object() {
+    #[derive(Debug)]
+    struct X;
+
+    impl Object for X {
+        fn repr(self: &Arc<Self>) -> ObjectRepr {
+            ObjectRepr::Plain
+        }
+    }
+
+    let x = Value::from_object(X);
+    assert!(x.try_iter().is_err());
+    assert_snapshot!(render!("{{ x }}|{{ x.missing_attr is undefined }}", x), @"X|true");
+}
