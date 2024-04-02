@@ -437,6 +437,7 @@ pub enum Enumerator {
 
 /// Defines the natural representation of this object.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum ObjectRepr {
     /// An object that has no reasonable representation.  Usually stringifies.
     Plain,
