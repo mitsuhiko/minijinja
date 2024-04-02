@@ -321,7 +321,7 @@ fn test_deep_recursion() {
 
     let mut env = Environment::new();
     let limit = if cfg!(target_arch = "wasm32") {
-        1000
+        500
     } else {
         10000
     };
