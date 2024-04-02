@@ -10,6 +10,9 @@ use crate::vm::State;
 
 /// A trait that represents a dynamic object.
 ///
+/// There is a type erased wrapper of this trait available called
+/// [`DynObject`] which is what the engine actually holds internally.
+///
 /// # Basic Struct
 ///
 /// The following example shows how to implement a dynamic object which

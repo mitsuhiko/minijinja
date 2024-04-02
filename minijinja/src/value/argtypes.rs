@@ -299,23 +299,19 @@ impl From<()> for Value {
     }
 }
 
-// FIXME: Make this efficient.
 impl<V: Into<Value>> FromIterator<V> for Value {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
-        let vec = iter.into_iter().map(Into::into).collect::<Vec<Value>>();
-        Value::from_object(vec)
+        Value::from_object(iter.into_iter().map(Into::into).collect::<Vec<Value>>())
     }
 }
 
-// FIXME: Make this efficient.
 impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let map = iter
-            .into_iter()
-            .map(|(k, v)| (k.into(), v.into()))
-            .collect::<ValueMap>();
-
-        Value::from_object(map)
+        Value::from_object(
+            iter.into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect::<ValueMap>(),
+        )
     }
 }
 
@@ -972,10 +968,9 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
             Some(value) => {
                 let iter = ok!(value
                     .as_object()
-                    // XXX: needs updating for iterators
-                    .filter(|x| matches!(x.repr(), ObjectRepr::Seq))
+                    .filter(|x| matches!(x.repr(), ObjectRepr::Seq | ObjectRepr::Iterable))
                     .and_then(|x| x.try_iter())
-                    .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not a sequence") }));
+                    .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not iterable") }));
                 let mut rv = Vec::new();
                 for value in iter {
                     rv.push(ok!(T::from_value_owned(value)));
@@ -988,10 +983,9 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
     fn from_value_owned(value: Value) -> Result<Self, Error> {
         let iter = ok!(value
             .as_object()
-            // XXX: needs updating for iterators
-            .filter(|x| matches!(x.repr(), ObjectRepr::Seq))
+            .filter(|x| matches!(x.repr(), ObjectRepr::Seq | ObjectRepr::Iterable))
             .and_then(|x| x.try_iter())
-            .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not a sequence") }));
+            .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not iterable") }));
         let mut rv = Vec::new();
         for value in iter {
             rv.push(ok!(T::from_value_owned(value)));
