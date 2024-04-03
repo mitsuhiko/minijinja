@@ -4,7 +4,7 @@ use std::fmt;
 use std::hash::Hash;
 use std::sync::Arc;
 
-use crate::error::{Error, ErrorKind, Result};
+use crate::error::{Error, ErrorKind};
 use crate::value::{intern, Value, ValueMap, ValueRepr};
 use crate::vm::State;
 
@@ -210,7 +210,7 @@ pub trait Object: fmt::Debug + Send + Sync {
     ///
     /// The default implementation returns an
     /// [`InvalidOperation`](crate::ErrorKind::InvalidOperation) error.
-    fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[Value]) -> Result<Value> {
+    fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
         let (_, _) = (state, args);
         Err(Error::new(
             ErrorKind::InvalidOperation,
@@ -230,7 +230,7 @@ pub trait Object: fmt::Debug + Send + Sync {
         state: &State<'_, '_>,
         method: &str,
         args: &[Value],
-    ) -> Result<Value> {
+    ) -> Result<Value, Error> {
         if let Some(value) = self.get_value(&Value::from(method)) {
             return value.call(state, args);
         }
@@ -624,14 +624,14 @@ type_erase! {
             &self,
             state: &State<'_, '_>,
             args: &[Value]
-        ) -> Result<Value>;
+        ) -> Result<Value, Error>;
 
         fn call_method(
             &self,
             state: &State<'_, '_>,
             method: &str,
             args: &[Value]
-        ) -> Result<Value>;
+        ) -> Result<Value, Error>;
 
         fn render(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 

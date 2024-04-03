@@ -137,7 +137,7 @@ use std::sync::{Arc, Mutex};
 
 use serde::ser::{Serialize, Serializer};
 
-use crate::error::{Error, ErrorKind, Result};
+use crate::error::{Error, ErrorKind};
 use crate::functions;
 use crate::utils::OnDrop;
 use crate::value::ops::as_f64;
