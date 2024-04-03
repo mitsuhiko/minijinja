@@ -696,3 +696,81 @@ fn test_plain_object() {
     assert!(x.try_iter().is_err());
     assert_snapshot!(render!("{{ x }}|{{ x.missing_attr is undefined }}", x), @"X|true");
 }
+
+#[test]
+fn test_reverse() {
+    // reverse vectors
+    assert_snapshot!(Value::from_iter(0..3).reverse().unwrap(), @"[2, 1, 0]");
+    // regular iterators (non reversible)
+    assert_snapshot!(Value::make_iterable(|| 0..3).reverse().unwrap(), @"[2, 1, 0]");
+    // strings
+    assert_snapshot!(Value::from("abc").reverse().unwrap(), @"cba");
+    // bytes
+    assert_snapshot!(Value::from_serializable(b"abc").reverse().unwrap(), @"[99, 98, 97]");
+    // undefined
+    assert!(Value::UNDEFINED.reverse().unwrap().is_undefined());
+    // none
+    assert!(Value::from(()).reverse().unwrap().is_none());
+
+    #[derive(Debug)]
+    struct OddMap;
+
+    impl Object for OddMap {
+        fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+            Some(key.clone())
+        }
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Str(&["a", "b", "c"])
+        }
+    }
+
+    let odd_map = Value::from_object(OddMap);
+    assert_eq!(odd_map.len(), Some(3));
+    assert_snapshot!(
+        render!("{% set r = m|reverse %}{{ m }}|{{ r }}|{{ r }}", m => odd_map),
+        @r###"{"a": "a", "b": "b", "c": "c"}|["c", "b", "a"]|["c", "b", "a"]"###
+    );
+
+    #[derive(Debug)]
+    struct RevThing;
+
+    impl Object for RevThing {
+        fn repr(self: &Arc<Self>) -> ObjectRepr {
+            ObjectRepr::Iterable
+        }
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::RevIter(Box::new((0..3).map(Value::from)))
+        }
+    }
+
+    let rev_thing = Value::from_object(RevThing);
+    assert_eq!(rev_thing.len(), Some(3));
+    assert_snapshot!(
+        render!("{% set r = m|reverse %}{{ m }}|{{ r }}|{{ r }}", m => rev_thing),
+        @"[0, 1, 2]|[0, 1, 2]|[0, 1, 2]"
+    );
+
+    #[derive(Debug)]
+    struct ValueThing;
+
+    impl Object for ValueThing {
+        fn repr(self: &Arc<Self>) -> ObjectRepr {
+            ObjectRepr::Iterable
+        }
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Values(vec![false.into(), true.into()])
+        }
+    }
+
+    let value_thing = Value::from_object(ValueThing);
+    assert_eq!(value_thing.len(), Some(2));
+    assert_snapshot!(
+        render!("{% set r = m|reverse %}{{ m }}|{{ r }}|{{ r }}", m => value_thing),
+        @"[false, true]|[true, false]|[true, false]"
+    );
+
+    assert_snapshot!(
+        Value::from(42).reverse().unwrap_err(),
+        @"invalid operation: cannot reverse values of type number"
+    );
+}

@@ -33,7 +33,7 @@
 //!
 //! For certain types of iterators (`Send` + `Sync` + `'static`) it's also
 //! possible to make the value lazily iterate over the value by using the
-//! `Value::make_iterable` function instead.  Whenever the value requires
+//! [`Value::make_iterable`] function instead.  Whenever the value requires
 //! iteration, the function is called to create that iterator.
 //!
 //! ```
@@ -108,7 +108,7 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //! as stateful values and more.  Dynamic objects are internally also used to
 //! implement the special `loop` variable, macros and similar things.
 //!
-//! To create a dynamic `Value` object or [`Value::from_object`],
+//! To create a [`Value`] from a dynamic object use [`Value::from_object`],
 //! [`Value::from_dyn_object`]:
 //!
 //! ```rust
@@ -250,7 +250,7 @@ fn mark_internal_serialization() -> impl Drop {
 pub enum ValueKind {
     /// The value is undefined
     Undefined,
-    /// The value is the none singleton ([`()`])
+    /// The value is the none singleton (`()`)
     None,
     /// The value is a [`bool`]
     Bool,
@@ -1032,7 +1032,7 @@ impl Value {
                     Some(Value::make_iterable(move || {
                         if let Some(iter) = iter.lock().unwrap().take() {
                             Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
-                        } else if let Ok(iter) = for_restart.try_iter() {
+                        } else if let Ok(iter) = for_restart.reverse().and_then(|x| x.try_iter()) {
                             Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
                         } else {
                             Box::new(None.into_iter())

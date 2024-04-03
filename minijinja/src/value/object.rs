@@ -172,33 +172,36 @@ pub trait Object: fmt::Debug + Send + Sync {
 
     /// Enumerates the object.
     ///
-    /// For more information see [`Enumerator`].  The default implementation
-    /// returns an `Empty` enumerator if the object repr is a `Map` or `Seq`,
-    /// and `NonEnumerable` for `Plain` objects or `Iterator`s.
+    /// The engine uses the returned enumerator to implement iteration and
+    /// the size information of an object.  For more information see
+    /// [`Enumerator`].  The default implementation returns `Empty` for
+    /// all object representations other than [`ObjectRepr::Plain`] which
+    /// default to `NonEnumerable`.
     ///
     /// When wrapping other objects you might want to consider using
     /// [`ObjectExt::mapped_enumerator`] and [`ObjectExt::mapped_rev_enumerator`].
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         match self.repr() {
-            ObjectRepr::Plain | ObjectRepr::Iterable => Enumerator::NonEnumerable,
-            ObjectRepr::Map | ObjectRepr::Seq => Enumerator::Empty,
+            ObjectRepr::Plain => Enumerator::NonEnumerable,
+            ObjectRepr::Iterable | ObjectRepr::Map | ObjectRepr::Seq => Enumerator::Empty,
         }
     }
 
     /// Returns the length of the object.
     ///
-    /// By default the length is taken from [`Enumerator::len`].  This means that in order
-    /// to determine the length, an iteration is started.  If you this is a problem for
-    /// your uses, you can manually implement this.  This might for instance be needed
-    /// if your type can only be iterated over once.
+    /// By default the length is taken by calling [`enumerate`](Self::enumerate) and
+    /// inspecting the [`Enumerator`].  This means that in order to determine
+    /// the length, an iteration is started.  If you this is a problem for your
+    /// uses, you can manually implement this.  This might for instance be
+    /// needed if your type can only be iterated over once.
     fn len(self: &Arc<Self>) -> Option<usize> {
-        self.enumerate().len()
+        self.enumerate().query_len()
     }
 
     /// Returns `true` if this object is considered empty.
     ///
-    /// The default implementation checks if the length of the object is `Some(0)` which
-    /// is the recommended behavior for objects.
+    /// The default implementation checks if the [`len`](Self::len) of the
+    /// object is `Some(0)` which is the recommended behavior for objects.
     fn is_empty(self: &Arc<Self>) -> bool {
         self.len() == Some(0)
     }
@@ -246,7 +249,7 @@ pub trait Object: fmt::Debug + Send + Sync {
     where
         Self: Sized + 'static,
     {
-        struct Dbg<'a>(pub &'a Value);
+        struct Dbg<'a>(&'a Value);
 
         impl<'a> fmt::Debug for Dbg<'a> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -466,32 +469,97 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
 
 impl<T: Object + Send + Sync + 'static> ObjectExt for T {}
 
-/// Utility type to enumerate an object.
+/// Enumerators help define iteration behavior for [`Object`]s.
+///
+/// When Jinja wants to know the length of an object, if it's empty or
+/// not or if it wants to iterate over it, it will ask the [`Object`] to
+/// enumerate itself with the [`enumerate`](Object::enumerate) method.  The
+/// returned enumerator has enough information so that the object can be
+/// iterated over, but it does not necessarily mean that iteration actually
+/// starts or that it has the data to yield the right values.
+///
+/// In fact, you should never inspect an enumerator.  You can create it or
+/// forward it.  For actual iteration use [`ObjectExt::try_iter`] etc.
 #[non_exhaustive]
 pub enum Enumerator {
-    /// A non enumerable enumeration.
+    /// Marks non enumerable objects.
     ///
-    /// This fails iteration and the object has no known length.
+    /// Such objects cannot be iterated over, the length is unknown which
+    /// means they are not considered empty by the engine.  This is a good
+    /// choice for plain objects.
+    ///
+    /// | Iterable | Length  |
+    /// |----------|---------|
+    /// | no       | unknown |
     NonEnumerable,
-    /// The empty enumeration.  It yields no elements.
+
+    /// The empty enumerator.  It yields no elements.
     ///
-    /// It has a known length of 0.
+    /// | Iterable | Length      |
+    /// |----------|-------------|
+    /// | yes      | known (`0`) |
     Empty,
-    /// A slice of static string keys.
+
+    /// A slice of static strings.
     ///
-    /// This has a known length which is the length of the slice.
+    /// This is a useful enumerator to enumerate the attributes of an
+    /// object or the keys in a string hash map.
+    ///
+    /// | Iterable | Length       |
+    /// |----------|--------------|
+    /// | yes      | known        |
     Str(&'static [&'static str]),
-    /// A dynamic iterator over values.  Length is known if the size hint has matching lower and upper bounds.
-    Iter(Box<dyn Iterator<Item = Value> + Send + Sync>),
-    /// Like `Iter` but supports efficient reversing.
-    RevIter(Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync>),
-    /// Instructs the engine to yield values by calling `get_value` from 0 to `usize`.
+
+    /// A dynamic iterator over values.
     ///
-    /// This has a known legth of `usize`.
+    /// The length is known if the [`Iterator::size_hint`] has matching lower
+    /// and upper bounds.  The logic used by the engine is the following:
+    ///
+    /// ```
+    /// # let iter = Some(1).into_iter();
+    /// let len = match iter.size_hint() {
+    ///     (lower, Some(upper)) if lower == upper => Some(lower),
+    ///     _ => None
+    /// };
+    /// ```
+    ///
+    /// Because the engine prefers repeatable iteration, it will keep creating
+    /// new enumerators every time the iteration should restart.  Sometimes
+    /// that might not always be possible (eg: you stream data in) in which
+    /// case
+    ///
+    /// | Iterable | Length          |
+    /// |----------|-----------------|
+    /// | yes      | sometimes known |
+    Iter(Box<dyn Iterator<Item = Value> + Send + Sync>),
+
+    /// Like `Iter` but supports efficient reversing.
+    ///
+    /// This means that the iterator has to be of type [`DoubleEndedIterator`].
+    ///
+    /// | Iterable | Length          |
+    /// |----------|-----------------|
+    /// | yes      | sometimes known |
+    RevIter(Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync>),
+
+    /// Indicates sequential iteration.
+    ///
+    /// This instructs the engine to iterate over an object by enumerating it
+    /// from `0` to `n` by calling [`Object::get_value`].  This is essentially the
+    /// way sequences are supposed to be enumerated.
+    ///
+    /// | Iterable | Length          |
+    /// |----------|-----------------|
+    /// | yes      | known           |
     Seq(usize),
+
     /// A vector of known values to iterate over.
     ///
-    /// This has a known length which is the length of the vector.
+    /// The iterator will yield each value in the vector one after another.
+    ///
+    /// | Iterable | Length          |
+    /// |----------|-----------------|
+    /// | yes      | known           |
     Values(Vec<Value>),
 }
 
@@ -507,13 +575,36 @@ pub enum Enumerator {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[non_exhaustive]
 pub enum ObjectRepr {
-    /// An object that has no reasonable representation.  Usually stringifies.
+    /// An object that has no reasonable representation.
+    ///
+    /// - **Default Render:** [`Debug`]
+    /// - **Collection Behavior:** none
+    /// - **Iteration Behavior:** none
+    /// - **Serialize:** [`Debug`] / [`render`](Object::render) output as string
     Plain,
-    /// serializes to {...} and over the enumeration, values
+
+    /// Represents a map or object.
+    ///
+    /// - **Default Render:** `{key: value,...}` pairs
+    /// - **Collection Behavior:** looks like a map, can be indexed by key, has a length
+    /// - **Iteration Behavior:** iterates over keys
+    /// - **Serialize:** Serializes as map
     Map,
-    /// serializes to [...] over its values
+
+    /// Represents a sequence (eg: array/list).
+    ///
+    /// - **Default Render:** `[value,...]`
+    /// - **Collection Behavior:** looks like a list, can be indexed by index, has a length
+    /// - **Iteration Behavior:** iterates over values
+    /// - **Serialize:** Serializes as list
     Seq,
-    /// Similar to `Seq` but without indexing
+
+    /// Represents a non indexable, iterable object.
+    ///
+    /// - **Default Render:** `[value,...]` (if length is known), `"<iterator>"` otherwise.
+    /// - **Collection Behavior:** looks like a list if length is known, cannot be indexed
+    /// - **Iteration Behavior:** iterates over values
+    /// - **Serialize:** Serializes as list
     Iterable,
 }
 
@@ -551,13 +642,6 @@ type_erase! {
 }
 
 impl DynObject {
-    /// Checks if the object is of a specific type.
-    ///
-    /// For details of this operation see [`downcast_ref`](#method.downcast_ref).
-    pub fn is<T: 'static>(&self) -> bool {
-        self.downcast::<T>().is_some()
-    }
-
     impl_object_helpers!(pub &Self);
 }
 
@@ -579,8 +663,7 @@ impl fmt::Display for DynObject {
 }
 
 impl Enumerator {
-    /// Returns the length of the enumerator if known.
-    pub fn len(&self) -> Option<usize> {
+    fn query_len(&self) -> Option<usize> {
         Some(match self {
             Enumerator::Empty => 0,
             Enumerator::Values(v) => v.len(),
@@ -596,11 +679,6 @@ impl Enumerator {
             Enumerator::Seq(v) => *v,
             Enumerator::NonEnumerable => return None,
         })
-    }
-
-    /// Returns `true` if this enumerator is considered empty.
-    pub fn is_empty(self: &Arc<Self>) -> bool {
-        self.len() == Some(0)
     }
 }
 

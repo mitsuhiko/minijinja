@@ -124,6 +124,13 @@ macro_rules! type_erase {
 
                 None
             }
+
+            /// Checks if the boxed value is a `T`.
+            ///
+            /// For details see [`downcast_ref`](Self::downcast_ref).
+            $v fn is<T: 'static>(&self) -> bool {
+                self.downcast::<T>().is_some()
+            }
         }
 
         impl Clone for $E {
