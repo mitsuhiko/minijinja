@@ -407,15 +407,14 @@ fn test_flattening_sub_item_shielded_print() {
 #[cfg(feature = "custom_syntax")]
 fn test_custom_syntax() {
     let mut env = Environment::new();
-    env.set_syntax(minijinja::Syntax {
-        block_start: "{".into(),
-        block_end: "}".into(),
-        variable_start: "${".into(),
-        variable_end: "}".into(),
-        comment_start: "{*".into(),
-        comment_end: "*}".into(),
-    })
-    .unwrap();
+    env.set_syntax(
+        minijinja::syntax::SyntaxConfig::builder()
+            .block_delimiters("{", "}")
+            .variable_delimiters("${", "}")
+            .comment_delimiters("{*", "*}")
+            .build()
+            .unwrap(),
+    );
 
     // this on the other hand is okay
     let value = env

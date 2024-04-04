@@ -3,8 +3,9 @@ use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::Mutex;
 
+use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Rest, Value};
-use minijinja::{context, escape_formatter, AutoEscape, Error, State, Syntax, UndefinedBehavior};
+use minijinja::{context, escape_formatter, AutoEscape, Error, State, UndefinedBehavior};
 use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -59,7 +60,7 @@ struct Inner {
     auto_escape_callback: Option<Py<PyAny>>,
     finalizer_callback: Option<Py<PyAny>>,
     path_join_callback: Option<Py<PyAny>>,
-    syntax: Option<Syntax>,
+    syntax: Option<SyntaxConfig>,
 }
 
 /// Represents a MiniJinja environment.

@@ -227,9 +227,6 @@ mod loader;
 #[cfg(feature = "loader")]
 pub use loader::path_loader;
 
-#[cfg(feature = "custom_syntax")]
-mod custom_syntax;
-
 #[cfg(feature = "debug")]
 mod debug;
 
@@ -243,9 +240,6 @@ pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
 
 /// Re-export for convenience.
 pub use self::value::Value;
-
-#[cfg(feature = "custom_syntax")]
-pub use self::custom_syntax::Syntax;
 
 pub use self::macros::__context;
 pub use self::vm::State;
@@ -262,7 +256,7 @@ pub mod machinery {
     pub use crate::compiler::ast;
     pub use crate::compiler::codegen::CodeGenerator;
     pub use crate::compiler::instructions::{Instruction, Instructions};
-    pub use crate::compiler::lexer::{tokenize, SyntaxConfig, Tokenizer, WhitespaceConfig};
+    pub use crate::compiler::lexer::{tokenize, Tokenizer, WhitespaceConfig};
     pub use crate::compiler::parser::{parse, parse_expr};
     pub use crate::compiler::tokens::{Span, Token};
     pub use crate::template::{CompiledTemplate, TemplateConfig};
@@ -280,11 +274,5 @@ pub mod machinery {
     /// Creates an [`Output`] that writes into a string.
     pub fn make_string_output(s: &mut String) -> Output<'_> {
         Output::with_string(s)
-    }
-
-    /// Creates a syntax config from a given [`Syntax`](crate::Syntax).
-    #[cfg(feature = "custom_syntax")]
-    pub fn make_syntax_config(syntax: crate::Syntax) -> Result<SyntaxConfig, crate::Error> {
-        syntax.compile()
     }
 }

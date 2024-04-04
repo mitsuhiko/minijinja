@@ -7,12 +7,13 @@ use serde::Serialize;
 
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
-use crate::compiler::lexer::{SyntaxConfig, WhitespaceConfig};
+use crate::compiler::lexer::WhitespaceConfig;
 use crate::compiler::meta::find_undeclared;
 use crate::compiler::parser::parse;
 use crate::environment::Environment;
 use crate::error::{attach_basic_debug_info, Error};
 use crate::output::{Output, WriteWrapper};
+use crate::syntax::SyntaxConfig;
 use crate::utils::AutoEscape;
 use crate::value::{self, Value};
 use crate::vm::{prepare_blocks, Context, State, Vm};

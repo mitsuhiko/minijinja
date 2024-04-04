@@ -3,9 +3,10 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::compiler::ast::{self, Spanned};
-use crate::compiler::lexer::{SyntaxConfig, Tokenizer, WhitespaceConfig};
+use crate::compiler::lexer::{Tokenizer, WhitespaceConfig};
 use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
+use crate::syntax::SyntaxConfig;
 use crate::value::Value;
 
 const MAX_RECURSION: usize = 150;

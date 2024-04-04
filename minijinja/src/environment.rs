@@ -7,7 +7,6 @@ use serde::Serialize;
 
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
-use crate::compiler::lexer::SyntaxConfig;
 use crate::compiler::parser::parse_expr;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::expression::Expression;
@@ -600,22 +599,17 @@ impl<'source> Environment<'source> {
     /// This setting is used whenever a template is loaded into the environment.
     /// Changing it at a later point only affects future templates loaded.
     ///
-    /// See [`Syntax`](crate::Syntax) for more information.
+    /// See [`SyntaxConfig`](crate::syntax::SyntaxConfig) for more information.
     #[cfg(feature = "custom_syntax")]
     #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
-    pub fn set_syntax(&mut self, syntax: crate::custom_syntax::Syntax) -> Result<(), Error> {
-        self.templates.template_config.syntax_config = ok!(syntax.compile());
-        Ok(())
+    pub fn set_syntax(&mut self, syntax: crate::syntax::SyntaxConfig) {
+        self.templates.template_config.syntax_config = syntax;
     }
 
-    /// Returns the current syntax.
+    /// Returns the current syntax config.
     #[cfg(feature = "custom_syntax")]
     #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
-    pub fn syntax(&self) -> &crate::custom_syntax::Syntax {
-        &self._syntax_config().syntax
-    }
-
-    fn _syntax_config(&self) -> &SyntaxConfig {
+    pub fn syntax(&self) -> &crate::syntax::SyntaxConfig {
         &self.templates.template_config.syntax_config
     }
 
