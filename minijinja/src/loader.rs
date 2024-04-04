@@ -160,6 +160,20 @@ impl<'source> LoaderStore<'source> {
         )
         .map(Arc::new)
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &CompiledTemplate<'_>)> {
+        let borrowed = self
+            .borrowed_templates
+            .iter()
+            .map(|(name, template)| (*name, &**template));
+
+        let owned = self
+            .owned_templates
+            .iter()
+            .map(|(name, template)| (&**name, template.borrow_dependent()));
+
+        borrowed.chain(owned)
+    }
 }
 
 /// Safely joins two paths.
