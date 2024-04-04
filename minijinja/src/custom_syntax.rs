@@ -131,3 +131,148 @@ impl Default for SyntaxConfigInternal {
         }
     }
 }
+
+#[derive(Debug, PartialEq, Clone)]
+struct Delims {
+    block_start: Cow<'static, str>,
+    block_end: Cow<'static, str>,
+    variable_start: Cow<'static, str>,
+    variable_end: Cow<'static, str>,
+    comment_start: Cow<'static, str>,
+    comment_end: Cow<'static, str>,
+}
+
+const DEFAULT_DELIMS: Delims = Delims {
+    block_start: Cow::Borrowed("{%"),
+    block_end: Cow::Borrowed("%}"),
+    variable_start: Cow::Borrowed("{{"),
+    variable_end: Cow::Borrowed("}}"),
+    comment_start: Cow::Borrowed("{#"),
+    comment_end: Cow::Borrowed("#}"),
+};
+
+/// Builder helper to reconfigure the syntax.
+#[derive(Debug)]
+pub struct SyntaxBuilder {
+    delims: Arc<Delims>,
+}
+
+impl SyntaxBuilder {
+    /// Sets the block start and end delimiters.
+    pub fn block_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
+    where
+        S: Into<Cow<'static, str>>,
+        E: Into<Cow<'static, str>>,
+    {
+        let delims = Arc::make_mut(&mut self.delims);
+        delims.block_start = s.into();
+        delims.block_end = e.into();
+        self
+    }
+
+    /// Sets the variable start and end delimiters.
+    pub fn variable_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
+    where
+        S: Into<Cow<'static, str>>,
+        E: Into<Cow<'static, str>>,
+    {
+        let delims = Arc::make_mut(&mut self.delims);
+        delims.variable_start = s.into();
+        delims.variable_end = e.into();
+        self
+    }
+
+    /// Sets the comment start and end delimiters.
+    pub fn comment_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
+    where
+        S: Into<Cow<'static, str>>,
+        E: Into<Cow<'static, str>>,
+    {
+        let delims = Arc::make_mut(&mut self.delims);
+        delims.comment_start = s.into();
+        delims.comment_end = e.into();
+        self
+    }
+
+    /// Builds the final syntax config.
+    pub fn build(&self) -> Result<SyntaxConfig2, Error> {
+        let delims = self.delims.clone();
+        if *delims == DEFAULT_DELIMS {
+            return Ok(SyntaxConfig2::default());
+        } else if delims.block_start == delims.variable_start
+            || delims.block_start == delims.comment_start
+            || delims.variable_start == delims.comment_start
+        {
+            return Err(ErrorKind::InvalidDelimiter.into());
+        }
+        let mut start_delimiters_order = [
+            StartMarker::Variable,
+            StartMarker::Block,
+            StartMarker::Comment,
+        ];
+        start_delimiters_order.sort_by_key(|marker| {
+            std::cmp::Reverse(match marker {
+                StartMarker::Variable => delims.variable_start.len(),
+                StartMarker::Block => delims.block_start.len(),
+                StartMarker::Comment => delims.comment_start.len(),
+            })
+        });
+        let aho_corasick = ok!(AhoCorasick::builder()
+            .match_kind(aho_corasick::MatchKind::LeftmostLongest)
+            .build([
+                &delims.variable_start as &str,
+                &delims.block_start as &str,
+                &delims.comment_start as &str,
+            ])
+            .map_err(|_| ErrorKind::InvalidDelimiter.into()));
+        Ok(SyntaxConfig2 {
+            delims,
+            start_delimiters_order,
+            aho_corasick: Some(aho_corasick),
+        })
+    }
+}
+
+struct SyntaxConfig2 {
+    pub(crate) delims: Arc<Delims>,
+    pub(crate) start_delimiters_order: [StartMarker; 3],
+    pub(crate) aho_corasick: Option<aho_corasick::AhoCorasick>,
+}
+
+impl Default for SyntaxConfig2 {
+    fn default() -> Self {
+        Self {
+            delims: Arc::new(DEFAULT_DELIMS),
+            start_delimiters_order: [
+                StartMarker::Variable,
+                StartMarker::Block,
+                StartMarker::Comment,
+            ],
+            aho_corasick: None,
+        }
+    }
+}
+
+impl SyntaxConfig2 {
+    /// Creates a syntax builder.
+    pub fn builder() -> SyntaxBuilder {
+        SyntaxBuilder {
+            delims: Arc::new(DEFAULT_DELIMS),
+        }
+    }
+
+    /// Returns the block delimiters.
+    pub fn block_delimiters(&self) -> (&str, &str) {
+        (&self.delims.block_start, &self.delims.block_end)
+    }
+
+    /// Returns the variable delimiters.
+    pub fn variable_delimiters(&self) -> (&str, &str) {
+        (&self.delims.variable_start, &self.delims.variable_end)
+    }
+
+    /// Returns the comment delimiters.
+    pub fn comment_delimiters(&self) -> (&str, &str) {
+        (&self.delims.comment_start, &self.delims.comment_end)
+    }
+}
