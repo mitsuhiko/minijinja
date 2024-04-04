@@ -1,4 +1,11 @@
-//! Documents the syntax for templates.
+#![cfg_attr(
+    feature = "custom_syntax",
+    doc = "Documents the syntax for templates and provides ways to reconfigure it."
+)]
+#![cfg_attr(
+    not(feature = "custom_syntax"),
+    doc = "Documents the syntax for templates."
+)]
 //!
 //! <details><summary><strong style="cursor: pointer">Table of Contents</strong></summary>
 //!
