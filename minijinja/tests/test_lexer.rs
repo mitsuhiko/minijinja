@@ -1,8 +1,6 @@
 #![cfg(feature = "unstable_machinery")]
-use minijinja::machinery::{
-    make_syntax_config, tokenize, Span, SyntaxConfig, Token, WhitespaceConfig,
-};
-use minijinja::Syntax;
+use minijinja::machinery::{tokenize, Span, Token, WhitespaceConfig};
+use minijinja::syntax::SyntaxConfig;
 
 use std::fmt::Write;
 
@@ -20,19 +18,16 @@ struct TestSettings {
 impl TestSettings {
     pub fn into_configs(self) -> (SyntaxConfig, WhitespaceConfig) {
         (
-            make_syntax_config(if let Some(ref markers) = self.markers {
-                Syntax {
-                    block_start: markers[0].to_string().into(),
-                    block_end: markers[1].to_string().into(),
-                    variable_start: markers[2].to_string().into(),
-                    variable_end: markers[3].to_string().into(),
-                    comment_start: markers[4].to_string().into(),
-                    comment_end: markers[5].to_string().into(),
-                }
+            if let Some(ref markers) = self.markers {
+                SyntaxConfig::builder()
+                    .block_delimiters(markers[0].to_string(), markers[1].to_string())
+                    .variable_delimiters(markers[2].to_string(), markers[3].to_string())
+                    .comment_delimiters(markers[4].to_string(), markers[5].to_string())
+                    .build()
+                    .unwrap()
             } else {
-                Syntax::default()
-            })
-            .unwrap(),
+                SyntaxConfig::default()
+            },
             WhitespaceConfig {
                 keep_trailing_newline: self.keep_trailing_newline,
                 lstrip_blocks: self.lstrip_blocks,

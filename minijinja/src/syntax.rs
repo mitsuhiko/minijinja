@@ -1,4 +1,11 @@
-//! Documents the syntax for templates.
+#![cfg_attr(
+    feature = "custom_syntax",
+    doc = "Documents the syntax for templates and provides ways to reconfigure it."
+)]
+#![cfg_attr(
+    not(feature = "custom_syntax"),
+    doc = "Documents the syntax for templates."
+)]
 //!
 //! <details><summary><strong style="cursor: pointer">Table of Contents</strong></summary>
 //!
@@ -720,23 +727,22 @@
 # Custom Delimiters
 
 When MiniJinja has been compiled with the `custom_syntax` feature (see
-[`Syntax`](crate::Syntax)), it's possible to reconfigure the delimiters of the
+[`SyntaxConfig`]), it's possible to reconfigure the delimiters of the
 templates.  This is generally not recommended but it's useful for situations
 where Jinja templates are used to generate files with a syntax that would be
 conflicting for Jinja.  With custom delimiters it can for instance be more
 convenient to generate LaTeX files:
 
 ```
-# use minijinja::{Environment, Syntax};
+# use minijinja::{Environment, syntax::SyntaxConfig};
 let mut environment = Environment::new();
-environment.set_syntax(Syntax {
-    block_start: "\\BLOCK{".into(),
-    block_end: "}".into(),
-    variable_start: "\\VAR{".into(),
-    variable_end: "}".into(),
-    comment_start: "\\#{".into(),
-    comment_end: "}".into(),
-}).unwrap();
+environment.set_syntax(SyntaxConfig::builder()
+    .block_delimiters("\\BLOCK{", "}")
+    .variable_delimiters("\\VAR{", "}")
+    .comment_delimiters("\\#{", "}")
+    .build()
+    .unwrap()
+);
 ```
 
 And then a template might look like this instead:
@@ -830,3 +836,215 @@ And then a template might look like this instead:
 //!
 //! By default, MiniJinja also removes trailing newlines.  To keep single trailing newlines,
 //! configure MiniJinja to [`keep_trailing_newline`](crate::Environment::set_keep_trailing_newline).
+
+#[cfg(feature = "custom_syntax")]
+mod imp {
+    use crate::compiler::lexer::StartMarker;
+    use crate::error::{Error, ErrorKind};
+    use aho_corasick::AhoCorasick;
+    use std::borrow::Cow;
+    use std::sync::Arc;
+
+    #[derive(Debug, PartialEq, Clone)]
+    pub(crate) struct Delims {
+        block_start: Cow<'static, str>,
+        block_end: Cow<'static, str>,
+        variable_start: Cow<'static, str>,
+        variable_end: Cow<'static, str>,
+        comment_start: Cow<'static, str>,
+        comment_end: Cow<'static, str>,
+    }
+
+    const DEFAULT_DELIMS: Delims = Delims {
+        block_start: Cow::Borrowed("{%"),
+        block_end: Cow::Borrowed("%}"),
+        variable_start: Cow::Borrowed("{{"),
+        variable_end: Cow::Borrowed("}}"),
+        comment_start: Cow::Borrowed("{#"),
+        comment_end: Cow::Borrowed("#}"),
+    };
+
+    /// Builder helper to reconfigure the syntax.
+    ///
+    /// A new builder is returned by [`SyntaxConfig::builder`].
+    #[derive(Debug)]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub struct SyntaxConfigBuilder {
+        delims: Arc<Delims>,
+    }
+
+    impl SyntaxConfigBuilder {
+        /// Sets the block start and end delimiters.
+        pub fn block_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
+        where
+            S: Into<Cow<'static, str>>,
+            E: Into<Cow<'static, str>>,
+        {
+            let delims = Arc::make_mut(&mut self.delims);
+            delims.block_start = s.into();
+            delims.block_end = e.into();
+            self
+        }
+
+        /// Sets the variable start and end delimiters.
+        pub fn variable_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
+        where
+            S: Into<Cow<'static, str>>,
+            E: Into<Cow<'static, str>>,
+        {
+            let delims = Arc::make_mut(&mut self.delims);
+            delims.variable_start = s.into();
+            delims.variable_end = e.into();
+            self
+        }
+
+        /// Sets the comment start and end delimiters.
+        pub fn comment_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
+        where
+            S: Into<Cow<'static, str>>,
+            E: Into<Cow<'static, str>>,
+        {
+            let delims = Arc::make_mut(&mut self.delims);
+            delims.comment_start = s.into();
+            delims.comment_end = e.into();
+            self
+        }
+
+        /// Builds the final syntax config.
+        pub fn build(&self) -> Result<SyntaxConfig, Error> {
+            let delims = self.delims.clone();
+            if *delims == DEFAULT_DELIMS {
+                return Ok(SyntaxConfig::default());
+            } else if delims.block_start == delims.variable_start
+                || delims.block_start == delims.comment_start
+                || delims.variable_start == delims.comment_start
+            {
+                return Err(ErrorKind::InvalidDelimiter.into());
+            }
+            let mut start_delimiters_order = [
+                StartMarker::Variable,
+                StartMarker::Block,
+                StartMarker::Comment,
+            ];
+            start_delimiters_order.sort_by_key(|marker| {
+                std::cmp::Reverse(match marker {
+                    StartMarker::Variable => delims.variable_start.len(),
+                    StartMarker::Block => delims.block_start.len(),
+                    StartMarker::Comment => delims.comment_start.len(),
+                })
+            });
+            let aho_corasick = ok!(AhoCorasick::builder()
+                .match_kind(aho_corasick::MatchKind::LeftmostLongest)
+                .build([
+                    &delims.variable_start as &str,
+                    &delims.block_start as &str,
+                    &delims.comment_start as &str,
+                ])
+                .map_err(|_| ErrorKind::InvalidDelimiter.into()));
+            Ok(SyntaxConfig {
+                delims,
+                start_delimiters_order,
+                aho_corasick: Some(aho_corasick),
+            })
+        }
+    }
+
+    /// The delimiter configuration for the environment and the parser.
+    ///
+    /// Custom syntax configurations require the `custom_syntax` feature.
+    /// Otherwise just the default syntax is available.
+    ///
+    /// You can  override the syntax configuration for templates by setting different
+    /// delimiters.  The end markers can be shared, but the start markers need to be
+    /// distinct.  It would thus not be valid to configure `{{` to be the marker for
+    /// both variables and blocks.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, syntax::SyntaxConfig};
+    /// let mut environment = Environment::new();
+    /// environment.set_syntax(
+    ///     SyntaxConfig::builder()
+    ///         .block_delimiters("\\BLOCK{", "}")
+    ///         .variable_delimiters("\\VAR{", "}")
+    ///         .comment_delimiters("\\#{", "}")
+    ///         .build()
+    ///         .unwrap()
+    /// );
+    #[derive(Clone, Debug)]
+    pub struct SyntaxConfig {
+        delims: Arc<Delims>,
+        pub(crate) start_delimiters_order: [StartMarker; 3],
+        pub(crate) aho_corasick: Option<aho_corasick::AhoCorasick>,
+    }
+
+    impl Default for SyntaxConfig {
+        fn default() -> Self {
+            Self {
+                delims: Arc::new(DEFAULT_DELIMS),
+                start_delimiters_order: [
+                    StartMarker::Variable,
+                    StartMarker::Block,
+                    StartMarker::Comment,
+                ],
+                aho_corasick: None,
+            }
+        }
+    }
+
+    impl SyntaxConfig {
+        /// Creates a syntax builder.
+        #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+        pub fn builder() -> SyntaxConfigBuilder {
+            SyntaxConfigBuilder {
+                delims: Arc::new(DEFAULT_DELIMS),
+            }
+        }
+
+        /// Returns the block delimiters.
+        #[inline(always)]
+        pub fn block_delimiters(&self) -> (&str, &str) {
+            (&self.delims.block_start, &self.delims.block_end)
+        }
+
+        /// Returns the variable delimiters.
+        #[inline(always)]
+        pub fn variable_delimiters(&self) -> (&str, &str) {
+            (&self.delims.variable_start, &self.delims.variable_end)
+        }
+
+        /// Returns the comment delimiters.
+        #[inline(always)]
+        pub fn comment_delimiters(&self) -> (&str, &str) {
+            (&self.delims.comment_start, &self.delims.comment_end)
+        }
+    }
+}
+
+#[cfg(not(feature = "custom_syntax"))]
+mod imp {
+    /// The default delimiter configuration for the environment and the parser.
+    #[derive(Clone, Default, Debug)]
+    pub struct SyntaxConfig;
+
+    impl SyntaxConfig {
+        /// Returns the block delimiters.
+        #[inline(always)]
+        pub fn block_delimiters(&self) -> (&str, &str) {
+            ("{%", "%}")
+        }
+
+        /// Returns the variable delimiters.
+        #[inline(always)]
+        pub fn variable_delimiters(&self) -> (&str, &str) {
+            ("{{", "}}")
+        }
+
+        /// Returns the comment delimiters.
+        #[inline(always)]
+        pub fn comment_delimiters(&self) -> (&str, &str) {
+            ("{#", "#}")
+        }
+    }
+}
+
+pub use self::imp::*;

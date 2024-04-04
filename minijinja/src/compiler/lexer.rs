@@ -3,15 +3,8 @@ use std::ops::ControlFlow;
 
 use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
+use crate::syntax::SyntaxConfig;
 use crate::utils::{memchr, memstr, unescape};
-
-#[cfg(feature = "custom_syntax")]
-pub use crate::custom_syntax::SyntaxConfig;
-
-/// Non configurable syntax config
-#[cfg(not(feature = "custom_syntax"))]
-#[derive(Debug, Clone, Default)]
-pub struct SyntaxConfig;
 
 /// Internal config struct to control whitespace in the engine.
 #[derive(Copy, Clone, Debug, Default)]
@@ -112,24 +105,24 @@ fn find_start_marker(a: &str, _syntax_config: &SyntaxConfig) -> Option<(usize, W
     find_start_marker_memchr(a)
 }
 
-fn match_start_marker(rest: &str, syntax_config: &SyntaxConfig) -> Option<(StartMarker, usize)> {
+fn match_start_marker(rest: &str, syntax: &SyntaxConfig) -> Option<(StartMarker, usize)> {
     #[cfg(not(feature = "custom_syntax"))]
     {
-        let _ = syntax_config;
+        let _ = syntax;
         match_start_marker_default(rest)
     }
 
     #[cfg(feature = "custom_syntax")]
     {
-        if syntax_config.aho_corasick.is_none() {
+        if syntax.aho_corasick.is_none() {
             return match_start_marker_default(rest);
         }
 
-        for delimiter in syntax_config.start_delimiters_order {
+        for delimiter in syntax.start_delimiters_order {
             let marker = match delimiter {
-                StartMarker::Variable => &syntax_config.syntax.variable_start as &str,
-                StartMarker::Block => &syntax_config.syntax.block_start as &str,
-                StartMarker::Comment => &syntax_config.syntax.comment_start as &str,
+                StartMarker::Variable => syntax.variable_delimiters().0,
+                StartMarker::Block => syntax.block_delimiters().0,
+                StartMarker::Comment => syntax.comment_delimiters().0,
             };
             if rest.get(..marker.len()) == Some(marker) {
                 return Some((delimiter, marker.len()));
@@ -147,22 +140,6 @@ fn match_start_marker_default(rest: &str) -> Option<(StartMarker, usize)> {
         Some("{#") => Some((StartMarker::Comment, 2)),
         _ => None,
     }
-}
-
-macro_rules! syntax_token_getter {
-    ($ident:ident, $default:expr) => {
-        #[inline]
-        fn $ident(&self) -> &str {
-            #[cfg(feature = "custom_syntax")]
-            {
-                &self.syntax_config.syntax.$ident
-            }
-            #[cfg(not(feature = "custom_syntax"))]
-            {
-                $default
-            }
-        }
-    };
 }
 
 #[cfg(feature = "unicode")]
@@ -491,10 +468,21 @@ impl<'s> Tokenizer<'s> {
         }
     }
 
-    syntax_token_getter!(variable_end, "}}");
-    syntax_token_getter!(block_start, "{%");
-    syntax_token_getter!(block_end, "%}");
-    syntax_token_getter!(comment_end, "#}");
+    fn variable_end(&self) -> &str {
+        self.syntax_config.variable_delimiters().1
+    }
+
+    fn block_start(&self) -> &str {
+        self.syntax_config.block_delimiters().0
+    }
+
+    fn block_end(&self) -> &str {
+        self.syntax_config.block_delimiters().1
+    }
+
+    fn comment_end(&self) -> &str {
+        self.syntax_config.comment_delimiters().1
+    }
 
     fn tokenize_root(&mut self) -> Result<ControlFlow<(Token<'s>, Span)>, Error> {
         if let Some((marker, skip)) = match_start_marker(self.rest, &self.syntax_config) {
@@ -789,18 +777,12 @@ mod tests {
     #[test]
     #[cfg(feature = "custom_syntax")]
     fn test_find_marker_custom_syntax() {
-        use crate::Syntax;
-
-        let syntax = Syntax {
-            block_start: "%{".into(),
-            block_end: "}%".into(),
-            variable_start: "[[".into(),
-            variable_end: "]]".into(),
-            comment_start: "/*".into(),
-            comment_end: "*/".into(),
-        };
-
-        let syntax_config = syntax.compile().expect("failed to create syntax config");
+        let syntax_config = SyntaxConfig::builder()
+            .block_delimiters("%{", "}%")
+            .variable_delimiters("[[", "]]")
+            .comment_delimiters("/*", "*/")
+            .build()
+            .unwrap();
 
         assert_eq!(
             find_start_marker("%{", &syntax_config),

@@ -3,8 +3,9 @@ use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::Mutex;
 
+use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Rest, Value};
-use minijinja::{context, escape_formatter, AutoEscape, Error, State, Syntax, UndefinedBehavior};
+use minijinja::{context, escape_formatter, AutoEscape, Error, State, UndefinedBehavior};
 use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -20,6 +21,37 @@ thread_local! {
     static CURRENT_ENV: AtomicPtr<c_void> = const { AtomicPtr::new(std::ptr::null_mut()) };
 }
 
+struct Syntax {
+    block_start: String,
+    block_end: String,
+    variable_start: String,
+    variable_end: String,
+    comment_start: String,
+    comment_end: String,
+}
+
+impl Default for Syntax {
+    fn default() -> Self {
+        Self {
+            block_start: "{%".into(),
+            block_end: "%}".into(),
+            variable_start: "{{".into(),
+            variable_end: "}}".into(),
+            comment_start: "{%".into(),
+            comment_end: "%}".into(),
+        }
+    }
+}
+impl Syntax {
+    fn compile(&self) -> Result<SyntaxConfig, Error> {
+        SyntaxConfig::builder()
+            .block_delimiters(self.block_start.clone(), self.block_end.clone())
+            .variable_delimiters(self.variable_start.clone(), self.variable_end.clone())
+            .comment_delimiters(self.comment_start.clone(), self.comment_end.clone())
+            .build()
+    }
+}
+
 macro_rules! syntax_setter {
     ($slf:expr, $value:expr, $field:ident, $default:expr) => {{
         let value = $value;
@@ -33,8 +65,8 @@ macro_rules! syntax_setter {
         if let Some(ref mut syntax) = inner.syntax {
             if syntax.$field != value {
                 syntax.$field = value.into();
-                let new_syntax = syntax.clone();
-                inner.env.set_syntax(new_syntax).map_err(to_py_error)?;
+                let syntax_config = syntax.compile().map_err(to_py_error)?;
+                inner.env.set_syntax(syntax_config);
             }
         }
         Ok(())
