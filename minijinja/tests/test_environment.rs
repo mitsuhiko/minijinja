@@ -173,3 +173,21 @@ fn test_unknown_method_callback() {
     let rv = env.render_str("{{ {'x': 42}.items() }}", ()).unwrap();
     assert_snapshot!(rv, @r###"[["x", 42]]"###);
 }
+
+#[test]
+fn test_iter() {
+    let mut env = Environment::new();
+    env.add_template("hello", "Hello {{ name }}!").unwrap();
+    env.add_template("goodbye", "Goodbye {{ name }}!").unwrap();
+
+    let mut ctx = BTreeMap::new();
+    ctx.insert("name", Value::from("World"));
+    let renders = env
+        .templates()
+        .map(|(name, tmpl)| (name, tmpl.render(&ctx).unwrap()))
+        .collect::<Vec<_>>();
+
+    assert_eq!(renders.len(), 2);
+    assert!(renders.contains(&("hello", "Hello World!".into())));
+    assert!(renders.contains(&("goodbye", "Goodbye World!".into())));
+}
