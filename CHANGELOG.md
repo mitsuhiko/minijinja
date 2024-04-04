@@ -2,6 +2,39 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.0.0
+
+This is a major update to MiniJinja that changes a lot of core internals and
+cleans up some APIs.  In particular it resolves somes limitations in the engine
+in relation to working with dynamic objects, unlocks potentials for future
+performance improvments and enhancements.
+
+It's very likely that you will need to do changes to your code when upgrading,
+particular when implementing dynamic objects.  In short:
+
+- `StructObject` and `SeqObject` are gone.  They have been replaced by improved
+  APIs directly on `Object`.  Please refer to the updated documentation to see
+  how these objects behave now.  For the most part code should become quite a bit
+  clearer during the upgrade.
+- `ObjectKind` has been replaced by `ObjectRepr`.  Rather than holding a reference
+  to a `StructObject` or `SeqObject` this now is a simple enum that just indicates
+  how that object serializes, renders and behaves.
+- `Object` no longer uses `fmt::Display` for rendering.  Instead the new
+  `Object::render` method is used which has a default implementation.
+- The `Object` trait has been completely transformed and the new type-erased type
+  `DynObject` has been added to work with unknown objects.  This trait has an
+  improved user experience and more flexibility.  It's now possible to implement
+  any non-primitive value type including maps with non string keys which was previously
+  not possible.
+- `ValueKind` is now non exhaustive and got a log of new value types.  This resolves
+  various issues in particular in relationship with iterators.  As a result of this
+  functions will no longer accidentally serialize into empty objects for example.
+- `Value::from_iterator` has been replaced by the new `Value::make_iterable`,
+  `Value::make_object_iterable` and `Value::make_one_shot_iterator`.  The direct
+  replacement is `Value::make_one_shot_iterator` but for most uses it's strongly
+  recommended to use one of the other APIs instead.  This results in a much improved
+  user experience as it's possible to iterate over such values more than once.
+
 ## 1.0.17
 
 - Added support for `Option<Into<Value>>` as return value from
