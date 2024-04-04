@@ -339,11 +339,33 @@ impl<'source> Environment<'source> {
         self.templates.clear();
     }
 
+    /// Returns an iterator over the already loaded templates and their names.
+    ///
+    /// Only templates that are already loaded will be returned.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, context};
+    /// let mut env = Environment::new();
+    /// env.add_template("hello.txt", "Hello {{ name }}!").unwrap();
+    /// env.add_template("goodbye.txt", "Goodbye {{ name }}!").unwrap();
+    ///
+    /// # assert_eq!(env.templates().count(), 2);
+    /// for (name, tmpl) in env.templates() {
+    ///     println!("{}", tmpl.render(context!{ name => "World" }).unwrap());
+    /// }
+    /// ```
+    pub fn templates(&self) -> impl Iterator<Item = (&str, Template<'_, '_>)> {
+        self.templates.iter().map(|(name, template)| {
+            let template = Template::new(self, CompiledTemplateRef::Borrowed(template));
+            (name, template)
+        })
+    }
+
     /// Fetches a template by name.
     ///
     /// This requires that the template has been loaded with
     /// [`add_template`](Environment::add_template) beforehand.  If the template was
-    /// not loaded an error of kind `TemplateNotFound` is returned.  If a loaded was
+    /// not loaded an error of kind `TemplateNotFound` is returned.  If a loader was
     /// added to the engine this can also dynamically load templates.
     ///
     /// ```
@@ -844,6 +866,10 @@ mod basic_store {
                 .get(name)
                 .map(|x| &**x)
                 .ok_or_else(|| Error::new_not_found(name))
+        }
+
+        pub fn iter(&self) -> impl Iterator<Item = (&str, &CompiledTemplate<'source>)> {
+            self.map.iter().map(|(name, template)| (*name, &**template))
         }
     }
 }
