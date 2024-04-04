@@ -34,6 +34,8 @@ particular when implementing dynamic objects.  In short:
   replacement is `Value::make_one_shot_iterator` but for most uses it's strongly
   recommended to use one of the other APIs instead.  This results in a much improved
   user experience as it's possible to iterate over such values more than once.
+- The `Syntax` type has been replaced by the `SyntaxConfig` type.  It uses a builder
+  patter to reconfigure the delimiters.
 
 ## 1.0.17
 
