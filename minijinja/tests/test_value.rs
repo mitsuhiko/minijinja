@@ -261,7 +261,7 @@ fn test_builtin_seq_objects() {
 fn test_value_object_interface() {
     let val = Value::from_object(vec![1u32, 2, 3, 4]);
     let obj = val.as_object().unwrap();
-    assert_eq!(obj.len(), Some(4));
+    assert_eq!(obj.enumerator_len(), Some(4));
     assert_eq!(obj.to_string(), "[1, 2, 3, 4]");
 }
 

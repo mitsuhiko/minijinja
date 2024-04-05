@@ -187,23 +187,23 @@ pub trait Object: fmt::Debug + Send + Sync {
         }
     }
 
-    /// Returns the length of the object.
+    /// Returns the length of the enumerator.
     ///
     /// By default the length is taken by calling [`enumerate`](Self::enumerate) and
     /// inspecting the [`Enumerator`].  This means that in order to determine
     /// the length, an iteration is started.  If you this is a problem for your
     /// uses, you can manually implement this.  This might for instance be
     /// needed if your type can only be iterated over once.
-    fn len(self: &Arc<Self>) -> Option<usize> {
+    fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
         self.enumerate().query_len()
     }
 
-    /// Returns `true` if this object is considered empty.
+    /// Returns `true` if this object is considered true for if conditions.
     ///
-    /// The default implementation checks if the [`len`](Self::len) of the
-    /// object is `Some(0)` which is the recommended behavior for objects.
-    fn is_empty(self: &Arc<Self>) -> bool {
-        self.len() == Some(0)
+    /// The default implementation checks if the [`enumerator_len`](Self::enumerator_len)
+    /// is not `Some(0)` which is the recommended behavior for objects.
+    fn is_true(self: &Arc<Self>) -> bool {
+        self.enumerator_len() != Some(0)
     }
 
     /// The engine calls this to invoke the object itself.
@@ -269,7 +269,7 @@ pub trait Object: fmt::Debug + Send + Sync {
             // for either sequences or iterables, a length is needed, otherwise we
             // don't want to risk iteration during printing and fall back to the
             // debug print.
-            ObjectRepr::Seq | ObjectRepr::Iterable if self.len().is_some() => {
+            ObjectRepr::Seq | ObjectRepr::Iterable if self.enumerator_len().is_some() => {
                 let mut dbg = f.debug_list();
                 for value in self.try_iter().into_iter().flatten() {
                     dbg.entry(&Dbg(&value));
@@ -613,9 +613,9 @@ type_erase! {
 
         fn enumerate(&self) -> Enumerator;
 
-        fn is_empty(&self) -> bool;
+        fn is_true(&self) -> bool;
 
-        fn len(&self) -> Option<usize>;
+        fn enumerator_len(&self) -> Option<usize>;
 
         fn call(
             &self,
@@ -689,7 +689,7 @@ impl<T: Into<Value> + Clone + Send + Sync + fmt::Debug> Object for Vec<T> {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Seq(Vec::len(self))
+        Enumerator::Seq(self.len())
     }
 }
 
