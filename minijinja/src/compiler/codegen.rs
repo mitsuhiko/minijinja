@@ -474,9 +474,6 @@ impl<'source> CodeGenerator<'source> {
     }
 
     fn compile_for_loop(&mut self, for_loop: &ast::Spanned<ast::ForLoop<'source>>) {
-        // #[cfg(feature = "internal_debug")]
-        // println!("compiling {:?}", &**for_loop);
-
         self.set_line_from_span(for_loop.span());
 
         // filter expressions work like a nested for loop without
