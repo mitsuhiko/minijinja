@@ -71,10 +71,7 @@ impl Object for Query {
                 let (offset,) = from_args(args)?;
                 Ok(Value::from_object(self.offset(offset)))
             }
-            _ => Err(minijinja::Error::new(
-                minijinja::ErrorKind::UnknownMethod,
-                format!("unknown query filter method {name}"),
-            )),
+            _ => Err(minijinja::Error::from(minijinja::ErrorKind::UnknownMethod)),
         }
     }
 

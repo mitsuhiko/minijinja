@@ -28,6 +28,11 @@ float-int: {{ 42 is float }}
 float-float: {{ 42.0 is float }}
 not-seq: {{ two is sequence }}
 seq: {{ seq is sequence }}
+reverse-not-seq: {{ seq|reverse is sequence }}
+iterable: {{ seq is iterable }}
+iterable-reverse: {{ seq|reverse is iterable }}
+string-iterable: {{ string is iterable }}
+not-iterable: {{ two is iterable }}
 not-map: {{ two is mapping }}
 map: {{ map is mapping }}
 string: {{ string is string }}

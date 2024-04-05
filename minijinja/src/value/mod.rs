@@ -956,7 +956,8 @@ impl Value {
     /// has a different behavior.
     ///
     /// * [`ValueKind::Map`]: the iterator yields the keys of the map.
-    /// * [`ValueKind::Seq`]: the iterator yields the items in the sequence.
+    /// * [`ValueKind::Seq`] / [`ValueKind::Iterable`]: the iterator yields the items in the sequence.
+    /// * [`ValueKind::String`]: the iterator yields characters in a string.
     /// * [`ValueKind::None`] / [`ValueKind::Undefined`]: the iterator is empty.
     ///
     /// ```
@@ -1190,10 +1191,12 @@ impl Value {
     pub fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         match self._call_method(state, name, args) {
             Ok(rv) => Ok(rv),
-            Err(err) => {
+            Err(mut err) => {
                 if err.kind() == ErrorKind::UnknownMethod {
                     if let Some(ref callback) = state.env().unknown_method_callback {
                         return callback(state, self, name, args);
+                    } else if err.detail().is_none() {
+                        err.set_detail(format!("{} has no method named {}", self.kind(), name));
                     }
                 }
                 Err(err)
@@ -1205,10 +1208,7 @@ impl Value {
         if let Some(object) = self.as_object() {
             object.call_method(state, name, args)
         } else {
-            Err(Error::new(
-                ErrorKind::UnknownMethod,
-                format!("object has no method named {name}"),
-            ))
+            Err(Error::from(ErrorKind::UnknownMethod))
         }
     }
 

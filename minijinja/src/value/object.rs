@@ -235,10 +235,7 @@ pub trait Object: fmt::Debug + Send + Sync {
             return value.call(state, args);
         }
 
-        Err(Error::new(
-            ErrorKind::UnknownMethod,
-            "object has no such method",
-        ))
+        Err(Error::from(ErrorKind::UnknownMethod))
     }
 
     /// Formats the object for stringification.

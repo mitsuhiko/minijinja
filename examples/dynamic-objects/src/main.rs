@@ -42,10 +42,7 @@ impl Object for Magic {
             let (tag,): (&str,) = from_args(args)?;
             Ok(Value::from(format!("magic-{tag}")))
         } else {
-            Err(Error::new(
-                minijinja::ErrorKind::UnknownMethod,
-                format!("object has no method named {name}"),
-            ))
+            Err(Error::from(minijinja::ErrorKind::UnknownMethod))
         }
     }
 }

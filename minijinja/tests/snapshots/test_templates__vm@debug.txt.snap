@@ -50,6 +50,7 @@ State {
             "in",
             "int",
             "integer",
+            "iterable",
             "le",
             "lessthan",
             "lt",

@@ -56,10 +56,7 @@ impl Object for Loop {
                 None => Ok(Value::UNDEFINED),
             }
         } else {
-            Err(Error::new(
-                ErrorKind::UnknownMethod,
-                format!("loop object has no method named {name}"),
-            ))
+            Err(Error::from(ErrorKind::UnknownMethod))
         }
     }
 

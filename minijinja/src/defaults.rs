@@ -128,6 +128,7 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
         rv.insert("float".into(), BoxedTest::new(tests::is_float));
         rv.insert("string".into(), BoxedTest::new(tests::is_string));
         rv.insert("sequence".into(), BoxedTest::new(tests::is_sequence));
+        rv.insert("iterable".into(), BoxedTest::new(tests::is_iterable));
         rv.insert("mapping".into(), BoxedTest::new(tests::is_mapping));
         rv.insert(
             "startingwith".into(),
