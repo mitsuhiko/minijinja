@@ -689,7 +689,7 @@ impl<T: Into<Value> + Clone + Send + Sync + fmt::Debug> Object for Vec<T> {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Seq(Vec::len(self))
+        Enumerator::Seq(self.len())
     }
 }
 
