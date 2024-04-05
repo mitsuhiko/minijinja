@@ -37,6 +37,17 @@ particular when implementing dynamic objects.  In short:
 - The `Syntax` type has been replaced by the `SyntaxConfig` type.  It uses a builder
   patter to reconfigure the delimiters.
 
+**Other Changes:**
+
+- Added a new `Environment::templates` method that iterates over loaded templates.  #471
+- Reverse iteration and slicing now return iterables instead of real sequences.
+- The engine no longer reports iterable as sequences.
+- The value iterator returned by `Value::try_iter` now holds a reference
+  to the `Value` internally via reference counting.
+- `DynObject` now replaces `Arc<Object>`.
+- The debug printing of some objects was simplified.
+- Added the `iterable` test.  #475
+
 ## 1.0.17
 
 - Added support for `Option<Into<Value>>` as return value from

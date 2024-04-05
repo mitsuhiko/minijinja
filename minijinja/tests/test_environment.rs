@@ -163,10 +163,7 @@ fn test_unknown_method_callback() {
             from_args(args)?;
             minijinja::filters::items(value.clone())
         } else {
-            Err(Error::new(
-                ErrorKind::UnknownMethod,
-                "object has no method named {name}",
-            ))
+            Err(Error::from(ErrorKind::UnknownMethod))
         }
     });
 

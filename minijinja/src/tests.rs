@@ -324,6 +324,17 @@ mod builtins {
         matches!(v.kind(), ValueKind::Seq)
     }
 
+    /// Checks if this value can be iterated over.
+    ///
+    /// ```jinja
+    /// {{ [1, 2, 3] is iterable }} -> true
+    /// {{ 42 is iterable }} -> false
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn is_iterable(v: Value) -> bool {
+        v.try_iter().is_ok()
+    }
+
     /// Checks if this value is a mapping
     ///
     /// ```jinja

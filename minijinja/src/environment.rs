@@ -312,10 +312,7 @@ impl<'source> Environment<'source> {
     ///         let _: () = from_args(args)?;
     ///         state.apply_filter("items", &[value.clone()])
     ///     } else {
-    ///         Err(Error::new(
-    ///             ErrorKind::UnknownMethod,
-    ///             "object has no method named {name}",
-    ///         ))
+    ///         Err(Error::from(ErrorKind::UnknownMethod))
     ///     }
     /// });
     /// ```
