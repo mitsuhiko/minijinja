@@ -115,7 +115,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
         ValueRepr::Object(obj) if matches!(obj.repr(), ObjectRepr::Seq | ObjectRepr::Iterable) => {
             Ok(Value::make_object_iterable(obj, move |obj| {
-                let len = obj.len().unwrap_or_default();
+                let len = obj.enumerator_len().unwrap_or_default();
                 let (start, len) = get_offset_and_len(start, stop, || len);
                 // The manual match here is important that we do not mess up the size_hint
                 if let Some(iter) = obj.try_iter() {

@@ -342,7 +342,7 @@ mod builtins {
             },
         };
 
-        if !update_with.values.is_empty() {
+        if update_with.values.is_true() {
             rv.extend(
                 update_with
                     .values

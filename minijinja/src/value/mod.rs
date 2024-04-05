@@ -783,7 +783,11 @@ impl Value {
         Kwargs::extract(self).is_some()
     }
 
-    /// Is this value true?
+    /// Is this value considered true?
+    ///
+    /// The engine inherits the same behavior as Jinja2 when it comes to
+    /// considering objects true.  Empty objects are generally not considered
+    /// true.  For custom objects this is customized by [`Object::is_true`].
     pub fn is_true(&self) -> bool {
         match self.0 {
             ValueRepr::Bool(val) => val,
@@ -795,7 +799,7 @@ impl Value {
             ValueRepr::String(ref x, _) => !x.is_empty(),
             ValueRepr::Bytes(ref x) => !x.is_empty(),
             ValueRepr::None | ValueRepr::Undefined | ValueRepr::Invalid(_) => false,
-            ValueRepr::Object(ref x) => !x.is_empty(),
+            ValueRepr::Object(ref x) => x.is_true(),
         }
     }
 
@@ -869,7 +873,7 @@ impl Value {
     pub fn len(&self) -> Option<usize> {
         match self.0 {
             ValueRepr::String(ref s, _) => Some(s.chars().count()),
-            ValueRepr::Object(ref dy) => dy.len(),
+            ValueRepr::Object(ref dy) => dy.enumerator_len(),
             _ => None,
         }
     }
@@ -1113,7 +1117,7 @@ impl Value {
             ValueRepr::Object(ref dy) => match dy.repr() {
                 ObjectRepr::Map | ObjectRepr::Plain | ObjectRepr::Iterable => dy.get_value(key),
                 ObjectRepr::Seq => {
-                    let idx = index(key, || dy.len()).map(Value::from);
+                    let idx = index(key, || dy.enumerator_len()).map(Value::from);
                     dy.get_value(idx.as_ref().unwrap_or(key))
                 }
             },
@@ -1266,7 +1270,7 @@ impl Serialize for Value {
                 ObjectRepr::Plain => serializer.serialize_str(&o.to_string()),
                 ObjectRepr::Seq | ObjectRepr::Iterable => {
                     use serde::ser::SerializeSeq;
-                    let mut seq = ok!(serializer.serialize_seq(o.len()));
+                    let mut seq = ok!(serializer.serialize_seq(o.enumerator_len()));
                     if let Some(iter) = o.try_iter() {
                         for item in iter {
                             ok!(seq.serialize_element(&item));
