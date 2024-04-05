@@ -275,6 +275,13 @@ impl<'a> From<&'a str> for Value {
     }
 }
 
+impl<'a> From<&'a String> for Value {
+    #[inline(always)]
+    fn from(val: &'a String) -> Self {
+        ValueRepr::String(Arc::from(val.to_string()), StringType::Normal).into()
+    }
+}
+
 impl From<String> for Value {
     #[inline(always)]
     fn from(val: String) -> Self {
@@ -289,6 +296,12 @@ impl<'a> From<Cow<'a, str>> for Value {
             Cow::Borrowed(x) => x.into(),
             Cow::Owned(x) => x.into(),
         }
+    }
+}
+
+impl From<Arc<str>> for Value {
+    fn from(value: Arc<str>) -> Self {
+        Value(ValueRepr::String(value, StringType::Normal))
     }
 }
 
@@ -332,12 +345,6 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
         let values = val.into_iter().map(|v| v.into()).collect::<Vec<_>>();
 
         Value::from_object(values)
-    }
-}
-
-impl From<Arc<str>> for Value {
-    fn from(value: Arc<str>) -> Self {
-        Value(ValueRepr::String(value, StringType::Normal))
     }
 }
 
