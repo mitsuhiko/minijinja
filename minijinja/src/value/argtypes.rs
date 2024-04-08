@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::error::{Error, ErrorKind};
 use crate::utils::UndefinedBehavior;
 use crate::value::{
-    DynObject, ObjectRepr, Packed, StringType, Value, ValueKind, ValueMap, ValueRepr,
+    DynObject, ObjectRepr, Packed, SmallStr, StringType, Value, ValueKind, ValueMap, ValueRepr,
 };
 use crate::vm::State;
 
@@ -271,14 +271,16 @@ impl<'a> From<&'a [u8]> for Value {
 impl<'a> From<&'a str> for Value {
     #[inline(always)]
     fn from(val: &'a str) -> Self {
-        ValueRepr::String(Arc::from(val.to_string()), StringType::Normal).into()
+        SmallStr::try_new(val)
+            .map(|small_str| Value(ValueRepr::SmallStr(small_str)))
+            .unwrap_or_else(|| Value::from(val.to_string()))
     }
 }
 
 impl<'a> From<&'a String> for Value {
     #[inline(always)]
     fn from(val: &'a String) -> Self {
-        ValueRepr::String(Arc::from(val.to_string()), StringType::Normal).into()
+        Value::from(val.as_str())
     }
 }
 
@@ -376,7 +378,8 @@ impl From<u128> for Value {
 impl From<char> for Value {
     #[inline(always)]
     fn from(val: char) -> Self {
-        ValueRepr::String(Arc::from(val.to_string()), StringType::Normal).into()
+        let mut buf = [0u8; 4];
+        ValueRepr::SmallStr(SmallStr::try_new(val.encode_utf8(&mut buf)).unwrap()).into()
     }
 }
 
@@ -468,6 +471,12 @@ primitive_try_from!(char, {
             unsupported_conversion(ValueKind::String, "non single character string")
         }))
     },
+    ValueRepr::SmallStr(ref val) => {
+        let mut char_iter = val.as_str().chars();
+        ok!(char_iter.next().filter(|_| char_iter.next().is_none()).ok_or_else(|| {
+            unsupported_conversion(ValueKind::String, "non single character string")
+        }))
+    },
 });
 primitive_try_from!(f32, {
     ValueRepr::U64(val) => val as f32,
@@ -503,6 +512,7 @@ impl TryFrom<Value> for Arc<str> {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.0 {
             ValueRepr::String(x, _) => Ok(x),
+            ValueRepr::SmallStr(x) => Ok(Arc::from(x.as_str())),
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "value is not a string",
@@ -568,6 +578,7 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
         match value {
             Some(value) => Ok(match value.0 {
                 ValueRepr::String(ref s, _) => Cow::Borrowed(s as &str),
+                ValueRepr::SmallStr(ref s) => Cow::Borrowed(s.as_str()),
                 _ => Cow::Owned(value.to_string()),
             }),
             None => Err(Error::from(ErrorKind::MissingArgument)),

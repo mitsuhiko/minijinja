@@ -5,7 +5,7 @@ use serde::{ser, Serialize, Serializer};
 
 use crate::utils::untrusted_size_hint;
 use crate::value::{
-    value_map_with_capacity, Arc, Packed, StringType, Value, ValueMap, ValueRepr, VALUE_HANDLES,
+    value_map_with_capacity, Arc, Packed, Value, ValueMap, ValueRepr, VALUE_HANDLES,
     VALUE_HANDLE_MARKER,
 };
 
@@ -107,11 +107,11 @@ impl Serializer for ValueSerializer {
     }
 
     fn serialize_char(self, v: char) -> Result<Value, InvalidValue> {
-        Ok(ValueRepr::String(Arc::from(v.to_string()), StringType::Normal).into())
+        Ok(Value::from(v))
     }
 
     fn serialize_str(self, value: &str) -> Result<Value, InvalidValue> {
-        Ok(ValueRepr::String(Arc::from(value.to_owned()), StringType::Normal).into())
+        Ok(Value::from(value))
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<Value, InvalidValue> {

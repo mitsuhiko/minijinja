@@ -994,22 +994,12 @@ impl<'env> Vm<'env> {
     ) {
         use crate::{compiler::instructions::MACRO_CALLER, vm::macro_object::Macro};
 
-        let arg_spec = match stack.pop().0 {
-            ValueRepr::Object(args) => args
-                .try_iter()
-                .unwrap()
-                .map(|value| match &value.0 {
-                    ValueRepr::String(arg, _) => arg.clone(),
-                    _ => unreachable!(),
-                })
-                .collect(),
-            _ => unreachable!(),
-        };
+        let arg_spec = stack.pop().try_iter().unwrap().collect();
         let closure = stack.pop();
         let macro_ref_id = state.macros.len();
         Arc::make_mut(&mut state.macros).push((state.instructions, offset));
         stack.push(Value::from_object(Macro {
-            name: Arc::from(name.to_string()),
+            name: Value::from(name),
             arg_spec,
             macro_ref_id,
             state_id: state.id,

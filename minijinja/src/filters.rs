@@ -623,7 +623,9 @@ mod builtins {
                     ))
                 }
             }
-            ValueRepr::String(s, _) => s
+            ValueRepr::String(..) | ValueRepr::SmallStr(_) => value
+                .as_str()
+                .unwrap()
                 .parse::<i128>()
                 .map(Value::from)
                 .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
@@ -648,7 +650,9 @@ mod builtins {
         match &value.0 {
             ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(0.0)),
             ValueRepr::Bool(x) => Ok(Value::from(*x as u64 as f64)),
-            ValueRepr::String(s, _) => s
+            ValueRepr::String(..) | ValueRepr::SmallStr(_) => value
+                .as_str()
+                .unwrap()
                 .parse::<f64>()
                 .map(Value::from)
                 .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
@@ -1089,9 +1093,9 @@ mod builtins {
             match &value.0 {
                 ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
                 ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
-                ValueRepr::String(s, _) => {
-                    Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
-                }
+                ValueRepr::String(..) | ValueRepr::SmallStr(_) => Ok(
+                    percent_encoding::utf8_percent_encode(value.as_str().unwrap(), SET).to_string(),
+                ),
                 _ => Ok(percent_encoding::utf8_percent_encode(&value.to_string(), SET).to_string()),
             }
         }
