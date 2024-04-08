@@ -35,7 +35,9 @@ particular when implementing dynamic objects.  In short:
   recommended to use one of the other APIs instead.  This results in a much improved
   user experience as it's possible to iterate over such values more than once.
 - The `Syntax` type has been replaced by the `SyntaxConfig` type.  It uses a builder
-  patter to reconfigure the delimiters.
+  pattern to reconfigure the delimiters.
+
+For upgrade instructions read the [UPDATING](UPDATING.md) guide.
 
 **Other Changes:**
 

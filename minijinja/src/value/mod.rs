@@ -635,6 +635,48 @@ impl Value {
     }
 
     /// Like [`from_object`](Self::from_object) but for type erased dynamic objects.
+    ///
+    /// This especially useful if you have an object that has an `Arc<T>` to another
+    /// child object that you want to return as a `Arc<T>` turns into a [`DynObject`]
+    /// automatically.
+    ///
+    /// ```rust
+    /// # use std::sync::Arc;
+    /// # use minijinja::value::{Value, Object, Enumerator};
+    /// #[derive(Debug)]
+    /// pub struct HttpConfig {
+    ///     port: usize,
+    /// }
+    ///
+    /// #[derive(Debug)]
+    /// struct Config {
+    ///     http: Arc<HttpConfig>,
+    /// }
+    ///
+    /// impl Object for HttpConfig {
+    ///     fn enumerate(self: &Arc<Self>) -> Enumerator {
+    ///         Enumerator::Str(&["port"])
+    ///     }
+    ///
+    ///     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+    ///         match key.as_str()? {
+    ///             Some("port") => Value::from(self.port),
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// impl Object for Config {
+    ///     fn enumerate(self: &Arc<Self>) -> Enumerator {
+    ///         Enumerator::Str(&["http"])
+    ///     }
+    ///
+    ///     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+    ///         match key.as_str()? {
+    ///             Some("http") => Value::from_dyn_object(self.http.clone()),
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub fn from_dyn_object<T: Into<DynObject>>(value: T) -> Value {
         Value::from(ValueRepr::Object(value.into()))
     }

@@ -31,6 +31,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [merge-context](merge-context): Shows how a context can be merged from more than one value.
 * [minimal](minimal): a Hello World example without default features.
 * [none-is-undefined](none-is-undefined): shows how MiniJinja can be configured to treat `None` like `undefined`.
+* [object-ref](object-ref): Demonstrates how to best work with complex dynamic objects and references.
 * [path-loader](path-loader): Demonstrates how to load templates from disk with the `loader` feature.
 * [recursive-for](recursive-for): demonstrates the recursive for loop.
 * [render-macro](render-macro): minimal Hello World example using the `render!` macro.
