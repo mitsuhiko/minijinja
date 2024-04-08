@@ -56,6 +56,8 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
 
 - Added support for `Option<Into<Value>>` as return value from
   functions.  #452
+- Deprecated `Value::from_serializable` for the improved replacement
+  method `Value::from_serialize`. #482
 
 ## 1.0.16
 

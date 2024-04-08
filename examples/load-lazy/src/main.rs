@@ -42,7 +42,7 @@ fn load_json(name: &str) -> Option<Value> {
     rv.set_extension("json");
     let contents = fs::read(&rv).ok()?;
     let parsed: serde_json::Value = serde_json::from_slice(&contents[..]).ok()?;
-    Some(Value::from_serializable(&parsed))
+    Some(Value::from_serialize(parsed))
 }
 
 fn main() {

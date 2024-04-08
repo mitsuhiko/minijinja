@@ -121,7 +121,7 @@ fn test_sort_different_types() {
 #[test]
 fn test_safe_string_roundtrip() {
     let v = Value::from_safe_string("<b>HTML</b>".into());
-    let v2 = Value::from_serializable(&v);
+    let v2 = Value::from_serialize(&v);
     assert!(v.is_safe());
     assert!(v2.is_safe());
     assert_eq!(v.to_string(), v2.to_string());
@@ -130,7 +130,7 @@ fn test_safe_string_roundtrip() {
 #[test]
 fn test_undefined_roundtrip() {
     let v = Value::UNDEFINED;
-    let v2 = Value::from_serializable(&v);
+    let v2 = Value::from_serialize(&v);
     assert!(v.is_undefined());
     assert!(v2.is_undefined());
 }
@@ -706,7 +706,7 @@ fn test_reverse() {
     // strings
     assert_snapshot!(Value::from("abc").reverse().unwrap(), @"cba");
     // bytes
-    assert_snapshot!(Value::from_serializable(b"abc").reverse().unwrap(), @"[99, 98, 97]");
+    assert_snapshot!(Value::from_serialize(b"abc").reverse().unwrap(), @"[99, 98, 97]");
     // undefined
     assert!(Value::UNDEFINED.reverse().unwrap().is_undefined());
     // none
