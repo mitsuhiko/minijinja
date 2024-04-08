@@ -177,6 +177,7 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
             ValueRepr::U128(v) => visitor.visit_u128(v.0),
             ValueRepr::F64(v) => visitor.visit_f64(v),
             ValueRepr::String(ref v, _) => visitor.visit_str(v),
+            ValueRepr::SmallStr(v) => visitor.visit_str(v.as_str()),
             ValueRepr::Undefined | ValueRepr::None => visitor.visit_unit(),
             ValueRepr::Bytes(ref v) => visitor.visit_bytes(v),
             ValueRepr::Object(o) => match o.repr() {
@@ -445,6 +446,7 @@ fn value_to_unexpected(value: &Value) -> de::Unexpected {
             }
         }
         ValueRepr::String(ref s, _) => de::Unexpected::Str(s),
+        ValueRepr::SmallStr(ref s) => de::Unexpected::Str(s.as_str()),
         ValueRepr::Bytes(ref b) => de::Unexpected::Bytes(b),
         ValueRepr::Object(..) => de::Unexpected::Other("<dynamic value>"),
     }

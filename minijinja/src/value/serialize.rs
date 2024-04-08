@@ -111,7 +111,7 @@ impl Serializer for ValueSerializer {
     }
 
     fn serialize_str(self, value: &str) -> Result<Value, InvalidValue> {
-        Ok(ValueRepr::String(Arc::from(value.to_owned()), StringType::Normal).into())
+        Ok(Value::from(value))
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<Value, InvalidValue> {

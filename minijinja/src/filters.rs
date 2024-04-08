@@ -627,6 +627,11 @@ mod builtins {
                 .parse::<i128>()
                 .map(Value::from)
                 .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
+            ValueRepr::SmallStr(s) => s
+                .as_str()
+                .parse::<i128>()
+                .map(Value::from)
+                .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
             ValueRepr::Bytes(_) | ValueRepr::Object(_) => Err(Error::new(
                 ErrorKind::InvalidOperation,
                 format!("cannot convert {} to integer", value.kind()),
@@ -649,6 +654,11 @@ mod builtins {
             ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(0.0)),
             ValueRepr::Bool(x) => Ok(Value::from(*x as u64 as f64)),
             ValueRepr::String(s, _) => s
+                .parse::<f64>()
+                .map(Value::from)
+                .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
+            ValueRepr::SmallStr(s) => s
+                .as_str()
                 .parse::<f64>()
                 .map(Value::from)
                 .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
@@ -1091,6 +1101,9 @@ mod builtins {
                 ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
                 ValueRepr::String(s, _) => {
                     Ok(percent_encoding::utf8_percent_encode(s, SET).to_string())
+                }
+                ValueRepr::SmallStr(s) => {
+                    Ok(percent_encoding::utf8_percent_encode(s.as_str(), SET).to_string())
                 }
                 _ => Ok(percent_encoding::utf8_percent_encode(&value.to_string(), SET).to_string()),
             }

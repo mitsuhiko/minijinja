@@ -330,6 +330,35 @@ impl<F: FnOnce()> Drop for OnDrop<F> {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct InlineStr {
+    len: u8,
+    buf: [u8; 22],
+}
+
+impl InlineStr {
+    pub fn new(s: &str) -> Option<InlineStr> {
+        if s.len() <= 22 {
+            let mut rv = InlineStr {
+                len: s.len() as u8,
+                buf: Default::default(),
+            };
+            rv.buf[..s.len()].copy_from_slice(s.as_bytes());
+            Some(rv)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        unsafe { std::str::from_utf8_unchecked(&self.buf[..self.len as usize]) }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

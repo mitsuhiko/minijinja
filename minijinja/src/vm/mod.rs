@@ -1000,6 +1000,7 @@ impl<'env> Vm<'env> {
                 .unwrap()
                 .map(|value| match &value.0 {
                     ValueRepr::String(arg, _) => arg.clone(),
+                    ValueRepr::SmallStr(arg) => Arc::from(arg.as_str()),
                     _ => unreachable!(),
                 })
                 .collect(),
