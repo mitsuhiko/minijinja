@@ -47,6 +47,7 @@ particular when implementing dynamic objects.  In short:
 - `DynObject` now replaces `Arc<Object>`.
 - The debug printing of some objects was simplified.
 - Added the `iterable` test.  #475
+- The parser no longer panics when using dotted assignments in unexpected places. #479
 
 ## 1.0.17
 
