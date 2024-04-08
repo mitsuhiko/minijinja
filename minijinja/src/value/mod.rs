@@ -899,10 +899,14 @@ impl Value {
         }
     }
 
-    /// If the value is an object, it's returned as [`Object`].
-    pub fn as_object(&self) -> Option<DynObject> {
+    /// If the value is an object a reference to it is returned.
+    ///
+    /// The returned value is a reference to a type erased [`DynObject`].
+    /// For a specific type use [`downcast_object`](Self::downcast_object)
+    /// instead.
+    pub fn as_object(&self) -> Option<&DynObject> {
         match self.0 {
-            ValueRepr::Object(ref dy) => Some(dy.clone()),
+            ValueRepr::Object(ref dy) => Some(dy),
             _ => None,
         }
     }

@@ -1023,6 +1023,7 @@ impl<'a> ArgType<'a> for DynObject {
     fn from_value_owned(value: Value) -> Result<Self, Error> {
         value
             .as_object()
+            .cloned()
             .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "not an object"))
     }
 }
