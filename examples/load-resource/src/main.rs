@@ -16,7 +16,7 @@ fn load_data(filename: &str) -> Result<Value, Error> {
     })?;
     let parsed: serde_json::Value = serde_json::from_slice(&contents[..])
         .map_err(|err| Error::new(ErrorKind::InvalidOperation, "invalid JSON").with_source(err))?;
-    Ok(Value::from_serializable(&parsed))
+    Ok(Value::from_serialize(parsed))
 }
 
 fn main() {

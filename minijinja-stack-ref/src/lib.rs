@@ -272,7 +272,7 @@ pub fn reborrow<T: ?Sized, R>(obj: &T, f: for<'a> fn(&'a T, &'a Scope) -> R) -> 
 ///                     scope.seq_object_ref(&slf.values[..])
 ///                 }))
 ///             } else {
-///                 Some(Value::from_serializable(&self.values))
+///                 Some(Value::from_serialize(&self.values))
 ///             },
 ///             _ => None
 ///         }

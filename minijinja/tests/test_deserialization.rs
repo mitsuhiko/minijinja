@@ -112,7 +112,7 @@ fn test_invalid() {
         }
     }
 
-    let v = Value::from_serializable(&X);
+    let v = Value::from_serialize(X);
     assert_eq!(v.to_string(), "<invalid value: meh>");
 
     let err = bool::deserialize(v).unwrap_err();

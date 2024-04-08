@@ -43,7 +43,7 @@ fn main() {
     );
 
     // Second example shows how you can deserialize directly from a value
-    let point_value = Value::from_serializable(&point);
+    let point_value = Value::from_serialize(&point);
     println!("Point serialized as value: {}", point_value);
     let point_again = Point::deserialize(point_value).unwrap();
     println!("Point deserialization: {:?}", point_again);

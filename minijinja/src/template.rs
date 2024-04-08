@@ -114,7 +114,7 @@ impl<'env, 'source> Template<'env, 'source> {
     pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _render.
-        self._render(Value::from_serializable(&ctx)).map(|x| x.0)
+        self._render(Value::from_serialize(&ctx)).map(|x| x.0)
     }
 
     /// Like [`render`](Self::render) but also return the evaluated [`State`].
@@ -140,7 +140,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ) -> Result<(String, State<'_, 'env>), Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _render.
-        self._render(Value::from_serializable(&ctx))
+        self._render(Value::from_serialize(&ctx))
     }
 
     fn _render(&self, root: Value) -> Result<(String, State<'_, 'env>), Error> {
@@ -174,7 +174,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ) -> Result<State<'_, 'env>, Error> {
         let mut wrapper = WriteWrapper { w, err: None };
         self._eval(
-            Value::from_serializable(&ctx),
+            Value::from_serialize(&ctx),
             &mut Output::with_write(&mut wrapper),
         )
         .map(|(_, state)| state)
@@ -203,7 +203,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ///
     /// For more information see [`State`].
     pub fn eval_to_state<S: Serialize>(&self, ctx: S) -> Result<State<'_, 'env>, Error> {
-        let root = Value::from_serializable(&ctx);
+        let root = Value::from_serialize(&ctx);
         let mut out = Output::null();
         let vm = Vm::new(self.env);
         let state = ok!(vm.eval(

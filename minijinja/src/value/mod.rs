@@ -58,11 +58,11 @@
 //!
 //! MiniJinja will usually however create values via an indirection via [`serde`] when
 //! a template is rendered or an expression is evaluated.  This can also be
-//! triggered manually by using the [`Value::from_serializable`] method:
+//! triggered manually by using the [`Value::from_serialize`] method:
 //!
 //! ```
 //! # use minijinja::value::Value;
-//! let value = Value::from_serializable(&[1, 2, 3]);
+//! let value = Value::from_serialize(&[1, 2, 3]);
 //! ```
 //!
 //! The inverse of that operation is to pass a value directly as serializer to
@@ -591,7 +591,7 @@ impl Value {
     ///
     /// ```
     /// # use minijinja::value::Value;
-    /// let val = Value::from_serializable(&vec![1, 2, 3]);
+    /// let val = Value::from_serialize(&vec![1, 2, 3]);
     /// ```
     ///
     /// This method does not fail but it might return a value that is not valid.  Such
@@ -606,6 +606,20 @@ impl Value {
     /// is to use the [`Value`] type as serializer.  You can pass a value into the
     /// [`deserialize`](serde::Deserialize::deserialize) method of a type that supports
     /// serde deserialization.
+    pub fn from_serialize<T: Serialize>(value: T) -> Value {
+        let _serialization_guard = mark_internal_serialization();
+        let _optimization_guard = value_optimization();
+        transform(value)
+    }
+
+    /// Deprecated original name of [`Value::from_serialize`].
+    ///
+    /// This method was replaced by the more generic method [`Value::from_serialize`]
+    /// which also takes values by either reference or value.
+    #[deprecated(
+        since = "1.17.0",
+        note = "this method was replaced by Value::from_serialize"
+    )]
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
         let _serialization_guard = mark_internal_serialization();
         let _optimization_guard = value_optimization();
@@ -1518,7 +1532,7 @@ mod tests {
         let x = Arc::new(X(Default::default()));
         let x_value = Value::from(x.clone());
         x.0.fetch_add(42, atomic::Ordering::Relaxed);
-        let x_clone = Value::from_serializable(&x_value);
+        let x_clone = Value::from_serialize(&x_value);
         x.0.fetch_add(23, atomic::Ordering::Relaxed);
 
         assert_eq!(x_value.to_string(), "65");
