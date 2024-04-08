@@ -166,7 +166,7 @@ macro_rules! __context_pair {
         $crate::__context::add(
             &mut $ctx,
             stringify!($key),
-            $crate::value::Value::from_serializable(&$value),
+            $crate::value::Value::from_serialize(&$value),
         );
     };
 }
@@ -193,7 +193,7 @@ macro_rules! __context_pair {
 /// ```
 ///
 /// Note that this like [`context!`](crate::context) goes through
-/// [`Value::from_serializable`](crate::value::Value::from_serializable).
+/// [`Value::from_serialize`](crate::value::Value::from_serialize).
 #[macro_export]
 macro_rules! args {
     () => { &[][..] as &[$crate::value::Value] };
@@ -235,17 +235,17 @@ macro_rules! __args_helper {
     // `$args` or `$kwargs` depending on type.
     (peel $args:ident, $kwargs:ident, $has_kwargs:ident, []) => {};
     (peel $args:ident, $kwargs:ident, $has_kwargs:ident, [$name:ident => $expr:expr]) => {
-        $kwargs.push((stringify!($name), $crate::value::Value::from_serializable(&$expr)));
+        $kwargs.push((stringify!($name), $crate::value::Value::from_serialize(&$expr)));
     };
     (peel $args:ident, $kwargs:ident, $has_kwargs:ident, [$name:ident => $expr:expr, $($rest:tt)*]) => {
-        $kwargs.push((stringify!($name), $crate::value::Value::from_serializable(&$expr)));
+        $kwargs.push((stringify!($name), $crate::value::Value::from_serialize(&$expr)));
         $crate::__args_helper!(peel $args, $kwargs, true, [$($rest)*]);
     };
     (peel $args:ident, $kwargs:ident, false, [$expr:expr]) => {
-        $args.push($crate::value::Value::from_serializable(&$expr));
+        $args.push($crate::value::Value::from_serialize(&$expr));
     };
     (peel $args:ident, $kwargs:ident, false, [$expr:expr, $($rest:tt)*]) => {
-        $args.push($crate::value::Value::from_serializable(&$expr));
+        $args.push($crate::value::Value::from_serialize(&$expr));
         $crate::__args_helper!(peel $args, $kwargs, false, [$($rest)*]);
     };
 }
