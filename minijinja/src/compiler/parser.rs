@@ -686,21 +686,23 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_assign_name(&mut self) -> Result<ast::Expr<'a>, Error> {
+    fn parse_assign_name(&mut self, dotted: bool) -> Result<ast::Expr<'a>, Error> {
         let (id, span) = expect_token!(self, Token::Ident(name) => name, "identifier");
         if RESERVED_NAMES.contains(&id) {
             syntax_error!("cannot assign to reserved variable name {}", id);
         }
         let mut rv = ast::Expr::Var(ast::Spanned::new(ast::Var { id }, span));
-        while skip_token!(self, Token::Dot) {
-            let (attr, span) = expect_token!(self, Token::Ident(name) => name, "identifier");
-            rv = ast::Expr::GetAttr(ast::Spanned::new(
-                ast::GetAttr {
-                    expr: rv,
-                    name: attr,
-                },
-                span,
-            ));
+        if dotted {
+            while skip_token!(self, Token::Dot) {
+                let (attr, span) = expect_token!(self, Token::Ident(name) => name, "identifier");
+                rv = ast::Expr::GetAttr(ast::Spanned::new(
+                    ast::GetAttr {
+                        expr: rv,
+                        name: attr,
+                    },
+                    span,
+                ));
+            }
         }
         Ok(rv)
     }
@@ -725,7 +727,7 @@ impl<'a> Parser<'a> {
                 expect_token!(self, Token::ParenClose, "`)`");
                 rv
             } else {
-                ok!(self.parse_assign_name())
+                ok!(self.parse_assign_name(false))
             });
             if matches_token!(self, Token::Comma) {
                 is_tuple = true;
@@ -811,7 +813,7 @@ impl<'a> Parser<'a> {
                 expect_token!(self, Token::ParenClose, "`)`");
                 assign
             } else {
-                ok!(self.parse_assign_name())
+                ok!(self.parse_assign_name(false))
             };
             expect_token!(self, Token::Assign, "assignment operator");
             let expr = ok!(self.parse_expr());
@@ -830,7 +832,7 @@ impl<'a> Parser<'a> {
             expect_token!(self, Token::ParenClose, "`)`");
             (assign, true)
         } else {
-            (ok!(self.parse_assign_name()), false)
+            (ok!(self.parse_assign_name(true)), false)
         };
 
         if !in_paren && matches_token!(self, Token::BlockEnd | Token::Pipe) {
@@ -977,9 +979,9 @@ impl<'a> Parser<'a> {
             if matches_token!(self, Token::BlockEnd) {
                 break;
             }
-            let name = ok!(self.parse_assign_name());
+            let name = ok!(self.parse_assign_name(false));
             let alias = if skip_token!(self, Token::Ident("as")) {
-                Some(ok!(self.parse_assign_name()))
+                Some(ok!(self.parse_assign_name(false)))
             } else {
                 None
             };
@@ -1004,7 +1006,7 @@ impl<'a> Parser<'a> {
                     break;
                 }
             }
-            args.push(ok!(self.parse_assign_name()));
+            args.push(ok!(self.parse_assign_name(false)));
             if skip_token!(self, Token::Assign) {
                 defaults.push(ok!(self.parse_expr()));
             } else if !defaults.is_empty() {
