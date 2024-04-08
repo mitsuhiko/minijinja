@@ -10,8 +10,8 @@ use crate::vm::state::State;
 use crate::vm::Vm;
 
 pub(crate) struct Macro {
-    pub name: Arc<str>,
-    pub arg_spec: Vec<Arc<str>>,
+    pub name: Value,
+    pub arg_spec: Vec<Value>,
     // because values need to be 'static, we can't hold a reference to the
     // instructions that declared the macro.  Instead of that we place the
     // reference to the macro instruction (and the jump offset) in the
@@ -35,8 +35,8 @@ impl Object for Macro {
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         Some(match some!(key.as_str()) {
-            "name" => Value::from(self.name.clone()),
-            "arguments" => Value::from_iter(self.arg_spec.iter().cloned().map(Value::from)),
+            "name" => self.name.clone(),
+            "arguments" => Value::from_iter(self.arg_spec.iter().cloned()),
             "caller" => Value::from(self.caller_reference),
             _ => return None,
         })
@@ -66,6 +66,13 @@ impl Object for Macro {
         let mut kwargs_used = BTreeSet::new();
         let mut arg_values = Vec::with_capacity(self.arg_spec.len());
         for (idx, name) in self.arg_spec.iter().enumerate() {
+            let name = match name.as_str() {
+                Some(name) => name,
+                None => {
+                    arg_values.push(Value::UNDEFINED);
+                    continue;
+                }
+            };
             let kwarg: Option<&Value> = match kwargs {
                 Some(ref kwargs) => kwargs.get(name).ok(),
                 _ => None,

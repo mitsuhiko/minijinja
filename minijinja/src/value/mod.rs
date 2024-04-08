@@ -384,6 +384,7 @@ impl PartialEq for Value {
             (ValueRepr::None, ValueRepr::None) => true,
             (ValueRepr::Undefined, ValueRepr::Undefined) => true,
             (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a == b,
+            (ValueRepr::SmallStr(a), ValueRepr::SmallStr(b)) => a.as_str() == b.as_str(),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
@@ -432,6 +433,7 @@ impl Ord for Value {
             (ValueRepr::None, ValueRepr::None) => Ordering::Equal,
             (ValueRepr::Undefined, ValueRepr::Undefined) => Ordering::Equal,
             (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a.cmp(b),
+            (ValueRepr::SmallStr(a), ValueRepr::SmallStr(b)) => a.as_str().cmp(b.as_str()),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.cmp(b),
             _ => match ops::coerce(self, other) {
                 Some(ops::CoerceResult::F64(a, b)) => f64_total_cmp(a, b),
@@ -1024,6 +1026,7 @@ impl Value {
             ValueRepr::Undefined | ValueRepr::None => Some(self.clone()),
             ValueRepr::String(ref s, _) => Some(Value::from(s.chars().rev().collect::<String>())),
             ValueRepr::SmallStr(ref s) => {
+                // TODO: add small str optimization here
                 Some(Value::from(s.as_str().chars().rev().collect::<String>()))
             }
             ValueRepr::Bytes(ref b) => {

@@ -330,7 +330,7 @@ impl<F: FnOnce()> Drop for OnDrop<F> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct InlineStr {
     len: u8,
     buf: [u8; 22],
