@@ -139,7 +139,7 @@ use serde::ser::{Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind};
 use crate::functions;
-use crate::utils::{InlineStr, OnDrop};
+use crate::utils::OnDrop;
 use crate::value::ops::as_f64;
 use crate::value::serialize::transform;
 use crate::vm::State;
@@ -311,6 +311,43 @@ impl<T: Copy> Clone for Packed<T> {
     }
 }
 
+/// Max size of a small str.
+///
+/// Logic: Value is 24 bytes. 1 byte is for the disciminant. One byte is
+/// needed for the small str length.
+const SMALL_STR_CAP: usize = 22;
+
+/// Helper to store string data inline.
+#[derive(Clone)]
+pub(crate) struct SmallStr {
+    len: u8,
+    buf: [u8; SMALL_STR_CAP],
+}
+
+impl SmallStr {
+    pub fn try_new(s: &str) -> Option<SmallStr> {
+        let len = s.len();
+        if len <= SMALL_STR_CAP {
+            let mut buf = [0u8; SMALL_STR_CAP];
+            buf[..len].copy_from_slice(s.as_bytes());
+            Some(SmallStr {
+                len: len as u8,
+                buf,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        unsafe { std::str::from_utf8_unchecked(&self.buf[..self.len as usize]) }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
+
 #[derive(Clone)]
 pub(crate) enum ValueRepr {
     Undefined,
@@ -322,9 +359,8 @@ pub(crate) enum ValueRepr {
     Invalid(Arc<str>),
     U128(Packed<u128>),
     I128(Packed<i128>),
-    // FIXME: Make Cow<'static, str>?
     String(Arc<str>, StringType),
-    SmallStr(InlineStr),
+    SmallStr(SmallStr),
     Bytes(Arc<Vec<u8>>),
     Object(DynObject),
 }

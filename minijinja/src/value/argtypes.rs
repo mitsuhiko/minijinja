@@ -5,9 +5,9 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::utils::{InlineStr, UndefinedBehavior};
+use crate::utils::UndefinedBehavior;
 use crate::value::{
-    DynObject, ObjectRepr, Packed, StringType, Value, ValueKind, ValueMap, ValueRepr,
+    DynObject, ObjectRepr, Packed, SmallStr, StringType, Value, ValueKind, ValueMap, ValueRepr,
 };
 use crate::vm::State;
 
@@ -271,11 +271,9 @@ impl<'a> From<&'a [u8]> for Value {
 impl<'a> From<&'a str> for Value {
     #[inline(always)]
     fn from(val: &'a str) -> Self {
-        InlineStr::new(val)
+        SmallStr::try_new(val)
             .map(|small_str| Value(ValueRepr::SmallStr(small_str)))
-            .unwrap_or_else(|| {
-                ValueRepr::String(Arc::from(val.to_string()), StringType::Normal).into()
-            })
+            .unwrap_or_else(|| Value::from(val.to_string()))
     }
 }
 
@@ -381,7 +379,7 @@ impl From<char> for Value {
     #[inline(always)]
     fn from(val: char) -> Self {
         let mut buf = [0u8; 4];
-        ValueRepr::SmallStr(InlineStr::new(val.encode_utf8(&mut buf)).unwrap()).into()
+        ValueRepr::SmallStr(SmallStr::try_new(val.encode_utf8(&mut buf)).unwrap()).into()
     }
 }
 
