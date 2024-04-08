@@ -12,7 +12,7 @@ readme = "README.md"
 rust-version = "1.61"
 
 [features]
-default = ["toml", "yaml", "querystring", "cbor", "datetime", "json5", "repl"]
+default = ["toml", "yaml", "querystring", "cbor", "datetime", "json5", "repl", "unicode"]
 yaml = ["serde_yaml"]
 querystring = ["serde_qs"]
 cbor = ["ciborium"]
@@ -20,6 +20,7 @@ datetime = ["minijinja-contrib/datetime", "minijinja-contrib/timezone"]
 json5 = ["serde_json5"]
 repl = ["rustyline"]
 completions = ["clap_complete", "clap_complete_nushell", "clap_complete_fig"]
+unicode = ["minijinja/unicode"]
 
 [dependencies]
 anyhow = "1.0.74"

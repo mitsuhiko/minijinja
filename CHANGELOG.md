@@ -50,6 +50,7 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
 - The debug printing of some objects was simplified.
 - Added the `iterable` test.  #475
 - The parser no longer panics when using dotted assignments in unexpected places. #479
+- The CLI now enables unicode support by default.
 
 ## 1.0.17
 
