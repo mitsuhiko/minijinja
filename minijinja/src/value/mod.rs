@@ -599,20 +599,6 @@ impl Value {
         transform(value)
     }
 
-    /// Deprecated original name of [`Value::from_serialize`].
-    ///
-    /// This method was replaced by the more generic method [`Value::from_serialize`]
-    /// which also takes values by either reference or value.
-    #[deprecated(
-        since = "1.17.0",
-        note = "this method was replaced by Value::from_serialize"
-    )]
-    pub fn from_serializable<T: Serialize>(value: &T) -> Value {
-        let _serialization_guard = mark_internal_serialization();
-        let _optimization_guard = value_optimization();
-        transform(value)
-    }
-
     /// Creates a value from a safe string.
     ///
     /// A safe string is one that will bypass auto escaping.  For instance if you
@@ -674,7 +660,8 @@ impl Value {
     ///
     ///     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
     ///         match key.as_str()? {
-    ///             Some("port") => Value::from(self.port),
+    ///             "port" => Some(Value::from(self.port)),
+    ///             _ => None,
     ///         }
     ///     }
     /// }
@@ -686,7 +673,8 @@ impl Value {
     ///
     ///     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
     ///         match key.as_str()? {
-    ///             Some("http") => Value::from_dyn_object(self.http.clone()),
+    ///             "http" => Some(Value::from_dyn_object(self.http.clone())),
+    ///             _ => None
     ///         }
     ///     }
     /// }
