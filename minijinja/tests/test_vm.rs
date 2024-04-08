@@ -14,7 +14,7 @@ pub fn simple_eval<S: serde::Serialize>(
     let env = Environment::new();
     let empty_blocks = BTreeMap::new();
     let vm = Vm::new(&env);
-    let root = Value::from_serializable(&ctx);
+    let root = Value::from_serialize(&ctx);
     let mut rv = String::new();
     let mut output = make_string_output(&mut rv);
     vm.eval(

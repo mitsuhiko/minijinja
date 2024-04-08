@@ -51,6 +51,7 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
 - Added the `iterable` test.  #475
 - The parser no longer panics when using dotted assignments in unexpected places. #479
 - The CLI now enables unicode support by default.
+- `Value::from_serializable` is now `Value::from_serialize`.
 
 ## 1.0.17
 
