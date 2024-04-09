@@ -131,6 +131,8 @@ fn tracker_visit_expr<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a
                                 }
                                 state.assign_nested(rv);
                                 return;
+                            } else {
+                                break;
                             }
                         }
                         ast::Expr::GetAttr(expr) => {

@@ -448,6 +448,31 @@ fn test_undeclared_variables() {
 }
 
 #[test]
+fn test_undeclared_variables_bug() {
+    // see https://github.com/mitsuhiko/minijinja/issues/484
+    let mut env = Environment::new();
+    env.add_template(
+        "demo",
+        r#"
+        {% for item in content.products.items() %}
+          {{ foo.bar }}
+          {{ item.name }}  // this used to cause a loop
+        {% endfor %}
+    "#,
+    )
+    .unwrap();
+    let tmpl = env.get_template("demo").unwrap();
+    let undeclared = tmpl.undeclared_variables(true);
+    assert_eq!(
+        undeclared,
+        ["foo.bar", "content.products.items"]
+            .into_iter()
+            .map(|x| x.to_string())
+            .collect()
+    );
+}
+
+#[test]
 fn test_block_fragments() {
     let mut env = Environment::new();
     env.add_template(
