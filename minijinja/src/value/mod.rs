@@ -18,9 +18,16 @@
 //! let int_value = Value::from(42);
 //! let none_value = Value::from(());
 //! let true_value = Value::from(true);
+//! let map = Value::from({
+//!     let mut m = std::collections::HashMap::new();
+//!     m.insert("foo", 1);
+//!     m.insert("bar", 2);
+//!     m
+//! });
 //! ```
 //!
-//! Or via the [`FromIterator`] trait which can create sequences or maps:
+//! Or via the [`FromIterator`] trait which can create sequences or maps.  When
+//! given a tuple it creates maps, otherwise it makes a sequence.
 //!
 //! ```
 //! # use minijinja::value::Value;
@@ -53,6 +60,26 @@
 //! The special [`Undefined`](Value::UNDEFINED) value also exists but does not
 //! have a rust equivalent.  It can be created via the [`UNDEFINED`](Value::UNDEFINED)
 //! constant.
+//!
+//! # Collections
+//!
+//! The standard library's collection types such as
+//! [`HashMap`](std::collections::HashMap), [`Vec`] and various others from the
+//! collections module are implemented are objects.  There is a cavet here which is
+//! that maps can only have string or [`Value`] as key.  The values in the collections
+//! are lazily converted into value when accessed or iterated over.   These types can
+//! be constructed either from [`Value::from`] or [`Value::from_object`].  Because the
+//! types are boxed unchanged, you can also downcast them.
+//!
+//! ```rust
+//! # use minijinja::Value;
+//! let vec = Value::from(vec![1i32, 2, 3, 4]);
+//! let vec_ref = vec.downcast_object_ref::<Vec<i32>>().unwrap();
+//! assert_eq!(vec_ref, &vec![1, 2, 3, 4]);
+//! ```
+//!
+//! **Caveat:** for convenience reasons maps with `&str` keys can be stored.  The keys
+//! however are converted into `Arc<str>`.
 //!
 //! # Serde Conversions
 //!

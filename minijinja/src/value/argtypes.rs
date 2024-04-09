@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -327,26 +327,6 @@ impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
                 .map(|(k, v)| (k.into(), v.into()))
                 .collect::<ValueMap>(),
         )
-    }
-}
-
-impl<K: Into<Value>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
-    fn from(val: BTreeMap<K, V>) -> Self {
-        val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
-    }
-}
-
-impl<K: Into<Value>, V: Into<Value>> From<HashMap<K, V>> for Value {
-    fn from(val: HashMap<K, V>) -> Self {
-        val.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
-    }
-}
-
-impl<T: Into<Value>> From<Vec<T>> for Value {
-    fn from(val: Vec<T>) -> Self {
-        let values = val.into_iter().map(|v| v.into()).collect::<Vec<_>>();
-
-        Value::from_object(values)
     }
 }
 
@@ -1037,6 +1017,12 @@ impl From<Value> for String {
 impl From<usize> for Value {
     fn from(val: usize) -> Self {
         Value::from(val as u64)
+    }
+}
+
+impl From<isize> for Value {
+    fn from(val: isize) -> Self {
+        Value::from(val as i64)
     }
 }
 
