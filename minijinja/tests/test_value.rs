@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
 use std::sync::Arc;
 
 use insta::assert_snapshot;
@@ -773,4 +774,185 @@ fn test_reverse() {
         Value::from(42).reverse().unwrap_err(),
         @"invalid operation: cannot reverse values of type number"
     );
+}
+
+#[test]
+fn test_object_vec() {
+    let value = Value::from(vec![1i32, 2, 3, 4]);
+    assert_eq!(
+        value.downcast_object_ref::<Vec<i32>>(),
+        Some(&vec![1, 2, 3, 4])
+    );
+    assert_eq!(
+        value.get_item_by_index(0).ok().and_then(|x| x.as_i64()),
+        Some(1)
+    );
+    let iter = value.try_iter().unwrap();
+    assert_eq!(iter.size_hint(), (4, Some(4)));
+    assert_eq!(
+        iter.map(|x| x.as_i64().unwrap()).collect::<Vec<_>>(),
+        vec![1, 2, 3, 4]
+    );
+    assert_eq!(value.to_string(), "[1, 2, 3, 4]");
+}
+
+#[test]
+fn test_object_vec_deque() {
+    let value = Value::from(VecDeque::from([1i32, 2, 3, 4]));
+    assert_eq!(
+        value.downcast_object_ref::<VecDeque<i32>>(),
+        Some(&VecDeque::from([1, 2, 3, 4]))
+    );
+    assert_eq!(
+        value.get_item_by_index(0).ok().and_then(|x| x.as_i64()),
+        Some(1)
+    );
+    let iter = value.try_iter().unwrap();
+    assert_eq!(iter.size_hint(), (4, Some(4)));
+    assert_eq!(
+        iter.map(|x| x.as_i64().unwrap()).collect::<Vec<_>>(),
+        vec![1, 2, 3, 4]
+    );
+    assert_eq!(value.to_string(), "[1, 2, 3, 4]");
+}
+
+#[test]
+fn test_object_linked_list() {
+    let value = Value::from(LinkedList::from([1i32, 2, 3, 4]));
+    assert_eq!(
+        value.downcast_object_ref::<LinkedList<i32>>(),
+        Some(&LinkedList::from([1, 2, 3, 4]))
+    );
+    let iter = value.try_iter().unwrap();
+    assert_eq!(iter.size_hint(), (4, Some(4)));
+    assert_eq!(
+        iter.map(|x| x.as_i64().unwrap()).collect::<Vec<_>>(),
+        vec![1, 2, 3, 4]
+    );
+    assert_eq!(value.to_string(), "[1, 2, 3, 4]");
+}
+
+#[test]
+fn test_object_hash_set() {
+    let value = Value::from(HashSet::from([1i32, 2, 3, 4]));
+    assert_eq!(
+        value.downcast_object_ref::<HashSet<i32>>(),
+        Some(&HashSet::from([1, 2, 3, 4]))
+    );
+    let iter = value.try_iter().unwrap();
+    let mut items = iter.map(|x| x.as_i64().unwrap()).collect::<Vec<_>>();
+    items.sort();
+    assert_eq!(items, vec![1, 2, 3, 4]);
+}
+
+#[test]
+fn test_object_btree_set() {
+    let value = Value::from(BTreeSet::from([1i32, 2, 3, 4]));
+    assert_eq!(
+        value.downcast_object_ref::<BTreeSet<i32>>(),
+        Some(&BTreeSet::from([1, 2, 3, 4]))
+    );
+    let iter = value.try_iter().unwrap();
+    assert_eq!(iter.size_hint(), (4, Some(4)));
+    assert_eq!(
+        iter.map(|x| x.as_i64().unwrap()).collect::<Vec<_>>(),
+        vec![1, 2, 3, 4]
+    );
+    assert_eq!(value.to_string(), "[1, 2, 3, 4]");
+}
+
+#[test]
+fn test_object_hash_map() {
+    let value = Value::from(HashMap::from_iter([("foo", 1i32), ("bar", 2)]));
+    assert_eq!(
+        value.downcast_object_ref::<HashMap<Arc<str>, i32>>(),
+        Some(&HashMap::from_iter([
+            (Arc::from("foo".to_string()), 1),
+            (Arc::from("bar".to_string()), 2),
+        ]))
+    );
+    let iter = value.try_iter().unwrap();
+    assert_eq!(iter.size_hint(), (2, Some(2)));
+
+    let value = Value::from(HashMap::from_iter([
+        ("foo".to_string(), 1i32),
+        ("bar".to_string(), 2),
+    ]));
+    assert_eq!(value.get_attr("foo").ok().and_then(|x| x.as_i64()), Some(1));
+    assert_eq!(
+        value.downcast_object_ref::<HashMap<String, i32>>(),
+        Some(&HashMap::from_iter([
+            ("foo".to_string(), 1),
+            ("bar".to_string(), 2),
+        ]))
+    );
+
+    let value = Value::from(HashMap::from_iter([("foo", 1i32)]));
+    assert_eq!(
+        value
+            .try_iter()
+            .unwrap()
+            .map(|x| x.as_str().unwrap().to_string())
+            .collect::<Vec<_>>(),
+        vec!["foo"]
+    );
+    assert_eq!(value.to_string(), "{\"foo\": 1}");
+
+    let value = Value::from(HashMap::from_iter([(Value::from(true), 1i32)]));
+    assert_eq!(
+        value
+            .get_item(&Value::from(true))
+            .ok()
+            .and_then(|x| x.as_i64()),
+        Some(1)
+    );
+    assert_eq!(value.to_string(), "{true: 1}");
+}
+
+#[test]
+fn test_object_btree_map() {
+    let value = Value::from(BTreeMap::from_iter([("foo", 1i32), ("bar", 2)]));
+    assert_eq!(
+        value.downcast_object_ref::<BTreeMap<Arc<str>, i32>>(),
+        Some(&BTreeMap::from_iter([
+            (Arc::from("foo".to_string()), 1),
+            (Arc::from("bar".to_string()), 2),
+        ]))
+    );
+    let iter = value.try_iter().unwrap();
+    assert_eq!(iter.size_hint(), (2, Some(2)));
+
+    let value = Value::from(BTreeMap::from_iter([
+        ("foo".to_string(), 1i32),
+        ("bar".to_string(), 2),
+    ]));
+    assert_eq!(value.get_attr("foo").ok().and_then(|x| x.as_i64()), Some(1));
+    assert_eq!(
+        value.downcast_object_ref::<BTreeMap<String, i32>>(),
+        Some(&BTreeMap::from_iter([
+            ("foo".to_string(), 1),
+            ("bar".to_string(), 2),
+        ]))
+    );
+
+    let value = Value::from(BTreeMap::from_iter([("foo", 1i32)]));
+    assert_eq!(
+        value
+            .try_iter()
+            .unwrap()
+            .map(|x| x.as_str().unwrap().to_string())
+            .collect::<Vec<_>>(),
+        vec!["foo"]
+    );
+    assert_eq!(value.to_string(), "{\"foo\": 1}");
+
+    let value = Value::from(BTreeMap::from_iter([(Value::from(true), 1i32)]));
+    assert_eq!(
+        value
+            .get_item(&Value::from(true))
+            .ok()
+            .and_then(|x| x.as_i64()),
+        Some(1)
+    );
+    assert_eq!(value.to_string(), "{true: 1}");
 }

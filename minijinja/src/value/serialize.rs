@@ -432,7 +432,7 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
 
     fn end(self) -> Result<Value, InvalidValue> {
         let mut rv = BTreeMap::new();
-        rv.insert(self.variant, Value::from_object(self.map));
+        rv.insert(self.variant.to_string(), Value::from_object(self.map));
         Ok(rv.into())
     }
 }
