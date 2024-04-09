@@ -1,11 +1,11 @@
-use std::borrow::Borrow;
-use std::collections::HashMap;
+use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
 use std::fmt;
 use std::hash::Hash;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{intern, Value, ValueMap, ValueRepr};
+use crate::value::{intern, Value, ValueRepr};
 use crate::vm::State;
 
 /// A trait that represents a dynamic object.
@@ -679,51 +679,181 @@ impl Enumerator {
     }
 }
 
-impl<T: Into<Value> + Clone + Send + Sync + fmt::Debug> Object for Vec<T> {
-    fn repr(self: &Arc<Self>) -> ObjectRepr {
-        ObjectRepr::Seq
-    }
+macro_rules! impl_value_vec {
+    ($vec_type:ident) => {
+        impl<T> Object for $vec_type<T>
+        where
+            T: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+        {
+            fn repr(self: &Arc<Self>) -> ObjectRepr {
+                ObjectRepr::Seq
+            }
 
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.get(some!(key.as_usize())).cloned().map(|v| v.into())
-    }
+            fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                self.get(some!(key.as_usize())).cloned().map(|v| v.into())
+            }
 
-    fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Seq(self.len())
-    }
+            fn enumerate(self: &Arc<Self>) -> Enumerator {
+                Enumerator::Seq(self.len())
+            }
+        }
+
+        impl<T> From<$vec_type<T>> for Value
+        where
+            T: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+        {
+            fn from(val: $vec_type<T>) -> Self {
+                Value::from_object(val)
+            }
+        }
+    };
 }
 
-impl Object for ValueMap {
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.get(key).cloned()
-    }
+macro_rules! impl_value_iterable {
+    ($iterable_type:ident, $enumerator:ident) => {
+        impl<T> Object for $iterable_type<T>
+        where
+            T: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+        {
+            fn repr(self: &Arc<Self>) -> ObjectRepr {
+                ObjectRepr::Iterable
+            }
 
-    fn enumerate(self: &Arc<Self>) -> Enumerator {
-        self.mapped_rev_enumerator(|this| Box::new(this.keys().cloned()))
-    }
+            fn enumerate(self: &Arc<Self>) -> Enumerator {
+                self.clone()
+                    .$enumerator(|this| Box::new(this.iter().map(|x| x.clone().into())))
+            }
+        }
+
+        impl<T> From<$iterable_type<T>> for Value
+        where
+            T: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+        {
+            fn from(val: $iterable_type<T>) -> Self {
+                Value::from_object(val)
+            }
+        }
+    };
 }
 
-impl<K, V> Object for HashMap<K, V>
-where
-    K: Borrow<str>
-        + AsRef<str>
-        + PartialEq
-        + Eq
-        + Hash
-        + Clone
-        + Send
-        + Sync
-        + fmt::Debug
-        + 'static,
-    V: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
-{
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.get(some!(key.as_str())).cloned().map(|v| v.into())
-    }
+macro_rules! impl_str_map_helper {
+    ($map_type:ident, $key_type:ty, $enumerator:ident) => {
+        impl<V> Object for $map_type<$key_type, V>
+        where
+            V: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+        {
+            fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                self.get(some!(key.as_str())).cloned().map(|v| v.into())
+            }
 
-    fn enumerate(self: &Arc<Self>) -> Enumerator {
-        self.mapped_enumerator(|this| {
-            Box::new(this.keys().map(|k| intern(k.as_ref())).map(Value::from))
-        })
-    }
+            fn enumerate(self: &Arc<Self>) -> Enumerator {
+                self.$enumerator(|this| {
+                    Box::new(this.keys().map(|k| intern(k.as_ref())).map(Value::from))
+                })
+            }
+        }
+    };
+}
+
+macro_rules! impl_str_map {
+    ($map_type:ident, $enumerator:ident) => {
+        impl_str_map_helper!($map_type, String, $enumerator);
+        impl_str_map_helper!($map_type, Arc<str>, $enumerator);
+
+        impl<V> From<$map_type<String, V>> for Value
+        where
+            V: Into<Value> + Send + Sync + Clone + fmt::Debug + 'static,
+        {
+            fn from(val: $map_type<String, V>) -> Self {
+                Value::from_object(val)
+            }
+        }
+
+        impl<V> From<$map_type<Arc<str>, V>> for Value
+        where
+            V: Into<Value> + Send + Sync + Clone + fmt::Debug + 'static,
+        {
+            fn from(val: $map_type<Arc<str>, V>) -> Self {
+                Value::from_object(val)
+            }
+        }
+
+        impl<'a, V> From<$map_type<&'a str, V>> for Value
+        where
+            V: Into<Value> + Send + Sync + Clone + fmt::Debug + 'static,
+        {
+            fn from(val: $map_type<&'a str, V>) -> Self {
+                Value::from(
+                    val.into_iter()
+                        .map(|(k, v)| (intern(k), v))
+                        .collect::<$map_type<Arc<str>, V>>(),
+                )
+            }
+        }
+
+        impl<'a, V> From<$map_type<Cow<'a, str>, V>> for Value
+        where
+            V: Into<Value> + Send + Sync + Clone + fmt::Debug + 'static,
+        {
+            fn from(val: $map_type<Cow<'a, str>, V>) -> Self {
+                Value::from(
+                    val.into_iter()
+                        .map(|(k, v)| {
+                            (
+                                match k {
+                                    Cow::Borrowed(s) => intern(s),
+                                    Cow::Owned(s) => Arc::<str>::from(s),
+                                },
+                                v,
+                            )
+                        })
+                        .collect::<$map_type<Arc<str>, V>>(),
+                )
+            }
+        }
+    };
+}
+
+macro_rules! impl_value_map {
+    ($map_type:ident, $enumerator:ident) => {
+        impl<V> Object for $map_type<Value, V>
+        where
+            V: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+        {
+            fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                self.get(key).cloned().map(|v| v.into())
+            }
+
+            fn enumerate(self: &Arc<Self>) -> Enumerator {
+                self.$enumerator(|this| Box::new(this.keys().cloned()))
+            }
+        }
+
+        impl<V> From<$map_type<Value, V>> for Value
+        where
+            V: Into<Value> + Send + Sync + Clone + fmt::Debug + 'static,
+        {
+            fn from(val: $map_type<Value, V>) -> Self {
+                Value::from_object(val)
+            }
+        }
+    };
+}
+
+impl_value_vec!(Vec);
+impl_value_vec!(VecDeque);
+impl_value_iterable!(LinkedList, mapped_rev_enumerator);
+impl_value_iterable!(HashSet, mapped_enumerator);
+impl_value_iterable!(BTreeSet, mapped_rev_enumerator);
+impl_str_map!(HashMap, mapped_enumerator);
+impl_str_map!(BTreeMap, mapped_rev_enumerator);
+impl_value_map!(HashMap, mapped_enumerator);
+impl_value_map!(BTreeMap, mapped_rev_enumerator);
+
+#[cfg(feature = "preserve_order")]
+mod preserve_order_impls {
+    use super::*;
+    use indexmap::IndexMap;
+
+    impl_value_map!(IndexMap, mapped_rev_enumerator);
 }
