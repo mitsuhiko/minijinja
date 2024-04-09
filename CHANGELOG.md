@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.18
+
+- Fixed an endless loop in `undeclared_variables`.  #486
+
 ## 1.0.17
 
 - Added support for `Option<Into<Value>>` as return value from
