@@ -535,7 +535,7 @@ impl<'a> Parser<'a> {
         let (token, span) = expect_token!(self, "expression");
         macro_rules! const_val {
             ($expr:expr) => {
-                make_const(Value::from($expr), span)
+                make_const(Value::from($expr), self.stream.expand_span(span))
             };
         }
 
@@ -544,7 +544,18 @@ impl<'a> Parser<'a> {
             Token::Ident("false" | "False") => Ok(const_val!(false)),
             Token::Ident("none" | "None") => Ok(const_val!(())),
             Token::Ident(name) => Ok(ast::Expr::Var(Spanned::new(ast::Var { id: name }, span))),
-            Token::Str(val) => Ok(const_val!(val)),
+            Token::Str(val) => {
+                if matches_token!(self, Token::Str(_)) {
+                    let mut buf = String::from(val);
+                    while let Some((Token::Str(s), _)) = ok!(self.stream.current()) {
+                        buf.push_str(s);
+                        ok!(self.stream.next());
+                    }
+                    Ok(const_val!(buf))
+                } else {
+                    Ok(const_val!(val))
+                }
+            }
             Token::String(val) => Ok(const_val!(val)),
             Token::Int(val) => Ok(const_val!(val)),
             Token::Int128(val) => Ok(const_val!(val)),

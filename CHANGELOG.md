@@ -53,6 +53,10 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
 - The CLI now enables unicode support by default.
 - `Value::from_serializable` is now `Value::from_serialize`.
 
+## 1.0.20
+
+- Added support for implicit string concatenation for Jinja2 compatibility.  #489
+
 ## 1.0.19
 
 - Deprecated `Value::from_iterator` and introduced replacement
