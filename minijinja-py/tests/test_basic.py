@@ -1,9 +1,10 @@
 import binascii
 import pytest
 import posixpath
+import types
 
 from _pytest.unraisableexception import catch_unraisable_exception
-from minijinja import Environment, TemplateError, safe, pass_state
+from minijinja import Environment, TemplateError, safe, pass_state, eval_expr, render_str
 
 
 def test_expression():
@@ -35,13 +36,15 @@ def test_callable_attrs():
 
 def test_generator():
     def hmm():
-        # This implicitly gets converted into a list. It's not a real iterator.
         yield 1
         yield 2
         yield 3
 
     hmm.public_attr = 42
     env = Environment()
+    rv = env.eval_expr("values", values=hmm())
+    assert isinstance(rv, types.GeneratorType)
+
     rv = env.eval_expr("values|list", values=hmm())
     assert rv == [1, 2, 3]
 
@@ -59,6 +62,15 @@ def test_method_calling():
     assert rv == ["This is X", 23]
     rv = env.eval_expr("x.items()|list", x={"a": "b"})
     assert rv == [("a", "b")]
+
+
+def test_types_passthrough():
+    tup = (1, 2, 3)
+    assert eval_expr("x", x=tup) == tup
+    assert render_str("{{ x }}", x=tup) == "(1, 2, 3)"
+    assert eval_expr("x is sequence", x=tup) == True
+    assert render_str("{{ x }}", x=(1, True)) == "(1, True)"
+    assert eval_expr("x[0] == 42", x=[42]) == True
 
 
 def test_custom_filter():
