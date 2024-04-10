@@ -14,12 +14,13 @@
 //! Values are typically created via the [`From`] trait:
 //!
 //! ```
+//! use std::collections::BTreeMap;
 //! # use minijinja::value::Value;
 //! let int_value = Value::from(42);
 //! let none_value = Value::from(());
 //! let true_value = Value::from(true);
 //! let map = Value::from({
-//!     let mut m = std::collections::HashMap::new();
+//!     let mut m = BTreeMap::new();
 //!     m.insert("foo", 1);
 //!     m.insert("bar", 2);
 //!     m

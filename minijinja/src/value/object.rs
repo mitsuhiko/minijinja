@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::hash::Hash;
 use std::sync::Arc;
@@ -709,6 +709,7 @@ macro_rules! impl_value_vec {
     };
 }
 
+#[allow(unused)]
 macro_rules! impl_value_iterable {
     ($iterable_type:ident, $enumerator:ident) => {
         impl<T> Object for $iterable_type<T>
@@ -841,14 +842,21 @@ macro_rules! impl_value_map {
 }
 
 impl_value_vec!(Vec);
-impl_value_vec!(VecDeque);
-impl_value_iterable!(LinkedList, mapped_rev_enumerator);
-impl_value_iterable!(HashSet, mapped_enumerator);
-impl_value_iterable!(BTreeSet, mapped_rev_enumerator);
-impl_str_map!(HashMap, mapped_enumerator);
-impl_str_map!(BTreeMap, mapped_rev_enumerator);
-impl_value_map!(HashMap, mapped_enumerator);
 impl_value_map!(BTreeMap, mapped_rev_enumerator);
+impl_str_map!(BTreeMap, mapped_rev_enumerator);
+
+#[cfg(feature = "std_collections")]
+mod std_collections_impls {
+    use super::*;
+    use std::collections::{BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
+
+    impl_value_iterable!(LinkedList, mapped_rev_enumerator);
+    impl_value_iterable!(HashSet, mapped_enumerator);
+    impl_value_iterable!(BTreeSet, mapped_rev_enumerator);
+    impl_str_map!(HashMap, mapped_enumerator);
+    impl_value_map!(HashMap, mapped_enumerator);
+    impl_value_vec!(VecDeque);
+}
 
 #[cfg(feature = "preserve_order")]
 mod preserve_order_impls {

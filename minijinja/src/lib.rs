@@ -158,6 +158,9 @@
 //!   - `deserialization`: when removed this disables deserialization support for
 //!     the [`Value`] type, removes the `ViaDeserialize` type and the error type
 //!     no longer implements `serde::de::Error`.
+//!   - `std_collections`: if this feature is removed some [`Object`](create::value::Object)
+//!     implementations for standard library collections are removed.  Only the
+//!     ones needed for the engine to function itself are retained.
 //!
 //! There are some additional features that provide extra functionality:
 //!

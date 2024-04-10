@@ -24,6 +24,7 @@ default = [
     "macros",
     "multi_template",
     "adjacent_loop_items",
+    "std_collections",
 ]
 
 # API features
@@ -33,6 +34,7 @@ debug = []
 loader = ["self_cell", "memo-map"]
 unicode = ["unicode-ident", "unicase"]
 custom_syntax = ["dep:aho-corasick"]
+std_collections = []
 
 # Speedups
 key_interning = []

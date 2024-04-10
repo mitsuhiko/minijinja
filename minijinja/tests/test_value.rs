@@ -797,6 +797,7 @@ fn test_object_vec() {
 }
 
 #[test]
+#[cfg(feature = "std_collections")]
 fn test_object_vec_deque() {
     let value = Value::from(VecDeque::from([1i32, 2, 3, 4]));
     assert_eq!(
@@ -817,6 +818,7 @@ fn test_object_vec_deque() {
 }
 
 #[test]
+#[cfg(feature = "std_collections")]
 fn test_object_linked_list() {
     let value = Value::from(LinkedList::from([1i32, 2, 3, 4]));
     assert_eq!(
@@ -833,6 +835,7 @@ fn test_object_linked_list() {
 }
 
 #[test]
+#[cfg(feature = "std_collections")]
 fn test_object_hash_set() {
     let value = Value::from(HashSet::from([1i32, 2, 3, 4]));
     assert_eq!(
@@ -846,6 +849,7 @@ fn test_object_hash_set() {
 }
 
 #[test]
+#[cfg(feature = "std_collections")]
 fn test_object_btree_set() {
     let value = Value::from(BTreeSet::from([1i32, 2, 3, 4]));
     assert_eq!(
@@ -862,6 +866,7 @@ fn test_object_btree_set() {
 }
 
 #[test]
+#[cfg(feature = "std_collections")]
 fn test_object_hash_map() {
     let value = Value::from(HashMap::from_iter([("foo", 1i32), ("bar", 2)]));
     assert_eq!(
