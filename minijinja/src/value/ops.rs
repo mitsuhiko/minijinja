@@ -177,8 +177,20 @@ macro_rules! math_binop {
 }
 
 pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    if lhs.kind() == ValueKind::Seq && rhs.kind() == ValueKind::Seq {
-        return Ok(Value::from_iter(lhs.try_iter()?.chain(rhs.try_iter()?)));
+    if matches!(lhs.kind(), ValueKind::Seq | ValueKind::Iterable)
+        && matches!(rhs.kind(), ValueKind::Seq | ValueKind::Iterable)
+    {
+        let lhs = lhs.clone();
+        let rhs = rhs.clone();
+        return Ok(Value::make_iterable(move || {
+            if let Ok(lhs) = lhs.try_iter() {
+                if let Ok(rhs) = rhs.try_iter() {
+                    return Box::new(lhs.chain(rhs))
+                        as Box<dyn Iterator<Item = Value> + Send + Sync>;
+                }
+            }
+            Box::new(None.into_iter()) as Box<dyn Iterator<Item = Value> + Send + Sync>
+        }));
     }
     match coerce(lhs, rhs) {
         Some(CoerceResult::I128(a, b)) => a
