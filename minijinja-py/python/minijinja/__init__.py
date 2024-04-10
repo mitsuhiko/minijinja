@@ -31,6 +31,8 @@ class Environment(_lowlevel.Environment):
         auto_escape_callback=None,
         path_join_callback=None,
         keep_trailing_newline=False,
+        trim_blocks=False,
+        lstrip_blocks=False,
         finalizer=None,
         reload_before_render=False,
         block_start_string="{%",
@@ -65,6 +67,10 @@ class Environment(_lowlevel.Environment):
             self.path_join_callback = path_join_callback
         if keep_trailing_newline:
             self.keep_trailing_newline = True
+        if trim_blocks:
+            self.trim_blocks = True
+        if lstrip_blocks:
+            self.lstrip_blocks = True
         if finalizer is not None:
             self.finalizer = finalizer
         if undefined_behavior is not None:
