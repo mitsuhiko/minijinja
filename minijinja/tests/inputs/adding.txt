@@ -6,11 +6,14 @@ Strings:
 {{ 'to' + name + 'you' }}!
 {{ 'to' + 'you' }}!
 
+Sequences:
+{{ [1] + [2] }}
+
 Adding:
 {{ 1 + 2 }}
 
 Minus:
-{{ 2 + 1 }}
+{{ 2 - 1 }}
 
 Divide:
 {{ 100 / 2 }}

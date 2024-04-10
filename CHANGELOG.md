@@ -56,6 +56,7 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
 ## 1.0.20
 
 - Added support for implicit string concatenation for Jinja2 compatibility.  #489
+- Added support for sequence concatenation with the plus operator for Jinja2 compatibility.  #491
 
 ## 1.0.19
 
