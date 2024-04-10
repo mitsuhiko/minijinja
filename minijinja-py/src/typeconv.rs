@@ -7,6 +7,7 @@ use minijinja::{AutoEscape, Error, State};
 
 use once_cell::sync::OnceCell;
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyDict, PyList, PySequence, PyTuple};
 
 use crate::error_support::{to_minijinja_error, to_py_error};
@@ -19,7 +20,7 @@ fn is_safe_attr(name: &str) -> bool {
     !name.starts_with('_')
 }
 
-fn is_dictish(val: &PyAny) -> bool {
+fn is_dictish(val: &Bound<'_, PyAny>) -> bool {
     val.hasattr("__getitem__").unwrap_or(false) && val.hasattr("items").unwrap_or(false)
 }
 
@@ -35,14 +36,14 @@ impl DynamicObject {
 
 impl fmt::Debug for DynamicObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Python::with_gil(|py| write!(f, "{}", self.inner.as_ref(py)))
+        Python::with_gil(|py| write!(f, "{}", self.inner.bind(py)))
     }
 }
 
 impl Object for DynamicObject {
     fn repr(self: &Arc<Self>) -> ObjectRepr {
         Python::with_gil(|py| {
-            let inner = self.inner.as_ref(py);
+            let inner = self.inner.bind(py);
             if inner.downcast::<PySequence>().is_ok() {
                 ObjectRepr::Seq
             } else if is_dictish(inner) {
@@ -59,17 +60,19 @@ impl Object for DynamicObject {
     where
         Self: Sized + 'static,
     {
-        Python::with_gil(|py| write!(f, "{}", self.inner.as_ref(py)))
+        Python::with_gil(|py| write!(f, "{}", self.inner.bind(py)))
     }
 
     fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
         Python::with_gil(|py| -> Result<Value, Error> {
             bind_state(state, || {
-                let inner = self.inner.as_ref(py);
+                let inner = self.inner.bind(py);
                 let (py_args, py_kwargs) =
                     to_python_args(py, inner, args).map_err(to_minijinja_error)?;
                 Ok(to_minijinja_value(
-                    inner.call(py_args, py_kwargs).map_err(to_minijinja_error)?,
+                    &inner
+                        .call(py_args, py_kwargs.as_ref())
+                        .map_err(to_minijinja_error)?,
                 ))
             })
         })
@@ -89,12 +92,12 @@ impl Object for DynamicObject {
         }
         Python::with_gil(|py| -> Result<Value, Error> {
             bind_state(state, || {
-                let inner = self.inner.as_ref(py);
+                let inner = self.inner.bind(py);
                 let (py_args, py_kwargs) =
                     to_python_args(py, inner, args).map_err(to_minijinja_error)?;
                 Ok(to_minijinja_value(
-                    inner
-                        .call_method(name, py_args, py_kwargs)
+                    &inner
+                        .call_method(name, py_args, py_kwargs.as_ref())
                         .map_err(to_minijinja_error)?,
                 ))
             })
@@ -103,14 +106,14 @@ impl Object for DynamicObject {
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         Python::with_gil(|py| {
-            let inner = self.inner.as_ref(py);
+            let inner = self.inner.bind(py);
             match inner.get_item(to_python_value_impl(py, key.clone()).ok()?) {
-                Ok(value) => Some(to_minijinja_value(value)),
+                Ok(value) => Some(to_minijinja_value(&value)),
                 Err(_) => {
                     if let Some(attr) = key.as_str() {
                         if is_safe_attr(attr) {
                             if let Ok(rv) = inner.getattr(attr) {
-                                return Some(to_minijinja_value(rv));
+                                return Some(to_minijinja_value(&rv));
                             }
                         }
                     }
@@ -122,13 +125,13 @@ impl Object for DynamicObject {
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         Python::with_gil(|py| {
-            let inner = self.inner.as_ref(py);
+            let inner = self.inner.bind(py);
             if inner.downcast::<PySequence>().is_ok() {
                 Enumerator::Seq(inner.len().unwrap_or(0))
             } else if let Ok(iter) = inner.iter() {
                 Enumerator::Values(
                     iter.filter_map(|x| match x {
-                        Ok(x) => Some(to_minijinja_value(x)),
+                        Ok(x) => Some(to_minijinja_value(&x)),
                         Err(_) => None,
                     })
                     .collect(),
@@ -140,7 +143,7 @@ impl Object for DynamicObject {
     }
 }
 
-pub fn to_minijinja_value(value: &PyAny) -> Value {
+pub fn to_minijinja_value(value: &Bound<'_, PyAny>) -> Value {
     if value.is_none() {
         Value::from(())
     } else if let Ok(val) = value.extract::<bool>() {
@@ -149,21 +152,21 @@ pub fn to_minijinja_value(value: &PyAny) -> Value {
         Value::from(val)
     } else if let Ok(val) = value.extract::<f64>() {
         Value::from(val)
-    } else if let Ok(val) = value.extract::<&str>() {
+    } else if let Ok(val) = value.extract::<PyBackedStr>() {
         if let Ok(to_html) = value.getattr("__html__") {
             if to_html.is_callable() {
                 // TODO: if to_minijinja_value returns results we could
                 // report the swallowed error of __html__.
                 if let Ok(html) = to_html.call0() {
-                    if let Ok(val) = html.extract::<&str>() {
-                        return Value::from_safe_string(val.into());
+                    if let Ok(val) = html.extract::<PyBackedStr>() {
+                        return Value::from_safe_string(val.to_string());
                     }
                 }
             }
         }
-        Value::from(val)
+        Value::from(val.to_string())
     } else {
-        Value::from_object(DynamicObject::new(value.into()))
+        Value::from_object(DynamicObject::new(value.clone().unbind()))
     }
 }
 
@@ -173,10 +176,10 @@ pub fn to_python_value(value: Value) -> PyResult<Py<PyAny>> {
 
 fn mark_string_safe(py: Python<'_>, value: &str) -> PyResult<Py<PyAny>> {
     let mark_safe: &Py<PyAny> = MARK_SAFE.get_or_try_init::<_, PyErr>(|| {
-        let module = py.import("minijinja._internal")?;
+        let module = py.import_bound("minijinja._internal")?;
         Ok(module.getattr("mark_safe")?.into())
     })?;
-    mark_safe.call1(py, PyTuple::new(py, [value]))
+    mark_safe.call1(py, PyTuple::new_bound(py, [value]))
 }
 
 fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
@@ -191,7 +194,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
         match obj.repr() {
             ObjectRepr::Plain => return Ok(obj.to_string().into_py(py)),
             ObjectRepr::Map => {
-                let rv = PyDict::new(py);
+                let rv = PyDict::new_bound(py);
                 if let Some(pair_iter) = obj.try_iter_pairs() {
                     for (key, value) in pair_iter {
                         rv.set_item(
@@ -203,7 +206,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
                 return Ok(rv.into());
             }
             ObjectRepr::Seq | ObjectRepr::Iterable => {
-                let rv = PyList::empty(py);
+                let rv = PyList::empty_bound(py);
                 if let Some(iter) = obj.try_iter() {
                     for value in iter {
                         rv.append(to_python_value_impl(py, value)?)?;
@@ -246,22 +249,22 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
 
 pub fn to_python_args<'py>(
     py: Python<'py>,
-    callback: &PyAny,
+    callback: &Bound<'_, PyAny>,
     args: &[Value],
-) -> PyResult<(&'py PyTuple, Option<&'py PyDict>)> {
+) -> PyResult<(Bound<'py, PyTuple>, Option<Bound<'py, PyDict>>)> {
     let mut py_args = Vec::new();
     let mut py_kwargs = None;
 
     if callback
         .getattr("__minijinja_pass_state__")
-        .map_or(false, |x| x.is_true().unwrap_or(false))
+        .map_or(false, |x| x.is_truthy().unwrap_or(false))
     {
-        py_args.push(Py::new(py, StateRef)?.to_object(py));
+        py_args.push(Bound::new(py, StateRef)?.to_object(py));
     }
 
     for arg in args {
         if arg.is_kwargs() {
-            let kwargs = py_kwargs.get_or_insert_with(|| PyDict::new(py));
+            let kwargs = py_kwargs.get_or_insert_with(|| PyDict::new_bound(py));
             if let Ok(iter) = arg.try_iter() {
                 for k in iter {
                     if let Ok(v) = arg.get_item(&k) {
@@ -274,7 +277,7 @@ pub fn to_python_args<'py>(
             py_args.push(to_python_value_impl(py, arg.clone())?);
         }
     }
-    let py_args = PyTuple::new(py, py_args);
+    let py_args = PyTuple::new_bound(py, py_args);
     Ok((py_args, py_kwargs))
 }
 

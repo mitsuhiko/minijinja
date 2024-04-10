@@ -294,3 +294,24 @@ def test_keep_trailing_newline():
     assert env.render_str("foo\n") == "foo"
     env = Environment(keep_trailing_newline=True)
     assert env.render_str("foo\n") == "foo\n"
+
+
+def test_trim_blocks():
+    env = Environment(trim_blocks=False)
+    assert env.render_str("{% if true %}\nfoo{% endif %}") == "\nfoo"
+    env = Environment(trim_blocks=True)
+    assert env.render_str("{% if true %}\nfoo{% endif %}") == "foo"
+
+
+def test_lstrip_blocks():
+    env = Environment(lstrip_blocks=False)
+    assert env.render_str("  {% if true %}\nfoo{% endif %}") == "  \nfoo"
+    env = Environment(lstrip_blocks=True)
+    assert env.render_str("  {% if true %}\nfoo{% endif %}") == "\nfoo"
+
+
+def test_trim_and_lstrip_blocks():
+    env = Environment(lstrip_blocks=False, trim_blocks=False)
+    assert env.render_str("  {% if true %}\nfoo{% endif %}") == "  \nfoo"
+    env = Environment(lstrip_blocks=True, trim_blocks=True)
+    assert env.render_str("  {% if true %}\nfoo{% endif %}") == "foo"

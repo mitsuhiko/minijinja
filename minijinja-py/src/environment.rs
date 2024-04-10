@@ -6,9 +6,9 @@ use std::sync::Mutex;
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Rest, Value};
 use minijinja::{context, escape_formatter, AutoEscape, Error, State, UndefinedBehavior};
-use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedStr;
 use pyo3::types::{PyDict, PyTuple};
 
 use crate::error_support::{report_unraisable, to_minijinja_error, to_py_error};
@@ -183,22 +183,22 @@ impl Environment {
 
     /// Registers a filter function.
     #[pyo3(text_signature = "(self, name, callback)")]
-    pub fn add_filter(&self, name: &str, callback: &PyAny) -> PyResult<()> {
+    pub fn add_filter(&self, name: &str, callback: &Bound<'_, PyAny>) -> PyResult<()> {
         if !callback.is_callable() {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
-        let callback: Py<PyAny> = callback.into();
+        let callback: Py<PyAny> = callback.clone().unbind();
         self.inner.lock().unwrap().env.add_filter(
             name.to_string(),
             move |state: &State, args: Rest<Value>| -> Result<Value, Error> {
                 Python::with_gil(|py| {
                     bind_state(state, || {
-                        let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), &args)
+                        let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
                         let rv = callback
-                            .call(py, py_args, py_kwargs)
+                            .call_bound(py, py_args, py_kwargs.as_ref())
                             .map_err(to_minijinja_error)?;
-                        Ok(to_minijinja_value(rv.as_ref(py)))
+                        Ok(to_minijinja_value(rv.bind(py)))
                     })
                 })
             },
@@ -215,22 +215,22 @@ impl Environment {
 
     /// Registers a test function.
     #[pyo3(text_signature = "(self, name, callback)")]
-    pub fn add_test(&self, name: &str, callback: &PyAny) -> PyResult<()> {
+    pub fn add_test(&self, name: &str, callback: &Bound<'_, PyAny>) -> PyResult<()> {
         if !callback.is_callable() {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
-        let callback: Py<PyAny> = callback.into();
+        let callback: Py<PyAny> = callback.clone().unbind();
         self.inner.lock().unwrap().env.add_test(
             name.to_string(),
             move |state: &State, args: Rest<Value>| -> Result<bool, Error> {
                 Python::with_gil(|py| {
                     bind_state(state, || {
-                        let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), &args)
+                        let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
                         let rv = callback
-                            .call(py, py_args, py_kwargs)
+                            .call_bound(py, py_args, py_kwargs.as_ref())
                             .map_err(to_minijinja_error)?;
-                        Ok(to_minijinja_value(rv.as_ref(py)).is_true())
+                        Ok(to_minijinja_value(rv.bind(py)).is_true())
                     })
                 })
             },
@@ -245,19 +245,19 @@ impl Environment {
         Ok(())
     }
 
-    fn add_function(&self, name: &str, callback: &PyAny) -> PyResult<()> {
-        let callback: Py<PyAny> = callback.into();
+    fn add_function(&self, name: &str, callback: &Bound<'_, PyAny>) -> PyResult<()> {
+        let callback: Py<PyAny> = callback.clone().unbind();
         self.inner.lock().unwrap().env.add_function(
             name.to_string(),
             move |state: &State, args: Rest<Value>| -> Result<Value, Error> {
                 Python::with_gil(|py| {
                     bind_state(state, || {
-                        let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), &args)
+                        let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
                         let rv = callback
-                            .call(py, py_args, py_kwargs)
+                            .call_bound(py, py_args, py_kwargs.as_ref())
                             .map_err(to_minijinja_error)?;
-                        Ok(to_minijinja_value(rv.as_ref(py)))
+                        Ok(to_minijinja_value(rv.bind(py)))
                     })
                 })
             },
@@ -267,7 +267,7 @@ impl Environment {
 
     /// Registers a global
     #[pyo3(text_signature = "(self, name, value)")]
-    pub fn add_global(&self, name: &str, value: &PyAny) -> PyResult<()> {
+    pub fn add_global(&self, name: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
         if value.is_callable() {
             self.add_function(name, value)
         } else {
@@ -292,31 +292,31 @@ impl Environment {
     /// Note that because this interface in MiniJinja is infallible, the callback is
     /// not able to raise an error.
     #[setter]
-    pub fn set_auto_escape_callback(&self, callback: &PyAny) -> PyResult<()> {
+    pub fn set_auto_escape_callback(&self, callback: &Bound<'_, PyAny>) -> PyResult<()> {
         if !callback.is_callable() {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
-        let callback: Py<PyAny> = callback.into();
+        let callback: Py<PyAny> = callback.clone().unbind();
         let mut inner = self.inner.lock().unwrap();
         inner.auto_escape_callback = Some(callback.clone());
         inner
             .env
             .set_auto_escape_callback(move |name: &str| -> AutoEscape {
                 Python::with_gil(|py| {
-                    let py_args = PyTuple::new(py, [name]);
-                    let rv = match callback.call(py, py_args, None) {
+                    let py_args = PyTuple::new_bound(py, [name]);
+                    let rv = match callback.call_bound(py, py_args, None) {
                         Ok(value) => value,
                         Err(err) => {
                             report_unraisable(py, err);
                             return AutoEscape::None;
                         }
                     };
-                    let rv = rv.as_ref(py);
+                    let rv = rv.bind(py);
                     if rv.is_none() {
                         return AutoEscape::None;
                     }
-                    if let Ok(value) = rv.extract::<&str>() {
-                        match value {
+                    if let Ok(value) = rv.extract::<PyBackedStr>() {
+                        match &value as &str {
                             "html" => AutoEscape::Html,
                             "json" => AutoEscape::Json,
                             other => get_custom_autoescape(other),
@@ -343,26 +343,26 @@ impl Environment {
     ///
     /// A finalizer is called before a value is rendered to customize it.
     #[setter]
-    pub fn set_finalizer(&self, callback: &PyAny) -> PyResult<()> {
+    pub fn set_finalizer(&self, callback: &Bound<'_, PyAny>) -> PyResult<()> {
         if !callback.is_callable() {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
-        let callback: Py<PyAny> = callback.into();
+        let callback: Py<PyAny> = callback.clone().unbind();
         let mut inner = self.inner.lock().unwrap();
         inner.finalizer_callback = Some(callback.clone());
         inner.env.set_formatter(move |output, state, value| {
             Python::with_gil(|py| -> Result<(), Error> {
                 let maybe_new_value = bind_state(state, || -> Result<_, Error> {
                     let args = std::slice::from_ref(value);
-                    let (py_args, py_kwargs) = to_python_args(py, callback.as_ref(py), args)
-                        .map_err(to_minijinja_error)?;
+                    let (py_args, py_kwargs) =
+                        to_python_args(py, callback.bind(py), args).map_err(to_minijinja_error)?;
                     let rv = callback
-                        .call(py, py_args, py_kwargs)
+                        .call_bound(py, py_args, py_kwargs.as_ref())
                         .map_err(to_minijinja_error)?;
                     if rv.is(&py.NotImplemented()) {
                         Ok(None)
                     } else {
-                        Ok(Some(to_minijinja_value(rv.as_ref(py))))
+                        Ok(Some(to_minijinja_value(rv.bind(py))))
                     }
                 })?;
                 let value = match maybe_new_value {
@@ -386,14 +386,14 @@ impl Environment {
     /// template exists the source code of the template should be returned a string,
     /// otherwise `None` can be used to indicate that the template does not exist.
     #[setter]
-    pub fn set_loader(&self, callback: Option<&PyAny>) -> PyResult<()> {
+    pub fn set_loader(&self, callback: Option<&Bound<'_, PyAny>>) -> PyResult<()> {
         let callback = match callback {
             None => None,
             Some(callback) => {
                 if !callback.is_callable() {
                     return Err(PyRuntimeError::new_err("expected callback"));
                 }
-                Some(callback.into())
+                Some(callback.clone().unbind())
             }
         };
         let mut inner = self.inner.lock().unwrap();
@@ -402,9 +402,9 @@ impl Environment {
         if let Some(callback) = callback {
             inner.env.set_loader(move |name| {
                 Python::with_gil(|py| {
-                    let callback = callback.as_ref(py);
+                    let callback = callback.bind(py);
                     let rv = callback
-                        .call1(PyTuple::new(py, [name]))
+                        .call1(PyTuple::new_bound(py, [name]))
                         .map_err(to_minijinja_error)?;
                     if rv.is_none() {
                         Ok(None)
@@ -426,17 +426,17 @@ impl Environment {
 
     /// Sets a new path join callback.
     #[setter]
-    pub fn set_path_join_callback(&self, callback: &PyAny) -> PyResult<()> {
+    pub fn set_path_join_callback(&self, callback: &Bound<'_, PyAny>) -> PyResult<()> {
         if !callback.is_callable() {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
-        let callback: Py<PyAny> = callback.into();
+        let callback: Py<PyAny> = callback.clone().unbind();
         let mut inner = self.inner.lock().unwrap();
         inner.path_join_callback = Some(callback.clone());
         inner.env.set_path_join_callback(move |name, parent| {
             Python::with_gil(|py| {
-                let callback = callback.as_ref(py);
-                match callback.call1(PyTuple::new(py, [name, parent])) {
+                let callback = callback.bind(py);
+                match callback.call1(PyTuple::new_bound(py, [name, parent])) {
                     Ok(rv) => Cow::Owned(rv.to_string()),
                     Err(err) => {
                         report_unraisable(py, err);
@@ -606,7 +606,7 @@ impl Environment {
     pub fn render_template(
         slf: PyRef<'_, Self>,
         template_name: &str,
-        ctx: Option<&PyDict>,
+        ctx: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<String> {
         if slf.reload_before_render.load(Ordering::Relaxed) {
             slf.reload()?;
@@ -615,7 +615,7 @@ impl Environment {
             let inner = slf.inner.lock().unwrap();
             let tmpl = inner.env.get_template(template_name).map_err(to_py_error)?;
             let ctx = ctx
-                .map(|ctx| Value::from_object(DynamicObject::new(ctx.into())))
+                .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
                 .unwrap_or_else(|| context!());
             tmpl.render(ctx).map_err(to_py_error)
         })
@@ -630,11 +630,11 @@ impl Environment {
         slf: PyRef<'_, Self>,
         source: &str,
         name: Option<&str>,
-        ctx: Option<&PyDict>,
+        ctx: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<String> {
         bind_environment(slf.as_ptr(), || {
             let ctx = ctx
-                .map(|ctx| Value::from_object(DynamicObject::new(ctx.into())))
+                .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
                 .unwrap_or_else(|| context!());
             slf.inner
                 .lock()
@@ -650,7 +650,7 @@ impl Environment {
     pub fn eval_expr(
         slf: PyRef<'_, Self>,
         expression: &str,
-        ctx: Option<&PyDict>,
+        ctx: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Py<PyAny>> {
         bind_environment(slf.as_ptr(), || {
             let inner = slf.inner.lock().unwrap();
@@ -659,7 +659,7 @@ impl Environment {
                 .compile_expression(expression)
                 .map_err(to_py_error)?;
             let ctx = ctx
-                .map(|ctx| Value::from_object(DynamicObject::new(ctx.into())))
+                .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
                 .unwrap_or_else(|| context!());
             to_python_value(expr.eval(ctx).map_err(to_py_error)?)
         })

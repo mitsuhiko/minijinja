@@ -96,11 +96,11 @@ pub fn report_unraisable(py: Python<'_>, err: PyErr) {
 fn make_error(err: Error) -> PyErr {
     Python::with_gil(|py| {
         let template_error: &Py<PyAny> = TEMPLATE_ERROR.get_or_init(|| {
-            let module = py.import("minijinja._internal").unwrap();
+            let module = py.import_bound("minijinja._internal").unwrap();
             let err = module.getattr("make_error").unwrap();
             err.into()
         });
-        let args = PyTuple::new(py, [PyCell::new(py, ErrorInfo { err }).unwrap()]);
-        PyErr::from_value(template_error.call1(py, args).unwrap().as_ref(py))
+        let args = PyTuple::new_bound(py, [Bound::new(py, ErrorInfo { err }).unwrap()]);
+        PyErr::from_value_bound(template_error.call1(py, args).unwrap().bind(py).clone())
     })
 }
