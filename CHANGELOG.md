@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.19
+
+- Deprecated `Value::from_iterator` and introduced replacement
+  `Value::make_one_shot_iterator` API which also exists in 2.x.  #487
+
 ## 1.0.18
 
 - Fixed an endless loop in `undeclared_variables`.  #486

@@ -34,11 +34,11 @@
 //!
 //! For certain types of iterators (`Send` + `Sync` + `'static`) it's also
 //! possible to make the value lazily iterate over the value by using the
-//! `Value::from_iterator` function instead:
+//! `Value::make_one_shot_iterator` function instead:
 //!
 //! ```
 //! # use minijinja::value::Value;
-//! let value: Value = Value::from_iterator(1..10);
+//! let value: Value = Value::make_one_shot_iterator(1..10);
 //! ```
 //!
 //! To to into the inverse directly the various [`TryFrom`](std::convert::TryFrom)
@@ -641,8 +641,21 @@ impl Value {
     ///
     /// ```
     /// # use minijinja::value::Value;
-    /// let val = Value::from_iterator(0..10);
+    /// let val = Value::make_one_shot_iterator(0..10);
     /// ```
+    pub fn make_one_shot_iterator<I, T>(iter: I) -> Value
+    where
+        I: Iterator<Item = T> + Send + Sync + 'static,
+        T: Into<Value> + Send + Sync + 'static,
+    {
+        Value::from_object(SimpleIteratorObject(Mutex::new(iter.fuse())))
+    }
+
+    /// Deprecated alternative to [`Value::make_one_shot_iterator`].
+    #[deprecated(
+        since = "1.19.0",
+        note = "this method was replaced by Value::make_one_shot_iterator"
+    )]
     pub fn from_iterator<I, T>(iter: I) -> Value
     where
         I: Iterator<Item = T> + Send + Sync + 'static,

@@ -214,7 +214,7 @@ pub enum ObjectKind<'a> {
     ///
     /// Requires that the object implements [`IteratorObject`].  It's not
     /// recommended to implement this, instead one should directly pass
-    /// iterators to [`Value::from_iterator`].
+    /// iterators to [`Value::make_one_shot_iterator`].
     Iterator(&'a dyn IteratorObject),
 }
 

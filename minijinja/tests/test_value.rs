@@ -513,7 +513,7 @@ fn test_seq_object_borrow() {
 
 #[test]
 fn test_iterator() {
-    let value = Value::from_iterator(0..10);
+    let value = Value::make_one_shot_iterator(0..10);
     assert_eq!(value.to_string(), "<iterator>");
     let rv = render!(
         "{% for item in iter %}[{{ item }}]{% endfor %}",
@@ -523,7 +523,7 @@ fn test_iterator() {
 
     let rv = render!(
         "{% for item in iter %}- {{ item }}: {{ loop.index }} / {{ loop.length }}\n{% endfor %}",
-        iter => Value::from_iterator('a'..'f')
+        iter => Value::make_one_shot_iterator('a'..'f')
     );
     assert_snapshot!(rv, @r###"
     - a: 1 / 5
@@ -535,7 +535,7 @@ fn test_iterator() {
 
     let rv = render!(
         "{% for item in iter %}- {{ item }}: {{ loop.index }} / {{ loop.length|default('?') }}\n{% endfor %}",
-     iter => Value::from_iterator((0..10).filter(|x| x % 2 == 0))
+     iter => Value::make_one_shot_iterator((0..10).filter(|x| x % 2 == 0))
     );
     assert_snapshot!(rv, @r###"
     - 0: 1 / ?
