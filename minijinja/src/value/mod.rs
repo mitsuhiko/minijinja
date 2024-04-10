@@ -617,7 +617,7 @@ impl Value {
     /// This method was replaced by the more generic method [`Value::from_serialize`]
     /// which also takes values by either reference or value.
     #[deprecated(
-        since = "1.17.0",
+        since = "1.0.17",
         note = "this method was replaced by Value::from_serialize"
     )]
     pub fn from_serializable<T: Serialize>(value: &T) -> Value {
@@ -653,7 +653,7 @@ impl Value {
 
     /// Deprecated alternative to [`Value::make_one_shot_iterator`].
     #[deprecated(
-        since = "1.19.0",
+        since = "1.0.19",
         note = "this method was replaced by Value::make_one_shot_iterator"
     )]
     pub fn from_iterator<I, T>(iter: I) -> Value
