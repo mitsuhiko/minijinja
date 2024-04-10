@@ -181,6 +181,11 @@ macro_rules! math_binop {
 }
 
 pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    if lhs.kind() == ValueKind::Seq && rhs.kind() == ValueKind::Seq {
+        return Ok(Value::from_iter(
+            lhs.try_iter_owned()?.chain(rhs.try_iter_owned()?),
+        ));
+    }
     match coerce(lhs, rhs) {
         Some(CoerceResult::I128(a, b)) => a
             .checked_add(b)
