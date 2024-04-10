@@ -57,6 +57,8 @@ def test_method_calling():
     env = Environment()
     rv = env.eval_expr("[x ~ '', x.my_method()]", x=MyClass())
     assert rv == ["This is X", 23]
+    rv = env.eval_expr("x.items()|list", x={"a": "b"})
+    assert rv == [("a", "b")]
 
 
 def test_custom_filter():
