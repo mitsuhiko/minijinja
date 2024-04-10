@@ -6,7 +6,6 @@ use std::sync::Mutex;
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Rest, Value};
 use minijinja::{context, escape_formatter, AutoEscape, Error, State, UndefinedBehavior};
-use pyo3::conversion::AsPyPointer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
