@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.20
+
+- Added support for implicit string concatenation for Jinja2 compatibility.  #489
+
 ## 1.0.19
 
 - Deprecated `Value::from_iterator` and introduced replacement
