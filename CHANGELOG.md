@@ -52,6 +52,7 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
 - The parser no longer panics when using dotted assignments in unexpected places. #479
 - The CLI now enables unicode support by default.
 - `Value::from_serializable` is now `Value::from_serialize`.
+- Ranges are now iterables and no longer sequences. #493
 
 ## 1.0.20
 
