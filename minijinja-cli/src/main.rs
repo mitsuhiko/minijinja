@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -113,7 +113,7 @@ fn load_data(
     let mut data: Value = match format {
         "json" => preferred_json::from_str(&contents)?,
         #[cfg(feature = "querystring")]
-        "querystring" => serde_qs::from_str(&contents)?,
+        "querystring" => Value::from(serde_qs::from_str::<HashMap<String, Value>>(&contents)?),
         #[cfg(feature = "yaml")]
         "yaml" => serde_yaml::from_str(&contents)?,
         #[cfg(feature = "toml")]

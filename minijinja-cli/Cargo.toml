@@ -65,3 +65,8 @@ clap_mangen = "0.2"
 clap_complete = { version = "4", optional = true }
 clap_complete_fig = { version = "4", optional = true }
 clap_complete_nushell = { version = "4", optional = true }
+
+[dev-dependencies]
+insta = { version = "1.38.0", features = ["filters"] }
+insta-cmd = "0.6.0"
+tempfile = "3.9.0"
