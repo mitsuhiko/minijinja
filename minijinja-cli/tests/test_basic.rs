@@ -32,7 +32,7 @@ macro_rules! bind_common_filters {
             "--- [TEMPLATE] ---",
         );
         settings.add_filter(
-            r"\(in \b.*minijinja-testfile--.*?:(\d+)\)",
+            r"\(in .*minijinja-testfile--.*?:(\d+)\)",
             "(in [TEMPLATE]:$1)",
         );
         let _guard = settings.bind_to_scope();

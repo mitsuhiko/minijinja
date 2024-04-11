@@ -47,6 +47,9 @@ run-tests:
 	@cd minijinja; cargo check --no-default-features --features=debug
 	@cd minijinja-autoreload; cargo test
 	@cd minijinja-contrib; cargo test
+
+.PHONY: test-cli
+test-cli:
 	@cd minijinja-cli; cargo test
 
 .PHONY: check
@@ -72,6 +75,9 @@ check:
 	@cd minijinja-contrib; cargo check
 	@cd minijinja-contrib; cargo check --all-features
 	@cd minijinja-contrib; cargo check --no-default-features
+
+.PHONY:
+check-cli:
 	@cd minijinja-cli; cargo check --no-default-features
 	@cd minijinja-cli; cargo check
 

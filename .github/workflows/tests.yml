@@ -33,23 +33,6 @@ jobs:
       - name: Test
         run: make test
 
-  ## Bugs in older Rust versions for some of our borrowing logic for filters
-  ## No longer makes supporting this Rust version possible
-  # build-old-stable:
-  #   name: Build on 1.45.0
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: dtolnay/rust-toolchain@master
-  #       with:
-  #         toolchain: 1.45.0
-  #     - name: Build
-  #       run: cargo build --features=unstable_machinery,builtins,source,json,urlencode,debug,internal_debug
-  #       working-directory: ./minijinja
-  #       env:
-  #         CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-  #         CARGO_HTTP_MULTIPLEXING: "false"
-
   test-32bit:
     name: Check on 1.61.0 (32bit)
     runs-on: ubuntu-latest
@@ -147,3 +130,32 @@ jobs:
       - name: Test
         run: make python-test
   
+  test-cli-linux:
+    name: Test CLI Linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Check
+        run: make check-cli
+      - name: Test
+        run: make test-cli
+  
+  test-cli-windows:
+    name: Test CLI Windows
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Check
+        run: make check-cli
+      - name: Test
+        run: make test-cli
