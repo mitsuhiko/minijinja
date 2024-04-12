@@ -399,6 +399,7 @@ impl SmallStr {
     }
 
     pub fn as_str(&self) -> &str {
+        // SAFETY: This is safe because we only place well-formed utf-8 strings
         unsafe { std::str::from_utf8_unchecked(&self.buf[..self.len as usize]) }
     }
 

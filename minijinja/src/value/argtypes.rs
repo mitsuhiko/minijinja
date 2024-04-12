@@ -736,6 +736,7 @@ impl Deref for KwargsValues {
 
 impl KwargsValues {
     fn as_value_map<'a>(self: &'a Arc<Self>) -> &'a Arc<ValueMap> {
+        // SAFETY: this is safe because of repr(transparent)
         unsafe { std::mem::transmute(self) }
     }
 }
