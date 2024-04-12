@@ -33,13 +33,7 @@ could not render include: error in "a_plus_b.txt" (in err_in_include.txt:2)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
     a: 1,
-    loop: Loop {
-        len: Some(
-            3,
-        ),
-        idx: 0,
-        depth: 0,
-    },
+    loop: <loop 0/3>,
     seq: [
         1,
         2,

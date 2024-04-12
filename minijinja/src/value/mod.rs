@@ -440,7 +440,7 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
             ValueRepr::SmallStr(val) => fmt::Debug::fmt(val.as_str(), f),
             ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::Object(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Object(val) => val.render(f),
         }
     }
 }

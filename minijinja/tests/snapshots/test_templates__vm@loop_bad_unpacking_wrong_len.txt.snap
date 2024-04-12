@@ -33,13 +33,7 @@ cannot unpack: sequence of wrong length (expected 2, got 3) (in loop_bad_unpacki
    5 | </ul>
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
-    loop: Loop {
-        len: Some(
-            3,
-        ),
-        idx: 0,
-        depth: 0,
-    },
+    loop: <loop 0/3>,
     seq: [
         [
             1,

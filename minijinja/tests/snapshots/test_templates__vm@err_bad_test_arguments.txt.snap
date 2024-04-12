@@ -27,13 +27,7 @@ too many arguments (in err_bad_test_arguments.txt:2)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
     item: 1,
-    loop: Loop {
-        len: Some(
-            3,
-        ),
-        idx: 0,
-        depth: 0,
-    },
+    loop: <loop 0/3>,
     seq: [
         1,
         2,

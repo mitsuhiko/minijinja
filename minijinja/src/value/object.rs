@@ -251,23 +251,11 @@ pub trait Object: fmt::Debug + Send + Sync {
     where
         Self: Sized + 'static,
     {
-        struct Dbg<'a>(&'a Value);
-
-        impl<'a> fmt::Debug for Dbg<'a> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                if let ValueRepr::Object(ref obj) = self.0 .0 {
-                    obj.render(f)
-                } else {
-                    fmt::Debug::fmt(&self.0, f)
-                }
-            }
-        }
-
         match self.repr() {
             ObjectRepr::Map => {
                 let mut dbg = f.debug_map();
                 for (key, value) in self.try_iter_pairs().into_iter().flatten() {
-                    dbg.entry(&Dbg(&key), &Dbg(&value));
+                    dbg.entry(&key, &value);
                 }
                 dbg.finish()
             }
@@ -277,7 +265,7 @@ pub trait Object: fmt::Debug + Send + Sync {
             ObjectRepr::Seq | ObjectRepr::Iterable if self.enumerator_len().is_some() => {
                 let mut dbg = f.debug_list();
                 for value in self.try_iter().into_iter().flatten() {
-                    dbg.entry(&Dbg(&value));
+                    dbg.entry(&value);
                 }
                 dbg.finish()
             }
