@@ -54,12 +54,12 @@ print(result)
 
 ## Purpose
 
-MiniJinja attempts a certain level of compatibility with Jinja2, but it does not
-try to achieve this at all costs.  As a result you will notice that quite a few
-templates will refuse to render with MiniJinja despite the fact that they probably
-look quite innocent.  It is however possible to write templates that render to the
-same results for both Jinja2 and MiniJinja.  This raises the question why you might
-want to use MiniJinja.
+MiniJinja attempts a reasonably high level of compatibility with Jinja2, but it
+does not try to achieve this at all costs.  As a result you will notice that
+quite a few templates will refuse to render with MiniJinja despite the fact that
+they probably look quite innocent.  It is however possible to write templates
+that render to the same results for both Jinja2 and MiniJinja.  This raises the
+question why you might want to use MiniJinja.
 
 The main benefit would be to achieve the exact same results in both Rust and Python.
 Additionally MiniJinja has a stronger sandbox than Jinja2 and might perform ever so
@@ -146,22 +146,20 @@ env.add_filter("add_a_variable", my_filter)
 
 ## Runtime Behavior
 
-MiniJinja uses it's own runtime model which is not matching the Python
-runtime model.  As a result there are clear gaps in behavior between the
-two and only limited effort is made to bridge them.  For instance you will
-be able to call some methods of types, but for instance builtins such as
-dicts and lists do not expose their methods on the MiniJinja side.  This
-means that it's very intentional that if you pass a dictionary to MiniJinja,
-the Python `.items()` method is unavailable.
+MiniJinja uses it's own runtime model which is not matching the Python runtime
+model.  As a result there are gaps in behavior between the two but some
+limited effort is made to bridge them.  For instance you will be able to call
+some methods of types, but for instance builtins such as dicts and lists do not
+expose their methods on the MiniJinja side in all cases.  A natively generated
+MiniJinja map (such as with the `dict` global function) will not have an `.items()`
+method, whereas a Python dict passed to MiniJinja will.
 
 Here is what this means for some basic types:
 
 * Python dictionaries and lists (as well as other objects that behave as sequences)
-  appear in the MiniJinja side as native lists.  They do not expose any specific
-  other behavior and when they move back to the Python side they will appear as basic
-  lists.  Specifically this means that a tuple (which does not exist in MiniJinja)
-  when moving from Python to MiniJinja turns into a list and will remain a list when
-  it moves back.
+  appear in the MiniJinja side very similar to how they do in Python.
+* Tuples on the MiniJinja side are represented as lists, but will appear again as
+  tuples if passed back to Python.
 * Python objects are represented in MiniJinja similarly to dicts, but they retain all
   their meaningful Python APIs.  This means they stringify via `__str__` and they
   allow the MiniJinja code to call their non-underscored methods.  Note that there is
@@ -169,6 +167,12 @@ Here is what this means for some basic types:
 * MiniJinja's python binding understand what `__html__` is when it exists on a string
   subclass.  This means that a `markupsafe.Markup` object will appear as safe string in
   MiniJinja.  This information can also flow back to Python again.
+* Stringification of objects uses `__str__` which is why mixed Python and MiniJinja
+  objects can be a bit confusing at times.
+* Where in Jinja2 there is a difference between `foo["bar"]` and `foo.bar` which can
+  be used to disambiugate properties and keys, in MiniJinja there is no such difference.
+  However methods are disambiugated so `foo.items()` works and will correctly call
+  the method in all cases.
 
 ## Sponsor
 
