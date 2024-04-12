@@ -633,10 +633,7 @@ mod builtins {
                 ErrorKind::InvalidOperation,
                 format!("cannot convert {} to integer", value.kind()),
             )),
-            ValueRepr::Invalid(ref x) => Err(Error::new(
-                ErrorKind::InvalidOperation,
-                format!("invalid value: {}", x),
-            )),
+            ValueRepr::Invalid(_) => value.validate(),
         }
     }
 
@@ -656,10 +653,7 @@ mod builtins {
                 .parse::<f64>()
                 .map(Value::from)
                 .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
-            ValueRepr::Invalid(ref x) => Err(Error::new(
-                ErrorKind::InvalidOperation,
-                format!("invalid value: {}", x),
-            )),
+            ValueRepr::Invalid(_) => value.validate(),
             _ => as_f64(&value).map(Value::from).ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,

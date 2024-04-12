@@ -53,6 +53,8 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
 - The CLI now enables unicode support by default.
 - `Value::from_serializable` is now `Value::from_serialize`.
 - Ranges are now iterables and no longer sequences. #493
+- `Value::from` is now implemented for `Error` as public API to create invalid values.
+  Previously this behavior was hidden internally in the serde support. #495
 
 ## 1.0.20
 

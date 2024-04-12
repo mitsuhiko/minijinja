@@ -111,6 +111,11 @@ use crate::vm::State;
 /// let value = Value::from_object(Range10);
 /// ```
 ///
+/// Iteration is encouraged to fail immediately (object is not iterable) or not at
+/// all.  However this is not always possible, but the iteration interface itself
+/// does not support fallible iteration.  It is however possible to accomplish the
+/// same thing by creating an [invalid value](index.html#invalid-values).
+///
 /// # Map As Context
 ///
 /// Map can also be used as template rendering context.  This has a lot of

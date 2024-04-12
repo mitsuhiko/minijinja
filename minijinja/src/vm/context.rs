@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::value::{Value, ValueIter, ValueRepr};
+use crate::value::{Value, ValueIter};
 use crate::vm::loop_object::Loop;
 
 #[cfg(feature = "macros")]
@@ -58,11 +58,7 @@ impl<'env> Frame<'env> {
 
     /// Creates a new frame with the given context and validates the value is not invalid
     pub fn new_checked(root: Value) -> Result<Frame<'env>, Error> {
-        if let ValueRepr::Invalid(ref err) = root.0 {
-            Err(Error::new(ErrorKind::BadSerialization, err.to_string()))
-        } else {
-            Ok(Frame::new(root))
-        }
+        Ok(Frame::new(ok!(root.validate())))
     }
 }
 

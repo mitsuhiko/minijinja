@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::fmt;
+use std::sync::Arc;
 
 use crate::compiler::tokens::Span;
 
@@ -41,15 +42,16 @@ pub struct Error {
 }
 
 /// The internal error data
+#[derive(Clone)]
 struct ErrorRepr {
     kind: ErrorKind,
     detail: Option<Cow<'static, str>>,
     name: Option<String>,
     lineno: usize,
     span: Option<Span>,
-    source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    source: Option<Arc<dyn std::error::Error + Send + Sync>>,
     #[cfg(feature = "debug")]
-    debug_info: Option<crate::debug::DebugInfo>,
+    debug_info: Option<Arc<crate::debug::DebugInfo>>,
 }
 
 impl fmt::Debug for Error {
@@ -86,7 +88,7 @@ impl fmt::Debug for Error {
 }
 
 /// An enum describing the error kind.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ErrorKind {
     /// A non primitive value was encountered where one was expected.
@@ -215,6 +217,12 @@ impl Error {
         }
     }
 
+    pub(crate) fn internal_clone(&self) -> Error {
+        Error {
+            repr: self.repr.clone(),
+        }
+    }
+
     pub(crate) fn set_filename_and_line(&mut self, filename: &str, lineno: usize) {
         self.repr.name = Some(filename.into());
         self.repr.lineno = lineno;
@@ -235,7 +243,7 @@ impl Error {
 
     /// Attaches another error as source to this error.
     pub fn with_source<E: std::error::Error + Send + Sync + 'static>(mut self, source: E) -> Self {
-        self.repr.source = Some(Box::new(source));
+        self.repr.source = Some(Arc::new(source));
         self
     }
 
@@ -350,13 +358,13 @@ impl Error {
     /// ([`Environment::set_debug`](crate::Environment::set_debug)).
     #[cfg(feature = "debug")]
     pub(crate) fn debug_info(&self) -> Option<&crate::debug::DebugInfo> {
-        self.repr.debug_info.as_ref()
+        self.repr.debug_info.as_deref()
     }
 
     #[cfg(feature = "debug")]
     #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
     pub(crate) fn attach_debug_info(&mut self, value: crate::debug::DebugInfo) {
-        self.repr.debug_info = Some(value);
+        self.repr.debug_info = Some(Arc::new(value));
     }
 }
 
@@ -395,10 +403,10 @@ pub fn attach_basic_debug_info<T>(rv: Result<T, Error>, source: &str) -> Result<
         match rv {
             Ok(rv) => Ok(rv),
             Err(mut err) => {
-                err.repr.debug_info = Some(crate::debug::DebugInfo {
+                err.repr.debug_info = Some(Arc::new(crate::debug::DebugInfo {
                     template_source: Some(source.to_string()),
                     ..Default::default()
-                });
+                }));
                 Err(err)
             }
         }

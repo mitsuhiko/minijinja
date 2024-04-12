@@ -10,8 +10,8 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use insta::assert_snapshot;
-use minijinja::value::{Enumerator, Object, Value};
-use minijinja::{context, render, Environment, Error, State};
+use minijinja::value::{Enumerator, Object, ObjectRepr, Value};
+use minijinja::{context, render, Environment, Error, ErrorKind, State};
 
 use similar_asserts::assert_eq;
 
@@ -370,7 +370,6 @@ fn test_flattening_sub_item_bad_lookup() {
 }
 
 #[test]
-#[should_panic = "can only flatten structs and maps"]
 fn test_flattening_sub_item_bad_attr() {
     let bad = Bad {
         a: 42,
@@ -381,8 +380,14 @@ fn test_flattening_sub_item_bad_attr() {
     let env = Environment::new();
 
     // resolving an invalid value will fail, even in an attribute lookup
-    env.render_str("{% if good.bad %}...{% endif %}", ctx)
-        .unwrap();
+    let err = env
+        .render_str("{% if good.bad %}...{% endif %}", ctx)
+        .unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::BadSerialization);
+    assert_eq!(
+        err.detail(),
+        Some("can only flatten structs and maps (got an enum)")
+    );
 }
 
 #[test]
@@ -399,7 +404,7 @@ fn test_flattening_sub_item_shielded_print() {
     let value = env.render_str("{{ good }}", ctx).unwrap();
     assert_eq!(
         value,
-        r#"{"bad": <invalid value: can only flatten structs and maps (got an enum)>}"#
+        r#"{"bad": <invalid value: could not serialize to value: can only flatten structs and maps (got an enum)>}"#
     );
 }
 
@@ -564,4 +569,39 @@ fn test_functions() {
         render!("{{ f() }}", f => Value::from_function(|| -> Result<i32, Error> { Ok(23) })),
         @"23"
     );
+}
+
+#[test]
+fn test_invalid_value_iteration() {
+    let env = Environment::new();
+    let mut out = Vec::<u8>::new();
+
+    #[derive(Debug)]
+    struct FailingIteration;
+
+    impl Object for FailingIteration {
+        fn repr(self: &Arc<Self>) -> ObjectRepr {
+            ObjectRepr::Iterable
+        }
+
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            Enumerator::Iter(Box::new((0..4).map(Value::from).chain(Some(Value::from(
+                Error::new(ErrorKind::InvalidOperation, "failed during iteration"),
+            )))))
+        }
+    }
+
+    let t = env
+        .template_from_str("{% for item in iter %}[{{ item }}]{% endfor %}")
+        .unwrap();
+    let err = t
+        .render_to_write(
+            context! { iter => Value::from_object(FailingIteration) },
+            &mut out,
+        )
+        .unwrap_err();
+    let out = String::from_utf8_lossy(&out);
+    assert_eq!(out, "[0][1][2][3]");
+    assert_eq!(err.kind(), ErrorKind::InvalidOperation);
+    assert_eq!(err.detail(), Some("failed during iteration"));
 }
