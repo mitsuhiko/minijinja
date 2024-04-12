@@ -262,7 +262,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::value::{ObjectRepr, Rest, ValueMap, ValueRepr};
+    use crate::value::{Rest, ValueMap, ValueRepr};
 
     /// Returns a range.
     ///

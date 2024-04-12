@@ -5,7 +5,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{intern, Value, ValueRepr};
+use crate::value::{intern, Value};
 use crate::vm::State;
 
 /// A trait that represents a dynamic object.
