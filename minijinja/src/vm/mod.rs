@@ -11,7 +11,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::namespace_object::Namespace;
-use crate::value::{ops, value_map_with_capacity, value_optimization, Kwargs, Value, ValueRepr};
+use crate::value::{ops, value_map_with_capacity, value_optimization, Kwargs, Value};
 use crate::vm::context::{Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
@@ -277,10 +277,10 @@ impl<'env> Vm<'env> {
             macro_rules! assert_valid {
                 ($expr:expr) => {{
                     let val = $expr;
-                    if let ValueRepr::Invalid(ref err) = val.0 {
-                        bail!(Error::new(ErrorKind::BadSerialization, err.to_string()));
+                    match val.validate() {
+                        Ok(val) => val,
+                        Err(err) => bail!(err),
                     }
-                    val
                 }};
             }
 

@@ -3,6 +3,7 @@ use std::fmt;
 
 use serde::{ser, Serialize, Serializer};
 
+use crate::error::{Error, ErrorKind};
 use crate::utils::untrusted_size_hint;
 use crate::value::{
     value_map_with_capacity, Arc, Packed, Value, ValueMap, ValueRepr, VALUE_HANDLES,
@@ -10,7 +11,7 @@ use crate::value::{
 };
 
 #[derive(Debug)]
-pub struct InvalidValue(Arc<str>);
+pub struct InvalidValue(String);
 
 impl std::error::Error for InvalidValue {}
 
@@ -25,7 +26,7 @@ impl serde::ser::Error for InvalidValue {
     where
         T: fmt::Display,
     {
-        InvalidValue(Arc::from(msg.to_string()))
+        InvalidValue(msg.to_string())
     }
 }
 
@@ -36,7 +37,7 @@ impl serde::ser::Error for InvalidValue {
 pub fn transform<T: Serialize>(value: T) -> Value {
     match value.serialize(ValueSerializer) {
         Ok(rv) => rv,
-        Err(invalid) => ValueRepr::Invalid(invalid.0).into(),
+        Err(invalid) => Value::from(Error::new(ErrorKind::BadSerialization, invalid.0)),
     }
 }
 

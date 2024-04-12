@@ -152,6 +152,32 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //! let value = Value::from_object(Foo);
 //! let value = Value::from_dyn_object(Arc::new(Foo));
 //! ```
+//!
+//! # Invalid Values
+//!
+//! MiniJinja knows the concept of an "invalid value".  These are rare in practice
+//! and should not be used, but they are needed in some situations.  An invalid value
+//! looks like a value but working with that value in the context of the engine will
+//! fail in most situations.  In principle an invalid value is a value that holds an
+//! error internally.  It's created with [`From`]:
+//!
+//! ```
+//! use minijinja::{Value, Error, ErrorKind};
+//! let error = Error::new(ErrorKind::InvalidOperation, "failed to generate an item");
+//! let invalid_value = Value::from(error);
+//! ```
+//!
+//! Invalid values are typically encountered in the following situations:
+//!
+//! - serialization fails with an error: this is the case when a value is crated
+//!   via [`Value::from_serialize`] and the underlying [`Serialize`] implementation
+//!   fails with an error.
+//! - fallible iteration: there might be situations where an iterator cannot indicate
+//!   failure ahead of iteration and must abort.  In that case the only option an
+//!   iterator in MiniJinja has is to create an invalid value.
+//!
+//! It's generally recommende to ignore the existence of invalid objects and let them
+//! fail naturally as they are encountered.
 
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
@@ -296,7 +322,12 @@ pub enum ValueKind {
     Iterable,
     /// A plain object without specific behavior.
     Plain,
-    /// This value is invalid.  This can happen when a serialization error occurred.
+    /// This value is invalid (holds an error).
+    ///
+    /// This can happen when a serialization error occurred or the engine
+    /// encountered a failure in a place where an error can otherwise not
+    /// be produced.  Interacting with such values in the context of the
+    /// template evaluation process will attempt to propagate the error.
     Invalid,
 }
 
@@ -384,7 +415,7 @@ pub(crate) enum ValueRepr {
     I64(i64),
     F64(f64),
     None,
-    Invalid(Arc<str>),
+    Invalid(Arc<Error>),
     U128(Packed<u128>),
     I128(Packed<i128>),
     String(Arc<str>, StringType),
@@ -420,7 +451,7 @@ impl Hash for Value {
             ValueRepr::String(ref s, _) => s.hash(state),
             ValueRepr::SmallStr(s) => s.as_str().hash(state),
             ValueRepr::Bool(b) => b.hash(state),
-            ValueRepr::Invalid(s) => s.hash(state),
+            ValueRepr::Invalid(ref e) => (e.kind(), e.detail()).hash(state),
             ValueRepr::Bytes(b) => b.hash(state),
             ValueRepr::Object(d) => d.hash(state),
             ValueRepr::U64(_)
@@ -625,6 +656,22 @@ impl Value {
         let _serialization_guard = mark_internal_serialization();
         let _optimization_guard = value_optimization();
         transform(value)
+    }
+
+    /// Extracts a contained error.
+    ///
+    /// An invalid value carres an error internally and will reveal that error
+    /// at a later point when iteracted with.  This is used to carry
+    /// serialization errors or failures that happen when the engine otherwise
+    /// assumes an infallible operation such as iteration.
+    pub(crate) fn validate(self) -> Result<Value, Error> {
+        if let ValueRepr::Invalid(err) = self.0 {
+            // Today the API implies tghat errors are `Clone`, but we don't want to expose
+            // this as a functionality (yet?).
+            Err(Arc::try_unwrap(err).unwrap_or_else(|arc| (*arc).internal_clone()))
+        } else {
+            Ok(self)
+        }
     }
 
     /// Creates a value from a safe string.
@@ -1169,11 +1216,13 @@ impl Value {
                     Some(Value::make_iterable(move || {
                         if let Some(iter) = iter.lock().unwrap().take() {
                             Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
-                        } else if let Ok(iter) = for_restart.reverse().and_then(|x| x.try_iter()) {
-                            Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
                         } else {
-                            Box::new(None.into_iter())
-                                as Box<dyn Iterator<Item = Value> + Send + Sync>
+                            match for_restart.reverse().and_then(|x| x.try_iter()) {
+                                Ok(iterable) => Box::new(iterable)
+                                    as Box<dyn Iterator<Item = Value> + Send + Sync>,
+                                Err(err) => Box::new(Some(Value::from(err)).into_iter())
+                                    as Box<dyn Iterator<Item = Value> + Send + Sync>,
+                            }
                         }
                     }))
                 }
@@ -1473,6 +1522,12 @@ enum ValueIterImpl {
     Empty,
     Chars(usize, usize, Arc<str>),
     Dyn(Box<dyn Iterator<Item = Value> + Send + Sync>),
+}
+
+impl From<Error> for Value {
+    fn from(value: Error) -> Self {
+        Value(ValueRepr::Invalid(Arc::new(value)))
+    }
 }
 
 #[cfg(test)]
