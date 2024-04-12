@@ -703,7 +703,7 @@ mod builtins {
         }
     }
 
-    /// Returns the first item from a list.
+    /// Returns the first item from an iterable.
     ///
     /// If the list is empty `undefined` is returned.
     ///
@@ -727,7 +727,7 @@ mod builtins {
         }
     }
 
-    /// Returns the last item from an iterable or string.
+    /// Returns the last item from an iterable.
     ///
     /// If the list is empty `undefined` is returned.
     ///
@@ -758,7 +758,11 @@ mod builtins {
         }
     }
 
-    /// Returns the smallest item from the list.
+    /// Returns the smallest item from an iterable.
+    ///
+    /// ```jinja
+    /// {{ [1, 2, 3, 4]|min }} -> 1
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn min(state: &State, value: Value) -> Result<Value, Error> {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
@@ -767,7 +771,11 @@ mod builtins {
         Ok(iter.min().unwrap_or(Value::UNDEFINED))
     }
 
-    /// Returns the largest item from the list.
+    /// Returns the largest item from an iterable.
+    ///
+    /// ```jinja
+    /// {{ [1, 2, 3, 4]|max }} -> 4
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn max(state: &State, value: Value) -> Result<Value, Error> {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
@@ -832,6 +840,10 @@ mod builtins {
     ///
     /// This behaves the same as the if statement does with regards to
     /// handling of boolean values.
+    ///
+    /// ```jinja
+    /// {{ 42|bool }} -> true
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn bool(value: Value) -> bool {
         value.is_true()
@@ -991,7 +1003,7 @@ mod builtins {
         })
     }
 
-    /// indents Value with spaces
+    /// Indents Value with spaces
     ///
     /// The first optional parameter to the filter can be set to `true` to
     /// indent the first line. The parameter defaults to false.
