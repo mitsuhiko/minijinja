@@ -147,12 +147,24 @@ impl UndefinedBehavior {
     /// looking up a missing attribute on a defined value.
     pub(crate) fn handle_undefined(self, parent_was_undefined: bool) -> Result<Value, Error> {
         match (self, parent_was_undefined) {
-            (UndefinedBehavior::Lenient, false) | (UndefinedBehavior::Chainable, _) => {
-                Ok(Value::UNDEFINED)
-            }
-            (UndefinedBehavior::Lenient, true) | (UndefinedBehavior::Strict, _) => {
+            (UndefinedBehavior::Lenient, false)
+            | (UndefinedBehavior::Strict, false)
+            | (UndefinedBehavior::Chainable, _) => Ok(Value::UNDEFINED),
+            (UndefinedBehavior::Lenient, true) | (UndefinedBehavior::Strict, true) => {
                 Err(Error::from(ErrorKind::UndefinedError))
             }
+        }
+    }
+
+    /// Utility method to check if something is true.
+    ///
+    /// This fails only for strict undefined values.
+    #[inline]
+    pub(crate) fn is_true(self, value: &Value) -> Result<bool, Error> {
+        if matches!(self, UndefinedBehavior::Strict) && value.is_undefined() {
+            Err(Error::from(ErrorKind::UndefinedError))
+        } else {
+            Ok(value.is_true())
         }
     }
 

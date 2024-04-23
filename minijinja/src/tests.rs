@@ -474,10 +474,11 @@ mod builtins {
     /// This is useful when combined with [`select`](crate::filters::select).
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_in(value: &Value, other: &Value) -> bool {
-        crate::value::ops::contains(other, value)
+    pub fn is_in(state: &State, value: &Value, other: &Value) -> Result<bool, Error> {
+        ok!(state.undefined_behavior().assert_iterable(value));
+        Ok(crate::value::ops::contains(other, value)
             .map(|value| value.is_true())
-            .unwrap_or(false)
+            .unwrap_or(false))
     }
 
     /// Checks if a value is `true`.

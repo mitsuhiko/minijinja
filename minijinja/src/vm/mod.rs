@@ -235,8 +235,7 @@ impl<'env> Vm<'env> {
 
             // if we only have two arguments that we pull from the stack, we
             // can assign them to a and b.  This slightly reduces the amount of
-            // code bloat generated here.  Do the same for a potential error
-            // that needs processing.
+            // code bloat generated here.
             let a;
             let b;
             let mut err;
@@ -483,13 +482,13 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::JumpIfFalse(jump_target) => {
                     a = stack.pop();
-                    if !a.is_true() {
+                    if !ok!(undefined_behavior.is_true(&a)) {
                         pc = *jump_target;
                         continue;
                     }
                 }
                 Instruction::JumpIfFalseOrPop(jump_target) => {
-                    if !stack.peek().is_true() {
+                    if !ok!(undefined_behavior.is_true(stack.peek())) {
                         pc = *jump_target;
                         continue;
                     } else {
@@ -497,7 +496,7 @@ impl<'env> Vm<'env> {
                     }
                 }
                 Instruction::JumpIfTrueOrPop(jump_target) => {
-                    if stack.peek().is_true() {
+                    if ok!(undefined_behavior.is_true(stack.peek())) {
                         pc = *jump_target;
                         continue;
                     } else {
