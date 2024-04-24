@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.21
+
+- Fixed an issue where `lstrip_blocks` unintentionally also applied to
+  variable expression blocks.  #502
+
 ## 1.0.20
 
 - Added support for implicit string concatenation for Jinja2 compatibility.  #489
