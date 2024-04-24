@@ -47,6 +47,8 @@ Ident("seq")
   "seq"
 BlockEnd
   "%}"
+TemplateData("    ")
+  "    "
 VariableStart
   "{{"
 Ident("item")
@@ -63,4 +65,3 @@ BlockEnd
   "%}"
 TemplateData("</ul>")
   "</ul>"
-

@@ -491,6 +491,7 @@ impl<'s> Tokenizer<'s> {
         }
     }
 
+    syntax_token_getter!(variable_start, "{{");
     syntax_token_getter!(variable_end, "}}");
     syntax_token_getter!(block_start, "{%");
     syntax_token_getter!(block_end, "%}");
@@ -506,7 +507,11 @@ impl<'s> Tokenizer<'s> {
         }
         let old_loc = self.loc();
         let (lead, span) = match find_start_marker(self.rest, &self.syntax_config) {
-            Some((start, Whitespace::Default)) if self.ws_config.lstrip_blocks => {
+            Some((start, Whitespace::Default))
+                if self.ws_config.lstrip_blocks
+                    && self.rest.get(start..start + self.variable_start().len())
+                        != Some(self.variable_start()) =>
+            {
                 let peeked = &self.rest[..start];
                 let trimmed = lstrip_block(peeked);
                 let lead = self.advance(trimmed.len());
