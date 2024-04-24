@@ -1,5 +1,7 @@
 #![cfg(feature = "builtins")]
-use minijinja::{render, Environment, ErrorKind, State, UndefinedBehavior};
+use std::collections::HashMap;
+
+use minijinja::{context, render, Environment, ErrorKind, State, UndefinedBehavior, Value};
 
 use similar_asserts::assert_eq;
 
@@ -24,8 +26,13 @@ fn test_lenient_undefined() {
         render!(in env, "<{% for x in undefined %}...{% endfor %}>"),
         "<>"
     );
+    assert_eq!(render!(in env, "{{ 'foo' is in(undefined) }}"), "false");
     assert_eq!(render!(in env, "<{{ undefined }}>"), "<>");
     assert_eq!(render!(in env, "{{ undefined is undefined }}"), "true");
+    assert_eq!(
+        render!(in env, "{{ x.foo is undefined }}", x => HashMap::<String, String>::new()),
+        "true"
+    );
     assert_eq!(render!(in env, "{{ undefined|list }}"), "[]");
     assert_eq!(render!(in env, "<{{ undefined|test }}>"), "<>");
     assert_eq!(render!(in env, "{{ 42 in undefined }}"), "false");
@@ -37,6 +44,9 @@ fn test_strict_undefined() {
     env.set_undefined_behavior(UndefinedBehavior::Strict);
     env.add_filter("test", |_state: &State, _value: String| -> String {
         panic!("filter must not be called");
+    });
+    env.add_filter("test2", |_state: &State, _value: Value| -> String {
+        "WAS CALLED".into()
     });
 
     assert_eq!(
@@ -58,10 +68,29 @@ fn test_strict_undefined() {
         ErrorKind::UndefinedError
     );
     assert_eq!(
+        env.render_str("{{ 'foo' is in(undefined) }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
         env.render_str("<{{ undefined }}>", ()).unwrap_err().kind(),
         ErrorKind::UndefinedError
     );
     assert_eq!(render!(in env, "{{ undefined is undefined }}"), "true");
+    assert_eq!(
+        render!(in env, "{{ x.foo is undefined }}", x => HashMap::<String, String>::new()),
+        "true"
+    );
+    assert_eq!(
+        env.render_str(
+            "{% if x.foo %}...{% endif %}",
+            context! { x => HashMap::<String, String>::new() }
+        )
+        .unwrap_err()
+        .kind(),
+        ErrorKind::UndefinedError
+    );
     assert_eq!(
         env.render_str("{{ undefined|list }}", ())
             .unwrap_err()
@@ -74,6 +103,7 @@ fn test_strict_undefined() {
             .kind(),
         ErrorKind::UndefinedError
     );
+    assert_eq!(render!(in env, "{{ undefined|test2 }}"), "WAS CALLED");
     assert_eq!(
         env.render_str("{{ 42 in undefined }}", ())
             .unwrap_err()
@@ -98,6 +128,11 @@ fn test_chainable_undefined() {
         render!(in env, "<{% for x in undefined %}...{% endfor %}>"),
         "<>"
     );
+    assert_eq!(
+        render!(in env, "{{ x.foo is undefined }}", x => HashMap::<String, String>::new()),
+        "true"
+    );
+    assert_eq!(render!(in env, "{{ 'foo' is in(undefined) }}"), "false");
     assert_eq!(render!(in env, "<{{ undefined }}>"), "<>");
     assert_eq!(render!(in env, "{{ undefined is undefined }}"), "true");
     assert_eq!(render!(in env, "{{ undefined|list }}"), "[]");
