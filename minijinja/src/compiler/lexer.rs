@@ -22,7 +22,7 @@ pub struct Tokenizer<'s> {
     current_col: u32,
     current_offset: u32,
     trim_leading_whitespace: bool,
-    pending_start_marker: Option<(StartMarker, usize, Whitespace)>,
+    pending_start_marker: Option<(StartMarker, usize)>,
     #[cfg(feature = "custom_syntax")]
     paren_balance: isize,
     syntax_config: SyntaxConfig,
@@ -97,12 +97,8 @@ fn find_start_marker_memchr(a: &str) -> Option<(usize, StartMarker, usize, White
                 continue;
             }
         };
-        return Some((
-            offset + idx,
-            marker,
-            2,
-            Whitespace::from_byte(bytes.get(offset + idx + 2).copied()),
-        ));
+        let ws = Whitespace::from_byte(bytes.get(offset + idx + 2).copied());
+        return Some((offset + idx, marker, 2 + ws.len(), ws));
     }
 }
 
@@ -142,28 +138,24 @@ fn find_start_marker(
             _ => unreachable!(),
         };
 
-        let new_match = (
-            m.start(),
-            marker,
-            m.len(),
-            if matches!(marker, StartMarker::LineStatement) {
-                let prefix = &bytes[..m.start()];
-                if matches!(
-                    prefix
-                        .iter()
-                        .copied()
-                        .rev()
-                        .find(|&x| x != b' ' && x != b'\t'),
-                    None | Some(b'\r') | Some(b'\n')
-                ) {
-                    Whitespace::Default
-                } else {
-                    continue;
-                }
+        let ws = if matches!(marker, StartMarker::LineStatement) {
+            let prefix = &bytes[..m.start()];
+            if matches!(
+                prefix
+                    .iter()
+                    .copied()
+                    .rev()
+                    .find(|&x| x != b' ' && x != b'\t'),
+                None | Some(b'\r') | Some(b'\n')
+            ) {
+                Whitespace::Default
             } else {
-                Whitespace::from_byte(bytes.get(m.start() + m.len()).copied())
-            },
-        );
+                continue;
+            }
+        } else {
+            Whitespace::from_byte(bytes.get(m.start() + m.len()).copied())
+        };
+        let new_match = (m.start(), marker, m.len() + ws.len(), ws);
 
         if longest_match.as_ref().map_or(false, |x| new_match.0 > x.0) {
             break;
@@ -238,11 +230,18 @@ fn should_lstrip_block(flag: bool, marker: StartMarker) -> bool {
     false
 }
 
-fn skip_basic_tag(block_str: &str, name: &str, block_end: &str) -> Option<(usize, Whitespace)> {
+fn skip_basic_tag(
+    block_str: &str,
+    name: &str,
+    block_end: &str,
+    skip_ws_control: bool,
+) -> Option<(usize, Whitespace)> {
     let mut ptr = block_str;
 
-    if let Some(rest) = ptr.strip_prefix(['-', '+']) {
-        ptr = rest;
+    if skip_ws_control {
+        if let Some(rest) = ptr.strip_prefix(['-', '+']) {
+            ptr = rest;
+        }
     }
     while let Some(rest) = ptr.strip_prefix(|x: char| x.is_ascii_whitespace()) {
         ptr = rest;
@@ -553,8 +552,8 @@ impl<'s> Tokenizer<'s> {
     }
 
     fn tokenize_root(&mut self) -> Result<ControlFlow<(Token<'s>, Span)>, Error> {
-        if let Some((marker, len, ws)) = self.pending_start_marker.take() {
-            return self.handle_start_marker(marker, len, ws);
+        if let Some((marker, len)) = self.pending_start_marker.take() {
+            return self.handle_start_marker(marker, len);
         }
         if self.trim_leading_whitespace {
             self.trim_leading_whitespace = false;
@@ -563,7 +562,7 @@ impl<'s> Tokenizer<'s> {
         let old_loc = self.loc();
         let (lead, span) = match find_start_marker(self.rest, &self.syntax_config) {
             Some((start, marker, len, whitespace)) => {
-                self.pending_start_marker = Some((marker, len, whitespace));
+                self.pending_start_marker = Some((marker, len));
                 match whitespace {
                     Whitespace::Default
                         if should_lstrip_block(self.ws_config.lstrip_blocks, marker) =>
@@ -602,7 +601,6 @@ impl<'s> Tokenizer<'s> {
         &mut self,
         marker: StartMarker,
         skip: usize,
-        ws: Whitespace,
     ) -> Result<ControlFlow<(Token<'s>, Span)>, Error> {
         match marker {
             StartMarker::Comment => {
@@ -620,7 +618,7 @@ impl<'s> Tokenizer<'s> {
             }
             StartMarker::Variable => {
                 let old_loc = self.loc();
-                self.advance(skip + ws.len());
+                self.advance(skip);
                 self.stack.push(LexerState::Variable);
                 Ok(ControlFlow::Break((
                     Token::VariableStart,
@@ -632,13 +630,13 @@ impl<'s> Tokenizer<'s> {
                 // block we want to skip everything until {% endraw %} completely ignoring interior
                 // syntax and emit the entire raw block as TemplateData.
                 if let Some((raw, ws_start)) =
-                    skip_basic_tag(&self.rest[skip..], "raw", self.block_end())
+                    skip_basic_tag(&self.rest[skip..], "raw", self.block_end(), false)
                 {
                     self.advance(raw + skip);
                     self.handle_raw_tag(ws_start)
                 } else {
                     let old_loc = self.loc();
-                    self.advance(skip + ws.len());
+                    self.advance(skip);
                     self.stack.push(LexerState::Block);
                     Ok(ControlFlow::Break((Token::BlockStart, self.span(old_loc))))
                 }
@@ -662,7 +660,7 @@ impl<'s> Tokenizer<'s> {
         while let Some(block) = memstr(&self.rest_bytes()[ptr..], self.block_start().as_bytes()) {
             ptr += block + self.block_start().len();
             if let Some((endraw, ws_next)) =
-                skip_basic_tag(&self.rest[ptr..], "endraw", self.block_end())
+                skip_basic_tag(&self.rest[ptr..], "endraw", self.block_end(), true)
             {
                 let ws = Whitespace::from_byte(self.rest_bytes().get(ptr).copied());
                 let end = ptr - self.block_start().len();
@@ -899,11 +897,11 @@ mod tests {
         );
         assert_eq!(
             find_start_marker("foo {{-", &syntax),
-            Some((4, StartMarker::Variable, 2, Whitespace::Remove))
+            Some((4, StartMarker::Variable, 3, Whitespace::Remove))
         );
         assert_eq!(
             find_start_marker("foo {{+", &syntax),
-            Some((4, StartMarker::Variable, 2, Whitespace::Preserve))
+            Some((4, StartMarker::Variable, 3, Whitespace::Preserve))
         );
     }
 
@@ -929,28 +927,28 @@ mod tests {
         );
         assert_eq!(
             find_start_marker("foo [[-", &syntax_config),
-            Some((4, StartMarker::Variable, 2, Whitespace::Remove))
+            Some((4, StartMarker::Variable, 3, Whitespace::Remove))
         );
     }
 
     #[test]
     fn test_is_basic_tag() {
         assert_eq!(
-            skip_basic_tag(" raw %}", "raw", "%}"),
+            skip_basic_tag(" raw %}", "raw", "%}", false),
             Some((7, Whitespace::Default))
         );
-        assert_eq!(skip_basic_tag(" raw %}", "endraw", "%}"), None);
+        assert_eq!(skip_basic_tag(" raw %}", "endraw", "%}", false), None);
         assert_eq!(
-            skip_basic_tag("  raw  %}", "raw", "%}"),
+            skip_basic_tag("  raw  %}", "raw", "%}", false),
             Some((9, Whitespace::Default))
         );
         assert_eq!(
-            skip_basic_tag("-  raw  -%}", "raw", "%}"),
-            Some((11, Whitespace::Remove))
+            skip_basic_tag("  raw  -%}", "raw", "%}", false),
+            Some((10, Whitespace::Remove))
         );
         assert_eq!(
-            skip_basic_tag("-  raw  +%}", "raw", "%}"),
-            Some((11, Whitespace::Preserve))
+            skip_basic_tag("  raw  +%}", "raw", "%}", false),
+            Some((10, Whitespace::Preserve))
         );
     }
 
