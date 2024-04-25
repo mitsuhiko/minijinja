@@ -57,7 +57,11 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
 - `Value::from` is now implemented for `Error` as public API to create invalid values.
   Previously this behavior was hidden internally in the serde support. #495
 - `UndefinedBehavior::Strict` now acts more delayed.  This means that now `value.key is defined`
-  will no longer error when `value.key` is `undefined`. #500
+
+## 1.0.21
+
+- Fixed an issue where `lstrip_blocks` unintentionally also applied to
+  variable expression blocks.  #502
 
 ## 1.0.20
 
