@@ -853,6 +853,7 @@ mod imp {
         variable_end: Cow<'static, str>,
         comment_start: Cow<'static, str>,
         comment_end: Cow<'static, str>,
+        line_statement_prefix: Option<Cow<'static, str>>,
     }
 
     const DEFAULT_DELIMS: Delims = Delims {
@@ -862,6 +863,7 @@ mod imp {
         variable_end: Cow::Borrowed("}}"),
         comment_start: Cow::Borrowed("{#"),
         comment_end: Cow::Borrowed("#}"),
+        line_statement_prefix: None,
     };
 
     /// Builder helper to reconfigure the syntax.
@@ -910,6 +912,16 @@ mod imp {
             self
         }
 
+        /// Sets the line statement prefix.
+        pub fn line_statement_prefix<S>(&mut self, s: Option<S>) -> &mut Self
+        where
+            S: Into<Cow<'static, str>>,
+        {
+            let delims = Arc::make_mut(&mut self.delims);
+            delims.line_statement_prefix = s.map(Into::into);
+            self
+        }
+
         /// Builds the final syntax config.
         pub fn build(&self) -> Result<SyntaxConfig, Error> {
             let delims = self.delims.clone();
@@ -925,21 +937,29 @@ mod imp {
                 StartMarker::Variable,
                 StartMarker::Block,
                 StartMarker::Comment,
+                StartMarker::LineStatement,
             ];
             start_delimiters_order.sort_by_key(|marker| {
                 std::cmp::Reverse(match marker {
                     StartMarker::Variable => delims.variable_start.len(),
                     StartMarker::Block => delims.block_start.len(),
                     StartMarker::Comment => delims.comment_start.len(),
+                    StartMarker::LineStatement => {
+                        delims.line_statement_prefix.as_ref().map_or(0, |x| x.len())
+                    }
                 })
             });
             let aho_corasick = ok!(AhoCorasick::builder()
                 .match_kind(aho_corasick::MatchKind::LeftmostLongest)
-                .build([
-                    &delims.variable_start as &str,
-                    &delims.block_start as &str,
-                    &delims.comment_start as &str,
-                ])
+                .build(
+                    [
+                        &delims.variable_start as &str,
+                        &delims.block_start as &str,
+                        &delims.comment_start as &str,
+                    ]
+                    .into_iter()
+                    .chain(delims.line_statement_prefix.as_ref().map(|x| x as &str))
+                )
                 .map_err(|_| ErrorKind::InvalidDelimiter.into()));
             Ok(SyntaxConfig {
                 delims,
@@ -973,7 +993,7 @@ mod imp {
     #[derive(Clone, Debug)]
     pub struct SyntaxConfig {
         delims: Arc<Delims>,
-        pub(crate) start_delimiters_order: [StartMarker; 3],
+        pub(crate) start_delimiters_order: [StartMarker; 4],
         pub(crate) aho_corasick: Option<aho_corasick::AhoCorasick>,
     }
 
@@ -985,6 +1005,7 @@ mod imp {
                     StartMarker::Variable,
                     StartMarker::Block,
                     StartMarker::Comment,
+                    StartMarker::LineStatement,
                 ],
                 aho_corasick: None,
             }
@@ -1017,6 +1038,12 @@ mod imp {
         pub fn comment_delimiters(&self) -> (&str, &str) {
             (&self.delims.comment_start, &self.delims.comment_end)
         }
+
+        /// Returns the line statement prefix.
+        #[inline(always)]
+        pub fn line_statement_prefix(&self) -> Option<&str> {
+            self.delims.line_statement_prefix.as_deref()
+        }
     }
 }
 
@@ -1043,6 +1070,12 @@ mod imp {
         #[inline(always)]
         pub fn comment_delimiters(&self) -> (&str, &str) {
             ("{#", "#}")
+        }
+
+        /// Returns the line statement prefix.
+        #[inline(always)]
+        pub fn line_statement_prefix(&self) -> Option<&str> {
+            None
         }
     }
 }
