@@ -22,7 +22,7 @@ pub struct Tokenizer<'s> {
     current_col: u32,
     current_offset: u32,
     trim_leading_whitespace: bool,
-    pending_start_marker: Option<StartMarker>,
+    pending_start_marker: Option<(StartMarker, usize, Whitespace)>,
     #[cfg(feature = "custom_syntax")]
     paren_balance: isize,
     syntax_config: SyntaxConfig,
@@ -80,7 +80,7 @@ impl Whitespace {
     }
 }
 
-fn find_start_marker_memchr(a: &str) -> Option<(usize, StartMarker, Whitespace)> {
+fn find_start_marker_memchr(a: &str) -> Option<(usize, StartMarker, usize, Whitespace)> {
     let bytes = a.as_bytes();
     let mut offset = 0;
     loop {
@@ -100,6 +100,7 @@ fn find_start_marker_memchr(a: &str) -> Option<(usize, StartMarker, Whitespace)>
         return Some((
             offset + idx,
             marker,
+            2,
             Whitespace::from_byte(bytes.get(offset + idx + 2).copied()),
         ));
     }
@@ -109,9 +110,7 @@ fn find_start_marker_memchr(a: &str) -> Option<(usize, StartMarker, Whitespace)>
 fn find_start_marker(
     a: &str,
     syntax_config: &SyntaxConfig,
-) -> Option<(usize, StartMarker, Whitespace)> {
-    use aho_corasick::automaton::OverlappingState;
-
+) -> Option<(usize, StartMarker, usize, Whitespace)> {
     // If we have a custom delimiter we need to use the aho-corasick
     // otherwise we can use internal memchr.
     let ac = match syntax_config.aho_corasick {
@@ -120,8 +119,8 @@ fn find_start_marker(
     };
 
     let bytes = a.as_bytes();
-    let mut state = OverlappingState::start();
-    let mut best_match = None::<(usize, StartMarker, Whitespace)>;
+    let mut state = aho_corasick::automaton::OverlappingState::start();
+    let mut longest_match = None::<(usize, StartMarker, usize, Whitespace)>;
 
     loop {
         // we have to use find_overlapping instead of iter_overlapping as the
@@ -130,55 +129,56 @@ fn find_start_marker(
         // though for when line statements are configured, so there could be
         // an alternative version that just uses aho corasick directly.
         ac.find_overlapping(bytes, &mut state);
-        let new_match = match state.get_match() {
+        let m = match state.get_match() {
             None => break,
-            Some(m) => {
-                let marker = match m.pattern().as_usize() {
-                    0 => StartMarker::Variable,
-                    1 => StartMarker::Block,
-                    2 => StartMarker::Comment,
-                    3 => StartMarker::LineStatement,
-                    _ => unreachable!(),
-                };
-
-                if matches!(marker, StartMarker::LineStatement) {
-                    let prefix = &bytes[..m.start()];
-                    if matches!(
-                        prefix
-                            .iter()
-                            .copied()
-                            .rev()
-                            .find(|&x| x != b' ' && x != b'\t'),
-                        None | Some(b'\r') | Some(b'\n')
-                    ) {
-                        (m.start(), StartMarker::LineStatement, Whitespace::Default)
-                    } else {
-                        continue;
-                    }
-                } else {
-                    (
-                        m.start(),
-                        marker,
-                        Whitespace::from_byte(bytes.get(m.start() + m.len()).copied()),
-                    )
-                }
-            }
+            Some(m) => m,
         };
 
-        if best_match.as_ref().map_or(false, |x| new_match.0 > x.0) {
+        let marker = match m.pattern().as_usize() {
+            0 => StartMarker::Variable,
+            1 => StartMarker::Block,
+            2 => StartMarker::Comment,
+            3 => StartMarker::LineStatement,
+            _ => unreachable!(),
+        };
+
+        let new_match = (
+            m.start(),
+            marker,
+            m.len(),
+            if matches!(marker, StartMarker::LineStatement) {
+                let prefix = &bytes[..m.start()];
+                if matches!(
+                    prefix
+                        .iter()
+                        .copied()
+                        .rev()
+                        .find(|&x| x != b' ' && x != b'\t'),
+                    None | Some(b'\r') | Some(b'\n')
+                ) {
+                    Whitespace::Default
+                } else {
+                    continue;
+                }
+            } else {
+                Whitespace::from_byte(bytes.get(m.start() + m.len()).copied())
+            },
+        );
+
+        if longest_match.as_ref().map_or(false, |x| new_match.0 > x.0) {
             break;
         }
-        best_match = Some(new_match);
+        longest_match = Some(new_match);
     }
 
-    best_match
+    longest_match
 }
 
 #[cfg(not(feature = "custom_syntax"))]
 fn find_start_marker(
     a: &str,
     _syntax_config: &SyntaxConfig,
-) -> Option<(usize, StartMarker, Whitespace)> {
+) -> Option<(usize, StartMarker, usize, Whitespace)> {
     find_start_marker_memchr(a)
 }
 
@@ -553,8 +553,8 @@ impl<'s> Tokenizer<'s> {
     }
 
     fn tokenize_root(&mut self) -> Result<ControlFlow<(Token<'s>, Span)>, Error> {
-        if let Some(marker) = self.pending_start_marker.take() {
-            return self.handle_start_marker(marker);
+        if let Some((marker, len, ws)) = self.pending_start_marker.take() {
+            return self.handle_start_marker(marker, len, ws);
         }
         if self.trim_leading_whitespace {
             self.trim_leading_whitespace = false;
@@ -562,8 +562,8 @@ impl<'s> Tokenizer<'s> {
         }
         let old_loc = self.loc();
         let (lead, span) = match find_start_marker(self.rest, &self.syntax_config) {
-            Some((start, marker, whitespace)) => {
-                self.pending_start_marker = Some(marker);
+            Some((start, marker, len, whitespace)) => {
+                self.pending_start_marker = Some((marker, len, whitespace));
                 match whitespace {
                     Whitespace::Default
                         if should_lstrip_block(self.ws_config.lstrip_blocks, marker) =>
@@ -601,17 +601,9 @@ impl<'s> Tokenizer<'s> {
     fn handle_start_marker(
         &mut self,
         marker: StartMarker,
+        skip: usize,
+        ws: Whitespace,
     ) -> Result<ControlFlow<(Token<'s>, Span)>, Error> {
-        let skip = match marker {
-            StartMarker::Variable => self.syntax_config.variable_delimiters().0.len(),
-            StartMarker::Block => self.block_start().len(),
-            StartMarker::Comment => self.syntax_config.comment_delimiters().0.len(),
-            #[cfg(feature = "custom_syntax")]
-            StartMarker::LineStatement => self
-                .syntax_config
-                .line_statement_prefix()
-                .map_or(0, |x| x.len()),
-        };
         match marker {
             StartMarker::Comment => {
                 if let Some(end) = memstr(&self.rest_bytes()[skip..], self.comment_end().as_bytes())
@@ -628,9 +620,7 @@ impl<'s> Tokenizer<'s> {
             }
             StartMarker::Variable => {
                 let old_loc = self.loc();
-                self.advance(
-                    skip + Whitespace::from_byte(self.rest_bytes().get(skip).copied()).len(),
-                );
+                self.advance(skip + ws.len());
                 self.stack.push(LexerState::Variable);
                 Ok(ControlFlow::Break((
                     Token::VariableStart,
@@ -648,9 +638,7 @@ impl<'s> Tokenizer<'s> {
                     self.handle_raw_tag(ws_start)
                 } else {
                     let old_loc = self.loc();
-                    self.advance(
-                        skip + Whitespace::from_byte(self.rest_bytes().get(skip).copied()).len(),
-                    );
+                    self.advance(skip + ws.len());
                     self.stack.push(LexerState::Block);
                     Ok(ControlFlow::Break((Token::BlockStart, self.span(old_loc))))
                 }
@@ -907,15 +895,15 @@ mod tests {
         assert!(find_start_marker("foo {", &syntax).is_none());
         assert_eq!(
             find_start_marker("foo {{", &syntax),
-            Some((4, StartMarker::Variable, Whitespace::Default))
+            Some((4, StartMarker::Variable, 2, Whitespace::Default))
         );
         assert_eq!(
             find_start_marker("foo {{-", &syntax),
-            Some((4, StartMarker::Variable, Whitespace::Remove))
+            Some((4, StartMarker::Variable, 2, Whitespace::Remove))
         );
         assert_eq!(
             find_start_marker("foo {{+", &syntax),
-            Some((4, StartMarker::Variable, Whitespace::Preserve))
+            Some((4, StartMarker::Variable, 2, Whitespace::Preserve))
         );
     }
 
@@ -931,17 +919,17 @@ mod tests {
 
         assert_eq!(
             find_start_marker("%{", &syntax_config),
-            Some((0, StartMarker::Block, Whitespace::Default))
+            Some((0, StartMarker::Block, 2, Whitespace::Default))
         );
         assert!(find_start_marker("/", &syntax_config).is_none());
         assert!(find_start_marker("foo [", &syntax_config).is_none());
         assert_eq!(
             find_start_marker("foo /*", &syntax_config),
-            Some((4, StartMarker::Comment, Whitespace::Default))
+            Some((4, StartMarker::Comment, 2, Whitespace::Default))
         );
         assert_eq!(
             find_start_marker("foo [[-", &syntax_config),
-            Some((4, StartMarker::Variable, Whitespace::Remove))
+            Some((4, StartMarker::Variable, 2, Whitespace::Remove))
         );
     }
 
