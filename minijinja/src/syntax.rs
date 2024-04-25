@@ -839,7 +839,6 @@ And then a template might look like this instead:
 
 #[cfg(feature = "custom_syntax")]
 mod imp {
-    use crate::compiler::lexer::StartMarker;
     use crate::error::{Error, ErrorKind};
     use aho_corasick::AhoCorasick;
     use std::borrow::Cow;
@@ -933,22 +932,6 @@ mod imp {
             {
                 return Err(ErrorKind::InvalidDelimiter.into());
             }
-            let mut start_delimiters_order = [
-                StartMarker::Variable,
-                StartMarker::Block,
-                StartMarker::Comment,
-                StartMarker::LineStatement,
-            ];
-            start_delimiters_order.sort_by_key(|marker| {
-                std::cmp::Reverse(match marker {
-                    StartMarker::Variable => delims.variable_start.len(),
-                    StartMarker::Block => delims.block_start.len(),
-                    StartMarker::Comment => delims.comment_start.len(),
-                    StartMarker::LineStatement => {
-                        delims.line_statement_prefix.as_ref().map_or(0, |x| x.len())
-                    }
-                })
-            });
             let aho_corasick = ok!(AhoCorasick::builder()
                 .match_kind(aho_corasick::MatchKind::LeftmostLongest)
                 .build(
@@ -963,7 +946,6 @@ mod imp {
                 .map_err(|_| ErrorKind::InvalidDelimiter.into()));
             Ok(SyntaxConfig {
                 delims,
-                start_delimiters_order,
                 aho_corasick: Some(aho_corasick),
             })
         }
@@ -993,7 +975,6 @@ mod imp {
     #[derive(Clone, Debug)]
     pub struct SyntaxConfig {
         delims: Arc<Delims>,
-        pub(crate) start_delimiters_order: [StartMarker; 4],
         pub(crate) aho_corasick: Option<aho_corasick::AhoCorasick>,
     }
 
@@ -1001,12 +982,6 @@ mod imp {
         fn default() -> Self {
             Self {
                 delims: Arc::new(DEFAULT_DELIMS),
-                start_delimiters_order: [
-                    StartMarker::Variable,
-                    StartMarker::Block,
-                    StartMarker::Comment,
-                    StartMarker::LineStatement,
-                ],
                 aho_corasick: None,
             }
         }
