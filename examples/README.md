@@ -12,10 +12,11 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [call-block-function](call-block-function): Shows how to use the `{% call %}` block with a custom function.
 * [custom-loader](custom-loader): shows how to load templates dynamically at runtime with a custom loader.
 * [debug](debug): contains an example showing the built-in `debug()` function.
+* [deserialize](deserialize): demonstrates how you can deserialize directly from a value.
 * [dsl](dsl): shows how to use MiniJinja has a DSL.
 * [dynamic-context](dynamic-context): demonstrates how to use dynamic objects as template context.
 * [dynamic-objects](dynamic-objects): demonstrates how to use dynamic objects in templates.
-* [deserialize](deserialize): demonstrates how you can deserialize directly from a value.
+* [embedding](embedding): shows how to use `minijina-embed` to embed templates optionally into the binary.
 * [error](error): shows the built-in error reporting support.
 * [eval-to-state](eval-to-state): Demonstrates what can be done with evaluating to state.
 * [expr](expr): demonstrates the expression evaluation support.
@@ -23,8 +24,8 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [generate-yaml](generate-yaml): renders YAML files from Jinja templates.
 * [hello](hello): minimal Hello World example.
 * [inheritance](inheritance): demonstrates how to use template inheritance.
-* [embedding](embedding): shows how to use `minijina-embed` to embed templates optionally into the binary.
 * [invalid-value](invalid-value): demonstrates how the engine deals with invalid values.
+* [line-statements](line-statements): Demonstrates the line statements and comment syntax feature.
 * [load-lazy](load-lazy): Demonstrates how to load data lazy on demand.
 * [load-resource](load-resource): Demonstrates how to load files dynamically from disk within templates.
 * [macros](macros): Demonstrates how to use macros and imports.
