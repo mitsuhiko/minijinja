@@ -45,6 +45,8 @@ pub enum StartMarker {
     Comment,
     #[cfg(feature = "custom_syntax")]
     LineStatement,
+    #[cfg(feature = "custom_syntax")]
+    LineComment,
 }
 
 /// What ends this block tokenization?
@@ -202,6 +204,23 @@ fn is_nl(c: char) -> bool {
     c == '\r' || c == '\n'
 }
 
+#[cfg(feature = "custom_syntax")]
+fn skip_nl(mut rest: &str) -> (bool, usize) {
+    let mut skip = 0;
+    let mut was_nl = false;
+    if let Some(new_rest) = rest.strip_prefix('\n') {
+        rest = new_rest;
+        skip += 1;
+        was_nl = true;
+    }
+    if let Some(new_rest) = rest.strip_prefix('\r') {
+        rest = new_rest;
+        skip += 1;
+        was_nl = true;
+    }
+    (was_nl || rest.is_empty(), skip)
+}
+
 fn lstrip_block(s: &str) -> &str {
     let trimmed = s.trim_end_matches(|x: char| x.is_whitespace() && !is_nl(x));
     if trimmed.is_empty() || trimmed.as_bytes().get(trimmed.len() - 1) == Some(&b'\n') {
@@ -217,7 +236,10 @@ fn should_lstrip_block(flag: bool, marker: StartMarker) -> bool {
     }
     #[cfg(feature = "custom_syntax")]
     {
-        if matches!(marker, StartMarker::LineStatement) {
+        if matches!(
+            marker,
+            StartMarker::LineStatement | StartMarker::LineComment
+        ) {
             return true;
         }
     }
@@ -651,6 +673,16 @@ impl<'s> Tokenizer<'s> {
                 self.stack.push(LexerState::LineStatement);
                 Ok(ControlFlow::Break((Token::BlockStart, self.span(old_loc))))
             }
+            #[cfg(feature = "custom_syntax")]
+            StartMarker::LineComment => {
+                let comment_skip = self.rest_bytes()[skip..]
+                    .iter()
+                    .take_while(|&&c| c != b'\r' && c != b'\n')
+                    .count();
+                let (_, nl_skip) = skip_nl(&self.rest()[skip + comment_skip..]);
+                self.advance(skip + comment_skip + nl_skip);
+                Ok(ControlFlow::Continue(()))
+            }
         }
     }
 
@@ -712,28 +744,14 @@ impl<'s> Tokenizer<'s> {
                 && self.paren_balance == 0
                 && self.syntax_config.line_statement_prefix().is_some()
             {
-                let mut skip = rest
+                let skip = rest
                     .chars()
                     .take_while(|&x| x.is_whitespace() && !is_nl(x))
                     .map(|x| x.len_utf8())
                     .sum();
-                let mut rest = &rest[skip..];
-                let mut was_nl = false;
-                if let Some(new_rest) = rest.strip_prefix('\n') {
-                    rest = new_rest;
-                    skip += 1;
-                    was_nl = true;
-                }
-                if let Some(new_rest) = rest.strip_prefix('\r') {
-                    rest = new_rest;
-                    skip += 1;
-                    was_nl = true;
-                }
-                if rest.is_empty() {
-                    was_nl = true;
-                }
+                let (was_nl, nl_skip) = skip_nl(&rest[skip..]);
                 if was_nl {
-                    self.advance(skip);
+                    self.advance(skip + nl_skip);
                     self.stack.pop();
                     return Ok(ControlFlow::Break((Token::BlockEnd, self.span(old_loc))));
                 }

@@ -14,6 +14,7 @@ struct TestSettings {
     trim_blocks: bool,
     markers: Option<[String; 6]>,
     line_statement_prefix: Option<String>,
+    line_comment_prefix: Option<String>,
 }
 
 impl TestSettings {
@@ -27,6 +28,9 @@ impl TestSettings {
         }
         if let Some(prefix) = self.line_statement_prefix {
             builder.line_statement_prefix(prefix);
+        }
+        if let Some(prefix) = self.line_comment_prefix {
+            builder.line_comment_prefix(prefix);
         }
         (
             builder.build().unwrap(),
