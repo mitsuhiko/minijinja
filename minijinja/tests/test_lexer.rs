@@ -13,21 +13,27 @@ struct TestSettings {
     lstrip_blocks: bool,
     trim_blocks: bool,
     markers: Option<[String; 6]>,
+    line_statement_prefix: Option<String>,
+    line_comment_prefix: Option<String>,
 }
 
 impl TestSettings {
     pub fn into_configs(self) -> (SyntaxConfig, WhitespaceConfig) {
+        let mut builder = SyntaxConfig::builder();
+        if let Some(ref markers) = self.markers {
+            builder
+                .block_delimiters(markers[0].to_string(), markers[1].to_string())
+                .variable_delimiters(markers[2].to_string(), markers[3].to_string())
+                .comment_delimiters(markers[4].to_string(), markers[5].to_string());
+        }
+        if let Some(prefix) = self.line_statement_prefix {
+            builder.line_statement_prefix(prefix);
+        }
+        if let Some(prefix) = self.line_comment_prefix {
+            builder.line_comment_prefix(prefix);
+        }
         (
-            if let Some(ref markers) = self.markers {
-                SyntaxConfig::builder()
-                    .block_delimiters(markers[0].to_string(), markers[1].to_string())
-                    .variable_delimiters(markers[2].to_string(), markers[3].to_string())
-                    .comment_delimiters(markers[4].to_string(), markers[5].to_string())
-                    .build()
-                    .unwrap()
-            } else {
-                SyntaxConfig::default()
-            },
+            builder.build().unwrap(),
             WhitespaceConfig {
                 keep_trailing_newline: self.keep_trailing_newline,
                 lstrip_blocks: self.lstrip_blocks,

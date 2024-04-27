@@ -723,7 +723,7 @@
 //!
 #![cfg_attr(
     feature = "custom_syntax",
-    doc = r#"
+    doc = r###"
 # Custom Delimiters
 
 When MiniJinja has been compiled with the `custom_syntax` feature (see
@@ -754,7 +754,62 @@ And then a template might look like this instead:
 \BLOCK{endfor}
 \end{itemize}
 ```
-"#
+
+# Line Statements and Comments
+
+MiniJinja supports line statements and comments like Jinja2 does.  Line statements
+and comments are an alternative syntax feature where blocks can be placed on their
+own line if they are opened with a configured prefix.  They must appear on their own
+line but can be prefixed with whitespace.  Line comments are similar but they can
+also be trailing.  These syntax features need to be configured explicitly.
+There are however small differences with regards to whitespace compared to
+Jinja2.
+
+To use line statements and comments the `custom_syntax` feature needs to be
+enabled and they need to be configured (see [`SyntaxConfig`]).
+
+```
+# use minijinja::{Environment, syntax::SyntaxConfig};
+let mut environment = Environment::new();
+environment.set_syntax(SyntaxConfig::builder()
+    .line_statement_prefix("#")
+    .line_comment_prefix("##")
+    .build()
+    .unwrap()
+);
+```
+
+With the above config you can render a template like this:
+
+```jinja
+## This block is
+## completely removed
+<ul>
+  # for item in [1, 2]
+    ## this is a comment that is also removed including leading whitespace
+    <li>{{ item }}
+  # endfor
+</ul>
+```
+
+Renders into the following HTML:
+
+```html
+<ul>
+    <li>1
+    <li>2
+</ul>
+```
+
+Note that this is slightly different than in Jinja2.  Specifically the following
+rules apply with regards to whitespace:
+
+* line statements remove all whitespace before and after including the newline
+* line comments remove the trailing newline and leading whitespace.
+
+This is different than in Jinja2 where empty lines can remain from line comments.
+Additionally whitespace control is not available for line statements.
+"###
 )]
 //! # Whitespace Control
 //!
@@ -841,7 +896,7 @@ And then a template might look like this instead:
 mod imp {
     use crate::compiler::lexer::StartMarker;
     use crate::error::{Error, ErrorKind};
-    use aho_corasick::AhoCorasick;
+    use aho_corasick::{AhoCorasick, PatternID};
     use std::borrow::Cow;
     use std::sync::Arc;
 
@@ -853,6 +908,8 @@ mod imp {
         variable_end: Cow<'static, str>,
         comment_start: Cow<'static, str>,
         comment_end: Cow<'static, str>,
+        line_statement_prefix: Cow<'static, str>,
+        line_comment_prefix: Cow<'static, str>,
     }
 
     const DEFAULT_DELIMS: Delims = Delims {
@@ -862,7 +919,35 @@ mod imp {
         variable_end: Cow::Borrowed("}}"),
         comment_start: Cow::Borrowed("{#"),
         comment_end: Cow::Borrowed("#}"),
+        line_statement_prefix: Cow::Borrowed(""),
+        line_comment_prefix: Cow::Borrowed(""),
     };
+
+    impl Delims {
+        fn validated_start_delims(&self) -> Result<Vec<&str>, Error> {
+            let mut delims = Vec::with_capacity(5);
+            for (delim, required) in [
+                (&self.variable_start, true),
+                (&self.block_start, true),
+                (&self.comment_start, true),
+                (&self.line_statement_prefix, false),
+                (&self.line_comment_prefix, false),
+            ] {
+                let delim = delim as &str;
+                if delim.is_empty() {
+                    if required {
+                        return Err(ErrorKind::InvalidDelimiter.into());
+                    }
+                } else if delims.contains(&delim) {
+                    return Err(ErrorKind::InvalidDelimiter.into());
+                } else {
+                    delims.push(delim);
+                }
+            }
+
+            Ok(delims)
+        }
+    }
 
     /// Builder helper to reconfigure the syntax.
     ///
@@ -910,40 +995,43 @@ mod imp {
             self
         }
 
+        /// Sets the line statement prefix.
+        ///
+        /// By default this is the empty string which disables the line
+        /// statement prefix feature.
+        pub fn line_statement_prefix<S>(&mut self, s: S) -> &mut Self
+        where
+            S: Into<Cow<'static, str>>,
+        {
+            let delims = Arc::make_mut(&mut self.delims);
+            delims.line_statement_prefix = s.into();
+            self
+        }
+
+        /// Sets the line comment prefix.
+        ///
+        /// By default this is the empty string which disables the line
+        /// comment prefix feature.
+        pub fn line_comment_prefix<S>(&mut self, s: S) -> &mut Self
+        where
+            S: Into<Cow<'static, str>>,
+        {
+            let delims = Arc::make_mut(&mut self.delims);
+            delims.line_comment_prefix = s.into();
+            self
+        }
+
         /// Builds the final syntax config.
         pub fn build(&self) -> Result<SyntaxConfig, Error> {
             let delims = self.delims.clone();
             if *delims == DEFAULT_DELIMS {
                 return Ok(SyntaxConfig::default());
-            } else if delims.block_start == delims.variable_start
-                || delims.block_start == delims.comment_start
-                || delims.variable_start == delims.comment_start
-            {
-                return Err(ErrorKind::InvalidDelimiter.into());
             }
-            let mut start_delimiters_order = [
-                StartMarker::Variable,
-                StartMarker::Block,
-                StartMarker::Comment,
-            ];
-            start_delimiters_order.sort_by_key(|marker| {
-                std::cmp::Reverse(match marker {
-                    StartMarker::Variable => delims.variable_start.len(),
-                    StartMarker::Block => delims.block_start.len(),
-                    StartMarker::Comment => delims.comment_start.len(),
-                })
-            });
             let aho_corasick = ok!(AhoCorasick::builder()
-                .match_kind(aho_corasick::MatchKind::LeftmostLongest)
-                .build([
-                    &delims.variable_start as &str,
-                    &delims.block_start as &str,
-                    &delims.comment_start as &str,
-                ])
+                .build(ok!(delims.validated_start_delims()))
                 .map_err(|_| ErrorKind::InvalidDelimiter.into()));
             Ok(SyntaxConfig {
                 delims,
-                start_delimiters_order,
                 aho_corasick: Some(aho_corasick),
             })
         }
@@ -973,7 +1061,6 @@ mod imp {
     #[derive(Clone, Debug)]
     pub struct SyntaxConfig {
         delims: Arc<Delims>,
-        pub(crate) start_delimiters_order: [StartMarker; 3],
         pub(crate) aho_corasick: Option<aho_corasick::AhoCorasick>,
     }
 
@@ -981,11 +1068,6 @@ mod imp {
         fn default() -> Self {
             Self {
                 delims: Arc::new(DEFAULT_DELIMS),
-                start_delimiters_order: [
-                    StartMarker::Variable,
-                    StartMarker::Block,
-                    StartMarker::Comment,
-                ],
                 aho_corasick: None,
             }
         }
@@ -1017,6 +1099,44 @@ mod imp {
         pub fn comment_delimiters(&self) -> (&str, &str) {
             (&self.delims.comment_start, &self.delims.comment_end)
         }
+
+        /// Returns the line statement prefix.
+        #[inline(always)]
+        pub fn line_statement_prefix(&self) -> Option<&str> {
+            if self.delims.line_statement_prefix.is_empty() {
+                None
+            } else {
+                Some(&self.delims.line_statement_prefix)
+            }
+        }
+
+        /// Returns the line comment prefix.
+        #[inline(always)]
+        pub fn line_comment_prefix(&self) -> Option<&str> {
+            if self.delims.line_comment_prefix.is_empty() {
+                None
+            } else {
+                Some(&self.delims.line_comment_prefix)
+            }
+        }
+
+        /// Reverse resolves the pattern to a start marker.
+        pub(crate) fn pattern_to_marker(&self, pattern: PatternID) -> StartMarker {
+            match pattern.as_usize() {
+                0 => StartMarker::Variable,
+                1 => StartMarker::Block,
+                2 => StartMarker::Comment,
+                3 => {
+                    if self.line_statement_prefix().is_some() {
+                        StartMarker::LineStatement
+                    } else {
+                        StartMarker::LineComment
+                    }
+                }
+                4 => StartMarker::LineComment,
+                _ => unreachable!(),
+            }
+        }
     }
 }
 
@@ -1043,6 +1163,18 @@ mod imp {
         #[inline(always)]
         pub fn comment_delimiters(&self) -> (&str, &str) {
             ("{#", "#}")
+        }
+
+        /// Returns the line statement prefix.
+        #[inline(always)]
+        pub fn line_statement_prefix(&self) -> Option<&str> {
+            None
+        }
+
+        /// Returns the line comment prefix.
+        #[inline(always)]
+        pub fn line_comment_prefix(&self) -> Option<&str> {
+            None
         }
     }
 }
