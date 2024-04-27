@@ -26,7 +26,7 @@ impl TestSettings {
                 .comment_delimiters(markers[4].to_string(), markers[5].to_string());
         }
         if let Some(prefix) = self.line_statement_prefix {
-            builder.line_statement_prefix(Some(prefix));
+            builder.line_statement_prefix(prefix);
         }
         (
             builder.build().unwrap(),

@@ -839,9 +839,11 @@ And then a template might look like this instead:
 
 #[cfg(feature = "custom_syntax")]
 mod imp {
+    use crate::compiler::lexer::StartMarker;
     use crate::error::{Error, ErrorKind};
-    use aho_corasick::AhoCorasick;
+    use aho_corasick::{AhoCorasick, PatternID};
     use std::borrow::Cow;
+    use std::collections::BTreeSet;
     use std::sync::Arc;
 
     #[derive(Debug, PartialEq, Clone)]
@@ -864,6 +866,30 @@ mod imp {
         comment_end: Cow::Borrowed("#}"),
         line_statement_prefix: None,
     };
+
+    impl Delims {
+        fn try_iter_starts(&self) -> Result<impl Iterator<Item = &str>, Error> {
+            let delims =
+                BTreeSet::from([&self.block_start, &self.variable_start, &self.comment_start]);
+            if delims.len() != 3 {
+                return Err(ErrorKind::InvalidDelimiter.into());
+            }
+
+            if let Some(ref line_statement_prefix) = self.line_statement_prefix {
+                if delims.contains(line_statement_prefix) {
+                    return Err(ErrorKind::InvalidDelimiter.into());
+                }
+            }
+
+            Ok([
+                &self.variable_start as &str,
+                &self.block_start as &str,
+                &self.comment_start as &str,
+            ]
+            .into_iter()
+            .chain(self.line_statement_prefix.as_ref().map(|x| x as &str)))
+        }
+    }
 
     /// Builder helper to reconfigure the syntax.
     ///
@@ -912,12 +938,20 @@ mod imp {
         }
 
         /// Sets the line statement prefix.
-        pub fn line_statement_prefix<S>(&mut self, s: Option<S>) -> &mut Self
+        ///
+        /// By default this is the empty string which disables the line
+        /// statement prefix feature.
+        pub fn line_statement_prefix<S>(&mut self, s: S) -> &mut Self
         where
             S: Into<Cow<'static, str>>,
         {
             let delims = Arc::make_mut(&mut self.delims);
-            delims.line_statement_prefix = s.map(Into::into);
+            let s = s.into();
+            if s.is_empty() {
+                delims.line_statement_prefix = None;
+            } else {
+                delims.line_statement_prefix = Some(s);
+            }
             self
         }
 
@@ -926,23 +960,9 @@ mod imp {
             let delims = self.delims.clone();
             if *delims == DEFAULT_DELIMS {
                 return Ok(SyntaxConfig::default());
-            } else if delims.block_start == delims.variable_start
-                || delims.block_start == delims.comment_start
-                || delims.variable_start == delims.comment_start
-            {
-                return Err(ErrorKind::InvalidDelimiter.into());
             }
             let aho_corasick = ok!(AhoCorasick::builder()
-                .match_kind(aho_corasick::MatchKind::LeftmostLongest)
-                .build(
-                    [
-                        &delims.variable_start as &str,
-                        &delims.block_start as &str,
-                        &delims.comment_start as &str,
-                    ]
-                    .into_iter()
-                    .chain(delims.line_statement_prefix.as_ref().map(|x| x as &str))
-                )
+                .build(ok!(delims.try_iter_starts()))
                 .map_err(|_| ErrorKind::InvalidDelimiter.into()));
             Ok(SyntaxConfig {
                 delims,
@@ -1018,6 +1038,17 @@ mod imp {
         #[inline(always)]
         pub fn line_statement_prefix(&self) -> Option<&str> {
             self.delims.line_statement_prefix.as_deref()
+        }
+
+        /// Reverse resolves the pattern to a start marker.
+        pub(crate) fn pattern_to_marker(&self, pattern: PatternID) -> StartMarker {
+            match pattern.as_usize() {
+                0 => StartMarker::Variable,
+                1 => StartMarker::Block,
+                2 => StartMarker::Comment,
+                3 => StartMarker::LineStatement,
+                _ => unreachable!(),
+            }
         }
     }
 }

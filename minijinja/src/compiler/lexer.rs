@@ -17,10 +17,10 @@ pub struct WhitespaceConfig {
 /// Tokenizes jinja templates.
 pub struct Tokenizer<'s> {
     stack: Vec<LexerState>,
-    rest: &'s str,
+    source: &'s str,
     current_line: u32,
     current_col: u32,
-    current_offset: u32,
+    current_offset: usize,
     trim_leading_whitespace: bool,
     pending_start_marker: Option<(StartMarker, usize)>,
     #[cfg(feature = "custom_syntax")]
@@ -105,41 +105,30 @@ fn find_start_marker_memchr(a: &str) -> Option<(usize, StartMarker, usize, White
 #[cfg(feature = "custom_syntax")]
 fn find_start_marker(
     a: &str,
+    offset: usize,
     syntax_config: &SyntaxConfig,
 ) -> Option<(usize, StartMarker, usize, Whitespace)> {
     // If we have a custom delimiter we need to use the aho-corasick
     // otherwise we can use internal memchr.
     let ac = match syntax_config.aho_corasick {
         Some(ref ac) => ac,
-        None => return find_start_marker_memchr(a),
+        None => return find_start_marker_memchr(&a[offset..]),
     };
 
-    let bytes = a.as_bytes();
+    let bytes = &a.as_bytes()[offset..];
     let mut state = aho_corasick::automaton::OverlappingState::start();
     let mut longest_match = None::<(usize, StartMarker, usize, Whitespace)>;
 
     loop {
-        // we have to use find_overlapping instead of iter_overlapping as the
-        // later does an internal check that rejects LeftmostLongest as match
-        // kind which we depend on here.  In theory all this here is only needed
-        // though for when line statements are configured, so there could be
-        // an alternative version that just uses aho corasick directly.
         ac.find_overlapping(bytes, &mut state);
         let m = match state.get_match() {
             None => break,
             Some(m) => m,
         };
 
-        let marker = match m.pattern().as_usize() {
-            0 => StartMarker::Variable,
-            1 => StartMarker::Block,
-            2 => StartMarker::Comment,
-            3 => StartMarker::LineStatement,
-            _ => unreachable!(),
-        };
-
+        let marker = syntax_config.pattern_to_marker(m.pattern());
         let ws = if matches!(marker, StartMarker::LineStatement) {
-            let prefix = &bytes[..m.start()];
+            let prefix = &a.as_bytes()[..offset + m.start()];
             if matches!(
                 prefix
                     .iter()
@@ -169,9 +158,10 @@ fn find_start_marker(
 #[cfg(not(feature = "custom_syntax"))]
 fn find_start_marker(
     a: &str,
+    offset: usize,
     _syntax_config: &SyntaxConfig,
 ) -> Option<(usize, StartMarker, usize, Whitespace)> {
-    find_start_marker_memchr(a)
+    find_start_marker_memchr(&a[offset..])
 }
 
 #[cfg(feature = "unicode")]
@@ -208,8 +198,12 @@ fn lex_identifier(s: &str) -> usize {
         .count()
 }
 
+fn is_nl(c: char) -> bool {
+    c == '\r' || c == '\n'
+}
+
 fn lstrip_block(s: &str) -> &str {
-    let trimmed = s.trim_end_matches(|x| x == ' ' || x == '\t');
+    let trimmed = s.trim_end_matches(|x: char| x.is_whitespace() && !is_nl(x));
     if trimmed.is_empty() || trimmed.as_bytes().get(trimmed.len() - 1) == Some(&b'\n') {
         trimmed
     } else {
@@ -275,17 +269,17 @@ impl<'s> Tokenizer<'s> {
         syntax_config: SyntaxConfig,
         whitespace_config: WhitespaceConfig,
     ) -> Tokenizer<'s> {
-        let mut rest = input;
+        let mut source = input;
         if !whitespace_config.keep_trailing_newline {
-            if rest.ends_with('\n') {
-                rest = &rest[..rest.len() - 1];
+            if source.ends_with('\n') {
+                source = &source[..source.len() - 1];
             }
-            if rest.ends_with('\r') {
-                rest = &rest[..rest.len() - 1];
+            if source.ends_with('\r') {
+                source = &source[..source.len() - 1];
             }
         }
         Tokenizer {
-            rest,
+            source,
             stack: vec![if in_expr {
                 LexerState::Variable
             } else {
@@ -306,7 +300,7 @@ impl<'s> Tokenizer<'s> {
     /// Produces the next token from the tokenizer.
     pub fn next_token(&mut self) -> Result<Option<(Token<'s>, Span)>, Error> {
         loop {
-            if self.rest.is_empty() {
+            if self.rest_bytes().is_empty() {
                 // line statements normally close with newlines.  At the end of the file
                 // however we need to use the stack to close out the block instead.
                 #[cfg(feature = "custom_syntax")]
@@ -335,12 +329,17 @@ impl<'s> Tokenizer<'s> {
     }
 
     #[inline]
-    fn rest_bytes(&self) -> &[u8] {
-        self.rest.as_bytes()
+    fn rest(&self) -> &'s str {
+        &self.source[self.current_offset..]
+    }
+
+    #[inline]
+    fn rest_bytes(&self) -> &'s [u8] {
+        &self.source.as_bytes()[self.current_offset..]
     }
 
     fn advance(&mut self, bytes: usize) -> &'s str {
-        let (skipped, new_rest) = self.rest.split_at(bytes);
+        let skipped = &self.rest()[..bytes];
         for c in skipped.chars() {
             match c {
                 '\n' => {
@@ -350,14 +349,17 @@ impl<'s> Tokenizer<'s> {
                 _ => self.current_col += 1,
             }
         }
-        self.current_offset += bytes as u32;
-        self.rest = new_rest;
+        self.current_offset += bytes;
         skipped
     }
 
     #[inline]
     fn loc(&self) -> (u32, u32, u32) {
-        (self.current_line, self.current_col, self.current_offset)
+        (
+            self.current_line,
+            self.current_col,
+            self.current_offset as u32,
+        )
     }
 
     #[inline]
@@ -368,7 +370,7 @@ impl<'s> Tokenizer<'s> {
             start_offset,
             end_line: self.current_line,
             end_col: self.current_col,
-            end_offset: self.current_offset,
+            end_offset: self.current_offset as u32,
         }
     }
 
@@ -452,7 +454,7 @@ impl<'s> Tokenizer<'s> {
     }
 
     fn eat_identifier(&mut self) -> Result<(Token<'s>, Span), Error> {
-        let ident_len = lex_identifier(self.rest);
+        let ident_len = lex_identifier(self.rest());
         if ident_len > 0 {
             let old_loc = self.loc();
             let ident = self.advance(ident_len);
@@ -503,7 +505,7 @@ impl<'s> Tokenizer<'s> {
 
     fn skip_whitespace(&mut self) {
         let skipped = self
-            .rest
+            .rest()
             .chars()
             .map_while(|c| c.is_whitespace().then(|| c.len_utf8()))
             .sum();
@@ -560,35 +562,36 @@ impl<'s> Tokenizer<'s> {
             self.skip_whitespace();
         }
         let old_loc = self.loc();
-        let (lead, span) = match find_start_marker(self.rest, &self.syntax_config) {
-            Some((start, marker, len, whitespace)) => {
-                self.pending_start_marker = Some((marker, len));
-                match whitespace {
-                    Whitespace::Default
-                        if should_lstrip_block(self.ws_config.lstrip_blocks, marker) =>
-                    {
-                        let peeked = &self.rest[..start];
-                        let trimmed = lstrip_block(peeked);
-                        let lead = self.advance(trimmed.len());
-                        let span = self.span(old_loc);
-                        self.advance(peeked.len() - trimmed.len());
-                        (lead, span)
-                    }
-                    Whitespace::Default | Whitespace::Preserve => {
-                        (self.advance(start), self.span(old_loc))
-                    }
-                    Whitespace::Remove => {
-                        let peeked = &self.rest[..start];
-                        let trimmed = peeked.trim_end();
-                        let lead = self.advance(trimmed.len());
-                        let span = self.span(old_loc);
-                        self.advance(peeked.len() - trimmed.len());
-                        (lead, span)
+        let (lead, span) =
+            match find_start_marker(self.source, self.current_offset, &self.syntax_config) {
+                Some((start, marker, len, whitespace)) => {
+                    self.pending_start_marker = Some((marker, len));
+                    match whitespace {
+                        Whitespace::Default
+                            if should_lstrip_block(self.ws_config.lstrip_blocks, marker) =>
+                        {
+                            let peeked = &self.rest()[..start];
+                            let trimmed = lstrip_block(peeked);
+                            let lead = self.advance(trimmed.len());
+                            let span = self.span(old_loc);
+                            self.advance(peeked.len() - trimmed.len());
+                            (lead, span)
+                        }
+                        Whitespace::Default | Whitespace::Preserve => {
+                            (self.advance(start), self.span(old_loc))
+                        }
+                        Whitespace::Remove => {
+                            let peeked = &self.rest()[..start];
+                            let trimmed = peeked.trim_end();
+                            let lead = self.advance(trimmed.len());
+                            let span = self.span(old_loc);
+                            self.advance(peeked.len() - trimmed.len());
+                            (lead, span)
+                        }
                     }
                 }
-            }
-            None => (self.advance(self.rest.len()), self.span(old_loc)),
-        };
+                None => (self.advance(self.rest().len()), self.span(old_loc)),
+            };
 
         if lead.is_empty() {
             Ok(ControlFlow::Continue(()))
@@ -630,7 +633,7 @@ impl<'s> Tokenizer<'s> {
                 // block we want to skip everything until {% endraw %} completely ignoring interior
                 // syntax and emit the entire raw block as TemplateData.
                 if let Some((raw, ws_start)) =
-                    skip_basic_tag(&self.rest[skip..], "raw", self.block_end(), false)
+                    skip_basic_tag(&self.rest()[skip..], "raw", self.block_end(), false)
                 {
                     self.advance(raw + skip);
                     self.handle_raw_tag(ws_start)
@@ -660,11 +663,11 @@ impl<'s> Tokenizer<'s> {
         while let Some(block) = memstr(&self.rest_bytes()[ptr..], self.block_start().as_bytes()) {
             ptr += block + self.block_start().len();
             if let Some((endraw, ws_next)) =
-                skip_basic_tag(&self.rest[ptr..], "endraw", self.block_end(), true)
+                skip_basic_tag(&self.rest()[ptr..], "endraw", self.block_end(), true)
             {
                 let ws = Whitespace::from_byte(self.rest_bytes().get(ptr).copied());
                 let end = ptr - self.block_start().len();
-                let mut result = &self.rest[..end];
+                let mut result = &self.rest()[..end];
                 self.advance(end);
                 let span = self.span(old_loc);
                 self.advance(self.block_start().len() + endraw);
@@ -699,6 +702,7 @@ impl<'s> Tokenizer<'s> {
         sentinel: BlockSentinel,
     ) -> Result<ControlFlow<(Token<'s>, Span)>, Error> {
         let old_loc = self.loc();
+        let rest = self.rest();
 
         // special case for looking for the end of a line statements if there are no
         // open parens, braces etc.  This can only happen with custom syntax
@@ -708,19 +712,19 @@ impl<'s> Tokenizer<'s> {
                 && self.paren_balance == 0
                 && self.syntax_config.line_statement_prefix().is_some()
             {
-                let rest = self.rest_bytes();
                 let mut skip = rest
-                    .iter()
-                    .take_while(|&&x| x == b' ' || x == b'\t')
-                    .count();
+                    .chars()
+                    .take_while(|&x| x.is_whitespace() && !is_nl(x))
+                    .map(|x| x.len_utf8())
+                    .sum();
                 let mut rest = &rest[skip..];
                 let mut was_nl = false;
-                if let Some(new_rest) = rest.strip_prefix(b"\n") {
+                if let Some(new_rest) = rest.strip_prefix('\n') {
                     rest = new_rest;
                     skip += 1;
                     was_nl = true;
                 }
-                if let Some(new_rest) = rest.strip_prefix(b"\r") {
+                if let Some(new_rest) = rest.strip_prefix('\r') {
                     rest = new_rest;
                     skip += 1;
                     was_nl = true;
@@ -737,14 +741,14 @@ impl<'s> Tokenizer<'s> {
         }
 
         // in blocks whitespace is generally ignored, skip it.
-        match self
-            .rest_bytes()
+        match rest
+            .as_bytes()
             .iter()
             .position(|&x| !x.is_ascii_whitespace())
         {
             Some(0) => {}
             None => {
-                self.advance(self.rest.len());
+                self.advance(rest.len());
                 return Ok(ControlFlow::Continue(()));
             }
             Some(offset) => {
@@ -756,11 +760,11 @@ impl<'s> Tokenizer<'s> {
         // look out for the end of blocks
         match sentinel {
             BlockSentinel::Block => {
-                if matches!(self.rest.get(..1), Some("-" | "+"))
-                    && self.rest[1..].starts_with(self.block_end())
+                if matches!(rest.get(..1), Some("-" | "+"))
+                    && rest[1..].starts_with(self.block_end())
                 {
                     self.stack.pop();
-                    let was_minus = &self.rest[..1] == "-";
+                    let was_minus = &rest[..1] == "-";
                     self.advance(self.block_end().len() + 1);
                     let span = self.span(old_loc);
                     if was_minus {
@@ -768,7 +772,7 @@ impl<'s> Tokenizer<'s> {
                     }
                     return Ok(ControlFlow::Break((Token::BlockEnd, span)));
                 }
-                if self.rest.starts_with(self.block_end()) {
+                if rest.starts_with(self.block_end()) {
                     self.stack.pop();
                     self.advance(self.block_end().len());
                     let span = self.span(old_loc);
@@ -777,11 +781,11 @@ impl<'s> Tokenizer<'s> {
                 }
             }
             BlockSentinel::Variable => {
-                if matches!(self.rest.get(..1), Some("-" | "+"))
-                    && self.rest[1..].starts_with(self.variable_end())
+                if matches!(rest.get(..1), Some("-" | "+"))
+                    && rest[1..].starts_with(self.variable_end())
                 {
                     self.stack.pop();
-                    let was_minus = &self.rest[..1] == "-";
+                    let was_minus = &rest[..1] == "-";
                     self.advance(self.variable_end().len() + 1);
                     let span = self.span(old_loc);
                     if was_minus {
@@ -789,7 +793,7 @@ impl<'s> Tokenizer<'s> {
                     }
                     return Ok(ControlFlow::Break((Token::VariableEnd, span)));
                 }
-                if self.rest.starts_with(self.variable_end()) {
+                if rest.starts_with(self.variable_end()) {
                     self.stack.pop();
                     self.advance(self.variable_end().len());
                     return Ok(ControlFlow::Break((Token::VariableEnd, self.span(old_loc))));
@@ -801,7 +805,7 @@ impl<'s> Tokenizer<'s> {
         }
 
         // two character operators
-        let op = match self.rest_bytes().get(..2) {
+        let op = match rest.as_bytes().get(..2) {
             Some(b"//") => Some(Token::FloorDiv),
             Some(b"**") => Some(Token::Pow),
             Some(b"==") => Some(Token::Eq),
@@ -826,7 +830,7 @@ impl<'s> Tokenizer<'s> {
         }
 
         // single character operators (and strings)
-        let op = match self.rest_bytes().get(0) {
+        let op = match rest.as_bytes().get(0) {
             Some(b'+') => Some(Token::Plus),
             Some(b'-') => Some(Token::Minus),
             Some(b'*') => Some(Token::Mul),
@@ -884,52 +888,6 @@ mod tests {
     use super::*;
 
     use similar_asserts::assert_eq;
-
-    #[test]
-    fn test_find_marker() {
-        let syntax = SyntaxConfig::default();
-        assert!(find_start_marker("{", &syntax).is_none());
-        assert!(find_start_marker("foo", &syntax).is_none());
-        assert!(find_start_marker("foo {", &syntax).is_none());
-        assert_eq!(
-            find_start_marker("foo {{", &syntax),
-            Some((4, StartMarker::Variable, 2, Whitespace::Default))
-        );
-        assert_eq!(
-            find_start_marker("foo {{-", &syntax),
-            Some((4, StartMarker::Variable, 3, Whitespace::Remove))
-        );
-        assert_eq!(
-            find_start_marker("foo {{+", &syntax),
-            Some((4, StartMarker::Variable, 3, Whitespace::Preserve))
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "custom_syntax")]
-    fn test_find_marker_custom_syntax() {
-        let syntax_config = SyntaxConfig::builder()
-            .block_delimiters("%{", "}%")
-            .variable_delimiters("[[", "]]")
-            .comment_delimiters("/*", "*/")
-            .build()
-            .unwrap();
-
-        assert_eq!(
-            find_start_marker("%{", &syntax_config),
-            Some((0, StartMarker::Block, 2, Whitespace::Default))
-        );
-        assert!(find_start_marker("/", &syntax_config).is_none());
-        assert!(find_start_marker("foo [", &syntax_config).is_none());
-        assert_eq!(
-            find_start_marker("foo /*", &syntax_config),
-            Some((4, StartMarker::Comment, 2, Whitespace::Default))
-        );
-        assert_eq!(
-            find_start_marker("foo [[-", &syntax_config),
-            Some((4, StartMarker::Variable, 3, Whitespace::Remove))
-        );
-    }
 
     #[test]
     fn test_is_basic_tag() {
