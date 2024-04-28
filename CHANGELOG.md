@@ -58,6 +58,7 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
   Previously this behavior was hidden internally in the serde support. #495
 - `UndefinedBehavior::Strict` now acts more delayed.  This means that now `value.key is defined`
 - Added support for line statements and comments.  #503 
+- The CLI now accepts `--syntax` to reconfigure syntax flags such as delimiters.  #504
 
 ## 1.0.21
 
