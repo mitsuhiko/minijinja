@@ -315,3 +315,29 @@ def test_trim_and_lstrip_blocks():
     assert env.render_str("  {% if true %}\nfoo{% endif %}") == "  \nfoo"
     env = Environment(lstrip_blocks=True, trim_blocks=True)
     assert env.render_str("  {% if true %}\nfoo{% endif %}") == "foo"
+
+
+def test_line_statements():
+    env = Environment()
+    assert env.line_statement_prefix is None
+    assert env.line_comment_prefix is None
+
+    env = Environment(line_statement_prefix="#", line_comment_prefix="##")
+    assert env.line_statement_prefix == "#"
+    assert env.line_comment_prefix == "##"
+
+    rv = env.render_str("# for x in range(3)\n{{ x }}\n# endfor")
+    assert rv == "0\n1\n2\n"
+
+
+def test_custom_delimiters():
+    env = Environment(
+        variable_start_string="${",
+        variable_end_string="}",
+        block_start_string="<%",
+        block_end_string="%>",
+        comment_start_string="<!--",
+        comment_end_string="-->",
+    )
+    rv = env.render_str('<% if true %>${ value }<% endif %><!-- nothing -->', value=42)
+    assert rv == '42'

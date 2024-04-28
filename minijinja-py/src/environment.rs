@@ -28,6 +28,8 @@ struct Syntax {
     variable_end: String,
     comment_start: String,
     comment_end: String,
+    line_statement_prefix: String,
+    line_comment_prefix: String,
 }
 
 impl Default for Syntax {
@@ -37,8 +39,10 @@ impl Default for Syntax {
             block_end: "%}".into(),
             variable_start: "{{".into(),
             variable_end: "}}".into(),
-            comment_start: "{%".into(),
-            comment_end: "%}".into(),
+            comment_start: "{#".into(),
+            comment_end: "#}".into(),
+            line_statement_prefix: "".into(),
+            line_comment_prefix: "".into(),
         }
     }
 }
@@ -48,6 +52,8 @@ impl Syntax {
             .block_delimiters(self.block_start.clone(), self.block_end.clone())
             .variable_delimiters(self.variable_start.clone(), self.variable_end.clone())
             .comment_delimiters(self.comment_start.clone(), self.comment_end.clone())
+            .line_statement_prefix(self.line_statement_prefix.clone())
+            .line_comment_prefix(self.line_comment_prefix.clone())
             .build()
     }
 }
@@ -534,6 +540,28 @@ impl Environment {
     #[getter]
     pub fn get_comment_end_string(&self) -> String {
         syntax_getter!(self, comment_end, "#}")
+    }
+
+    #[setter]
+    pub fn set_line_statement_prefix(&self, value: Option<String>) -> PyResult<()> {
+        syntax_setter!(self, value.unwrap_or_default(), line_statement_prefix, "")
+    }
+
+    #[getter]
+    pub fn get_line_statement_prefix(&self) -> Option<String> {
+        let rv: String = syntax_getter!(self, line_statement_prefix, "");
+        (!rv.is_empty()).then_some(rv)
+    }
+
+    #[setter]
+    pub fn set_line_comment_prefix(&self, value: Option<String>) -> PyResult<()> {
+        syntax_setter!(self, value.unwrap_or_default(), line_comment_prefix, "")
+    }
+
+    #[getter]
+    pub fn get_line_comment_prefix(&self) -> Option<String> {
+        let rv: String = syntax_getter!(self, line_comment_prefix, "");
+        (!rv.is_empty()).then_some(rv)
     }
 
     /// Configures the trailing newline trimming feature.

@@ -939,6 +939,7 @@ mod imp {
                         return Err(ErrorKind::InvalidDelimiter.into());
                     }
                 } else if delims.contains(&delim) {
+                    dbg!(&delims, delim);
                     return Err(ErrorKind::InvalidDelimiter.into());
                 } else {
                     delims.push(delim);
