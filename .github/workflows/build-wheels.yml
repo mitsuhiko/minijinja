@@ -1,6 +1,9 @@
 name: Build Wheels
 
-on: [pull_request]
+on:
+  push:
+    tags: "*"
+  workflow_dispatch:
 
 jobs:
   macos:
