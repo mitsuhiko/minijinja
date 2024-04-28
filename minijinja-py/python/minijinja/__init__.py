@@ -41,6 +41,8 @@ class Environment(_lowlevel.Environment):
         variable_end_string="}}",
         comment_start_string="{#",
         comment_end_string="#}",
+        line_statement_prefix=None,
+        line_comment_prefix=None,
     ):
         super().__init__()
         if loader is not None:
@@ -85,6 +87,8 @@ class Environment(_lowlevel.Environment):
         self.variable_end_string = variable_end_string
         self.comment_start_string = comment_start_string
         self.comment_end_string = comment_end_string
+        self.line_statement_prefix = line_statement_prefix
+        self.line_comment_prefix = line_comment_prefix
 
 
 DEFAULT_ENVIRONMENT = Environment()
