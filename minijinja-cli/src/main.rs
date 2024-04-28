@@ -10,6 +10,7 @@ use clap::ArgMatches;
 use minijinja::machinery::{
     get_compiled_template, parse, tokenize, Instructions, WhitespaceConfig,
 };
+use minijinja::syntax::SyntaxConfig;
 use minijinja::{
     context, AutoEscape, Environment, Error as MError, ErrorKind, UndefinedBehavior, Value,
 };
@@ -163,15 +164,59 @@ fn interpret_raw_value(s: &str) -> Result<Value, Error> {
         .with_context(|| format!("invalid raw value '{}' (not valid {})", s, imp::FMT))
 }
 
+fn make_syntax(matches: &ArgMatches) -> Result<SyntaxConfig, Error> {
+    let mut iter = matches.get_many::<String>("syntax");
+
+    let mut f_block_start = "{%".to_string();
+    let mut f_block_end = "%}".to_string();
+    let mut f_variable_start = "{{".to_string();
+    let mut f_variable_end = "}}".to_string();
+    let mut f_comment_start = "{#".to_string();
+    let mut f_comment_end = "#}".to_string();
+    let mut f_line_statement_prefix = "".to_string();
+    let mut f_line_comment_prefix = "".to_string();
+
+    if let Some(ref mut iter) = iter {
+        for pair in iter {
+            let (key, value) = pair
+                .split_once('=')
+                .ok_or_else(|| anyhow!("syntax feature needs to be a key=value pair"))?;
+
+            *match key {
+                "block-start" => &mut f_block_start,
+                "block-end" => &mut f_block_end,
+                "variable-start" => &mut f_variable_start,
+                "variable-end" => &mut f_variable_end,
+                "comment-start" => &mut f_comment_start,
+                "comment-end" => &mut f_comment_end,
+                "line-statement-prefix" => &mut f_line_statement_prefix,
+                "line-comment-prefix" => &mut f_line_comment_prefix,
+                _ => bail!("unknown syntax feature '{}'", key),
+            } = value.to_string();
+        }
+    }
+
+    SyntaxConfig::builder()
+        .block_delimiters(f_block_start, f_block_end)
+        .variable_delimiters(f_variable_start, f_variable_end)
+        .comment_delimiters(f_comment_start, f_comment_end)
+        .line_statement_prefix(f_line_statement_prefix)
+        .line_comment_prefix(f_line_comment_prefix)
+        .build()
+        .context("could not configure syntax")
+}
+
 fn create_env(
     matches: &ArgMatches,
     cwd: PathBuf,
     allowed_template: Option<String>,
     safe_paths: Vec<PathBuf>,
     stdin_used_for_data: bool,
+    syntax: SyntaxConfig,
 ) -> Environment<'static> {
     let mut env = Environment::new();
     env.set_debug(true);
+    env.set_syntax(syntax);
 
     if let Some(fuel) = matches.get_one::<u64>("fuel") {
         if *fuel > 0 {
@@ -352,7 +397,15 @@ fn execute() -> Result<i32, Error> {
 
     let no_newline = matches.get_flag("no-newline");
 
-    let env = create_env(&matches, cwd, allowed_template, safe_paths, stdin_used);
+    let syntax = make_syntax(&matches)?;
+    let env = create_env(
+        &matches,
+        cwd,
+        allowed_template,
+        safe_paths,
+        stdin_used,
+        syntax,
+    );
 
     if let Some(expr) = matches.get_one::<String>("expr") {
         let rv = env.compile_expression(expr)?.eval(ctx)?;
