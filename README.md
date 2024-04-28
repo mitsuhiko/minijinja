@@ -74,6 +74,16 @@ fn main() {
 If you are stuck with `MiniJinja`, have suggestions or need help, you can use the
 [GitHub Discussions](https://github.com/mitsuhiko/minijinja/discussions).
 
+## Upgrading from MiniJinja 1.x
+
+There are two major versions of MiniJinja both of which are currently maintained.  Most users should
+upgrade to 2.x which has a much improved object system.  However if you have been using dynamic
+objects in the past the upgrade might be quite involved.  For upgrade informations refer to
+[UPDATING](UPDATING.md) which has a guide with examples of what the changes between the two engine
+versions are.
+
+To see examples and code from MiniJinja 1.x, you can browse the [minijinja-1.x branch](https://github.com/mitsuhiko/minijinja/tree/minijinja-1.x).
+
 ## Related Crates
 
 * [minijinja-autoreload](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-autoreload): provides
