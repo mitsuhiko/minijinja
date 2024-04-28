@@ -4,7 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## 2.0.1
 
-- Fixed an issue that caused custom delimiters to not work in the Python binding.
+- Fixed an issue that caused custom delimiters to not work in the Python
+  binding.  #506
 
 ## 2.0.0
 
