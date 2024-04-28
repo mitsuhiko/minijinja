@@ -1,6 +1,6 @@
 [package]
 name = "minijinja-contrib"
-version = "2.0.0-alpha.0"
+version = "2.0.0"
 edition = "2018"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
@@ -21,12 +21,12 @@ datetime = ["time"]
 timezone = ["time-tz"]
 
 [dependencies]
-minijinja = { version = "2.0.0-alpha.0", path = "../minijinja", default-features = false }
+minijinja = { version = "2.0.0", path = "../minijinja", default-features = false }
 serde = "1.0.164"
 time = { version = "0.3.22", optional = true, features = ["serde", "formatting", "parsing"] }
 time-tz = { version = "1.0.3", features = ["db"], optional = true }
 
 [dev-dependencies]
 chrono = { version = "0.4.26", features = ["serde"] }
-minijinja = { version = "2.0.0-alpha.0", path = "../minijinja", features = ["loader"] }
+minijinja = { version = "2.0.0", path = "../minijinja", features = ["loader"] }
 similar-asserts = "1.4.2"
