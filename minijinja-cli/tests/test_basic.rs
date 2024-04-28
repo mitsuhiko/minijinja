@@ -395,3 +395,26 @@ fn test_stdin_template() {
     ----- stderr -----
     "###);
 }
+
+#[test]
+fn test_line_statement() {
+    let tmpl = file_with_contents("# for item in seq\n  {{ item }}\n# endfor");
+    let input = file_with_contents_and_ext(r#"{"seq": [1, 2, 3]}"#, ".json");
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg("-sline-statement-prefix=#")
+            .arg("--no-newline")
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+      1
+      2
+      3
+
+    ----- stderr -----
+    "###);
+}

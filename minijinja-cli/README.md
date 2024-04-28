@@ -71,6 +71,16 @@ can be set to stdin at once.
     enables strict mode.  Undefined variables will then error upon rendering.
 - `--no-include`:
     disallows including or extending of templates from the file system.
+- `--no-newline`:
+    Do not output a trailing newline
+- `--trim-blocks`:
+    Enable the trim_blocks flag
+- `--lstrip-blocks`:
+    Enable the lstrip_blocks flag
+- `-s`, `--syntax <PAIR>`:
+    Changes a syntax feature (feature=value) [possible features: `block-start`, `block-end`, `variable-start`, `variable-end`, `comment-start`, `comment-end`, `line-statement-prefix`, `line-statement-comment`]
+- `--safe-path <PATH>`:
+    Only allow includes from this path. Can be used multiple times.
 - `--env`:
     passes the environment variables to the template in the variable `ENV`
 - `-E`, `--expr` `<EXPR>`:

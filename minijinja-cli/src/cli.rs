@@ -26,9 +26,13 @@ pub(super) fn make_command() -> Command {
                 .action(ArgAction::Append),
             arg!(--strict "disallow undefined variables in templates"),
             arg!(--"no-include" "Disallow includes and extending"),
-            arg!(--"no-newline" "Do not output a newline"),
+            arg!(--"no-newline" "Do not output a trailing newline"),
             arg!(--"trim-blocks" "Enable the trim_blocks flag"),
             arg!(--"lstrip-blocks" "Enable the lstrip_blocks flag"),
+            arg!(-s --syntax <PAIR>... "Changes a syntax feature (feature=value) \
+                [possible features: block-start, block-end, variable-start, variable-end, \
+                comment-start, comment-end, line-statement-prefix, \
+                line-statement-comment]"),
             arg!(--"safe-path" <PATH>... "Only allow includes from this path. Can be used multiple times.")
                 .conflicts_with("no-include")
                 .value_parser(value_parser!(PathBuf)),
