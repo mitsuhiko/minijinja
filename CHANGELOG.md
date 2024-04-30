@@ -61,7 +61,7 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
   was raised to 100000. #493
 - `Value::from` is now implemented for `Error` as public API to create invalid values.
   Previously this behavior was hidden internally in the serde support. #495
-- `UndefinedBehavior::Strict` now acts more delayed.  This means that now `value.key is defined`
+- `UndefinedBehavior::Strict` now acts more delayed.  This means that now `value.key is defined` will no longer fail.
 - Added support for line statements and comments.  #503 
 - The CLI now accepts `--syntax` to reconfigure syntax flags such as delimiters.  #504
 
