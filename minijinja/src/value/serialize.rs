@@ -123,9 +123,9 @@ impl Serializer for ValueSerializer {
         Ok(ValueRepr::None.into())
     }
 
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Value, InvalidValue>
+    fn serialize_some<T>(self, value: &T) -> Result<Value, InvalidValue>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         Ok(transform(value))
     }
@@ -156,18 +156,18 @@ impl Serializer for ValueSerializer {
         }
     }
 
-    fn serialize_newtype_struct<T: ?Sized>(
+    fn serialize_newtype_struct<T>(
         self,
         _name: &'static str,
         value: &T,
     ) -> Result<Value, InvalidValue>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         Ok(transform(value))
     }
 
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
         _name: &'static str,
         _variant_index: u32,
@@ -175,7 +175,7 @@ impl Serializer for ValueSerializer {
         value: &T,
     ) -> Result<Value, InvalidValue>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         let mut map = value_map_with_capacity(1);
         map.insert(variant.into(), transform(value));
@@ -256,9 +256,9 @@ impl ser::SerializeSeq for SerializeSeq {
     type Ok = Value;
     type Error = InvalidValue;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValue>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), InvalidValue>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.elements.push(transform(value));
         Ok(())
@@ -277,9 +277,9 @@ impl ser::SerializeTuple for SerializeTuple {
     type Ok = Value;
     type Error = InvalidValue;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValue>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), InvalidValue>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.elements.push(transform(value));
         Ok(())
@@ -298,9 +298,9 @@ impl ser::SerializeTupleStruct for SerializeTupleStruct {
     type Ok = Value;
     type Error = InvalidValue;
 
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValue>
+    fn serialize_field<T>(&mut self, value: &T) -> Result<(), InvalidValue>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.fields.push(transform(value));
         Ok(())
@@ -320,9 +320,9 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
     type Ok = Value;
     type Error = InvalidValue;
 
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValue>
+    fn serialize_field<T>(&mut self, value: &T) -> Result<(), InvalidValue>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.fields.push(transform(value));
         Ok(())
@@ -344,9 +344,9 @@ impl ser::SerializeMap for SerializeMap {
     type Ok = Value;
     type Error = InvalidValue;
 
-    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), InvalidValue>
+    fn serialize_key<T>(&mut self, key: &T) -> Result<(), InvalidValue>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         match key.serialize(ValueSerializer) {
             Ok(key) => self.key = Some(key),
@@ -355,9 +355,9 @@ impl ser::SerializeMap for SerializeMap {
         Ok(())
     }
 
-    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), InvalidValue>
+    fn serialize_value<T>(&mut self, value: &T) -> Result<(), InvalidValue>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         if let Some(key) = self.key.take() {
             self.entries.insert(key, transform(value));
@@ -369,14 +369,10 @@ impl ser::SerializeMap for SerializeMap {
         Ok(Value::from_object(self.entries))
     }
 
-    fn serialize_entry<K: ?Sized, V: ?Sized>(
-        &mut self,
-        key: &K,
-        value: &V,
-    ) -> Result<(), InvalidValue>
+    fn serialize_entry<K, V>(&mut self, key: &K, value: &V) -> Result<(), InvalidValue>
     where
-        K: Serialize,
-        V: Serialize,
+        K: Serialize + ?Sized,
+        V: Serialize + ?Sized,
     {
         if let Ok(key) = key.serialize(ValueSerializer) {
             self.entries.insert(key, transform(value));
@@ -393,13 +389,9 @@ impl ser::SerializeStruct for SerializeStruct {
     type Ok = Value;
     type Error = InvalidValue;
 
-    fn serialize_field<T: ?Sized>(
-        &mut self,
-        key: &'static str,
-        value: &T,
-    ) -> Result<(), InvalidValue>
+    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), InvalidValue>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.fields.insert(key.into(), transform(value));
         Ok(())
@@ -419,13 +411,9 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
     type Ok = Value;
     type Error = InvalidValue;
 
-    fn serialize_field<T: ?Sized>(
-        &mut self,
-        key: &'static str,
-        value: &T,
-    ) -> Result<(), InvalidValue>
+    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), InvalidValue>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.map.insert(key.into(), transform(value));
         Ok(())
