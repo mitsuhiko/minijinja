@@ -1249,8 +1249,8 @@ impl Value {
     ///
     /// This is basically the "reverse" of [`from_object`](Self::from_object)
     /// and [`from_dyn_object`](Self::from_dyn_object). It's also a shortcut for
-    /// [`downcast_ref`](trait.Object.html#method.downcast_ref) on the return
-    /// value of [`as_object`](Self::as_object).
+    /// [`downcast_ref`](DynObject::downcast_ref) on the return value of
+    /// [`as_object`](Self::as_object).
     ///
     /// # Example
     ///
