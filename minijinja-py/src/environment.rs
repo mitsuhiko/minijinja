@@ -403,7 +403,7 @@ impl Environment {
             }
         };
         let mut inner = self.inner.lock().unwrap();
-        inner.loader = callback.clone();
+        inner.loader.clone_from(&callback);
 
         if let Some(callback) = callback {
             inner.env.set_loader(move |name| {

@@ -154,7 +154,7 @@ fn visit_dirs(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io::Result<()> {
 }
 
 #[doc(hidden)]
-pub fn _embed_templates<P: AsRef<Path>>(path: P, extensions: &[&str]) -> String
+pub fn _embed_templates<P>(path: P, extensions: &[&str]) -> String
 where
     P: AsRef<Path>,
 {
