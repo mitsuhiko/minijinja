@@ -1247,11 +1247,10 @@ impl Value {
 
     /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
     ///
-    /// This is basically the "reverse" of [`from_object`](Self::from_object),
-    /// [`from_object`](Self::from_object) and
-    /// [`from_object`](Self::from_object). It's also a shortcut for
-    /// [`downcast_ref`](trait.Object.html#method.downcast_ref) on the return
-    /// value of [`as_object`](Self::as_object).
+    /// This is basically the "reverse" of [`from_object`](Self::from_object)
+    /// and [`from_dyn_object`](Self::from_dyn_object). It's also a shortcut for
+    /// [`downcast_ref`](DynObject::downcast_ref) on the return value of
+    /// [`as_object`](Self::as_object).
     ///
     /// # Example
     ///
