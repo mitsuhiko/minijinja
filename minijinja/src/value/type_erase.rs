@@ -8,7 +8,7 @@ macro_rules! type_erase {
         $(
             impl $impl_name:path {
                 $(
-                    fn $f_impl:ident[$f_impl_vtable:ident](
+                    fn $f_impl:ident(
                         &self $(, $p_impl:ident: $t_impl:ty $(,)?)*
                     ) $(-> $r_impl:ty)?;
                 )*
@@ -24,7 +24,7 @@ macro_rules! type_erase {
         const _: () = {
             struct VTable {
                 $($f: fn(*const (), $($p: $t),*) $(-> $r)?,)*
-                $($($f_impl_vtable: fn(*const (), $($p_impl: $t_impl),*) $(-> $r_impl)?,)*)*
+                $($($f_impl: fn(*const (), $($p_impl: $t_impl),*) $(-> $r_impl)?,)*)*
                 __type_id: fn() -> std::any::TypeId,
                 __type_name: fn() -> &'static str,
                 __drop: fn(*const ()),
@@ -49,7 +49,7 @@ macro_rules! type_erase {
                             },
                         )*
                         $($(
-                            $f_impl_vtable: |ptr, $($p_impl),*| unsafe {
+                            $f_impl: |ptr, $($p_impl),*| unsafe {
                                 let arc = std::sync::Arc::<T>::from_raw(ptr as *const T);
                                 let v = <T as $impl_name>::$f_impl(&*arc, $($p_impl),*);
                                 std::mem::forget(arc);
@@ -147,7 +147,7 @@ macro_rules! type_erase {
                 impl $impl_name for $erased_t_name {
                     $(
                         fn $f_impl(&self, $($p_impl: $t_impl),*) $(-> $r_impl)? {
-                            (vt(self).$f_impl_vtable)(self.ptr, $($p_impl),*)
+                            (vt(self).$f_impl)(self.ptr, $($p_impl),*)
                         }
                     )*
                 }
