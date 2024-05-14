@@ -3,47 +3,47 @@
 /// This is used in the engine to create a `DynObject` for an `Object`.
 /// For the exact use of this look at where the macro is invoked.
 macro_rules! type_erase {
-    ($v:vis trait $T:ident => $ErasedT:ident {
-        $(fn $f:ident(&self $(, $p:ident: $t:ty $(,)?)*) $(-> $R:ty)?;)*
+    ($v:vis trait $t_name:ident => $erased_t_name:ident {
+        $(fn $f:ident(&self $(, $p:ident: $t:ty $(,)?)*) $(-> $r:ty)?;)*
         $(
-            impl $Trait:path {
+            impl $impl_name:path {
                 $(
                     fn $f_impl:ident[$f_impl_vtable:ident](
                         &self $(, $p_impl:ident: $t_impl:ty $(,)?)*
-                    ) $(-> $R_:ty)?;
+                    ) $(-> $r_impl:ty)?;
                 )*
             }
         )*
     }) => {
-        #[doc = concat!("Type-erased version of [`", stringify!($T), "`]")]
-        $v struct $ErasedT {
+        #[doc = concat!("Type-erased version of [`", stringify!($t_name), "`]")]
+        $v struct $erased_t_name {
             ptr: *const (),
             vtable: *const (),
         }
 
         const _: () = {
             struct VTable {
-                $($f: fn(*const (), $($p: $t),*) $(-> $R)?,)*
-                $($($f_impl_vtable: fn(*const (), $($p_impl: $t_impl),*) $(-> $R_)?,)*)*
+                $($f: fn(*const (), $($p: $t),*) $(-> $r)?,)*
+                $($($f_impl_vtable: fn(*const (), $($p_impl: $t_impl),*) $(-> $r_impl)?,)*)*
                 __type_id: fn() -> std::any::TypeId,
                 __type_name: fn() -> &'static str,
                 __drop: fn(*const ()),
             }
 
             #[inline(always)]
-            fn vt(e: &$ErasedT) -> &VTable {
+            fn vt(e: &$erased_t_name) -> &VTable {
                 unsafe { &*(e.vtable as *const VTable) }
             }
 
-            impl $ErasedT {
+            impl $erased_t_name {
                 #[doc = concat!("Returns a new boxed, type-erased [`", stringify!($T), "`].")]
-                $v fn new<T: $T + 'static>(v: std::sync::Arc<T>) -> Self {
+                $v fn new<T: $t_name + 'static>(v: std::sync::Arc<T>) -> Self {
                     let ptr = std::sync::Arc::into_raw(v) as *const T as *const ();
                     let vtable = &VTable {
                         $(
                             $f: |ptr, $($p),*| unsafe {
                                 let arc = std::sync::Arc::<T>::from_raw(ptr as *const T);
-                                let v = <T as $T>::$f(&arc, $($p),*);
+                                let v = <T as $t_name>::$f(&arc, $($p),*);
                                 std::mem::forget(arc);
                                 v
                             },
@@ -51,7 +51,7 @@ macro_rules! type_erase {
                         $($(
                             $f_impl_vtable: |ptr, $($p_impl),*| unsafe {
                                 let arc = std::sync::Arc::<T>::from_raw(ptr as *const T);
-                                let v = <T as $Trait>::$f_impl(&*arc, $($p_impl),*);
+                                let v = <T as $impl_name>::$f_impl(&*arc, $($p_impl),*);
                                 std::mem::forget(arc);
                                 v
                             },
@@ -71,7 +71,7 @@ macro_rules! type_erase {
                         "Calls [`", stringify!($T), "::", stringify!($f),
                         "`] of the underlying boxed value."
                     )]
-                    $v fn $f(&self, $($p: $t),*) $(-> $R)? {
+                    $v fn $f(&self, $($p: $t),*) $(-> $r)? {
                         (vt(self).$f)(self.ptr, $($p),*)
                     }
                 )*
@@ -118,7 +118,7 @@ macro_rules! type_erase {
                 }
             }
 
-            impl Clone for $ErasedT {
+            impl Clone for $erased_t_name {
                 fn clone(&self) -> Self {
                     unsafe {
                         std::sync::Arc::increment_strong_count(self.ptr);
@@ -131,22 +131,22 @@ macro_rules! type_erase {
                 }
             }
 
-            impl Drop for $ErasedT {
+            impl Drop for $erased_t_name {
                 fn drop(&mut self) {
                     (vt(self).__drop)(self.ptr);
                 }
             }
 
-            impl<T: $T + 'static> From<Arc<T>> for $ErasedT {
+            impl<T: $t_name + 'static> From<Arc<T>> for $erased_t_name {
                 fn from(value: Arc<T>) -> Self {
-                    $ErasedT::new(value)
+                    $erased_t_name::new(value)
                 }
             }
 
             $(
-                impl $Trait for $ErasedT {
+                impl $impl_name for $erased_t_name {
                     $(
-                        fn $f_impl(&self, $($p_impl: $t_impl),*) $(-> $R_)? {
+                        fn $f_impl(&self, $($p_impl: $t_impl),*) $(-> $r_impl)? {
                             (vt(self).$f_impl_vtable)(self.ptr, $($p_impl),*)
                         }
                     )*
