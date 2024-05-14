@@ -8,7 +8,7 @@ macro_rules! type_erase {
         $(
             impl $Trait:path {
                 $(
-                    fn $f_impl:ident[$f_vtable:ident](
+                    fn $f_impl:ident[$f_impl_vtable:ident](
                         &self $(, $p_impl:ident: $t_impl:ty $(,)?)*
                     ) $(-> $R_:ty)?;
                 )*
@@ -24,7 +24,7 @@ macro_rules! type_erase {
         const _: () = {
             struct VTable {
                 $($f: fn(*const (), $($p: $t),*) $(-> $R)?,)*
-                $($($f_vtable: fn(*const (), $($p_impl: $t_impl),*) $(-> $R_)?,)*)*
+                $($($f_impl_vtable: fn(*const (), $($p_impl: $t_impl),*) $(-> $R_)?,)*)*
                 __type_id: fn() -> std::any::TypeId,
                 __type_name: fn() -> &'static str,
                 __drop: fn(*const ()),
@@ -42,15 +42,15 @@ macro_rules! type_erase {
                     let vtable = &VTable {
                         $(
                             $f: |ptr, $($p),*| unsafe {
-                                let arc: std::sync::Arc<T> = std::sync::Arc::from_raw(ptr as *const T);
+                                let arc = std::sync::Arc::<T>::from_raw(ptr as *const T);
                                 let v = <T as $T>::$f(&arc, $($p),*);
                                 std::mem::forget(arc);
                                 v
                             },
                         )*
                         $($(
-                            $f_vtable: |ptr, $($p_impl),*| unsafe {
-                                let arc: std::sync::Arc<T> = std::sync::Arc::from_raw(ptr as *const T);
+                            $f_impl_vtable: |ptr, $($p_impl),*| unsafe {
+                                let arc = std::sync::Arc::<T>::from_raw(ptr as *const T);
                                 let v = <T as $Trait>::$f_impl(&*arc, $($p_impl),*);
                                 std::mem::forget(arc);
                                 v
@@ -67,7 +67,10 @@ macro_rules! type_erase {
                 }
 
                 $(
-                    #[doc = concat!("Calls [`", stringify!($T), "::", stringify!($f), "`] of the underlying boxed value.")]
+                    #[doc = concat!(
+                        "Calls [`", stringify!($T), "::", stringify!($f),
+                        "`] of the underlying boxed value."
+                    )]
                     $v fn $f(&self, $($p: $t),*) $(-> $R)? {
                         (vt(self).$f)(self.ptr, $($p),*)
                     }
@@ -97,7 +100,7 @@ macro_rules! type_erase {
                 $v fn downcast<T: 'static>(&self) -> Option<Arc<T>> {
                     if (vt(self).__type_id)() == std::any::TypeId::of::<T>() {
                         unsafe {
-                            let arc: Arc<T> = std::sync::Arc::from_raw(self.ptr as *const T);
+                            let arc = std::sync::Arc::<T>::from_raw(self.ptr as *const T);
                             let v = arc.clone();
                             std::mem::forget(arc);
                             return Some(v);
@@ -144,7 +147,7 @@ macro_rules! type_erase {
                 impl $Trait for $ErasedT {
                     $(
                         fn $f_impl(&self, $($p_impl: $t_impl),*) $(-> $R_)? {
-                            (vt(self).$f_vtable)(self.ptr, $($p_impl),*)
+                            (vt(self).$f_impl_vtable)(self.ptr, $($p_impl),*)
                         }
                     )*
                 }
