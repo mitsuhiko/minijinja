@@ -626,7 +626,7 @@ type_erase! {
         fn render(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
         impl fmt::Debug {
-            fn fmt[debug](&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+            fn fmt[debug_fmt](&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
         }
     }
 }

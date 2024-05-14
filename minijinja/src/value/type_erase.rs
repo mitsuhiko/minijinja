@@ -13,11 +13,11 @@ macro_rules! type_erase {
         )*
     }) => {
         struct $VT {
-            $($f: fn(&(), *const (), $($p : $t),*) $(-> $R)?,)*
+            $($f: fn(*const (), $($p : $t),*) $(-> $R)?,)*
             $($($f1: fn(*const (), $($p_ : $t_),*) $(-> $R_)?,)*)*
-            type_id: fn() -> core::any::TypeId,
-            type_name: fn() -> &'static str,
-            drop: fn(*const ()),
+            __type_id: fn() -> std::any::TypeId,
+            __type_name: fn() -> &'static str,
+            __drop: fn(*const ()),
         }
 
         /// Typed-erased version of
@@ -34,8 +34,8 @@ macro_rules! type_erase {
                 let ptr = std::sync::Arc::into_raw(v) as *const T as *const ();
                 let vtable = &$VT {
                     $(
-                        $f: |_, ptr, $($p),*| unsafe {
-                            let arc: Arc<T> = std::sync::Arc::from_raw(ptr as *const T);
+                        $f: |ptr, $($p),*| unsafe {
+                            let arc: std::sync::Arc<T> = std::sync::Arc::from_raw(ptr as *const T);
                             let v = <T as $T>::$f(&arc, $($p),*);
                             std::mem::forget(arc);
                             v
@@ -43,19 +43,15 @@ macro_rules! type_erase {
                     )*
                     $($(
                         $f1: |ptr, $($p_),*| unsafe {
-                            let arc: Arc<T> = std::sync::Arc::from_raw(ptr as *const T);
+                            let arc: std::sync::Arc<T> = std::sync::Arc::from_raw(ptr as *const T);
                             let v = <T as $S>::$f_(&*arc, $($p_),*);
                             std::mem::forget(arc);
                             v
                         },
                     )*)*
-                    type_id: || {
-                        core::any::TypeId::of::<T>()
-                    },
-                    type_name: || {
-                        core::any::type_name::<T>()
-                    },
-                    drop: |ptr| unsafe {
+                    __type_id: || std::any::TypeId::of::<T>(),
+                    __type_name: || std::any::type_name::<T>(),
+                    __drop: |ptr| unsafe {
                         drop(std::sync::Arc::from_raw(ptr as *const T));
                     },
                 };
@@ -68,13 +64,13 @@ macro_rules! type_erase {
                 #[doc = concat!("[`", stringify!($T), "::", stringify!($f), "`]")]
                 /// on the underlying boxed value.
                 $v fn $f(&self, $($p: $t),*) $(-> $R)? {
-                    (self.vtable.$f)(&(), self.ptr, $($p),*)
+                    (self.vtable.$f)(self.ptr, $($p),*)
                 }
             )*
 
             /// Returns the type name of the conrete underlying type.
             $v fn type_name(&self) -> &'static str {
-                (self.vtable.type_name)()
+                (self.vtable.__type_name)()
             }
 
             /// Downcast to `T` if the boxed value holds a `T`.
@@ -100,7 +96,7 @@ macro_rules! type_erase {
             /// assert_eq!(thing.id, 42);
             /// ```
             $v fn downcast_ref<T: 'static>(&self) -> Option<&T> {
-                if (self.vtable.type_id)() == core::any::TypeId::of::<T>() {
+                if (self.vtable.__type_id)() == std::any::TypeId::of::<T>() {
                     unsafe {
                         return Some(&*(self.ptr as *const T));
                     }
@@ -113,7 +109,7 @@ macro_rules! type_erase {
             ///
             /// For details see [`downcast_ref`](Self::downcast_ref).
             $v fn downcast<T: 'static>(&self) -> Option<Arc<T>> {
-                if (self.vtable.type_id)() == core::any::TypeId::of::<T>() {
+                if (self.vtable.__type_id)() == std::any::TypeId::of::<T>() {
                     unsafe {
                         let arc: Arc<T> = std::sync::Arc::from_raw(self.ptr as *const T);
                         let v = arc.clone();
@@ -148,7 +144,7 @@ macro_rules! type_erase {
 
         impl Drop for $E {
             fn drop(&mut self) {
-                (self.vtable.drop)(self.ptr);
+                (self.vtable.__drop)(self.ptr);
             }
         }
 
