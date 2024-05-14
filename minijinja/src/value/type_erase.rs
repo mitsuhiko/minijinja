@@ -1,19 +1,22 @@
+/// Utility macro that creates a type erased version of a trait.
+///
+/// This is used in the engine to create a `DynObject` for an `Object`.
+/// For the exact use of this look at where the macro is invoked.
 macro_rules! type_erase {
-    ($v:vis trait $T:ident => $E:ident {
-        $(fn $f:ident(&self $(, $p:ident : $t:ty $(,)?)*) $(-> $R:ty)?;)*
-
+    ($v:vis trait $T:ident => $ErasedT:ident {
+        $(fn $f:ident(&self $(, $p:ident: $t:ty $(,)?)*) $(-> $R:ty)?;)*
         $(
-            impl $S:path {
+            impl $Trait:path {
                 $(
                     fn $f_impl:ident[$f_vtable:ident](
-                        &self $(, $p_impl:ident : $t_impl:ty $(,)?)*
+                        &self $(, $p_impl:ident: $t_impl:ty $(,)?)*
                     ) $(-> $R_:ty)?;
                 )*
             }
         )*
     }) => {
         #[doc = concat!("Type-erased version of [`", stringify!($T), "`]")]
-        $v struct $E {
+        $v struct $ErasedT {
             ptr: *const (),
             vtable: *const (),
         }
@@ -28,11 +31,11 @@ macro_rules! type_erase {
             }
 
             #[inline(always)]
-            fn vt(e: &$E) -> &VTable {
+            fn vt(e: &$ErasedT) -> &VTable {
                 unsafe { &*(e.vtable as *const VTable) }
             }
 
-            impl $E {
+            impl $ErasedT {
                 #[doc = concat!("Returns a new boxed, type-erased [`", stringify!($T), "`].")]
                 $v fn new<T: $T + 'static>(v: std::sync::Arc<T>) -> Self {
                     let ptr = std::sync::Arc::into_raw(v) as *const T as *const ();
@@ -48,7 +51,7 @@ macro_rules! type_erase {
                         $($(
                             $f_vtable: |ptr, $($p_impl),*| unsafe {
                                 let arc: std::sync::Arc<T> = std::sync::Arc::from_raw(ptr as *const T);
-                                let v = <T as $S>::$f_impl(&*arc, $($p_impl),*);
+                                let v = <T as $Trait>::$f_impl(&*arc, $($p_impl),*);
                                 std::mem::forget(arc);
                                 v
                             },
@@ -77,26 +80,7 @@ macro_rules! type_erase {
 
                 /// Downcast to `T` if the boxed value holds a `T`.
                 ///
-                /// This is basically the “reverse” of [`Value::from_object`].
-                ///
-                /// # Example
-                ///
-                /// ```
-                /// # use minijinja::value::{Value, Object};
-                /// use std::fmt;
-                ///
-                /// #[derive(Debug)]
-                /// struct Thing {
-                ///     id: usize,
-                /// }
-                ///
-                /// impl Object for Thing {}
-                ///
-                /// let x_value = Value::from_object(Thing { id: 42 });
-                /// let value_as_obj = x_value.as_object().unwrap();
-                /// let thing = value_as_obj.downcast_ref::<Thing>().unwrap();
-                /// assert_eq!(thing.id, 42);
-                /// ```
+                /// This works like [`Any::downcast_ref`](std::any::Any#method.downcast_ref).
                 $v fn downcast_ref<T: 'static>(&self) -> Option<&T> {
                     if (vt(self).__type_id)() == std::any::TypeId::of::<T>() {
                         unsafe {
@@ -109,7 +93,7 @@ macro_rules! type_erase {
 
                 /// Downcast to `T` if the boxed value holds a `T`.
                 ///
-                /// For details see [`downcast_ref`](Self::downcast_ref).
+                /// This is similar to [`downcast_ref`](Self::downcast_ref) but returns the [`Arc`].
                 $v fn downcast<T: 'static>(&self) -> Option<Arc<T>> {
                     if (vt(self).__type_id)() == std::any::TypeId::of::<T>() {
                         unsafe {
@@ -125,13 +109,13 @@ macro_rules! type_erase {
 
                 /// Checks if the boxed value is a `T`.
                 ///
-                /// For details see [`downcast_ref`](Self::downcast_ref).
+                /// This works like [`Any::is`](std::any::Any#method.is).
                 $v fn is<T: 'static>(&self) -> bool {
                     self.downcast::<T>().is_some()
                 }
             }
 
-            impl Clone for $E {
+            impl Clone for $ErasedT {
                 fn clone(&self) -> Self {
                     unsafe {
                         std::sync::Arc::increment_strong_count(self.ptr);
@@ -144,20 +128,20 @@ macro_rules! type_erase {
                 }
             }
 
-            impl Drop for $E {
+            impl Drop for $ErasedT {
                 fn drop(&mut self) {
                     (vt(self).__drop)(self.ptr);
                 }
             }
 
-            impl<T: $T + 'static> From<Arc<T>> for $E {
+            impl<T: $T + 'static> From<Arc<T>> for $ErasedT {
                 fn from(value: Arc<T>) -> Self {
-                    $E::new(value)
+                    $ErasedT::new(value)
                 }
             }
 
             $(
-                impl $S for $E {
+                impl $Trait for $ErasedT {
                     $(
                         fn $f_impl(&self, $($p_impl: $t_impl),*) $(-> $R_)? {
                             (vt(self).$f_vtable)(self.ptr, $($p_impl),*)
