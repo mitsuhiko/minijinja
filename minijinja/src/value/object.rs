@@ -599,7 +599,7 @@ pub enum ObjectRepr {
 }
 
 type_erase! {
-    pub trait Object: Send + Sync => DynObject(DynObjectVT) {
+    pub trait Object => DynObject {
         fn repr(&self) -> ObjectRepr;
 
         fn get_value(&self, key: &Value) -> Option<Value>;
@@ -626,10 +626,13 @@ type_erase! {
         fn render(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
         impl fmt::Debug {
-            fn fmt[debug](&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
         }
     }
 }
+
+unsafe impl Send for DynObject {}
+unsafe impl Sync for DynObject {}
 
 impl DynObject {
     impl_object_helpers!(pub &Self);
