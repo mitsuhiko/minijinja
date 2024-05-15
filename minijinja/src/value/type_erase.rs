@@ -42,24 +42,22 @@ macro_rules! type_erase {
                     let vtable = &VTable {
                         $(
                             $f: |ptr, $($p),*| unsafe {
+                                std::sync::Arc::<T>::increment_strong_count(ptr as *const T);
                                 let arc = std::sync::Arc::<T>::from_raw(ptr as *const T);
-                                let v = <T as $t_name>::$f(&arc, $($p),*);
-                                std::mem::forget(arc);
-                                v
+                                <T as $t_name>::$f(&arc, $($p),*)
                             },
                         )*
                         $($(
                             $f_impl: |ptr, $($p_impl),*| unsafe {
+                                std::sync::Arc::<T>::increment_strong_count(ptr as *const T);
                                 let arc = std::sync::Arc::<T>::from_raw(ptr as *const T);
-                                let v = <T as $impl_name>::$f_impl(&*arc, $($p_impl),*);
-                                std::mem::forget(arc);
-                                v
+                                <T as $impl_name>::$f_impl(&*arc, $($p_impl),*)
                             },
                         )*)*
                         __type_id: || std::any::TypeId::of::<T>(),
                         __type_name: || std::any::type_name::<T>(),
                         __drop: |ptr| unsafe {
-                            drop(std::sync::Arc::from_raw(ptr as *const T));
+                            std::sync::Arc::from_raw(ptr as *const T);
                         },
                     };
 
@@ -100,10 +98,8 @@ macro_rules! type_erase {
                 $v fn downcast<T: 'static>(&self) -> Option<Arc<T>> {
                     if (vt(self).__type_id)() == std::any::TypeId::of::<T>() {
                         unsafe {
-                            let arc = std::sync::Arc::<T>::from_raw(self.ptr as *const T);
-                            let v = arc.clone();
-                            std::mem::forget(arc);
-                            return Some(v);
+                            std::sync::Arc::<T>::increment_strong_count(self.ptr as *const T);
+                            return Some(std::sync::Arc::<T>::from_raw(self.ptr as *const T));
                         }
                     }
 
