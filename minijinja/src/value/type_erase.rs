@@ -36,7 +36,7 @@ macro_rules! type_erase {
             }
 
             impl $erased_t_name {
-                #[doc = concat!("Returns a new boxed, type-erased [`", stringify!($T), "`].")]
+                #[doc = concat!("Returns a new boxed, type-erased [`", stringify!($t_name), "`].")]
                 $v fn new<T: $t_name + 'static>(v: std::sync::Arc<T>) -> Self {
                     let ptr = std::sync::Arc::into_raw(v) as *const T as *const ();
                     let vtable = &VTable {
@@ -66,7 +66,7 @@ macro_rules! type_erase {
 
                 $(
                     #[doc = concat!(
-                        "Calls [`", stringify!($T), "::", stringify!($f),
+                        "Calls [`", stringify!($t_name), "::", stringify!($f),
                         "`] of the underlying boxed value."
                     )]
                     $v fn $f(&self, $($p: $t),*) $(-> $r)? {
