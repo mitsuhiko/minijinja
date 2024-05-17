@@ -42,15 +42,13 @@ macro_rules! type_erase {
                     let vtable = &VTable {
                         $(
                             $f: |ptr, $($p),*| unsafe {
-                                std::sync::Arc::<T>::increment_strong_count(ptr as *const T);
-                                let arc = std::sync::Arc::<T>::from_raw(ptr as *const T);
+                                let arc = std::mem::ManuallyDrop::new(std::sync::Arc::<T>::from_raw(ptr as *const T));
                                 <T as $t_name>::$f(&arc, $($p),*)
                             },
                         )*
                         $($(
                             $f_impl: |ptr, $($p_impl),*| unsafe {
-                                std::sync::Arc::<T>::increment_strong_count(ptr as *const T);
-                                let arc = std::sync::Arc::<T>::from_raw(ptr as *const T);
+                                let arc = std::mem::ManuallyDrop::new(std::sync::Arc::<T>::from_raw(ptr as *const T));
                                 <T as $impl_name>::$f_impl(&*arc, $($p_impl),*)
                             },
                         )*)*
