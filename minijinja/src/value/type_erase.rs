@@ -27,7 +27,8 @@ macro_rules! type_erase {
                 $($($f_impl: fn(*const (), $($p_impl: $t_impl),*) $(-> $r_impl)?,)*)*
                 __type_id: fn() -> std::any::TypeId,
                 __type_name: fn() -> &'static str,
-                __drop: fn(*const ()),
+                __incref: fn(*const ()),
+                __decref: fn(*const ()),
             }
 
             #[inline(always)]
@@ -54,7 +55,10 @@ macro_rules! type_erase {
                         )*)*
                         __type_id: || std::any::TypeId::of::<T>(),
                         __type_name: || std::any::type_name::<T>(),
-                        __drop: |ptr| unsafe {
+                        __incref: |ptr| unsafe {
+                            std::sync::Arc::<T>::increment_strong_count(ptr as *const T);
+                        },
+                        __decref: |ptr| unsafe {
                             std::sync::Arc::from_raw(ptr as *const T);
                         },
                     };
@@ -114,10 +118,7 @@ macro_rules! type_erase {
 
             impl Clone for $erased_t_name {
                 fn clone(&self) -> Self {
-                    unsafe {
-                        std::sync::Arc::increment_strong_count(self.ptr);
-                    }
-
+                    (vt(self).__incref)(self.ptr);
                     Self {
                         ptr: self.ptr,
                         vtable: self.vtable,
@@ -127,7 +128,7 @@ macro_rules! type_erase {
 
             impl Drop for $erased_t_name {
                 fn drop(&mut self) {
-                    (vt(self).__drop)(self.ptr);
+                    (vt(self).__decref)(self.ptr);
                 }
             }
 

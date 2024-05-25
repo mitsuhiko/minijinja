@@ -23,7 +23,7 @@ timezone = ["time-tz"]
 [dependencies]
 minijinja = { version = "2.0.1", path = "../minijinja", default-features = false }
 serde = "1.0.164"
-time = { version = "0.3.22", optional = true, features = ["serde", "formatting", "parsing"] }
+time = { version = "0.3.35", optional = true, features = ["serde", "formatting", "parsing"] }
 time-tz = { version = "1.0.3", features = ["db"], optional = true }
 
 [dev-dependencies]
