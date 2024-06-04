@@ -103,6 +103,7 @@ State {
             "selectattr",
             "slice",
             "sort",
+            "split",
             "title",
             "tojson",
             "trim",

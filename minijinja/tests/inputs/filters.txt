@@ -104,3 +104,5 @@ unique-filter: {{ [1, 1, 1, 4, 3, 0, 0, 5]|unique }}
 pprint-filter: {{ objects|pprint }}
 int-filter: {{ true|int }}, {{ "42"|int }}, {{ "-23"|int }}, {{ 42.0|int }}
 float-filter: {{ true|float }}, {{ "42"|float }}, {{ "-23.5"|float }}, {{ 42.5|float }}
+split: {{ three_words|split }}
+split: {{ three_words|split(" and ") }}

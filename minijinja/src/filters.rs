@@ -557,6 +557,23 @@ mod builtins {
         }
     }
 
+    /// Split a string with a separator
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn split(val: Value, split: Option<Cow<'_, str>>) -> Result<Value, Error> {
+        let split = split.as_deref().unwrap_or(" ");
+
+        match val.as_str() {
+            Some(s) => {
+                let elements = s.split(split).map(Value::from).collect::<Vec<Value>>();
+                Ok(Value::from(elements))
+            }
+            None => Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!("cannot split value of type {}", val.kind()),
+            )),
+        }
+    }
+
     /// If the value is undefined it will return the passed default value,
     /// otherwise the value of the variable:
     ///
