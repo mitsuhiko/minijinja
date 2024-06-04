@@ -557,7 +557,11 @@ mod builtins {
         }
     }
 
-    /// Split a string with a separator
+    /// Split a string with a separator (separator defaults to " ")
+    /// ```jinja
+    /// <p>{{ "hello world"|split == ["hello", "world"] }}</p>
+    /// <p>{{ "c,s,v"|split(",") == ["c", "s", "v"] }}</p>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn split(val: Value, split: Option<Cow<'_, str>>) -> Result<Value, Error> {
         let split = split.as_deref().unwrap_or(" ");
