@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.0.2
+
+- Implemented sequence (+ some iterator) and string repeating with the `*`
+  operator to match Jinja2 behavior.  #519
+
 ## 2.0.1
 
 - Fixed an issue that caused custom delimiters to not work in the Python
