@@ -1,5 +1,5 @@
 use crate::error::{Error, ErrorKind};
-use crate::value::{ObjectRepr, Value, ValueKind, ValueRepr};
+use crate::value::{DynObject, ObjectRepr, Value, ValueKind, ValueRepr};
 
 const MIN_I128_AS_POS_U128: u128 = 170141183460469231731687303715884105728;
 
@@ -204,8 +204,92 @@ pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 }
 
 math_binop!(sub, checked_sub, -);
-math_binop!(mul, checked_mul, *);
 math_binop!(rem, checked_rem_euclid, %);
+
+pub fn mul(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    if let Some((s, n)) = lhs
+        .as_str()
+        .map(|s| (s, rhs))
+        .or_else(|| rhs.as_str().map(|s| (s, lhs)))
+    {
+        return Ok(Value::from(s.repeat(ok!(n.as_usize().ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidOperation,
+                "strings can only be multiplied with integers",
+            )
+        })))));
+    } else if let Some((seq, n)) = lhs
+        .as_object()
+        .map(|s| (s, rhs))
+        .or_else(|| rhs.as_object().map(|s| (s, lhs)))
+        .filter(|x| matches!(x.0.repr(), ObjectRepr::Iterable | ObjectRepr::Seq))
+    {
+        return repeat_iterable(n, seq);
+    }
+
+    match coerce(lhs, rhs) {
+        Some(CoerceResult::I128(a, b)) => match a.checked_mul(b) {
+            Some(val) => Ok(int_as_value(val)),
+            None => Err(failed_op(stringify!(*), lhs, rhs)),
+        },
+        Some(CoerceResult::F64(a, b)) => Ok((a * b).into()),
+        _ => Err(impossible_op(stringify!(*), lhs, rhs)),
+    }
+}
+
+fn repeat_iterable(n: &Value, seq: &DynObject) -> Result<Value, Error> {
+    struct LenIterWrap<I: Send + Sync>(usize, I);
+
+    impl<I: Iterator<Item = Value> + Send + Sync> Iterator for LenIterWrap<I> {
+        type Item = Value;
+
+        #[inline(always)]
+        fn next(&mut self) -> Option<Self::Item> {
+            self.1.next()
+        }
+
+        #[inline(always)]
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            (self.0, Some(self.0))
+        }
+    }
+
+    let n = ok!(n.as_usize().ok_or_else(|| {
+        Error::new(
+            ErrorKind::InvalidOperation,
+            "sequences and iterables can only be multiplied with integers",
+        )
+    }));
+
+    let len = ok!(seq.enumerator_len().ok_or_else(|| {
+        Error::new(
+            ErrorKind::InvalidOperation,
+            "cannot repeat unsized iterables",
+        )
+    }));
+
+    // This is not optimal.  We only query the enumerator for the length once
+    // but we support repeated iteration.  We could both lie about our length
+    // here and we could actually deal with an object that changes how much
+    // data it returns.  This is not really permissible so we won't try to
+    // improve on this here.
+    Ok(Value::make_object_iterable(seq.clone(), move |seq| {
+        Box::new(LenIterWrap(
+            len * n,
+            (0..n).flat_map(move |_| {
+                seq.try_iter().unwrap_or_else(|| {
+                    Box::new(
+                        std::iter::repeat(Value::from(Error::new(
+                            ErrorKind::InvalidOperation,
+                            "iterable did not iterate against expectations",
+                        )))
+                        .take(len),
+                    )
+                })
+            }),
+        ))
+    }))
+}
 
 pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {

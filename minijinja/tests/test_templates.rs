@@ -2,7 +2,8 @@
     feature = "multi_template",
     feature = "macros",
     feature = "builtins",
-    feature = "adjacent_loop_items"
+    feature = "adjacent_loop_items",
+    feature = "deserialization"
 ))]
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -35,7 +36,7 @@ fn test_vm() {
         let contents = std::fs::read_to_string(path).unwrap();
         let mut iter = contents.splitn(2, "\n---\n");
         let mut env = Environment::new();
-        let ctx: serde_json::Value = serde_json::from_str(iter.next().unwrap()).unwrap();
+        let ctx: Value = serde_json::from_str(iter.next().unwrap()).unwrap();
 
         for (path, source) in &refs {
             let ref_filename = path.file_name().unwrap().to_str().unwrap();
@@ -50,7 +51,11 @@ fn test_vm() {
         } else {
             let template = env.get_template(filename).unwrap();
 
-            match template.render(&ctx) {
+            let actual_context = context! {
+                one_shot_iterator => Value::make_one_shot_iterator(0..3),
+                ..ctx.clone()
+            };
+            match template.render(&actual_context) {
                 Ok(mut rendered) => {
                     rendered.push('\n');
                     rendered
