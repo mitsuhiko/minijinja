@@ -2,7 +2,8 @@
     feature = "multi_template",
     feature = "macros",
     feature = "builtins",
-    feature = "adjacent_loop_items"
+    feature = "adjacent_loop_items",
+    feature = "deserialization"
 ))]
 use std::collections::BTreeMap;
 use std::fmt::Write;
