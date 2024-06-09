@@ -14,7 +14,7 @@
 
 use minijinja::Environment;
 
-/// Implements Python methods for better compatibility
+/// Implements Python methods for better compatibility.
 #[cfg(feature = "pycompat")]
 pub mod pycompat;
 

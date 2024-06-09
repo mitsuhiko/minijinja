@@ -225,6 +225,9 @@ fn create_env(
     }
 
     minijinja_contrib::add_to_environment(&mut env);
+    if matches.get_flag("py-compat") {
+        env.set_unknown_method_callback(minijinja_contrib::pycompat::unknown_method_callback);
+    }
 
     if matches.get_flag("env") {
         env.add_global("ENV", Value::from_iter(std::env::vars()));

@@ -1,5 +1,3 @@
-//! Adds support for python methods to MiniJinja objects.
-
 use minijinja::value::{from_args, ValueKind};
 use minijinja::{Error, ErrorKind, State, Value};
 
