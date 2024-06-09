@@ -6,6 +6,11 @@ All notable changes to MiniJinja are documented here.
 
 - Implemented sequence (+ some iterator) and string repeating with the `*`
   operator to match Jinja2 behavior.  #519
+- Added the new `minijinja::pycompat` module which allows one to register
+  an unknown method callback that provides most built-in Python methods.
+  This makes things such as `dict.keys` work.  Also adds a new
+  `--py-compat` flag to `minijinja-cli` that enables it.  This improves
+  the compatibility with Python based templates.  #521
 
 ## 2.0.1
 
