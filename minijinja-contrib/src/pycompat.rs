@@ -31,6 +31,7 @@ use minijinja::{Error, ErrorKind, State, Value};
 /// * `str.replace`
 /// * `str.rstrip`
 /// * `str.split`
+/// * `str.splitlines`
 /// * `str.strip`
 /// * `str.title`
 /// * `str.upper`
@@ -122,6 +123,23 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
             Ok(minijinja::filters::split(s.into(), sep, maxsplits)
                 .try_iter()?
                 .collect::<Value>())
+        }
+        "splitlines" => {
+            let (keepends,): (Option<bool>,) = from_args(args)?;
+            if !keepends.unwrap_or(false) {
+                Ok(s.lines().map(Value::from).collect())
+            } else {
+                let mut rv = Vec::new();
+                let mut rest = s;
+                while let Some(offset) = rest.find('\n') {
+                    rv.push(Value::from(&rest[..offset + 1]));
+                    rest = &rest[offset + 1..];
+                }
+                if !rest.is_empty() {
+                    rv.push(Value::from(rest));
+                }
+                Ok(Value::from(rv))
+            }
         }
         "capitalize" => {
             from_args(args)?;

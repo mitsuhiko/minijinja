@@ -45,6 +45,8 @@ fn test_string_methods() {
     assert!(eval_expr("'a  b  c'.split() == ['a', 'b', 'c']").is_true());
     assert!(eval_expr("'a  b  c'.split(none, 1) == ['a', 'b  c']").is_true());
     assert!(eval_expr("'abcbd'.split('b', 1) == ['a', 'cbd']").is_true());
+    assert!(eval_expr("'a\\nb\\r\\nc'.splitlines() == ['a', 'b', 'c']").is_true());
+    assert!(eval_expr("'a\\nb\\r\\nc'.splitlines(true) == ['a\\n', 'b\\r\\n', 'c']").is_true());
 }
 
 #[test]
