@@ -30,6 +30,7 @@ use minijinja::{Error, ErrorKind, State, Value};
 /// * `str.lstrip`
 /// * `str.replace`
 /// * `str.rstrip`
+/// * `str.split`
 /// * `str.strip`
 /// * `str.title`
 /// * `str.upper`

@@ -11,6 +11,7 @@ All notable changes to MiniJinja are documented here.
   This makes things such as `dict.keys` work.  Also adds a new
   `--py-compat` flag to `minijinja-cli` that enables it.  This improves
   the compatibility with Python based templates.  #521
+- Added a new `|split` filter that works like the `.split` method in Python.  #517
 
 ## 2.0.1
 
