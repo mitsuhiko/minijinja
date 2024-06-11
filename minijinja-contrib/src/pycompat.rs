@@ -30,6 +30,7 @@ use minijinja::{Error, ErrorKind, State, Value};
 /// * `str.lstrip`
 /// * `str.replace`
 /// * `str.rstrip`
+/// * `str.split`
 /// * `str.strip`
 /// * `str.title`
 /// * `str.upper`
@@ -113,6 +114,14 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
             // one shall not call into these filters.  However we consider ourselves
             // privileged.
             Ok(Value::from(minijinja::filters::title(s.into())))
+        }
+        "split" => {
+            let (sep, maxsplits) = from_args(args)?;
+            // one shall not call into these filters.  However we consider ourselves
+            // privileged.
+            Ok(minijinja::filters::split(s.into(), sep, maxsplits)
+                .try_iter()?
+                .collect::<Value>())
         }
         "capitalize" => {
             from_args(args)?;

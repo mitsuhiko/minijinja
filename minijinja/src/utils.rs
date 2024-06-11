@@ -342,6 +342,46 @@ impl<F: FnOnce()> Drop for OnDrop<F> {
     }
 }
 
+#[cfg(feature = "builtins")]
+pub fn splitn_whitespace(s: &str, maxsplits: usize) -> impl Iterator<Item = &str> + '_ {
+    let mut splits = 1;
+    let mut skip_ws = true;
+    let mut split_start = None;
+    let mut last_split_end = 0;
+    let mut chars = s.char_indices();
+
+    std::iter::from_fn(move || {
+        for (idx, c) in chars.by_ref() {
+            if splits >= maxsplits && !skip_ws {
+                continue;
+            } else if c.is_whitespace() {
+                if let Some(old) = split_start {
+                    let rv = &s[old..idx];
+                    split_start = None;
+                    last_split_end = idx;
+                    splits += 1;
+                    skip_ws = true;
+                    return Some(rv);
+                }
+            } else {
+                skip_ws = false;
+                if split_start.is_none() {
+                    split_start = Some(idx);
+                    last_split_end = idx;
+                }
+            }
+        }
+
+        let rest = &s[last_split_end..];
+        if !rest.is_empty() {
+            last_split_end = s.len();
+            Some(rest)
+        } else {
+            None
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -361,5 +401,22 @@ mod tests {
         assert_eq!(unescape(r"\t\b\f\r\n\\\/").unwrap(), "\t\x08\x0c\r\n\\/");
         assert_eq!(unescape("foobarbaz").unwrap(), "foobarbaz");
         assert_eq!(unescape(r"\ud83d\udca9").unwrap(), "💩");
+    }
+
+    #[test]
+    #[cfg(feature = "builtins")]
+    fn test_splitn_whitespace() {
+        fn s(s: &str, n: usize) -> Vec<&str> {
+            splitn_whitespace(s, n).collect::<Vec<_>>()
+        }
+
+        assert_eq!(s("a b c", 1), vec!["a b c"]);
+        assert_eq!(s("a b c", 2), vec!["a", "b c"]);
+        assert_eq!(s("a    b c", 2), vec!["a", "b c"]);
+        assert_eq!(s("a    b c   ", 2), vec!["a", "b c   "]);
+        assert_eq!(s("a   b   c", 3), vec!["a", "b", "c"]);
+        assert_eq!(s("a   b   c", 4), vec!["a", "b", "c"]);
+        assert_eq!(s("   a   b   c", 3), vec!["a", "b", "c"]);
+        assert_eq!(s("   a   b   c", 4), vec!["a", "b", "c"]);
     }
 }

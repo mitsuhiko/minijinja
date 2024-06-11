@@ -293,6 +293,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
+    use crate::utils::splitn_whitespace;
     use crate::value::ops::as_f64;
     use crate::value::{Kwargs, ValueKind, ValueRepr};
     use std::borrow::Cow;
@@ -555,6 +556,35 @@ mod builtins {
                 format!("cannot join value of type {}", val.kind()),
             ))
         }
+    }
+
+    /// Split a string into its substrings, using `split` as the separator string.
+    ///
+    /// If `split` is not provided or `none` the string is split at all whitespace
+    /// characters and multiple spaces and empty strings will be removed from the
+    /// result.
+    ///
+    /// The `maxsplits` parameter defines the maximum number of splits
+    /// (starting from the left).  Note that this follows Python conventions
+    /// rather than Rust ones so `1` means one split and two resulting items.
+    ///
+    /// ```jinja
+    /// {{ "hello world"|split|list }}
+    ///     -> ["hello", "world"]
+    ///
+    /// {{ "c,s,v"|split(",")|list }}
+    ///     -> ["c", "s", "v"]
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn split(s: Arc<str>, split: Option<Arc<str>>, maxsplits: Option<i64>) -> Value {
+        let maxsplits = maxsplits.and_then(|x| if x >= 0 { Some(x as usize + 1) } else { None });
+
+        Value::make_object_iterable((s, split), move |(s, split)| match (split, maxsplits) {
+            (None, None) => Box::new(s.split_whitespace().map(Value::from)),
+            (Some(split), None) => Box::new(s.split(split as &str).map(Value::from)),
+            (None, Some(n)) => Box::new(splitn_whitespace(s, n).map(Value::from)),
+            (Some(split), Some(n)) => Box::new(s.splitn(n, split as &str).map(Value::from)),
+        })
     }
 
     /// If the value is undefined it will return the passed default value,

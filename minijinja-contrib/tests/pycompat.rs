@@ -41,6 +41,10 @@ fn test_string_methods() {
     );
     assert_eq!(eval_expr("'foo barooo'.count('oo')").as_usize(), Some(2));
     assert_eq!(eval_expr("'foo barooo'.find('oo')").as_usize(), Some(1));
+    assert!(eval_expr("'a b c'.split() == ['a', 'b', 'c']").is_true());
+    assert!(eval_expr("'a  b  c'.split() == ['a', 'b', 'c']").is_true());
+    assert!(eval_expr("'a  b  c'.split(none, 1) == ['a', 'b  c']").is_true());
+    assert!(eval_expr("'abcbd'.split('b', 1) == ['a', 'cbd']").is_true());
 }
 
 #[test]
