@@ -318,7 +318,9 @@ impl<'source> Environment<'source> {
     /// ```
     ///
     /// This can be used to increase the compatibility with Jinja2 templates that might
-    /// call Python methods on objects which are not available in minijinja.
+    /// call Python methods on objects which are not available in minijinja.  A range of
+    /// common Python methods is implemented in `minijinja-contrib`.  For more information
+    /// see [minijinja_contrib::pycompat](https://docs.rs/minijinja-contrib/latest/minijinja_contrib/pycompat/).
     pub fn set_unknown_method_callback<F>(&mut self, f: F)
     where
         F: Fn(&State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send + 'static,
