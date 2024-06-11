@@ -23,15 +23,24 @@ use minijinja::{Error, ErrorKind, State, Value};
 /// * `list.count`
 /// * `str.capitalize`
 /// * `str.count`
+/// * `str.endswith`
 /// * `str.find`
+/// * `str.isalnum`
+/// * `str.isalpha`
+/// * `str.isascii`
+/// * `str.isdigit`
 /// * `str.islower`
+/// * `str.isnumeric`
 /// * `str.isupper`
+/// * `str.join`
 /// * `str.lower`
 /// * `str.lstrip`
 /// * `str.replace`
+/// * `str.rfind`
 /// * `str.rstrip`
 /// * `str.split`
 /// * `str.splitlines`
+/// * `str.startswith`
 /// * `str.strip`
 /// * `str.title`
 /// * `str.upper`
@@ -76,6 +85,24 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
         "isspace" => {
             from_args(args)?;
             Ok(Value::from(s.chars().all(|x| x.is_whitespace())))
+        }
+        "isdigit" | "isnumeric" => {
+            // this is not a perfect mapping to what Python does, but
+            // close enough for most uses in templates.
+            from_args(args)?;
+            Ok(Value::from(s.chars().all(|x| x.is_numeric())))
+        }
+        "isalnum" => {
+            from_args(args)?;
+            Ok(Value::from(s.chars().all(|x| x.is_alphanumeric())))
+        }
+        "isalpha" => {
+            from_args(args)?;
+            Ok(Value::from(s.chars().all(|x| x.is_alphabetic())))
+        }
+        "isascii" => {
+            from_args(args)?;
+            Ok(Value::from(s.chars().all(|x| x.is_ascii())))
         }
         "strip" => {
             let (chars,): (Option<&str>,) = from_args(args)?;
@@ -163,6 +190,83 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
                 Some(x) => x as i64,
                 None => -1,
             }))
+        }
+        "rfind" => {
+            let (what,): (&str,) = from_args(args)?;
+            Ok(Value::from(match s.rfind(what) {
+                Some(x) => x as i64,
+                None => -1,
+            }))
+        }
+        "startswith" => {
+            let (prefix,): (&Value,) = from_args(args)?;
+            if let Some(prefix) = prefix.as_str() {
+                Ok(Value::from(s.starts_with(prefix)))
+            } else if matches!(prefix.kind(), ValueKind::Iterable | ValueKind::Seq) {
+                for prefix in prefix.try_iter()? {
+                    if s.starts_with(prefix.as_str().ok_or_else(|| {
+                        Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!(
+                                "tuple for startswith must contain only strings, not {}",
+                                prefix.kind()
+                            ),
+                        )
+                    })?) {
+                        return Ok(Value::from(true));
+                    }
+                }
+                Ok(Value::from(false))
+            } else {
+                Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!(
+                        "startswith argument must be string or a tuple of strings, not {}",
+                        prefix.kind()
+                    ),
+                ))
+            }
+        }
+        "endswith" => {
+            let (suffix,): (&Value,) = from_args(args)?;
+            if let Some(suffix) = suffix.as_str() {
+                Ok(Value::from(s.ends_with(suffix)))
+            } else if matches!(suffix.kind(), ValueKind::Iterable | ValueKind::Seq) {
+                for suffix in suffix.try_iter()? {
+                    if s.ends_with(suffix.as_str().ok_or_else(|| {
+                        Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!(
+                                "tuple for endswith must contain only strings, not {}",
+                                suffix.kind()
+                            ),
+                        )
+                    })?) {
+                        return Ok(Value::from(true));
+                    }
+                }
+                Ok(Value::from(false))
+            } else {
+                Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!(
+                        "endswith argument must be string or a tuple of strings, not {}",
+                        suffix.kind()
+                    ),
+                ))
+            }
+        }
+        "join" => {
+            use std::fmt::Write;
+            let (values,): (&Value,) = from_args(args)?;
+            let mut rv = String::new();
+            for (idx, value) in values.try_iter()?.enumerate() {
+                if idx > 0 {
+                    rv.push_str(s);
+                }
+                write!(rv, "{}", value).ok();
+            }
+            Ok(Value::from(rv))
         }
         _ => Err(Error::from(ErrorKind::UnknownMethod)),
     }
