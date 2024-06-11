@@ -293,6 +293,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
+    use crate::utils::splitn_whitespace;
     use crate::value::ops::as_f64;
     use crate::value::{Kwargs, ValueKind, ValueRepr};
     use std::borrow::Cow;
@@ -559,23 +560,19 @@ mod builtins {
 
     /// Split a string with a separator (separator defaults to " ")
     /// ```jinja
-    /// <p>{{ "hello world"|split == ["hello", "world"] }}</p>
-    /// <p>{{ "c,s,v"|split(",") == ["c", "s", "v"] }}</p>
+    /// <p>{{ "hello world"|split|list == ["hello", "world"] }}</p>
+    /// <p>{{ "c,s,v"|split(",")|list == ["c", "s", "v"] }}</p>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn split(val: Value, split: Option<Cow<'_, str>>) -> Result<Value, Error> {
-        let split = split.as_deref().unwrap_or(" ");
+    pub fn split(s: Arc<str>, split: Option<Arc<str>>, maxsplits: Option<i64>) -> Value {
+        let maxsplits = maxsplits.and_then(|x| if x >= 0 { Some(x as usize + 1) } else { None });
 
-        match val.as_str() {
-            Some(s) => {
-                let elements = s.split(split).map(Value::from).collect::<Vec<Value>>();
-                Ok(Value::from(elements))
-            }
-            None => Err(Error::new(
-                ErrorKind::InvalidOperation,
-                format!("cannot split value of type {}", val.kind()),
-            )),
-        }
+        Value::make_object_iterable((s, split), move |(s, split)| match (split, maxsplits) {
+            (None, None) => Box::new(s.split_whitespace().map(Value::from)),
+            (Some(split), None) => Box::new(s.split(split as &str).map(Value::from)),
+            (None, Some(n)) => Box::new(splitn_whitespace(s, n).map(Value::from)),
+            (Some(split), Some(n)) => Box::new(s.splitn(n, split as &str).map(Value::from)),
+        })
     }
 
     /// If the value is undefined it will return the passed default value,
