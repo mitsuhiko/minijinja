@@ -77,6 +77,9 @@ can be set to stdin at once.
     Enable the trim_blocks flag
 - `--lstrip-blocks`:
     Enable the lstrip_blocks flag
+- `--py-compat`:
+    Enables improved Python compatibility.  Enabling this adds methods such as
+    `dict.keys` and some others.
 - `-s`, `--syntax <PAIR>`:
     Changes a syntax feature (feature=value) [possible features: `block-start`, `block-end`, `variable-start`, `variable-end`, `comment-start`, `comment-end`, `line-statement-prefix`, `line-statement-comment`]
 - `--safe-path <PATH>`:

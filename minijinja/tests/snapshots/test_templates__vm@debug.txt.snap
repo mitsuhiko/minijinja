@@ -19,6 +19,7 @@ State {
             depth: 0,
         },
         "f": minijinja::functions::builtins::range,
+        "one_shot_iterator": <iterator>,
         "upper": 1,
     },
     env: Environment {

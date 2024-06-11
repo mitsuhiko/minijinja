@@ -27,6 +27,10 @@ you cannot do `x.items()` to iterate over items.  For this particular case
 both Jinja2 and MiniJinja now support `|items` for iteration instead.  Other
 methods are rarely useful and filters should be used instead.
 
+Support for these Python methods can however be loaded by registering the
+`unknown_method_callback` from the `pycompat` module in the `minijinja-contrib`
+crate.
+
 ### Tuples
 
 MiniJinja does not implement tuples.  The creation of tuples with tuple syntax

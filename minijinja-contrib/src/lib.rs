@@ -14,6 +14,10 @@
 
 use minijinja::Environment;
 
+/// Implements Python methods for better compatibility.
+#[cfg(feature = "pycompat")]
+pub mod pycompat;
+
 /// Utility filters.
 pub mod filters;
 
@@ -24,6 +28,9 @@ pub mod globals;
 ///
 /// All the filters that are available will be added, same with global
 /// functions that exist.
+///
+/// **Note:** the `pycompat` support is intentionally not registered
+/// with the environment.
 pub fn add_to_environment(env: &mut Environment) {
     env.add_filter("pluralize", filters::pluralize);
     #[cfg(feature = "datetime")]
