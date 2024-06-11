@@ -47,6 +47,13 @@ fn test_string_methods() {
     assert!(eval_expr("'abcbd'.split('b', 1) == ['a', 'cbd']").is_true());
     assert!(eval_expr("'a\\nb\\r\\nc'.splitlines() == ['a', 'b', 'c']").is_true());
     assert!(eval_expr("'a\\nb\\r\\nc'.splitlines(true) == ['a\\n', 'b\\r\\n', 'c']").is_true());
+    assert!(eval_expr("'foobarbaz'.startswith('foo')").is_true());
+    assert!(eval_expr("'foobarbaz'.startswith(('foo', 'bar'))").is_true());
+    assert!(!eval_expr("'barfoobaz'.startswith(('foo', 'baz'))").is_true());
+    assert!(eval_expr("'foobarbaz'.endswith('baz')").is_true());
+    assert!(eval_expr("'foobarbaz'.endswith(('baz', 'bar'))").is_true());
+    assert!(!eval_expr("'foobarbazblah'.endswith(('baz', 'bar'))").is_true());
+    assert_eq!(eval_expr("'|'.join([1, 2, 3])").as_str(), Some("1|2|3"));
 }
 
 #[test]
