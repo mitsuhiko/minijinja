@@ -23,15 +23,24 @@ use minijinja::{Error, ErrorKind, State, Value};
 /// * `list.count`
 /// * `str.capitalize`
 /// * `str.count`
+/// * `str.endswith`
 /// * `str.find`
+/// * `str.isalnum`
+/// * `str.isalpha`
+/// * `str.isascii`
+/// * `str.isdigit`
 /// * `str.islower`
+/// * `str.isnumeric`
 /// * `str.isupper`
+/// * `str.join`
 /// * `str.lower`
 /// * `str.lstrip`
 /// * `str.replace`
+/// * `str.rfind`
 /// * `str.rstrip`
 /// * `str.split`
 /// * `str.splitlines`
+/// * `str.startswith`
 /// * `str.strip`
 /// * `str.title`
 /// * `str.upper`
@@ -82,6 +91,18 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
             // close enough for most uses in templates.
             from_args(args)?;
             Ok(Value::from(s.chars().all(|x| x.is_numeric())))
+        }
+        "isalnum" => {
+            from_args(args)?;
+            Ok(Value::from(s.chars().all(|x| x.is_alphanumeric())))
+        }
+        "isalpha" => {
+            from_args(args)?;
+            Ok(Value::from(s.chars().all(|x| x.is_alphabetic())))
+        }
+        "isascii" => {
+            from_args(args)?;
+            Ok(Value::from(s.chars().all(|x| x.is_ascii())))
         }
         "strip" => {
             let (chars,): (Option<&str>,) = from_args(args)?;
@@ -166,6 +187,13 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
         "find" => {
             let (what,): (&str,) = from_args(args)?;
             Ok(Value::from(match s.find(what) {
+                Some(x) => x as i64,
+                None => -1,
+            }))
+        }
+        "rfind" => {
+            let (what,): (&str,) = from_args(args)?;
+            Ok(Value::from(match s.rfind(what) {
                 Some(x) => x as i64,
                 None => -1,
             }))

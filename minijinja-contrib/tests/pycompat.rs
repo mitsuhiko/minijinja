@@ -26,6 +26,9 @@ fn test_string_methods() {
     assert!(eval_expr("'foobar'.islower()").is_true());
     assert!(eval_expr("'FOOBAR'.isupper()").is_true());
     assert!(eval_expr("' \\n'.isspace()").is_true());
+    assert!(eval_expr("'abc'.isalpha()").is_true());
+    assert!(eval_expr("'abc123'.isalnum()").is_true());
+    assert!(eval_expr("'abc%@#'.isascii()").is_true());
     assert_eq!(
         eval_expr("'foobar'.replace('o', 'x')").as_str(),
         Some("fxxbar")
@@ -41,6 +44,7 @@ fn test_string_methods() {
     );
     assert_eq!(eval_expr("'foo barooo'.count('oo')").as_usize(), Some(2));
     assert_eq!(eval_expr("'foo barooo'.find('oo')").as_usize(), Some(1));
+    assert_eq!(eval_expr("'foo barooo'.rfind('oo')").as_usize(), Some(8));
     assert!(eval_expr("'a b c'.split() == ['a', 'b', 'c']").is_true());
     assert!(eval_expr("'a  b  c'.split() == ['a', 'b', 'c']").is_true());
     assert!(eval_expr("'a  b  c'.split(none, 1) == ['a', 'b  c']").is_true());
