@@ -95,6 +95,7 @@ To see examples and code from MiniJinja 1.x, you can browse the [minijinja-1.x b
 * [minijinja-py](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py): makes MiniJinja
   available to Python
 * [minijinja-cli](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli): a command line utility.
+* [minijinja-cabi](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cabi): a C binding to MiniJinja.
 
 ## Similar Projects
 
