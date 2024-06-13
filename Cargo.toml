@@ -12,7 +12,7 @@ pr-run-mode = "plan"
 precise-builds = true
 
 [profile.release]
-debug = true
+strip = true
 
 [profile.dev.package.insta]
 opt-level = 3
