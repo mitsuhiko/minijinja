@@ -51,7 +51,7 @@ impl mj_value {
 impl From<Value> for mj_value {
     fn from(value: Value) -> Self {
         mj_value {
-            _opaque: unsafe { transmute(value) },
+            _opaque: unsafe { transmute::<Value, [usize; 3]>(value) },
         }
     }
 }
