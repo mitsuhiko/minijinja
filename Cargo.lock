@@ -1941,6 +1941,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "minijinja-cabi"
+version = "0.1.0"
+dependencies = [
+ "minijinja",
+]
+
+[[package]]
 name = "minijinja-cli"
 version = "2.0.2"
 dependencies = [
