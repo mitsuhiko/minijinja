@@ -379,7 +379,12 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
         }
 
         // SAFETY: this is safe because the `IterObject` will keep our object alive.
-        let iter = unsafe { std::mem::transmute(maker(self)) };
+        let iter = unsafe {
+            std::mem::transmute::<
+                Box<dyn Iterator<Item = _>>,
+                Box<dyn Iterator<Item = _> + Send + Sync>,
+            >(maker(self))
+        };
         let _object = self.clone();
         Enumerator::Iter(Box::new(IterObject { iter, _object }))
     }
@@ -449,7 +454,12 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
         }
 
         // SAFETY: this is safe because the `IterObject` will keep our object alive.
-        let iter = unsafe { std::mem::transmute(maker(self)) };
+        let iter = unsafe {
+            std::mem::transmute::<
+                Box<dyn DoubleEndedIterator<Item = _>>,
+                Box<dyn DoubleEndedIterator<Item = _> + Send + Sync>,
+            >(maker(self))
+        };
         let _object = self.clone();
         Enumerator::RevIter(Box::new(IterObject { iter, _object }))
     }

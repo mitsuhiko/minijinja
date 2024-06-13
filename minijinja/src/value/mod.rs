@@ -845,7 +845,12 @@ impl Value {
                 }
 
                 // SAFETY: this is safe because the object is kept alive by the iter
-                let iter = unsafe { std::mem::transmute((self.maker)(&self.object)) };
+                let iter = unsafe {
+                    std::mem::transmute::<
+                        Box<dyn Iterator<Item = _>>,
+                        Box<dyn Iterator<Item = _> + Send + Sync>,
+                    >((self.maker)(&self.object))
+                };
                 let _object = DynObject::new(self.clone());
                 Enumerator::Iter(Box::new(Iter { iter, _object }))
             }
