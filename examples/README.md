@@ -21,6 +21,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [eval-to-state](eval-to-state): Demonstrates what can be done with evaluating to state.
 * [expr](expr): demonstrates the expression evaluation support.
 * [filters](filters): Shows how to write and use custom filters and global functions.
+* [function-using-async](function-using-async): Demonstrates how tokio handle's `block_on` can be used from within a function.
 * [generate-yaml](generate-yaml): renders YAML files from Jinja templates.
 * [hello](hello): minimal Hello World example.
 * [inheritance](inheritance): demonstrates how to use template inheritance.
