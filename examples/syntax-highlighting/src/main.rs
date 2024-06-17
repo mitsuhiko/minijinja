@@ -46,8 +46,10 @@ impl Object for Highlighter {
                 "call block did not return a string",
             )
         })?;
-        if let Some(rest) = content_str.strip_prefix('\n') {
-            content_str = rest;
+        for prefix in ['\r', '\n'] {
+            if let Some(rest) = content_str.strip_prefix(prefix) {
+                content_str = rest;
+            }
         }
         let syntax = self.ss.find_syntax_by_token(lang).ok_or_else(|| {
             Error::new(
