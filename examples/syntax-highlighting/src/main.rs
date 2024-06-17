@@ -1,5 +1,5 @@
 use core::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use minijinja::value::{from_args, Kwargs, Object, ObjectRepr};
 use minijinja::{args, Environment, Error, ErrorKind, State, Value};
@@ -10,7 +10,6 @@ use syntect::parsing::SyntaxSet;
 struct Highlighter {
     ss: SyntaxSet,
     ts: ThemeSet,
-    theme: Arc<Mutex<String>>,
 }
 
 impl fmt::Debug for Highlighter {
@@ -23,11 +22,7 @@ impl Highlighter {
     pub fn new() -> Highlighter {
         let ss = SyntaxSet::load_defaults_newlines();
         let ts = ThemeSet::load_defaults();
-        Highlighter {
-            ss,
-            ts,
-            theme: Mutex::new("InspiredGitHub".to_string()).into(),
-        }
+        Highlighter { ss, ts }
     }
 }
 
@@ -58,39 +53,17 @@ impl Object for Highlighter {
             )
         })?;
         kwargs.assert_all_used()?;
-        let theme = self.theme.lock().unwrap();
-        let rv = highlighted_html_for_string(
-            content_str,
-            &self.ss,
-            syntax,
-            &self.ts.themes[&theme as &str],
-        )
-        .map_err(|err| {
-            Error::new(ErrorKind::InvalidOperation, "failed to syntax highlight").with_source(err)
-        })?;
+        let theme = state.lookup("SYNTAX_THEME");
+        let theme = theme
+            .as_ref()
+            .and_then(|x| x.as_str())
+            .unwrap_or("InspiredGitHub");
+        let rv = highlighted_html_for_string(content_str, &self.ss, syntax, &self.ts.themes[theme])
+            .map_err(|err| {
+                Error::new(ErrorKind::InvalidOperation, "failed to syntax highlight")
+                    .with_source(err)
+            })?;
         Ok(Value::from_safe_string(rv))
-    }
-
-    fn call_method(
-        self: &Arc<Self>,
-        _state: &State<'_, '_>,
-        method: &str,
-        args: &[Value],
-    ) -> Result<Value, Error> {
-        match method {
-            "set_theme" => {
-                let (name,): (String,) = from_args(args)?;
-                if !self.ts.themes.contains_key(&name) {
-                    return Err(Error::new(
-                        ErrorKind::InvalidOperation,
-                        format!("unknown theme {}", name),
-                    ));
-                }
-                *self.theme.lock().unwrap() = name;
-                Ok(Value::UNDEFINED)
-            }
-            _ => Err(Error::from(ErrorKind::UnknownMethod)),
-        }
     }
 }
 
