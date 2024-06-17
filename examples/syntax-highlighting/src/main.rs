@@ -1,16 +1,22 @@
+use core::fmt;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{from_args, Kwargs, Object};
+use minijinja::value::{from_args, Kwargs, Object, ObjectRepr};
 use minijinja::{args, Environment, Error, ErrorKind, State, Value};
 use syntect::highlighting::ThemeSet;
 use syntect::html::highlighted_html_for_string;
 use syntect::parsing::SyntaxSet;
 
-#[derive(Debug)]
 struct Highlighter {
     ss: SyntaxSet,
     ts: ThemeSet,
     theme: Arc<Mutex<String>>,
+}
+
+impl fmt::Debug for Highlighter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "highlight")
+    }
 }
 
 impl Highlighter {
@@ -26,6 +32,10 @@ impl Highlighter {
 }
 
 impl Object for Highlighter {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Plain
+    }
+
     fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
         let (lang, kwargs): (&str, Kwargs) = from_args(args)?;
         let caller: Value = kwargs.get("caller")?;
