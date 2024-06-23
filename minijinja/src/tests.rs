@@ -241,7 +241,18 @@ mod builtins {
 
     use std::borrow::Cow;
 
+    use crate::value::ops::{coerce, CoerceResult};
     use crate::value::ValueKind;
+
+    /// Return true if the object is a boolean value.
+    ///
+    /// ```jinja
+    /// {{ true is boolean }} -> true
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn is_boolean(v: Value) -> bool {
+        v.kind() == ValueKind::Bool
+    }
 
     /// Checks if a value is odd.
     ///
@@ -261,6 +272,20 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_even(v: Value) -> bool {
         i128::try_from(v).ok().map_or(false, |x| x % 2 == 0)
+    }
+
+    /// Return true if the value is divisible by another one.
+    ///
+    /// ```jinja
+    /// {{ 42 is divisibleby(2) }} -> true
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn is_divisibleby(v: Value, other: Value) -> bool {
+        match coerce(&v, &other) {
+            Some(CoerceResult::I128(a, b)) => (a % b) == 0,
+            Some(CoerceResult::F64(a, b)) => (a % b) == 0.0,
+            _ => false,
+        }
     }
 
     /// Checks if this value is a number.
@@ -523,6 +548,28 @@ mod builtins {
     #[cfg(feature = "builtins")]
     pub fn is_test(state: &State, name: &str) -> bool {
         state.env.get_test(name).is_some()
+    }
+
+    /// Checks if a string is all lowercase.
+    ///
+    /// ```jinja
+    /// {{ 'foo' is lower }} -> true
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_lower(name: &str) -> bool {
+        name.chars().all(|x| x.is_lowercase())
+    }
+
+    /// Checks if a string is all uppercase.
+    ///
+    /// ```jinja
+    /// {{ 'FOO' is upper }} -> true
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_upper(name: &str) -> bool {
+        name.chars().all(|x| x.is_uppercase())
     }
 }
 

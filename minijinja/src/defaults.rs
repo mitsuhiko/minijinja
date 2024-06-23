@@ -121,8 +121,10 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
     rv.insert("escaped".into(), is_safe);
     #[cfg(feature = "builtins")]
     {
+        rv.insert("boolean".into(), BoxedTest::new(tests::is_boolean));
         rv.insert("odd".into(), BoxedTest::new(tests::is_odd));
         rv.insert("even".into(), BoxedTest::new(tests::is_even));
+        rv.insert("divisibleby".into(), BoxedTest::new(tests::is_divisibleby));
         rv.insert("number".into(), BoxedTest::new(tests::is_number));
         rv.insert("integer".into(), BoxedTest::new(tests::is_integer));
         rv.insert("int".into(), BoxedTest::new(tests::is_integer));
@@ -136,6 +138,8 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
             BoxedTest::new(tests::is_startingwith),
         );
         rv.insert("endingwith".into(), BoxedTest::new(tests::is_endingwith));
+        rv.insert("lower".into(), BoxedTest::new(tests::is_lower));
+        rv.insert("upper".into(), BoxedTest::new(tests::is_upper));
 
         // operators
         let is_eq = BoxedTest::new(tests::is_eq);
