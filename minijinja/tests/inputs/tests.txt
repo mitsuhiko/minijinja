@@ -45,3 +45,7 @@ is-true: {{ true is true }} | {{ 42 is true }}
 is-false: {{ false is false }} | {{ 0 is false }}
 is-filter: {{ 'escape' is filter }} | {{ 'unknown-filter' is filter }}
 is-test: {{ 'safe' is test }} | {{ 'unknown-test' is test }}
+is-boolean: {{ true is boolean }} | {{ 42 is boolean }}
+is-divisibleby: {{ 42 is divisibleby(2) }} | {{ 41 is divisibleby(2) }}
+is-lower: {{ "foo" is lower }} | {{ "FOO" is lower }}
+is-upper: {{ "foo" is upper }} | {{ "FOO" is upper }}
