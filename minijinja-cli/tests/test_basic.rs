@@ -139,6 +139,43 @@ fn test_yaml() {
 }
 
 #[test]
+#[cfg(feature = "yaml")]
+fn test_yaml_aliases() {
+    let input = file_with_contents_and_ext(
+        r#"
+a: &a
+  key1: value1
+
+b: &b
+  key2: value2
+
+c:
+  <<: *a
+  key2: from-c
+
+d:
+  <<: [*a, *b]
+  key3: value3
+"#,
+        ".yaml",
+    );
+    let tmpl = file_with_contents(r#"{{ [c.key1, c.key2] }}\n{{ [d.key1, d.key2, d.key3] }}"#);
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    ["value1", "from-c"]\n["value1", "value2", "value3"]
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 #[cfg(feature = "toml")]
 fn test_toml() {
     let input = file_with_contents_and_ext("[section]\nfoo = \"bar\"", ".toml");

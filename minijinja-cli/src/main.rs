@@ -116,7 +116,14 @@ fn load_data(
         #[cfg(feature = "querystring")]
         "querystring" => Value::from(serde_qs::from_str::<HashMap<String, Value>>(&contents)?),
         #[cfg(feature = "yaml")]
-        "yaml" => serde_yaml::from_str(&contents)?,
+        "yaml" => {
+            // for merge keys to work we need to manually call `apply_merge`.
+            // For this reason we need to deserialize into a serde_yml::Value
+            // before converting it into a final value.
+            let mut v: serde_yml::Value = serde_yml::from_str(&contents)?;
+            v.apply_merge()?;
+            Value::from_serialize(v)
+        }
         #[cfg(feature = "toml")]
         "toml" => toml::from_str(&contents)?,
         #[cfg(feature = "cbor")]
@@ -157,7 +164,7 @@ fn interpret_raw_value(s: &str) -> Result<Value, Error> {
     }
     #[cfg(feature = "yaml")]
     mod imp {
-        pub use serde_yaml::from_str;
+        pub use serde_yml::from_str;
         pub const FMT: &str = "JSON";
     }
     imp::from_str::<Value>(s)

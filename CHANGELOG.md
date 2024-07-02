@@ -8,6 +8,7 @@ All notable changes to MiniJinja are documented here.
   `str.isalnum`, `str.isalpha`, `str.isascii`, `str.isdigit`,
   `str.isnumeric`, `str.join`, `str.startswith`.  #522
 - Added the missing tests `boolean`, `divisibleby`, `lower` and `upper`.  #592
+- minijinja-cli now supports YAML aliases and merge keys.  #531
 
 ## 2.0.2
 
