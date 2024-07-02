@@ -105,6 +105,8 @@ fn load_data(
             Some("toml") => "toml",
             #[cfg(feature = "cbor")]
             Some("cbor") => "cbor",
+            #[cfg(feature = "ini")]
+            Some("ini" | "config" | "properties") => "ini",
             _ => bail!("cannot auto detect format from extension"),
         }
     } else {
@@ -128,6 +130,14 @@ fn load_data(
         "toml" => toml::from_str(&contents)?,
         #[cfg(feature = "cbor")]
         "cbor" => ciborium::from_reader(contents.as_bytes())?,
+        #[cfg(feature = "ini")]
+        "ini" => {
+            let mut config = configparser::ini::Ini::new();
+            config
+                .read(contents)
+                .map_err(|msg| anyhow!("could not load ini: {}", msg))?;
+            Value::from_serialize(config.get_map_ref())
+        }
         _ => unreachable!(),
     };
 

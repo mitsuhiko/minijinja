@@ -21,6 +21,7 @@ json5 = ["serde_json5"]
 repl = ["rustyline"]
 completions = ["clap_complete", "clap_complete_nushell", "clap_complete_fig"]
 unicode = ["minijinja/unicode"]
+ini = ["configparser"]
 
 [dependencies]
 anyhow = "1.0.74"
@@ -53,6 +54,7 @@ toml = { version = "0.7.6", optional = true }
 clap_complete = { version = "4", optional = true }
 clap_complete_fig = { version = "4", optional = true }
 clap_complete_nushell = { version = "4", optional = true }
+configparser = { version = "3.1.0", optional = true }
 
 [build-dependencies]
 clap = { version = "4.3.21", default-features = false, features = [

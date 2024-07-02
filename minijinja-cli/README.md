@@ -104,6 +104,8 @@ can be set to stdin at once.
     the compiled bytecode.
 - `-o`, `--output` `<FILENAME>`:
     writes the output to a filename rather than stdout.
+- `--select` `<SELECTOR>`:
+    select a path of the input data.
 - `--generate-completion` `<SHELL>`:
     generate the completions for the given shell.
 - `--version`:
@@ -120,6 +122,37 @@ The following formats are supported:
 - `toml` (`*.toml`): TOML
 - `cbor` (`*.cbor`): CBOR
 - `querystring` (`*.qs`): URL encoded query strings
+- `ini` (`*.ini`, `*.config`, `*.properties`): text only INI files
+
+For most formats there is a pretty straightforward mapping into the template
+context.  The only exception to this is currently INI files where sections are
+effectively mandatory.  If keys are placed in the unnamed section, the second
+is renamed to `default`.  You can use `--select` to make a section be implied:
+
+```
+minijinja-cli template.j2 input.ini --section default
+```
+
+Note that not all formats support all input types.  For instance querystring
+and INI will only support strings for the most part.
+
+## Selecting
+
+By default the input file is fed directly as context.  You can however also
+select a sub-portion of this file.  For instance if you have a TOML file
+where all variables are placed in the `values` section you normally need
+to reference the values like so:
+
+```jinja
+{{ values.key }}
+```
+
+If you however invoke minijinja-cli with `--select=values` you can directly
+reference the keys:
+
+```jinja
+{{ key }}
+```
 
 ## Examples
 
@@ -177,6 +210,7 @@ selected when the defaults are turned off:
 * `cbor`: enables CBOR support
 * `json5`: enables JSON5 support (instead of JSON)
 * `querystring`: enables querystring support
+* `ini`: enables INI support
 * `datetime`: enables the date and time filters and `now()` function
 * `completions`: enables the generation of completions
 * `unicode`: enables the unicode identifier support
