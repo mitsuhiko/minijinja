@@ -233,6 +233,44 @@ fn test_querystring() {
 }
 
 #[test]
+#[cfg(feature = "ini")]
+fn test_ini() {
+    let input = file_with_contents_and_ext("[section]\nfoo = bar", ".ini");
+    let tmpl = file_with_contents(r#"Hello {{ section.foo }}!"#);
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello bar!
+
+    ----- stderr -----
+    "###);
+
+    let input = file_with_contents_and_ext("foo = bar", ".ini");
+    let mut tmpl = NamedTempFile::new().unwrap();
+    tmpl.write_all(br#"Hello {{ foo }}!"#).unwrap();
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg("--select=default")
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello bar!
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 fn test_context_stdin() {
     let tmpl = file_with_contents(r#"Hello {{ foo }}!"#);
 
