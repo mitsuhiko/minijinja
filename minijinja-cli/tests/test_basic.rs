@@ -141,7 +141,8 @@ fn test_yaml() {
 #[test]
 #[cfg(feature = "yaml")]
 fn test_yaml_aliases() {
-    let input = file_with_contents_and_ext(r#"
+    let input = file_with_contents_and_ext(
+        r#"
 a: &a
   key1: value1
 
@@ -155,7 +156,9 @@ c:
 d:
   <<: [*a, *b]
   key3: value3
-"#, ".yaml");
+"#,
+        ".yaml",
+    );
     let tmpl = file_with_contents(r#"{{ [c.key1, c.key2] }}\n{{ [d.key1, d.key2, d.key3] }}"#);
 
     assert_cmd_snapshot!(
