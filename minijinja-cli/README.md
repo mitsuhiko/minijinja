@@ -136,6 +136,24 @@ minijinja-cli template.j2 input.ini --section default
 Note that not all formats support all input types.  For instance querystring
 and INI will only support strings for the most part.
 
+## Selecting
+
+By default the input file is fed directly as context.  You can however also
+select a sub-portion of this file.  For instance if you have a TOML file
+where all variables are placed in the `values` section you normally need
+to reference the values like so:
+
+```jinja
+{{ values.key }}
+```
+
+If you however invoke minijinja-cli with `--select=values` you can directly
+reference the keys:
+
+```jinja
+{{ key }}
+```
+
 ## Examples
 
 Render a template with a string and integer variable:
@@ -192,6 +210,7 @@ selected when the defaults are turned off:
 * `cbor`: enables CBOR support
 * `json5`: enables JSON5 support (instead of JSON)
 * `querystring`: enables querystring support
+* `ini`: enables INI support
 * `datetime`: enables the date and time filters and `now()` function
 * `completions`: enables the generation of completions
 * `unicode`: enables the unicode identifier support
