@@ -729,6 +729,10 @@ impl<'env> Vm<'env> {
             let old_escape = mem::replace(&mut state.auto_escape, tmpl.initial_auto_escape());
             let old_instructions = mem::replace(&mut state.instructions, new_instructions);
             let old_blocks = mem::replace(&mut state.blocks, prepare_blocks(new_blocks));
+            // we need to make a copy of the loaded templates here as we want
+            // to forget about the templates that an include triggered by the
+            // time the include finishes.
+            let old_loaded_templates = state.loaded_templates.clone();
             ok!(state.ctx.incr_depth(INCLUDE_RECURSION_COST));
             let rv;
             #[cfg(feature = "macros")]
@@ -742,6 +746,7 @@ impl<'env> Vm<'env> {
                 rv = self.eval_state(state, out);
             }
             state.ctx.decr_depth(INCLUDE_RECURSION_COST);
+            state.loaded_templates = old_loaded_templates;
             state.auto_escape = old_escape;
             state.instructions = old_instructions;
             state.blocks = old_blocks;

@@ -610,3 +610,22 @@ fn test_invalid_value_iteration() {
     assert_eq!(err.kind(), ErrorKind::InvalidOperation);
     assert_eq!(err.detail(), Some("failed during iteration"));
 }
+
+#[test]
+fn test_multiple_extended_includes_in_loop() {
+    let mut env = Environment::new();
+    env.add_template("dummy.txt", "{% block blk %}{% endblock %}")
+        .unwrap();
+    env.add_template(
+        "include.txt",
+        "{% extends 'dummy.txt' %}{% block blk %}{{ item }}{% endblock %}",
+    )
+    .unwrap();
+    env.add_template(
+        "main.txt",
+        "{% for item in range(3) %}{% include 'include.txt' %}{% endfor %}",
+    )
+    .unwrap();
+    let rv = env.get_template("main.txt").unwrap().render(()).unwrap();
+    assert_eq!(rv, "012");
+}
