@@ -238,7 +238,6 @@ impl<'env> Vm<'env> {
             // code bloat generated here.
             let a;
             let b;
-            let mut err;
 
             macro_rules! func_binop {
                 ($method:ident) => {{
@@ -258,7 +257,7 @@ impl<'env> Vm<'env> {
 
             macro_rules! bail {
                 ($err:expr) => {{
-                    err = $err;
+                    let mut err = $err;
                     process_err(&mut err, pc, state);
                     return Err(err);
                 }};
