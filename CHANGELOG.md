@@ -5,6 +5,8 @@ All notable changes to MiniJinja are documented here.
 ## 2.0.4
 
 - minijinja-cli now supports `.ini` files.  #532
+- Fixed a bug that caused cycle detection to trigger incorrectly when an included
+  template extended from another template.  #538
 
 ## 2.0.3
 
