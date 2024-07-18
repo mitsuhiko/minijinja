@@ -93,9 +93,14 @@
 //! let value = Value::from_serialize(&[1, 2, 3]);
 //! ```
 //!
-//! The inverse of that operation is to pass a value directly as serializer to
-//! a type that supports deserialization.  This requires the `deserialization`
-//! feature.
+//! This feature is enabled by default but in fact optional.  If you disable default
+//! features (which means turning off the default `serde` feature), MiniJinja will
+//! instead use a custom `Serialize` trait which is only implemented for some very
+//! basic types and cannot be implemented for custom types.
+//!
+//! The inverse of the serialize operation is to pass a value directly as
+//! serializer to a type that supports deserialization.  This requires the
+//! `deserialization` feature.
 //!
 #![cfg_attr(
     feature = "deserialization",
