@@ -24,11 +24,11 @@ fn main() {
             include_str!("src/example.rs.jinja"),
             struct_name => "Point",
             points => vec![
-                (1.0, 2.0),
-                (2.0, 2.5),
-                (4.0, 1.0),
+                vec![1.0, 2.0],
+                vec![2.0, 2.5],
+                vec![4.0, 1.0],
             ],
-            build_cwd => env::current_dir().unwrap()
+            build_cwd => env::current_dir().unwrap().to_string_lossy().to_string(),
         ),
     )
     .unwrap();

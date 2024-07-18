@@ -21,6 +21,7 @@ default = [
     "builtins",
     "debug",
     "deserialization",
+    "serde",
     "macros",
     "multi_template",
     "adjacent_loop_items",
@@ -29,12 +30,13 @@ default = [
 
 # API features
 preserve_order = ["indexmap"]
-deserialization = []
+deserialization = ["serde"]
 debug = []
 loader = ["self_cell", "memo-map"]
 unicode = ["unicode-ident", "unicase"]
 custom_syntax = ["dep:aho-corasick"]
 std_collections = []
+serde = ["dep:serde"]
 
 # Speedups
 key_interning = []
@@ -48,17 +50,17 @@ adjacent_loop_items = []
 fuel = []
 
 # Extra Filters
-json = ["serde_json"]
+json = ["serde", "serde_json"]
 urlencode = ["percent-encoding"]
 
 # Internal Features that should not be used
 internal_debug = []
 unstable_machinery = ["internal_debug"]
-unstable_machinery_serde = ["unstable_machinery", "serde/derive"]
+unstable_machinery_serde = ["serde", "unstable_machinery", "serde/derive"]
 
 [dependencies]
 aho-corasick = { version = "1.0", default-features = false, optional = true }
-serde = "1.0.130"
+serde = { version = "1.0.130", optional = true }
 v_htmlescape = { version = "0.15.8", optional = true }
 self_cell = { version = "1.0.0", optional = true }
 serde_json = { version = "1.0.68", optional = true }

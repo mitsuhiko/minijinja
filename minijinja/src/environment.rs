@@ -3,8 +3,6 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
-use serde::Serialize;
-
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
 use crate::compiler::parser::parse_expr;
@@ -13,7 +11,7 @@ use crate::expression::Expression;
 use crate::output::Output;
 use crate::template::{CompiledTemplate, CompiledTemplateRef, Template, TemplateConfig};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
-use crate::value::{FunctionArgs, FunctionResult, Value};
+use crate::value::{FunctionArgs, FunctionResult, Serialize, Value};
 use crate::vm::State;
 use crate::{defaults, filters, functions, tests};
 

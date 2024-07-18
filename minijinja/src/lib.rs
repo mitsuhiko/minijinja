@@ -6,9 +6,10 @@
 //! MiniJinja is a powerful but minimal dependency template engine for Rust which
 //! is based on the syntax and behavior of the
 //! [Jinja2](https://jinja.palletsprojects.com/) template engine for Python.  It's
-//! implemented on top of [`serde`].  The goal is to be able to render a large
-//! chunk of the Jinja2 template ecosystem from Rust with a minimal engine and to
-//! leverage an already existing ecosystem of editor integrations.
+//! implemented on top of `serde` though that dependency can be disabled.  The goal
+//! is to be able to render a large chunk of the Jinja2 template ecosystem from
+//! Rust with a minimal engine and to leverage an already existing ecosystem of
+//! editor integrations.
 //!
 //! ```jinja
 //! {% for user in users %}
@@ -153,6 +154,9 @@
 //!
 //! - **Rust Functionality:**
 //!
+//!   - `serde`: if this feature is removed the `serde` dependency is not used at all.
+//!     This restricts some value conversions that would otherwise be possible though
+//!     a large set of the engine stays functional.
 //!   - `debug`: if this feature is removed some debug functionality of the engine is
 //!     removed as well.  This mainly affects the quality of error reporting.
 //!   - `deserialization`: when removed this disables deserialization support for
