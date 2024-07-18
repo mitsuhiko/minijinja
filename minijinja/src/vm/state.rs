@@ -138,6 +138,13 @@ impl<'template, 'env> State<'template, 'env> {
     }
 
     /// Looks up a variable by name in the context.
+    ///
+    /// # Note on Closures
+    ///
+    /// Macros and call blocks analyze which variables are referenced and
+    /// create closures for them.  This means that unless a variable is defined
+    /// as a [global](Environment::add_global) in the environment or it was
+    /// referenced by a macro, this method won't be able to find it.
     #[inline(always)]
     pub fn lookup(&self, name: &str) -> Option<Value> {
         self.ctx.load(self.env, name)
