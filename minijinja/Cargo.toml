@@ -60,7 +60,7 @@ unstable_machinery_serde = ["unstable_machinery", "serde/derive"]
 aho-corasick = { version = "1.0", default-features = false, optional = true }
 serde = "1.0.130"
 v_htmlescape = { version = "0.15.8", optional = true }
-self_cell = { version = "1.0.0", optional = true }
+self_cell = { version = "1.0.4", optional = true }
 serde_json = { version = "1.0.68", optional = true }
 percent-encoding = { version = "2.2.0", optional = true }
 indexmap = { version = "1.9.0", optional = true }
