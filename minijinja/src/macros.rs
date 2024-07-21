@@ -117,6 +117,17 @@ pub mod __context {
 /// The merge works with an value, not just values created by the `context!`
 /// macro and is performed lazy.  This means it also works with dynamic
 /// [`Object`](crate::value::Object)s.
+///
+/// # Note on Conversions
+///
+/// This macro uses [`Value::from_serialize`](crate::Value::from_serialize)
+/// for conversions.
+///
+/// This macro currently does not move passed values.  Future versions of
+/// MiniJinja are going to change the move behavior and it's recommended to not
+/// depend on this implicit reference behavior.  You should thus pass values
+/// with `&value` if you intend on still being able to reference them
+/// after the macro invocation.
 #[macro_export]
 macro_rules! context {
     () => {
