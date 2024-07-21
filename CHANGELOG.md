@@ -8,6 +8,8 @@ All notable changes to MiniJinja are documented here.
 - Fixed a bug that caused cycle detection to trigger incorrectly when an included
   template extended from another template.  #538
 - Bumped the minimum version of `self_cell` to 1.0.4.  #540
+- MiniJinja will now warn if the `serde` feature is disabled.  This is in
+  anticipation of removing the serde dependency in the future.  #541
 
 ## 2.0.3
 
