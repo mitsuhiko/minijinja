@@ -86,9 +86,6 @@ fn main() {
 Here are some interesting Open Source users and use cases of MiniJinja.  The examples link directly to where
 the engine is used so you can see how it's utilized:
 
-* Code Generation:
-  * **[DataDog](https://www.datadoghq.com/)** is using it to [generate Rust bindings](https://github.com/DataDog/datadog-api-client-rust/blob/e51163e5b73bec32308f783a03725bf8ee4169a8/.generator/src/generator/templates/api.j2) for their API
-
 * HTML Generation:
   * **[Zine](https://github.com/zineland/zine)** uses it to [generate static HTML](https://github.com/zineland/zine/blob/17285efe9f9a63b79a42a738b54d4d730b8cd551/src/engine.rs#L8)
   * **[Oranda](https://github.com/axodotdev/oranda)** uses it to [generate HTML landing pages](https://github.com/axodotdev/oranda/blob/fb97859c99ab81f644ab5b1449f725fc5c3e9721/src/site/templates.rs)

@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - minijinja-cli now supports `.ini` files.  #532
 - Fixed a bug that caused cycle detection to trigger incorrectly when an included
   template extended from another template.  #538
+- Bumped the minimum version of `self_cell` to 1.0.4.  #540
 
 ## 2.0.3
 
