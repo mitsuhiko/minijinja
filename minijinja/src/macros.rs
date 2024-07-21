@@ -138,7 +138,7 @@ pub mod __context {
 /// macro and is performed lazy.  This means it also works with dynamic
 /// [`Object`](crate::value::Object)s.
 ///
-/// ## Supported Conversions
+/// # Note on Conversions
 ///
 /// The `context!` macro is special in that it supports two forms of value
 /// conversions.  It first attempts to convert a value with `Into<Value>`
