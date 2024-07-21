@@ -10,6 +10,9 @@ All notable changes to MiniJinja are documented here.
 - Bumped the minimum version of `self_cell` to 1.0.4.  #540
 - MiniJinja will now warn if the `serde` feature is disabled.  This is in
   anticipation of removing the serde dependency in the future.  #541
+- Improved an edge case with `State::resolve`.  It now can resolve the
+  initial template context in macro calls even if no closure has been
+  created.  #542
 
 ## 2.0.3
 
