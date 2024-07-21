@@ -151,6 +151,9 @@
 //!     filter's case insensitive comparison changes to using unicode and not
 //!     ASCII rules.  Without this features only ASCII identifiers can be used
 //!     for variable names and attributes.
+//!   - `serde`: enables or disables serde support.  In current versions of MiniJinja
+//!     it's not possible to disable serde but it will become possible.  To prevent
+//!     breakage, MiniJinja warns if this feature is disabled.
 //!
 //! - **Rust Functionality:**
 //!

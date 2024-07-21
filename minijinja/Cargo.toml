@@ -26,6 +26,7 @@ default = [
     "multi_template",
     "adjacent_loop_items",
     "std_collections",
+    "serde",
 ]
 
 # API features
