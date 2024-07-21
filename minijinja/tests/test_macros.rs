@@ -218,6 +218,12 @@ fn test_caller_bug() {
 /// https://github.com/mitsuhiko/minijinja/issues/535
 #[test]
 fn test_unenclosed_resolve() {
+    // the current intended logic here is that a the state can
+    // observe real globals and the initial template context, but
+    // no other modifications.  Normally the call block can only
+    // see what it encloses explicitly, but since it does not
+    // refer to anything here it in fact has an empty closure.
+
     fn resolve(state: &minijinja::State, var: &str) -> Value {
         state.lookup(var).unwrap_or_default()
     }
@@ -228,14 +234,16 @@ fn test_unenclosed_resolve() {
     let rv = env
         .render_str(
             r#"
+    {%- set template_global = 'template global' %}
     {%- macro wrapper() %}{{ caller() }}{% endmacro %}
     {%- call wrapper() %}
         {{- resolve('render_global') }}|
-        {{- resolve('ctx_global') }}
+        {{- resolve('ctx_global') }}|
+        {{- resolve('template_global') }}
     {%- endcall -%}
     "#,
             context! { render_global => "render global" },
         )
         .unwrap();
-    assert_snapshot!(rv, @"render global|ctx global");
+    assert_snapshot!(rv, @"render global|ctx global|");
 }
