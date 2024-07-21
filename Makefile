@@ -1,5 +1,5 @@
 DOC_FEATURES=loader,json,urlencode,custom_syntax,fuel
-TEST_FEATURES=unstable_machinery,builtins,loader,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax,deserialization
+TEST_FEATURES=unstable_machinery,builtins,loader,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax,deserialization,serde
 
 .PHONY: all
 all: test
@@ -42,7 +42,7 @@ run-tests:
 	@echo "CARGO TESTS"
 	@cd minijinja; cargo test --features=json,urlencode,internal_debug
 	@echo "CARGO TEST SPEEDUPS"
-	@cd minijinja; cargo test --no-default-features --features=speedups,$(FEATURES)
+	@cd minijinja; cargo test --no-default-features --features=speedups,$(TEST_FEATURES)
 	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
 	@cd minijinja; cargo check --no-default-features --features=debug
 	@cd minijinja-autoreload; cargo test
