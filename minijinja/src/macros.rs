@@ -24,7 +24,7 @@ macro_rules! some {
 #[doc(hidden)]
 pub mod __context {
     pub use crate::value::merge_object::MergeObject;
-    use crate::value::{Value, ValueMap};
+    use crate::value::{Serialize, Value, ValueMap};
     use crate::Environment;
     use std::rc::Rc;
 
@@ -61,8 +61,7 @@ pub mod __context {
         fn convert_to_minijinja_value(self) -> Value;
     }
 
-    #[cfg(feature = "serde")]
-    impl<'a, T: serde::Serialize> ConvertToValue<T> for &'a Convert<T> {
+    impl<'a, T: Serialize> ConvertToValue<T> for &'a Convert<T> {
         #[inline(always)]
         fn convert_to_minijinja_value(self) -> Value {
             Value::from_serialize(&self.0)
