@@ -137,6 +137,7 @@ impl Object for Macro {
             instructions,
             *offset,
             closure,
+            state.ctx.clone_base(),
             caller,
             &mut out,
             state,
