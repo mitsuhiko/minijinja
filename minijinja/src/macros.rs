@@ -61,6 +61,7 @@ pub mod __context {
         fn convert_to_minijinja_value(self) -> Value;
     }
 
+    #[cfg(feature = "serde")]
     impl<'a, T: serde::Serialize> ConvertToValue<T> for &'a Convert<T> {
         #[inline(always)]
         fn convert_to_minijinja_value(self) -> Value {
