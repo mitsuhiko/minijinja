@@ -256,6 +256,15 @@ impl<'env> Context<'env> {
         self.stack.last_mut().unwrap().closure = closure;
     }
 
+    /// Return the base context value
+    #[cfg(feature = "macros")]
+    pub fn clone_base(&self) -> Value {
+        self.stack
+            .first()
+            .map(|x| x.ctx.clone())
+            .unwrap_or_default()
+    }
+
     /// Looks up a variable in the context.
     pub fn load(&self, env: &Environment, key: &str) -> Option<Value> {
         for frame in self.stack.iter().rev() {

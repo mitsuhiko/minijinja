@@ -38,7 +38,7 @@ const INCLUDE_RECURSION_COST: usize = 10;
 
 // the cost of a single macro call against the stack limit.
 #[cfg(feature = "macros")]
-const MACRO_RECURSION_COST: usize = 5;
+const MACRO_RECURSION_COST: usize = 4;
 
 /// Helps to evaluate something.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
@@ -108,12 +108,14 @@ impl<'env> Vm<'env> {
         instructions: &Instructions<'env>,
         pc: usize,
         closure: Value,
+        context_base: Value,
         caller: Option<Value>,
         out: &mut Output,
         state: &State,
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
-        let mut ctx = Context::new_with_frame(Frame::new(closure), self.env.recursion_limit());
+        let mut ctx = Context::new_with_frame(Frame::new(context_base), self.env.recursion_limit());
+        ok!(ctx.push_frame(Frame::new(closure)));
         if let Some(caller) = caller {
             ctx.store("caller", caller);
         }
