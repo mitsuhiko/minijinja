@@ -150,6 +150,9 @@
 //!     filter's case insensitive comparison changes to using unicode and not
 //!     ASCII rules.  Without this features only ASCII identifiers can be used
 //!     for variable names and attributes.
+//!   - `serde`: enables or disables serde support.  In current versions of MiniJinja
+//!     it's not possible to disable serde but it will become possible.  To prevent
+//!     breakage, MiniJinja warns if this feature is disabled.
 //!
 //! - **Rust Functionality:**
 //!
@@ -245,6 +248,23 @@ pub use self::value::Value;
 
 pub use self::macros::__context;
 pub use self::vm::State;
+
+// fowards compatibility
+#[cfg(not(feature = "serde"))]
+const _: () = {
+    #[deprecated(
+        since = "2.0.4",
+        note = "Future versions of MiniJinja will require enabling \
+        the 'serde' feature to use serde types.  To silence this warning \
+        add 'serde' to the least of features of minijinja."
+    )]
+    #[allow(unused)]
+    fn enable_implicit_serde_support() {}
+
+    fn trigger_warning() {
+        enable_implicit_serde_support();
+    }
+};
 
 /// This module gives access to the low level machinery.
 ///
