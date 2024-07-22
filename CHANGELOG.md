@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## 2.0.4
+## 2.1.0
 
 - minijinja-cli now supports `.ini` files.  #532
 - Fixed a bug that caused cycle detection to trigger incorrectly when an included
