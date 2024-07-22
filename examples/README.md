@@ -45,8 +45,8 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [syntax-highlighting](syntax-highlighting): Shows how to implement syntax highlighting with syntect.
 * [undefined-tracking](undefined-tracking): Shows how you can track undefined values.
 * [value-tracking](value-tracking): Shows how you can track values that are referenced at runtime.
-* [wasm-yew](wasm-yew): Shows how to use MiniJinja with WASM in the browser.
 
 ## Third-party Examples
 
 * [Actix Web Integration](https://github.com/actix/examples/blob/master/templating/minijinja)
+* [MiniJinja Playground](https://github.com/mitsuhiko/minijinja-playground/) (WASM)
