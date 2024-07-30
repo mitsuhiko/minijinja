@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.1.1
+
+- Added `indent` parameter to `tojson` filter.  #546
+
 ## 2.1.0
 
 - minijinja-cli now supports `.ini` files.  #532

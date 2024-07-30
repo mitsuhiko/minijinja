@@ -1008,9 +1008,27 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "json"))))]
     #[cfg(feature = "json")]
-    pub fn tojson(value: Value, pretty: Option<bool>) -> Result<Value, Error> {
-        if pretty.unwrap_or(false) {
-            serde_json::to_string_pretty(&value)
+    pub fn tojson(value: Value, indent: Option<Value>, args: Kwargs) -> Result<Value, Error> {
+        let indent = match indent {
+            Some(indent) => Some(indent),
+            None => ok!(args.get("indent")),
+        };
+        let indent = match indent {
+            None => None,
+            Some(ref val) => match bool::try_from(val.clone()).ok() {
+                Some(true) => Some(2),
+                Some(false) => None,
+                None => Some(ok!(usize::try_from(val.clone()))),
+            },
+        };
+        args.assert_all_used()?;
+        if let Some(indent) = indent {
+            let mut out = Vec::<u8>::new();
+            let indentation = " ".repeat(indent);
+            let formatter = serde_json::ser::PrettyFormatter::with_indent(indentation.as_bytes());
+            let mut s = serde_json::Serializer::with_formatter(&mut out, formatter);
+            serde::Serialize::serialize(&value, &mut s)
+                .map(|_| unsafe { String::from_utf8_unchecked(out) })
         } else {
             serde_json::to_string(&value)
         }

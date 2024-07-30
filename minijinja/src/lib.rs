@@ -202,7 +202,6 @@
 #![allow(clippy::cognitive_complexity)]
 #![allow(clippy::get_first)]
 #![allow(clippy::default_constructed_unit_structs)]
-#![allow(where_clauses_object_safety)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(missing_docs)]
 #![doc(html_logo_url = "https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo-square.png")]
