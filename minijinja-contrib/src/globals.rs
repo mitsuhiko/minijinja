@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 #[allow(unused)]
 use minijinja::value::Value;
-use minijinja::value::{from_args, Kwargs, Object, ObjectRepr};
+use minijinja::value::{from_args, Object, ObjectRepr};
 use minijinja::{Error, ErrorKind, State};
 
 /// Returns the current time in UTC as unix timestamp.
@@ -173,7 +173,11 @@ pub fn randrange(state: &State, n: i64, m: Option<i64>) -> i64 {
 /// * `html`: set to `true` to generate HTML paragraphs instead.
 #[cfg(feature = "rand")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand")))]
-pub fn lipsum(state: &State, n: Option<usize>, kwargs: Kwargs) -> Result<Value, Error> {
+pub fn lipsum(
+    state: &State,
+    n: Option<usize>,
+    kwargs: minijinja::value::Kwargs,
+) -> Result<Value, Error> {
     use rand::seq::SliceRandom;
     use rand::Rng;
 
