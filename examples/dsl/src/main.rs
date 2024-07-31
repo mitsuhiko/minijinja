@@ -3,7 +3,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use minijinja::value::{from_args, Kwargs, Object, Value};
-use minijinja::{Environment, Error, ErrorKind};
+use minijinja::{Environment, Error};
 
 /// A copy-on-write object that holds an assembled query.
 #[derive(Debug, Clone)]
@@ -85,29 +85,19 @@ fn query(table: String) -> Value {
     Value::from_object(Query::new(table))
 }
 
-/// Utility function to extract a [`Query`] out of a [`Value`].
-fn value_as_query(obj: &Value) -> Result<&Query, Error> {
-    obj.downcast_object_ref::<Query>().ok_or_else(|| {
-        Error::new(
-            ErrorKind::InvalidOperation,
-            "filter must be applied to query",
-        )
-    })
-}
-
 /// Filters a query by some keyword arguments as filter function.
-fn filter_filter(obj: &Value, kwargs: Kwargs) -> Result<Value, Error> {
-    Ok(Value::from_object(value_as_query(obj)?.filter(kwargs)))
+fn filter_filter(obj: &Query, kwargs: Kwargs) -> Result<Value, Error> {
+    Ok(Value::from_object(obj.filter(kwargs)))
 }
 
 /// Applies a limit to a query as filter function.
-fn limit_filter(obj: &Value, limit: usize) -> Result<Value, Error> {
-    Ok(Value::from_object(value_as_query(obj)?.limit(limit)))
+fn limit_filter(obj: &Query, limit: usize) -> Result<Value, Error> {
+    Ok(Value::from_object(obj.limit(limit)))
 }
 
 /// Applies an offset to a query as filter function.
-fn offset_filter(obj: &Value, offset: usize) -> Result<Value, Error> {
-    Ok(Value::from_object(value_as_query(obj)?.offset(offset)))
+fn offset_filter(obj: &Query, offset: usize) -> Result<Value, Error> {
+    Ok(Value::from_object(obj.offset(offset)))
 }
 
 fn main() {
