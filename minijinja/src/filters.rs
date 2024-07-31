@@ -1078,7 +1078,6 @@ mod builtins {
     /// {{ global_config|indent(2,true,true)}} # indent whole Value and all blank lines
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
-    #[cfg(feature = "builtins")]
     pub fn indent(
         mut value: String,
         width: usize,
@@ -1166,7 +1165,6 @@ mod builtins {
         }
     }
 
-    #[cfg(feature = "builtins")]
     fn select_or_reject(
         state: &State,
         invert: bool,
@@ -1218,7 +1216,6 @@ mod builtins {
     /// {{ [false, null, 42]|select }} -> [42]
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn select(
         state: &State,
         value: Value,
@@ -1238,7 +1235,6 @@ mod builtins {
     /// {{ users|selectattr("id", "even") }} -> returns all users with an even id
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn selectattr(
         state: &State,
         value: Value,
@@ -1253,7 +1249,6 @@ mod builtins {
     ///
     /// This is the inverse of [`select`].
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn reject(
         state: &State,
         value: Value,
@@ -1273,7 +1268,6 @@ mod builtins {
     /// {{ users|rejectattr("id", "even") }} -> returns all users with an odd id
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn rejectattr(
         state: &State,
         value: Value,
@@ -1311,7 +1305,6 @@ mod builtins {
     /// Users on this page: {{ titles|map('lower')|join(', ') }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn map(
         state: &State,
         value: Value,
@@ -1385,7 +1378,6 @@ mod builtins {
     /// in the iterable passed to the filter.  The filter will not detect
     /// duplicate objects or arrays, only primitives such as strings or numbers.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn unique(values: Vec<Value>) -> Value {
         use std::collections::BTreeSet;
 
@@ -1406,7 +1398,6 @@ mod builtins {
     ///
     /// This is useful for debugging as it better shows what's inside an object.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn pprint(value: &Value) -> String {
         format!("{:#?}", value)
     }
