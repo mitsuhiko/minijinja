@@ -1,11 +1,10 @@
+use minijinja::{context, Environment};
 use minijinja_contrib::filters::pluralize;
 use similar_asserts::assert_eq;
 
 #[test]
 fn test_pluralize() {
-    use minijinja::context;
-
-    let mut env = minijinja::Environment::new();
+    let mut env = Environment::new();
 
     env.add_filter("pluralize", pluralize);
     for (num, s) in [
@@ -91,4 +90,17 @@ fn test_pluralize() {
         "invalid operation: Pluralize argument is not an integer, or a sequence / object with \
             a length but of type number (in <string>:1)",
     );
+}
+
+#[test]
+#[cfg(feature = "rand")]
+fn test_random() {
+    use minijinja::render;
+    use minijinja_contrib::filters::random;
+
+    let mut env = Environment::new();
+    env.add_filter("random", random);
+
+    insta::assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ [1, 2, 3, 4]|random }}"), @"2");
+    insta::assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ 'HelloWorld'|random }}"), @"e");
 }

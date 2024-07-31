@@ -1944,7 +1944,9 @@ name = "minijinja-contrib"
 version = "2.1.0"
 dependencies = [
  "chrono",
+ "insta",
  "minijinja",
+ "rand",
  "serde",
  "similar-asserts",
  "time 0.3.36",
