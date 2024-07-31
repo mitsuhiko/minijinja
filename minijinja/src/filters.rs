@@ -642,23 +642,18 @@ mod builtins {
             ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::U128(_) | ValueRepr::I128(_) => {
                 Ok(value)
             }
-            ValueRepr::F64(v) => {
-                let x = *v as i128;
-                if x as f64 == *v {
-                    Ok(Value::from(x))
+            ValueRepr::F64(v) => Ok(Value::from(*v as i128)),
+            ValueRepr::String(..) | ValueRepr::SmallStr(_) => {
+                let s = value.as_str().unwrap();
+                if let Ok(i) = s.parse::<i128>() {
+                    Ok(Value::from(i))
                 } else {
-                    Err(Error::new(
-                        ErrorKind::InvalidOperation,
-                        format!("cannot convert float {} to integer", v),
-                    ))
+                    match s.parse::<f64>() {
+                        Ok(f) => Ok(Value::from(f as i128)),
+                        Err(err) => Err(Error::new(ErrorKind::InvalidOperation, err.to_string())),
+                    }
                 }
             }
-            ValueRepr::String(..) | ValueRepr::SmallStr(_) => value
-                .as_str()
-                .unwrap()
-                .parse::<i128>()
-                .map(Value::from)
-                .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
             ValueRepr::Bytes(_) | ValueRepr::Object(_) => Err(Error::new(
                 ErrorKind::InvalidOperation,
                 format!("cannot convert {} to integer", value.kind()),
