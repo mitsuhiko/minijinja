@@ -1006,6 +1006,17 @@ mod builtins {
     /// </script>
     /// <a href="#" data-info='{{ json_object|tojson }}'>...</a>
     /// ```
+    ///
+    /// The filter takes one argument `indent` (which can also be passed as keyword
+    /// argument for compatibility with Jinja2) which can be set to `true` to enable
+    /// pretty printing or an integer to control the indentation of the pretty
+    /// printing feature.
+    ///
+    /// ```jinja
+    /// <script>
+    ///   const GLOBAL_CONFIG = {{ global_config|tojson(indent=2) }};
+    /// </script>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "json"))))]
     #[cfg(feature = "json")]
     pub fn tojson(value: Value, indent: Option<Value>, args: Kwargs) -> Result<Value, Error> {
