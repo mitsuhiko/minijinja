@@ -214,6 +214,7 @@ selected when the defaults are turned off:
 * `datetime`: enables the date and time filters and `now()` function
 * `completions`: enables the generation of completions
 * `unicode`: enables the unicode identifier support
+* `contrib`: enables the `minijinja_contrib` based functionality including the `--py-compat` flag
 
 Additionally if the `ASSET_OUT_DIR` environment variable is set during
 compilation manpage (and optionally completions) are generated into that

@@ -43,8 +43,8 @@ pub fn add_to_environment(env: &mut Environment) {
     #[cfg(feature = "rand")]
     {
         env.add_filter("random", filters::random);
-        env.add_filter("randrange", globals::randrange);
-        env.add_filter("lipsum", globals::lipsum);
+        env.add_function("lipsum", globals::lipsum);
+        env.add_function("randrange", globals::randrange);
     }
     env.add_function("cycler", globals::cycler);
     env.add_function("joiner", globals::joiner);
