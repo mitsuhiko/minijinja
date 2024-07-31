@@ -961,3 +961,29 @@ fn test_object_btree_map() {
     );
     assert_eq!(value.to_string(), "{true: 1}");
 }
+
+#[test]
+fn test_downcast_arg() {
+    #[derive(Debug)]
+    struct A;
+
+    #[derive(Debug)]
+    struct B;
+
+    fn my_func(a: &A, b: Arc<B>) -> String {
+        format!("{:?}|{:?}", a, b)
+    }
+
+    impl Object for A {}
+    impl Object for B {}
+
+    let mut env = Environment::new();
+    env.add_function("my_func", my_func);
+
+    assert_eq!(
+        render!(in env, "{{ my_func(a, b) }}",
+        a => Value::from_object(A),
+        b => Value::from_object(B)),
+        "A|B"
+    );
+}
