@@ -6,8 +6,8 @@
 //! For the most part the existence of the value type can be ignored as
 //! MiniJinja will perform the necessary conversions for you.  For instance
 //! if you write a filter that converts a string you can directly declare the
-//! filter to take a [`String`]).  However for some more
-//! advanced use cases it's useful to know that this type exists.
+//! filter to take a [`String`].  However for some more advanced use cases
+//! it's useful to know that this type exists.
 //!
 //! # Basic Value Conversions
 //!

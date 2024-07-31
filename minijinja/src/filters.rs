@@ -1006,11 +1006,40 @@ mod builtins {
     /// </script>
     /// <a href="#" data-info='{{ json_object|tojson }}'>...</a>
     /// ```
+    ///
+    /// The filter takes one argument `indent` (which can also be passed as keyword
+    /// argument for compatibility with Jinja2) which can be set to `true` to enable
+    /// pretty printing or an integer to control the indentation of the pretty
+    /// printing feature.
+    ///
+    /// ```jinja
+    /// <script>
+    ///   const GLOBAL_CONFIG = {{ global_config|tojson(indent=2) }};
+    /// </script>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "json"))))]
     #[cfg(feature = "json")]
-    pub fn tojson(value: Value, pretty: Option<bool>) -> Result<Value, Error> {
-        if pretty.unwrap_or(false) {
-            serde_json::to_string_pretty(&value)
+    pub fn tojson(value: Value, indent: Option<Value>, args: Kwargs) -> Result<Value, Error> {
+        let indent = match indent {
+            Some(indent) => Some(indent),
+            None => ok!(args.get("indent")),
+        };
+        let indent = match indent {
+            None => None,
+            Some(ref val) => match bool::try_from(val.clone()).ok() {
+                Some(true) => Some(2),
+                Some(false) => None,
+                None => Some(ok!(usize::try_from(val.clone()))),
+            },
+        };
+        args.assert_all_used()?;
+        if let Some(indent) = indent {
+            let mut out = Vec::<u8>::new();
+            let indentation = " ".repeat(indent);
+            let formatter = serde_json::ser::PrettyFormatter::with_indent(indentation.as_bytes());
+            let mut s = serde_json::Serializer::with_formatter(&mut out, formatter);
+            serde::Serialize::serialize(&value, &mut s)
+                .map(|_| unsafe { String::from_utf8_unchecked(out) })
         } else {
             serde_json::to_string(&value)
         }
@@ -1049,7 +1078,6 @@ mod builtins {
     /// {{ global_config|indent(2,true,true)}} # indent whole Value and all blank lines
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
-    #[cfg(feature = "builtins")]
     pub fn indent(
         mut value: String,
         width: usize,
@@ -1137,7 +1165,6 @@ mod builtins {
         }
     }
 
-    #[cfg(feature = "builtins")]
     fn select_or_reject(
         state: &State,
         invert: bool,
@@ -1189,7 +1216,6 @@ mod builtins {
     /// {{ [false, null, 42]|select }} -> [42]
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn select(
         state: &State,
         value: Value,
@@ -1209,7 +1235,6 @@ mod builtins {
     /// {{ users|selectattr("id", "even") }} -> returns all users with an even id
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn selectattr(
         state: &State,
         value: Value,
@@ -1224,7 +1249,6 @@ mod builtins {
     ///
     /// This is the inverse of [`select`].
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn reject(
         state: &State,
         value: Value,
@@ -1244,7 +1268,6 @@ mod builtins {
     /// {{ users|rejectattr("id", "even") }} -> returns all users with an odd id
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn rejectattr(
         state: &State,
         value: Value,
@@ -1282,7 +1305,6 @@ mod builtins {
     /// Users on this page: {{ titles|map('lower')|join(', ') }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn map(
         state: &State,
         value: Value,
@@ -1356,7 +1378,6 @@ mod builtins {
     /// in the iterable passed to the filter.  The filter will not detect
     /// duplicate objects or arrays, only primitives such as strings or numbers.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn unique(values: Vec<Value>) -> Value {
         use std::collections::BTreeSet;
 
@@ -1377,7 +1398,6 @@ mod builtins {
     ///
     /// This is useful for debugging as it better shows what's inside an object.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    #[cfg(feature = "builtins")]
     pub fn pprint(value: &Value) -> String {
         format!("{:#?}", value)
     }

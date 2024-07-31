@@ -58,3 +58,30 @@ pub fn pluralize(v: Value, singular: Option<Value>, plural: Option<Value>) -> Re
         Ok(rv)
     }
 }
+
+/// Choses a random element from a sequence or string.
+///
+/// The random number generated can be seeded with the `RAND_SEED`
+/// global context variable.
+///
+/// ```jinja
+/// {{ [1, 2, 3, 4]|random }}
+/// ```
+#[cfg(feature = "rand")]
+#[cfg_attr(docsrs, doc(cfg(feature = "rand")))]
+pub fn random(state: &minijinja::State, seq: Value) -> Result<Value, Error> {
+    use crate::globals::get_rng;
+    use minijinja::value::ValueKind;
+    use rand::Rng;
+
+    if matches!(seq.kind(), ValueKind::Seq | ValueKind::String) {
+        let len = seq.len().unwrap_or(0);
+        let idx = get_rng(state).gen_range(0..len);
+        seq.get_item_by_index(idx)
+    } else {
+        Err(Error::new(
+            ErrorKind::InvalidOperation,
+            "can only select random elements from sequences",
+        ))
+    }
+}
