@@ -7,6 +7,8 @@ All notable changes to MiniJinja are documented here.
 - Added `indent` parameter to `tojson` filter.  #546
 - Added `randrange`, `lipsum`, `random`, `cycler` and `joiner` to
   `minijinja-contrib`.  #547
+- Added the ability to use `&T` and `Arc<T>` as parameters
+  to filters and functions if `T` is an `Object`.  #548
 
 ## 2.1.0
 

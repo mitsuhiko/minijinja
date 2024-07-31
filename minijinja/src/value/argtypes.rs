@@ -111,7 +111,7 @@ where
 /// * bytes: [`&[u8]`][`slice`]
 /// * values: [`Value`], `&Value`
 /// * vectors: [`Vec<T>`]
-/// * objects: [`DynObject`]
+/// * objects: [`DynObject`], [`Arc<T>`], `&T` (where `T` is an [`Object`])
 /// * serde deserializable: [`ViaDeserialize<T>`](crate::value::deserialize::ViaDeserialize)
 /// * keyword arguments: [`Kwargs`]
 /// * leftover arguments: [`Rest<T>`]
@@ -596,6 +596,34 @@ impl<'a> ArgType<'a> for &[Value] {
     ) -> Result<(&'a [Value], usize), Error> {
         let args = values.get(offset..).unwrap_or_default();
         Ok((args, args.len()))
+    }
+}
+
+impl<'a, T: Object + 'static> ArgType<'a> for &T {
+    type Output = &'a T;
+
+    #[inline(always)]
+    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+        match value {
+            Some(value) => value
+                .downcast_object_ref()
+                .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "expected object")),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
+        }
+    }
+}
+
+impl<'a, T: Object + 'static> ArgType<'a> for Arc<T> {
+    type Output = Arc<T>;
+
+    #[inline(always)]
+    fn from_value(value: Option<&'a Value>) -> Result<Self::Output, Error> {
+        match value {
+            Some(value) => value
+                .downcast_object()
+                .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "expected object")),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
+        }
     }
 }
 
