@@ -144,6 +144,9 @@ pub(crate) fn get_rng(state: &State) -> rand::rngs::SmallRng {
 /// If only one parameter is provided it's taken as exclusive upper
 /// bound with 0 as lower bound, otherwise two parameters need to be
 /// passed for the lower and upper bound.  Only integers are permitted.
+///
+/// The random number generated can be seeded with the `RAND_SEED`
+/// global context variable.
 #[cfg(feature = "rand")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand")))]
 pub fn randrange(state: &State, n: i64, m: Option<i64>) -> i64 {
