@@ -642,17 +642,7 @@ mod builtins {
             ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::U128(_) | ValueRepr::I128(_) => {
                 Ok(value)
             }
-            ValueRepr::F64(v) => {
-                let x = *v as i128;
-                if x as f64 == *v {
-                    Ok(Value::from(x))
-                } else {
-                    Err(Error::new(
-                        ErrorKind::InvalidOperation,
-                        format!("cannot convert float {} to integer", v),
-                    ))
-                }
-            }
+            ValueRepr::F64(v) => Ok(Value::from(*v as i128)),
             ValueRepr::String(..) | ValueRepr::SmallStr(_) => value
                 .as_str()
                 .unwrap()
