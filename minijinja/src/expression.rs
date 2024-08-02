@@ -1,8 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 
-use serde::Serialize;
-
 use crate::compiler::ast;
 use crate::compiler::instructions::Instructions;
 use crate::compiler::meta::find_undeclared;
@@ -10,7 +8,7 @@ use crate::compiler::parser::parse_expr;
 use crate::environment::Environment;
 use crate::error::Error;
 use crate::output::Output;
-use crate::value::Value;
+use crate::value::{Serialize, Value};
 use crate::vm::Vm;
 
 /// A handle to a compiled expression.
@@ -88,7 +86,7 @@ impl<'env, 'source> Expression<'env, 'source> {
     pub fn eval<S: Serialize>(&self, ctx: S) -> Result<Value, Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _eval.
-        self._eval(Value::from_serialize(&ctx))
+        self._eval(Value::from_serialize(ctx))
     }
 
     /// Returns a set of all undeclared variables in the expression.
