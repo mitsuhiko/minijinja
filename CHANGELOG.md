@@ -9,6 +9,8 @@ All notable changes to MiniJinja are documented here.
   `minijinja-contrib`.  #547
 - Added the ability to use `&T` and `Arc<T>` as parameters
   to filters and functions if `T` is an `Object`.  #548
+- `minijinja-cli` now also enables the datetime, timezone and rand features.  #549
+- Aligned the behavior of the `int` filter closer to Jinja2.  #549
 
 ## 2.1.0
 

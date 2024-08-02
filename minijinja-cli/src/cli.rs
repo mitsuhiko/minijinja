@@ -29,6 +29,7 @@ pub(super) fn make_command() -> Command {
             arg!(--"no-newline" "Do not output a trailing newline"),
             arg!(--"trim-blocks" "Enable the trim_blocks flag"),
             arg!(--"lstrip-blocks" "Enable the lstrip_blocks flag"),
+            #[cfg(feature = "contrib")]
             arg!(--"py-compat" "Enables improved Python compatibility.  Enabling \
                 this adds methods such as dict.keys and some others."),
             arg!(-s --syntax <PAIR>... "Changes a syntax feature (feature=value) \
