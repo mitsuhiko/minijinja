@@ -231,6 +231,11 @@ impl<'env> Vm<'env> {
                     };
                     out.end_capture(AutoEscape::None);
                     pc = 0;
+                    // flush cached filters and tests, as the local_id could be different.
+                    for i in 0..MAX_LOCALS {
+                        loaded_filters[i] = None;
+                        loaded_tests[i] = None;
+                    }
                     continue;
                 }
             };
