@@ -211,7 +211,7 @@ impl<'env> Vm<'env> {
             }};
         }
 
-        // looks nicer nice way
+        // looks nicer this way
         #[allow(clippy::while_let_loop)]
         loop {
             let instr = match state.instructions.get(pc) {
@@ -231,11 +231,11 @@ impl<'env> Vm<'env> {
                     };
                     out.end_capture(AutoEscape::None);
                     pc = 0;
-                    // flush cached filters and tests, as the local_id could be different.
-                    for i in 0..MAX_LOCALS {
-                        loaded_filters[i] = None;
-                        loaded_tests[i] = None;
-                    }
+                    // because we swap out the instructions we also need to unload all
+                    // the filters and tests to ensure that we are not accidentally
+                    // reusing the local_ids for completely different filters.
+                    loaded_filters = [None; MAX_LOCALS];
+                    loaded_tests = [None; MAX_LOCALS];
                     continue;
                 }
             };
