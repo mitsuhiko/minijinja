@@ -629,3 +629,32 @@ fn test_multiple_extended_includes_in_loop() {
     let rv = env.get_template("main.txt").unwrap().render(()).unwrap();
     assert_eq!(rv, "012");
 }
+
+/// See https://github.com/mitsuhiko/minijinja/issues/551
+#[test]
+fn test_filter_caching() {
+    let mut env = Environment::new();
+    env.add_template("parent.txt", "{{ 'Hello Foo' | lower }}")
+        .unwrap();
+    env.add_template(
+        "child.txt",
+        "{% extends 'parent.txt' %}{% set dummy = 'a' | upper %}",
+    )
+    .unwrap();
+    let rv = env.get_template("child.txt").unwrap().render(()).unwrap();
+    assert_eq!(rv, "hello foo");
+}
+
+/// See https://github.com/mitsuhiko/minijinja/issues/551
+#[test]
+fn test_test_caching() {
+    let mut env = Environment::new();
+    env.add_template("parent.txt", "{{ 42 is odd }}").unwrap();
+    env.add_template(
+        "child.txt",
+        "{% extends 'parent.txt' %}{% set dummy = 23 is even %}",
+    )
+    .unwrap();
+    let rv = env.get_template("child.txt").unwrap().render(()).unwrap();
+    assert_eq!(rv, "false");
+}

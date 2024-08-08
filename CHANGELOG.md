@@ -2,6 +2,12 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.1.2
+
+- Flush filter and test cache when processing extended template.
+  This fixes a bug that caused the wrong filters to be used in some
+  cases. #551
+
 ## 2.1.1
 
 - Added `indent` parameter to `tojson` filter.  #546
