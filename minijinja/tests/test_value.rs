@@ -560,6 +560,7 @@ fn test_complex_key() {
 #[test]
 #[cfg(feature = "deserialization")]
 fn test_deserialize() {
+    use minijinja::value::{from_args, ViaDeserialize};
     use serde::Deserialize;
 
     #[derive(Deserialize, Debug, PartialEq, Eq)]
@@ -572,6 +573,34 @@ fn test_deserialize() {
     let point = Point::deserialize(point_value).unwrap();
 
     assert_eq!(point, Point { x: 42, y: -23 });
+
+    #[derive(Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq)]
+    enum SimpleEnum {
+        B,
+        C,
+        D,
+    }
+
+    #[derive(Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq)]
+    enum TaggedUnion {
+        V(String),
+    }
+
+    #[derive(Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq)]
+    struct UnitStruct(String);
+
+    let spe = Value::from_serialize(SimpleEnum::B);
+    let spu = Value::from_serialize(UnitStruct("hello".into()));
+    let spt = Value::from_serialize(TaggedUnion::V("workd".into()));
+
+    let a: (
+        ViaDeserialize<SimpleEnum>,
+        ViaDeserialize<UnitStruct>,
+        ViaDeserialize<TaggedUnion>,
+    ) = from_args(args!(spe, spu, spt)).unwrap();
+    assert_eq!((a.0).0, SimpleEnum::B);
+    assert_eq!((a.1).0, UnitStruct("hello".into()));
+    assert_eq!((a.2).0, TaggedUnion::V("workd".into()));
 }
 
 #[test]

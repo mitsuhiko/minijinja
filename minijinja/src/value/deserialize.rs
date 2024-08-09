@@ -246,10 +246,30 @@ impl<'de> de::Deserializer<'de> for ValueDeserializer {
         visitor.visit_enum(EnumDeserializer { variant, value })
     }
 
+    #[inline]
+    fn deserialize_unit_struct<V>(self, _name: &'static str, visitor: V) -> Result<V::Value, Error>
+    where
+        V: Visitor<'de>,
+    {
+        self.deserialize_unit(visitor)
+    }
+
+    #[inline]
+    fn deserialize_newtype_struct<V>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_newtype_struct(self)
+    }
+
     forward_to_deserialize_any! {
         bool u8 u16 u32 u64 i8 i16 i32 i64 f32 f64 char str string unit
-        seq bytes byte_buf map unit_struct
-        tuple_struct struct tuple ignored_any identifier newtype_struct
+        seq bytes byte_buf map
+        tuple_struct struct tuple ignored_any identifier
     }
 }
 
@@ -403,11 +423,31 @@ impl<'de, 'v> de::Deserializer<'de> for &'v Value {
         ValueDeserializer::new(self.clone()).deserialize_any(visitor)
     }
 
+    fn deserialize_option<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
+        ValueDeserializer::new(self.clone()).deserialize_option(visitor)
+    }
+
+    fn deserialize_enum<V: de::Visitor<'de>>(
+        self,
+        name: &'static str,
+        variants: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Error> {
+        ValueDeserializer::new(self.clone()).deserialize_enum(name, variants, visitor)
+    }
+
+    fn deserialize_newtype_struct<V: de::Visitor<'de>>(
+        self,
+        name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Error> {
+        ValueDeserializer::new(self.clone()).deserialize_newtype_struct(name, visitor)
+    }
+
     forward_to_deserialize_any! {
         bool u8 u16 u32 u64 i8 i16 i32 i64 f32 f64 char str string unit
         seq bytes byte_buf map unit_struct
         tuple_struct struct tuple ignored_any identifier
-        option enum newtype_struct
     }
 }
 
