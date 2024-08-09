@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.1.3
+
+- Fixes a bug where some enums did not deserialize correctly when
+  used with `ViaDeserialize`.  #554
+
 ## 2.1.2
 
 - Flush filter and test cache when processing extended template.
