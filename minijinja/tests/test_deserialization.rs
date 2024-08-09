@@ -7,6 +7,14 @@ use similar_asserts::assert_eq;
 use minijinja::value::{Enumerator, Object, ObjectRepr, Value};
 
 #[test]
+fn test_into_deserializer() {
+    use serde::de::IntoDeserializer;
+
+    let v = Value::from(42);
+    assert_eq!(v.clone().into_deserializer(), v);
+}
+
+#[test]
 fn test_seq() {
     let v = Vec::<i32>::deserialize(Value::from(vec![1, 2, 3])).unwrap();
     assert_eq!(v, vec![1, 2, 3]);
