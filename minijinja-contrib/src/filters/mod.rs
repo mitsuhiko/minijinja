@@ -85,3 +85,39 @@ pub fn random(state: &minijinja::State, seq: Value) -> Result<Value, Error> {
         ))
     }
 }
+
+/// Formats the value like a "human-readable" file size.
+///
+/// For example. 13 kB, 4.1 MB, 102 Bytes, etc.  Per default decimal prefixes are
+/// used (Mega, Giga, etc.),  if the second parameter is set to true
+/// the binary prefixes are used (Mebi, Gibi).
+pub fn filesizeformat(value: f64, binary: Option<bool>) -> String {
+    const BIN_PREFIXES: &[&str] = &["KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"];
+    const SI_PREFIXES: &[&str] = &["kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+    let (prefixes, base) = if binary.unwrap_or(false) {
+        (BIN_PREFIXES, 1024.0)
+    } else {
+        (SI_PREFIXES, 1000.0)
+    };
+
+    if value == 1.0 {
+        return "1 Byte".into();
+    }
+    let (sign, value) = if value < 0.0 {
+        ("-", -value)
+    } else {
+        ("", value)
+    };
+
+    if value < base {
+        format!("{}{} Bytes", sign, value)
+    } else {
+        for (idx, prefix) in prefixes.iter().enumerate() {
+            let unit = base.powf(idx as f64 + 2.0);
+            if value < unit || idx == prefixes.len() - 1 {
+                return format!("{}{:.1} {}", sign, base * value / unit, prefix);
+            }
+        }
+        unreachable!();
+    }
+}

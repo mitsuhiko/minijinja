@@ -104,3 +104,25 @@ fn test_random() {
     insta::assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ [1, 2, 3, 4]|random }}"), @"2");
     insta::assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ 'HelloWorld'|random }}"), @"e");
 }
+
+#[test]
+fn test_filesizeformat() {
+    use minijinja::render;
+    use minijinja_contrib::filters::filesizeformat;
+
+    let mut env = Environment::new();
+    env.add_filter("filesizeformat", filesizeformat);
+
+    insta::assert_snapshot!(render!(in env, r"{{ 0.5|filesizeformat }}"), @"0.5 Bytes");
+    insta::assert_snapshot!(render!(in env, r"{{ 1|filesizeformat }}"), @"1 Byte");
+    insta::assert_snapshot!(render!(in env, r"{{ -1|filesizeformat }}"), @"-1 Bytes");
+    insta::assert_snapshot!(render!(in env, r"{{ 1024|filesizeformat }}"), @"1.0 kB");
+    insta::assert_snapshot!(render!(in env, r"{{ 1024|filesizeformat(true) }}"), @"1.0 KiB");
+    insta::assert_snapshot!(render!(in env, r"{{ 1000|filesizeformat }}"), @"1.0 kB");
+    insta::assert_snapshot!(render!(in env, r"{{ 1000|filesizeformat(true) }}"), @"1000 Bytes");
+    insta::assert_snapshot!(render!(in env, r"{{ (1024 * 1024 * 1024)|filesizeformat }}"), @"1.1 GB");
+    insta::assert_snapshot!(render!(in env, r"{{ (1024 * 1024 * 1024)|filesizeformat(true) }}"), @"1.0 GiB");
+    insta::assert_snapshot!(render!(in env, r"{{ (1024 * 1024 * 1024 * 1024 * 1024)|filesizeformat }}"), @"1.1 PB");
+    insta::assert_snapshot!(render!(in env, r"{{ (1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024)|filesizeformat }}"), @"1.2 YB");
+    insta::assert_snapshot!(render!(in env, r"{{ (1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024)|filesizeformat }}"), @"1267650.6 YB");
+}
