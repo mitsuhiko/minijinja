@@ -42,7 +42,7 @@ pub fn add_to_environment(env: &mut Environment) {
         env.add_function("now", globals::now);
     }
     #[cfg(feature = "rand")]
-{
+    {
         env.add_filter("random", filters::random);
         env.add_function("lipsum", globals::lipsum);
         env.add_function("randrange", globals::randrange);
