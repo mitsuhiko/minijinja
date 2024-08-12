@@ -33,6 +33,7 @@ pub mod globals;
 /// with the environment.
 pub fn add_to_environment(env: &mut Environment) {
     env.add_filter("pluralize", filters::pluralize);
+    env.add_filter("filesizeformat", filters::filesizeformat);
     #[cfg(feature = "datetime")]
     {
         env.add_filter("datetimeformat", filters::datetimeformat);
@@ -41,7 +42,7 @@ pub fn add_to_environment(env: &mut Environment) {
         env.add_function("now", globals::now);
     }
     #[cfg(feature = "rand")]
-    {
+{
         env.add_filter("random", filters::random);
         env.add_function("lipsum", globals::lipsum);
         env.add_function("randrange", globals::randrange);
