@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Fixes a bug where some enums did not deserialize correctly when
   used with `ViaDeserialize`.  #554
 - Implemented `IntoDeserializer` for `Value` and `&Value`.  #555
+- Added `filesizeformat` to minijinja-contrib.  #556
 
 ## 2.1.2
 
