@@ -135,9 +135,8 @@ impl<'source> CodeGenerator<'source> {
             flags |= LOOP_FLAG_RECURSIVE;
         }
         self.add(Instruction::PushLoop(flags));
-        let iter_instr = self.add(Instruction::Iterate(!0));
-        self.pending_block
-            .push(PendingBlock::Loop(iter_instr, Vec::new()));
+        let instr = self.add(Instruction::Iterate(!0));
+        self.pending_block.push(PendingBlock::Loop(instr, vec![]));
     }
 
     /// Ends the open for loop
@@ -149,20 +148,13 @@ impl<'source> CodeGenerator<'source> {
                 self.add(Instruction::PushDidNotIterate);
             };
             self.add(Instruction::PopFrame);
-            if let Some(Instruction::Iterate(ref mut jump_target)) =
-                self.instructions.get_mut(iter_instr)
-            {
-                *jump_target = loop_end;
-            } else {
-                unreachable!();
-            }
-            for break_instr in breaks {
-                if let Some(Instruction::Jump(ref mut jump_target)) =
-                    self.instructions.get_mut(break_instr)
-                {
-                    *jump_target = loop_end;
-                } else {
-                    unreachable!();
+            for instr in breaks.into_iter().chain(Some(iter_instr)) {
+                match self.instructions.get_mut(instr) {
+                    Some(Instruction::Iterate(ref mut jump_target))
+                    | Some(Instruction::Jump(ref mut jump_target)) => {
+                        *jump_target = loop_end;
+                    }
+                    _ => unreachable!(),
                 }
             }
         } else {
