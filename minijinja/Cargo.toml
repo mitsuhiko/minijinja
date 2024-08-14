@@ -47,6 +47,7 @@ builtins = []
 macros = []
 multi_template = []
 adjacent_loop_items = []
+loop_controls = []
 fuel = []
 
 # Extra Filters

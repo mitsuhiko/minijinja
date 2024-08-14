@@ -35,7 +35,7 @@ fn get_local_id<'source>(ids: &mut BTreeMap<&'source str, LocalId>, name: &'sour
 /// jump targets.
 enum PendingBlock {
     Branch(usize),
-    Loop(usize),
+    Loop(usize, Vec<usize>),
     ScBool(Vec<usize>),
 }
 
@@ -136,28 +136,37 @@ impl<'source> CodeGenerator<'source> {
         }
         self.add(Instruction::PushLoop(flags));
         let iter_instr = self.add(Instruction::Iterate(!0));
-        self.pending_block.push(PendingBlock::Loop(iter_instr));
+        self.pending_block
+            .push(PendingBlock::Loop(iter_instr, Vec::new()));
     }
 
     /// Ends the open for loop
     pub fn end_for_loop(&mut self, push_did_not_iterate: bool) {
-        match self.pending_block.pop() {
-            Some(PendingBlock::Loop(iter_instr)) => {
-                self.add(Instruction::Jump(iter_instr));
-                let loop_end = self.next_instruction();
-                if push_did_not_iterate {
-                    self.add(Instruction::PushDidNotIterate);
-                };
-                self.add(Instruction::PopFrame);
-                if let Some(Instruction::Iterate(ref mut jump_target)) =
-                    self.instructions.get_mut(iter_instr)
+        if let Some(PendingBlock::Loop(iter_instr, breaks)) = self.pending_block.pop() {
+            self.add(Instruction::Jump(iter_instr));
+            let loop_end = self.next_instruction();
+            if push_did_not_iterate {
+                self.add(Instruction::PushDidNotIterate);
+            };
+            self.add(Instruction::PopFrame);
+            if let Some(Instruction::Iterate(ref mut jump_target)) =
+                self.instructions.get_mut(iter_instr)
+            {
+                *jump_target = loop_end;
+            } else {
+                unreachable!();
+            }
+            for break_instr in breaks {
+                if let Some(Instruction::Jump(ref mut jump_target)) =
+                    self.instructions.get_mut(break_instr)
                 {
                     *jump_target = loop_end;
                 } else {
                     unreachable!();
                 }
             }
-            _ => unreachable!(),
+        } else {
+            unreachable!()
         }
     }
 
@@ -346,6 +355,27 @@ impl<'source> CodeGenerator<'source> {
             #[cfg(feature = "macros")]
             ast::Stmt::CallBlock(call_block) => {
                 self.compile_call_block(call_block);
+            }
+            #[cfg(feature = "loop_controls")]
+            ast::Stmt::Continue(cont) => {
+                self.set_line_from_span(cont.span());
+                for pending_block in self.pending_block.iter().rev() {
+                    if let PendingBlock::Loop(instr, _) = pending_block {
+                        self.add(Instruction::Jump(*instr));
+                        break;
+                    }
+                }
+            }
+            #[cfg(feature = "loop_controls")]
+            ast::Stmt::Break(brk) => {
+                self.set_line_from_span(brk.span());
+                let instr = self.add(Instruction::Jump(0));
+                for pending_block in self.pending_block.iter_mut().rev() {
+                    if let PendingBlock::Loop(_, ref mut breaks) = pending_block {
+                        breaks.push(instr);
+                        break;
+                    }
+                }
             }
             ast::Stmt::Do(do_tag) => {
                 self.compile_do(do_tag);

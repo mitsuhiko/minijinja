@@ -166,6 +166,8 @@ struct Parser<'a> {
     #[allow(unused)]
     in_macro: bool,
     #[allow(unused)]
+    in_loop: bool,
+    #[allow(unused)]
     blocks: BTreeSet<&'a str>,
     depth: usize,
 }
@@ -236,6 +238,7 @@ impl<'a> Parser<'a> {
         Parser {
             stream: TokenStream::new(source, in_expr, syntax_config, whitespace_config),
             in_macro: false,
+            in_loop: false,
             blocks: BTreeSet::new(),
             depth: 0,
         }
@@ -692,6 +695,20 @@ impl<'a> Parser<'a> {
             "macro" => ast::Stmt::Macro(respan!(ok!(self.parse_macro()))),
             #[cfg(feature = "macros")]
             "call" => ast::Stmt::CallBlock(respan!(ok!(self.parse_call_block()))),
+            #[cfg(feature = "loop_controls")]
+            "continue" => {
+                if !self.in_loop {
+                    syntax_error!("'continue' must be placed inside a loop");
+                }
+                ast::Stmt::Continue(respan!(ast::Continue))
+            }
+            #[cfg(feature = "loop_controls")]
+            "break" => {
+                if !self.in_loop {
+                    syntax_error!("'break' must be placed inside a loop");
+                }
+                ast::Stmt::Break(respan!(ast::Break))
+            }
             "do" => ast::Stmt::Do(respan!(ok!(self.parse_do()))),
             name => syntax_error!("unknown statement {}", name),
         })
@@ -758,6 +775,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_for_stmt(&mut self) -> Result<ast::ForLoop<'a>, Error> {
+        let old_in_loop = std::mem::replace(&mut self.in_loop, true);
         let target = ok!(self.parse_assignment());
         expect_token!(self, Token::Ident("in"), "in");
         let iter = ok!(self.parse_expr_noif());
@@ -776,6 +794,7 @@ impl<'a> Parser<'a> {
             Vec::new()
         };
         ok!(self.stream.next());
+        self.in_loop = old_in_loop;
         Ok(ast::ForLoop {
             target,
             iter,
@@ -872,6 +891,7 @@ impl<'a> Parser<'a> {
         if self.in_macro {
             syntax_error!("block tags in macros are not allowed");
         }
+        let old_in_loop = std::mem::replace(&mut self.in_loop, false);
         let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier");
         if !self.blocks.insert(name) {
             syntax_error!("block '{}' defined twice", name);
@@ -891,6 +911,7 @@ impl<'a> Parser<'a> {
             }
             ok!(self.stream.next());
         }
+        self.in_loop = old_in_loop;
 
         Ok(ast::Block { name, body })
     }
@@ -1035,6 +1056,7 @@ impl<'a> Parser<'a> {
         name: Option<&'a str>,
     ) -> Result<ast::Macro<'a>, Error> {
         expect_token!(self, Token::BlockEnd, "end of block");
+        let old_in_loop = std::mem::replace(&mut self.in_loop, false);
         let old_in_macro = std::mem::replace(&mut self.in_macro, true);
         let body = ok!(self.subparse(&|tok| match tok {
             Token::Ident("endmacro") if name.is_some() => true,
@@ -1042,6 +1064,7 @@ impl<'a> Parser<'a> {
             _ => false,
         }));
         self.in_macro = old_in_macro;
+        self.in_loop = old_in_loop;
         ok!(self.stream.next());
         Ok(ast::Macro {
             name: name.unwrap_or("caller"),

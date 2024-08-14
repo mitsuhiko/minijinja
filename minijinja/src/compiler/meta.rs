@@ -268,6 +268,8 @@ fn track_walk<'a>(node: &ast::Stmt<'a>, state: &mut AssignmentTracker<'a>) {
                 .for_each(|x| tracker_visit_expr(x, state));
             tracker_visit_macro(&stmt.macro_decl, state);
         }
+        #[cfg(feature = "loop_controls")]
+        ast::Stmt::Continue(_) | ast::Stmt::Break(_) => {}
         ast::Stmt::Do(stmt) => {
             tracker_visit_expr(&stmt.call.expr, state);
             stmt.call

@@ -33,6 +33,7 @@
 //!   - [`{% do %}`](#-do-)
 //!   - [`{% autoescape %}`](#-autoescape-)
 //!   - [`{% raw %}`](#-raw-)
+//!   - [`{% break %} / {% continue %}`](#-break----continue-)
 #![cfg_attr(
     feature = "custom_syntax",
     doc = "- [Custom Delimiters](#custom-delimiters)"
@@ -719,6 +720,30 @@
 //! {% endfor %}
 //! </ul>
 //! {% endraw %}
+//! ```
+//!
+//! ## `{% break %}` / `{% continue %}`
+//!
+//! If MiniJinja was compiled with the `loop_controls` feature, it’s possible to
+//! use `break`` and `continue`` in loops.  When break is reached, the loop is
+//! terminated; if continue is reached, the processing is stopped and continues
+//! with the next iteration.
+//!
+//! Here’s a loop that skips every second item:
+//!
+//! ```jinja
+//! {% for user in users %}
+//! {%- if loop.index is even %}{% continue %}{% endif %}
+//! ...
+//! {% endfor %}
+//! ```
+//!
+//! Likewise, a loop that stops processing after the 10th iteration:
+//!
+//! ```jinja
+//! {% for user in users %}
+//! {%- if loop.index >= 10 %}{% break %}{% endif %}
+//! {%- endfor %}
 //! ```
 //!
 #![cfg_attr(
