@@ -2,12 +2,14 @@
 
 All notable changes to MiniJinja are documented here.
 
-## 2.1.3
+## 2.2.0
 
 - Fixes a bug where some enums did not deserialize correctly when
   used with `ViaDeserialize`.  #554
 - Implemented `IntoDeserializer` for `Value` and `&Value`.  #555
 - Added `filesizeformat` to minijinja-contrib.  #556
+- Added support for the `loop_controls` feature which adds
+  `{% break %}` and `{% continue %}`.  #558
 
 ## 2.1.2
 

@@ -177,6 +177,8 @@
 //! - `json`: When enabled the `tojson` filter is added as builtin filter as well as
 //!   the ability to auto escape via `AutoEscape::Json`.
 //! - `urlencode`: When enabled the `urlencode` filter is added as builtin filter.
+//! - `loop_controls`: enables the `{% break %}` and `{% continue %}` loop control flow
+//!    tags.
 //!
 //! Performance and memory related features:
 //!
