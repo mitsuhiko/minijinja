@@ -34,9 +34,16 @@ fn get_local_id<'source>(ids: &mut BTreeMap<&'source str, LocalId>, name: &'sour
 /// Represents an open block of code that does not yet have updated
 /// jump targets.
 enum PendingBlock {
-    Branch(usize),
-    Loop(usize, Vec<usize>),
-    ScBool(Vec<usize>),
+    Branch {
+        jump_instr: usize,
+    },
+    Loop {
+        iter_instr: usize,
+        jump_instrs: Vec<usize>,
+    },
+    ScBool {
+        jump_instrs: Vec<usize>,
+    },
 }
 
 /// Provides a convenient interface to creating instructions for the VM.
@@ -136,19 +143,26 @@ impl<'source> CodeGenerator<'source> {
         }
         self.add(Instruction::PushLoop(flags));
         let instr = self.add(Instruction::Iterate(!0));
-        self.pending_block.push(PendingBlock::Loop(instr, vec![]));
+        self.pending_block.push(PendingBlock::Loop {
+            iter_instr: instr,
+            jump_instrs: Vec::new(),
+        });
     }
 
     /// Ends the open for loop
     pub fn end_for_loop(&mut self, push_did_not_iterate: bool) {
-        if let Some(PendingBlock::Loop(iter_instr, breaks)) = self.pending_block.pop() {
+        if let Some(PendingBlock::Loop {
+            iter_instr,
+            jump_instrs,
+        }) = self.pending_block.pop()
+        {
             self.add(Instruction::Jump(iter_instr));
             let loop_end = self.next_instruction();
             if push_did_not_iterate {
                 self.add(Instruction::PushDidNotIterate);
             };
             self.add(Instruction::PopFrame);
-            for instr in breaks.into_iter().chain(Some(iter_instr)) {
+            for instr in jump_instrs.into_iter().chain(Some(iter_instr)) {
                 match self.instructions.get_mut(instr) {
                     Some(Instruction::Iterate(ref mut jump_target))
                     | Some(Instruction::Jump(ref mut jump_target)) => {
@@ -165,14 +179,14 @@ impl<'source> CodeGenerator<'source> {
     /// Begins an if conditional
     pub fn start_if(&mut self) {
         let jump_instr = self.add(Instruction::JumpIfFalse(!0));
-        self.pending_block.push(PendingBlock::Branch(jump_instr));
+        self.pending_block.push(PendingBlock::Branch { jump_instr });
     }
 
     /// Begins an else conditional
     pub fn start_else(&mut self) {
         let jump_instr = self.add(Instruction::Jump(!0));
         self.end_condition(jump_instr + 1);
-        self.pending_block.push(PendingBlock::Branch(jump_instr));
+        self.pending_block.push(PendingBlock::Branch { jump_instr });
     }
 
     /// Closes the current if block.
@@ -182,13 +196,18 @@ impl<'source> CodeGenerator<'source> {
 
     /// Starts a short-circuited bool block.
     pub fn start_sc_bool(&mut self) {
-        self.pending_block.push(PendingBlock::ScBool(vec![]));
+        self.pending_block.push(PendingBlock::ScBool {
+            jump_instrs: Vec::new(),
+        });
     }
 
     /// Emits a short-circuited bool operator.
     pub fn sc_bool(&mut self, and: bool) {
-        if let Some(PendingBlock::ScBool(ref mut instructions)) = self.pending_block.last_mut() {
-            instructions.push(self.instructions.add(if and {
+        if let Some(PendingBlock::ScBool {
+            ref mut jump_instrs,
+        }) = self.pending_block.last_mut()
+        {
+            jump_instrs.push(self.instructions.add(if and {
                 Instruction::JumpIfFalseOrPop(!0)
             } else {
                 Instruction::JumpIfTrueOrPop(!0)
@@ -201,8 +220,8 @@ impl<'source> CodeGenerator<'source> {
     /// Ends a short-circuited bool block.
     pub fn end_sc_bool(&mut self) {
         let end = self.next_instruction();
-        if let Some(PendingBlock::ScBool(instructions)) = self.pending_block.pop() {
-            for instr in instructions {
+        if let Some(PendingBlock::ScBool { jump_instrs }) = self.pending_block.pop() {
+            for instr in jump_instrs {
                 match self.instructions.get_mut(instr) {
                     Some(Instruction::JumpIfFalseOrPop(ref mut target))
                     | Some(Instruction::JumpIfTrueOrPop(ref mut target)) => {
@@ -214,15 +233,17 @@ impl<'source> CodeGenerator<'source> {
         }
     }
 
-    fn end_condition(&mut self, jump_instr: usize) {
+    fn end_condition(&mut self, new_jump_instr: usize) {
         match self.pending_block.pop() {
-            Some(PendingBlock::Branch(instr)) => match self.instructions.get_mut(instr) {
-                Some(Instruction::JumpIfFalse(ref mut target))
-                | Some(Instruction::Jump(ref mut target)) => {
-                    *target = jump_instr;
+            Some(PendingBlock::Branch { jump_instr }) => {
+                match self.instructions.get_mut(jump_instr) {
+                    Some(Instruction::JumpIfFalse(ref mut target))
+                    | Some(Instruction::Jump(ref mut target)) => {
+                        *target = new_jump_instr;
+                    }
+                    _ => {}
                 }
-                _ => {}
-            },
+            }
             _ => unreachable!(),
         }
     }
@@ -352,8 +373,8 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::Continue(cont) => {
                 self.set_line_from_span(cont.span());
                 for pending_block in self.pending_block.iter().rev() {
-                    if let PendingBlock::Loop(instr, _) = pending_block {
-                        self.add(Instruction::Jump(*instr));
+                    if let PendingBlock::Loop { iter_instr, .. } = pending_block {
+                        self.add(Instruction::Jump(*iter_instr));
                         break;
                     }
                 }
@@ -363,8 +384,12 @@ impl<'source> CodeGenerator<'source> {
                 self.set_line_from_span(brk.span());
                 let instr = self.add(Instruction::Jump(0));
                 for pending_block in self.pending_block.iter_mut().rev() {
-                    if let PendingBlock::Loop(_, ref mut breaks) = pending_block {
-                        breaks.push(instr);
+                    if let PendingBlock::Loop {
+                        ref mut jump_instrs,
+                        ..
+                    } = pending_block
+                    {
+                        jump_instrs.push(instr);
                         break;
                     }
                 }
