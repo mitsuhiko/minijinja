@@ -11,7 +11,7 @@ fn main() {
         SyntaxConfig::builder()
             .block_delimiters("{%", "%}")
             .variable_delimiters("${{", "}}")
-            .block_delimiters("{#", "#}")
+            .comment_delimiters("{#", "#}")
             .build()
             .unwrap(),
     );
