@@ -173,11 +173,13 @@ impl UndefinedBehavior {
     /// If the value is undefined, then iteration fails if the behavior is set to strict,
     /// otherwise it succeeds with an empty iteration.  This is also internally used in the
     /// engine to convert values to lists.
+    #[inline]
     pub(crate) fn try_iter(self, value: Value) -> Result<ValueIter, Error> {
         self.assert_iterable(&value).and_then(|_| value.try_iter())
     }
 
     /// Are we strict on iteration?
+    #[inline]
     pub(crate) fn assert_iterable(self, value: &Value) -> Result<(), Error> {
         if matches!(self, UndefinedBehavior::Strict) && value.is_undefined() {
             Err(Error::from(ErrorKind::UndefinedError))
