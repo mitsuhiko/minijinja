@@ -10,6 +10,9 @@ All notable changes to MiniJinja are documented here.
 - Added `filesizeformat` to minijinja-contrib.  #556
 - Added support for the `loop_controls` feature which adds
   `{% break %}` and `{% continue %}`.  #558
+- Iterables can now be indexed into.  It was already possible previously
+  to slice them.  This improves support for Jinja2 compatibility as Jinja2
+  is more likely to create temporary lists when slicing lists.  #565
 
 ## 2.1.2
 
