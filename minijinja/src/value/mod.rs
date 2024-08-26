@@ -1301,7 +1301,23 @@ impl Value {
 
         match self.0 {
             ValueRepr::Object(ref dy) => match dy.repr() {
-                ObjectRepr::Map | ObjectRepr::Plain | ObjectRepr::Iterable => dy.get_value(key),
+                ObjectRepr::Map | ObjectRepr::Plain => dy.get_value(key),
+                ObjectRepr::Iterable => {
+                    if let Some(rv) = dy.get_value(key) {
+                        return Some(rv);
+                    }
+                    // The default behavior is to try to index into the iterable
+                    // as if nth() was called.  This lets one slice an array and
+                    // then index into it.
+                    if let Some(idx) = index(key, || dy.enumerator_len()) {
+                        if let Some(mut iter) = dy.try_iter() {
+                            if let Some(rv) = iter.nth(idx) {
+                                return Some(rv);
+                            }
+                        }
+                    }
+                    None
+                }
                 ObjectRepr::Seq => {
                     let idx = index(key, || dy.enumerator_len()).map(Value::from);
                     dy.get_value(idx.as_ref().unwrap_or(key))
