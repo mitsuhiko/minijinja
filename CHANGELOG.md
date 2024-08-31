@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.2.1
+
+- Fixes incorrect ordering of maps when the keys of those maps
+  were not in consistent order.  #569
+
 ## 2.2.0
 
 - Fixes a bug where some enums did not deserialize correctly when
