@@ -1016,3 +1016,36 @@ fn test_downcast_arg() {
         "A|B"
     );
 }
+
+#[test]
+fn test_map_eq() {
+    #[derive(Debug, Copy, Clone)]
+    struct Thing {
+        rev: bool,
+    }
+
+    impl Object for Thing {
+        fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+            match key.as_str()? {
+                "a" => Some(Value::from(1)),
+                "b" => Some(Value::from(2)),
+                _ => None,
+            }
+        }
+
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            if self.rev {
+                Enumerator::Str(&["b", "a"])
+            } else {
+                Enumerator::Str(&["a", "b"])
+            }
+        }
+    }
+
+    let t1 = Value::from_object(Thing { rev: false });
+    let t2 = Value::from_object(Thing { rev: true });
+
+    assert_snapshot!(t1.to_string(), @r###"{"a": 1, "b": 2}"###);
+    assert_snapshot!(t2.to_string(), @r###"{"b": 2, "a": 1}"###);
+    assert_eq!(t1, t2);
+}
