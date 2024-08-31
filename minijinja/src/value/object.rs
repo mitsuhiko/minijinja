@@ -646,6 +646,11 @@ unsafe impl Sync for DynObject {}
 
 impl DynObject {
     impl_object_helpers!(pub &Self);
+
+    /// Checks if this dyn object is the same as another.
+    pub(crate) fn is_same_object(&self, other: &DynObject) -> bool {
+        self.ptr == other.ptr && self.vtable == other.vtable
+    }
 }
 
 impl Hash for DynObject {
@@ -758,6 +763,10 @@ macro_rules! impl_str_map_helper {
                     Box::new(this.keys().map(|k| intern(k.as_ref())).map(Value::from))
                 })
             }
+
+            fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
+                Some(self.len())
+            }
         }
     };
 }
@@ -833,6 +842,10 @@ macro_rules! impl_value_map {
 
             fn enumerate(self: &Arc<Self>) -> Enumerator {
                 self.$enumerator(|this| Box::new(this.keys().cloned()))
+            }
+
+            fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
+                Some(self.len())
             }
         }
 

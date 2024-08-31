@@ -488,14 +488,29 @@ impl PartialEq for Value {
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
                 None => {
                     if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
-                        if a.repr() != b.repr() {
-                            false
-                        } else if let (Some(ak), Some(bk)) =
-                            (a.try_iter_pairs(), b.try_iter_pairs())
-                        {
-                            ak.eq(bk)
-                        } else {
-                            false
+                        if a.is_same_object(b) {
+                            return true;
+                        }
+                        match (a.repr(), b.repr()) {
+                            (ObjectRepr::Map, ObjectRepr::Map) => {
+                                if a.enumerator_len() != b.enumerator_len() {
+                                    return false;
+                                }
+                                a.try_iter_pairs().map_or(false, |mut ak| {
+                                    ak.all(|(k, v1)| b.get_value(&k).map_or(false, |v2| v1 == v2))
+                                })
+                            }
+                            (
+                                ObjectRepr::Seq | ObjectRepr::Iterable,
+                                ObjectRepr::Seq | ObjectRepr::Iterable,
+                            ) => {
+                                if let (Some(ak), Some(bk)) = (a.try_iter(), b.try_iter()) {
+                                    ak.eq(bk)
+                                } else {
+                                    false
+                                }
+                            }
+                            _ => false,
                         }
                     } else {
                         false
@@ -540,13 +555,24 @@ impl Ord for Value {
                         (Ok(a), Ok(b)) => a.cmp(b),
                         _ => self.len().cmp(&other.len()),
                     },
-                    (ValueKind::Map, ValueKind::Map) => match (
-                        self.as_object().and_then(|x| x.try_iter_pairs()),
-                        other.as_object().and_then(|x| x.try_iter_pairs()),
-                    ) {
-                        (Some(a), Some(b)) => a.cmp(b),
-                        _ => self.len().cmp(&other.len()),
-                    },
+                    (ValueKind::Map, ValueKind::Map) => {
+                        if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
+                            if a.is_same_object(b) {
+                                Ordering::Equal
+                            } else {
+                                // This is not really correct.  Because the keys can be in arbitrary
+                                // order this could just sort really weirdly as a result.  However
+                                // we don't want to pay the cost of actually sorting the keys for
+                                // ordering so we just accept this for now.
+                                match (a.try_iter_pairs(), b.try_iter_pairs()) {
+                                    (Some(a), Some(b)) => a.cmp(b),
+                                    _ => self.len().cmp(&other.len()),
+                                }
+                            }
+                        } else {
+                            unreachable!();
+                        }
+                    }
                     _ => Ordering::Equal,
                 },
             },
