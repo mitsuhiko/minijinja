@@ -135,12 +135,11 @@ useful.
 
 ### `{% continue %}`
 
-`continue` is not supported. You can, however, filter a sequence during
-iteration to skip items.
+`continue` is supported only if the `loop_controls` feature is enabled.
 
 ### `{% break %}`
 
-`break` is not supported.
+`break` is supported only if the `loop_controls` feature is enabled.
 
 ## Expressions
 
