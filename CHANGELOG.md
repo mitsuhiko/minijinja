@@ -10,7 +10,7 @@ All notable changes to MiniJinja are documented here.
 - The `unique` filter now is case insensitive by default like in
   Jinja2 and supports an optional flag to make it case sensitive.
   It also now lets one check individual attributes instead of
-  values.
+  values.  #571
 
 ## 2.2.0
 
