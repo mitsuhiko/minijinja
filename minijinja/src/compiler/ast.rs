@@ -80,6 +80,10 @@ pub enum Stmt<'a> {
     Macro(Spanned<Macro<'a>>),
     #[cfg(feature = "macros")]
     CallBlock(Spanned<CallBlock<'a>>),
+    #[cfg(feature = "loop_controls")]
+    Continue(Spanned<Continue>),
+    #[cfg(feature = "loop_controls")]
+    Break(Spanned<Break>),
     Do(Spanned<Do<'a>>),
 }
 
@@ -111,6 +115,10 @@ impl<'a> fmt::Debug for Stmt<'a> {
             Stmt::Macro(s) => fmt::Debug::fmt(s, f),
             #[cfg(feature = "macros")]
             Stmt::CallBlock(s) => fmt::Debug::fmt(s, f),
+            #[cfg(feature = "loop_controls")]
+            Stmt::Continue(s) => fmt::Debug::fmt(s, f),
+            #[cfg(feature = "loop_controls")]
+            Stmt::Break(s) => fmt::Debug::fmt(s, f),
             Stmt::Do(s) => fmt::Debug::fmt(s, f),
         }
     }
@@ -297,6 +305,18 @@ pub struct CallBlock<'a> {
     pub call: Spanned<Call<'a>>,
     pub macro_decl: Spanned<Macro<'a>>,
 }
+
+/// Continue
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg(feature = "loop_controls")]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
+pub struct Continue;
+
+/// Break
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg(feature = "loop_controls")]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
+pub struct Break;
 
 /// A call block
 #[cfg_attr(feature = "internal_debug", derive(Debug))]

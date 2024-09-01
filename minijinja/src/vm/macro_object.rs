@@ -121,12 +121,6 @@ impl Object for Macro {
         let mut rv = String::new();
         let mut out = Output::with_string(&mut rv);
 
-        // If a macro is self referential we need to put a reference to ourselves
-        // there.  Unfortunately because we only have a &self reference here, we
-        // cannot bump our own refcount.  Instead we need to wrap the macro data
-        // into an extra level of Arc to avoid unnecessary clones.
-        let closure = self.closure.clone();
-
         // This requires some explanation here.  Because we get the state as &State and
         // not &mut State we are required to create a new state here.  This is unfortunate
         // but makes the calling interface more convenient for the rest of the system.
@@ -136,7 +130,7 @@ impl Object for Macro {
         ok!(vm.eval_macro(
             instructions,
             *offset,
-            closure,
+            self.closure.clone(),
             state.ctx.clone_base(),
             caller,
             &mut out,

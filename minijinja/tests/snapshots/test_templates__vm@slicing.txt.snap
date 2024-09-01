@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_templates.rs
-description: "{{ hello[:] }}\n{{ hello[1:] }}\n{{ hello[1:-1] }}\n{{ hello[::2] }}\n{{ hello[2:10] }}\n{{ hello[2:10:2] }}\n{{ intrange[:] }}\n{{ intrange[1:] }}\n{{ intrange[1:-1] }}\n{{ intrange[::2] }}\n{{ intrange[2:10] }}\n{{ intrange[2:10:2] }}"
+description: "{{ hello[:] }}\n{{ hello[1:] }}\n{{ hello[1:-1] }}\n{{ hello[::2] }}\n{{ hello[2:10] }}\n{{ hello[2:10:2] }}\n{{ intrange[:] }}\n{{ intrange[1:] }}\n{{ intrange[1:-1] }}\n{{ intrange[::2] }}\n{{ intrange[2:10] }}\n{{ intrange[2:10:2] }}\n{{ intrange[2:10][0] }}\n{{ intrange[2:10][2:][0] }}"
 info:
   hello: Hällo Wörld
   intrange:
@@ -28,4 +28,5 @@ loWr
 [0, 2, 4, 6, 8]
 [2, 3, 4, 5, 6, 7, 8, 9]
 [2, 4, 6, 8]
-
+2
+4

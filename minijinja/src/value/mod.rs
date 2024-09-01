@@ -501,14 +501,29 @@ impl PartialEq for Value {
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
                 None => {
                     if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
-                        if a.repr() != b.repr() {
-                            false
-                        } else if let (Some(ak), Some(bk)) =
-                            (a.try_iter_pairs(), b.try_iter_pairs())
-                        {
-                            ak.eq(bk)
-                        } else {
-                            false
+                        if a.is_same_object(b) {
+                            return true;
+                        }
+                        match (a.repr(), b.repr()) {
+                            (ObjectRepr::Map, ObjectRepr::Map) => {
+                                if a.enumerator_len() != b.enumerator_len() {
+                                    return false;
+                                }
+                                a.try_iter_pairs().map_or(false, |mut ak| {
+                                    ak.all(|(k, v1)| b.get_value(&k).map_or(false, |v2| v1 == v2))
+                                })
+                            }
+                            (
+                                ObjectRepr::Seq | ObjectRepr::Iterable,
+                                ObjectRepr::Seq | ObjectRepr::Iterable,
+                            ) => {
+                                if let (Some(ak), Some(bk)) = (a.try_iter(), b.try_iter()) {
+                                    ak.eq(bk)
+                                } else {
+                                    false
+                                }
+                            }
+                            _ => false,
                         }
                     } else {
                         false
@@ -553,13 +568,24 @@ impl Ord for Value {
                         (Ok(a), Ok(b)) => a.cmp(b),
                         _ => self.len().cmp(&other.len()),
                     },
-                    (ValueKind::Map, ValueKind::Map) => match (
-                        self.as_object().and_then(|x| x.try_iter_pairs()),
-                        other.as_object().and_then(|x| x.try_iter_pairs()),
-                    ) {
-                        (Some(a), Some(b)) => a.cmp(b),
-                        _ => self.len().cmp(&other.len()),
-                    },
+                    (ValueKind::Map, ValueKind::Map) => {
+                        if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
+                            if a.is_same_object(b) {
+                                Ordering::Equal
+                            } else {
+                                // This is not really correct.  Because the keys can be in arbitrary
+                                // order this could just sort really weirdly as a result.  However
+                                // we don't want to pay the cost of actually sorting the keys for
+                                // ordering so we just accept this for now.
+                                match (a.try_iter_pairs(), b.try_iter_pairs()) {
+                                    (Some(a), Some(b)) => a.cmp(b),
+                                    _ => self.len().cmp(&other.len()),
+                                }
+                            }
+                        } else {
+                            unreachable!();
+                        }
+                    }
                     _ => Ordering::Equal,
                 },
             },
@@ -1329,7 +1355,23 @@ impl Value {
 
         match self.0 {
             ValueRepr::Object(ref dy) => match dy.repr() {
-                ObjectRepr::Map | ObjectRepr::Plain | ObjectRepr::Iterable => dy.get_value(key),
+                ObjectRepr::Map | ObjectRepr::Plain => dy.get_value(key),
+                ObjectRepr::Iterable => {
+                    if let Some(rv) = dy.get_value(key) {
+                        return Some(rv);
+                    }
+                    // The default behavior is to try to index into the iterable
+                    // as if nth() was called.  This lets one slice an array and
+                    // then index into it.
+                    if let Some(idx) = index(key, || dy.enumerator_len()) {
+                        if let Some(mut iter) = dy.try_iter() {
+                            if let Some(rv) = iter.nth(idx) {
+                                return Some(rv);
+                            }
+                        }
+                    }
+                    None
+                }
                 ObjectRepr::Seq => {
                     let idx = index(key, || dy.enumerator_len()).map(Value::from);
                     dy.get_value(idx.as_ref().unwrap_or(key))
@@ -1445,6 +1487,15 @@ impl Value {
             }
         }
         Ok(rv)
+    }
+
+    #[cfg(feature = "builtins")]
+    pub(crate) fn get_path_or_default(&self, path: &str, default: &Value) -> Value {
+        match self.get_path(path) {
+            Err(_) => default.clone(),
+            Ok(val) if val.is_undefined() => default.clone(),
+            Ok(val) => val,
+        }
     }
 }
 

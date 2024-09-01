@@ -15,3 +15,5 @@
 {{ intrange[::2] }}
 {{ intrange[2:10] }}
 {{ intrange[2:10:2] }}
+{{ intrange[2:10][0] }}
+{{ intrange[2:10][2:][0] }}

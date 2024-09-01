@@ -26,7 +26,7 @@ ecosystem of editor integrations.
 ```
 $ cargo tree
 minimal v0.1.0 (/Users/mitsuhiko/Development/minijinja/examples/minimal)
-└── minijinja v2.1.1 (/Users/mitsuhiko/Development/minijinja/minijinja)
+└── minijinja v2.2.0 (/Users/mitsuhiko/Development/minijinja/minijinja)
 ```
 
 Additionally minijinja is also available as an (optionally pre-compiled) command line executable

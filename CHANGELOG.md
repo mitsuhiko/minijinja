@@ -2,6 +2,34 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.3.0
+
+- Fixes incorrect ordering of maps when the keys of those maps
+  were not in consistent order.  #569
+- Implemented the missing `groupby` filter.  #570
+- The `unique` filter now is case insensitive by default like in
+  Jinja2 and supports an optional flag to make it case sensitive.
+  It also now lets one check individual attributes instead of
+  values.  #571
+
+## 2.2.0
+
+- Fixes a bug where some enums did not deserialize correctly when
+  used with `ViaDeserialize`.  #554
+- Implemented `IntoDeserializer` for `Value` and `&Value`.  #555
+- Added `filesizeformat` to minijinja-contrib.  #556
+- Added support for the `loop_controls` feature which adds
+  `{% break %}` and `{% continue %}`.  #558
+- Iterables can now be indexed into.  It was already possible previously
+  to slice them.  This improves support for Jinja2 compatibility as Jinja2
+  is more likely to create temporary lists when slicing lists.  #565
+
+## 2.1.2
+
+- Flush filter and test cache when processing extended template.
+  This fixes a bug that caused the wrong filters to be used in some
+  cases. #551
+
 ## 2.1.1
 
 - Added `indent` parameter to `tojson` filter.  #546

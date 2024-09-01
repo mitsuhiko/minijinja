@@ -1,5 +1,5 @@
 DOC_FEATURES=loader,json,urlencode,custom_syntax,fuel
-TEST_FEATURES=unstable_machinery,builtins,loader,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax,deserialization,serde
+TEST_FEATURES=unstable_machinery,builtins,loader,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax,deserialization,serde,loop_controls
 
 .PHONY: all
 all: test
@@ -40,7 +40,7 @@ snapshot-tests:
 run-tests:
 	@rustup component add rustfmt 2> /dev/null
 	@echo "CARGO TESTS"
-	@cd minijinja; cargo test --features=json,urlencode,internal_debug
+	@cd minijinja; cargo test --features=json,urlencode,internal_debug,loop_controls
 	@echo "CARGO TEST SPEEDUPS"
 	@cd minijinja; cargo test --no-default-features --features=speedups,$(TEST_FEATURES)
 	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
