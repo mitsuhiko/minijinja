@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 - Fixes incorrect ordering of maps when the keys of those maps
   were not in consistent order.  #569
+- Implemented the missing `groupby` filter.  #570
 
 ## 2.2.0
 
