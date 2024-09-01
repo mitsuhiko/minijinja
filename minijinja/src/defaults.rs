@@ -95,6 +95,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::Boxe
         rv.insert("selectattr".into(), BoxedFilter::new(filters::selectattr));
         rv.insert("rejectattr".into(), BoxedFilter::new(filters::rejectattr));
         rv.insert("map".into(), BoxedFilter::new(filters::map));
+        rv.insert("groupby".into(), BoxedFilter::new(filters::groupby));
         rv.insert("unique".into(), BoxedFilter::new(filters::unique));
         rv.insert("pprint".into(), BoxedFilter::new(filters::pprint));
 
