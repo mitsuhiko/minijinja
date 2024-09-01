@@ -394,7 +394,7 @@ mod builtins {
         })
     }
 
-    fn sort_helper(a: &Value, b: &Value, case_sensitive: bool) -> Ordering {
+    fn cmp_helper(a: &Value, b: &Value, case_sensitive: bool) -> Ordering {
         if !case_sensitive {
             if let (Some(a), Some(b)) = (a.as_str(), b.as_str()) {
                 #[cfg(feature = "unicode")]
@@ -441,7 +441,7 @@ mod builtins {
             let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
             rv.sort_by(|a, b| {
                 let (a, b) = if by_value { (&a.1, &b.1) } else { (&a.0, &b.0) };
-                sort_helper(a, b, case_sensitive)
+                cmp_helper(a, b, case_sensitive)
             });
             if let Some(true) = ok!(kwargs.get("reverse")) {
                 rv.reverse();
@@ -834,11 +834,11 @@ mod builtins {
         let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
         if let Some(attr) = ok!(kwargs.get::<Option<&str>>("attribute")) {
             items.sort_by(|a, b| match (a.get_path(attr), b.get_path(attr)) {
-                (Ok(a), Ok(b)) => sort_helper(&a, &b, case_sensitive),
+                (Ok(a), Ok(b)) => cmp_helper(&a, &b, case_sensitive),
                 _ => Ordering::Equal,
             });
         } else {
-            items.sort_by(|a, b| sort_helper(a, b, case_sensitive))
+            items.sort_by(|a, b| cmp_helper(a, b, case_sensitive))
         }
         if let Some(true) = ok!(kwargs.get("reverse")) {
             items.reverse();
@@ -1422,7 +1422,7 @@ mod builtins {
         items.sort_by(|a, b| {
             let a = a.get_path_or_default(attr, &default);
             let b = b.get_path_or_default(attr, &default);
-            sort_helper(&a, &b, case_sensitive)
+            cmp_helper(&a, &b, case_sensitive)
         });
         kwargs.assert_all_used()?;
 
@@ -1462,7 +1462,7 @@ mod builtins {
         for item in items {
             let group_by = item.get_path_or_default(attr, &default);
             if let Some(ref last_grouper) = grouper {
-                if sort_helper(last_grouper, &group_by, case_sensitive) != Ordering::Equal {
+                if cmp_helper(last_grouper, &group_by, case_sensitive) != Ordering::Equal {
                     rv.push(Value::from_object(GroupTuple {
                         grouper: last_grouper.clone(),
                         list: std::mem::take(&mut list),
