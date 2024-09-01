@@ -1027,7 +1027,7 @@ mod builtins {
                 None => Some(ok!(usize::try_from(val.clone()))),
             },
         };
-        args.assert_all_used()?;
+        ok!(args.assert_all_used());
         if let Some(indent) = indent {
             let mut out = Vec::<u8>::new();
             let indentation = " ".repeat(indent);
@@ -1424,7 +1424,7 @@ mod builtins {
             let b = b.get_path_or_default(attr, &default);
             cmp_helper(&a, &b, case_sensitive)
         });
-        kwargs.assert_all_used()?;
+        ok!(kwargs.assert_all_used());
 
         #[derive(Debug)]
         pub struct GroupTuple {
@@ -1493,21 +1493,51 @@ mod builtins {
     /// The unique items are yielded in the same order as their first occurrence
     /// in the iterable passed to the filter.  The filter will not detect
     /// duplicate objects or arrays, only primitives such as strings or numbers.
+    ///
+    /// Optionally the `attribute` keyword argument can be used to make the filter
+    /// operate on an attribute instead of the value itself.  In this case only
+    /// one city per state would be returned:
+    ///
+    /// ```jinja
+    /// {{ list_of_cities|unique(attribute='state') }}
+    /// ```
+    ///
+    /// Like the [`sort`] filter this operates case-insensitive by default.
+    /// For example, if a list has the US state codes `["CA", "NY", "ca"]``,
+    /// the resulting list will have `["CA", "NY"]`.  This can be disabled by
+    /// passing `case_sensitive=True`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn unique(values: Vec<Value>) -> Value {
+    pub fn unique(values: Vec<Value>, kwargs: Kwargs) -> Result<Value, Error> {
         use std::collections::BTreeSet;
+
+        let attr = ok!(kwargs.get::<Option<&str>>("attribute"));
+        let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
+        ok!(kwargs.assert_all_used());
 
         let mut rv = Vec::new();
         let mut seen = BTreeSet::new();
 
         for item in values {
-            if !seen.contains(&item) {
-                rv.push(item.clone());
-                seen.insert(item);
+            let value_to_compare = if let Some(attr) = attr {
+                item.get_path_or_default(attr, &Value::UNDEFINED)
+            } else {
+                item.clone()
+            };
+            let memorized_value = if case_sensitive {
+                value_to_compare.clone()
+            } else if let Some(s) = value_to_compare.as_str() {
+                Value::from(s.to_lowercase())
+            } else {
+                value_to_compare.clone()
+            };
+
+            if !seen.contains(&memorized_value) {
+                rv.push(item);
+                seen.insert(memorized_value);
             }
         }
 
-        Value::from(rv)
+        Ok(Value::from(rv))
     }
 
     /// Pretty print a variable.
