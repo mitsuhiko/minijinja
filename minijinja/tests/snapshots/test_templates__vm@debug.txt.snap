@@ -86,6 +86,7 @@ State {
             "escape",
             "first",
             "float",
+            "groupby",
             "indent",
             "int",
             "items",

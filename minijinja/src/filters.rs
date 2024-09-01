@@ -295,7 +295,7 @@ mod builtins {
     use crate::error::ErrorKind;
     use crate::utils::splitn_whitespace;
     use crate::value::ops::as_f64;
-    use crate::value::{Kwargs, ValueKind, ValueRepr};
+    use crate::value::{Enumerator, Kwargs, Object, ObjectRepr, ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::cmp::Ordering;
     use std::fmt::Write;
@@ -1360,6 +1360,127 @@ mod builtins {
             rv.push(ok!(filter.apply_to(state, &new_args)));
         }
         Ok(rv)
+    }
+
+    /// Group a sequence of objects by an attribute.
+    ///
+    /// The attribute can use dot notation for nested access, like `"address.city"``.
+    /// The values are sorted first so only one group is returned for each unique value.
+    /// The attribute can be passed as first argument or as keyword argument named
+    /// `atttribute`.
+    ///
+    /// For example, a list of User objects with a city attribute can be
+    /// rendered in groups. In this example, grouper refers to the city value of
+    /// the group.
+    ///
+    /// ```jinja
+    /// <ul>{% for city, items in users|groupby("city") %}
+    ///   <li>{{ city }}
+    ///   <ul>{% for user in items %}
+    ///     <li>{{ user.name }}
+    ///   {% endfor %}</ul>
+    /// </li>
+    /// {% endfor %}</ul>
+    /// ```
+    ///
+    /// groupby yields named tuples of `(grouper, list)``, which can be used instead
+    /// of the tuple unpacking above.  As such this example is equivalent:
+    ///
+    /// ```jinja
+    /// <ul>{% for group in users|groupby(attribute="city") %}
+    ///   <li>{{ group.grouper }}
+    ///   <ul>{% for user in group.list %}
+    ///     <li>{{ user.name }}
+    ///   {% endfor %}</ul>
+    /// </li>
+    /// {% endfor %}</ul>
+    /// ```
+    ///
+    /// You can specify a default value to use if an object in the list does not
+    /// have the given attribute.
+    ///
+    /// ```jinja
+    /// <ul>{% for city, items in users|groupby("city", default="NY") %}
+    ///   <li>{{ city }}: {{ items|map(attribute="name")|join(", ") }}</li>
+    /// {% endfor %}</ul>
+    /// ```
+    ///
+    /// Like the [`sort`] filter, sorting and grouping is case-insensitive by default.
+    /// The key for each group will have the case of the first item in that group
+    /// of values. For example, if a list of users has cities `["CA", "NY", "ca"]``,
+    /// the "CA" group will have two values.  This can be disabled by passing
+    /// `case_sensitive=True`.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn groupby(value: Value, attribute: Option<&str>, kwargs: Kwargs) -> Result<Value, Error> {
+        let default = ok!(kwargs.get::<Option<Value>>("default")).unwrap_or_default();
+        let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
+        let attr = match attribute {
+            Some(attr) => attr,
+            None => ok!(kwargs.get::<&str>("attribute")),
+        };
+        let mut items: Vec<Value> = ok!(value.try_iter()).collect();
+        items.sort_by(|a, b| {
+            let a = a.get_path_or_default(attr, &default);
+            let b = b.get_path_or_default(attr, &default);
+            sort_helper(&a, &b, case_sensitive)
+        });
+        kwargs.assert_all_used()?;
+
+        #[derive(Debug)]
+        pub struct GroupTuple {
+            grouper: Value,
+            list: Vec<Value>,
+        }
+
+        impl Object for GroupTuple {
+            fn repr(self: &Arc<Self>) -> ObjectRepr {
+                ObjectRepr::Seq
+            }
+
+            fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                match (key.as_usize(), key.as_str()) {
+                    (Some(0), None) | (None, Some("grouper")) => Some(self.grouper.clone()),
+                    (Some(1), None) | (None, Some("list")) => {
+                        Some(Value::make_object_iterable(self.clone(), |this| {
+                            Box::new(this.list.iter().cloned())
+                                as Box<dyn Iterator<Item = _> + Send + Sync>
+                        }))
+                    }
+                    _ => None,
+                }
+            }
+
+            fn enumerate(self: &Arc<Self>) -> Enumerator {
+                Enumerator::Seq(2)
+            }
+        }
+
+        let mut rv = Vec::new();
+        let mut grouper = None::<Value>;
+        let mut list = Vec::new();
+
+        for item in items {
+            let group_by = item.get_path_or_default(attr, &default);
+            if let Some(ref last_grouper) = grouper {
+                if sort_helper(last_grouper, &group_by, case_sensitive) != Ordering::Equal {
+                    rv.push(Value::from_object(GroupTuple {
+                        grouper: last_grouper.clone(),
+                        list: std::mem::take(&mut list),
+                    }));
+                }
+            }
+            grouper = Some(group_by);
+            list.push(item);
+        }
+
+        if !list.is_empty() {
+            rv.push(Value::from_object(GroupTuple {
+                grouper: grouper.unwrap(),
+                list,
+            }));
+        }
+
+        Ok(Value::from_object(rv))
     }
 
     /// Returns a list of unique items from the given iterable.
