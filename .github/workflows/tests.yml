@@ -28,6 +28,8 @@ jobs:
         with:
           toolchain: nightly
       - uses: Swatinem/rust-cache@v2
+      - name: Wipe Cargo.lock
+        run: rm Cargo.lock
       - name: Check
         run: make check
       - name: Test
