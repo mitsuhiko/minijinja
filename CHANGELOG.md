@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.3.1
+
+- Fixes some compiler warnings in Rust 1.81.  #575
+
 ## 2.3.0
 
 - Fixes incorrect ordering of maps when the keys of those maps
