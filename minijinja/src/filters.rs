@@ -679,7 +679,7 @@ mod builtins {
                 .map(Value::from)
                 .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
             ValueRepr::Invalid(_) => value.validate(),
-            _ => as_f64(&value).map(Value::from).ok_or_else(|| {
+            _ => as_f64(&value, true).map(Value::from).ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
                     format!("cannot convert {} to float", value.kind()),

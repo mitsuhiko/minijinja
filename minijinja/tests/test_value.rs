@@ -1049,3 +1049,13 @@ fn test_map_eq() {
     assert_snapshot!(t2.to_string(), @r###"{"b": 2, "a": 1}"###);
     assert_eq!(t1, t2);
 }
+
+#[test]
+fn test_float_eq() {
+    let a = Value::from(2i128.pow(53));
+    let b = Value::from(2.0f64.powf(53.0));
+    assert_eq!(a, b);
+    let xa = Value::from(i64::MAX as i128);
+    let xb = Value::from(i64::MAX as f64);
+    assert_ne!(xa, xb);
+}

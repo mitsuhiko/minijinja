@@ -9,19 +9,30 @@ pub enum CoerceResult<'a> {
     Str(&'a str, &'a str),
 }
 
-pub(crate) fn as_f64(value: &Value) -> Option<f64> {
+pub(crate) fn as_f64(value: &Value, lossy: bool) -> Option<f64> {
+    macro_rules! checked {
+        ($expr:expr, $ty:ty) => {{
+            let rv = $expr as f64;
+            return if lossy || rv as $ty == $expr {
+                Some(rv)
+            } else {
+                None
+            };
+        }};
+    }
+
     Some(match value.0 {
         ValueRepr::Bool(x) => x as i64 as f64,
-        ValueRepr::U64(x) => x as f64,
-        ValueRepr::U128(x) => x.0 as f64,
-        ValueRepr::I64(x) => x as f64,
-        ValueRepr::I128(x) => x.0 as f64,
+        ValueRepr::U64(x) => checked!(x, u64),
+        ValueRepr::U128(x) => checked!(x.0, u128),
+        ValueRepr::I64(x) => checked!(x, i64),
+        ValueRepr::I128(x) => checked!(x.0, i128),
         ValueRepr::F64(x) => x,
         _ => return None,
     })
 }
 
-pub fn coerce<'x>(a: &'x Value, b: &'x Value) -> Option<CoerceResult<'x>> {
+pub fn coerce<'x>(a: &'x Value, b: &'x Value, lossy: bool) -> Option<CoerceResult<'x>> {
     match (&a.0, &b.0) {
         // equal mappings are trivial
         (ValueRepr::U64(a), ValueRepr::U64(b)) => Some(CoerceResult::I128(*a as i128, *b as i128)),
@@ -39,8 +50,8 @@ pub fn coerce<'x>(a: &'x Value, b: &'x Value) -> Option<CoerceResult<'x>> {
         (ValueRepr::F64(a), ValueRepr::F64(b)) => Some(CoerceResult::F64(*a, *b)),
 
         // are floats involved?
-        (ValueRepr::F64(a), _) => Some(CoerceResult::F64(*a, some!(as_f64(b)))),
-        (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(some!(as_f64(a)), *b)),
+        (ValueRepr::F64(a), _) => Some(CoerceResult::F64(*a, some!(as_f64(b, lossy)))),
+        (_, ValueRepr::F64(b)) => Some(CoerceResult::F64(some!(as_f64(a, lossy)), *b)),
 
         // everything else goes up to i128
         _ => Some(CoerceResult::I128(
@@ -164,7 +175,7 @@ fn failed_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
 macro_rules! math_binop {
     ($name:ident, $int:ident, $float:tt) => {
         pub fn $name(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-            match coerce(lhs, rhs) {
+            match coerce(lhs, rhs, true) {
                 Some(CoerceResult::I128(a, b)) => match a.$int(b) {
                     Some(val) => Ok(int_as_value(val)),
                     None => Err(failed_op(stringify!($float), lhs, rhs))
@@ -192,7 +203,7 @@ pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
             Box::new(None.into_iter()) as Box<dyn Iterator<Item = Value> + Send + Sync>
         }));
     }
-    match coerce(lhs, rhs) {
+    match coerce(lhs, rhs, true) {
         Some(CoerceResult::I128(a, b)) => a
             .checked_add(b)
             .ok_or_else(|| failed_op("+", lhs, rhs))
@@ -227,7 +238,7 @@ pub fn mul(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
         return repeat_iterable(n, seq);
     }
 
-    match coerce(lhs, rhs) {
+    match coerce(lhs, rhs, true) {
         Some(CoerceResult::I128(a, b)) => match a.checked_mul(b) {
             Some(val) => Ok(int_as_value(val)),
             None => Err(failed_op(stringify!(*), lhs, rhs)),
@@ -293,15 +304,15 @@ fn repeat_iterable(n: &Value, seq: &DynObject) -> Result<Value, Error> {
 
 pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        let a = some!(as_f64(lhs));
-        let b = some!(as_f64(rhs));
+        let a = some!(as_f64(lhs, true));
+        let b = some!(as_f64(rhs, true));
         Some((a / b).into())
     }
     do_it(lhs, rhs).ok_or_else(|| impossible_op("/", lhs, rhs))
 }
 
 pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    match coerce(lhs, rhs) {
+    match coerce(lhs, rhs, true) {
         Some(CoerceResult::I128(a, b)) => {
             if b != 0 {
                 a.checked_div_euclid(b)
@@ -318,7 +329,7 @@ pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 
 /// Implements a binary `pow` operation on values.
 pub fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    match coerce(lhs, rhs) {
+    match coerce(lhs, rhs, true) {
         Some(CoerceResult::I128(a, b)) => {
             match TryFrom::try_from(b).ok().and_then(|b| a.checked_pow(b)) {
                 Some(val) => Ok(int_as_value(val)),
