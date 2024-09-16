@@ -2,12 +2,9 @@
 
 All notable changes to MiniJinja are documented here.
 
-## 2.3.1
-
-- Fixes some compiler warnings in Rust 1.81.  #575
-
 ## 2.3.0
 
+- Fixes some compiler warnings in Rust 1.81.  #575
 - Fixes incorrect ordering of maps when the keys of those maps
   were not in consistent order.  #569
 - Implemented the missing `groupby` filter.  #570
@@ -15,6 +12,8 @@ All notable changes to MiniJinja are documented here.
   Jinja2 and supports an optional flag to make it case sensitive.
   It also now lets one check individual attributes instead of
   values.  #571
+- Changed sort order of `Ord` to avoid accidentally non total order
+  that could cause panics on Rust 1.81.  #579
 
 ## 2.2.0
 

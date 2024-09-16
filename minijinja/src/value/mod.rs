@@ -540,7 +540,11 @@ fn f64_total_cmp(left: f64, right: f64) -> Ordering {
 
 impl Ord for Value {
     fn cmp(&self, other: &Self) -> Ordering {
-        let value_ordering = match (&self.0, &other.0) {
+        let kind_ordering = self.kind().cmp(&other.kind());
+        if matches!(kind_ordering, Ordering::Less | Ordering::Greater) {
+            return kind_ordering;
+        }
+        match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => Ordering::Equal,
             (ValueRepr::Undefined, ValueRepr::Undefined) => Ordering::Equal,
             (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a.cmp(b),
@@ -550,34 +554,38 @@ impl Ord for Value {
                 Some(ops::CoerceResult::F64(a, b)) => f64_total_cmp(a, b),
                 Some(ops::CoerceResult::I128(a, b)) => a.cmp(&b),
                 Some(ops::CoerceResult::Str(a, b)) => a.cmp(b),
-                None => match (self.kind(), other.kind()) {
-                    (ValueKind::Seq, ValueKind::Seq) => match (self.try_iter(), other.try_iter()) {
-                        (Ok(a), Ok(b)) => a.cmp(b),
-                        _ => self.len().cmp(&other.len()),
-                    },
-                    (ValueKind::Map, ValueKind::Map) => {
-                        if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
-                            if a.is_same_object(b) {
-                                Ordering::Equal
-                            } else {
-                                // This is not really correct.  Because the keys can be in arbitrary
-                                // order this could just sort really weirdly as a result.  However
-                                // we don't want to pay the cost of actually sorting the keys for
-                                // ordering so we just accept this for now.
-                                match (a.try_iter_pairs(), b.try_iter_pairs()) {
-                                    (Some(a), Some(b)) => a.cmp(b),
-                                    _ => self.len().cmp(&other.len()),
-                                }
-                            }
+                None => {
+                    if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
+                        if a.is_same_object(b) {
+                            Ordering::Equal
                         } else {
-                            unreachable!();
+                            match (a.repr(), b.repr()) {
+                                (ObjectRepr::Map, ObjectRepr::Map) => {
+                                    // This is not really correct.  Because the keys can be in arbitrary
+                                    // order this could just sort really weirdly as a result.  However
+                                    // we don't want to pay the cost of actually sorting the keys for
+                                    // ordering so we just accept this for now.
+                                    match (a.try_iter_pairs(), b.try_iter_pairs()) {
+                                        (Some(a), Some(b)) => a.cmp(b),
+                                        _ => unreachable!(),
+                                    }
+                                }
+                                (
+                                    ObjectRepr::Seq | ObjectRepr::Iterable,
+                                    ObjectRepr::Seq | ObjectRepr::Iterable,
+                                ) => match (a.try_iter(), b.try_iter()) {
+                                    (Some(a), Some(b)) => a.cmp(b),
+                                    _ => unreachable!(),
+                                },
+                                (_, _) => unreachable!(),
+                            }
                         }
+                    } else {
+                        unreachable!()
                     }
-                    _ => Ordering::Equal,
-                },
+                }
             },
-        };
-        value_ordering.then((self.kind() as usize).cmp(&(other.kind() as usize)))
+        }
     }
 }
 
