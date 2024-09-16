@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
 use std::sync::Arc;
 
-use insta::assert_snapshot;
+use insta::{assert_debug_snapshot, assert_snapshot};
 use similar_asserts::assert_eq;
 
 use minijinja::value::{DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value};
-use minijinja::{args, render, Environment, Error};
+use minijinja::{args, render, Environment, Error, ErrorKind};
 
 #[test]
 fn test_sort() {
@@ -69,13 +69,13 @@ fn test_sort_different_types() {
     [
         undefined,
         none,
+        false,
+        true,
         -inf,
         -100,
         -75.0,
         -50.0,
-        false,
         0,
-        true,
         1,
         30,
         80,
@@ -1058,4 +1058,70 @@ fn test_float_eq() {
     let xa = Value::from(i64::MAX as i128);
     let xb = Value::from(i64::MAX as f64);
     assert_ne!(xa, xb);
+}
+
+#[test]
+fn test_sorting() {
+    let mut values = vec![
+        Value::from(-f64::INFINITY),
+        Value::from(1.0),
+        Value::from(f64::NAN),
+        Value::from(f64::INFINITY),
+        Value::from(42.0),
+        Value::from(41),
+        Value::from(128),
+        Value::from(-2),
+        Value::from(-5.0),
+        Value::from(32i32),
+        Value::from(true),
+        Value::from(false),
+        Value::from(vec![1, 2, 3]),
+        Value::from(vec![1, 2, 3, 4]),
+        Value::from(vec![1]),
+        Value::from("whatever"),
+        Value::from("floats"),
+        Value::from("the"),
+        Value::from("boat"),
+        Value::UNDEFINED,
+        Value::from(()),
+        Value::from(Error::new(ErrorKind::InvalidOperation, "shit hit the fan")),
+    ];
+    values.sort();
+    assert_debug_snapshot!(&values, @r###"
+    [
+        undefined,
+        none,
+        false,
+        true,
+        -inf,
+        -5.0,
+        -2,
+        1.0,
+        32,
+        41,
+        42.0,
+        128,
+        inf,
+        NaN,
+        "boat",
+        "floats",
+        "the",
+        "whatever",
+        [
+            1,
+        ],
+        [
+            1,
+            2,
+            3,
+        ],
+        [
+            1,
+            2,
+            3,
+            4,
+        ],
+        <invalid value: invalid operation: shit hit the fan>,
+    ]
+    "###);
 }
