@@ -979,6 +979,14 @@ impl Value {
         )
     }
 
+    /// Returns true if the number is a real integer.
+    pub fn is_integer(&self) -> bool {
+        matches!(
+            self.0,
+            ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::I128(_) | ValueRepr::U128(_)
+        )
+    }
+
     /// Returns `true` if the map represents keyword arguments.
     pub fn is_kwargs(&self) -> bool {
         Kwargs::extract(self).is_some()
