@@ -307,13 +307,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_integer(v: Value) -> bool {
-        matches!(
-            v.0,
-            crate::value::ValueRepr::U64(_)
-                | crate::value::ValueRepr::I64(_)
-                | crate::value::ValueRepr::U128(_)
-                | crate::value::ValueRepr::I128(_)
-        )
+        v.is_integer()
     }
 
     /// Checks if this value is a float
