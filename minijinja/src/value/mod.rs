@@ -463,7 +463,7 @@ impl Hash for Value {
                 if let Ok(val) = i64::try_from(self.clone()) {
                     val.hash(state)
                 } else {
-                    as_f64(self).map(|x| x.to_bits()).hash(state)
+                    as_f64(self, true).map(|x| x.to_bits()).hash(state)
                 }
             }
         }
@@ -482,7 +482,7 @@ impl PartialEq for Value {
             (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a == b,
             (ValueRepr::SmallStr(a), ValueRepr::SmallStr(b)) => a.as_str() == b.as_str(),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
-            _ => match ops::coerce(self, other) {
+            _ => match ops::coerce(self, other, false) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
@@ -546,7 +546,7 @@ impl Ord for Value {
             (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a.cmp(b),
             (ValueRepr::SmallStr(a), ValueRepr::SmallStr(b)) => a.as_str().cmp(b.as_str()),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.cmp(b),
-            _ => match ops::coerce(self, other) {
+            _ => match ops::coerce(self, other, false) {
                 Some(ops::CoerceResult::F64(a, b)) => f64_total_cmp(a, b),
                 Some(ops::CoerceResult::I128(a, b)) => a.cmp(&b),
                 Some(ops::CoerceResult::Str(a, b)) => a.cmp(b),

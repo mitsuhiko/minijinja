@@ -281,7 +281,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_divisibleby(v: Value, other: Value) -> bool {
-        match coerce(&v, &other) {
+        match coerce(&v, &other, false) {
             Some(CoerceResult::I128(a, b)) => (a % b) == 0,
             Some(CoerceResult::F64(a, b)) => (a % b) == 0.0,
             _ => false,
