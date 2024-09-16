@@ -980,6 +980,9 @@ impl Value {
     }
 
     /// Returns true if the number is a real integer.
+    ///
+    /// This can be used to distinguish `42` from `42.0`.  For the most part
+    /// the engine keeps these the same.
     pub fn is_integer(&self) -> bool {
         matches!(
             self.0,

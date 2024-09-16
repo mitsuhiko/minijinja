@@ -14,6 +14,8 @@ All notable changes to MiniJinja are documented here.
   values.  #571
 - Changed sort order of `Ord` to avoid accidentally non total order
   that could cause panics on Rust 1.81.  #579
+- Added a `Value::is_integer` method to allow a user to tell floats
+  and true integers apart.  #580
 
 ## 2.2.0
 
