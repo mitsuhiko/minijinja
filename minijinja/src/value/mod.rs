@@ -493,12 +493,34 @@ impl PartialEq for Value {
                         }
                         match (a.repr(), b.repr()) {
                             (ObjectRepr::Map, ObjectRepr::Map) => {
-                                if a.enumerator_len() != b.enumerator_len() {
+                                // only if we have known lengths can we compare the enumerators
+                                // ahead of time.  This function has a fallback for when a
+                                // map has an unknown length.  That's generally a bad idea, but
+                                // it makes sense supporting regardless as silent failures are
+                                // not a lot of fun.
+                                let mut need_length_fallback = true;
+                                if let (Some(a_len), Some(b_len)) =
+                                    (a.enumerator_len(), b.enumerator_len())
+                                {
+                                    if a_len != b_len {
+                                        return false;
+                                    }
+                                    need_length_fallback = false;
+                                }
+                                let mut a_count = 0;
+                                if !a.try_iter_pairs().map_or(false, |mut ak| {
+                                    ak.all(|(k, v1)| {
+                                        a_count += 1;
+                                        b.get_value(&k).map_or(false, |v2| v1 == v2)
+                                    })
+                                }) {
                                     return false;
                                 }
-                                a.try_iter_pairs().map_or(false, |mut ak| {
-                                    ak.all(|(k, v1)| b.get_value(&k).map_or(false, |v2| v1 == v2))
-                                })
+                                if !need_length_fallback {
+                                    true
+                                } else {
+                                    a_count == b.try_iter().map_or(0, |x| x.count())
+                                }
                             }
                             (
                                 ObjectRepr::Seq | ObjectRepr::Iterable,
