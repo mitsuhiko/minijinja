@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.3.1
+
+- Fixes a regresion in `PartialEq` / `Eq` in `Value` caused by changes
+  in 2.3.0.  #584
+
 ## 2.3.0
 
 - Fixes some compiler warnings in Rust 1.81.  #575
