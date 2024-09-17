@@ -5,7 +5,7 @@ use insta::{assert_debug_snapshot, assert_snapshot};
 use similar_asserts::assert_eq;
 
 use minijinja::value::{DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value};
-use minijinja::{args, render, Environment, Error, ErrorKind};
+use minijinja::{args, context, render, Environment, Error, ErrorKind};
 
 #[test]
 fn test_sort() {
@@ -1058,6 +1058,68 @@ fn test_float_eq() {
     let xa = Value::from(i64::MAX as i128);
     let xb = Value::from(i64::MAX as f64);
     assert_ne!(xa, xb);
+}
+
+#[test]
+fn test_eq_regression() {
+    // merged objects used to not have a length.  let's make sure that they have
+    let vars = context! {};
+    let new_vars = context! {..vars.clone()};
+    assert_eq!(vars.len(), Some(0));
+    assert_eq!(new_vars.len(), Some(0));
+    assert_eq!(&vars, &new_vars);
+
+    // we also want to make sure that objects with unknown lengths are properly checked.
+    #[derive(Debug)]
+    struct MadMap;
+
+    impl Object for MadMap {
+        fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+            match key.as_str()? {
+                "a" => Some(Value::from(1)),
+                "b" => Some(Value::from(2)),
+                _ => None,
+            }
+        }
+
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            let mut idx = 0;
+            Enumerator::Iter(Box::new(std::iter::from_fn(move || {
+                let new_idx = {
+                    idx += 1;
+                    idx
+                };
+                match new_idx {
+                    1 => Some(Value::from("a")),
+                    2 => Some(Value::from("b")),
+                    _ => None,
+                }
+            })))
+        }
+    }
+
+    let normal_map = context! {
+        a => 1,
+        b => 2
+    };
+    let mad_map = Value::from_object(MadMap);
+    assert_eq!(mad_map.len(), None);
+    assert_eq!(mad_map, normal_map);
+    assert_eq!(normal_map, mad_map);
+    assert_ne!(
+        mad_map,
+        context! {
+            a => 1,
+            b => 2,
+            c => 3,
+        }
+    );
+    assert_ne!(
+        mad_map,
+        context! {
+            a => 1,
+        }
+    );
 }
 
 #[test]
