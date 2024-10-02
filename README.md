@@ -129,6 +129,8 @@ These are related template engines for Rust:
 
 * [Askama](https://crates.io/crates/askama): Jinja inspired, type-safe, requires template
   precompilation. Has significant divergence from Jinja syntax in parts.
+* [Rinja](https://crates.io/crates/rinja): Jinja inspired, type-safe, requires template
+  precompilation. Has significant divergence from Jinja syntax in parts.
 * [Tera](https://crates.io/crates/tera): Jinja inspired, dynamic, has divergences from Jinja.
 * [TinyTemplate](https://crates.io/crates/tinytemplate): minimal footprint template engine
   with syntax that takes lose inspiration from Jinja and handlebars.
