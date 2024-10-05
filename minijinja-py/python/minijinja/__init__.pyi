@@ -27,7 +27,7 @@ _R_co = TypeVar("_R_co", covariant=True)
 class _PassesState(Protocol[_A_contra, _R_co]):
     def __call__(self, state: State, value: _A_contra, /) -> _R_co: ...
 
-    __minijinja_pass_state__: bool
+    __minijinja_pass_state__: Literal[True]
 
 _StrPath: TypeAlias = PurePath | str
 _Behavior = Literal["strict", "lenient", "chainable"]
