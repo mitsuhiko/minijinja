@@ -7,9 +7,19 @@ from typing import (
     Protocol,
     overload,
 )
-from typing_extensions import TypeAlias
+from typing_extensions import Final, TypeAlias, Self
 from minijinja._lowlevel import State
 from collections.abc import Mapping
+
+__all__ = [
+    "Environment",
+    "TemplateError",
+    "safe",
+    "escape",
+    "render_str",
+    "eval_expr",
+    "pass_state",
+]
 
 _A_contra = TypeVar("_A_contra", contravariant=True)
 _R_co = TypeVar("_R_co", covariant=True)
@@ -21,6 +31,11 @@ class _PassesState(Protocol[_A_contra, _R_co]):
 
 _StrPath: TypeAlias = PurePath | str
 _Behavior = Literal["strict", "lenient", "chainable"]
+
+DEFAULT_ENVIRONMENT: Final[Environment]
+
+def render_str(source: str, name: str | None = None, /, **context: Any) -> str: ...
+def eval_expr(expression: str, /, **context: Any) -> Any: ...
 
 class Environment:
     loader: Callable[[str], str] | None
@@ -126,6 +141,11 @@ class TemplateError(RuntimeError):
     def template_source(self) -> str | None: ...
     def __str__(self) -> str: ...
 
+class Markup(str):
+    def __html__(self) -> Self: ...
+
+def safe(value: str) -> str: ...
+def escape(value: Any) -> str: ...
 def pass_state(
     f: Callable[[State, _A_contra], _R_co],
 ) -> _PassesState[_A_contra, _R_co]: ...
