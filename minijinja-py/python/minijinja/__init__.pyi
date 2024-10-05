@@ -3,11 +3,11 @@ from typing import (
     Any,
     Callable,
     Literal,
-    TypeAlias,
     TypeVar,
     Protocol,
     overload,
 )
+from typing_extensions import TypeAlias
 from minijinja._lowlevel import State
 from collections.abc import Mapping
 

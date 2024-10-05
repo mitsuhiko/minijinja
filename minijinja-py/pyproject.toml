@@ -34,3 +34,9 @@ Repository = "https://github.com/mitsuhiko/minijinja"
 module-name = "minijinja._lowlevel"
 python-source = "python"
 strip = true
+
+[tool.pyright]
+include = ["python/**/*.pyi"]
+exclude = ["python/**/*.py"]
+typeCheckingMode = "strict"
+pythonVersion = "3.9"
