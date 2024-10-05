@@ -95,7 +95,7 @@ class Environment:
         globals: Mapping[str, Any] | None = None,
         debug: bool = True,
         fuel: int | None = None,
-        undefined_behavior: Literal["strict", "lenient", "chainable"] = "lenient",
+        undefined_behavior: _Behavior = "lenient",
         auto_escape_callback: Callable[[str], bool] | None = None,
         path_join_callback: Callable[[str, str], _StrPath] | None = None,
         keep_trailing_newline: bool = False,
