@@ -1,5 +1,5 @@
 from typing import Any
-from jinja2 import Environment
+from . import Environment
 from typing_extensions import final
 
 @final
