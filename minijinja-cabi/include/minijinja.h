@@ -35,7 +35,7 @@ typedef enum mj_err_kind {
   MJ_ERR_KIND_UNKNOWN_METHOD,
   MJ_ERR_KIND_BAD_ESCAPE,
   MJ_ERR_KIND_UNDEFINED_ERROR,
-  KJ_ERROR_KIND_BAD_SERIALIZTION,
+  MJ_ERROR_KIND_BAD_SERIALIZTION,
   MJ_ERR_KIND_BAD_INCLUDE,
   MJ_ERR_KIND_EVAL_BLOCK,
   MJ_ERR_KIND_CANNOT_UNPACK,
@@ -414,7 +414,7 @@ MINIJINJA_API char *mj_value_to_str(struct mj_value value);
 MINIJINJA_API struct mj_value_iter *mj_value_try_iter(struct mj_value value);
 
 #ifdef __cplusplus
-} // extern "C"
-#endif // __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
-#endif /* _minijinja_h_included */
+#endif  /* _minijinja_h_included */
