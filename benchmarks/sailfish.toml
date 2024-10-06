@@ -1,0 +1,4 @@
+template_dirs = ["inputs"]
+
+[optimizations]
+rm_whitespace = false
