@@ -42,6 +42,14 @@ struct RinjaContext {
     title: &'static str,
 }
 
+#[derive(Serialize, Debug, sailfish::Template)]
+#[template(path = "comparison/askama.html")]
+struct SailFishContext {
+    items: Vec<String>,
+    site: Site,
+    title: &'static str,
+}
+
 macro_rules! default_context {
     ($($ty:ident),+) => {
         $(impl Default for $ty {
@@ -87,7 +95,7 @@ macro_rules! default_context {
     }
 }
 
-default_context!(Context, RinjaContext);
+default_context!(Context, RinjaContext, SailFishContext);
 
 pub fn bench_compare_compile(c: &mut Criterion) {
     let mut g = c.benchmark_group("cmp_compile");
@@ -224,6 +232,13 @@ pub fn bench_compare_render(c: &mut Criterion) {
         b.iter(|| {
             let context = black_box(Context::default());
             askama::Template::render(&context).unwrap();
+        });
+    });
+
+    g.bench_function("sailfish", |b| {
+        b.iter(|| {
+            let context = black_box(SailFishContext::default());
+            sailfish::Template::render(&context).unwrap();
         });
     });
 }
