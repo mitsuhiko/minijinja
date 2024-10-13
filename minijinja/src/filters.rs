@@ -527,35 +527,26 @@ mod builtins {
         }
 
         let joiner = joiner.as_ref().unwrap_or(&Cow::Borrowed(""));
-
-        if let Some(s) = val.as_str() {
-            let mut rv = String::new();
-            for c in s.chars() {
-                if !rv.is_empty() {
-                    rv.push_str(joiner);
-                }
-                rv.push(c);
-            }
-            Ok(rv)
-        } else if let Some(iter) = val.as_object().and_then(|x| x.try_iter()) {
-            let mut rv = String::new();
-            for item in iter {
-                if !rv.is_empty() {
-                    rv.push_str(joiner);
-                }
-                if let Some(s) = item.as_str() {
-                    rv.push_str(s);
-                } else {
-                    write!(rv, "{item}").ok();
-                }
-            }
-            Ok(rv)
-        } else {
-            Err(Error::new(
+        let iter = ok!(val.try_iter().map_err(|err| {
+            Error::new(
                 ErrorKind::InvalidOperation,
                 format!("cannot join value of type {}", val.kind()),
-            ))
+            )
+            .with_source(err)
+        }));
+
+        let mut rv = String::new();
+        for item in iter {
+            if !rv.is_empty() {
+                rv.push_str(joiner);
+            }
+            if let Some(s) = item.as_str() {
+                rv.push_str(s);
+            } else {
+                write!(rv, "{item}").ok();
+            }
         }
+        Ok(rv)
     }
 
     /// Split a string into its substrings, using `split` as the separator string.
