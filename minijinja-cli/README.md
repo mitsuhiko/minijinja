@@ -5,7 +5,7 @@
 [![Crates.io](https://img.shields.io/crates/d/minijinja-cli.svg)](https://crates.io/crates/minijinja-cli)
 [![rustc 1.61.0](https://img.shields.io/badge/rust-1.61%2B-orange.svg)](https://img.shields.io/badge/rust-1.61%2B-orange.svg)
 
-`minijinja-cli` is a command line executable that uses 
+`minijinja-cli` is a command line executable that uses
 [MiniJinja](https://github.com/mitsuhiko/minijinja) to render Jinja2 templates
 directly from the command line to stdout.
 
@@ -51,6 +51,9 @@ can be set to stdin at once.
     is based on file extensions.
 
 ## Options
+
+Note: The below options can also be set via environment varibles using the
+`MINIJINJA_<OPTION>` syntax, for example `MINIJINJA_FORMAT=auto`.
 
 - `-f`, `--format` `<FORMAT>`:
     this defines the input format of the data file.  The default is `auto` which
