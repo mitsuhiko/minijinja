@@ -21,3 +21,8 @@ test: .venv
 .PHONY: format
 format:
 	.venv/bin/black tests python
+
+.PHONY: type-check
+type-check:
+	.venv/bin/pyright python
+

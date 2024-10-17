@@ -1,0 +1,19 @@
+name: Pyright
+
+on: [push, pull_request]
+
+jobs:
+  pyright:
+    name: Pyright
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyright
+      - name: Run pyright
+        run: pyright python
