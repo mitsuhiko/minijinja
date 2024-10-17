@@ -80,6 +80,26 @@ fn test_no_newline() {
 }
 
 #[test]
+fn test_no_newline_env() {
+    let input = file_with_contents(r#"{"foo": "bar"}"#);
+    let tmpl = file_with_contents(r#"Hello {{ foo }}!"#);
+
+    assert_cmd_snapshot!(
+        cli()
+            .env("MINIJINJA_FORMAT", "json")
+            .env("MINIJINJA_NO_NEWLINE", "true")
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello bar!
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 fn test_json() {
     let input = file_with_contents_and_ext(r#"{"foo": "bar"}"#, ".json");
     let tmpl = file_with_contents(r#"Hello {{ foo }}!"#);
