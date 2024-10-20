@@ -9,6 +9,8 @@
 [MiniJinja](https://github.com/mitsuhiko/minijinja) to render Jinja2 templates
 directly from the command line to stdout.
 
+## Installation methods
+
 You can install binaries automatically with the shell installer:
 
 ```
@@ -34,6 +36,8 @@ And then run like this:
 ```
 minijinja-cli my-template.j2 data.json
 ```
+
+## Unofficial installation methods
 
 You can also install it with [Homebrew](https://brew.sh/)
 
