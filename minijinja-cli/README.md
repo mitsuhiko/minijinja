@@ -5,9 +5,11 @@
 [![Crates.io](https://img.shields.io/crates/d/minijinja-cli.svg)](https://crates.io/crates/minijinja-cli)
 [![rustc 1.61.0](https://img.shields.io/badge/rust-1.61%2B-orange.svg)](https://img.shields.io/badge/rust-1.61%2B-orange.svg)
 
-`minijinja-cli` is a command line executable that uses 
+`minijinja-cli` is a command line executable that uses
 [MiniJinja](https://github.com/mitsuhiko/minijinja) to render Jinja2 templates
 directly from the command line to stdout.
+
+## Installation methods
 
 You can install binaries automatically with the shell installer:
 
@@ -33,6 +35,14 @@ And then run like this:
 
 ```
 minijinja-cli my-template.j2 data.json
+```
+
+## Unofficial installation methods
+
+You can also install it with [Homebrew](https://brew.sh/)
+
+```
+brew install minijinja-cli
 ```
 
 ## Arguments
