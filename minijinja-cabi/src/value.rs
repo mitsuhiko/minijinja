@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr, CString};
-use std::mem::{transmute, ManuallyDrop};
+use std::mem::{transmute, ManuallyDrop, size_of};
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -39,8 +39,10 @@ where
 /// Opaque value type.
 #[repr(C)]
 pub struct mj_value {
-    _opaque: [usize; 3],
+    _opaque: [u8; VALUE_SIZE],
 }
+
+const VALUE_SIZE: usize = size_of::<Value>();
 
 impl mj_value {
     pub(crate) fn into_value(self) -> Value {
@@ -51,7 +53,7 @@ impl mj_value {
 impl From<Value> for mj_value {
     fn from(value: Value) -> Self {
         mj_value {
-            _opaque: unsafe { transmute::<Value, [usize; 3]>(value) },
+            _opaque: unsafe { transmute::<Value, [u8; VALUE_SIZE]>(value) },
         }
     }
 }
