@@ -37,7 +37,7 @@ where
 }
 
 /// Opaque value type.
-#[repr(C)]
+#[repr(C, align(8))]
 pub struct mj_value {
     _opaque: [u8; VALUE_SIZE],
 }
@@ -388,5 +388,36 @@ ffi_fn! {
     /// Debug prints a value to stderr
     unsafe fn mj_value_dbg(_scope, value: mj_value) {
         eprintln!("{:?}", &value as &Value);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::mem;
+
+    #[test]
+    fn test_mj_value_size_and_alignment() {
+        // Compute sizes and alignments once and store them in variables
+        let mj_size = mem::size_of::<mj_value>();
+        let value_size = mem::size_of::<Value>();
+        let mj_align = mem::align_of::<mj_value>();
+        let value_align = mem::align_of::<Value>();
+
+        // Check size
+        assert_eq!(
+            mj_size, value_size,
+            "Size of mj_value ({}) does not match size of Value ({})",
+            mj_size, value_size
+        );
+
+        // Check alignment
+        assert_eq!(
+            mj_align, value_align,
+            "Alignment of mj_value ({}) does not match alignment of Value ({})",
+            mj_align, value_align
+        );
+        // If the alignment requirements of `Value` evolve, the explicit alignment of
+        // `mj_value` should be updated to reflect it.
     }
 }
