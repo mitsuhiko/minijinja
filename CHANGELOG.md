@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.4.0
+
+- Updated version of `minijinja-cli` with support for better documentation,
+  config file and environment variable support.  #602
+
 ## 2.3.1
 
 - Fixes a regresion in `PartialEq` / `Eq` in `Value` caused by changes
