@@ -20,7 +20,7 @@ test-msrv:
 	@cd minijinja; cargo test --all-features
 
 .PHONY: test
-test: test-msrv
+test: test-msrv test-cli
 	@echo "CARGO TEST MINIJINJA-CONTRIB ALL FEATURES"
 	@cd minijinja-contrib; cargo test --all-features
 
