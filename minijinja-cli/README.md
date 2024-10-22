@@ -45,7 +45,7 @@ You can also install it with [Homebrew](https://brew.sh/)
 brew install minijinja-cli
 ```
 
-## Arguments
+## Arguments and Options
 
 `minijinja-cli` has two positional arguments to refer to files.  Either one of them can
 be set to `-` to read from stdin.  This is the default for the template, but only one
@@ -60,68 +60,8 @@ can be set to stdin at once.
     When data is read from `stdin`, `--format` must be specified as auto detection
     is based on file extensions.
 
-## Options
-
-- `-f`, `--format` `<FORMAT>`:
-    this defines the input format of the data file.  The default is `auto` which
-    turns on auto detection based on the file extension.  For the supported formats
-    see the next section.
-- `-a`, `--autoescape` `<MODE>`:
-    picks an auto escape mode.  The default is auto detection (`auto`) based on
-    file extension.  The options are `none` to disable escaping, `html` to
-    enable HTML/XML escaping, `json` to enable JSON (YAML compatible)
-    serialization.
-- `-D`, `--define` `<EXPR>`:
-    defines a variable from an expression.  The supported formats are `NAME` to define
-    the variable `NAME` with the value `true`, `NAME=VALUE` to define the variable
-    `NAME` with the value `VALUE` as string or `NAME:=VALUE` to set the variable `NAME`
-    to the YAML interpreted value `VALUE`.  When YAML support is not enabled, `:=`
-    only supports JSON.
-- `--strict`:
-    enables strict mode.  Undefined variables will then error upon rendering.
-- `--no-include`:
-    disallows including or extending of templates from the file system.
-- `--no-newline`:
-    Do not output a trailing newline
-- `--trim-blocks`:
-    Enable the trim_blocks flag
-- `--lstrip-blocks`:
-    Enable the lstrip_blocks flag
-- `--py-compat`:
-    Enables improved Python compatibility.  Enabling this adds methods such as
-    `dict.keys` and some others.
-- `-s`, `--syntax <PAIR>`:
-    Changes a syntax feature (feature=value) [possible features: `block-start`, `block-end`, `variable-start`, `variable-end`, `comment-start`, `comment-end`, `line-statement-prefix`, `line-statement-comment`]
-- `--safe-path <PATH>`:
-    Only allow includes from this path. Can be used multiple times.
-- `--env`:
-    passes the environment variables to the template in the variable `ENV`
-- `-E`, `--expr` `<EXPR>`:
-    rather than rendering a template, evaluates an expression instead.  What happens
-    with the result is determined by `--expr-out`.
-- `--expr-out` `<MODE>`:
-    sets the expression output mode.  The default is `print`.  `print` just prints
-    the expression output, `json` emits it as JSON serialized value and
-    `status` hides the output but reports it as exit status.  `true` converts to `0`
-    and `false` converts to `1`.  Numeric results are returned unchanged.
-- `--fuel` `<AMOUNT>`:
-    sets the maximum fuel for the engine.  When the engine runs out of fuel it will error.
-- `--repl`:
-    spawns an interactive read-eval print loop for MiniJinja expressions.
-- `--dump` `<KIND>`:
-    prints internals of the template.  Possible options are `tokens` to see the output
-    of the tokenizer, `ast` to see the AST after parsing, and `instructions` to inspect
-    the compiled bytecode.
-- `-o`, `--output` `<FILENAME>`:
-    writes the output to a filename rather than stdout.
-- `--select` `<SELECTOR>`:
-    select a path of the input data.
-- `--generate-completion` `<SHELL>`:
-    generate the completions for the given shell.
-- `--version`:
-    prints the version.
-- `--help`:
-    prints the help.
+MiniJinja supports a wide range of options, too long to mention here.  For the full help
+use `--long-help` or `--help` for a brief summary.
 
 ## Formats
 
@@ -145,6 +85,15 @@ minijinja-cli template.j2 input.ini --section default
 
 Note that not all formats support all input types.  For instance querystring
 and INI will only support strings for the most part.
+
+## Config File
+
+The config file is in TOML format.  By default the file in `~/.minijinja.toml` is loaded
+but an alternative path can be supplied with the `--config-file` command line argument
+or the `MINIJINJA_CONFIG_FILE` environment variable.
+
+To see what the config file looks like, invoke `minijinja-cli --print-config` which will
+print out the current loaded config as TOML (including defaults).
 
 ## Selecting
 
@@ -216,7 +165,7 @@ By default all features are enabled.  The following features can be explicitly
 selected when the defaults are turned off:
 
 * `yaml`: enables YAML support
-* `toml`: enables TOML support
+* `toml`: enables TOML support (required for `--config-file` support)
 * `cbor`: enables CBOR support
 * `json5`: enables JSON5 support (instead of JSON)
 * `querystring`: enables querystring support

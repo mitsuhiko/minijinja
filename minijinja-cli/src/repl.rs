@@ -6,7 +6,7 @@ use minijinja::{context, Environment, Value};
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 
-use crate::print_error;
+use crate::cli::print_error;
 
 pub fn run(mut env: Environment, ctx: Value) -> Result<(), Error> {
     let mut editor = DefaultEditor::new()?;
