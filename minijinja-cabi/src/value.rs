@@ -398,7 +398,6 @@ mod tests {
 
     #[test]
     fn test_mj_value_size_and_alignment() {
-        // Compute sizes and alignments once and store them in variables
         let mj_size = mem::size_of::<mj_value>();
         let value_size = mem::size_of::<Value>();
         let mj_align = mem::align_of::<mj_value>();
