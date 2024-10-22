@@ -493,3 +493,17 @@ fn test_line_statement() {
     ----- stderr -----
     "###);
 }
+
+#[test]
+#[cfg(all(
+    feature = "cbor",
+    feature = "ini",
+    feature = "json5",
+    feature = "querystring",
+    feature = "toml",
+    feature = "yaml",
+))]
+fn test_help() {
+    assert_cmd_snapshot!("short_help", cli().arg("--help"));
+    assert_cmd_snapshot!("long_help", cli().arg("--long-help"));
+}
