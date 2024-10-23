@@ -92,7 +92,7 @@ typedef struct mj_value_iter mj_value_iter;
  Opaque value type.
  */
 typedef struct mj_value {
-  uintptr_t _opaque[3];
+  uint64_t _opaque[3];
 } mj_value;
 
 /*
@@ -414,7 +414,7 @@ MINIJINJA_API char *mj_value_to_str(struct mj_value value);
 MINIJINJA_API struct mj_value_iter *mj_value_try_iter(struct mj_value value);
 
 #ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
+} // extern "C"
+#endif // __cplusplus
 
-#endif  /* _minijinja_h_included */
+#endif /* _minijinja_h_included */
