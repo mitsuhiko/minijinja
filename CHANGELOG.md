@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 - Updated version of `minijinja-cli` with support for better documentation,
   config file and environment variable support.  #602
+- Made the c-bindings compatible with wasm compilation.  #603
 
 ## 2.3.1
 
