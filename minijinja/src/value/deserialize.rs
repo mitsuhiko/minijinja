@@ -117,7 +117,15 @@ impl<'a, T: Deserialize<'a>> ArgType<'a> for ViaDeserialize<T> {
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
-            Some(value) => T::deserialize(value).map(ViaDeserialize),
+            Some(value) => {
+                if value.is_kwargs() {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        "cannot deserialize from kwargs",
+                    ));
+                }
+                T::deserialize(value).map(ViaDeserialize)
+            }
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
