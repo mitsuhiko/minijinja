@@ -235,6 +235,12 @@ pub(super) fn make_command() -> Command {
                     \
                     [env var: MINIJINJA_ENV]")
                 .help_heading(BEHAVIOR),
+            arg!(-t --template <TEMPLATE_STRING> "Render a string template")
+                .long_help("\
+                    Renders a template from a string instead of the file given.\n\n\
+                    \
+                    This can be used as an alternative to the template file that is normally passed. \
+                    Note that this is different to --expr which evaluates expressions instead."),
             arg!(-E --expr <EXPR> "Evaluates an template expression")
                 .long_help("\
                     Evalues a template expression instead of rendering a template.\n\n\
@@ -276,7 +282,7 @@ pub(super) fn make_command() -> Command {
                     Starts the read-eval loop with the given input data.\n\n\
                     \
                     This allows basic experimentation of MiniJinja expressions with some input data.")
-                .conflicts_with_all(["expr", "template"])
+                .conflicts_with_all(["expr", "template", "template_file"])
                 .help_heading(ADVANCED),
             arg!(-o --output <FILENAME> "Path to the output file")
                 .long_help("\
@@ -309,14 +315,15 @@ pub(super) fn make_command() -> Command {
                 .action(ArgAction::HelpShort),
             arg!(--"long-help" "Print long help (extended, long explanation texts)")
                 .action(ArgAction::HelpLong),
-            arg!(template: [TEMPLATE] "Path to the input template")
+            arg!(template_file: [TEMPLATE_FILE] "Path to the input template")
                 .long_help("\
                     This is the path to the input template in MiniJinja/Jinja2 syntax.  \
                     If not provided this defaults to '-' which means the template is \
                     loaded from stdin.  When the format is set to 'auto' which is the \
                     default, the extension of the filename is used to detect the format.")
-                .default_value("-"),
-            arg!(data: [DATA] "Path to the data file")
+                .default_value("-")
+                .conflicts_with("template"),
+            arg!(data_file: [DATA_FILE] "Path to the data file")
                 .long_help("\
                     Path to the data file in the given format.\n\n\
                     \
