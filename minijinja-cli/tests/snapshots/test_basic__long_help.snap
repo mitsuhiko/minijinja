@@ -32,17 +32,17 @@ Examples:
 
     minijinja-cli --strict --env hello.j2
 
-Usage: minijinja-cli [OPTIONS] [TEMPLATE] [DATA]
+Usage: minijinja-cli [OPTIONS] [TEMPLATE_FILE] [DATA_FILE]
 
 Arguments:
-  [TEMPLATE]
+  [TEMPLATE_FILE]
           This is the path to the input template in MiniJinja/Jinja2 syntax.  If not provided this
           defaults to '-' which means the template is loaded from stdin.  When the format is set to
           'auto' which is the default, the extension of the filename is used to detect the format.
           
           [default: -]
 
-  [DATA]
+  [DATA_FILE]
           Path to the data file in the given format.
           
           The data file is used to supply the context (variables) to the template. Various file
@@ -94,6 +94,12 @@ Options:
           -D user_id:=42      defines an integer
           -D is_active:=true  defines a boolean
           -D is_true          shortform to define true boolean
+
+  -t, --template <TEMPLATE_STRING>
+          Renders a template from a string instead of the file given.
+          
+          This can be used as an alternative to the template file that is normally passed. Note that
+          this is different to --expr which evaluates expressions instead.
 
   -o, --output <FILENAME>
           Path to the output file instead of stdout.

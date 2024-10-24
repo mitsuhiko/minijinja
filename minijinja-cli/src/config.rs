@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 /// Overrides specific syntax settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", default)]
 pub struct SyntaxElements {
     block_start: String,
     block_end: String,
@@ -40,7 +40,7 @@ impl Default for SyntaxElements {
 
 /// Holds in-memory config state for the execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case", default)]
 pub struct Config {
     format: String,
     autoescape: String,

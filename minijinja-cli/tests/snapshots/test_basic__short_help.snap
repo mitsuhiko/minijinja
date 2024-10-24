@@ -12,23 +12,24 @@ minijinja-cli is a command line tool to render or evaluate jinja2 templates.
 
 Pass a template and optionally a file with template variables to render it to stdout.
 
-Usage: minijinja-cli [OPTIONS] [TEMPLATE] [DATA]
+Usage: minijinja-cli [OPTIONS] [TEMPLATE_FILE] [DATA_FILE]
 
 Arguments:
-  [TEMPLATE]  Path to the input template [default: -]
-  [DATA]      Path to the data file
+  [TEMPLATE_FILE]  Path to the input template [default: -]
+  [DATA_FILE]      Path to the data file
 
 Options:
-      --config-file <PATH>  Alternative path to the config file.
-  -f, --format <FORMAT>     The format of the input data [possible values: auto, json, querystring,
-                            yaml, toml, cbor]
-  -D, --define <EXPR>       Defines an input variable (key=value / key:=json_value)
-  -o, --output <FILENAME>   Path to the output file [default: -]
-      --select <SELECTOR>   Select a subset of the input data
-      --print-config        Print out the loaded config
-  -h, --help                Print short help (short texts)
-      --long-help           Print long help (extended, long explanation texts)
-  -V, --version             Print version
+      --config-file <PATH>          Alternative path to the config file.
+  -f, --format <FORMAT>             The format of the input data [possible values: auto, json,
+                                    querystring, yaml, toml, cbor]
+  -D, --define <EXPR>               Defines an input variable (key=value / key:=json_value)
+  -t, --template <TEMPLATE_STRING>  Render a string template
+  -o, --output <FILENAME>           Path to the output file [default: -]
+      --select <SELECTOR>           Select a subset of the input data
+      --print-config                Print out the loaded config
+  -h, --help                        Print short help (short texts)
+      --long-help                   Print long help (extended, long explanation texts)
+  -V, --version                     Print version
 
 Template Behavior:
   -a, --autoescape <MODE>  Reconfigures autoescape behavior [possible values: auto, html, json,

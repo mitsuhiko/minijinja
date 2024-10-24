@@ -495,6 +495,108 @@ fn test_line_statement() {
 }
 
 #[test]
+#[allow(clippy::suspicious_command_arg_space)]
+fn test_template_string() {
+    assert_cmd_snapshot!(
+        cli()
+            .arg("-tHello {{ name }}")
+            .arg("-Dname=Peter")
+            .arg("--no-newline"),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello Peter
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn test_print_config_fully_loaded() {
+    assert_cmd_snapshot!(
+        cli()
+            .arg("--strict")
+            .arg("--trim-blocks")
+            .arg("-Dvar1=value1")
+            .arg("-Dvar2=value2")
+            .arg("-Dvar3:=42")
+            .arg("-Dvar4:=true")
+            .arg("-Dvar5:=[1,2,true]")
+            .arg("--print-config"),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    format = "auto"
+    autoescape = "auto"
+    include = true
+    newline = true
+    trim-blocks = true
+    lstrip-blocks = false
+    py-compat = false
+    env = false
+    strict = true
+    safe-paths = []
+    expr-out = "print"
+    fuel = 0
+
+    [syntax]
+    block-start = "{%"
+    block-end = "%}"
+    variable-start = "{{"
+    variable-end = "}}"
+    comment-start = "{#"
+    comment-end = "#}"
+    line-statement-prefix = ""
+    line-comment-prefix = ""
+
+    [defines]
+    var1 = "value1"
+    var2 = "value2"
+    var3 = 42
+    var4 = true
+    var5 = [
+        1,
+        2,
+        true,
+    ]
+
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn test_load_config() {
+    let config = file_with_contents_and_ext(
+        r#"
+    [defines]
+    greeting = "Hello"
+    punctuation = "!"
+    "#,
+        ".toml",
+    );
+
+    let input = file_with_contents_and_ext(r#"{"name": "World"}"#, ".json");
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg("--config-file")
+            .arg(config.path())
+            .arg("-")
+            .arg(input.path())
+            .pass_stdin("{{ greeting }} {{ name }}{{ punctuation }}"),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello World!
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 #[cfg(all(
     feature = "cbor",
     feature = "ini",

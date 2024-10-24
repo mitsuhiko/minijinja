@@ -145,6 +145,7 @@ fn create_env(
     config: &Config,
     cwd: PathBuf,
     template_name: &str,
+    template_source: Option<String>,
     stdin_used_for_data: bool,
 ) -> Result<Environment<'static>, Error> {
     let mut env = Environment::new();
@@ -195,6 +196,10 @@ fn create_env(
                 })?);
             }
             return Ok(stdin.clone());
+        } else if name == template_name {
+            if let Some(ref source) = template_source {
+                return Ok(Some(source.clone()));
+            }
         }
 
         let fs_name = Path::new(name);
@@ -374,7 +379,7 @@ pub fn execute() -> Result<i32, Error> {
         }
     }
 
-    let (base_ctx, stdin_used) = if let Some(data) = matches.get_one::<PathBuf>("data") {
+    let (base_ctx, stdin_used) = if let Some(data) = matches.get_one::<PathBuf>("data_file") {
         load_data(
             config.format(),
             data,
@@ -386,13 +391,25 @@ pub fn execute() -> Result<i32, Error> {
 
     let cwd = std::env::current_dir()?;
     let ctx = context!(..config.defines(), ..base_ctx);
-    let template_name = match matches.get_one::<String>("template").unwrap().as_str() {
-        STDIN_STDOUT => Cow::Borrowed(STDIN_STDOUT),
-        rel_name => Cow::Owned(cwd.join(rel_name).to_string_lossy().to_string()),
+
+    let (template_name, template_source) = match (
+        matches.get_one::<String>("template"),
+        matches
+            .get_one::<String>("template_file")
+            .map(|x| x.as_str()),
+    ) {
+        (None, Some(STDIN_STDOUT)) => (Cow::Borrowed(STDIN_STDOUT), None),
+        (None, Some(rel_name)) => (
+            Cow::Owned(cwd.join(rel_name).to_string_lossy().to_string()),
+            None,
+        ),
+        (Some(source), Some(STDIN_STDOUT)) => (Cow::Borrowed("<string>"), Some(source.clone())),
+        _ => unreachable!(),
     };
+
     let mut output = Output::new(matches.get_one::<PathBuf>("output").unwrap())?;
 
-    let env = create_env(&config, cwd, &template_name, stdin_used)?;
+    let env = create_env(&config, cwd, &template_name, template_source, stdin_used)?;
     let mut exit_code = 0;
 
     if let Some(expr) = matches.get_one::<String>("expr") {
