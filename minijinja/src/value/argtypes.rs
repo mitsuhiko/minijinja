@@ -559,7 +559,15 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
             Some(value) => Ok(match value.0 {
                 ValueRepr::String(ref s, _) => Cow::Borrowed(s as &str),
                 ValueRepr::SmallStr(ref s) => Cow::Borrowed(s.as_str()),
-                _ => Cow::Owned(value.to_string()),
+                _ => {
+                    if value.is_kwargs() {
+                        return Err(Error::new(
+                            ErrorKind::InvalidOperation,
+                            "cannot convert kwargs to string",
+                        ));
+                    }
+                    Cow::Owned(value.to_string())
+                }
             }),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
@@ -975,7 +983,15 @@ impl<'a> ArgType<'a> for String {
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
-            Some(value) => Ok(value.to_string()),
+            Some(value) => {
+                if value.is_kwargs() {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        "cannot convert kwargs to string",
+                    ));
+                }
+                Ok(value.to_string())
+            }
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
@@ -1092,6 +1108,26 @@ mod tests {
         assert_eq!(args, &[Value::from(42), Value::from(true)]);
         assert_eq!(kwargs.get::<Value>("foo").unwrap(), Value::from(1));
         assert_eq!(kwargs.get::<Value>("bar").unwrap(), Value::from(2));
+    }
+
+    #[test]
+    fn test_kwargs_fails_string_conversion() {
+        let kwargs = Kwargs::from_iter([("foo", Value::from(1)), ("bar", Value::from(2))]);
+        let args = [Value::from(kwargs)];
+
+        let result = from_args::<(String,)>(&args);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "invalid operation: cannot convert kwargs to string"
+        );
+
+        let result = from_args::<(Cow<str>,)>(&args);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "invalid operation: cannot convert kwargs to string"
+        );
     }
 
     #[test]
