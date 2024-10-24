@@ -51,10 +51,10 @@ brew install minijinja-cli
 be set to `-` to read from stdin.  This is the default for the template, but only one
 can be set to stdin at once.
 
-- `[TEMPLATE]`:
+- `[TEMPLATE_FILE]`:
     the first argument is the filename of the template.  If not provided it defaults
     to `-` which means it loads the template from stdin.
-- `[DATA]`:
+- `[DATA_FILE]`:
     the second argument is the path to the data file.  This is a file which holds
     input variables that should be rendered.  Various file formats are supported.
     When data is read from `stdin`, `--format` must be specified as auto detection
@@ -119,6 +119,12 @@ Render a template with a string and integer variable:
 
 ```
 minijinja-cli template.j2 -D name=World -D count:=3
+```
+
+Render a template string:
+
+```
+minijinja-cli -t "Hello {{ name }}" -D name=World
 ```
 
 Render a template with variables from stdin:
