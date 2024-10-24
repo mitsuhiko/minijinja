@@ -11,3 +11,7 @@ Examples:
     minijinja-cli -Dvariable=value hello.j2
 
     minijinja-cli --strict --env hello.j2
+
+    minijinja-cli --template="Hello {{ name }}!" -Dname=World
+
+    minijinja-cli --expr "1 + 1"

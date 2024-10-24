@@ -222,7 +222,7 @@ pub(super) fn make_command() -> Command {
                     line-statement-prefix=\n\
                     line-statement-comment=\n\n\
                     \
-                    Example: -sline-statement-prefix='#' -svariable-start='${' -svariable-end='}'\n\n\
+                    Example: minijinja-cli -svariable-start='${' -svariable-end='}'\n\n\
                     \
                     For environment variable usage split multiple config strings with whitespace.\n\n\
                     \
@@ -240,7 +240,9 @@ pub(super) fn make_command() -> Command {
                     Renders a template from a string instead of the file given.\n\n\
                     \
                     This can be used as an alternative to the template file that is normally passed. \
-                    Note that this is different to --expr which evaluates expressions instead."),
+                    Note that this is different to --expr which evaluates expressions instead.\n\n\
+                    \
+                    Example: minijinja-cli --template='Hello {{ name }}' -Dname=World"),
             arg!(-E --expr <EXPR> "Evaluates an template expression")
                 .long_help("\
                     Evalues a template expression instead of rendering a template.\n\n\

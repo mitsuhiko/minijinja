@@ -32,6 +32,10 @@ Examples:
 
     minijinja-cli --strict --env hello.j2
 
+    minijinja-cli --template="Hello {{ name }}!" -Dname=World
+
+    minijinja-cli --expr "1 + 1"
+
 Usage: minijinja-cli [OPTIONS] [TEMPLATE_FILE] [DATA_FILE]
 
 Arguments:
@@ -100,6 +104,8 @@ Options:
           
           This can be used as an alternative to the template file that is normally passed. Note that
           this is different to --expr which evaluates expressions instead.
+          
+          Example: minijinja-cli --template='Hello {{ name }}' -Dname=World
 
   -o, --output <FILENAME>
           Path to the output file instead of stdout.
@@ -210,7 +216,7 @@ Template Behavior:
           line-statement-prefix=
           line-statement-comment=
           
-          Example: -sline-statement-prefix='#' -svariable-start='${' -svariable-end='}'
+          Example: minijinja-cli -svariable-start='${' -svariable-end='}'
           
           For environment variable usage split multiple config strings with whitespace.
           
