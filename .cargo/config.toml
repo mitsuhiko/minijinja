@@ -1,17 +1,5 @@
 [target.wasm32-wasi]
 runner = ["./scripts/wasmtime-wrapper.sh"]
 
-[target.aarch64-unknown-linux-gnu]
-linker = "aarch64-linux-gnu-gcc"
-
-[target.aarch64-unknown-linux-musl]
-linker = "aarch64-linux-musl-gcc"
-
-[target.armv7-unknown-linux-gnueabihf]
-linker = "arm-linux-gnueabihf-gcc"
-
-[target.arm-unknown-linux-musleabihf]
-linker = "arm-linux-musleabihf-gcc"
-
 [target.'cfg(all(target_env = "msvc", target_os = "windows"))']
 rustflags = ["-C", "target-feature=+crt-static"]
