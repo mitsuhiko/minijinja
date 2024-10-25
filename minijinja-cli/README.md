@@ -17,6 +17,14 @@ You can install binaries automatically with the shell installer:
 curl -sSfL https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-installer.sh | sh
 ```
 
+This script detects what platform you're on and fetches an appropriate archive from GitHub
+then unpacks the binaries and installs them to the first of the following locations:
+
+* `$MINIJINJA_CLI_INSTALL_DIR/bin`
+* `~/.local/bin`
+
+To influence where it installs, you can set the `MINIJINJA_CLI_INSTALL_DIR` environment variable.
+
 Or download a binary manually:
 
 - [aarch64-apple-darwin](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-aarch64-apple-darwin.tar.xz) (Apple Silicon macOS)
