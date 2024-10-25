@@ -23,3 +23,5 @@ install-updater = false
 [dist.dependencies.apt]
 gcc-aarch64-linux-gnu = { version = '*', targets = ["aarch64-unknown-linux-gnu"] }
 gcc-arm-linux-gnueabihf = { version = '*', targets = ["armv7-unknown-linux-gnueabihf"] }
+gcc-i686-linux-gnu = { version = '*', targets = ["i686-unknown-linux-gnu"] }
+
