@@ -142,6 +142,9 @@ Options:
       --long-help
           Print long help (extended, long explanation texts)
 
+      --syntax-help
+          Print syntax help (primer on Jinja2/MiniJinja syntax)
+
   -V, --version
           Print version
 
@@ -308,6 +311,6 @@ Shell Support:
           
           [possible values: bash, elvish, fig, fish, nushell, powershell, zsh]
 
-For extended help use --long-help, for short help --help.
+For a short help use --help, for extended help --long-help, and for help on syntax --syntax-help.
 
 ----- stderr -----
