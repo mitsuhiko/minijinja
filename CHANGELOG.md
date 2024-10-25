@@ -8,6 +8,8 @@ All notable changes to MiniJinja are documented here.
   config file and environment variable support.  #602
 - `minijinja-cli` now supports template source passed by parameter for
   simple cases.  #606
+- `minijinja-cli` now has a `--syntax-help` argument that prints out the
+  primer on the syntax.  #607
 - Made the c-bindings compatible with wasm compilation.  #603
 - `String`/`Cow<str>` argument types will no longer implicitly convert
   keyword arguments to string form.  This was an unintended foot gun.  #605

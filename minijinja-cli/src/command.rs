@@ -317,6 +317,8 @@ pub(super) fn make_command() -> Command {
                 .action(ArgAction::HelpShort),
             arg!(--"long-help" "Print long help (extended, long explanation texts)")
                 .action(ArgAction::HelpLong),
+            arg!(--"syntax-help" "Print syntax help (primer on Jinja2/MiniJinja syntax)")
+                .action(ArgAction::SetTrue),
             arg!(template_file: [TEMPLATE_FILE] "Path to the input template")
                 .long_help("\
                     This is the path to the input template in MiniJinja/Jinja2 syntax.  \
@@ -352,7 +354,7 @@ pub(super) fn make_command() -> Command {
                 ]).help_heading("Shell Support"),
         ])
         .before_help("minijinja-cli is a command line tool to render or evaluate jinja2 templates.")
-        .after_help("For extended help use --long-help, for short help --help.")
+        .after_help("For a short help use --help, for extended help --long-help, and for help on syntax --syntax-help.")
         .about("Pass a template and optionally a file with template variables to render it to stdout.")
         .long_about(include_str!("long_help.txt"))
 }
