@@ -13,6 +13,9 @@ linker = "arm-linux-gnueabihf-gcc"
 [target.arm-unknown-linux-musleabihf]
 linker = "arm-linux-musleabihf-gcc"
 
+[target.armv7-unknown-linux-musleabihf]
+linker = "arm-linux-musleabihf-gcc"
+
 [target.i686-unknown-linux-gnu]
 linker = "i686-linux-gnu-gcc"
 

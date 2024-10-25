@@ -22,6 +22,7 @@ install-updater = false
 
 [dist.dependencies.apt]
 gcc-aarch64-linux-gnu = { version = '*' }
+gcc-i686-linux-gnu = { version = '*' }
+gcc-arm-linux-gnueabi = { version = '*' }
 gcc-arm-linux-gnueabihf = { version = '*' }
 musl-tools = { version = '*' }
-gcc-i686-linux-gnu = { version = '*' }
