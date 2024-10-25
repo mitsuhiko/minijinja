@@ -12,13 +12,13 @@ fn file_with_contents(contents: &str) -> NamedTempFile {
     file_with_contents_and_ext(contents, "")
 }
 
-fn file_with_contents_and_ext(contents: &str, ext: &str) -> NamedTempFile {
+fn file_with_contents_and_ext<X: AsRef<[u8]>>(contents: X, ext: &str) -> NamedTempFile {
     let mut f = tempfile::Builder::new()
         .prefix("minijinja-testfile--")
         .suffix(ext)
         .tempfile()
         .unwrap();
-    f.write_all(contents.as_bytes()).unwrap();
+    f.write_all(contents.as_ref()).unwrap();
     f
 }
 
@@ -233,6 +233,29 @@ fn test_querystring() {
 }
 
 #[test]
+#[cfg(feature = "cbor")]
+fn test_cbor() {
+    let input = file_with_contents_and_ext(
+        [0xa1, 0x63, 0x66, 0x6f, 0x6f, 0x63, 0x62, 0x61, 0x72],
+        ".cbor",
+    );
+    let tmpl = file_with_contents(r#"Hello {{ foo }}!"#);
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello bar!
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 #[cfg(feature = "ini")]
 fn test_ini() {
     let input = file_with_contents_and_ext("[section]\nfoo = bar", ".ini");
@@ -265,6 +288,128 @@ fn test_ini() {
     exit_code: 0
     ----- stdout -----
     Hello bar!
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+#[cfg(feature = "preserve_order")]
+fn test_preserve_order_json() {
+    let input = file_with_contents_and_ext(r#"{"x": {"c": 3, "a": 1, "b": 2}}"#, ".json");
+    let tmpl =
+        file_with_contents("{% for key, value in x|items %}{{ key }}: {{ value }}\n{% endfor %}");
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    c: 3
+    a: 1
+    b: 2
+
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+#[cfg(all(feature = "preserve_order", feature = "yaml"))]
+fn test_preserve_order_yaml() {
+    let input = file_with_contents_and_ext(
+        r#"
+x:
+  c: 3
+  a: 1
+  b: 2
+"#,
+        ".yaml",
+    );
+    let tmpl =
+        file_with_contents("{% for key, value in x|items %}{{ key }}: {{ value }}\n{% endfor %}");
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    c: 3
+    a: 1
+    b: 2
+
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+#[cfg(all(feature = "preserve_order", feature = "toml"))]
+fn test_preserve_order_toml() {
+    let input = file_with_contents_and_ext(
+        r#"
+[x]
+c = 3
+a = 1
+b = 2
+"#,
+        ".toml",
+    );
+    let tmpl =
+        file_with_contents("{% for key, value in x|items %}{{ key }}: {{ value }}\n{% endfor %}");
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    c: 3
+    a: 1
+    b: 2
+
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+#[cfg(all(feature = "preserve_order", feature = "cbor"))]
+fn test_preserve_order_cbor() {
+    let input = file_with_contents_and_ext(
+        [
+            0xa1, // map(1)
+            0x61, 0x78, // "x"
+            0xa3, // map(3)
+            0x61, 0x63, 0x03, // "c": 3
+            0x61, 0x61, 0x01, // "a": 1
+            0x61, 0x62, 0x02, // "b": 2
+        ],
+        ".cbor",
+    );
+    let tmpl =
+        file_with_contents("{% for key, value in x|items %}{{ key }}: {{ value }}\n{% endfor %}");
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    c: 3
+    a: 1
+    b: 2
+
 
     ----- stderr -----
     "###);

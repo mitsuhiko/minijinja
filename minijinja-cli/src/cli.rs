@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::{fs, io};
@@ -67,13 +67,14 @@ fn load_data(
     selector: Option<&str>,
 ) -> Result<(BTreeMap<String, Value>, bool), Error> {
     let (contents, stdin_used) = if path == Path::new(STDIN_STDOUT) {
-        (
-            io::read_to_string(io::stdin()).context("unable to read data from stdin")?,
-            true,
-        )
+        let mut buf = Vec::<u8>::new();
+        io::stdin()
+            .read_to_end(&mut buf)
+            .context("unable to read data from stdin")?;
+        (buf, true)
     } else {
         (
-            fs::read_to_string(path)
+            fs::read(path)
                 .with_context(|| format!("unable to read data file '{}'", path.display()))?,
             false,
         )
@@ -89,24 +90,28 @@ fn load_data(
     };
 
     let mut data: Value = match format {
-        "json" => preferred_json::from_str(&contents)?,
+        "json" => preferred_json::from_slice(&contents)?,
         #[cfg(feature = "querystring")]
-        "querystring" => Value::from(serde_qs::from_str::<BTreeMap<String, Value>>(&contents)?),
+        "querystring" => Value::from(serde_qs::from_bytes::<BTreeMap<String, Value>>(&contents)?),
         #[cfg(feature = "yaml")]
         "yaml" => {
             // for merge keys to work we need to manually call `apply_merge`.
             // For this reason we need to deserialize into a serde_yml::Value
             // before converting it into a final value.
-            let mut v: serde_yml::Value = serde_yml::from_str(&contents)?;
+            let mut v: serde_yml::Value = serde_yml::from_slice(&contents)?;
             v.apply_merge()?;
             Value::from_serialize(v)
         }
         #[cfg(feature = "toml")]
-        "toml" => toml::from_str(&contents)?,
+        "toml" => {
+            let contents = String::from_utf8(contents).context("invalid utf-8")?;
+            toml::from_str(&contents)?
+        }
         #[cfg(feature = "cbor")]
-        "cbor" => ciborium::from_reader(contents.as_bytes())?,
+        "cbor" => ciborium::from_reader(&contents[..])?,
         #[cfg(feature = "ini")]
         "ini" => {
+            let contents = String::from_utf8(contents).context("invalid utf-8")?;
             let mut config = configparser::ini::Ini::new();
             config
                 .read(contents)
