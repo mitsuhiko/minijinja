@@ -366,6 +366,11 @@ pub fn execute() -> Result<i32, Error> {
     let matches = make_command().get_matches();
     let config = load_config(&matches)?;
 
+    if matches.get_flag("syntax-help") {
+        println!("{}", include_str!("syntax_help.txt"));
+        return Ok(0);
+    }
+
     #[cfg(feature = "completions")]
     {
         if let Some(shell) = matches.get_one::<String>("generate-completion") {
