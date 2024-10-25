@@ -21,9 +21,7 @@ install-path = ["$MINIJINJA_CLI_INSTALL_DIR/bin", "~/.local/bin"]
 install-updater = false
 
 [dist.dependencies.apt]
-gcc-aarch64-linux-gnu = { version = '*', targets = ["aarch64-unknown-linux-gnu", "aarch64-unknown-linux-musl"] }
-gcc-arm-linux-gnueabihf = { version = '*', targets = ["armv7-unknown-linux-gnueabihf", "arm-unknown-linux-musleabihf"] }
-musl-tools = { version = '*', targets = ["aarch64-unknown-linux-musl", "arm-unknown-linux-musleabihf"] }
-gcc-i686-linux-gnu = { version = '*', targets = ["i686-unknown-linux-gnu"] }
-
-
+gcc-aarch64-linux-gnu = { version = '*' }
+gcc-arm-linux-gnueabihf = { version = '*' }
+musl-tools = { version = '*' }
+gcc-i686-linux-gnu = { version = '*' }
