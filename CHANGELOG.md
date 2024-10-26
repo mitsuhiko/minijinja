@@ -2,11 +2,12 @@
 
 All notable changes to MiniJinja are documented here.
 
-## 2.4.1
+## 2.5.0
 
 - `minijinja-cli` now supports preservation of order in maps.  #611
 - Fixed an issue where CBOR was not correctly deserialized in
   `minijinja-cli`.  #611
+- Added a `lines` filter to split a string into lines.
 
 ## 2.4.0
 

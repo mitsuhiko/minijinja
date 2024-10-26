@@ -93,6 +93,7 @@ State {
             "join",
             "last",
             "length",
+            "lines",
             "list",
             "lower",
             "map",
