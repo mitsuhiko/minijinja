@@ -578,6 +578,20 @@ mod builtins {
         })
     }
 
+    /// Splits a string into lines.
+    ///
+    /// The newline character is removed in the process and not retained.  This
+    /// function supports both Windows and UNIX style newlines.
+    ///
+    /// ```jinja
+    /// {{ "foo\nbar\nbaz"|lines }}
+    ///     -> ["foo", "bar", "baz"]
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn lines(s: Arc<str>) -> Value {
+        Value::from_iter(s.lines().map(|x| x.to_string()))
+    }
+
     /// If the value is undefined it will return the passed default value,
     /// otherwise the value of the variable:
     ///

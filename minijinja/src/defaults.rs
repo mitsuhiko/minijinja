@@ -73,6 +73,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::Boxe
         rv.insert("trim".into(), BoxedFilter::new(filters::trim));
         rv.insert("join".into(), BoxedFilter::new(filters::join));
         rv.insert("split".into(), BoxedFilter::new(filters::split));
+        rv.insert("lines".into(), BoxedFilter::new(filters::lines));
         rv.insert("default".into(), BoxedFilter::new(filters::default));
         rv.insert("round".into(), BoxedFilter::new(filters::round));
         rv.insert("abs".into(), BoxedFilter::new(filters::abs));

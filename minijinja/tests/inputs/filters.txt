@@ -112,3 +112,4 @@ split-at-and: {{ three_words|split(" and ")|list }}
 split-n-ws: {{ three_words|split(none, 1)|list }}
 split-n-d: {{ three_words|split("d", 1)|list }}
 split-n-ws-filter-empty: {{ "  foo    bar baz  "|split(none, 1)|list }}
+lines: {{ "foo\nbar\r\nbaz"|lines }}
