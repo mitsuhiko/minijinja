@@ -4,7 +4,7 @@ use std::sync::Arc;
 use insta::{assert_debug_snapshot, assert_snapshot};
 use similar_asserts::assert_eq;
 
-use minijinja::value::{DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value};
+use minijinja::value::{DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value, ValueKind};
 use minijinja::{args, context, render, Environment, Error, ErrorKind};
 
 #[test]
@@ -1186,4 +1186,24 @@ fn test_sorting() {
         <invalid value: invalid operation: shit hit the fan>,
     ]
     "###);
+}
+
+#[test]
+fn test_bytes() {
+    let bytes = vec![1u8, 2, 3, 4];
+    let byte_value = Value::from_bytes(bytes);
+    assert_eq!(byte_value.kind(), ValueKind::Bytes);
+    assert!(byte_value.try_iter().is_err());
+    assert_eq!(format!("{:?}", byte_value), "b'\\x01\\x02\\x03\\x04'");
+
+    let bytes = vec![1u8, 2, 3, 4];
+    let not_byte_value = Value::from(bytes);
+    assert_eq!(not_byte_value.kind(), ValueKind::Seq);
+    assert!(not_byte_value.try_iter().is_ok());
+    assert_eq!(format!("{:?}", not_byte_value), "[1, 2, 3, 4]");
+
+    assert_eq!(
+        format!("{:?}", Value::from_bytes((&b"'foo\""[..]).into())),
+        "b'\\'foo\"'"
+    );
 }

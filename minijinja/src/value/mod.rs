@@ -439,7 +439,17 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
             ValueRepr::SmallStr(val) => fmt::Debug::fmt(val.as_str(), f),
-            ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Bytes(val) => {
+                write!(f, "b'")?;
+                for &b in val.iter() {
+                    if b == b'"' {
+                        write!(f, "\"")?
+                    } else {
+                        write!(f, "{}", b.escape_ascii())?;
+                    }
+                }
+                write!(f, "'")
+            }
             ValueRepr::Object(val) => val.render(f),
         }
     }
@@ -743,6 +753,20 @@ impl Value {
     /// ```
     pub fn from_safe_string(value: String) -> Value {
         ValueRepr::String(Arc::from(value), StringType::Safe).into()
+    }
+
+    /// Creates a value from a byte vector.
+    ///
+    /// MiniJinja can hold on to bytes and has some limited built-in support for
+    /// working with them.  They are non iterable and not particularly useful
+    /// in the context of templates.  When they are stringified, they are assumed
+    /// to contain UTF-8 and will be treated as such.  They become more useful
+    /// when a filter can do something with them (eg: base64 encode them etc.).
+    ///
+    /// This method exists so that a value can be constructed as creating a
+    /// value from a `Vec<u8>` would normally just create a sequence.
+    pub fn from_bytes(value: Vec<u8>) -> Value {
+        ValueRepr::Bytes(value.into()).into()
     }
 
     /// Creates a value from a dynamic object.
