@@ -866,6 +866,18 @@ mod builtins {
         Ok(Value::from(iter.collect::<Vec<_>>()))
     }
 
+    /// Converts a value into a string if it's not one already.
+    ///
+    /// If the string has been marked as safe, that value is preserved.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn string(value: Value) -> Value {
+        if value.kind() == ValueKind::String {
+            value
+        } else {
+            value.to_string().into()
+        }
+    }
+
     /// Converts the value into a boolean value.
     ///
     /// This behaves the same as the if statement does with regards to
