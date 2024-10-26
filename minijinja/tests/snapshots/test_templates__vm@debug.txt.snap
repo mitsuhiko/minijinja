@@ -111,6 +111,7 @@ State {
             "slice",
             "sort",
             "split",
+            "string",
             "title",
             "tojson",
             "trim",
