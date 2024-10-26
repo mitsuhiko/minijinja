@@ -11,6 +11,7 @@ All notable changes to MiniJinja are documented here.
 - Bytes are now better supported in MiniJinja.  They can be created from
   `Value::from_bytes` without having to go via serde, and they are now
   producing a nicer looking debug output.  #616
+- Added the missing `string` filter from Jinja2.  #617
 
 ## 2.4.0
 
