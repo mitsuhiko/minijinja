@@ -128,6 +128,12 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
                     .collect::<String>(),
             ))
         }
+        ValueRepr::Bytes(ref b) => {
+            let (start, len) = get_offset_and_len(start, stop, || b.len());
+            Ok(Value::from_bytes(
+                b.get(start..start + len).unwrap_or_default().to_owned(),
+            ))
+        }
         ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
         ValueRepr::Object(obj) if matches!(obj.repr(), ObjectRepr::Seq | ObjectRepr::Iterable) => {
             Ok(Value::make_object_iterable(obj, move |obj| {

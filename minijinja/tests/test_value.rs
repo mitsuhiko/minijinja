@@ -1195,6 +1195,15 @@ fn test_bytes() {
     assert_eq!(byte_value.kind(), ValueKind::Bytes);
     assert!(byte_value.try_iter().is_err());
     assert_eq!(format!("{:?}", byte_value), "b'\\x01\\x02\\x03\\x04'");
+    assert_eq!(byte_value.get_item_by_index(0).ok(), Some(Value::from(1)));
+    assert_eq!(
+        byte_value.reverse().ok(),
+        Some(Value::from_bytes(vec![4, 3, 2, 1]))
+    );
+    assert_eq!(
+        render!("{{ x[1:-1] }}", x => Value::from_bytes(vec![1, 76, 65, 4])),
+        "LA"
+    );
 
     let bytes = vec![1u8, 2, 3, 4];
     let not_byte_value = Value::from(bytes);

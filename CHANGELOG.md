@@ -12,6 +12,8 @@ All notable changes to MiniJinja are documented here.
   `Value::from_bytes` without having to go via serde, and they are now
   producing a nicer looking debug output.  #616
 - Added the missing `string` filter from Jinja2.  #617
+- Reversing bytes and convergint them implicitly to strings will now work
+  more consistently.  #619
 
 ## 2.4.0
 

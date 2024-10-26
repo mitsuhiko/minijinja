@@ -493,6 +493,7 @@ impl TryFrom<Value> for Arc<str> {
         match value.0 {
             ValueRepr::String(x, _) => Ok(x),
             ValueRepr::SmallStr(x) => Ok(Arc::from(x.as_str())),
+            ValueRepr::Bytes(ref x) => Ok(Arc::from(String::from_utf8_lossy(x))),
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "value is not a string",
