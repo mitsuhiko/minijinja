@@ -8,6 +8,9 @@ All notable changes to MiniJinja are documented here.
 - Fixed an issue where CBOR was not correctly deserialized in
   `minijinja-cli`.  #611
 - Added a `lines` filter to split a string into lines.
+- Bytes are now better supported in MiniJinja.  They can be created from
+  `Value::from_bytes` without having to go via serde, and they are now
+  producing a nicer looking debug output.  #616
 
 ## 2.4.0
 
