@@ -178,10 +178,28 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //!
 //! It's generally recommende to ignore the existence of invalid objects and let them
 //! fail naturally as they are encountered.
+//!
+//! # Notes on Bytes and Strings
+//!
+//! Usually one would pass strings to templates as Jinja is entirely based on string
+//! rendering.  However there are situations where it can be useful to pass bytes instead.
+//! As such MiniJinja allows a value type to carry bytes even though there is no syntax
+//! within the template language to create a byte literal.
+//!
+//! When rendering bytes as strings, MiniJinja will attempt to interpret them as
+//! lossy utf-8.  This is a bit different to Jinja2 which in Python 3 stopped
+//! rendering byte strings as strings.  This is an intentional change that was
+//! deemed acceptable given how infrequently bytes are used but how relatively
+//! commonly bytes are often holding "almost utf-8" in templates.  Most
+//! conversions to strings also will do almost the same.  The debug rendering of
+//! bytes however is different and bytes are not iterable.  Like strings however
+//! they can be sliced and indexed, but they will be sliced by bytes and not by
+//! characters.
 
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
 
+use core::str;
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -1078,19 +1096,25 @@ impl Value {
     }
 
     /// If the value is a string, return it.
+    ///
+    /// This will also perform a lossy string conversion of bytes from utf-8.
     pub fn to_str(&self) -> Option<Arc<str>> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Some(s.clone()),
             ValueRepr::SmallStr(ref s) => Some(Arc::from(s.as_str())),
+            ValueRepr::Bytes(ref b) => Some(Arc::from(String::from_utf8_lossy(b))),
             _ => None,
         }
     }
 
     /// If the value is a string, return it.
+    ///
+    /// This will also return well formed utf-8 bytes as string.
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Some(s as &str),
             ValueRepr::SmallStr(ref s) => Some(s.as_str()),
+            ValueRepr::Bytes(ref b) => str::from_utf8(b).ok(),
             _ => None,
         }
     }
@@ -1140,6 +1164,7 @@ impl Value {
         match self.0 {
             ValueRepr::String(ref s, _) => Some(s.chars().count()),
             ValueRepr::SmallStr(ref s) => Some(s.as_str().chars().count()),
+            ValueRepr::Bytes(ref b) => Some(b.len()),
             ValueRepr::Object(ref dy) => dy.enumerator_len(),
             _ => None,
         }
@@ -1285,9 +1310,9 @@ impl Value {
                 // TODO: add small str optimization here
                 Some(Value::from(s.as_str().chars().rev().collect::<String>()))
             }
-            ValueRepr::Bytes(ref b) => {
-                Some(Value::from(b.iter().rev().copied().collect::<Vec<_>>()))
-            }
+            ValueRepr::Bytes(ref b) => Some(Value::from_bytes(
+                b.iter().rev().copied().collect::<Vec<_>>(),
+            )),
             ValueRepr::Object(ref o) => match o.enumerate() {
                 Enumerator::NonEnumerable => None,
                 Enumerator::Empty => Some(Value::make_iterable(|| None::<Value>.into_iter())),
@@ -1421,6 +1446,10 @@ impl Value {
             ValueRepr::SmallStr(ref s) => {
                 let idx = some!(index(key, || Some(s.as_str().chars().count())));
                 s.as_str().chars().nth(idx).map(Value::from)
+            }
+            ValueRepr::Bytes(ref b) => {
+                let idx = some!(index(key, || Some(b.len())));
+                b.get(idx).copied().map(Value::from)
             }
             _ => None,
         }
