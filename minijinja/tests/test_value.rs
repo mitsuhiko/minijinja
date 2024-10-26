@@ -1203,7 +1203,7 @@ fn test_bytes() {
     assert_eq!(format!("{:?}", not_byte_value), "[1, 2, 3, 4]");
 
     assert_eq!(
-        format!("{:?}", Value::from_bytes(b"'foo\"".into())),
+        format!("{:?}", Value::from_bytes((&b"'foo\""[..]).into())),
         "b'\\'foo\"'"
     );
 }
