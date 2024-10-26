@@ -1201,4 +1201,9 @@ fn test_bytes() {
     assert_eq!(not_byte_value.kind(), ValueKind::Seq);
     assert!(not_byte_value.try_iter().is_ok());
     assert_eq!(format!("{:?}", not_byte_value), "[1, 2, 3, 4]");
+
+    assert_eq!(
+        format!("{:?}", Value::from_bytes(b"'foo\"".into())),
+        "b'\\'foo\"'"
+    );
 }

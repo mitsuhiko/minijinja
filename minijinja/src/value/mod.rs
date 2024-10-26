@@ -442,7 +442,11 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::Bytes(val) => {
                 write!(f, "b'")?;
                 for &b in val.iter() {
-                    write!(f, "{}", b.escape_ascii())?;
+                    if b == b'"' {
+                        write!(f, "\"")?
+                    } else {
+                        write!(f, "{}", b.escape_ascii())?;
+                    }
                 }
                 write!(f, "'")
             }
