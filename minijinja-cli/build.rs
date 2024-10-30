@@ -1,7 +1,7 @@
 use std::fs::create_dir_all;
 
 pub mod cli {
-    include!("src/cli.rs");
+    include!("src/command.rs");
 }
 
 fn main() -> std::io::Result<()> {

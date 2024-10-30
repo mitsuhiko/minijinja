@@ -2,6 +2,32 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.5.0
+
+- `minijinja-cli` now supports preservation of order in maps.  #611
+- Fixed an issue where CBOR was not correctly deserialized in
+  `minijinja-cli`.  #611
+- Added a `lines` filter to split a string into lines.
+- Bytes are now better supported in MiniJinja.  They can be created from
+  `Value::from_bytes` without having to go via serde, and they are now
+  producing a nicer looking debug output.  #616
+- Added the missing `string` filter from Jinja2.  #617
+- Reversing bytes and convergint them implicitly to strings will now work
+  more consistently.  #619
+
+## 2.4.0
+
+- Updated version of `minijinja-cli` with support for better documentation,
+  config file and environment variable support.  #602
+- `minijinja-cli` now supports template source passed by parameter for
+  simple cases.  #606
+- `minijinja-cli` now has a `--syntax-help` argument that prints out the
+  primer on the syntax.  #607
+- `minijinja-cli` now installs to `~/.local/bin` by default.  #608
+- Made the c-bindings compatible with wasm compilation.  #603
+- `String`/`Cow<str>` argument types will no longer implicitly convert
+  keyword arguments to string form.  This was an unintended foot gun.  #605
+
 ## 2.3.1
 
 - Fixes a regresion in `PartialEq` / `Eq` in `Value` caused by changes

@@ -227,8 +227,8 @@ macro_rules! tuple_impls {
                 if values.get(idx).is_some() {
                     Err(Error::from(ErrorKind::TooManyArguments))
                 } else {
-                    // SAFETY: this is safe because both no batter what `rest_first` is set to
-                    // either way the variable is set.
+                    // SAFETY: this is safe because both no matter what `rest_first` is set to
+                    // the rest_name variable is set at this point.
                     Ok(($($name,)* unsafe { $rest_name.unwrap_unchecked() },))
                 }
             }
@@ -493,6 +493,7 @@ impl TryFrom<Value> for Arc<str> {
         match value.0 {
             ValueRepr::String(x, _) => Ok(x),
             ValueRepr::SmallStr(x) => Ok(Arc::from(x.as_str())),
+            ValueRepr::Bytes(ref x) => Ok(Arc::from(String::from_utf8_lossy(x))),
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "value is not a string",
@@ -559,7 +560,15 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
             Some(value) => Ok(match value.0 {
                 ValueRepr::String(ref s, _) => Cow::Borrowed(s as &str),
                 ValueRepr::SmallStr(ref s) => Cow::Borrowed(s.as_str()),
-                _ => Cow::Owned(value.to_string()),
+                _ => {
+                    if value.is_kwargs() {
+                        return Err(Error::new(
+                            ErrorKind::InvalidOperation,
+                            "cannot convert kwargs to string",
+                        ));
+                    }
+                    Cow::Owned(value.to_string())
+                }
             }),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
@@ -975,7 +984,15 @@ impl<'a> ArgType<'a> for String {
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
-            Some(value) => Ok(value.to_string()),
+            Some(value) => {
+                if value.is_kwargs() {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        "cannot convert kwargs to string",
+                    ));
+                }
+                Ok(value.to_string())
+            }
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
@@ -1092,6 +1109,26 @@ mod tests {
         assert_eq!(args, &[Value::from(42), Value::from(true)]);
         assert_eq!(kwargs.get::<Value>("foo").unwrap(), Value::from(1));
         assert_eq!(kwargs.get::<Value>("bar").unwrap(), Value::from(2));
+    }
+
+    #[test]
+    fn test_kwargs_fails_string_conversion() {
+        let kwargs = Kwargs::from_iter([("foo", Value::from(1)), ("bar", Value::from(2))]);
+        let args = [Value::from(kwargs)];
+
+        let result = from_args::<(String,)>(&args);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "invalid operation: cannot convert kwargs to string"
+        );
+
+        let result = from_args::<(Cow<str>,)>(&args);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "invalid operation: cannot convert kwargs to string"
+        );
     }
 
     #[test]

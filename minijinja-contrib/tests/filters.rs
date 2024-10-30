@@ -94,7 +94,9 @@ fn test_pluralize() {
 
 #[test]
 #[cfg(feature = "rand")]
+#[cfg(target_pointer_width = "64")]
 fn test_random() {
+    // The small rng is pointer size specific.  Test on 64bit platforms only
     use minijinja::render;
     use minijinja_contrib::filters::random;
 

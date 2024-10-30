@@ -527,35 +527,26 @@ mod builtins {
         }
 
         let joiner = joiner.as_ref().unwrap_or(&Cow::Borrowed(""));
-
-        if let Some(s) = val.as_str() {
-            let mut rv = String::new();
-            for c in s.chars() {
-                if !rv.is_empty() {
-                    rv.push_str(joiner);
-                }
-                rv.push(c);
-            }
-            Ok(rv)
-        } else if let Some(iter) = val.as_object().and_then(|x| x.try_iter()) {
-            let mut rv = String::new();
-            for item in iter {
-                if !rv.is_empty() {
-                    rv.push_str(joiner);
-                }
-                if let Some(s) = item.as_str() {
-                    rv.push_str(s);
-                } else {
-                    write!(rv, "{item}").ok();
-                }
-            }
-            Ok(rv)
-        } else {
-            Err(Error::new(
+        let iter = ok!(val.try_iter().map_err(|err| {
+            Error::new(
                 ErrorKind::InvalidOperation,
                 format!("cannot join value of type {}", val.kind()),
-            ))
+            )
+            .with_source(err)
+        }));
+
+        let mut rv = String::new();
+        for item in iter {
+            if !rv.is_empty() {
+                rv.push_str(joiner);
+            }
+            if let Some(s) = item.as_str() {
+                rv.push_str(s);
+            } else {
+                write!(rv, "{item}").ok();
+            }
         }
+        Ok(rv)
     }
 
     /// Split a string into its substrings, using `split` as the separator string.
@@ -585,6 +576,20 @@ mod builtins {
             (None, Some(n)) => Box::new(splitn_whitespace(s, n).map(Value::from)),
             (Some(split), Some(n)) => Box::new(s.splitn(n, split as &str).map(Value::from)),
         })
+    }
+
+    /// Splits a string into lines.
+    ///
+    /// The newline character is removed in the process and not retained.  This
+    /// function supports both Windows and UNIX style newlines.
+    ///
+    /// ```jinja
+    /// {{ "foo\nbar\nbaz"|lines }}
+    ///     -> ["foo", "bar", "baz"]
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn lines(s: Arc<str>) -> Value {
+        Value::from_iter(s.lines().map(|x| x.to_string()))
     }
 
     /// If the value is undefined it will return the passed default value,
@@ -859,6 +864,18 @@ mod builtins {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
         Ok(Value::from(iter.collect::<Vec<_>>()))
+    }
+
+    /// Converts a value into a string if it's not one already.
+    ///
+    /// If the string has been marked as safe, that value is preserved.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn string(value: Value) -> Value {
+        if value.kind() == ValueKind::String {
+            value
+        } else {
+            value.to_string().into()
+        }
     }
 
     /// Converts the value into a boolean value.
