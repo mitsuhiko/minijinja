@@ -409,12 +409,13 @@ pub fn execute() -> Result<i32, Error> {
             .map(|x| x.as_str()),
     ) {
         (None, Some(STDIN_STDOUT)) => (Cow::Borrowed(STDIN_STDOUT), None),
+        (None, Some("")) => bail!("Empty template names are only valid with --template."),
         (None, Some(rel_name)) => (
             Cow::Owned(cwd.join(rel_name).to_string_lossy().to_string()),
             None,
         ),
-        (Some(source), Some(STDIN_STDOUT)) => (Cow::Borrowed("<string>"), Some(source.clone())),
-        _ => unreachable!(),
+        (Some(source), None | Some("")) => (Cow::Borrowed("<string>"), Some(source.clone())),
+        _ => bail!("When --template is used, a template cannot be passed as argument (only an empty argument is allowed)."),
     };
 
     let mut output = Output::new(matches.get_one::<PathBuf>("output").unwrap())?;
