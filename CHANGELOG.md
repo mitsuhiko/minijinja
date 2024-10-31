@@ -18,6 +18,8 @@ All notable changes to MiniJinja are documented here.
 - `minijinja-cli` now allows the template name to be set to an empty
   string when `--template` is used, to allow suppliying a data file.  #624
 - Added the missing `sameas` filter from Jinja2.  #625
+- Tests can now support one argument without parentheses like in Jinja2
+  (`1 is sameas 1`).  #626
 
 ## 2.4.0
 
