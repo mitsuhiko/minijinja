@@ -12,4 +12,4 @@ jobs:
         with:
           python-version: '3.9'
       - name: Run pyright
-        run: make type-check
+        run: make python-type-check
