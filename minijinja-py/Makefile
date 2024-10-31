@@ -4,7 +4,7 @@ all: develop test
 .venv:
 	python3 -mvenv .venv
 	.venv/bin/pip install --upgrade pip
-	.venv/bin/pip install maturin==0.15.1 pytest markupsafe black
+	.venv/bin/pip install maturin==0.15.1 pytest markupsafe black pyright
 
 .PHONY: test
 develop: .venv
