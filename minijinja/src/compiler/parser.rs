@@ -460,6 +460,29 @@ impl<'a> Parser<'a> {
                         expect_token!(self, Token::Ident(name) => name, "identifier");
                     let args = if matches_token!(self, Token::ParenOpen) {
                         ok!(self.parse_args())
+                    } else if matches_token!(
+                        self,
+                        Token::Ident(_)
+                            | Token::Str(_)
+                            | Token::String(_)
+                            | Token::Int(_)
+                            | Token::Int128(_)
+                            | Token::Float(_)
+                            | Token::Plus
+                            | Token::Minus
+                            | Token::BracketOpen
+                            | Token::BraceOpen
+                    ) && !matches_token!(
+                        self,
+                        Token::Ident("and")
+                            | Token::Ident("or")
+                            | Token::Ident("else")
+                            | Token::Ident("is")
+                    ) {
+                        let span = self.stream.current_span();
+                        let mut expr = ok!(self.parse_unary_only());
+                        expr = ok!(self.parse_postfix(expr, span));
+                        vec![expr]
                     } else {
                         Vec::new()
                     };
