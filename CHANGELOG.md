@@ -15,6 +15,8 @@ All notable changes to MiniJinja are documented here.
 - Reversing bytes and convergint them implicitly to strings will now work
   more consistently.  #619
 - Added type hints for the Python binding and relaxed maturin constraint.  #590
+- `minijinja-cli` now allows the template name to be set to an empty
+  string when `--template` is used, to allow suppliying a data file.  #624
 
 ## 2.4.0
 

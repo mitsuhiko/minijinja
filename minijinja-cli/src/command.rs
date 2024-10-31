@@ -3,6 +3,7 @@
 /// application and by build.rs to generate shell completions.
 use std::path::PathBuf;
 
+use clap::builder::ArgPredicate;
 use clap::{arg, command, value_parser, ArgAction, Command};
 
 const ADVANCED: &str = "Advanced";
@@ -324,9 +325,12 @@ pub(super) fn make_command() -> Command {
                     This is the path to the input template in MiniJinja/Jinja2 syntax.  \
                     If not provided this defaults to '-' which means the template is \
                     loaded from stdin.  When the format is set to 'auto' which is the \
-                    default, the extension of the filename is used to detect the format.")
+                    default, the extension of the filename is used to detect the format.\n\n\
+                    \
+                    This argument can be set to an empty string when --template is provided \
+                    to allow a data file to be supplied.")
                 .default_value("-")
-                .conflicts_with("template"),
+                .default_value_if("template", ArgPredicate::IsPresent, None),
             arg!(data_file: [DATA_FILE] "Path to the data file")
                 .long_help("\
                     Path to the data file in the given format.\n\n\

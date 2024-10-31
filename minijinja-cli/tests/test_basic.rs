@@ -657,6 +657,63 @@ fn test_template_string() {
 }
 
 #[test]
+#[allow(clippy::suspicious_command_arg_space)]
+fn test_empty_template_name_with_string_template() {
+    let input = file_with_contents_and_ext(r#"{"name": "Peter"}"#, ".json");
+    assert_cmd_snapshot!(
+        cli()
+            .arg("-tHello {{ name }}")
+            .arg("")
+            .arg(input.path())
+            .arg("--no-newline"),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello Peter
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+#[allow(clippy::suspicious_command_arg_space)]
+fn test_template_name_with_string_template_fails() {
+    let input = file_with_contents_and_ext(r#"{"name": "Peter"}"#, ".json");
+    assert_cmd_snapshot!(
+        cli()
+            .arg("-tHello {{ name }}")
+            .arg("invalid.tmpl")
+            .arg(input.path())
+            .arg("--no-newline"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    error: When --template is used, a template cannot be passed as argument (only an empty argument is allowed).
+    "###);
+}
+
+#[test]
+fn test_empty_template_name_errors() {
+    let input = file_with_contents_and_ext(r#"{"name": "Peter"}"#, ".json");
+    assert_cmd_snapshot!(
+        cli()
+            .arg("")
+            .arg(input.path())
+            .arg("--no-newline"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Empty template names are only valid with --template.
+    "###);
+}
+
+#[test]
 fn test_print_config_fully_loaded() {
     assert_cmd_snapshot!(
         cli()
