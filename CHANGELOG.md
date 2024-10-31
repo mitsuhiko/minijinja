@@ -14,6 +14,7 @@ All notable changes to MiniJinja are documented here.
 - Added the missing `string` filter from Jinja2.  #617
 - Reversing bytes and convergint them implicitly to strings will now work
   more consistently.  #619
+- Added type hints for the Python binding and relaxed maturin constraint.  #590
 
 ## 2.4.0
 
