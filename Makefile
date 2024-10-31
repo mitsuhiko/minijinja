@@ -32,6 +32,10 @@ wasi-test:
 python-test:
 	@make -C minijinja-py
 
+.PHONY: python-type-check
+python-type-check:
+	@make -C minijinja-py type-check
+
 .PHONY: snapshot-tests
 snapshot-tests:
 	@cd minijinja; cargo insta test --all-features --review

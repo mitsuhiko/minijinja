@@ -4,7 +4,14 @@ import posixpath
 import types
 
 from _pytest.unraisableexception import catch_unraisable_exception
-from minijinja import Environment, TemplateError, safe, pass_state, eval_expr, render_str
+from minijinja import (
+    Environment,
+    TemplateError,
+    safe,
+    pass_state,
+    eval_expr,
+    render_str,
+)
 
 
 def test_expression():
@@ -268,19 +275,20 @@ def test_custom_syntax():
         comment_start_string="/*",
         comment_end_string="*/",
     )
-    rv = env.render_str('[% if true %]{value}[% endif %]/* nothing */', value=42)
-    assert rv == '42'
+    rv = env.render_str("[% if true %]{value}[% endif %]/* nothing */", value=42)
+    assert rv == "42"
 
 
 def test_path_join():
     def join_path(name, parent):
         return posixpath.join(posixpath.dirname(parent), name)
+
     env = Environment(
         path_join_callback=join_path,
         templates={
             "foo/bar.txt": "{% include 'baz.txt' %}",
             "foo/baz.txt": "I am baz!",
-        }
+        },
     )
 
     with catch_unraisable_exception() as cm:
@@ -339,5 +347,5 @@ def test_custom_delimiters():
         comment_start_string="<!--",
         comment_end_string="-->",
     )
-    rv = env.render_str('<% if true %>${ value }<% endif %><!-- nothing -->', value=42)
-    assert rv == '42'
+    rv = env.render_str("<% if true %>${ value }<% endif %><!-- nothing -->", value=42)
+    assert rv == "42"

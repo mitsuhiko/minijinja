@@ -1,5 +1,4 @@
-from _pytest.unraisableexception import catch_unraisable_exception
-from minijinja import Environment, TemplateError, safe
+from minijinja import Environment
 
 
 def test_private_attrs():

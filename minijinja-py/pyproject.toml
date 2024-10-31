@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=0.15,<0.16"]
+requires = ["maturin>=1.5"]
 build-backend = "maturin"
 
 [project]
@@ -34,3 +34,9 @@ Repository = "https://github.com/mitsuhiko/minijinja"
 module-name = "minijinja._lowlevel"
 python-source = "python"
 strip = true
+
+[tool.pyright]
+include = ["python/**/*.pyi"]
+exclude = ["python/**/*.py"]
+typeCheckingMode = "strict"
+pythonVersion = "3.9"
