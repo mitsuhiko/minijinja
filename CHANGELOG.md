@@ -17,6 +17,7 @@ All notable changes to MiniJinja are documented here.
 - Added type hints for the Python binding and relaxed maturin constraint.  #590
 - `minijinja-cli` now allows the template name to be set to an empty
   string when `--template` is used, to allow suppliying a data file.  #624
+- Added the missing `sameas` filter from Jinja2.  #625
 
 ## 2.4.0
 

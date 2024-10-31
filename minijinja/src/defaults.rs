@@ -143,6 +143,7 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
         rv.insert("endingwith".into(), BoxedTest::new(tests::is_endingwith));
         rv.insert("lower".into(), BoxedTest::new(tests::is_lower));
         rv.insert("upper".into(), BoxedTest::new(tests::is_upper));
+        rv.insert("sameas".into(), BoxedTest::new(tests::is_sameas));
 
         // operators
         let is_eq = BoxedTest::new(tests::is_eq);
