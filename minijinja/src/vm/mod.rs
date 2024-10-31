@@ -488,13 +488,13 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::JumpIfFalse(jump_target) => {
                     a = stack.pop();
-                    if !ok!(undefined_behavior.is_true(&a)) {
+                    if !ctx_ok!(undefined_behavior.is_true(&a)) {
                         pc = *jump_target;
                         continue;
                     }
                 }
                 Instruction::JumpIfFalseOrPop(jump_target) => {
-                    if !ok!(undefined_behavior.is_true(stack.peek())) {
+                    if !ctx_ok!(undefined_behavior.is_true(stack.peek())) {
                         pc = *jump_target;
                         continue;
                     } else {
@@ -502,7 +502,7 @@ impl<'env> Vm<'env> {
                     }
                 }
                 Instruction::JumpIfTrueOrPop(jump_target) => {
-                    if ok!(undefined_behavior.is_true(stack.peek())) {
+                    if ctx_ok!(undefined_behavior.is_true(stack.peek())) {
                         pc = *jump_target;
                         continue;
                     } else {
