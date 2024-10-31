@@ -137,16 +137,6 @@ These are related template engines for Rust:
 * [Liquid](https://crates.io/crates/liquid): an implementation of Liquid templates for Rust.
   Liquid was inspired by Django from which Jinja took it's inspiration.
 
-## Upgrading from MiniJinja 1.x
-
-There are two major versions of MiniJinja both of which are currently maintained.  Most users should
-upgrade to 2.x which has a much improved object system.  However if you have been using dynamic
-objects in the past the upgrade might be quite involved.  For upgrade informations refer to
-[UPDATING](UPDATING.md) which has a guide with examples of what the changes between the two engine
-versions are.
-
-To see examples and code from MiniJinja 1.x, you can browse the [minijinja-1.x branch](https://github.com/mitsuhiko/minijinja/tree/minijinja-1.x).
-
 ## Sponsor
 
 If you like the project and find it useful you can [become a
@@ -159,4 +149,5 @@ sponsor](https://github.com/sponsors/mitsuhiko).
 - [Examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
 - [Issue Tracker](https://github.com/mitsuhiko/minijinja/issues)
 - [MiniJinja Playground](https://mitsuhiko.github.io/minijinja-playground/)
+- [Updating Guide](UPDATING.md)
 - License: [Apache-2.0](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
