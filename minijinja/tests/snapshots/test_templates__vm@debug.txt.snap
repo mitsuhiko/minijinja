@@ -64,6 +64,7 @@ State {
             "number",
             "odd",
             "safe",
+            "sameas",
             "sequence",
             "startingwith",
             "string",

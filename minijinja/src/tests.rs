@@ -565,6 +565,36 @@ mod builtins {
     pub fn is_upper(name: &str) -> bool {
         name.chars().all(|x| x.is_uppercase())
     }
+
+    /// Checks if two values are identical.
+    ///
+    /// This primarily exists for compatibilith with Jinja2.  It can be seen as a much
+    /// stricter comparison than a regular comparison.  The main difference is that
+    /// values that have the same structure but a different internal object will not
+    /// compare equal.
+    ///
+    /// ```jinja
+    /// {{ [1, 2, 3] is sameas([1, 2, 3]) }}
+    ///     -> false
+    ///
+    /// {{ false is sameas(false) }}
+    ///     -> true
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_sameas(value: &Value, other: &Value) -> bool {
+        match (value.as_object(), other.as_object()) {
+            (Some(a), Some(b)) => a.is_same_object(b),
+            (None, Some(_)) | (Some(_), None) => false,
+            (None, None) => {
+                if value.kind() != other.kind() || value.is_integer() != other.is_integer() {
+                    false
+                } else {
+                    value == other
+                }
+            }
+        }
+    }
 }
 
 #[cfg(feature = "builtins")]

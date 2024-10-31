@@ -49,3 +49,6 @@ is-boolean: {{ true is boolean }} | {{ 42 is boolean }}
 is-divisibleby: {{ 42 is divisibleby(2) }} | {{ 41 is divisibleby(2) }}
 is-lower: {{ "foo" is lower }} | {{ "FOO" is lower }}
 is-upper: {{ "foo" is upper }} | {{ "FOO" is upper }}
+seq-same-as: {{ [1, 2, 3] is sameas([1, 2, 3]) }}
+const-same-as: {{ true is sameas(true) }}
+int-same-as: {{ 1 is sameas(1.0) }}
