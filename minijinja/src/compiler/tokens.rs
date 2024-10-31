@@ -44,8 +44,6 @@ pub enum Token<'a> {
     Pow,
     /// A mod (`%`) operator.
     Mod,
-    /// The bang (`!`) operator.
-    Bang,
     /// A dot operator (`.`)
     Dot,
     /// The comma operator (`,`)
@@ -103,7 +101,6 @@ impl<'a> fmt::Display for Token<'a> {
             Token::FloorDiv => f.write_str("`//`"),
             Token::Pow => f.write_str("`**`"),
             Token::Mod => f.write_str("`%`"),
-            Token::Bang => f.write_str("`!`"),
             Token::Dot => f.write_str("`.`"),
             Token::Comma => f.write_str("`,`"),
             Token::Colon => f.write_str("`:`"),

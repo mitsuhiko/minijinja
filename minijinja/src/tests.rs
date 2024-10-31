@@ -368,8 +368,8 @@ mod builtins {
     /// Checks if the value is starting with a string.
     ///
     /// ```jinja
-    /// {{ "foobar" is startingwith("foo") }} -> true
-    /// {{ "foobar" is startingwith("bar") }} -> false
+    /// {{ "foobar" is startingwith "foo" }} -> true
+    /// {{ "foobar" is startingwith "bar" }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_startingwith(v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
@@ -379,8 +379,8 @@ mod builtins {
     /// Checks if the value is ending with a string.
     ///
     /// ```jinja
-    /// {{ "foobar" is endingwith("bar") }} -> true
-    /// {{ "foobar" is endingwith("foo") }} -> false
+    /// {{ "foobar" is endingwith "bar" }} -> true
+    /// {{ "foobar" is endingwith "foo" }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_endingwith(v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
@@ -574,10 +574,10 @@ mod builtins {
     /// compare equal.
     ///
     /// ```jinja
-    /// {{ [1, 2, 3] is sameas([1, 2, 3]) }}
+    /// {{ [1, 2, 3] is sameas [1, 2, 3] }}
     ///     -> false
     ///
-    /// {{ false is sameas(false) }}
+    /// {{ false is sameas false }}
     ///     -> true
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]

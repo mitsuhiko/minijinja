@@ -854,7 +854,6 @@ impl<'s> Tokenizer<'s> {
             Some(b'*') => Some(Token::Mul),
             Some(b'/') => Some(Token::Div),
             Some(b'%') => Some(Token::Mod),
-            Some(b'!') => Some(Token::Bang),
             Some(b'.') => Some(Token::Dot),
             Some(b',') => Some(Token::Comma),
             Some(b':') => Some(Token::Colon),
