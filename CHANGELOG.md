@@ -20,6 +20,8 @@ All notable changes to MiniJinja are documented here.
 - Added the missing `sameas` filter from Jinja2.  #625
 - Tests can now support one argument without parentheses like in Jinja2
   (`1 is sameas 1`).  #626
+- Added error context for strict undefined errors during template
+  rendering.  #627
 
 ## 2.4.0
 
