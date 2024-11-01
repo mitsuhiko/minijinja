@@ -20,11 +20,11 @@ datetime = ["minijinja-contrib/datetime", "minijinja-contrib/timezone"]
 json5 = ["serde_json5"]
 repl = ["rustyline"]
 completions = ["clap_complete", "clap_complete_nushell", "clap_complete_fig"]
-unicode = ["minijinja/unicode"]
+unicode = ["axominijinja/unicode"]
 ini = ["configparser"]
 contrib = ["minijinja-contrib"]
 toml = ["dep:toml", "home"]
-preserve_order = ["minijinja/preserve_order"]
+preserve_order = ["axominijinja/preserve_order"]
 
 [dependencies]
 anyhow = "1.0.74"
@@ -38,7 +38,7 @@ clap = { version = "4.3.21", default-features = false, features = [
     "error-context",
 ] }
 dunce = "1.0.4"
-minijinja = { version = "=2.4.0", path = "../minijinja", features = [
+axominijinja = { version = "=2.4.0", path = "../minijinja", features = [
     "loader",
     "json",
     "urlencode",

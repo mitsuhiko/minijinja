@@ -7,5 +7,5 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-minijinja = { path = "../../minijinja" }
+axominijinja = { path = "../../minijinja" }
 syntect = { version = "5.2.0", default-features = false, features = ["default-fancy", "default-syntaxes"] }

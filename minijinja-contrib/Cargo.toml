@@ -17,13 +17,13 @@ all-features = true
 
 [features]
 default = []
-pycompat = ["minijinja/builtins"]
+pycompat = ["axominijinja/builtins"]
 datetime = ["time"]
 timezone = ["time-tz"]
 rand = ["dep:rand"]
 
 [dependencies]
-minijinja = { version = "2.4.0", path = "../minijinja", default-features = false }
+axominijinja = { version = "2.4.0", path = "../minijinja", default-features = false }
 rand = { version = "0.8.5", optional = true, default-features = false, features = ["std", "std_rng", "small_rng"] }
 serde = "1.0.164"
 time = { version = "0.3.35", optional = true, features = ["serde", "formatting", "parsing"] }
@@ -32,5 +32,5 @@ time-tz = { version = "1.0.3", features = ["db"], optional = true }
 [dev-dependencies]
 insta = { version = "1.38.0", features = ["glob", "serde"] }
 chrono = { version = "0.4.26", features = ["serde"] }
-minijinja = { version = "2.4.0", path = "../minijinja", features = ["loader"] }
+axominijinja = { version = "2.4.0", path = "../minijinja", features = ["loader"] }
 similar-asserts = "1.4.2"

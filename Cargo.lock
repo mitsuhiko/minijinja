@@ -191,7 +191,7 @@ name = "actix-web-demo"
 version = "0.1.0"
 dependencies = [
  "actix-web",
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -373,8 +373,27 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 name = "autoreload"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "minijinja-autoreload",
+]
+
+[[package]]
+name = "axominijinja"
+version = "2.4.0"
+dependencies = [
+ "aho-corasick 1.0.0",
+ "indexmap 1.9.2",
+ "insta",
+ "memo-map",
+ "percent-encoding",
+ "self_cell",
+ "serde",
+ "serde_json",
+ "similar-asserts",
+ "stacker",
+ "unicase",
+ "unicode-ident",
+ "v_htmlescape",
 ]
 
 [[package]]
@@ -412,10 +431,10 @@ name = "benchmarks"
 version = "0.1.0"
 dependencies = [
  "askama",
+ "axominijinja",
  "criterion",
  "handlebars",
  "liquid",
- "minijinja",
  "rinja",
  "serde",
  "serde_json",
@@ -513,7 +532,7 @@ dependencies = [
 name = "build-script"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -541,7 +560,7 @@ dependencies = [
 name = "call-block-function"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -872,7 +891,7 @@ dependencies = [
 name = "custom-loader"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -923,7 +942,7 @@ dependencies = [
 name = "debug"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -953,7 +972,7 @@ dependencies = [
 name = "deserialize"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "serde",
 ]
 
@@ -983,7 +1002,7 @@ checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 name = "dsl"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -996,14 +1015,14 @@ checksum = "56ce8c6da7551ec6c462cbaf3bfbc75131ebbfa1c944aeaa9dab51ca1c5f0c3b"
 name = "dynamic-context"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
 name = "dynamic-objects"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -1016,7 +1035,7 @@ checksum = "90e5c1c8368803113bf0c9584fc495a58b86dc8a29edbf8fe877d21d9507e797"
 name = "embedding"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "minijinja-embed",
 ]
 
@@ -1061,7 +1080,7 @@ dependencies = [
 name = "error"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -1074,14 +1093,14 @@ checksum = "a5d9305ccc6942a704f4335694ecd3de2ea531b114ac2d51f5f843750787a92f"
 name = "eval-to-state"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
 name = "expr"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "serde_json",
 ]
 
@@ -1128,7 +1147,7 @@ dependencies = [
 name = "filters"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -1169,7 +1188,7 @@ dependencies = [
 name = "function-using-async"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "tokio",
 ]
 
@@ -1207,7 +1226,7 @@ dependencies = [
 name = "generate-yaml"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -1328,7 +1347,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 name = "hello"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -1480,7 +1499,7 @@ checksum = "b248f5224d1d606005e02c97f5aa4e88eeb230488bcc03bc9ca4d7991399f2b5"
 name = "inheritance"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "serde",
  "serde_json",
 ]
@@ -1536,7 +1555,7 @@ dependencies = [
 name = "invalid-value"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "serde",
 ]
 
@@ -1648,7 +1667,7 @@ checksum = "3e281a65eeba3d4503a2839252f86374528f9ceafe6fed97c1d3b52e1fb625c1"
 name = "line-statements"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -1733,7 +1752,7 @@ dependencies = [
 name = "load-lazy"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "serde_json",
 ]
 
@@ -1741,7 +1760,7 @@ dependencies = [
 name = "load-resource"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "serde_json",
 ]
 
@@ -1783,7 +1802,7 @@ checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 name = "macros"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -1820,7 +1839,7 @@ dependencies = [
 name = "merge-context"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "minijinja-contrib",
 ]
 
@@ -1841,29 +1860,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "minijinja"
-version = "2.4.0"
-dependencies = [
- "aho-corasick 1.0.0",
- "indexmap 1.9.2",
- "insta",
- "memo-map",
- "percent-encoding",
- "self_cell",
- "serde",
- "serde_json",
- "similar-asserts",
- "stacker",
- "unicase",
- "unicode-ident",
- "v_htmlescape",
-]
-
-[[package]]
 name = "minijinja-autoreload"
 version = "2.4.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "notify",
 ]
 
@@ -1871,7 +1871,7 @@ dependencies = [
 name = "minijinja-cabi"
 version = "2.4.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -1879,6 +1879,7 @@ name = "minijinja-cli"
 version = "2.4.0"
 dependencies = [
  "anyhow",
+ "axominijinja",
  "ciborium",
  "clap",
  "clap_complete",
@@ -1890,7 +1891,6 @@ dependencies = [
  "home",
  "insta",
  "insta-cmd",
- "minijinja",
  "minijinja-contrib",
  "rustyline",
  "serde",
@@ -1906,9 +1906,9 @@ dependencies = [
 name = "minijinja-contrib"
 version = "2.4.0"
 dependencies = [
+ "axominijinja",
  "chrono",
  "insta",
- "minijinja",
  "rand",
  "serde",
  "similar-asserts",
@@ -1924,7 +1924,7 @@ version = "2.4.0"
 name = "minijinja-py"
 version = "2.4.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "once_cell",
  "pyo3",
 ]
@@ -1933,7 +1933,7 @@ dependencies = [
 name = "minimal"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -1998,7 +1998,7 @@ dependencies = [
 name = "none-as-undefined"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "serde",
 ]
 
@@ -2057,14 +2057,14 @@ dependencies = [
 name = "object-ref"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
 name = "object-using-async"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "tokio",
 ]
 
@@ -2134,7 +2134,7 @@ checksum = "b4b27ab7be369122c218afc2079489cdcb4b517c0a3fc386ff11e1fedfcc2b35"
 name = "path-loader"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "once_cell",
 ]
 
@@ -2500,7 +2500,7 @@ dependencies = [
 name = "recursive-for"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "serde",
 ]
 
@@ -2552,7 +2552,7 @@ checksum = "7a66a03ae7c801facd77a29370b4faec201768915ac14a721ba36f20bc9c209b"
 name = "render-macro"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -2560,7 +2560,7 @@ name = "render-template"
 version = "0.1.0"
 dependencies = [
  "argh",
- "minijinja",
+ "axominijinja",
  "serde_json",
 ]
 
@@ -2568,7 +2568,7 @@ dependencies = [
 name = "render-value"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -2707,7 +2707,7 @@ checksum = "ddccb15bcce173023b3fedd9436f882a0739b8dfb45e4f6b6002bee5929f61b2"
 name = "self-referential-context"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -2955,7 +2955,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "streaming"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -2984,7 +2984,7 @@ dependencies = [
 name = "syntax-highlighting"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
  "syntect",
 ]
 
@@ -3304,7 +3304,7 @@ dependencies = [
 name = "undefined-tracking"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]
@@ -3432,7 +3432,7 @@ checksum = "4e8257fbc510f0a46eb602c10215901938b5c2a7d5e70fc11483b1d3c9b5b18c"
 name = "value-tracking"
 version = "0.1.0"
 dependencies = [
- "minijinja",
+ "axominijinja",
 ]
 
 [[package]]

@@ -10,7 +10,7 @@ publish = false
 bundled = []
 
 [dependencies]
-minijinja = { path = "../../minijinja", features = ["loader"] }
+axominijinja = { path = "../../minijinja", features = ["loader"] }
 minijinja-embed = { path = "../../minijinja-embed" }
 
 [build-dependencies]

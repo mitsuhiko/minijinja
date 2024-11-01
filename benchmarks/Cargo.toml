@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2018"
 
 [features]
-speedups = ["minijinja/speedups"]
+speedups = ["axominijinja/speedups"]
 
 [dependencies]
 handlebars = "5.1.2"
 liquid = "0.26.1"
-minijinja = { path = "../minijinja", default-features = false, features = [
+axominijinja = { path = "../minijinja", default-features = false, features = [
     "unstable_machinery",
     "multi_template",
     "builtins",

@@ -12,7 +12,7 @@ cargo-fuzz = true
 arbitrary = { version = "1.1.6", features = ["derive"] }
 libfuzzer-sys = "0.4"
 serde = { version = "1.0.145", features = ["derive"] }
-minijinja = { path = "../minijinja", features = ["json", "urlencode", "fuel"] }
+axominijinja = { path = "../minijinja", features = ["json", "urlencode", "fuel"] }
 
 # Prevent this from interfering with workspaces
 [workspace]

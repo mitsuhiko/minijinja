@@ -8,5 +8,5 @@ publish = false
 
 [dependencies]
 argh = "0.1.6"
-minijinja = { path = "../../minijinja" }
+axominijinja = { path = "../../minijinja" }
 serde_json = "1.0.68"

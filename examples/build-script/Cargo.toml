@@ -5,4 +5,4 @@ edition = "2021"
 publish = false
 
 [build-dependencies]
-minijinja = { path = "../../minijinja", default-features = false, features = ["serde", "builtins"] }
+axominijinja = { path = "../../minijinja", default-features = false, features = ["serde", "builtins"] }
