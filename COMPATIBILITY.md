@@ -16,7 +16,7 @@ turned on with the `unicode` feature to achieve parity with Jinja2.
 
 The biggest differences between MiniJinja and Jinja2 stem from the different
 runtime environments.  Jinja2 leaks out a lot of the underlying Python engine
-whereas MiniJinja implements it's own runtime data model.
+whereas MiniJinja implements its own runtime data model.
 
 The most significant differences are documented here:
 
