@@ -5,7 +5,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{intern, Value};
+use crate::value::{intern, intern_into_value, Value};
 use crate::vm::State;
 
 /// A trait that represents a dynamic object.
@@ -297,7 +297,7 @@ macro_rules! impl_object_helpers {
                 }
                 Enumerator::Iter(iter) => Some(iter),
                 Enumerator::RevIter(iter) => Some(Box::new(iter)),
-                Enumerator::Str(s) => Some(Box::new(s.iter().copied().map(intern).map(Value::from))),
+                Enumerator::Str(s) => Some(Box::new(s.iter().copied().map(intern_into_value))),
                 Enumerator::Values(v) => Some(Box::new(v.into_iter())),
             }
         }
@@ -760,7 +760,7 @@ macro_rules! impl_str_map_helper {
 
             fn enumerate(self: &Arc<Self>) -> Enumerator {
                 self.$enumerator(|this| {
-                    Box::new(this.keys().map(|k| intern(k.as_ref())).map(Value::from))
+                    Box::new(this.keys().map(|x| intern_into_value(x.as_ref())))
                 })
             }
 

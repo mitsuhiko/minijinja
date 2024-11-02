@@ -690,6 +690,9 @@ impl Default for Value {
 /// same functionality.  There is no guarantee that a string will be interned
 /// as there are heuristics involved for it.  Additionally the string interning
 /// will only work during the template engine execution (eg: within filters etc.).
+///
+/// The use of this function is generally recommended against and it might
+/// become deprecated in the future.
 pub fn intern(s: &str) -> Arc<str> {
     #[cfg(feature = "key_interning")]
     {
@@ -698,6 +701,17 @@ pub fn intern(s: &str) -> Arc<str> {
     #[cfg(not(feature = "key_interning"))]
     {
         Arc::from(s.to_string())
+    }
+}
+
+/// Like [`intern`] but returns a [`Value`] instead of an `Arc<str>`.
+///
+/// This has the benefit that it will only perform interning if the string
+/// is not already interned.
+pub(crate) fn intern_into_value(s: &str) -> Value {
+    match SmallStr::try_new(s) {
+        Some(small_str) => Value(ValueRepr::SmallStr(small_str)),
+        None => Value::from(intern(s)),
     }
 }
 
