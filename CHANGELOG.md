@@ -22,6 +22,8 @@ All notable changes to MiniJinja are documented here.
   (`1 is sameas 1`).  #626
 - Added error context for strict undefined errors during template
   rendering.  #627
+- Syntax errors caused by the lexer now include the correct position of
+  the error.  #630
 
 ## 2.4.0
 
