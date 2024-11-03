@@ -18,6 +18,7 @@ pub struct WhitespaceConfig {
 pub struct Tokenizer<'s> {
     stack: Vec<LexerState>,
     source: &'s str,
+    filename: &'s str,
     current_line: u32,
     current_col: u32,
     current_offset: usize,
@@ -287,6 +288,7 @@ impl<'s> Tokenizer<'s> {
     /// Creates a new tokenizer.
     pub fn new(
         input: &'s str,
+        filename: &'s str,
         in_expr: bool,
         syntax_config: SyntaxConfig,
         whitespace_config: WhitespaceConfig,
@@ -302,6 +304,7 @@ impl<'s> Tokenizer<'s> {
         }
         Tokenizer {
             source,
+            filename,
             stack: vec![if in_expr {
                 LexerState::Variable
             } else {
@@ -317,6 +320,11 @@ impl<'s> Tokenizer<'s> {
             syntax_config,
             ws_config: whitespace_config,
         }
+    }
+
+    /// Returns the current filename.
+    pub fn filename(&self) -> &str {
+        self.filename
     }
 
     /// Produces the next token from the tokenizer.
@@ -398,7 +406,14 @@ impl<'s> Tokenizer<'s> {
 
     #[inline]
     fn syntax_error(&mut self, msg: &'static str) -> Error {
-        Error::new(ErrorKind::SyntaxError, msg)
+        let mut span = self.span(self.loc());
+        if span.start_col == span.end_col {
+            span.end_col += 1;
+            span.end_offset += 1;
+        }
+        let mut err = Error::new(ErrorKind::SyntaxError, msg);
+        err.set_filename_and_span(self.filename, span);
+        err
     }
 
     fn eat_number(&mut self) -> Result<(Token<'s>, Span), Error> {
@@ -469,7 +484,7 @@ impl<'s> Tokenizer<'s> {
             } else {
                 u128::from_str_radix(&num, radix)
                     .map(Token::Int128)
-                    .map_err(|_| self.syntax_error("invalid integer"))
+                    .map_err(|_| self.syntax_error("invalid integer (too large)"))
             }),
             self.span(old_loc),
         ))
@@ -509,6 +524,7 @@ impl<'s> Tokenizer<'s> {
             })
             .count();
         if escaped || self.rest_bytes().get(str_len + 1) != Some(&delim) {
+            self.advance(str_len + 1);
             return Err(self.syntax_error("unexpected end of string"));
         }
         let s = self.advance(str_len + 2);
@@ -638,6 +654,7 @@ impl<'s> Tokenizer<'s> {
                     self.handle_tail_ws(ws);
                     Ok(ControlFlow::Continue(()))
                 } else {
+                    self.advance(self.rest_bytes().len());
                     Err(self.syntax_error("unexpected end of comment"))
                 }
             }
@@ -726,6 +743,7 @@ impl<'s> Tokenizer<'s> {
                 return Ok(ControlFlow::Break((Token::TemplateData(result), span)));
             }
         }
+        self.advance(self.rest_bytes().len());
         Err(self.syntax_error("unexpected end of raw block"))
     }
 
@@ -896,7 +914,8 @@ pub fn tokenize(
 ) -> impl Iterator<Item = Result<(Token<'_>, Span), Error>> {
     // This function is unused in minijinja itself, it's only used in tests and in the
     // unstable machinery as a convenient alternative to the tokenizer.
-    let mut tokenizer = Tokenizer::new(input, in_expr, syntax_config, whitespace_config);
+    let mut tokenizer =
+        Tokenizer::new(input, "<string>", in_expr, syntax_config, whitespace_config);
     std::iter::from_fn(move || tokenizer.next_token().transpose())
 }
 

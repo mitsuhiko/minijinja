@@ -16,7 +16,7 @@ Error {
 syntax error: '_' may not occur at end of number (in err_bad_trailing_underscore.txt:1)
 ----------------------- err_bad_trailing_underscore.txt -----------------------
    1 > {{ 10_ }}
-     i ^^ syntax error
+     i       ^ syntax error
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 No referenced variables
 -------------------------------------------------------------------------------
