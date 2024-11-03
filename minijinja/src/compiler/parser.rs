@@ -231,6 +231,13 @@ macro_rules! with_recursion_guard {
 }
 
 impl<'a> Parser<'a> {
+    /// Creates a new parser.
+    ///
+    /// `in_expr` is necessary to parse within an expression context.  Otherwise
+    /// the parser starts out in template context.  This means that when
+    /// [`parse`](Self::parse) is to be called, the `in_expr` argument must be
+    /// `false` and for [`parse_standalone_expr`](Self::parse_standalone_expr)
+    /// it must be `true`.
     pub fn new(
         source: &'a str,
         filename: &'a str,
@@ -245,6 +252,37 @@ impl<'a> Parser<'a> {
             blocks: BTreeSet::new(),
             depth: 0,
         }
+    }
+
+    /// Parses a template.
+    pub fn parse(&mut self) -> Result<ast::Stmt<'a>, Error> {
+        let span = self.stream.last_span();
+        self.subparse(&|_| false)
+            .map(|children| {
+                ast::Stmt::Template(Spanned::new(
+                    ast::Template { children },
+                    self.stream.expand_span(span),
+                ))
+            })
+            .map_err(|err| self.attach_location_to_error(err))
+    }
+
+    /// Parses an expression and asserts that there is no more input after it.
+    pub fn parse_standalone_expr(&mut self) -> Result<ast::Expr<'a>, Error> {
+        self.parse_expr()
+            .and_then(|result| {
+                if ok!(self.stream.next()).is_some() {
+                    syntax_error!("unexpected input after expression")
+                } else {
+                    Ok(result)
+                }
+            })
+            .map_err(|err| self.attach_location_to_error(err))
+    }
+
+    /// Returns the current filename.
+    pub fn filename(&self) -> &str {
+        self.stream.tokenizer.filename()
     }
 
     fn parse_ifexpr(&mut self) -> Result<ast::Expr<'a>, Error> {
@@ -1178,46 +1216,12 @@ impl<'a> Parser<'a> {
         Ok(rv)
     }
 
-    /// Parses a template.
-    pub fn parse(&mut self) -> Result<ast::Stmt<'a>, Error> {
-        let span = self.stream.last_span();
-        Ok(ast::Stmt::Template(Spanned::new(
-            ast::Template {
-                children: match self.subparse(&|_| false) {
-                    Ok(children) => children,
-                    Err(mut err) => {
-                        if err.line().is_none() {
-                            err.set_filename_and_span(self.filename(), self.stream.last_span())
-                        }
-                        return Err(err);
-                    }
-                },
-            },
-            self.stream.expand_span(span),
-        )))
-    }
-
-    /// Parses an expression and asserts that there is no more input after it.
-    pub fn parse_standalone_expr(&mut self) -> Result<ast::Expr<'a>, Error> {
-        self.parse_expr()
-            .and_then(|result| {
-                if ok!(self.stream.next()).is_some() {
-                    syntax_error!("unexpected input after expression")
-                } else {
-                    Ok(result)
-                }
-            })
-            .map_err(|mut err| {
-                if err.line().is_none() {
-                    err.set_filename_and_span(self.filename(), self.stream.last_span())
-                }
-                err
-            })
-    }
-
-    /// Returns the current filename.
-    pub fn filename(&self) -> &str {
-        self.stream.tokenizer.filename()
+    #[inline]
+    fn attach_location_to_error(&mut self, mut err: Error) -> Error {
+        if err.line().is_none() {
+            err.set_filename_and_span(self.filename(), self.stream.last_span())
+        }
+        err
     }
 }
 
