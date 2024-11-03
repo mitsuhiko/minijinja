@@ -103,7 +103,7 @@ impl<'a> TokenStream<'a> {
     /// Tokenize a template
     pub fn new(
         source: &'a str,
-        filename: &str,
+        filename: &'a str,
         in_expr: bool,
         syntax_config: SyntaxConfig,
         whitespace_config: WhitespaceConfig,
@@ -233,7 +233,7 @@ macro_rules! with_recursion_guard {
 impl<'a> Parser<'a> {
     pub fn new(
         source: &'a str,
-        filename: &str,
+        filename: &'a str,
         in_expr: bool,
         syntax_config: SyntaxConfig,
         whitespace_config: WhitespaceConfig,
@@ -1224,7 +1224,7 @@ impl<'a> Parser<'a> {
 /// Parses a template.
 pub fn parse<'source>(
     source: &'source str,
-    filename: &str,
+    filename: &'source str,
     syntax_config: SyntaxConfig,
     whitespace_config: WhitespaceConfig,
 ) -> Result<ast::Stmt<'source>, Error> {
