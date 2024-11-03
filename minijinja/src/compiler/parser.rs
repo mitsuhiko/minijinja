@@ -103,11 +103,13 @@ impl<'a> TokenStream<'a> {
     /// Tokenize a template
     pub fn new(
         source: &'a str,
+        filename: &str,
         in_expr: bool,
         syntax_config: SyntaxConfig,
         whitespace_config: WhitespaceConfig,
     ) -> TokenStream<'a> {
-        let mut tokenizer = Tokenizer::new(source, in_expr, syntax_config, whitespace_config);
+        let mut tokenizer =
+            Tokenizer::new(source, filename, in_expr, syntax_config, whitespace_config);
         let current = tokenizer.next_token().transpose();
         TokenStream {
             tokenizer,
@@ -231,12 +233,13 @@ macro_rules! with_recursion_guard {
 impl<'a> Parser<'a> {
     pub fn new(
         source: &'a str,
+        filename: &str,
         in_expr: bool,
         syntax_config: SyntaxConfig,
         whitespace_config: WhitespaceConfig,
     ) -> Parser<'a> {
         Parser {
-            stream: TokenStream::new(source, in_expr, syntax_config, whitespace_config),
+            stream: TokenStream::new(source, filename, in_expr, syntax_config, whitespace_config),
             in_macro: false,
             in_loop: false,
             blocks: BTreeSet::new(),
@@ -668,11 +671,11 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    pub fn parse_expr(&mut self) -> Result<ast::Expr<'a>, Error> {
+    fn parse_expr(&mut self) -> Result<ast::Expr<'a>, Error> {
         with_recursion_guard!(self, self.parse_ifexpr())
     }
 
-    pub fn parse_expr_noif(&mut self) -> Result<ast::Expr<'a>, Error> {
+    fn parse_expr_noif(&mut self) -> Result<ast::Expr<'a>, Error> {
         self.parse_or()
     }
 
@@ -1175,14 +1178,46 @@ impl<'a> Parser<'a> {
         Ok(rv)
     }
 
+    /// Parses a template.
     pub fn parse(&mut self) -> Result<ast::Stmt<'a>, Error> {
         let span = self.stream.last_span();
         Ok(ast::Stmt::Template(Spanned::new(
             ast::Template {
-                children: ok!(self.subparse(&|_| false)),
+                children: match self.subparse(&|_| false) {
+                    Ok(children) => children,
+                    Err(mut err) => {
+                        if err.line().is_none() {
+                            err.set_filename_and_span(self.filename(), self.stream.last_span())
+                        }
+                        return Err(err);
+                    }
+                },
             },
             self.stream.expand_span(span),
         )))
+    }
+
+    /// Parses an expression and asserts that there is no more input after it.
+    pub fn parse_standalone_expr(&mut self) -> Result<ast::Expr<'a>, Error> {
+        self.parse_expr()
+            .and_then(|result| {
+                if ok!(self.stream.next()).is_some() {
+                    syntax_error!("unexpected input after expression")
+                } else {
+                    Ok(result)
+                }
+            })
+            .map_err(|mut err| {
+                if err.line().is_none() {
+                    err.set_filename_and_span(self.filename(), self.stream.last_span())
+                }
+                err
+            })
+    }
+
+    /// Returns the current filename.
+    pub fn filename(&self) -> &str {
+        self.stream.tokenizer.filename()
     }
 }
 
@@ -1193,31 +1228,17 @@ pub fn parse<'source>(
     syntax_config: SyntaxConfig,
     whitespace_config: WhitespaceConfig,
 ) -> Result<ast::Stmt<'source>, Error> {
-    let mut parser = Parser::new(source, false, syntax_config, whitespace_config);
-    parser.parse().map_err(|mut err| {
-        if err.line().is_none() {
-            err.set_filename_and_span(filename, parser.stream.last_span())
-        }
-        err
-    })
+    Parser::new(source, filename, false, syntax_config, whitespace_config).parse()
 }
 
-/// Parses an expression
+/// Parses a standalone expression.
 pub fn parse_expr(source: &str) -> Result<ast::Expr<'_>, Error> {
-    let mut parser = Parser::new(source, true, Default::default(), Default::default());
-    parser
-        .parse_expr()
-        .and_then(|result| {
-            if ok!(parser.stream.next()).is_some() {
-                syntax_error!("unexpected input after expression")
-            } else {
-                Ok(result)
-            }
-        })
-        .map_err(|mut err| {
-            if err.line().is_none() {
-                err.set_filename_and_span("<expression>", parser.stream.last_span())
-            }
-            err
-        })
+    Parser::new(
+        source,
+        "<expression>",
+        true,
+        Default::default(),
+        Default::default(),
+    )
+    .parse_standalone_expr()
 }
