@@ -484,7 +484,7 @@ impl<'s> Tokenizer<'s> {
             } else {
                 u128::from_str_radix(&num, radix)
                     .map(Token::Int128)
-                    .map_err(|_| self.syntax_error("invalid integer"))
+                    .map_err(|_| self.syntax_error("invalid integer (too large)"))
             }),
             self.span(old_loc),
         ))
