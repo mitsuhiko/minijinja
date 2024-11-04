@@ -12,7 +12,7 @@ readme = "README.md"
 rust-version = "1.65"
 
 [features]
-default = ["toml", "yaml", "querystring", "cbor", "datetime", "json5", "repl", "unicode", "contrib", "preserve_order"]
+default = ["toml", "yaml", "querystring", "cbor", "datetime", "json5", "repl", "completions", "unicode", "ini", "contrib", "preserve_order"]
 yaml = ["serde_yml"]
 querystring = ["serde_qs"]
 cbor = ["ciborium"]

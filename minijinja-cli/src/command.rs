@@ -15,7 +15,11 @@ pub static SUPPORTED_FORMATS: &[(&str, &str, &[&str])] = &[
     #[cfg(feature = "cbor")]
     ("cbor", "CBOR", &["cbor"]),
     #[cfg(feature = "ini")]
-    ("ini", "INI / Config", &["ini", "config", "properties"]),
+    (
+        "ini",
+        "INI / Config",
+        &["ini", "conf", "config", "properties"],
+    ),
     #[cfg(not(feature = "json5"))]
     ("json", "JSON", &["json"]),
     #[cfg(feature = "json5")]
@@ -79,15 +83,17 @@ pub(super) fn make_command() -> Command {
                     [env var: MINIJINJA_FORMAT]"))
                 .value_parser([
                     "auto",
+                    #[cfg(feature = "cbor")]
+                    "cbor",
+                    #[cfg(feature = "ini")]
+                    "ini",
                     "json",
                     #[cfg(feature = "querystring")]
                     "querystring",
-                    #[cfg(feature = "yaml")]
-                    "yaml",
                     #[cfg(feature = "toml")]
                     "toml",
-                    #[cfg(feature = "cbor")]
-                    "cbor",
+                    #[cfg(feature = "yaml")]
+                    "yaml",
                 ]),
             arg!(-a --autoescape <MODE> "Reconfigures autoescape behavior")
                 .long_help("\

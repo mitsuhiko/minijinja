@@ -112,7 +112,7 @@ fn load_data(
         #[cfg(feature = "ini")]
         "ini" => {
             let contents = String::from_utf8(contents).context("invalid utf-8")?;
-            let mut config = configparser::ini::Ini::new();
+            let mut config = configparser::ini::Ini::new_cs();
             config
                 .read(contents)
                 .map_err(|msg| anyhow::anyhow!("could not load ini: {}", msg))?;

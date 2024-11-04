@@ -20,8 +20,8 @@ Arguments:
 
 Options:
       --config-file <PATH>          Alternative path to the config file.
-  -f, --format <FORMAT>             The format of the input data [possible values: auto, json,
-                                    querystring, yaml, toml, cbor]
+  -f, --format <FORMAT>             The format of the input data [possible values: auto, cbor, ini,
+                                    json, querystring, toml, yaml]
   -D, --define <EXPR>               Defines an input variable (key=value / key:=json_value)
   -t, --template <TEMPLATE_STRING>  Render a string template
   -o, --output <FILENAME>           Path to the output file [default: -]

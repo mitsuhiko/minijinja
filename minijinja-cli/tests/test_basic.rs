@@ -35,6 +35,7 @@ macro_rules! bind_common_filters {
             r"\(in .*minijinja-testfile--.*?:(\d+)\)",
             "(in [TEMPLATE]:$1)",
         );
+        settings.add_filter(r"\bminijinja-cli\.exe\b", "minijinja-cli");
         let _guard = settings.bind_to_scope();
     };
 }
@@ -196,6 +197,43 @@ fn test_toml() {
 
     let mut tmpl = NamedTempFile::new().unwrap();
     tmpl.write_all(br#"Hello {{ foo }}!"#).unwrap();
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg("--select=section")
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello bar!
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+#[cfg(feature = "ini")]
+fn test_ini_casing() {
+    let input = file_with_contents_and_ext("[section]\nFOO = bar", ".ini");
+    let tmpl = file_with_contents(r#"Hello {{ section.FOO }}!"#);
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg(tmpl.path())
+            .arg(input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hello bar!
+
+    ----- stderr -----
+    "###);
+
+    let mut tmpl = NamedTempFile::new().unwrap();
+    tmpl.write_all(br#"Hello {{ FOO }}!"#).unwrap();
 
     assert_cmd_snapshot!(
         cli()
@@ -808,6 +846,7 @@ fn test_load_config() {
     feature = "yaml",
 ))]
 fn test_help() {
+    bind_common_filters!();
     assert_cmd_snapshot!("short_help", cli().arg("--help"));
     assert_cmd_snapshot!("long_help", cli().arg("--long-help"));
 }

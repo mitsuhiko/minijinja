@@ -24,6 +24,10 @@ All notable changes to MiniJinja are documented here.
   rendering.  #627
 - Syntax errors caused by the lexer now include the correct position of
   the error.  #630
+- `minijinja-cli` now has all features enabled by default as documented
+  (that means also shell completion and ini).  #633
+- `minijinja-cli` now does not convert INI files to lowercase anymore.  This was
+  an unintended behavior.  #633
 
 ## 2.4.0
 
