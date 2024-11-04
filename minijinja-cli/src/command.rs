@@ -15,7 +15,11 @@ pub static SUPPORTED_FORMATS: &[(&str, &str, &[&str])] = &[
     #[cfg(feature = "cbor")]
     ("cbor", "CBOR", &["cbor"]),
     #[cfg(feature = "ini")]
-    ("ini", "INI / Config", &["ini", "conf", "config", "properties"]),
+    (
+        "ini",
+        "INI / Config",
+        &["ini", "conf", "config", "properties"],
+    ),
     #[cfg(not(feature = "json5"))]
     ("json", "JSON", &["json"]),
     #[cfg(feature = "json5")]
