@@ -156,4 +156,12 @@ are available in MiniJinja or behave the same.
 ## Filters
 
 MiniJinja supports many common Jinja2 filters but leaves out some.  For instance
-some string formatting filters like `|xmlattr` or `|urlize` are missing.
+some string formatting filters like `|xmlattr` or `|urlize` are missing.  Additionally
+some filters do not support all the same arguments or only support some arguments
+as positional ones.
+
+It's a soft goal to increase the number of filters that are supported and to
+match the behavior of Jinja2 as close as possible but there are some situations
+where it might be acceptable to deviate.  For instance there are some filters
+which in Jinja2 support an `attribute` argument.  Most of those filters currently
+do not support that argument in MiniJinja.
