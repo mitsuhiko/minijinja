@@ -85,7 +85,7 @@ The following formats are supported:
 - `toml` (`*.toml`): TOML
 - `cbor` (`*.cbor`): CBOR
 - `querystring` (`*.qs`): URL encoded query strings
-- `ini` (`*.ini`, `*.config`, `*.properties`): text only INI files
+- `ini` (`*.ini`, `*.conf`, `*.config`, `*.properties`): text only INI files
 
 For most formats there is a pretty straightforward mapping into the template
 context.  The only exception to this is currently INI files where sections are
@@ -93,7 +93,7 @@ effectively mandatory.  If keys are placed in the unnamed section, the second
 is renamed to `default`.  You can use `--select` to make a section be implied:
 
 ```
-minijinja-cli template.j2 input.ini --section default
+minijinja-cli template.j2 input.ini --select default
 ```
 
 Note that not all formats support all input types.  For instance querystring
