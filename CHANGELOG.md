@@ -28,6 +28,7 @@ All notable changes to MiniJinja are documented here.
   (that means also shell completion and ini).  #633
 - `minijinja-cli` now does not convert INI files to lowercase anymore.  This was
   an unintended behavior.  #633
+- Moved up MSRV to 1.63.0 due to indexmap.
 
 ## 2.4.0
 
