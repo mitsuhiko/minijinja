@@ -7,5 +7,5 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-actix-web = "4.6.0"
+actix-web = "4.9.0"
 minijinja = { path = "../../minijinja", features = ["loader"] }
