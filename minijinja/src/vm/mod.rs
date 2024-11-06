@@ -242,9 +242,10 @@ impl<'env> Vm<'env> {
 
             // if we only have two arguments that we pull from the stack, we
             // can assign them to a and b.  This slightly reduces the amount of
-            // code bloat generated here.
+            // code bloat generated here.  Same with the error.
             let a;
             let b;
+            let mut err;
 
             macro_rules! func_binop {
                 ($method:ident) => {{
@@ -264,7 +265,7 @@ impl<'env> Vm<'env> {
 
             macro_rules! bail {
                 ($err:expr) => {{
-                    let mut err = $err;
+                    err = $err;
                     process_err(&mut err, pc, state);
                     return Err(err);
                 }};
