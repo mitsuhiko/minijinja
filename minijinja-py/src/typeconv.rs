@@ -187,7 +187,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
     // conversion.  That means that when passing the object back to Python we
     // extract the retained raw Python reference.
     if let Some(pyobj) = value.downcast_object_ref::<DynamicObject>() {
-        return Ok(pyobj.inner.clone());
+        return Ok(pyobj.inner.clone_ref(py));
     }
 
     if let Some(obj) = value.as_object() {

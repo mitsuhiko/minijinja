@@ -304,7 +304,7 @@ impl Environment {
         }
         let callback: Py<PyAny> = callback.clone().unbind();
         let mut inner = self.inner.lock().unwrap();
-        inner.auto_escape_callback = Some(callback.clone());
+        inner.auto_escape_callback = Python::with_gil(|py| Some(callback.clone_ref(py)));
         inner
             .env
             .set_auto_escape_callback(move |name: &str| -> AutoEscape {
@@ -341,8 +341,14 @@ impl Environment {
     }
 
     #[getter]
-    pub fn get_auto_escape_callback(&self) -> PyResult<Option<Py<PyAny>>> {
-        Ok(self.inner.lock().unwrap().auto_escape_callback.clone())
+    pub fn get_auto_escape_callback(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        Ok(self
+            .inner
+            .lock()
+            .unwrap()
+            .auto_escape_callback
+            .as_ref()
+            .map(|x| x.clone_ref(py)))
     }
 
     /// Sets a finalizer.
@@ -355,7 +361,9 @@ impl Environment {
         }
         let callback: Py<PyAny> = callback.clone().unbind();
         let mut inner = self.inner.lock().unwrap();
-        inner.finalizer_callback = Some(callback.clone());
+        Python::with_gil(|py| {
+            inner.finalizer_callback = Some(callback.clone_ref(py));
+        });
         inner.env.set_formatter(move |output, state, value| {
             Python::with_gil(|py| -> Result<(), Error> {
                 let maybe_new_value = bind_state(state, || -> Result<_, Error> {
@@ -382,8 +390,14 @@ impl Environment {
     }
 
     #[getter]
-    pub fn get_finalizer(&self) -> PyResult<Option<Py<PyAny>>> {
-        Ok(self.inner.lock().unwrap().finalizer_callback.clone())
+    pub fn get_finalizer(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        Ok(self
+            .inner
+            .lock()
+            .unwrap()
+            .finalizer_callback
+            .as_ref()
+            .map(|x| x.clone_ref(py)))
     }
 
     /// Sets a loader function for the environment.
@@ -403,7 +417,9 @@ impl Environment {
             }
         };
         let mut inner = self.inner.lock().unwrap();
-        inner.loader.clone_from(&callback);
+        Python::with_gil(|py| {
+            inner.loader = callback.as_ref().map(|x| x.clone_ref(py));
+        });
 
         if let Some(callback) = callback {
             inner.env.set_loader(move |name| {
@@ -426,8 +442,13 @@ impl Environment {
 
     /// Returns the current loader.
     #[getter]
-    pub fn get_loader(&self) -> Option<Py<PyAny>> {
-        self.inner.lock().unwrap().loader.clone()
+    pub fn get_loader(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.inner
+            .lock()
+            .unwrap()
+            .loader
+            .as_ref()
+            .map(|x| x.clone_ref(py))
     }
 
     /// Sets a new path join callback.
@@ -438,7 +459,9 @@ impl Environment {
         }
         let callback: Py<PyAny> = callback.clone().unbind();
         let mut inner = self.inner.lock().unwrap();
-        inner.path_join_callback = Some(callback.clone());
+        Python::with_gil(|py| {
+            inner.path_join_callback = Some(callback.clone_ref(py));
+        });
         inner.env.set_path_join_callback(move |name, parent| {
             Python::with_gil(|py| {
                 let callback = callback.bind(py);
@@ -456,14 +479,19 @@ impl Environment {
 
     /// Returns the current path join callback.
     #[getter]
-    pub fn get_path_join_callback(&self) -> Option<Py<PyAny>> {
-        self.inner.lock().unwrap().path_join_callback.clone()
+    pub fn get_path_join_callback(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.inner
+            .lock()
+            .unwrap()
+            .path_join_callback
+            .as_ref()
+            .map(|x| x.clone_ref(py))
     }
 
     /// Triggers a reload of the templates.
-    pub fn reload(&self) -> PyResult<()> {
+    pub fn reload(&self, py: Python<'_>) -> PyResult<()> {
         let mut inner = self.inner.lock().unwrap();
-        let loader = inner.loader.as_ref().cloned();
+        let loader = inner.loader.as_ref().map(|x| x.clone_ref(py));
         if loader.is_some() {
             inner.env.clear_templates();
         }
@@ -633,11 +661,12 @@ impl Environment {
     #[pyo3(signature = (template_name, /, **ctx))]
     pub fn render_template(
         slf: PyRef<'_, Self>,
+        py: Python<'_>,
         template_name: &str,
         ctx: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<String> {
         if slf.reload_before_render.load(Ordering::Relaxed) {
-            slf.reload()?;
+            slf.reload(py)?;
         }
         bind_environment(slf.as_ptr(), || {
             let inner = slf.inner.lock().unwrap();
