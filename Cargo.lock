@@ -840,6 +840,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "custom-error"
+version = "0.1.0"
+dependencies = [
+ "minijinja",
+]
+
+[[package]]
 name = "custom-loader"
 version = "0.1.0"
 dependencies = [
