@@ -18,6 +18,11 @@ use serde_json as preferred_json;
 #[cfg(feature = "json5")]
 use serde_json5 as preferred_json;
 
+#[cfg(windows)]
+use dunce::canonicalize;
+#[cfg(not(windows))]
+use std::fs::canonicalize;
+
 use crate::command::{make_command, SUPPORTED_FORMATS};
 use crate::config::Config;
 use crate::output::{Output, STDIN_STDOUT};
@@ -166,7 +171,7 @@ fn create_env(
                 .unwrap_or(Path::new(""))
                 .join(name)
         };
-        dunce::canonicalize(&p)
+        canonicalize(&p)
             .unwrap_or(p)
             .to_string_lossy()
             .to_string()
