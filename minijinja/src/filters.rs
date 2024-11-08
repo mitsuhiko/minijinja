@@ -1384,7 +1384,7 @@ mod builtins {
     /// The attribute can use dot notation for nested access, like `"address.city"``.
     /// The values are sorted first so only one group is returned for each unique value.
     /// The attribute can be passed as first argument or as keyword argument named
-    /// `atttribute`.
+    /// `attribute`.
     ///
     /// For example, a list of User objects with a city attribute can be
     /// rendered in groups. In this example, grouper refers to the city value of

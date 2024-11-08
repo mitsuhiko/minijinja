@@ -288,7 +288,7 @@ MINIJINJA_API struct mj_value mj_value_get_by_index(struct mj_value value, uint6
 MINIJINJA_API struct mj_value mj_value_get_by_str(struct mj_value value, const char *key);
 
 /*
- Looks up an element by a vaue
+ Looks up an element by a value
  */
 MINIJINJA_API struct mj_value mj_value_get_by_value(struct mj_value value, struct mj_value key);
 
