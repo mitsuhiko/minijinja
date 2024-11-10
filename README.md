@@ -104,6 +104,8 @@ the engine is used so you can see how it's utilized:
 * Data and Processing:
   * **[Cube](https://cube.dev/docs/product/data-modeling/dynamic/jinja)** uses it [for data modelling](https://github.com/cube-js/cube/tree/db11c121c77c663845242366d3d972b9bc30ae54/packages/cubejs-backend-native/src/template/mj_value)
   * **[PRQL](https://prql-lang.org/)** uses it [to handle DBT style pipelines](https://github.com/PRQL/prql/blob/59fb3cc4b9b6c9e195c928b1ba1134e2c5706ea3/prqlc/prqlc/src/cli/jinja.rs#L21)
+  * **[qsv](https://qsv.dathere.com)** uses it [to render templates from CSV files](https://github.com/jqnatividad/qsv/blob/master/src/cmd/template.rs#L2) and to [construct payloads to post to web services](https://github.com/jqnatividad/qsv/blob/master/src/cmd/fetchpost.rs#L3).
+
 
 ## Getting Help
 
