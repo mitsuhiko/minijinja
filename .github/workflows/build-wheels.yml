@@ -20,7 +20,7 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          args: --release --universal2 --out dist -m minijinja-py/Cargo.toml
+          args: --release --target universal2-apple-darwin --out dist -m minijinja-py/Cargo.toml
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
@@ -66,7 +66,7 @@ jobs:
           python-version: "3.10"
           architecture: ${{ matrix.target }}
       - uses: dtolnay/rust-toolchain@stable
-      - name: Build wheels - universal2
+      - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
