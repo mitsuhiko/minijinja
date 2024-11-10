@@ -11,7 +11,9 @@ use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::namespace_object::Namespace;
-use crate::value::{ops, value_map_with_capacity, value_optimization, Kwargs, Value, ValueMap};
+use crate::value::{
+    ops, value_map_with_capacity, value_optimization, Kwargs, ObjectRepr, Value, ValueMap,
+};
 use crate::vm::context::{Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
@@ -394,13 +396,18 @@ impl<'env> Vm<'env> {
                     let values: &[Value] = &kwargs_sources;
                     let mut rv = ValueMap::new();
                     for value in values {
+                        ctx_ok!(self.env.undefined_behavior().assert_iterable(value));
                         let iter = ctx_ok!(value
                             .as_object()
+                            .filter(|x| x.repr() == ObjectRepr::Map)
                             .and_then(|x| x.try_iter_pairs())
                             .ok_or_else(|| {
                                 Error::new(
                                     ErrorKind::InvalidOperation,
-                                    "attempted to construct keyword arguments from non object",
+                                    format!(
+                                        "attempted to apply keyword arguments from non map (got {})",
+                                        value.kind()
+                                    ),
                                 )
                             }));
                         for (key, value) in iter {
