@@ -626,8 +626,8 @@ impl<'env> Vm<'env> {
                                 "loop() takes one argument"
                             ));
                         }
-                        // leave the one argument on the stack for the recursion
-                        // this internall calls continue.
+                        // leave the one argument on the stack for the recursion.  The
+                        // recurse_loop! macro itself will perform a jump and not return here.
                         recurse_loop!(true);
                     } else if let Some(func) = state.lookup(name) {
                         ctx_ok!(func.call(state, args))
