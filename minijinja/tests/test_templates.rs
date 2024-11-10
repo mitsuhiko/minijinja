@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use insta::assert_snapshot;
-use minijinja::value::{Enumerator, Object, ObjectRepr, Value};
+use minijinja::value::{Enumerator, Object, ObjectRepr, Rest, Value};
 use minijinja::{context, render, Environment, Error, ErrorKind, State};
 
 use similar_asserts::assert_eq;
@@ -36,6 +36,9 @@ fn test_vm() {
         let contents = std::fs::read_to_string(path).unwrap();
         let mut iter = contents.splitn(2, "\n---\n");
         let mut env = Environment::new();
+        env.add_function("get_args", |args: Rest<Value>| -> Value {
+            Value::from(args.0)
+        });
         let ctx: Value = serde_json::from_str(iter.next().unwrap()).unwrap();
 
         for (path, source) in &refs {

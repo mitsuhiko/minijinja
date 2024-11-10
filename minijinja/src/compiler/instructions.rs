@@ -60,11 +60,17 @@ pub enum Instruction<'source> {
     /// Builds a kwargs map of the last n pairs on the stack.
     BuildKwargs(usize),
 
+    /// Merges N kwargs maps on the list into one.
+    MergeKwargs(usize),
+
     /// Builds a list of the last n pairs on the stack.
     BuildList(Option<usize>),
 
     /// Unpacks a list into N stack items.
     UnpackList(usize),
+
+    /// Unpacks N lists onto the stack and pushes the number of items there were unpacked.
+    UnpackLists(usize),
 
     /// Add the top two values
     Add,
@@ -122,10 +128,10 @@ pub enum Instruction<'source> {
     In,
 
     /// Apply a filter.
-    ApplyFilter(&'source str, usize, LocalId),
+    ApplyFilter(&'source str, Option<u16>, LocalId),
 
     /// Perform a filter.
-    PerformTest(&'source str, usize, LocalId),
+    PerformTest(&'source str, Option<u16>, LocalId),
 
     /// Emit the stack top as output
     Emit,
@@ -175,13 +181,13 @@ pub enum Instruction<'source> {
     EndCapture,
 
     /// Calls a global function
-    CallFunction(&'source str, usize),
+    CallFunction(&'source str, Option<u16>),
 
     /// Calls a method
-    CallMethod(&'source str, usize),
+    CallMethod(&'source str, Option<u16>),
 
     /// Calls an object
-    CallObject(usize),
+    CallObject(Option<u16>),
 
     /// Duplicates the top item
     DupTop,

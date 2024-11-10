@@ -81,6 +81,15 @@ fn tracker_visit_macro<'a>(m: &ast::Macro<'a>, state: &mut AssignmentTracker<'a>
     m.body.iter().for_each(|node| track_walk(node, state));
 }
 
+fn tracker_visit_callarg<'a>(callarg: &ast::CallArg<'a>, state: &mut AssignmentTracker<'a>) {
+    match callarg {
+        ast::CallArg::Pos(expr)
+        | ast::CallArg::Kwarg(_, expr)
+        | ast::CallArg::PosSplat(expr)
+        | ast::CallArg::KwargSplat(expr) => tracker_visit_expr(expr, state),
+    }
+}
+
 fn tracker_visit_expr<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a>) {
     match expr {
         ast::Expr::Var(var) => {
@@ -108,11 +117,15 @@ fn tracker_visit_expr<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a
         }
         ast::Expr::Filter(expr) => {
             tracker_visit_expr_opt(&expr.expr, state);
-            expr.args.iter().for_each(|x| tracker_visit_expr(x, state));
+            expr.args
+                .iter()
+                .for_each(|x| tracker_visit_callarg(x, state));
         }
         ast::Expr::Test(expr) => {
             tracker_visit_expr(&expr.expr, state);
-            expr.args.iter().for_each(|x| tracker_visit_expr(x, state));
+            expr.args
+                .iter()
+                .for_each(|x| tracker_visit_callarg(x, state));
         }
         ast::Expr::GetAttr(expr) => {
             // if we are tracking nested, we check if we have a chain of attribute
@@ -157,17 +170,15 @@ fn tracker_visit_expr<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a
         }
         ast::Expr::Call(expr) => {
             tracker_visit_expr(&expr.expr, state);
-            expr.args.iter().for_each(|x| tracker_visit_expr(x, state));
+            expr.args
+                .iter()
+                .for_each(|x| tracker_visit_callarg(x, state));
         }
         ast::Expr::List(expr) => expr.items.iter().for_each(|x| tracker_visit_expr(x, state)),
         ast::Expr::Map(expr) => expr.keys.iter().zip(expr.values.iter()).for_each(|(k, v)| {
             tracker_visit_expr(k, state);
             tracker_visit_expr(v, state);
         }),
-        ast::Expr::Kwargs(expr) => expr
-            .pairs
-            .iter()
-            .for_each(|(_, v)| tracker_visit_expr(v, state)),
     }
 }
 
@@ -265,7 +276,7 @@ fn track_walk<'a>(node: &ast::Stmt<'a>, state: &mut AssignmentTracker<'a>) {
             stmt.call
                 .args
                 .iter()
-                .for_each(|x| tracker_visit_expr(x, state));
+                .for_each(|x| tracker_visit_callarg(x, state));
             tracker_visit_macro(&stmt.macro_decl, state);
         }
         #[cfg(feature = "loop_controls")]
@@ -275,7 +286,7 @@ fn track_walk<'a>(node: &ast::Stmt<'a>, state: &mut AssignmentTracker<'a>) {
             stmt.call
                 .args
                 .iter()
-                .for_each(|x| tracker_visit_expr(x, state));
+                .for_each(|x| tracker_visit_callarg(x, state));
         }
     }
 }

@@ -7,7 +7,7 @@ use crate::compiler::instructions::{
 use crate::compiler::tokens::Span;
 use crate::output::CaptureMode;
 use crate::value::ops::neg;
-use crate::value::Value;
+use crate::value::{Kwargs, Value, ValueMap};
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -503,7 +503,7 @@ impl<'source> CodeGenerator<'source> {
                         self.add_with_span(Instruction::FastSuper, call.span());
                         return;
                     } else if name == "loop" && call.args.len() == 1 {
-                        self.compile_expr(&call.args[0]);
+                        self.compile_call_args(std::slice::from_ref(&call.args[0]), 0, None);
                         self.add(Instruction::FastRecurse);
                         return;
                     }
@@ -660,21 +660,17 @@ impl<'source> CodeGenerator<'source> {
                 if let Some(ref expr) = f.expr {
                     self.compile_expr(expr);
                 }
-                for arg in &f.args {
-                    self.compile_expr(arg);
-                }
+                let arg_count = self.compile_call_args(&f.args, 1, None);
                 let local_id = get_local_id(&mut self.filter_local_ids, f.name);
-                self.add(Instruction::ApplyFilter(f.name, f.args.len() + 1, local_id));
+                self.add(Instruction::ApplyFilter(f.name, arg_count, local_id));
                 self.pop_span();
             }
             ast::Expr::Test(f) => {
                 self.push_span(f.span());
                 self.compile_expr(&f.expr);
-                for arg in &f.args {
-                    self.compile_expr(arg);
-                }
+                let arg_count = self.compile_call_args(&f.args, 1, None);
                 let local_id = get_local_id(&mut self.test_local_ids, f.name);
-                self.add(Instruction::PerformTest(f.name, f.args.len() + 1, local_id));
+                self.add(Instruction::PerformTest(f.name, arg_count, local_id));
                 self.pop_span();
             }
             ast::Expr::GetAttr(g) => {
@@ -717,18 +713,6 @@ impl<'source> CodeGenerator<'source> {
                     self.add(Instruction::BuildMap(m.keys.len()));
                 }
             }
-            ast::Expr::Kwargs(m) => {
-                if let Some(val) = m.as_const() {
-                    self.add(Instruction::LoadConst(val));
-                } else {
-                    self.set_line_from_span(m.span());
-                    for (key, value) in &m.pairs {
-                        self.add(Instruction::LoadConst(Value::from(*key)));
-                        self.compile_expr(value);
-                    }
-                    self.add(Instruction::BuildKwargs(m.pairs.len()));
-                }
-            }
         }
     }
 
@@ -740,7 +724,7 @@ impl<'source> CodeGenerator<'source> {
         self.push_span(c.span());
         match c.identify_call() {
             ast::CallType::Function(name) => {
-                let arg_count = self.compile_call_args(&c.args, caller);
+                let arg_count = self.compile_call_args(&c.args, 0, caller);
                 self.add(Instruction::CallFunction(name, arg_count));
             }
             #[cfg(feature = "multi_template")]
@@ -751,13 +735,13 @@ impl<'source> CodeGenerator<'source> {
             }
             ast::CallType::Method(expr, name) => {
                 self.compile_expr(expr);
-                let arg_count = self.compile_call_args(&c.args, caller);
-                self.add(Instruction::CallMethod(name, arg_count + 1));
+                let arg_count = self.compile_call_args(&c.args, 1, caller);
+                self.add(Instruction::CallMethod(name, arg_count));
             }
             ast::CallType::Object(expr) => {
                 self.compile_expr(expr);
-                let arg_count = self.compile_call_args(&c.args, caller);
-                self.add(Instruction::CallObject(arg_count + 1));
+                let arg_count = self.compile_call_args(&c.args, 1, caller);
+                self.add(Instruction::CallObject(arg_count));
             }
         };
         self.pop_span();
@@ -765,57 +749,112 @@ impl<'source> CodeGenerator<'source> {
 
     fn compile_call_args(
         &mut self,
-        args: &[ast::Expr<'source>],
+        args: &[ast::CallArg<'source>],
+        extra_args: usize,
         caller: Option<&Caller<'source>>,
-    ) -> usize {
-        match caller {
-            // we can conditionally compile the caller part here since this will
-            // nicely call through for non macro builds
-            #[cfg(feature = "macros")]
-            Some(caller) => self.compile_call_args_with_caller(args, caller),
-            _ => {
-                for arg in args {
-                    self.compile_expr(arg);
-                }
-                args.len()
-            }
-        }
-    }
+    ) -> Option<u16> {
+        let mut pending_args = extra_args;
+        let mut num_args_batches = 0;
+        let mut has_kwargs = caller.is_some();
+        let mut static_kwargs = caller.is_none();
 
-    #[cfg(feature = "macros")]
-    fn compile_call_args_with_caller(
-        &mut self,
-        args: &[ast::Expr<'source>],
-        caller: &Caller<'source>,
-    ) -> usize {
-        let mut injected_caller = false;
-
-        // try to add the caller to already existing keyword arguments.
         for arg in args {
-            if let ast::Expr::Kwargs(ref m) = arg {
-                self.set_line_from_span(m.span());
-                for (key, value) in &m.pairs {
-                    self.add(Instruction::LoadConst(Value::from(*key)));
-                    self.compile_expr(value);
+            match arg {
+                ast::CallArg::Pos(expr) => {
+                    self.compile_expr(expr);
+                    pending_args += 1;
                 }
-                self.add(Instruction::LoadConst(Value::from("caller")));
-                self.compile_macro_expression(caller);
-                self.add(Instruction::BuildKwargs(m.pairs.len() + 1));
-                injected_caller = true;
-            } else {
-                self.compile_expr(arg);
+                ast::CallArg::PosSplat(expr) => {
+                    if pending_args > 0 {
+                        self.add(Instruction::BuildList(Some(pending_args)));
+                        pending_args = 0;
+                        num_args_batches += 1;
+                    }
+                    self.compile_expr(expr);
+                    num_args_batches += 1;
+                }
+                ast::CallArg::Kwarg(_, expr) => {
+                    if !matches!(expr, ast::Expr::Const(_)) {
+                        static_kwargs = false;
+                    }
+                    has_kwargs = true;
+                }
+                ast::CallArg::KwargSplat(_) => {
+                    static_kwargs = false;
+                    has_kwargs = true;
+                }
             }
         }
 
-        // if there are no keyword args so far, create a new kwargs object
-        // and add caller to that.
-        if !injected_caller {
-            self.add(Instruction::LoadConst(Value::from("caller")));
-            self.compile_macro_expression(caller);
-            self.add(Instruction::BuildKwargs(1));
-            args.len() + 1
+        if has_kwargs {
+            let mut pending_kwargs = 0;
+            let mut num_kwargs_batches = 0;
+            let mut collected_kwargs = ValueMap::new();
+            for arg in args {
+                match arg {
+                    ast::CallArg::Kwarg(key, value) => {
+                        if static_kwargs {
+                            if let ast::Expr::Const(c) = value {
+                                collected_kwargs.insert(Value::from(*key), c.value.clone());
+                            } else {
+                                unreachable!();
+                            }
+                        } else {
+                            self.add(Instruction::LoadConst(Value::from(*key)));
+                            self.compile_expr(value);
+                            pending_kwargs += 1;
+                        }
+                    }
+                    ast::CallArg::KwargSplat(expr) => {
+                        if pending_kwargs > 0 {
+                            self.add(Instruction::BuildKwargs(pending_kwargs));
+                            num_kwargs_batches += 1;
+                            pending_kwargs = 0;
+                        }
+                        self.compile_expr(expr);
+                        num_kwargs_batches += 1;
+                    }
+                    ast::CallArg::Pos(_) | ast::CallArg::PosSplat(_) => {}
+                }
+            }
+
+            if !collected_kwargs.is_empty() {
+                self.add(Instruction::LoadConst(Kwargs::wrap(collected_kwargs)));
+            } else {
+                // The conditions above guarantee that if we collect static kwargs
+                // we cannot enter this block (single kwargs batch, no caller).
+
+                #[cfg(feature = "macros")]
+                {
+                    if let Some(caller) = caller {
+                        self.add(Instruction::LoadConst(Value::from("caller")));
+                        self.compile_macro_expression(caller);
+                        pending_kwargs += 1
+                    }
+                }
+                if num_kwargs_batches > 0 {
+                    if pending_kwargs > 0 {
+                        self.add(Instruction::BuildKwargs(pending_kwargs));
+                        num_kwargs_batches += 1;
+                    }
+                    self.add(Instruction::MergeKwargs(num_kwargs_batches));
+                } else {
+                    self.add(Instruction::BuildKwargs(pending_kwargs));
+                }
+            }
+            pending_args += 1;
+        }
+
+        if num_args_batches > 0 {
+            if pending_args > 0 {
+                self.add(Instruction::BuildList(Some(pending_args)));
+                num_args_batches += 1;
+            }
+            self.add(Instruction::UnpackLists(num_args_batches));
+            None
         } else {
-            args.len()
+            assert!(pending_args as u16 as usize == pending_args);
+            Some(pending_args as u16)
         }
     }
 

@@ -109,7 +109,11 @@ impl Stack {
         self.values[start..].reverse();
     }
 
-    pub fn slice_top(&mut self, n: usize) -> &[Value] {
+    pub fn get_call_args(&mut self, n: Option<u16>) -> &[Value] {
+        let n = match n {
+            Some(n) => n as usize,
+            None => self.pop().as_usize().unwrap(),
+        };
         &self.values[self.values.len() - n..]
     }
 

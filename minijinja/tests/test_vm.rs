@@ -307,7 +307,7 @@ fn test_call_object() {
         42 + a
     })));
     c.add(Instruction::LoadConst(Value::from(23i32)));
-    c.add(Instruction::CallObject(2));
+    c.add(Instruction::CallObject(Some(2)));
     c.add(Instruction::Emit);
 
     let output = simple_eval(&c.finish().0, ()).unwrap();

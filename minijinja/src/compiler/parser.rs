@@ -523,7 +523,7 @@ impl<'a> Parser<'a> {
                         let span = self.stream.current_span();
                         let mut expr = ok!(self.parse_unary_only());
                         expr = ok!(self.parse_postfix(expr, span));
-                        vec![expr]
+                        vec![ast::CallArg::Pos(expr)]
                     } else {
                         Vec::new()
                     };
@@ -547,49 +547,76 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn parse_args(&mut self) -> Result<Vec<ast::Expr<'a>>, Error> {
+    fn parse_args(&mut self) -> Result<Vec<ast::CallArg<'a>>, Error> {
         let mut args = Vec::new();
         let mut first_span = None;
-        let mut kwargs = Vec::new();
+        let mut has_kwargs = false;
+
+        enum ArgType {
+            Regular,
+            Splat,
+            KwargsSplat,
+        }
 
         expect_token!(self, Token::ParenOpen, "`(`");
         loop {
             if skip_token!(self, Token::ParenClose) {
                 break;
             }
-            if !args.is_empty() || !kwargs.is_empty() {
+            if !args.is_empty() || has_kwargs {
                 expect_token!(self, Token::Comma, "`,`");
                 if skip_token!(self, Token::ParenClose) {
                     break;
                 }
             }
+
+            let arg_type = if skip_token!(self, Token::Pow) {
+                ArgType::KwargsSplat
+            } else if skip_token!(self, Token::Mul) {
+                ArgType::Splat
+            } else {
+                ArgType::Regular
+            };
+
             let expr = ok!(self.parse_expr());
 
-            // keyword argument
-            match expr {
-                ast::Expr::Var(ref var) if skip_token!(self, Token::Assign) => {
-                    if first_span.is_none() {
-                        first_span = Some(var.span());
+            match arg_type {
+                ArgType::Regular => {
+                    // keyword argument
+                    match expr {
+                        ast::Expr::Var(ref var) if skip_token!(self, Token::Assign) => {
+                            if first_span.is_none() {
+                                first_span = Some(var.span());
+                            }
+                            has_kwargs = true;
+                            args.push(ast::CallArg::Kwarg(var.id, ok!(self.parse_expr_noif())));
+                        }
+                        _ if has_kwargs => {
+                            return Err(syntax_error(Cow::Borrowed(
+                                "non-keyword arg after keyword arg",
+                            )));
+                        }
+                        _ => {
+                            args.push(ast::CallArg::Pos(expr));
+                        }
                     }
-                    kwargs.push((var.id, ok!(self.parse_expr_noif())));
                 }
-                _ if !kwargs.is_empty() => {
-                    return Err(syntax_error(Cow::Borrowed(
-                        "non-keyword arg after keyword arg",
-                    )));
+                ArgType::Splat => {
+                    args.push(ast::CallArg::PosSplat(expr));
                 }
-                _ => {
-                    args.push(expr);
+                ArgType::KwargsSplat => {
+                    args.push(ast::CallArg::KwargSplat(expr));
+                    has_kwargs = true;
                 }
             }
-        }
 
-        if !kwargs.is_empty() {
-            args.push(ast::Expr::Kwargs(ast::Spanned::new(
-                ast::Kwargs { pairs: kwargs },
-                self.stream.expand_span(first_span.unwrap()),
-            )));
-        };
+            // Set an arbitrary limit of max function parameters.  This is done
+            // in parts because the opcodes can only express 2**16 as argument
+            // count.
+            if args.len() > 2000 {
+                syntax_error!("Too many aguments in function call")
+            }
+        }
 
         Ok(args)
     }

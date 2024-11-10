@@ -11,7 +11,9 @@ use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::namespace_object::Namespace;
-use crate::value::{ops, value_map_with_capacity, value_optimization, Kwargs, Value};
+use crate::value::{
+    ops, value_map_with_capacity, value_optimization, Kwargs, ObjectRepr, Value, ValueMap,
+};
 use crate::vm::context::{Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
@@ -367,21 +369,52 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::BuildMap(pair_count) => {
                     let mut map = value_map_with_capacity(*pair_count);
+                    stack.reverse_top(*pair_count * 2);
                     for _ in 0..*pair_count {
-                        let value = stack.pop();
                         let key = stack.pop();
+                        let value = stack.pop();
                         map.insert(key, value);
                     }
                     stack.push(Value::from_object(map))
                 }
                 Instruction::BuildKwargs(pair_count) => {
                     let mut map = value_map_with_capacity(*pair_count);
+                    stack.reverse_top(*pair_count * 2);
                     for _ in 0..*pair_count {
-                        let value = stack.pop();
                         let key = stack.pop();
+                        let value = stack.pop();
                         map.insert(key, value);
                     }
                     stack.push(Kwargs::wrap(map))
+                }
+                Instruction::MergeKwargs(count) => {
+                    let mut kwargs_sources = Vec::new();
+                    for _ in 0..*count {
+                        kwargs_sources.push(stack.pop());
+                    }
+                    kwargs_sources.reverse();
+                    let values: &[Value] = &kwargs_sources;
+                    let mut rv = ValueMap::new();
+                    for value in values {
+                        ctx_ok!(self.env.undefined_behavior().assert_iterable(value));
+                        let iter = ctx_ok!(value
+                            .as_object()
+                            .filter(|x| x.repr() == ObjectRepr::Map)
+                            .and_then(|x| x.try_iter_pairs())
+                            .ok_or_else(|| {
+                                Error::new(
+                                    ErrorKind::InvalidOperation,
+                                    format!(
+                                        "attempted to apply keyword arguments from non map (got {})",
+                                        value.kind()
+                                    ),
+                                )
+                            }));
+                        for (key, value) in iter {
+                            rv.insert(key, value);
+                        }
+                    }
+                    stack.push(Kwargs::wrap(rv));
                 }
                 Instruction::BuildList(n) => {
                     let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
@@ -394,6 +427,20 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::UnpackList(count) => {
                     ctx_ok!(self.unpack_list(&mut stack, *count));
+                }
+                Instruction::UnpackLists(count) => {
+                    let mut lists = Vec::new();
+                    for _ in 0..*count {
+                        lists.push(stack.pop());
+                    }
+                    let mut len = 0;
+                    for list in lists.into_iter().rev() {
+                        for item in ctx_ok!(list.try_iter()) {
+                            stack.push(item);
+                            len += 1;
+                        }
+                    }
+                    stack.push(Value::from(len));
                 }
                 Instruction::Add => func_binop!(add),
                 Instruction::Sub => func_binop!(sub),
@@ -541,9 +588,10 @@ impl<'env> Vm<'env> {
                                 format!("filter {name} is unknown"),
                             )
                         }));
-                    let args = stack.slice_top(*arg_count);
+                    let args = stack.get_call_args(*arg_count);
+                    let arg_count = args.len();
                     a = ctx_ok!(filter.apply_to(state, args));
-                    stack.drop_top(*arg_count);
+                    stack.drop_top(arg_count);
                     stack.push(a);
                 }
                 Instruction::PerformTest(name, arg_count, local_id) => {
@@ -553,53 +601,58 @@ impl<'env> Vm<'env> {
                     .ok_or_else(|| {
                         Error::new(ErrorKind::UnknownTest, format!("test {name} is unknown"))
                     }));
-                    let args = stack.slice_top(*arg_count);
+                    let args = stack.get_call_args(*arg_count);
+                    let arg_count = args.len();
                     let rv = ctx_ok!(test.perform(state, args));
-                    stack.drop_top(*arg_count);
+                    stack.drop_top(arg_count);
                     stack.push(Value::from(rv));
                 }
                 Instruction::CallFunction(name, arg_count) => {
+                    let args = stack.get_call_args(*arg_count);
                     // super is a special function reserved for super-ing into blocks.
-                    if *name == "super" {
-                        if *arg_count != 0 {
+                    let rv = if *name == "super" {
+                        if !args.is_empty() {
                             bail!(Error::new(
                                 ErrorKind::InvalidOperation,
                                 "super() takes no arguments",
                             ));
                         }
-                        stack.push(ctx_ok!(self.perform_super(state, out, true)));
+                        ctx_ok!(self.perform_super(state, out, true))
                     // loop is a special name which when called recurses the current loop.
                     } else if *name == "loop" {
-                        if *arg_count != 1 {
+                        if args.len() != 1 {
                             bail!(Error::new(
                                 ErrorKind::InvalidOperation,
-                                format!("loop() takes one argument, got {}", *arg_count)
+                                "loop() takes one argument"
                             ));
                         }
-                        // leave the one argument on the stack for the recursion
+                        // leave the one argument on the stack for the recursion.  The
+                        // recurse_loop! macro itself will perform a jump and not return here.
                         recurse_loop!(true);
                     } else if let Some(func) = state.lookup(name) {
-                        let args = stack.slice_top(*arg_count);
-                        a = ctx_ok!(func.call(state, args));
-                        stack.drop_top(*arg_count);
-                        stack.push(a);
+                        ctx_ok!(func.call(state, args))
                     } else {
                         bail!(Error::new(
                             ErrorKind::UnknownFunction,
                             format!("{name} is unknown"),
                         ));
-                    }
+                    };
+                    let arg_count = args.len();
+                    stack.drop_top(arg_count);
+                    stack.push(rv);
                 }
                 Instruction::CallMethod(name, arg_count) => {
-                    let args = stack.slice_top(*arg_count);
+                    let args = stack.get_call_args(*arg_count);
+                    let arg_count = args.len();
                     a = ctx_ok!(args[0].call_method(state, name, &args[1..]));
-                    stack.drop_top(*arg_count);
+                    stack.drop_top(arg_count);
                     stack.push(a);
                 }
                 Instruction::CallObject(arg_count) => {
-                    let args = stack.slice_top(*arg_count);
+                    let args = stack.get_call_args(*arg_count);
+                    let arg_count = args.len();
                     a = ctx_ok!(args[0].call(state, &args[1..]));
-                    stack.drop_top(*arg_count);
+                    stack.drop_top(arg_count);
                     stack.push(a);
                 }
                 Instruction::DupTop => {
