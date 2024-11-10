@@ -26,6 +26,7 @@ State {
         globals: {
             "debug": minijinja::functions::builtins::debug,
             "dict": minijinja::functions::builtins::dict,
+            "get_args": test_templates::test_vm::{{closure}}::{{closure}},
             "namespace": minijinja::functions::builtins::namespace,
             "range": minijinja::functions::builtins::range,
         },

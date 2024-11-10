@@ -26,12 +26,16 @@ Ok(
                         name: "cycle",
                     } @ 2:3-2:13,
                     args: [
-                        Const {
-                            value: 1,
-                        } @ 2:14-2:15,
-                        Const {
-                            value: 2,
-                        } @ 2:17-2:18,
+                        Pos(
+                            Const {
+                                value: 1,
+                            } @ 2:14-2:15,
+                        ),
+                        Pos(
+                            Const {
+                                value: 2,
+                            } @ 2:17-2:18,
+                        ),
                     ],
                 } @ 2:7-2:19,
             } @ 2:0-2:19,
@@ -58,28 +62,28 @@ Ok(
                         id: "foo",
                     } @ 4:3-4:6,
                     args: [
-                        Const {
-                            value: 1,
-                        } @ 4:7-4:8,
-                        Const {
-                            value: 2,
-                        } @ 4:10-4:11,
-                        Kwargs {
-                            pairs: [
-                                (
-                                    "a",
-                                    Const {
-                                        value: 3,
-                                    } @ 4:15-4:16,
-                                ),
-                                (
-                                    "b",
-                                    Const {
-                                        value: 4,
-                                    } @ 4:20-4:21,
-                                ),
-                            ],
-                        } @ 4:13-4:22,
+                        Pos(
+                            Const {
+                                value: 1,
+                            } @ 4:7-4:8,
+                        ),
+                        Pos(
+                            Const {
+                                value: 2,
+                            } @ 4:10-4:11,
+                        ),
+                        Kwarg(
+                            "a",
+                            Const {
+                                value: 3,
+                            } @ 4:15-4:16,
+                        ),
+                        Kwarg(
+                            "b",
+                            Const {
+                                value: 4,
+                            } @ 4:20-4:21,
+                        ),
                     ],
                 } @ 4:3-4:22,
             } @ 4:0-4:22,
@@ -92,12 +96,16 @@ Ok(
                         id: "trailing",
                     } @ 5:3-5:11,
                     args: [
-                        Const {
-                            value: 1,
-                        } @ 5:12-5:13,
-                        Const {
-                            value: 2,
-                        } @ 5:15-5:16,
+                        Pos(
+                            Const {
+                                value: 1,
+                            } @ 5:12-5:13,
+                        ),
+                        Pos(
+                            Const {
+                                value: 2,
+                            } @ 5:15-5:16,
+                        ),
                     ],
                 } @ 5:3-5:18,
             } @ 5:0-5:18,
@@ -110,22 +118,22 @@ Ok(
                         id: "trailing_kwarg",
                     } @ 6:3-6:17,
                     args: [
-                        Const {
-                            value: 1,
-                        } @ 6:18-6:19,
-                        Const {
-                            value: 2,
-                        } @ 6:21-6:22,
-                        Kwargs {
-                            pairs: [
-                                (
-                                    "a",
-                                    Const {
-                                        value: 3,
-                                    } @ 6:26-6:27,
-                                ),
-                            ],
-                        } @ 6:24-6:29,
+                        Pos(
+                            Const {
+                                value: 1,
+                            } @ 6:18-6:19,
+                        ),
+                        Pos(
+                            Const {
+                                value: 2,
+                            } @ 6:21-6:22,
+                        ),
+                        Kwarg(
+                            "a",
+                            Const {
+                                value: 3,
+                            } @ 6:26-6:27,
+                        ),
                     ],
                 } @ 6:3-6:29,
             } @ 6:0-6:29,

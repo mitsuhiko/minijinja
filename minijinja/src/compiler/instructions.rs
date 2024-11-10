@@ -60,11 +60,17 @@ pub enum Instruction<'source> {
     /// Builds a kwargs map of the last n pairs on the stack.
     BuildKwargs(usize),
 
+    /// Merges N kwargs maps on the list into one.
+    MergeKwargs(usize),
+
     /// Builds a list of the last n pairs on the stack.
     BuildList(Option<usize>),
 
     /// Unpacks a list into N stack items.
     UnpackList(usize),
+
+    /// Unpacks N lists onto the stack and pushes the number of items there were unpacked.
+    UnpackLists(usize),
 
     /// Add the top two values
     Add,

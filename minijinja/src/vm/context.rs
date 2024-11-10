@@ -110,6 +110,11 @@ impl Stack {
     }
 
     pub fn slice_top(&mut self, n: usize) -> &[Value] {
+        let n = if n == !0 {
+            self.pop().as_usize().unwrap()
+        } else {
+            n
+        };
         &self.values[self.values.len() - n..]
     }
 
