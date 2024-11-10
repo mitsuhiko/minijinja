@@ -588,7 +588,7 @@ impl<'env> Vm<'env> {
                                 format!("filter {name} is unknown"),
                             )
                         }));
-                    let args = stack.slice_top(*arg_count);
+                    let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
                     a = ctx_ok!(filter.apply_to(state, args));
                     stack.drop_top(arg_count);
@@ -601,54 +601,55 @@ impl<'env> Vm<'env> {
                     .ok_or_else(|| {
                         Error::new(ErrorKind::UnknownTest, format!("test {name} is unknown"))
                     }));
-                    let args = stack.slice_top(*arg_count);
+                    let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
                     let rv = ctx_ok!(test.perform(state, args));
                     stack.drop_top(arg_count);
                     stack.push(Value::from(rv));
                 }
                 Instruction::CallFunction(name, arg_count) => {
+                    let args = stack.get_call_args(*arg_count);
                     // super is a special function reserved for super-ing into blocks.
-                    if *name == "super" {
-                        if *arg_count != 0 {
+                    let rv = if *name == "super" {
+                        if !args.is_empty() {
                             bail!(Error::new(
                                 ErrorKind::InvalidOperation,
                                 "super() takes no arguments",
                             ));
                         }
-                        stack.push(ctx_ok!(self.perform_super(state, out, true)));
+                        ctx_ok!(self.perform_super(state, out, true))
                     // loop is a special name which when called recurses the current loop.
                     } else if *name == "loop" {
-                        if *arg_count != 1 {
+                        if args.len() != 1 {
                             bail!(Error::new(
                                 ErrorKind::InvalidOperation,
-                                format!("loop() takes one argument, got {}", *arg_count)
+                                "loop() takes one argument"
                             ));
                         }
                         // leave the one argument on the stack for the recursion
+                        // this internall calls continue.
                         recurse_loop!(true);
                     } else if let Some(func) = state.lookup(name) {
-                        let args = stack.slice_top(*arg_count);
-                        let arg_count = args.len();
-                        a = ctx_ok!(func.call(state, args));
-                        stack.drop_top(arg_count);
-                        stack.push(a);
+                        ctx_ok!(func.call(state, args))
                     } else {
                         bail!(Error::new(
                             ErrorKind::UnknownFunction,
                             format!("{name} is unknown"),
                         ));
-                    }
+                    };
+                    let arg_count = args.len();
+                    stack.drop_top(arg_count);
+                    stack.push(rv);
                 }
                 Instruction::CallMethod(name, arg_count) => {
-                    let args = stack.slice_top(*arg_count);
+                    let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
                     a = ctx_ok!(args[0].call_method(state, name, &args[1..]));
                     stack.drop_top(arg_count);
                     stack.push(a);
                 }
                 Instruction::CallObject(arg_count) => {
-                    let args = stack.slice_top(*arg_count);
+                    let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
                     a = ctx_ok!(args[0].call(state, &args[1..]));
                     stack.drop_top(arg_count);

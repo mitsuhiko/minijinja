@@ -503,7 +503,7 @@ impl<'source> CodeGenerator<'source> {
                         self.add_with_span(Instruction::FastSuper, call.span());
                         return;
                     } else if name == "loop" && call.args.len() == 1 {
-                        self.compile_call_args(std::slice::from_ref(&call.args[0]), None);
+                        self.compile_call_args(std::slice::from_ref(&call.args[0]), 0, None);
                         self.add(Instruction::FastRecurse);
                         return;
                     }
@@ -660,17 +660,17 @@ impl<'source> CodeGenerator<'source> {
                 if let Some(ref expr) = f.expr {
                     self.compile_expr(expr);
                 }
-                let arg_count = self.compile_call_args(&f.args, None);
+                let arg_count = self.compile_call_args(&f.args, 1, None);
                 let local_id = get_local_id(&mut self.filter_local_ids, f.name);
-                self.add(Instruction::ApplyFilter(f.name, arg_count + 1, local_id));
+                self.add(Instruction::ApplyFilter(f.name, arg_count, local_id));
                 self.pop_span();
             }
             ast::Expr::Test(f) => {
                 self.push_span(f.span());
                 self.compile_expr(&f.expr);
-                let arg_count = self.compile_call_args(&f.args, None);
+                let arg_count = self.compile_call_args(&f.args, 1, None);
                 let local_id = get_local_id(&mut self.test_local_ids, f.name);
-                self.add(Instruction::PerformTest(f.name, arg_count + 1, local_id));
+                self.add(Instruction::PerformTest(f.name, arg_count, local_id));
                 self.pop_span();
             }
             ast::Expr::GetAttr(g) => {
@@ -724,7 +724,7 @@ impl<'source> CodeGenerator<'source> {
         self.push_span(c.span());
         match c.identify_call() {
             ast::CallType::Function(name) => {
-                let arg_count = self.compile_call_args(&c.args, caller);
+                let arg_count = self.compile_call_args(&c.args, 0, caller);
                 self.add(Instruction::CallFunction(name, arg_count));
             }
             #[cfg(feature = "multi_template")]
@@ -735,13 +735,13 @@ impl<'source> CodeGenerator<'source> {
             }
             ast::CallType::Method(expr, name) => {
                 self.compile_expr(expr);
-                let arg_count = self.compile_call_args(&c.args, caller);
-                self.add(Instruction::CallMethod(name, arg_count + 1));
+                let arg_count = self.compile_call_args(&c.args, 1, caller);
+                self.add(Instruction::CallMethod(name, arg_count));
             }
             ast::CallType::Object(expr) => {
                 self.compile_expr(expr);
-                let arg_count = self.compile_call_args(&c.args, caller);
-                self.add(Instruction::CallObject(arg_count + 1));
+                let arg_count = self.compile_call_args(&c.args, 1, caller);
+                self.add(Instruction::CallObject(arg_count));
             }
         };
         self.pop_span();
@@ -750,9 +750,10 @@ impl<'source> CodeGenerator<'source> {
     fn compile_call_args(
         &mut self,
         args: &[ast::CallArg<'source>],
+        extra_args: usize,
         caller: Option<&Caller<'source>>,
-    ) -> usize {
-        let mut pending_args = 0;
+    ) -> Option<u16> {
+        let mut pending_args = extra_args;
         let mut num_args_batches = 0;
         let mut has_kwargs = caller.is_some();
         let mut static_kwargs = caller.is_none();
@@ -850,9 +851,10 @@ impl<'source> CodeGenerator<'source> {
                 num_args_batches += 1;
             }
             self.add(Instruction::UnpackLists(num_args_batches));
-            !0
+            None
         } else {
-            pending_args
+            assert!(pending_args as u16 as usize == pending_args);
+            Some(pending_args as u16)
         }
     }
 
