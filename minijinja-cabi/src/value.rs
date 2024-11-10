@@ -40,7 +40,7 @@ where
 #[repr(C)]
 pub struct mj_value {
     // Motivation on the size here: The size of `Value` is really not
-    // known and since cbindgen has no way to guarnatee us a matching
+    // known and since cbindgen has no way to guarantee us a matching
     // size we have to be creative.  The dominating type size wise is
     // most likely going to be SmallStr which is a u8+[u8; 22] plus the
     // enum discriminant (u8).
@@ -335,7 +335,7 @@ ffi_fn! {
 }
 
 ffi_fn! {
-    /// Looks up an element by a vaue
+    /// Looks up an element by a value
     unsafe fn mj_value_get_by_value(_scope, value: mj_value, key: mj_value) -> mj_value {
         value.get_item(&key as &Value).unwrap_or_default().into()
     }

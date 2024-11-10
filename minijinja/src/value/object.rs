@@ -196,7 +196,7 @@ pub trait Object: fmt::Debug + Send + Sync {
     ///
     /// By default the length is taken by calling [`enumerate`](Self::enumerate) and
     /// inspecting the [`Enumerator`].  This means that in order to determine
-    /// the length, an iteration is started.  If you this is a problem for your
+    /// the length, an iteration is started.  If you think this is a problem for your
     /// uses, you can manually implement this.  This might for instance be
     /// needed if your type can only be iterated over once.
     fn enumerator_len(self: &Arc<Self>) -> Option<usize> {

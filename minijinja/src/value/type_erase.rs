@@ -76,7 +76,7 @@ macro_rules! type_erase {
                     }
                 )*
 
-                /// Returns the type name of the conrete underlying type.
+                /// Returns the type name of the concrete underlying type.
                 $v fn type_name(&self) -> &'static str {
                     (vt(self).__type_name)()
                 }

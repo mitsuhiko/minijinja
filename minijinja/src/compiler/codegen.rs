@@ -525,7 +525,7 @@ impl<'source> CodeGenerator<'source> {
 
         // filter expressions work like a nested for loop without
         // the special loop variable. in one loop, the condition is checked and
-        // passing items accumlated into a list. in the second, that list is
+        // passing items accumulated into a list. in the second, that list is
         // iterated over normally
         if let Some(ref filter_expr) = for_loop.filter_expr {
             self.add(Instruction::LoadConst(Value::from(0usize)));

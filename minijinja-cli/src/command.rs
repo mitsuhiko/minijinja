@@ -279,7 +279,7 @@ pub(super) fn make_command() -> Command {
                 .long_help("\
                     Dump internals of a template to stdout.\n\n\
                     \
-                    This feature is primarily useful to debug what is going on in a MiniJinja tempalte. \
+                    This feature is primarily useful to debug what is going on in a MiniJinja template. \
                     'instructions' will dump out the bytecode that the engine generated, 'ast' dumps out \
                     the AST in a text only format and 'tokens' will print a line per token of the template \
                     after lexing.")

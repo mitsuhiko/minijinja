@@ -20,7 +20,7 @@ features enabled at compilation time.
 
 Configuration is loaded from $HOME/minijinja.toml and environment variables, before being overridden
 by command line options.  The environment variables are documented with the options that they
-correspond to.  Note that flags (boolen values) are reconfigured with true/false or 1/0
+correspond to.  Note that flags (boolean values) are reconfigured with true/false or 1/0
 respectively.  For instance --no-include corresponds to MINIJINJA_INCLUDE=false.  Not all options
 can be configured from environment variables or config options.
 
@@ -293,7 +293,7 @@ Advanced:
       --dump <KIND>
           Dump internals of a template to stdout.
           
-          This feature is primarily useful to debug what is going on in a MiniJinja tempalte.
+          This feature is primarily useful to debug what is going on in a MiniJinja template.
           'instructions' will dump out the bytecode that the engine generated, 'ast' dumps out the
           AST in a text only format and 'tokens' will print a line per token of the template after
           lexing.

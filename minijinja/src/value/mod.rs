@@ -1315,7 +1315,7 @@ impl Value {
     /// * undefined or none: value returned unchanged.
     /// * string and bytes: returns a reversed version of that value
     /// * iterables: returns a reversed version of the iterable.  If the iterable is not
-    ///   reversable itself, it consumes it and then reverses it.
+    ///   reversible itself, it consumes it and then reverses it.
     pub fn reverse(&self) -> Result<Value, Error> {
         match self.0 {
             ValueRepr::Undefined | ValueRepr::None => Some(self.clone()),

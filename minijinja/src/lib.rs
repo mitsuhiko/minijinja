@@ -250,7 +250,7 @@ pub use self::value::Value;
 pub use self::macros::__context;
 pub use self::vm::State;
 
-// fowards compatibility
+// forwards compatibility
 #[cfg(not(feature = "serde"))]
 const _: () = {
     #[deprecated(
