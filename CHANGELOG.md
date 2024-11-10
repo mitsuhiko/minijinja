@@ -29,6 +29,9 @@ All notable changes to MiniJinja are documented here.
 - `minijinja-cli` now does not convert INI files to lowercase anymore.  This was
   an unintended behavior.  #633
 - Moved up MSRV to 1.63.0 due to indexmap.  #635
+- Added argument splatting support (`*args` for variable args and `**kwargs`
+  for keyword arguments) and fixed a bug where sometimes maps and keyword
+  arguments were created in inverse order.  #642
 
 ## 2.4.0
 
