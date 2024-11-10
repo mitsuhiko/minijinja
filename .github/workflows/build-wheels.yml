@@ -40,10 +40,9 @@ jobs:
         with:
           python-version: "3.9"
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install dependencies
+      - name: Wipe Config
         run: |
-          sudo apt-get update --fix-missing
-          sudo apt-get install -y gcc-i686-linux-gnu gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi gcc-arm-linux-gnueabihf libc6-dev-armel-cross
+          rm .cargo/config.toml
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
