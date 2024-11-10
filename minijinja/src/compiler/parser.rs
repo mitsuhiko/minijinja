@@ -602,10 +602,10 @@ impl<'a> Parser<'a> {
                     }
                 }
                 ArgType::Splat => {
-                    args.push(ast::CallArg::Splat(expr));
+                    args.push(ast::CallArg::PosSplat(expr));
                 }
                 ArgType::KwargsSplat => {
-                    args.push(ast::CallArg::KwargsSplat(expr));
+                    args.push(ast::CallArg::KwargSplat(expr));
                     has_kwargs = true;
                 }
             }

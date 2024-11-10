@@ -483,8 +483,8 @@ pub struct Call<'a> {
 pub enum CallArg<'a> {
     Pos(Expr<'a>),
     Kwarg(&'a str, Expr<'a>),
-    Splat(Expr<'a>),
-    KwargsSplat(Expr<'a>),
+    PosSplat(Expr<'a>),
+    KwargSplat(Expr<'a>),
 }
 
 /// Creates a list of values.

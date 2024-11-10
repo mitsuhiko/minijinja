@@ -763,7 +763,7 @@ impl<'source> CodeGenerator<'source> {
                     self.compile_expr(expr);
                     pending_args += 1;
                 }
-                ast::CallArg::Splat(expr) => {
+                ast::CallArg::PosSplat(expr) => {
                     if pending_args > 0 {
                         self.add(Instruction::BuildList(Some(pending_args)));
                         pending_args = 0;
@@ -778,7 +778,7 @@ impl<'source> CodeGenerator<'source> {
                     }
                     has_kwargs = true;
                 }
-                ast::CallArg::KwargsSplat(_) => {
+                ast::CallArg::KwargSplat(_) => {
                     static_kwargs = false;
                     has_kwargs = true;
                 }
@@ -804,7 +804,7 @@ impl<'source> CodeGenerator<'source> {
                             pending_kwargs += 1;
                         }
                     }
-                    ast::CallArg::KwargsSplat(expr) => {
+                    ast::CallArg::KwargSplat(expr) => {
                         if pending_kwargs > 0 {
                             self.add(Instruction::BuildKwargs(pending_kwargs));
                             num_kwargs_batches += 1;
@@ -813,7 +813,7 @@ impl<'source> CodeGenerator<'source> {
                         self.compile_expr(expr);
                         num_kwargs_batches += 1;
                     }
-                    ast::CallArg::Pos(_) | ast::CallArg::Splat(_) => {}
+                    ast::CallArg::Pos(_) | ast::CallArg::PosSplat(_) => {}
                 }
             }
 

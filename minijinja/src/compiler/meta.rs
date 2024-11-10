@@ -85,8 +85,8 @@ fn tracker_visit_callarg<'a>(callarg: &ast::CallArg<'a>, state: &mut AssignmentT
     match callarg {
         ast::CallArg::Pos(expr)
         | ast::CallArg::Kwarg(_, expr)
-        | ast::CallArg::Splat(expr)
-        | ast::CallArg::KwargsSplat(expr) => tracker_visit_expr(expr, state),
+        | ast::CallArg::PosSplat(expr)
+        | ast::CallArg::KwargSplat(expr) => tracker_visit_expr(expr, state),
     }
 }
 
