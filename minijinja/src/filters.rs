@@ -1564,9 +1564,7 @@ mod builtins {
     /// whole words.
     ///
     /// ```jinja
-    /// {{ "Hello World"|truncate(5) }}         -> "He..."
-    /// {{ "Hello World"|truncate(5, True) }}   -> "Hell..."
-    /// {{ "Hello World"|truncate(5, end='*') }} -> "He*"
+    /// {{ "Hello World"|truncate(length=5) }}
     /// ```
     ///
     /// The filter accepts a few keyword arguments:
