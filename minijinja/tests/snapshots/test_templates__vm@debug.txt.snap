@@ -4,6 +4,7 @@ description: "{% with f = range %}{% for x in f(upper) %}{{ debug() }}{% endfor 
 info:
   upper: 1
 input_file: minijinja/tests/inputs/debug.txt
+snapshot_kind: text
 ---
 State {
     name: "debug.txt",
@@ -117,6 +118,7 @@ State {
             "title",
             "tojson",
             "trim",
+            "truncate",
             "unique",
             "upper",
             "urlencode",

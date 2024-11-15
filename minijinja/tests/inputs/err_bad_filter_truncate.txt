@@ -1,0 +1,5 @@
+{
+  "fifteen_chars_test": "fifteen chars !"
+}
+---
+{{ fifteen_chars_test|truncate(length=1) }}

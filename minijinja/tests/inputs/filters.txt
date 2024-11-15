@@ -16,7 +16,9 @@
     "a": "b",
     "c": "d"
   },
-  "scary_html": "<>&'"
+  "scary_html": "<>&'",
+  "fifteen_chars_test": "fifteen chars !",
+  "lorem_ipsum": "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum."
 }
 ---
 lower: {{ word|lower }}
@@ -114,3 +116,10 @@ split-n-d: {{ three_words|split("d", 1)|list }}
 split-n-ws-filter-empty: {{ "  foo    bar baz  "|split(none, 1)|list }}
 lines: {{ "foo\nbar\r\nbaz"|lines }}
 string: {{ [1|string, 2|string] }}
+truncate: {{ lorem_ipsum| truncate }}
+truncate-unchanged: {{ three_words|truncate }}
+truncate-10: {{ lorem_ipsum|truncate(length=10) }}
+truncate-10-killwords: {{ lorem_ipsum|truncate(length=10, killwords=true) }}
+truncate-10-killwords-custtom-end: {{ lorem_ipsum|truncate(length=10, killwords=true, end="***") }}
+truncate-leeway-default: {{ fifteen_chars_test|truncate(length=10) }}
+truncate-leeway-custom: {{ fifteen_chars_test|truncate(length=10, leeway=0) }}

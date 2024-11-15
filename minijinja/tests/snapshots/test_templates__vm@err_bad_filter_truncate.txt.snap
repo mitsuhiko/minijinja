@@ -1,0 +1,26 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ fifteen_chars_test|truncate(length=1) }}"
+info:
+  fifteen_chars_test: fifteen chars !
+input_file: minijinja/tests/inputs/err_bad_filter_truncate.txt
+snapshot_kind: text
+---
+!!!ERROR!!!
+
+Error {
+    kind: InvalidOperation,
+    detail: "expected length >= 3, got 1",
+    name: "err_bad_filter_truncate.txt",
+    line: 1,
+}
+
+invalid operation: expected length >= 3, got 1 (in err_bad_filter_truncate.txt:1)
+------------------------- err_bad_filter_truncate.txt -------------------------
+   1 > {{ fifteen_chars_test|truncate(length=1) }}
+     i                       ^^^^^^^^^^^^^^^^^^ invalid operation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Referenced variables: {
+    fifteen_chars_test: "fifteen chars !",
+}
+-------------------------------------------------------------------------------

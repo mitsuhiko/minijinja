@@ -99,6 +99,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::Boxe
         rv.insert("map".into(), BoxedFilter::new(filters::map));
         rv.insert("groupby".into(), BoxedFilter::new(filters::groupby));
         rv.insert("unique".into(), BoxedFilter::new(filters::unique));
+        rv.insert("truncate".into(), BoxedFilter::new(filters::truncate));
         rv.insert("pprint".into(), BoxedFilter::new(filters::pprint));
 
         #[cfg(feature = "json")]
