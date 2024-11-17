@@ -48,7 +48,7 @@ All notable changes to MiniJinja are documented here.
 
 ## 2.3.1
 
-- Fixes a regresion in `PartialEq` / `Eq` in `Value` caused by changes
+- Fixes a regression in `PartialEq` / `Eq` in `Value` caused by changes
   in 2.3.0.  #584
 
 ## 2.3.0
@@ -133,9 +133,9 @@ All notable changes to MiniJinja are documented here.
 ## 2.0.0
 
 This is a major update to MiniJinja that changes a lot of core internals and
-cleans up some APIs.  In particular it resolves somes limitations in the engine
+cleans up some APIs.  In particular it resolves some limitations in the engine
 in relation to working with dynamic objects, unlocks potentials for future
-performance improvments and enhancements.
+performance improvements and enhancements.
 
 It's very likely that you will need to do changes to your code when upgrading,
 particular when implementing dynamic objects.  In short:
@@ -247,7 +247,7 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
   includes or extends from paths not explicitly allowlisted.  #432
 - Added support for `Error::display_debug_info` which displays just the
   debug info, same way as alternative display on the error does.  #420
-- Added the `namspace()` function from Jinja2 and the ability to assign
+- Added the `namespace()` function from Jinja2 and the ability to assign
   to it via `{% set %}`.  #422
 - `minijinja-autoreload` now supports `on_should_reload_callback` which
   lets one register a callback to be called just before an auto reload
