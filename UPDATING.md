@@ -206,7 +206,7 @@ let value = Value::from_seq_object(SimpleDynamicSeq(...));
 Because the default object representation is a `Map`, we need to
 change it to `ObjectRepr::seq` in the `repr` method.  As sequences
 iterate over their values, we can use the convenient `Enumerator::Seq`
-enumerator which instructs the engine to sequentually iterate over
+enumerator which instructs the engine to sequentially iterate over
 the object from `0` to the given `length`.  Otherwise the interface
 is the same as with the map above, which means that rather than
 implementing `get_item` you now also implement `get_value` which

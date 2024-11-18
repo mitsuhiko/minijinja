@@ -59,7 +59,7 @@ pub fn pluralize(v: Value, singular: Option<Value>, plural: Option<Value>) -> Re
     }
 }
 
-/// Choses a random element from a sequence or string.
+/// Chooses a random element from a sequence or string.
 ///
 /// The random number generated can be seeded with the `RAND_SEED`
 /// global context variable.

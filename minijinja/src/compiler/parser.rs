@@ -614,7 +614,7 @@ impl<'a> Parser<'a> {
             // in parts because the opcodes can only express 2**16 as argument
             // count.
             if args.len() > 2000 {
-                syntax_error!("Too many aguments in function call")
+                syntax_error!("Too many arguments in function call")
             }
         }
 
