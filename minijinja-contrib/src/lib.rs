@@ -34,6 +34,7 @@ pub mod globals;
 pub fn add_to_environment(env: &mut Environment) {
     env.add_filter("pluralize", filters::pluralize);
     env.add_filter("filesizeformat", filters::filesizeformat);
+    env.add_filter("truncate", filters::truncate);
     #[cfg(feature = "datetime")]
     {
         env.add_filter("datetimeformat", filters::datetimeformat);

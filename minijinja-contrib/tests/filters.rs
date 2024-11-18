@@ -128,3 +128,77 @@ fn test_filesizeformat() {
     insta::assert_snapshot!(render!(in env, r"{{ (1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024)|filesizeformat }}"), @"1.2 YB");
     insta::assert_snapshot!(render!(in env, r"{{ (1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024)|filesizeformat }}"), @"1267650.6 YB");
 }
+
+#[test]
+fn test_truncate() {
+    use minijinja::render;
+    use minijinja_contrib::filters::truncate;
+
+    const LONG_TEXT: &str = "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
+    const SHORT_TEXT: &str = "Fifteen chars !";
+    const SPECIAL_TEXT: &str = "Hello 👋 World";
+
+    let mut env = Environment::new();
+    env.add_filter("truncate", truncate);
+
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate }}", text=>SHORT_TEXT),
+        @"Fifteen chars !"
+    );
+
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate }}", text=>LONG_TEXT),
+        @"Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It..."
+    );
+
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(length=10) }}", text=>LONG_TEXT),
+        @"Lorem..."
+    );
+
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(length=10, killwords=true) }}", text=>LONG_TEXT),
+        @"Lorem I..."
+    );
+
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(length=10, end='***') }}", text=>LONG_TEXT),
+        @"Lorem***"
+    );
+
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(length=10, killwords=true, end='') }}", text=>LONG_TEXT),
+        @"Lorem Ipsu"
+    );
+
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(length=10, leeway=5) }}", text=>SHORT_TEXT),
+        @"Fifteen chars !"
+    );
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(length=10, leeway=0) }}", text=>SHORT_TEXT),
+        @"Fifteen..."
+    );
+
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(length=7, leeway=0, end='') }}", text=>SPECIAL_TEXT),
+        @"Hello"
+    );
+
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(length=7, leeway=0, end='', killwords=true) }}", text=>SPECIAL_TEXT),
+        @"Hello 👋"
+    );
+
+    insta::assert_snapshot!(
+        render!(in env, r"{{ text|truncate(length=8, leeway=0, end='') }}", text=>SPECIAL_TEXT),
+        @"Hello 👋"
+    );
+
+    assert_eq!(
+        env.render_str(r"{{ 'hello'|truncate(length=1) }}", context! {})
+            .unwrap_err()
+            .to_string(),
+        "invalid operation: expected length >= 3, got 1 (in <string>:1)"
+    );
+}
