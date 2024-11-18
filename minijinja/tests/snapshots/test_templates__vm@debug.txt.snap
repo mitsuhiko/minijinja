@@ -114,6 +114,7 @@ State {
             "sort",
             "split",
             "string",
+            "sum",
             "title",
             "tojson",
             "trim",
