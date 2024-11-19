@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## 2.6.0
 
 - Added `sum` filter.  #648
+- Added `truncate` filter to `minijinja-contrib`.  #647
 
 ## 2.5.0
 
