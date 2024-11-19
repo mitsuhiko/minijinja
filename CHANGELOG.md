@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.6.0
+
+- Added `sum` filter.  #648
+
 ## 2.5.0
 
 - `minijinja-cli` now supports preservation of order in maps.  #611
