@@ -136,7 +136,7 @@ pub fn filesizeformat(value: f64, binary: Option<bool>) -> String {
 /// The filter accepts a few keyword arguments:
 /// * `length`: maximum length of the output string (defaults to 255)
 /// * `killwords`: set to `true` if you want to cut text exactly at length; if `false`,
-/// the filter will preserve last word (defaults to `false`)
+///   the filter will preserve last word (defaults to `false`)
 /// * `end`: if you want a specific ellipsis sign you can specify it (defaults to "...")
 /// * `leeway`: determines the tolerance margin before truncation occurs (defaults to 5)
 ///
