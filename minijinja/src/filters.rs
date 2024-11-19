@@ -294,7 +294,7 @@ mod builtins {
 
     use crate::error::ErrorKind;
     use crate::utils::splitn_whitespace;
-    use crate::value::ops::as_f64;
+    use crate::value::ops::{self, as_f64};
     use crate::value::{Enumerator, Kwargs, Object, ObjectRepr, ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::cmp::Ordering;
@@ -691,6 +691,31 @@ mod builtins {
                 )
             }),
         }
+    }
+
+    /// Sums up all the values in a sequence.
+    ///
+    /// ```jinja
+    /// {{ range(10)|sum }} -> 45
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn sum(state: &State, values: Value) -> Result<Value, Error> {
+        let mut rv = Value::from(0);
+        let iter = ok!(state.undefined_behavior().try_iter(values));
+        for value in iter {
+            if value.is_undefined() {
+                ok!(state.undefined_behavior().handle_undefined(false));
+                continue;
+            } else if !value.is_number() {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("can only sum numbers, got {}", value.kind()),
+                ));
+            }
+            rv = ok!(ops::add(&rv, &value));
+        }
+
+        Ok(rv)
     }
 
     /// Looks up an attribute.
