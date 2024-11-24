@@ -1,5 +1,5 @@
 use minijinja::{context, Environment};
-use minijinja_contrib::filters::pluralize;
+use minijinja_contrib::filters::{pluralize, wordcount};
 use similar_asserts::assert_eq;
 
 #[test]
@@ -200,5 +200,46 @@ fn test_truncate() {
             .unwrap_err()
             .to_string(),
         "invalid operation: expected length >= 3, got 1 (in <string>:1)"
+    );
+}
+
+#[test]
+fn test_wordcount() {
+    let mut env = Environment::new();
+    env.add_filter("wordcount", wordcount);
+
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordcount }}",
+            context! {
+                text => "Hello world! How are you?"
+            }
+        )
+        .unwrap(),
+        "5"
+    );
+
+    // Test empty string
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordcount }}",
+            context! {
+                text => ""
+            }
+        )
+        .unwrap(),
+        "0"
+    );
+
+    // Test multiple whitespace
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordcount }}",
+            context! {
+                text => "Hello    world!   Test"
+            }
+        )
+        .unwrap(),
+        "3"
     );
 }

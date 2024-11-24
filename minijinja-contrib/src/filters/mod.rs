@@ -214,3 +214,17 @@ pub fn truncate(state: &State, value: Value, kwargs: Kwargs) -> Result<String, E
     result.push_str(end);
     Ok(result)
 }
+
+/// Counts the words in a string.
+///
+/// ```jinja
+/// {{ "Hello world!"|wordcount }}
+/// ```
+pub fn wordcount(value: Value) -> Result<Value, Error> {
+    let s = value.as_str().unwrap_or_default();
+
+    // Split on whitespace and count non-empty words
+    let count = s.split_whitespace().count();
+    
+    Ok(Value::from(count))
+}
