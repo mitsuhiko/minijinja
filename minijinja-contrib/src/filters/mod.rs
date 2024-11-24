@@ -225,6 +225,6 @@ pub fn wordcount(value: Value) -> Result<Value, Error> {
 
     // Split on whitespace and count non-empty words
     let count = s.split_whitespace().count();
-    
+
     Ok(Value::from(count))
 }
