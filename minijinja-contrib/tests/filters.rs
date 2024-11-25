@@ -242,4 +242,28 @@ fn test_wordcount() {
         .unwrap(),
         "3"
     );
+
+    // Test other word separators
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordcount }}",
+            context! {
+                text => "hello-again@world! It's_me!"
+            }
+        )
+        .unwrap(),
+        "5"
+    );
+
+    // Test multiple other word separators
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordcount }}",
+            context! {
+                text => "hello--again@-!world"
+            }
+        )
+        .unwrap(),
+        "3"
+    );
 }

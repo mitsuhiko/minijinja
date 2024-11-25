@@ -222,9 +222,19 @@ pub fn truncate(state: &State, value: Value, kwargs: Kwargs) -> Result<String, E
 /// ```
 pub fn wordcount(value: Value) -> Result<Value, Error> {
     let s = value.as_str().unwrap_or_default();
+    let mut count: u32 = 0;
+    let mut in_word = false;
 
-    // Split on whitespace and count non-empty words
-    let count = s.split_whitespace().count();
+    // Iterate through characters, counting transitions from non-word to word chars
+    for c in s.chars() {
+        let is_word_char = c.is_alphanumeric() || c == '_';
+        if is_word_char && !in_word {
+            count += 1;
+            in_word = true;
+        } else if !is_word_char {
+            in_word = false;
+        }
+    }
 
     Ok(Value::from(count))
 }
