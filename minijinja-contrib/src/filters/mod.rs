@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use minijinja::value::{Kwargs, Value, ValueKind};
 use minijinja::State;
 use minijinja::{Error, ErrorKind};
+use textwrap::{wrap, Options as WrapOptions, WordSplitter};
 
 #[cfg(feature = "datetime")]
 mod datetime;
@@ -237,4 +238,57 @@ pub fn wordcount(value: Value) -> Result<Value, Error> {
     }
 
     Ok(Value::from(count))
+}
+
+/// Wrap a string to the given width.
+///
+/// Parameters:
+/// - s: Original text to wrap
+/// - width: Maximum length of wrapped lines (default: 79)
+/// - break_long_words: If a word is longer than width, break it across lines (default: true)
+/// - break_on_hyphens: If a word contains hyphens, it may be split across lines (default: true)
+/// - wrapstring: String to join each wrapped line (default: newline)
+pub fn wordwrap(value: Value, kwargs: Kwargs) -> Result<Value, Error> {
+    let s = value.as_str().unwrap_or_default();
+
+    // Extract kwargs with defaults
+    let width = kwargs.get::<Option<usize>>("width")?.unwrap_or(79);
+    let break_long_words = kwargs
+        .get::<Option<bool>>("break_long_words")?
+        .unwrap_or(true);
+    let break_on_hyphens = kwargs
+        .get::<Option<bool>>("break_on_hyphens")?
+        .unwrap_or(true);
+    let wrapstring = kwargs.get::<Option<&str>>("wrapstring")?.unwrap_or("\n");
+
+    let mut options = WrapOptions::new(width).break_words(break_long_words);
+
+    if break_on_hyphens {
+        options = options.word_splitter(WordSplitter::HyphenSplitter);
+    }
+
+    // Handle empty/whitespace-only input
+    if s.trim().is_empty() {
+        return Ok(Value::from(s));
+    }
+
+    // Split input into paragraphs on existing newlines
+    let paragraphs: Vec<&str> = s.split('\n').collect();
+
+    // Wrap each paragraph separately
+    let wrapped: Vec<String> = paragraphs
+        .iter()
+        .map(|&p| {
+            if p.trim().is_empty() {
+                // Preserve empty lines
+                String::new()
+            } else {
+                // Wrap the paragraph
+                wrap(p, &options).join(wrapstring)
+            }
+        })
+        .collect();
+
+    // Join paragraphs with newlines
+    Ok(Value::from(wrapped.join("\n")))
 }
