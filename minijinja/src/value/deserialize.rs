@@ -158,7 +158,7 @@ macro_rules! common_forward {
 }
 
 #[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
-impl<'de> IntoDeserializer<'de, Error> for Value {
+impl IntoDeserializer<'_, Error> for Value {
     type Deserializer = Value;
 
     fn into_deserializer(self) -> Value {
@@ -343,7 +343,7 @@ impl<'de> VariantAccess<'de> for VariantDeserializer {
 }
 
 #[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
-impl<'de, 'v> Deserializer<'de> for &'v Value {
+impl<'de> Deserializer<'de> for &Value {
     type Error = Error;
 
     #[inline]
