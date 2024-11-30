@@ -109,7 +109,7 @@ pub struct EnvironmentGuard<'reloader> {
     mutex_guard: MutexGuard<'reloader, Option<Environment<'static>>>,
 }
 
-impl<'reloader> Deref for EnvironmentGuard<'reloader> {
+impl Deref for EnvironmentGuard<'_> {
     type Target = Environment<'static>;
 
     fn deref(&self) -> &Self::Target {
