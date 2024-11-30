@@ -26,6 +26,7 @@ rand = ["dep:rand"]
 minijinja = { version = "2.5.0", path = "../minijinja", default-features = false }
 rand = { version = "0.8.5", optional = true, default-features = false, features = ["std", "std_rng", "small_rng"] }
 serde = "1.0.164"
+textwrap = "0.16.1"
 time = { version = "0.3.35", optional = true, features = ["serde", "formatting", "parsing"] }
 time-tz = { version = "1.0.3", features = ["db"], optional = true }
 
