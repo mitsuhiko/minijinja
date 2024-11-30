@@ -539,7 +539,7 @@ impl PartialEq for Value {
                                 if !a.try_iter_pairs().map_or(false, |mut ak| {
                                     ak.all(|(k, v1)| {
                                         a_count += 1;
-                                        b.get_value(&k).map_or(false, |v2| v1 == v2)
+                                        b.get_value(&k) == Some(v1)
                                     })
                                 }) {
                                     return false;

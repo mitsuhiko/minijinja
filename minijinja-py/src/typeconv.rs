@@ -257,7 +257,7 @@ pub fn to_python_args<'py>(
 
     if callback
         .getattr("__minijinja_pass_state__")
-        .map_or(false, |x| x.is_truthy().unwrap_or(false))
+        .is_ok_and(|x| x.is_truthy().unwrap_or(false))
     {
         py_args.push(Bound::new(py, StateRef)?.to_object(py));
     }
