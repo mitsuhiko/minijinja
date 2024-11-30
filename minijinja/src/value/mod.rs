@@ -390,7 +390,7 @@ impl<T: Copy> Clone for Packed<T> {
 
 /// Max size of a small str.
 ///
-/// Logic: Value is 24 bytes. 1 byte is for the disciminant. One byte is
+/// Logic: Value is 24 bytes. 1 byte is for the discriminant. One byte is
 /// needed for the small str length.
 const SMALL_STR_CAP: usize = 22;
 
