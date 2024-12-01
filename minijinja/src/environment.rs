@@ -61,13 +61,13 @@ pub struct Environment<'source> {
     recursion_limit: usize,
 }
 
-impl<'source> Default for Environment<'source> {
+impl Default for Environment<'_> {
     fn default() -> Self {
         Environment::empty()
     }
 }
 
-impl<'source> fmt::Debug for Environment<'source> {
+impl fmt::Debug for Environment<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Environment")
             .field("globals", &self.globals)
@@ -820,7 +820,7 @@ mod basic_store {
         map: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
     }
 
-    impl<'source> fmt::Debug for BasicStore<'source> {
+    impl fmt::Debug for BasicStore<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             BTreeMapKeysDebug(&self.map).fmt(f)
         }

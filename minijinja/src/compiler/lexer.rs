@@ -87,10 +87,7 @@ fn find_start_marker_memchr(a: &str) -> Option<(usize, StartMarker, usize, White
     let bytes = a.as_bytes();
     let mut offset = 0;
     loop {
-        let idx = match memchr(&bytes[offset..], b'{') {
-            Some(idx) => idx,
-            None => return None,
-        };
+        let idx = some!(memchr(&bytes[offset..], b'{'));
         let marker = match bytes.get(offset + idx + 1).copied() {
             Some(b'{') => StartMarker::Variable,
             Some(b'%') => StartMarker::Block,
@@ -530,10 +527,7 @@ impl<'s> Tokenizer<'s> {
         let s = self.advance(str_len + 2);
         Ok(if has_escapes {
             (
-                Token::String(match unescape(&s[1..s.len() - 1]) {
-                    Ok(unescaped) => unescaped,
-                    Err(err) => return Err(err),
-                }),
+                Token::String(ok!(unescape(&s[1..s.len() - 1]))),
                 self.span(old_loc),
             )
         } else {
