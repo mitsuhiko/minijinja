@@ -1,5 +1,5 @@
 use minijinja::{context, Environment};
-use minijinja_contrib::filters::{pluralize, wordcount, wordwrap};
+use minijinja_contrib::filters::{pluralize, wordcount};
 use similar_asserts::assert_eq;
 
 #[test]
@@ -269,7 +269,10 @@ fn test_wordcount() {
 }
 
 #[test]
+#[cfg(feature = "wordwrap")]
 fn test_wordwrap() {
+    use minijinja_contrib::filters::wordwrap;
+
     let mut env = minijinja::Environment::new();
     env.add_filter("wordwrap", wordwrap);
 

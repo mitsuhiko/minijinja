@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Added `sum` filter.  #648
 - Added `truncate` filter to `minijinja-contrib`.  #647
 - Added `wordcount` filter to `minijinja-contrib`.  #649
+- Added `wordwrap` filter to `minijinja-contrib`.  #651
 
 ## 2.5.0
 
