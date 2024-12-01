@@ -88,7 +88,7 @@ pub enum Stmt<'a> {
 }
 
 #[cfg(feature = "internal_debug")]
-impl<'a> fmt::Debug for Stmt<'a> {
+impl fmt::Debug for Stmt<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Stmt::Template(s) => fmt::Debug::fmt(s, f),
@@ -148,7 +148,7 @@ pub enum Expr<'a> {
 }
 
 #[cfg(feature = "internal_debug")]
-impl<'a> fmt::Debug for Expr<'a> {
+impl fmt::Debug for Expr<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Expr::Var(s) => fmt::Debug::fmt(s, f),
@@ -168,7 +168,7 @@ impl<'a> fmt::Debug for Expr<'a> {
     }
 }
 
-impl<'a> Expr<'a> {
+impl Expr<'_> {
     pub fn description(&self) -> &'static str {
         match self {
             Expr::Var(_) => "variable",
@@ -494,7 +494,7 @@ pub struct List<'a> {
     pub items: Vec<Expr<'a>>,
 }
 
-impl<'a> List<'a> {
+impl List<'_> {
     pub fn as_const(&self) -> Option<Value> {
         if !self.items.iter().all(|x| matches!(x, Expr::Const(_))) {
             return None;
@@ -518,7 +518,7 @@ pub struct Map<'a> {
     pub values: Vec<Expr<'a>>,
 }
 
-impl<'a> Map<'a> {
+impl Map<'_> {
     pub fn as_const(&self) -> Option<Value> {
         if !self.keys.iter().all(|x| matches!(x, Expr::Const(_)))
             || !self.values.iter().all(|x| matches!(x, Expr::Const(_)))

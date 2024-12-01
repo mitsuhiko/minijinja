@@ -15,7 +15,7 @@ pub(crate) struct DebugInfo {
 
 struct VarPrinter<'x>(&'x BTreeMap<String, Value>);
 
-impl<'x> fmt::Debug for VarPrinter<'x> {
+impl fmt::Debug for VarPrinter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.0.is_empty() {
             return f.write_str("No referenced variables");

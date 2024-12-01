@@ -55,7 +55,7 @@ pub struct Template<'env: 'source, 'source> {
     pub(crate) compiled: CompiledTemplateRef<'env, 'source>,
 }
 
-impl<'env, 'source> fmt::Debug for Template<'env, 'source> {
+impl fmt::Debug for Template<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("Template");
         ds.field("name", &self.name());
@@ -320,7 +320,7 @@ pub(crate) enum CompiledTemplateRef<'env: 'source, 'source> {
     Borrowed(&'env CompiledTemplate<'source>),
 }
 
-impl<'env, 'source> Deref for CompiledTemplateRef<'env, 'source> {
+impl<'source> Deref for CompiledTemplateRef<'_, 'source> {
     type Target = CompiledTemplate<'source>;
 
     fn deref(&self) -> &Self::Target {
@@ -345,7 +345,7 @@ pub struct CompiledTemplate<'source> {
     pub initial_auto_escape: AutoEscape,
 }
 
-impl<'env> fmt::Debug for CompiledTemplate<'env> {
+impl fmt::Debug for CompiledTemplate<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("CompiledTemplate");
         #[cfg(feature = "internal_debug")]

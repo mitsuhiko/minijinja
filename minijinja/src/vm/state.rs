@@ -57,7 +57,7 @@ pub struct State<'template, 'env> {
     pub(crate) fuel_tracker: Option<std::sync::Arc<FuelTracker>>,
 }
 
-impl<'template, 'env> fmt::Debug for State<'template, 'env> {
+impl fmt::Debug for State<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("State");
         ds.field("name", &self.instructions.name());

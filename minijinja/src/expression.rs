@@ -44,7 +44,7 @@ enum ExpressionBacking<'source> {
     Owned(crate::loader::OwnedInstructions),
 }
 
-impl<'env, 'source> fmt::Debug for Expression<'env, 'source> {
+impl fmt::Debug for Expression<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Expression")
             .field("env", &self.env)

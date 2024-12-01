@@ -31,7 +31,7 @@ pub(crate) struct LoaderStore<'source> {
     borrowed_templates: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
 }
 
-impl<'source> fmt::Debug for LoaderStore<'source> {
+impl fmt::Debug for LoaderStore<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut l = f.debug_list();
         for key in self.owned_templates.keys() {

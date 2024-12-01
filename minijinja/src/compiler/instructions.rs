@@ -438,11 +438,11 @@ impl<'source> Instructions<'source> {
 }
 
 #[cfg(feature = "internal_debug")]
-impl<'source> fmt::Debug for Instructions<'source> {
+impl fmt::Debug for Instructions<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         struct InstructionWrapper<'a>(usize, &'a Instruction<'a>, Option<usize>);
 
-        impl<'a> fmt::Debug for InstructionWrapper<'a> {
+        impl fmt::Debug for InstructionWrapper<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 ok!(write!(f, "{:>05} | {:?}", self.0, self.1,));
                 if let Some(line) = self.2 {
