@@ -39,7 +39,15 @@ where
 /// Opaque value type.
 #[repr(C)]
 pub struct mj_value {
-    _opaque: [usize; 3],
+    // Motivation on the size here: The size of `Value` is really not
+    // known and since cbindgen has no way to guarantee us a matching
+    // size we have to be creative.  The dominating type size wise is
+    // most likely going to be SmallStr which is a u8+[u8; 22] plus the
+    // enum discriminant (u8).
+    //
+    // We are going with u64 here for alignment reasons which is likely
+    // to be a good default across platforms.
+    _opaque: [u64; 3],
 }
 
 impl mj_value {
@@ -51,7 +59,7 @@ impl mj_value {
 impl From<Value> for mj_value {
     fn from(value: Value) -> Self {
         mj_value {
-            _opaque: unsafe { transmute::<Value, [usize; 3]>(value) },
+            _opaque: unsafe { transmute::<Value, [u64; 3]>(value) },
         }
     }
 }
@@ -327,7 +335,7 @@ ffi_fn! {
 }
 
 ffi_fn! {
-    /// Looks up an element by a vaue
+    /// Looks up an element by a value
     unsafe fn mj_value_get_by_value(_scope, value: mj_value, key: mj_value) -> mj_value {
         value.get_item(&key as &Value).unwrap_or_default().into()
     }

@@ -63,7 +63,7 @@ impl<'env> Frame<'env> {
 }
 
 #[cfg(feature = "internal_debug")]
-impl<'env> fmt::Debug for Frame<'env> {
+impl fmt::Debug for Frame<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut m = f.debug_map();
         m.entry(&"locals", &self.locals);
@@ -109,7 +109,11 @@ impl Stack {
         self.values[start..].reverse();
     }
 
-    pub fn slice_top(&mut self, n: usize) -> &[Value] {
+    pub fn get_call_args(&mut self, n: Option<u16>) -> &[Value] {
+        let n = match n {
+            Some(n) => n as usize,
+            None => self.pop().as_usize().unwrap(),
+        };
         &self.values[self.values.len() - n..]
     }
 
@@ -139,7 +143,7 @@ pub(crate) struct Context<'env> {
     recursion_limit: usize,
 }
 
-impl<'env> fmt::Debug for Context<'env> {
+impl fmt::Debug for Context<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fn dump<'a>(
             m: &mut std::fmt::DebugMap,

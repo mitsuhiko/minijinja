@@ -16,7 +16,7 @@ turned on with the `unicode` feature to achieve parity with Jinja2.
 
 The biggest differences between MiniJinja and Jinja2 stem from the different
 runtime environments.  Jinja2 leaks out a lot of the underlying Python engine
-whereas MiniJinja implements it's own runtime data model.
+whereas MiniJinja implements its own runtime data model.
 
 The most significant differences are documented here:
 
@@ -135,12 +135,11 @@ useful.
 
 ### `{% continue %}`
 
-`continue` is not supported. You can, however, filter a sequence during
-iteration to skip items.
+`continue` is supported only if the `loop_controls` feature is enabled.
 
 ### `{% break %}`
 
-`break` is not supported.
+`break` is supported only if the `loop_controls` feature is enabled.
 
 ## Expressions
 
@@ -157,4 +156,12 @@ are available in MiniJinja or behave the same.
 ## Filters
 
 MiniJinja supports many common Jinja2 filters but leaves out some.  For instance
-some string formatting filters like `|xmlattr` or `|urlize` are missing.
+some string formatting filters like `|xmlattr` or `|urlize` are missing.  Additionally
+some filters do not support all the same arguments or only support some arguments
+as positional ones.
+
+It's a soft goal to increase the number of filters that are supported and to
+match the behavior of Jinja2 as close as possible but there are some situations
+where it might be acceptable to deviate.  For instance there are some filters
+which in Jinja2 support an `attribute` argument.  Most of those filters currently
+do not support that argument in MiniJinja.

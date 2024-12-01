@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
-use minijinja::value::Value;
+use minijinja::value::{Kwargs, Value, ValueKind};
+use minijinja::State;
 use minijinja::{Error, ErrorKind};
 
 #[cfg(feature = "datetime")]
@@ -59,7 +60,7 @@ pub fn pluralize(v: Value, singular: Option<Value>, plural: Option<Value>) -> Re
     }
 }
 
-/// Choses a random element from a sequence or string.
+/// Chooses a random element from a sequence or string.
 ///
 /// The random number generated can be seeded with the `RAND_SEED`
 /// global context variable.
@@ -120,4 +121,181 @@ pub fn filesizeformat(value: f64, binary: Option<bool>) -> String {
         }
         unreachable!();
     }
+}
+
+/// Returns a truncated copy of the string.
+///
+/// The string will be truncated to the specified length, with an ellipsis
+/// appended if truncation occurs. By default, the filter tries to preserve
+/// whole words.
+///
+/// ```jinja
+/// {{ "Hello World"|truncate(length=5) }}
+/// ```
+///
+/// The filter accepts a few keyword arguments:
+/// * `length`: maximum length of the output string (defaults to 255)
+/// * `killwords`: set to `true` if you want to cut text exactly at length; if `false`,
+///   the filter will preserve last word (defaults to `false`)
+/// * `end`: if you want a specific ellipsis sign you can specify it (defaults to "...")
+/// * `leeway`: determines the tolerance margin before truncation occurs (defaults to 5)
+///
+/// The truncation only occurs if the string length exceeds both the specified
+/// length and the leeway margin combined. This means that if a string is just
+/// slightly longer than the target length (within the leeway value), it will
+/// be left unmodified.
+///
+/// When `killwords` is set to false (default behavior), the function ensures
+/// that words remain intact by finding the last complete word that fits within
+/// the length limit. This prevents words from being cut in the middle and
+/// maintains text readability.
+///
+/// The specified length parameter is inclusive of the end string (ellipsis).
+/// For example, with a length of 5 and the default ellipsis "...", only 2
+/// characters from the original string will be preserved.
+///
+/// # Example with all attributes
+/// ```jinja
+/// {{ "Hello World"|truncate(
+///     length=5,
+///     killwords=true,
+///     end='...',
+///     leeway=2
+/// ) }}
+/// ```
+pub fn truncate(state: &State, value: Value, kwargs: Kwargs) -> Result<String, Error> {
+    if matches!(value.kind(), ValueKind::None | ValueKind::Undefined) {
+        return Ok("".into());
+    }
+
+    let s = value.as_str().ok_or_else(|| {
+        Error::new(
+            ErrorKind::InvalidOperation,
+            format!("expected string, got {}", value.kind()),
+        )
+    })?;
+
+    let length = kwargs.get::<Option<usize>>("length")?.unwrap_or(255);
+    let killwords = kwargs.get::<Option<bool>>("killwords")?.unwrap_or_default();
+    let end = kwargs.get::<Option<&str>>("end")?.unwrap_or("...");
+    let leeway = kwargs.get::<Option<usize>>("leeway")?.unwrap_or_else(|| {
+        state
+            .lookup("TRUNCATE_LEEWAY")
+            .and_then(|x| usize::try_from(x.clone()).ok())
+            .unwrap_or(5)
+    });
+
+    kwargs.assert_all_used()?;
+
+    let end_len = end.chars().count();
+    if length < end_len {
+        return Err(Error::new(
+            ErrorKind::InvalidOperation,
+            format!("expected length >= {}, got {}", end_len, length),
+        ));
+    }
+
+    if s.chars().count() <= length + leeway {
+        return Ok(s.to_string());
+    }
+
+    let trunc_pos = length - end_len;
+    let truncated = if killwords {
+        s.chars().take(trunc_pos).collect::<String>()
+    } else {
+        let chars: Vec<char> = s.chars().take(trunc_pos).collect();
+        match chars.iter().rposition(|&c| c == ' ') {
+            Some(last_space) => chars[..last_space].iter().collect(),
+            None => chars.iter().collect(),
+        }
+    };
+    let mut result = String::with_capacity(truncated.len() + end.len());
+    result.push_str(&truncated);
+    result.push_str(end);
+    Ok(result)
+}
+
+/// Counts the words in a string.
+///
+/// ```jinja
+/// {{ "Hello world!"|wordcount }}
+/// ```
+pub fn wordcount(value: Value) -> Result<Value, Error> {
+    let s = value.as_str().unwrap_or_default();
+    let mut count: u32 = 0;
+    let mut in_word = false;
+
+    // Iterate through characters, counting transitions from non-word to word chars
+    for c in s.chars() {
+        let is_word_char = c.is_alphanumeric() || c == '_';
+        if is_word_char && !in_word {
+            count += 1;
+            in_word = true;
+        } else if !is_word_char {
+            in_word = false;
+        }
+    }
+
+    Ok(Value::from(count))
+}
+
+/// Wrap a string to the given width.
+///
+/// By default this filter is not unicode aware (feature = `wordwrap`) but when the unicode
+/// feature is enabled (`unicode_wordwrap`) then it becomes so.  It's implemented on top of
+/// the `textwrap` crate.
+///
+/// **Keyword arguments:**
+///
+/// - `width`: Maximum length of wrapped lines (default: 79)
+/// - `break_long_words`: If a word is longer than width, break it across lines (default: true)
+/// - `break_on_hyphens`: If a word contains hyphens, it may be split across lines (default: true)
+/// - `wrapstring`: String to join each wrapped line (default: newline)
+#[cfg(feature = "wordwrap")]
+#[cfg_attr(docsrs, doc(any(cfg(feature = "wordwrap"), cfg = "unicode_wordwrap")))]
+pub fn wordwrap(value: Value, kwargs: Kwargs) -> Result<Value, Error> {
+    use textwrap::{wrap, Options as WrapOptions, WordSplitter};
+    let s = value.as_str().unwrap_or_default();
+
+    let width = kwargs.get::<Option<usize>>("width")?.unwrap_or(79);
+    let break_long_words = kwargs
+        .get::<Option<bool>>("break_long_words")?
+        .unwrap_or(true);
+    let break_on_hyphens = kwargs
+        .get::<Option<bool>>("break_on_hyphens")?
+        .unwrap_or(true);
+    let wrapstring = kwargs.get::<Option<&str>>("wrapstring")?.unwrap_or("\n");
+    kwargs.assert_all_used()?;
+
+    let mut options = WrapOptions::new(width).break_words(break_long_words);
+
+    if break_on_hyphens {
+        options = options.word_splitter(WordSplitter::HyphenSplitter);
+    }
+
+    // Handle empty/whitespace-only input
+    if s.trim().is_empty() {
+        return Ok(Value::from(""));
+    }
+
+    // Process paragraphs sequentially into final string
+    Ok(Value::from(s.lines().enumerate().fold(
+        String::new(),
+        |mut acc, (i, p)| {
+            if i > 0 {
+                acc.push_str(wrapstring);
+            }
+            if !p.trim().is_empty() {
+                // Wrap the paragraph and join with wrapstring
+                let wrapped = wrap(p, &options);
+                for (j, line) in wrapped.iter().enumerate() {
+                    if j > 0 {
+                        acc.push_str(wrapstring);
+                    }
+                    acc.push_str(line);
+                }
+            }
+            acc
+        },
+    )))
 }

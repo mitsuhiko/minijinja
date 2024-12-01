@@ -108,7 +108,7 @@ pub enum AutoEscape {
 ///
 /// At present there are three types of behaviors available which mirror the behaviors
 /// that Jinja2 provides out of the box.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum UndefinedBehavior {
     /// The default, somewhat lenient undefined behavior.
@@ -116,6 +116,7 @@ pub enum UndefinedBehavior {
     /// * **printing:** allowed (returns empty string)
     /// * **iteration:** allowed (returns empty array)
     /// * **attribute access of undefined values:** fails
+    #[default]
     Lenient,
     /// Like `Lenient`, but also allows chaining of undefined lookups.
     ///
@@ -129,12 +130,6 @@ pub enum UndefinedBehavior {
     /// * **iteration:** fails
     /// * **attribute access of undefined values:** fails
     Strict,
-}
-
-impl Default for UndefinedBehavior {
-    fn default() -> UndefinedBehavior {
-        UndefinedBehavior::Lenient
-    }
 }
 
 impl UndefinedBehavior {
@@ -192,7 +187,7 @@ impl UndefinedBehavior {
 /// Helper to HTML escape a string.
 pub struct HtmlEscape<'a>(pub &'a str);
 
-impl<'a> fmt::Display for HtmlEscape<'a> {
+impl fmt::Display for HtmlEscape<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         #[cfg(feature = "v_htmlescape")]
         {
@@ -324,7 +319,7 @@ pub fn unescape(s: &str) -> Result<String, Error> {
 
 pub struct BTreeMapKeysDebug<'a, K: fmt::Debug, V>(pub &'a BTreeMap<K, V>);
 
-impl<'a, K: fmt::Debug, V> fmt::Debug for BTreeMapKeysDebug<'a, K, V> {
+impl<K: fmt::Debug, V> fmt::Debug for BTreeMapKeysDebug<'_, K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.0.iter().map(|x| x.0)).finish()
     }

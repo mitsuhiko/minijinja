@@ -281,7 +281,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_divisibleby(v: Value, other: Value) -> bool {
-        match coerce(&v, &other) {
+        match coerce(&v, &other, false) {
             Some(CoerceResult::I128(a, b)) => (a % b) == 0,
             Some(CoerceResult::F64(a, b)) => (a % b) == 0.0,
             _ => false,
@@ -307,13 +307,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_integer(v: Value) -> bool {
-        matches!(
-            v.0,
-            crate::value::ValueRepr::U64(_)
-                | crate::value::ValueRepr::I64(_)
-                | crate::value::ValueRepr::U128(_)
-                | crate::value::ValueRepr::I128(_)
-        )
+        v.is_integer()
     }
 
     /// Checks if this value is a float
@@ -374,8 +368,8 @@ mod builtins {
     /// Checks if the value is starting with a string.
     ///
     /// ```jinja
-    /// {{ "foobar" is startingwith("foo") }} -> true
-    /// {{ "foobar" is startingwith("bar") }} -> false
+    /// {{ "foobar" is startingwith "foo" }} -> true
+    /// {{ "foobar" is startingwith "bar" }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_startingwith(v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
@@ -385,8 +379,8 @@ mod builtins {
     /// Checks if the value is ending with a string.
     ///
     /// ```jinja
-    /// {{ "foobar" is endingwith("bar") }} -> true
-    /// {{ "foobar" is endingwith("foo") }} -> false
+    /// {{ "foobar" is endingwith "bar" }} -> true
+    /// {{ "foobar" is endingwith "foo" }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_endingwith(v: Cow<'_, str>, other: Cow<'_, str>) -> bool {
@@ -570,6 +564,36 @@ mod builtins {
     #[cfg(feature = "builtins")]
     pub fn is_upper(name: &str) -> bool {
         name.chars().all(|x| x.is_uppercase())
+    }
+
+    /// Checks if two values are identical.
+    ///
+    /// This primarily exists for compatibilith with Jinja2.  It can be seen as a much
+    /// stricter comparison than a regular comparison.  The main difference is that
+    /// values that have the same structure but a different internal object will not
+    /// compare equal.
+    ///
+    /// ```jinja
+    /// {{ [1, 2, 3] is sameas [1, 2, 3] }}
+    ///     -> false
+    ///
+    /// {{ false is sameas false }}
+    ///     -> true
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    #[cfg(feature = "builtins")]
+    pub fn is_sameas(value: &Value, other: &Value) -> bool {
+        match (value.as_object(), other.as_object()) {
+            (Some(a), Some(b)) => a.is_same_object(b),
+            (None, Some(_)) | (Some(_), None) => false,
+            (None, None) => {
+                if value.kind() != other.kind() || value.is_integer() != other.is_integer() {
+                    false
+                } else {
+                    value == other
+                }
+            }
+        }
     }
 }
 

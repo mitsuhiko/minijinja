@@ -2,8 +2,65 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.6.0
+
+- Added `sum` filter.  #648
+- Added `truncate` filter to `minijinja-contrib`.  #647
+- Added `wordcount` filter to `minijinja-contrib`.  #649
+- Added `wordwrap` filter to `minijinja-contrib`.  #651
+
+## 2.5.0
+
+- `minijinja-cli` now supports preservation of order in maps.  #611
+- Fixed an issue where CBOR was not correctly deserialized in
+  `minijinja-cli`.  #611
+- Added a `lines` filter to split a string into lines.
+- Bytes are now better supported in MiniJinja.  They can be created from
+  `Value::from_bytes` without having to go via serde, and they are now
+  producing a nicer looking debug output.  #616
+- Added the missing `string` filter from Jinja2.  #617
+- Reversing bytes and convergint them implicitly to strings will now work
+  more consistently.  #619
+- Added type hints for the Python binding and relaxed maturin constraint.  #590
+- `minijinja-cli` now allows the template name to be set to an empty
+  string when `--template` is used, to allow suppliying a data file.  #624
+- Added the missing `sameas` filter from Jinja2.  #625
+- Tests can now support one argument without parentheses like in Jinja2
+  (`1 is sameas 1`).  #626
+- Added error context for strict undefined errors during template
+  rendering.  #627
+- Syntax errors caused by the lexer now include the correct position of
+  the error.  #630
+- `minijinja-cli` now has all features enabled by default as documented
+  (that means also shell completion and ini).  #633
+- `minijinja-cli` now does not convert INI files to lowercase anymore.  This was
+  an unintended behavior.  #633
+- Moved up MSRV to 1.63.0 due to indexmap.  #635
+- Added argument splatting support (`*args` for variable args and `**kwargs`
+  for keyword arguments) and fixed a bug where sometimes maps and keyword
+  arguments were created in inverse order.  #642
+
+## 2.4.0
+
+- Updated version of `minijinja-cli` with support for better documentation,
+  config file and environment variable support.  #602
+- `minijinja-cli` now supports template source passed by parameter for
+  simple cases.  #606
+- `minijinja-cli` now has a `--syntax-help` argument that prints out the
+  primer on the syntax.  #607
+- `minijinja-cli` now installs to `~/.local/bin` by default.  #608
+- Made the c-bindings compatible with wasm compilation.  #603
+- `String`/`Cow<str>` argument types will no longer implicitly convert
+  keyword arguments to string form.  This was an unintended foot gun.  #605
+
+## 2.3.1
+
+- Fixes a regression in `PartialEq` / `Eq` in `Value` caused by changes
+  in 2.3.0.  #584
+
 ## 2.3.0
 
+- Fixes some compiler warnings in Rust 1.81.  #575
 - Fixes incorrect ordering of maps when the keys of those maps
   were not in consistent order.  #569
 - Implemented the missing `groupby` filter.  #570
@@ -11,6 +68,10 @@ All notable changes to MiniJinja are documented here.
   Jinja2 and supports an optional flag to make it case sensitive.
   It also now lets one check individual attributes instead of
   values.  #571
+- Changed sort order of `Ord` to avoid accidentally non total order
+  that could cause panics on Rust 1.81.  #579
+- Added a `Value::is_integer` method to allow a user to tell floats
+  and true integers apart.  #580
 
 ## 2.2.0
 
@@ -79,9 +140,9 @@ All notable changes to MiniJinja are documented here.
 ## 2.0.0
 
 This is a major update to MiniJinja that changes a lot of core internals and
-cleans up some APIs.  In particular it resolves somes limitations in the engine
+cleans up some APIs.  In particular it resolves some limitations in the engine
 in relation to working with dynamic objects, unlocks potentials for future
-performance improvments and enhancements.
+performance improvements and enhancements.
 
 It's very likely that you will need to do changes to your code when upgrading,
 particular when implementing dynamic objects.  In short:
@@ -193,7 +254,7 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
   includes or extends from paths not explicitly allowlisted.  #432
 - Added support for `Error::display_debug_info` which displays just the
   debug info, same way as alternative display on the error does.  #420
-- Added the `namspace()` function from Jinja2 and the ability to assign
+- Added the `namespace()` function from Jinja2 and the ability to assign
   to it via `{% set %}`.  #422
 - `minijinja-autoreload` now supports `on_should_reload_callback` which
   lets one register a callback to be called just before an auto reload

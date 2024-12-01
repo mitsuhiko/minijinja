@@ -20,7 +20,7 @@ test-msrv:
 	@cd minijinja; cargo test --all-features
 
 .PHONY: test
-test: test-msrv
+test: test-msrv test-cli
 	@echo "CARGO TEST MINIJINJA-CONTRIB ALL FEATURES"
 	@cd minijinja-contrib; cargo test --all-features
 
@@ -31,6 +31,10 @@ wasi-test:
 .PHONY: python-test
 python-test:
 	@make -C minijinja-py
+
+.PHONY: python-type-check
+python-type-check:
+	@make -C minijinja-py type-check
 
 .PHONY: snapshot-tests
 snapshot-tests:

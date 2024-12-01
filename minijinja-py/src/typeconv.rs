@@ -187,7 +187,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
     // conversion.  That means that when passing the object back to Python we
     // extract the retained raw Python reference.
     if let Some(pyobj) = value.downcast_object_ref::<DynamicObject>() {
-        return Ok(pyobj.inner.clone());
+        return Ok(pyobj.inner.clone_ref(py));
     }
 
     if let Some(obj) = value.as_object() {
@@ -257,7 +257,7 @@ pub fn to_python_args<'py>(
 
     if callback
         .getattr("__minijinja_pass_state__")
-        .map_or(false, |x| x.is_truthy().unwrap_or(false))
+        .is_ok_and(|x| x.is_truthy().unwrap_or(false))
     {
         py_args.push(Bound::new(py, StateRef)?.to_object(py));
     }

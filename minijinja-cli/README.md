@@ -3,11 +3,13 @@
 [![Build Status](https://github.com/mitsuhiko/minijinja/workflows/Tests/badge.svg?branch=main)](https://github.com/mitsuhiko/minijinja/actions?query=workflow%3ATests)
 [![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
 [![Crates.io](https://img.shields.io/crates/d/minijinja-cli.svg)](https://crates.io/crates/minijinja-cli)
-[![rustc 1.61.0](https://img.shields.io/badge/rust-1.61%2B-orange.svg)](https://img.shields.io/badge/rust-1.61%2B-orange.svg)
+[![rustc 1.63.0](https://img.shields.io/badge/rust-1.63%2B-orange.svg)](https://img.shields.io/badge/rust-1.63%2B-orange.svg)
 
-`minijinja-cli` is a command line executable that uses 
+`minijinja-cli` is a command line executable that uses
 [MiniJinja](https://github.com/mitsuhiko/minijinja) to render Jinja2 templates
 directly from the command line to stdout.
+
+## Installation methods
 
 You can install binaries automatically with the shell installer:
 
@@ -15,13 +17,26 @@ You can install binaries automatically with the shell installer:
 curl -sSfL https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-installer.sh | sh
 ```
 
+This script detects what platform you're on and fetches an appropriate archive from GitHub
+then unpacks the binaries and installs them to the first of the following locations:
+
+* `$MINIJINJA_CLI_INSTALL_DIR/bin`
+* `~/.local/bin`
+
+To influence where it installs, you can set the `MINIJINJA_CLI_INSTALL_DIR` environment variable.
+
 Or download a binary manually:
 
 - [aarch64-apple-darwin](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-aarch64-apple-darwin.tar.xz) (Apple Silicon macOS)
 - [x86_64-apple-darwin](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-apple-darwin.tar.xz) (Intel macOS)
 - [x86_64-pc-windows-msvc](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-pc-widows-msvc.zip) (x64 Windows)
+- [i686-pc-windows-msvc](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-i686-pc-widows-msvc.zip) (x86 Windows)
 - [x86_64-unknown-linux-gnu](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-unknown-linux-gnu.tar.xz) (x64 Linux, GNU)
 - [x86_64-unknown-linux-musl](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-unknown-linux-musl.tar.xz) (x64 Linux, MUSL)
+- [i686-unknown-linux-gnu](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-i686-unknown-linux-gnu.tar.xz) (x86 Linux, GNU)
+- [i686-unknown-linux-musl](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-i686-unknown-linux-musl.tar.xz) (x86 Linux, MUSL)
+- [aarch64-unknown-linux-gnu](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-aarch64-unknown-linux-gnu.tar.xz) (ARM64 Linux, GNU)
+- [aarch64-unknown-linux-musl](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-aarch64-unknown-linux-musl.tar.xz) (ARM64 Linux, MUSL)
 
 You can also compile it yourself with `cargo`:
 
@@ -35,83 +50,31 @@ And then run like this:
 minijinja-cli my-template.j2 data.json
 ```
 
-## Arguments
+## Unofficial installation methods
+
+You can also install it with [Homebrew](https://brew.sh/)
+
+```
+brew install minijinja-cli
+```
+
+## Arguments and Options
 
 `minijinja-cli` has two positional arguments to refer to files.  Either one of them can
 be set to `-` to read from stdin.  This is the default for the template, but only one
 can be set to stdin at once.
 
-- `[TEMPLATE]`:
+- `[TEMPLATE_FILE]`:
     the first argument is the filename of the template.  If not provided it defaults
     to `-` which means it loads the template from stdin.
-- `[DATA]`:
+- `[DATA_FILE]`:
     the second argument is the path to the data file.  This is a file which holds
     input variables that should be rendered.  Various file formats are supported.
     When data is read from `stdin`, `--format` must be specified as auto detection
     is based on file extensions.
 
-## Options
-
-- `-f`, `--format` `<FORMAT>`:
-    this defines the input format of the data file.  The default is `auto` which
-    turns on auto detection based on the file extension.  For the supported formats
-    see the next section.
-- `-a`, `--autoescape` `<MODE>`:
-    picks an auto escape mode.  The default is auto detection (`auto`) based on
-    file extension.  The options are `none` to disable escaping, `html` to
-    enable HTML/XML escaping, `json` to enable JSON (YAML compatible)
-    serialization.
-- `-D`, `--define` `<EXPR>`:
-    defines a variable from an expression.  The supported formats are `NAME` to define
-    the variable `NAME` with the value `true`, `NAME=VALUE` to define the variable
-    `NAME` with the value `VALUE` as string or `NAME:=VALUE` to set the variable `NAME`
-    to the YAML interpreted value `VALUE`.  When YAML support is not enabled, `:=`
-    only supports JSON.
-- `--strict`:
-    enables strict mode.  Undefined variables will then error upon rendering.
-- `--no-include`:
-    disallows including or extending of templates from the file system.
-- `--no-newline`:
-    Do not output a trailing newline
-- `--trim-blocks`:
-    Enable the trim_blocks flag
-- `--lstrip-blocks`:
-    Enable the lstrip_blocks flag
-- `--py-compat`:
-    Enables improved Python compatibility.  Enabling this adds methods such as
-    `dict.keys` and some others.
-- `-s`, `--syntax <PAIR>`:
-    Changes a syntax feature (feature=value) [possible features: `block-start`, `block-end`, `variable-start`, `variable-end`, `comment-start`, `comment-end`, `line-statement-prefix`, `line-statement-comment`]
-- `--safe-path <PATH>`:
-    Only allow includes from this path. Can be used multiple times.
-- `--env`:
-    passes the environment variables to the template in the variable `ENV`
-- `-E`, `--expr` `<EXPR>`:
-    rather than rendering a template, evaluates an expression instead.  What happens
-    with the result is determined by `--expr-out`.
-- `--expr-out` `<MODE>`:
-    sets the expression output mode.  The default is `print`.  `print` just prints
-    the expression output, `json` emits it as JSON serialized value and
-    `status` hides the output but reports it as exit status.  `true` converts to `0`
-    and `false` converts to `1`.  Numeric results are returned unchanged.
-- `--fuel` `<AMOUNT>`:
-    sets the maximum fuel for the engine.  When the engine runs out of fuel it will error.
-- `--repl`:
-    spawns an interactive read-eval print loop for MiniJinja expressions.
-- `--dump` `<KIND>`:
-    prints internals of the template.  Possible options are `tokens` to see the output
-    of the tokenizer, `ast` to see the AST after parsing, and `instructions` to inspect
-    the compiled bytecode.
-- `-o`, `--output` `<FILENAME>`:
-    writes the output to a filename rather than stdout.
-- `--select` `<SELECTOR>`:
-    select a path of the input data.
-- `--generate-completion` `<SHELL>`:
-    generate the completions for the given shell.
-- `--version`:
-    prints the version.
-- `--help`:
-    prints the help.
+MiniJinja supports a wide range of options, too long to mention here.  For the full help
+use `--long-help` or `--help` for a brief summary.
 
 ## Formats
 
@@ -122,7 +85,7 @@ The following formats are supported:
 - `toml` (`*.toml`): TOML
 - `cbor` (`*.cbor`): CBOR
 - `querystring` (`*.qs`): URL encoded query strings
-- `ini` (`*.ini`, `*.config`, `*.properties`): text only INI files
+- `ini` (`*.ini`, `*.conf`, `*.config`, `*.properties`): text only INI files
 
 For most formats there is a pretty straightforward mapping into the template
 context.  The only exception to this is currently INI files where sections are
@@ -130,11 +93,20 @@ effectively mandatory.  If keys are placed in the unnamed section, the second
 is renamed to `default`.  You can use `--select` to make a section be implied:
 
 ```
-minijinja-cli template.j2 input.ini --section default
+minijinja-cli template.j2 input.ini --select default
 ```
 
 Note that not all formats support all input types.  For instance querystring
 and INI will only support strings for the most part.
+
+## Config File
+
+The config file is in TOML format.  By default the file in `~/.minijinja.toml` is loaded
+but an alternative path can be supplied with the `--config-file` command line argument
+or the `MINIJINJA_CONFIG_FILE` environment variable.
+
+To see what the config file looks like, invoke `minijinja-cli --print-config` which will
+print out the current loaded config as TOML (including defaults).
 
 ## Selecting
 
@@ -160,6 +132,12 @@ Render a template with a string and integer variable:
 
 ```
 minijinja-cli template.j2 -D name=World -D count:=3
+```
+
+Render a template string:
+
+```
+minijinja-cli -t "Hello {{ name }}" -D name=World
 ```
 
 Render a template with variables from stdin:
@@ -206,7 +184,7 @@ By default all features are enabled.  The following features can be explicitly
 selected when the defaults are turned off:
 
 * `yaml`: enables YAML support
-* `toml`: enables TOML support
+* `toml`: enables TOML support (required for `--config-file` support)
 * `cbor`: enables CBOR support
 * `json5`: enables JSON5 support (instead of JSON)
 * `querystring`: enables querystring support
@@ -215,6 +193,7 @@ selected when the defaults are turned off:
 * `completions`: enables the generation of completions
 * `unicode`: enables the unicode identifier support
 * `contrib`: enables the `minijinja_contrib` based functionality including the `--py-compat` flag
+* `preserve_order`: enables order preservation for maps
 
 Additionally if the `ASSET_OUT_DIR` environment variable is set during
 compilation manpage (and optionally completions) are generated into that

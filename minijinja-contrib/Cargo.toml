@@ -1,6 +1,6 @@
 [package]
 name = "minijinja-contrib"
-version = "2.2.0"
+version = "2.5.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
@@ -9,7 +9,7 @@ homepage = "https://github.com/mitsuhiko/minijinja"
 repository = "https://github.com/mitsuhiko/minijinja"
 keywords = ["jinja", "jinja2", "templates"]
 readme = "README.md"
-rust-version = "1.61"
+rust-version = "1.63"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
@@ -21,16 +21,19 @@ pycompat = ["minijinja/builtins"]
 datetime = ["time"]
 timezone = ["time-tz"]
 rand = ["dep:rand"]
+wordwrap = ["textwrap"]
+unicode_wordwrap = ["wordwrap", "textwrap/unicode-linebreak", "textwrap/unicode-width"]
 
 [dependencies]
-minijinja = { version = "2.2.0", path = "../minijinja", default-features = false }
+minijinja = { version = "2.5.0", path = "../minijinja", default-features = false }
 rand = { version = "0.8.5", optional = true, default-features = false, features = ["std", "std_rng", "small_rng"] }
 serde = "1.0.164"
+textwrap = { version = "0.16.1", optional = true, default-features = false, features = ["smawk"] }
 time = { version = "0.3.35", optional = true, features = ["serde", "formatting", "parsing"] }
 time-tz = { version = "1.0.3", features = ["db"], optional = true }
 
 [dev-dependencies]
 insta = { version = "1.38.0", features = ["glob", "serde"] }
 chrono = { version = "0.4.26", features = ["serde"] }
-minijinja = { version = "2.2.0", path = "../minijinja", features = ["loader"] }
+minijinja = { version = "2.5.0", path = "../minijinja", features = ["loader"] }
 similar-asserts = "1.4.2"

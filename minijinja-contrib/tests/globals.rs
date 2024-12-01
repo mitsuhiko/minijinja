@@ -45,7 +45,9 @@ joiner: {{ j }}"), @r###"
 
 #[test]
 #[cfg(feature = "rand")]
+#[cfg(target_pointer_width = "64")]
 fn test_lispum() {
+    // The small rng is pointer size specific.  Test on 64bit platforms only
     use minijinja_contrib::globals::lipsum;
 
     let mut env = Environment::new();

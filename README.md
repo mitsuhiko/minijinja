@@ -5,7 +5,7 @@
 [![Build Status](https://github.com/mitsuhiko/minijinja/workflows/Tests/badge.svg?branch=main)](https://github.com/mitsuhiko/minijinja/actions?query=workflow%3ATests)
 [![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
 [![Crates.io](https://img.shields.io/crates/d/minijinja.svg)](https://crates.io/crates/minijinja)
-[![rustc 1.61.0](https://img.shields.io/badge/rust-1.61%2B-orange.svg)](https://img.shields.io/badge/rust-1.61%2B-orange.svg)
+[![rustc 1.63.0](https://img.shields.io/badge/rust-1.63%2B-orange.svg)](https://img.shields.io/badge/rust-1.63%2B-orange.svg)
 [![Documentation](https://docs.rs/minijinja/badge.svg)](https://docs.rs/minijinja)
 
 </div>
@@ -26,7 +26,7 @@ ecosystem of editor integrations.
 ```
 $ cargo tree
 minimal v0.1.0 (/Users/mitsuhiko/Development/minijinja/examples/minimal)
-└── minijinja v2.2.0 (/Users/mitsuhiko/Development/minijinja/minijinja)
+└── minijinja v2.5.0 (/Users/mitsuhiko/Development/minijinja/minijinja)
 ```
 
 Additionally minijinja is also available as an (optionally pre-compiled) command line executable
@@ -104,6 +104,8 @@ the engine is used so you can see how it's utilized:
 * Data and Processing:
   * **[Cube](https://cube.dev/docs/product/data-modeling/dynamic/jinja)** uses it [for data modelling](https://github.com/cube-js/cube/tree/db11c121c77c663845242366d3d972b9bc30ae54/packages/cubejs-backend-native/src/template/mj_value)
   * **[PRQL](https://prql-lang.org/)** uses it [to handle DBT style pipelines](https://github.com/PRQL/prql/blob/59fb3cc4b9b6c9e195c928b1ba1134e2c5706ea3/prqlc/prqlc/src/cli/jinja.rs#L21)
+  * **[qsv](https://qsv.dathere.com)** uses it [to render templates from CSV files](https://github.com/jqnatividad/qsv/blob/master/src/cmd/template.rs#L2) and to [construct payloads to post to web services](https://github.com/jqnatividad/qsv/blob/master/src/cmd/fetchpost.rs#L3).
+
 
 ## Getting Help
 
@@ -129,21 +131,13 @@ These are related template engines for Rust:
 
 * [Askama](https://crates.io/crates/askama): Jinja inspired, type-safe, requires template
   precompilation. Has significant divergence from Jinja syntax in parts.
+* [Rinja](https://crates.io/crates/rinja): Jinja inspired, type-safe, requires template
+  precompilation. Has significant divergence from Jinja syntax in parts.
 * [Tera](https://crates.io/crates/tera): Jinja inspired, dynamic, has divergences from Jinja.
 * [TinyTemplate](https://crates.io/crates/tinytemplate): minimal footprint template engine
   with syntax that takes lose inspiration from Jinja and handlebars.
 * [Liquid](https://crates.io/crates/liquid): an implementation of Liquid templates for Rust.
   Liquid was inspired by Django from which Jinja took it's inspiration.
-
-## Upgrading from MiniJinja 1.x
-
-There are two major versions of MiniJinja both of which are currently maintained.  Most users should
-upgrade to 2.x which has a much improved object system.  However if you have been using dynamic
-objects in the past the upgrade might be quite involved.  For upgrade informations refer to
-[UPDATING](UPDATING.md) which has a guide with examples of what the changes between the two engine
-versions are.
-
-To see examples and code from MiniJinja 1.x, you can browse the [minijinja-1.x branch](https://github.com/mitsuhiko/minijinja/tree/minijinja-1.x).
 
 ## Sponsor
 
@@ -157,4 +151,5 @@ sponsor](https://github.com/sponsors/mitsuhiko).
 - [Examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
 - [Issue Tracker](https://github.com/mitsuhiko/minijinja/issues)
 - [MiniJinja Playground](https://mitsuhiko.github.io/minijinja-playground/)
+- [Updating Guide](UPDATING.md)
 - License: [Apache-2.0](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)

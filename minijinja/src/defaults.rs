@@ -73,6 +73,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::Boxe
         rv.insert("trim".into(), BoxedFilter::new(filters::trim));
         rv.insert("join".into(), BoxedFilter::new(filters::join));
         rv.insert("split".into(), BoxedFilter::new(filters::split));
+        rv.insert("lines".into(), BoxedFilter::new(filters::lines));
         rv.insert("default".into(), BoxedFilter::new(filters::default));
         rv.insert("round".into(), BoxedFilter::new(filters::round));
         rv.insert("abs".into(), BoxedFilter::new(filters::abs));
@@ -86,9 +87,11 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::Boxe
         rv.insert("sort".into(), BoxedFilter::new(filters::sort));
         rv.insert("d".into(), BoxedFilter::new(filters::default));
         rv.insert("list".into(), BoxedFilter::new(filters::list));
+        rv.insert("string".into(), BoxedFilter::new(filters::string));
         rv.insert("bool".into(), BoxedFilter::new(filters::bool));
         rv.insert("batch".into(), BoxedFilter::new(filters::batch));
         rv.insert("slice".into(), BoxedFilter::new(filters::slice));
+        rv.insert("sum".into(), BoxedFilter::new(filters::sum));
         rv.insert("indent".into(), BoxedFilter::new(filters::indent));
         rv.insert("select".into(), BoxedFilter::new(filters::select));
         rv.insert("reject".into(), BoxedFilter::new(filters::reject));
@@ -141,6 +144,7 @@ pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
         rv.insert("endingwith".into(), BoxedTest::new(tests::is_endingwith));
         rv.insert("lower".into(), BoxedTest::new(tests::is_lower));
         rv.insert("upper".into(), BoxedTest::new(tests::is_upper));
+        rv.insert("sameas".into(), BoxedTest::new(tests::is_sameas));
 
         // operators
         let is_eq = BoxedTest::new(tests::is_eq);

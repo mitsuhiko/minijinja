@@ -103,11 +103,13 @@ impl<'a> TokenStream<'a> {
     /// Tokenize a template
     pub fn new(
         source: &'a str,
+        filename: &'a str,
         in_expr: bool,
         syntax_config: SyntaxConfig,
         whitespace_config: WhitespaceConfig,
     ) -> TokenStream<'a> {
-        let mut tokenizer = Tokenizer::new(source, in_expr, syntax_config, whitespace_config);
+        let mut tokenizer =
+            Tokenizer::new(source, filename, in_expr, syntax_config, whitespace_config);
         let current = tokenizer.next_token().transpose();
         TokenStream {
             tokenizer,
@@ -229,19 +231,58 @@ macro_rules! with_recursion_guard {
 }
 
 impl<'a> Parser<'a> {
+    /// Creates a new parser.
+    ///
+    /// `in_expr` is necessary to parse within an expression context.  Otherwise
+    /// the parser starts out in template context.  This means that when
+    /// [`parse`](Self::parse) is to be called, the `in_expr` argument must be
+    /// `false` and for [`parse_standalone_expr`](Self::parse_standalone_expr)
+    /// it must be `true`.
     pub fn new(
         source: &'a str,
+        filename: &'a str,
         in_expr: bool,
         syntax_config: SyntaxConfig,
         whitespace_config: WhitespaceConfig,
     ) -> Parser<'a> {
         Parser {
-            stream: TokenStream::new(source, in_expr, syntax_config, whitespace_config),
+            stream: TokenStream::new(source, filename, in_expr, syntax_config, whitespace_config),
             in_macro: false,
             in_loop: false,
             blocks: BTreeSet::new(),
             depth: 0,
         }
+    }
+
+    /// Parses a template.
+    pub fn parse(&mut self) -> Result<ast::Stmt<'a>, Error> {
+        let span = self.stream.last_span();
+        self.subparse(&|_| false)
+            .map(|children| {
+                ast::Stmt::Template(Spanned::new(
+                    ast::Template { children },
+                    self.stream.expand_span(span),
+                ))
+            })
+            .map_err(|err| self.attach_location_to_error(err))
+    }
+
+    /// Parses an expression and asserts that there is no more input after it.
+    pub fn parse_standalone_expr(&mut self) -> Result<ast::Expr<'a>, Error> {
+        self.parse_expr()
+            .and_then(|result| {
+                if ok!(self.stream.next()).is_some() {
+                    syntax_error!("unexpected input after expression")
+                } else {
+                    Ok(result)
+                }
+            })
+            .map_err(|err| self.attach_location_to_error(err))
+    }
+
+    /// Returns the current filename.
+    pub fn filename(&self) -> &str {
+        self.stream.tokenizer.filename()
     }
 
     fn parse_ifexpr(&mut self) -> Result<ast::Expr<'a>, Error> {
@@ -460,6 +501,29 @@ impl<'a> Parser<'a> {
                         expect_token!(self, Token::Ident(name) => name, "identifier");
                     let args = if matches_token!(self, Token::ParenOpen) {
                         ok!(self.parse_args())
+                    } else if matches_token!(
+                        self,
+                        Token::Ident(_)
+                            | Token::Str(_)
+                            | Token::String(_)
+                            | Token::Int(_)
+                            | Token::Int128(_)
+                            | Token::Float(_)
+                            | Token::Plus
+                            | Token::Minus
+                            | Token::BracketOpen
+                            | Token::BraceOpen
+                    ) && !matches_token!(
+                        self,
+                        Token::Ident("and")
+                            | Token::Ident("or")
+                            | Token::Ident("else")
+                            | Token::Ident("is")
+                    ) {
+                        let span = self.stream.current_span();
+                        let mut expr = ok!(self.parse_unary_only());
+                        expr = ok!(self.parse_postfix(expr, span));
+                        vec![ast::CallArg::Pos(expr)]
                     } else {
                         Vec::new()
                     };
@@ -483,49 +547,76 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn parse_args(&mut self) -> Result<Vec<ast::Expr<'a>>, Error> {
+    fn parse_args(&mut self) -> Result<Vec<ast::CallArg<'a>>, Error> {
         let mut args = Vec::new();
         let mut first_span = None;
-        let mut kwargs = Vec::new();
+        let mut has_kwargs = false;
+
+        enum ArgType {
+            Regular,
+            Splat,
+            KwargsSplat,
+        }
 
         expect_token!(self, Token::ParenOpen, "`(`");
         loop {
             if skip_token!(self, Token::ParenClose) {
                 break;
             }
-            if !args.is_empty() || !kwargs.is_empty() {
+            if !args.is_empty() || has_kwargs {
                 expect_token!(self, Token::Comma, "`,`");
                 if skip_token!(self, Token::ParenClose) {
                     break;
                 }
             }
+
+            let arg_type = if skip_token!(self, Token::Pow) {
+                ArgType::KwargsSplat
+            } else if skip_token!(self, Token::Mul) {
+                ArgType::Splat
+            } else {
+                ArgType::Regular
+            };
+
             let expr = ok!(self.parse_expr());
 
-            // keyword argument
-            match expr {
-                ast::Expr::Var(ref var) if skip_token!(self, Token::Assign) => {
-                    if first_span.is_none() {
-                        first_span = Some(var.span());
+            match arg_type {
+                ArgType::Regular => {
+                    // keyword argument
+                    match expr {
+                        ast::Expr::Var(ref var) if skip_token!(self, Token::Assign) => {
+                            if first_span.is_none() {
+                                first_span = Some(var.span());
+                            }
+                            has_kwargs = true;
+                            args.push(ast::CallArg::Kwarg(var.id, ok!(self.parse_expr_noif())));
+                        }
+                        _ if has_kwargs => {
+                            return Err(syntax_error(Cow::Borrowed(
+                                "non-keyword arg after keyword arg",
+                            )));
+                        }
+                        _ => {
+                            args.push(ast::CallArg::Pos(expr));
+                        }
                     }
-                    kwargs.push((var.id, ok!(self.parse_expr_noif())));
                 }
-                _ if !kwargs.is_empty() => {
-                    return Err(syntax_error(Cow::Borrowed(
-                        "non-keyword arg after keyword arg",
-                    )));
+                ArgType::Splat => {
+                    args.push(ast::CallArg::PosSplat(expr));
                 }
-                _ => {
-                    args.push(expr);
+                ArgType::KwargsSplat => {
+                    args.push(ast::CallArg::KwargSplat(expr));
+                    has_kwargs = true;
                 }
             }
-        }
 
-        if !kwargs.is_empty() {
-            args.push(ast::Expr::Kwargs(ast::Spanned::new(
-                ast::Kwargs { pairs: kwargs },
-                self.stream.expand_span(first_span.unwrap()),
-            )));
-        };
+            // Set an arbitrary limit of max function parameters.  This is done
+            // in parts because the opcodes can only express 2**16 as argument
+            // count.
+            if args.len() > 2000 {
+                syntax_error!("Too many arguments in function call")
+            }
+        }
 
         Ok(args)
     }
@@ -645,11 +736,11 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    pub fn parse_expr(&mut self) -> Result<ast::Expr<'a>, Error> {
+    fn parse_expr(&mut self) -> Result<ast::Expr<'a>, Error> {
         with_recursion_guard!(self, self.parse_ifexpr())
     }
 
-    pub fn parse_expr_noif(&mut self) -> Result<ast::Expr<'a>, Error> {
+    fn parse_expr_noif(&mut self) -> Result<ast::Expr<'a>, Error> {
         self.parse_or()
     }
 
@@ -1152,49 +1243,33 @@ impl<'a> Parser<'a> {
         Ok(rv)
     }
 
-    pub fn parse(&mut self) -> Result<ast::Stmt<'a>, Error> {
-        let span = self.stream.last_span();
-        Ok(ast::Stmt::Template(Spanned::new(
-            ast::Template {
-                children: ok!(self.subparse(&|_| false)),
-            },
-            self.stream.expand_span(span),
-        )))
+    #[inline]
+    fn attach_location_to_error(&mut self, mut err: Error) -> Error {
+        if err.line().is_none() {
+            err.set_filename_and_span(self.filename(), self.stream.last_span())
+        }
+        err
     }
 }
 
 /// Parses a template.
 pub fn parse<'source>(
     source: &'source str,
-    filename: &str,
+    filename: &'source str,
     syntax_config: SyntaxConfig,
     whitespace_config: WhitespaceConfig,
 ) -> Result<ast::Stmt<'source>, Error> {
-    let mut parser = Parser::new(source, false, syntax_config, whitespace_config);
-    parser.parse().map_err(|mut err| {
-        if err.line().is_none() {
-            err.set_filename_and_span(filename, parser.stream.last_span())
-        }
-        err
-    })
+    Parser::new(source, filename, false, syntax_config, whitespace_config).parse()
 }
 
-/// Parses an expression
+/// Parses a standalone expression.
 pub fn parse_expr(source: &str) -> Result<ast::Expr<'_>, Error> {
-    let mut parser = Parser::new(source, true, Default::default(), Default::default());
-    parser
-        .parse_expr()
-        .and_then(|result| {
-            if ok!(parser.stream.next()).is_some() {
-                syntax_error!("unexpected input after expression")
-            } else {
-                Ok(result)
-            }
-        })
-        .map_err(|mut err| {
-            if err.line().is_none() {
-                err.set_filename_and_span("<expression>", parser.stream.last_span())
-            }
-            err
-        })
+    Parser::new(
+        source,
+        "<expression>",
+        true,
+        Default::default(),
+        Default::default(),
+    )
+    .parse_standalone_expr()
 }

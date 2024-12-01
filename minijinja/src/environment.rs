@@ -59,13 +59,13 @@ pub struct Environment<'source> {
     recursion_limit: usize,
 }
 
-impl<'source> Default for Environment<'source> {
+impl Default for Environment<'_> {
     fn default() -> Self {
         Environment::empty()
     }
 }
 
-impl<'source> fmt::Debug for Environment<'source> {
+impl fmt::Debug for Environment<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Environment")
             .field("globals", &self.globals)
@@ -139,7 +139,7 @@ impl<'source> Environment<'source> {
     ///
     /// Note that there are situations where the interface of this method is
     /// too restrictive as you need to hold on to the strings for the lifetime
-    /// of the environment.
+    /// of the environment.  This methodl fails if the template has a syntax error.
     #[cfg_attr(
         feature = "loader",
         doc = "To address this restriction use [`add_template_owned`](Self::add_template_owned)."
@@ -160,7 +160,7 @@ impl<'source> Environment<'source> {
     /// ```
     ///
     /// **Note**: the name is a bit of a misnomer as this API also allows to borrow too as
-    /// the parameters are actually [`Cow`].
+    /// the parameters are actually [`Cow`].  This method fails if the template has a syntax error.
     #[cfg(feature = "loader")]
     #[cfg_attr(docsrs, doc(cfg(feature = "loader")))]
     pub fn add_template_owned<N, S>(&mut self, name: N, source: S) -> Result<(), Error>
@@ -818,7 +818,7 @@ mod basic_store {
         map: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
     }
 
-    impl<'source> fmt::Debug for BasicStore<'source> {
+    impl fmt::Debug for BasicStore<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             BTreeMapKeysDebug(&self.map).fmt(f)
         }

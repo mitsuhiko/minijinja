@@ -294,7 +294,7 @@ mod builtins {
 
     use crate::error::ErrorKind;
     use crate::utils::splitn_whitespace;
-    use crate::value::ops::as_f64;
+    use crate::value::ops::{self, as_f64};
     use crate::value::{Enumerator, Kwargs, Object, ObjectRepr, ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::cmp::Ordering;
@@ -527,35 +527,26 @@ mod builtins {
         }
 
         let joiner = joiner.as_ref().unwrap_or(&Cow::Borrowed(""));
-
-        if let Some(s) = val.as_str() {
-            let mut rv = String::new();
-            for c in s.chars() {
-                if !rv.is_empty() {
-                    rv.push_str(joiner);
-                }
-                rv.push(c);
-            }
-            Ok(rv)
-        } else if let Some(iter) = val.as_object().and_then(|x| x.try_iter()) {
-            let mut rv = String::new();
-            for item in iter {
-                if !rv.is_empty() {
-                    rv.push_str(joiner);
-                }
-                if let Some(s) = item.as_str() {
-                    rv.push_str(s);
-                } else {
-                    write!(rv, "{item}").ok();
-                }
-            }
-            Ok(rv)
-        } else {
-            Err(Error::new(
+        let iter = ok!(val.try_iter().map_err(|err| {
+            Error::new(
                 ErrorKind::InvalidOperation,
                 format!("cannot join value of type {}", val.kind()),
-            ))
+            )
+            .with_source(err)
+        }));
+
+        let mut rv = String::new();
+        for item in iter {
+            if !rv.is_empty() {
+                rv.push_str(joiner);
+            }
+            if let Some(s) = item.as_str() {
+                rv.push_str(s);
+            } else {
+                write!(rv, "{item}").ok();
+            }
         }
+        Ok(rv)
     }
 
     /// Split a string into its substrings, using `split` as the separator string.
@@ -585,6 +576,20 @@ mod builtins {
             (None, Some(n)) => Box::new(splitn_whitespace(s, n).map(Value::from)),
             (Some(split), Some(n)) => Box::new(s.splitn(n, split as &str).map(Value::from)),
         })
+    }
+
+    /// Splits a string into lines.
+    ///
+    /// The newline character is removed in the process and not retained.  This
+    /// function supports both Windows and UNIX style newlines.
+    ///
+    /// ```jinja
+    /// {{ "foo\nbar\nbaz"|lines }}
+    ///     -> ["foo", "bar", "baz"]
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn lines(s: Arc<str>) -> Value {
+        Value::from_iter(s.lines().map(|x| x.to_string()))
     }
 
     /// If the value is undefined it will return the passed default value,
@@ -679,13 +684,38 @@ mod builtins {
                 .map(Value::from)
                 .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
             ValueRepr::Invalid(_) => value.validate(),
-            _ => as_f64(&value).map(Value::from).ok_or_else(|| {
+            _ => as_f64(&value, true).map(Value::from).ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
                     format!("cannot convert {} to float", value.kind()),
                 )
             }),
         }
+    }
+
+    /// Sums up all the values in a sequence.
+    ///
+    /// ```jinja
+    /// {{ range(10)|sum }} -> 45
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn sum(state: &State, values: Value) -> Result<Value, Error> {
+        let mut rv = Value::from(0);
+        let iter = ok!(state.undefined_behavior().try_iter(values));
+        for value in iter {
+            if value.is_undefined() {
+                ok!(state.undefined_behavior().handle_undefined(false));
+                continue;
+            } else if !value.is_number() {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("can only sum numbers, got {}", value.kind()),
+                ));
+            }
+            rv = ok!(ops::add(&rv, &value));
+        }
+
+        Ok(rv)
     }
 
     /// Looks up an attribute.
@@ -859,6 +889,18 @@ mod builtins {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
         Ok(Value::from(iter.collect::<Vec<_>>()))
+    }
+
+    /// Converts a value into a string if it's not one already.
+    ///
+    /// If the string has been marked as safe, that value is preserved.
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn string(value: Value) -> Value {
+        if value.kind() == ValueKind::String {
+            value
+        } else {
+            value.to_string().into()
+        }
     }
 
     /// Converts the value into a boolean value.
@@ -1068,7 +1110,7 @@ mod builtins {
     /// ```jinja
     /// example:
     ///   config:
-    /// {{ global_conifg|indent(2) }}          # does not indent first line
+    /// {{ global_config|indent(2) }}          # does not indent first line
     /// {{ global_config|indent(2,true) }}     # indent whole Value with two spaces
     /// {{ global_config|indent(2,true,true)}} # indent whole Value and all blank lines
     /// ```
@@ -1367,7 +1409,7 @@ mod builtins {
     /// The attribute can use dot notation for nested access, like `"address.city"``.
     /// The values are sorted first so only one group is returned for each unique value.
     /// The attribute can be passed as first argument or as keyword argument named
-    /// `atttribute`.
+    /// `attribute`.
     ///
     /// For example, a list of User objects with a city attribute can be
     /// rendered in groups. In this example, grouper refers to the city value of

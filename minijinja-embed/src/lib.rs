@@ -59,8 +59,8 @@ use std::path::Path;
 /// # }
 /// ```
 ///
-/// To embed diffent folders, alternative bundle names can be provided.
-/// Also tempaltes can be filtered down by extension to avoid accidentally
+/// To embed different folders, alternative bundle names can be provided.
+/// Also templates can be filtered down by extension to avoid accidentally
 /// including unexpected templates.
 ///
 /// ```rust

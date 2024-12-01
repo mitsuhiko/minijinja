@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
 use std::sync::Arc;
 
-use insta::assert_snapshot;
+use insta::{assert_debug_snapshot, assert_snapshot};
 use similar_asserts::assert_eq;
 
-use minijinja::value::{DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value};
-use minijinja::{args, render, Environment, Error};
+use minijinja::value::{DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value, ValueKind};
+use minijinja::{args, context, render, Environment, Error, ErrorKind};
 
 #[test]
 fn test_sort() {
@@ -69,13 +69,13 @@ fn test_sort_different_types() {
     [
         undefined,
         none,
+        false,
+        true,
         -inf,
         -100,
         -75.0,
         -50.0,
-        false,
         0,
-        true,
         1,
         30,
         80,
@@ -1052,4 +1052,171 @@ fn test_map_eq() {
     assert_snapshot!(t1.to_string(), @r###"{"a": 1, "b": 2}"###);
     assert_snapshot!(t2.to_string(), @r###"{"b": 2, "a": 1}"###);
     assert_eq!(t1, t2);
+}
+
+#[test]
+fn test_float_eq() {
+    let a = Value::from(2i128.pow(53));
+    let b = Value::from(2.0f64.powf(53.0));
+    assert_eq!(a, b);
+    let xa = Value::from(i64::MAX as i128);
+    let xb = Value::from(i64::MAX as f64);
+    assert_ne!(xa, xb);
+}
+
+#[test]
+fn test_eq_regression() {
+    // merged objects used to not have a length.  let's make sure that they have
+    let vars = context! {};
+    let new_vars = context! {..vars.clone()};
+    assert_eq!(vars.len(), Some(0));
+    assert_eq!(new_vars.len(), Some(0));
+    assert_eq!(&vars, &new_vars);
+
+    // we also want to make sure that objects with unknown lengths are properly checked.
+    #[derive(Debug)]
+    struct MadMap;
+
+    impl Object for MadMap {
+        fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+            match key.as_str()? {
+                "a" => Some(Value::from(1)),
+                "b" => Some(Value::from(2)),
+                _ => None,
+            }
+        }
+
+        fn enumerate(self: &Arc<Self>) -> Enumerator {
+            let mut idx = 0;
+            Enumerator::Iter(Box::new(std::iter::from_fn(move || {
+                let new_idx = {
+                    idx += 1;
+                    idx
+                };
+                match new_idx {
+                    1 => Some(Value::from("a")),
+                    2 => Some(Value::from("b")),
+                    _ => None,
+                }
+            })))
+        }
+    }
+
+    let normal_map = context! {
+        a => 1,
+        b => 2
+    };
+    let mad_map = Value::from_object(MadMap);
+    assert_eq!(mad_map.len(), None);
+    assert_eq!(mad_map, normal_map);
+    assert_eq!(normal_map, mad_map);
+    assert_ne!(
+        mad_map,
+        context! {
+            a => 1,
+            b => 2,
+            c => 3,
+        }
+    );
+    assert_ne!(
+        mad_map,
+        context! {
+            a => 1,
+        }
+    );
+}
+
+#[test]
+fn test_sorting() {
+    let mut values = vec![
+        Value::from(-f64::INFINITY),
+        Value::from(1.0),
+        Value::from(f64::NAN),
+        Value::from(f64::INFINITY),
+        Value::from(42.0),
+        Value::from(41),
+        Value::from(128),
+        Value::from(-2),
+        Value::from(-5.0),
+        Value::from(32i32),
+        Value::from(true),
+        Value::from(false),
+        Value::from(vec![1, 2, 3]),
+        Value::from(vec![1, 2, 3, 4]),
+        Value::from(vec![1]),
+        Value::from("whatever"),
+        Value::from("floats"),
+        Value::from("the"),
+        Value::from("boat"),
+        Value::UNDEFINED,
+        Value::from(()),
+        Value::from(Error::new(ErrorKind::InvalidOperation, "shit hit the fan")),
+    ];
+    values.sort();
+    assert_debug_snapshot!(&values, @r###"
+    [
+        undefined,
+        none,
+        false,
+        true,
+        -inf,
+        -5.0,
+        -2,
+        1.0,
+        32,
+        41,
+        42.0,
+        128,
+        inf,
+        NaN,
+        "boat",
+        "floats",
+        "the",
+        "whatever",
+        [
+            1,
+        ],
+        [
+            1,
+            2,
+            3,
+        ],
+        [
+            1,
+            2,
+            3,
+            4,
+        ],
+        <invalid value: invalid operation: shit hit the fan>,
+    ]
+    "###);
+}
+
+#[test]
+fn test_bytes() {
+    let bytes = vec![1u8, 2, 3, 4];
+    let byte_value = Value::from_bytes(bytes);
+    assert_eq!(byte_value.kind(), ValueKind::Bytes);
+    assert!(byte_value.try_iter().is_err());
+    assert_eq!(format!("{:?}", byte_value), "b'\\x01\\x02\\x03\\x04'");
+    assert_eq!(byte_value.get_item_by_index(0).ok(), Some(Value::from(1)));
+    assert_eq!(
+        byte_value.reverse().ok(),
+        Some(Value::from_bytes(vec![4, 3, 2, 1]))
+    );
+    assert_eq!(
+        render!("{{ x[1:-1] }}", x => Value::from_bytes(vec![1, 76, 65, 4])),
+        "LA"
+    );
+
+    let bytes = vec![1u8, 2, 3, 4];
+    let not_byte_value = Value::from(bytes);
+    assert_eq!(not_byte_value.kind(), ValueKind::Seq);
+    assert!(not_byte_value.try_iter().is_ok());
+    assert_eq!(format!("{:?}", not_byte_value), "[1, 2, 3, 4]");
+
+    assert_eq!(
+        format!("{:?}", Value::from_bytes((&b"'foo\""[..]).into())),
+        "b'\\'foo\"'"
+    );
 }

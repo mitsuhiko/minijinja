@@ -34,46 +34,60 @@ struct Context {
     title: &'static str,
 }
 
-impl Default for Context {
-    fn default() -> Self {
-        Self {
-            items: vec![
-                "<First Item>".into(),
-                "<Second Item>".into(),
-                "<Third Item>".into(),
-                "<Fourth Item>".into(),
-                "<Fifth Item>".into(),
-                "<Sixth Item>".into(),
-            ],
-            site: Site {
-                nav: vec![
-                    NavItem {
-                        url: "/",
-                        title: "Index",
-                        is_active: true,
+#[derive(Serialize, Debug, rinja::Template)]
+#[template(path = "comparison/askama.html")]
+struct RinjaContext {
+    items: Vec<String>,
+    site: Site,
+    title: &'static str,
+}
+
+macro_rules! default_context {
+    ($($ty:ident),+) => {
+        $(impl Default for $ty {
+            fn default() -> Self {
+                Self {
+                    items: vec![
+                        "<First Item>".into(),
+                        "<Second Item>".into(),
+                        "<Third Item>".into(),
+                        "<Fourth Item>".into(),
+                        "<Fifth Item>".into(),
+                        "<Sixth Item>".into(),
+                    ],
+                    site: Site {
+                        nav: vec![
+                            NavItem {
+                                url: "/",
+                                title: "Index",
+                                is_active: true,
+                            },
+                            NavItem {
+                                url: "/download",
+                                title: "Download",
+                                is_active: false,
+                            },
+                            NavItem {
+                                url: "/about",
+                                title: "About",
+                                is_active: false,
+                            },
+                            NavItem {
+                                url: "/help",
+                                title: "Help",
+                                is_active: false,
+                            },
+                        ],
+                        copyright: 2022,
                     },
-                    NavItem {
-                        url: "/download",
-                        title: "Download",
-                        is_active: false,
-                    },
-                    NavItem {
-                        url: "/about",
-                        title: "About",
-                        is_active: false,
-                    },
-                    NavItem {
-                        url: "/help",
-                        title: "Help",
-                        is_active: false,
-                    },
-                ],
-                copyright: 2022,
-            },
-            title: "My Benchmark Site",
-        }
+                    title: "My Benchmark Site",
+                }
+            }
+        })+
     }
 }
+
+default_context!(Context, RinjaContext);
 
 pub fn bench_compare_compile(c: &mut Criterion) {
     let mut g = c.benchmark_group("cmp_compile");
@@ -196,6 +210,13 @@ pub fn bench_compare_render(c: &mut Criterion) {
         b.iter(|| {
             hbs.render("template.html", &black_box(Context::default()))
                 .unwrap();
+        });
+    });
+
+    g.bench_function("rinja", |b| {
+        b.iter(|| {
+            let context = black_box(RinjaContext::default());
+            rinja::Template::render(&context).unwrap();
         });
     });
 

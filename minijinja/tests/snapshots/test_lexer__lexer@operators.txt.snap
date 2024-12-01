@@ -1,14 +1,12 @@
 ---
 source: minijinja/tests/test_lexer.rs
-description: "{{ (!a + b) * (c - d) / e % f // g ~ h }}"
+description: "{{ (a + b) * (c - d) / e % f // g ~ h }}"
 input_file: minijinja/tests/lexer-inputs/operators.txt
 ---
 VariableStart
   "{{"
 ParenOpen
   "("
-Bang
-  "!"
 Ident("a")
   "a"
 Plus
@@ -47,4 +45,3 @@ Ident("h")
   "h"
 VariableEnd
   "}}"
-

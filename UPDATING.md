@@ -1,7 +1,7 @@
 # Updating to MiniJinja 2
 
 MiniJinja 2.0 is a major update to MiniJinja that changes a lot of core
-internals and cleans up some APIs.  In particular it resolves somes limitations
+internals and cleans up some APIs.  In particular it resolves some limitations
 in the engine in relation to working with dynamic objects, unlocks potentials
 for future performance improvements and enhancements.  This document helps with
 upgrading to that version.
@@ -93,12 +93,12 @@ In a nutshell:
 
 When working with objects of an unknown type, you can use the new `DynObject`
 struct which is a type erased box over `Arc<Object>`.  `Value::as_object` now
-returns an `Option<&DynObject>` compared to previosly an `Option<&dyn Object>`
+returns an `Option<&DynObject>` compared to previously an `Option<&dyn Object>`
 as an example.  The `DynObject` can be cheaply cloned which bumps the reference
 count.
 
 On the value type, the object related APIs were changed a bit to better
-accomodate for the new trait:
+accommodate for the new trait:
 
 * `Value::as_struct` was removed, use `Value::as_object` instead.
 * `Value::as_seq` was removed, use `Value::as_object` instead.
@@ -206,7 +206,7 @@ let value = Value::from_seq_object(SimpleDynamicSeq(...));
 Because the default object representation is a `Map`, we need to
 change it to `ObjectRepr::seq` in the `repr` method.  As sequences
 iterate over their values, we can use the convenient `Enumerator::Seq`
-enumerator which instructs the engine to sequentually iterate over
+enumerator which instructs the engine to sequentially iterate over
 the object from `0` to the given `length`.  Otherwise the interface
 is the same as with the map above, which means that rather than
 implementing `get_item` you now also implement `get_value` which
@@ -313,7 +313,7 @@ impl Object for Markdown {
 
 ## Stack Ref
 
-The old `minijinja-stack-ref` module was removed as it can no longer accomodate the
+The old `minijinja-stack-ref` module was removed as it can no longer accommodate the
 new object model.  However that module largely is no longer useful as the new object
 system is powerful enough to support it _for the most part_.  While it's not possible
 any more to return references to objects on the stack, you can now trivially work with

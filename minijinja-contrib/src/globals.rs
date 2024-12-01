@@ -53,7 +53,7 @@ pub fn cycler(items: Vec<Value>) -> Result<Value, Error> {
         ) -> Result<Value, Error> {
             match method {
                 "next" => {
-                    from_args(args)?;
+                    let () = from_args(args)?;
                     let idx = self.pos.load(Ordering::Relaxed);
                     self.pos
                         .store((idx + 1) % self.items.len(), Ordering::Relaxed);
@@ -107,7 +107,7 @@ pub fn joiner(sep: Option<Value>) -> Value {
         }
 
         fn call(self: &Arc<Self>, _state: &State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
-            from_args(args)?;
+            let () = from_args(args)?;
             let used = self.used.swap(true, Ordering::Relaxed);
             if used {
                 Ok(self.sep.clone())

@@ -35,7 +35,7 @@ typedef enum mj_err_kind {
   MJ_ERR_KIND_UNKNOWN_METHOD,
   MJ_ERR_KIND_BAD_ESCAPE,
   MJ_ERR_KIND_UNDEFINED_ERROR,
-  KJ_ERROR_KIND_BAD_SERIALIZTION,
+  MJ_ERROR_KIND_BAD_SERIALIZTION,
   MJ_ERR_KIND_BAD_INCLUDE,
   MJ_ERR_KIND_EVAL_BLOCK,
   MJ_ERR_KIND_CANNOT_UNPACK,
@@ -92,7 +92,7 @@ typedef struct mj_value_iter mj_value_iter;
  Opaque value type.
  */
 typedef struct mj_value {
-  uintptr_t _opaque[3];
+  uint64_t _opaque[3];
 } mj_value;
 
 /*
@@ -288,7 +288,7 @@ MINIJINJA_API struct mj_value mj_value_get_by_index(struct mj_value value, uint6
 MINIJINJA_API struct mj_value mj_value_get_by_str(struct mj_value value, const char *key);
 
 /*
- Looks up an element by a vaue
+ Looks up an element by a value
  */
 MINIJINJA_API struct mj_value mj_value_get_by_value(struct mj_value value, struct mj_value key);
 

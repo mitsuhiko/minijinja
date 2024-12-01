@@ -183,10 +183,28 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //!
 //! It's generally recommende to ignore the existence of invalid objects and let them
 //! fail naturally as they are encountered.
+//!
+//! # Notes on Bytes and Strings
+//!
+//! Usually one would pass strings to templates as Jinja is entirely based on string
+//! rendering.  However there are situations where it can be useful to pass bytes instead.
+//! As such MiniJinja allows a value type to carry bytes even though there is no syntax
+//! within the template language to create a byte literal.
+//!
+//! When rendering bytes as strings, MiniJinja will attempt to interpret them as
+//! lossy utf-8.  This is a bit different to Jinja2 which in Python 3 stopped
+//! rendering byte strings as strings.  This is an intentional change that was
+//! deemed acceptable given how infrequently bytes are used but how relatively
+//! commonly bytes are often holding "almost utf-8" in templates.  Most
+//! conversions to strings also will do almost the same.  The debug rendering of
+//! bytes however is different and bytes are not iterable.  Like strings however
+//! they can be sliced and indexed, but they will be sliced by bytes and not by
+//! characters.
 
 // this module is based on the content module in insta which in turn is based
 // on the content module in serde::private::ser.
 
+use core::str;
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -385,7 +403,7 @@ impl<T: Copy> Clone for Packed<T> {
 
 /// Max size of a small str.
 ///
-/// Logic: Value is 24 bytes. 1 byte is for the disciminant. One byte is
+/// Logic: Value is 24 bytes. 1 byte is for the discriminant. One byte is
 /// needed for the small str length.
 const SMALL_STR_CAP: usize = 22;
 
@@ -452,7 +470,17 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
             ValueRepr::SmallStr(val) => fmt::Debug::fmt(val.as_str(), f),
-            ValueRepr::Bytes(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Bytes(val) => {
+                write!(f, "b'")?;
+                for &b in val.iter() {
+                    if b == b'"' {
+                        write!(f, "\"")?
+                    } else {
+                        write!(f, "{}", b.escape_ascii())?;
+                    }
+                }
+                write!(f, "'")
+            }
             ValueRepr::Object(val) => val.render(f),
         }
     }
@@ -476,7 +504,7 @@ impl Hash for Value {
                 if let Ok(val) = i64::try_from(self.clone()) {
                     val.hash(state)
                 } else {
-                    as_f64(self).map(|x| x.to_bits()).hash(state)
+                    as_f64(self, true).map(|x| x.to_bits()).hash(state)
                 }
             }
         }
@@ -495,7 +523,7 @@ impl PartialEq for Value {
             (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a == b,
             (ValueRepr::SmallStr(a), ValueRepr::SmallStr(b)) => a.as_str() == b.as_str(),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
-            _ => match ops::coerce(self, other) {
+            _ => match ops::coerce(self, other, false) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
@@ -506,12 +534,34 @@ impl PartialEq for Value {
                         }
                         match (a.repr(), b.repr()) {
                             (ObjectRepr::Map, ObjectRepr::Map) => {
-                                if a.enumerator_len() != b.enumerator_len() {
+                                // only if we have known lengths can we compare the enumerators
+                                // ahead of time.  This function has a fallback for when a
+                                // map has an unknown length.  That's generally a bad idea, but
+                                // it makes sense supporting regardless as silent failures are
+                                // not a lot of fun.
+                                let mut need_length_fallback = true;
+                                if let (Some(a_len), Some(b_len)) =
+                                    (a.enumerator_len(), b.enumerator_len())
+                                {
+                                    if a_len != b_len {
+                                        return false;
+                                    }
+                                    need_length_fallback = false;
+                                }
+                                let mut a_count = 0;
+                                if !a.try_iter_pairs().map_or(false, |mut ak| {
+                                    ak.all(|(k, v1)| {
+                                        a_count += 1;
+                                        b.get_value(&k) == Some(v1)
+                                    })
+                                }) {
                                     return false;
                                 }
-                                a.try_iter_pairs().map_or(false, |mut ak| {
-                                    ak.all(|(k, v1)| b.get_value(&k).map_or(false, |v2| v1 == v2))
-                                })
+                                if !need_length_fallback {
+                                    true
+                                } else {
+                                    a_count == b.try_iter().map_or(0, |x| x.count())
+                                }
                             }
                             (
                                 ObjectRepr::Seq | ObjectRepr::Iterable,
@@ -553,44 +603,52 @@ fn f64_total_cmp(left: f64, right: f64) -> Ordering {
 
 impl Ord for Value {
     fn cmp(&self, other: &Self) -> Ordering {
-        let value_ordering = match (&self.0, &other.0) {
+        let kind_ordering = self.kind().cmp(&other.kind());
+        if matches!(kind_ordering, Ordering::Less | Ordering::Greater) {
+            return kind_ordering;
+        }
+        match (&self.0, &other.0) {
             (ValueRepr::None, ValueRepr::None) => Ordering::Equal,
             (ValueRepr::Undefined, ValueRepr::Undefined) => Ordering::Equal,
             (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a.cmp(b),
             (ValueRepr::SmallStr(a), ValueRepr::SmallStr(b)) => a.as_str().cmp(b.as_str()),
             (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.cmp(b),
-            _ => match ops::coerce(self, other) {
+            _ => match ops::coerce(self, other, false) {
                 Some(ops::CoerceResult::F64(a, b)) => f64_total_cmp(a, b),
                 Some(ops::CoerceResult::I128(a, b)) => a.cmp(&b),
                 Some(ops::CoerceResult::Str(a, b)) => a.cmp(b),
-                None => match (self.kind(), other.kind()) {
-                    (ValueKind::Seq, ValueKind::Seq) => match (self.try_iter(), other.try_iter()) {
-                        (Ok(a), Ok(b)) => a.cmp(b),
-                        _ => self.len().cmp(&other.len()),
-                    },
-                    (ValueKind::Map, ValueKind::Map) => {
-                        if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
-                            if a.is_same_object(b) {
-                                Ordering::Equal
-                            } else {
-                                // This is not really correct.  Because the keys can be in arbitrary
-                                // order this could just sort really weirdly as a result.  However
-                                // we don't want to pay the cost of actually sorting the keys for
-                                // ordering so we just accept this for now.
-                                match (a.try_iter_pairs(), b.try_iter_pairs()) {
-                                    (Some(a), Some(b)) => a.cmp(b),
-                                    _ => self.len().cmp(&other.len()),
-                                }
-                            }
+                None => {
+                    if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
+                        if a.is_same_object(b) {
+                            Ordering::Equal
                         } else {
-                            unreachable!();
+                            match (a.repr(), b.repr()) {
+                                (ObjectRepr::Map, ObjectRepr::Map) => {
+                                    // This is not really correct.  Because the keys can be in arbitrary
+                                    // order this could just sort really weirdly as a result.  However
+                                    // we don't want to pay the cost of actually sorting the keys for
+                                    // ordering so we just accept this for now.
+                                    match (a.try_iter_pairs(), b.try_iter_pairs()) {
+                                        (Some(a), Some(b)) => a.cmp(b),
+                                        _ => unreachable!(),
+                                    }
+                                }
+                                (
+                                    ObjectRepr::Seq | ObjectRepr::Iterable,
+                                    ObjectRepr::Seq | ObjectRepr::Iterable,
+                                ) => match (a.try_iter(), b.try_iter()) {
+                                    (Some(a), Some(b)) => a.cmp(b),
+                                    _ => unreachable!(),
+                                },
+                                (_, _) => unreachable!(),
+                            }
                         }
+                    } else {
+                        unreachable!()
                     }
-                    _ => Ordering::Equal,
-                },
+                }
             },
-        };
-        value_ordering.then((self.kind() as usize).cmp(&(other.kind() as usize)))
+        }
     }
 }
 
@@ -645,6 +703,9 @@ impl Default for Value {
 /// same functionality.  There is no guarantee that a string will be interned
 /// as there are heuristics involved for it.  Additionally the string interning
 /// will only work during the template engine execution (eg: within filters etc.).
+///
+/// The use of this function is generally recommended against and it might
+/// become deprecated in the future.
 pub fn intern(s: &str) -> Arc<str> {
     #[cfg(feature = "key_interning")]
     {
@@ -653,6 +714,17 @@ pub fn intern(s: &str) -> Arc<str> {
     #[cfg(not(feature = "key_interning"))]
     {
         Arc::from(s.to_string())
+    }
+}
+
+/// Like [`intern`] but returns a [`Value`] instead of an `Arc<str>`.
+///
+/// This has the benefit that it will only perform interning if the string
+/// is not already interned.
+pub(crate) fn intern_into_value(s: &str) -> Value {
+    match SmallStr::try_new(s) {
+        Some(small_str) => Value(ValueRepr::SmallStr(small_str)),
+        None => Value::from(intern(s)),
     }
 }
 
@@ -741,6 +813,20 @@ impl Value {
     /// ```
     pub fn from_safe_string(value: String) -> Value {
         ValueRepr::String(Arc::from(value), StringType::Safe).into()
+    }
+
+    /// Creates a value from a byte vector.
+    ///
+    /// MiniJinja can hold on to bytes and has some limited built-in support for
+    /// working with them.  They are non iterable and not particularly useful
+    /// in the context of templates.  When they are stringified, they are assumed
+    /// to contain UTF-8 and will be treated as such.  They become more useful
+    /// when a filter can do something with them (eg: base64 encode them etc.).
+    ///
+    /// This method exists so that a value can be constructed as creating a
+    /// value from a `Vec<u8>` would normally just create a sequence.
+    pub fn from_bytes(value: Vec<u8>) -> Value {
+        ValueRepr::Bytes(value.into()).into()
     }
 
     /// Creates a value from a dynamic object.
@@ -999,6 +1085,17 @@ impl Value {
         )
     }
 
+    /// Returns true if the number is a real integer.
+    ///
+    /// This can be used to distinguish `42` from `42.0`.  For the most part
+    /// the engine keeps these the same.
+    pub fn is_integer(&self) -> bool {
+        matches!(
+            self.0,
+            ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::I128(_) | ValueRepr::U128(_)
+        )
+    }
+
     /// Returns `true` if the map represents keyword arguments.
     pub fn is_kwargs(&self) -> bool {
         Kwargs::extract(self).is_some()
@@ -1041,19 +1138,25 @@ impl Value {
     }
 
     /// If the value is a string, return it.
+    ///
+    /// This will also perform a lossy string conversion of bytes from utf-8.
     pub fn to_str(&self) -> Option<Arc<str>> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Some(s.clone()),
             ValueRepr::SmallStr(ref s) => Some(Arc::from(s.as_str())),
+            ValueRepr::Bytes(ref b) => Some(Arc::from(String::from_utf8_lossy(b))),
             _ => None,
         }
     }
 
     /// If the value is a string, return it.
+    ///
+    /// This will also return well formed utf-8 bytes as string.
     pub fn as_str(&self) -> Option<&str> {
         match &self.0 {
             ValueRepr::String(ref s, _) => Some(s as &str),
             ValueRepr::SmallStr(ref s) => Some(s.as_str()),
+            ValueRepr::Bytes(ref b) => str::from_utf8(b).ok(),
             _ => None,
         }
     }
@@ -1103,6 +1206,7 @@ impl Value {
         match self.0 {
             ValueRepr::String(ref s, _) => Some(s.chars().count()),
             ValueRepr::SmallStr(ref s) => Some(s.as_str().chars().count()),
+            ValueRepr::Bytes(ref b) => Some(b.len()),
             ValueRepr::Object(ref dy) => dy.enumerator_len(),
             _ => None,
         }
@@ -1239,7 +1343,7 @@ impl Value {
     /// * undefined or none: value returned unchanged.
     /// * string and bytes: returns a reversed version of that value
     /// * iterables: returns a reversed version of the iterable.  If the iterable is not
-    ///   reversable itself, it consumes it and then reverses it.
+    ///   reversible itself, it consumes it and then reverses it.
     pub fn reverse(&self) -> Result<Value, Error> {
         match self.0 {
             ValueRepr::Undefined | ValueRepr::None => Some(self.clone()),
@@ -1248,9 +1352,9 @@ impl Value {
                 // TODO: add small str optimization here
                 Some(Value::from(s.as_str().chars().rev().collect::<String>()))
             }
-            ValueRepr::Bytes(ref b) => {
-                Some(Value::from(b.iter().rev().copied().collect::<Vec<_>>()))
-            }
+            ValueRepr::Bytes(ref b) => Some(Value::from_bytes(
+                b.iter().rev().copied().collect::<Vec<_>>(),
+            )),
             ValueRepr::Object(ref o) => match o.enumerate() {
                 Enumerator::NonEnumerable => None,
                 Enumerator::Empty => Some(Value::make_iterable(|| None::<Value>.into_iter())),
@@ -1384,6 +1488,10 @@ impl Value {
             ValueRepr::SmallStr(ref s) => {
                 let idx = some!(index(key, || Some(s.as_str().chars().count())));
                 s.as_str().chars().nth(idx).map(Value::from)
+            }
+            ValueRepr::Bytes(ref b) => {
+                let idx = some!(index(key, || Some(b.len())));
+                b.get(idx).copied().map(Value::from)
             }
             _ => None,
         }

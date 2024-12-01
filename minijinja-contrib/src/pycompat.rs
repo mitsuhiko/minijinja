@@ -67,42 +67,42 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
 
     match method {
         "upper" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             Ok(Value::from(s.to_uppercase()))
         }
         "lower" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             Ok(Value::from(s.to_lowercase()))
         }
         "islower" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             Ok(Value::from(s.chars().all(|x| x.is_lowercase())))
         }
         "isupper" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             Ok(Value::from(s.chars().all(|x| x.is_uppercase())))
         }
         "isspace" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             Ok(Value::from(s.chars().all(|x| x.is_whitespace())))
         }
         "isdigit" | "isnumeric" => {
             // this is not a perfect mapping to what Python does, but
             // close enough for most uses in templates.
-            from_args(args)?;
+            let () = from_args(args)?;
             Ok(Value::from(s.chars().all(|x| x.is_numeric())))
         }
         "isalnum" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             Ok(Value::from(s.chars().all(|x| x.is_alphanumeric())))
         }
         "isalpha" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             Ok(Value::from(s.chars().all(|x| x.is_alphabetic())))
         }
         "isascii" => {
-            from_args(args)?;
-            Ok(Value::from(s.chars().all(|x| x.is_ascii())))
+            let () = from_args(args)?;
+            Ok(Value::from(s.is_ascii()))
         }
         "strip" => {
             let (chars,): (Option<&str>,) = from_args(args)?;
@@ -138,7 +138,7 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
             }))
         }
         "title" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             // one shall not call into these filters.  However we consider ourselves
             // privileged.
             Ok(Value::from(minijinja::filters::title(s.into())))
@@ -169,7 +169,7 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
             }
         }
         "capitalize" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             // one shall not call into these filters.  However we consider ourselves
             // privileged.
             Ok(Value::from(minijinja::filters::capitalize(s.into())))
@@ -280,7 +280,7 @@ fn map_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, Err
 
     match method {
         "keys" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             Ok(Value::make_object_iterable(obj.clone(), |obj| {
                 match obj.try_iter() {
                     Some(iter) => iter,
@@ -289,7 +289,7 @@ fn map_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, Err
             }))
         }
         "values" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             Ok(Value::make_object_iterable(obj.clone(), |obj| {
                 match obj.try_iter_pairs() {
                     Some(iter) => Box::new(iter.map(|(_, v)| v)),
@@ -298,7 +298,7 @@ fn map_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, Err
             }))
         }
         "items" => {
-            from_args(args)?;
+            let () = from_args(args)?;
             Ok(Value::make_object_iterable(obj.clone(), |obj| {
                 match obj.try_iter_pairs() {
                     Some(iter) => Box::new(iter.map(|(k, v)| Value::from(vec![k, v]))),

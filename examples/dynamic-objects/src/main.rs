@@ -14,7 +14,7 @@ struct Cycler {
 impl Object for Cycler {
     fn call(self: &Arc<Self>, _state: &State, args: &[Value]) -> Result<Value, Error> {
         // we don't want any args
-        from_args(args)?;
+        let () = from_args(args)?;
         let idx = self.idx.fetch_add(1, Ordering::Relaxed);
         Ok(self.values[idx % self.values.len()].clone())
     }

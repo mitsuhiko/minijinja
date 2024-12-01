@@ -318,7 +318,7 @@ impl Error {
     pub fn display_debug_info(&self) -> impl fmt::Display + '_ {
         struct Proxy<'a>(&'a Error);
 
-        impl<'a> fmt::Display for Proxy<'a> {
+        impl fmt::Display for Proxy<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 if let Some(info) = self.0.debug_info() {
                     crate::debug::render_debug_info(

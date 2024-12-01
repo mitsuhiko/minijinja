@@ -88,7 +88,7 @@ pub enum Stmt<'a> {
 }
 
 #[cfg(feature = "internal_debug")]
-impl<'a> fmt::Debug for Stmt<'a> {
+impl fmt::Debug for Stmt<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Stmt::Template(s) => fmt::Debug::fmt(s, f),
@@ -145,11 +145,10 @@ pub enum Expr<'a> {
     Call(Spanned<Call<'a>>),
     List(Spanned<List<'a>>),
     Map(Spanned<Map<'a>>),
-    Kwargs(Spanned<Kwargs<'a>>),
 }
 
 #[cfg(feature = "internal_debug")]
-impl<'a> fmt::Debug for Expr<'a> {
+impl fmt::Debug for Expr<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Expr::Var(s) => fmt::Debug::fmt(s, f),
@@ -165,12 +164,11 @@ impl<'a> fmt::Debug for Expr<'a> {
             Expr::Call(s) => fmt::Debug::fmt(s, f),
             Expr::List(s) => fmt::Debug::fmt(s, f),
             Expr::Map(s) => fmt::Debug::fmt(s, f),
-            Expr::Kwargs(s) => fmt::Debug::fmt(s, f),
         }
     }
 }
 
-impl<'a> Expr<'a> {
+impl Expr<'_> {
     pub fn description(&self) -> &'static str {
         match self {
             Expr::Var(_) => "variable",
@@ -186,7 +184,6 @@ impl<'a> Expr<'a> {
             Expr::Map(_) => "map literal",
             Expr::Test(_) => "test expression",
             Expr::Filter(_) => "filter expression",
-            Expr::Kwargs(_) => "keyword arguments",
         }
     }
 }
@@ -444,7 +441,7 @@ pub struct IfExpr<'a> {
 pub struct Filter<'a> {
     pub name: &'a str,
     pub expr: Option<Expr<'a>>,
-    pub args: Vec<Expr<'a>>,
+    pub args: Vec<CallArg<'a>>,
 }
 
 /// A test expression.
@@ -453,7 +450,7 @@ pub struct Filter<'a> {
 pub struct Test<'a> {
     pub name: &'a str,
     pub expr: Expr<'a>,
-    pub args: Vec<Expr<'a>>,
+    pub args: Vec<CallArg<'a>>,
 }
 
 /// An attribute lookup expression.
@@ -477,7 +474,17 @@ pub struct GetItem<'a> {
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Call<'a> {
     pub expr: Expr<'a>,
-    pub args: Vec<Expr<'a>>,
+    pub args: Vec<CallArg<'a>>,
+}
+
+/// A call argument helper
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
+pub enum CallArg<'a> {
+    Pos(Expr<'a>),
+    Kwarg(&'a str, Expr<'a>),
+    PosSplat(Expr<'a>),
+    KwargSplat(Expr<'a>),
 }
 
 /// Creates a list of values.
@@ -487,7 +494,7 @@ pub struct List<'a> {
     pub items: Vec<Expr<'a>>,
 }
 
-impl<'a> List<'a> {
+impl List<'_> {
     pub fn as_const(&self) -> Option<Value> {
         if !self.items.iter().all(|x| matches!(x, Expr::Const(_))) {
             return None;
@@ -503,30 +510,6 @@ impl<'a> List<'a> {
     }
 }
 
-/// Creates a map of kwargs
-#[cfg_attr(feature = "internal_debug", derive(Debug))]
-#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
-pub struct Kwargs<'a> {
-    pub pairs: Vec<(&'a str, Expr<'a>)>,
-}
-
-impl<'a> Kwargs<'a> {
-    pub fn as_const(&self) -> Option<Value> {
-        if !self.pairs.iter().all(|x| matches!(x.1, Expr::Const(_))) {
-            return None;
-        }
-
-        let mut rv = value_map_with_capacity(self.pairs.len());
-        for (key, value) in &self.pairs {
-            if let Expr::Const(value) = value {
-                rv.insert(Value::from(*key), value.value.clone());
-            }
-        }
-
-        Some(crate::value::Kwargs::wrap(rv))
-    }
-}
-
 /// Creates a map of values.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
@@ -535,7 +518,7 @@ pub struct Map<'a> {
     pub values: Vec<Expr<'a>>,
 }
 
-impl<'a> Map<'a> {
+impl Map<'_> {
     pub fn as_const(&self) -> Option<Value> {
         if !self.keys.iter().all(|x| matches!(x, Expr::Const(_)))
             || !self.values.iter().all(|x| matches!(x, Expr::Const(_)))

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use crate::value::{Enumerator, Object, ObjectExt, Value};
+use crate::value::{Enumerator, Object, Value};
 
 /// Utility struct used by [`context!`](crate::context) to merge
 /// multiple values.
@@ -17,22 +17,14 @@ impl Object for MergeObject {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        self.mapped_enumerator(|this| {
-            let mut seen = BTreeSet::new();
-            Box::new(
-                this.0
-                    .iter()
-                    .flat_map(|v| v.try_iter().ok())
-                    .flatten()
-                    .filter_map(move |v| {
-                        if seen.contains(&v) {
-                            None
-                        } else {
-                            seen.insert(v.clone());
-                            Some(v)
-                        }
-                    }),
-            )
-        })
+        // we collect here the whole internal object once on iteration so that
+        // we have an enumerator with a known length.
+        let items = self
+            .0
+            .iter()
+            .flat_map(|v| v.try_iter().ok())
+            .flatten()
+            .collect::<BTreeSet<_>>();
+        Enumerator::Iter(Box::new(items.into_iter()))
     }
 }
