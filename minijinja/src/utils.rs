@@ -187,7 +187,7 @@ impl UndefinedBehavior {
 /// Helper to HTML escape a string.
 pub struct HtmlEscape<'a>(pub &'a str);
 
-impl<'a> fmt::Display for HtmlEscape<'a> {
+impl fmt::Display for HtmlEscape<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         #[cfg(feature = "v_htmlescape")]
         {
@@ -319,7 +319,7 @@ pub fn unescape(s: &str) -> Result<String, Error> {
 
 pub struct BTreeMapKeysDebug<'a, K: fmt::Debug, V>(pub &'a BTreeMap<K, V>);
 
-impl<'a, K: fmt::Debug, V> fmt::Debug for BTreeMapKeysDebug<'a, K, V> {
+impl<K: fmt::Debug, V> fmt::Debug for BTreeMapKeysDebug<'_, K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.0.iter().map(|x| x.0)).finish()
     }
