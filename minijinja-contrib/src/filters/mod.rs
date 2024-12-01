@@ -238,3 +238,64 @@ pub fn wordcount(value: Value) -> Result<Value, Error> {
 
     Ok(Value::from(count))
 }
+
+/// Wrap a string to the given width.
+///
+/// By default this filter is not unicode aware (feature = `wordwrap`) but when the unicode
+/// feature is enabled (`unicode_wordwrap`) then it becomes so.  It's implemented on top of
+/// the `textwrap` crate.
+///
+/// **Keyword arguments:**
+///
+/// - `width`: Maximum length of wrapped lines (default: 79)
+/// - `break_long_words`: If a word is longer than width, break it across lines (default: true)
+/// - `break_on_hyphens`: If a word contains hyphens, it may be split across lines (default: true)
+/// - `wrapstring`: String to join each wrapped line (default: newline)
+#[cfg(feature = "wordwrap")]
+#[cfg_attr(docsrs, doc(any(cfg(feature = "wordwrap"), cfg = "unicode_wordwrap")))]
+pub fn wordwrap(value: Value, kwargs: Kwargs) -> Result<Value, Error> {
+    use textwrap::{wrap, Options as WrapOptions, WordSplitter};
+    let s = value.as_str().unwrap_or_default();
+
+    let width = kwargs.get::<Option<usize>>("width")?.unwrap_or(79);
+    let break_long_words = kwargs
+        .get::<Option<bool>>("break_long_words")?
+        .unwrap_or(true);
+    let break_on_hyphens = kwargs
+        .get::<Option<bool>>("break_on_hyphens")?
+        .unwrap_or(true);
+    let wrapstring = kwargs.get::<Option<&str>>("wrapstring")?.unwrap_or("\n");
+    kwargs.assert_all_used()?;
+
+    let mut options = WrapOptions::new(width).break_words(break_long_words);
+
+    if break_on_hyphens {
+        options = options.word_splitter(WordSplitter::HyphenSplitter);
+    }
+
+    // Handle empty/whitespace-only input
+    if s.trim().is_empty() {
+        return Ok(Value::from(""));
+    }
+
+    // Process paragraphs sequentially into final string
+    Ok(Value::from(s.lines().enumerate().fold(
+        String::new(),
+        |mut acc, (i, p)| {
+            if i > 0 {
+                acc.push_str(wrapstring);
+            }
+            if !p.trim().is_empty() {
+                // Wrap the paragraph and join with wrapstring
+                let wrapped = wrap(p, &options);
+                for (j, line) in wrapped.iter().enumerate() {
+                    if j > 0 {
+                        acc.push_str(wrapstring);
+                    }
+                    acc.push_str(line);
+                }
+            }
+            acc
+        },
+    )))
+}

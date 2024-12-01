@@ -46,7 +46,7 @@ minijinja = { version = "=2.5.0", path = "../minijinja", features = [
     "custom_syntax",
     "loop_controls"
 ] }
-minijinja-contrib = { version = "=2.5.0", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand"] }
+minijinja-contrib = { version = "=2.5.0", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand", "unicode_wordwrap"] }
 rustyline = { version = "14.0.0", optional = true }
 serde = { version = "1.0.183", features = ["derive", "rc"] }
 serde_json = "1.0.105"

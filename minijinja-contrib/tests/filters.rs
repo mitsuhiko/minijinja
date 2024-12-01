@@ -267,3 +267,84 @@ fn test_wordcount() {
         "3"
     );
 }
+
+#[test]
+#[cfg(feature = "wordwrap")]
+fn test_wordwrap() {
+    use minijinja_contrib::filters::wordwrap;
+
+    let mut env = minijinja::Environment::new();
+    env.add_filter("wordwrap", wordwrap);
+
+    // Test basic wrapping
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordwrap(width=20) }}",
+            context! {
+                text => "This is a long piece of text that should be wrapped at a specific width."
+            }
+        )
+        .unwrap(),
+        "This is a long piece\nof text that should\nbe wrapped at a\nspecific width."
+    );
+
+    // Test custom wrap string
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordwrap(width=10, wrapstring=' <br> ') }}",
+            context! {
+                text => "This is a test of custom wrap strings."
+            }
+        )
+        .unwrap(),
+        "This is <br> a test <br> of custom <br> wrap <br> strings."
+    );
+
+    // Test preserving newlines
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordwrap(width=20) }}",
+            context! {
+                text => "First paragraph.\n\nSecond paragraph."
+            }
+        )
+        .unwrap(),
+        "First paragraph.\n\nSecond paragraph."
+    );
+
+    // Test breaking long words
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordwrap(width=10, break_long_words=true) }}",
+            context! {
+                text => "ThisIsAVeryLongWordThatShouldBeBroken"
+            }
+        )
+        .unwrap(),
+        "ThisIsAVer\nyLongWordT\nhatShouldB\neBroken"
+    );
+
+    // Test not breaking long words
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordwrap(width=10, break_long_words=false) }}",
+            context! {
+                text => "ThisIsAVeryLongWordThatShouldBeBroken"
+            }
+        )
+        .unwrap(),
+        "ThisIsAVeryLongWordThatShouldBeBroken"
+    );
+
+    // Test breaking on hyphens
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordwrap(width=10, break_on_hyphens=true) }}",
+            context! {
+                text => "This-is-a-hyphenated-word"
+            }
+        )
+        .unwrap(),
+        "This-is-a-\nhyphenated\n-word"
+    );
+}
