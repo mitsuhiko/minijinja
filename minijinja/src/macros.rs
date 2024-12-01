@@ -61,7 +61,7 @@ pub mod __context {
         fn convert_to_minijinja_value(self) -> Value;
     }
 
-    impl<'a, T: Serialize> ConvertToValue<T> for &'a Convert<T> {
+    impl<T: Serialize> ConvertToValue<T> for &Convert<T> {
         #[inline(always)]
         fn convert_to_minijinja_value(self) -> Value {
             Value::from_serialize(&self.0)
