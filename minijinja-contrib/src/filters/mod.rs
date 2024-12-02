@@ -220,14 +220,18 @@ pub fn truncate(state: &State, value: Value, kwargs: Kwargs) -> Result<String, E
 /// ```jinja
 /// {{ "Hello world!"|wordcount }}
 /// ```
+#[cfg(feature = "wordcount")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wordcount")))]
 pub fn wordcount(value: Value) -> Result<Value, Error> {
+    use unicode_categories::UnicodeCategories;
+
     let s = value.as_str().unwrap_or_default();
     let mut count: u32 = 0;
     let mut in_word = false;
 
     // Iterate through characters, counting transitions from non-word to word chars
     for c in s.chars() {
-        let is_word_char = c.is_alphanumeric() || c == '_';
+        let is_word_char = c.is_letter() || c.is_numeric() || c == '_';
         if is_word_char && !in_word {
             count += 1;
             in_word = true;

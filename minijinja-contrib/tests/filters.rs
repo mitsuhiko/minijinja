@@ -266,6 +266,18 @@ fn test_wordcount() {
         .unwrap(),
         "3"
     );
+
+    // Test unicode marks
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordcount }}",
+            context! {
+                text => "helloाworld"
+            }
+        )
+        .unwrap(),
+        "2"
+    );
 }
 
 #[test]
