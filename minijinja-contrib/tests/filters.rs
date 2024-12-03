@@ -1,5 +1,5 @@
 use minijinja::{context, Environment};
-use minijinja_contrib::filters::{pluralize, wordcount};
+use minijinja_contrib::filters::pluralize;
 use similar_asserts::assert_eq;
 
 #[test]
@@ -204,7 +204,10 @@ fn test_truncate() {
 }
 
 #[test]
+#[cfg(feature = "wordwrap")]
 fn test_wordcount() {
+    use minijinja_contrib::filters::wordcount;
+
     let mut env = Environment::new();
     env.add_filter("wordcount", wordcount);
 
@@ -265,6 +268,18 @@ fn test_wordcount() {
         )
         .unwrap(),
         "3"
+    );
+
+    // Test unicode marks
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordcount }}",
+            context! {
+                text => "helloाworld"
+            }
+        )
+        .unwrap(),
+        "2"
     );
 }
 
