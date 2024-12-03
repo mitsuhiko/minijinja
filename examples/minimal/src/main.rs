@@ -7,6 +7,7 @@ fn main() {
     let tmpl = env.get_template("hello.txt").unwrap();
     println!(
         "{}",
-        tmpl.render(context!(names => ["John", "Peter"])).unwrap()
+        tmpl.render(context!(names => vec!["John", "Peter"]))
+            .unwrap()
     );
 }
