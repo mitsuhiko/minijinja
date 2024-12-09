@@ -29,7 +29,11 @@ pub use self::datetime::*;
 /// ```jinja
 /// {{ platypuses|length }} platypus{{ platypuses|pluralize(None, "es") }}.
 /// ```
-pub fn pluralize(v: Value, singular: Option<Value>, plural: Option<Value>) -> Result<Value, Error> {
+pub fn pluralize(
+    v: &Value,
+    singular: Option<Value>,
+    plural: Option<Value>,
+) -> Result<Value, Error> {
     let is_singular = match v.len() {
         Some(val) => val == 1,
         None => match i64::try_from(v.clone()) {
@@ -70,7 +74,7 @@ pub fn pluralize(v: Value, singular: Option<Value>, plural: Option<Value>) -> Re
 /// ```
 #[cfg(feature = "rand")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand")))]
-pub fn random(state: &minijinja::State, seq: Value) -> Result<Value, Error> {
+pub fn random(state: &minijinja::State, seq: &Value) -> Result<Value, Error> {
     use crate::globals::get_rng;
     use minijinja::value::ValueKind;
     use rand::Rng;
@@ -163,7 +167,7 @@ pub fn filesizeformat(value: f64, binary: Option<bool>) -> String {
 ///     leeway=2
 /// ) }}
 /// ```
-pub fn truncate(state: &State, value: Value, kwargs: Kwargs) -> Result<String, Error> {
+pub fn truncate(state: &State, value: &Value, kwargs: Kwargs) -> Result<String, Error> {
     if matches!(value.kind(), ValueKind::None | ValueKind::Undefined) {
         return Ok("".into());
     }
@@ -222,7 +226,7 @@ pub fn truncate(state: &State, value: Value, kwargs: Kwargs) -> Result<String, E
 /// ```
 #[cfg(feature = "wordcount")]
 #[cfg_attr(docsrs, doc(cfg(feature = "wordcount")))]
-pub fn wordcount(value: Value) -> Result<Value, Error> {
+pub fn wordcount(value: &Value) -> Result<Value, Error> {
     use unicode_categories::UnicodeCategories;
 
     let s = value.as_str().unwrap_or_default();
@@ -257,7 +261,7 @@ pub fn wordcount(value: Value) -> Result<Value, Error> {
 /// - `wrapstring`: String to join each wrapped line (default: newline)
 #[cfg(feature = "wordwrap")]
 #[cfg_attr(docsrs, doc(any(cfg(feature = "wordwrap"), cfg = "unicode_wordwrap")))]
-pub fn wordwrap(value: Value, kwargs: Kwargs) -> Result<Value, Error> {
+pub fn wordwrap(value: &Value, kwargs: Kwargs) -> Result<Value, Error> {
     use textwrap::{wrap, Options as WrapOptions, WordSplitter};
     let s = value.as_str().unwrap_or_default();
 
