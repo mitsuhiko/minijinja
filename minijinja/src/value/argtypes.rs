@@ -5,7 +5,6 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::utils::UndefinedBehavior;
 use crate::value::{
     DynObject, ObjectRepr, Packed, SmallStr, StringType, Value, ValueKind, ValueMap, ValueRepr,
 };
@@ -158,18 +157,10 @@ pub trait ArgType<'a> {
 
     #[doc(hidden)]
     fn from_state_and_value(
-        state: Option<&'a State>,
+        _state: Option<&'a State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
-        if value.map_or(false, |x| x.is_undefined())
-            && state.map_or(false, |x| {
-                matches!(x.undefined_behavior(), UndefinedBehavior::Strict)
-            })
-        {
-            Err(Error::from(ErrorKind::UndefinedError))
-        } else {
-            Ok((ok!(Self::from_value(value)), 1))
-        }
+        Ok((ok!(Self::from_value(value)), 1))
     }
 
     #[doc(hidden)]
@@ -959,13 +950,6 @@ impl TryFrom<Value> for Kwargs {
 
 impl<'a> ArgType<'a> for Value {
     type Output = Self;
-
-    fn from_state_and_value(
-        _state: Option<&'a State>,
-        value: Option<&'a Value>,
-    ) -> Result<(Self::Output, usize), Error> {
-        Ok((ok!(Self::from_value(value)), 1))
-    }
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
