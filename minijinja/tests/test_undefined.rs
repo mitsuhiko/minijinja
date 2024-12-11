@@ -1,7 +1,7 @@
 #![cfg(feature = "builtins")]
 use std::collections::HashMap;
 
-use minijinja::{context, render, Environment, ErrorKind, State, UndefinedBehavior, Value};
+use minijinja::{context, render, Environment, ErrorKind, State, UndefinedBehavior};
 
 use similar_asserts::assert_eq;
 
@@ -42,12 +42,6 @@ fn test_lenient_undefined() {
 fn test_strict_undefined() {
     let mut env = Environment::new();
     env.set_undefined_behavior(UndefinedBehavior::Strict);
-    env.add_filter("test", |_state: &State, _value: String| -> String {
-        panic!("filter must not be called");
-    });
-    env.add_filter("test2", |_state: &State, _value: Value| -> String {
-        "WAS CALLED".into()
-    });
 
     assert_eq!(
         env.render_str("{{ true.missing_attribute }}", ())
@@ -97,13 +91,6 @@ fn test_strict_undefined() {
             .kind(),
         ErrorKind::InvalidOperation
     );
-    assert_eq!(
-        env.render_str("{{ undefined|test }}", ())
-            .unwrap_err()
-            .kind(),
-        ErrorKind::UndefinedError
-    );
-    assert_eq!(render!(in env, "{{ undefined|test2 }}"), "WAS CALLED");
     assert_eq!(
         env.render_str("{{ 42 in undefined }}", ())
             .unwrap_err()

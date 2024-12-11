@@ -264,9 +264,9 @@ pub fn safe(v: String) -> Value {
 /// this filter escapes with the format that is native to the format or HTML
 /// otherwise.  This means that if the auto escape setting is set to
 /// `Json` for instance then this filter will serialize to JSON instead.
-pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
+pub fn escape(state: &State, v: &Value) -> Result<Value, Error> {
     if v.is_safe() {
-        return Ok(v);
+        return Ok(v.clone());
     }
 
     // this tries to use the escaping flag of the current scope, then
@@ -284,7 +284,7 @@ pub fn escape(state: &State, v: Value) -> Result<Value, Error> {
         None => String::new(),
     };
     let mut out = Output::with_string(&mut rv);
-    ok!(write_escaped(&mut out, auto_escape, &v));
+    ok!(write_escaped(&mut out, auto_escape, v));
     Ok(Value::from_safe_string(rv))
 }
 
@@ -385,7 +385,7 @@ mod builtins {
     /// <p>Search results: {{ results|length }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn length(v: Value) -> Result<usize, Error> {
+    pub fn length(v: &Value) -> Result<usize, Error> {
         v.len().ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidOperation,
@@ -420,7 +420,7 @@ mod builtins {
     /// * `by`: set to `"value"` to sort by value. Defaults to `"key"`.
     /// * `reverse`: set to `true` to sort in reverse.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn dictsort(v: Value, kwargs: Kwargs) -> Result<Value, Error> {
+    pub fn dictsort(v: &Value, kwargs: Kwargs) -> Result<Value, Error> {
         if v.kind() == ValueKind::Map {
             let mut rv = Vec::with_capacity(v.len().unwrap_or(0));
             let iter = ok!(v.try_iter());
@@ -478,7 +478,7 @@ mod builtins {
     /// </dl>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn items(v: Value) -> Result<Value, Error> {
+    pub fn items(v: &Value) -> Result<Value, Error> {
         if v.kind() == ValueKind::Map {
             let mut rv = Vec::with_capacity(v.len().unwrap_or(0));
             let iter = ok!(v.try_iter());
@@ -503,7 +503,7 @@ mod builtins {
     /// {% endfor %}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn reverse(v: Value) -> Result<Value, Error> {
+    pub fn reverse(v: &Value) -> Result<Value, Error> {
         v.reverse()
     }
 
@@ -521,7 +521,7 @@ mod builtins {
 
     /// Joins a sequence by a character
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn join(val: Value, joiner: Option<Cow<'_, str>>) -> Result<String, Error> {
+    pub fn join(val: &Value, joiner: Option<Cow<'_, str>>) -> Result<String, Error> {
         if val.is_undefined() || val.is_none() {
             return Ok(String::new());
         }
@@ -599,11 +599,11 @@ mod builtins {
     /// <p>{{ my_variable|default("my_variable was not defined") }}</p>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn default(value: Value, other: Option<Value>) -> Value {
+    pub fn default(value: &Value, other: Option<Value>) -> Value {
         if value.is_undefined() {
             other.unwrap_or_else(|| Value::from(""))
         } else {
-            value
+            value.clone()
         }
     }
 
@@ -640,12 +640,12 @@ mod builtins {
     /// {{ "42"|int == 42 }} -> true
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn int(value: Value) -> Result<Value, Error> {
+    pub fn int(value: &Value) -> Result<Value, Error> {
         match &value.0 {
             ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(0)),
             ValueRepr::Bool(x) => Ok(Value::from(*x as u64)),
             ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::U128(_) | ValueRepr::I128(_) => {
-                Ok(value)
+                Ok(value.clone())
             }
             ValueRepr::F64(v) => Ok(Value::from(*v as i128)),
             ValueRepr::String(..) | ValueRepr::SmallStr(_) => {
@@ -663,7 +663,7 @@ mod builtins {
                 ErrorKind::InvalidOperation,
                 format!("cannot convert {} to integer", value.kind()),
             )),
-            ValueRepr::Invalid(_) => value.validate(),
+            ValueRepr::Invalid(_) => value.clone().validate(),
         }
     }
 
@@ -673,7 +673,7 @@ mod builtins {
     /// {{ "42.5"|float == 42.5 }} -> true
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn float(value: Value) -> Result<Value, Error> {
+    pub fn float(value: &Value) -> Result<Value, Error> {
         match &value.0 {
             ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(0.0)),
             ValueRepr::Bool(x) => Ok(Value::from(*x as u64 as f64)),
@@ -683,8 +683,8 @@ mod builtins {
                 .parse::<f64>()
                 .map(Value::from)
                 .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
-            ValueRepr::Invalid(_) => value.validate(),
-            _ => as_f64(&value, true).map(Value::from).ok_or_else(|| {
+            ValueRepr::Invalid(_) => value.clone().validate(),
+            _ => as_f64(value, true).map(Value::from).ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
                     format!("cannot convert {} to float", value.kind()),
@@ -728,7 +728,7 @@ mod builtins {
     /// {{ value['key'] == value|attr('key') }} -> true
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn attr(value: Value, key: &Value) -> Result<Value, Error> {
+    pub fn attr(value: &Value, key: &Value) -> Result<Value, Error> {
         value.get_item(key)
     }
 
@@ -769,7 +769,7 @@ mod builtins {
     /// </dl>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn first(value: Value) -> Result<Value, Error> {
+    pub fn first(value: &Value) -> Result<Value, Error> {
         if let Some(s) = value.as_str() {
             Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
         } else if let Some(mut iter) = value.as_object().and_then(|x| x.try_iter()) {
@@ -895,9 +895,9 @@ mod builtins {
     ///
     /// If the string has been marked as safe, that value is preserved.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn string(value: Value) -> Value {
+    pub fn string(value: &Value) -> Value {
         if value.kind() == ValueKind::String {
-            value
+            value.clone()
         } else {
             value.to_string().into()
         }
@@ -912,7 +912,7 @@ mod builtins {
     /// {{ 42|bool }} -> true
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn bool(value: Value) -> bool {
+    pub fn bool(value: &Value) -> bool {
         value.is_true()
     }
 
@@ -1056,7 +1056,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "json"))))]
     #[cfg(feature = "json")]
-    pub fn tojson(value: Value, indent: Option<Value>, args: Kwargs) -> Result<Value, Error> {
+    pub fn tojson(value: &Value, indent: Option<Value>, args: Kwargs) -> Result<Value, Error> {
         let indent = match indent {
             Some(indent) => Some(indent),
             None => ok!(args.get("indent")),
@@ -1163,7 +1163,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins", feature = "urlencode"))))]
     #[cfg(feature = "urlencode")]
-    pub fn urlencode(value: Value) -> Result<String, Error> {
+    pub fn urlencode(value: &Value) -> Result<String, Error> {
         const SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
             .remove(b'/')
             .remove(b'.')
@@ -1549,7 +1549,7 @@ mod builtins {
     /// the resulting list will have `["CA", "NY"]`.  This can be disabled by
     /// passing `case_sensitive=True`.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn unique(values: Vec<Value>, kwargs: Kwargs) -> Result<Value, Error> {
+    pub fn unique(state: &State, values: Value, kwargs: Kwargs) -> Result<Value, Error> {
         use std::collections::BTreeSet;
 
         let attr = ok!(kwargs.get::<Option<&str>>("attribute"));
@@ -1559,7 +1559,8 @@ mod builtins {
         let mut rv = Vec::new();
         let mut seen = BTreeSet::new();
 
-        for item in values {
+        let iter = ok!(state.undefined_behavior().try_iter(values));
+        for item in iter {
             let value_to_compare = if let Some(attr) = attr {
                 item.get_path_or_default(attr, &Value::UNDEFINED)
             } else {

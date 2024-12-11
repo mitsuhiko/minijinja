@@ -202,7 +202,7 @@ impl BoxedTest {
 /// ```jinja
 /// {{ 42 is undefined }} -> false
 /// ```
-pub fn is_undefined(v: Value) -> bool {
+pub fn is_undefined(v: &Value) -> bool {
     v.is_undefined()
 }
 
@@ -211,7 +211,7 @@ pub fn is_undefined(v: Value) -> bool {
 /// ```jinja
 /// {{ 42 is defined }} -> true
 /// ```
-pub fn is_defined(v: Value) -> bool {
+pub fn is_defined(v: &Value) -> bool {
     !v.is_undefined()
 }
 
@@ -220,7 +220,7 @@ pub fn is_defined(v: Value) -> bool {
 /// ```jinja
 /// {{ none is none }} -> true
 /// ```
-pub fn is_none(v: Value) -> bool {
+pub fn is_none(v: &Value) -> bool {
     v.is_none()
 }
 
@@ -231,7 +231,7 @@ pub fn is_none(v: Value) -> bool {
 /// ```
 ///
 /// This filter is also registered with the `escaped` alias.
-pub fn is_safe(v: Value) -> bool {
+pub fn is_safe(v: &Value) -> bool {
     v.is_safe()
 }
 
@@ -250,7 +250,7 @@ mod builtins {
     /// {{ true is boolean }} -> true
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_boolean(v: Value) -> bool {
+    pub fn is_boolean(v: &Value) -> bool {
         v.kind() == ValueKind::Bool
     }
 
@@ -280,8 +280,8 @@ mod builtins {
     /// {{ 42 is divisibleby(2) }} -> true
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_divisibleby(v: Value, other: Value) -> bool {
-        match coerce(&v, &other, false) {
+    pub fn is_divisibleby(v: &Value, other: &Value) -> bool {
+        match coerce(v, other, false) {
             Some(CoerceResult::I128(a, b)) => (a % b) == 0,
             Some(CoerceResult::F64(a, b)) => (a % b) == 0.0,
             _ => false,
@@ -295,7 +295,7 @@ mod builtins {
     /// {{ "42" is number }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_number(v: Value) -> bool {
+    pub fn is_number(v: &Value) -> bool {
         matches!(v.kind(), ValueKind::Number)
     }
 
@@ -306,7 +306,7 @@ mod builtins {
     /// {{ 42.0 is integer }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_integer(v: Value) -> bool {
+    pub fn is_integer(v: &Value) -> bool {
         v.is_integer()
     }
 
@@ -317,7 +317,7 @@ mod builtins {
     /// {{ 42.0 is float }} -> true
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_float(v: Value) -> bool {
+    pub fn is_float(v: &Value) -> bool {
         matches!(v.0, crate::value::ValueRepr::F64(_))
     }
 
@@ -328,7 +328,7 @@ mod builtins {
     /// {{ 42 is string }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_string(v: Value) -> bool {
+    pub fn is_string(v: &Value) -> bool {
         matches!(v.kind(), ValueKind::String)
     }
 
@@ -339,7 +339,7 @@ mod builtins {
     /// {{ 42 is sequence }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_sequence(v: Value) -> bool {
+    pub fn is_sequence(v: &Value) -> bool {
         matches!(v.kind(), ValueKind::Seq)
     }
 
@@ -350,7 +350,7 @@ mod builtins {
     /// {{ 42 is iterable }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_iterable(v: Value) -> bool {
+    pub fn is_iterable(v: &Value) -> bool {
         v.try_iter().is_ok()
     }
 
@@ -361,7 +361,7 @@ mod builtins {
     /// {{ [1, 2, 3] is mapping }} -> false
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn is_mapping(v: Value) -> bool {
+    pub fn is_mapping(v: &Value) -> bool {
         matches!(v.kind(), ValueKind::Map)
     }
 
@@ -494,7 +494,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
     pub fn is_in(state: &State, value: &Value, other: &Value) -> Result<bool, Error> {
-        ok!(state.undefined_behavior().assert_iterable(value));
+        ok!(state.undefined_behavior().assert_iterable(other));
         Ok(crate::value::ops::contains(other, value)
             .map(|value| value.is_true())
             .unwrap_or(false))
