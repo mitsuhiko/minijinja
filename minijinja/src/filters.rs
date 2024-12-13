@@ -428,10 +428,8 @@ mod builtins {
             ));
         }
 
-        let by_value = matches!(kwargs.get("by")?, Some("value"));
-        let case_sensitive = kwargs
-            .get::<Option<bool>>("case_sensitive")?
-            .unwrap_or(false);
+        let by_value = matches!(ok!(kwargs.get("by")), Some("value"));
+        let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
         let mut rv: Vec<_> = ok!(v.try_iter())
             .map(|key| (key.clone(), v.get_item(&key).unwrap_or(Value::UNDEFINED)))
             .collect();
