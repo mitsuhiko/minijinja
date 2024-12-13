@@ -421,43 +421,32 @@ mod builtins {
     /// * `reverse`: set to `true` to sort in reverse.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn dictsort(v: &Value, kwargs: Kwargs) -> Result<Value, Error> {
-        if v.kind() == ValueKind::Map {
-            let mut rv = Vec::with_capacity(v.len().unwrap_or(0));
-            let iter = ok!(v.try_iter());
-            for key in iter {
-                let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
-                rv.push((key, value));
-            }
-            let by_value = match ok!(kwargs.get("by")) {
-                None | Some("key") => false,
-                Some("value") => true,
-                Some(invalid) => {
-                    return Err(Error::new(
-                        ErrorKind::InvalidOperation,
-                        format!("invalid value '{}' for 'by' parameter", invalid),
-                    ))
-                }
-            };
-            let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
-            rv.sort_by(|a, b| {
-                let (a, b) = if by_value { (&a.1, &b.1) } else { (&a.0, &b.0) };
-                cmp_helper(a, b, case_sensitive)
-            });
-            if let Some(true) = ok!(kwargs.get("reverse")) {
-                rv.reverse();
-            }
-            ok!(kwargs.assert_all_used());
-            Ok(Value::from(
-                rv.into_iter()
-                    .map(|(k, v)| Value::from(vec![k, v]))
-                    .collect::<Vec<_>>(),
-            ))
-        } else {
-            Err(Error::new(
+        if v.kind() != ValueKind::Map {
+            return Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "cannot convert value into pair list",
-            ))
+            ));
         }
+
+        let by_value = matches!(kwargs.get("by")?, Some("value"));
+        let case_sensitive = kwargs
+            .get::<Option<bool>>("case_sensitive")?
+            .unwrap_or(false);
+        let mut rv: Vec<_> = ok!(v.try_iter())
+            .map(|key| (key.clone(), v.get_item(&key).unwrap_or(Value::UNDEFINED)))
+            .collect();
+        rv.sort_by(|a, b| {
+            let (a, b) = if by_value { (&a.1, &b.1) } else { (&a.0, &b.0) };
+            cmp_helper(a, b, case_sensitive)
+        });
+        if let Some(true) = ok!(kwargs.get("reverse")) {
+            rv.reverse();
+        }
+        kwargs.assert_all_used()?;
+        Ok(rv
+            .into_iter()
+            .map(|(k, v)| Value::from(vec![k, v]))
+            .collect())
     }
 
     /// Returns a list of pairs (items) from a mapping.
