@@ -117,8 +117,8 @@ impl fmt::Display for Token<'_> {
             Token::BracketClose => f.write_str("`]`"),
             Token::ParenOpen => f.write_str("`(`"),
             Token::ParenClose => f.write_str("`)`"),
-            Token::BraceOpen => f.write_str("`{{`"),
-            Token::BraceClose => f.write_str("`}}`"),
+            Token::BraceOpen => f.write_str("`{`"),
+            Token::BraceClose => f.write_str("`}`"),
         }
     }
 }
