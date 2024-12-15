@@ -384,7 +384,7 @@ impl<'source> CodeGenerator<'source> {
                 self.set_line_from_span(brk.span());
                 let instr = self.add(Instruction::Jump(0));
                 for pending_block in self.pending_block.iter_mut().rev() {
-                    if let PendingBlock::Loop {
+                    if let &mut PendingBlock::Loop {
                         ref mut jump_instrs,
                         ..
                     } = pending_block

@@ -226,20 +226,20 @@ macro_rules! __args_helper {
     (branch [[$e:expr, $($rest:tt)*]], $args:tt) => { $crate::__args_helper!(branch [[$($rest)*]], $args) };
 
     // creates args on the stack
-    (args [$($arg:tt)*]) => {{
+    (args [$($arg:tt)*]) => {&{
         let mut args = Vec::<$crate::value::Value>::new();
         $crate::__args_helper!(peel args, args, false, [$($arg)*]);
-        &(&{args})[..]
-    }};
+        args
+    }[..]};
 
     // creates args with kwargs on the stack
-    (kwargs [$($arg:tt)*]) => {{
+    (kwargs [$($arg:tt)*]) => {&{
         let mut args = Vec::<$crate::value::Value>::new();
         let mut kwargs = Vec::<(&str, $crate::value::Value)>::new();
         $crate::__args_helper!(peel args, kwargs, false, [$($arg)*]);
         args.push($crate::value::Kwargs::from_iter(kwargs.into_iter()).into());
-        &(&{args})[..]
-    }};
+        args
+    }[..]};
 
     // Peels a single argument from the arguments and stuffs them into
     // `$args` or `$kwargs` depending on type.
