@@ -11,6 +11,7 @@ All notable changes to MiniJinja are documented here.
 - Some tests and filters now pass borrowed values for performance reasons
   and a bug was fixed that caused undefined values in strict undefined
   mode not to work with tests.  #657
+- Fixed an error reporting issue for some syntax errors.  #655
 
 ## 2.5.0
 
