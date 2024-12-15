@@ -675,9 +675,9 @@ impl<'source> Environment<'source> {
     fn _compile_expression<'expr>(&self, expr: &'expr str) -> Result<Instructions<'expr>, Error> {
         attach_basic_debug_info(
             parse_expr(expr).map(|ast| {
-                let mut gen = CodeGenerator::new("<expression>", expr);
-                gen.compile_expr(&ast);
-                gen.finish().0
+                let mut g = CodeGenerator::new("<expression>", expr);
+                g.compile_expr(&ast);
+                g.finish().0
             }),
             expr,
         )

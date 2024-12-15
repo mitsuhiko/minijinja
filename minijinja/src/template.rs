@@ -381,10 +381,10 @@ impl<'source> CompiledTemplate<'source> {
             config.syntax_config.clone(),
             config.ws_config
         ));
-        let mut gen = CodeGenerator::new(name, source);
-        gen.compile_stmt(&ast);
-        let buffer_size_hint = gen.buffer_size_hint();
-        let (instructions, blocks) = gen.finish();
+        let mut g = CodeGenerator::new(name, source);
+        g.compile_stmt(&ast);
+        let buffer_size_hint = g.buffer_size_hint();
+        let (instructions, blocks) = g.finish();
         Ok(CompiledTemplate {
             instructions,
             blocks,
