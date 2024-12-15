@@ -445,19 +445,19 @@ pub(crate) enum ValueRepr {
 
 impl fmt::Debug for ValueRepr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
+        match *self {
             ValueRepr::Undefined => f.write_str("undefined"),
-            ValueRepr::Bool(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::U64(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::I64(val) => fmt::Debug::fmt(val, f),
-            ValueRepr::F64(val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Bool(ref val) => fmt::Debug::fmt(val, f),
+            ValueRepr::U64(ref val) => fmt::Debug::fmt(val, f),
+            ValueRepr::I64(ref val) => fmt::Debug::fmt(val, f),
+            ValueRepr::F64(ref val) => fmt::Debug::fmt(val, f),
             ValueRepr::None => f.write_str("none"),
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-            ValueRepr::String(val, _) => fmt::Debug::fmt(val, f),
-            ValueRepr::SmallStr(val) => fmt::Debug::fmt(val.as_str(), f),
-            ValueRepr::Bytes(val) => {
+            ValueRepr::String(ref val, _) => fmt::Debug::fmt(val, f),
+            ValueRepr::SmallStr(ref val) => fmt::Debug::fmt(val.as_str(), f),
+            ValueRepr::Bytes(ref val) => {
                 write!(f, "b'")?;
                 for &b in val.iter() {
                     if b == b'"' {
@@ -468,21 +468,21 @@ impl fmt::Debug for ValueRepr {
                 }
                 write!(f, "'")
             }
-            ValueRepr::Object(val) => val.render(f),
+            ValueRepr::Object(ref val) => val.render(f),
         }
     }
 }
 
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        match &self.0 {
+        match self.0 {
             ValueRepr::None | ValueRepr::Undefined => 0u8.hash(state),
             ValueRepr::String(ref s, _) => s.hash(state),
-            ValueRepr::SmallStr(s) => s.as_str().hash(state),
+            ValueRepr::SmallStr(ref s) => s.as_str().hash(state),
             ValueRepr::Bool(b) => b.hash(state),
             ValueRepr::Invalid(ref e) => (e.kind(), e.detail()).hash(state),
-            ValueRepr::Bytes(b) => b.hash(state),
-            ValueRepr::Object(d) => d.hash(state),
+            ValueRepr::Bytes(ref b) => b.hash(state),
+            ValueRepr::Object(ref d) => d.hash(state),
             ValueRepr::U64(_)
             | ValueRepr::I64(_)
             | ValueRepr::F64(_)
@@ -505,11 +505,11 @@ pub struct Value(pub(crate) ValueRepr);
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
-            (ValueRepr::None, ValueRepr::None) => true,
-            (ValueRepr::Undefined, ValueRepr::Undefined) => true,
-            (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a == b,
-            (ValueRepr::SmallStr(a), ValueRepr::SmallStr(b)) => a.as_str() == b.as_str(),
-            (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a == b,
+            (&ValueRepr::None, &ValueRepr::None) => true,
+            (&ValueRepr::Undefined, &ValueRepr::Undefined) => true,
+            (&ValueRepr::String(ref a, _), &ValueRepr::String(ref b, _)) => a == b,
+            (&ValueRepr::SmallStr(ref a), &ValueRepr::SmallStr(ref b)) => a.as_str() == b.as_str(),
+            (&ValueRepr::Bytes(ref a), &ValueRepr::Bytes(ref b)) => a == b,
             _ => match ops::coerce(self, other, false) {
                 Some(ops::CoerceResult::F64(a, b)) => a == b,
                 Some(ops::CoerceResult::I128(a, b)) => a == b,
@@ -595,11 +595,13 @@ impl Ord for Value {
             return kind_ordering;
         }
         match (&self.0, &other.0) {
-            (ValueRepr::None, ValueRepr::None) => Ordering::Equal,
-            (ValueRepr::Undefined, ValueRepr::Undefined) => Ordering::Equal,
-            (ValueRepr::String(ref a, _), ValueRepr::String(ref b, _)) => a.cmp(b),
-            (ValueRepr::SmallStr(a), ValueRepr::SmallStr(b)) => a.as_str().cmp(b.as_str()),
-            (ValueRepr::Bytes(a), ValueRepr::Bytes(b)) => a.cmp(b),
+            (&ValueRepr::None, &ValueRepr::None) => Ordering::Equal,
+            (&ValueRepr::Undefined, &ValueRepr::Undefined) => Ordering::Equal,
+            (&ValueRepr::String(ref a, _), &ValueRepr::String(ref b, _)) => a.cmp(b),
+            (&ValueRepr::SmallStr(ref a), &ValueRepr::SmallStr(ref b)) => {
+                a.as_str().cmp(b.as_str())
+            }
+            (&ValueRepr::Bytes(ref a), &ValueRepr::Bytes(ref b)) => a.cmp(b),
             _ => match ops::coerce(self, other, false) {
                 Some(ops::CoerceResult::F64(a, b)) => f64_total_cmp(a, b),
                 Some(ops::CoerceResult::I128(a, b)) => a.cmp(&b),
@@ -647,7 +649,7 @@ impl fmt::Debug for Value {
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0 {
+        match self.0 {
             ValueRepr::Undefined => Ok(()),
             ValueRepr::Bool(val) => val.fmt(f),
             ValueRepr::U64(val) => val.fmt(f),
@@ -668,11 +670,11 @@ impl fmt::Display for Value {
             ValueRepr::None => f.write_str("none"),
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
-            ValueRepr::String(val, _) => write!(f, "{val}"),
-            ValueRepr::SmallStr(val) => write!(f, "{}", val.as_str()),
-            ValueRepr::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
+            ValueRepr::String(ref val, _) => write!(f, "{val}"),
+            ValueRepr::SmallStr(ref val) => write!(f, "{}", val.as_str()),
+            ValueRepr::Bytes(ref val) => write!(f, "{}", String::from_utf8_lossy(val)),
             ValueRepr::U128(val) => write!(f, "{}", { val.0 }),
-            ValueRepr::Object(x) => write!(f, "{x}"),
+            ValueRepr::Object(ref x) => write!(f, "{x}"),
         }
     }
 }
@@ -1113,7 +1115,7 @@ impl Value {
     ///
     /// This will also perform a lossy string conversion of bytes from utf-8.
     pub fn to_str(&self) -> Option<Arc<str>> {
-        match &self.0 {
+        match self.0 {
             ValueRepr::String(ref s, _) => Some(s.clone()),
             ValueRepr::SmallStr(ref s) => Some(Arc::from(s.as_str())),
             ValueRepr::Bytes(ref b) => Some(Arc::from(String::from_utf8_lossy(b))),
@@ -1125,7 +1127,7 @@ impl Value {
     ///
     /// This will also return well formed utf-8 bytes as string.
     pub fn as_str(&self) -> Option<&str> {
-        match &self.0 {
+        match self.0 {
             ValueRepr::String(ref s, _) => Some(s as &str),
             ValueRepr::SmallStr(ref s) => Some(s.as_str()),
             ValueRepr::Bytes(ref b) => str::from_utf8(b).ok(),
@@ -1145,7 +1147,7 @@ impl Value {
 
     /// Returns the bytes of this value if they exist.
     pub fn as_bytes(&self) -> Option<&[u8]> {
-        match &self.0 {
+        match self.0 {
             ValueRepr::String(ref s, _) => Some(s.as_bytes()),
             ValueRepr::SmallStr(ref s) => Some(s.as_str().as_bytes()),
             ValueRepr::Bytes(ref b) => Some(&b[..]),
@@ -1655,15 +1657,15 @@ impl Iterator for ValueIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         match &mut self.imp {
-            ValueIterImpl::Empty => None,
-            ValueIterImpl::Chars(offset, len, ref s) => {
+            &mut ValueIterImpl::Empty => None,
+            &mut ValueIterImpl::Chars(ref mut offset, ref mut len, ref s) => {
                 (s as &str)[*offset..].chars().next().map(|c| {
                     *offset += c.len_utf8();
                     *len -= 1;
                     Value::from(c)
                 })
             }
-            ValueIterImpl::Dyn(iter) => iter.next(),
+            &mut ValueIterImpl::Dyn(ref mut iter) => iter.next(),
         }
     }
 

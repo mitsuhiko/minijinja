@@ -164,8 +164,8 @@ impl<'source> CodeGenerator<'source> {
             self.add(Instruction::PopFrame);
             for instr in jump_instrs.into_iter().chain(Some(iter_instr)) {
                 match self.instructions.get_mut(instr) {
-                    Some(Instruction::Iterate(ref mut jump_target))
-                    | Some(Instruction::Jump(ref mut jump_target)) => {
+                    Some(&mut Instruction::Iterate(ref mut jump_target))
+                    | Some(&mut Instruction::Jump(ref mut jump_target)) => {
                         *jump_target = loop_end;
                     }
                     _ => unreachable!(),
@@ -203,7 +203,7 @@ impl<'source> CodeGenerator<'source> {
 
     /// Emits a short-circuited bool operator.
     pub fn sc_bool(&mut self, and: bool) {
-        if let Some(PendingBlock::ScBool {
+        if let Some(&mut PendingBlock::ScBool {
             ref mut jump_instrs,
         }) = self.pending_block.last_mut()
         {
@@ -223,8 +223,8 @@ impl<'source> CodeGenerator<'source> {
         if let Some(PendingBlock::ScBool { jump_instrs }) = self.pending_block.pop() {
             for instr in jump_instrs {
                 match self.instructions.get_mut(instr) {
-                    Some(Instruction::JumpIfFalseOrPop(ref mut target))
-                    | Some(Instruction::JumpIfTrueOrPop(ref mut target)) => {
+                    Some(&mut Instruction::JumpIfFalseOrPop(ref mut target))
+                    | Some(&mut Instruction::JumpIfTrueOrPop(ref mut target)) => {
                         *target = end;
                     }
                     _ => unreachable!(),
@@ -237,8 +237,8 @@ impl<'source> CodeGenerator<'source> {
         match self.pending_block.pop() {
             Some(PendingBlock::Branch { jump_instr }) => {
                 match self.instructions.get_mut(jump_instr) {
-                    Some(Instruction::JumpIfFalse(ref mut target))
-                    | Some(Instruction::Jump(ref mut target)) => {
+                    Some(&mut Instruction::JumpIfFalse(ref mut target))
+                    | Some(&mut Instruction::Jump(ref mut target)) => {
                         *target = new_jump_instr;
                     }
                     _ => {}
@@ -455,7 +455,7 @@ impl<'source> CodeGenerator<'source> {
             flags |= MACRO_CALLER;
         }
         self.add(Instruction::BuildMacro(macro_decl.name, instr + 1, flags));
-        if let Some(Instruction::Jump(ref mut target)) = self.instructions.get_mut(instr) {
+        if let Some(&mut Instruction::Jump(ref mut target)) = self.instructions.get_mut(instr) {
             *target = macro_instr;
         } else {
             unreachable!();

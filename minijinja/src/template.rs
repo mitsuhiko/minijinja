@@ -324,7 +324,7 @@ impl<'source> Deref for CompiledTemplateRef<'_, 'source> {
     type Target = CompiledTemplate<'source>;
 
     fn deref(&self) -> &Self::Target {
-        match self {
+        match *self {
             CompiledTemplateRef::Owned(ref x) => x,
             CompiledTemplateRef::Borrowed(x) => x,
         }
