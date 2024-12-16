@@ -1656,16 +1656,16 @@ impl Iterator for ValueIter {
     type Item = Value;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match &mut self.imp {
-            &mut ValueIterImpl::Empty => None,
-            &mut ValueIterImpl::Chars(ref mut offset, ref mut len, ref s) => {
+        match self.imp {
+            ValueIterImpl::Empty => None,
+            ValueIterImpl::Chars(ref mut offset, ref mut len, ref s) => {
                 (s as &str)[*offset..].chars().next().map(|c| {
                     *offset += c.len_utf8();
                     *len -= 1;
                     Value::from(c)
                 })
             }
-            &mut ValueIterImpl::Dyn(ref mut iter) => iter.next(),
+            ValueIterImpl::Dyn(ref mut iter) => iter.next(),
         }
     }
 
