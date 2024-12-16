@@ -6,7 +6,8 @@ use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
 use crate::value::{
-    DynObject, ObjectRepr, Packed, SmallStr, StringType, Value, ValueKind, ValueMap, ValueRepr,
+    DynObject, ObjectExt, ObjectRepr, Packed, SmallStr, StringType, Value, ValueKind, ValueMap,
+    ValueRepr,
 };
 use crate::vm::State;
 
@@ -762,20 +763,17 @@ impl Deref for KwargsValues {
     }
 }
 
-impl KwargsValues {
-    fn as_value_map<'a>(self: &'a Arc<Self>) -> &'a Arc<ValueMap> {
-        // SAFETY: this is safe because of repr(transparent)
-        unsafe { std::mem::transmute(self) }
-    }
-}
-
 impl Object for KwargsValues {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.as_value_map().get_value(key)
+        self.0.get(key).cloned()
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        self.as_value_map().enumerate()
+        self.mapped_enumerator(|this| Box::new(this.0.keys().cloned()))
+    }
+
+    fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
+        Some(self.0.len())
     }
 }
 
