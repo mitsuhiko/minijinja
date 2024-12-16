@@ -12,6 +12,8 @@ All notable changes to MiniJinja are documented here.
   and a bug was fixed that caused undefined values in strict undefined
   mode not to work with tests.  #657
 - Fixed an error reporting issue for some syntax errors.  #655
+- Removed an `unsafe` code block from the `Kwargs` type internally
+  which was probably unsafe.  #659
 
 ## 2.5.0
 
