@@ -14,8 +14,9 @@ MiniJinja is a powerful but minimal dependency template engine for Rust which
 is based on the syntax and behavior of the
 [Jinja2](https://jinja.palletsprojects.com/) template engine for Python.
 
-It's implemented on top of `serde` and only has it as a single required
-dependency. It supports [a range of features from Jinja2](https://github.com/mitsuhiko/minijinja/blob/main/COMPATIBILITY.md)
+It can be used entirely without dependencies though by default it uses
+`serde`'s `Serialize` trait for value conversions.  It supports
+[a range of features from Jinja2](https://github.com/mitsuhiko/minijinja/blob/main/COMPATIBILITY.md)
 including inheritance, filters and more.  The goal is that it should be possible
 to use some templates in Rust programs without the fear of pulling in complex
 dependencies for a small problem.  Additionally it tries not to re-invent
@@ -24,9 +25,8 @@ ecosystem of editor integrations.
 
 ```
 $ cargo tree
-minimal v0.1.0 (examples/minimal)
-└── minijinja v2.5.0 (minijinja)
-    └── serde v1.0.144
+minimal v0.1.0 (/Users/mitsuhiko/Development/minijinja/examples/minimal)
+└── minijinja v2.5.0 (/Users/mitsuhiko/Development/minijinja/minijinja)
 ```
 
 Additionally minijinja is also available as an (optionally pre-compiled) command line executable

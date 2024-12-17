@@ -2,7 +2,8 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use insta::assert_snapshot;
+use insta::{assert_debug_snapshot, assert_snapshot};
+use serde::Serialize;
 use similar_asserts::assert_eq;
 
 use minijinja::value::{Kwargs, Object, Value};
@@ -246,4 +247,54 @@ fn test_unenclosed_resolve() {
         )
         .unwrap();
     assert_snapshot!(rv, @"render global|ctx global|");
+}
+
+#[test]
+fn test_conversions() {
+    struct SerializeOnly;
+    struct FromOnly;
+    struct Both;
+
+    impl Serialize for SerializeOnly {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            serializer.serialize_str("serialize-only")
+        }
+    }
+
+    impl From<FromOnly> for Value {
+        fn from(_: FromOnly) -> Self {
+            Value::from("from-only")
+        }
+    }
+
+    impl From<Both> for Value {
+        fn from(_: Both) -> Self {
+            Value::from("both")
+        }
+    }
+
+    impl Serialize for Both {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            serializer.serialize_str("SHOULD NEVER SHOW UP")
+        }
+    }
+
+    let value = context! {
+        both => Both,
+        from_only => FromOnly,
+        serialize_only => SerializeOnly,
+    };
+    assert_debug_snapshot!(&value, @r###"
+    {
+        "both": "both",
+        "from_only": "from-only",
+        "serialize_only": "serialize-only",
+    }
+    "###);
 }
