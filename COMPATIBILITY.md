@@ -44,10 +44,6 @@ mapping them to filter functions is tricky.  This also means that some filters i
 MiniJinja do not accept the parameters with keyword arguments whereas in Jinja2
 they do.
 
-### Variadic Calls
-
-MiniJinja does not support the `*args` and `**kwargs` syntax for calls.
-
 ### Undefined
 
 The Jinja2 undefined type tracks the origin of creation, in MiniJinja the undefined
