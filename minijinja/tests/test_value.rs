@@ -137,6 +137,7 @@ fn test_undefined_roundtrip() {
 }
 
 #[test]
+#[cfg(feature = "serde")]
 fn test_value_serialization() {
     // make sure if we serialize to json we get regular values
     assert_eq!(serde_json::to_string(&Value::UNDEFINED).unwrap(), "null");
@@ -735,8 +736,11 @@ fn test_reverse() {
     assert_snapshot!(Value::make_iterable(|| 0..3).reverse().unwrap(), @"[2, 1, 0]");
     // strings
     assert_snapshot!(Value::from("abc").reverse().unwrap(), @"cba");
-    // bytes
-    assert_snapshot!(Value::from_serialize(b"abc").reverse().unwrap(), @"[99, 98, 97]");
+    #[cfg(feature = "serde")]
+    {
+        // bytes
+        assert_snapshot!(Value::from_serialize(b"abc").reverse().unwrap(), @"[99, 98, 97]");
+    }
     // undefined
     assert!(Value::UNDEFINED.reverse().unwrap().is_undefined());
     // none

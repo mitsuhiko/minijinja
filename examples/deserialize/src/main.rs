@@ -37,7 +37,7 @@ fn main() {
         template
             .render(context! {
                 path => std::env::current_dir().unwrap(),
-                point => point,
+                point => &point,
             })
             .unwrap()
     );

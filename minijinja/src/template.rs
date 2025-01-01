@@ -3,8 +3,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, io};
 
-use serde::Serialize;
-
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
 use crate::compiler::lexer::WhitespaceConfig;
@@ -15,7 +13,7 @@ use crate::error::{attach_basic_debug_info, Error};
 use crate::output::{Output, WriteWrapper};
 use crate::syntax::SyntaxConfig;
 use crate::utils::AutoEscape;
-use crate::value::{self, Value};
+use crate::value::{self, Serialize, Value};
 use crate::vm::{prepare_blocks, Context, State, Vm};
 
 /// Callback for auto escape determination
@@ -90,7 +88,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// Renders the template into a string.
     ///
     /// The provided value is used as the initial context for the template.  It
-    /// can be any object that implements [`Serialize`](serde::Serialize).  You
+    /// can be any object that implements [`Serialize`](crate::value::Serialize).  You
     /// can either create your own struct and derive `Serialize` for it or the
     /// [`context!`](crate::context) macro can be used to create an ad-hoc context.
     ///
@@ -115,7 +113,7 @@ impl<'env, 'source> Template<'env, 'source> {
     pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _render.
-        self._render(Value::from_serialize(&ctx)).map(|x| x.0)
+        self._render(Value::from_serialize(ctx)).map(|x| x.0)
     }
 
     /// Like [`render`](Self::render) but also return the evaluated [`State`].
@@ -141,7 +139,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ) -> Result<(String, State<'_, 'env>), Error> {
         // reduce total amount of code faling under mono morphization into
         // this function, and share the rest in _render.
-        self._render(Value::from_serialize(&ctx))
+        self._render(Value::from_serialize(ctx))
     }
 
     fn _render(&self, root: Value) -> Result<(String, State<'_, 'env>), Error> {
@@ -175,7 +173,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ) -> Result<State<'_, 'env>, Error> {
         let mut wrapper = WriteWrapper { w, err: None };
         self._eval(
-            Value::from_serialize(&ctx),
+            Value::from_serialize(ctx),
             &mut Output::with_write(&mut wrapper),
         )
         .map(|(_, state)| state)
@@ -204,7 +202,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ///
     /// For more information see [`State`].
     pub fn eval_to_state<S: Serialize>(&self, ctx: S) -> Result<State<'_, 'env>, Error> {
-        let root = Value::from_serialize(&ctx);
+        let root = Value::from_serialize(ctx);
         let mut out = Output::null();
         let vm = Vm::new(self.env);
         let state = ok!(vm.eval(

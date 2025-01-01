@@ -2,7 +2,7 @@ use minijinja::{context, Environment};
 use serde::Serialize;
 
 /// This struct makes no sense, and serde will fail serializing it.
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Copy, Clone)]
 pub struct BadStruct {
     a: i32,
     #[serde(flatten)]
