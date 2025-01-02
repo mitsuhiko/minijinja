@@ -16,6 +16,9 @@ All notable changes to MiniJinja are documented here.
   which was probably unsafe.  #659
 - Fix a regression with latest serde that caused internals to leak
   out when flattening on value handles is used.  #664
+- Added `Value::make_object_map` to create projections from object
+  into maps, similar to how it was already possible to create
+  iterators that were projected from objects.  #663
 
 ## 2.5.0
 

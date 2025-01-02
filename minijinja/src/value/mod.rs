@@ -941,36 +941,97 @@ impl Value {
             }
 
             fn enumerate(self: &Arc<Self>) -> Enumerator {
-                struct Iter {
-                    iter: Box<dyn Iterator<Item = Value> + Send + Sync + 'static>,
-                    _object: DynObject,
-                }
-
-                impl Iterator for Iter {
-                    type Item = Value;
-
-                    fn next(&mut self) -> Option<Self::Item> {
-                        self.iter.next()
-                    }
-
-                    fn size_hint(&self) -> (usize, Option<usize>) {
-                        self.iter.size_hint()
-                    }
-                }
-
-                // SAFETY: this is safe because the object is kept alive by the iter
-                let iter = unsafe {
-                    std::mem::transmute::<
-                        Box<dyn Iterator<Item = _>>,
-                        Box<dyn Iterator<Item = _> + Send + Sync>,
-                    >((self.maker)(&self.object))
-                };
-                let _object = DynObject::new(self.clone());
-                Enumerator::Iter(Box::new(Iter { iter, _object }))
+                mapped_enumerator(self, |this| (this.maker)(&this.object))
             }
         }
 
         Value::from_object(Iterable { maker, object })
+    }
+
+    /// Creates an object projection onto a map.
+    ///
+    /// This is similar to [`make_object_iterable`](Self::make_object_iterable) but
+    /// it creates a map rather than an iterable.  To accomplish this, it also
+    /// requires two callbacks.  One for enumeration, and one for looking up
+    /// attributes.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::collections::HashMap;
+    /// use std::sync::Arc;
+    /// use minijinja::value::{Value, Object, ObjectExt, Enumerator};
+    ///
+    /// #[derive(Debug)]
+    /// struct Element {
+    ///     tag: String,
+    ///     attrs: HashMap<String, String>,
+    /// }
+    ///
+    /// impl Object for Element {
+    ///     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+    ///         match key.as_str()? {
+    ///             "tag" => Some(Value::from(&self.tag)),
+    ///             "attrs" => Some(Value::make_object_map(
+    ///                 self.clone(),
+    ///                 |this| Box::new(this.attrs.keys().map(Value::from)),
+    ///                 |this, key| this.attrs.get(key.as_str()?).map(Value::from),
+    ///             )),
+    ///             _ => None
+    ///         }
+    ///     }
+    ///
+    ///     fn enumerate(self: &Arc<Self>) -> Enumerator {
+    ///         Enumerator::Str(&["tag", "attrs"])
+    ///     }
+    /// }
+    /// ```
+    pub fn make_object_map<T, E, A>(object: T, enumerate_fn: E, attr_fn: A) -> Value
+    where
+        T: Send + Sync + 'static,
+        E: for<'a> Fn(&'a T) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
+            + Send
+            + Sync
+            + 'static,
+        A: Fn(&T, &Value) -> Option<Value> + Send + Sync + 'static,
+    {
+        struct ProxyMapObject<T, E, A> {
+            enumerate_fn: E,
+            attr_fn: A,
+            object: T,
+        }
+
+        impl<T, E, A> fmt::Debug for ProxyMapObject<T, E, A> {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_struct("<map-object>").finish()
+            }
+        }
+
+        impl<T, E, A> Object for ProxyMapObject<T, E, A>
+        where
+            T: Send + Sync + 'static,
+            E: for<'a> Fn(&'a T) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
+                + Send
+                + Sync
+                + 'static,
+            A: Fn(&T, &Value) -> Option<Value> + Send + Sync + 'static,
+        {
+            #[inline]
+            fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                (self.attr_fn)(&self.object, key)
+            }
+
+            #[inline]
+            fn enumerate(self: &Arc<Self>) -> Enumerator {
+                mapped_enumerator(self, |this| (this.enumerate_fn)(&this.object))
+            }
+        }
+
+        Value::from_object(ProxyMapObject {
+            enumerate_fn,
+            attr_fn,
+            object,
+        })
     }
 
     /// Creates a value from a one-shot iterator.
@@ -1646,6 +1707,39 @@ impl Serialize for Value {
             },
         }
     }
+}
+
+/// Helper to create an iterator proxy that borrows from an object.
+pub(crate) fn mapped_enumerator<F, T>(obj: &Arc<T>, maker: F) -> Enumerator
+where
+    T: Object + 'static,
+    F: for<'a> FnOnce(&'a T) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>,
+{
+    struct Iter {
+        iter: Box<dyn Iterator<Item = Value> + Send + Sync + 'static>,
+        _object: DynObject,
+    }
+
+    impl Iterator for Iter {
+        type Item = Value;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            self.iter.next()
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            self.iter.size_hint()
+        }
+    }
+
+    // SAFETY: this is safe because the object is kept alive by the iter
+    let iter = unsafe {
+        std::mem::transmute::<Box<dyn Iterator<Item = _>>, Box<dyn Iterator<Item = _> + Send + Sync>>(
+            maker(obj),
+        )
+    };
+    let _object = DynObject::new(obj.clone());
+    Enumerator::Iter(Box::new(Iter { iter, _object }))
 }
 
 /// Utility to iterate over values.
