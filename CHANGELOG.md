@@ -14,6 +14,8 @@ All notable changes to MiniJinja are documented here.
 - Fixed an error reporting issue for some syntax errors.  #655
 - Removed an `unsafe` code block from the `Kwargs` type internally
   which was probably unsafe.  #659
+- Fix a regression with latest serde that caused internals to leak
+  out when flattening on value handles is used.  #664
 
 ## 2.5.0
 
