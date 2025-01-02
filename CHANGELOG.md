@@ -14,6 +14,9 @@ All notable changes to MiniJinja are documented here.
 - Fixed an error reporting issue for some syntax errors.  #655
 - Removed an `unsafe` code block from the `Kwargs` type internally
   which was probably unsafe.  #659
+- Added `Value::make_object_map` to create projections from object
+  into maps, similar to how it was already possible to create
+  iterators that were projected from objects.  #663
 
 ## 2.5.0
 
