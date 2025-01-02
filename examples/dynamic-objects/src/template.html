@@ -6,6 +6,8 @@
   </ul>
 {%- endwith %}
 
-{%- for item in real_iter %}
+{% for item in real_iter %}
   - {{ item }} ({{ loop.index }} from {{ loop.length|default("?") }})
 {%- endfor %}
+
+A projected map: {{ a_element|safe }}

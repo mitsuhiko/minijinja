@@ -5,7 +5,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{intern, intern_into_value, Value};
+use crate::value::{intern, intern_into_value, mapped_enumerator, Value};
 use crate::vm::State;
 
 /// A trait that represents a dynamic object.
@@ -361,32 +361,7 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
             + 'static,
         Self: Sized,
     {
-        struct IterObject<T> {
-            iter: Box<dyn Iterator<Item = Value> + Send + Sync + 'static>,
-            _object: Arc<T>,
-        }
-
-        impl<T> Iterator for IterObject<T> {
-            type Item = Value;
-
-            fn next(&mut self) -> Option<Self::Item> {
-                self.iter.next()
-            }
-
-            fn size_hint(&self) -> (usize, Option<usize>) {
-                self.iter.size_hint()
-            }
-        }
-
-        // SAFETY: this is safe because the `IterObject` will keep our object alive.
-        let iter = unsafe {
-            std::mem::transmute::<
-                Box<dyn Iterator<Item = _>>,
-                Box<dyn Iterator<Item = _> + Send + Sync>,
-            >(maker(self))
-        };
-        let _object = self.clone();
-        Enumerator::Iter(Box::new(IterObject { iter, _object }))
+        mapped_enumerator(self, maker)
     }
 
     /// Creates a new reversible iterator enumeration that projects into the given object.
@@ -430,12 +405,14 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
             + 'static,
         Self: Sized,
     {
-        struct IterObject<T> {
+        // Taken from `mapped_enumerator`.
+
+        struct Iter {
             iter: Box<dyn DoubleEndedIterator<Item = Value> + Send + Sync + 'static>,
-            _object: Arc<T>,
+            _object: DynObject,
         }
 
-        impl<T> Iterator for IterObject<T> {
+        impl Iterator for Iter {
             type Item = Value;
 
             fn next(&mut self) -> Option<Self::Item> {
@@ -447,21 +424,21 @@ pub trait ObjectExt: Object + Send + Sync + 'static {
             }
         }
 
-        impl<T> DoubleEndedIterator for IterObject<T> {
+        impl DoubleEndedIterator for Iter {
             fn next_back(&mut self) -> Option<Self::Item> {
                 self.iter.next_back()
             }
         }
 
-        // SAFETY: this is safe because the `IterObject` will keep our object alive.
+        // SAFETY: this is safe because the `Iter` will keep our object alive.
         let iter = unsafe {
             std::mem::transmute::<
                 Box<dyn DoubleEndedIterator<Item = _>>,
                 Box<dyn DoubleEndedIterator<Item = _> + Send + Sync>,
             >(maker(self))
         };
-        let _object = self.clone();
-        Enumerator::RevIter(Box::new(IterObject { iter, _object }))
+        let _object = DynObject::new(self.clone());
+        Enumerator::RevIter(Box::new(Iter { iter, _object }))
     }
 
     impl_object_helpers!(&Arc<Self>);
