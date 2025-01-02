@@ -384,7 +384,7 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
 
 - Added `json5` as file extension for JSON formatter.
 
-- The autoreload crate now supports fast reloading by just clearning the
+- The autoreload crate now supports fast reloading by just clearing the
   already templates.  This is enabled via `set_fast_reload` on the
   `Notifier`.
 
