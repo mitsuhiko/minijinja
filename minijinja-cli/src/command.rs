@@ -252,7 +252,7 @@ pub(super) fn make_command() -> Command {
                     Example: minijinja-cli --template='Hello {{ name }}' -Dname=World"),
             arg!(-E --expr <EXPR> "Evaluates an template expression")
                 .long_help("\
-                    Evalues a template expression instead of rendering a template.\n\n\
+                    Evaluates a template expression instead of rendering a template.\n\n\
                     \
                     The value to the parameter is a template expression that is evaluated with the \
                     context of the template and the result is emitted according to --expr-out.  The \

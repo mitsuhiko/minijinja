@@ -207,7 +207,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 
-use serde::ser::{Serialize, Serializer};
+use serde::ser::{Serialize, SerializeTupleStruct, Serializer};
 
 use crate::error::{Error, ErrorKind};
 use crate::functions;
@@ -1592,17 +1592,18 @@ impl Serialize for Value {
                 // we are okay with overflowing the handle here because these values only
                 // live for a very short period of time and it's not likely that you run out
                 // of an entire u32 worth of handles in a single serialization operation.
-                // This lets us stick the handle into a unit variant in the serde data model.
                 let rv = x.get().wrapping_add(1);
                 x.set(rv);
                 rv
             });
             VALUE_HANDLES.with(|handles| handles.borrow_mut().insert(handle, self.clone()));
-            return serializer.serialize_unit_variant(
-                VALUE_HANDLE_MARKER,
-                handle,
-                VALUE_HANDLE_MARKER,
-            );
+
+            // we serialize this into a tuple struct as a form of in-band signalling
+            // we can detect.  This also will fail with a somewhat acceptable error
+            // for flattening operations.  See https://github.com/mitsuhiko/minijinja/issues/222
+            let mut s = ok!(serializer.serialize_tuple_struct(VALUE_HANDLE_MARKER, 1));
+            ok!(s.serialize_field(&handle));
+            return s.end();
         }
 
         match self.0 {
