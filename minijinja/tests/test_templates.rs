@@ -394,7 +394,7 @@ fn test_flattening_sub_item_bad_attr() {
     assert_eq!(err.kind(), ErrorKind::BadSerialization);
     assert_eq!(
         err.detail(),
-        Some("can only flatten structs and maps (got an enum)")
+        Some("can only flatten structs and maps (got a tuple struct)")
     );
 }
 
@@ -412,7 +412,7 @@ fn test_flattening_sub_item_shielded_print() {
     let value = env.render_str("{{ good }}", ctx).unwrap();
     assert_eq!(
         value,
-        r#"{"bad": <invalid value: could not serialize to value: can only flatten structs and maps (got an enum)>}"#
+        r#"{"bad": <invalid value: could not serialize to value: can only flatten structs and maps (got a tuple struct)>}"#
     );
 }
 
