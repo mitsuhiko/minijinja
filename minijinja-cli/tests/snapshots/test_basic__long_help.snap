@@ -269,7 +269,7 @@ Security:
 
 Advanced:
   -E, --expr <EXPR>
-          Evalues a template expression instead of rendering a template.
+          Evaluates a template expression instead of rendering a template.
           
           The value to the parameter is a template expression that is evaluated with the context of
           the template and the result is emitted according to --expr-out.  The default output mode
