@@ -447,7 +447,7 @@ mod builtins {
             .collect())
     }
 
-    /// Returns a list of pairs (items) from a mapping.
+    /// Returns an iterable of pairs (items) from a mapping.
     ///
     /// This can be used to iterate over keys and values of a mapping
     /// at once.  Note that this will use the original order of the map
@@ -467,17 +467,24 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn items(v: &Value) -> Result<Value, Error> {
         if v.kind() == ValueKind::Map {
-            let mut rv = Vec::with_capacity(v.len().unwrap_or(0));
-            let iter = ok!(v.try_iter());
-            for key in iter {
-                let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
-                rv.push(Value::from(vec![key, value]));
-            }
-            Ok(Value::from(rv))
+            Ok(Value::make_object_iterable(v.clone(), |v| {
+                match v.as_object().and_then(|v| v.try_iter_pairs()) {
+                    Some(iter) => Box::new(iter.map(|(key, value)| Value::from(vec![key, value]))),
+                    None => Box::new(
+                        // this really should not happen unless the object changes it's shape
+                        // after the initial check
+                        Some(Value::from(Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!("{} is not iterable", v.kind()),
+                        )))
+                        .into_iter(),
+                    ),
+                }
+            }))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
-                "cannot convert value into pair list",
+                "cannot convert value into pairs",
             ))
         }
     }

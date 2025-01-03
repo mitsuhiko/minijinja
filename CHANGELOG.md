@@ -19,6 +19,8 @@ All notable changes to MiniJinja are documented here.
 - Added `Value::make_object_map` to create projections from object
   into maps, similar to how it was already possible to create
   iterators that were projected from objects.  #663
+- The `|items` filter will no longer allocate a list and instead
+  return an iterator.  #665
 
 ## 2.5.0
 
