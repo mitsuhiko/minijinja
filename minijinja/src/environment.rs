@@ -138,14 +138,13 @@ impl<'source> Environment<'source> {
     /// let mut env = Environment::new();
     /// env.add_template("index.html", "Hello {{ name }}!").unwrap();
     /// ```
+    /// This method fails if the template has a syntax error.
     ///
     /// Note that there are situations where the interface of this method is
     /// too restrictive as you need to hold on to the strings for the lifetime
-    /// of the environment.  This methodl fails if the template has a syntax error.
-    #[cfg_attr(
-        feature = "loader",
-        doc = "To address this restriction use [`add_template_owned`](Self::add_template_owned)."
-    )]
+    /// of the environment. To avoid this restriction use
+    /// [`add_template_owned`](Self::add_template_owned), which is available
+    /// when the `loader` feature is enabled.
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
         self.templates.insert(name, source)
     }
