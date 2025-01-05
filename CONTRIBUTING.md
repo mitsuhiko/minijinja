@@ -17,12 +17,6 @@ and fill out the fields in the appropriate provided template.
 When making a feature request, please make it clear what problem you intend to
 solve with the feature and maybe provide some ideas for how to go about that.
 
-## MiniJinja 1
-
-The main branch is pointing to the not yet released major version of MiniJinja1.  For
-the old 1.x versions see head over to the `minijinja-1.x` branch:
-[`minijinja-1.x`](https://github.com/mitsuhiko/minijinja/tree/minijinja-1.x)
-
 ## Rust toolchain
 MiniJinja targets [Rust 1.63.0](https://blog.rust-lang.org/2022/08/11/Rust-1.63.0.html) as it's MSRV (Minimum Supported Rust Version).
 
