@@ -732,6 +732,9 @@ impl<'source> Environment<'source> {
     /// functions and other global variables share the same namespace.
     /// For more details about functions have a look at
     /// [`Function`](crate::functions::Function).
+    ///
+    /// This is a shortcut for calling [`add_global`](Self::add_global) with the
+    /// function wrapped with [`Value::from_function`].
     pub fn add_function<N, F, Rv, Args>(&mut self, name: N, f: F)
     where
         N: Into<Cow<'source, str>>,
