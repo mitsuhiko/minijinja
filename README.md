@@ -89,6 +89,9 @@ the engine is used so you can see how it's utilized:
   * **[Zine](https://github.com/zineland/zine)** uses it to [generate static HTML](https://github.com/zineland/zine/blob/17285efe9f9a63b79a42a738b54d4d730b8cd551/src/engine.rs#L8)
   * **[Oranda](https://github.com/axodotdev/oranda)** uses it to [generate HTML landing pages](https://github.com/axodotdev/oranda/blob/fb97859c99ab81f644ab5b1449f725fc5c3e9721/src/site/templates.rs)
 
+* Code Generation:
+  * **[OpenTelemetry's Weaver](https://github.com/open-telemetry/weaver)** uses it to [generate documentation, code and other outputs](https://github.com/open-telemetry/weaver/blob/d49881445e09beb42e1a394bfa5f3068c660daf3/crates/weaver_forge/src/lib.rs#L482-L567) from the OTel specificiation.
+
 * Structure Generation:
   * **[Astral's Rye](https://rye.astral.sh/)** is using it to [generate project structures](https://github.com/astral-sh/rye/blob/c60682fb6bb5c9a0cc2669f263eeed99d2e5be71/rye/src/cli/init.rs)
   * **[Maturin](https://github.com/PyO3/maturin)** uses it to [generate project structures](https://github.com/PyO3/maturin/blob/e35097e6cf3b9115736e8ae208972178029a20d0/src/new_project.rs)
