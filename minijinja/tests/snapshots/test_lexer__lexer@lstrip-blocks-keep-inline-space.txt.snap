@@ -1,0 +1,25 @@
+---
+source: minijinja/tests/test_lexer.rs
+description: "[{% if true %} {% endif %}]"
+input_file: minijinja/tests/lexer-inputs/lstrip-blocks-keep-inline-space.txt
+---
+TemplateData("[")
+  "["
+BlockStart
+  "{%"
+Ident("if")
+  "if"
+Ident("true")
+  "true"
+BlockEnd
+  "%}"
+TemplateData(" ")
+  " "
+BlockStart
+  "{%"
+Ident("endif")
+  "endif"
+BlockEnd
+  "%}"
+TemplateData("]")
+  "]"
