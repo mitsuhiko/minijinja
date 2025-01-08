@@ -228,8 +228,17 @@ fn lstrip_block(s: &str) -> &str {
     }
 }
 
-fn should_lstrip_block(flag: bool, marker: StartMarker) -> bool {
+fn should_lstrip_block(flag: bool, marker: StartMarker, prefix: &str) -> bool {
     if flag && !matches!(marker, StartMarker::Variable) {
+        // Only strip if we're at the start of a line
+        for c in prefix.chars().rev() {
+            if is_nl(c) {
+                return true;
+            } else if !c.is_whitespace() {
+                return false;
+            }
+        }
+        // If we get here, we're at the start of the file
         return true;
     }
     #[cfg(feature = "custom_syntax")]
@@ -600,7 +609,11 @@ impl<'s> Tokenizer<'s> {
                     self.pending_start_marker = Some((marker, len));
                     match whitespace {
                         Whitespace::Default
-                            if should_lstrip_block(self.ws_config.lstrip_blocks, marker) =>
+                            if should_lstrip_block(
+                                self.ws_config.lstrip_blocks,
+                                marker,
+                                &self.source[..self.current_offset + start],
+                            ) =>
                         {
                             let peeked = &self.rest()[..start];
                             let trimmed = lstrip_block(peeked);
