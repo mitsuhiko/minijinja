@@ -229,8 +229,6 @@ pub(crate) mod namespace_object;
 mod object;
 pub(crate) mod ops;
 mod serialize;
-#[cfg(feature = "key_interning")]
-mod string_interning;
 
 #[cfg(feature = "deserialization")]
 pub use self::deserialize::ViaDeserialize;
@@ -285,22 +283,6 @@ thread_local! {
 /// deserialized.
 pub fn serializing_for_value() -> bool {
     INTERNAL_SERIALIZATION.with(|flag| flag.get())
-}
-
-/// Enables value optimizations.
-///
-/// If `key_interning` is enabled, this turns on that feature, otherwise
-/// it becomes a noop.
-#[inline(always)]
-pub(crate) fn value_optimization() -> impl Drop {
-    #[cfg(feature = "key_interning")]
-    {
-        crate::value::string_interning::use_string_cache()
-    }
-    #[cfg(not(feature = "key_interning"))]
-    {
-        OnDrop::new(|| {})
-    }
 }
 
 fn mark_internal_serialization() -> impl Drop {
@@ -685,36 +667,10 @@ impl Default for Value {
     }
 }
 
-/// Intern a string.
-///
-/// When the `key_interning` feature is in used, then MiniJinja will attempt to
-/// reuse strings in certain cases.  This function can be used to utilize the
-/// same functionality.  There is no guarantee that a string will be interned
-/// as there are heuristics involved for it.  Additionally the string interning
-/// will only work during the template engine execution (eg: within filters etc.).
-///
-/// The use of this function is generally recommended against and it might
-/// become deprecated in the future.
+#[doc(hidden)]
+#[deprecated = "This function no longer has an effect.  Use Arc::from directly."]
 pub fn intern(s: &str) -> Arc<str> {
-    #[cfg(feature = "key_interning")]
-    {
-        crate::value::string_interning::try_intern(s)
-    }
-    #[cfg(not(feature = "key_interning"))]
-    {
-        Arc::from(s.to_string())
-    }
-}
-
-/// Like [`intern`] but returns a [`Value`] instead of an `Arc<str>`.
-///
-/// This has the benefit that it will only perform interning if the string
-/// is not already interned.
-pub(crate) fn intern_into_value(s: &str) -> Value {
-    match SmallStr::try_new(s) {
-        Some(small_str) => Value(ValueRepr::SmallStr(small_str)),
-        None => Value::from(intern(s)),
-    }
+    Arc::from(s.to_string())
 }
 
 #[allow(clippy::len_without_is_empty)]
@@ -755,7 +711,6 @@ impl Value {
     /// serde deserialization.
     pub fn from_serialize<T: Serialize>(value: T) -> Value {
         let _serialization_guard = mark_internal_serialization();
-        let _optimization_guard = value_optimization();
         transform(value)
     }
 

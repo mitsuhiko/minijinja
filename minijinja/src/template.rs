@@ -15,7 +15,7 @@ use crate::error::{attach_basic_debug_info, Error};
 use crate::output::{Output, WriteWrapper};
 use crate::syntax::SyntaxConfig;
 use crate::utils::AutoEscape;
-use crate::value::{self, Value};
+use crate::value::Value;
 use crate::vm::{prepare_blocks, Context, State, Vm};
 
 /// Callback for auto escape determination
@@ -372,9 +372,6 @@ impl<'source> CompiledTemplate<'source> {
         source: &'source str,
         config: &TemplateConfig,
     ) -> Result<CompiledTemplate<'source>, Error> {
-        // the parser/compiler combination can create constants in which case
-        // we can probably benefit from the value optimization a bit.
-        let _guard = value::value_optimization();
         let ast = ok!(parse(
             source,
             name,

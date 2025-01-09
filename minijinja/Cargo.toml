@@ -39,7 +39,6 @@ std_collections = []
 serde = []
 
 # Speedups
-key_interning = []
 speedups = ["v_htmlescape"]
 
 # Engine Features
@@ -53,6 +52,9 @@ fuel = []
 # Extra Filters
 json = ["serde_json"]
 urlencode = ["percent-encoding"]
+
+# Deprecated features
+key_interning = []
 
 # Internal Features that should not be used
 internal_debug = []
