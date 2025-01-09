@@ -90,7 +90,7 @@ the engine is used so you can see how it's utilized:
   * **[Oranda](https://github.com/axodotdev/oranda)** uses it to [generate HTML landing pages](https://github.com/axodotdev/oranda/blob/fb97859c99ab81f644ab5b1449f725fc5c3e9721/src/site/templates.rs)
 
 * Code Generation:
-  * **[OpenTelemetry's Weaver](https://github.com/open-telemetry/weaver)** uses it to [generate documentation, code and other outputs](https://github.com/open-telemetry/weaver/blob/d49881445e09beb42e1a394bfa5f3068c660daf3/crates/weaver_forge/src/lib.rs#L482-L567) from the OTel specificiation.
+  * **[OpenTelemetry's Weaver](https://github.com/open-telemetry/weaver)** uses it to [generate documentation, code and other outputs](https://github.com/open-telemetry/weaver/blob/d49881445e09beb42e1a394bfa5f3068c660daf3/crates/weaver_forge/src/lib.rs#L482-L567) from the OTel specification.
 
 * Structure Generation:
   * **[Astral's Rye](https://rye.astral.sh/)** is using it to [generate project structures](https://github.com/astral-sh/rye/blob/c60682fb6bb5c9a0cc2669f263eeed99d2e5be71/rye/src/cli/init.rs)
