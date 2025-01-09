@@ -11,9 +11,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::namespace_object::Namespace;
-use crate::value::{
-    ops, value_map_with_capacity, value_optimization, Kwargs, ObjectRepr, Value, ValueMap,
-};
+use crate::value::{ops, value_map_with_capacity, Kwargs, ObjectRepr, Value, ValueMap};
 use crate::vm::context::{Frame, LoopState, Stack};
 use crate::vm::loop_object::Loop;
 use crate::vm::state::BlockStack;
@@ -91,7 +89,6 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         auto_escape: AutoEscape,
     ) -> Result<(Option<Value>, State<'template, 'env>), Error> {
-        let _guard = value_optimization();
         let mut state = State::new(
             self.env,
             Context::new_with_frame(ok!(Frame::new_checked(root)), self.env.recursion_limit()),

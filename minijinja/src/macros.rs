@@ -29,11 +29,6 @@ pub mod __context {
     use std::rc::Rc;
 
     #[inline(always)]
-    pub fn value_optimization() -> impl Drop {
-        crate::value::value_optimization()
-    }
-
-    #[inline(always)]
     pub fn make() -> ValueMap {
         ValueMap::default()
     }
@@ -137,7 +132,6 @@ macro_rules! context {
         $($key:ident $(=> $value:expr)?),*
         $(, .. $ctx:expr),* $(,)?
     ) => {{
-        let _guard = $crate::__context::value_optimization();
         let mut ctx = $crate::__context::make();
         $(
             $crate::__context_pair!(ctx, $key $(=> $value)?);
@@ -157,7 +151,6 @@ macro_rules! context {
     (
         $(.. $ctx:expr),* $(,)?
     ) => {{
-        let _guard = $crate::__context::value_optimization();
         let mut ctx = ::std::vec::Vec::new();
         $(
             ctx.push($crate::value::Value::from($ctx));

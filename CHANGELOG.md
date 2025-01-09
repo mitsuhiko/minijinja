@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.7.0
+
+- Removed string interning.  #675
+
 ## 2.6.0
 
 - Added `sum` filter.  #648

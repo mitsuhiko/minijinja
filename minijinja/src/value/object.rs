@@ -5,7 +5,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{intern, intern_into_value, mapped_enumerator, Value};
+use crate::value::{mapped_enumerator, Value};
 use crate::vm::State;
 
 /// A trait that represents a dynamic object.
@@ -297,7 +297,7 @@ macro_rules! impl_object_helpers {
                 }
                 Enumerator::Iter(iter) => Some(iter),
                 Enumerator::RevIter(iter) => Some(Box::new(iter)),
-                Enumerator::Str(s) => Some(Box::new(s.iter().copied().map(intern_into_value))),
+                Enumerator::Str(s) => Some(Box::new(s.iter().copied().map(Value::from))),
                 Enumerator::Values(v) => Some(Box::new(v.into_iter())),
             }
         }
@@ -736,9 +736,7 @@ macro_rules! impl_str_map_helper {
             }
 
             fn enumerate(self: &Arc<Self>) -> Enumerator {
-                self.$enumerator(|this| {
-                    Box::new(this.keys().map(|x| intern_into_value(x.as_ref())))
-                })
+                self.$enumerator(|this| Box::new(this.keys().map(|x| Value::from(x as &str))))
             }
 
             fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
@@ -778,7 +776,7 @@ macro_rules! impl_str_map {
             fn from(val: $map_type<&'a str, V>) -> Self {
                 Value::from(
                     val.into_iter()
-                        .map(|(k, v)| (intern(k), v))
+                        .map(|(k, v)| (Arc::from(k), v))
                         .collect::<$map_type<Arc<str>, V>>(),
                 )
             }
@@ -791,15 +789,7 @@ macro_rules! impl_str_map {
             fn from(val: $map_type<Cow<'a, str>, V>) -> Self {
                 Value::from(
                     val.into_iter()
-                        .map(|(k, v)| {
-                            (
-                                match k {
-                                    Cow::Borrowed(s) => intern(s),
-                                    Cow::Owned(s) => Arc::<str>::from(s),
-                                },
-                                v,
-                            )
-                        })
+                        .map(|(k, v)| (Arc::from(k), v))
                         .collect::<$map_type<Arc<str>, V>>(),
                 )
             }
