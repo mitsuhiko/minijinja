@@ -1,0 +1,5 @@
+{}
+---
+peeking loses items:
+{% for item in one_shot_iterator %}{{ item }}(next: {{ loop.nextitem }}){% if item == 0 %}{% break %}{% endif %}{% endfor %}
+{%- for item in one_shot_iterator %}{{ item }}(next: {{ loop.nextitem }}){% endfor %}

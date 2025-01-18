@@ -746,6 +746,11 @@
 //! {%- endfor %}
 //! ```
 //!
+//! **Note on one-shot iterators:** if you break from a loop but you have
+//! accessed the `loop.nextitem` special variable, then you will lose one item.
+//! This is because accessing that attribute will peak into the iterator and
+//! there is no support for "putting values back".
+//!
 #![cfg_attr(
     feature = "custom_syntax",
     doc = r###"

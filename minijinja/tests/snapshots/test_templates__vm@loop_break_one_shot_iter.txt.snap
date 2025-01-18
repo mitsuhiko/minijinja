@@ -1,0 +1,8 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "normal iteration does not lose items:\n{% for item in one_shot_iterator %}{{ item }}{% if item == 1 %}{% break %}{% endif %}{% endfor %}\n{%- for item in one_shot_iterator %}{{ item }}{% endfor %}"
+info: {}
+input_file: minijinja/tests/inputs/loop_break_one_shot_iter.txt
+---
+normal iteration does not lose items:
+012
