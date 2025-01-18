@@ -1,0 +1,5 @@
+{}
+---
+normal iteration does not lose items:
+{% for item in one_shot_iterator %}{{ item }}{% if item == 1 %}{% break %}{% endif %}{% endfor %}
+{%- for item in one_shot_iterator %}{{ item }}{% endfor %}

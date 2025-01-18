@@ -1,0 +1,8 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "peeking loses items:\n{% for item in one_shot_iterator %}{{ item }}(next: {{ loop.nextitem }}){% if item == 0 %}{% break %}{% endif %}{% endfor %}\n{%- for item in one_shot_iterator %}{{ item }}(next: {{ loop.nextitem }}){% endfor %}"
+info: {}
+input_file: minijinja/tests/inputs/loop_break_one_shot_iter_peek.txt
+---
+peeking loses items:
+0(next: 1)2(next: )
