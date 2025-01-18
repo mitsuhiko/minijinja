@@ -26,7 +26,7 @@ test: test-msrv test-cli
 
 .PHONY: wasi-test
 wasi-test:
-	@cd minijinja; cargo test --all-features --target=wasm32-wasi -- --nocapture
+	@cd minijinja; cargo test --all-features --target=wasm32-wasip1 -- --nocapture
 
 .PHONY: python-test
 python-test:
