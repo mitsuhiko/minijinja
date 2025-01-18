@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 use std::mem;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+
+#[cfg(any(feature = "macros", feature = "multi_template"))]
+use std::sync::Arc;
 
 use crate::compiler::instructions::{
     Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR, MAX_LOCALS,
@@ -12,8 +13,8 @@ use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
 use crate::value::namespace_object::Namespace;
 use crate::value::{ops, value_map_with_capacity, Kwargs, ObjectRepr, Value, ValueMap};
-use crate::vm::context::{Frame, LoopState, Stack};
-use crate::vm::loop_object::Loop;
+use crate::vm::context::{Frame, Stack};
+use crate::vm::loop_object::LoopState;
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
@@ -498,24 +499,7 @@ impl<'env> Vm<'env> {
                     ctx_ok!(self.push_loop(state, a, *flags, pc, next_loop_recursion_jump.take()));
                 }
                 Instruction::Iterate(jump_target) => {
-                    let l = state.ctx.current_loop().unwrap();
-                    l.object.idx.fetch_add(1, Ordering::Relaxed);
-
-                    let next = {
-                        #[cfg(feature = "adjacent_loop_items")]
-                        {
-                            let mut triple = l.object.value_triple.lock().unwrap();
-                            triple.0 = triple.1.take();
-                            triple.1 = triple.2.take();
-                            triple.2 = l.iterator.next();
-                            triple.1.clone()
-                        }
-                        #[cfg(not(feature = "adjacent_loop_items"))]
-                        {
-                            l.iterator.next()
-                        }
-                    };
-                    match next {
+                    match state.ctx.current_loop().unwrap().next() {
                         Some(item) => stack.push(assert_valid!(item)),
                         None => {
                             pc = *jump_target;
@@ -525,7 +509,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::PushDidNotIterate => {
                     let l = state.ctx.current_loop().unwrap();
-                    stack.push(Value::from(l.object.idx.load(Ordering::Relaxed) == 0));
+                    stack.push(Value::from(l.did_not_iterate()));
                 }
                 Instruction::Jump(jump_target) => {
                     pc = *jump_target;
@@ -984,15 +968,7 @@ impl<'env> Vm<'env> {
         current_recursion_jump: Option<(usize, bool)>,
     ) -> Result<(), Error> {
         #[allow(unused_mut)]
-        let mut iterator = ok!(state.undefined_behavior().try_iter(iterable));
-        // for an iterator where the lower and upper bound are matching we can
-        // consider them to have ExactSizeIterator semantics.  We do however not
-        // expect ExactSizeIterator bounds themselves to support iteration by
-        // other means.
-        let len = match iterator.size_hint() {
-            (lower, Some(upper)) if lower == upper => Some(lower),
-            _ => None,
-        };
+        let mut iter = ok!(state.undefined_behavior().try_iter(iterable));
         let depth = state
             .ctx
             .current_loop()
@@ -1001,20 +977,13 @@ impl<'env> Vm<'env> {
         let recursive = flags & LOOP_FLAG_RECURSIVE != 0;
         let with_loop_var = flags & LOOP_FLAG_WITH_LOOP_VAR != 0;
         ok!(state.ctx.push_frame(Frame {
-            current_loop: Some(LoopState {
+            current_loop: Some(LoopState::new(
+                iter,
+                depth,
                 with_loop_var,
-                recurse_jump_target: if recursive { Some(pc) } else { None },
-                current_recursion_jump,
-                object: Arc::new(Loop {
-                    idx: AtomicUsize::new(!0usize),
-                    len,
-                    depth,
-                    #[cfg(feature = "adjacent_loop_items")]
-                    value_triple: Mutex::new((None, None, iterator.next())),
-                    last_changed_value: Mutex::default(),
-                }),
-                iterator,
-            }),
+                if recursive { Some(pc) } else { None },
+                current_recursion_jump
+            )),
             ..Frame::default()
         }));
         Ok(())

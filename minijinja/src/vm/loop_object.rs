@@ -3,15 +3,126 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{Enumerator, Object, Value};
+use crate::value::{Enumerator, Object, Value, ValueIter};
 use crate::vm::state::State;
+
+pub(crate) struct LoopState {
+    pub(crate) with_loop_var: bool,
+    pub(crate) recurse_jump_target: Option<usize>,
+
+    // if we're popping the frame, do we want to jump somewhere?  The
+    // first item is the target jump instruction, the second argument
+    // tells us if we need to end capturing.
+    pub(crate) current_recursion_jump: Option<(usize, bool)>,
+
+    // Depending on if adjacent_loop_items is enabled or not, the iterator
+    // is stored either on the loop state or in the loop object.  This is
+    // done because when the feature is disabled, we can avoid using a mutex.
+    pub(crate) object: Arc<Loop>,
+    #[cfg(not(feature = "adjacent_loop_items"))]
+    iter: crate::value::ValueIter,
+}
+
+impl LoopState {
+    pub fn new(
+        iter: ValueIter,
+        depth: usize,
+        with_loop_var: bool,
+        recurse_jump_target: Option<usize>,
+        current_recursion_jump: Option<(usize, bool)>,
+    ) -> LoopState {
+        // for an iterator where the lower and upper bound are matching we can
+        // consider them to have ExactSizeIterator semantics.  We do however not
+        // expect ExactSizeIterator bounds themselves to support iteration by
+        // other means.
+        let len = match iter.size_hint() {
+            (lower, Some(upper)) if lower == upper => Some(lower),
+            _ => None,
+        };
+        LoopState {
+            with_loop_var,
+            recurse_jump_target,
+            current_recursion_jump,
+            object: Arc::new(Loop {
+                idx: AtomicUsize::new(!0usize),
+                len,
+                depth,
+                #[cfg(feature = "adjacent_loop_items")]
+                iter: Mutex::new(AdjacentLoopItemIterWrapper::new(iter)),
+                last_changed_value: Mutex::default(),
+            }),
+            #[cfg(not(feature = "adjacent_loop_items"))]
+            iter,
+        }
+    }
+
+    pub fn did_not_iterate(&self) -> bool {
+        self.object.idx.load(Ordering::Relaxed) == 0
+    }
+
+    pub fn next(&mut self) -> Option<Value> {
+        self.object.idx.fetch_add(1, Ordering::Relaxed);
+        #[cfg(feature = "adjacent_loop_items")]
+        {
+            self.object.iter.lock().unwrap().next()
+        }
+        #[cfg(not(feature = "adjacent_loop_items"))]
+        {
+            self.iter.next()
+        }
+    }
+}
+
+#[cfg(feature = "adjacent_loop_items")]
+pub(crate) struct AdjacentLoopItemIterWrapper {
+    prev_item: Option<Value>,
+    current_item: Option<Value>,
+    next_item: Option<Value>,
+    iter: ValueIter,
+}
+
+#[cfg(feature = "adjacent_loop_items")]
+impl AdjacentLoopItemIterWrapper {
+    pub fn new(iterator: ValueIter) -> AdjacentLoopItemIterWrapper {
+        AdjacentLoopItemIterWrapper {
+            prev_item: None,
+            current_item: None,
+            next_item: None,
+            iter: iterator,
+        }
+    }
+
+    pub fn next(&mut self) -> Option<Value> {
+        self.prev_item = self.current_item.take();
+        self.current_item = if let Some(ref next) = self.next_item.take() {
+            Some(next.clone())
+        } else {
+            self.next_item = None;
+            self.iter.next()
+        };
+        self.current_item.clone()
+    }
+
+    pub fn next_item(&mut self) -> Value {
+        if let Some(ref next) = self.next_item {
+            next.clone()
+        } else {
+            self.next_item = self.iter.next();
+            self.next_item.clone().unwrap_or_default()
+        }
+    }
+
+    pub fn prev_item(&self) -> Value {
+        self.prev_item.clone().unwrap_or_default()
+    }
+}
 
 pub(crate) struct Loop {
     pub len: Option<usize>,
     pub idx: AtomicUsize,
     pub depth: usize,
     #[cfg(feature = "adjacent_loop_items")]
-    pub value_triple: Mutex<(Option<Value>, Option<Value>, Option<Value>)>,
+    pub iter: Mutex<AdjacentLoopItemIterWrapper>,
     pub last_changed_value: Mutex<Option<Vec<Value>>>,
 }
 
@@ -107,23 +218,9 @@ impl Object for Loop {
             "depth" => Some(Value::from(self.depth + 1)),
             "depth0" => Some(Value::from(self.depth)),
             #[cfg(feature = "adjacent_loop_items")]
-            "previtem" => Some(
-                self.value_triple
-                    .lock()
-                    .unwrap()
-                    .0
-                    .clone()
-                    .unwrap_or(Value::UNDEFINED),
-            ),
+            "previtem" => Some(self.iter.lock().unwrap().prev_item()),
             #[cfg(feature = "adjacent_loop_items")]
-            "nextitem" => Some(
-                self.value_triple
-                    .lock()
-                    .unwrap()
-                    .2
-                    .clone()
-                    .unwrap_or(Value::UNDEFINED),
-            ),
+            "nextitem" => Some(self.iter.lock().unwrap().next_item()),
             _ => None,
         }
     }

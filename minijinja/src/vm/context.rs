@@ -1,28 +1,19 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
+
+#[cfg(any(feature = "macros", feature = "multi_template"))]
 use std::sync::Arc;
 
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
-use crate::value::{Value, ValueIter};
-use crate::vm::loop_object::Loop;
+use crate::value::Value;
+use crate::vm::loop_object::LoopState;
 
 #[cfg(feature = "macros")]
 use crate::vm::closure_object::Closure;
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
-
-pub(crate) struct LoopState {
-    pub(crate) with_loop_var: bool,
-    pub(crate) recurse_jump_target: Option<usize>,
-    // if we're popping the frame, do we want to jump somewhere?  The
-    // first item is the target jump instruction, the second argument
-    // tells us if we need to end capturing.
-    pub(crate) current_recursion_jump: Option<(usize, bool)>,
-    pub(crate) iterator: ValueIter,
-    pub(crate) object: Arc<Loop>,
-}
 
 pub(crate) struct Frame<'env> {
     pub(crate) locals: Locals<'env>,
