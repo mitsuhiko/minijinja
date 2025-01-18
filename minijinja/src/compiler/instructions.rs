@@ -156,6 +156,9 @@ pub enum Instruction<'source> {
     /// Pops the topmost frame
     PopFrame,
 
+    /// Pops the topmost frame and runs loop logic
+    PopLoopFrame,
+
     /// Jump to a specific instruction
     Jump(usize),
 

@@ -1,0 +1,21 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ loop([1, 2, 3]) }}"
+info: {}
+input_file: minijinja/tests/inputs/err_bad_fast_recurse.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: UnknownFunction,
+    detail: "loop is unknown",
+    name: "err_bad_fast_recurse.txt",
+    line: 1,
+}
+
+unknown function: loop is unknown (in err_bad_fast_recurse.txt:1)
+-------------------------- err_bad_fast_recurse.txt ---------------------------
+   1 > {{ loop([1, 2, 3]) }}
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------

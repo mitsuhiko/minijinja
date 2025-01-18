@@ -8,6 +8,8 @@ All notable changes to MiniJinja are documented here.
 - `loop.nextitem` is now a lazy operation.  This prevents issues when
   iterating over one-shot iterators combined with `{% break %}` and
   it now ensures that the iterator is not running "one item ahead".  #677
+- Fixed an issue that caused loop aliasing not to be supported for
+  recursive loops.  #678
 
 ## 2.6.0
 
