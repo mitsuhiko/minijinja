@@ -5,6 +5,9 @@ All notable changes to MiniJinja are documented here.
 ## 2.7.0
 
 - Removed string interning.  #675
+- `loop.nextitem` is now a lazy operation.  This prevents issues when
+  iterating over one-shot iterators combined with `{% break %}` and
+  it now ensures that the iterator is not running "one item ahead".  #677
 
 ## 2.6.0
 
