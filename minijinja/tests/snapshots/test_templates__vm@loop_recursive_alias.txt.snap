@@ -1,0 +1,122 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "<ul class=\"nav\">\n{% for item in nav recursive %}\n  {% set parent = loop %}\n  {% for color in ['blue', 'red'] %}\n    <li class={{ color }}><a href={{ item.link }}\">{{ item.title }}</a>{%\n      if item.children %}<ul>{{ parent(item.children) }}</ul>{% endif %}</li>\n  {% endfor %}\n{% endfor %}\n</ul>"
+info:
+  nav:
+    - link: /
+      title: Index
+    - link: /docs
+      title: Docs
+      children:
+        - link: /docs/installation
+          title: Installation
+          children:
+            - link: /docs/installation/quickstart
+              title: Quickstart
+            - link: /docs/installation/advanced
+              title: Advanced
+        - link: /docs/faq
+          title: FAQ
+input_file: minijinja/tests/inputs/loop_recursive_alias.txt
+---
+<ul class="nav">
+
+  
+  
+    <li class=blue><a href=/">Index</a></li>
+  
+    <li class=red><a href=/">Index</a></li>
+  
+
+  
+  
+    <li class=blue><a href=/docs">Docs</a><ul>
+  
+  
+    <li class=blue><a href=/docs/installation">Installation</a><ul>
+  
+  
+    <li class=blue><a href=/docs/installation/quickstart">Quickstart</a></li>
+  
+    <li class=red><a href=/docs/installation/quickstart">Quickstart</a></li>
+  
+
+  
+  
+    <li class=blue><a href=/docs/installation/advanced">Advanced</a></li>
+  
+    <li class=red><a href=/docs/installation/advanced">Advanced</a></li>
+  
+</ul></li>
+  
+    <li class=red><a href=/docs/installation">Installation</a><ul>
+  
+  
+    <li class=blue><a href=/docs/installation/quickstart">Quickstart</a></li>
+  
+    <li class=red><a href=/docs/installation/quickstart">Quickstart</a></li>
+  
+
+  
+  
+    <li class=blue><a href=/docs/installation/advanced">Advanced</a></li>
+  
+    <li class=red><a href=/docs/installation/advanced">Advanced</a></li>
+  
+</ul></li>
+  
+
+  
+  
+    <li class=blue><a href=/docs/faq">FAQ</a></li>
+  
+    <li class=red><a href=/docs/faq">FAQ</a></li>
+  
+</ul></li>
+  
+    <li class=red><a href=/docs">Docs</a><ul>
+  
+  
+    <li class=blue><a href=/docs/installation">Installation</a><ul>
+  
+  
+    <li class=blue><a href=/docs/installation/quickstart">Quickstart</a></li>
+  
+    <li class=red><a href=/docs/installation/quickstart">Quickstart</a></li>
+  
+
+  
+  
+    <li class=blue><a href=/docs/installation/advanced">Advanced</a></li>
+  
+    <li class=red><a href=/docs/installation/advanced">Advanced</a></li>
+  
+</ul></li>
+  
+    <li class=red><a href=/docs/installation">Installation</a><ul>
+  
+  
+    <li class=blue><a href=/docs/installation/quickstart">Quickstart</a></li>
+  
+    <li class=red><a href=/docs/installation/quickstart">Quickstart</a></li>
+  
+
+  
+  
+    <li class=blue><a href=/docs/installation/advanced">Advanced</a></li>
+  
+    <li class=red><a href=/docs/installation/advanced">Advanced</a></li>
+  
+</ul></li>
+  
+
+  
+  
+    <li class=blue><a href=/docs/faq">FAQ</a></li>
+  
+    <li class=red><a href=/docs/faq">FAQ</a></li>
+  
+</ul></li>
+  
+
+</ul>

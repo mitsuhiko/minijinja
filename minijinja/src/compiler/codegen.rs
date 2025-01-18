@@ -161,7 +161,7 @@ impl<'source> CodeGenerator<'source> {
             if push_did_not_iterate {
                 self.add(Instruction::PushDidNotIterate);
             };
-            self.add(Instruction::PopFrame);
+            self.add(Instruction::PopLoopFrame);
             for instr in jump_instrs.into_iter().chain(Some(iter_instr)) {
                 match self.instructions.get_mut(instr) {
                     Some(&mut Instruction::Iterate(ref mut jump_target))

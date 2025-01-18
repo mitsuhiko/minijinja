@@ -311,7 +311,7 @@ impl<'env> Context<'env> {
         &mut self.stack.last_mut().unwrap().locals
     }
 
-    /// Returns the current innermost loop.
+    /// Returns the current innermost loop state.
     pub fn current_loop(&mut self) -> Option<&mut LoopState> {
         self.stack
             .iter_mut()

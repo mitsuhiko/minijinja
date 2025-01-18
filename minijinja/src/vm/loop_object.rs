@@ -8,19 +8,18 @@ use crate::vm::state::State;
 
 pub(crate) struct LoopState {
     pub(crate) with_loop_var: bool,
-    pub(crate) recurse_jump_target: Option<usize>,
 
     // if we're popping the frame, do we want to jump somewhere?  The
     // first item is the target jump instruction, the second argument
     // tells us if we need to end capturing.
     pub(crate) current_recursion_jump: Option<(usize, bool)>,
+    pub(crate) object: Arc<Loop>,
 
     // Depending on if adjacent_loop_items is enabled or not, the iterator
     // is stored either on the loop state or in the loop object.  This is
     // done because when the feature is disabled, we can avoid using a mutex.
-    pub(crate) object: Arc<Loop>,
     #[cfg(not(feature = "adjacent_loop_items"))]
-    iter: crate::value::ValueIter,
+    iter: ValueIter,
 }
 
 impl LoopState {
@@ -41,15 +40,15 @@ impl LoopState {
         };
         LoopState {
             with_loop_var,
-            recurse_jump_target,
             current_recursion_jump,
             object: Arc::new(Loop {
                 idx: AtomicUsize::new(!0usize),
                 len,
                 depth,
+                recurse_jump_target,
+                last_changed_value: Mutex::default(),
                 #[cfg(feature = "adjacent_loop_items")]
                 iter: Mutex::new(AdjacentLoopItemIterWrapper::new(iter)),
-                last_changed_value: Mutex::default(),
             }),
             #[cfg(not(feature = "adjacent_loop_items"))]
             iter,
@@ -83,37 +82,30 @@ pub(crate) struct AdjacentLoopItemIterWrapper {
 
 #[cfg(feature = "adjacent_loop_items")]
 impl AdjacentLoopItemIterWrapper {
-    pub fn new(iterator: ValueIter) -> AdjacentLoopItemIterWrapper {
+    pub fn new(iter: ValueIter) -> AdjacentLoopItemIterWrapper {
         AdjacentLoopItemIterWrapper {
             prev_item: None,
             current_item: None,
             next_item: None,
-            iter: iterator,
+            iter,
         }
     }
 
-    pub fn next(&mut self) -> Option<Value> {
+    fn next(&mut self) -> Option<Value> {
         self.prev_item = self.current_item.take();
-        self.current_item = if let Some(ref next) = self.next_item.take() {
-            Some(next.clone())
-        } else {
-            self.next_item = None;
-            self.iter.next()
-        };
+        self.current_item = self.next_item.take().or_else(|| self.iter.next());
         self.current_item.clone()
     }
 
-    pub fn next_item(&mut self) -> Value {
-        if let Some(ref next) = self.next_item {
-            next.clone()
-        } else {
-            self.next_item = self.iter.next();
-            self.next_item.clone().unwrap_or_default()
-        }
+    fn prev_item(&self) -> Value {
+        self.prev_item.clone().unwrap_or_default()
     }
 
-    pub fn prev_item(&self) -> Value {
-        self.prev_item.clone().unwrap_or_default()
+    fn next_item(&mut self) -> Value {
+        self.next_item.clone().unwrap_or_else(|| {
+            self.next_item = self.iter.next();
+            self.next_item.clone().unwrap_or_default()
+        })
     }
 }
 
@@ -121,9 +113,10 @@ pub(crate) struct Loop {
     pub len: Option<usize>,
     pub idx: AtomicUsize,
     pub depth: usize,
-    #[cfg(feature = "adjacent_loop_items")]
-    pub iter: Mutex<AdjacentLoopItemIterWrapper>,
     pub last_changed_value: Mutex<Option<Vec<Value>>>,
+    pub recurse_jump_target: Option<usize>,
+    #[cfg(feature = "adjacent_loop_items")]
+    iter: Mutex<AdjacentLoopItemIterWrapper>,
 }
 
 impl fmt::Debug for Loop {
@@ -138,9 +131,13 @@ impl fmt::Debug for Loop {
 
 impl Object for Loop {
     fn call(self: &Arc<Self>, _state: &State, _args: &[Value]) -> Result<Value, Error> {
+        // this could happen if a filter or some other code where to get hold
+        // on the loop and try to call it.  The template execution itself will
+        // not end up here as the CallFunction opcode has a special code path
+        // for loop recursion.
         Err(Error::new(
             ErrorKind::InvalidOperation,
-            "loop cannot be called if reassigned to different variable",
+            "loop recursion cannot be called this way",
         ))
     }
 
