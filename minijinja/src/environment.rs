@@ -796,7 +796,12 @@ impl<'source> Environment<'source> {
         state: &State,
         out: &mut Output,
     ) -> Result<(), Error> {
-        if value.is_undefined() && matches!(self.undefined_behavior, UndefinedBehavior::Strict) {
+        if value.is_undefined()
+            && matches!(
+                self.undefined_behavior,
+                UndefinedBehavior::Strict | UndefinedBehavior::MediumStrict
+            )
+        {
             Err(Error::from(ErrorKind::UndefinedError))
         } else {
             (self.formatter)(out, state, value)

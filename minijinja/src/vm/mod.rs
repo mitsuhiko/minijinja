@@ -318,13 +318,7 @@ impl<'env> Vm<'env> {
                     ok!(out.write_str(val).map_err(Error::from));
                 }
                 Instruction::Emit => {
-                    let value = &stack.pop();
-                    if value.is_undefined()
-                        && matches!(undefined_behavior, UndefinedBehavior::MediumStrict)
-                    {
-                        bail!(Error::from(ErrorKind::UndefinedError));
-                    }
-                    ctx_ok!(self.env.format(value, state, out));
+                    ctx_ok!(self.env.format(&stack.pop(), state, out));
                 }
                 Instruction::StoreLocal(name) => {
                     state.ctx.store(name, stack.pop());
@@ -371,7 +365,12 @@ impl<'env> Vm<'env> {
                     let stop = stack.pop();
                     b = stack.pop();
                     a = stack.pop();
-                    if a.is_undefined() && matches!(undefined_behavior, UndefinedBehavior::Strict) {
+                    if a.is_undefined()
+                        && matches!(
+                            undefined_behavior,
+                            UndefinedBehavior::Strict | UndefinedBehavior::MediumStrict
+                        )
+                    {
                         bail!(Error::from(ErrorKind::UndefinedError));
                     }
                     stack.push(ctx_ok!(ops::slice(a, b, stop, step)));
