@@ -124,6 +124,13 @@ pub enum UndefinedBehavior {
     /// * **iteration:** allowed (returns empty array)
     /// * **attribute access of undefined values:** allowed (returns [`undefined`](Value::UNDEFINED))
     Chainable,
+
+    /// Medium strict:
+    /// * **printing:** fails
+    /// * **iteration:** allowed (returns empty array)
+    /// * **testing** returns false
+    /// * **attribute access of undefined values:** fails
+    MediumStrict,
     /// Complains very quickly about undefined values.
     ///
     /// * **printing:** fails
@@ -144,8 +151,11 @@ impl UndefinedBehavior {
         match (self, parent_was_undefined) {
             (UndefinedBehavior::Lenient, false)
             | (UndefinedBehavior::Strict, false)
+            | (UndefinedBehavior::MediumStrict, false)
             | (UndefinedBehavior::Chainable, _) => Ok(Value::UNDEFINED),
-            (UndefinedBehavior::Lenient, true) | (UndefinedBehavior::Strict, true) => {
+            (UndefinedBehavior::Lenient, true)
+            | (UndefinedBehavior::Strict, true)
+            | (UndefinedBehavior::MediumStrict, true) => {
                 Err(Error::from(ErrorKind::UndefinedError))
             }
         }
@@ -176,7 +186,11 @@ impl UndefinedBehavior {
     /// Are we strict on iteration?
     #[inline]
     pub(crate) fn assert_iterable(self, value: &Value) -> Result<(), Error> {
-        if matches!(self, UndefinedBehavior::Strict) && value.is_undefined() {
+        if matches!(
+            self,
+            UndefinedBehavior::Strict | UndefinedBehavior::MediumStrict
+        ) && value.is_undefined()
+        {
             Err(Error::from(ErrorKind::UndefinedError))
         } else {
             Ok(())

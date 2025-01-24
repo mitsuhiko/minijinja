@@ -318,7 +318,13 @@ impl<'env> Vm<'env> {
                     ok!(out.write_str(val).map_err(Error::from));
                 }
                 Instruction::Emit => {
-                    ctx_ok!(self.env.format(&stack.pop(), state, out));
+                    let value = &stack.pop();
+                    if value.is_undefined()
+                        && matches!(undefined_behavior, UndefinedBehavior::MediumStrict)
+                    {
+                        bail!(Error::from(ErrorKind::UndefinedError));
+                    }
+                    ctx_ok!(self.env.format(value, state, out));
                 }
                 Instruction::StoreLocal(name) => {
                     state.ctx.store(name, stack.pop());
