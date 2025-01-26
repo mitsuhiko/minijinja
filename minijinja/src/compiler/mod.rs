@@ -6,4 +6,5 @@ pub mod instructions;
 pub mod lexer;
 pub mod meta;
 pub mod parser;
+pub mod to_source;
 pub mod tokens;
