@@ -10,6 +10,7 @@ All notable changes to MiniJinja are documented here.
   it now ensures that the iterator is not running "one item ahead".  #677
 - Fixed an issue that caused loop aliasing not to be supported for
   recursive loops.  #678
+- CLI moved from `serde_yml` to `serde_yaml`.  #684
 
 ## 2.6.0
 
