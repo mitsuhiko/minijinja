@@ -334,7 +334,7 @@ fn interpret_raw_value(s: &str) -> Result<Value, Error> {
     }
     #[cfg(feature = "yaml")]
     mod imp {
-        pub use serde_yml::from_str;
+        pub use serde_yaml::from_str;
         pub const FMT: &str = "JSON";
     }
     imp::from_str::<Value>(s)

@@ -101,9 +101,9 @@ fn load_data(
         #[cfg(feature = "yaml")]
         "yaml" => {
             // for merge keys to work we need to manually call `apply_merge`.
-            // For this reason we need to deserialize into a serde_yml::Value
+            // For this reason we need to deserialize into a serde_yaml::Value
             // before converting it into a final value.
-            let mut v: serde_yml::Value = serde_yml::from_slice(&contents)?;
+            let mut v: serde_yaml::Value = serde_yaml::from_slice(&contents)?;
             v.apply_merge()?;
             Value::from_serialize(v)
         }
