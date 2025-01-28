@@ -336,7 +336,7 @@ mod builtins {
         let mut rv = match value {
             None => ValueMap::default(),
             Some(value) => match value.0 {
-                ValueRepr::Undefined => ValueMap::default(),
+                ValueRepr::Undefined | ValueRepr::SilentUndefined => ValueMap::default(),
                 ValueRepr::Object(obj) if obj.repr() == ObjectRepr::Map => {
                     obj.try_iter_pairs().into_iter().flatten().collect()
                 }

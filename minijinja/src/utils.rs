@@ -124,6 +124,17 @@ pub enum UndefinedBehavior {
     /// * **iteration:** allowed (returns empty array)
     /// * **attribute access of undefined values:** allowed (returns [`undefined`](Value::UNDEFINED))
     Chainable,
+    /// Complains very quickly about undefined values but not quite as strictly.
+    ///
+    /// The difference of this to the strict undefined is that some operations are still
+    /// possible with mostly strict ones.  In particular using it in an `if` statement
+    /// without using the `undefined` filter will not fail.  You can also safely iterate
+    /// or print the implied `undefined` in `value if false`.
+    ///
+    /// * **printing:** fails (most of the time, see disclaimer)
+    /// * **iteration:** fails (most of the time, see disclaimer)
+    /// * **attribute access of undefined values:** fails
+    MostlyStrict,
     /// Complains very quickly about undefined values.
     ///
     /// * **printing:** fails
@@ -136,16 +147,17 @@ impl UndefinedBehavior {
     /// Utility method used in the engine to determine what to do when an undefined is
     /// encountered.
     ///
-    /// The flag indicates if this is the first or second level of undefined value.  If
-    /// `parent_was_undefined` is set to `true`, the undefined was created by looking up
-    /// a missing attribute on an undefined value.  If `false` the undefined was created by
-    /// looking up a missing attribute on a defined value.
-    pub(crate) fn handle_undefined(self, parent_was_undefined: bool) -> Result<Value, Error> {
-        match (self, parent_was_undefined) {
+    /// The flag indicates if this is the first or second level of undefined value.  The
+    /// parent value is passed too.
+    pub(crate) fn handle_undefined(self, parent: &Value) -> Result<Value, Error> {
+        match (self, parent.is_undefined()) {
             (UndefinedBehavior::Lenient, false)
             | (UndefinedBehavior::Strict, false)
+            | (UndefinedBehavior::MostlyStrict, false)
             | (UndefinedBehavior::Chainable, _) => Ok(Value::UNDEFINED),
-            (UndefinedBehavior::Lenient, true) | (UndefinedBehavior::Strict, true) => {
+            (UndefinedBehavior::Lenient, true)
+            | (UndefinedBehavior::Strict, true)
+            | (UndefinedBehavior::MostlyStrict, true) => {
                 Err(Error::from(ErrorKind::UndefinedError))
             }
         }
@@ -156,10 +168,14 @@ impl UndefinedBehavior {
     /// This fails only for strict undefined values.
     #[inline]
     pub(crate) fn is_true(self, value: &Value) -> Result<bool, Error> {
-        if matches!(self, UndefinedBehavior::Strict) && value.is_undefined() {
-            Err(Error::from(ErrorKind::UndefinedError))
-        } else {
-            Ok(value.is_true())
+        match (self, &value.0) {
+            (UndefinedBehavior::Strict, &ValueRepr::Undefined | &ValueRepr::SilentUndefined) => {
+                Err(Error::from(ErrorKind::UndefinedError))
+            }
+            (UndefinedBehavior::MostlyStrict, &ValueRepr::Undefined) => {
+                Err(Error::from(ErrorKind::UndefinedError))
+            }
+            _ => Ok(value.is_true()),
         }
     }
 
@@ -176,10 +192,12 @@ impl UndefinedBehavior {
     /// Are we strict on iteration?
     #[inline]
     pub(crate) fn assert_iterable(self, value: &Value) -> Result<(), Error> {
-        if matches!(self, UndefinedBehavior::Strict) && value.is_undefined() {
-            Err(Error::from(ErrorKind::UndefinedError))
-        } else {
-            Ok(())
+        match (self, &value.0) {
+            (UndefinedBehavior::Strict, &ValueRepr::Undefined | &ValueRepr::SilentUndefined)
+            | (UndefinedBehavior::MostlyStrict, &ValueRepr::Undefined) => {
+                Err(Error::from(ErrorKind::UndefinedError))
+            }
+            _ => Ok(()),
         }
     }
 }
