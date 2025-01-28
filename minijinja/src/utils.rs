@@ -116,6 +116,7 @@ pub enum UndefinedBehavior {
     /// * **printing:** allowed (returns empty string)
     /// * **iteration:** allowed (returns empty array)
     /// * **attribute access of undefined values:** fails
+    /// * **if true:** allowed (is false)
     #[default]
     Lenient,
     /// Like `Lenient`, but also allows chaining of undefined lookups.
@@ -123,6 +124,7 @@ pub enum UndefinedBehavior {
     /// * **printing:** allowed (returns empty string)
     /// * **iteration:** allowed (returns empty array)
     /// * **attribute access of undefined values:** allowed (returns [`undefined`](Value::UNDEFINED))
+    /// * **if true:** allowed (is false)
     Chainable,
     /// Complains very quickly about undefined values but not quite as strictly.
     ///
@@ -134,12 +136,14 @@ pub enum UndefinedBehavior {
     /// * **printing:** fails (most of the time, see disclaimer)
     /// * **iteration:** fails (most of the time, see disclaimer)
     /// * **attribute access of undefined values:** fails
+    /// * **if true:** allowed (is false)
     MostlyStrict,
     /// Complains very quickly about undefined values.
     ///
     /// * **printing:** fails
     /// * **iteration:** fails
     /// * **attribute access of undefined values:** fails
+    /// * **if true:** fails
     Strict,
 }
 
