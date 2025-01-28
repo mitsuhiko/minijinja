@@ -80,12 +80,11 @@ fn test_mostly_strict_undefined() {
     );
     assert_eq!(
         env.render_str(
-            "{% if x.foo %}...{% endif %}",
+            "<{% if x.foo %}...{% endif %}>",
             context! { x => HashMap::<String, String>::new() }
         )
-        .unwrap_err()
-        .kind(),
-        ErrorKind::UndefinedError
+        .unwrap(),
+        "<>"
     );
     assert_eq!(
         env.render_str("{{ undefined|list }}", ())

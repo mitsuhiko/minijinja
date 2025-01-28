@@ -172,9 +172,6 @@ impl UndefinedBehavior {
             (UndefinedBehavior::Strict, &ValueRepr::Undefined | &ValueRepr::SilentUndefined) => {
                 Err(Error::from(ErrorKind::UndefinedError))
             }
-            (UndefinedBehavior::MostlyStrict, &ValueRepr::Undefined) => {
-                Err(Error::from(ErrorKind::UndefinedError))
-            }
             _ => Ok(value.is_true()),
         }
     }
