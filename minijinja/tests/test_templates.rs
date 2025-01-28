@@ -3,6 +3,7 @@
     feature = "macros",
     feature = "builtins",
     feature = "adjacent_loop_items",
+    feature = "custom_syntax",
     feature = "deserialization"
 ))]
 use std::collections::BTreeMap;
@@ -11,10 +12,43 @@ use std::sync::Arc;
 use std::{env, fs};
 
 use insta::assert_snapshot;
+use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Enumerator, Object, ObjectRepr, Rest, Value};
-use minijinja::{context, render, Environment, Error, ErrorKind, State};
+use minijinja::{context, render, Environment, Error, ErrorKind, State, UndefinedBehavior};
 
+use serde::Deserialize;
 use similar_asserts::assert_eq;
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct TestSettings {
+    keep_trailing_newline: bool,
+    lstrip_blocks: bool,
+    trim_blocks: bool,
+    markers: Option<[String; 6]>,
+    line_statement_prefix: Option<String>,
+    line_comment_prefix: Option<String>,
+    undefined: Option<String>,
+}
+
+impl TestSettings {
+    pub fn into_syntax(self) -> SyntaxConfig {
+        let mut builder = SyntaxConfig::builder();
+        if let Some(ref markers) = self.markers {
+            builder
+                .block_delimiters(markers[0].to_string(), markers[1].to_string())
+                .variable_delimiters(markers[2].to_string(), markers[3].to_string())
+                .comment_delimiters(markers[4].to_string(), markers[5].to_string());
+        }
+        if let Some(prefix) = self.line_statement_prefix {
+            builder.line_statement_prefix(prefix);
+        }
+        if let Some(prefix) = self.line_comment_prefix {
+            builder.line_comment_prefix(prefix);
+        }
+        builder.build().unwrap()
+    }
+}
 
 #[test]
 fn test_vm() {
@@ -40,6 +74,22 @@ fn test_vm() {
             Value::from(args.0)
         });
         let ctx: Value = serde_json::from_str(iter.next().unwrap()).unwrap();
+        let settings =
+            if let Some(settings) = ctx.get_attr("$settings").ok().filter(|x| !x.is_undefined()) {
+                TestSettings::deserialize(settings).unwrap()
+            } else {
+                TestSettings::default()
+            };
+        env.set_undefined_behavior(match settings.undefined.as_deref() {
+            Some("strict") => UndefinedBehavior::Strict,
+            Some("lenient") | None => UndefinedBehavior::Lenient,
+            Some("chainable") => UndefinedBehavior::Chainable,
+            Some(other) => panic!("unknown undefined behavior '{}'", other),
+        });
+        env.set_keep_trailing_newline(settings.keep_trailing_newline);
+        env.set_trim_blocks(settings.trim_blocks);
+        env.set_lstrip_blocks(settings.lstrip_blocks);
+        env.set_syntax(settings.into_syntax());
 
         for (path, source) in &refs {
             let ref_filename = path.file_name().unwrap().to_str().unwrap();

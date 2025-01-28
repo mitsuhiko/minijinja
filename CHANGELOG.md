@@ -11,6 +11,8 @@ All notable changes to MiniJinja are documented here.
 - Fixed an issue that caused loop aliasing not to be supported for
   recursive loops.  #678
 - CLI moved from `serde_yml` to `serde_yaml`.  #684
+- Improved undefined error reporting.  Undefined values will now in most
+  cases point to exactly where the error happened.  #686
 
 ## 2.6.0
 

@@ -480,8 +480,10 @@ impl<'source> CodeGenerator<'source> {
 
     fn compile_if_stmt(&mut self, if_cond: &ast::Spanned<ast::IfCond<'source>>) {
         self.set_line_from_span(if_cond.span());
+        self.push_span(if_cond.expr.span());
         self.compile_expr(&if_cond.expr);
         self.start_if();
+        self.pop_span();
         for node in &if_cond.true_body {
             self.compile_stmt(node);
         }
@@ -495,8 +497,8 @@ impl<'source> CodeGenerator<'source> {
     }
 
     fn compile_emit_expr(&mut self, expr: &ast::Spanned<ast::EmitExpr<'source>>) {
-        self.set_line_from_span(expr.span());
         if let ast::Expr::Call(call) = &expr.expr {
+            self.set_line_from_span(expr.expr.span());
             match call.identify_call() {
                 ast::CallType::Function(name) => {
                     if name == "super" && call.args.is_empty() {
@@ -516,8 +518,10 @@ impl<'source> CodeGenerator<'source> {
                 _ => {}
             }
         }
+        self.push_span(expr.expr.span());
         self.compile_expr(&expr.expr);
         self.add(Instruction::Emit);
+        self.pop_span();
     }
 
     fn compile_for_loop(&mut self, for_loop: &ast::Spanned<ast::ForLoop<'source>>) {
@@ -529,6 +533,7 @@ impl<'source> CodeGenerator<'source> {
         // iterated over normally
         if let Some(ref filter_expr) = for_loop.filter_expr {
             self.add(Instruction::LoadConst(Value::from(0usize)));
+            self.push_span(filter_expr.span());
             self.compile_expr(&for_loop.iter);
             self.start_for_loop(false, false);
             self.add(Instruction::DupTop);
@@ -541,13 +546,17 @@ impl<'source> CodeGenerator<'source> {
             self.start_else();
             self.add(Instruction::DiscardTop);
             self.end_if();
+            self.pop_span();
             self.end_for_loop(false);
             self.add(Instruction::BuildList(None));
+            self.start_for_loop(true, for_loop.recursive);
         } else {
+            self.push_span(for_loop.iter.span());
             self.compile_expr(&for_loop.iter);
+            self.start_for_loop(true, for_loop.recursive);
+            self.pop_span();
         }
 
-        self.start_for_loop(true, for_loop.recursive);
         self.compile_assignment(&for_loop.target);
         for node in &for_loop.body {
             self.compile_stmt(node);
