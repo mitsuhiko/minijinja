@@ -1,0 +1,5 @@
+{"$settings": {"undefined": "strict"}}
+---
+{% if undefined_value %}
+    ...
+{% endif %}

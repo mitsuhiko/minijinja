@@ -186,6 +186,24 @@ impl Expr<'_> {
             Expr::Filter(_) => "filter expression",
         }
     }
+
+    pub fn span(&self) -> Span {
+        match self {
+            Expr::Var(s) => s.span(),
+            Expr::Const(s) => s.span(),
+            Expr::Slice(s) => s.span(),
+            Expr::UnaryOp(s) => s.span(),
+            Expr::BinOp(s) => s.span(),
+            Expr::IfExpr(s) => s.span(),
+            Expr::Filter(s) => s.span(),
+            Expr::Test(s) => s.span(),
+            Expr::GetAttr(s) => s.span(),
+            Expr::GetItem(s) => s.span(),
+            Expr::Call(s) => s.span(),
+            Expr::List(s) => s.span(),
+            Expr::Map(s) => s.span(),
+        }
+    }
 }
 
 /// Root template node.

@@ -514,6 +514,10 @@ mod builtins {
     }
 
     /// Joins a sequence by a character
+    ///
+    /// ```jinja
+    /// {{ "Foo Bar Baz" | join(", ") }} -> foo, bar, baz
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn join(val: &Value, joiner: Option<Cow<'_, str>>) -> Result<String, Error> {
         if val.is_undefined() || val.is_none() {
