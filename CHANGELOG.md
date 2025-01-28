@@ -13,6 +13,8 @@ All notable changes to MiniJinja are documented here.
 - CLI moved from `serde_yml` to `serde_yaml`.  #684
 - Improved undefined error reporting.  Undefined values will now in most
   cases point to exactly where the error happened.  #686
+- Allow newer notify dependency versions (up to 8.x) for the autoreload
+  crate.  #688
 
 ## 2.6.0
 
