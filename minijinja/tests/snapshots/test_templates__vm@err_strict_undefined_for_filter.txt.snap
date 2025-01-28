@@ -1,0 +1,27 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{% for item in [undefined_value] if item %}\n    ...\n{% endfor %}"
+info:
+  $settings:
+    undefined: strict
+input_file: minijinja/tests/inputs/err_strict_undefined_for_filter.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: UndefinedError,
+    name: "err_strict_undefined_for_filter.txt",
+    line: 1,
+}
+
+undefined value (in err_strict_undefined_for_filter.txt:1)
+--------------------- err_strict_undefined_for_filter.txt ---------------------
+   1 > {% for item in [undefined_value] if item %}
+     i                                     ^^^^ undefined value
+   2 |     ...
+   3 | {% endfor %}
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Referenced variables: {
+    item: undefined,
+}
+-------------------------------------------------------------------------------

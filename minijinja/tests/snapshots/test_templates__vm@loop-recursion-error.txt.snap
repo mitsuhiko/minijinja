@@ -20,6 +20,7 @@ Error {
 invalid operation: recursion limit exceeded (in loop-recursion-error.txt:1)
 -------------------------- loop-recursion-error.txt ---------------------------
    1 > {% for item in seq recursive %}
+     i                ^^^ invalid operation
    2 |   {{ loop(seq) }}
    3 | {% endfor %}
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
