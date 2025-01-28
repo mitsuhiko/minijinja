@@ -3,6 +3,7 @@
     feature = "macros",
     feature = "builtins",
     feature = "adjacent_loop_items",
+    feature = "custom_syntax",
     feature = "deserialization"
 ))]
 use std::collections::BTreeMap;
