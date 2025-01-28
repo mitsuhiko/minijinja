@@ -1,6 +1,6 @@
 [package]
 name = "minijinja-contrib"
-version = "2.6.0"
+version = "2.7.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
@@ -26,7 +26,7 @@ wordwrap = ["textwrap"]
 unicode_wordwrap = ["wordwrap", "textwrap/unicode-linebreak", "textwrap/unicode-width"]
 
 [dependencies]
-minijinja = { version = "2.6.0", path = "../minijinja", default-features = false }
+minijinja = { version = "2.7.0", path = "../minijinja", default-features = false }
 rand = { version = "0.8.5", optional = true, default-features = false, features = ["std", "std_rng", "small_rng"] }
 serde = "1.0.164"
 textwrap = { version = "0.16.1", optional = true, default-features = false, features = ["smawk"] }
@@ -37,5 +37,5 @@ unicode_categories = { version = "0.1.1", optional = true }
 [dev-dependencies]
 insta = { version = "1.38.0", features = ["glob", "serde"] }
 chrono = { version = "0.4.26", features = ["serde"] }
-minijinja = { version = "2.6.0", path = "../minijinja", features = ["loader"] }
+minijinja = { version = "2.7.0", path = "../minijinja", features = ["loader"] }
 similar-asserts = "1.4.2"

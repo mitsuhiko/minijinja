@@ -1,6 +1,6 @@
 [package]
 name = "minijinja-embed"
-version = "2.6.0"
+version = "2.7.0"
 edition = "2018"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
