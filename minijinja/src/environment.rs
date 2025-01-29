@@ -13,7 +13,7 @@ use crate::expression::Expression;
 use crate::output::Output;
 use crate::template::{CompiledTemplate, CompiledTemplateRef, Template, TemplateConfig};
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
-use crate::value::{FunctionArgs, FunctionResult, Value};
+use crate::value::{FunctionArgs, FunctionResult, Value, ValueRepr};
 use crate::vm::State;
 use crate::{defaults, filters, functions, tests};
 
@@ -796,10 +796,14 @@ impl<'source> Environment<'source> {
         state: &State,
         out: &mut Output,
     ) -> Result<(), Error> {
-        if value.is_undefined() && matches!(self.undefined_behavior, UndefinedBehavior::Strict) {
-            Err(Error::from(ErrorKind::UndefinedError))
-        } else {
-            (self.formatter)(out, state, value)
+        match (self.undefined_behavior, &value.0) {
+            // this intentionally does not check for SilentUndefined.  SilentUndefined is
+            // exclusively used in the missing else condition of an if expression to match
+            // Jinja2 behavior.  Those go straight to the formatter.
+            (UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict, &ValueRepr::Undefined) => {
+                Err(Error::from(ErrorKind::UndefinedError))
+            }
+            _ => (self.formatter)(out, state, value),
         }
     }
 

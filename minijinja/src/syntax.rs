@@ -180,6 +180,15 @@
 //! {{ title|upper if title }}
 //! ```
 //!
+//! Note that for compatibility with Jinja2, when the `else` block is missing the undefined
+//! value will be marked as "silent".  This means even if strict undefined behavior is
+//! requested, this undefined value will print to an empty string.  This means
+//! that this is always valid:
+//!
+//! ```jinja
+//! {{ value if false }} -> prints an empty string (silent undefined returned from else)
+//! ```
+//!
 //! # Tags
 //!
 //! Tags control logic in templates.  The following tags exist:

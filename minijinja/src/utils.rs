@@ -106,8 +106,9 @@ pub enum AutoEscape {
 
 /// Defines the behavior of undefined values in the engine.
 ///
-/// At present there are three types of behaviors available which mirror the behaviors
-/// that Jinja2 provides out of the box.
+/// At present there are three types of behaviors available which mirror the
+/// behaviors that Jinja2 provides out of the box and an extra option called
+/// `SemiStrict` which is a slightly less strict undefined.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum UndefinedBehavior {
@@ -116,6 +117,7 @@ pub enum UndefinedBehavior {
     /// * **printing:** allowed (returns empty string)
     /// * **iteration:** allowed (returns empty array)
     /// * **attribute access of undefined values:** fails
+    /// * **if true:** allowed (is considered false)
     #[default]
     Lenient,
     /// Like `Lenient`, but also allows chaining of undefined lookups.
@@ -123,12 +125,21 @@ pub enum UndefinedBehavior {
     /// * **printing:** allowed (returns empty string)
     /// * **iteration:** allowed (returns empty array)
     /// * **attribute access of undefined values:** allowed (returns [`undefined`](Value::UNDEFINED))
+    /// * **if true:** allowed (is considered false)
     Chainable,
+    /// Like strict, but does not error when the undefined is checked for truthyness.
+    ///
+    /// * **printing:** fails
+    /// * **iteration:** fails
+    /// * **attribute access of undefined values:** fails
+    /// * **if true:** allowed (is considered false)
+    SemiStrict,
     /// Complains very quickly about undefined values.
     ///
     /// * **printing:** fails
     /// * **iteration:** fails
     /// * **attribute access of undefined values:** fails
+    /// * **if true:** fails
     Strict,
 }
 
@@ -136,18 +147,17 @@ impl UndefinedBehavior {
     /// Utility method used in the engine to determine what to do when an undefined is
     /// encountered.
     ///
-    /// The flag indicates if this is the first or second level of undefined value.  If
-    /// `parent_was_undefined` is set to `true`, the undefined was created by looking up
-    /// a missing attribute on an undefined value.  If `false` the undefined was created by
-    /// looking up a missing attribute on a defined value.
+    /// The flag indicates if this is the first or second level of undefined value.  The
+    /// parent value is passed too.
     pub(crate) fn handle_undefined(self, parent_was_undefined: bool) -> Result<Value, Error> {
         match (self, parent_was_undefined) {
             (UndefinedBehavior::Lenient, false)
             | (UndefinedBehavior::Strict, false)
+            | (UndefinedBehavior::SemiStrict, false)
             | (UndefinedBehavior::Chainable, _) => Ok(Value::UNDEFINED),
-            (UndefinedBehavior::Lenient, true) | (UndefinedBehavior::Strict, true) => {
-                Err(Error::from(ErrorKind::UndefinedError))
-            }
+            (UndefinedBehavior::Lenient, true)
+            | (UndefinedBehavior::Strict, true)
+            | (UndefinedBehavior::SemiStrict, true) => Err(Error::from(ErrorKind::UndefinedError)),
         }
     }
 
@@ -156,10 +166,12 @@ impl UndefinedBehavior {
     /// This fails only for strict undefined values.
     #[inline]
     pub(crate) fn is_true(self, value: &Value) -> Result<bool, Error> {
-        if matches!(self, UndefinedBehavior::Strict) && value.is_undefined() {
-            Err(Error::from(ErrorKind::UndefinedError))
-        } else {
-            Ok(value.is_true())
+        match (self, &value.0) {
+            // silent undefined doesn't error, even in strict mode
+            (UndefinedBehavior::Strict, &ValueRepr::Undefined) => {
+                Err(Error::from(ErrorKind::UndefinedError))
+            }
+            _ => Ok(value.is_true()),
         }
     }
 
@@ -176,10 +188,12 @@ impl UndefinedBehavior {
     /// Are we strict on iteration?
     #[inline]
     pub(crate) fn assert_iterable(self, value: &Value) -> Result<(), Error> {
-        if matches!(self, UndefinedBehavior::Strict) && value.is_undefined() {
-            Err(Error::from(ErrorKind::UndefinedError))
-        } else {
-            Ok(())
+        match (self, &value.0) {
+            // silent undefined doesn't error, even in strict mode
+            (UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict, &ValueRepr::Undefined) => {
+                Err(Error::from(ErrorKind::UndefinedError))
+            }
+            _ => Ok(()),
         }
     }
 }

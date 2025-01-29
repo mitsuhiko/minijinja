@@ -39,6 +39,68 @@ fn test_lenient_undefined() {
 }
 
 #[test]
+fn test_semi_strict_undefined() {
+    let mut env = Environment::new();
+    env.set_undefined_behavior(UndefinedBehavior::SemiStrict);
+
+    assert_eq!(
+        env.render_str("{{ true.missing_attribute }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined.missing_attribute }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("<{% for x in undefined %}...{% endfor %}>", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ 'foo' is in(undefined) }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(render!(in env, "<{% if undefined %}42{% endif %}>"), "<>");
+    assert_eq!(
+        env.render_str("<{{ undefined }}>", ()).unwrap_err().kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(render!(in env, "{{ undefined is undefined }}"), "true");
+    assert_eq!(render!(in env, "<{{ 42 if false }}>"), "<>");
+    assert_eq!(
+        render!(in env, "{{ x.foo is undefined }}", x => HashMap::<String, String>::new()),
+        "true"
+    );
+    assert_eq!(
+        env.render_str(
+            "<{% if x.foo %}...{% endif %}>",
+            context! { x => HashMap::<String, String>::new() }
+        )
+        .unwrap(),
+        "<>"
+    );
+    assert_eq!(
+        env.render_str("{{ undefined|list }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::InvalidOperation
+    );
+    assert_eq!(
+        env.render_str("{{ 42 in undefined }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+}
+
+#[test]
 fn test_strict_undefined() {
     let mut env = Environment::new();
     env.set_undefined_behavior(UndefinedBehavior::Strict);
@@ -68,10 +130,17 @@ fn test_strict_undefined() {
         ErrorKind::UndefinedError
     );
     assert_eq!(
+        env.render_str("<{% if undefined %}42{% endif %}>", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
         env.render_str("<{{ undefined }}>", ()).unwrap_err().kind(),
         ErrorKind::UndefinedError
     );
     assert_eq!(render!(in env, "{{ undefined is undefined }}"), "true");
+    assert_eq!(env.render_str("<{{ 42 if false }}>", ()).unwrap(), "<>");
     assert_eq!(
         render!(in env, "{{ x.foo is undefined }}", x => HashMap::<String, String>::new()),
         "true"

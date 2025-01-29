@@ -134,7 +134,9 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
                 b.get(start..start + len).unwrap_or_default().to_owned(),
             ))
         }
-        ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
+        ValueRepr::Undefined | ValueRepr::SilentUndefined | ValueRepr::None => {
+            Ok(Value::from(Vec::<Value>::new()))
+        }
         ValueRepr::Object(obj) if matches!(obj.repr(), ObjectRepr::Seq | ObjectRepr::Iterable) => {
             Ok(Value::make_object_iterable(obj, move |obj| {
                 let len = obj.enumerator_len().unwrap_or_default();

@@ -2,6 +2,13 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.8.0
+
+- Added `SemiStrict` undefined mode that is like strict but allows
+  to be checked for truthiness.  Additionally an if expression without
+  an else block will always produce a silent undefined object that
+  never errors for compatibility with Jinja2.  #687
+
 ## 2.7.0
 
 - Removed string interning.  #675

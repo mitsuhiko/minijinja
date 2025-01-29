@@ -7,7 +7,7 @@ use crate::compiler::instructions::{
 use crate::compiler::tokens::Span;
 use crate::output::CaptureMode;
 use crate::value::ops::neg;
-use crate::value::{Kwargs, Value, ValueMap};
+use crate::value::{Kwargs, Value, ValueMap, ValueRepr};
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -660,7 +660,10 @@ impl<'source> CodeGenerator<'source> {
                 if let Some(ref false_expr) = i.false_expr {
                     self.compile_expr(false_expr);
                 } else {
-                    self.add(Instruction::LoadConst(Value::UNDEFINED));
+                    // special behavior: missing false block have a silent undefined
+                    // to permit special casing.  This is for compatibility also with
+                    // what Jinja2 does.
+                    self.add(Instruction::LoadConst(ValueRepr::SilentUndefined.into()));
                 }
                 self.end_if();
             }

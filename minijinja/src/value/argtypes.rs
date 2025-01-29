@@ -937,7 +937,9 @@ impl TryFrom<Value> for Kwargs {
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.0 {
-            ValueRepr::Undefined => Ok(Kwargs::new(Default::default())),
+            ValueRepr::Undefined | ValueRepr::SilentUndefined => {
+                Ok(Kwargs::new(Default::default()))
+            }
             ValueRepr::Object(_) => {
                 Kwargs::extract(&value).ok_or_else(|| Error::from(ErrorKind::InvalidOperation))
             }

@@ -640,7 +640,9 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn int(value: &Value) -> Result<Value, Error> {
         match &value.0 {
-            ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(0)),
+            ValueRepr::Undefined | ValueRepr::SilentUndefined | ValueRepr::None => {
+                Ok(Value::from(0))
+            }
             ValueRepr::Bool(x) => Ok(Value::from(*x as u64)),
             ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::U128(_) | ValueRepr::I128(_) => {
                 Ok(value.clone())
@@ -673,7 +675,9 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn float(value: &Value) -> Result<Value, Error> {
         match &value.0 {
-            ValueRepr::Undefined | ValueRepr::None => Ok(Value::from(0.0)),
+            ValueRepr::Undefined | ValueRepr::SilentUndefined | ValueRepr::None => {
+                Ok(Value::from(0.0))
+            }
             ValueRepr::Bool(x) => Ok(Value::from(*x as u64 as f64)),
             ValueRepr::String(..) | ValueRepr::SmallStr(_) => value
                 .as_str()
@@ -1190,7 +1194,9 @@ mod builtins {
             Ok(rv)
         } else {
             match &value.0 {
-                ValueRepr::None | ValueRepr::Undefined => Ok("".into()),
+                ValueRepr::None | ValueRepr::Undefined | ValueRepr::SilentUndefined => {
+                    Ok("".into())
+                }
                 ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
                 ValueRepr::String(..) | ValueRepr::SmallStr(_) => Ok(
                     percent_encoding::utf8_percent_encode(value.as_str().unwrap(), SET).to_string(),

@@ -181,7 +181,9 @@ impl<'de> Deserializer<'de> for Value {
             ValueRepr::F64(v) => visitor.visit_f64(v),
             ValueRepr::String(ref v, _) => visitor.visit_str(v),
             ValueRepr::SmallStr(v) => visitor.visit_str(v.as_str()),
-            ValueRepr::Undefined | ValueRepr::None => visitor.visit_unit(),
+            ValueRepr::Undefined | ValueRepr::SilentUndefined | ValueRepr::None => {
+                visitor.visit_unit()
+            }
             ValueRepr::Bytes(ref v) => visitor.visit_bytes(v),
             ValueRepr::Object(o) => match o.repr() {
                 ObjectRepr::Plain => Err(de::Error::custom("cannot deserialize plain objects")),
@@ -197,7 +199,9 @@ impl<'de> Deserializer<'de> for Value {
 
     fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Error> {
         match self.0 {
-            ValueRepr::None | ValueRepr::Undefined => visitor.visit_unit(),
+            ValueRepr::None | ValueRepr::Undefined | ValueRepr::SilentUndefined => {
+                visitor.visit_unit()
+            }
             _ => visitor.visit_some(self),
         }
     }
@@ -405,7 +409,7 @@ impl de::Error for Error {
 
 fn value_to_unexpected(value: &Value) -> Unexpected {
     match value.0 {
-        ValueRepr::Undefined | ValueRepr::None => Unexpected::Unit,
+        ValueRepr::Undefined | ValueRepr::SilentUndefined | ValueRepr::None => Unexpected::Unit,
         ValueRepr::Bool(val) => Unexpected::Bool(val),
         ValueRepr::U64(val) => Unexpected::Unsigned(val),
         ValueRepr::I64(val) => Unexpected::Signed(val),
