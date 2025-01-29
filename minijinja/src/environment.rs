@@ -800,10 +800,9 @@ impl<'source> Environment<'source> {
             // this intentionally does not check for SilentUndefined.  SilentUndefined is
             // exclusively used in the missing else condition of an if expression to match
             // Jinja2 behavior.  Those go straight to the formatter.
-            (
-                UndefinedBehavior::Strict | UndefinedBehavior::MostlyStrict,
-                &ValueRepr::Undefined,
-            ) => Err(Error::from(ErrorKind::UndefinedError)),
+            (UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict, &ValueRepr::Undefined) => {
+                Err(Error::from(ErrorKind::UndefinedError))
+            }
             _ => (self.formatter)(out, state, value),
         }
     }

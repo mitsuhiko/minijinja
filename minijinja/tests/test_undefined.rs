@@ -39,9 +39,9 @@ fn test_lenient_undefined() {
 }
 
 #[test]
-fn test_mostly_strict_undefined() {
+fn test_semi_strict_undefined() {
     let mut env = Environment::new();
-    env.set_undefined_behavior(UndefinedBehavior::MostlyStrict);
+    env.set_undefined_behavior(UndefinedBehavior::SemiStrict);
 
     assert_eq!(
         env.render_str("{{ true.missing_attribute }}", ())

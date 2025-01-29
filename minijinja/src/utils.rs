@@ -108,7 +108,7 @@ pub enum AutoEscape {
 ///
 /// At present there are three types of behaviors available which mirror the
 /// behaviors that Jinja2 provides out of the box and an extra option called
-/// `MostlyStrict` which is a slightly less strict undefined.
+/// `SemiStrict` which is a slightly less strict undefined.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum UndefinedBehavior {
@@ -133,7 +133,7 @@ pub enum UndefinedBehavior {
     /// * **iteration:** fails
     /// * **attribute access of undefined values:** fails
     /// * **if true:** allowed (is considered false)
-    MostlyStrict,
+    SemiStrict,
     /// Complains very quickly about undefined values.
     ///
     /// * **printing:** fails
@@ -153,13 +153,11 @@ impl UndefinedBehavior {
         match (self, parent_was_undefined) {
             (UndefinedBehavior::Lenient, false)
             | (UndefinedBehavior::Strict, false)
-            | (UndefinedBehavior::MostlyStrict, false)
+            | (UndefinedBehavior::SemiStrict, false)
             | (UndefinedBehavior::Chainable, _) => Ok(Value::UNDEFINED),
             (UndefinedBehavior::Lenient, true)
             | (UndefinedBehavior::Strict, true)
-            | (UndefinedBehavior::MostlyStrict, true) => {
-                Err(Error::from(ErrorKind::UndefinedError))
-            }
+            | (UndefinedBehavior::SemiStrict, true) => Err(Error::from(ErrorKind::UndefinedError)),
         }
     }
 
@@ -192,10 +190,9 @@ impl UndefinedBehavior {
     pub(crate) fn assert_iterable(self, value: &Value) -> Result<(), Error> {
         match (self, &value.0) {
             // silent undefined doesn't error, even in strict mode
-            (
-                UndefinedBehavior::Strict | UndefinedBehavior::MostlyStrict,
-                &ValueRepr::Undefined,
-            ) => Err(Error::from(ErrorKind::UndefinedError)),
+            (UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict, &ValueRepr::Undefined) => {
+                Err(Error::from(ErrorKind::UndefinedError))
+            }
             _ => Ok(()),
         }
     }
