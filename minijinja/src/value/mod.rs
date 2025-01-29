@@ -410,7 +410,10 @@ impl SmallStr {
 
 #[derive(Clone)]
 pub(crate) enum ValueRepr {
+    /// The regular undefined type produced as part of template evaluation
     Undefined,
+    /// A special undefined marker that indicates an always-quiet undefined.
+    /// This is emitted for ternary expressions with missing else blocks.
     SilentUndefined,
     Bool(bool),
     U64(u64),

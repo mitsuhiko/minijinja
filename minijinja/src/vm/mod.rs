@@ -337,7 +337,7 @@ impl<'env> Vm<'env> {
                     // special case.
                     stack.push(match a.get_attr_fast(name) {
                         Some(value) => assert_valid!(value),
-                        None => ctx_ok!(undefined_behavior.handle_undefined(&a)),
+                        None => ctx_ok!(undefined_behavior.handle_undefined(a.is_undefined())),
                     });
                 }
                 Instruction::SetAttr(name) => {
@@ -357,7 +357,7 @@ impl<'env> Vm<'env> {
                     b = stack.pop();
                     stack.push(match b.get_item_opt(&a) {
                         Some(value) => assert_valid!(value),
-                        None => ctx_ok!(undefined_behavior.handle_undefined(&b)),
+                        None => ctx_ok!(undefined_behavior.handle_undefined(b.is_undefined())),
                     });
                 }
                 Instruction::Slice => {

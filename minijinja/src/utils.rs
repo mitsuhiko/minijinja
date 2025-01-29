@@ -106,8 +106,9 @@ pub enum AutoEscape {
 
 /// Defines the behavior of undefined values in the engine.
 ///
-/// At present there are three types of behaviors available which mirror the behaviors
-/// that Jinja2 provides out of the box.
+/// At present there are three types of behaviors available which mirror the
+/// behaviors that Jinja2 provides out of the box and an extra option called
+/// `MostlyStrict` which is a slightly less strict undefined.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum UndefinedBehavior {
@@ -116,7 +117,7 @@ pub enum UndefinedBehavior {
     /// * **printing:** allowed (returns empty string)
     /// * **iteration:** allowed (returns empty array)
     /// * **attribute access of undefined values:** fails
-    /// * **if true:** allowed (is false)
+    /// * **if true:** allowed (is considered false)
     #[default]
     Lenient,
     /// Like `Lenient`, but also allows chaining of undefined lookups.
@@ -124,19 +125,14 @@ pub enum UndefinedBehavior {
     /// * **printing:** allowed (returns empty string)
     /// * **iteration:** allowed (returns empty array)
     /// * **attribute access of undefined values:** allowed (returns [`undefined`](Value::UNDEFINED))
-    /// * **if true:** allowed (is false)
+    /// * **if true:** allowed (is considered false)
     Chainable,
-    /// Complains very quickly about undefined values but not quite as strictly.
+    /// Like strict, but does not error when the undefined is checked for truthyness.
     ///
-    /// The difference of this to the strict undefined is that some operations are still
-    /// possible with mostly strict ones.  In particular using it in an `if` statement
-    /// without using the `undefined` filter will not fail.  You can also safely iterate
-    /// or print the implied `undefined` in `value if false`.
-    ///
-    /// * **printing:** fails (most of the time, see disclaimer)
-    /// * **iteration:** fails (most of the time, see disclaimer)
+    /// * **printing:** fails
+    /// * **iteration:** fails
     /// * **attribute access of undefined values:** fails
-    /// * **if true:** allowed (is false)
+    /// * **if true:** allowed (is considered false)
     MostlyStrict,
     /// Complains very quickly about undefined values.
     ///
@@ -153,8 +149,8 @@ impl UndefinedBehavior {
     ///
     /// The flag indicates if this is the first or second level of undefined value.  The
     /// parent value is passed too.
-    pub(crate) fn handle_undefined(self, parent: &Value) -> Result<Value, Error> {
-        match (self, parent.is_undefined()) {
+    pub(crate) fn handle_undefined(self, parent_was_undefined: bool) -> Result<Value, Error> {
+        match (self, parent_was_undefined) {
             (UndefinedBehavior::Lenient, false)
             | (UndefinedBehavior::Strict, false)
             | (UndefinedBehavior::MostlyStrict, false)
@@ -173,7 +169,8 @@ impl UndefinedBehavior {
     #[inline]
     pub(crate) fn is_true(self, value: &Value) -> Result<bool, Error> {
         match (self, &value.0) {
-            (UndefinedBehavior::Strict, &ValueRepr::Undefined | &ValueRepr::SilentUndefined) => {
+            // silent undefined doesn't error, even in strict mode
+            (UndefinedBehavior::Strict, &ValueRepr::Undefined) => {
                 Err(Error::from(ErrorKind::UndefinedError))
             }
             _ => Ok(value.is_true()),
@@ -194,10 +191,11 @@ impl UndefinedBehavior {
     #[inline]
     pub(crate) fn assert_iterable(self, value: &Value) -> Result<(), Error> {
         match (self, &value.0) {
-            (UndefinedBehavior::Strict, &ValueRepr::Undefined | &ValueRepr::SilentUndefined)
-            | (UndefinedBehavior::MostlyStrict, &ValueRepr::Undefined) => {
-                Err(Error::from(ErrorKind::UndefinedError))
-            }
+            // silent undefined doesn't error, even in strict mode
+            (
+                UndefinedBehavior::Strict | UndefinedBehavior::MostlyStrict,
+                &ValueRepr::Undefined,
+            ) => Err(Error::from(ErrorKind::UndefinedError)),
             _ => Ok(()),
         }
     }

@@ -706,7 +706,7 @@ mod builtins {
         let iter = ok!(state.undefined_behavior().try_iter(values));
         for value in iter {
             if value.is_undefined() {
-                ok!(state.undefined_behavior().handle_undefined(&value));
+                ok!(state.undefined_behavior().handle_undefined(false));
                 continue;
             } else if !value.is_number() {
                 return Err(Error::new(
