@@ -25,7 +25,7 @@ jobs:
         with:
           args: --release --target universal2-apple-darwin --out dist -m minijinja-py/Cargo.toml
       - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: wheels
           path: dist
@@ -53,7 +53,7 @@ jobs:
           args: --release --out dist -m minijinja-py/Cargo.toml --interpreter "3.9"
           manylinux: auto
       - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: wheels
           path: dist
@@ -78,7 +78,7 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist -m minijinja-py/Cargo.toml
       - name: Upload wheels
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: wheels
           path: dist
@@ -94,7 +94,7 @@ jobs:
           command: sdist
           args: --out dist -m minijinja-py/Cargo.toml
       - name: Upload sdist
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: wheels
           path: dist
