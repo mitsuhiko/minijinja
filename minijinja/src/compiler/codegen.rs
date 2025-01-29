@@ -661,7 +661,8 @@ impl<'source> CodeGenerator<'source> {
                     self.compile_expr(false_expr);
                 } else {
                     // special behavior: missing false block have a silent undefined
-                    // to permit special casing.
+                    // to permit special casing.  This is for compatibility also with
+                    // what Jinja2 does.
                     self.add(Instruction::LoadConst(ValueRepr::SilentUndefined.into()));
                 }
                 self.end_if();
