@@ -8,6 +8,11 @@ All notable changes to MiniJinja are documented here.
   to be checked for truthiness.  Additionally an if expression without
   an else block will always produce a silent undefined object that
   never errors for compatibility with Jinja2.  #687
+- Make the trait bounds of `ViaDeserialize` stricter.  Now the type
+  can only be constructed if the type implements `DeserializeOwned`.
+  This is not a new requirement for passing the function to
+  `add_function` but bad code will now error earlier for better
+  error reporting.  #689
 
 ## 2.7.0
 
