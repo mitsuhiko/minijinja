@@ -2,8 +2,8 @@ use std::ops::{Deref, DerefMut};
 
 use serde::de::value::{MapDeserializer, SeqDeserializer};
 use serde::de::{
-    self, Deserialize, DeserializeSeed, Deserializer, EnumAccess, IntoDeserializer, MapAccess,
-    SeqAccess, Unexpected, VariantAccess, Visitor,
+    self, Deserialize, DeserializeOwned, DeserializeSeed, Deserializer, EnumAccess,
+    IntoDeserializer, MapAccess, SeqAccess, Unexpected, VariantAccess, Visitor,
 };
 use serde::forward_to_deserialize_any;
 
@@ -110,9 +110,9 @@ impl<'de> Visitor<'de> for ValueVisitor {
 /// env.add_filter("dirname", dirname);
 /// ```
 #[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
-pub struct ViaDeserialize<T>(pub T);
+pub struct ViaDeserialize<T: DeserializeOwned>(pub T);
 
-impl<'a, T: Deserialize<'a>> ArgType<'a> for ViaDeserialize<T> {
+impl<'a, T: DeserializeOwned> ArgType<'a> for ViaDeserialize<T> {
     type Output = Self;
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
@@ -131,7 +131,7 @@ impl<'a, T: Deserialize<'a>> ArgType<'a> for ViaDeserialize<T> {
     }
 }
 
-impl<T> Deref for ViaDeserialize<T> {
+impl<T: DeserializeOwned> Deref for ViaDeserialize<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
@@ -139,7 +139,7 @@ impl<T> Deref for ViaDeserialize<T> {
     }
 }
 
-impl<T> DerefMut for ViaDeserialize<T> {
+impl<T: DeserializeOwned> DerefMut for ViaDeserialize<T> {
     fn deref_mut(&mut self) -> &mut T {
         &mut self.0
     }
