@@ -135,7 +135,7 @@ pub(crate) fn get_rng(state: &State) -> rand::rngs::SmallRng {
     {
         SmallRng::seed_from_u64(seed)
     } else {
-        SmallRng::from_entropy()
+        SmallRng::from_os_rng()
     }
 }
 
@@ -157,7 +157,7 @@ pub fn randrange(state: &State, n: i64, m: Option<i64>) -> i64 {
         Some(m) => (n, m),
     };
 
-    get_rng(state).gen_range(lower..upper)
+    get_rng(state).random_range(lower..upper)
 }
 
 /// Generates a random lorem ipsum.
@@ -178,7 +178,7 @@ pub fn lipsum(
     n: Option<usize>,
     kwargs: minijinja::value::Kwargs,
 ) -> Result<Value, Error> {
-    use rand::seq::SliceRandom;
+    use rand::seq::IndexedRandom;
     use rand::Rng;
 
     #[rustfmt::skip]
@@ -230,7 +230,7 @@ pub fn lipsum(
         let mut last_fullstop = 0;
         let mut last = "";
 
-        for idx in 0..rng.gen_range(min..max) {
+        for idx in 0..rng.random_range(min..max) {
             if idx > 0 {
                 rv.push(' ');
             } else if html {
@@ -258,7 +258,7 @@ pub fn lipsum(
                 rv.push_str(word);
             }
 
-            if idx - last_fullstop > rng.gen_range(10..20) {
+            if idx - last_fullstop > rng.random_range(10..20) {
                 rv.push('.');
                 last_fullstop = idx;
                 next_capitalized = true;
