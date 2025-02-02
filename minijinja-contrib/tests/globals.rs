@@ -54,23 +54,21 @@ fn test_lispum() {
     env.add_function("lipsum", lipsum);
 
     assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ lipsum(5) }}"), @r###"
-    Facilisi accumsan class rutrum integer euismod gravida cras vsociis arcu lobortis sociosqu elementum lacus nulla. Leo imperdiet penatibus id quam malesuada pretium sociosqu scelerisque diam sociosqu penatibus imperdiet et nisl. Ante s vulputate nulla porta ssociis per gravida primis porta penatibus nostra congue dui.
+    Felis platea netus nisl sociosqu ssociis at morbi ante lobortis ssociis mi cubilia sociosqu ssociis. Nunc etiam posuere interdum sagittis dapibus nibh ipsum neque elementum magna scelerisque diam dictum arcu ssociis sociosqu nunc. Scelerisque ad sociosqu convallis leo facilisi felis in et id habitant orci consequat nisl mi. Porttitor dictumst hendrerit egestas eleifend ssociis lacus pellentesque nonummy eu ssociis facilisis justo ssociis vsociis felis odio. Lacinia sociosqu litora lectus pede elit curae dolor adipiscing quam sociosqu hac eros amet a enim. Inceptos fermentum ornare dis.
 
-    Ipsum cras integer magna ssociis etiam eu rutrum ac praesent ssociis primis nisl malesuada sociosqu. Senectus sem neque ridiculus aliquet duis nisl facilisis quam diam nibh ad eget. Rutrum mauris aliquam faucibus magna eu phasellus ssociis libero neque convallis magna. Ante aliquet proin montes nibh sociosqu vulputate auctor.
+    Enim sociosqu praesent ipsum cubilia sociosqu commodo aliquet montes pellentesque sociosqu dapibus interdum. Elementum enim natoque quisque inceptos pede sociosqu sem sociosqu consectetuer lectus est. Sociis nisl sit hendrerit molestie parturient magna id orci erat proin phasellus ante sociosqu ssociis egestas. Posuere fames iaculis libero fermentum neque integer euismod fusce et euismod eu ac. Amet pellentesque per nunc sociis eleifend massa fames fermentum purus non. Ssociis feugiat dignissim nostra dis commodo sociosqu gravida nullam quisque sit et malesuada ante sociosqu. Lectus etiam justo phasellus proin ssoincidusociis sociosqu facilisi nec s placerat netus ssociis aptent. Sociosqu sapien.
 
-    Lacinia aliquam dictumst pellentesque nibh sociosqu sagittis leo ad dictum elementum sapien mi sociosqu. Et ssociis laoreet dolor egestas scelerisque potenti duis natoque ssociis feugiat. Proin luctus porta rhoncus quis phasellus netus non proin sociosqu nonummy ornare lacinia. Leo sociis inceptos cum leo non elit class sed sapien dictum diam mattis dapibus netus facilisis. Hendrerit montes aliquam ssociis ridiculus a cras sociosqu nisi ssociis curabitur.
+    Magnis ssociis per commodo curabitur sociosqu platea condimentum enim sociosqu nullam litora proin molestie fusce. Molestie sociosqu ssociis lectus ligula.
 
-    Justo nonummy pulvinar potenti in potenti at facilisi platea sagittis scelerisque quis sapien semper dictum in ipsum. Nunc nonummy ornare etiam elementum nullam curae eu nullam ad nascetur ssociis nullam mus. Nisi ssociis gravida dapibus non sociosqu laoreet adipiscing potenti ipsum parturient potenti mollis odio. Leo eget felis pretium libero consectetuer hymenaeos sociosqu ssociis in posuere.
+    Sapien faucibus senectus convallis augue fames habitant morbi montes potenti nisi pretium mauris. Ante ssociis purus neque bibendum faucibus neque aliquam amet ssociis congue maecenas dolor dignissim. Habitasse nostra phasellus imperdiet id porta litora blandit in sed lacinia. Quam ssoincidusociis sociosqu massa proin dolor montes imperdiet cum sociosqu bibendum auctor.
 
-    S commodo fames ridiculus luctus proin non aptent nullam mi eleifend consectetuer aliquam ad. Scelerisque nisl blandit sociis euismod curae semper nunc nec litora condimentum fames habitasse. Inceptos augue sociosqu hendrerit justo montes orci proin mus molestie id iaculis nostra lacus. Cum facilisis potenti facilisis nonummy sem.
-
+    Cras natoque felis nostra ssociis arcu sociosqu scelerisque ssociis eros placerat proin rhoncus sociis est ssociis dapibus condimentum sed. Quisque et class placerat pharetra malesuada enim potenti fermentum natoque dolor risus auctor sociosqu nec risus ssociis sociosqu. Et bibendum egestas gravida pellentesque montes dapibus s donec hendrerit mollis et sit nibh amet. Cursus pretium molestie ssociis ridiculus convallis sociosqu sociis sagittis fermentum gravida quisque nostra. Ante scelerisque sociosqu non magnis ssociis lacinia feugiat risus erat risus.
     "###);
 
     assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ lipsum(2, html=true) }}"), @r###"
-    <p>Facilisi accumsan class rutrum integer euismod gravida cras vsociis arcu lobortis sociosqu elementum lacus nulla. Leo imperdiet penatibus id quam malesuada pretium sociosqu scelerisque diam sociosqu penatibus imperdiet et nisl. Ante s vulputate nulla porta ssociis per gravida primis porta penatibus nostra congue dui.</p>
+    <p>Felis platea netus nisl sociosqu ssociis at morbi ante lobortis ssociis mi cubilia sociosqu ssociis. Nunc etiam posuere interdum sagittis dapibus nibh ipsum neque elementum magna scelerisque diam dictum arcu ssociis sociosqu nunc. Scelerisque ad sociosqu convallis leo facilisi felis in et id habitant orci consequat nisl mi. Porttitor dictumst hendrerit egestas eleifend ssociis lacus pellentesque nonummy eu ssociis facilisis justo ssociis vsociis felis odio. Lacinia sociosqu litora lectus pede elit curae dolor adipiscing quam sociosqu hac eros amet a enim. Inceptos fermentum ornare dis.</p>
 
-    <p>Ipsum cras integer magna ssociis etiam eu rutrum ac praesent ssociis primis nisl malesuada sociosqu. Senectus sem neque ridiculus aliquet duis nisl facilisis quam diam nibh ad eget. Rutrum mauris aliquam faucibus magna eu phasellus ssociis libero neque convallis magna. Ante aliquet proin montes nibh sociosqu vulputate auctor.</p>
-
+    <p>Enim sociosqu praesent ipsum cubilia sociosqu commodo aliquet montes pellentesque sociosqu dapibus interdum. Elementum enim natoque quisque inceptos pede sociosqu sem sociosqu consectetuer lectus est. Sociis nisl sit hendrerit molestie parturient magna id orci erat proin phasellus ante sociosqu ssociis egestas. Posuere fames iaculis libero fermentum neque integer euismod fusce et euismod eu ac. Amet pellentesque per nunc sociis eleifend massa fames fermentum purus non. Ssociis feugiat dignissim nostra dis commodo sociosqu gravida nullam quisque sit et malesuada ante sociosqu. Lectus etiam justo phasellus proin ssoincidusociis sociosqu facilisi nec s placerat netus ssociis aptent. Sociosqu sapien.</p>
     "###);
 }
 
@@ -82,6 +80,6 @@ fn test_randrange() {
     let mut env = Environment::new();
     env.add_function("randrange", randrange);
 
-    assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ randrange(10) }}"), @"1");
-    assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ randrange(-50, 50) }}"), @"-20");
+    assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ randrange(10) }}"), @"8");
+    assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ randrange(-50, 50) }}"), @"31");
 }
