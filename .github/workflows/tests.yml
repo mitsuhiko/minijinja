@@ -36,14 +36,14 @@ jobs:
         run: make test
 
   test-32bit:
-    name: Check on 1.63.0 (32bit)
+    name: Check on 1.70.0 (32bit)
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.63.0
+          toolchain: 1.70.0
           targets: armv5te-unknown-linux-gnueabi
       - uses: Swatinem/rust-cache@v2
       - name: Install Cross Deps
@@ -56,14 +56,14 @@ jobs:
         run: cargo check --all-features -p minijinja --target armv5te-unknown-linux-gnueabi
 
   test-fuel-feature:
-    name: Check on 1.63.0 (fuel feature)
+    name: Check on 1.70.0 (fuel feature)
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.63.0
+          toolchain: 1.70.0
       - uses: Swatinem/rust-cache@v2
       - name: Restore Cargo.lock
         run: cp Cargo.lock.msrv Cargo.lock
@@ -71,14 +71,14 @@ jobs:
         run: cargo check --no-default-features -p minijinja --features fuel
 
   test-stable:
-    name: Test on 1.63.0
+    name: Test on 1.70.0
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.63.0
+          toolchain: 1.70.0
       - uses: Swatinem/rust-cache@v2
       - name: Restore Cargo.lock
         run: cp Cargo.lock.msrv Cargo.lock
