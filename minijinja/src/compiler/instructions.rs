@@ -320,8 +320,7 @@ impl<'source> Instructions<'source> {
     fn add_line_record(&mut self, instr: usize, line: u32) {
         let same_loc = self
             .line_infos
-            .last()
-            .map_or(false, |last_loc| last_loc.line == line);
+            .last().is_some_and(|last_loc| last_loc.line == line);
         if !same_loc {
             self.line_infos.push(LineInfo {
                 first_instruction: instr as u32,
@@ -338,7 +337,7 @@ impl<'source> Instructions<'source> {
         // if we follow up to a valid span with no more span, clear it out
         #[cfg(feature = "debug")]
         {
-            if self.span_infos.last().map_or(false, |x| x.span.is_some()) {
+            if self.span_infos.last().is_some_and(|x| x.span.is_some()) {
                 self.span_infos.push(SpanInfo {
                     first_instruction: rv as u32,
                     span: None,
@@ -355,8 +354,7 @@ impl<'source> Instructions<'source> {
         {
             let same_loc = self
                 .span_infos
-                .last()
-                .map_or(false, |last_loc| last_loc.span == Some(span));
+                .last().is_some_and(|last_loc| last_loc.span == Some(span));
             if !same_loc {
                 self.span_infos.push(SpanInfo {
                     first_instruction: rv as u32,

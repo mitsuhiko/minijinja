@@ -525,7 +525,7 @@ impl PartialEq for Value {
                                     need_length_fallback = false;
                                 }
                                 let mut a_count = 0;
-                                if !a.try_iter_pairs().map_or(false, |mut ak| {
+                                if !a.try_iter_pairs().is_some_and(|mut ak| {
                                     ak.all(|(k, v1)| {
                                         a_count += 1;
                                         b.get_value(&k) == Some(v1)
