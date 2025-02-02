@@ -125,18 +125,15 @@ pub fn joiner(sep: Option<Value>) -> Value {
 
 /// Returns the rng for the state
 #[cfg(feature = "rand")]
-pub(crate) fn get_rng(state: &State) -> rand::rngs::SmallRng {
-    use rand::rngs::SmallRng;
-    use rand::SeedableRng;
-
-    if let Some(seed) = state
-        .lookup("RAND_SEED")
-        .and_then(|x| u64::try_from(x).ok())
-    {
-        SmallRng::seed_from_u64(seed)
-    } else {
-        SmallRng::from_os_rng()
-    }
+pub(crate) fn get_rng(state: &State) -> crate::rand::XorShiftRng {
+    // XXX: we have no way to stash the rng away today which renders this
+    // feature rather useless.  Repeated calls to randrange etc. will
+    // always yield the same number.
+    crate::rand::XorShiftRng::new(
+        state
+            .lookup("RAND_SEED")
+            .and_then(|x| u64::try_from(x).ok()),
+    )
 }
 
 /// Returns a random number in a given range.
@@ -150,14 +147,12 @@ pub(crate) fn get_rng(state: &State) -> rand::rngs::SmallRng {
 #[cfg(feature = "rand")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand")))]
 pub fn randrange(state: &State, n: i64, m: Option<i64>) -> i64 {
-    use rand::Rng;
-
     let (lower, upper) = match m {
         None => (0, n),
         Some(m) => (n, m),
     };
 
-    get_rng(state).random_range(lower..upper)
+    get_rng(state).random_range(lower, upper)
 }
 
 /// Generates a random lorem ipsum.
@@ -178,9 +173,6 @@ pub fn lipsum(
     n: Option<usize>,
     kwargs: minijinja::value::Kwargs,
 ) -> Result<Value, Error> {
-    use rand::seq::IndexedRandom;
-    use rand::Rng;
-
     #[rustfmt::skip]
     const LIPSUM_WORDS: &[&str] = &[
         "a", "ac", "accumsan", "ad", "adipiscing", "aenean", "aliquam",
@@ -230,14 +222,14 @@ pub fn lipsum(
         let mut last_fullstop = 0;
         let mut last = "";
 
-        for idx in 0..rng.random_range(min..max) {
+        for idx in 0..rng.random_range(min as i64, max as i64) {
             if idx > 0 {
                 rv.push(' ');
             } else if html {
                 rv.push_str("<p>");
             }
             let word = loop {
-                let word = LIPSUM_WORDS.choose(&mut rng).copied().unwrap_or("");
+                let word = LIPSUM_WORDS[rng.next_usize(LIPSUM_WORDS.len())];
                 if word != last {
                     last = word;
                     break word;
@@ -258,7 +250,7 @@ pub fn lipsum(
                 rv.push_str(word);
             }
 
-            if idx - last_fullstop > rng.random_range(10..20) {
+            if idx - last_fullstop > rng.random_range(10, 20) {
                 rv.push('.');
                 last_fullstop = idx;
                 next_capitalized = true;
