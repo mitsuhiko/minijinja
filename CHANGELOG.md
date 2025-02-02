@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.9.0
+
+- Raise MSRV to 1.70.
+
 ## 2.8.0
 
 - Added `SemiStrict` undefined mode that is like strict but allows
