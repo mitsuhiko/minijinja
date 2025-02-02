@@ -139,7 +139,7 @@ fn visit_dirs(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io::Result<()> {
             if path
                 .file_name()
                 .and_then(|x| x.to_str())
-                .map_or(false, |x| x.starts_with('.'))
+                .is_some_and(|x| x.starts_with('.'))
             {
                 continue;
             }
@@ -168,7 +168,7 @@ where
             && !p
                 .file_name()
                 .and_then(|x| x.to_str())
-                .map_or(false, |name| extensions.iter().any(|x| name.ends_with(x)))
+                .is_some_and(|name| extensions.iter().any(|x| name.ends_with(x)))
         {
             return;
         }
