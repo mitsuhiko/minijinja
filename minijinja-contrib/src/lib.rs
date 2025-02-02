@@ -24,6 +24,9 @@ pub mod filters;
 /// Globals
 pub mod globals;
 
+#[cfg(feature = "rand")]
+mod rand;
+
 /// Registers all features of this crate with an [`Environment`].
 ///
 /// All the filters that are available will be added, same with global

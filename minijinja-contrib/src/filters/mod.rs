@@ -77,11 +77,10 @@ pub fn pluralize(
 pub fn random(state: &minijinja::State, seq: &Value) -> Result<Value, Error> {
     use crate::globals::get_rng;
     use minijinja::value::ValueKind;
-    use rand::Rng;
 
     if matches!(seq.kind(), ValueKind::Seq | ValueKind::String) {
         let len = seq.len().unwrap_or(0);
-        let idx = get_rng(state).random_range(0..len);
+        let idx = get_rng(state).next_usize(len);
         seq.get_item_by_index(idx)
     } else {
         Err(Error::new(
