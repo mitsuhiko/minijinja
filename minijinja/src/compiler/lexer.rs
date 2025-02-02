@@ -146,7 +146,7 @@ fn find_start_marker(
         };
         let new_match = (m.start(), marker, m.len() + ws.len(), ws);
 
-        if longest_match.as_ref().map_or(false, |x| new_match.0 > x.0) {
+        if longest_match.as_ref().is_some_and(|x| new_match.0 > x.0) {
             break;
         }
         longest_match = Some(new_match);
