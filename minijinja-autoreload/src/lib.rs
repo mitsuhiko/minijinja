@@ -302,7 +302,7 @@ impl Notifier {
             return true;
         }
 
-        let should_reload = inner.should_reload_callback.as_ref().map_or(false, |x| x());
+        let should_reload = inner.should_reload_callback.as_ref().is_some_and(|x| x());
 
         if should_reload {
             if let Some(callback) = inner.on_should_reload_callback.as_ref() {

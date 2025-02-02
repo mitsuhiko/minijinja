@@ -262,7 +262,7 @@ thread_local! {
     // This should be an AtomicU64 but sadly 32bit targets do not necessarily have
     // AtomicU64 available.
     static LAST_VALUE_HANDLE: Cell<u32> = const { Cell::new(0) };
-    static VALUE_HANDLES: RefCell<BTreeMap<u32, Value>> = RefCell::new(BTreeMap::new());
+    static VALUE_HANDLES: RefCell<BTreeMap<u32, Value>> = const { RefCell::new(BTreeMap::new()) };
 }
 
 /// Function that returns true when serialization for [`Value`] is taking place.
@@ -525,7 +525,7 @@ impl PartialEq for Value {
                                     need_length_fallback = false;
                                 }
                                 let mut a_count = 0;
-                                if !a.try_iter_pairs().map_or(false, |mut ak| {
+                                if !a.try_iter_pairs().is_some_and(|mut ak| {
                                     ak.all(|(k, v1)| {
                                         a_count += 1;
                                         b.get_value(&k) == Some(v1)

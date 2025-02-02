@@ -9,7 +9,7 @@ homepage = "https://github.com/mitsuhiko/minijinja"
 repository = "https://github.com/mitsuhiko/minijinja"
 keywords = ["jinja", "jinja2", "templates", "cli"]
 readme = "README.md"
-rust-version = "1.65"
+rust-version = "1.70"
 
 [features]
 default = ["toml", "yaml", "querystring", "cbor", "datetime", "json5", "repl", "completions", "unicode", "ini", "contrib", "preserve_order"]
