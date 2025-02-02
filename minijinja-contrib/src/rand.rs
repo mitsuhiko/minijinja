@@ -28,8 +28,8 @@ impl XorShiftRng {
     pub fn next(&mut self) -> u64 {
         let mut rv = self.seed;
         rv ^= rv << 13;
-        rv ^= rv >> 17;
-        rv ^= rv << 5;
+        rv ^= rv >> 7;
+        rv ^= rv << 17;
         self.seed = rv;
         rv
     }
