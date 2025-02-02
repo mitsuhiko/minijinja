@@ -5,6 +5,8 @@ All notable changes to MiniJinja are documented here.
 ## 2.9.0
 
 - Raise MSRV to 1.70.
+- The contrib crate now uses a basic xorrand implementation instead
+  of depending on all of the `rand` module.  #696
 
 ## 2.8.0
 
