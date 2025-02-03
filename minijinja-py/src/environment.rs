@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::Mutex;
@@ -675,6 +676,42 @@ impl Environment {
                 .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
                 .unwrap_or_else(|| context!());
             tmpl.render(ctx).map_err(to_py_error)
+        })
+    }
+
+    /// Finds undeclared variables in a template.
+    #[pyo3(signature = (template_name, nested = false))]
+    pub fn undeclared_variables_in_template(
+        slf: PyRef<'_, Self>,
+        py: Python<'_>,
+        template_name: &str,
+        nested: bool,
+    ) -> PyResult<HashSet<String>> {
+        if slf.reload_before_render.load(Ordering::Relaxed) {
+            slf.reload(py)?;
+        }
+        bind_environment(slf.as_ptr(), || {
+            let inner = slf.inner.lock().unwrap();
+            let tmpl = inner.env.get_template(template_name).map_err(to_py_error)?;
+            Ok(tmpl.undeclared_variables(nested))
+        })
+    }
+
+    /// Finds undeclared variables in a template string.
+    #[pyo3(signature = (source, nested = false))]
+    pub fn undeclared_variables_in_str(
+        slf: PyRef<'_, Self>,
+        py: Python<'_>,
+        source: &str,
+        nested: bool,
+    ) -> PyResult<HashSet<String>> {
+        if slf.reload_before_render.load(Ordering::Relaxed) {
+            slf.reload(py)?;
+        }
+        bind_environment(slf.as_ptr(), || {
+            let inner = slf.inner.lock().unwrap();
+            let tmpl = inner.env.template_from_str(source).map_err(to_py_error)?;
+            Ok(tmpl.undeclared_variables(nested))
         })
     }
 
