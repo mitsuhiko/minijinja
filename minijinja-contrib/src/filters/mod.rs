@@ -75,12 +75,11 @@ pub fn pluralize(
 #[cfg(feature = "rand")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand")))]
 pub fn random(state: &minijinja::State, seq: &Value) -> Result<Value, Error> {
-    use crate::globals::get_rng;
     use minijinja::value::ValueKind;
 
     if matches!(seq.kind(), ValueKind::Seq | ValueKind::String) {
         let len = seq.len().unwrap_or(0);
-        let idx = get_rng(state).next_usize(len);
+        let idx = crate::rand::XorShiftRng::for_state(state).next_usize(len);
         seq.get_item_by_index(idx)
     } else {
         Err(Error::new(

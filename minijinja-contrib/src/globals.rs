@@ -123,19 +123,6 @@ pub fn joiner(sep: Option<Value>) -> Value {
     })
 }
 
-/// Returns the rng for the state
-#[cfg(feature = "rand")]
-pub(crate) fn get_rng(state: &State) -> crate::rand::XorShiftRng {
-    // XXX: we have no way to stash the rng away today which renders this
-    // feature rather useless.  Repeated calls to randrange etc. will
-    // always yield the same number.
-    crate::rand::XorShiftRng::new(
-        state
-            .lookup("RAND_SEED")
-            .and_then(|x| u64::try_from(x).ok()),
-    )
-}
-
 /// Returns a random number in a given range.
 ///
 /// If only one parameter is provided it's taken as exclusive upper
@@ -152,7 +139,7 @@ pub fn randrange(state: &State, n: i64, m: Option<i64>) -> i64 {
         Some(m) => (n, m),
     };
 
-    get_rng(state).random_range(lower, upper)
+    crate::rand::XorShiftRng::for_state(state).random_range(lower, upper)
 }
 
 /// Generates a random lorem ipsum.
@@ -215,7 +202,7 @@ pub fn lipsum(
     let n = n.or(n_kwargs).unwrap_or(5);
     let mut rv = String::new();
 
-    let mut rng = get_rng(state);
+    let rng = crate::rand::XorShiftRng::for_state(state);
 
     for _ in 0..n {
         let mut next_capitalized = true;
