@@ -80,6 +80,6 @@ fn test_randrange() {
     let mut env = Environment::new();
     env.add_function("randrange", randrange);
 
-    assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ randrange(10) }}"), @"0");
+    assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ randrange(10) }}|{{ randrange(10) }}"), @"0|6");
     assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ randrange(-50, 50) }}"), @"-50");
 }
