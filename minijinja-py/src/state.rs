@@ -5,7 +5,7 @@ use std::ffi::c_void;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 use crate::environment::{with_environment, Environment};
-use crate::typeconv::to_python_value;
+use crate::typeconv::{to_minijinja_value, to_python_value};
 
 thread_local! {
     static CURRENT_STATE: AtomicPtr<c_void> = const { AtomicPtr::new(std::ptr::null_mut()) };
@@ -55,6 +55,37 @@ impl StateRef {
         with_state(|state| {
             state
                 .lookup(name)
+                .map(to_python_value)
+                .unwrap_or_else(|| Ok(Python::with_gil(|py| py.None())))
+        })
+    }
+
+    /// Looks up a temp by name.
+    #[pyo3(signature = (name, default = None))]
+    pub fn get_temp(&self, name: &str, default: Option<&Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+        with_state(|state| {
+            let rv = state.get_temp(name);
+            match rv {
+                Some(rv) => to_python_value(rv),
+                None => {
+                    if let Some(default) = default {
+                        let val = to_minijinja_value(default);
+                        state.set_temp(name, val.clone());
+                        to_python_value(val)
+                    } else {
+                        Ok(Python::with_gil(|py| py.None()))
+                    }
+                }
+            }
+        })
+    }
+
+    /// Sets a temp by name and returns the old value.
+    #[pyo3(text_signature = "(self, name, value)")]
+    pub fn set_temp(&self, name: &str, value: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        with_state(|state| {
+            state
+                .set_temp(name, to_minijinja_value(value))
                 .map(to_python_value)
                 .unwrap_or_else(|| Ok(Python::with_gil(|py| py.None())))
         })
