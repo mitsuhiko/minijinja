@@ -8,6 +8,8 @@ All notable changes to MiniJinja are documented here.
 - The contrib crate now uses a basic xorrand implementation instead
   of depending on all of the `rand` module.  #696
 - Added temps, a way to stash away temporary state during rendering.  #697
+- Fixed a bug that caused the random functions in the contrib crate
+  to not advance the RNG between calls.  #698
 
 ## 2.8.0
 
