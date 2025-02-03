@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::sync::{Arc, Mutex};
 
 use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
@@ -7,7 +8,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::template::Template;
 use crate::utils::{AutoEscape, UndefinedBehavior};
-use crate::value::{ArgType, Value};
+use crate::value::{ArgType, Object, Value};
 use crate::vm::context::Context;
 
 #[cfg(feature = "fuel")]
@@ -44,6 +45,7 @@ pub struct State<'template, 'env> {
     pub(crate) current_block: Option<&'env str>,
     pub(crate) auto_escape: AutoEscape,
     pub(crate) instructions: &'template Instructions<'env>,
+    pub(crate) temps: Arc<Mutex<BTreeMap<Box<str>, Value>>>,
     pub(crate) blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
     #[allow(unused)]
     pub(crate) loaded_templates: BTreeSet<&'env str>,
@@ -87,6 +89,7 @@ impl<'template, 'env> State<'template, 'env> {
             auto_escape,
             instructions,
             blocks,
+            temps: Default::default(),
             loaded_templates: BTreeSet::new(),
             #[cfg(feature = "macros")]
             macros: Default::default(),
@@ -297,6 +300,90 @@ impl<'template, 'env> State<'template, 'env> {
         self.fuel_tracker
             .as_ref()
             .map(|x| (x.consumed(), x.remaining()))
+    }
+
+    /// Looks up a temp and returns it.
+    ///
+    /// Temps are similar to context values but the engine never looks them up
+    /// on their own and they are not scoped.  The lifetime of temps is limited
+    /// to the rendering process of a template.  Temps are useful so that
+    /// filters and other things can temporary stash away state without having
+    /// to resort to thread locals which are hard to manage.  Unlike context
+    /// variables, temps can also be modified during evaluation by filters and
+    /// functions.
+    ///
+    /// Temps are values but if you want to hold complex state you can store a
+    /// custom object there.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use minijinja::{Value, State};
+    ///
+    /// fn inc(state: &State) -> Value {
+    ///     let old = state
+    ///         .get_temp("my_counter")
+    ///         .unwrap_or_else(|| Value::from(0i64));
+    ///     let new = Value::from(i64::try_from(old).unwrap() + 1);
+    ///     state.set_temp("my_counter", new.clone());
+    ///     new
+    /// }
+    /// ```
+    pub fn get_temp(&self, name: &str) -> Option<Value> {
+        self.temps.lock().unwrap().get(name).cloned()
+    }
+
+    /// Inserts a temp and returns the old temp.
+    ///
+    /// For more information see [`get_temp`](Self::get_temp).
+    pub fn set_temp(&self, name: &str, value: Value) -> Option<Value> {
+        self.temps
+            .lock()
+            .unwrap()
+            .insert(name.to_owned().into(), value)
+    }
+
+    /// Shortcut for registering an object as a temp.
+    ///
+    /// If the value is already there, it's returned as object, if it's
+    /// not there yet, the function is invoked to create it.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::sync::atomic::{AtomicUsize, Ordering};
+    /// use minijinja::{Value, State};
+    /// use minijinja::value::Object;
+    ///
+    /// #[derive(Debug, Default)]
+    /// struct MyObject(AtomicUsize);
+    ///
+    /// impl Object for MyObject {}
+    ///
+    /// fn inc(state: &State) -> Value {
+    ///     let obj = state.get_or_set_temp_object("my_counter", MyObject::default);
+    ///     let old = obj.0.fetch_add(1, Ordering::AcqRel);
+    ///     Value::from(old + 1)
+    /// }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// This will panick if the value registered under that name is not
+    /// the object expected.
+    pub fn get_or_set_temp_object<O, F>(&self, name: &str, f: F) -> Arc<O>
+    where
+        O: Object + 'static,
+        F: FnOnce() -> O,
+    {
+        self.get_temp(name)
+            .unwrap_or_else(|| {
+                let rv = Value::from_object(f());
+                self.set_temp(name, rv.clone());
+                rv
+            })
+            .downcast_object()
+            .expect("downcast unexpectedly failed. Name conflict?")
     }
 
     #[cfg(feature = "debug")]

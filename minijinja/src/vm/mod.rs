@@ -128,6 +128,7 @@ impl<'env> Vm<'env> {
                 auto_escape: state.auto_escape(),
                 instructions,
                 blocks: BTreeMap::default(),
+                temps: state.temps.clone(),
                 loaded_templates: Default::default(),
                 #[cfg(feature = "macros")]
                 id: state.id,
