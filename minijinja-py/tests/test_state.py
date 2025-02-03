@@ -91,3 +91,22 @@ def test_test_state():
         bar=23,
     )
     assert rv == "true"
+
+
+def test_temps():
+    env = Environment()
+    first = True
+
+    @pass_state
+    def inc(state):
+        nonlocal first
+        if first:
+            assert state.get_temp("counter") is None
+            first = False
+        new = state.get_temp("counter", 0) + 1
+        state.set_temp("counter", new)
+        return new
+
+    env.add_global("inc", inc)
+    rv = env.render_str("{{ inc() }} {{ inc() }} {{ inc() }}")
+    assert rv == "1 2 3"
