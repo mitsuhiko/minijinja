@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 - Raise MSRV to 1.70.
 - The contrib crate now uses a basic xorrand implementation instead
   of depending on all of the `rand` module.  #696
+- Added temps, a way to stash away temporary state during rendering.  #697
 
 ## 2.8.0
 

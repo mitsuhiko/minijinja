@@ -42,6 +42,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [render-template](render-template): CLI app that renders templates from string.
 * [render-value](render-value): Demonstrates how `Value` can be passed as `Serialize` as context.
 * [self-referential-context](self-referential-context): Shows a helper that allows self-referential contexts.
+* [state-temps](state-temps): Shows how temporaries can be used for hidden state.
 * [streaming](streaming): Demonstrates how a one-shot iterator can be used to stream results in.
 * [syntax-highlighting](syntax-highlighting): Shows how to implement syntax highlighting with syntect.
 * [undefined-tracking](undefined-tracking): Shows how you can track undefined values.
