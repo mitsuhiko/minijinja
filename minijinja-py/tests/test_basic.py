@@ -349,3 +349,26 @@ def test_custom_delimiters():
     )
     rv = env.render_str("<% if true %>${ value }<% endif %><!-- nothing -->", value=42)
     assert rv == "42"
+
+
+def test_undeclared_variables():
+    env = Environment(
+        templates={
+            "foo.txt": "{{ foo }} {{ bar.x }}",
+            "bar.txt": "{{ x }}",
+        }
+    )
+
+    assert env.undeclared_variables_in_str("{{ foo }}") == {"foo"}
+    assert env.undeclared_variables_in_str("{{ foo }} {{ bar.x }}") == {"foo", "bar"}
+    assert env.undeclared_variables_in_str("{{ foo }} {{ bar.x }}", nested=True) == {
+        "foo",
+        "bar.x",
+    }
+
+    assert env.undeclared_variables_in_template("foo.txt") == {"foo", "bar"}
+    assert env.undeclared_variables_in_template("bar.txt") == {"x"}
+    assert env.undeclared_variables_in_template("foo.txt", nested=True) == {
+        "foo",
+        "bar.x",
+    }
