@@ -10,6 +10,8 @@ All notable changes to MiniJinja are documented here.
 - Added temps, a way to stash away temporary state during rendering.  #697
 - Fixed a bug that caused the random functions in the contrib crate
   to not advance the RNG between calls.  #698
+- Added `Environment.undeclared_variables_in_template` and
+  `Environnent.undeclared_variables_in_str` to Python binding.  #699
 
 ## 2.8.0
 
