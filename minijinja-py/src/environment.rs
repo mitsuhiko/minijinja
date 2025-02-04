@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::Mutex;
+use std::collections::HashSet;
 
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Rest, Value};
@@ -652,6 +653,52 @@ impl Environment {
     /// Clears all loaded templates.
     pub fn clear_templates(&self) {
         self.inner.lock().unwrap().env.clear_templates();
+    }
+
+    /// Returns undeclared variables in a named template
+    ///
+    /// The first argument is the name of the template
+    #[pyo3(signature = (template_name))]
+    pub fn get_template_undeclared_variables(
+        slf: PyRef<'_, Self>,
+        py: Python<'_>,
+        template_name: &str,
+    ) -> PyResult<HashSet<String>> {
+        if slf.reload_before_render.load(Ordering::Relaxed) {
+            slf.reload(py)?;
+        }
+        bind_environment(slf.as_ptr(), || {
+            let variables = slf.inner
+                .lock()
+                .unwrap()
+                .env
+                .get_template(template_name)
+                .map_err(to_py_error)?
+                .undeclared_variables(false);
+
+            Ok(variables)
+        })
+    }
+
+    /// Returns undeclared variables from a string
+    ///
+    /// The first argument is the source of the template
+    #[pyo3(signature = (source))]
+    pub fn get_str_undeclared_variables(
+        slf: PyRef<'_, Self>,
+        source: &str,
+    ) -> PyResult<HashSet<String>> {
+        bind_environment(slf.as_ptr(), || {
+            let variables = slf.inner
+                .lock()
+                .unwrap()
+                .env
+                .template_from_named_str("<string>", source)
+                .map_err(to_py_error)?
+                .undeclared_variables(false);
+
+            Ok(variables)
+        })
     }
 
     /// Renders a template looked up from the loader.
