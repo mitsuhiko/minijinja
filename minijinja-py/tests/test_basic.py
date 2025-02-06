@@ -372,3 +372,18 @@ def test_undeclared_variables():
         "foo",
         "bar.x",
     }
+
+
+def test_loop_controls():
+    env = Environment()
+    rv = env.render_str("""
+    {% for x in [1, 2, 3, 4, 5] %}
+      {% if x == 1 %}
+        {% continue %}
+      {% elif x == 3 %}
+        {% break %}
+      {% endif %}
+      {{ x }}
+    {% endfor %}
+    """)
+    assert rv.split() == ["2"]

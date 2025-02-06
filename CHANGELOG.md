@@ -12,6 +12,7 @@ All notable changes to MiniJinja are documented here.
   to not advance the RNG between calls.  #698
 - Added `Environment.undeclared_variables_in_template` and
   `Environnent.undeclared_variables_in_str` to Python binding.  #699
+- Enable `loop_controls` for Python in-line with the CLI.  #704
 
 ## 2.8.0
 
