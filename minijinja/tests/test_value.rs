@@ -1245,4 +1245,6 @@ fn test_plain_object_compare() {
     assert!((v1 >= v1_clone));
     assert!(v2 < v1);
     assert!(v2 != v1);
+    assert!(v1 != Value::from(vec![1, 2, 3]));
+    assert!(v1 > Value::from(vec![1, 2, 3]));
 }
