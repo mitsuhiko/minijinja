@@ -549,7 +549,12 @@ impl PartialEq for Value {
                                     false
                                 }
                             }
-                            _ => false,
+                            // terrible fallback for plain objects
+                            (ObjectRepr::Plain, ObjectRepr::Plain) => {
+                                a.to_string() == b.to_string()
+                            }
+                            // should not happen
+                            (_, _) => false,
                         }
                     } else {
                         false
@@ -621,6 +626,11 @@ impl Ord for Value {
                                     (Some(a), Some(b)) => a.cmp(b),
                                     _ => unreachable!(),
                                 },
+                                // terrible fallback for plain objects
+                                (ObjectRepr::Plain, ObjectRepr::Plain) => {
+                                    a.to_string().cmp(&b.to_string())
+                                }
+                                // should not happen
                                 (_, _) => unreachable!(),
                             }
                         }

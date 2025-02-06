@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
+use std::fmt;
 use std::sync::Arc;
 
 use insta::{assert_debug_snapshot, assert_snapshot};
@@ -1215,4 +1216,35 @@ fn test_bytes() {
         format!("{:?}", Value::from_bytes((&b"'foo\""[..]).into())),
         "b'\\'foo\"'"
     );
+}
+
+#[test]
+fn test_plain_object_compare() {
+    #[derive(Debug)]
+    struct X(i32);
+
+    impl Object for X {
+        fn repr(self: &Arc<Self>) -> ObjectRepr {
+            ObjectRepr::Plain
+        }
+
+        fn render(self: &Arc<Self>, f: &mut fmt::Formatter<'_>) -> fmt::Result
+        where
+            Self: Sized + 'static,
+        {
+            // Today these compare by string fallback
+            write!(f, "{}", self.0)
+        }
+    }
+
+    let v1 = Value::from_object(X(4));
+    let v1_clone = v1.clone();
+    let v2 = Value::from_object(X(0));
+
+    assert!(v1 == v1_clone);
+    assert!((v1 >= v1_clone));
+    assert!(v2 < v1);
+    assert!(v2 != v1);
+    assert!(v1 != Value::from(vec![1, 2, 3]));
+    assert!(v1 > Value::from(vec![1, 2, 3]));
 }
