@@ -13,6 +13,7 @@ All notable changes to MiniJinja are documented here.
 - Added `Environment.undeclared_variables_in_template` and
   `Environnent.undeclared_variables_in_str` to Python binding.  #699
 - Enable `loop_controls` for Python in-line with the CLI.  #704
+- Fixed a panic when comparing plain objects.  #705
 
 ## 2.8.0
 
