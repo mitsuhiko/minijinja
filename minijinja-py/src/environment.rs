@@ -203,7 +203,7 @@ impl Environment {
                         let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
                         let rv = callback
-                            .call_bound(py, py_args, py_kwargs.as_ref())
+                            .call(py, py_args, py_kwargs.as_ref())
                             .map_err(to_minijinja_error)?;
                         Ok(to_minijinja_value(rv.bind(py)))
                     })
@@ -235,7 +235,7 @@ impl Environment {
                         let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
                         let rv = callback
-                            .call_bound(py, py_args, py_kwargs.as_ref())
+                            .call(py, py_args, py_kwargs.as_ref())
                             .map_err(to_minijinja_error)?;
                         Ok(to_minijinja_value(rv.bind(py)).is_true())
                     })
@@ -262,7 +262,7 @@ impl Environment {
                         let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
                         let rv = callback
-                            .call_bound(py, py_args, py_kwargs.as_ref())
+                            .call(py, py_args, py_kwargs.as_ref())
                             .map_err(to_minijinja_error)?;
                         Ok(to_minijinja_value(rv.bind(py)))
                     })
@@ -310,8 +310,8 @@ impl Environment {
             .env
             .set_auto_escape_callback(move |name: &str| -> AutoEscape {
                 Python::with_gil(|py| {
-                    let py_args = PyTuple::new_bound(py, [name]);
-                    let rv = match callback.call_bound(py, py_args, None) {
+                    let py_args = PyTuple::new(py, [name]).unwrap();
+                    let rv = match callback.call(py, py_args, None) {
                         Ok(value) => value,
                         Err(err) => {
                             report_unraisable(py, err);
@@ -372,7 +372,7 @@ impl Environment {
                     let (py_args, py_kwargs) =
                         to_python_args(py, callback.bind(py), args).map_err(to_minijinja_error)?;
                     let rv = callback
-                        .call_bound(py, py_args, py_kwargs.as_ref())
+                        .call(py, py_args, py_kwargs.as_ref())
                         .map_err(to_minijinja_error)?;
                     if rv.is(&py.NotImplemented()) {
                         Ok(None)
@@ -427,7 +427,7 @@ impl Environment {
                 Python::with_gil(|py| {
                     let callback = callback.bind(py);
                     let rv = callback
-                        .call1(PyTuple::new_bound(py, [name]))
+                        .call1(PyTuple::new(py, [name]).unwrap())
                         .map_err(to_minijinja_error)?;
                     if rv.is_none() {
                         Ok(None)
@@ -466,7 +466,7 @@ impl Environment {
         inner.env.set_path_join_callback(move |name, parent| {
             Python::with_gil(|py| {
                 let callback = callback.bind(py);
-                match callback.call1(PyTuple::new_bound(py, [name, parent])) {
+                match callback.call1(PyTuple::new(py, [name, parent]).unwrap()) {
                     Ok(rv) => Cow::Owned(rv.to_string()),
                     Err(err) => {
                         report_unraisable(py, err);
