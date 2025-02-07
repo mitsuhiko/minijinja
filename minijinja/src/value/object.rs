@@ -662,7 +662,7 @@ impl DynObject {
         self.ptr == other.ptr && self.vtable == other.vtable
     }
 
-    /// Checks if the two dyn objects are of the same tyep.
+    /// Checks if the two dyn objects are of the same type.
     pub(crate) fn is_same_object_type(&self, other: &DynObject) -> bool {
         self.type_id() == other.type_id()
     }
