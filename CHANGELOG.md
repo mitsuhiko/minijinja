@@ -14,6 +14,9 @@ All notable changes to MiniJinja are documented here.
   `Environnent.undeclared_variables_in_str` to Python binding.  #699
 - Enable `loop_controls` for Python in-line with the CLI.  #704
 - Fixed a panic when comparing plain objects.  #705
+- Added `Object::custom_cmp` to allow objects to influence how they
+  compare against themselves.  This also fixes Python objects in the
+  Python binding not to compare correctly.  #707
 
 ## 2.8.0
 

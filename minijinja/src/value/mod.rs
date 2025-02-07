@@ -507,6 +507,10 @@ impl PartialEq for Value {
                     if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
                         if a.is_same_object(b) {
                             return true;
+                        } else if a.is_same_object_type(b) {
+                            if let Some(rv) = a.custom_cmp(b) {
+                                return rv == Ordering::Equal;
+                            }
                         }
                         match (a.repr(), b.repr()) {
                             (ObjectRepr::Map, ObjectRepr::Map) => {
@@ -604,38 +608,43 @@ impl Ord for Value {
                 Some(ops::CoerceResult::I128(a, b)) => a.cmp(&b),
                 Some(ops::CoerceResult::Str(a, b)) => a.cmp(b),
                 None => {
-                    if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
-                        if a.is_same_object(b) {
-                            Ordering::Equal
-                        } else {
-                            match (a.repr(), b.repr()) {
-                                (ObjectRepr::Map, ObjectRepr::Map) => {
-                                    // This is not really correct.  Because the keys can be in arbitrary
-                                    // order this could just sort really weirdly as a result.  However
-                                    // we don't want to pay the cost of actually sorting the keys for
-                                    // ordering so we just accept this for now.
-                                    match (a.try_iter_pairs(), b.try_iter_pairs()) {
-                                        (Some(a), Some(b)) => a.cmp(b),
-                                        _ => unreachable!(),
-                                    }
-                                }
-                                (
-                                    ObjectRepr::Seq | ObjectRepr::Iterable,
-                                    ObjectRepr::Seq | ObjectRepr::Iterable,
-                                ) => match (a.try_iter(), b.try_iter()) {
-                                    (Some(a), Some(b)) => a.cmp(b),
-                                    _ => unreachable!(),
-                                },
-                                // terrible fallback for plain objects
-                                (ObjectRepr::Plain, ObjectRepr::Plain) => {
-                                    a.to_string().cmp(&b.to_string())
-                                }
-                                // should not happen
-                                (_, _) => unreachable!(),
+                    let a = self.as_object().unwrap();
+                    let b = other.as_object().unwrap();
+
+                    if a.is_same_object(b) {
+                        Ordering::Equal
+                    } else {
+                        // if there is a custom comparison, run it.
+                        if a.is_same_object_type(b) {
+                            if let Some(rv) = a.custom_cmp(b) {
+                                return rv;
                             }
                         }
-                    } else {
-                        unreachable!()
+                        match (a.repr(), b.repr()) {
+                            (ObjectRepr::Map, ObjectRepr::Map) => {
+                                // This is not really correct.  Because the keys can be in arbitrary
+                                // order this could just sort really weirdly as a result.  However
+                                // we don't want to pay the cost of actually sorting the keys for
+                                // ordering so we just accept this for now.
+                                match (a.try_iter_pairs(), b.try_iter_pairs()) {
+                                    (Some(a), Some(b)) => a.cmp(b),
+                                    _ => unreachable!(),
+                                }
+                            }
+                            (
+                                ObjectRepr::Seq | ObjectRepr::Iterable,
+                                ObjectRepr::Seq | ObjectRepr::Iterable,
+                            ) => match (a.try_iter(), b.try_iter()) {
+                                (Some(a), Some(b)) => a.cmp(b),
+                                _ => unreachable!(),
+                            },
+                            // terrible fallback for plain objects
+                            (ObjectRepr::Plain, ObjectRepr::Plain) => {
+                                a.to_string().cmp(&b.to_string())
+                            }
+                            // should not happen
+                            (_, _) => unreachable!(),
+                        }
                     }
                 }
             },

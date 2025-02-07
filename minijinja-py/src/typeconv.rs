@@ -1,8 +1,9 @@
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{Enumerator, Object, ObjectRepr, Value, ValueKind};
+use minijinja::value::{DynObject, Enumerator, Object, ObjectRepr, Value, ValueKind};
 use minijinja::{AutoEscape, Error, State};
 
 use once_cell::sync::OnceCell;
@@ -120,6 +121,17 @@ impl Object for DynamicObject {
                     None
                 }
             }
+        })
+    }
+
+    fn custom_cmp(self: &Arc<Self>, other: &DynObject) -> Option<Ordering> {
+        // Attention: this can violate the requirements of custom_cmp,
+        // namely that it implements a total order.
+        Python::with_gil(|py| {
+            let self_inner = self.inner.bind(py);
+            let other = other.downcast_ref::<DynamicObject>()?;
+            let other_inner = other.inner.bind(py);
+            self_inner.compare(other_inner).ok()
         })
     }
 
