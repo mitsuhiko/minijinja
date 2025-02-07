@@ -253,7 +253,7 @@ pub trait Object: fmt::Debug + Send + Sync {
     /// anything else.  Objects of different types are given an absolute
     /// ordering outside the scope of this method.
     ///
-    /// The expectation is that an implementer downcasts the other [`DynObject`]
+    /// The requirement is that an implementer downcasts the other [`DynObject`]
     /// to itself, and it that cannot be accomplished `None` must be returned.
     ///
     /// ```rust
