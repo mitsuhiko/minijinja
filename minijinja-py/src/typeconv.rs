@@ -231,7 +231,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
     }
 
     match value.kind() {
-        ValueKind::Undefined | ValueKind::None => Ok(().into_py_any(py)?),
+        ValueKind::Undefined | ValueKind::None => Ok(py.None()),
         ValueKind::Bool => Ok(value.is_true().into_py_any(py)?),
         ValueKind::Number => {
             if let Ok(rv) = TryInto::<i64>::try_into(value.clone()) {
