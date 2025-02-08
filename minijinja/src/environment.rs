@@ -85,6 +85,15 @@ impl<'source> Environment<'source> {
     /// the default filters, tests and globals loaded.  If you do not want any
     /// default configuration you can use the alternative
     /// [`empty`](Environment::empty) method.
+    #[cfg_attr(
+        not(feature = "serde"),
+        deprecated(
+            since = "2.0.4",
+            note = "Attempted to instanciate an environment with serde.  Future \
+        versions of MiniJinja will require enabling the 'serde' feature to use \
+        serde types.  To silence this warning add 'serde' to the list of features of minijinja."
+        )
+    )]
     pub fn new() -> Environment<'source> {
         Environment {
             templates: TemplateStore::new(TemplateConfig::new(Arc::new(
