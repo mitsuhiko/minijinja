@@ -293,7 +293,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::utils::splitn_whitespace;
+    use crate::utils::{safe_sort, splitn_whitespace};
     use crate::value::ops::{self, as_f64};
     use crate::value::{Enumerator, Kwargs, Object, ObjectRepr, ValueKind, ValueRepr};
     use std::borrow::Cow;
@@ -433,10 +433,10 @@ mod builtins {
         let mut rv: Vec<_> = ok!(v.try_iter())
             .map(|key| (key.clone(), v.get_item(&key).unwrap_or(Value::UNDEFINED)))
             .collect();
-        rv.sort_by(|a, b| {
+        safe_sort(&mut rv, |a, b| {
             let (a, b) = if by_value { (&a.1, &b.1) } else { (&a.0, &b.0) };
             cmp_helper(a, b, case_sensitive)
-        });
+        })?;
         if let Some(true) = ok!(kwargs.get("reverse")) {
             rv.reverse();
         }
@@ -865,12 +865,14 @@ mod builtins {
         .collect::<Vec<_>>();
         let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
         if let Some(attr) = ok!(kwargs.get::<Option<&str>>("attribute")) {
-            items.sort_by(|a, b| match (a.get_path(attr), b.get_path(attr)) {
-                (Ok(a), Ok(b)) => cmp_helper(&a, &b, case_sensitive),
-                _ => Ordering::Equal,
-            });
+            safe_sort(&mut items, |a, b| {
+                match (a.get_path(attr), b.get_path(attr)) {
+                    (Ok(a), Ok(b)) => cmp_helper(&a, &b, case_sensitive),
+                    _ => Ordering::Equal,
+                }
+            })?;
         } else {
-            items.sort_by(|a, b| cmp_helper(a, b, case_sensitive))
+            safe_sort(&mut items, |a, b| cmp_helper(a, b, case_sensitive))?;
         }
         if let Some(true) = ok!(kwargs.get("reverse")) {
             items.reverse();
@@ -1465,11 +1467,11 @@ mod builtins {
             None => ok!(kwargs.get::<&str>("attribute")),
         };
         let mut items: Vec<Value> = ok!(value.try_iter()).collect();
-        items.sort_by(|a, b| {
+        safe_sort(&mut items, |a, b| {
             let a = a.get_path_or_default(attr, &default);
             let b = b.get_path_or_default(attr, &default);
             cmp_helper(&a, &b, case_sensitive)
-        });
+        })?;
         ok!(kwargs.assert_all_used());
 
         #[derive(Debug)]

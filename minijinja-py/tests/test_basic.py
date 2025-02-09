@@ -1,6 +1,7 @@
 import binascii
 import pytest
 import posixpath
+import random
 import types
 from functools import total_ordering
 
@@ -413,3 +414,17 @@ def test_pass_through_sort():
     env = Environment()
     rv = env.render_str("{{ values|sort|join(',') }}", values=values)
     assert rv == "-1,4,23,42"
+
+
+def test_fucked_up_object():
+    @total_ordering
+    class X:
+        __lt__ = __eq__ = lambda s, o: random.random() > 0.5
+
+    values = [X()] * 500
+    env = Environment()
+    with pytest.raises(
+        TemplateError,
+        match="invalid operation: failed to sort: user-provided comparison function does not correctly implement a total order",
+    ):
+        env.eval_expr("values|sort", values=values)
