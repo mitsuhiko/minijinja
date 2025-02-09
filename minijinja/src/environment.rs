@@ -89,7 +89,7 @@ impl<'source> Environment<'source> {
         not(feature = "serde"),
         deprecated(
             since = "2.0.4",
-            note = "Attempted to instanciate an environment with serde.  Future \
+            note = "Attempted to instantiate an environment with serde.  Future \
         versions of MiniJinja will require enabling the 'serde' feature to use \
         serde types.  To silence this warning add 'serde' to the list of features of minijinja."
         )
