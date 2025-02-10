@@ -22,7 +22,7 @@ def handle_panic(orig):
             except BaseException as e:
                 if e.__class__.__name__ == "PanicException":
                     info = _lowlevel.get_panic_info()
-                    message, loc = info or ("unknonw panic", None)
+                    message, loc = info or ("unknown panic", None)
                     raise TemplateError(
                         "panic during rendering: {} ({})".format(
                             message, loc or "unknown location"
