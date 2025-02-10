@@ -11,6 +11,30 @@ __all__ = [
 ]
 
 
+def handle_panic(orig):
+    def decorator(f):
+        from functools import wraps
+
+        @wraps(orig)
+        def protected_call(*args, **kwargs):
+            try:
+                return f(*args, **kwargs)
+            except BaseException as e:
+                if e.__class__.__name__ == "PanicException":
+                    info = _lowlevel.get_panic_info()
+                    message, loc = info or ("unknown panic", None)
+                    raise TemplateError(
+                        "panic during rendering: {} ({})".format(
+                            message, loc or "unknown location"
+                        )
+                    )
+                raise
+
+        return protected_call
+
+    return decorator
+
+
 class Environment(_lowlevel.Environment):
     """Represents a MiniJinja environment"""
 
@@ -89,6 +113,14 @@ class Environment(_lowlevel.Environment):
         self.comment_end_string = comment_end_string
         self.line_statement_prefix = line_statement_prefix
         self.line_comment_prefix = line_comment_prefix
+
+    @handle_panic(_lowlevel.Environment.render_str)
+    def render_str(self, *args, **kwargs):
+        return super().render_str(*args, **kwargs)
+
+    @handle_panic(_lowlevel.Environment.eval_expr)
+    def eval_expr(self, *args, **kwargs):
+        return super().eval_expr(*args, **kwargs)
 
 
 DEFAULT_ENVIRONMENT = Environment()
@@ -185,3 +217,6 @@ class TemplateError(RuntimeError):
         if self._info is not None:
             return self._info.full_description
         return self.message
+
+
+del handle_panic

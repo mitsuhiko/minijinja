@@ -60,6 +60,7 @@ key_interning = []
 internal_debug = []
 unstable_machinery = ["internal_debug"]
 unstable_machinery_serde = ["unstable_machinery", "serde/derive"]
+internal_safe_search = []
 
 [dependencies]
 aho-corasick = { version = "1.0", default-features = false, optional = true }

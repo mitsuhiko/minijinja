@@ -1,4 +1,5 @@
 use std::char::decode_utf16;
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::{once, repeat};
@@ -391,6 +392,40 @@ pub fn splitn_whitespace(s: &str, maxsplits: usize) -> impl Iterator<Item = &str
             None
         }
     })
+}
+
+/// Because the Python crate violates our ordering guarantees by design
+/// we want to catch failed sorts in a landing pad.  This is not ideal but
+/// it at least gives us error context for when invalid search operations
+/// are taking place.
+#[cfg_attr(not(feature = "internal_safe_search"), inline)]
+pub fn safe_sort<T, F>(seq: &mut [T], f: F) -> Result<(), Error>
+where
+    F: FnMut(&T, &T) -> Ordering,
+{
+    #[cfg(feature = "internal_safe_search")]
+    {
+        if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            seq.sort_by(f);
+        })) {
+            let msg = panic
+                .downcast_ref::<&str>()
+                .copied()
+                .or_else(|| panic.downcast_ref::<String>().map(|x| x.as_str()));
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!(
+                    "failed to sort: {}",
+                    msg.unwrap_or("comparator does not implement total order")
+                ),
+            ));
+        }
+    }
+    #[cfg(not(feature = "internal_safe_search"))]
+    {
+        seq.sort_by(f);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
