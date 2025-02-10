@@ -536,6 +536,31 @@ fn test_undeclared_variables_bug() {
 }
 
 #[test]
+fn test_undeclared_variables_macro_bug() {
+    // https://github.com/mitsuhiko/minijinja/issues/712
+    let mut env = Environment::new();
+    env.add_template(
+        "demo",
+        r#"
+        {% macro bar(a) %}
+            {{ a }}
+        {% endmacro %}
+        {% call (b) bar() %}
+            {{ b }}
+        {% endcall %}
+        {{ a }} {{ b }}
+    "#,
+    )
+    .unwrap();
+    let tmpl = env.get_template("demo").unwrap();
+    let undeclared = tmpl.undeclared_variables(true);
+    assert_eq!(
+        undeclared,
+        ["a", "b"].into_iter().map(|x| x.to_string()).collect()
+    );
+}
+
+#[test]
 fn test_block_fragments() {
     let mut env = Environment::new();
     env.add_template(

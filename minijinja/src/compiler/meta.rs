@@ -268,7 +268,9 @@ fn track_walk<'a>(node: &ast::Stmt<'a>, state: &mut AssignmentTracker<'a>) {
         #[cfg(feature = "macros")]
         ast::Stmt::Macro(stmt) => {
             state.assign(stmt.name);
+            state.push();
             tracker_visit_macro(stmt, state);
+            state.pop();
         }
         #[cfg(feature = "macros")]
         ast::Stmt::CallBlock(stmt) => {
@@ -277,7 +279,9 @@ fn track_walk<'a>(node: &ast::Stmt<'a>, state: &mut AssignmentTracker<'a>) {
                 .args
                 .iter()
                 .for_each(|x| tracker_visit_callarg(x, state));
+            state.push();
             tracker_visit_macro(&stmt.macro_decl, state);
+            state.pop();
         }
         #[cfg(feature = "loop_controls")]
         ast::Stmt::Continue(_) | ast::Stmt::Break(_) => {}

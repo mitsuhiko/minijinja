@@ -17,6 +17,8 @@ All notable changes to MiniJinja are documented here.
 - Added `Object::custom_cmp` to allow objects to influence how they
   compare against themselves.  This also fixes Python objects in the
   Python binding not to compare correctly.  #707
+- Fixed a bug where `undeclared_variables` would incorrectly handle
+  variables referenced by macros.  #714
 
 ## 2.8.0
 
