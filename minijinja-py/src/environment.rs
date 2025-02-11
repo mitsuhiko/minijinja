@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Rest, Value};
@@ -104,7 +104,7 @@ struct Inner {
 /// Represents a MiniJinja environment.
 #[pyclass(subclass, module = "minijinja._lowlevel")]
 pub struct Environment {
-    inner: Mutex<Inner>,
+    inner: Arc<Mutex<Inner>>,
     reload_before_render: AtomicBool,
 }
 
@@ -113,14 +113,14 @@ impl Environment {
     #[new]
     fn py_new() -> PyResult<Self> {
         Ok(Environment {
-            inner: Mutex::new(Inner {
+            inner: Arc::new(Mutex::new(Inner {
                 env: minijinja::Environment::new(),
                 loader: None,
                 auto_escape_callback: None,
                 finalizer_callback: None,
                 path_join_callback: None,
                 syntax: None,
-            }),
+            })),
             reload_before_render: AtomicBool::new(false),
         })
     }
@@ -671,13 +671,16 @@ impl Environment {
         if slf.reload_before_render.load(Ordering::Relaxed) {
             slf.reload(py)?;
         }
+        let ctx = ctx
+            .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
+            .unwrap_or_else(|| context!());
         bind_environment(slf.as_ptr(), || {
-            let inner = slf.inner.lock().unwrap();
-            let tmpl = inner.env.get_template(template_name).map_err(to_py_error)?;
-            let ctx = ctx
-                .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
-                .unwrap_or_else(|| context!());
-            tmpl.render(ctx).map_err(to_py_error)
+            let inner = slf.inner.clone();
+            py.allow_threads(move || {
+                let inner = inner.lock().unwrap();
+                let tmpl = inner.env.get_template(template_name).map_err(to_py_error)?;
+                tmpl.render(ctx).map_err(to_py_error)
+            })
         })
     }
 
@@ -724,6 +727,7 @@ impl Environment {
     #[pyo3(signature = (source, name=None, /, **ctx))]
     pub fn render_str(
         slf: PyRef<'_, Self>,
+        py: Python<'_>,
         source: &str,
         name: Option<&str>,
         ctx: Option<&Bound<'_, PyDict>>,
@@ -732,12 +736,15 @@ impl Environment {
             let ctx = ctx
                 .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
                 .unwrap_or_else(|| context!());
-            slf.inner
-                .lock()
-                .unwrap()
-                .env
-                .render_named_str(name.unwrap_or("<string>"), source, ctx)
-                .map_err(to_py_error)
+            let inner = slf.inner.clone();
+            py.allow_threads(move || {
+                inner
+                    .lock()
+                    .unwrap()
+                    .env
+                    .render_named_str(name.unwrap_or("<string>"), source, ctx)
+                    .map_err(to_py_error)
+            })
         })
     }
 
@@ -745,19 +752,23 @@ impl Environment {
     #[pyo3(signature = (expression, /, **ctx))]
     pub fn eval_expr(
         slf: PyRef<'_, Self>,
+        py: Python<'_>,
         expression: &str,
         ctx: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Py<PyAny>> {
         bind_environment(slf.as_ptr(), || {
-            let inner = slf.inner.lock().unwrap();
-            let expr = inner
-                .env
-                .compile_expression(expression)
-                .map_err(to_py_error)?;
+            let inner = slf.inner.clone();
             let ctx = ctx
                 .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
                 .unwrap_or_else(|| context!());
-            to_python_value(expr.eval(ctx).map_err(to_py_error)?)
+            py.allow_threads(move || {
+                let inner = inner.lock().unwrap();
+                let expr = inner
+                    .env
+                    .compile_expression(expression)
+                    .map_err(to_py_error)?;
+                to_python_value(expr.eval(ctx).map_err(to_py_error)?)
+            })
         })
     }
 }
