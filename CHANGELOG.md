@@ -21,6 +21,8 @@ All notable changes to MiniJinja are documented here.
   variables referenced by macros.  #714
 - Fixed a deadlock in the Python binding when multiple threads were
   rendering from the same environment at once.  #717
+- The Python bindings handle `__bool__` correctly now for custom
+  objects in if-conditions and filters.  #719
 
 ## 2.8.0
 
