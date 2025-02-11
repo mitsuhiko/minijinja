@@ -19,8 +19,8 @@ pub struct StateRef;
 impl StateRef {
     /// Returns a reference to the environment.
     #[getter]
-    pub fn get_env(&self) -> PyResult<Py<Environment>> {
-        with_environment(Ok)
+    pub fn get_env(&self, py: Python<'_>) -> PyResult<Py<Environment>> {
+        with_environment(py, Ok)
     }
 
     /// Returns the name of the template.

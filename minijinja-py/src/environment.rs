@@ -299,13 +299,17 @@ impl Environment {
     /// Note that because this interface in MiniJinja is infallible, the callback is
     /// not able to raise an error.
     #[setter]
-    pub fn set_auto_escape_callback(&self, callback: &Bound<'_, PyAny>) -> PyResult<()> {
+    pub fn set_auto_escape_callback(
+        &self,
+        py: Python<'_>,
+        callback: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
         if !callback.is_callable() {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
         let callback: Py<PyAny> = callback.clone().unbind();
         let mut inner = self.inner.lock().unwrap();
-        inner.auto_escape_callback = Python::with_gil(|py| Some(callback.clone_ref(py)));
+        inner.auto_escape_callback = Some(callback.clone_ref(py));
         inner
             .env
             .set_auto_escape_callback(move |name: &str| -> AutoEscape {
@@ -356,15 +360,13 @@ impl Environment {
     ///
     /// A finalizer is called before a value is rendered to customize it.
     #[setter]
-    pub fn set_finalizer(&self, callback: &Bound<'_, PyAny>) -> PyResult<()> {
+    pub fn set_finalizer(&self, py: Python<'_>, callback: &Bound<'_, PyAny>) -> PyResult<()> {
         if !callback.is_callable() {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
         let callback: Py<PyAny> = callback.clone().unbind();
         let mut inner = self.inner.lock().unwrap();
-        Python::with_gil(|py| {
-            inner.finalizer_callback = Some(callback.clone_ref(py));
-        });
+        inner.finalizer_callback = Some(callback.clone_ref(py));
         inner.env.set_formatter(move |output, state, value| {
             Python::with_gil(|py| -> Result<(), Error> {
                 let maybe_new_value = bind_state(state, || -> Result<_, Error> {
@@ -407,7 +409,7 @@ impl Environment {
     /// template exists the source code of the template should be returned a string,
     /// otherwise `None` can be used to indicate that the template does not exist.
     #[setter]
-    pub fn set_loader(&self, callback: Option<&Bound<'_, PyAny>>) -> PyResult<()> {
+    pub fn set_loader(&self, py: Python<'_>, callback: Option<&Bound<'_, PyAny>>) -> PyResult<()> {
         let callback = match callback {
             None => None,
             Some(callback) => {
@@ -418,9 +420,7 @@ impl Environment {
             }
         };
         let mut inner = self.inner.lock().unwrap();
-        Python::with_gil(|py| {
-            inner.loader = callback.as_ref().map(|x| x.clone_ref(py));
-        });
+        inner.loader = callback.as_ref().map(|x| x.clone_ref(py));
 
         if let Some(callback) = callback {
             inner.env.set_loader(move |name| {
@@ -454,15 +454,17 @@ impl Environment {
 
     /// Sets a new path join callback.
     #[setter]
-    pub fn set_path_join_callback(&self, callback: &Bound<'_, PyAny>) -> PyResult<()> {
+    pub fn set_path_join_callback(
+        &self,
+        py: Python<'_>,
+        callback: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
         if !callback.is_callable() {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
         let callback: Py<PyAny> = callback.clone().unbind();
         let mut inner = self.inner.lock().unwrap();
-        Python::with_gil(|py| {
-            inner.path_join_callback = Some(callback.clone_ref(py));
-        });
+        inner.path_join_callback = Some(callback.clone_ref(py));
         inner.env.set_path_join_callback(move |name, parent| {
             Python::with_gil(|py| {
                 let callback = callback.bind(py);
@@ -760,17 +762,18 @@ impl Environment {
     }
 }
 
-pub fn with_environment<R, F: FnOnce(Py<Environment>) -> PyResult<R>>(f: F) -> PyResult<R> {
-    Python::with_gil(|py| {
-        CURRENT_ENV.with(|handle| {
-            let ptr = handle.load(Ordering::Relaxed) as *mut _;
-            match unsafe { Py::<Environment>::from_borrowed_ptr_or_opt(py, ptr) } {
-                Some(env) => f(env),
-                None => Err(PyRuntimeError::new_err(
-                    "environment cannot be used outside of template render",
-                )),
-            }
-        })
+pub fn with_environment<R, F: FnOnce(Py<Environment>) -> PyResult<R>>(
+    py: Python<'_>,
+    f: F,
+) -> PyResult<R> {
+    CURRENT_ENV.with(|handle| {
+        let ptr = handle.load(Ordering::Relaxed) as *mut _;
+        match unsafe { Py::<Environment>::from_borrowed_ptr_or_opt(py, ptr) } {
+            Some(env) => f(env),
+            None => Err(PyRuntimeError::new_err(
+                "environment cannot be used outside of template render",
+            )),
+        }
     })
 }
 
