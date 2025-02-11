@@ -451,3 +451,25 @@ def test_threading_interactions():
 
     executor.shutdown(wait=True)
     assert done == ["something"] * 4
+
+
+def test_truthy():
+    class Custom:
+        def __init__(self, is_true):
+            self.is_true = is_true
+
+        def __bool__(self):
+            return bool(self.is_true)
+
+    env = Environment()
+    assert env.eval_expr("x|bool", x=Custom(True)) is True
+    assert env.eval_expr("x|bool", x=Custom(False)) is False
+    assert env.eval_expr("x|bool", x=Custom(None)) is False
+    assert env.eval_expr("x|bool", x=Custom("")) is False
+    assert env.eval_expr("x|bool", x=Custom("foo")) is True
+
+    class Fallback:
+        def __bool__(self):
+            raise RuntimeError("swallowed but true")
+
+    assert env.eval_expr("x|bool", x=Fallback()) is True

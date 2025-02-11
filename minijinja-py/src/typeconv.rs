@@ -135,6 +135,13 @@ impl Object for DynamicObject {
         })
     }
 
+    fn is_true(self: &Arc<Self>) -> bool {
+        Python::with_gil(|py| {
+            let inner = self.inner.bind(py);
+            inner.is_truthy().unwrap_or(true)
+        })
+    }
+
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         Python::with_gil(|py| {
             let inner = self.inner.bind(py);
