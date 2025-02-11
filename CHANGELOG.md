@@ -19,6 +19,8 @@ All notable changes to MiniJinja are documented here.
   Python binding not to compare correctly.  #707
 - Fixed a bug where `undeclared_variables` would incorrectly handle
   variables referenced by macros.  #714
+- Fixed a deadlock in the Python binding when multiple threads were
+  rendering from the same environment at once.  #717
 
 ## 2.8.0
 

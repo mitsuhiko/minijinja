@@ -173,6 +173,13 @@ Here is what this means for some basic types:
   However methods are disambiugated so `foo.items()` works and will correctly call
   the method in all cases.
 
+## Threading
+
+MiniJinja's Python bindin is thread-safe but it uses locks internally on the
+environment.  In particular only one thread can render a template from the same
+environment at the time.  If you want to render templates from multiple threads
+you should be creating a new environment for each thread.
+
 ## Sponsor
 
 If you like the project and find it useful you can [become a

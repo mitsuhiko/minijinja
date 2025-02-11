@@ -9,9 +9,6 @@ strip = true
 [profile.dev.package.insta]
 opt-level = 3
 
-[profile.dev.package.similar]
-opt-level = 3
-
 # The profile that 'cargo dist' will build with
 [profile.dist]
 inherits = "release"

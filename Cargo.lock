@@ -1972,7 +1972,6 @@ name = "minijinja-py"
 version = "2.7.0"
 dependencies = [
  "minijinja",
- "once_cell",
  "pyo3",
 ]
 

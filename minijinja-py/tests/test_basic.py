@@ -428,3 +428,26 @@ def test_fucked_up_object():
         match="invalid operation: failed to sort: user-provided comparison function does not correctly implement a total order",
     ):
         env.eval_expr("values|sort", values=values)
+
+
+def test_threading_interactions():
+    from time import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    done = []
+
+    def busy_wait(value, seconds: float):
+        start = time()
+        while time() - start < seconds:
+            continue
+        done.append(value)
+        return value
+
+    env = Environment(filters={"busy_wait": busy_wait})
+    executor = ThreadPoolExecutor()
+
+    for _ in range(4):
+        executor.submit(lambda: env.render_str("{{ 'something' | busy_wait(0.1) }}"))
+
+    executor.shutdown(wait=True)
+    assert done == ["something"] * 4

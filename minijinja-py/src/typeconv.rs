@@ -6,8 +6,8 @@ use std::sync::{Arc, Mutex};
 use minijinja::value::{DynObject, Enumerator, Object, ObjectRepr, Value, ValueKind};
 use minijinja::{AutoEscape, Error, State};
 
-use once_cell::sync::OnceCell;
 use pyo3::pybacked::PyBackedStr;
+use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyList, PySequence, PyTuple};
 use pyo3::{prelude::*, IntoPyObjectExt};
 
@@ -15,7 +15,7 @@ use crate::error_support::{to_minijinja_error, to_py_error};
 use crate::state::{bind_state, StateRef};
 
 static AUTO_ESCAPE_CACHE: Mutex<BTreeMap<String, AutoEscape>> = Mutex::new(BTreeMap::new());
-static MARK_SAFE: OnceCell<Py<PyAny>> = OnceCell::new();
+static MARK_SAFE: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
 fn is_safe_attr(name: &str) -> bool {
     !name.starts_with('_')
@@ -187,7 +187,7 @@ pub fn to_python_value(value: Value) -> PyResult<Py<PyAny>> {
 }
 
 fn mark_string_safe(py: Python<'_>, value: &str) -> PyResult<Py<PyAny>> {
-    let mark_safe: &Py<PyAny> = MARK_SAFE.get_or_try_init::<_, PyErr>(|| {
+    let mark_safe: &Py<PyAny> = MARK_SAFE.get_or_try_init::<_, PyErr>(py, || {
         let module = py.import("minijinja._internal")?;
         Ok(module.getattr("mark_safe")?.into())
     })?;
