@@ -470,6 +470,6 @@ def test_truthy():
 
     class Fallback:
         def __bool__(self):
-            raise RuntimeError("swalloed but true")
+            raise RuntimeError("swallowed but true")
 
     assert env.eval_expr("x|bool", x=Fallback()) is True
