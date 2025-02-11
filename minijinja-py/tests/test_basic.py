@@ -467,3 +467,9 @@ def test_truthy():
     assert env.eval_expr("x|bool", x=Custom(None)) is False
     assert env.eval_expr("x|bool", x=Custom("")) is False
     assert env.eval_expr("x|bool", x=Custom("foo")) is True
+
+    class Fallback:
+        def __bool__(self):
+            raise RuntimeError("swalloed but true")
+
+    assert env.eval_expr("x|bool", x=Fallback()) is True
