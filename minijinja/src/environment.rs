@@ -775,9 +775,14 @@ impl<'source> Environment<'source> {
         State::new_for_env(self)
     }
 
-    /// Looks up a function.
+    /// Looks up a global.
     pub(crate) fn get_global(&self, name: &str) -> Option<Value> {
         self.globals.get(name).cloned()
+    }
+
+    /// Iterates over all globals.
+    pub(crate) fn globals(&self) -> impl Iterator<Item = &str> {
+        self.globals.keys().map(|x| x as &str)
     }
 
     /// Looks up a filter.
