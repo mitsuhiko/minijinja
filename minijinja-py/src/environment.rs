@@ -294,6 +294,16 @@ impl Environment {
         Ok(())
     }
 
+    /// The set of known global variables.
+    #[getter]
+    pub fn globals(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let rv = PyDict::new(py);
+        for (key, value) in self.inner.lock().unwrap().env.globals() {
+            rv.set_item(key, to_python_value(value)?)?;
+        }
+        Ok(rv.into())
+    }
+
     /// Sets an auto escape callback.
     ///
     /// Note that because this interface in MiniJinja is infallible, the callback is

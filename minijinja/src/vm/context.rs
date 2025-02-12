@@ -284,7 +284,7 @@ impl<'env> Context<'env> {
             }
         }
         if with_globals {
-            seen.extend(self.env.globals().map(Cow::Borrowed));
+            seen.extend(self.env.globals().map(|x| Cow::Borrowed(x.0)));
         }
         seen
     }
