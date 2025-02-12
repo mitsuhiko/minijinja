@@ -24,7 +24,6 @@ pub struct Tokenizer<'s> {
     current_offset: usize,
     trim_leading_whitespace: bool,
     pending_start_marker: Option<(StartMarker, usize)>,
-    #[cfg(feature = "custom_syntax")]
     paren_balance: isize,
     syntax_config: SyntaxConfig,
     ws_config: WhitespaceConfig,
@@ -319,7 +318,6 @@ impl<'s> Tokenizer<'s> {
             current_line: 1,
             current_col: 0,
             current_offset: 0,
-            #[cfg(feature = "custom_syntax")]
             paren_balance: 0,
             trim_leading_whitespace: false,
             pending_start_marker: None,
@@ -801,50 +799,52 @@ impl<'s> Tokenizer<'s> {
         }
 
         // look out for the end of blocks
-        match sentinel {
-            BlockSentinel::Block => {
-                if matches!(rest.get(..1), Some("-" | "+"))
-                    && rest[1..].starts_with(self.block_end())
-                {
-                    self.stack.pop();
-                    let was_minus = &rest[..1] == "-";
-                    self.advance(self.block_end().len() + 1);
-                    let span = self.span(old_loc);
-                    if was_minus {
-                        self.trim_leading_whitespace = true;
+        if self.paren_balance == 0 {
+            match sentinel {
+                BlockSentinel::Block => {
+                    if matches!(rest.get(..1), Some("-" | "+"))
+                        && rest[1..].starts_with(self.block_end())
+                    {
+                        self.stack.pop();
+                        let was_minus = &rest[..1] == "-";
+                        self.advance(self.block_end().len() + 1);
+                        let span = self.span(old_loc);
+                        if was_minus {
+                            self.trim_leading_whitespace = true;
+                        }
+                        return Ok(ControlFlow::Break((Token::BlockEnd, span)));
                     }
-                    return Ok(ControlFlow::Break((Token::BlockEnd, span)));
-                }
-                if rest.starts_with(self.block_end()) {
-                    self.stack.pop();
-                    self.advance(self.block_end().len());
-                    let span = self.span(old_loc);
-                    self.skip_newline_if_trim_blocks();
-                    return Ok(ControlFlow::Break((Token::BlockEnd, span)));
-                }
-            }
-            BlockSentinel::Variable => {
-                if matches!(rest.get(..1), Some("-" | "+"))
-                    && rest[1..].starts_with(self.variable_end())
-                {
-                    self.stack.pop();
-                    let was_minus = &rest[..1] == "-";
-                    self.advance(self.variable_end().len() + 1);
-                    let span = self.span(old_loc);
-                    if was_minus {
-                        self.trim_leading_whitespace = true;
+                    if rest.starts_with(self.block_end()) {
+                        self.stack.pop();
+                        self.advance(self.block_end().len());
+                        let span = self.span(old_loc);
+                        self.skip_newline_if_trim_blocks();
+                        return Ok(ControlFlow::Break((Token::BlockEnd, span)));
                     }
-                    return Ok(ControlFlow::Break((Token::VariableEnd, span)));
                 }
-                if rest.starts_with(self.variable_end()) {
-                    self.stack.pop();
-                    self.advance(self.variable_end().len());
-                    return Ok(ControlFlow::Break((Token::VariableEnd, self.span(old_loc))));
+                BlockSentinel::Variable => {
+                    if matches!(rest.get(..1), Some("-" | "+"))
+                        && rest[1..].starts_with(self.variable_end())
+                    {
+                        self.stack.pop();
+                        let was_minus = &rest[..1] == "-";
+                        self.advance(self.variable_end().len() + 1);
+                        let span = self.span(old_loc);
+                        if was_minus {
+                            self.trim_leading_whitespace = true;
+                        }
+                        return Ok(ControlFlow::Break((Token::VariableEnd, span)));
+                    }
+                    if rest.starts_with(self.variable_end()) {
+                        self.stack.pop();
+                        self.advance(self.variable_end().len());
+                        return Ok(ControlFlow::Break((Token::VariableEnd, self.span(old_loc))));
+                    }
                 }
+                // line statements are handled above
+                #[cfg(feature = "custom_syntax")]
+                BlockSentinel::LineStatement => {}
             }
-            // line statements are handled above
-            #[cfg(feature = "custom_syntax")]
-            BlockSentinel::LineStatement => {}
         }
 
         // two character operators
@@ -864,10 +864,7 @@ impl<'s> Tokenizer<'s> {
 
         macro_rules! with_paren_balance {
             ($delta:expr, $tok:expr) => {{
-                #[cfg(feature = "custom_syntax")]
-                {
-                    self.paren_balance += $delta;
-                }
+                self.paren_balance += $delta;
                 Some($tok)
             }};
         }
