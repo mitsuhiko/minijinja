@@ -1,0 +1,27 @@
+---
+source: minijinja/tests/test_lexer.rs
+description: "{{ {\"a\": {\"b\": 1}} }}"
+input_file: minijinja/tests/lexer-inputs/parent-balance.txt
+---
+VariableStart
+  "{{"
+BraceOpen
+  "{"
+Str("a")
+  "\"a\""
+Colon
+  ":"
+BraceOpen
+  "{"
+Str("b")
+  "\"b\""
+Colon
+  ":"
+Int(1)
+  "1"
+BraceClose
+  "}"
+BraceClose
+  "}"
+VariableEnd
+  "}}"
