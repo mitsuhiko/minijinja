@@ -175,6 +175,10 @@ Here is what this means for some basic types:
 * Operator overloading is not supported.  This in particular means that operators like
   `+` will not invoke the `__add__` method of most objects.  This is an intentional
   limitation of the engine.
+* When MiniJinja objects are exposed to the Python side they lose most of their
+  functionality.  For instance plain objects such as functions are currently
+  just represented as strings, maps are dictionaries etc.  This also means you
+  cannot call methods on them from the Python side.
 
 ## Threading
 
