@@ -61,3 +61,13 @@ fn test_state_object_temps() {
         .unwrap();
     assert_eq!(rv, "1|2|3");
 }
+
+#[test]
+fn test_known_variables() {
+    let mut env = Environment::new();
+    env.add_global("foo", 42);
+    let state = env.empty_state();
+    let mut vars = state.known_variables();
+    vars.sort();
+    assert_eq!(vars, vec!["debug", "dict", "foo", "namespace", "range"]);
+}

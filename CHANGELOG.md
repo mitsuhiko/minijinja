@@ -25,6 +25,8 @@ All notable changes to MiniJinja are documented here.
   objects in if-conditions and filters.  #719
 - Fixed a bug where `}}` caused a syntax error in expressions with
   open parentheses, braces or brackets.  #723
+- Added `State::known_variables` to return a list of known variables
+  and `Environment::globals`.  #724
 
 ## 2.8.0
 

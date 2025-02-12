@@ -10,17 +10,11 @@ State {
     current_block: None,
     auto_escape: None,
     ctx: {
-        "x": 0,
-        "loop": Loop {
-            len: Some(
-                1,
-            ),
-            idx: 0,
-            depth: 0,
-        },
         "f": minijinja::functions::builtins::range,
+        "loop": <loop 0/1>,
         "one_shot_iterator": <iterator>,
         "upper": 1,
+        "x": 0,
     },
     env: Environment {
         globals: {

@@ -137,46 +137,14 @@ pub(crate) struct Context<'env> {
 
 impl fmt::Debug for Context<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fn dump<'a>(
-            m: &mut std::fmt::DebugMap,
-            seen: &mut HashSet<Cow<'a, str>>,
-            ctx: &'a Context<'a>,
-        ) -> fmt::Result {
-            for frame in ctx.stack.iter().rev() {
-                for (key, value) in frame.locals.iter() {
-                    if !seen.contains(&Cow::Borrowed(*key)) {
-                        m.entry(&key, value);
-                        seen.insert(Cow::Borrowed(key));
-                    }
-                }
-
-                if let Some(ref l) = frame.current_loop {
-                    if l.with_loop_var && !seen.contains("loop") {
-                        m.entry(&"loop", &l.object);
-                        seen.insert(Cow::Borrowed("loop"));
-                    }
-                }
-
-                if let Ok(iter) = frame.ctx.try_iter() {
-                    for key in iter {
-                        if let Some(str_key) = key.as_str() {
-                            if !seen.contains(&Cow::Borrowed(str_key)) {
-                                if let Ok(value) = frame.ctx.get_item(&key) {
-                                    m.entry(&str_key, &value);
-                                    seen.insert(Cow::Owned(str_key.to_owned()));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            Ok(())
-        }
-
-        let mut m = f.debug_map();
-        let mut seen = HashSet::new();
-        ok!(dump(&mut m, &mut seen, self));
-        m.finish()
+        let mut vars = Vec::from_iter(self.known_variables(false));
+        vars.sort();
+        f.debug_map()
+            .entries(vars.into_iter().map(|key| {
+                let value = self.load(&key).unwrap_or_default();
+                (key, value)
+            }))
+            .finish()
     }
 }
 
@@ -285,6 +253,40 @@ impl<'env> Context<'env> {
         }
 
         self.env.get_global(key)
+    }
+
+    /// Returns an iterable of all declared variables.
+    pub fn known_variables(&self, with_globals: bool) -> HashSet<Cow<'_, str>> {
+        let mut seen = HashSet::<Cow<'_, str>>::new();
+        for frame in self.stack.iter().rev() {
+            for key in frame.locals.keys() {
+                if !seen.contains(&Cow::Borrowed(*key)) {
+                    seen.insert(Cow::Borrowed(key));
+                }
+            }
+
+            if let Some(ref l) = frame.current_loop {
+                if l.with_loop_var && !seen.contains("loop") {
+                    seen.insert(Cow::Borrowed("loop"));
+                }
+            }
+
+            if let Ok(iter) = frame.ctx.try_iter() {
+                for key in iter {
+                    if let Some(str_key) = key.as_str() {
+                        if !seen.contains(&Cow::Borrowed(str_key))
+                            && frame.ctx.get_item(&key).is_ok()
+                        {
+                            seen.insert(Cow::Owned(str_key.to_owned()));
+                        }
+                    }
+                }
+            }
+        }
+        if with_globals {
+            seen.extend(self.env.globals().map(|x| Cow::Borrowed(x.0)));
+        }
+        seen
     }
 
     /// Pushes a new layer.

@@ -770,12 +770,19 @@ impl<'source> Environment<'source> {
         self.globals.remove(name);
     }
 
+    /// Returns an iterator of all global variables.
+    pub fn globals(&self) -> impl Iterator<Item = (&str, Value)> {
+        self.globals
+            .iter()
+            .map(|(key, value)| (key as &str, value.clone()))
+    }
+
     /// Returns an empty [`State`] for testing purposes and similar.
     pub fn empty_state(&self) -> State<'_, '_> {
         State::new_for_env(self)
     }
 
-    /// Looks up a function.
+    /// Looks up a global.
     pub(crate) fn get_global(&self, name: &str) -> Option<Value> {
         self.globals.get(name).cloned()
     }
