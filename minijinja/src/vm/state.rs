@@ -104,7 +104,7 @@ impl<'template, 'env> State<'template, 'env> {
     pub(crate) fn new_for_env(env: &'env Environment) -> State<'env, 'env> {
         State::new(
             env,
-            Context::new(env.recursion_limit()),
+            Context::new(env),
             AutoEscape::None,
             &crate::compiler::instructions::EMPTY_INSTRUCTIONS,
             BTreeMap::new(),
@@ -151,7 +151,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// able to find it.
     #[inline(always)]
     pub fn lookup(&self, name: &str) -> Option<Value> {
-        self.ctx.load(self.env, name)
+        self.ctx.load(name)
     }
 
     /// Looks up a global macro and calls it.

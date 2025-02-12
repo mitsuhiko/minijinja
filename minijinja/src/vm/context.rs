@@ -129,6 +129,7 @@ impl From<Vec<Value>> for Stack {
 }
 
 pub(crate) struct Context<'env> {
+    env: &'env Environment<'env>,
     stack: Vec<Frame<'env>>,
     outer_stack_depth: usize,
     recursion_limit: usize,
@@ -181,17 +182,18 @@ impl fmt::Debug for Context<'_> {
 
 impl<'env> Context<'env> {
     /// Creates an empty context.
-    pub fn new(recursion_limit: usize) -> Context<'env> {
+    pub fn new(env: &'env Environment<'env>) -> Context<'env> {
         Context {
+            env,
             stack: Vec::with_capacity(32),
             outer_stack_depth: 0,
-            recursion_limit,
+            recursion_limit: env.recursion_limit(),
         }
     }
 
     /// Creates a context
-    pub fn new_with_frame(frame: Frame<'env>, recursion_limit: usize) -> Context<'env> {
-        let mut rv = Context::new(recursion_limit);
+    pub fn new_with_frame(env: &'env Environment<'env>, frame: Frame<'env>) -> Context<'env> {
+        let mut rv = Context::new(env);
         rv.stack.push(frame);
         rv
     }
@@ -214,7 +216,7 @@ impl<'env> Context<'env> {
     /// to emulate the behavior of how scopes work in Jinja2 in Python.  The
     /// unfortunate downside is that this has to be done with a `Mutex`.
     #[cfg(feature = "macros")]
-    pub fn enclose(&mut self, env: &Environment, key: &str) {
+    pub fn enclose(&mut self, key: &str) {
         self.stack
             .last_mut()
             .unwrap()
@@ -222,7 +224,7 @@ impl<'env> Context<'env> {
             .as_mut()
             .unwrap()
             .clone()
-            .store_if_missing(key, || self.load(env, key).unwrap_or(Value::UNDEFINED));
+            .store_if_missing(key, || self.load(key).unwrap_or(Value::UNDEFINED));
     }
 
     /// Loads the closure and returns it.
@@ -261,7 +263,7 @@ impl<'env> Context<'env> {
     }
 
     /// Looks up a variable in the context.
-    pub fn load(&self, env: &Environment, key: &str) -> Option<Value> {
+    pub fn load(&self, key: &str) -> Option<Value> {
         for frame in self.stack.iter().rev() {
             // look at locals first
             if let Some(value) = frame.locals.get(key) {
@@ -282,7 +284,7 @@ impl<'env> Context<'env> {
             }
         }
 
-        env.get_global(key)
+        self.env.get_global(key)
     }
 
     /// Pushes a new layer.

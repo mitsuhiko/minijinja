@@ -92,7 +92,7 @@ impl<'env> Vm<'env> {
     ) -> Result<(Option<Value>, State<'template, 'env>), Error> {
         let mut state = State::new(
             self.env,
-            Context::new_with_frame(ok!(Frame::new_checked(root)), self.env.recursion_limit()),
+            Context::new_with_frame(self.env, ok!(Frame::new_checked(root))),
             auto_escape,
             instructions,
             prepare_blocks(blocks),
@@ -114,7 +114,7 @@ impl<'env> Vm<'env> {
         state: &State,
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
-        let mut ctx = Context::new_with_frame(Frame::new(context_base), self.env.recursion_limit());
+        let mut ctx = Context::new_with_frame(self.env, Frame::new(context_base));
         ok!(ctx.push_frame(Frame::new(closure)));
         if let Some(caller) = caller {
             ctx.store("caller", caller);
@@ -727,7 +727,7 @@ impl<'env> Vm<'env> {
                         state.closure_tracker.track_closure(closure.clone());
                         state.ctx.reset_closure(Some(closure));
                     }
-                    state.ctx.enclose(state.env, name);
+                    state.ctx.enclose(name);
                 }
                 #[cfg(feature = "macros")]
                 Instruction::GetClosure => {

@@ -272,7 +272,7 @@ impl<'env, 'source> Template<'env, 'source> {
     pub fn new_state(&self) -> State<'_, 'env> {
         State::new(
             self.env,
-            Context::new(self.env.recursion_limit()),
+            Context::new(self.env),
             self.compiled.initial_auto_escape,
             &self.compiled.instructions,
             prepare_blocks(&self.compiled.blocks),
