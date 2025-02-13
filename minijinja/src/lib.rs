@@ -79,7 +79,7 @@
 //! # Custom Filters
 //!
 //! MiniJinja lets you register functions as filter functions (see
-//! [`Filter`](crate::filters::Filter)) with the engine.  These can then be
+//! [`Function`](crate::functions::Function)) with the engine.  These can then be
 //! invoked directly from the template:
 //!
 //! ```

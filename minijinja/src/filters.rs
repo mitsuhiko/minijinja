@@ -43,13 +43,14 @@
 //! ```
 //!
 //! MiniJinja will perform the necessary conversions automatically.  For more
-//! information see the [`Filter`] trait.
+//! information see the [`Function`](crate::functions::Function) trait.
 //!
 //! # Accessing State
 //!
 //! In some cases it can be necessary to access the execution [`State`].  Since a borrowed
-//! state implements [`ArgType`] it's possible to add a parameter that holds the state.
-//! For instance the following filter appends the current template name to the string:
+//! state implements [`ArgType`](crate::value::ArgType) it's possible to add a
+//! parameter that holds the state.  For instance the following filter appends
+//! the current template name to the string:
 //!
 //! ```
 //! # use minijinja::Environment;
@@ -115,141 +116,15 @@
 use std::sync::Arc;
 
 use crate::error::Error;
-use crate::utils::{write_escaped, SealedMarker};
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Value};
+use crate::utils::write_escaped;
+use crate::value::Value;
 use crate::vm::State;
 use crate::{AutoEscape, Output};
 
-type FilterFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
-
-#[derive(Clone)]
-pub(crate) struct BoxedFilter(Arc<FilterFunc>);
-
-/// A utility trait that represents filters.
-///
-/// This trait is used by the [`add_filter`](crate::Environment::add_filter) method to abstract over
-/// different types of functions that implement filters.  Filters are functions
-/// which at the very least accept the [`State`] by reference as first parameter
-/// and the value that that the filter is applied to as second.  Additionally up to
-/// 4 further parameters are supported.
-///
-/// A filter can return any of the following types:
-///
-/// * `Rv` where `Rv` implements `Into<Value>`
-/// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
-///
-/// Filters accept one mandatory parameter which is the value the filter is
-/// applied to and up to 4 extra parameters.  The extra parameters can be
-/// marked optional by using `Option<T>`.  The last argument can also use
-/// [`Rest<T>`](crate::value::Rest) to capture the remaining arguments.  All
-/// types are supported for which [`ArgType`] is implemented.
-///
-/// For a list of built-in filters see [`filters`](crate::filters).
-///
-/// # Basic Example
-///
-/// ```
-/// # use minijinja::Environment;
-/// # let mut env = Environment::new();
-/// use minijinja::State;
-///
-/// fn slugify(value: String) -> String {
-///     value.to_lowercase().split_whitespace().collect::<Vec<_>>().join("-")
-/// }
-///
-/// env.add_filter("slugify", slugify);
-/// ```
-///
-/// ```jinja
-/// {{ "Foo Bar Baz"|slugify }} -> foo-bar-baz
-/// ```
-///
-/// # Arguments and Optional Arguments
-///
-/// ```
-/// # use minijinja::Environment;
-/// # let mut env = Environment::new();
-/// fn substr(value: String, start: u32, end: Option<u32>) -> String {
-///     let end = end.unwrap_or(value.len() as _);
-///     value.get(start as usize..end as usize).unwrap_or_default().into()
-/// }
-///
-/// env.add_filter("substr", substr);
-/// ```
-///
-/// ```jinja
-/// {{ "Foo Bar Baz"|substr(4) }} -> Bar Baz
-/// {{ "Foo Bar Baz"|substr(4, 7) }} -> Bar
-/// ```
-///
-/// # Variadic
-///
-/// ```
-/// # use minijinja::Environment;
-/// # let mut env = Environment::new();
-/// use minijinja::value::Rest;
-///
-/// fn pyjoin(joiner: String, values: Rest<String>) -> String {
-///     values.join(&joiner)
-/// }
-///
-/// env.add_filter("pyjoin", pyjoin);
-/// ```
-///
-/// ```jinja
-/// {{ "|".join(1, 2, 3) }} -> 1|2|3
-/// ```
-pub trait Filter<Rv, Args>: Send + Sync + 'static {
-    /// Applies a filter to value with the given arguments.
-    ///
-    /// The value is always the first argument.
-    #[doc(hidden)]
-    fn apply_to(&self, args: Args, _: SealedMarker) -> Rv;
-}
-
-macro_rules! tuple_impls {
-    ( $( $name:ident )* ) => {
-        impl<Func, Rv, $($name),*> Filter<Rv, ($($name,)*)> for Func
-        where
-            Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
-            Rv: FunctionResult,
-            $($name: for<'a> ArgType<'a>,)*
-        {
-            fn apply_to(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
-                #[allow(non_snake_case)]
-                let ($($name,)*) = args;
-                (self)($($name,)*)
-            }
-        }
-    };
-}
-
-tuple_impls! {}
-tuple_impls! { A }
-tuple_impls! { A B }
-tuple_impls! { A B C }
-tuple_impls! { A B C D }
-tuple_impls! { A B C D E }
-
-impl BoxedFilter {
-    /// Creates a new boxed filter.
-    pub fn new<F, Rv, Args>(f: F) -> BoxedFilter
-    where
-        F: Filter<Rv, Args> + for<'a> Filter<Rv, <Args as FunctionArgs<'a>>::Output>,
-        Rv: FunctionResult,
-        Args: for<'a> FunctionArgs<'a>,
-    {
-        BoxedFilter(Arc::new(move |state, args| -> Result<Value, Error> {
-            f.apply_to(ok!(Args::from_values(Some(state), args)), SealedMarker)
-                .into_result()
-        }))
-    }
-
-    /// Applies the filter to a value and argument.
-    pub fn apply_to(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
-        (self.0)(state, args)
-    }
-}
+/// Deprecated alias
+#[deprecated = "Use the minijinja::functions::Function instead"]
+#[doc(hidden)]
+pub use crate::functions::Function as Filter;
 
 /// Marks a value as safe.  This converts it into a string.
 ///
@@ -1236,7 +1111,7 @@ mod builtins {
                     .into_iter()
                     .chain(args.0.iter().cloned())
                     .collect::<Vec<_>>();
-                ok!(test.perform(state, &new_args))
+                ok!(test.call(state, &new_args)).is_true()
             } else {
                 test_value.is_true()
             };
@@ -1405,7 +1280,7 @@ mod builtins {
                 .into_iter()
                 .chain(args.iter().skip(1).cloned())
                 .collect::<Vec<_>>();
-            rv.push(ok!(filter.apply_to(state, &new_args)));
+            rv.push(ok!(filter.call(state, &new_args)));
         }
         Ok(rv)
     }

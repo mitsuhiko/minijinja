@@ -29,7 +29,7 @@
 //! # Custom Tests
 //!
 //! A custom test function is just a simple function which accepts its
-//! inputs as parameters and then returns a bool. For instance the following
+//! inputs as parameters and then returns a bool.  For instance the following
 //! shows a test function which takes an input value and checks if it's
 //! lowercase:
 //!
@@ -44,7 +44,9 @@
 //! ```
 //!
 //! MiniJinja will perform the necessary conversions automatically.  For more
-//! information see the [`Test`] trait.
+//! information see the [`Function`](crate::functions::Function) trait.  If a
+//! test returns a value that is not a bool, it will be evaluated for truthiness
+//! with [`Value::is_true`].
 //!
 //! # Built-in Tests
 //!
@@ -53,149 +55,17 @@
 //! this module.  Note though that these functions are not to be
 //! called from Rust code as their exact interface (arguments and return types)
 //! might change from one MiniJinja version to another.
-use std::sync::Arc;
-
 use crate::error::Error;
-use crate::utils::SealedMarker;
-use crate::value::{ArgType, FunctionArgs, Value};
+use crate::value::Value;
 use crate::vm::State;
 
-type TestFunc = dyn Fn(&State, &[Value]) -> Result<bool, Error> + Sync + Send + 'static;
-
-#[derive(Clone)]
-pub(crate) struct BoxedTest(Arc<TestFunc>);
-
-/// A utility trait that represents the return value of filters.
-///
-/// It's implemented for the following types:
-///
-/// * `bool`
-/// * `Result<bool, Error>`
-///
-/// The equivalent for filters or functions is [`FunctionResult`](crate::value::FunctionResult).
-pub trait TestResult {
-    #[doc(hidden)]
-    fn into_result(self) -> Result<bool, Error>;
-}
-
-impl TestResult for Result<bool, Error> {
-    fn into_result(self) -> Result<bool, Error> {
-        self
-    }
-}
-
-impl TestResult for bool {
-    fn into_result(self) -> Result<bool, Error> {
-        Ok(self)
-    }
-}
-
-/// A utility trait that represents test functions.
-///
-/// This trait is used by the [`add_test`](crate::Environment::add_test) method to abstract over
-/// different types of functions that implement tests.  Tests are similar to
-/// [`filters`](crate::filters) but they always return boolean values and use a
-/// slightly different syntax to filters.  Like filters they accept the [`State`] by
-/// reference as first parameter and the value that that the test is applied to as second.
-/// Additionally up to 4 further parameters are supported.
-///
-/// A test function can return any of the following types:
-///
-/// * `bool`
-/// * `Result<bool, Error>`
-///
-/// Tests accept one mandatory parameter which is the value the filter is
-/// applied to and up to 4 extra parameters.  The extra parameters can be
-/// marked optional by using `Option<T>`.  The last argument can also use
-/// [`Rest<T>`](crate::value::Rest) to capture the remaining arguments.  All
-/// types are supported for which [`ArgType`] is implemented.
-///
-/// For a list of built-in tests see [`tests`](crate::tests).
-///
-/// # Basic Example
-///
-/// ```
-/// # use minijinja::Environment;
-/// # let mut env = Environment::new();
-/// use minijinja::State;
-///
-/// fn is_lowercase(value: String) -> bool {
-///     value.chars().all(|x| x.is_lowercase())
-/// }
-///
-/// env.add_test("lowercase", is_lowercase);
-/// ```
-///
-/// ```jinja
-/// {{ "foo" is lowercase }} -> true
-/// ```
-///
-/// # Arguments and Optional Arguments
-///
-/// ```
-/// # use minijinja::Environment;
-/// # let mut env = Environment::new();
-/// use minijinja::State;
-///
-/// fn is_containing(value: String, other: String) -> bool {
-///     value.contains(&other)
-/// }
-///
-/// env.add_test("containing", is_containing);
-/// ```
-///
-/// ```jinja
-/// {{ "foo" is containing("o") }} -> true
-/// ```
-pub trait Test<Rv, Args>: Send + Sync + 'static {
-    /// Performs a test to value with the given arguments.
-    #[doc(hidden)]
-    fn perform(&self, args: Args, _: SealedMarker) -> Rv;
-}
-
-macro_rules! tuple_impls {
-    ( $( $name:ident )* ) => {
-        impl<Func, Rv, $($name),*> Test<Rv, ($($name,)*)> for Func
-        where
-            Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
-            Rv: TestResult,
-            $($name: for<'a> ArgType<'a>),*
-        {
-            fn perform(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
-                #[allow(non_snake_case)]
-                let ($($name,)*) = args;
-                (self)($($name,)*)
-            }
-        }
-    };
-}
-
-tuple_impls! {}
-tuple_impls! { A }
-tuple_impls! { A B }
-tuple_impls! { A B C }
-tuple_impls! { A B C D }
-tuple_impls! { A B C D E }
-
-impl BoxedTest {
-    /// Creates a new boxed filter.
-    pub fn new<F, Rv, Args>(f: F) -> BoxedTest
-    where
-        F: Test<Rv, Args> + for<'a> Test<Rv, <Args as FunctionArgs<'a>>::Output>,
-        Rv: TestResult,
-        Args: for<'a> FunctionArgs<'a>,
-    {
-        BoxedTest(Arc::new(move |state, args| -> Result<bool, Error> {
-            f.perform(ok!(Args::from_values(Some(state), args)), SealedMarker)
-                .into_result()
-        }))
-    }
-
-    /// Applies the filter to a value and argument.
-    pub fn perform(&self, state: &State, args: &[Value]) -> Result<bool, Error> {
-        (self.0)(state, args)
-    }
-}
+/// Deprecated alias
+#[deprecated = "Use the minijinja::functions::Function instead"]
+#[doc(hidden)]
+pub use crate::functions::Function as Test;
+#[deprecated = "Use the minijinja::value::FunctionResult instead"]
+#[doc(hidden)]
+pub use crate::value::FunctionResult as TestResult;
 
 /// Checks if a value is undefined.
 ///

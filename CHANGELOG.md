@@ -28,6 +28,8 @@ All notable changes to MiniJinja are documented here.
 - Added `State::known_variables` to return a list of known variables
   and `Environment::globals`.  #724
 - Fixed an issue with undeclared variables not handling `caller`.  #725
+- Removed unnecessary `Filters` and `Tests` traits.  They remain as
+  hidden aliases to `Function`.  #726
 
 ## 2.8.0
 

@@ -15,7 +15,7 @@ use crate::template::{CompiledTemplate, CompiledTemplateRef, Template, TemplateC
 use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
 use crate::value::{FunctionArgs, FunctionResult, Value, ValueRepr};
 use crate::vm::State;
-use crate::{defaults, filters, functions, tests};
+use crate::{defaults, functions};
 
 type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + Sync + Send;
 type PathJoinFunc = dyn for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Sync + Send;
@@ -47,8 +47,8 @@ const MAX_RECURSION: usize = 500;
 #[derive(Clone)]
 pub struct Environment<'source> {
     templates: TemplateStore<'source>,
-    filters: BTreeMap<Cow<'source, str>, filters::BoxedFilter>,
-    tests: BTreeMap<Cow<'source, str>, tests::BoxedTest>,
+    filters: BTreeMap<Cow<'source, str>, Value>,
+    tests: BTreeMap<Cow<'source, str>, Value>,
     globals: BTreeMap<Cow<'source, str>, Value>,
     path_join_callback: Option<Arc<PathJoinFunc>>,
     pub(crate) unknown_method_callback: Option<Arc<UnknownMethodFunc>>,
@@ -695,18 +695,17 @@ impl<'source> Environment<'source> {
     ///
     /// Filter functions are functions that can be applied to values in
     /// templates.  For details about filters have a look at
-    /// [`Filter`](crate::filters::Filter).
+    /// [`filters`](crate::filters).
     pub fn add_filter<N, F, Rv, Args>(&mut self, name: N, f: F)
     where
         N: Into<Cow<'source, str>>,
         // the crazy bounds here exist to enable borrowing in closures
-        F: filters::Filter<Rv, Args>
-            + for<'a> filters::Filter<Rv, <Args as FunctionArgs<'a>>::Output>,
+        F: functions::Function<Rv, Args>
+            + for<'a> functions::Function<Rv, <Args as FunctionArgs<'a>>::Output>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.filters
-            .insert(name.into(), filters::BoxedFilter::new(f));
+        self.filters.insert(name.into(), Value::from_function(f));
     }
 
     /// Removes a filter by name.
@@ -718,16 +717,17 @@ impl<'source> Environment<'source> {
     ///
     /// Test functions are similar to filters but perform a check on a value
     /// where the return value is always true or false.  For details about tests
-    /// have a look at [`Test`](crate::tests::Test).
+    /// have a look at [`tests`](crate::tests).
     pub fn add_test<N, F, Rv, Args>(&mut self, name: N, f: F)
     where
         N: Into<Cow<'source, str>>,
         // the crazy bounds here exist to enable borrowing in closures
-        F: tests::Test<Rv, Args> + for<'a> tests::Test<Rv, <Args as FunctionArgs<'a>>::Output>,
-        Rv: tests::TestResult,
+        F: functions::Function<Rv, Args>
+            + for<'a> functions::Function<Rv, <Args as FunctionArgs<'a>>::Output>,
+        Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.tests.insert(name.into(), tests::BoxedTest::new(f));
+        self.tests.insert(name.into(), Value::from_function(f));
     }
 
     /// Removes a test by name.
@@ -788,12 +788,12 @@ impl<'source> Environment<'source> {
     }
 
     /// Looks up a filter.
-    pub(crate) fn get_filter(&self, name: &str) -> Option<&filters::BoxedFilter> {
+    pub(crate) fn get_filter(&self, name: &str) -> Option<&Value> {
         self.filters.get(name)
     }
 
     /// Looks up a test function.
-    pub(crate) fn get_test(&self, name: &str) -> Option<&tests::BoxedTest> {
+    pub(crate) fn get_test(&self, name: &str) -> Option<&Value> {
         self.tests.get(name)
     }
 

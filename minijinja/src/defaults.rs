@@ -2,9 +2,9 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use crate::error::Error;
-use crate::filters::{self, BoxedFilter};
+use crate::filters;
 use crate::output::Output;
-use crate::tests::{self, BoxedTest};
+use crate::tests;
 use crate::utils::{write_escaped, AutoEscape};
 use crate::value::Value;
 use crate::vm::State;
@@ -51,128 +51,146 @@ pub fn escape_formatter(out: &mut Output, state: &State, value: &Value) -> Resul
     write_escaped(out, state.auto_escape(), value)
 }
 
-pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, filters::BoxedFilter> {
+pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, Value> {
     let mut rv = BTreeMap::new();
-    rv.insert("safe".into(), BoxedFilter::new(filters::safe));
-    let escape = BoxedFilter::new(filters::escape);
+    rv.insert("safe".into(), Value::from_function(filters::safe));
+    let escape = Value::from_function(filters::escape);
     rv.insert("escape".into(), escape.clone());
     rv.insert("e".into(), escape);
     #[cfg(feature = "builtins")]
     {
-        rv.insert("lower".into(), BoxedFilter::new(filters::lower));
-        rv.insert("upper".into(), BoxedFilter::new(filters::upper));
-        rv.insert("title".into(), BoxedFilter::new(filters::title));
-        rv.insert("capitalize".into(), BoxedFilter::new(filters::capitalize));
-        rv.insert("replace".into(), BoxedFilter::new(filters::replace));
-        let length = BoxedFilter::new(filters::length);
+        rv.insert("lower".into(), Value::from_function(filters::lower));
+        rv.insert("upper".into(), Value::from_function(filters::upper));
+        rv.insert("title".into(), Value::from_function(filters::title));
+        rv.insert(
+            "capitalize".into(),
+            Value::from_function(filters::capitalize),
+        );
+        rv.insert("replace".into(), Value::from_function(filters::replace));
+        let length = Value::from_function(filters::length);
         rv.insert("length".into(), length.clone());
         rv.insert("count".into(), length);
-        rv.insert("dictsort".into(), BoxedFilter::new(filters::dictsort));
-        rv.insert("items".into(), BoxedFilter::new(filters::items));
-        rv.insert("reverse".into(), BoxedFilter::new(filters::reverse));
-        rv.insert("trim".into(), BoxedFilter::new(filters::trim));
-        rv.insert("join".into(), BoxedFilter::new(filters::join));
-        rv.insert("split".into(), BoxedFilter::new(filters::split));
-        rv.insert("lines".into(), BoxedFilter::new(filters::lines));
-        rv.insert("default".into(), BoxedFilter::new(filters::default));
-        rv.insert("round".into(), BoxedFilter::new(filters::round));
-        rv.insert("abs".into(), BoxedFilter::new(filters::abs));
-        rv.insert("int".into(), BoxedFilter::new(filters::int));
-        rv.insert("float".into(), BoxedFilter::new(filters::float));
-        rv.insert("attr".into(), BoxedFilter::new(filters::attr));
-        rv.insert("first".into(), BoxedFilter::new(filters::first));
-        rv.insert("last".into(), BoxedFilter::new(filters::last));
-        rv.insert("min".into(), BoxedFilter::new(filters::min));
-        rv.insert("max".into(), BoxedFilter::new(filters::max));
-        rv.insert("sort".into(), BoxedFilter::new(filters::sort));
-        rv.insert("d".into(), BoxedFilter::new(filters::default));
-        rv.insert("list".into(), BoxedFilter::new(filters::list));
-        rv.insert("string".into(), BoxedFilter::new(filters::string));
-        rv.insert("bool".into(), BoxedFilter::new(filters::bool));
-        rv.insert("batch".into(), BoxedFilter::new(filters::batch));
-        rv.insert("slice".into(), BoxedFilter::new(filters::slice));
-        rv.insert("sum".into(), BoxedFilter::new(filters::sum));
-        rv.insert("indent".into(), BoxedFilter::new(filters::indent));
-        rv.insert("select".into(), BoxedFilter::new(filters::select));
-        rv.insert("reject".into(), BoxedFilter::new(filters::reject));
-        rv.insert("selectattr".into(), BoxedFilter::new(filters::selectattr));
-        rv.insert("rejectattr".into(), BoxedFilter::new(filters::rejectattr));
-        rv.insert("map".into(), BoxedFilter::new(filters::map));
-        rv.insert("groupby".into(), BoxedFilter::new(filters::groupby));
-        rv.insert("unique".into(), BoxedFilter::new(filters::unique));
-        rv.insert("pprint".into(), BoxedFilter::new(filters::pprint));
+        rv.insert("dictsort".into(), Value::from_function(filters::dictsort));
+        rv.insert("items".into(), Value::from_function(filters::items));
+        rv.insert("reverse".into(), Value::from_function(filters::reverse));
+        rv.insert("trim".into(), Value::from_function(filters::trim));
+        rv.insert("join".into(), Value::from_function(filters::join));
+        rv.insert("split".into(), Value::from_function(filters::split));
+        rv.insert("lines".into(), Value::from_function(filters::lines));
+        rv.insert("default".into(), Value::from_function(filters::default));
+        rv.insert("round".into(), Value::from_function(filters::round));
+        rv.insert("abs".into(), Value::from_function(filters::abs));
+        rv.insert("int".into(), Value::from_function(filters::int));
+        rv.insert("float".into(), Value::from_function(filters::float));
+        rv.insert("attr".into(), Value::from_function(filters::attr));
+        rv.insert("first".into(), Value::from_function(filters::first));
+        rv.insert("last".into(), Value::from_function(filters::last));
+        rv.insert("min".into(), Value::from_function(filters::min));
+        rv.insert("max".into(), Value::from_function(filters::max));
+        rv.insert("sort".into(), Value::from_function(filters::sort));
+        rv.insert("d".into(), Value::from_function(filters::default));
+        rv.insert("list".into(), Value::from_function(filters::list));
+        rv.insert("string".into(), Value::from_function(filters::string));
+        rv.insert("bool".into(), Value::from_function(filters::bool));
+        rv.insert("batch".into(), Value::from_function(filters::batch));
+        rv.insert("slice".into(), Value::from_function(filters::slice));
+        rv.insert("sum".into(), Value::from_function(filters::sum));
+        rv.insert("indent".into(), Value::from_function(filters::indent));
+        rv.insert("select".into(), Value::from_function(filters::select));
+        rv.insert("reject".into(), Value::from_function(filters::reject));
+        rv.insert(
+            "selectattr".into(),
+            Value::from_function(filters::selectattr),
+        );
+        rv.insert(
+            "rejectattr".into(),
+            Value::from_function(filters::rejectattr),
+        );
+        rv.insert("map".into(), Value::from_function(filters::map));
+        rv.insert("groupby".into(), Value::from_function(filters::groupby));
+        rv.insert("unique".into(), Value::from_function(filters::unique));
+        rv.insert("pprint".into(), Value::from_function(filters::pprint));
 
         #[cfg(feature = "json")]
         {
-            rv.insert("tojson".into(), BoxedFilter::new(filters::tojson));
+            rv.insert("tojson".into(), Value::from_function(filters::tojson));
         }
         #[cfg(feature = "urlencode")]
         {
-            rv.insert("urlencode".into(), BoxedFilter::new(filters::urlencode));
+            rv.insert("urlencode".into(), Value::from_function(filters::urlencode));
         }
     }
 
     rv
 }
 
-pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, BoxedTest> {
+pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, Value> {
     let mut rv = BTreeMap::new();
-    rv.insert("undefined".into(), BoxedTest::new(tests::is_undefined));
-    rv.insert("defined".into(), BoxedTest::new(tests::is_defined));
-    rv.insert("none".into(), BoxedTest::new(tests::is_none));
-    let is_safe = BoxedTest::new(tests::is_safe);
+    rv.insert(
+        "undefined".into(),
+        Value::from_function(tests::is_undefined),
+    );
+    rv.insert("defined".into(), Value::from_function(tests::is_defined));
+    rv.insert("none".into(), Value::from_function(tests::is_none));
+    let is_safe = Value::from_function(tests::is_safe);
     rv.insert("safe".into(), is_safe.clone());
     rv.insert("escaped".into(), is_safe);
     #[cfg(feature = "builtins")]
     {
-        rv.insert("boolean".into(), BoxedTest::new(tests::is_boolean));
-        rv.insert("odd".into(), BoxedTest::new(tests::is_odd));
-        rv.insert("even".into(), BoxedTest::new(tests::is_even));
-        rv.insert("divisibleby".into(), BoxedTest::new(tests::is_divisibleby));
-        rv.insert("number".into(), BoxedTest::new(tests::is_number));
-        rv.insert("integer".into(), BoxedTest::new(tests::is_integer));
-        rv.insert("int".into(), BoxedTest::new(tests::is_integer));
-        rv.insert("float".into(), BoxedTest::new(tests::is_float));
-        rv.insert("string".into(), BoxedTest::new(tests::is_string));
-        rv.insert("sequence".into(), BoxedTest::new(tests::is_sequence));
-        rv.insert("iterable".into(), BoxedTest::new(tests::is_iterable));
-        rv.insert("mapping".into(), BoxedTest::new(tests::is_mapping));
+        rv.insert("boolean".into(), Value::from_function(tests::is_boolean));
+        rv.insert("odd".into(), Value::from_function(tests::is_odd));
+        rv.insert("even".into(), Value::from_function(tests::is_even));
+        rv.insert(
+            "divisibleby".into(),
+            Value::from_function(tests::is_divisibleby),
+        );
+        rv.insert("number".into(), Value::from_function(tests::is_number));
+        rv.insert("integer".into(), Value::from_function(tests::is_integer));
+        rv.insert("int".into(), Value::from_function(tests::is_integer));
+        rv.insert("float".into(), Value::from_function(tests::is_float));
+        rv.insert("string".into(), Value::from_function(tests::is_string));
+        rv.insert("sequence".into(), Value::from_function(tests::is_sequence));
+        rv.insert("iterable".into(), Value::from_function(tests::is_iterable));
+        rv.insert("mapping".into(), Value::from_function(tests::is_mapping));
         rv.insert(
             "startingwith".into(),
-            BoxedTest::new(tests::is_startingwith),
+            Value::from_function(tests::is_startingwith),
         );
-        rv.insert("endingwith".into(), BoxedTest::new(tests::is_endingwith));
-        rv.insert("lower".into(), BoxedTest::new(tests::is_lower));
-        rv.insert("upper".into(), BoxedTest::new(tests::is_upper));
-        rv.insert("sameas".into(), BoxedTest::new(tests::is_sameas));
+        rv.insert(
+            "endingwith".into(),
+            Value::from_function(tests::is_endingwith),
+        );
+        rv.insert("lower".into(), Value::from_function(tests::is_lower));
+        rv.insert("upper".into(), Value::from_function(tests::is_upper));
+        rv.insert("sameas".into(), Value::from_function(tests::is_sameas));
 
         // operators
-        let is_eq = BoxedTest::new(tests::is_eq);
+        let is_eq = Value::from_function(tests::is_eq);
         rv.insert("eq".into(), is_eq.clone());
         rv.insert("equalto".into(), is_eq.clone());
         rv.insert("==".into(), is_eq);
-        let is_ne = BoxedTest::new(tests::is_ne);
+        let is_ne = Value::from_function(tests::is_ne);
         rv.insert("ne".into(), is_ne.clone());
         rv.insert("!=".into(), is_ne);
-        let is_lt = BoxedTest::new(tests::is_lt);
+        let is_lt = Value::from_function(tests::is_lt);
         rv.insert("lt".into(), is_lt.clone());
         rv.insert("lessthan".into(), is_lt.clone());
         rv.insert("<".into(), is_lt);
-        let is_le = BoxedTest::new(tests::is_le);
+        let is_le = Value::from_function(tests::is_le);
         rv.insert("le".into(), is_le.clone());
         rv.insert("<=".into(), is_le);
-        let is_gt = BoxedTest::new(tests::is_gt);
+        let is_gt = Value::from_function(tests::is_gt);
         rv.insert("gt".into(), is_gt.clone());
         rv.insert("greaterthan".into(), is_gt.clone());
         rv.insert(">".into(), is_gt);
-        let is_ge = BoxedTest::new(tests::is_ge);
+        let is_ge = Value::from_function(tests::is_ge);
         rv.insert("ge".into(), is_ge.clone());
         rv.insert(">=".into(), is_ge);
-        rv.insert("in".into(), BoxedTest::new(tests::is_in));
-        rv.insert("true".into(), BoxedTest::new(tests::is_true));
-        rv.insert("false".into(), BoxedTest::new(tests::is_false));
-        rv.insert("filter".into(), BoxedTest::new(tests::is_filter));
-        rv.insert("test".into(), BoxedTest::new(tests::is_test));
+        rv.insert("in".into(), Value::from_function(tests::is_in));
+        rv.insert("true".into(), Value::from_function(tests::is_true));
+        rv.insert("false".into(), Value::from_function(tests::is_false));
+        rv.insert("filter".into(), Value::from_function(tests::is_filter));
+        rv.insert("test".into(), Value::from_function(tests::is_test));
     }
     rv
 }

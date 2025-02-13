@@ -137,6 +137,9 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 /// to implement a custom callable, you can directly implement
 /// [`Object::call`] which is what the engine actually uses internally.
 ///
+/// This trait is also used for [`filters`](crate::filters) and
+/// [`tests`](crate::tests).
+///
 /// # Basic Example
 ///
 /// ```rust
@@ -175,6 +178,24 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 ///
 /// ```jinja
 /// {{ sum(1, 2, 3) }} -> 6
+/// ```
+///
+/// # Optional Arguments
+///
+/// ```jinja
+/// # use minijinja::Environment;
+/// # let mut env = Environment::new();
+/// fn substr(value: String, start: u32, end: Option<u32>) -> String {
+///     let end = end.unwrap_or(value.len() as _);
+///     value.get(start as usize..end as usize).unwrap_or_default().into()
+/// }
+///
+/// env.add_filter("substr", substr);
+/// ```
+///
+/// ```jinja
+/// {{ "Foo Bar Baz"|substr(4) }} -> Bar Baz
+/// {{ "Foo Bar Baz"|substr(4, 7) }} -> Bar
 /// ```
 pub trait Function<Rv, Args>: Send + Sync + 'static {
     /// Calls a function with the given arguments.
