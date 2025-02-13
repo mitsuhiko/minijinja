@@ -491,19 +491,23 @@ fn test_undeclared_variables() {
     let mut env = Environment::new();
     env.add_template(
         "demo",
-        "{% set x = foo %}{{ x }}{{ bar.baz }}{{ bar.blub }}",
+        "{% set x = foo %}{{ x }}{{ bar.baz }}{{ bar.blub }}
+        {% macro blah() %}{{ macro_x }}{{ caller() }}{% endmacro %}",
     )
     .unwrap();
     let tmpl = env.get_template("demo").unwrap();
     let undeclared = tmpl.undeclared_variables(false);
     assert_eq!(
         undeclared,
-        ["foo", "bar"].into_iter().map(|x| x.to_string()).collect()
+        ["foo", "bar", "macro_x"]
+            .into_iter()
+            .map(|x| x.to_string())
+            .collect()
     );
     let undeclared = tmpl.undeclared_variables(true);
     assert_eq!(
         undeclared,
-        ["foo", "bar.baz", "bar.blub"]
+        ["foo", "bar.baz", "bar.blub", "macro_x"]
             .into_iter()
             .map(|x| x.to_string())
             .collect()
