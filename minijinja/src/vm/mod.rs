@@ -91,7 +91,6 @@ impl<'env> Vm<'env> {
         auto_escape: AutoEscape,
     ) -> Result<(Option<Value>, State<'template, 'env>), Error> {
         let mut state = State::new(
-            self.env,
             Context::new_with_frame(self.env, ok!(Frame::new_checked(root))),
             auto_escape,
             instructions,
@@ -122,7 +121,6 @@ impl<'env> Vm<'env> {
         ok!(ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST));
         self.do_eval(
             &mut State {
-                env: self.env,
                 ctx,
                 current_block: None,
                 auto_escape: state.auto_escape(),
@@ -572,7 +570,7 @@ impl<'env> Vm<'env> {
                 Instruction::ApplyFilter(name, arg_count, local_id) => {
                     let filter =
                         ctx_ok!(get_or_lookup_local(&mut loaded_filters, *local_id, || {
-                            state.env.get_filter(name)
+                            state.env().get_filter(name)
                         })
                         .ok_or_else(|| {
                             Error::new(
@@ -588,7 +586,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::PerformTest(name, arg_count, local_id) => {
                     let test = ctx_ok!(get_or_lookup_local(&mut loaded_tests, *local_id, || {
-                        state.env.get_test(name)
+                        state.env().get_test(name)
                     })
                     .ok_or_else(|| {
                         Error::new(ErrorKind::UnknownTest, format!("test {name} is unknown"))
@@ -1045,7 +1043,7 @@ fn process_err(err: &mut Error, pc: usize, state: &State) {
     // only attach debug info if we don't have one yet and we are in debug mode.
     #[cfg(feature = "debug")]
     {
-        if state.env.debug() && err.debug_info().is_none() {
+        if state.env().debug() && err.debug_info().is_none() {
             err.attach_debug_info(state.make_debug_info(pc, state.instructions));
         }
     }

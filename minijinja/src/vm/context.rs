@@ -166,6 +166,12 @@ impl<'env> Context<'env> {
         rv
     }
 
+    /// The env
+    #[inline(always)]
+    pub fn env(&self) -> &'env Environment<'env> {
+        self.env
+    }
+
     /// Stores a variable in the context.
     pub fn store(&mut self, key: &'env str, value: Value) {
         let top = self.stack.last_mut().unwrap();

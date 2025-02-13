@@ -530,7 +530,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
     pub fn is_filter(state: &State, name: &str) -> bool {
-        state.env.get_filter(name).is_some()
+        state.env().get_filter(name).is_some()
     }
 
     /// Checks if a test with a given name is available.
@@ -541,7 +541,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
     pub fn is_test(state: &State, name: &str) -> bool {
-        state.env.get_test(name).is_some()
+        state.env().get_test(name).is_some()
     }
 
     /// Checks if a string is all lowercase.

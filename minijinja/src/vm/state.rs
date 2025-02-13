@@ -41,7 +41,6 @@ static STATE_ID: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize
 /// lifetimes through the type.  You should always elide these lifetimes
 /// as there might be lifetimes added or removed between releases.
 pub struct State<'template, 'env> {
-    pub(crate) env: &'env Environment<'env>,
     pub(crate) ctx: Context<'env>,
     pub(crate) current_block: Option<&'env str>,
     pub(crate) auto_escape: AutoEscape,
@@ -67,7 +66,7 @@ impl fmt::Debug for State<'_, '_> {
         ds.field("current_block", &self.current_block);
         ds.field("auto_escape", &self.auto_escape);
         ds.field("ctx", &self.ctx);
-        ds.field("env", &self.env);
+        ds.field("env", &self.env());
         ds.finish()
     }
 }
@@ -75,7 +74,6 @@ impl fmt::Debug for State<'_, '_> {
 impl<'template, 'env> State<'template, 'env> {
     /// Creates a new state.
     pub(crate) fn new(
-        env: &'env Environment,
         ctx: Context<'env>,
         auto_escape: AutoEscape,
         instructions: &'template Instructions<'env>,
@@ -84,8 +82,6 @@ impl<'template, 'env> State<'template, 'env> {
         State {
             #[cfg(feature = "macros")]
             id: STATE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-            env,
-            ctx,
             current_block: None,
             auto_escape,
             instructions,
@@ -97,14 +93,14 @@ impl<'template, 'env> State<'template, 'env> {
             #[cfg(feature = "macros")]
             closure_tracker: Default::default(),
             #[cfg(feature = "fuel")]
-            fuel_tracker: env.fuel().map(FuelTracker::new),
+            fuel_tracker: ctx.env().fuel().map(FuelTracker::new),
+            ctx,
         }
     }
 
     /// Creates an empty state for an environment.
     pub(crate) fn new_for_env(env: &'env Environment) -> State<'env, 'env> {
         State::new(
-            env,
             Context::new(env),
             AutoEscape::None,
             &crate::compiler::instructions::EMPTY_INSTRUCTIONS,
@@ -114,8 +110,8 @@ impl<'template, 'env> State<'template, 'env> {
 
     /// Returns a reference to the current environment.
     #[inline(always)]
-    pub fn env(&self) -> &Environment<'_> {
-        self.env
+    pub fn env(&self) -> &'env Environment<'env> {
+        self.ctx.env()
     }
 
     /// Returns the name of the current template.
@@ -132,7 +128,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// Returns the current undefined behavior.
     #[inline(always)]
     pub fn undefined_behavior(&self) -> UndefinedBehavior {
-        self.env.undefined_behavior()
+        self.env().undefined_behavior()
     }
 
     /// Returns the name of the innermost block.
@@ -199,7 +195,7 @@ impl<'template, 'env> State<'template, 'env> {
     #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
     pub fn render_block(&mut self, block: &str) -> Result<String, Error> {
         let mut buf = String::new();
-        crate::vm::Vm::new(self.env)
+        crate::vm::Vm::new(self.env())
             .call_block(block, self, &mut Output::with_string(&mut buf))
             .map(|_| buf)
     }
@@ -214,7 +210,7 @@ impl<'template, 'env> State<'template, 'env> {
         W: std::io::Write,
     {
         let mut wrapper = crate::output::WriteWrapper { w, err: None };
-        crate::vm::Vm::new(self.env)
+        crate::vm::Vm::new(self.env())
             .call_block(block, self, &mut Output::with_write(&mut wrapper))
             .map(|_| ())
             .map_err(|err| wrapper.take_err(err))
@@ -245,8 +241,8 @@ impl<'template, 'env> State<'template, 'env> {
     ///
     /// For more information see [`Environment::set_path_join_callback`].
     pub fn get_template(&self, name: &str) -> Result<Template<'env, 'env>, Error> {
-        self.env
-            .get_template(&self.env.join_template_path(name, self.name()))
+        self.env()
+            .get_template(&self.env().join_template_path(name, self.name()))
     }
 
     /// Invokes a filter with some arguments.
@@ -261,7 +257,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// assert_eq!(rv.as_str(), Some("HELLO WORLD"));
     /// ```
     pub fn apply_filter(&self, filter: &str, args: &[Value]) -> Result<Value, Error> {
-        match self.env.get_filter(filter) {
+        match self.env().get_filter(filter) {
             Some(filter) => filter.apply_to(self, args),
             None => Err(Error::from(ErrorKind::UnknownFilter)),
         }
@@ -279,7 +275,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// assert!(rv);
     /// ```
     pub fn perform_test(&self, test: &str, args: &[Value]) -> Result<bool, Error> {
-        match self.env.get_test(test) {
+        match self.env().get_test(test) {
             Some(test) => test.perform(self, args),
             None => Err(Error::from(ErrorKind::UnknownTest)),
         }
@@ -298,7 +294,7 @@ impl<'template, 'env> State<'template, 'env> {
     pub fn format(&self, value: Value) -> Result<String, Error> {
         let mut rv = String::new();
         let mut out = Output::with_string(&mut rv);
-        self.env.format(&value, self, &mut out).map(|_| rv)
+        self.env().format(&value, self, &mut out).map(|_| rv)
     }
 
     /// Returns the fuel levels.

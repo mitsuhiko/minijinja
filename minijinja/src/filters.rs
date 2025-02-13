@@ -1219,7 +1219,7 @@ mod builtins {
         let mut rv = vec![];
         let test = if let Some(test_name) = test_name {
             Some(ok!(state
-                .env
+                .env()
                 .get_test(&test_name)
                 .ok_or_else(|| Error::from(ErrorKind::UnknownTest))))
         } else {
@@ -1397,7 +1397,7 @@ mod builtins {
         }));
 
         let filter = ok!(state
-            .env
+            .env()
             .get_filter(filter_name)
             .ok_or_else(|| Error::from(ErrorKind::UnknownFilter)));
         for value in ok!(state.undefined_behavior().try_iter(value)) {

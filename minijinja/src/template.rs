@@ -275,7 +275,6 @@ impl<'env, 'source> Template<'env, 'source> {
     /// the template environment.
     pub fn new_state(&self) -> State<'_, 'env> {
         State::new(
-            self.env,
             Context::new(self.env),
             self.compiled.initial_auto_escape,
             &self.compiled.instructions,
