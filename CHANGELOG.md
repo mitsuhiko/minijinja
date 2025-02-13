@@ -27,6 +27,7 @@ All notable changes to MiniJinja are documented here.
   open parentheses, braces or brackets.  #723
 - Added `State::known_variables` to return a list of known variables
   and `Environment::globals`.  #724
+- Fixed an issue with undeclared variables not handling `caller`.  #725
 
 ## 2.8.0
 

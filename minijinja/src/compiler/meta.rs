@@ -43,7 +43,7 @@ pub fn find_macro_closure<'a>(m: &ast::Macro<'a>) -> HashSet<&'a str> {
         nested_out: None,
         assigned: vec![Default::default()],
     };
-    tracker_visit_macro(m, &mut state);
+    tracker_visit_macro(m, &mut state, false);
     state.out
 }
 
@@ -73,7 +73,18 @@ fn tracker_visit_expr_opt<'a>(expr: &Option<ast::Expr<'a>>, state: &mut Assignme
 }
 
 #[cfg(feature = "macros")]
-fn tracker_visit_macro<'a>(m: &ast::Macro<'a>, state: &mut AssignmentTracker<'a>) {
+fn tracker_visit_macro<'a>(
+    m: &ast::Macro<'a>,
+    state: &mut AssignmentTracker<'a>,
+    declare_caller: bool,
+) {
+    if declare_caller {
+        // this is not completely correct as caller is actually only defined
+        // if the macro was used in the context of a call block.  However it
+        // is impossible to determine this at compile time so we err on the
+        // side of assuming caller is there.
+        state.assign("caller");
+    }
     m.args.iter().for_each(|arg| track_assign(arg, state));
     m.defaults
         .iter()
@@ -269,7 +280,7 @@ fn track_walk<'a>(node: &ast::Stmt<'a>, state: &mut AssignmentTracker<'a>) {
         ast::Stmt::Macro(stmt) => {
             state.assign(stmt.name);
             state.push();
-            tracker_visit_macro(stmt, state);
+            tracker_visit_macro(stmt, state, true);
             state.pop();
         }
         #[cfg(feature = "macros")]
@@ -280,7 +291,7 @@ fn track_walk<'a>(node: &ast::Stmt<'a>, state: &mut AssignmentTracker<'a>) {
                 .iter()
                 .for_each(|x| tracker_visit_callarg(x, state));
             state.push();
-            tracker_visit_macro(&stmt.macro_decl, state);
+            tracker_visit_macro(&stmt.macro_decl, state, true);
             state.pop();
         }
         #[cfg(feature = "loop_controls")]
