@@ -258,7 +258,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// ```
     pub fn apply_filter(&self, filter: &str, args: &[Value]) -> Result<Value, Error> {
         match self.env().get_filter(filter) {
-            Some(filter) => filter.apply_to(self, args),
+            Some(filter) => filter.call(self, args),
             None => Err(Error::from(ErrorKind::UnknownFilter)),
         }
     }
@@ -276,7 +276,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// ```
     pub fn perform_test(&self, test: &str, args: &[Value]) -> Result<bool, Error> {
         match self.env().get_test(test) {
-            Some(test) => test.perform(self, args),
+            Some(test) => test.call(self, args).map(|x| x.is_true()),
             None => Err(Error::from(ErrorKind::UnknownTest)),
         }
     }

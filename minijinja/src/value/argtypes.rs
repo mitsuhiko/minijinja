@@ -13,14 +13,12 @@ use crate::vm::State;
 
 use super::{Enumerator, Object};
 
-/// A utility trait that represents the return value of functions and filters.
+/// A utility trait that represents the return value of functions, filters and tests.
 ///
 /// It's implemented for the following types:
 ///
 /// * `Rv` where `Rv` implements `Into<AnyMapObject>`
 /// * `Result<Rv, Error>` where `Rv` implements `Into<Value>`
-///
-/// The equivalent for test functions is [`TestResult`](crate::tests::TestResult).
 pub trait FunctionResult {
     #[doc(hidden)]
     fn into_result(self) -> Result<Value, Error>;
@@ -631,8 +629,7 @@ impl<'a, T: Object + 'static> ArgType<'a> for Arc<T> {
 /// Utility type to capture remaining arguments.
 ///
 /// In some cases you might want to have a variadic function.  In that case
-/// you can define the last argument to a [`Filter`](crate::filters::Filter),
-/// [`Test`](crate::tests::Test) or [`Function`](crate::functions::Function)
+/// you can define the last argument to a [`Function`](crate::functions::Function)
 /// this way.  The `Rest<T>` type will collect all the remaining arguments
 /// here.  It's implemented for all [`ArgType`]s.  The type itself deref's
 /// into the inner vector.

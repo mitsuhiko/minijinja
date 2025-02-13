@@ -580,7 +580,7 @@ impl<'env> Vm<'env> {
                         }));
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
-                    a = ctx_ok!(filter.apply_to(state, args));
+                    a = ctx_ok!(filter.call(state, args));
                     stack.drop_top(arg_count);
                     stack.push(a);
                 }
@@ -593,7 +593,7 @@ impl<'env> Vm<'env> {
                     }));
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
-                    let rv = ctx_ok!(test.perform(state, args));
+                    let rv = ctx_ok!(test.call(state, args)).is_true();
                     stack.drop_top(arg_count);
                     stack.push(Value::from(rv));
                 }
