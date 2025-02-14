@@ -275,6 +275,6 @@ pub mod machinery {
 
     /// Creates an [`Output`] that writes into a string.
     pub fn make_string_output(s: &mut String) -> Output<'_> {
-        Output::with_string(s)
+        Output::new(s)
     }
 }

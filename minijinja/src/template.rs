@@ -146,7 +146,7 @@ impl<'env, 'source> Template<'env, 'source> {
 
     fn _render(&self, root: Value) -> Result<(String, State<'_, 'env>), Error> {
         let mut rv = String::with_capacity(self.compiled.buffer_size_hint);
-        self._eval(root, &mut Output::with_string(&mut rv))
+        self._eval(root, &mut Output::new(&mut rv))
             .map(|(_, state)| (rv, state))
     }
 
@@ -174,12 +174,9 @@ impl<'env, 'source> Template<'env, 'source> {
         w: W,
     ) -> Result<State<'_, 'env>, Error> {
         let mut wrapper = WriteWrapper { w, err: None };
-        self._eval(
-            Value::from_serialize(&ctx),
-            &mut Output::with_write(&mut wrapper),
-        )
-        .map(|(_, state)| state)
-        .map_err(|err| wrapper.take_err(err))
+        self._eval(Value::from_serialize(&ctx), &mut Output::new(&mut wrapper))
+            .map(|(_, state)| state)
+            .map_err(|err| wrapper.take_err(err))
     }
 
     /// Evaluates the template into a [`State`].

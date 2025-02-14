@@ -119,7 +119,7 @@ impl Object for Macro {
         let (instructions, offset) = &state.macros[self.macro_ref_id];
         let vm = Vm::new(state.env());
         let mut rv = String::new();
-        let mut out = Output::with_string(&mut rv);
+        let mut out = Output::new(&mut rv);
 
         // This requires some explanation here.  Because we get the state as &State and
         // not &mut State we are required to create a new state here.  This is unfortunate

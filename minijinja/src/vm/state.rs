@@ -196,7 +196,7 @@ impl<'template, 'env> State<'template, 'env> {
     pub fn render_block(&mut self, block: &str) -> Result<String, Error> {
         let mut buf = String::new();
         crate::vm::Vm::new(self.env())
-            .call_block(block, self, &mut Output::with_string(&mut buf))
+            .call_block(block, self, &mut Output::new(&mut buf))
             .map(|_| buf)
     }
 
@@ -211,7 +211,7 @@ impl<'template, 'env> State<'template, 'env> {
     {
         let mut wrapper = crate::output::WriteWrapper { w, err: None };
         crate::vm::Vm::new(self.env())
-            .call_block(block, self, &mut Output::with_write(&mut wrapper))
+            .call_block(block, self, &mut Output::new(&mut wrapper))
             .map(|_| ())
             .map_err(|err| wrapper.take_err(err))
     }
@@ -293,7 +293,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// ```
     pub fn format(&self, value: Value) -> Result<String, Error> {
         let mut rv = String::new();
-        let mut out = Output::with_string(&mut rv);
+        let mut out = Output::new(&mut rv);
         self.env().format(&value, self, &mut out).map(|_| rv)
     }
 

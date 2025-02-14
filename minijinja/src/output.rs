@@ -25,15 +25,8 @@ pub struct Output<'a> {
 }
 
 impl<'a> Output<'a> {
-    /// Creates an output writing to a string.
-    pub(crate) fn with_string(buf: &'a mut String) -> Self {
-        Self {
-            w: buf,
-            capture_stack: Vec::new(),
-        }
-    }
-
-    pub(crate) fn with_write(w: &'a mut (dyn fmt::Write + 'a)) -> Self {
+    /// Creates a new output.
+    pub(crate) fn new(w: &'a mut (dyn fmt::Write + 'a)) -> Self {
         Self {
             w,
             capture_stack: Vec::new(),

@@ -158,7 +158,7 @@ pub fn escape(state: &State, v: &Value) -> Result<Value, Error> {
         Some(s) => String::with_capacity(s.len()),
         None => String::new(),
     };
-    let mut out = Output::with_string(&mut rv);
+    let mut out = Output::new(&mut rv);
     ok!(write_escaped(&mut out, auto_escape, v));
     Ok(Value::from_safe_string(rv))
 }
