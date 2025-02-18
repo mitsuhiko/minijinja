@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-description: "{{ \"foo\" }}\n{{ \"foo\" \"bar\" }}\n{{ \"foo\" \"bar\" \"baz\" }}"
+description: "{{ \"foo\" }}\n{{ \"foo\" \"bar\" }}\n{{ \"foo\" \"bar\" \"baz\" }}\n{{ \"foo\" \"\\u2603bar\" \"baz\" }}\n{{ \"foo\\u2603bar\" \"baz\" }}\n{{ \"foo\\nbar\" \"bar\\nbaz\" }}"
 input_file: minijinja/tests/parser-inputs/string-implicit-concat.txt
 ---
 Ok(
@@ -27,6 +27,30 @@ Ok(
                     value: "foobarbaz",
                 } @ 3:3-3:20,
             } @ 3:0-3:20,
+            EmitRaw {
+                raw: "\n",
+            } @ 3:23-4:0,
+            EmitExpr {
+                expr: Const {
+                    value: "foo☃barbaz",
+                } @ 4:3-4:26,
+            } @ 4:0-4:26,
+            EmitRaw {
+                raw: "\n",
+            } @ 4:29-5:0,
+            EmitExpr {
+                expr: Const {
+                    value: "foo☃barbaz",
+                } @ 5:3-5:23,
+            } @ 5:0-5:23,
+            EmitRaw {
+                raw: "\n",
+            } @ 5:26-6:0,
+            EmitExpr {
+                expr: Const {
+                    value: "foo\nbarbar\nbaz",
+                } @ 6:3-6:24,
+            } @ 6:0-6:24,
         ],
-    } @ 0:0-3:23,
+    } @ 0:0-6:27,
 )
