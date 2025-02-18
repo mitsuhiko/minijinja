@@ -1,3 +1,6 @@
 {{ "foo" }}
 {{ "foo" "bar" }}
 {{ "foo" "bar" "baz" }}
+{{ "foo" "\u2603bar" "baz" }}
+{{ "foo\u2603bar" "baz" }}
+{{ "foo\nbar" "bar\nbaz" }}
