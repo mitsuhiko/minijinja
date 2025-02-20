@@ -638,19 +638,30 @@ impl<'a> Parser<'a> {
             Token::Ident("false" | "False") => Ok(const_val!(false)),
             Token::Ident("none" | "None") => Ok(const_val!(())),
             Token::Ident(name) => Ok(ast::Expr::Var(Spanned::new(ast::Var { id: name }, span))),
-            Token::Str(val) => {
-                if matches_token!(self, Token::Str(_)) {
-                    let mut buf = String::from(val);
-                    while let Some((Token::Str(s), _)) = ok!(self.stream.current()) {
-                        buf.push_str(s);
-                        ok!(self.stream.next());
-                    }
-                    Ok(const_val!(buf))
-                } else {
-                    Ok(const_val!(val))
-                }
+            Token::Str(val)
+                if !matches!(
+                    self.stream.current(),
+                    Ok(Some((Token::Str(_), _) | (Token::String(_), _)))
+                ) =>
+            {
+                Ok(const_val!(val))
             }
-            Token::String(val) => Ok(const_val!(val)),
+            Token::Str(_) | Token::String(_) => {
+                let mut buf = match token {
+                    Token::Str(s) => s.to_owned(),
+                    Token::String(s) => s,
+                    _ => unreachable!(),
+                };
+                loop {
+                    match ok!(self.stream.current()) {
+                        Some((Token::Str(s), _)) => buf.push_str(s),
+                        Some((Token::String(s), _)) => buf.push_str(s),
+                        _ => break,
+                    }
+                    ok!(self.stream.next());
+                }
+                Ok(const_val!(buf))
+            }
             Token::Int(val) => Ok(const_val!(val)),
             Token::Int128(val) => Ok(const_val!(val)),
             Token::Float(val) => Ok(const_val!(val)),
