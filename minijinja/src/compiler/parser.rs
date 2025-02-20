@@ -640,8 +640,8 @@ impl<'a> Parser<'a> {
             Token::Ident(name) => Ok(ast::Expr::Var(Spanned::new(ast::Var { id: name }, span))),
             Token::Str(val)
                 if !matches!(
-                    ok!(self.stream.current()),
-                    Some((Token::Str(_), _)) | Some((Token::String(_), _))
+                    self.stream.current(),
+                    Ok(Some((Token::Str(_), _) | (Token::String(_), _)))
                 ) =>
             {
                 Ok(const_val!(val))
