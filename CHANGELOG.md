@@ -30,6 +30,8 @@ All notable changes to MiniJinja are documented here.
 - Fixed an issue with undeclared variables not handling `caller`.  #725
 - Removed unnecessary `Filters` and `Tests` traits.  They remain as
   hidden aliases to `Function`.  #726
+- Fixed a bug that caused implicit string concatenation to not correctly
+  handle escapes.  #728
 
 ## 2.8.0
 
