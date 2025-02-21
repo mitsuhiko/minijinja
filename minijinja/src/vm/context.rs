@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 
-#[cfg(any(feature = "macros", feature = "multi_template"))]
+#[cfg(feature = "macros")]
 use std::sync::Arc;
 
 use crate::environment::Environment;

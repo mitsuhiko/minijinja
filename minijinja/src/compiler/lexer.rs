@@ -487,7 +487,7 @@ impl<'s> Tokenizer<'s> {
                 Ok(Token::Int(int))
             } else {
                 u128::from_str_radix(&num, radix)
-                    .map(Token::Int128)
+                    .map(|x| Token::Int128(Box::new(x)))
                     .map_err(|_| self.syntax_error("invalid integer (too large)"))
             }),
             self.span(old_loc),
@@ -534,7 +534,7 @@ impl<'s> Tokenizer<'s> {
         let s = self.advance(str_len + 2);
         Ok(if has_escapes {
             (
-                Token::String(ok!(unescape(&s[1..s.len() - 1]))),
+                Token::String(ok!(unescape(&s[1..s.len() - 1])).into_boxed_str()),
                 self.span(old_loc),
             )
         } else {

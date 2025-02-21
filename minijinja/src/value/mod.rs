@@ -360,7 +360,8 @@ pub(crate) enum StringType {
 ///
 /// This is used for `i128`/`u128` in the value repr to avoid
 /// the excessive 16 byte alignment.
-#[derive(Copy)]
+#[derive(Copy, Debug)]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 #[repr(packed)]
 pub(crate) struct Packed<T: Copy>(pub T);
 

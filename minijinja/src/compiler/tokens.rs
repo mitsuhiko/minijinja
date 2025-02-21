@@ -23,11 +23,11 @@ pub enum Token<'a> {
     /// A borrowed string.
     Str(&'a str),
     /// An allocated string.
-    String(String),
+    String(Box<str>),
     /// An integer (limited to i64)
     Int(u64),
     /// A large integer
-    Int128(u128),
+    Int128(Box<u128>),
     /// A float
     Float(f64),
     /// A plus (`+`) operator.

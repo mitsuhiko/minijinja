@@ -14,22 +14,20 @@ use crate::value::{value_map_with_capacity, Value};
 /// to become too large.
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Spanned<T> {
-    node: Box<T>,
-    span: Span,
+    inner: Box<(T, Span)>,
 }
 
 impl<T> Spanned<T> {
     /// Creates a new spanned node.
     pub fn new(node: T, span: Span) -> Spanned<T> {
         Spanned {
-            node: Box::new(node),
-            span,
+            inner: Box::new((node, span)),
         }
     }
 
     /// Accesses the span.
     pub fn span(&self) -> Span {
-        self.span
+        self.inner.1
     }
 }
 
@@ -37,15 +35,15 @@ impl<T> Deref for Spanned<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.node
+        &self.inner.0
     }
 }
 
 #[cfg(feature = "internal_debug")]
 impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        ok!(fmt::Debug::fmt(&self.node, f));
-        write!(f, "{:?}", self.span)
+        ok!(fmt::Debug::fmt(&self.inner.0, f));
+        write!(f, "{:?}", self.inner.1)
     }
 }
 

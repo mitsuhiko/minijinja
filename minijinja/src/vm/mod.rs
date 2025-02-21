@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::mem;
 
-#[cfg(any(feature = "macros", feature = "multi_template"))]
+#[cfg(feature = "macros")]
 use std::sync::Arc;
 
 use crate::compiler::instructions::{
