@@ -43,7 +43,7 @@ impl<T> Deref for Spanned<T> {
 impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         ok!(fmt::Debug::fmt(&self.inner.0, f));
-        write!(f, "{:?}", self.inner.0)
+        write!(f, "{:?}", self.inner.1)
     }
 }
 
