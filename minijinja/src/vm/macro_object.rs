@@ -116,25 +116,22 @@ impl Object for Macro {
             }
         }
 
-        let (instructions, offset) = &state.macros[self.macro_ref_id];
         let vm = Vm::new(state.env());
         let mut rv = String::new();
-        let mut out = Output::new(&mut rv);
 
-        // This requires some explanation here.  Because we get the state as &State and
-        // not &mut State we are required to create a new state here.  This is unfortunate
-        // but makes the calling interface more convenient for the rest of the system.
-        // Because macros cannot return anything other than strings (most importantly they)
-        // can't return other macros this is however not an issue, as modifications in the
+        // This requires some explanation here.  Because we get the state as
+        // &State and not &mut State we are required to create a new state in
+        // eval_macro.  This is unfortunate but makes the calling interface more
+        // convenient for the rest of the system.  Because macros cannot return
+        // anything other than strings (most importantly they) can't return
+        // other macros this is however not an issue, as modifications in the
         // macro cannot leak out.
         ok!(vm.eval_macro(
-            instructions,
-            *offset,
-            self.closure.clone(),
-            state.ctx.clone_base(),
-            caller,
-            &mut out,
             state,
+            self.macro_ref_id,
+            &mut Output::new(&mut rv),
+            self.closure.clone(),
+            caller,
             arg_values
         ));
 

@@ -101,18 +101,17 @@ impl<'env> Vm<'env> {
 
     /// Evaluate a macro in a state.
     #[cfg(feature = "macros")]
-    #[allow(clippy::too_many_arguments)]
     pub fn eval_macro(
         &self,
-        instructions: &Instructions<'env>,
-        pc: usize,
-        closure: Value,
-        context_base: Value,
-        caller: Option<Value>,
-        out: &mut Output,
         state: &State,
+        macro_id: usize,
+        out: &mut Output,
+        closure: Value,
+        caller: Option<Value>,
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
+        let (instructions, pc) = &state.macros[macro_id];
+        let context_base = state.ctx.clone_base();
         let mut ctx = Context::new_with_frame(self.env, Frame::new(context_base));
         ok!(ctx.push_frame(Frame::new(closure)));
         if let Some(caller) = caller {
@@ -139,7 +138,7 @@ impl<'env> Vm<'env> {
             },
             out,
             Stack::from(args),
-            pc,
+            *pc,
         )
     }
 
