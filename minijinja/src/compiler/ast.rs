@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::fmt;
 
 use crate::compiler::tokens::Span;
-use crate::value::{value_map_with_capacity, Value};
+use crate::value::{ops, value_map_with_capacity, Value};
 
 /// Container for nodes with location info.
 ///
@@ -200,6 +200,47 @@ impl Expr<'_> {
             Expr::Call(s) => s.span(),
             Expr::List(s) => s.span(),
             Expr::Map(s) => s.span(),
+        }
+    }
+
+    pub fn as_const(&self) -> Option<Value> {
+        match self {
+            Expr::Const(c) => Some(c.value.clone()),
+            Expr::List(l) => l.as_const(),
+            Expr::Map(m) => m.as_const(),
+            Expr::UnaryOp(c) => match c.op {
+                UnaryOpKind::Not => c.expr.as_const().map(|value| Value::from(!value.is_true())),
+                UnaryOpKind::Neg => c.expr.as_const().and_then(|v| ops::neg(&v).ok()),
+            },
+            Expr::BinOp(c) => {
+                let (Some(left), Some(right)) = (c.left.as_const(), c.right.as_const()) else {
+                    return None;
+                };
+                match c.op {
+                    BinOpKind::Add => ops::add(&left, &right).ok(),
+                    BinOpKind::Sub => ops::sub(&left, &right).ok(),
+                    BinOpKind::Mul => ops::mul(&left, &right).ok(),
+                    BinOpKind::Div => ops::div(&left, &right).ok(),
+                    BinOpKind::FloorDiv => ops::int_div(&left, &right).ok(),
+                    BinOpKind::Rem => ops::rem(&left, &right).ok(),
+                    BinOpKind::Pow => ops::pow(&left, &right).ok(),
+                    BinOpKind::Concat => Some(ops::string_concat(left, &right)),
+                    BinOpKind::Eq => Some(Value::from(left == right)),
+                    BinOpKind::Ne => Some(Value::from(left != right)),
+                    BinOpKind::Lt => Some(Value::from(left < right)),
+                    BinOpKind::Lte => Some(Value::from(left <= right)),
+                    BinOpKind::Gt => Some(Value::from(left > right)),
+                    BinOpKind::Gte => Some(Value::from(left >= right)),
+                    BinOpKind::In => ops::contains(&right, &left).ok(),
+                    BinOpKind::ScAnd => Some(if left.is_true() && right.is_true() {
+                        right
+                    } else {
+                        Value::from(false)
+                    }),
+                    BinOpKind::ScOr => Some(if left.is_true() { left } else { right }),
+                }
+            }
+            _ => None,
         }
     }
 }
