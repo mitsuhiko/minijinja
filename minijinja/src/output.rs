@@ -20,7 +20,8 @@ pub enum CaptureMode {
 /// can write into an [`std::fmt::Write`] value.  It's primarily used internally
 /// in the engine but it's also passed to the custom formatter function.
 pub struct Output<'a> {
-    w: &'a mut (dyn fmt::Write + 'a),
+    w: *mut (dyn fmt::Write + 'a),
+    target: *mut (dyn fmt::Write + 'a),
     capture_stack: Vec<Option<String>>,
 }
 
@@ -29,6 +30,7 @@ impl<'a> Output<'a> {
     pub(crate) fn new(w: &'a mut (dyn fmt::Write + 'a)) -> Self {
         Self {
             w,
+            target: w,
             capture_stack: Vec::new(),
         }
     }
@@ -40,6 +42,7 @@ impl<'a> Output<'a> {
         // shadow it.  This is done so that `is_discarding` returns true.
         Self {
             w: NullWriter::get_mut(),
+            target: NullWriter::get_mut(),
             capture_stack: vec![None],
         }
     }
@@ -50,11 +53,12 @@ impl<'a> Output<'a> {
             CaptureMode::Capture => Some(String::new()),
             CaptureMode::Discard => None,
         });
+        self.retarget();
     }
 
     /// Ends capturing and returns the captured string as value.
     pub(crate) fn end_capture(&mut self, auto_escape: AutoEscape) -> Value {
-        if let Some(captured) = self.capture_stack.pop().unwrap() {
+        let rv = if let Some(captured) = self.capture_stack.pop().unwrap() {
             if !matches!(auto_escape, AutoEscape::None) {
                 Value::from_safe_string(captured)
             } else {
@@ -62,16 +66,24 @@ impl<'a> Output<'a> {
             }
         } else {
             Value::UNDEFINED
-        }
+        };
+        self.retarget();
+        rv
+    }
+
+    fn retarget(&mut self) {
+        self.target = match self.capture_stack.last_mut() {
+            Some(Some(stream)) => stream,
+            Some(None) => NullWriter::get_mut(),
+            None => self.w,
+        };
     }
 
     #[inline(always)]
     fn target(&mut self) -> &mut dyn fmt::Write {
-        match self.capture_stack.last_mut() {
-            Some(Some(stream)) => stream as _,
-            Some(None) => NullWriter::get_mut(),
-            None => self.w,
-        }
+        // SAFETY: this is safe because we carefully maintain the capture stack
+        // to update self.target whenever it's modified
+        unsafe { &mut *self.target }
     }
 
     /// Returns `true` if the output is discarding.
