@@ -32,6 +32,7 @@ All notable changes to MiniJinja are documented here.
   hidden aliases to `Function`.  #726
 - Fixed a bug that caused implicit string concatenation to not correctly
   handle escapes.  #728
+- Implemented constant folding in the code generator.  #731
 
 ## 2.8.0
 
