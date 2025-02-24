@@ -706,28 +706,20 @@ impl<'source> CodeGenerator<'source> {
                 self.compile_call(c, None);
             }
             ast::Expr::List(l) => {
-                if let Some(val) = l.as_const() {
-                    self.add(Instruction::LoadConst(val));
-                } else {
-                    self.set_line_from_span(l.span());
-                    for item in &l.items {
-                        self.compile_expr(item);
-                    }
-                    self.add(Instruction::BuildList(Some(l.items.len())));
+                self.set_line_from_span(l.span());
+                for item in &l.items {
+                    self.compile_expr(item);
                 }
+                self.add(Instruction::BuildList(Some(l.items.len())));
             }
             ast::Expr::Map(m) => {
-                if let Some(val) = m.as_const() {
-                    self.add(Instruction::LoadConst(val));
-                } else {
-                    self.set_line_from_span(m.span());
-                    assert_eq!(m.keys.len(), m.values.len());
-                    for (key, value) in m.keys.iter().zip(m.values.iter()) {
-                        self.compile_expr(key);
-                        self.compile_expr(value);
-                    }
-                    self.add(Instruction::BuildMap(m.keys.len()));
+                self.set_line_from_span(m.span());
+                assert_eq!(m.keys.len(), m.values.len());
+                for (key, value) in m.keys.iter().zip(m.values.iter()) {
+                    self.compile_expr(key);
+                    self.compile_expr(value);
                 }
+                self.add(Instruction::BuildMap(m.keys.len()));
             }
         }
     }
