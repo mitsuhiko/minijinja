@@ -343,7 +343,7 @@ impl<'source> Instructions<'source> {
         {
             if self.span_infos.last().is_some_and(|x| x.span.is_some()) {
                 self.span_infos.push(SpanInfo {
-                    first_instruction: rv as u32,
+                    first_instruction: rv,
                     span: None,
                 });
             }
@@ -362,7 +362,7 @@ impl<'source> Instructions<'source> {
                 .is_some_and(|last_loc| last_loc.span == Some(span));
             if !same_loc {
                 self.span_infos.push(SpanInfo {
-                    first_instruction: rv as u32,
+                    first_instruction: rv,
                     span: Some(span),
                 });
             }
