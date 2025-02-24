@@ -4,13 +4,13 @@ expression: "&c.finish()"
 ---
 (
     [
-        00000 | Lookup("items")  [line 0],
+        00000 | Lookup(0)  ("items")  [line 0],
         00001 | PushLoop(1),
         00002 | Iterate(5),
         00003 | Emit,
         00004 | Jump(2),
         00005 | PopLoopFrame,
-        00006 | EmitRaw("!"),
+        00006 | EmitRaw(1)  ("!"),
     ],
     {},
 )

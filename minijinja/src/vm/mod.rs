@@ -307,23 +307,27 @@ impl<'env> Vm<'env> {
                     stack.push(a);
                     stack.push(b);
                 }
-                Instruction::EmitRaw(val) => {
+                Instruction::EmitRaw(str_id) => {
                     // this only produces a format error, no need to attach
                     // location information.
+                    let val = state.instructions.get_str(*str_id).unwrap();
                     ok!(out.write_str(val).map_err(Error::from));
                 }
                 Instruction::Emit => {
                     ctx_ok!(self.env.format(&stack.pop(), state, out));
                 }
-                Instruction::StoreLocal(name) => {
+                Instruction::StoreLocal(str_id) => {
+                    let name = state.instructions.get_str(*str_id).unwrap();
                     state.ctx.store(name, stack.pop());
                 }
-                Instruction::Lookup(name) => {
+                Instruction::Lookup(str_id) => {
+                    let name = state.instructions.get_str(*str_id).unwrap();
                     stack.push(assert_valid!(state
                         .lookup(name)
                         .unwrap_or(Value::UNDEFINED)));
                 }
-                Instruction::GetAttr(name) => {
+                Instruction::GetAttr(str_id) => {
+                    let name = state.instructions.get_str(*str_id).unwrap();
                     a = stack.pop();
                     // This is a common enough operation that it's interesting to consider a fast
                     // path here.  This is slightly faster than the regular attr lookup because we
@@ -335,7 +339,8 @@ impl<'env> Vm<'env> {
                         None => ctx_ok!(undefined_behavior.handle_undefined(a.is_undefined())),
                     });
                 }
-                Instruction::SetAttr(name) => {
+                Instruction::SetAttr(str_id) => {
+                    let name = state.instructions.get_str(*str_id).unwrap();
                     b = stack.pop();
                     a = stack.pop();
                     if let Some(ns) = b.downcast_object_ref::<Namespace>() {
@@ -420,7 +425,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::BuildList(n) => {
                     let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
-                    let mut v = Vec::with_capacity(untrusted_size_hint(count));
+                    let mut v = Vec::with_capacity(untrusted_size_hint(count as usize));
                     for _ in 0..count {
                         v.push(stack.pop());
                     }
@@ -545,7 +550,8 @@ impl<'env> Vm<'env> {
                     }
                 }
                 #[cfg(feature = "multi_template")]
-                Instruction::CallBlock(name) => {
+                Instruction::CallBlock(str_id) => {
+                    let name = state.instructions.get_str(*str_id).unwrap();
                     if parent_instructions.is_none() && !out.is_discarding() {
                         self.call_block(name, state, out)?;
                     }
@@ -564,7 +570,8 @@ impl<'env> Vm<'env> {
                 Instruction::EndCapture => {
                     stack.push(out.end_capture(state.auto_escape));
                 }
-                Instruction::ApplyFilter(name, arg_count, local_id) => {
+                Instruction::ApplyFilter(str_id, arg_count, local_id) => {
+                    let name = state.instructions.get_str(*str_id).unwrap();
                     let filter =
                         ctx_ok!(get_or_lookup_local(&mut loaded_filters, *local_id, || {
                             state.env().get_filter(name)
@@ -581,7 +588,8 @@ impl<'env> Vm<'env> {
                     stack.drop_top(arg_count);
                     stack.push(a);
                 }
-                Instruction::PerformTest(name, arg_count, local_id) => {
+                Instruction::PerformTest(str_id, arg_count, local_id) => {
+                    let name = state.instructions.get_str(*str_id).unwrap();
                     let test = ctx_ok!(get_or_lookup_local(&mut loaded_tests, *local_id, || {
                         state.env().get_test(name)
                     })
@@ -594,10 +602,11 @@ impl<'env> Vm<'env> {
                     stack.drop_top(arg_count);
                     stack.push(Value::from(rv));
                 }
-                Instruction::CallFunction(name, arg_count) => {
+                Instruction::CallFunction(str_id, arg_count) => {
+                    let name = state.instructions.get_str(*str_id).unwrap();
                     let args = stack.get_call_args(*arg_count);
                     // super is a special function reserved for super-ing into blocks.
-                    let rv = if *name == "super" {
+                    let rv = if name == "super" {
                         if !args.is_empty() {
                             bail!(Error::new(
                                 ErrorKind::InvalidOperation,
@@ -630,7 +639,8 @@ impl<'env> Vm<'env> {
                     stack.drop_top(arg_count);
                     stack.push(rv);
                 }
-                Instruction::CallMethod(name, arg_count) => {
+                Instruction::CallMethod(str_id, arg_count) => {
+                    let name = state.instructions.get_str(*str_id).unwrap();
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
                     a = ctx_ok!(args[0].call_method(state, name, &args[1..]));
@@ -707,13 +717,15 @@ impl<'env> Vm<'env> {
                     stack.push(Value::from_object(module));
                 }
                 #[cfg(feature = "macros")]
-                Instruction::BuildMacro(name, offset, flags) => {
+                Instruction::BuildMacro(str_id, offset, flags) => {
+                    let name = state.instructions.get_str(*str_id).unwrap();
                     self.build_macro(&mut stack, state, *offset, name, *flags);
                 }
                 #[cfg(feature = "macros")]
                 Instruction::Return => break,
                 #[cfg(feature = "macros")]
-                Instruction::Enclose(name) => {
+                Instruction::Enclose(str_id) => {
+                    let name = state.instructions.get_str(*str_id).unwrap();
                     // the first time we enclose a value, we need to create a closure
                     // and store it on the context, and add it to the closure tracker
                     // for cycle breaking.

@@ -4,8 +4,8 @@ expression: "&c.finish()"
 ---
 (
     [
-        00000 | LoadConst(0)  [value="a"]  [line 0],
-        00001 | LoadConst(1)  [value=42],
+        00000 | LoadConst(0)  ("a")  [line 0],
+        00001 | LoadConst(1)  (42),
         00002 | StringConcat,
     ],
     {},

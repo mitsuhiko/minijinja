@@ -544,10 +544,10 @@ fn test_dump() {
     exit_code: 0
     ----- stdout -----
     Block: "<root>"
-         0: EmitRaw("Hello ")
-         1: Lookup("foo")
+         0: EmitRaw(0)  ("Hello ")
+         1: Lookup(1)  ("foo")
          2: Emit
-         3: EmitRaw("!")
+         3: EmitRaw(2)  ("!")
 
     ----- stderr -----
     "###);

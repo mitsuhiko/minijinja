@@ -4,11 +4,11 @@ expression: "&c.finish()"
 ---
 (
     [
-        00000 | Lookup("first")  [line 0],
+        00000 | Lookup(0)  ("first")  [line 0],
         00001 | JumpIfFalseOrPop(5),
-        00002 | Lookup("second"),
+        00002 | Lookup(1)  ("second"),
         00003 | JumpIfTrueOrPop(5),
-        00004 | Lookup("third"),
+        00004 | Lookup(2)  ("third"),
     ],
     {},
 )

@@ -29,21 +29,21 @@ pub const MAX_LOCALS: usize = 50;
     serde(tag = "op", content = "arg")
 )]
 #[derive(Clone)]
-pub enum Instruction<'source> {
+pub enum Instruction {
     /// Emits raw source
-    EmitRaw(&'source str),
+    EmitRaw(u32),
 
     /// Stores a variable (only possible in for loops)
-    StoreLocal(&'source str),
+    StoreLocal(u32),
 
     /// Load a variable,
-    Lookup(&'source str),
+    Lookup(u32),
 
     /// Looks up an attribute.
-    GetAttr(&'source str),
+    GetAttr(u32),
 
     /// Sets an attribute.
-    SetAttr(&'source str),
+    SetAttr(u32),
 
     /// Looks up an item.
     GetItem,
@@ -64,7 +64,7 @@ pub enum Instruction<'source> {
     MergeKwargs(u32),
 
     /// Builds a list of the last n pairs on the stack.
-    BuildList(Option<usize>),
+    BuildList(Option<u32>),
 
     /// Unpacks a list into N stack items.
     UnpackList(u32),
@@ -128,10 +128,10 @@ pub enum Instruction<'source> {
     In,
 
     /// Apply a filter.
-    ApplyFilter(&'source str, Option<u16>, LocalId),
+    ApplyFilter(u32, Option<u16>, LocalId),
 
     /// Perform a filter.
-    PerformTest(&'source str, Option<u16>, LocalId),
+    PerformTest(u32, Option<u16>, LocalId),
 
     /// Emit the stack top as output
     Emit,
@@ -184,10 +184,10 @@ pub enum Instruction<'source> {
     EndCapture,
 
     /// Calls a global function
-    CallFunction(&'source str, Option<u16>),
+    CallFunction(u32, Option<u16>),
 
     /// Calls a method
-    CallMethod(&'source str, Option<u16>),
+    CallMethod(u32, Option<u16>),
 
     /// Calls an object
     CallObject(Option<u16>),
@@ -209,7 +209,7 @@ pub enum Instruction<'source> {
 
     /// Call into a block.
     #[cfg(feature = "multi_template")]
-    CallBlock(&'source str),
+    CallBlock(u32),
 
     /// Loads block from a template with name on stack ("extends")
     #[cfg(feature = "multi_template")]
@@ -225,7 +225,7 @@ pub enum Instruction<'source> {
 
     /// Builds a macro on the stack.
     #[cfg(feature = "macros")]
-    BuildMacro(&'source str, u32, u8),
+    BuildMacro(u32, u32, u8),
 
     /// Breaks from the interpreter loop (exists a function)
     #[cfg(feature = "macros")]
@@ -237,11 +237,45 @@ pub enum Instruction<'source> {
 
     /// Encloses a variable.
     #[cfg(feature = "macros")]
-    Enclose(&'source str),
+    Enclose(u32),
 
     /// Returns the closure of this context level.
     #[cfg(feature = "macros")]
     GetClosure,
+}
+
+impl Instruction {
+    /// Returns the embedded const reference
+    #[cfg(any(feature = "internal_debug", feature = "unstable_machinery"))]
+    pub fn const_ref(&self, instr: &Instructions) -> Option<Value> {
+        if let Instruction::LoadConst(idx) = self {
+            instr.get_const(*idx).cloned()
+        } else {
+            None
+        }
+    }
+
+    /// Returns the embedded string reference
+    #[cfg(any(feature = "internal_debug", feature = "unstable_machinery"))]
+    pub fn str_ref<'source>(&self, instr: &Instructions<'source>) -> Option<&'source str> {
+        let idx = match self {
+            Instruction::EmitRaw(idx)
+            | Instruction::Lookup(idx)
+            | Instruction::GetAttr(idx)
+            | Instruction::CallFunction(idx, _)
+            | Instruction::StoreLocal(idx)
+            | Instruction::SetAttr(idx)
+            | Instruction::PerformTest(idx, _, _)
+            | Instruction::ApplyFilter(idx, _, _)
+            | Instruction::CallMethod(idx, _) => *idx,
+            #[cfg(feature = "multi_template")]
+            Instruction::CallBlock(idx) => *idx,
+            #[cfg(feature = "macros")]
+            Instruction::BuildMacro(idx, _, _) | Instruction::Enclose(idx) => *idx,
+            _ => return None,
+        };
+        instr.get_str(idx)
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -259,8 +293,9 @@ struct SpanInfo {
 
 /// Wrapper around instructions to help with location management.
 pub struct Instructions<'source> {
-    pub(crate) instructions: Vec<Instruction<'source>>,
+    pub(crate) instructions: Vec<Instruction>,
     pub(crate) consts: Vec<Value>,
+    pub(crate) strings: Vec<&'source str>,
     line_infos: Vec<LineInfo>,
     #[cfg(feature = "debug")]
     span_infos: Vec<SpanInfo>,
@@ -271,6 +306,7 @@ pub struct Instructions<'source> {
 pub(crate) static EMPTY_INSTRUCTIONS: Instructions<'static> = Instructions {
     instructions: Vec::new(),
     consts: Vec::new(),
+    strings: Vec::new(),
     line_infos: Vec::new(),
     #[cfg(feature = "debug")]
     span_infos: Vec::new(),
@@ -284,6 +320,7 @@ impl<'source> Instructions<'source> {
         Instructions {
             instructions: Vec::with_capacity(128),
             consts: Vec::with_capacity(128),
+            strings: Vec::with_capacity(128),
             line_infos: Vec::with_capacity(128),
             #[cfg(feature = "debug")]
             span_infos: Vec::with_capacity(128),
@@ -304,17 +341,17 @@ impl<'source> Instructions<'source> {
 
     /// Returns an instruction by index
     #[inline(always)]
-    pub fn get(&self, idx: u32) -> Option<&Instruction<'source>> {
+    pub fn get(&self, idx: u32) -> Option<&Instruction> {
         self.instructions.get(idx as usize)
     }
 
     /// Returns an instruction by index mutably
-    pub fn get_mut(&mut self, idx: u32) -> Option<&mut Instruction<'source>> {
+    pub fn get_mut(&mut self, idx: u32) -> Option<&mut Instruction> {
         self.instructions.get_mut(idx as usize)
     }
 
     /// Adds a new instruction
-    pub fn add(&mut self, instr: Instruction<'source>) -> u32 {
+    pub fn add(&mut self, instr: Instruction) -> u32 {
         let rv = self.instructions.len();
         self.instructions.push(instr);
         rv as u32
@@ -334,7 +371,7 @@ impl<'source> Instructions<'source> {
     }
 
     /// Adds a new instruction with line number.
-    pub fn add_with_line(&mut self, instr: Instruction<'source>, line: u32) -> u32 {
+    pub fn add_with_line(&mut self, instr: Instruction, line: u32) -> u32 {
         let rv = self.add(instr);
         self.add_line_record(rv, line);
 
@@ -352,7 +389,7 @@ impl<'source> Instructions<'source> {
     }
 
     /// Adds a new instruction with span.
-    pub fn add_with_span(&mut self, instr: Instruction<'source>, span: Span) -> u32 {
+    pub fn add_with_span(&mut self, instr: Instruction, span: Span) -> u32 {
         let rv = self.add(instr);
         #[cfg(feature = "debug")]
         {
@@ -417,9 +454,9 @@ impl<'source> Instructions<'source> {
         let idx = (idx as usize).min(self.instructions.len() - 1);
         for instr in self.instructions[..=idx].iter().rev() {
             let name = match instr {
-                Instruction::Lookup(name)
-                | Instruction::StoreLocal(name)
-                | Instruction::CallFunction(name, _) => *name,
+                Instruction::Lookup(name_id)
+                | Instruction::StoreLocal(name_id)
+                | Instruction::CallFunction(name_id, _) => self.get_str(*name_id).unwrap(),
                 Instruction::PushLoop(flags) if flags & LOOP_FLAG_WITH_LOOP_VAR != 0 => "loop",
                 Instruction::PushLoop(_) | Instruction::PushWith => break,
                 _ => continue,
@@ -434,6 +471,11 @@ impl<'source> Instructions<'source> {
     /// Returns a constant by index
     pub fn get_const(&self, idx: u32) -> Option<&Value> {
         self.consts.get(idx as usize)
+    }
+
+    /// Returns a string by index
+    pub fn get_str(&self, idx: u32) -> Option<&'source str> {
+        self.strings.get(idx as usize).copied()
     }
 
     /// Returns the number of instructions
@@ -453,18 +495,19 @@ impl fmt::Debug for Instructions<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         struct InstructionWrapper<'a> {
             idx: usize,
-            instr: &'a Instruction<'a>,
+            instr: &'a Instruction,
             line: Option<usize>,
             instructions: &'a Instructions<'a>,
         }
 
         impl fmt::Debug for InstructionWrapper<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                ok!(write!(f, "{:>05} | {:?}", self.idx, self.instr,));
-                if let Instruction::LoadConst(idx) = self.instr {
-                    if let Some(value) = self.instructions.get_const(*idx) {
-                        ok!(write!(f, "  [value={:?}]", value));
-                    }
+                ok!(write!(f, "{:>05} | {:?}", self.idx, self.instr));
+                if let Some(value) = self.instr.const_ref(self.instructions) {
+                    ok!(write!(f, "  ({:?})", value));
+                }
+                if let Some(s) = self.instr.str_ref(self.instructions) {
+                    ok!(write!(f, "  ({:?})", s));
                 }
                 if let Some(line) = self.line {
                     ok!(write!(f, "  [line {line}]"));
@@ -492,5 +535,5 @@ impl fmt::Debug for Instructions<'_> {
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn test_sizes() {
-    assert_eq!(std::mem::size_of::<Instruction>(), 24);
+    assert_eq!(std::mem::size_of::<Instruction>(), 12);
 }

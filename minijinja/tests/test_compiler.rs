@@ -8,11 +8,13 @@ use minijinja::value::Value;
 #[test]
 fn test_for_loop() {
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::Lookup("items"));
+    let string_id = c.register_str("items");
+    c.add(Instruction::Lookup(string_id));
     c.start_for_loop(true, false);
     c.add(Instruction::Emit);
     c.end_for_loop(false);
-    c.add(Instruction::EmitRaw("!"));
+    let string_id = c.register_str("!");
+    c.add(Instruction::EmitRaw(string_id));
 
     insta::assert_debug_snapshot!(&c.finish());
 }
@@ -20,15 +22,20 @@ fn test_for_loop() {
 #[test]
 fn test_if_branches() {
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::Lookup("false"));
+    let string_id = c.register_str("false");
+    c.add(Instruction::Lookup(string_id));
     c.start_if();
-    c.add(Instruction::EmitRaw("nope1"));
+    let string_id = c.register_str("nope1");
+    c.add(Instruction::EmitRaw(string_id));
     c.start_else();
-    c.add(Instruction::Lookup("nil"));
+    let string_id = c.register_str("nil");
+    c.add(Instruction::Lookup(string_id));
     c.start_if();
-    c.add(Instruction::EmitRaw("nope1"));
+    let string_id = c.register_str("nope1");
+    c.add(Instruction::EmitRaw(string_id));
     c.start_else();
-    c.add(Instruction::EmitRaw("yes"));
+    let string_id = c.register_str("yes");
+    c.add(Instruction::EmitRaw(string_id));
     c.end_if();
     c.end_if();
 
@@ -40,11 +47,14 @@ fn test_bool_ops() {
     let mut c = CodeGenerator::new("<unknown>", "");
 
     c.start_sc_bool();
-    c.add(Instruction::Lookup("first"));
+    let string_id = c.register_str("first");
+    c.add(Instruction::Lookup(string_id));
     c.sc_bool(true);
-    c.add(Instruction::Lookup("second"));
+    let string_id = c.register_str("second");
+    c.add(Instruction::Lookup(string_id));
     c.sc_bool(false);
-    c.add(Instruction::Lookup("third"));
+    let string_id = c.register_str("third");
+    c.add(Instruction::Lookup(string_id));
     c.end_sc_bool();
 
     insta::assert_debug_snapshot!(&c.finish());

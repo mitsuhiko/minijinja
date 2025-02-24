@@ -33,11 +33,13 @@ fn test_loop() {
     ctx.insert("items", Value::from((1..=9).collect::<Vec<_>>()));
 
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::Lookup("items"));
+    let items_id = c.register_str("items");
+    c.add(Instruction::Lookup(items_id));
     c.start_for_loop(false, false);
     c.add(Instruction::Emit);
     c.end_for_loop(false);
-    c.add(Instruction::EmitRaw("!"));
+    let bang_id = c.register_str("!");
+    c.add(Instruction::EmitRaw(bang_id));
 
     let output = simple_eval(&c.finish().0, ctx).unwrap();
 
@@ -51,11 +53,14 @@ fn test_if() {
         ctx.insert("cond", Value::from(val));
 
         let mut c = CodeGenerator::new("<unknown>", "");
-        c.add(Instruction::Lookup("cond"));
+        let cond_id = c.register_str("cond");
+        c.add(Instruction::Lookup(cond_id));
         c.start_if();
-        c.add(Instruction::EmitRaw("true"));
+        let true_id = c.register_str("true");
+        c.add(Instruction::EmitRaw(true_id));
         c.start_else();
-        c.add(Instruction::EmitRaw("false"));
+        let false_id = c.register_str("false");
+        c.add(Instruction::EmitRaw(false_id));
         c.end_if();
 
         let output = simple_eval(&c.finish().0, ctx).unwrap();
@@ -71,15 +76,19 @@ fn test_if_branches() {
     ctx.insert("nil", Value::from(()));
 
     let mut c = CodeGenerator::new("<unknown>", "");
-    c.add(Instruction::Lookup("false"));
+    let false_id = c.register_str("false");
+    c.add(Instruction::Lookup(false_id));
     c.start_if();
-    c.add(Instruction::EmitRaw("nope1"));
+    let nope1_id = c.register_str("nope1");
+    c.add(Instruction::EmitRaw(nope1_id));
     c.start_else();
-    c.add(Instruction::Lookup("nil"));
+    let nil_id = c.register_str("nil");
+    c.add(Instruction::Lookup(nil_id));
     c.start_if();
-    c.add(Instruction::EmitRaw("nope1"));
+    c.add(Instruction::EmitRaw(nope1_id));
     c.start_else();
-    c.add(Instruction::EmitRaw("yes"));
+    let yes_id = c.register_str("yes");
+    c.add(Instruction::EmitRaw(yes_id));
     c.end_if();
     c.end_if();
 
@@ -97,16 +106,22 @@ fn test_basic() {
     ctx.insert("a", Value::from(42));
     ctx.insert("b", Value::from(23));
 
-    let mut i = Instructions::new("", "");
-    i.add(Instruction::EmitRaw("Hello "));
-    i.add(Instruction::Lookup("user"));
-    i.add(Instruction::GetAttr("name"));
-    i.add(Instruction::Emit);
-    i.add(Instruction::Lookup("a"));
-    i.add(Instruction::Lookup("b"));
-    i.add(Instruction::Add);
-    i.add(Instruction::Neg);
-    i.add(Instruction::Emit);
+    let mut c = CodeGenerator::new("hello.html", "");
+    let hello_id = c.register_str("Hello ");
+    c.add(Instruction::EmitRaw(hello_id));
+    let user_id = c.register_str("user");
+    c.add(Instruction::Lookup(user_id));
+    let name_id = c.register_str("name");
+    c.add(Instruction::GetAttr(name_id));
+    c.add(Instruction::Emit);
+    let a_id = c.register_str("a");
+    c.add(Instruction::Lookup(a_id));
+    let b_id = c.register_str("b");
+    c.add(Instruction::Lookup(b_id));
+    c.add(Instruction::Add);
+    c.add(Instruction::Neg);
+    c.add(Instruction::Emit);
+    let i = c.finish().0;
 
     let output = simple_eval(&i, ctx).unwrap();
     assert_eq!(output, "Hello Peter-65");
@@ -116,10 +131,13 @@ fn test_basic() {
 fn test_error_info() {
     let mut c = CodeGenerator::new("hello.html", "");
     c.set_line(1);
-    c.add(Instruction::EmitRaw("<h1>Hello</h1>\n"));
+    let hello_id = c.register_str("<h1>Hello</h1>\n");
+    c.add(Instruction::EmitRaw(hello_id));
     c.set_line(2);
-    c.add(Instruction::Lookup("a_string"));
-    c.add(Instruction::Lookup("an_int"));
+    let a_string_id = c.register_str("a_string");
+    c.add(Instruction::Lookup(a_string_id));
+    let an_int_id = c.register_str("an_int");
+    c.add(Instruction::Lookup(an_int_id));
     c.add(Instruction::Add);
 
     let mut ctx = std::collections::BTreeMap::new();
