@@ -29,23 +29,32 @@ pub(crate) fn untrusted_size_hint(value: usize) -> usize {
 }
 
 fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
-    if matches!(
+    if let Some(s) = value.as_str() {
+        write!(out, "{}", HtmlEscape(s))
+    } else if matches!(
         value.kind(),
         ValueKind::Undefined | ValueKind::None | ValueKind::Bool | ValueKind::Number
     ) {
         write!(out, "{value}")
-    } else if let Some(s) = value.as_str() {
-        write!(out, "{}", HtmlEscape(s))
     } else {
         write!(out, "{}", HtmlEscape(&value.to_string()))
     }
 }
 
+#[cold]
 fn invalid_autoescape(name: &str) -> Result<(), Error> {
     Err(Error::new(
         ErrorKind::InvalidOperation,
         format!("Default formatter does not know how to format to custom format '{name}'"),
     ))
+}
+
+#[cfg(feature = "json")]
+fn json_escape_write(out: &mut Output, value: &Value) -> Result<(), Error> {
+    let value = ok!(serde_json::to_string(&value).map_err(|err| {
+        Error::new(ErrorKind::BadSerialization, "unable to format to JSON").with_source(err)
+    }));
+    write!(out, "{value}").map_err(Error::from)
 }
 
 #[inline(always)]
@@ -54,23 +63,16 @@ pub fn write_escaped(
     auto_escape: AutoEscape,
     value: &Value,
 ) -> Result<(), Error> {
-    // common case of safe strings or strings without auto escaping
-    if let ValueRepr::String(ref s, ty) = value.0 {
-        if matches!(ty, StringType::Safe) || matches!(auto_escape, AutoEscape::None) {
-            return out.write_str(s).map_err(Error::from);
-        }
+    // string strings bypass all of this
+    if let ValueRepr::String(ref s, StringType::Safe) = value.0 {
+        return out.write_str(s).map_err(Error::from);
     }
 
     match auto_escape {
         AutoEscape::None => write!(out, "{value}").map_err(Error::from),
         AutoEscape::Html => write_with_html_escaping(out, value).map_err(Error::from),
         #[cfg(feature = "json")]
-        AutoEscape::Json => {
-            let value = ok!(serde_json::to_string(&value).map_err(|err| {
-                Error::new(ErrorKind::BadSerialization, "unable to format to JSON").with_source(err)
-            }));
-            write!(out, "{value}").map_err(Error::from)
-        }
+        AutoEscape::Json => json_escape_write(out, value),
         AutoEscape::Custom(name) => invalid_autoescape(name),
     }
 }
