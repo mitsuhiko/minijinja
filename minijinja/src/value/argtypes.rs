@@ -263,7 +263,7 @@ impl<'a> From<&'a str> for Value {
     fn from(val: &'a str) -> Self {
         SmallStr::try_new(val)
             .map(|small_str| Value(ValueRepr::SmallStr(small_str)))
-            .unwrap_or_else(|| Value::from(val.to_string()))
+            .unwrap_or_else(|| Value(ValueRepr::String(val.into(), StringType::Normal)))
     }
 }
 
