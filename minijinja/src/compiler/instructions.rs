@@ -52,25 +52,25 @@ pub enum Instruction<'source> {
     Slice,
 
     /// Loads a constant value.
-    LoadConst(Value),
+    LoadConst(u32),
 
     /// Builds a map of the last n pairs on the stack.
-    BuildMap(usize),
+    BuildMap(u32),
 
     /// Builds a kwargs map of the last n pairs on the stack.
-    BuildKwargs(usize),
+    BuildKwargs(u32),
 
     /// Merges N kwargs maps on the list into one.
-    MergeKwargs(usize),
+    MergeKwargs(u32),
 
     /// Builds a list of the last n pairs on the stack.
     BuildList(Option<usize>),
 
     /// Unpacks a list into N stack items.
-    UnpackList(usize),
+    UnpackList(u32),
 
     /// Unpacks N lists onto the stack and pushes the number of items there were unpacked.
-    UnpackLists(usize),
+    UnpackLists(u32),
 
     /// Add the top two values
     Add,
@@ -148,7 +148,7 @@ pub enum Instruction<'source> {
     ///
     /// The argument is the jump target for when the loop
     /// ends and must point to a `PopFrame` instruction.
-    Iterate(usize),
+    Iterate(u32),
 
     /// Push a bool that indicates that the loop iterated.
     PushDidNotIterate,
@@ -160,16 +160,16 @@ pub enum Instruction<'source> {
     PopLoopFrame,
 
     /// Jump to a specific instruction
-    Jump(usize),
+    Jump(u32),
 
     /// Jump if the stack top evaluates to false
-    JumpIfFalse(usize),
+    JumpIfFalse(u32),
 
     /// Jump if the stack top evaluates to false or pops the value
-    JumpIfFalseOrPop(usize),
+    JumpIfFalseOrPop(u32),
 
     /// Jump if the stack top evaluates to true or pops the value
-    JumpIfTrueOrPop(usize),
+    JumpIfTrueOrPop(u32),
 
     /// Sets the auto escape flag to the current value.
     PushAutoEscape,
@@ -225,7 +225,7 @@ pub enum Instruction<'source> {
 
     /// Builds a macro on the stack.
     #[cfg(feature = "macros")]
-    BuildMacro(&'source str, usize, u8),
+    BuildMacro(&'source str, u32, u8),
 
     /// Breaks from the interpreter loop (exists a function)
     #[cfg(feature = "macros")]
@@ -260,6 +260,7 @@ struct SpanInfo {
 /// Wrapper around instructions to help with location management.
 pub struct Instructions<'source> {
     pub(crate) instructions: Vec<Instruction<'source>>,
+    pub(crate) consts: Vec<Value>,
     line_infos: Vec<LineInfo>,
     #[cfg(feature = "debug")]
     span_infos: Vec<SpanInfo>,
@@ -269,6 +270,7 @@ pub struct Instructions<'source> {
 
 pub(crate) static EMPTY_INSTRUCTIONS: Instructions<'static> = Instructions {
     instructions: Vec::new(),
+    consts: Vec::new(),
     line_infos: Vec::new(),
     #[cfg(feature = "debug")]
     span_infos: Vec::new(),
@@ -281,6 +283,7 @@ impl<'source> Instructions<'source> {
     pub fn new(name: &'source str, source: &'source str) -> Instructions<'source> {
         Instructions {
             instructions: Vec::with_capacity(128),
+            consts: Vec::with_capacity(128),
             line_infos: Vec::with_capacity(128),
             #[cfg(feature = "debug")]
             span_infos: Vec::with_capacity(128),
@@ -301,37 +304,37 @@ impl<'source> Instructions<'source> {
 
     /// Returns an instruction by index
     #[inline(always)]
-    pub fn get(&self, idx: usize) -> Option<&Instruction<'source>> {
-        self.instructions.get(idx)
+    pub fn get(&self, idx: u32) -> Option<&Instruction<'source>> {
+        self.instructions.get(idx as usize)
     }
 
     /// Returns an instruction by index mutably
-    pub fn get_mut(&mut self, idx: usize) -> Option<&mut Instruction<'source>> {
-        self.instructions.get_mut(idx)
+    pub fn get_mut(&mut self, idx: u32) -> Option<&mut Instruction<'source>> {
+        self.instructions.get_mut(idx as usize)
     }
 
     /// Adds a new instruction
-    pub fn add(&mut self, instr: Instruction<'source>) -> usize {
+    pub fn add(&mut self, instr: Instruction<'source>) -> u32 {
         let rv = self.instructions.len();
         self.instructions.push(instr);
-        rv
+        rv as u32
     }
 
-    fn add_line_record(&mut self, instr: usize, line: u32) {
+    fn add_line_record(&mut self, instr: u32, line: u32) {
         let same_loc = self
             .line_infos
             .last()
             .is_some_and(|last_loc| last_loc.line == line);
         if !same_loc {
             self.line_infos.push(LineInfo {
-                first_instruction: instr as u32,
+                first_instruction: instr,
                 line,
             });
         }
     }
 
     /// Adds a new instruction with line number.
-    pub fn add_with_line(&mut self, instr: Instruction<'source>, line: u32) -> usize {
+    pub fn add_with_line(&mut self, instr: Instruction<'source>, line: u32) -> u32 {
         let rv = self.add(instr);
         self.add_line_record(rv, line);
 
@@ -349,7 +352,7 @@ impl<'source> Instructions<'source> {
     }
 
     /// Adds a new instruction with span.
-    pub fn add_with_span(&mut self, instr: Instruction<'source>, span: Span) -> usize {
+    pub fn add_with_span(&mut self, instr: Instruction<'source>, span: Span) -> u32 {
         let rv = self.add(instr);
         #[cfg(feature = "debug")]
         {
@@ -369,10 +372,10 @@ impl<'source> Instructions<'source> {
     }
 
     /// Looks up the line for an instruction
-    pub fn get_line(&self, idx: usize) -> Option<usize> {
+    pub fn get_line(&self, idx: u32) -> Option<usize> {
         let loc = match self
             .line_infos
-            .binary_search_by_key(&idx, |x| x.first_instruction as usize)
+            .binary_search_by_key(&idx, |x| x.first_instruction)
         {
             Ok(idx) => &self.line_infos[idx],
             Err(0) => return None,
@@ -382,12 +385,12 @@ impl<'source> Instructions<'source> {
     }
 
     /// Looks up a span for an instruction.
-    pub fn get_span(&self, idx: usize) -> Option<Span> {
+    pub fn get_span(&self, idx: u32) -> Option<Span> {
         #[cfg(feature = "debug")]
         {
             let loc = match self
                 .span_infos
-                .binary_search_by_key(&idx, |x| x.first_instruction as usize)
+                .binary_search_by_key(&idx, |x| x.first_instruction)
             {
                 Ok(idx) => &self.span_infos[idx],
                 Err(0) => return None,
@@ -405,13 +408,13 @@ impl<'source> Instructions<'source> {
     /// Returns a list of all names referenced in the current block backwards
     /// from the given pc.
     #[cfg(feature = "debug")]
-    pub fn get_referenced_names(&self, idx: usize) -> Vec<&'source str> {
+    pub fn get_referenced_names(&self, idx: u32) -> Vec<&'source str> {
         let mut rv = Vec::new();
         // make sure we don't crash on empty instructions
         if self.instructions.is_empty() {
             return rv;
         }
-        let idx = idx.min(self.instructions.len() - 1);
+        let idx = (idx as usize).min(self.instructions.len() - 1);
         for instr in self.instructions[..=idx].iter().rev() {
             let name = match instr {
                 Instruction::Lookup(name)
@@ -426,6 +429,11 @@ impl<'source> Instructions<'source> {
             }
         }
         rv
+    }
+
+    /// Returns a constant by index
+    pub fn get_const(&self, idx: u32) -> Option<&Value> {
+        self.consts.get(idx as usize)
     }
 
     /// Returns the number of instructions
@@ -443,12 +451,22 @@ impl<'source> Instructions<'source> {
 #[cfg(feature = "internal_debug")]
 impl fmt::Debug for Instructions<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        struct InstructionWrapper<'a>(usize, &'a Instruction<'a>, Option<usize>);
+        struct InstructionWrapper<'a> {
+            idx: usize,
+            instr: &'a Instruction<'a>,
+            line: Option<usize>,
+            instructions: &'a Instructions<'a>,
+        }
 
         impl fmt::Debug for InstructionWrapper<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                ok!(write!(f, "{:>05} | {:?}", self.0, self.1,));
-                if let Some(line) = self.2 {
+                ok!(write!(f, "{:>05} | {:?}", self.idx, self.instr,));
+                if let Instruction::LoadConst(idx) = self.instr {
+                    if let Some(value) = self.instructions.get_const(*idx) {
+                        ok!(write!(f, "  [value={:?}]", value));
+                    }
+                }
+                if let Some(line) = self.line {
                     ok!(write!(f, "  [line {line}]"));
                 }
                 Ok(())
@@ -458,12 +476,13 @@ impl fmt::Debug for Instructions<'_> {
         let mut list = f.debug_list();
         let mut last_line = None;
         for (idx, instr) in self.instructions.iter().enumerate() {
-            let line = self.get_line(idx);
-            list.entry(&InstructionWrapper(
+            let line = self.get_line(idx as u32);
+            list.entry(&InstructionWrapper {
                 idx,
                 instr,
-                if line != last_line { line } else { None },
-            ));
+                line: if line != last_line { line } else { None },
+                instructions: self,
+            });
             last_line = line;
         }
         list.finish()
@@ -473,5 +492,5 @@ impl fmt::Debug for Instructions<'_> {
 #[test]
 #[cfg(target_pointer_width = "64")]
 fn test_sizes() {
-    assert_eq!(std::mem::size_of::<Instruction>(), 32);
+    assert_eq!(std::mem::size_of::<Instruction>(), 24);
 }

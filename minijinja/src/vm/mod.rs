@@ -158,7 +158,7 @@ impl<'env> Vm<'env> {
         state: &mut State<'_, 'env>,
         out: &mut Output,
         stack: Stack,
-        pc: usize,
+        pc: u32,
     ) -> Result<Option<Value>, Error> {
         #[cfg(feature = "stacker")]
         {
@@ -178,7 +178,7 @@ impl<'env> Vm<'env> {
         state: &mut State<'_, 'env>,
         out: &mut Output,
         mut stack: Stack,
-        mut pc: usize,
+        mut pc: u32,
     ) -> Result<Option<Value>, Error> {
         let initial_auto_escape = state.auto_escape;
         let undefined_behavior = state.undefined_behavior();
@@ -365,12 +365,13 @@ impl<'env> Vm<'env> {
                     }
                     stack.push(ctx_ok!(ops::slice(a, b, stop, step)));
                 }
-                Instruction::LoadConst(value) => {
+                Instruction::LoadConst(idx) => {
+                    let value = state.instructions.get_const(*idx).unwrap();
                     stack.push(value.clone());
                 }
                 Instruction::BuildMap(pair_count) => {
-                    let mut map = value_map_with_capacity(*pair_count);
-                    stack.reverse_top(*pair_count * 2);
+                    let mut map = value_map_with_capacity(*pair_count as usize);
+                    stack.reverse_top((*pair_count * 2) as usize);
                     for _ in 0..*pair_count {
                         let key = stack.pop();
                         let value = stack.pop();
@@ -379,8 +380,8 @@ impl<'env> Vm<'env> {
                     stack.push(Value::from_object(map))
                 }
                 Instruction::BuildKwargs(pair_count) => {
-                    let mut map = value_map_with_capacity(*pair_count);
-                    stack.reverse_top(*pair_count * 2);
+                    let mut map = value_map_with_capacity(*pair_count as usize);
+                    stack.reverse_top((*pair_count * 2) as usize);
                     for _ in 0..*pair_count {
                         let key = stack.pop();
                         let value = stack.pop();
@@ -951,8 +952,8 @@ impl<'env> Vm<'env> {
         state: &mut State<'_, 'env>,
         iterable: Value,
         flags: u8,
-        pc: usize,
-        current_recursion_jump: Option<(usize, bool)>,
+        pc: u32,
+        current_recursion_jump: Option<(u32, bool)>,
     ) -> Result<(), Error> {
         let iter = ok!(state.undefined_behavior().try_iter(iterable));
         let depth = state
@@ -972,7 +973,7 @@ impl<'env> Vm<'env> {
         })
     }
 
-    fn unpack_list(&self, stack: &mut Stack, count: usize) -> Result<(), Error> {
+    fn unpack_list(&self, stack: &mut Stack, count: u32) -> Result<(), Error> {
         let top = stack.pop();
         let iter = ok!(top
             .as_object()
@@ -986,7 +987,7 @@ impl<'env> Vm<'env> {
         }
 
         if n == count {
-            stack.reverse_top(n);
+            stack.reverse_top(n as usize);
             Ok(())
         } else {
             Err(Error::new(
@@ -1001,7 +1002,7 @@ impl<'env> Vm<'env> {
         &self,
         stack: &mut Stack,
         state: &mut State,
-        offset: usize,
+        offset: u32,
         name: &str,
         flags: u8,
     ) {
@@ -1024,7 +1025,7 @@ impl<'env> Vm<'env> {
 
 #[inline(never)]
 #[cold]
-fn process_err(err: &mut Error, pc: usize, state: &State) {
+fn process_err(err: &mut Error, pc: u32, state: &State) {
     // only attach line information if the error does not have line info yet.
     if err.line().is_none() {
         if let Some(span) = state.instructions.get_span(pc) {

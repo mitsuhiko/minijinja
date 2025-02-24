@@ -8,7 +8,7 @@ use std::{fs, io};
 use anyhow::{bail, Context, Error};
 use clap::ArgMatches;
 use minijinja::machinery::{
-    get_compiled_template, parse, tokenize, Instructions, WhitespaceConfig,
+    get_compiled_template, parse, tokenize, Instruction, Instructions, WhitespaceConfig,
 };
 use minijinja::{context, Environment, Error as MError, ErrorKind, Value};
 use serde::Deserialize;
@@ -318,7 +318,13 @@ fn print_instructions(
     writeln!(output, "Block: {block_name:?}")?;
     for idx in 0.. {
         if let Some(instruction) = instructions.get(idx) {
-            writeln!(output, "  {idx:4}: {instruction:?}")?;
+            write!(output, "  {idx:4}: {instruction:?}")?;
+            if let Instruction::LoadConst(idx) = instruction {
+                if let Some(value) = instructions.get_const(*idx) {
+                    write!(output, "  [value={:?}]", value)?;
+                }
+            }
+            writeln!(output)?;
         } else {
             break;
         }

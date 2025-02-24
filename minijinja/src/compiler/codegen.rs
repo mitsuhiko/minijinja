@@ -35,14 +35,14 @@ fn get_local_id<'source>(ids: &mut BTreeMap<&'source str, LocalId>, name: &'sour
 /// jump targets.
 enum PendingBlock {
     Branch {
-        jump_instr: usize,
+        jump_instr: u32,
     },
     Loop {
-        iter_instr: usize,
-        jump_instrs: Vec<usize>,
+        iter_instr: u32,
+        jump_instrs: Vec<u32>,
     },
     ScBool {
-        jump_instrs: Vec<usize>,
+        jump_instrs: Vec<u32>,
     },
 }
 
@@ -95,7 +95,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     /// Add a simple instruction with the current location.
-    pub fn add(&mut self, instr: Instruction<'source>) -> usize {
+    pub fn add(&mut self, instr: Instruction<'source>) -> u32 {
         if let Some(span) = self.span_stack.last() {
             if span.start_line == self.current_line {
                 return self.instructions.add_with_span(instr, *span);
@@ -105,13 +105,13 @@ impl<'source> CodeGenerator<'source> {
     }
 
     /// Add a simple instruction with other location.
-    pub fn add_with_span(&mut self, instr: Instruction<'source>, span: Span) -> usize {
+    pub fn add_with_span(&mut self, instr: Instruction<'source>, span: Span) -> u32 {
         self.instructions.add_with_span(instr, span)
     }
 
     /// Returns the next instruction index.
-    pub fn next_instruction(&self) -> usize {
-        self.instructions.len()
+    pub fn next_instruction(&self) -> u32 {
+        self.instructions.len() as u32
     }
 
     /// Creates a sub generator.
@@ -217,6 +217,13 @@ impl<'source> CodeGenerator<'source> {
         }
     }
 
+    /// Make a const instruction
+    pub fn add_const(&mut self, value: Value) {
+        let idx = self.instructions.consts.len() as u32;
+        self.instructions.consts.push(value);
+        self.add(Instruction::LoadConst(idx));
+    }
+
     /// Ends a short-circuited bool block.
     pub fn end_sc_bool(&mut self) {
         let end = self.next_instruction();
@@ -233,7 +240,7 @@ impl<'source> CodeGenerator<'source> {
         }
     }
 
-    fn end_condition(&mut self, new_jump_instr: usize) {
+    fn end_condition(&mut self, new_jump_instr: u32) {
         match self.pending_block.pop() {
             Some(PendingBlock::Branch { jump_instr }) => {
                 match self.instructions.get_mut(jump_instr) {
@@ -440,7 +447,7 @@ impl<'source> CodeGenerator<'source> {
             self.add(Instruction::Enclose(name));
         }
         self.add(Instruction::GetClosure);
-        self.add(Instruction::LoadConst(Value::from_object(
+        self.add_const(Value::from_object(
             macro_decl
                 .args
                 .iter()
@@ -449,7 +456,7 @@ impl<'source> CodeGenerator<'source> {
                     _ => unreachable!(),
                 })
                 .collect::<Vec<Value>>(),
-        )));
+        ));
         let mut flags = 0;
         if caller_reference {
             flags |= MACRO_CALLER;
@@ -532,7 +539,7 @@ impl<'source> CodeGenerator<'source> {
         // passing items accumulated into a list. in the second, that list is
         // iterated over normally
         if let Some(ref filter_expr) = for_loop.filter_expr {
-            self.add(Instruction::LoadConst(Value::from(0usize)));
+            self.add_const(Value::from(0usize));
             self.push_span(filter_expr.span());
             self.compile_expr(&for_loop.iter);
             self.start_for_loop(false, false);
@@ -541,7 +548,7 @@ impl<'source> CodeGenerator<'source> {
             self.compile_expr(filter_expr);
             self.start_if();
             self.add(Instruction::Swap);
-            self.add(Instruction::LoadConst(Value::from(1usize)));
+            self.add_const(Value::from(1usize));
             self.add(Instruction::Add);
             self.start_else();
             self.add(Instruction::DiscardTop);
@@ -579,7 +586,7 @@ impl<'source> CodeGenerator<'source> {
             }
             ast::Expr::List(list) => {
                 self.push_span(list.span());
-                self.add(Instruction::UnpackList(list.items.len()));
+                self.add(Instruction::UnpackList(list.items.len() as u32));
                 for expr in &list.items {
                     self.compile_assignment(expr);
                 }
@@ -599,7 +606,7 @@ impl<'source> CodeGenerator<'source> {
         // try to do constant folding
         if let Some(v) = expr.as_const() {
             self.set_line_from_span(expr.span());
-            self.add(Instruction::LoadConst(v.clone()));
+            self.add_const(v.clone());
             return;
         }
 
@@ -615,17 +622,17 @@ impl<'source> CodeGenerator<'source> {
                 if let Some(ref start) = s.start {
                     self.compile_expr(start);
                 } else {
-                    self.add(Instruction::LoadConst(Value::from(0)));
+                    self.add_const(Value::from(0));
                 }
                 if let Some(ref stop) = s.stop {
                     self.compile_expr(stop);
                 } else {
-                    self.add(Instruction::LoadConst(Value::from(())));
+                    self.add_const(Value::from(()));
                 }
                 if let Some(ref step) = s.step {
                     self.compile_expr(step);
                 } else {
-                    self.add(Instruction::LoadConst(Value::from(1)));
+                    self.add_const(Value::from(1));
                 }
                 self.add(Instruction::Slice);
                 self.pop_span();
@@ -643,7 +650,7 @@ impl<'source> CodeGenerator<'source> {
                         // an error.
                         if let ast::Expr::Const(ref c) = c.expr {
                             if let Ok(negated) = neg(&c.value) {
-                                self.add(Instruction::LoadConst(negated));
+                                self.add_const(negated);
                                 return;
                             }
                         }
@@ -667,7 +674,7 @@ impl<'source> CodeGenerator<'source> {
                     // special behavior: missing false block have a silent undefined
                     // to permit special casing.  This is for compatibility also with
                     // what Jinja2 does.
-                    self.add(Instruction::LoadConst(ValueRepr::SilentUndefined.into()));
+                    self.add_const(ValueRepr::SilentUndefined.into());
                 }
                 self.end_if();
             }
@@ -719,7 +726,7 @@ impl<'source> CodeGenerator<'source> {
                     self.compile_expr(key);
                     self.compile_expr(value);
                 }
-                self.add(Instruction::BuildMap(m.keys.len()));
+                self.add(Instruction::BuildMap(m.keys.len() as u32));
             }
         }
     }
@@ -808,7 +815,7 @@ impl<'source> CodeGenerator<'source> {
                                 unreachable!();
                             }
                         } else {
-                            self.add(Instruction::LoadConst(Value::from(*key)));
+                            self.add_const(Value::from(*key));
                             self.compile_expr(value);
                             pending_kwargs += 1;
                         }
@@ -827,7 +834,7 @@ impl<'source> CodeGenerator<'source> {
             }
 
             if !collected_kwargs.is_empty() {
-                self.add(Instruction::LoadConst(Kwargs::wrap(collected_kwargs)));
+                self.add_const(Kwargs::wrap(collected_kwargs));
             } else {
                 // The conditions above guarantee that if we collect static kwargs
                 // we cannot enter this block (single kwargs batch, no caller).
@@ -835,7 +842,7 @@ impl<'source> CodeGenerator<'source> {
                 #[cfg(feature = "macros")]
                 {
                     if let Some(caller) = caller {
-                        self.add(Instruction::LoadConst(Value::from("caller")));
+                        self.add_const(Value::from("caller"));
                         self.compile_macro_expression(caller);
                         pending_kwargs += 1
                     }
