@@ -277,7 +277,9 @@ impl<'a> From<&'a String> for Value {
 impl From<String> for Value {
     #[inline(always)]
     fn from(val: String) -> Self {
-        ValueRepr::String(Arc::from(val), StringType::Normal).into()
+        // There is no benefit here of "reusing" the string allocation.  The reason
+        // is that From<String> for Arc<str> copies the bytes over anyways.
+        Value::from(val.as_str())
     }
 }
 
