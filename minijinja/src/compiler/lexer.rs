@@ -109,9 +109,8 @@ fn find_start_marker(
 ) -> Option<(usize, StartMarker, usize, Whitespace)> {
     // If we have a custom delimiter we need to use the aho-corasick
     // otherwise we can use internal memchr.
-    let ac = match syntax_config.aho_corasick {
-        Some(ref ac) => ac,
-        None => return find_start_marker_memchr(&a[offset..]),
+    let Some(ref ac) = syntax_config.aho_corasick else {
+        return find_start_marker_memchr(&a[offset..]);
     };
 
     let bytes = &a.as_bytes()[offset..];

@@ -195,14 +195,11 @@ impl<'env> Vm<'env> {
 
         macro_rules! recurse_loop {
             ($capture:expr, $loop_object:expr) => {{
-                let jump_target = match $loop_object.recurse_jump_target {
-                    Some(jump_target) => jump_target,
-                    None => {
-                        bail!(Error::new(
-                            ErrorKind::InvalidOperation,
-                            "cannot recurse outside of recursive loop",
-                        ))
-                    }
+                let Some(jump_target) = $loop_object.recurse_jump_target else {
+                    bail!(Error::new(
+                        ErrorKind::InvalidOperation,
+                        "cannot recurse outside of recursive loop",
+                    ))
                 };
                 // the way this works is that we remember the next instruction
                 // as loop exit jump target.  Whenever a loop is pushed, it
@@ -877,14 +874,11 @@ impl<'env> Vm<'env> {
         name: Value,
         state: &mut State<'_, 'env>,
     ) -> Result<&'env Instructions<'env>, Error> {
-        let name = match name.as_str() {
-            Some(name) => name,
-            None => {
-                return Err(Error::new(
-                    ErrorKind::InvalidOperation,
-                    "template name was not a string",
-                ))
-            }
+        let Some(name) = name.as_str() else {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "template name was not a string",
+            ));
         };
         if state.loaded_templates.contains(&name) {
             return Err(Error::new(

@@ -210,9 +210,8 @@ pub fn path_loader<'x, P: AsRef<Path> + 'x>(
 ) -> impl for<'a> Fn(&'a str) -> Result<Option<String>, Error> + Send + Sync + 'static {
     let dir = dir.as_ref().to_path_buf();
     move |name| {
-        let path = match safe_join(&dir, name) {
-            Some(path) => path,
-            None => return Ok(None),
+        let Some(path) = safe_join(&dir, name) else {
+            return Ok(None);
         };
         match fs::read_to_string(path) {
             Ok(result) => Ok(Some(result)),

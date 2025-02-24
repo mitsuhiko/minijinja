@@ -60,9 +60,8 @@ pub fn unknown_method_callback(
 }
 
 fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, Error> {
-    let s = match value.as_str() {
-        Some(s) => s,
-        None => return Err(Error::from(ErrorKind::UnknownMethod)),
+    let Some(s) = value.as_str() else {
+        return Err(Error::from(ErrorKind::UnknownMethod));
     };
 
     match method {
@@ -273,9 +272,8 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
 }
 
 fn map_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, Error> {
-    let obj = match value.as_object() {
-        Some(obj) => obj,
-        None => return Err(Error::from(ErrorKind::UnknownMethod)),
+    let Some(obj) = value.as_object() else {
+        return Err(Error::from(ErrorKind::UnknownMethod));
     };
 
     match method {
@@ -318,9 +316,8 @@ fn map_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, Err
 }
 
 fn seq_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, Error> {
-    let obj = match value.as_object() {
-        Some(obj) => obj,
-        None => return Err(Error::from(ErrorKind::UnknownMethod)),
+    let Some(obj) = value.as_object() else {
+        return Err(Error::from(ErrorKind::UnknownMethod));
     };
 
     match method {

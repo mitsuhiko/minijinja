@@ -279,18 +279,16 @@ impl Notifier {
     }
 
     fn fast_reload(&self) -> bool {
-        let handle = match self.handle() {
-            Some(handle) => handle,
-            None => return false,
+        let Some(handle) = self.handle() else {
+            return false;
         };
         let inner = handle.lock().unwrap();
         inner.fast_reload
     }
 
     fn should_reload(&self) -> bool {
-        let handle = match self.handle() {
-            Some(handle) => handle,
-            None => return false,
+        let Some(handle) = self.handle() else {
+            return false;
         };
         let inner = handle.lock().unwrap();
 
@@ -317,9 +315,8 @@ impl Notifier {
     fn with_fs_watcher<F: FnOnce(&mut notify::RecommendedWatcher)>(&self, f: F) {
         use notify::event::{EventKind, ModifyKind};
 
-        let handle = match self.handle() {
-            Some(handle) => handle,
-            None => return,
+        let Some(handle) = self.handle() else {
+            return;
         };
         let weak_handle = Arc::downgrade(&handle);
         f(handle
