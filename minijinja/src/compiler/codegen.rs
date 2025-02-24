@@ -596,15 +596,19 @@ impl<'source> CodeGenerator<'source> {
 
     /// Compiles an expression.
     pub fn compile_expr(&mut self, expr: &ast::Expr<'source>) {
+        // try to do constant folding
+        if let Some(v) = expr.as_const() {
+            self.set_line_from_span(expr.span());
+            self.add(Instruction::LoadConst(v.clone()));
+            return;
+        }
+
         match expr {
             ast::Expr::Var(v) => {
                 self.set_line_from_span(v.span());
                 self.add(Instruction::Lookup(v.id));
             }
-            ast::Expr::Const(v) => {
-                self.set_line_from_span(v.span());
-                self.add(Instruction::LoadConst(v.value.clone()));
-            }
+            ast::Expr::Const(_) => unreachable!(), // handled by constant folding
             ast::Expr::Slice(s) => {
                 self.push_span(s.span());
                 self.compile_expr(&s.expr);
