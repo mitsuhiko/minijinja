@@ -1184,9 +1184,16 @@ impl Value {
         }
     }
 
-    /// If this is an i64 return it
+    /// If this is an usize return it
+    #[inline]
     pub fn as_usize(&self) -> Option<usize> {
-        usize::try_from(self.clone()).ok()
+        // This is manually implemented as the engine calls as_usize a few times
+        // during execution on hotter paths.  This way we can avoid an unnecessary clone.
+        match self.0 {
+            ValueRepr::I64(val) => TryFrom::try_from(val).ok(),
+            ValueRepr::U64(val) => TryFrom::try_from(val).ok(),
+            _ => self.clone().try_into().ok(),
+        }
     }
 
     /// If this is an i64 return it

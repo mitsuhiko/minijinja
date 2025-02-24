@@ -715,6 +715,7 @@ macro_rules! impl_value_vec {
                 ObjectRepr::Seq
             }
 
+            #[inline(always)]
             fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
                 self.get(some!(key.as_usize())).cloned().map(|v| v.into())
             }
@@ -769,6 +770,7 @@ macro_rules! impl_str_map_helper {
         where
             V: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
         {
+            #[inline(always)]
             fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
                 self.get(some!(key.as_str())).cloned().map(|v| v.into())
             }
@@ -841,6 +843,7 @@ macro_rules! impl_value_map {
         where
             V: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
         {
+            #[inline(always)]
             fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
                 self.get(key).cloned().map(|v| v.into())
             }
