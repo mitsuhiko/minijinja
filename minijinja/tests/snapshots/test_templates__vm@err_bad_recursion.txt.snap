@@ -1,0 +1,45 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{% for x in [1, 2, 3] recursive %}\n  {{ loop(x) }}\n{% endfor %}"
+info: {}
+input_file: minijinja/tests/inputs/err_bad_recursion.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: InvalidOperation,
+    detail: "cannot recurse because of non-iterable value",
+    name: "err_bad_recursion.txt",
+    line: 2,
+    source: Error {
+        kind: InvalidOperation,
+        detail: "number is not iterable",
+        name: "err_bad_recursion.txt",
+        line: 1,
+    },
+}
+
+invalid operation: cannot recurse because of non-iterable value (in err_bad_recursion.txt:2)
+---------------------------- err_bad_recursion.txt ----------------------------
+   1 | {% for x in [1, 2, 3] recursive %}
+   2 >   {{ loop(x) }}
+     i      ^^^^^^^ invalid operation
+   3 | {% endfor %}
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Referenced variables: {
+    loop: <loop 0/3>,
+    x: 1,
+}
+-------------------------------------------------------------------------------
+
+caused by: invalid operation: number is not iterable (in err_bad_recursion.txt:1)
+---------------------------- err_bad_recursion.txt ----------------------------
+   1 > {% for x in [1, 2, 3] recursive %}
+     i             ^^^^^^^^^ invalid operation
+   2 |   {{ loop(x) }}
+   3 | {% endfor %}
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Referenced variables: {
+    loop: <loop 0/3>,
+}
+-------------------------------------------------------------------------------
