@@ -34,6 +34,9 @@ All notable changes to MiniJinja are documented here.
   handle escapes.  #728
 - Implemented constant folding in the code generator.  #731
 - Improved error reporting for bad loop recursion calls.  #734
+- The engine now uses smaller integers to represent columns, line numbers
+  and addresses.  This cuts down on the memory usage needed for debug
+  information.  #735
 
 ## 2.8.0
 
