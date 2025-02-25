@@ -33,6 +33,7 @@ All notable changes to MiniJinja are documented here.
 - Fixed a bug that caused implicit string concatenation to not correctly
   handle escapes.  #728
 - Implemented constant folding in the code generator.  #731
+- Improved error reporting for bad loop recursion calls.  #734
 
 ## 2.8.0
 
