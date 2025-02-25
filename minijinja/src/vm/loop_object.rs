@@ -12,7 +12,7 @@ pub(crate) struct LoopState {
     // if we're popping the frame, do we want to jump somewhere?  The
     // first item is the target jump instruction, the second argument
     // tells us if we need to end capturing.
-    pub(crate) current_recursion_jump: Option<(usize, bool)>,
+    pub(crate) current_recursion_jump: Option<(u32, bool)>,
     pub(crate) object: Arc<Loop>,
 
     // Depending on if adjacent_loop_items is enabled or not, the iterator
@@ -27,8 +27,8 @@ impl LoopState {
         iter: ValueIter,
         depth: usize,
         with_loop_var: bool,
-        recurse_jump_target: Option<usize>,
-        current_recursion_jump: Option<(usize, bool)>,
+        recurse_jump_target: Option<u32>,
+        current_recursion_jump: Option<(u32, bool)>,
     ) -> LoopState {
         // for an iterator where the lower and upper bound are matching we can
         // consider them to have ExactSizeIterator semantics.  We do however not
@@ -114,7 +114,7 @@ pub(crate) struct Loop {
     pub idx: AtomicUsize,
     pub depth: usize,
     pub last_changed_value: Mutex<Option<Vec<Value>>>,
-    pub recurse_jump_target: Option<usize>,
+    pub recurse_jump_target: Option<u32>,
     #[cfg(feature = "adjacent_loop_items")]
     iter: Mutex<AdjacentLoopItemIterWrapper>,
 }
