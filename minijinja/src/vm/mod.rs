@@ -56,18 +56,17 @@ pub(crate) fn prepare_blocks<'env, 'template>(
         .collect()
 }
 
-fn get_or_lookup_local<T, F>(vec: &mut [Option<T>], local_id: u8, f: F) -> Option<T>
+fn get_or_lookup_local<'a, F>(vec: &mut [Option<&'a Value>], idx: u8, f: F) -> Option<&'a Value>
 where
-    T: Copy,
-    F: FnOnce() -> Option<T>,
+    F: FnOnce() -> Option<&'a Value>,
 {
-    if local_id == !0 {
+    if idx == !0 {
         f()
-    } else if let Some(Some(rv)) = vec.get(local_id as usize) {
+    } else if let Some(Some(rv)) = vec.get(idx as usize) {
         Some(*rv)
     } else {
         let val = some!(f());
-        vec[local_id as usize] = Some(val);
+        vec[idx as usize] = Some(val);
         Some(val)
     }
 }
@@ -302,8 +301,8 @@ impl<'env> Vm<'env> {
 
             match instr {
                 Instruction::Swap => {
-                    let a = stack.pop();
-                    let b = stack.pop();
+                    a = stack.pop();
+                    b = stack.pop();
                     stack.push(a);
                     stack.push(b);
                 }
@@ -389,33 +388,9 @@ impl<'env> Vm<'env> {
                     stack.push(Kwargs::wrap(map))
                 }
                 Instruction::MergeKwargs(count) => {
-                    let mut kwargs_sources = Vec::new();
-                    for _ in 0..*count {
-                        kwargs_sources.push(stack.pop());
-                    }
+                    let mut kwargs_sources = Vec::from_iter((0..*count).map(|_| stack.pop()));
                     kwargs_sources.reverse();
-                    let values: &[Value] = &kwargs_sources;
-                    let mut rv = ValueMap::new();
-                    for value in values {
-                        ctx_ok!(self.env.undefined_behavior().assert_iterable(value));
-                        let iter = ctx_ok!(value
-                            .as_object()
-                            .filter(|x| x.repr() == ObjectRepr::Map)
-                            .and_then(|x| x.try_iter_pairs())
-                            .ok_or_else(|| {
-                                Error::new(
-                                    ErrorKind::InvalidOperation,
-                                    format!(
-                                        "attempted to apply keyword arguments from non map (got {})",
-                                        value.kind()
-                                    ),
-                                )
-                            }));
-                        for (key, value) in iter {
-                            rv.insert(key, value);
-                        }
-                    }
-                    stack.push(Kwargs::wrap(rv));
+                    stack.push(ctx_ok!(self.merge_kwargs(kwargs_sources)));
                 }
                 Instruction::BuildList(n) => {
                     let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
@@ -430,10 +405,7 @@ impl<'env> Vm<'env> {
                     ctx_ok!(self.unpack_list(&mut stack, *count));
                 }
                 Instruction::UnpackLists(count) => {
-                    let mut lists = Vec::new();
-                    for _ in 0..*count {
-                        lists.push(stack.pop());
-                    }
+                    let lists = Vec::from_iter((0..*count).map(|_| stack.pop()));
                     let mut len = 0;
                     for list in lists.into_iter().rev() {
                         for item in ctx_ok!(list.try_iter()) {
@@ -543,12 +515,6 @@ impl<'env> Vm<'env> {
                         stack.pop();
                     }
                 }
-                #[cfg(feature = "multi_template")]
-                Instruction::CallBlock(name) => {
-                    if parent_instructions.is_none() && !out.is_discarding() {
-                        self.call_block(name, state, out)?;
-                    }
-                }
                 Instruction::PushAutoEscape => {
                     a = stack.pop();
                     auto_escape_stack.push(state.auto_escape);
@@ -589,9 +555,9 @@ impl<'env> Vm<'env> {
                     }));
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
-                    let rv = ctx_ok!(test.call(state, args)).is_true();
+                    a = ctx_ok!(test.call(state, args));
                     stack.drop_top(arg_count);
-                    stack.push(Value::from(rv));
+                    stack.push(Value::from(a.is_true()));
                 }
                 Instruction::CallFunction(name, arg_count) => {
                     let args = stack.get_call_args(*arg_count);
@@ -705,6 +671,12 @@ impl<'env> Vm<'env> {
                     }
                     stack.push(Value::from_object(module));
                 }
+                #[cfg(feature = "multi_template")]
+                Instruction::CallBlock(name) => {
+                    if parent_instructions.is_none() && !out.is_discarding() {
+                        self.call_block(name, state, out)?;
+                    }
+                }
                 #[cfg(feature = "macros")]
                 Instruction::BuildMacro(name, offset, flags) => {
                     self.build_macro(&mut stack, state, *offset, name, *flags);
@@ -737,6 +709,30 @@ impl<'env> Vm<'env> {
         }
 
         Ok(stack.try_pop())
+    }
+
+    fn merge_kwargs(&self, values: Vec<Value>) -> Result<Value, Error> {
+        let mut rv = ValueMap::new();
+        for value in values {
+            ok!(self.env.undefined_behavior().assert_iterable(&value));
+            let iter = ok!(value
+                .as_object()
+                .filter(|x| x.repr() == ObjectRepr::Map)
+                .and_then(|x| x.try_iter_pairs())
+                .ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!(
+                            "attempted to apply keyword arguments from non map (got {})",
+                            value.kind()
+                        ),
+                    )
+                }));
+            for (key, value) in iter {
+                rv.insert(key, value);
+            }
+        }
+        Ok(Kwargs::wrap(rv))
     }
 
     #[cfg(feature = "multi_template")]
@@ -954,7 +950,28 @@ impl<'env> Vm<'env> {
         pc: usize,
         current_recursion_jump: Option<(usize, bool)>,
     ) -> Result<(), Error> {
-        let iter = ok!(state.undefined_behavior().try_iter(iterable));
+        let iter = ok!(state
+            .undefined_behavior()
+            .try_iter(iterable)
+            .map_err(|mut err| {
+                if let Some((jump_instr, _)) = current_recursion_jump {
+                    // When a recursion error happens, we need to process the error at both the
+                    // recursion call site and the loop definition.  This is because the error
+                    // happens at the recursion call site, but the loop definition is where the
+                    // recursion is defined.  This helps provide a more helpful error message.
+                    // For better reporting we basically turn this around.  jump_pc - 1 is the
+                    // location of FastRecurse or CallFunction.
+                    process_err(&mut err, pc, state);
+                    let mut call_err = Error::new(
+                        ErrorKind::InvalidOperation,
+                        "cannot recurse because of non-iterable value",
+                    );
+                    process_err(&mut call_err, jump_instr - 1, state);
+                    call_err.with_source(err)
+                } else {
+                    err
+                }
+            }));
         let depth = state
             .ctx
             .current_loop()
