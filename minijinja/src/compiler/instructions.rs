@@ -148,7 +148,7 @@ pub enum Instruction<'source> {
     ///
     /// The argument is the jump target for when the loop
     /// ends and must point to a `PopFrame` instruction.
-    Iterate(usize),
+    Iterate(u32),
 
     /// Push a bool that indicates that the loop iterated.
     PushDidNotIterate,
@@ -160,16 +160,16 @@ pub enum Instruction<'source> {
     PopLoopFrame,
 
     /// Jump to a specific instruction
-    Jump(usize),
+    Jump(u32),
 
     /// Jump if the stack top evaluates to false
-    JumpIfFalse(usize),
+    JumpIfFalse(u32),
 
     /// Jump if the stack top evaluates to false or pops the value
-    JumpIfFalseOrPop(usize),
+    JumpIfFalseOrPop(u32),
 
     /// Jump if the stack top evaluates to true or pops the value
-    JumpIfTrueOrPop(usize),
+    JumpIfTrueOrPop(u32),
 
     /// Sets the auto escape flag to the current value.
     PushAutoEscape,
@@ -225,7 +225,7 @@ pub enum Instruction<'source> {
 
     /// Builds a macro on the stack.
     #[cfg(feature = "macros")]
-    BuildMacro(&'source str, usize, u8),
+    BuildMacro(&'source str, u32, u8),
 
     /// Breaks from the interpreter loop (exists a function)
     #[cfg(feature = "macros")]
@@ -247,14 +247,14 @@ pub enum Instruction<'source> {
 #[derive(Copy, Clone)]
 struct LineInfo {
     first_instruction: u32,
-    line: u32,
+    line: u16,
 }
 
 #[cfg(feature = "debug")]
 #[derive(Copy, Clone)]
 struct SpanInfo {
     first_instruction: u32,
-    span: Option<Span>,
+    span: Span,
 }
 
 /// Wrapper around instructions to help with location management.
@@ -301,47 +301,51 @@ impl<'source> Instructions<'source> {
 
     /// Returns an instruction by index
     #[inline(always)]
-    pub fn get(&self, idx: usize) -> Option<&Instruction<'source>> {
-        self.instructions.get(idx)
+    pub fn get(&self, idx: u32) -> Option<&Instruction<'source>> {
+        self.instructions.get(idx as usize)
     }
 
     /// Returns an instruction by index mutably
-    pub fn get_mut(&mut self, idx: usize) -> Option<&mut Instruction<'source>> {
-        self.instructions.get_mut(idx)
+    pub fn get_mut(&mut self, idx: u32) -> Option<&mut Instruction<'source>> {
+        self.instructions.get_mut(idx as usize)
     }
 
     /// Adds a new instruction
-    pub fn add(&mut self, instr: Instruction<'source>) -> usize {
+    pub fn add(&mut self, instr: Instruction<'source>) -> u32 {
         let rv = self.instructions.len();
         self.instructions.push(instr);
-        rv
+        rv as u32
     }
 
-    fn add_line_record(&mut self, instr: usize, line: u32) {
+    fn add_line_record(&mut self, instr: u32, line: u16) {
         let same_loc = self
             .line_infos
             .last()
             .is_some_and(|last_loc| last_loc.line == line);
         if !same_loc {
             self.line_infos.push(LineInfo {
-                first_instruction: instr as u32,
+                first_instruction: instr,
                 line,
             });
         }
     }
 
     /// Adds a new instruction with line number.
-    pub fn add_with_line(&mut self, instr: Instruction<'source>, line: u32) -> usize {
+    pub fn add_with_line(&mut self, instr: Instruction<'source>, line: u16) -> u32 {
         let rv = self.add(instr);
         self.add_line_record(rv, line);
 
         // if we follow up to a valid span with no more span, clear it out
         #[cfg(feature = "debug")]
         {
-            if self.span_infos.last().is_some_and(|x| x.span.is_some()) {
+            if self
+                .span_infos
+                .last()
+                .is_some_and(|x| x.span != Span::default())
+            {
                 self.span_infos.push(SpanInfo {
-                    first_instruction: rv as u32,
-                    span: None,
+                    first_instruction: rv,
+                    span: Span::default(),
                 });
             }
         }
@@ -349,18 +353,18 @@ impl<'source> Instructions<'source> {
     }
 
     /// Adds a new instruction with span.
-    pub fn add_with_span(&mut self, instr: Instruction<'source>, span: Span) -> usize {
+    pub fn add_with_span(&mut self, instr: Instruction<'source>, span: Span) -> u32 {
         let rv = self.add(instr);
         #[cfg(feature = "debug")]
         {
             let same_loc = self
                 .span_infos
                 .last()
-                .is_some_and(|last_loc| last_loc.span == Some(span));
+                .is_some_and(|last_loc| last_loc.span == span);
             if !same_loc {
                 self.span_infos.push(SpanInfo {
-                    first_instruction: rv as u32,
-                    span: Some(span),
+                    first_instruction: rv,
+                    span,
                 });
             }
         }
@@ -369,10 +373,10 @@ impl<'source> Instructions<'source> {
     }
 
     /// Looks up the line for an instruction
-    pub fn get_line(&self, idx: usize) -> Option<usize> {
+    pub fn get_line(&self, idx: u32) -> Option<usize> {
         let loc = match self
             .line_infos
-            .binary_search_by_key(&idx, |x| x.first_instruction as usize)
+            .binary_search_by_key(&idx, |x| x.first_instruction)
         {
             Ok(idx) => &self.line_infos[idx],
             Err(0) => return None,
@@ -382,18 +386,18 @@ impl<'source> Instructions<'source> {
     }
 
     /// Looks up a span for an instruction.
-    pub fn get_span(&self, idx: usize) -> Option<Span> {
+    pub fn get_span(&self, idx: u32) -> Option<Span> {
         #[cfg(feature = "debug")]
         {
             let loc = match self
                 .span_infos
-                .binary_search_by_key(&idx, |x| x.first_instruction as usize)
+                .binary_search_by_key(&idx, |x| x.first_instruction)
             {
                 Ok(idx) => &self.span_infos[idx],
                 Err(0) => return None,
                 Err(idx) => &self.span_infos[idx - 1],
             };
-            loc.span
+            (loc.span != Span::default()).then_some(loc.span)
         }
         #[cfg(not(feature = "debug"))]
         {
@@ -405,13 +409,13 @@ impl<'source> Instructions<'source> {
     /// Returns a list of all names referenced in the current block backwards
     /// from the given pc.
     #[cfg(feature = "debug")]
-    pub fn get_referenced_names(&self, idx: usize) -> Vec<&'source str> {
+    pub fn get_referenced_names(&self, idx: u32) -> Vec<&'source str> {
         let mut rv = Vec::new();
         // make sure we don't crash on empty instructions
         if self.instructions.is_empty() {
             return rv;
         }
-        let idx = idx.min(self.instructions.len() - 1);
+        let idx = (idx as usize).min(self.instructions.len() - 1);
         for instr in self.instructions[..=idx].iter().rev() {
             let name = match instr {
                 Instruction::Lookup(name)
@@ -458,7 +462,7 @@ impl fmt::Debug for Instructions<'_> {
         let mut list = f.debug_list();
         let mut last_line = None;
         for (idx, instr) in self.instructions.iter().enumerate() {
-            let line = self.get_line(idx);
+            let line = self.get_line(idx as u32);
             list.entry(&InstructionWrapper(
                 idx,
                 instr,

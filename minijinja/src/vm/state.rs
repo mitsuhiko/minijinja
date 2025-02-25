@@ -52,7 +52,7 @@ pub struct State<'template, 'env> {
     #[cfg(feature = "macros")]
     pub(crate) id: isize,
     #[cfg(feature = "macros")]
-    pub(crate) macros: std::sync::Arc<Vec<(&'template Instructions<'env>, usize)>>,
+    pub(crate) macros: std::sync::Arc<Vec<(&'template Instructions<'env>, u32)>>,
     #[cfg(feature = "macros")]
     pub(crate) closure_tracker: std::sync::Arc<crate::vm::closure_object::ClosureTracker>,
     #[cfg(feature = "fuel")]
@@ -398,7 +398,7 @@ impl<'template, 'env> State<'template, 'env> {
     #[cfg(feature = "debug")]
     pub(crate) fn make_debug_info(
         &self,
-        pc: usize,
+        pc: u32,
         instructions: &Instructions<'_>,
     ) -> crate::debug::DebugInfo {
         crate::debug::DebugInfo {

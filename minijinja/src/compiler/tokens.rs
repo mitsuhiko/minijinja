@@ -127,11 +127,11 @@ impl fmt::Display for Token<'_> {
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Span {
-    pub start_line: u32,
-    pub start_col: u32,
+    pub start_line: u16,
+    pub start_col: u16,
     pub start_offset: u32,
-    pub end_line: u32,
-    pub end_col: u32,
+    pub end_line: u16,
+    pub end_col: u16,
     pub end_offset: u32,
 }
 

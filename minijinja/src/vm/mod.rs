@@ -157,7 +157,7 @@ impl<'env> Vm<'env> {
         state: &mut State<'_, 'env>,
         out: &mut Output,
         stack: Stack,
-        pc: usize,
+        pc: u32,
     ) -> Result<Option<Value>, Error> {
         #[cfg(feature = "stacker")]
         {
@@ -177,7 +177,7 @@ impl<'env> Vm<'env> {
         state: &mut State<'_, 'env>,
         out: &mut Output,
         mut stack: Stack,
-        mut pc: usize,
+        mut pc: u32,
     ) -> Result<Option<Value>, Error> {
         let initial_auto_escape = state.auto_escape;
         let undefined_behavior = state.undefined_behavior();
@@ -947,8 +947,8 @@ impl<'env> Vm<'env> {
         state: &mut State<'_, 'env>,
         iterable: Value,
         flags: u8,
-        pc: usize,
-        current_recursion_jump: Option<(usize, bool)>,
+        pc: u32,
+        current_recursion_jump: Option<(u32, bool)>,
     ) -> Result<(), Error> {
         let iter = ok!(state
             .undefined_behavior()
@@ -1018,7 +1018,7 @@ impl<'env> Vm<'env> {
         &self,
         stack: &mut Stack,
         state: &mut State,
-        offset: usize,
+        offset: u32,
         name: &str,
         flags: u8,
     ) {
@@ -1041,7 +1041,7 @@ impl<'env> Vm<'env> {
 
 #[inline(never)]
 #[cold]
-fn process_err(err: &mut Error, pc: usize, state: &State) {
+fn process_err(err: &mut Error, pc: u32, state: &State) {
     // only attach line information if the error does not have line info yet.
     if err.line().is_none() {
         if let Some(span) = state.instructions.get_span(pc) {

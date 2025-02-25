@@ -19,8 +19,8 @@ pub struct Tokenizer<'s> {
     stack: Vec<LexerState>,
     source: &'s str,
     filename: &'s str,
-    current_line: u32,
-    current_col: u32,
+    current_line: u16,
+    current_col: u16,
     current_offset: usize,
     trim_leading_whitespace: bool,
     pending_start_marker: Option<(StartMarker, usize)>,
@@ -387,7 +387,7 @@ impl<'s> Tokenizer<'s> {
     }
 
     #[inline]
-    fn loc(&self) -> (u32, u32, u32) {
+    fn loc(&self) -> (u16, u16, u32) {
         (
             self.current_line,
             self.current_col,
@@ -396,7 +396,7 @@ impl<'s> Tokenizer<'s> {
     }
 
     #[inline]
-    fn span(&self, (start_line, start_col, start_offset): (u32, u32, u32)) -> Span {
+    fn span(&self, (start_line, start_col, start_offset): (u16, u16, u32)) -> Span {
         Span {
             start_line,
             start_col,

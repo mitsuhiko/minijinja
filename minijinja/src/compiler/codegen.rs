@@ -35,14 +35,14 @@ fn get_local_id<'source>(ids: &mut BTreeMap<&'source str, LocalId>, name: &'sour
 /// jump targets.
 enum PendingBlock {
     Branch {
-        jump_instr: usize,
+        jump_instr: u32,
     },
     Loop {
-        iter_instr: usize,
-        jump_instrs: Vec<usize>,
+        iter_instr: u32,
+        jump_instrs: Vec<u32>,
     },
     ScBool {
-        jump_instrs: Vec<usize>,
+        jump_instrs: Vec<u32>,
     },
 }
 
@@ -51,7 +51,7 @@ pub struct CodeGenerator<'source> {
     instructions: Instructions<'source>,
     blocks: BTreeMap<&'source str, Instructions<'source>>,
     pending_block: Vec<PendingBlock>,
-    current_line: u32,
+    current_line: u16,
     span_stack: Vec<Span>,
     filter_local_ids: BTreeMap<&'source str, LocalId>,
     test_local_ids: BTreeMap<&'source str, LocalId>,
@@ -74,7 +74,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     /// Sets the current location's line.
-    pub fn set_line(&mut self, lineno: u32) {
+    pub fn set_line(&mut self, lineno: u16) {
         self.current_line = lineno;
     }
 
@@ -95,7 +95,7 @@ impl<'source> CodeGenerator<'source> {
     }
 
     /// Add a simple instruction with the current location.
-    pub fn add(&mut self, instr: Instruction<'source>) -> usize {
+    pub fn add(&mut self, instr: Instruction<'source>) -> u32 {
         if let Some(span) = self.span_stack.last() {
             if span.start_line == self.current_line {
                 return self.instructions.add_with_span(instr, *span);
@@ -105,13 +105,13 @@ impl<'source> CodeGenerator<'source> {
     }
 
     /// Add a simple instruction with other location.
-    pub fn add_with_span(&mut self, instr: Instruction<'source>, span: Span) -> usize {
+    pub fn add_with_span(&mut self, instr: Instruction<'source>, span: Span) -> u32 {
         self.instructions.add_with_span(instr, span)
     }
 
     /// Returns the next instruction index.
-    pub fn next_instruction(&self) -> usize {
-        self.instructions.len()
+    pub fn next_instruction(&self) -> u32 {
+        self.instructions.len() as u32
     }
 
     /// Creates a sub generator.
@@ -233,7 +233,7 @@ impl<'source> CodeGenerator<'source> {
         }
     }
 
-    fn end_condition(&mut self, new_jump_instr: usize) {
+    fn end_condition(&mut self, new_jump_instr: u32) {
         match self.pending_block.pop() {
             Some(PendingBlock::Branch { jump_instr }) => {
                 match self.instructions.get_mut(jump_instr) {
