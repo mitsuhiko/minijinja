@@ -7,7 +7,7 @@ use crate::compiler::instructions::{
 use crate::compiler::tokens::Span;
 use crate::output::CaptureMode;
 use crate::value::ops::neg;
-use crate::value::{Kwargs, Value, ValueMap, ValueRepr};
+use crate::value::{Kwargs, UndefinedType, Value, ValueMap, ValueRepr};
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -667,7 +667,9 @@ impl<'source> CodeGenerator<'source> {
                     // special behavior: missing false block have a silent undefined
                     // to permit special casing.  This is for compatibility also with
                     // what Jinja2 does.
-                    self.add(Instruction::LoadConst(ValueRepr::SilentUndefined.into()));
+                    self.add(Instruction::LoadConst(
+                        ValueRepr::Undefined(UndefinedType::Silent).into(),
+                    ));
                 }
                 self.end_if();
             }

@@ -6,7 +6,7 @@ use std::iter::{once, repeat};
 use std::str::Chars;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{StringType, Value, ValueIter, ValueKind, ValueRepr};
+use crate::value::{StringType, UndefinedType, Value, ValueIter, ValueKind, ValueRepr};
 use crate::Output;
 
 /// internal marker to seal up some trait methods
@@ -171,7 +171,7 @@ impl UndefinedBehavior {
     pub(crate) fn is_true(self, value: &Value) -> Result<bool, Error> {
         match (self, &value.0) {
             // silent undefined doesn't error, even in strict mode
-            (UndefinedBehavior::Strict, &ValueRepr::Undefined) => {
+            (UndefinedBehavior::Strict, &ValueRepr::Undefined(UndefinedType::Default)) => {
                 Err(Error::from(ErrorKind::UndefinedError))
             }
             _ => Ok(value.is_true()),
@@ -193,9 +193,10 @@ impl UndefinedBehavior {
     pub(crate) fn assert_iterable(self, value: &Value) -> Result<(), Error> {
         match (self, &value.0) {
             // silent undefined doesn't error, even in strict mode
-            (UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict, &ValueRepr::Undefined) => {
-                Err(Error::from(ErrorKind::UndefinedError))
-            }
+            (
+                UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict,
+                &ValueRepr::Undefined(UndefinedType::Default),
+            ) => Err(Error::from(ErrorKind::UndefinedError)),
             _ => Ok(()),
         }
     }

@@ -356,6 +356,13 @@ pub(crate) enum StringType {
     Safe,
 }
 
+/// Type type of undefined
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum UndefinedType {
+    Default,
+    Silent,
+}
+
 /// Wraps an internal copyable value but marks it as packed.
 ///
 /// This is used for `i128`/`u128` in the value repr to avoid
@@ -411,16 +418,12 @@ impl SmallStr {
 
 #[derive(Clone)]
 pub(crate) enum ValueRepr {
-    /// The regular undefined type produced as part of template evaluation
-    Undefined,
-    /// A special undefined marker that indicates an always-quiet undefined.
-    /// This is emitted for ternary expressions with missing else blocks.
-    SilentUndefined,
+    None,
+    Undefined(UndefinedType),
     Bool(bool),
     U64(u64),
     I64(i64),
     F64(f64),
-    None,
     Invalid(Arc<Error>),
     U128(Packed<u128>),
     I128(Packed<i128>),
@@ -433,7 +436,7 @@ pub(crate) enum ValueRepr {
 impl fmt::Debug for ValueRepr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            ValueRepr::Undefined | ValueRepr::SilentUndefined => f.write_str("undefined"),
+            ValueRepr::Undefined(_) => f.write_str("undefined"),
             ValueRepr::Bool(ref val) => fmt::Debug::fmt(val, f),
             ValueRepr::U64(ref val) => fmt::Debug::fmt(val, f),
             ValueRepr::I64(ref val) => fmt::Debug::fmt(val, f),
@@ -463,7 +466,7 @@ impl fmt::Debug for ValueRepr {
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self.0 {
-            ValueRepr::None | ValueRepr::Undefined | ValueRepr::SilentUndefined => 0u8.hash(state),
+            ValueRepr::None | ValueRepr::Undefined(_) => 0u8.hash(state),
             ValueRepr::String(ref s, _) => s.hash(state),
             ValueRepr::SmallStr(ref s) => s.as_str().hash(state),
             ValueRepr::Bool(b) => b.hash(state),
@@ -493,10 +496,7 @@ impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
             (&ValueRepr::None, &ValueRepr::None) => true,
-            (
-                &ValueRepr::Undefined | &ValueRepr::SilentUndefined,
-                &ValueRepr::Undefined | &ValueRepr::SilentUndefined,
-            ) => true,
+            (&ValueRepr::Undefined(_), &ValueRepr::Undefined(_)) => true,
             (&ValueRepr::String(ref a, _), &ValueRepr::String(ref b, _)) => a == b,
             (&ValueRepr::SmallStr(ref a), &ValueRepr::SmallStr(ref b)) => a.as_str() == b.as_str(),
             (&ValueRepr::Bytes(ref a), &ValueRepr::Bytes(ref b)) => a == b,
@@ -595,10 +595,7 @@ impl Ord for Value {
         }
         match (&self.0, &other.0) {
             (&ValueRepr::None, &ValueRepr::None) => Ordering::Equal,
-            (
-                &ValueRepr::Undefined | &ValueRepr::SilentUndefined,
-                &ValueRepr::Undefined | &ValueRepr::SilentUndefined,
-            ) => Ordering::Equal,
+            (&ValueRepr::Undefined(_), &ValueRepr::Undefined(_)) => Ordering::Equal,
             (&ValueRepr::String(ref a, _), &ValueRepr::String(ref b, _)) => a.cmp(b),
             (&ValueRepr::SmallStr(ref a), &ValueRepr::SmallStr(ref b)) => {
                 a.as_str().cmp(b.as_str())
@@ -662,7 +659,7 @@ impl fmt::Debug for Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
-            ValueRepr::Undefined | ValueRepr::SilentUndefined => Ok(()),
+            ValueRepr::Undefined(_) => Ok(()),
             ValueRepr::Bool(val) => val.fmt(f),
             ValueRepr::U64(val) => val.fmt(f),
             ValueRepr::I64(val) => val.fmt(f),
@@ -693,7 +690,7 @@ impl fmt::Display for Value {
 
 impl Default for Value {
     fn default() -> Value {
-        ValueRepr::Undefined.into()
+        ValueRepr::Undefined(UndefinedType::Default).into()
     }
 }
 
@@ -709,7 +706,7 @@ impl Value {
     ///
     /// This constant exists because the undefined type does not exist in Rust
     /// and this is the only way to construct it.
-    pub const UNDEFINED: Value = Value(ValueRepr::Undefined);
+    pub const UNDEFINED: Value = Value(ValueRepr::Undefined(UndefinedType::Default));
 
     /// Creates a value from something that can be serialized.
     ///
@@ -1073,7 +1070,7 @@ impl Value {
     /// perform operations on it.
     pub fn kind(&self) -> ValueKind {
         match self.0 {
-            ValueRepr::Undefined | ValueRepr::SilentUndefined => ValueKind::Undefined,
+            ValueRepr::Undefined(_) => ValueKind::Undefined,
             ValueRepr::Bool(_) => ValueKind::Bool,
             ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::F64(_) => ValueKind::Number,
             ValueRepr::None => ValueKind::None,
@@ -1137,10 +1134,7 @@ impl Value {
             ValueRepr::String(ref x, _) => !x.is_empty(),
             ValueRepr::SmallStr(ref x) => !x.is_empty(),
             ValueRepr::Bytes(ref x) => !x.is_empty(),
-            ValueRepr::None
-            | ValueRepr::Undefined
-            | ValueRepr::SilentUndefined
-            | ValueRepr::Invalid(_) => false,
+            ValueRepr::None | ValueRepr::Undefined(_) | ValueRepr::Invalid(_) => false,
             ValueRepr::Object(ref x) => x.is_true(),
         }
     }
@@ -1152,7 +1146,7 @@ impl Value {
 
     /// Returns `true` if this value is undefined.
     pub fn is_undefined(&self) -> bool {
-        matches!(&self.0, ValueRepr::Undefined | ValueRepr::SilentUndefined)
+        matches!(&self.0, ValueRepr::Undefined(_))
     }
 
     /// Returns `true` if this value is none.
@@ -1260,9 +1254,7 @@ impl Value {
     /// ```
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
         let value = match self.0 {
-            ValueRepr::Undefined | ValueRepr::SilentUndefined => {
-                return Err(Error::from(ErrorKind::UndefinedError))
-            }
+            ValueRepr::Undefined(_) => return Err(Error::from(ErrorKind::UndefinedError)),
             ValueRepr::Object(ref dy) => dy.get_value(&Value::from(key)),
             _ => None,
         };
@@ -1313,7 +1305,7 @@ impl Value {
     /// assert_eq!(value.to_string(), "Foo");
     /// ```
     pub fn get_item(&self, key: &Value) -> Result<Value, Error> {
-        if let ValueRepr::Undefined | ValueRepr::SilentUndefined = self.0 {
+        if let ValueRepr::Undefined(_) = self.0 {
             Err(Error::from(ErrorKind::UndefinedError))
         } else {
             Ok(self.get_item_opt(key).unwrap_or(Value::UNDEFINED))
@@ -1347,9 +1339,7 @@ impl Value {
     /// ```
     pub fn try_iter(&self) -> Result<ValueIter, Error> {
         match self.0 {
-            ValueRepr::None | ValueRepr::Undefined | ValueRepr::SilentUndefined => {
-                Some(ValueIterImpl::Empty)
-            }
+            ValueRepr::None | ValueRepr::Undefined(_) => Some(ValueIterImpl::Empty),
             ValueRepr::String(ref s, _) => {
                 Some(ValueIterImpl::Chars(0, s.chars().count(), Arc::clone(s)))
             }
@@ -1380,9 +1370,7 @@ impl Value {
     ///   reversible itself, it consumes it and then reverses it.
     pub fn reverse(&self) -> Result<Value, Error> {
         match self.0 {
-            ValueRepr::Undefined | ValueRepr::SilentUndefined | ValueRepr::None => {
-                Some(self.clone())
-            }
+            ValueRepr::Undefined(_) | ValueRepr::None => Some(self.clone()),
             ValueRepr::String(ref s, _) => Some(Value::from(s.chars().rev().collect::<String>())),
             ValueRepr::SmallStr(ref s) => {
                 // TODO: add small str optimization here
@@ -1673,10 +1661,9 @@ impl Serialize for Value {
             ValueRepr::U64(u) => serializer.serialize_u64(u),
             ValueRepr::I64(i) => serializer.serialize_i64(i),
             ValueRepr::F64(f) => serializer.serialize_f64(f),
-            ValueRepr::None
-            | ValueRepr::Undefined
-            | ValueRepr::SilentUndefined
-            | ValueRepr::Invalid(_) => serializer.serialize_unit(),
+            ValueRepr::None | ValueRepr::Undefined(_) | ValueRepr::Invalid(_) => {
+                serializer.serialize_unit()
+            }
             ValueRepr::U128(u) => serializer.serialize_u128(u.0),
             ValueRepr::I128(i) => serializer.serialize_i128(i.0),
             ValueRepr::String(ref s, _) => serializer.serialize_str(s),
