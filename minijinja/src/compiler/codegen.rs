@@ -506,7 +506,7 @@ impl<'source> CodeGenerator<'source> {
                         return;
                     } else if name == "loop" && call.args.len() == 1 {
                         self.compile_call_args(std::slice::from_ref(&call.args[0]), 0, None);
-                        self.add(Instruction::FastRecurse);
+                        self.add_with_span(Instruction::FastRecurse, call.span());
                         return;
                     }
                 }
