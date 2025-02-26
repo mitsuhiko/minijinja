@@ -13,6 +13,7 @@ from minijinja import (
     pass_state,
     eval_expr,
     render_str,
+    load_from_path,
 )
 
 
@@ -473,3 +474,17 @@ def test_truthy():
             raise RuntimeError("swallowed but true")
 
     assert env.eval_expr("x|bool", x=Fallback()) is True
+
+
+def test_load_from_path():
+    env = Environment(loader=load_from_path("tests/templates"))
+    rv = env.render_template("base.txt", woot="woot")
+    assert rv.strip() == "I am from foo! woot!"
+
+    with pytest.raises(TemplateError) as e:
+        env.render_template("missing.txt")
+    assert e.value.kind == "TemplateNotFound"
+
+    with pytest.raises(TemplateError) as e:
+        env.render_template("../test_basic.py")
+    assert e.value.kind == "TemplateNotFound"
