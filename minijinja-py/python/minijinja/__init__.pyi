@@ -1,7 +1,9 @@
 from pathlib import PurePath
+import pathlib
 from typing import (
     Any,
     Callable,
+    Iterable,
     Literal,
     TypeVar,
     Protocol,
@@ -158,3 +160,7 @@ def escape(value: Any) -> str: ...
 def pass_state(
     f: Callable[[State, _A_contra], _R_co],
 ) -> _PassesState[_A_contra, _R_co]: ...
+
+Path = str | pathlib.Path
+
+def load_from_path(paths: Iterable[Path] | Path) -> Callable[[str], str]: ...

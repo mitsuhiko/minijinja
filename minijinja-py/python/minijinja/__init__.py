@@ -1,3 +1,4 @@
+import pathlib
 from . import _lowlevel
 
 __all__ = [
@@ -161,6 +162,27 @@ def pass_state(f):
     """Pass the engine state to the function as first argument."""
     f.__minijinja_pass_state__ = True
     return f
+
+
+def load_from_path(paths):
+    """Load a template from one or more paths."""
+    if isinstance(paths, (str, pathlib.Path)):
+        paths = [paths]
+
+    def loader(name):
+        if "\\" in name:
+            return None
+
+        pieces = name.strip("/").split("/")
+        if ".." in pieces:
+            return None
+
+        for path in paths:
+            p = pathlib.Path(path).joinpath(*pieces)
+            if p.is_file():
+                return p.read_text()
+
+    return loader
 
 
 class TemplateError(RuntimeError):
