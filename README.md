@@ -102,6 +102,8 @@ the engine is used so you can see how it's utilized:
   * **[mistral.rs](https://github.com/EricLBuehler/mistral.rs)** uses it to [render LLM chat templates](https://github.com/EricLBuehler/mistral.rs/blob/c834f59fe0b3b020a56cb6a0279a051370554539/mistralrs-core/src/pipeline/chat_template.rs)
   * **[BoundaryML's BAML](https://docs.boundaryml.com/)** uses it to [render LLM chat templates](https://github.com/BoundaryML/baml/blob/17123de7ea653f51547576169bb0589d39053edc/engine/baml-lib/jinja/src/lib.rs)
   * **[LSP-AI](https://github.com/SilasMarvin/lsp-ai)** uses it to [render LLM chat templates](https://github.com/SilasMarvin/lsp-ai/blob/1f70756c5b48e9098d64a7c5ce63ac803bc5d0ab/crates/lsp-ai/src/template.rs)
+  * **[LoRAX](https://loraexchange.ai/)** uses it to [render LLM chat templates](https://github.com/predibase/lorax/blob/6a83954b8c6ffd51eb69e7096ee2730d53b903dd/router/src/infer.rs)
+  * **[tensorzero](https://www.tensorzero.com/) uses it to [render LLM and system templates](https://github.com/tensorzero/tensorzero/blob/26ae697f219c1f0385fe7936b9f04b97ff318f61/tensorzero-internal/src/minijinja_util.rs#L2)
 
 * Data and Processing:
   * **[Cube](https://cube.dev/docs/product/data-modeling/dynamic/jinja)** uses it [for data modelling](https://github.com/cube-js/cube/tree/db11c121c77c663845242366d3d972b9bc30ae54/packages/cubejs-backend-native/src/template/mj_value)
