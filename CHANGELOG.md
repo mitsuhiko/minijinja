@@ -37,6 +37,7 @@ All notable changes to MiniJinja are documented here.
 - The engine now uses smaller integers to represent columns, line numbers
   and addresses.  This cuts down on the memory usage needed for debug
   information.  #735
+- Added `load_from_path` to python.  #736
 
 ## 2.8.0
 
