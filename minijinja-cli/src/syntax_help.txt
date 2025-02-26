@@ -139,6 +139,13 @@ evaluates into an undefined value:
 
     {{ title|upper if title }}
   
+Note that for compatibility with Jinja2, when the `else` block is missing the
+undefined value will be marked as “silent”. This means even if strict undefined
+behavior is requested, this undefined value will print to an empty string. This
+means that this is always valid:
+
+    {{ value if false }} -> prints an empty string (silent undefined returned from else)
+  
 Tags
 ====
 
@@ -638,6 +645,87 @@ Likewise, a loop that stops processing after the 10th iteration:
     {%- if loop.index >= 10 %}{% break %}{% endif %}
     {%- endfor %}
   
+**Note on one-shot iterators:** if you break from a loop but you have accessed
+the `loop.nextitem` special variable, then you will lose one item. This is
+because accessing that attribute will peak into the iterator and there is no
+support for “putting values back”.
+
+Custom Delimiters
+=================
+
+When MiniJinja has been compiled with the `custom_syntax` feature (see
+SyntaxConfig), it’s possible to reconfigure the delimiters of the templates.
+This is generally not recommended but it’s useful for situations where Jinja
+templates are used to generate files with a syntax that would be conflicting for
+Jinja. With custom delimiters it can for instance be more convenient to generate
+LaTeX files:
+
+    let mut environment = Environment::new();
+    environment.set_syntax(SyntaxConfig::builder()
+        .block_delimiters("\\BLOCK{", "}")
+        .variable_delimiters("\\VAR{", "}")
+        .comment_delimiters("\\#{", "}")
+        .build()
+        .unwrap()
+    );
+  
+And then a template might look like this instead:
+
+    \begin{itemize}
+    \BLOCK{for item in sequence}
+      \item \VAR{item}
+    \BLOCK{endfor}
+    \end{itemize}
+  
+Line Statements and Comments
+============================
+
+MiniJinja supports line statements and comments like Jinja2 does. Line
+statements and comments are an alternative syntax feature where blocks can be
+placed on their own line if they are opened with a configured prefix. They must
+appear on their own line but can be prefixed with whitespace. Line comments are
+similar but they can also be trailing. These syntax features need to be
+configured explicitly. There are however small differences with regards to
+whitespace compared to Jinja2.
+
+To use line statements and comments the `custom_syntax` feature needs to be
+enabled and they need to be configured (see SyntaxConfig).
+
+    let mut environment = Environment::new();
+    environment.set_syntax(SyntaxConfig::builder()
+        .line_statement_prefix("#")
+        .line_comment_prefix("##")
+        .build()
+        .unwrap()
+    );
+  
+With the above config you can render a template like this:
+
+    ## This block is
+    ## completely removed
+    <ul>
+      # for item in [1, 2]
+        ## this is a comment that is also removed including leading whitespace
+        <li>{{ item }}
+      # endfor
+    </ul>
+  
+Renders into the following HTML:
+
+    <ul>
+        <li>1
+        <li>2
+    </ul>
+  
+Note that this is slightly different than in Jinja2. Specifically the following
+rules apply with regards to whitespace:
+
+* line statements remove all whitespace before and after including the newline
+* line comments remove the trailing newline and leading whitespace.
+
+This is different than in Jinja2 where empty lines can remain from line
+comments. Additionally whitespace control is not available for line statements.
+
 Whitespace Control
 ==================
 
