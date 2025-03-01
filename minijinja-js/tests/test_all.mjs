@@ -70,12 +70,26 @@ No referenced variables
       let obj = Object.fromEntries(result);
       expect(obj).to.deep.equal({ a: 1, b: 2 });
     });
+
+    it("should allow passing of functions to templates", () => {
+      const env = new Environment();
+      const result = env.evalExpr("hello()", { hello: () => "World" });
+      expect(result).to.equal("World");
+    });
+
+    it("should allow passing of functions to templates, even in arrays", () => {
+      const env = new Environment();
+      const result = env.evalExpr("hello[0]()", { hello: [() => "World"] });
+      expect(result).to.equal("World");
+    });
   });
 
   describe("filters", () => {
     it("should add a filter", () => {
       const env = new Environment();
-      env.addFilter("my_reverse", (value) => value.split("").reverse().join(""));
+      env.addFilter("my_reverse", (value) =>
+        value.split("").reverse().join("")
+      );
       const result = env.renderStr("{{ 'hello'|my_reverse }}", {});
       expect(result).to.equal("olleh");
     });
@@ -108,7 +122,7 @@ No referenced variables
 
     it("should allow adding of globals with a function", () => {
       const env = new Environment();
-      env.addFunction("hello", () => "world");
+      env.addGlobal("hello", () => "world");
       const result = env.renderStr("{{ hello() }}", {});
       expect(result).to.equal("world");
     });

@@ -22,6 +22,8 @@ This exposes a bunch of MiniJinja via wasm to the browser, but not all of it.
 
 ## Example
 
+Render a template from a string:
+
 ```typescript
 import { Environment } from "minijinja-js";
 
@@ -31,12 +33,34 @@ const result = env.renderStr('Hello {{ name }}!', { name: 'World' });
 console.log(result);
 ```
 
-## Current Limitations
+Render a template registered to the engine:
 
-* Functions can only be registered with `addFunction` globally, they cannot be passed
-  in template context.
+```typescript
+import { Environment } from "minijinja-js";
+
+const env = new Environment();
+env.addTemplate('index.html', 'Hello {{ name }}!');
+const result = env.renderTemplate('index.html', { name: 'World' });
+console.log(result);
+```
+
+Evaluate an expression:
+
+```typescript
+import { Environment } from "minijinja-js";
+
+const env = new Environment();
+const result = env.evalExpr('1 + 1', {});
+console.log(result);
+```
+
+## Known Limitations
+
+There are various limitations with the binding today, some of which can be fixed,
+others probably not so much.  You might run into the following:
+
 * Access of the template engine state from JavaScript is not possible.
-* You currently cannot register a custom auto escape callback or a finalizer
+* You cannot register a custom auto escape callback or a finalizer
 * If the engine panics, the WASM runtime corrupts.
 
 ## Sponsor

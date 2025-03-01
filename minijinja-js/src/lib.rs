@@ -3,8 +3,10 @@
 
 extern crate wee_alloc;
 
+use std::collections::BTreeMap;
+
 use fragile::Fragile;
-use js_sys::Function;
+use js_sys::{Array, Function, Object};
 use minijinja::{self as mj, Error, ErrorKind, Value};
 use wasm_bindgen::prelude::*;
 
@@ -46,7 +48,7 @@ impl Environment {
 
     /// Renders a registered template by name with the given context.
     pub fn renderTemplate(&mut self, name: &str, ctx: JsValue) -> Result<String, JsError> {
-        let ctx: Value = serde_wasm_bindgen::from_value(ctx)?;
+        let ctx = js_to_mj_value(ctx)?;
         let t = self.inner.get_template(name).map_err(convert_error)?;
         t.render(ctx).map_err(convert_error)
     }
@@ -56,7 +58,7 @@ impl Environment {
     /// This is useful for one-off template rendering without registering the template.  The
     /// template is parsed and rendered immediately.
     pub fn renderStr(&mut self, source: &str, ctx: JsValue) -> Result<String, JsError> {
-        let ctx: Value = serde_wasm_bindgen::from_value(ctx)?;
+        let ctx = js_to_mj_value(ctx)?;
         self.inner.render_str(source, ctx).map_err(convert_error)
     }
 
@@ -67,7 +69,7 @@ impl Environment {
         source: &str,
         ctx: JsValue,
     ) -> Result<String, JsError> {
-        let ctx: Value = serde_wasm_bindgen::from_value(ctx)?;
+        let ctx = js_to_mj_value(ctx)?;
         self.inner
             .render_named_str(name, source, ctx)
             .map_err(convert_error)
@@ -78,7 +80,7 @@ impl Environment {
     /// This is useful for evaluating expressions outside of templates.  The expression is
     /// parsed and evaluated immediately.
     pub fn evalExpr(&mut self, expr: &str, ctx: JsValue) -> Result<JsValue, JsError> {
-        let ctx: Value = serde_wasm_bindgen::from_value(ctx)?;
+        let ctx = js_to_mj_value(ctx)?;
         let e = self.inner.compile_expression(expr).map_err(convert_error)?;
         let result = e.eval(ctx).map_err(convert_error)?;
         serde_wasm_bindgen::to_value(&result).map_err(|err| JsError::new(&err.to_string()))
@@ -94,12 +96,6 @@ impl Environment {
     pub fn addTest(&mut self, name: &str, func: Function) {
         self.inner
             .add_test(name.to_string(), create_js_callback(func));
-    }
-
-    /// Registers a global function
-    pub fn addFunction(&mut self, name: &str, func: Function) {
-        self.inner
-            .add_function(name.to_string(), create_js_callback(func));
     }
 
     /// Enables python compatibility.
@@ -178,8 +174,8 @@ impl Environment {
     /// Registers a value as global.
     #[wasm_bindgen]
     pub fn addGlobal(&mut self, name: &str, value: JsValue) -> Result<(), JsError> {
-        let value: Value = serde_wasm_bindgen::from_value(value)?;
-        self.inner.add_global(name.to_string(), value);
+        self.inner
+            .add_global(name.to_string(), js_to_mj_value(value)?);
         Ok(())
     }
 
@@ -230,11 +226,32 @@ fn convert_error(err: minijinja::Error) -> JsError {
     JsError::new(&format!("{:#}", err))
 }
 
-fn serde_to_mj_error(err: serde_wasm_bindgen::Error) -> Error {
-    Error::new(
-        ErrorKind::InvalidOperation,
-        format!("failed to convert result: {}", err),
-    )
+fn js_to_mj_value(value: JsValue) -> Result<Value, JsError> {
+    if value.is_function() {
+        Ok(Value::from_function(create_js_callback(Function::from(
+            value,
+        ))))
+    } else if value.is_array() {
+        let arr = Array::from(&value);
+        let mut rv = Vec::new();
+        for i in 0..arr.length() {
+            rv.push(js_to_mj_value(arr.get(i))?);
+        }
+        Ok(Value::from(rv))
+    } else if value.is_object() {
+        let obj = Object::from(value);
+        let entries = Object::entries(&obj);
+        let mut map = BTreeMap::new();
+        for i in 0..entries.length() {
+            let entry = Array::from(&entries.get(i));
+            let key = entry.get(0);
+            let value = entry.get(1);
+            map.insert(js_to_mj_value(key)?, js_to_mj_value(value)?);
+        }
+        Ok(Value::from(map))
+    } else {
+        Ok(serde_wasm_bindgen::from_value(value)?)
+    }
 }
 
 fn create_js_callback(func: Function) -> impl Fn(&[Value]) -> Result<Value, Error> {
@@ -242,11 +259,21 @@ fn create_js_callback(func: Function) -> impl Fn(&[Value]) -> Result<Value, Erro
     move |args: &[Value]| -> Result<Value, Error> {
         let values = js_sys::Array::new();
         for arg in args {
-            values.push(&serde_wasm_bindgen::to_value(arg).map_err(serde_to_mj_error)?);
+            values.push(&serde_wasm_bindgen::to_value(arg).map_err(|err| {
+                Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("failed to convert argument: {}", err),
+                )
+            })?);
         }
         let func = fragile_func.get();
         let rv = func.apply(&JsValue::null(), &values).unwrap();
-        let ctx: Value = serde_wasm_bindgen::from_value(rv).map_err(serde_to_mj_error)?;
+        let ctx: Value = js_to_mj_value(rv).map_err(|err| {
+            Error::new(
+                ErrorKind::InvalidOperation,
+                format!("failed to convert result: {:?}", err),
+            )
+        })?;
         Ok(ctx)
     }
 }
