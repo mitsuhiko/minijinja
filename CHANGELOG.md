@@ -38,6 +38,7 @@ All notable changes to MiniJinja are documented here.
   and addresses.  This cuts down on the memory usage needed for debug
   information.  #735
 - Added `load_from_path` to python.  #736
+- Added JavaScript bindings.  #737
 
 ## 2.8.0
 
