@@ -1,6 +1,6 @@
 <div align="center">
   <img src="https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo.png" alt="" width=320>
-  <p><strong>MiniJinja for JavaScript: a powerful template engine for Rust and Python</strong></p>
+  <p><strong>MiniJinja for JavaScript: a powerful template engine</strong></p>
 
 [![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
 [![Crates.io](https://img.shields.io/crates/d/minijinja.svg)](https://crates.io/crates/minijinja)
