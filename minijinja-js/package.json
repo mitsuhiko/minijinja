@@ -1,0 +1,42 @@
+{
+  "browser": "dist/web/minijinja_js.js",
+  "description": "JavaScript bindings for minijinja",
+  "devDependencies": {
+    "chai": "^5.0.0",
+    "mocha": "^11.0.1",
+    "cross-env": "^7.0.3"
+  },
+  "files": [
+    "dist/**/*",
+    "package.json"
+  ],
+  "license": "Apache-2.0",
+  "author": "Armin Ronacher",
+  "main": "dist/node/minijinja_js.js",
+  "name": "minijinja-js",
+  "bugs": {
+    "url": "https://github.com/mitsuhiko/minijinja/issues"
+  },
+  "homepage": "https://github.com/mitsuhiko/minijinja",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mitsuhiko/minijinja.git",
+    "directory": "minijinja-js"
+  },
+  "keywords": [
+    "jinja2",
+    "minijinja",
+    "templating",
+    "templates"
+  ],
+  "scripts": {
+    "build": "npm run build:node && npm run build:web && npm run build:bundler",
+    "build:bundler": "npx cross-env wasm-pack build --target bundler --out-dir dist/bundler --${PROFILE} && rm dist/bundler/.gitignore",
+    "build:node": "npx cross-env wasm-pack build --target nodejs --out-dir dist/node --${PROFILE} && rm dist/node/.gitignore",
+    "build:web": "npx cross-env wasm-pack build --target web --out-dir dist/web --${PROFILE} && rm dist/web/.gitignore",
+    "prepare": "npm run build",
+    "test": "mocha tests"
+  },
+  "types": "dist/node/minijinja_js.d.ts",
+  "version": "0.13.4"
+}
