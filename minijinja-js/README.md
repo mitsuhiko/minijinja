@@ -20,6 +20,11 @@ of a data set between Rust, Python and JavaScript.
 
 This exposes a bunch of MiniJinja via wasm to the browser, but not all of it.
 
+This package can be useful if you have MiniJinja templates that you want to
+evaluate as a sandbox in a browser for a user or on the backend.  Given the
+overheads that this creates size and performance wise, it would not be wise to
+use this for actual template rendering in the browser.
+
 ## Example
 
 Render a template from a string:
