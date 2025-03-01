@@ -11,6 +11,7 @@ perl -pi -e "s/\bminijinja v.*? /minijinja v$NEW_VERSION /" README.md
 perl -pi -e "s/^version = \".*?\"/version = \"$NEW_VERSION\"/" minijinja-py/pyproject.toml
 perl -pi -e "s/^version = \".*?\"/version = \"$NEW_VERSION\"/" minijinja/Cargo.toml
 perl -pi -e "s/^version = \".*?\"/version = \"$NEW_VERSION\"/" minijinja-*/Cargo.toml
+perl -pi -e "s/^(\s*)\"version\": \".*?\"/\$1\"version\": \"$NEW_VERSION\"/" minijinja-js/package.json
 perl -pi -e "s/^(minijinja.*?)version = \".*?\"/\$1version = \"$NEW_VERSION\"/" examples/*/Cargo.toml
 perl -pi -e "s/^(minijinja.*?)version = \".*?\"/\$1version = \"$NEW_VERSION\"/" minijinja-*/Cargo.toml
 perl -pi -e "s/^(minijinja.*?)version = \".*?\"/\$1version = \"=$NEW_VERSION\"/" minijinja-cli/Cargo.toml
