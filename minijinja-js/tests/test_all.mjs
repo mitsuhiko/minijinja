@@ -71,4 +71,55 @@ No referenced variables
       expect(obj).to.deep.equal({ a: 1, b: 2 });
     });
   });
+
+  describe("filters", () => {
+    it("should add a filter", () => {
+      const env = new Environment();
+      env.addFilter("my_reverse", (value) => value.split("").reverse().join(""));
+      const result = env.renderStr("{{ 'hello'|my_reverse }}", {});
+      expect(result).to.equal("olleh");
+    });
+  });
+
+  describe("tests", () => {
+    it("should add a test", () => {
+      const env = new Environment();
+      env.addTest("hello", (x) => x == "hello");
+      const result = env.renderStr("{{ 'hello' is hello }}", {});
+      expect(result).to.equal("true");
+    });
+  });
+
+  describe("globals", () => {
+    it("should allow adding of globals", () => {
+      const env = new Environment();
+      env.addGlobal("hello", "world");
+      const result = env.renderStr("{{ hello }}", {});
+      expect(result).to.equal("world");
+    });
+
+    it("should allow removing of globals", () => {
+      const env = new Environment();
+      env.addGlobal("hello", "world");
+      env.removeGlobal("hello");
+      const result = env.renderStr("{{ hello }}", {});
+      expect(result).to.equal("");
+    });
+
+    it("should allow adding of globals with a function", () => {
+      const env = new Environment();
+      env.addFunction("hello", () => "world");
+      const result = env.renderStr("{{ hello() }}", {});
+      expect(result).to.equal("world");
+    });
+  });
+
+  describe("py compat", () => {
+    it("should enable py compat", () => {
+      const env = new Environment();
+      env.enablePyCompat();
+      const result = env.renderStr("{{ {1: 2}.items() }}", {});
+      expect(result).to.equal("[[1, 2]]");
+    });
+  });
 });

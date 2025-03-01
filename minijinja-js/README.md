@@ -18,10 +18,7 @@ You might want to use MiniJinja instead of Jinja2 when the full feature set
 of Jinja2 is not required and you want to have the same rendering experience
 of a data set between Rust, Python and JavaScript.
 
-This exposes a bunch of MiniJinja via wasm to the browser.  Due to limitations you
-can only render templates and register globals, but you cannot register callbacks.
-This might be something that can be changed in the future.  However as a result it's
-currently not possible to customize this package for more elaborate uses.
+This exposes a bunch of MiniJinja via wasm to the browser, but not all of it.
 
 ## Example
 
@@ -33,6 +30,14 @@ env.debug = true;
 const result = env.renderStr('Hello {{ name }}!', { name: 'World' });
 console.log(result);
 ```
+
+## Current Limitations
+
+* Functions can only be registered with `addFunction` globally, they cannot be passed
+  in template context.
+* Access of the template engine state from JavaScript is not possible.
+* You currently cannot register a custom auto escape callback or a finalizer
+* If the engine panics, the WASM runtime corrupts.
 
 ## Sponsor
 

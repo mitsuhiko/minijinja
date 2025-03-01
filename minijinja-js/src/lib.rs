@@ -3,12 +3,15 @@
 
 extern crate wee_alloc;
 
-use minijinja::{self as mj, Value};
+use fragile::Fragile;
+use js_sys::Function;
+use minijinja::{self as mj, Error, ErrorKind, Value};
 use wasm_bindgen::prelude::*;
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+/// Represents a MiniJinja environment.
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct Environment {
@@ -81,6 +84,31 @@ impl Environment {
         serde_wasm_bindgen::to_value(&result).map_err(|err| JsError::new(&err.to_string()))
     }
 
+    /// Registers a filter function.
+    pub fn addFilter(&mut self, name: &str, func: Function) {
+        self.inner
+            .add_filter(name.to_string(), create_js_callback(func));
+    }
+
+    /// Registers a test function.
+    pub fn addTest(&mut self, name: &str, func: Function) {
+        self.inner
+            .add_test(name.to_string(), create_js_callback(func));
+    }
+
+    /// Registers a global function
+    pub fn addFunction(&mut self, name: &str, func: Function) {
+        self.inner
+            .add_function(name.to_string(), create_js_callback(func));
+    }
+
+    /// Enables python compatibility.
+    pub fn enablePyCompat(&mut self) {
+        self.inner
+            .set_unknown_method_callback(minijinja_contrib::pycompat::unknown_method_callback);
+    }
+
+    /// Enables or disables debug mode.
     #[wasm_bindgen(getter)]
     pub fn debug(&self) -> bool {
         self.inner.debug()
@@ -91,6 +119,7 @@ impl Environment {
         self.inner.set_debug(yes);
     }
 
+    /// Enables or disables block trimming.
     #[wasm_bindgen(getter)]
     pub fn trimBlocks(&self) -> bool {
         self.inner.trim_blocks()
@@ -101,16 +130,18 @@ impl Environment {
         self.inner.set_trim_blocks(yes);
     }
 
+    /// Enables or disables the lstrip blocks feature.
     #[wasm_bindgen(getter)]
-    pub fn lstrip_blocks(&self) -> bool {
+    pub fn lstripBlocks(&self) -> bool {
         self.inner.lstrip_blocks()
     }
 
     #[wasm_bindgen(setter)]
-    pub fn set_lstrip_blocks(&mut self, yes: bool) {
+    pub fn set_lstripBlocks(&mut self, yes: bool) {
         self.inner.set_lstrip_blocks(yes);
     }
 
+    /// Enables or disables keeping of the final newline.
     #[wasm_bindgen(getter)]
     pub fn keepTrailingNewline(&self) -> bool {
         self.inner.keep_trailing_newline()
@@ -121,6 +152,7 @@ impl Environment {
         self.inner.set_keep_trailing_newline(yes);
     }
 
+    /// Reconfigures the behavior of undefined variables.
     #[wasm_bindgen(getter)]
     pub fn undefinedBehavior(&self) -> UndefinedBehavior {
         self.inner.undefined_behavior().into()
@@ -132,6 +164,7 @@ impl Environment {
         Ok(())
     }
 
+    /// Configures the max-fuel for template evaluation.
     #[wasm_bindgen(getter)]
     pub fn fuel(&self) -> Option<u32> {
         self.inner.fuel().map(|x| x as u32)
@@ -142,15 +175,17 @@ impl Environment {
         self.inner.set_fuel(value.map(|x| x as u64));
     }
 
+    /// Registers a value as global.
     #[wasm_bindgen]
-    pub fn addGlobal(mut self, name: &str, value: JsValue) -> Result<(), JsError> {
+    pub fn addGlobal(&mut self, name: &str, value: JsValue) -> Result<(), JsError> {
         let value: Value = serde_wasm_bindgen::from_value(value)?;
         self.inner.add_global(name.to_string(), value);
         Ok(())
     }
 
+    /// Removes a global again.
     #[wasm_bindgen]
-    pub fn removeGlobal(mut self, name: &str) {
+    pub fn removeGlobal(&mut self, name: &str) {
         self.inner.remove_global(name);
     }
 }
@@ -193,4 +228,25 @@ fn convert_error(err: minijinja::Error) -> JsError {
     console_error_panic_hook::set_once();
 
     JsError::new(&format!("{:#}", err))
+}
+
+fn serde_to_mj_error(err: serde_wasm_bindgen::Error) -> Error {
+    Error::new(
+        ErrorKind::InvalidOperation,
+        format!("failed to convert result: {}", err),
+    )
+}
+
+fn create_js_callback(func: Function) -> impl Fn(&[Value]) -> Result<Value, Error> {
+    let fragile_func = Fragile::new(func);
+    move |args: &[Value]| -> Result<Value, Error> {
+        let values = js_sys::Array::new();
+        for arg in args {
+            values.push(&serde_wasm_bindgen::to_value(arg).map_err(serde_to_mj_error)?);
+        }
+        let func = fragile_func.get();
+        let rv = func.apply(&JsValue::null(), &values).unwrap();
+        let ctx: Value = serde_wasm_bindgen::from_value(rv).map_err(serde_to_mj_error)?;
+        Ok(ctx)
+    }
 }

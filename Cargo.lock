@@ -1178,6 +1178,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "fragile"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c2141d6d6c8512188a7891b4b01590a45f6dac67afb4f255c4124dbb86d4eaa"
+
+[[package]]
 name = "fsevent-sys"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2070,6 +2076,8 @@ name = "minijinja-js"
 version = "2.7.0"
 dependencies = [
  "console_error_panic_hook",
+ "fragile",
+ "js-sys",
  "minijinja",
  "minijinja-contrib",
  "serde-wasm-bindgen",
