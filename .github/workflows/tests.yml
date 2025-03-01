@@ -120,7 +120,7 @@ jobs:
         run: make wasi-test
 
   test-python:
-    name: Test on Python binding
+    name: Test Python binding
     runs-on: ubuntu-latest
 
     steps:
@@ -131,6 +131,22 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Test
         run: make python-test
+
+  test-js:
+    name: Test JS binding
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install wasm-pack
+        run: |
+          curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+      - name: Test
+        run: make js-test
   
   test-cli-linux:
     name: Test CLI Linux
