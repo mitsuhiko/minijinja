@@ -1,17 +1,12 @@
 #![cfg(target_family = "wasm")]
 #![allow(non_snake_case)]
 
-extern crate wee_alloc;
-
 use std::collections::BTreeMap;
 
 use fragile::Fragile;
 use js_sys::{Array, Function, Object};
 use minijinja::{self as mj, Error, ErrorKind, Value};
 use wasm_bindgen::prelude::*;
-
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 /// Represents a MiniJinja environment.
 #[wasm_bindgen]
