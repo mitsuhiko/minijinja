@@ -126,6 +126,8 @@ If you are stuck with `MiniJinja`, have suggestions or need help, you can use th
   additional utilities too specific for the core
 * [minijinja-py](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py): makes MiniJinja
   available to Python
+* [minijinja-js](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-js): makes MiniJinja
+  available to JavaScript via WASM (for Node and Browser)
 * [minijinja-cli](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli): a command line utility.
 * [minijinja-cabi](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cabi): a C binding to MiniJinja.
 
