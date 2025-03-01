@@ -32,6 +32,10 @@ wasi-test:
 python-test:
 	@make -C minijinja-py
 
+.PHONY: js-test
+js-test:
+	@make -C minijinja-js
+
 .PHONY: python-type-check
 python-type-check:
 	@make -C minijinja-py type-check
