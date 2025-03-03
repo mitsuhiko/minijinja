@@ -5,5 +5,5 @@ edition = "2021"
 publish = false
 
 [dependencies]
-minijinja = { version = "2.7.0", path = "../../minijinja" }
+minijinja = { version = "2.8.0", path = "../../minijinja" }
 tokio = { version = "1.37.0", features = ["macros", "rt", "rt-multi-thread"] }
