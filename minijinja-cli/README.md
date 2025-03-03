@@ -16,6 +16,12 @@ You can install binaries automatically with the shell installer:
 curl -sSfL https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-installer.sh | sh
 ```
 
+Or on Windows:
+
+```
+powershell -ExecutionPolicy ByPass -c "irm https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-installer.ps1 | iex"
+```
+
 This script detects what platform you're on and fetches an appropriate archive from GitHub
 then unpacks the binaries and installs them to the first of the following locations:
 
