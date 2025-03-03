@@ -56,6 +56,17 @@ const result = env.evalExpr('1 + 1', {});
 console.log(result);
 ```
 
+## Web Usage
+
+If you want to use minijinja-js from the browser instead of node, you will
+need to use slightly different imports and call init explicitly:
+
+
+```javascript
+import init, { Environment } from "minijinja-js/dist/web";
+await init();
+```
+
 ## Known Limitations
 
 There are various limitations with the binding today, some of which can be fixed,
