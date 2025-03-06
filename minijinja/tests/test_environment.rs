@@ -173,6 +173,13 @@ fn test_unknown_method_callback() {
 
     let rv = env.render_str("{{ {'x': 42}.items() }}", ()).unwrap();
     assert_snapshot!(rv, @r###"[["x", 42]]"###);
+
+    let err = env.render_str("{{ [].does_not_exist() }}", ()).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::UnknownMethod);
+    assert_eq!(
+        err.detail(),
+        Some("sequence has no method named does_not_exist")
+    );
 }
 
 #[test]

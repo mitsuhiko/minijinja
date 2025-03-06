@@ -7,6 +7,8 @@ All notable changes to MiniJinja are documented here.
 - Do not panic if too large templates (too many lines or too many
   columns) are loaded.  The error reporting will be wrong in those
   cases but the templates will load.  #742
+- Fixed a bug that caused unknown method callbacks to not get
+  proper error reporting if they cannot find a method.  #743
 
 ## 2.8.0
 
