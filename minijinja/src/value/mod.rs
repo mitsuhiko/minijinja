@@ -1590,8 +1590,21 @@ impl Value {
             Err(mut err) => {
                 if err.kind() == ErrorKind::UnknownMethod {
                     if let Some(ref callback) = state.env().unknown_method_callback {
-                        return callback(state, self, name, args);
-                    } else if err.detail().is_none() {
+                        match callback(state, self, name, args) {
+                            Ok(result) => return Ok(result),
+                            Err(callback_err) => {
+                                // if the callback fails with the same error, we
+                                // want to also attach the default detail if
+                                // it's missing
+                                if callback_err.kind() == ErrorKind::UnknownMethod {
+                                    err = callback_err;
+                                } else {
+                                    return Err(err);
+                                }
+                            }
+                        }
+                    }
+                    if err.detail().is_none() {
                         err.set_detail(format!("{} has no method named {}", self.kind(), name));
                     }
                 }
