@@ -137,10 +137,21 @@ pub struct Span {
 
 impl fmt::Debug for Span {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            " @ {}:{}-{}:{}",
-            self.start_line, self.start_col, self.end_line, self.end_col
-        )
+        if f.alternate() {
+            f.debug_struct("Span")
+                .field("start_line", &self.start_line)
+                .field("start_col", &self.start_col)
+                .field("start_offset", &self.start_offset)
+                .field("end_line", &self.end_line)
+                .field("end_col", &self.end_col)
+                .field("end_offset", &self.end_offset)
+                .finish()
+        } else {
+            write!(
+                f,
+                " @ {}:{}-{}:{}",
+                self.start_line, self.start_col, self.end_line, self.end_col
+            )
+        }
     }
 }

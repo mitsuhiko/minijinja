@@ -2,6 +2,12 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.9.0
+
+- Do not panic if too large templates (too many lines or too many
+  columns) are loaded.  The error reporting will be wrong in those
+  cases but the templates will load.  #742
+
 ## 2.8.0
 
 - Added `SemiStrict` undefined mode that is like strict but allows
