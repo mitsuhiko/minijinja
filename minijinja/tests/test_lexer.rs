@@ -108,3 +108,60 @@ fn test_trim_blocks() {
       "%}"
     "###);
 }
+
+#[test]
+fn test_overflowing_column() {
+    // Test that the lexer can handle a template with a very large column number.  This is
+    // important because the lexer uses u16 for line and column numbers.  If the column
+    // number overflows, it should saturate instead of panicking.
+    let mut input = String::with_capacity(70005);
+    for _ in 0..70000 {
+        input.push(' ');
+    }
+    input.push_str("{{ x }}");
+
+    let tokens_result: Result<Vec<_>, _> =
+        tokenize(&input, false, Default::default(), Default::default()).collect();
+    let spans = tokens_result
+        .unwrap()
+        .into_iter()
+        .map(|x| x.1)
+        .collect::<Vec<_>>();
+
+    insta::assert_snapshot!(format!("{:#?}", &spans), @r###"
+    [
+        Span {
+            start_line: 1,
+            start_col: 0,
+            start_offset: 0,
+            end_line: 1,
+            end_col: 65535,
+            end_offset: 70000,
+        },
+        Span {
+            start_line: 1,
+            start_col: 65535,
+            start_offset: 70000,
+            end_line: 1,
+            end_col: 65535,
+            end_offset: 70002,
+        },
+        Span {
+            start_line: 1,
+            start_col: 65535,
+            start_offset: 70003,
+            end_line: 1,
+            end_col: 65535,
+            end_offset: 70004,
+        },
+        Span {
+            start_line: 1,
+            start_col: 65535,
+            start_offset: 70005,
+            end_line: 1,
+            end_col: 65535,
+            end_offset: 70007,
+        },
+    ]
+    "###);
+}

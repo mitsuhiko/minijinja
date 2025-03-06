@@ -376,10 +376,10 @@ impl<'s> Tokenizer<'s> {
         for c in skipped.chars() {
             match c {
                 '\n' => {
-                    self.current_line += 1;
+                    self.current_line = self.current_line.saturating_add(1);
                     self.current_col = 0;
                 }
-                _ => self.current_col += 1,
+                _ => self.current_col = self.current_col.saturating_add(1),
             }
         }
         self.current_offset += bytes;
