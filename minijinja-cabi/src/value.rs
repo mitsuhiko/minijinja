@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr, CString};
 use std::mem::{transmute, ManuallyDrop};
 use std::ops::Deref;
+use std::ptr;
 use std::sync::Arc;
 
 use minijinja::value::{Object, ValueIter, ValueKind};
@@ -281,6 +282,22 @@ ffi_fn! {
         CString::new(value.to_string()).map_err(|_| {
             Error::new(ErrorKind::InvalidOperation, "string contains null bytes")
         })?.into_raw()
+    }
+}
+
+ffi_fn! {
+    /// If the value is a string or bytes, returns it the pointer
+    /// to it, and the length.
+    ///
+    /// Note that strings are not null terminated.  If you need that, use
+    /// `mj_value_to_str` which will also stringify non string values.
+    unsafe fn mj_value_as_bytes(_scope, value: mj_value, len_out: &mut usize) -> *const c_char {
+        if let Some(bytes) = value.as_bytes() {
+            *len_out = bytes.len();
+            bytes.as_ptr() as *const c_char
+        } else {
+            ptr::null()
+        }
     }
 }
 

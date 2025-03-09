@@ -21,6 +21,12 @@ impl<T> AbiResult for *mut T {
     }
 }
 
+impl<T> AbiResult for *const T {
+    fn err_value() -> Self {
+        ptr::null()
+    }
+}
+
 impl AbiResult for u64 {
     fn err_value() -> Self {
         0
