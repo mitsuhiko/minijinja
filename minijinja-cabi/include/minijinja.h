@@ -253,6 +253,11 @@ MINIJINJA_API void mj_syntax_config_default(struct mj_syntax_config *syntax);
 MINIJINJA_API bool mj_value_append(struct mj_value *slf, struct mj_value value);
 
 /*
+ If the value is a string or bytes, returns it the pointer
+ */
+MINIJINJA_API const char *mj_value_as_bytes(struct mj_value value, uintptr_t *len_out);
+
+/*
  Extracts a float from the value
  */
 MINIJINJA_API double mj_value_as_f64(struct mj_value value);

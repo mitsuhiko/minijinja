@@ -1,6 +1,7 @@
 #include <minijinja.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 int main()
 {
@@ -59,6 +60,14 @@ seq: {{ seq }}");
     fprintf(stderr, "1 + 2 = %s\n", ervs);
     mj_str_free(ervs);
     mj_value_decref(&erv);
+
+    // you can borrow utf-8 from strings, if they are strings.
+    mj_value bv = mj_value_new_string("Hello");
+    uintptr_t bvlen;
+    const char *bvstr = mj_value_as_bytes(bv, &bvlen);
+    assert(bvlen == 5);
+    assert(memcmp(bvstr, "Hello", 5) == 0);
+    mj_value_decref(&bv);
 
     mj_env_free(env);
 

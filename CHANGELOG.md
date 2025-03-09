@@ -13,6 +13,8 @@ All notable changes to MiniJinja are documented here.
   merge feature, and fixed enumeration behavior when non-map objects
   are attempted to be merged.  #745
 - Added `mj_value_new_bytes` to the C-ABI.  #749
+- Added `mj_value_as_bytes` to the C-ABI to borrow from strings or
+  byte values.  #750
 
 ## 2.8.0
 
