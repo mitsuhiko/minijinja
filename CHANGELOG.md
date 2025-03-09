@@ -9,6 +9,9 @@ All notable changes to MiniJinja are documented here.
   cases but the templates will load.  #742
 - Fixed a bug that caused unknown method callbacks to not get
   proper error reporting if they cannot find a method.  #743
+- Added `merge_maps` which is a dynamic version of the `context!`
+  merge feature, and fixed enumeration behavior when non-map objects
+  are attempted to be merged.  #745
 
 ## 2.8.0
 

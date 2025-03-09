@@ -23,7 +23,6 @@ macro_rules! some {
 /// Hidden utility module for the [`context!`](crate::context!) macro.
 #[doc(hidden)]
 pub mod __context {
-    pub use crate::value::merge_object::MergeObject;
     use crate::value::{Value, ValueMap};
     use crate::Environment;
     use std::rc::Rc;
@@ -111,7 +110,8 @@ pub mod __context {
 ///
 /// The merge works with an value, not just values created by the `context!`
 /// macro and is performed lazy.  This means it also works with dynamic
-/// [`Object`](crate::value::Object)s.
+/// [`Object`](crate::value::Object)s.  The merge uses the underlying
+/// [`merge_maps`](crate::value::merge_maps) function.
 ///
 /// # Note on Conversions
 ///
@@ -137,25 +137,26 @@ macro_rules! context {
             $crate::__context_pair!(ctx, $key $(=> $value)?);
         )*
         let ctx = $crate::__context::build(ctx);
-        let mut merged_ctx = ::std::vec::Vec::new();
-        $(
-            merged_ctx.push($crate::value::Value::from($ctx));
-        )*;
-        if merged_ctx.is_empty() {
+        let merge_ctx = [
+            $(
+                $crate::value::Value::from($ctx),
+            )*
+        ];
+        if merge_ctx.is_empty() {
             ctx
         } else {
-            merged_ctx.insert(0, ctx);
-            $crate::value::Value::from_object($crate::__context::MergeObject(merged_ctx))
+            $crate::value::merge_maps(
+                std::iter::once(ctx).chain(merge_ctx.into_iter()))
         }
     }};
     (
         $(.. $ctx:expr),* $(,)?
     ) => {{
-        let mut ctx = ::std::vec::Vec::new();
-        $(
-            ctx.push($crate::value::Value::from($ctx));
-        )*;
-        $crate::value::Value::from_object($crate::__context::MergeObject(ctx))
+        $crate::value::merge_maps([
+            $(
+                $crate::value::Value::from($ctx),
+            )*
+        ])
     }};
 }
 
