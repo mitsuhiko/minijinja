@@ -1,5 +1,5 @@
 use std::ffi::{c_char, CStr};
-use std::ptr;
+use std::{ptr, slice};
 
 use minijinja::{Error, ErrorKind};
 
@@ -53,6 +53,13 @@ impl Scope {
         unsafe { CStr::from_ptr(s) }
             .to_str()
             .map_err(|_| Error::new(ErrorKind::InvalidOperation, "expected valid utf-8"))
+    }
+
+    pub unsafe fn get_bytes(&self, b: *const c_char, length: u64) -> Vec<u8> {
+        if b.is_null() || length == 0 {
+            return Vec::<u8>::new();
+        }
+        slice::from_raw_parts(b as *const u8, length as usize).to_vec()
     }
 }
 

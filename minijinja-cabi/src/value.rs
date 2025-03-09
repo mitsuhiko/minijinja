@@ -100,6 +100,13 @@ ffi_fn! {
 }
 
 ffi_fn! {
+    /// Creates an new bytes value
+    unsafe fn mj_value_new_bytes(scope, b: *const c_char, length: u64) -> mj_value {
+        Value::from(scope.get_bytes(b, length)).into()
+    }
+}
+
+ffi_fn! {
     /// Creates a new boolean value
     unsafe fn mj_value_new_bool(_scope, value: bool) -> mj_value {
         Value::from(value).into()
