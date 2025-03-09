@@ -12,6 +12,7 @@ All notable changes to MiniJinja are documented here.
 - Added `merge_maps` which is a dynamic version of the `context!`
   merge feature, and fixed enumeration behavior when non-map objects
   are attempted to be merged.  #745
+- Added `mj_value_new_bytes` to the C-ABI.  #749
 
 ## 2.8.0
 
