@@ -10,6 +10,7 @@ use clap::ArgMatches;
 use minijinja::machinery::{
     get_compiled_template, parse, tokenize, Instructions, WhitespaceConfig,
 };
+use minijinja::value::merge_maps;
 use minijinja::{context, Environment, Error as MError, ErrorKind, Value};
 use serde::Deserialize;
 
@@ -396,22 +397,15 @@ pub fn execute() -> Result<i32, Error> {
 
     let (base_ctx, stdin_used) = if let Some(data_files) = matches.get_many::<PathBuf>("data_file")
     {
-        let mut old_ctx = None;
+        let mut contexts = Vec::with_capacity(data_files.len());
         let mut stdin_used = false;
+        let select = matches.get_one::<String>("select").map(|x| x.as_str());
         for data_file in data_files {
-            let (new_ctx, stdin_used_here) = load_data(
-                config.format(),
-                data_file,
-                matches.get_one::<String>("select").map(|x| x.as_str()),
-            )?;
+            let (new_ctx, stdin_used_here) = load_data(config.format(), data_file, select)?;
+            contexts.push(new_ctx);
             stdin_used = stdin_used || stdin_used_here;
-            old_ctx = if let Some(old_ctx) = old_ctx.take() {
-                Some(context!(..new_ctx, ..old_ctx))
-            } else {
-                Some(Value::from(new_ctx))
-            };
         }
-        (old_ctx.unwrap_or_default(), false)
+        (merge_maps(contexts), false)
     } else {
         (Default::default(), false)
     };

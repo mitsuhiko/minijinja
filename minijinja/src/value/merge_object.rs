@@ -37,7 +37,8 @@ impl Object for MergeObject {
 ///
 /// This is the operation the [`context!`](crate::context) macro uses behind
 /// the scenes.  The merge is done lazily which means that any dynamic object
-/// that behaves like a map can be used here.
+/// that behaves like a map can be used here.  Note though that the order of
+/// this function is inverse to what the macro does.
 ///
 /// ```
 /// use minijinja::{context, value::merge_maps};
@@ -59,7 +60,15 @@ where
     I: IntoIterator<Item = V>,
     V: Into<Value>,
 {
-    Value::from_object(MergeObject(iter.into_iter().map(Into::into).collect()))
+    let mut sources: Box<[Value]> = iter.into_iter().map(Into::into).collect();
+    // if we only have a single source, we can use it directly to avoid making
+    // an unnecessary indirection.
+    if sources.len() == 1 {
+        sources[0].clone()
+    } else {
+        sources.reverse();
+        Value::from_object(MergeObject(sources))
+    }
 }
 
 #[test]
@@ -80,8 +89,8 @@ fn test_merge_object() {
     let merged = merge_maps([Value::from(map1), Value::from(map2)]);
 
     // Check that the merged object contains all keys with expected values
-    // The value from the first map should be used when keys overlap
+    // The value from the latter map should be used when keys overlap
     assert_eq!(merged.get_attr("a").unwrap(), Value::from(1));
-    assert_eq!(merged.get_attr("b").unwrap(), Value::from(2)); // Takes value from map1
+    assert_eq!(merged.get_attr("b").unwrap(), Value::from(3)); // Takes value from map2
     assert_eq!(merged.get_attr("c").unwrap(), Value::from(4));
 }
