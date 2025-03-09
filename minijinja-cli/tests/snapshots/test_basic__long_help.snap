@@ -36,7 +36,7 @@ Examples:
 
     minijinja-cli --expr "1 + 1"
 
-Usage: minijinja-cli [OPTIONS] [TEMPLATE_FILE] [DATA_FILE]
+Usage: minijinja-cli [OPTIONS] [TEMPLATE_FILE] [DATA_FILE]...
 
 Arguments:
   [TEMPLATE_FILE]
@@ -49,12 +49,13 @@ Arguments:
           
           [default: -]
 
-  [DATA_FILE]
+  [DATA_FILE]...
           Path to the data file in the given format.
           
           The data file is used to supply the context (variables) to the template. Various file
           formats are supported.  When data is read from stdin (by using '-' as file name), --format
-          must be specified as auto detection is based on file extensions.
+          must be specified as auto detection is based on file extensions.  Multiple files can be
+          provided which are merged.  Later files override files passed before.
 
 Options:
       --config-file <PATH>

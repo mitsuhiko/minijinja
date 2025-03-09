@@ -337,14 +337,15 @@ pub(super) fn make_command() -> Command {
                     to allow a data file to be supplied.")
                 .default_value("-")
                 .default_value_if("template", ArgPredicate::IsPresent, None),
-            arg!(data_file: [DATA_FILE] "Path to the data file")
+            arg!(data_file: [DATA_FILE]... "Path to one or more data files used as template context")
                 .long_help("\
                     Path to the data file in the given format.\n\n\
                     \
                     The data file is used to supply the context (variables) to the template. \
                     Various file formats are supported.  When data is read from stdin (by using '-' \
                     as file name), --format must be specified as auto detection is based on \
-                    file extensions.")
+                    file extensions.  Multiple files can be provided which are merged.  Later \
+                    files override files passed before.")
                 .value_parser(value_parser!(PathBuf)),
             #[cfg(feature = "completions")]
             arg!(--"generate-completion" <SH> "Generate a completion script for the given shell")

@@ -12,11 +12,11 @@ minijinja-cli is a command line tool to render or evaluate jinja2 templates.
 
 Pass a template and optionally a file with template variables to render it to stdout.
 
-Usage: minijinja-cli [OPTIONS] [TEMPLATE_FILE] [DATA_FILE]
+Usage: minijinja-cli [OPTIONS] [TEMPLATE_FILE] [DATA_FILE]...
 
 Arguments:
   [TEMPLATE_FILE]  Path to the input template [default: -]
-  [DATA_FILE]      Path to the data file
+  [DATA_FILE]...   Path to one or more data files used as template context
 
 Options:
       --config-file <PATH>          Alternative path to the config file.

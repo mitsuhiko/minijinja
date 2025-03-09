@@ -177,6 +177,55 @@ d:
 }
 
 #[test]
+#[cfg(feature = "yaml")]
+fn test_multiple_data_files() {
+    let json_input =
+        file_with_contents_and_ext(r#"{"name": "World", "greeting": "Hello"}"#, ".json");
+    let yaml_input = file_with_contents_and_ext(r#"greeting: Hi"#, ".yaml");
+    let tmpl = file_with_contents(r#"{{ greeting }} {{ name }}!"#);
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg(tmpl.path())
+            .arg(json_input.path())
+            .arg(yaml_input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hi World!
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+#[cfg(feature = "yaml")]
+fn test_select_from_toplevel() {
+    let json_input = file_with_contents_and_ext(
+        r#"{"base": {"name": "World", "greeting": "Hello"}}"#,
+        ".json",
+    );
+    let yaml_input = file_with_contents_and_ext(r#"base: {greeting: Hi}"#, ".yaml");
+    let tmpl = file_with_contents(r#"{{ greeting }} {{ name }}!"#);
+
+    assert_cmd_snapshot!(
+        cli()
+            .arg("--select=base")
+            .arg(tmpl.path())
+            .arg(json_input.path())
+            .arg(yaml_input.path()),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Hi World!
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 #[cfg(feature = "toml")]
 fn test_toml() {
     let input = file_with_contents_and_ext("[section]\nfoo = \"bar\"", ".toml");

@@ -146,7 +146,7 @@ macro_rules! context {
             ctx
         } else {
             $crate::value::merge_maps(
-                std::iter::once(ctx).chain(merge_ctx.into_iter()))
+                merge_ctx.into_iter().rev().chain(::std::iter::once(ctx)))
         }
     }};
     (
@@ -156,7 +156,7 @@ macro_rules! context {
             $(
                 $crate::value::Value::from($ctx),
             )*
-        ])
+        ].into_iter().rev())
     }};
 }
 
