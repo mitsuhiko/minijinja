@@ -28,7 +28,7 @@ unicode_wordwrap = ["wordwrap", "textwrap/unicode-linebreak", "textwrap/unicode-
 [dependencies]
 minijinja = { version = "2.8.0", path = "../minijinja", default-features = false }
 serde = "1.0.164"
-textwrap = { version = "0.16.1", optional = true, default-features = false, features = ["smawk"] }
+textwrap = { version = "0.16.2", optional = true, default-features = false, features = ["smawk"] }
 time = { version = "0.3.35", optional = true, features = ["serde", "formatting", "parsing"] }
 time-tz = { version = "2.0.0", features = ["db"], optional = true }
 unicode_categories = { version = "0.1.1", optional = true }
