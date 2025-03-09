@@ -101,8 +101,12 @@ ffi_fn! {
 
 ffi_fn! {
     /// Creates an new bytes value
-    unsafe fn mj_value_new_bytes(scope, b: *const c_char, length: u64) -> mj_value {
-        Value::from(scope.get_bytes(b, length)).into()
+    unsafe fn mj_value_new_bytes(_scope, b: *const c_char, length: usize) -> mj_value {
+        Value::from_bytes(if b.is_null() || length == 0 {
+            &[]
+        } else {
+            std::slice::from_raw_parts(b as *const u8, length as usize)
+        }.to_vec()).into()
     }
 }
 
