@@ -333,6 +333,11 @@ MINIJINJA_API uint64_t mj_value_len(struct mj_value value);
 MINIJINJA_API struct mj_value mj_value_new_bool(bool value);
 
 /*
+ Creates an new bytes value
+ */
+MINIJINJA_API struct mj_value mj_value_new_bytes(const char *b, uintptr_t length);
+
+/*
  Creates a new f32 value
  */
 MINIJINJA_API struct mj_value mj_value_new_f32(float value);

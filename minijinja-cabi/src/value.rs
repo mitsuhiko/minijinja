@@ -100,6 +100,17 @@ ffi_fn! {
 }
 
 ffi_fn! {
+    /// Creates an new bytes value
+    unsafe fn mj_value_new_bytes(_scope, b: *const c_char, length: usize) -> mj_value {
+        Value::from_bytes(if b.is_null() || length == 0 {
+            &[]
+        } else {
+            std::slice::from_raw_parts(b as *const u8, length as usize)
+        }.to_vec()).into()
+    }
+}
+
+ffi_fn! {
     /// Creates a new boolean value
     unsafe fn mj_value_new_bool(_scope, value: bool) -> mj_value {
         Value::from(value).into()
