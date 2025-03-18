@@ -50,28 +50,28 @@ pub extern "C" fn mj_err_print() -> bool {
 
 /// Returns the error's description if there is an error.
 #[no_mangle]
-pub unsafe extern "C" fn mj_err_get_detail() -> *const c_char {
+pub unsafe extern "C" fn mj_err_get_detail() -> *mut c_char {
     LAST_ERROR
         .with_borrow(|x| {
             x.as_ref()
                 .and_then(|x| x.detail())
                 .and_then(|detail| CString::new(detail).ok())
-                .map(|cstr| cstr.into_raw() as *const c_char)
+                .map(|cstr| cstr.into_raw())
         })
-        .unwrap_or(ptr::null())
+        .unwrap_or(ptr::null_mut())
 }
 
 /// Returns the error's current template.
 #[no_mangle]
-pub unsafe extern "C" fn mj_err_get_template_name() -> *const c_char {
+pub unsafe extern "C" fn mj_err_get_template_name() -> *mut c_char {
     LAST_ERROR
         .with_borrow(|x| {
             x.as_ref()
                 .and_then(|x| x.name())
                 .and_then(|name| CString::new(name).ok())
-                .map(|cstr| cstr.into_raw() as *const c_char)
+                .map(|cstr| cstr.into_raw())
         })
-        .unwrap_or(ptr::null())
+        .unwrap_or(ptr::null_mut())
 }
 
 /// Returns the error's current line.
