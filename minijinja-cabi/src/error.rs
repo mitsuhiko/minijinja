@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::error::Error as _;
-use std::ffi::c_char;
+use std::ffi::{c_char, CString};
 use std::ptr;
 
 use minijinja::{Error, ErrorKind};
@@ -55,7 +55,8 @@ pub unsafe extern "C" fn mj_err_get_detail() -> *const c_char {
         .with_borrow(|x| {
             x.as_ref()
                 .and_then(|x| x.detail())
-                .map(|x| x.as_ptr() as *const _)
+                .and_then(|detail| CString::new(detail).ok())
+                .map(|cstr| cstr.into_raw() as *const c_char)
         })
         .unwrap_or(ptr::null())
 }
@@ -67,7 +68,8 @@ pub unsafe extern "C" fn mj_err_get_template_name() -> *const c_char {
         .with_borrow(|x| {
             x.as_ref()
                 .and_then(|x| x.name())
-                .map(|x| x.as_ptr() as *const _)
+                .and_then(|name| CString::new(name).ok())
+                .map(|cstr| cstr.into_raw() as *const c_char)
         })
         .unwrap_or(ptr::null())
 }
