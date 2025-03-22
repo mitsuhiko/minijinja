@@ -49,6 +49,8 @@ pub extern "C" fn mj_err_print() -> bool {
 }
 
 /// Returns the error's description if there is an error.
+///
+/// The value must be freed with `mj_str_free`.
 #[no_mangle]
 pub unsafe extern "C" fn mj_err_get_detail() -> *mut c_char {
     LAST_ERROR
@@ -62,6 +64,8 @@ pub unsafe extern "C" fn mj_err_get_detail() -> *mut c_char {
 }
 
 /// Returns the error's current template.
+///
+/// The value must be freed with `mj_str_free`.
 #[no_mangle]
 pub unsafe extern "C" fn mj_err_get_template_name() -> *mut c_char {
     LAST_ERROR
