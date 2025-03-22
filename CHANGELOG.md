@@ -18,6 +18,8 @@ All notable changes to MiniJinja are documented here.
 - Fixed buggy `mj_err_get_detail` and `mj_err_get_template_name`.  These
   did not work correctly.  To fix them the return value now needs to be
   freed.  #754
+- Fix a compilation issue on 32bit systems when `AtomicU64` is
+  not available in minijinja-contrib.  #755
 
 ## 2.8.0
 
