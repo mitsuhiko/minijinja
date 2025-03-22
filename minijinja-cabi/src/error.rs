@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::error::Error as _;
-use std::ffi::c_char;
+use std::ffi::{c_char, CString};
 use std::ptr;
 
 use minijinja::{Error, ErrorKind};
@@ -49,27 +49,33 @@ pub extern "C" fn mj_err_print() -> bool {
 }
 
 /// Returns the error's description if there is an error.
+///
+/// The value must be freed with `mj_str_free`.
 #[no_mangle]
-pub unsafe extern "C" fn mj_err_get_detail() -> *const c_char {
+pub unsafe extern "C" fn mj_err_get_detail() -> *mut c_char {
     LAST_ERROR
         .with_borrow(|x| {
             x.as_ref()
                 .and_then(|x| x.detail())
-                .map(|x| x.as_ptr() as *const _)
+                .and_then(|detail| CString::new(detail).ok())
+                .map(|cstr| cstr.into_raw())
         })
-        .unwrap_or(ptr::null())
+        .unwrap_or(ptr::null_mut())
 }
 
 /// Returns the error's current template.
+///
+/// The value must be freed with `mj_str_free`.
 #[no_mangle]
-pub unsafe extern "C" fn mj_err_get_template_name() -> *const c_char {
+pub unsafe extern "C" fn mj_err_get_template_name() -> *mut c_char {
     LAST_ERROR
         .with_borrow(|x| {
             x.as_ref()
                 .and_then(|x| x.name())
-                .map(|x| x.as_ptr() as *const _)
+                .and_then(|name| CString::new(name).ok())
+                .map(|cstr| cstr.into_raw())
         })
-        .unwrap_or(ptr::null())
+        .unwrap_or(ptr::null_mut())
 }
 
 /// Returns the error's current line.

@@ -210,7 +210,7 @@ MINIJINJA_API void mj_err_clear(void);
 /*
  Returns the error's description if there is an error.
  */
-MINIJINJA_API const char *mj_err_get_detail(void);
+MINIJINJA_API char *mj_err_get_detail(void);
 
 /*
  Returns the error's kind
@@ -225,7 +225,7 @@ MINIJINJA_API uint32_t mj_err_get_line(void);
 /*
  Returns the error's current template.
  */
-MINIJINJA_API const char *mj_err_get_template_name(void);
+MINIJINJA_API char *mj_err_get_template_name(void);
 
 /*
  Returns `true` if there is currently an error.
