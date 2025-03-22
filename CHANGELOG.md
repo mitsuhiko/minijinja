@@ -15,6 +15,8 @@ All notable changes to MiniJinja are documented here.
 - Added `mj_value_new_bytes` to the C-ABI.  #749
 - Added `mj_value_as_bytes` to the C-ABI to borrow from strings or
   byte values.  #750
+- Fix a compilation issue on 32bit systems when `AtomicU64` is
+  not available in minijinja-contrib.  #755
 
 ## 2.8.0
 
