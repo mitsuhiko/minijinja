@@ -6,4 +6,10 @@
 {% from "foo.html" import a, %}
 {% from "foo.html" import a as b, %}
 {% from "foo.html" import a as b, b as c, %}
+{% from "foo.html" import a as b, b as c with context %}
+{% from "foo.html" import a as b, b as c without context %}
+{% from "foo.html" import a as b, b as c, with context %}
+{% from "foo.html" import a as b, b as c, without context %}
 {% import "foo.html" as x %}
+{% import "foo.html" as x with context %}
+{% import "foo.html" as x without context %}

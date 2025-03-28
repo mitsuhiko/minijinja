@@ -1068,17 +1068,12 @@ impl<'a> Parser<'a> {
     #[cfg(feature = "multi_template")]
     fn parse_include(&mut self) -> Result<ast::Include<'a>, Error> {
         let name = ok!(self.parse_expr());
-
-        // with/without context is without meaning in MiniJinja, but for syntax
-        // compatibility it's supported.
-        if skip_token!(self, Token::Ident("without" | "with")) {
-            expect_token!(self, Token::Ident("context"), "missing keyword");
-        }
+        let skipped_context = ok!(self.skip_context_marker());
 
         let ignore_missing = if skip_token!(self, Token::Ident("ignore")) {
             expect_token!(self, Token::Ident("missing"), "missing keyword");
-            if skip_token!(self, Token::Ident("without" | "with")) {
-                expect_token!(self, Token::Ident("context"), "missing keyword");
+            if !skipped_context {
+                ok!(self.skip_context_marker());
             }
             true
         } else {
@@ -1095,6 +1090,7 @@ impl<'a> Parser<'a> {
         let expr = ok!(self.parse_expr());
         expect_token!(self, Token::Ident("as"), "as");
         let name = ok!(self.parse_expr());
+        ok!(self.skip_context_marker());
         Ok(ast::Import { expr, name })
     }
 
@@ -1104,13 +1100,13 @@ impl<'a> Parser<'a> {
         let mut names = Vec::new();
         expect_token!(self, Token::Ident("import"), "import");
         loop {
-            if matches_token!(self, Token::BlockEnd) {
+            if ok!(self.skip_context_marker()) || matches_token!(self, Token::BlockEnd) {
                 break;
             }
             if !names.is_empty() {
                 expect_token!(self, Token::Comma, "`,`");
             }
-            if matches_token!(self, Token::BlockEnd) {
+            if ok!(self.skip_context_marker()) || matches_token!(self, Token::BlockEnd) {
                 break;
             }
             let name = ok!(self.parse_assign_name(false));
@@ -1122,6 +1118,18 @@ impl<'a> Parser<'a> {
             names.push((name, alias));
         }
         Ok(ast::FromImport { expr, names })
+    }
+
+    #[cfg(feature = "multi_template")]
+    fn skip_context_marker(&mut self) -> Result<bool, Error> {
+        // with/without context is without meaning in MiniJinja, but for syntax
+        // copatibility it's supported.
+        if skip_token!(self, Token::Ident("with") | Token::Ident("without")) {
+            expect_token!(self, Token::Ident("context"), "context");
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     #[cfg(feature = "macros")]
