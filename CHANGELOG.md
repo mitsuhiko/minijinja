@@ -20,6 +20,8 @@ All notable changes to MiniJinja are documented here.
   freed.  #754
 - Fix a compilation issue on 32bit systems when `AtomicU64` is
   not available in minijinja-contrib.  #755
+- Correctly handle `with context` and `without context` for
+  imports.  #759
 
 ## 2.8.0
 

@@ -1,6 +1,6 @@
 ---
 source: minijinja/tests/test_parser.rs
-description: "{% from \"foo.html\" import a, b %}\n{% from \"foo.html\" import a %}\n{% from \"foo.html\" import a as b %}\n{% from \"foo.html\" import a as b, b as c %}\n{% from \"foo.html\" import a, b, %}\n{% from \"foo.html\" import a, %}\n{% from \"foo.html\" import a as b, %}\n{% from \"foo.html\" import a as b, b as c, %}\n{% import \"foo.html\" as x %}"
+description: "{% from \"foo.html\" import a, b %}\n{% from \"foo.html\" import a %}\n{% from \"foo.html\" import a as b %}\n{% from \"foo.html\" import a as b, b as c %}\n{% from \"foo.html\" import a, b, %}\n{% from \"foo.html\" import a, %}\n{% from \"foo.html\" import a as b, %}\n{% from \"foo.html\" import a as b, b as c, %}\n{% from \"foo.html\" import a as b, b as c with context %}\n{% from \"foo.html\" import a as b, b as c without context %}\n{% from \"foo.html\" import a as b, b as c, with context %}\n{% from \"foo.html\" import a as b, b as c, without context %}\n{% import \"foo.html\" as x %}\n{% import \"foo.html\" as x with context %}\n{% import \"foo.html\" as x without context %}"
 input_file: minijinja/tests/parser-inputs/imports.txt
 ---
 Ok(
@@ -182,14 +182,156 @@ Ok(
             EmitRaw {
                 raw: "\n",
             } @ 8:44-9:0,
+            FromImport {
+                expr: Const {
+                    value: "foo.html",
+                } @ 9:8-9:18,
+                names: [
+                    (
+                        Var {
+                            id: "a",
+                        } @ 9:26-9:27,
+                        Some(
+                            Var {
+                                id: "b",
+                            } @ 9:31-9:32,
+                        ),
+                    ),
+                    (
+                        Var {
+                            id: "b",
+                        } @ 9:34-9:35,
+                        Some(
+                            Var {
+                                id: "c",
+                            } @ 9:39-9:40,
+                        ),
+                    ),
+                ],
+            } @ 9:3-9:53,
+            EmitRaw {
+                raw: "\n",
+            } @ 9:56-10:0,
+            FromImport {
+                expr: Const {
+                    value: "foo.html",
+                } @ 10:8-10:18,
+                names: [
+                    (
+                        Var {
+                            id: "a",
+                        } @ 10:26-10:27,
+                        Some(
+                            Var {
+                                id: "b",
+                            } @ 10:31-10:32,
+                        ),
+                    ),
+                    (
+                        Var {
+                            id: "b",
+                        } @ 10:34-10:35,
+                        Some(
+                            Var {
+                                id: "c",
+                            } @ 10:39-10:40,
+                        ),
+                    ),
+                ],
+            } @ 10:3-10:56,
+            EmitRaw {
+                raw: "\n",
+            } @ 10:59-11:0,
+            FromImport {
+                expr: Const {
+                    value: "foo.html",
+                } @ 11:8-11:18,
+                names: [
+                    (
+                        Var {
+                            id: "a",
+                        } @ 11:26-11:27,
+                        Some(
+                            Var {
+                                id: "b",
+                            } @ 11:31-11:32,
+                        ),
+                    ),
+                    (
+                        Var {
+                            id: "b",
+                        } @ 11:34-11:35,
+                        Some(
+                            Var {
+                                id: "c",
+                            } @ 11:39-11:40,
+                        ),
+                    ),
+                ],
+            } @ 11:3-11:54,
+            EmitRaw {
+                raw: "\n",
+            } @ 11:57-12:0,
+            FromImport {
+                expr: Const {
+                    value: "foo.html",
+                } @ 12:8-12:18,
+                names: [
+                    (
+                        Var {
+                            id: "a",
+                        } @ 12:26-12:27,
+                        Some(
+                            Var {
+                                id: "b",
+                            } @ 12:31-12:32,
+                        ),
+                    ),
+                    (
+                        Var {
+                            id: "b",
+                        } @ 12:34-12:35,
+                        Some(
+                            Var {
+                                id: "c",
+                            } @ 12:39-12:40,
+                        ),
+                    ),
+                ],
+            } @ 12:3-12:57,
+            EmitRaw {
+                raw: "\n",
+            } @ 12:60-13:0,
             Import {
                 expr: Const {
                     value: "foo.html",
-                } @ 9:10-9:20,
+                } @ 13:10-13:20,
                 name: Var {
                     id: "x",
-                } @ 9:24-9:25,
-            } @ 9:3-9:25,
+                } @ 13:24-13:25,
+            } @ 13:3-13:25,
+            EmitRaw {
+                raw: "\n",
+            } @ 13:28-14:0,
+            Import {
+                expr: Const {
+                    value: "foo.html",
+                } @ 14:10-14:20,
+                name: Var {
+                    id: "x",
+                } @ 14:24-14:25,
+            } @ 14:3-14:38,
+            EmitRaw {
+                raw: "\n",
+            } @ 14:41-15:0,
+            Import {
+                expr: Const {
+                    value: "foo.html",
+                } @ 15:10-15:20,
+                name: Var {
+                    id: "x",
+                } @ 15:24-15:25,
+            } @ 15:3-15:41,
         ],
-    } @ 0:0-9:28,
+    } @ 0:0-15:44,
 )
