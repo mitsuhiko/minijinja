@@ -78,6 +78,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, Value> {
         rv.insert("split".into(), Value::from_function(filters::split));
         rv.insert("lines".into(), Value::from_function(filters::lines));
         rv.insert("default".into(), Value::from_function(filters::default));
+        rv.insert("d".into(), Value::from_function(filters::default));
         rv.insert("round".into(), Value::from_function(filters::round));
         rv.insert("abs".into(), Value::from_function(filters::abs));
         rv.insert("int".into(), Value::from_function(filters::int));
