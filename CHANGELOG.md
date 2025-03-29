@@ -22,6 +22,8 @@ All notable changes to MiniJinja are documented here.
   not available in minijinja-contrib.  #755
 - Correctly handle `with context` and `without context` for
   imports.  #759
+- The `default` filter is now also registered as `d` for Jinja2
+  compatibility.  #763
 
 ## 2.8.0
 
