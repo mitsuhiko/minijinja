@@ -471,9 +471,18 @@ mod builtins {
     /// ```jinja
     /// <p>{{ my_variable|default("my_variable was not defined") }}</p>
     /// ```
+    ///
+    /// Setting the optional second parameter to `true` will also treat falsy
+    /// values as undefined, e.g. empty strings:
+    ///
+    /// ```jinja
+    /// <p>{{ ""|default("string was empty", true) }}</p>
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn default(value: &Value, other: Option<Value>) -> Value {
+    pub fn default(value: &Value, other: Option<Value>, lax: Option<bool>) -> Value {
         if value.is_undefined() {
+            other.unwrap_or_else(|| Value::from(""))
+        } else if lax.unwrap_or(false) && !value.is_true() {
             other.unwrap_or_else(|| Value::from(""))
         } else {
             value.clone()
