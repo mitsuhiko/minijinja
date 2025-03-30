@@ -24,6 +24,8 @@ All notable changes to MiniJinja are documented here.
   imports.  #759
 - The `default` filter is now also registered as `d` for Jinja2
   compatibility.  #763
+- The `default` filter now accepts a second argument to enable lax
+  defaulting.  #764
 
 ## 2.8.0
 

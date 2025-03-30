@@ -53,6 +53,7 @@ join-pipe: {{ list|join("|") }}
 join_string: {{ word|join('-') }}
 default: {{ undefined|default == "" }}
 default-value: {{ undefined|default(42) }}
+default-value-falsy: {{ ""|default("b", true) }}
 d: {{ undefined|d == "" }}
 d-value: {{ undefined|d(42) }}
 first-list: {{ list|first }}
