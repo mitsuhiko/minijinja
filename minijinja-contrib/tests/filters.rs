@@ -372,7 +372,10 @@ fn test_striptags() {
         "Hello & World!>"
     );
     assert_eq!(striptags("Hello &amp< World!&gt;".into()), "Hello &");
-    assert_eq!(striptags("<!-- <a href='x'>blah</a> -->muh".into()), "muh");
+    assert_eq!(
+        striptags("<!-- <a href='x'>blah</a> -->haha".into()),
+        "haha"
+    );
     #[cfg(feature = "html_entities")]
     {
         assert_eq!(striptags("Hello W&ouml;rld".into()), "Hello Wörld");
