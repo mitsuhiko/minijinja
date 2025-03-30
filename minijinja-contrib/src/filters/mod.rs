@@ -15,7 +15,7 @@ use crate::html_entities::HTML_ENTITIES;
 
 // this list has to be ASCII sorted because we're going to binary search through it.
 #[cfg(not(feature = "html_entities"))]
-const HTML_ENTITIES: &[(&str, &str)] = &[("amp", "&")("gt", ">"), ("lt", "<"), ("quot", "\"")];
+const HTML_ENTITIES: &[(&str, &str)] = &[("amp", "&"), ("gt", ">"), ("lt", "<"), ("quot", "\"")];
 
 /// Returns a plural suffix if the value is not 1, '1', or an object of
 /// length 1.
@@ -428,4 +428,9 @@ fn resolve_numeric_entity(entity: &str) -> Option<char> {
     } else {
         None
     }
+}
+
+#[test]
+fn test_entities_sorted() {
+    assert!(HTML_ENTITIES.iter().is_sorted());
 }
