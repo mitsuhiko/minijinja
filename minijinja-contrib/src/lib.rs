@@ -24,6 +24,9 @@ pub mod filters;
 /// Globals
 pub mod globals;
 
+#[cfg(feature = "html_entities")]
+mod html_entities;
+
 #[cfg(feature = "rand")]
 mod rand;
 
@@ -38,6 +41,7 @@ pub fn add_to_environment(env: &mut Environment) {
     env.add_filter("pluralize", filters::pluralize);
     env.add_filter("filesizeformat", filters::filesizeformat);
     env.add_filter("truncate", filters::truncate);
+    env.add_filter("striptags", filters::striptags);
     #[cfg(feature = "wordcount")]
     {
         env.add_filter("wordcount", filters::wordcount);

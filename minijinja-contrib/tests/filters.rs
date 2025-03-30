@@ -1,5 +1,5 @@
 use minijinja::{context, Environment};
-use minijinja_contrib::filters::pluralize;
+use minijinja_contrib::filters::{pluralize, striptags};
 use similar_asserts::assert_eq;
 
 #[test]
@@ -361,5 +361,39 @@ fn test_wordwrap() {
         )
         .unwrap(),
         "This-is-a-\nhyphenated\n-word"
+    );
+}
+
+#[test]
+fn test_striptags() {
+    assert_eq!(striptags("   <a> Hello </a>   ".into()), "Hello");
+    assert_eq!(striptags("Hello &amp World!&gt;".into()), "Hello & World!>");
+    assert_eq!(
+        striptags("Hello &amp; World!&gt;".into()),
+        "Hello & World!>"
+    );
+    assert_eq!(striptags("Hello &amp< World!&gt;".into()), "Hello &");
+    assert_eq!(
+        striptags("<!-- <a href='x'>blah</a> -->haha".into()),
+        "haha"
+    );
+    #[cfg(feature = "html_entities")]
+    {
+        assert_eq!(striptags("Hello W&ouml;rld".into()), "Hello Wörld");
+        assert_eq!(striptags("  \n&nbsp; Hello  \n  ".into()), "Hello");
+        assert_eq!(striptags("&nbsp; Hello  \n  ".into()), "Hello");
+        assert_eq!(striptags("a&nbsp;b".into()), "a b");
+    }
+    assert_eq!(striptags("This is &amp&amp&amp; x".into()), "This is &&& x");
+    assert_eq!(
+        striptags("This is &unknown<a>b".into()),
+        "This is &unknownb"
+    );
+    assert_eq!(striptags("This is &unknown".into()), "This is &unknown");
+    assert_eq!(striptags("This is &unknown;".into()), "This is &unknown;");
+    assert_eq!(striptags("This is &unknown x".into()), "This is &unknown x");
+    assert_eq!(
+        striptags("This is &unknown; x".into()),
+        "This is &unknown; x"
     );
 }

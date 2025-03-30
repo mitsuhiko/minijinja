@@ -26,6 +26,7 @@ All notable changes to MiniJinja are documented here.
   compatibility.  #763
 - The `default` filter now accepts a second argument to enable lax
   defaulting.  #764
+- Added a `striptags` filter to the contrib module.  #765
 - Enable `pycompat` by default for the Python bindings and register
   the default contrib filters and tests.  #767
 

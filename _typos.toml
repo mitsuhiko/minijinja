@@ -1,3 +1,6 @@
+[files]
+extend-exclude = ["minijinja-contrib/src/html_entities.rs"]
+
 [default]
 extend-ignore-identifiers-re = ["workd", "entit", "FoO", "mis", "flate"]
 

@@ -498,3 +498,9 @@ def test_pycompat():
     with pytest.raises(TemplateError) as e:
         assert env.eval_expr("{'x': 42}.get('x')")
     assert "unknown method: map has no method named get" in e.value.message
+
+
+def test_striptags():
+    env = Environment()
+    assert env.eval_expr("'<a>foo</a>'|striptags") == "foo"
+    assert env.eval_expr("'<a>&auml;</a>'|striptags") == "ä"

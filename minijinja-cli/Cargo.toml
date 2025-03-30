@@ -22,7 +22,7 @@ repl = ["rustyline"]
 completions = ["clap_complete", "clap_complete_nushell", "clap_complete_fig"]
 unicode = ["minijinja/unicode"]
 ini = ["configparser"]
-contrib = ["minijinja-contrib"]
+contrib = ["minijinja-contrib", "minijinja-contrib/html_entities"]
 toml = ["dep:toml", "home"]
 preserve_order = ["minijinja/preserve_order"]
 
