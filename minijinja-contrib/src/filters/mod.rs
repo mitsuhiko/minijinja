@@ -10,6 +10,12 @@ mod datetime;
 #[cfg(feature = "datetime")]
 pub use self::datetime::*;
 
+#[cfg(feature = "html_entities")]
+use crate::html_entities::HTML_ENTITIES;
+
+#[cfg(not(feature = "html_entities"))]
+const HTML_ENTITIES: &[(&str, &str)] = &[("lt", "<"), ("gt", ">"), ("quot", "\""), ("amp", "&")];
+
 /// Returns a plural suffix if the value is not 1, '1', or an object of
 /// length 1.
 ///
@@ -304,4 +310,121 @@ pub fn wordwrap(value: &Value, kwargs: Kwargs) -> Result<Value, Error> {
             acc
         },
     )))
+}
+
+/// Performs HTML tag stripping and unescaping.
+///
+/// ```jinja
+/// {{ "<span>Hello &amp; World</span>"|striptags }} -> Hello & World
+/// ```
+///
+/// By default the filter only knows about `&amp;`, `&lt;`, `&gt;`, and `&amp;`.  To
+/// get all HTML5 entities, you need to enable the `html_entities` feature.
+pub fn striptags(s: String) -> String {
+    #[derive(Copy, Clone, PartialEq)]
+    enum State {
+        Text,
+        Tag,
+        Entity,
+        Comment,
+        CommentDash1,
+        CommentDash2,
+    }
+
+    let mut chars = s.chars().map(Some).chain(Some(None)).peekable();
+    let mut rv = String::new();
+    let mut entity_buffer = String::new();
+    let mut last_was_space = true;
+    let mut state = State::Text;
+
+    while let Some(c) = chars.next() {
+        state = match (c, state) {
+            (Some('<'), State::Text) => {
+                if chars.peek() == Some(&Some('!'))
+                    && chars.nth(1) == Some(Some('-'))
+                    && chars.next() == Some(Some('-'))
+                {
+                    State::Comment
+                } else {
+                    State::Tag
+                }
+            }
+            (Some('>'), State::Tag) => State::Text,
+            (Some('&'), State::Text) => {
+                entity_buffer.clear();
+                State::Entity
+            }
+            (Some('-'), State::Comment) => State::CommentDash1,
+            (Some('-'), State::CommentDash1) => State::CommentDash2,
+            (Some('>'), State::CommentDash2) => State::Text,
+            (_, State::CommentDash1 | State::CommentDash2) => State::Comment,
+            (_, State::Entity) => {
+                let cc = c.unwrap_or('\x00');
+                if cc == '\x00' || cc == ';' || cc == '<' || cc == '&' || cc.is_whitespace() {
+                    if let Some(resolved) = resolve_numeric_entity(&entity_buffer) {
+                        rv.push(resolved);
+                        last_was_space = resolved.is_whitespace();
+                    } else if let Some((_, resolved)) = HTML_ENTITIES
+                        .iter()
+                        .find(|(name, _)| *name == entity_buffer)
+                    {
+                        rv.push_str(resolved);
+                        last_was_space = resolved.chars().all(|c| c.is_whitespace());
+                    } else {
+                        last_was_space = false;
+                        rv.push('&');
+                        rv.push_str(&entity_buffer);
+                        if cc == ';' {
+                            rv.push(';');
+                        }
+                    }
+
+                    if cc == '<' {
+                        State::Tag
+                    } else if cc == '&' {
+                        entity_buffer.clear();
+                        State::Entity
+                    } else {
+                        if cc.is_whitespace() && !last_was_space {
+                            rv.push(' ');
+                            last_was_space = true;
+                        }
+                        State::Text
+                    }
+                } else if let Some(c) = c {
+                    entity_buffer.push(c);
+                    State::Entity
+                } else {
+                    State::Entity
+                }
+            }
+            (Some(c), State::Text) if c.is_whitespace() => {
+                if !last_was_space {
+                    rv.push(' ');
+                    last_was_space = true;
+                }
+                State::Text
+            }
+            (Some(c), State::Text) => {
+                rv.push(c);
+                last_was_space = false;
+                State::Text
+            }
+            (_, state) => state,
+        }
+    }
+
+    rv
+}
+
+fn resolve_numeric_entity(entity: &str) -> Option<char> {
+    let num_str = entity.strip_prefix('#')?;
+    if num_str.starts_with('x') || num_str.starts_with('X') {
+        let code = u32::from_str_radix(&num_str[1..], 16).ok()?;
+        char::from_u32(code)
+    } else if let Ok(code) = num_str.parse::<u32>() {
+        char::from_u32(code)
+    } else {
+        None
+    }
 }
