@@ -325,54 +325,58 @@ pub fn striptags(s: String) -> String {
     #[derive(Copy, Clone, PartialEq)]
     enum State {
         Text,
+        TagStart,
         Tag,
         Entity,
+        CommentStart1,
+        CommentStart2,
         Comment,
-        CommentDash1,
-        CommentDash2,
+        CommentEnd1,
+        CommentEnd2,
     }
 
-    let mut chars = s.chars().map(Some).chain(Some(None)).peekable();
     let mut rv = String::new();
     let mut entity_buffer = String::new();
-    let mut last_was_space = true;
     let mut state = State::Text;
 
-    while let Some(c) = chars.next() {
-        state = match (c, state) {
-            (Some('<'), State::Text) => {
-                if chars.peek() == Some(&Some('!'))
-                    && chars.nth(1) == Some(Some('-'))
-                    && chars.next() == Some(Some('-'))
-                {
-                    State::Comment
-                } else {
-                    State::Tag
-                }
+    macro_rules! push_char {
+        ($c:expr) => {
+            if !$c.is_whitespace() || rv.ends_with(|c: char| !c.is_whitespace()) {
+                rv.push($c);
             }
-            (Some('>'), State::Tag) => State::Text,
+        };
+    }
+
+    for c in s.chars().map(Some).chain(Some(None)) {
+        state = match (c, state) {
+            (Some('<'), State::Text) => State::TagStart,
+            (Some('>'), State::Tag | State::TagStart) => State::Text,
+            (Some('!'), State::TagStart) => State::CommentStart1,
+            (Some('-'), State::CommentStart1) => State::CommentStart2,
+            (Some('-'), State::CommentStart2) => State::Comment,
+            (_, State::CommentStart1 | State::CommentStart2) => State::Tag,
+            (_, State::Tag | State::TagStart) => State::Tag,
             (Some('&'), State::Text) => {
                 entity_buffer.clear();
                 State::Entity
             }
-            (Some('-'), State::Comment) => State::CommentDash1,
-            (Some('-'), State::CommentDash1) => State::CommentDash2,
-            (Some('>'), State::CommentDash2) => State::Text,
-            (_, State::CommentDash1 | State::CommentDash2) => State::Comment,
+            (Some('-'), State::Comment) => State::CommentEnd1,
+            (Some('-'), State::CommentEnd1) => State::CommentEnd2,
+            (Some('>'), State::CommentEnd2) => State::Text,
+            (_, State::CommentEnd1 | State::CommentEnd2) => State::Comment,
             (_, State::Entity) => {
                 let cc = c.unwrap_or('\x00');
                 if cc == '\x00' || cc == ';' || cc == '<' || cc == '&' || cc.is_whitespace() {
                     if let Some(resolved) = resolve_numeric_entity(&entity_buffer) {
-                        rv.push(resolved);
-                        last_was_space = resolved.is_whitespace();
+                        push_char!(resolved);
                     } else if let Ok(resolved) = HTML_ENTITIES
                         .binary_search_by_key(&entity_buffer.as_str(), |x| x.0)
                         .map(|x| &HTML_ENTITIES[x].1)
                     {
-                        rv.push_str(resolved);
-                        last_was_space = resolved.chars().all(|c| c.is_whitespace());
+                        for c in resolved.chars() {
+                            push_char!(c);
+                        }
                     } else {
-                        last_was_space = false;
                         rv.push('&');
                         rv.push_str(&entity_buffer);
                         if cc == ';' {
@@ -386,9 +390,8 @@ pub fn striptags(s: String) -> String {
                         entity_buffer.clear();
                         State::Entity
                     } else {
-                        if cc.is_whitespace() && !last_was_space {
-                            rv.push(' ');
-                            last_was_space = true;
+                        if cc.is_whitespace() {
+                            push_char!(cc);
                         }
                         State::Text
                     }
@@ -399,21 +402,15 @@ pub fn striptags(s: String) -> String {
                     State::Entity
                 }
             }
-            (Some(c), State::Text) if c.is_whitespace() => {
-                if !last_was_space {
-                    rv.push(' ');
-                    last_was_space = true;
-                }
-                State::Text
-            }
             (Some(c), State::Text) => {
-                rv.push(c);
-                last_was_space = false;
+                push_char!(c);
                 State::Text
             }
             (_, state) => state,
         }
     }
+
+    rv.truncate(rv.trim_end().len());
 
     rv
 }

@@ -366,6 +366,8 @@ fn test_wordwrap() {
 
 #[test]
 fn test_striptags() {
+    assert_eq!(striptags("  \n&nbsp; Hello  \n  ".into()), "Hello");
+    assert_eq!(striptags("   <a> Hello </a>   ".into()), "Hello");
     assert_eq!(striptags("Hello &amp World!&gt;".into()), "Hello & World!>");
     assert_eq!(
         striptags("Hello &amp; World!&gt;".into()),
