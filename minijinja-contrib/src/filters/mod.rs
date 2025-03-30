@@ -13,8 +13,9 @@ pub use self::datetime::*;
 #[cfg(feature = "html_entities")]
 use crate::html_entities::HTML_ENTITIES;
 
+// this list has to be ASCII sorted because we're going to binary search through it.
 #[cfg(not(feature = "html_entities"))]
-const HTML_ENTITIES: &[(&str, &str)] = &[("lt", "<"), ("gt", ">"), ("quot", "\""), ("amp", "&")];
+const HTML_ENTITIES: &[(&str, &str)] = &[("amp", "&")("gt", ">"), ("lt", "<"), ("quot", "\"")];
 
 /// Returns a plural suffix if the value is not 1, '1', or an object of
 /// length 1.
@@ -364,9 +365,9 @@ pub fn striptags(s: String) -> String {
                     if let Some(resolved) = resolve_numeric_entity(&entity_buffer) {
                         rv.push(resolved);
                         last_was_space = resolved.is_whitespace();
-                    } else if let Some((_, resolved)) = HTML_ENTITIES
-                        .iter()
-                        .find(|(name, _)| *name == entity_buffer)
+                    } else if let Ok(resolved) = HTML_ENTITIES
+                        .binary_search_by_key(&entity_buffer.as_str(), |x| x.0)
+                        .map(|x| &HTML_ENTITIES[x].1)
                     {
                         rv.push_str(resolved);
                         last_was_space = resolved.chars().all(|c| c.is_whitespace());

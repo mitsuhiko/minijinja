@@ -1,3 +1,4 @@
+// this list has to be ASCII sorted because we're going to binary search through it.
 pub const HTML_ENTITIES: &[(&str, &str)] = &[
     ("AElig", "Æ"),
     ("AMP", "&"),
