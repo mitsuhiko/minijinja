@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex};
 
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Rest, Value};
-use minijinja::{context, escape_formatter, AutoEscape, Error, State, UndefinedBehavior};
+use minijinja::{
+    context, escape_formatter, AutoEscape, Error, ErrorKind, State, UndefinedBehavior,
+};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedStr;
@@ -106,15 +108,32 @@ struct Inner {
 pub struct Environment {
     inner: Arc<Mutex<Inner>>,
     reload_before_render: AtomicBool,
+    pycompat: Arc<AtomicBool>,
 }
 
 #[pymethods]
 impl Environment {
     #[new]
     fn py_new() -> PyResult<Self> {
+        let mut env = minijinja::Environment::new();
+        minijinja_contrib::add_to_environment(&mut env);
+
+        let pycompat = Arc::new(AtomicBool::new(false));
+        let pycompat_weak = Arc::downgrade(&pycompat);
+        env.set_unknown_method_callback(move |state, value, method, args| {
+            if let Some(pycompat) = pycompat_weak.upgrade() {
+                if pycompat.load(Ordering::Relaxed) {
+                    return minijinja_contrib::pycompat::unknown_method_callback(
+                        state, value, method, args,
+                    );
+                }
+            }
+            Err(Error::from(ErrorKind::UnknownMethod))
+        });
+
         Ok(Environment {
             inner: Arc::new(Mutex::new(Inner {
-                env: minijinja::Environment::new(),
+                env,
                 loader: None,
                 auto_escape_callback: None,
                 finalizer_callback: None,
@@ -122,6 +141,7 @@ impl Environment {
                 syntax: None,
             })),
             reload_before_render: AtomicBool::new(false),
+            pycompat,
         })
     }
 
@@ -138,6 +158,19 @@ impl Environment {
     pub fn get_debug(&self) -> PyResult<bool> {
         let inner = self.inner.lock().unwrap();
         Ok(inner.env.debug())
+    }
+
+    /// Enables or disables pycompat mode.
+    #[setter]
+    pub fn set_pycompat(&self, value: bool) -> PyResult<()> {
+        self.pycompat.store(value, Ordering::Relaxed);
+        Ok(())
+    }
+
+    /// Enables or disables pycompat mode.
+    #[getter]
+    pub fn get_pycompat(&self) -> PyResult<bool> {
+        Ok(self.pycompat.load(Ordering::Relaxed))
     }
 
     /// Sets the undefined behavior.

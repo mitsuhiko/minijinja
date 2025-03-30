@@ -2079,6 +2079,7 @@ name = "minijinja-py"
 version = "2.8.0"
 dependencies = [
  "minijinja",
+ "minijinja-contrib",
  "pyo3",
 ]
 

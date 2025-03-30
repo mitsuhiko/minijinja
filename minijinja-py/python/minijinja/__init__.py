@@ -68,6 +68,7 @@ class Environment(_lowlevel.Environment):
         comment_end_string="#}",
         line_statement_prefix=None,
         line_comment_prefix=None,
+        pycompat=True,
     ):
         super().__init__()
         if loader is not None:
@@ -114,6 +115,7 @@ class Environment(_lowlevel.Environment):
         self.comment_end_string = comment_end_string
         self.line_statement_prefix = line_statement_prefix
         self.line_comment_prefix = line_comment_prefix
+        self.pycompat = pycompat
 
     @handle_panic(_lowlevel.Environment.render_str)
     def render_str(self, *args, **kwargs):

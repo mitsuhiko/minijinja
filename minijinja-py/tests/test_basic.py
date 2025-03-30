@@ -488,3 +488,13 @@ def test_load_from_path():
     with pytest.raises(TemplateError) as e:
         env.render_template("../test_basic.py")
     assert e.value.kind == "TemplateNotFound"
+
+
+def test_pycompat():
+    env = Environment()
+    assert env.eval_expr("{'x': 42}.get('x')") == 42
+
+    env.pycompat = False
+    with pytest.raises(TemplateError) as e:
+        assert env.eval_expr("{'x': 42}.get('x')")
+    assert "unknown method: map has no method named get" in e.value.message
