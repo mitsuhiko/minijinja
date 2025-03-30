@@ -432,5 +432,5 @@ fn resolve_numeric_entity(entity: &str) -> Option<char> {
 
 #[test]
 fn test_entities_sorted() {
-    assert!(HTML_ENTITIES.iter().is_sorted());
+    assert!(HTML_ENTITIES.windows(2).all(|w| w[0] <= w[1]));
 }
