@@ -341,7 +341,11 @@ pub fn striptags(s: String) -> String {
 
     macro_rules! push_char {
         ($c:expr) => {
-            if !$c.is_whitespace() || rv.ends_with(|c: char| !c.is_whitespace()) {
+            if $c.is_whitespace() {
+                if rv.ends_with(|c: char| !c.is_whitespace()) {
+                    rv.push(' ');
+                }
+            } else {
                 rv.push($c);
             }
         };
