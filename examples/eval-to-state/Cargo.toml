@@ -7,4 +7,4 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-minijinja = { version = "2.8.0", path = "../../minijinja" }
+minijinja = { version = "2.9.0", path = "../../minijinja" }

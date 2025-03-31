@@ -38,5 +38,5 @@
     "test": "mocha tests"
   },
   "types": "dist/node/minijinja_js.d.ts",
-  "version": "2.8.0"
+  "version": "2.9.0"
 }
