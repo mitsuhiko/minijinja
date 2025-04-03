@@ -236,7 +236,7 @@ Template Behavior:
           [env var: MINIJINJA_ENV]
 
 Security:
-      --no-include
+  --no-include
           Disallow includes and extending for security reasons.
           
           When this is enabled all inclusions and template extension features are disabled entirely.
@@ -245,7 +245,7 @@ Security:
           
           [env var: MINIJINJA_INCLUDE]
 
-      --safe-path <PATH>
+  --safe-path <PATH>
           Only allow includes from this path.
           
           This can be used to better control where includes and layout extensions can load templates
@@ -256,7 +256,7 @@ Security:
           
           [env var: MINIJINJA_SAFE_PATH]
 
-      --fuel <AMOUNT>
+  --fuel <AMOUNT>
           Sets the maximum fuel a template can consume.
           
           When fuel is set, every instruction consumes a certain amount of fuel. Usually 1, some
@@ -307,7 +307,7 @@ Advanced:
           This allows basic experimentation of MiniJinja expressions with some input data.
 
 Shell Support:
-      --generate-completion <SH>
+  --generate-completion <SH>
           Generate a completion script for the given shell and print it to stdout.
           
           This completion script can be added to your shell startup to provide completions for the
