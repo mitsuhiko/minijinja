@@ -46,9 +46,9 @@ Template Behavior:
       --env                Pass environment variables as ENV to the template
 
 Security:
-  --no-include        Disallow includes and extending
-  --safe-path <PATH>  Only allow includes from this path
-  --fuel <AMOUNT>     Configures the maximum fuel
+      --no-include        Disallow includes and extending
+      --safe-path <PATH>  Only allow includes from this path
+      --fuel <AMOUNT>     Configures the maximum fuel
 
 Advanced:
   -E, --expr <EXPR>      Evaluates an template expression
@@ -58,8 +58,8 @@ Advanced:
       --repl             Starts the repl with the given data
 
 Shell Support:
-  --generate-completion <SH>  Generate a completion script for the given shell [possible values:
-                              bash, elvish, fig, fish, nushell, powershell, zsh]
+      --generate-completion <SH>  Generate a completion script for the given shell [possible values:
+                                  bash, elvish, fig, fish, nushell, powershell, zsh]
 
 For a short help use --help, for extended help --long-help, and for help on syntax --syntax-help.
 
