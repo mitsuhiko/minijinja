@@ -17,7 +17,14 @@ impl Output {
                 None
             } else {
                 let filename = std::env::current_dir()?.join(filename);
-                let ntf = NamedTempFile::new_in(
+                #[allow(unused_mut)]
+                let mut builder = tempfile::Builder::new();
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    builder.permissions(std::fs::Permissions::from_mode(0o666));
+                }
+                let ntf = builder.tempfile_in(
                     filename
                         .parent()
                         .ok_or_else(|| anyhow!("cannot write to root"))?,

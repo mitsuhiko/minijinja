@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.10.0
+
+- Fix incorrect permissions when `--output` is used in the CLI.  #772
+
 ## 2.9.0
 
 - Do not panic if too large templates (too many lines or too many
