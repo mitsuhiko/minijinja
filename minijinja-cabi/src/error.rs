@@ -67,11 +67,12 @@ pub unsafe extern "C" fn mj_err_get_debug_info() -> *mut c_char {
                     }
                     let mut source_opt = x.source();
                     while let Some(source) = source_opt {
+                        writeln!(info, "\ncaused by: {source}").unwrap();
                         if let Some(source) = source.downcast_ref::<Error>() {
                             if source.name().is_some() {
                                 let src_info = x.display_debug_info().to_string();
                                 if !src_info.is_empty() {
-                                    writeln!(info, "\ncaused by: {source}\n{src_info}").unwrap();
+                                    writeln!(info, "{src_info}").unwrap();
                                 }
                             }
                         }
