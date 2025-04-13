@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## 2.10.0
 
 - Fix incorrect permissions when `--output` is used in the CLI.  #772
+- Added `mj_err_get_debug_info` to the C-ABI.  #775
 
 ## 2.9.0
 
