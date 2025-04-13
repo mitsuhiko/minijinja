@@ -208,6 +208,11 @@ void mj_env_set_undefined_behavior(struct mj_env *env,
 MINIJINJA_API void mj_err_clear(void);
 
 /*
+ Returns the error's debug info if there is an error.
+ */
+MINIJINJA_API char *mj_err_get_debug_info(void);
+
+/*
  Returns the error's description if there is an error.
  */
 MINIJINJA_API char *mj_err_get_detail(void);

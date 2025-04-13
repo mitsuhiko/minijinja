@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::error::Error as _;
 use std::ffi::{c_char, CString};
+use std::fmt::Write;
 use std::ptr;
 
 use minijinja::{Error, ErrorKind};
@@ -46,6 +47,37 @@ pub extern "C" fn mj_err_print() -> bool {
             false
         }
     })
+}
+
+/// Returns the error's debug info if there is an error.
+///
+/// The value must be freed with `mj_str_free`.
+#[no_mangle]
+pub unsafe extern "C" fn mj_err_get_debug_info() -> *mut c_char {
+    LAST_ERROR
+        .with_borrow(|x| {
+            x.as_ref()
+                .and_then(|x| {
+                    let mut info = String::new();
+                    if x.name().is_some() {
+                        writeln!(info, "{}", x.display_debug_info()).unwrap();
+                    }
+                    let mut source_opt = x.source();
+                    while let Some(source) = source_opt {
+                        writeln!(info, "\ncaused by: {source}").unwrap();
+                        if let Some(source) = source.downcast_ref::<Error>() {
+                            if source.name().is_some() {
+                                writeln!(info, "{}", source.display_debug_info()).unwrap();
+                            }
+                        }
+                        source_opt = source.source();
+                    }
+                    info.into()
+                })
+                .and_then(|info| CString::new(info).ok())
+                .map(|cstr| cstr.into_raw())
+        })
+        .unwrap_or(ptr::null_mut())
 }
 
 /// Returns the error's description if there is an error.
