@@ -18,7 +18,11 @@ static AUTO_ESCAPE_CACHE: Mutex<BTreeMap<String, AutoEscape>> = Mutex::new(BTree
 static MARK_SAFE: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
 
 fn is_safe_attr(name: &str) -> bool {
-    !name.starts_with('_')
+    if matches!(name, "__add__" | "__sub__") {
+        true
+    } else {
+        !name.starts_with('_')
+    }
 }
 
 fn is_dictish(val: &Bound<'_, PyAny>) -> bool {
