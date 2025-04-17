@@ -60,14 +60,20 @@ pub unsafe extern "C" fn mj_err_get_debug_info() -> *mut c_char {
                 .and_then(|x| {
                     let mut info = String::new();
                     if x.name().is_some() {
-                        writeln!(info, "{}", x.display_debug_info()).unwrap();
+                        let err_info = x.display_debug_info().to_string();
+                        if !err_info.is_empty() {
+                            writeln!(info, "{err_info}").unwrap();
+                        }
                     }
                     let mut source_opt = x.source();
                     while let Some(source) = source_opt {
                         writeln!(info, "\ncaused by: {source}").unwrap();
                         if let Some(source) = source.downcast_ref::<Error>() {
                             if source.name().is_some() {
-                                writeln!(info, "{}", source.display_debug_info()).unwrap();
+                                let src_info = x.display_debug_info().to_string();
+                                if !src_info.is_empty() {
+                                    writeln!(info, "{src_info}").unwrap();
+                                }
                             }
                         }
                         source_opt = source.source();
