@@ -1,0 +1,7 @@
+{
+}
+---
+{% set x = 23 %}
+{% import 'import-mixed.txt' as module %}
+{{ module|tojson }}
+|||{{ module }}|||

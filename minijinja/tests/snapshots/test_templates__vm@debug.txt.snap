@@ -122,6 +122,7 @@ State {
             "call_macro.txt",
             "debug.txt",
             "example_macro.txt",
+            "import-mixed.txt",
             "include_with_var_and_macro.txt",
             "layout_with_var.txt",
             "self-extends.txt",

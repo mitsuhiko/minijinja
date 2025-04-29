@@ -1,1 +1,2 @@
 Text from an included template
+{% set x = 42 %}

@@ -1,0 +1,8 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{% set x = 23 %}\n{% import 'import-mixed.txt' as module %}\n{{ module|tojson }}\n|||{{ module }}|||"
+info: {}
+input_file: minijinja/tests/inputs/import_all.txt
+---
+{"output":42}
+|||This is the body 23|||
