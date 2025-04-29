@@ -31,6 +31,8 @@ mod fuel;
 mod loop_object;
 #[cfg(feature = "macros")]
 mod macro_object;
+#[cfg(feature = "multi_template")]
+mod module_object;
 mod state;
 
 // the cost of a single include against the stack limit.
@@ -664,12 +666,15 @@ impl<'env> Vm<'env> {
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::ExportLocals => {
+                    let captured = stack.pop();
                     let locals = state.ctx.current_locals_mut();
-                    let mut module = value_map_with_capacity(locals.len());
+                    let mut values = value_map_with_capacity(locals.len());
                     for (key, value) in locals.iter() {
-                        module.insert(Value::from(*key), value.clone());
+                        values.insert(Value::from(*key), value.clone());
                     }
-                    stack.push(Value::from_object(module));
+                    stack.push(Value::from_object(crate::vm::module_object::Module::new(
+                        values, captured,
+                    )));
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::CallBlock(name) => {

@@ -6,6 +6,10 @@ All notable changes to MiniJinja are documented here.
 
 - Fix incorrect permissions when `--output` is used in the CLI.  #772
 - Added `mj_err_get_debug_info` to the C-ABI.  #775
+- Modules now capture their output like they do in Jinja2.  This
+  means that if you do `{% import 'template.j2' as x %}` and you
+  then render `{{ x }}` the output of `template.j2` is rendered as
+  if it was included.  #778
 
 ## 2.9.0
 

@@ -1,6 +1,6 @@
 {
     "rust-analyzer.cargo.allFeatures": true,
-    "rust-analyzer.checkOnSave.command": "clippy",
     "python.formatting.provider": "black",
-    "python.REPL.enableREPLSmartSend": false
+    "python.REPL.enableREPLSmartSend": false,
+    "rust-analyzer.check.command": "clippy"
 }
