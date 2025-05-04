@@ -87,8 +87,41 @@ fn get_offset_and_len<F: FnOnce() -> usize>(
     }
 }
 
+fn range_step_backwards(
+    start_was_none: bool,
+    start: i64,
+    stop: Option<i64>,
+    step: usize,
+    end: usize,
+) -> impl Iterator<Item = usize> {
+    let start = if start_was_none {
+        end.saturating_sub(1)
+    } else if start >= 0 {
+        if start as usize >= end {
+            end.saturating_sub(1)
+        } else {
+            start as usize
+        }
+    } else {
+        (end as i64 + start).max(0) as usize
+    };
+    let stop = match stop {
+        None => 0,
+        Some(stop) if stop < 0 => (end as i64 + stop).max(0) as usize,
+        Some(stop) => stop as usize,
+    };
+    let length = if stop == 0 {
+        (start + step) / step
+    } else {
+        (start - stop + step - 1) / step
+    };
+    std::iter::successors(Some(start), move |&i| i.checked_sub(step)).take(length)
+}
+
 pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Value, Error> {
-    let start: i64 = if start.is_none() {
+    let start_was_none = start.is_none();
+
+    let start: i64 = if start_was_none {
         0
     } else {
         ok!(start.try_into())
@@ -99,9 +132,9 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         Some(ok!(i64::try_from(stop)))
     };
     let step = if step.is_none() {
-        1
+        1i64
     } else {
-        ok!(u64::try_from(step)) as usize
+        ok!(i64::try_from(step))
     };
     if step == 0 {
         return Err(Error::new(
@@ -119,33 +152,74 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     match value.0 {
         ValueRepr::String(..) | ValueRepr::SmallStr(_) => {
             let s = value.as_str().unwrap();
-            let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
-            Ok(Value::from(
-                s.chars()
-                    .skip(start)
-                    .take(len)
-                    .step_by(step)
-                    .collect::<String>(),
-            ))
+            if step > 0 {
+                let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
+                Ok(Value::from(
+                    s.chars()
+                        .skip(start)
+                        .take(len)
+                        .step_by(step as usize)
+                        .collect::<String>(),
+                ))
+            } else {
+                let chars: Vec<char> = s.chars().collect();
+                Ok(Value::from(
+                    range_step_backwards(start_was_none, start, stop, -step as usize, chars.len())
+                        .map(move |i| chars[i])
+                        .collect::<String>(),
+                ))
+            }
         }
         ValueRepr::Bytes(ref b) => {
-            let (start, len) = get_offset_and_len(start, stop, || b.len());
-            Ok(Value::from_bytes(
-                b.get(start..start + len).unwrap_or_default().to_owned(),
-            ))
+            if step > 0 {
+                let (start, len) = get_offset_and_len(start, stop, || b.len());
+                Ok(Value::from_bytes(
+                    b.iter()
+                        .skip(start)
+                        .take(len)
+                        .step_by(step as usize)
+                        .copied()
+                        .collect(),
+                ))
+            } else {
+                Ok(Value::from_bytes(
+                    range_step_backwards(start_was_none, start, stop, -step as usize, b.len())
+                        .map(|i| b[i])
+                        .collect::<Vec<u8>>(),
+                ))
+            }
         }
         ValueRepr::Undefined(_) | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
         ValueRepr::Object(obj) if matches!(obj.repr(), ObjectRepr::Seq | ObjectRepr::Iterable) => {
-            Ok(Value::make_object_iterable(obj, move |obj| {
+            if step > 0 {
                 let len = obj.enumerator_len().unwrap_or_default();
                 let (start, len) = get_offset_and_len(start, stop, || len);
-                // The manual match here is important that we do not mess up the size_hint
-                if let Some(iter) = obj.try_iter() {
-                    Box::new(iter.skip(start).take(len).step_by(step))
-                } else {
-                    Box::new(None.into_iter())
-                }
-            }))
+                Ok(Value::make_object_iterable(obj, move |obj| {
+                    if let Some(iter) = obj.try_iter() {
+                        Box::new(iter.skip(start).take(len).step_by(step as usize))
+                    } else {
+                        Box::new(None.into_iter())
+                    }
+                }))
+            } else {
+                Ok(Value::make_object_iterable(obj.clone(), move |obj| {
+                    if let Some(iter) = obj.try_iter() {
+                        let vec: Vec<Value> = iter.collect();
+                        Box::new(
+                            range_step_backwards(
+                                start_was_none,
+                                start,
+                                stop,
+                                -step as usize,
+                                vec.len(),
+                            )
+                            .map(move |i| vec[i].clone()),
+                        )
+                    } else {
+                        Box::new(None.into_iter())
+                    }
+                }))
+            }
         }
         _ => error,
     }
@@ -498,6 +572,147 @@ mod tests {
         assert_eq!(
             string_concat(Value::from(23), &Value::from(42)),
             Value::from("2342")
+        );
+    }
+
+    #[test]
+    fn test_slicing() {
+        let v = Value::from(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+        // [::] - full slice
+        assert_eq!(
+            slice(v.clone(), Value::from(()), Value::from(()), Value::from(())).unwrap(),
+            Value::from(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        );
+
+        // [::2] - every 2nd element
+        assert_eq!(
+            slice(v.clone(), Value::from(()), Value::from(()), Value::from(2)).unwrap(),
+            Value::from(vec![0, 2, 4, 6, 8])
+        );
+
+        // [1:2:2] - slice with start, stop, step
+        assert_eq!(
+            slice(v.clone(), Value::from(1), Value::from(2), Value::from(2)).unwrap(),
+            Value::from(vec![1])
+        );
+
+        // [::-2] - reverse with step of 2
+        assert_eq!(
+            slice(v.clone(), Value::from(()), Value::from(()), Value::from(-2)).unwrap(),
+            Value::from(vec![9, 7, 5, 3, 1])
+        );
+
+        // [2::-2] - from index 2 to start, reverse with step of 2
+        assert_eq!(
+            slice(v.clone(), Value::from(2), Value::from(()), Value::from(-2)).unwrap(),
+            Value::from(vec![2, 0])
+        );
+
+        // [4:2:-2] - from index 4 to 2, reverse with step of 2
+        assert_eq!(
+            slice(v.clone(), Value::from(4), Value::from(2), Value::from(-2)).unwrap(),
+            Value::from(vec![4])
+        );
+
+        // [8:3:-2] - from index 8 to 3, reverse with step of 2
+        assert_eq!(
+            slice(v.clone(), Value::from(8), Value::from(3), Value::from(-2)).unwrap(),
+            Value::from(vec![8, 6, 4])
+        );
+    }
+
+    #[test]
+    fn test_string_slicing() {
+        let s = Value::from("abcdefghij");
+
+        // [::] - full slice
+        assert_eq!(
+            slice(s.clone(), Value::from(()), Value::from(()), Value::from(())).unwrap(),
+            Value::from("abcdefghij")
+        );
+
+        // [::2] - every 2nd character
+        assert_eq!(
+            slice(s.clone(), Value::from(()), Value::from(()), Value::from(2)).unwrap(),
+            Value::from("acegi")
+        );
+
+        // [1:2:2] - slice with start, stop, step
+        assert_eq!(
+            slice(s.clone(), Value::from(1), Value::from(2), Value::from(2)).unwrap(),
+            Value::from("b")
+        );
+
+        // [::-2] - reverse with step of 2
+        assert_eq!(
+            slice(s.clone(), Value::from(()), Value::from(()), Value::from(-2)).unwrap(),
+            Value::from("jhfdb")
+        );
+
+        // [2::-2] - from index 2 to start, reverse with step of 2
+        assert_eq!(
+            slice(s.clone(), Value::from(2), Value::from(()), Value::from(-2)).unwrap(),
+            Value::from("ca")
+        );
+
+        // [4:2:-2] - from index 4 to 2, reverse with step of 2
+        assert_eq!(
+            slice(s.clone(), Value::from(4), Value::from(2), Value::from(-2)).unwrap(),
+            Value::from("e")
+        );
+
+        // [8:3:-2] - from index 8 to 3, reverse with step of 2
+        assert_eq!(
+            slice(s.clone(), Value::from(8), Value::from(3), Value::from(-2)).unwrap(),
+            Value::from("ige")
+        );
+    }
+
+    #[test]
+    fn test_bytes_slicing() {
+        let s = Value::from_bytes(b"abcdefghij".to_vec());
+
+        // [::] - full slice
+        assert_eq!(
+            slice(s.clone(), Value::from(()), Value::from(()), Value::from(())).unwrap(),
+            Value::from_bytes(b"abcdefghij".to_vec())
+        );
+
+        // [::2] - every 2nd character
+        assert_eq!(
+            slice(s.clone(), Value::from(()), Value::from(()), Value::from(2)).unwrap(),
+            Value::from_bytes(b"acegi".to_vec())
+        );
+
+        // [1:2:2] - slice with start, stop, step
+        assert_eq!(
+            slice(s.clone(), Value::from(1), Value::from(2), Value::from(2)).unwrap(),
+            Value::from_bytes(b"b".to_vec())
+        );
+
+        // [::-2] - reverse with step of 2
+        assert_eq!(
+            slice(s.clone(), Value::from(()), Value::from(()), Value::from(-2)).unwrap(),
+            Value::from_bytes(b"jhfdb".to_vec())
+        );
+
+        // [2::-2] - from index 2 to start, reverse with step of 2
+        assert_eq!(
+            slice(s.clone(), Value::from(2), Value::from(()), Value::from(-2)).unwrap(),
+            Value::from_bytes(b"ca".to_vec())
+        );
+
+        // [4:2:-2] - from index 4 to 2, reverse with step of 2
+        assert_eq!(
+            slice(s.clone(), Value::from(4), Value::from(2), Value::from(-2)).unwrap(),
+            Value::from_bytes(b"e".to_vec())
+        );
+
+        // [8:3:-2] - from index 8 to 3, reverse with step of 2
+        assert_eq!(
+            slice(s.clone(), Value::from(8), Value::from(3), Value::from(-2)).unwrap(),
+            Value::from_bytes(b"ige".to_vec())
         );
     }
 }
