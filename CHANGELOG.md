@@ -10,6 +10,9 @@ All notable changes to MiniJinja are documented here.
   means that if you do `{% import 'template.j2' as x %}` and you
   then render `{{ x }}` the output of `template.j2` is rendered as
   if it was included.  #778
+- Improved compatibility with Jinja2 for slicing.  Negative steps
+  are now correctly handled.  Additionally slicing on bytes now
+  correctly handles steps other than 1.  #781
 
 ## 2.9.0
 
