@@ -141,6 +141,7 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
+          alias apt-get="apt-get --assume-yes"
           ${{ matrix.packages_install }}
       - name: Build artifacts
         run: |
