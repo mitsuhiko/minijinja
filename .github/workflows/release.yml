@@ -138,6 +138,8 @@ jobs:
           path: target/distrib/
           merge-multiple: true
       - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
           ${{ matrix.packages_install }}
       - name: Build artifacts

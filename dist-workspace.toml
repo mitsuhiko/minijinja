@@ -19,6 +19,8 @@ precise-builds = true
 install-path = ["$MINIJINJA_CLI_INSTALL_DIR/bin", "~/.local/bin"]
 # Whether to install an updater program
 install-updater = false
+# We're doing some changes to the CI config to work around bugs.
+allow-dirty = ["ci"]
 
 [dist.dependencies.apt]
 gcc-aarch64-linux-gnu = { version = '*' }
