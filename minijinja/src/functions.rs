@@ -182,7 +182,7 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 ///
 /// # Optional Arguments
 ///
-/// ```jinja
+/// ```
 /// # use minijinja::Environment;
 /// # let mut env = Environment::new();
 /// fn substr(value: String, start: u32, end: Option<u32>) -> String {
