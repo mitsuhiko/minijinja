@@ -230,6 +230,8 @@ macro_rules! tuple_impls {
             Rv: FunctionResult,
             $($name: for<'a> ArgType<'a>,)*
         {
+            // Need to allow this lint for the one-element tuple case.
+            #[allow(clippy::needless_lifetimes)]
             fn invoke<'a>(&self, args: ($(<$name as ArgType<'a>>::Output,)*), _: SealedMarker) -> Rv {
                 self.invoke_nested(args)
             }
