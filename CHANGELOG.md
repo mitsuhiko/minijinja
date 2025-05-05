@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.10.2
+
+* Fixed an issue with the function bounds that caused the
+  next-generation trait resolver to fail.  #787
+
 ## 2.10.1
 
 - Re-release of 2.10.0 because of a broken release process.
