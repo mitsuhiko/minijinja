@@ -62,10 +62,11 @@ pub fn coerce<'x>(a: &'x Value, b: &'x Value, lossy: bool) -> Option<CoerceResul
 }
 
 fn get_offset_and_len<F: FnOnce() -> usize>(
-    start: i64,
+    start: Option<i64>,
     stop: Option<i64>,
     end: F,
 ) -> (usize, usize) {
+    let start = start.unwrap_or(0);
     if start < 0 || stop.map_or(true, |x| x < 0) {
         let end = end();
         let start = if start < 0 {
@@ -88,22 +89,16 @@ fn get_offset_and_len<F: FnOnce() -> usize>(
 }
 
 fn range_step_backwards(
-    start_was_none: bool,
-    start: i64,
+    start: Option<i64>,
     stop: Option<i64>,
     step: usize,
     end: usize,
 ) -> impl Iterator<Item = usize> {
-    let start = if start_was_none {
-        end.saturating_sub(1)
-    } else if start >= 0 {
-        if start as usize >= end {
-            end.saturating_sub(1)
-        } else {
-            start as usize
-        }
-    } else {
-        (end as i64 + start).max(0) as usize
+    let start = match start {
+        None => end.saturating_sub(1),
+        Some(start) if start >= end as i64 => end.saturating_sub(1),
+        Some(start) if start >= 0 => start as usize,
+        Some(start) => (end as i64 + start).max(0) as usize,
     };
     let stop = match stop {
         None => 0,
@@ -115,16 +110,14 @@ fn range_step_backwards(
     } else {
         (start - stop + step - 1) / step
     };
-    std::iter::successors(Some(start), move |&i| i.checked_sub(step)).take(length)
+    (stop..=start).rev().step_by(step).take(length)
 }
 
 pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Value, Error> {
-    let start_was_none = start.is_none();
-
-    let start: i64 = if start_was_none {
-        0
+    let start = if start.is_none() {
+        None
     } else {
-        ok!(start.try_into())
+        Some(ok!(start.try_into()))
     };
     let stop = if stop.is_none() {
         None
@@ -164,7 +157,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
             } else {
                 let chars: Vec<char> = s.chars().collect();
                 Ok(Value::from(
-                    range_step_backwards(start_was_none, start, stop, -step as usize, chars.len())
+                    range_step_backwards(start, stop, -step as usize, chars.len())
                         .map(move |i| chars[i])
                         .collect::<String>(),
                 ))
@@ -183,7 +176,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
                 ))
             } else {
                 Ok(Value::from_bytes(
-                    range_step_backwards(start_was_none, start, stop, -step as usize, b.len())
+                    range_step_backwards(start, stop, -step as usize, b.len())
                         .map(|i| b[i])
                         .collect::<Vec<u8>>(),
                 ))
@@ -206,14 +199,8 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
                     if let Some(iter) = obj.try_iter() {
                         let vec: Vec<Value> = iter.collect();
                         Box::new(
-                            range_step_backwards(
-                                start_was_none,
-                                start,
-                                stop,
-                                -step as usize,
-                                vec.len(),
-                            )
-                            .map(move |i| vec[i].clone()),
+                            range_step_backwards(start, stop, -step as usize, vec.len())
+                                .map(move |i| vec[i].clone()),
                         )
                     } else {
                         Box::new(None.into_iter())
