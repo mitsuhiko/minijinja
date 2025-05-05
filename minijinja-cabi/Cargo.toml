@@ -1,10 +1,10 @@
 [package]
 name = "minijinja-cabi"
-version = "2.10.0"
+version = "2.10.1"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-minijinja = { version = "2.10.0", path = "../minijinja", features = ["loader", "custom_syntax"] }
+minijinja = { version = "2.10.1", path = "../minijinja", features = ["loader", "custom_syntax"] }

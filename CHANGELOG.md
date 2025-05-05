@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.10.1
+
+- Re-release of 2.10.0 because of a broken release process.
+
 ## 2.10.0
 
 - Fix incorrect permissions when `--output` is used in the CLI.  #772
