@@ -615,7 +615,7 @@ impl<'source> CodeGenerator<'source> {
                 if let Some(ref start) = s.start {
                     self.compile_expr(start);
                 } else {
-                    self.add(Instruction::LoadConst(Value::from(0)));
+                    self.add(Instruction::LoadConst(Value::from(())));
                 }
                 if let Some(ref stop) = s.stop {
                     self.compile_expr(stop);
@@ -625,7 +625,7 @@ impl<'source> CodeGenerator<'source> {
                 if let Some(ref step) = s.step {
                     self.compile_expr(step);
                 } else {
-                    self.add(Instruction::LoadConst(Value::from(1)));
+                    self.add(Instruction::LoadConst(Value::from(())));
                 }
                 self.add(Instruction::Slice);
                 self.pop_span();
