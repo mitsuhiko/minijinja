@@ -203,20 +203,35 @@ pub trait Function<Rv, Args: for<'a> FunctionArgs<'a>>: Send + Sync + 'static {
     fn invoke(&self, args: <Args as FunctionArgs<'_>>::Output, _: SealedMarker) -> Rv;
 }
 
+// This is necessary to avoid a bug in the trait solver. See
+// https://github.com/mitsuhiko/minijinja/pull/787 for more details.
+trait FunctionHelper<Rv, Args> {
+    fn invoke_nested(&self, args: Args) -> Rv;
+}
+
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
+        impl<Func, Rv, $($name),*> FunctionHelper<Rv, ($($name,)*)> for Func
+        where
+            Func: Fn($($name),*) -> Rv
+        {
+            fn invoke_nested(&self, args: ($($name,)*)) -> Rv {
+                #[allow(non_snake_case)]
+                let ($($name,)*) = args;
+                (self)($($name,)*)
+            }
+        }
+
         impl<Func, Rv, $($name),*> Function<Rv, ($($name,)*)> for Func
         where
             Func: Send + Sync + 'static,
             // the crazy bounds here exist to enable borrowing in closures
-            Func: Fn($($name),*) -> Rv + for<'a> Fn($(<$name as ArgType<'a>>::Output),*) -> Rv,
+            Func: Fn($($name),*) -> Rv + for<'a> FunctionHelper<Rv, ($(<$name as ArgType<'a>>::Output,)*)>,
             Rv: FunctionResult,
             $($name: for<'a> ArgType<'a>,)*
         {
             fn invoke<'a>(&self, args: ($(<$name as ArgType<'a>>::Output,)*), _: SealedMarker) -> Rv {
-                #[allow(non_snake_case)]
-                let ($($name,)*) = args;
-                (self)($($name,)*)
+                self.invoke_nested(args)
             }
         }
     };
