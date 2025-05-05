@@ -197,21 +197,23 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 /// {{ "Foo Bar Baz"|substr(4) }} -> Bar Baz
 /// {{ "Foo Bar Baz"|substr(4, 7) }} -> Bar
 /// ```
-pub trait Function<Rv, Args>: Send + Sync + 'static {
+pub trait Function<Rv, Args: for<'a> FunctionArgs<'a>>: Send + Sync + 'static {
     /// Calls a function with the given arguments.
     #[doc(hidden)]
-    fn invoke(&self, args: Args, _: SealedMarker) -> Rv;
+    fn invoke(&self, args: <Args as FunctionArgs<'_>>::Output, _: SealedMarker) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
         impl<Func, Rv, $($name),*> Function<Rv, ($($name,)*)> for Func
         where
-            Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
+            Func: Send + Sync + 'static,
+            // the crazy bounds here exist to enable borrowing in closures
+            Func: Fn($($name),*) -> Rv + for<'a> Fn($(<$name as ArgType<'a>>::Output),*) -> Rv,
             Rv: FunctionResult,
             $($name: for<'a> ArgType<'a>,)*
         {
-            fn invoke(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
+            fn invoke<'a>(&self, args: ($(<$name as ArgType<'a>>::Output,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
                 (self)($($name,)*)
@@ -231,7 +233,7 @@ impl BoxedFunction {
     /// Creates a new boxed filter.
     pub fn new<F, Rv, Args>(f: F) -> BoxedFunction
     where
-        F: Function<Rv, Args> + for<'a> Function<Rv, <Args as FunctionArgs<'a>>::Output>,
+        F: Function<Rv, Args>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
