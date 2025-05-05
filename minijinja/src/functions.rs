@@ -213,6 +213,9 @@ macro_rules! tuple_impls {
             Rv: FunctionResult,
             $($name: for<'a> ArgType<'a>,)*
         {
+            // eliding the lifetime here causes issues, so we need to silence the clippy
+            // warning.  See https://github.com/mitsuhiko/minijinja/pull/788
+            #[allow(clippy::needless_lifetimes)]
             fn invoke<'a>(&self, args: ($(<$name as ArgType<'a>>::Output,)*), _: SealedMarker) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
