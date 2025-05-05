@@ -13,7 +13,7 @@ MiniJinja is a powerful but minimal dependency template engine for Rust which
 is based on the syntax and behavior of the
 [Jinja2](https://jinja.palletsprojects.com/) template engine for Python.
 
-It's implemented on top of `serde` and only has it as a single required
+It's supports all `serde` types and only has it as a single required
 dependency. It supports [a range of features from Jinja2](https://github.com/mitsuhiko/minijinja/blob/main/COMPATIBILITY.md)
 including inheritance, filters and more.  The goal is that it should be possible
 to use some templates in Rust programs without the fear of pulling in complex
@@ -80,37 +80,6 @@ fn main() {
 }
 ```
 
-## Use Cases and Users
-
-Here are some interesting Open Source users and use cases of MiniJinja.  The examples link directly to where
-the engine is used so you can see how it's utilized:
-
-* HTML Generation:
-  * **[Zine](https://github.com/zineland/zine)** uses it to [generate static HTML](https://github.com/zineland/zine/blob/17285efe9f9a63b79a42a738b54d4d730b8cd551/src/engine.rs#L8)
-  * **[Oranda](https://github.com/axodotdev/oranda)** uses it to [generate HTML landing pages](https://github.com/axodotdev/oranda/blob/fb97859c99ab81f644ab5b1449f725fc5c3e9721/src/site/templates.rs)
-
-* Code Generation:
-  * **[OpenTelemetry's Weaver](https://github.com/open-telemetry/weaver)** uses it to [generate documentation, code and other outputs](https://github.com/open-telemetry/weaver/blob/d49881445e09beb42e1a394bfa5f3068c660daf3/crates/weaver_forge/src/lib.rs#L482-L567) from the OTel specification.
-
-* Structure Generation:
-  * **[Astral's Rye](https://rye.astral.sh/)** is using it to [generate project structures](https://github.com/astral-sh/rye/blob/c60682fb6bb5c9a0cc2669f263eeed99d2e5be71/rye/src/cli/init.rs)
-  * **[Maturin](https://github.com/PyO3/maturin)** uses it to [generate project structures](https://github.com/PyO3/maturin/blob/e35097e6cf3b9115736e8ae208972178029a20d0/src/new_project.rs)
-  * **[cargo-dist](https://github.com/axodotdev/cargo-dist)** uses it to [generate CI and project configuration](https://github.com/axodotdev/cargo-dist/blob/4cd61134863f54ca5a037400ebec71d039d42742/cargo-dist/src/backend/templates.rs)
-
-* AI Chat Templating:
-  * **[HuggingFace](https://huggingface.co/docs/text-generation-inference/index)** uses it to [render LLM chat templates](https://github.com/huggingface/text-generation-inference/blob/0759ec495e15a865d2a59befc2b796b5acc09b50/router/src/infer/mod.rs)
-  * **[mistral.rs](https://github.com/EricLBuehler/mistral.rs)** uses it to [render LLM chat templates](https://github.com/EricLBuehler/mistral.rs/blob/c834f59fe0b3b020a56cb6a0279a051370554539/mistralrs-core/src/pipeline/chat_template.rs)
-  * **[BoundaryML's BAML](https://docs.boundaryml.com/)** uses it to [render LLM chat templates](https://github.com/BoundaryML/baml/blob/17123de7ea653f51547576169bb0589d39053edc/engine/baml-lib/jinja/src/lib.rs)
-  * **[LSP-AI](https://github.com/SilasMarvin/lsp-ai)** uses it to [render LLM chat templates](https://github.com/SilasMarvin/lsp-ai/blob/1f70756c5b48e9098d64a7c5ce63ac803bc5d0ab/crates/lsp-ai/src/template.rs)
-  * **[LoRAX](https://loraexchange.ai/)** uses it to [render LLM chat templates](https://github.com/predibase/lorax/blob/6a83954b8c6ffd51eb69e7096ee2730d53b903dd/router/src/infer.rs)
-  * **[tensorzero](https://www.tensorzero.com/)** uses it to [render LLM and system templates](https://github.com/tensorzero/tensorzero/blob/26ae697f219c1f0385fe7936b9f04b97ff318f61/tensorzero-internal/src/minijinja_util.rs#L2)
-
-* Data and Processing:
-  * **[Cube](https://cube.dev/docs/product/data-modeling/dynamic/jinja)** uses it [for data modelling](https://github.com/cube-js/cube/tree/db11c121c77c663845242366d3d972b9bc30ae54/packages/cubejs-backend-native/src/template/mj_value)
-  * **[PRQL](https://prql-lang.org/)** uses it [to handle DBT style pipelines](https://github.com/PRQL/prql/blob/59fb3cc4b9b6c9e195c928b1ba1134e2c5706ea3/prqlc/prqlc/src/cli/jinja.rs#L21)
-  * **[qsv](https://qsv.dathere.com)** uses it [to render templates from CSV files](https://github.com/jqnatividad/qsv/blob/master/src/cmd/template.rs#L2) and to [construct payloads to post to web services](https://github.com/jqnatividad/qsv/blob/master/src/cmd/fetchpost.rs#L3).
-
-
 ## Getting Help
 
 If you are stuck with `MiniJinja`, have suggestions or need help, you can use the
@@ -131,19 +100,44 @@ If you are stuck with `MiniJinja`, have suggestions or need help, you can use th
 * [minijinja-cli](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli): a command line utility.
 * [minijinja-cabi](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cabi): a C binding to MiniJinja.
 
+## Use Cases and Users
+
+Here are some interesting Open Source users and use cases of MiniJinja.  The examples link directly to where
+the engine is used so you can see how it's utilized:
+
+* AI Chat Templating:
+  * **[HuggingFace](https://huggingface.co/docs/text-generation-inference/index)** uses it to [render LLM chat templates](https://github.com/huggingface/text-generation-inference/blob/0759ec495e15a865d2a59befc2b796b5acc09b50/router/src/infer/mod.rs)
+  * **[mistral.rs](https://github.com/EricLBuehler/mistral.rs)** uses it to [render LLM chat templates](https://github.com/EricLBuehler/mistral.rs/blob/c834f59fe0b3b020a56cb6a0279a051370554539/mistralrs-core/src/pipeline/chat_template.rs)
+  * **[BoundaryML's BAML](https://docs.boundaryml.com/)** uses it to [render LLM chat templates](https://github.com/BoundaryML/baml/blob/17123de7ea653f51547576169bb0589d39053edc/engine/baml-lib/jinja/src/lib.rs)
+  * **[LSP-AI](https://github.com/SilasMarvin/lsp-ai)** uses it to [render LLM chat templates](https://github.com/SilasMarvin/lsp-ai/blob/1f70756c5b48e9098d64a7c5ce63ac803bc5d0ab/crates/lsp-ai/src/template.rs)
+  * **[LoRAX](https://loraexchange.ai/)** uses it to [render LLM chat templates](https://github.com/predibase/lorax/blob/6a83954b8c6ffd51eb69e7096ee2730d53b903dd/router/src/infer.rs)
+  * **[tensorzero](https://www.tensorzero.com/)** uses it to [render LLM and system templates](https://github.com/tensorzero/tensorzero/blob/26ae697f219c1f0385fe7936b9f04b97ff318f61/tensorzero-internal/src/minijinja_util.rs#L2)
+
+* Data and Processing:
+  * **[Cube](https://cube.dev/docs/product/data-modeling/dynamic/jinja)** uses it [for data modelling](https://github.com/cube-js/cube/tree/db11c121c77c663845242366d3d972b9bc30ae54/packages/cubejs-backend-native/src/template/mj_value)
+  * **[PRQL](https://prql-lang.org/)** uses it [to handle DBT style pipelines](https://github.com/PRQL/prql/blob/59fb3cc4b9b6c9e195c928b1ba1134e2c5706ea3/prqlc/prqlc/src/cli/jinja.rs#L21)
+  * **[qsv](https://qsv.dathere.com)** uses it [to render templates from CSV files](https://github.com/jqnatividad/qsv/blob/master/src/cmd/template.rs#L2) and to [construct payloads to post to web services](https://github.com/jqnatividad/qsv/blob/master/src/cmd/fetchpost.rs#L3).
+
+* HTML Generation:
+  * **[Zine](https://github.com/zineland/zine)** uses it to [generate static HTML](https://github.com/zineland/zine/blob/17285efe9f9a63b79a42a738b54d4d730b8cd551/src/engine.rs#L8)
+  * **[Oranda](https://github.com/axodotdev/oranda)** uses it to [generate HTML landing pages](https://github.com/axodotdev/oranda/blob/fb97859c99ab81f644ab5b1449f725fc5c3e9721/src/site/templates.rs)
+
+* Code Generation:
+  * **[OpenTelemetry's Weaver](https://github.com/open-telemetry/weaver)** uses it to [generate documentation, code and other outputs](https://github.com/open-telemetry/weaver/blob/d49881445e09beb42e1a394bfa5f3068c660daf3/crates/weaver_forge/src/lib.rs#L482-L567) from the OTel specification.
+  * **[Maturin](https://github.com/PyO3/maturin)** uses it to [generate project structures](https://github.com/PyO3/maturin/blob/e35097e6cf3b9115736e8ae208972178029a20d0/src/new_project.rs)
+  * **[cargo-dist](https://github.com/axodotdev/cargo-dist)** uses it to [generate CI and project configuration](https://github.com/axodotdev/cargo-dist/blob/4cd61134863f54ca5a037400ebec71d039d42742/cargo-dist/src/backend/templates.rs)
+
 ## Similar Projects
 
 These are related template engines for Rust:
 
 * [Askama](https://crates.io/crates/askama): Jinja inspired, type-safe, requires template
   precompilation. Has significant divergence from Jinja syntax in parts.
-* [Rinja](https://crates.io/crates/rinja): Jinja inspired, type-safe, requires template
-  precompilation. Has significant divergence from Jinja syntax in parts.
 * [Tera](https://crates.io/crates/tera): Jinja inspired, dynamic, has divergences from Jinja.
-* [TinyTemplate](https://crates.io/crates/tinytemplate): minimal footprint template engine
-  with syntax that takes lose inspiration from Jinja and handlebars.
 * [Liquid](https://crates.io/crates/liquid): an implementation of Liquid templates for Rust.
   Liquid was inspired by Django from which Jinja took it's inspiration.
+* [TinyTemplate](https://crates.io/crates/tinytemplate): minimal footprint template engine
+  with syntax that takes lose inspiration from Jinja and handlebars.
 
 ## Sponsor
 
