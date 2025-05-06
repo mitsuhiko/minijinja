@@ -34,6 +34,8 @@ jobs:
         run: make check
       - name: Test
         run: make test
+      - name: -Znext-solver
+        run: RUSTFLAGS="-Znext-solver" cargo check --all --all-features
 
   test-32bit:
     name: Check on 1.70.0 (32bit)
