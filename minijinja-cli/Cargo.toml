@@ -1,6 +1,6 @@
 [package]
 name = "minijinja-cli"
-version = "2.10.1"
+version = "2.10.2"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
@@ -37,7 +37,7 @@ clap = { version = "4.3.21", default-features = false, features = [
     "usage",
     "error-context",
 ] }
-minijinja = { version = "=2.10.1", path = "../minijinja", features = [
+minijinja = { version = "=2.10.2", path = "../minijinja", features = [
     "loader",
     "json",
     "urlencode",
@@ -46,7 +46,7 @@ minijinja = { version = "=2.10.1", path = "../minijinja", features = [
     "custom_syntax",
     "loop_controls"
 ] }
-minijinja-contrib = { version = "=2.10.1", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand", "unicode_wordwrap", "wordcount"] }
+minijinja-contrib = { version = "=2.10.2", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand", "unicode_wordwrap", "wordcount"] }
 rustyline = { version = "14.0.0", optional = true }
 serde = { version = "1.0.183", features = ["derive", "rc"] }
 serde_json = "1.0.105"
