@@ -147,24 +147,43 @@ impl TestResult for bool {
 /// ```jinja
 /// {{ "foo" is containing("o") }} -> true
 /// ```
-pub trait Test<Rv, Args>: Send + Sync + 'static {
+pub trait Test<Rv, Args: for<'a> FunctionArgs<'a>>: Send + Sync + 'static {
     /// Performs a test to value with the given arguments.
     #[doc(hidden)]
-    fn perform(&self, args: Args, _: SealedMarker) -> Rv;
+    fn perform(&self, args: <Args as FunctionArgs<'_>>::Output, _: SealedMarker) -> Rv;
+}
+
+// This is necessary to avoid a bug in the trait solver. See
+// https://github.com/mitsuhiko/minijinja/pull/787 for more details.
+trait TestHelper<Rv, Args> {
+    fn perform_nested(&self, args: Args) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<Func, Rv, $($name),*> Test<Rv, ($($name,)*)> for Func
+        impl<Func, Rv, $($name),*> TestHelper<Rv, ($($name,)*)> for Func
         where
-            Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
-            Rv: TestResult,
-            $($name: for<'a> ArgType<'a>),*
+            Func: Fn($($name),*) -> Rv,
         {
-            fn perform(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
+            fn perform_nested(&self, args: ($($name,)*)) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
                 (self)($($name,)*)
+            }
+        }
+
+        impl<Func, Rv, $($name),*> Test<Rv, ($($name,)*)> for Func
+        where
+            Func: Send + Sync + 'static,
+            // the crazy bounds here exist to enable borrowing in closures
+            Func: Fn($($name),*) -> Rv + for<'a> TestHelper<Rv, ($(<$name as ArgType<'a>>::Output,)*)>,
+            Rv: TestResult,
+            $($name: for<'a> ArgType<'a>),*
+        {
+            // Need to allow this lint for the one-element tuple case.
+            #[allow(clippy::needless_lifetimes)]
+            fn perform<'a>(&self, args: ($(<$name as ArgType<'a>>::Output,)*), _: SealedMarker) -> Rv {
+                self.perform_nested(args)
             }
         }
     };
@@ -181,7 +200,7 @@ impl BoxedTest {
     /// Creates a new boxed filter.
     pub fn new<F, Rv, Args>(f: F) -> BoxedTest
     where
-        F: Test<Rv, Args> + for<'a> Test<Rv, <Args as FunctionArgs<'a>>::Output>,
+        F: Test<Rv, Args>,
         Rv: TestResult,
         Args: for<'a> FunctionArgs<'a>,
     {

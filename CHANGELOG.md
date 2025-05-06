@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 1.0.22
+
+* Fixed an issue with the function bounds that caused the
+  next-generation trait resolver to fail.  #790
+
 ## 1.0.21
 
 - Fixed an issue where `lstrip_blocks` unintentionally also applied to
