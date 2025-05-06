@@ -319,6 +319,11 @@ For upgrade instructions read the [UPDATING](UPDATING.md) guide.
 - Added support for line statements and comments.  #503 
 - The CLI now accepts `--syntax` to reconfigure syntax flags such as delimiters.  #504
 
+## 1.0.22
+
+* Fixed an issue with the function bounds that caused the
+  next-generation trait resolver to fail.  #790
+
 ## 1.0.21
 
 - Fixed an issue where `lstrip_blocks` unintentionally also applied to
