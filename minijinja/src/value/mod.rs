@@ -1056,9 +1056,7 @@ impl Value {
     /// ```
     pub fn from_function<F, Rv, Args>(f: F) -> Value
     where
-        // the crazy bounds here exist to enable borrowing in closures
-        F: functions::Function<Rv, Args>
-            + for<'a> functions::Function<Rv, <Args as FunctionArgs<'a>>::Output>,
+        F: functions::Function<Rv, Args>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
