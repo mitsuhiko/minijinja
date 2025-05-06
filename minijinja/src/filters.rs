@@ -199,26 +199,45 @@ pub(crate) struct BoxedFilter(Arc<FilterFunc>);
 /// ```jinja
 /// {{ "|".join(1, 2, 3) }} -> 1|2|3
 /// ```
-pub trait Filter<Rv, Args>: Send + Sync + 'static {
+pub trait Filter<Rv, Args: for<'a> FunctionArgs<'a>>: Send + Sync + 'static {
     /// Applies a filter to value with the given arguments.
     ///
     /// The value is always the first argument.
     #[doc(hidden)]
-    fn apply_to(&self, args: Args, _: SealedMarker) -> Rv;
+    fn apply_to(&self, args: <Args as FunctionArgs<'_>>::Output, _: SealedMarker) -> Rv;
+}
+
+// This is necessary to avoid a bug in the trait solver. See
+// https://github.com/mitsuhiko/minijinja/pull/787 for more details.
+trait FilterHelper<Rv, Args> {
+    fn apply_to_nested(&self, args: Args) -> Rv;
 }
 
 macro_rules! tuple_impls {
     ( $( $name:ident )* ) => {
-        impl<Func, Rv, $($name),*> Filter<Rv, ($($name,)*)> for Func
+        impl<Func, Rv, $($name),*> FilterHelper<Rv, ($($name,)*)> for Func
         where
-            Func: Fn($($name),*) -> Rv + Send + Sync + 'static,
-            Rv: FunctionResult,
-            $($name: for<'a> ArgType<'a>,)*
+            Func: Fn($($name),*) -> Rv,
         {
-            fn apply_to(&self, args: ($($name,)*), _: SealedMarker) -> Rv {
+            fn apply_to_nested(&self, args: ($($name,)*)) -> Rv {
                 #[allow(non_snake_case)]
                 let ($($name,)*) = args;
                 (self)($($name,)*)
+            }
+        }
+
+        impl<Func, Rv, $($name),*> Filter<Rv, ($($name,)*)> for Func
+        where
+            Func: Send + Sync + 'static,
+            // the crazy bounds here exist to enable borrowing in closures
+            Func: Fn($($name),*) -> Rv + for<'a> FilterHelper<Rv, ($(<$name as ArgType<'a>>::Output,)*)>,
+            Rv: FunctionResult,
+            $($name: for<'a> ArgType<'a>,)*
+        {
+            // Need to allow this lint for the one-element tuple case.
+            #[allow(clippy::needless_lifetimes)]
+            fn apply_to<'a>(&self, args: ($(<$name as ArgType<'a>>::Output,)*), _: SealedMarker) -> Rv {
+                self.apply_to_nested(args)
             }
         }
     };
@@ -235,7 +254,7 @@ impl BoxedFilter {
     /// Creates a new boxed filter.
     pub fn new<F, Rv, Args>(f: F) -> BoxedFilter
     where
-        F: Filter<Rv, Args> + for<'a> Filter<Rv, <Args as FunctionArgs<'a>>::Output>,
+        F: Filter<Rv, Args>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {

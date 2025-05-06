@@ -676,9 +676,7 @@ impl<'source> Environment<'source> {
     pub fn add_filter<N, F, Rv, Args>(&mut self, name: N, f: F)
     where
         N: Into<Cow<'source, str>>,
-        // the crazy bounds here exist to enable borrowing in closures
-        F: filters::Filter<Rv, Args>
-            + for<'a> filters::Filter<Rv, <Args as FunctionArgs<'a>>::Output>,
+        F: filters::Filter<Rv, Args>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
@@ -699,8 +697,7 @@ impl<'source> Environment<'source> {
     pub fn add_test<N, F, Rv, Args>(&mut self, name: N, f: F)
     where
         N: Into<Cow<'source, str>>,
-        // the crazy bounds here exist to enable borrowing in closures
-        F: tests::Test<Rv, Args> + for<'a> tests::Test<Rv, <Args as FunctionArgs<'a>>::Output>,
+        F: tests::Test<Rv, Args>,
         Rv: tests::TestResult,
         Args: for<'a> FunctionArgs<'a>,
     {
@@ -721,9 +718,7 @@ impl<'source> Environment<'source> {
     pub fn add_function<N, F, Rv, Args>(&mut self, name: N, f: F)
     where
         N: Into<Cow<'source, str>>,
-        // the crazy bounds here exist to enable borrowing in closures
-        F: functions::Function<Rv, Args>
-            + for<'a> functions::Function<Rv, <Args as FunctionArgs<'a>>::Output>,
+        F: functions::Function<Rv, Args>,
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
