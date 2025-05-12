@@ -409,8 +409,8 @@ mod builtins {
         }));
 
         let mut rv = String::new();
-        for item in iter {
-            if !rv.is_empty() {
+        for (idx, item) in iter.enumerate() {
+            if idx > 0 {
                 rv.push_str(joiner);
             }
             if let Some(s) = item.as_str() {
