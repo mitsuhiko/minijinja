@@ -51,6 +51,7 @@ trim-bird: {{ word|trim("Bd") }}
 join-default: {{ list|join }}
 join-pipe: {{ list|join("|") }}
 join_string: {{ word|join('-') }}
+join-empty-strings: {{ [undefined, "", "blub", "", undefined, 42]|join('|') }}
 default: {{ undefined|default == "" }}
 default-value: {{ undefined|default(42) }}
 default-value-falsy: {{ ""|default("b", true) }}
