@@ -2,6 +2,13 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.11.0
+
+* Fixed incorrect joining of leading undefineds or empty
+  strings in the `|join` filter.  This was inconsistent with
+  Jinja2 and the filter itself for undefineds in other
+  positions.  #794
+
 ## 2.10.2
 
 * Fixed an issue with the function bounds that caused the
