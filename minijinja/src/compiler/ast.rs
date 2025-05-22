@@ -217,13 +217,13 @@ impl Expr<'_> {
                     return None;
                 };
                 match c.op {
-                    BinOpKind::Add => ops::add(&left, &right).ok(),
-                    BinOpKind::Sub => ops::sub(&left, &right).ok(),
-                    BinOpKind::Mul => ops::mul(&left, &right).ok(),
-                    BinOpKind::Div => ops::div(&left, &right).ok(),
-                    BinOpKind::FloorDiv => ops::int_div(&left, &right).ok(),
-                    BinOpKind::Rem => ops::rem(&left, &right).ok(),
-                    BinOpKind::Pow => ops::pow(&left, &right).ok(),
+                    BinOpKind::Add => ops::add(None, &left, &right).ok(),
+                    BinOpKind::Sub => ops::sub(None, &left, &right).ok(),
+                    BinOpKind::Mul => ops::mul(None, &left, &right).ok(),
+                    BinOpKind::Div => ops::div(None, &left, &right).ok(),
+                    BinOpKind::FloorDiv => ops::int_div(None, &left, &right).ok(),
+                    BinOpKind::Rem => ops::rem(None, &left, &right).ok(),
+                    BinOpKind::Pow => ops::pow(None, &left, &right).ok(),
                     BinOpKind::Concat => Some(ops::string_concat(left, &right)),
                     BinOpKind::Eq => Some(Value::from(left == right)),
                     BinOpKind::Ne => Some(Value::from(left != right)),
