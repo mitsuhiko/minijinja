@@ -321,8 +321,8 @@ mod builtins {
     ///
     /// This function will refuse to create ranges over 10.000 items.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn range(lower: u32, upper: Option<u32>, step: Option<u32>) -> Result<Value, Error> {
-        fn to_result<I: ExactSizeIterator<Item = u32> + Send + Sync + Clone + 'static>(
+    pub fn range(lower: i32, upper: Option<i32>, step: Option<i32>) -> Result<Value, Error> {
+        fn to_result<I: ExactSizeIterator<Item = i32> + Send + Sync + Clone + 'static>(
             i: I,
         ) -> Result<Value, Error> {
             if i.len() > 100000 {
@@ -339,17 +339,34 @@ mod builtins {
             Some(upper) => lower..upper,
             None => 0..lower,
         };
-        if let Some(step) = step {
-            if step == 0 {
-                Err(Error::new(
-                    ErrorKind::InvalidOperation,
-                    "cannot create range with step of 0",
-                ))
-            } else {
-                to_result(rng.step_by(step as usize))
-            }
+
+        let Some(step) = step else {
+            return to_result(rng);
+        };
+
+        if step == 0 {
+            Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "cannot create range with step of 0",
+            ))
+        } else if step > 0 {
+            to_result(rng.step_by(step as usize))
         } else {
-            to_result(rng)
+            // handle negative steps
+            debug_assert!(step < 0);
+            let (start, end) = match upper {
+                Some(upper) => (lower, upper),
+                None => (0, lower),
+            };
+
+            let len = if start <= end {
+                0
+            } else {
+                ((start - end + (-step) - 1) / (-step)) as usize
+            };
+
+            let iter = (0..len).map(move |i| start + (i as i32) * step);
+            to_result(iter)
         }
     }
 
