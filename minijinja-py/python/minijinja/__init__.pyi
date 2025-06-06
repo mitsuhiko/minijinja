@@ -10,7 +10,7 @@ from typing import (
     overload,
 )
 from typing_extensions import Final, TypeAlias, Self
-from minijinja._lowlevel import State
+from minijinja._lowlevel import State, ErrorInfo
 from collections.abc import Mapping
 
 __all__ = [
@@ -40,11 +40,12 @@ def render_str(source: str, name: str | None = None, /, **context: Any) -> str: 
 def eval_expr(expression: str, /, **context: Any) -> Any: ...
 
 class Environment:
-    loader: Callable[[str], str] | None
+    loader: Callable[[str], str | None] | None
     fuel: int | None
     debug: bool
+    pycompat: bool
     undefined_behavior: _Behavior
-    auto_escape_callback: Callable[[str], bool] | None
+    auto_escape_callback: Callable[[str], str | bool | None] | None
     path_join_callback: Callable[[str, str], _StrPath] | None
     keep_trailing_newline: bool
     trim_blocks: bool
@@ -59,11 +60,12 @@ class Environment:
     comment_end_string: str
     line_statement_prefix: str | None
     line_comment_prefix: str | None
+    globals: dict[str, Any]
 
     @overload
     def __init__(
         self,
-        loader: Callable[[str], str] | None = None,
+        loader: Callable[[str], str | None] | None = None,
         templates: Mapping[str, str] | None = None,
         filters: Mapping[str, Callable[[Any], Any]] | None = None,
         tests: Mapping[str, Callable[[Any], bool]] | None = None,
@@ -71,7 +73,7 @@ class Environment:
         debug: bool = True,
         fuel: int | None = None,
         undefined_behavior: _Behavior = "lenient",
-        auto_escape_callback: Callable[[str], bool] | None = None,
+        auto_escape_callback: Callable[[str], str | bool | None] | None = None,
         path_join_callback: Callable[[str, str], _StrPath] | None = None,
         keep_trailing_newline: bool = False,
         trim_blocks: bool = False,
@@ -86,19 +88,20 @@ class Environment:
         comment_end_string: str = "#}",
         line_statement_prefix: str | None = None,
         line_comment_prefix: str | None = None,
+        pycompat: bool = True,
     ) -> None: ...
     @overload
     def __init__(
         self,
-        loader: Callable[[str], str] | None = None,
+        loader: Callable[[str], str | None] | None = None,
         templates: Mapping[str, str] | None = None,
         filters: Mapping[str, Callable[..., Any]] | None = None,
-        tests: Mapping[str, Callable[[Any], bool]] | None = None,
+        tests: Mapping[str, Callable[..., bool]] | None = None,
         globals: Mapping[str, Any] | None = None,
         debug: bool = True,
         fuel: int | None = None,
         undefined_behavior: _Behavior = "lenient",
-        auto_escape_callback: Callable[[str], bool] | None = None,
+        auto_escape_callback: Callable[[str], str | bool | None] | None = None,
         path_join_callback: Callable[[str, str], _StrPath] | None = None,
         keep_trailing_newline: bool = False,
         trim_blocks: bool = False,
@@ -113,15 +116,18 @@ class Environment:
         comment_end_string: str = "#}",
         line_statement_prefix: str | None = None,
         line_comment_prefix: str | None = None,
+        pycompat: bool = True,
     ) -> None: ...
     def add_template(self, name: str, source: str) -> None: ...
     def remove_template(self, name: str) -> None: ...
-    def add_filter(self, name: str, filter: Callable[[Any], bool]) -> None: ...
+    def add_filter(self, name: str, filter: Callable[..., Any]) -> None: ...
     def remove_filter(self, name: str) -> None: ...
-    def add_test(self, name: str, test: Callable[[Any], bool]) -> None: ...
+    def add_test(self, name: str, test: Callable[..., bool]) -> None: ...
     def remove_test(self, name: str) -> None: ...
     def add_global(self, name: str, value: Any) -> None: ...
     def remove_global(self, name: str) -> None: ...
+    def clear_templates(self) -> None: ...
+    def reload(self) -> None: ...
     def render_template(self, template_name: str, /, **context: Any) -> str: ...
     def render_str(
         self, source: str, name: str | None = None, /, **context: Any
@@ -147,7 +153,7 @@ class TemplateError(RuntimeError):
     @property
     def line(self) -> int | None: ...
     @property
-    def range(self) -> int | None: ...
+    def range(self) -> tuple[int, int] | None: ...
     @property
     def template_source(self) -> str | None: ...
     def __str__(self) -> str: ...
@@ -163,4 +169,4 @@ def pass_state(
 
 Path = str | pathlib.Path
 
-def load_from_path(paths: Iterable[Path] | Path) -> Callable[[str], str]: ...
+def load_from_path(paths: Iterable[Path] | Path) -> Callable[[str], str | None]: ...
