@@ -40,3 +40,8 @@ include = ["python/**/*.pyi"]
 exclude = ["python/**/*.py"]
 typeCheckingMode = "strict"
 pythonVersion = "3.9"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.401",
+]

@@ -10,7 +10,7 @@ from typing import (
     overload,
 )
 from typing_extensions import Final, TypeAlias, Self
-from minijinja._lowlevel import State, ErrorInfo
+from minijinja._lowlevel import State
 from collections.abc import Mapping
 
 __all__ = [
