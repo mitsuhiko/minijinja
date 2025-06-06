@@ -8,6 +8,9 @@ All notable changes to MiniJinja are documented here.
   strings in the `|join` filter.  This was inconsistent with
   Jinja2 and the filter itself for undefineds in other
   positions.  #794
+* Allow negative arguments to `range` function and change
+  range to `isize`.  #799
+* Allow `isize` as argument type.  #799
 
 ## 2.10.2
 
