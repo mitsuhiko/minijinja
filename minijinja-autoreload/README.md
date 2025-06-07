@@ -12,13 +12,13 @@ This simplifies fast development cycles without writing custom code.
 
 ```rust
 use minijinja_autoreload::AutoReloader;
-use minijinja::{Source, Environment};
+use minijinja::{path_loader, Environment};
 
 let reloader = AutoReloader::new(|notifier| {
     let mut env = Environment::new();
     let template_path = "path/to/templates";
     notifier.watch_path(template_path, true);
-    env.set_source(Source::from_path(template_path));
+    env.set_loader(path_loader(template_path));
     Ok(env)
 });
 
