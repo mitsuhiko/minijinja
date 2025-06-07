@@ -1,4 +1,4 @@
-use std::char::decode_utf16;
+THIS SHOULD BE A LINTER ERRORuse std::char::decode_utf16;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -281,6 +281,10 @@ impl Unescaper {
                             let val = ok!(self.parse_hex_byte(&mut char_iter));
                             ok!(self.push_char(val as char));
                         }
+                        '0'..='7' => {
+                            let val = ok!(self.parse_octal_byte(d, &mut char_iter));
+                            ok!(self.push_char(val as char));
+                        }
                         _ => return Err(ErrorKind::BadEscape.into()),
                     },
                 }
@@ -307,6 +311,27 @@ impl Unescaper {
             return Err(ErrorKind::BadEscape.into());
         }
         u8::from_str_radix(&hexnum, 16).map_err(|_| ErrorKind::BadEscape.into())
+    }
+    
+    fn parse_octal_byte(&self, first_digit: char, chars: &mut Chars) -> Result<u8, Error> {
+        let mut octal_str = String::new();
+        octal_str.push(first_digit);
+        
+        // Try to read up to 2 more octal digits
+        for _ in 0..2 {
+            if let Some(&next_char) = chars.as_str().chars().next() {
+                if next_char.is_ascii_digit() && next_char <= '7' {
+                    octal_str.push(next_char);
+                    chars.next(); // Consume the character
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        
+        u8::from_str_radix(&octal_str, 8).map_err(|_| ErrorKind::BadEscape.into())
     }
 
     fn push_u16(&mut self, c: u16) -> Result<(), Error> {
@@ -478,6 +503,27 @@ mod tests {
         assert!(unescape(r"\x1").is_err());
         assert!(unescape(r"\xGG").is_err());
         assert!(unescape(r"\xZ1").is_err());
+    }
+
+    #[test]
+    fn test_unescape_octal() {
+        // Test basic octal escape sequences
+        assert_eq!(unescape(r"\101\102\103").unwrap(), "ABC"); // 101, 102, 103 octal = 65, 66, 67 decimal
+        assert_eq!(unescape(r"\0").unwrap(), "\0"); // null character
+        assert_eq!(unescape(r"\40").unwrap(), " "); // 40 octal = 32 decimal (space)
+        assert_eq!(unescape(r"\377").unwrap(), "\u{ff}"); // 377 octal = 255 decimal
+        
+        // Test 1, 2, and 3 digit octal sequences
+        assert_eq!(unescape(r"\7").unwrap(), "\u{07}"); // single digit
+        assert_eq!(unescape(r"\10").unwrap(), "\u{08}"); // two digits
+        assert_eq!(unescape(r"\101").unwrap(), "A"); // three digits
+        
+        // Test that octal parsing stops at non-octal digits
+        assert_eq!(unescape(r"\108").unwrap(), "\u{08}8"); // \10 + "8"
+        assert_eq!(unescape(r"\1089").unwrap(), "\u{08}89"); // \10 + "89"
+        
+        // Test mixed with other characters
+        assert_eq!(unescape(r"Hello\40World\41").unwrap(), "Hello World!");
     }
 
     #[test]
