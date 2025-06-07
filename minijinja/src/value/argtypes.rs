@@ -432,6 +432,7 @@ primitive_int_try_from!(i32);
 primitive_int_try_from!(i64);
 primitive_int_try_from!(i128);
 primitive_int_try_from!(usize);
+primitive_int_try_from!(isize);
 
 primitive_try_from!(bool, {
     ValueRepr::Bool(val) => val,

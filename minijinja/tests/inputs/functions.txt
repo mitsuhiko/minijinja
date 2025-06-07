@@ -3,3 +3,7 @@
 short-range: {{ range(10) }}
 range-is-iterable: {{ range(10) is iterable }}
 range-is-not-a-sequence: {{ range(10) is not sequence }}
+negative-range: {{ range(-5, 5) }}
+negative-start: {{ range(-3, 3, 2) }}
+negative-step: {{ range(5, -5, -2) }}
+negative-step-off: {{ range(5, -4, -2) }}
