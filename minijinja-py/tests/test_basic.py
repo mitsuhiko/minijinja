@@ -3,9 +3,9 @@ import pytest
 import posixpath
 import random
 import types
+import sys
 from functools import total_ordering
 
-from _pytest.unraisableexception import catch_unraisable_exception
 from minijinja import (
     Environment,
     TemplateError,
@@ -15,6 +15,26 @@ from minijinja import (
     render_str,
     load_from_path,
 )
+
+
+class catch_unraisable_exception:
+    def __init__(self) -> None:
+        self.unraisable = None
+        self._old_hook = None
+
+    def _hook(self, unraisable):
+        self.unraisable = unraisable
+
+    def __enter__(self):
+        self._old_hook = sys.unraisablehook
+        sys.unraisablehook = self._hook
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        assert self._old_hook is not None
+        sys.unraisablehook = self._old_hook
+        self._old_hook = None
+        del self.unraisable
 
 
 def test_expression():
