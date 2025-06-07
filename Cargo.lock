@@ -2449,6 +2449,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "pycompat-rendering"
+version = "0.1.0"
+dependencies = [
+ "minijinja",
+]
+
+[[package]]
 name = "pyo3"
 version = "0.23.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
