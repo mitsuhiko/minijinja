@@ -203,7 +203,7 @@ use core::str;
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::fmt;
+use std::fmt::{self, Write};
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 
@@ -383,7 +383,7 @@ impl<T: Copy> Clone for Packed<T> {
 ///
 /// Logic: Value is 24 bytes. 1 byte is for the discriminant. One byte is
 /// needed for the small str length.
-const SMALL_STR_CAP: usize = 22;
+const SMALL_STR_CAP: usize = 23 - std::mem::size_of::<usize>();
 
 /// Helper to store string data inline.
 #[derive(Clone)]
@@ -417,6 +417,47 @@ impl SmallStr {
     }
 }
 
+/// Helper function for Python-style string representation
+fn python_string_repr(s: &str) -> String {
+    // Check if the string contains single quotes but not double quotes
+    let has_single = s.contains('\'');
+    let has_double = s.contains('"');
+    
+    let quote_char = if has_single && !has_double {
+        '"'
+    } else {
+        '\''
+    };
+    
+    let mut result = String::with_capacity(s.len() + 2);
+    result.push(quote_char);
+    
+    for ch in s.chars() {
+        match ch {
+            '\n' => result.push_str("\\n"),
+            '\r' => result.push_str("\\r"),
+            '\t' => result.push_str("\\t"),
+            '\0' => result.push_str("\\0"),
+            '\\' => result.push_str("\\\\"),
+            c if c == quote_char => {
+                result.push('\\');
+                result.push(c);
+            },
+            c if c.is_control() => {
+                if (c as u32) <= 0xFF {
+                    write!(result, "\\x{:02x}", c as u8).unwrap();
+                } else {
+                    write!(result, "\\u{{{:04x}}}", c as u32).unwrap();
+                }
+            },
+            c => result.push(c),
+        }
+    }
+    
+    result.push(quote_char);
+    result
+}
+
 #[derive(Clone)]
 pub(crate) enum ValueRepr {
     None,
@@ -438,16 +479,16 @@ impl fmt::Debug for ValueRepr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ValueRepr::Undefined(_) => f.write_str("undefined"),
-            ValueRepr::Bool(ref val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Bool(val) => f.write_str(if val { "True" } else { "False" }),
             ValueRepr::U64(ref val) => fmt::Debug::fmt(val, f),
             ValueRepr::I64(ref val) => fmt::Debug::fmt(val, f),
             ValueRepr::F64(ref val) => fmt::Debug::fmt(val, f),
-            ValueRepr::None => f.write_str("none"),
+            ValueRepr::None => f.write_str("None"),
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-            ValueRepr::String(ref val, _) => fmt::Debug::fmt(val, f),
-            ValueRepr::SmallStr(ref val) => fmt::Debug::fmt(val.as_str(), f),
+            ValueRepr::String(ref val, _) => f.write_str(&python_string_repr(val)),
+            ValueRepr::SmallStr(ref val) => f.write_str(&python_string_repr(val.as_str())),
             ValueRepr::Bytes(ref val) => {
                 write!(f, "b'")?;
                 for &b in val.iter() {
@@ -661,7 +702,7 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             ValueRepr::Undefined(_) => Ok(()),
-            ValueRepr::Bool(val) => val.fmt(f),
+            ValueRepr::Bool(val) => f.write_str(if val { "True" } else { "False" }),
             ValueRepr::U64(val) => val.fmt(f),
             ValueRepr::I64(val) => val.fmt(f),
             ValueRepr::F64(val) => {
@@ -677,7 +718,7 @@ impl fmt::Display for Value {
                     write!(f, "{num}")
                 }
             }
-            ValueRepr::None => f.write_str("none"),
+            ValueRepr::None => Ok(()),
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
             ValueRepr::String(ref val, _) => write!(f, "{val}"),
@@ -1431,7 +1472,7 @@ impl Value {
         })
     }
 
-    /// Returns some reference to the boxed object if it is of type `T`, or None if it isn’t.
+    /// Returns some reference to the boxed object if it is of type `T`, or None if it isn't.
     ///
     /// This is basically the "reverse" of [`from_object`](Self::from_object)
     /// and [`from_dyn_object`](Self::from_dyn_object). It's also a shortcut for
