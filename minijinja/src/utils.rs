@@ -1,4 +1,4 @@
-THIS SHOULD BE A LINTER ERRORuse std::char::decode_utf16;
+use std::char::decode_utf16;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -319,7 +319,8 @@ impl Unescaper {
         
         // Try to read up to 2 more octal digits
         for _ in 0..2 {
-            if let Some(&next_char) = chars.as_str().chars().next() {
+            let remaining = chars.as_str();
+            if let Some(next_char) = remaining.chars().next() {
                 if next_char.is_ascii_digit() && next_char <= '7' {
                     octal_str.push(next_char);
                     chars.next(); // Consume the character
