@@ -318,7 +318,7 @@ impl Unescaper {
         for _ in 0..2 {
             let next_char = chars.as_str().chars().next();
             if let Some(c) = next_char {
-                if c >= '0' && c <= '7' {
+                if ('0'..='7').contains(&c) {
                     octal_str.push(c);
                     chars.next(); // consume the character
                 } else {
