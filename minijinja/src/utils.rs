@@ -277,6 +277,10 @@ impl Unescaper {
                             let val = ok!(self.parse_u16(&mut char_iter));
                             ok!(self.push_u16(val));
                         }
+                        'x' => {
+                            let val = ok!(self.parse_hex_byte(&mut char_iter));
+                            ok!(self.push_char(val as char));
+                        }
                         _ => return Err(ErrorKind::BadEscape.into()),
                     },
                 }
@@ -295,6 +299,11 @@ impl Unescaper {
     fn parse_u16(&self, chars: &mut Chars) -> Result<u16, Error> {
         let hexnum = chars.chain(repeat('\0')).take(4).collect::<String>();
         u16::from_str_radix(&hexnum, 16).map_err(|_| ErrorKind::BadEscape.into())
+    }
+
+    fn parse_hex_byte(&self, chars: &mut Chars) -> Result<u8, Error> {
+        let hexnum = chars.chain(repeat('\0')).take(2).collect::<String>();
+        u8::from_str_radix(&hexnum, 16).map_err(|_| ErrorKind::BadEscape.into())
     }
 
     fn push_u16(&mut self, c: u16) -> Result<(), Error> {
@@ -450,6 +459,12 @@ mod tests {
         assert_eq!(unescape(r"\t\b\f\r\n\\\/").unwrap(), "\t\x08\x0c\r\n\\/");
         assert_eq!(unescape("foobarbaz").unwrap(), "foobarbaz");
         assert_eq!(unescape(r"\ud83d\udca9").unwrap(), "💩");
+        // Test hexadecimal escape sequences
+        assert_eq!(unescape(r"\x00").unwrap(), "\x00");
+        assert_eq!(unescape(r"\x42").unwrap(), "B");
+        assert_eq!(unescape(r"\xab").unwrap(), "\u{ab}");
+        assert_eq!(unescape(r"hello\x20world").unwrap(), "hello world");
+        assert_eq!(unescape(r"\x41\x42\x43").unwrap(), "ABC");
     }
 
     #[test]
