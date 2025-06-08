@@ -306,7 +306,10 @@ impl Unescaper {
     }
 
     fn parse_hex_byte(&self, chars: &mut Chars) -> Result<u8, Error> {
-        let hexnum = chars.chain(repeat('\0')).take(2).collect::<String>();
+        let hexnum = chars.take(2).collect::<String>();
+        if hexnum.len() != 2 {
+            return Err(ErrorKind::BadEscape.into());
+        }
         u8::from_str_radix(&hexnum, 16).map_err(|_| ErrorKind::BadEscape.into())
     }
 
@@ -318,7 +321,7 @@ impl Unescaper {
         for _ in 0..2 {
             let next_char = chars.as_str().chars().next();
             if let Some(c) = next_char {
-                if c >= '0' && c <= '7' {
+                if ('0'..='7').contains(&c) {
                     octal_str.push(c);
                     chars.next(); // consume the character
                 } else {
@@ -495,6 +498,12 @@ mod tests {
         assert_eq!(unescape(r"foo\x42bar").unwrap(), "fooBbar");
         assert_eq!(unescape(r"\x0a").unwrap(), "\n");
         assert_eq!(unescape(r"\x0d").unwrap(), "\r");
+
+        // Test truncation
+        assert!(unescape(r"\x").is_err()); // truncated \x
+        assert!(unescape(r"\x1").is_err()); // truncated \x1
+        assert!(unescape(r"\x1g").is_err()); // invalid hex digit
+        assert!(unescape(r"\x1G").is_err()); // invalid hex digit
 
         // Test octal escape sequences
         assert_eq!(unescape(r"\0").unwrap(), "\0"); // octal 0 = null
