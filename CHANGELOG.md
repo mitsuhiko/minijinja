@@ -11,6 +11,8 @@ All notable changes to MiniJinja are documented here.
 * Allow negative arguments to `range` function and change
   range to `isize`.  #799
 * Allow `isize` as argument type.  #799
+* MiniJinja now correctly handles `\x` escape sequences in strings
+  as well as octals.  #805
 
 ## 2.10.2
 

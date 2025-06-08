@@ -277,6 +277,14 @@ impl Unescaper {
                             let val = ok!(self.parse_u16(&mut char_iter));
                             ok!(self.push_u16(val));
                         }
+                        'x' => {
+                            let val = ok!(self.parse_hex_byte(&mut char_iter));
+                            ok!(self.push_char(val as char));
+                        }
+                        '0'..='7' => {
+                            let val = ok!(self.parse_octal_byte(d, &mut char_iter));
+                            ok!(self.push_char(val as char));
+                        }
                         _ => return Err(ErrorKind::BadEscape.into()),
                     },
                 }
@@ -295,6 +303,36 @@ impl Unescaper {
     fn parse_u16(&self, chars: &mut Chars) -> Result<u16, Error> {
         let hexnum = chars.chain(repeat('\0')).take(4).collect::<String>();
         u16::from_str_radix(&hexnum, 16).map_err(|_| ErrorKind::BadEscape.into())
+    }
+
+    fn parse_hex_byte(&self, chars: &mut Chars) -> Result<u8, Error> {
+        let hexnum = chars.take(2).collect::<String>();
+        if hexnum.len() != 2 {
+            return Err(ErrorKind::BadEscape.into());
+        }
+        u8::from_str_radix(&hexnum, 16).map_err(|_| ErrorKind::BadEscape.into())
+    }
+
+    fn parse_octal_byte(&self, first_digit: char, chars: &mut Chars) -> Result<u8, Error> {
+        let mut octal_str = String::new();
+        octal_str.push(first_digit);
+
+        // Collect up to 2 more octal digits (0-7)
+        for _ in 0..2 {
+            let next_char = chars.as_str().chars().next();
+            if let Some(c) = next_char {
+                if ('0'..='7').contains(&c) {
+                    octal_str.push(c);
+                    chars.next(); // consume the character
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        u8::from_str_radix(&octal_str, 8).map_err(|_| ErrorKind::BadEscape.into())
     }
 
     fn push_u16(&mut self, c: u16) -> Result<(), Error> {
@@ -450,6 +488,32 @@ mod tests {
         assert_eq!(unescape(r"\t\b\f\r\n\\\/").unwrap(), "\t\x08\x0c\r\n\\/");
         assert_eq!(unescape("foobarbaz").unwrap(), "foobarbaz");
         assert_eq!(unescape(r"\ud83d\udca9").unwrap(), "💩");
+
+        // Test new escape sequences
+        assert_eq!(unescape(r"\0").unwrap(), "\0");
+        assert_eq!(unescape(r"foo\0bar").unwrap(), "foo\0bar");
+        assert_eq!(unescape(r"\x00").unwrap(), "\0");
+        assert_eq!(unescape(r"\x42").unwrap(), "B");
+        assert_eq!(unescape(r"\xab").unwrap(), "\u{ab}");
+        assert_eq!(unescape(r"foo\x42bar").unwrap(), "fooBbar");
+        assert_eq!(unescape(r"\x0a").unwrap(), "\n");
+        assert_eq!(unescape(r"\x0d").unwrap(), "\r");
+
+        // Test truncation
+        assert!(unescape(r"\x").is_err()); // truncated \x
+        assert!(unescape(r"\x1").is_err()); // truncated \x1
+        assert!(unescape(r"\x1g").is_err()); // invalid hex digit
+        assert!(unescape(r"\x1G").is_err()); // invalid hex digit
+
+        // Test octal escape sequences
+        assert_eq!(unescape(r"\0").unwrap(), "\0"); // octal 0 = null
+        assert_eq!(unescape(r"\1").unwrap(), "\x01"); // octal 1 = SOH
+        assert_eq!(unescape(r"\12").unwrap(), "\n"); // octal 12 = 10 decimal = LF
+        assert_eq!(unescape(r"\123").unwrap(), "S"); // octal 123 = 83 decimal = 'S'
+        assert_eq!(unescape(r"\141").unwrap(), "a"); // octal 141 = 97 decimal = 'a'
+        assert_eq!(unescape(r"\177").unwrap(), "\x7f"); // octal 177 = 127 decimal = DEL
+        assert_eq!(unescape(r"foo\123bar").unwrap(), "fooSbar"); // 'S' in the middle
+        assert_eq!(unescape(r"\101\102\103").unwrap(), "ABC"); // octal for A, B, C
     }
 
     #[test]
