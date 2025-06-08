@@ -259,6 +259,7 @@ pub(crate) fn value_map_with_capacity(capacity: usize) -> ValueMap {
 
 thread_local! {
     static INTERNAL_SERIALIZATION: Cell<bool> = const { Cell::new(false) };
+    static PYCOMPAT_RENDERING: Cell<bool> = const { Cell::new(false) };
 
     // This should be an AtomicU64 but sadly 32bit targets do not necessarily have
     // AtomicU64 available.
@@ -286,6 +287,14 @@ pub fn serializing_for_value() -> bool {
     INTERNAL_SERIALIZATION.with(|flag| flag.get())
 }
 
+/// Function that returns true when Python-compatible rendering is enabled.
+///
+/// When this returns `true`, values should be rendered in a way that's compatible
+/// with Python Jinja2, such as `True`/`False` instead of `true`/`false`.
+pub(crate) fn pycompat_rendering() -> bool {
+    PYCOMPAT_RENDERING.with(|flag| flag.get())
+}
+
 fn mark_internal_serialization() -> impl Drop {
     let old = INTERNAL_SERIALIZATION.with(|flag| {
         let old = flag.get();
@@ -296,6 +305,17 @@ fn mark_internal_serialization() -> impl Drop {
         if !old {
             INTERNAL_SERIALIZATION.with(|flag| flag.set(false));
         }
+    })
+}
+
+pub(crate) fn mark_pycompat_rendering(enabled: bool) -> impl Drop {
+    let old = PYCOMPAT_RENDERING.with(|flag| {
+        let old = flag.get();
+        flag.set(enabled);
+        old
+    });
+    OnDrop::new(move || {
+        PYCOMPAT_RENDERING.with(|flag| flag.set(old));
     })
 }
 
@@ -434,20 +454,80 @@ pub(crate) enum ValueRepr {
     Object(DynObject),
 }
 
+fn python_string_debug_fmt(s: &str, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    // Python prefers single quotes unless the string contains single quotes
+    let contains_single = s.contains('\'');
+    let contains_double = s.contains('"');
+
+    let quote_char = if contains_single && !contains_double {
+        '"'
+    } else {
+        '\''
+    };
+
+    write!(f, "{}", quote_char)?;
+    for ch in s.chars() {
+        match ch {
+            '\'' if quote_char == '\'' => write!(f, "\\'")?,
+            '"' if quote_char == '"' => write!(f, "\\\"")?,
+            '\\' => write!(f, "\\\\")?,
+            '\n' => write!(f, "\\n")?,
+            '\r' => write!(f, "\\r")?,
+            '\t' => write!(f, "\\t")?,
+            c if c.is_control() => {
+                let code = c as u32;
+                if code <= 0xFF {
+                    write!(f, "\\x{:02x}", code)?;
+                } else if code <= 0xFFFF {
+                    write!(f, "\\u{:04x}", code)?;
+                } else {
+                    write!(f, "\\U{:08x}", code)?;
+                }
+            }
+            c => write!(f, "{}", c)?,
+        }
+    }
+    write!(f, "{}", quote_char)
+}
+
 impl fmt::Debug for ValueRepr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ValueRepr::Undefined(_) => f.write_str("undefined"),
-            ValueRepr::Bool(ref val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Bool(ref val) => {
+                if pycompat_rendering() {
+                    write!(f, "{}", if *val { "True" } else { "False" })
+                } else {
+                    fmt::Debug::fmt(val, f)
+                }
+            }
             ValueRepr::U64(ref val) => fmt::Debug::fmt(val, f),
             ValueRepr::I64(ref val) => fmt::Debug::fmt(val, f),
             ValueRepr::F64(ref val) => fmt::Debug::fmt(val, f),
-            ValueRepr::None => f.write_str("none"),
+            ValueRepr::None => {
+                if pycompat_rendering() {
+                    f.write_str("None")
+                } else {
+                    f.write_str("none")
+                }
+            }
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-            ValueRepr::String(ref val, _) => fmt::Debug::fmt(val, f),
-            ValueRepr::SmallStr(ref val) => fmt::Debug::fmt(val.as_str(), f),
+            ValueRepr::String(ref val, _) => {
+                if pycompat_rendering() {
+                    python_string_debug_fmt(val, f)
+                } else {
+                    fmt::Debug::fmt(val, f)
+                }
+            }
+            ValueRepr::SmallStr(ref val) => {
+                if pycompat_rendering() {
+                    python_string_debug_fmt(val.as_str(), f)
+                } else {
+                    fmt::Debug::fmt(val.as_str(), f)
+                }
+            }
             ValueRepr::Bytes(ref val) => {
                 write!(f, "b'")?;
                 for &b in val.iter() {
@@ -661,7 +741,13 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             ValueRepr::Undefined(_) => Ok(()),
-            ValueRepr::Bool(val) => val.fmt(f),
+            ValueRepr::Bool(val) => {
+                if pycompat_rendering() {
+                    write!(f, "{}", if val { "True" } else { "False" })
+                } else {
+                    val.fmt(f)
+                }
+            }
             ValueRepr::U64(val) => val.fmt(f),
             ValueRepr::I64(val) => val.fmt(f),
             ValueRepr::F64(val) => {
@@ -677,7 +763,13 @@ impl fmt::Display for Value {
                     write!(f, "{num}")
                 }
             }
-            ValueRepr::None => f.write_str("none"),
+            ValueRepr::None => {
+                if pycompat_rendering() {
+                    f.write_str("None")
+                } else {
+                    f.write_str("none")
+                }
+            }
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {}>", val),
             ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
             ValueRepr::String(ref val, _) => write!(f, "{val}"),

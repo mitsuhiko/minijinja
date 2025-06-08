@@ -91,6 +91,7 @@ impl<'env> Vm<'env> {
         out: &mut Output,
         auto_escape: AutoEscape,
     ) -> Result<(Option<Value>, State<'template, 'env>), Error> {
+        let _pycompat_guard = crate::value::mark_pycompat_rendering(self.env.pycompat_rendering());
         let mut state = State::new(
             Context::new_with_frame(self.env, ok!(Frame::new_checked(root))),
             auto_escape,

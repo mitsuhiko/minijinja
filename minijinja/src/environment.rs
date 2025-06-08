@@ -59,6 +59,7 @@ pub struct Environment<'source> {
     #[cfg(feature = "fuel")]
     fuel: Option<u64>,
     recursion_limit: usize,
+    pycompat_rendering: bool,
 }
 
 impl Default for Environment<'_> {
@@ -111,6 +112,7 @@ impl<'source> Environment<'source> {
             #[cfg(feature = "fuel")]
             fuel: None,
             recursion_limit: MAX_RECURSION,
+            pycompat_rendering: false,
         }
     }
 
@@ -133,6 +135,7 @@ impl<'source> Environment<'source> {
             #[cfg(feature = "fuel")]
             fuel: None,
             recursion_limit: MAX_RECURSION,
+            pycompat_rendering: false,
         }
     }
 
@@ -574,6 +577,24 @@ impl<'source> Environment<'source> {
     #[cfg(feature = "debug")]
     pub fn debug(&self) -> bool {
         self.debug
+    }
+
+    /// Enables or disables Python-compatible rendering mode.
+    ///
+    /// When enabled, certain value types will be rendered to match Python Jinja2's output:
+    /// - `true`/`false` will be rendered as `True`/`False`
+    /// - `none` will be rendered as `None`
+    /// - String escaping and quoting will match Python's style
+    ///
+    /// This is useful when you need template output that's compatible with Python Jinja2.
+    /// By default this is disabled.
+    pub fn set_pycompat_rendering(&mut self, enabled: bool) {
+        self.pycompat_rendering = enabled;
+    }
+
+    /// Returns whether Python-compatible rendering mode is enabled.
+    pub fn pycompat_rendering(&self) -> bool {
+        self.pycompat_rendering
     }
 
     /// Sets the optional fuel of the engine.
