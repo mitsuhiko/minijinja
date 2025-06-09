@@ -255,7 +255,7 @@ impl<'env> Vm<'env> {
                 ($method:ident) => {{
                     b = stack.pop();
                     a = stack.pop();
-                    stack.push(ctx_ok!(ops::$method(&a, &b)));
+                    stack.push(ctx_ok!(ops::$method(Some(state), &a, &b)));
                 }};
             }
 
