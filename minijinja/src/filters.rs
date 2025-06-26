@@ -1467,6 +1467,153 @@ mod builtins {
         Ok(Value::from(rv))
     }
 
+    /// Chain two or more iterable objects as a single iterable object.
+    ///
+    /// If all the individual objects are dictionaries, then the final chained object
+    /// also acts like a dictionary -- you can lookup a key, or iterate over the keys
+    /// etc. Note that the dictionaries are not merged, so if there are duplicate keys,
+    /// then the lookup will return the value from the last matching dictionary in the
+    /// chain, but the iteration will yield all the duplicate keys.
+    ///
+    /// If all the individual objects are lists, then the final chained object also acts
+    /// like a list as if the lists are appended.
+    ///
+    /// Otherwise, the chained object acts like an iterator chaining individual
+    /// iterators, but it cannot be indexed.
+    ///
+    /// ```jinja
+    /// {{ users | chain(moreusers) | length }}
+    /// {% for user, info in shard0 | chain(shard1, shard2) | dictsort %}
+    ///   {{user}}: {{info}}
+    /// {% endfor %}
+    /// {{ list1 | chain(list2) | attr(1) }}
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn chain(
+        _state: &State,
+        value: Value,
+        others: crate::value::Rest<Value>,
+    ) -> Result<Value, Error> {
+        use crate::value::ValueKind;
+        use std::sync::Arc;
+
+        let all_values = std::iter::once(value.clone())
+            .chain(others.0.iter().cloned())
+            .collect::<Vec<_>>();
+
+        // Check if all values are dictionaries
+        let all_dicts = all_values.iter().all(|v| v.kind() == ValueKind::Map);
+
+        // Check if all values are sequences/lists
+        let all_seqs = all_values
+            .iter()
+            .all(|v| matches!(v.kind(), ValueKind::Seq));
+
+        if all_dicts {
+            // Dictionary chaining behavior - create custom object with lookup capability
+            #[derive(Debug)]
+            struct ChainedDict {
+                values: Vec<Value>,
+            }
+
+            impl Object for ChainedDict {
+                fn repr(self: &Arc<Self>) -> ObjectRepr {
+                    ObjectRepr::Map
+                }
+
+                fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                    // Look up key in reverse order (last matching dict wins)
+                    for value in self.values.iter().rev() {
+                        if let Ok(v) = value.get_item(key) {
+                            if !v.is_undefined() {
+                                return Some(v);
+                            }
+                        }
+                    }
+                    None
+                }
+
+                fn enumerate(self: &Arc<Self>) -> Enumerator {
+                    let values = self.values.clone();
+                    Enumerator::Iter(Box::new(values.into_iter().flat_map(|v| {
+                        if let Ok(iter) = v.try_iter() {
+                            iter.collect::<Vec<_>>().into_iter()
+                        } else {
+                            vec![].into_iter()
+                        }
+                    })))
+                }
+
+                fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
+                    // For dictionaries, we return the total number of keys (including duplicates)
+                    Some(self.values.iter().map(|v| v.len().unwrap_or(0)).sum())
+                }
+            }
+
+            Ok(Value::from_object(ChainedDict { values: all_values }))
+        } else if all_seqs {
+            // List chaining behavior - calculate total length for size hint
+            let total_len = all_values.iter().map(|v| v.len().unwrap_or(0)).sum();
+
+            #[derive(Debug)]
+            struct ChainedSeq {
+                values: Vec<Value>,
+                total_len: usize,
+            }
+
+            impl Object for ChainedSeq {
+                fn repr(self: &Arc<Self>) -> ObjectRepr {
+                    ObjectRepr::Seq
+                }
+
+                fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                    if let Some(idx) = key.as_usize() {
+                        let mut current_idx = 0;
+                        for value in &self.values {
+                            let len = value.len().unwrap_or(0);
+                            if idx < current_idx + len {
+                                return value.get_item(&Value::from(idx - current_idx)).ok();
+                            }
+                            current_idx += len;
+                        }
+                    }
+                    None
+                }
+
+                fn enumerate(self: &Arc<Self>) -> Enumerator {
+                    let values = self.values.clone();
+                    Enumerator::Iter(Box::new(values.into_iter().flat_map(|v| {
+                        if let Ok(iter) = v.try_iter() {
+                            iter.collect::<Vec<_>>().into_iter()
+                        } else {
+                            vec![].into_iter()
+                        }
+                    })))
+                }
+
+                fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
+                    Some(self.total_len)
+                }
+            }
+
+            Ok(Value::from_object(ChainedSeq {
+                values: all_values,
+                total_len,
+            }))
+        } else {
+            // General iterator chaining behavior
+            Ok(Value::make_object_iterable(all_values, |values| {
+                Box::new(values.into_iter().flat_map(|v| {
+                    if let Ok(iter) = v.try_iter() {
+                        Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
+                    } else {
+                        Box::new(std::iter::empty())
+                    }
+                })) as Box<dyn Iterator<Item = Value> + Send + Sync>
+            }))
+        }
+    }
+
     /// Pretty print a variable.
     ///
     /// This is useful for debugging as it better shows what's inside an object.

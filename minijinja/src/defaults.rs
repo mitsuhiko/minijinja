@@ -110,6 +110,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, Value> {
         rv.insert("map".into(), Value::from_function(filters::map));
         rv.insert("groupby".into(), Value::from_function(filters::groupby));
         rv.insert("unique".into(), Value::from_function(filters::unique));
+        rv.insert("chain".into(), Value::from_function(filters::chain));
         rv.insert("pprint".into(), Value::from_function(filters::pprint));
 
         #[cfg(feature = "json")]

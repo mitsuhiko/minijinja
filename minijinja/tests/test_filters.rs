@@ -1,6 +1,6 @@
 #![cfg(feature = "builtins")]
 use minijinja::value::Value;
-use minijinja::{args, Environment};
+use minijinja::{args, context, Environment};
 use similar_asserts::assert_eq;
 
 use minijinja::filters::{abs, indent};
@@ -85,4 +85,75 @@ fn test_abs_overflow() {
     assert_eq!(ok, Value::from(-(i64::MIN as i128)));
     let err = abs(Value::from(i128::MIN)).unwrap_err();
     assert_eq!(err.to_string(), "invalid operation: overflow on abs");
+}
+
+#[test]
+fn test_chain_lists() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{{ [1, 2] | chain([3, 4]) | list }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, "[1, 2, 3, 4]");
+}
+
+#[test]
+fn test_chain_length() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{{ [1, 2] | chain([3, 4, 5]) | length }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, "5");
+}
+
+#[test]
+fn test_chain_dicts() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{{ {'a': 1} | chain({'b': 2}) | items | list }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"[["a", 1], ["b", 2]]"#);
+}
+
+#[test]
+fn test_chain_dict_lookup() {
+    let env = Environment::new();
+    // Last dict wins for lookups
+    let tmpl = env
+        .template_from_str("{{ ({'a': 1} | chain({'a': 2}))['a'] }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, "2");
+}
+
+#[test]
+fn test_chain_multiple() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{{ [1] | chain([2], [3, 4]) | list }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, "[1, 2, 3, 4]");
+}
+
+#[test]
+fn test_chain_with_iteration() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{% for item in [1, 2] | chain([3, 4]) %}{{ item }}{% endfor %}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, "1234");
+}
+
+#[test]
+fn test_chain_indexing() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{{ ([1, 2] | chain([3, 4]))[2] }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, "3");
 }
