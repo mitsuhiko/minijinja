@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+use crate::value::ops::LenIterWrap;
 use crate::value::{Enumerator, Object, ObjectRepr, Value, ValueKind};
 
 /// Dictionary merging behavior - create custom object with lookup capability
@@ -58,12 +59,12 @@ impl Object for MergeDict {
 #[derive(Debug)]
 pub struct MergeSeq {
     values: Vec<Value>,
-    total_len: usize,
+    total_len: Option<usize>,
 }
 
 impl MergeSeq {
     pub fn new(values: Vec<Value>) -> Self {
-        let total_len = values.iter().map(|v| v.len().unwrap_or(0)).sum();
+        let total_len = values.iter().map(|v| v.len()).sum();
         Self { values, total_len }
     }
 }
@@ -89,17 +90,15 @@ impl Object for MergeSeq {
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         let values = self.values.clone();
-        Enumerator::Iter(Box::new(values.into_iter().flat_map(|v| {
-            if let Ok(iter) = v.try_iter() {
-                Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
-            } else {
-                Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Value> + Send + Sync>
-            }
-        })))
-    }
-
-    fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
-        Some(self.total_len)
+        let iter = values.into_iter().flat_map(|v| {
+            v.try_iter()
+                .unwrap_or_else(|_| Value::UNDEFINED.try_iter().unwrap())
+        });
+        Enumerator::Iter(if let Some(total_len) = self.total_len {
+            Box::new(LenIterWrap(total_len, iter))
+        } else {
+            Box::new(iter)
+        })
     }
 }
 

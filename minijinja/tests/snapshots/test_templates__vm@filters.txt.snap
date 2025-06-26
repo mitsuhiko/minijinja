@@ -150,5 +150,5 @@ chain-lists: [1, 2, 3, 4, 5, 6]
 chain-multiple: [1, 2, 3, 4, 5, 6, 7, 8]
 chain-maps: {"a": "b", "c": "d", "e": "f", "g": "h"}
 chain-and-length: 6
-chain-iteration: 1,2,3,4,5,6,
+chain-iteration: 1,2,3,4,5,6
 chain-indexing: 5

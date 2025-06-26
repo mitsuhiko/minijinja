@@ -3,6 +3,23 @@ use crate::value::{DynObject, ObjectRepr, Value, ValueKind, ValueRepr};
 
 const MIN_I128_AS_POS_U128: u128 = 170141183460469231731687303715884105728;
 
+/// Iterator wrapper that provides exact size hints for iterators with known length.
+pub(crate) struct LenIterWrap<I: Send + Sync>(pub(crate) usize, pub(crate) I);
+
+impl<I: Iterator<Item = Value> + Send + Sync> Iterator for LenIterWrap<I> {
+    type Item = Value;
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.1.next()
+    }
+
+    #[inline(always)]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.0, Some(self.0))
+    }
+}
+
 pub enum CoerceResult<'a> {
     I128(i128, i128),
     F64(f64, f64),
@@ -316,22 +333,6 @@ pub fn mul(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 }
 
 fn repeat_iterable(n: &Value, seq: &DynObject) -> Result<Value, Error> {
-    struct LenIterWrap<I: Send + Sync>(usize, I);
-
-    impl<I: Iterator<Item = Value> + Send + Sync> Iterator for LenIterWrap<I> {
-        type Item = Value;
-
-        #[inline(always)]
-        fn next(&mut self) -> Option<Self::Item> {
-            self.1.next()
-        }
-
-        #[inline(always)]
-        fn size_hint(&self) -> (usize, Option<usize>) {
-            (self.0, Some(self.0))
-        }
-    }
-
     let n = ok!(n.as_usize().ok_or_else(|| {
         Error::new(
             ErrorKind::InvalidOperation,

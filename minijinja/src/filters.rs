@@ -1473,10 +1473,10 @@ mod builtins {
     /// also acts like a dictionary -- you can lookup a key, or iterate over the keys
     /// etc. Note that the dictionaries are not merged, so if there are duplicate keys,
     /// then the lookup will return the value from the last matching dictionary in the
-    /// chain, but the iteration will yield all the duplicate keys.
+    /// chain.
     ///
-    /// If all the individual objects are lists, then the final chained object also acts
-    /// like a list as if the lists are appended.
+    /// If all the individual objects are sequences, then the final chained
+    /// object also acts like a list as if the lists are appended.
     ///
     /// Otherwise, the chained object acts like an iterator chaining individual
     /// iterators, but it cannot be indexed.
