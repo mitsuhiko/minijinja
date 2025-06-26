@@ -113,11 +113,12 @@
 //!
 //! Some additional filters are available in the
 //! [`minijinja-contrib`](https://crates.io/crates/minijinja-contrib) crate.
+use std::fmt;
 use std::sync::Arc;
 
 use crate::error::Error;
 use crate::utils::write_escaped;
-use crate::value::Value;
+use crate::value::{Enumerator, Object, Value, ValueKind};
 use crate::vm::State;
 use crate::{AutoEscape, Output};
 
@@ -1473,6 +1474,213 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn pprint(value: &Value) -> String {
         format!("{:#?}", value)
+    }
+
+    // Helper iterator for chaining multiple values
+    struct ChainIterator {
+        maps: Vec<Value>,
+        current_map: usize,
+        current_iter: Option<Box<dyn Iterator<Item = Value> + Send + Sync>>,
+    }
+
+    impl Iterator for ChainIterator {
+        type Item = Value;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            loop {
+                // If we have a current iterator, try to get the next item
+                if let Some(ref mut iter) = self.current_iter {
+                    if let Some(item) = iter.next() {
+                        return Some(item);
+                    }
+                    // Current iterator is exhausted, move to the next one
+                    self.current_iter = None;
+                    self.current_map += 1;
+                }
+
+                // If no current iterator or it's exhausted, try to get the next one
+                if self.current_map >= self.maps.len() {
+                    return None;
+                }
+
+                // Try to create an iterator for the current map
+                if let Ok(iter) = self.maps[self.current_map].try_iter() {
+                    self.current_iter = Some(Box::new(iter));
+                    // Continue the loop to get the first item from this iterator
+                } else {
+                    // Skip this map if it's not iterable
+                    self.current_map += 1;
+                }
+            }
+        }
+
+        fn size_hint(&self) -> (usize, Option<usize>) {
+            // Calculate size hint by summing remaining maps
+            let remaining_exact_sizes: Option<Vec<usize>> = self.maps[self.current_map..]
+                .iter()
+                .map(|v| v.len())
+                .collect();
+
+            if let Some(sizes) = remaining_exact_sizes {
+                let total: usize = sizes.iter().sum();
+                // Subtract what we might have already consumed from current iterator
+                if let Some(ref iter) = self.current_iter {
+                    let (lower, upper) = iter.size_hint();
+                    if let Some(upper_bound) = upper {
+                        (
+                            lower,
+                            Some(total - (sizes.get(0).unwrap_or(&0) - upper_bound)),
+                        )
+                    } else {
+                        (lower, Some(total))
+                    }
+                } else {
+                    (total, Some(total))
+                }
+            } else {
+                // If we can't determine exact sizes, use conservative estimates
+                (0, None)
+            }
+        }
+    }
+
+    /// Chain two or more iterable objects as a single iterable object.
+    ///
+    /// If all the individual objects are dictionaries, then the final chained object
+    /// also acts like a dictionary -- you can lookup a key, or iterate over the keys
+    /// etc. Note that the dictionaries are not merged, so if there are duplicate keys,
+    /// then the lookup will return the value from the last matching dictionary in the
+    /// chain, but the iteration will yield all the duplicate keys.
+    ///
+    /// If all the individual objects are lists, then the final chained object also acts
+    /// like a list as if the lists are appended.
+    ///
+    /// Otherwise, the chained object acts like an iterator chaining individual
+    /// iterators, but it cannot be indexed.
+    ///
+    /// ```jinja
+    /// {{ users | chain(moreusers) | length }}
+    ///
+    /// {% for user, info in shard0 | chain(shard1, shard2) | dictsort %}
+    ///    {{user}}: {{info}}
+    /// {% endfor %}
+    ///
+    /// {{ list1 | chain(list2) | attr(1) }}
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn chain(first: &Value, others: crate::value::Rest<Value>) -> Result<Value, Error> {
+        let mut all_values = vec![first.clone()];
+        all_values.extend(others.0);
+
+        if all_values.is_empty() {
+            return Ok(Value::from(Vec::<Value>::new()));
+        }
+
+        // Check if all values are mappings (dictionaries)
+        let all_mappings = all_values.iter().all(|v| v.kind() == ValueKind::Map);
+
+        // Check if all values are sequences (lists/arrays)
+        let all_sequences = all_values.iter().all(|v| v.kind() == ValueKind::Seq);
+
+        if all_mappings {
+            // Create a chained mapping
+            struct ChainedMap {
+                maps: Vec<Value>,
+            }
+
+            impl fmt::Debug for ChainedMap {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    write!(f, "<chained mapping>")
+                }
+            }
+
+            impl Object for ChainedMap {
+                fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                    // Look up key in reverse order, so last map wins
+                    for map in self.maps.iter().rev() {
+                        if let Ok(value) = map.get_item(key) {
+                            if !value.is_undefined() {
+                                return Some(value);
+                            }
+                        }
+                    }
+                    None
+                }
+
+                fn enumerate(self: &Arc<Self>) -> Enumerator {
+                    // Create an iterator that chains all map iterators
+                    let chain_iter = ChainIterator {
+                        maps: self.maps.clone(),
+                        current_map: 0,
+                        current_iter: None,
+                    };
+                    Enumerator::Iter(Box::new(chain_iter))
+                }
+            }
+
+            Ok(Value::from_object(ChainedMap { maps: all_values }))
+        } else if all_sequences {
+            // Create a chained sequence
+            struct ChainedSeq {
+                sequences: Vec<Value>,
+            }
+
+            impl fmt::Debug for ChainedSeq {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    write!(f, "<chained sequence>")
+                }
+            }
+
+            impl Object for ChainedSeq {
+                fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                    if let Some(idx) = key.as_usize() {
+                        let mut current_offset = 0;
+                        for seq in &self.sequences {
+                            if let Some(len) = seq.len() {
+                                if idx < current_offset + len {
+                                    return seq.get_item(&Value::from(idx - current_offset)).ok();
+                                }
+                                current_offset += len;
+                            } else {
+                                // If we can't get length, fall back to iteration
+                                if let Ok(iter) = seq.try_iter() {
+                                    for (i, item) in iter.enumerate() {
+                                        if current_offset + i == idx {
+                                            return Some(item);
+                                        }
+                                    }
+                                    current_offset += seq.len().unwrap_or(0);
+                                }
+                            }
+                        }
+                    }
+                    None
+                }
+
+                fn enumerate(self: &Arc<Self>) -> Enumerator {
+                    // Create an iterator that chains all sequence iterators
+                    let chain_iter = ChainIterator {
+                        maps: self.sequences.clone(),
+                        current_map: 0,
+                        current_iter: None,
+                    };
+                    Enumerator::Iter(Box::new(chain_iter))
+                }
+            }
+
+            Ok(Value::from_object(ChainedSeq {
+                sequences: all_values,
+            }))
+        } else {
+            // Create a generic chained iterator
+            Ok(Value::make_object_iterable(all_values, move |values| {
+                Box::new(ChainIterator {
+                    maps: values.clone(),
+                    current_map: 0,
+                    current_iter: None,
+                }) as Box<dyn Iterator<Item = _> + Send + Sync>
+            }))
+        }
     }
 }
 
