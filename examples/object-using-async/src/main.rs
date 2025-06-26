@@ -46,5 +46,5 @@ async fn main() {
     let rv = spawn_blocking(move || render!("title: {{ site.get_config('title') }}", site))
         .await
         .unwrap();
-    println!("{}", rv);
+    println!("{rv}");
 }

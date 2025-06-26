@@ -263,7 +263,7 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
                 if idx > 0 {
                     rv.push_str(s);
                 }
-                write!(rv, "{}", value).ok();
+                write!(rv, "{value}").ok();
             }
             Ok(Value::from(rv))
         }

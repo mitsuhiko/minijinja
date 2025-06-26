@@ -139,7 +139,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     let kind = value.kind();
     let error = Err(Error::new(
         ErrorKind::InvalidOperation,
-        format!("value of type {} cannot be sliced", kind),
+        format!("value of type {kind} cannot be sliced"),
     ));
 
     match value.0 {
