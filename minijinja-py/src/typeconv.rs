@@ -261,7 +261,7 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
         ValueKind::Bytes => Ok(value.as_bytes().unwrap().into_py_any(py)?),
         kind => Err(to_py_error(minijinja::Error::new(
             minijinja::ErrorKind::InvalidOperation,
-            format!("object {} cannot roundtrip", kind),
+            format!("object {kind} cannot roundtrip"),
         ))),
     }
 }

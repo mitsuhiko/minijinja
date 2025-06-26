@@ -135,7 +135,7 @@ fn render(env: &Environment, template: &str, ctx: &Value, locals: &BTreeMap<Stri
         ),
     ) {
         Ok(rv) => {
-            println!("{}", rv);
+            println!("{rv}");
         }
         Err(err) => print_error(&Error::from(err)),
     }
@@ -145,16 +145,16 @@ fn print_result(value: &Value) {
     if value.is_undefined() {
         // nothing
     } else if let Some(s) = value.as_str() {
-        println!("{:?}", s);
+        println!("{s:?}");
     } else if let Some(b) = value.as_bytes() {
         println!("{:?}", BytesRef(b));
     } else {
-        println!("{}", value);
+        println!("{value}");
     }
 }
 
 fn print(value: Value) -> Value {
-    println!("{}", value);
+    println!("{value}");
     Value::UNDEFINED
 }
 
@@ -178,7 +178,7 @@ impl fmt::Debug for BytesRef<'_> {
             } else if (0x20..0x7f).contains(&b) {
                 write!(f, "{}", b as char)?;
             } else {
-                write!(f, "\\x{:02x}", b)?;
+                write!(f, "\\x{b:02x}")?;
             }
         }
         write!(f, "\"")?;

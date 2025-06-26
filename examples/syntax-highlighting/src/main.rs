@@ -49,7 +49,7 @@ impl Object for Highlighter {
         let syntax = self.ss.find_syntax_by_token(lang).ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidOperation,
-                format!("unknown language {}", lang),
+                format!("unknown language {lang}"),
             )
         })?;
         kwargs.assert_all_used()?;
