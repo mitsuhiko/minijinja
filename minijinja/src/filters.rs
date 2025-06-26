@@ -113,8 +113,6 @@
 //!
 //! Some additional filters are available in the
 //! [`minijinja-contrib`](https://crates.io/crates/minijinja-contrib) crate.
-use std::sync::Arc;
-
 use crate::error::Error;
 use crate::utils::write_escaped;
 use crate::value::Value;
@@ -169,12 +167,14 @@ mod builtins {
 
     use crate::error::ErrorKind;
     use crate::utils::{safe_sort, splitn_whitespace};
+    use crate::value::merge_object::{MergeDict, MergeSeq};
     use crate::value::ops::{self, as_f64};
     use crate::value::{Enumerator, Kwargs, Object, ObjectRepr, ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::cmp::Ordering;
     use std::fmt::Write;
-    use std::mem;
+    use std::sync::Arc;
+    use std::{iter, mem};
 
     /// Converts a value to uppercase.
     ///
@@ -1494,112 +1494,17 @@ mod builtins {
         value: Value,
         others: crate::value::Rest<Value>,
     ) -> Result<Value, Error> {
-        use crate::value::ValueKind;
-        use std::sync::Arc;
-
-        let all_values = std::iter::once(value.clone())
+        let all_values = iter::once(value.clone())
             .chain(others.0.iter().cloned())
             .collect::<Vec<_>>();
 
-        // Check if all values are dictionaries
-        let all_dicts = all_values.iter().all(|v| v.kind() == ValueKind::Map);
-
-        // Check if all values are sequences/lists
-        let all_seqs = all_values
+        if all_values.iter().all(|v| v.kind() == ValueKind::Map) {
+            Ok(Value::from_object(MergeDict::new(all_values)))
+        } else if all_values
             .iter()
-            .all(|v| matches!(v.kind(), ValueKind::Seq));
-
-        if all_dicts {
-            // Dictionary chaining behavior - create custom object with lookup capability
-            #[derive(Debug)]
-            struct ChainedDict {
-                values: Vec<Value>,
-            }
-
-            impl Object for ChainedDict {
-                fn repr(self: &Arc<Self>) -> ObjectRepr {
-                    ObjectRepr::Map
-                }
-
-                fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-                    // Look up key in reverse order (last matching dict wins)
-                    for value in self.values.iter().rev() {
-                        if let Ok(v) = value.get_item(key) {
-                            if !v.is_undefined() {
-                                return Some(v);
-                            }
-                        }
-                    }
-                    None
-                }
-
-                fn enumerate(self: &Arc<Self>) -> Enumerator {
-                    let values = self.values.clone();
-                    Enumerator::Iter(Box::new(values.into_iter().flat_map(|v| {
-                        if let Ok(iter) = v.try_iter() {
-                            iter.collect::<Vec<_>>().into_iter()
-                        } else {
-                            vec![].into_iter()
-                        }
-                    })))
-                }
-
-                fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
-                    // For dictionaries, we return the total number of keys (including duplicates)
-                    Some(self.values.iter().map(|v| v.len().unwrap_or(0)).sum())
-                }
-            }
-
-            Ok(Value::from_object(ChainedDict { values: all_values }))
-        } else if all_seqs {
-            // List chaining behavior - calculate total length for size hint
-            let total_len = all_values.iter().map(|v| v.len().unwrap_or(0)).sum();
-
-            #[derive(Debug)]
-            struct ChainedSeq {
-                values: Vec<Value>,
-                total_len: usize,
-            }
-
-            impl Object for ChainedSeq {
-                fn repr(self: &Arc<Self>) -> ObjectRepr {
-                    ObjectRepr::Seq
-                }
-
-                fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-                    if let Some(idx) = key.as_usize() {
-                        let mut current_idx = 0;
-                        for value in &self.values {
-                            let len = value.len().unwrap_or(0);
-                            if idx < current_idx + len {
-                                return value.get_item(&Value::from(idx - current_idx)).ok();
-                            }
-                            current_idx += len;
-                        }
-                    }
-                    None
-                }
-
-                fn enumerate(self: &Arc<Self>) -> Enumerator {
-                    let values = self.values.clone();
-                    Enumerator::Iter(Box::new(values.into_iter().flat_map(|v| {
-                        if let Ok(iter) = v.try_iter() {
-                            iter.collect::<Vec<_>>().into_iter()
-                        } else {
-                            vec![].into_iter()
-                        }
-                    })))
-                }
-
-                fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
-                    Some(self.total_len)
-                }
-            }
-
-            Ok(Value::from_object(ChainedSeq {
-                values: all_values,
-                total_len,
-            }))
+            .all(|v| matches!(v.kind(), ValueKind::Seq))
+        {
+            Ok(Value::from_object(MergeSeq::new(all_values)))
         } else {
             // General iterator chaining behavior
             Ok(Value::make_object_iterable(all_values, |values| {
@@ -1607,7 +1512,7 @@ mod builtins {
                     if let Ok(iter) = v.try_iter() {
                         Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
                     } else {
-                        Box::new(std::iter::empty())
+                        Box::new(iter::empty())
                     }
                 })) as Box<dyn Iterator<Item = Value> + Send + Sync>
             }))

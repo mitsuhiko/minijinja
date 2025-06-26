@@ -1,30 +1,105 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use crate::value::{Enumerator, Object, Value, ValueKind};
+use crate::value::{Enumerator, Object, ObjectRepr, Value, ValueKind};
 
-#[derive(Clone, Debug)]
-struct MergeObject(pub Box<[Value]>);
+/// Dictionary merging behavior - create custom object with lookup capability
+#[derive(Debug)]
+pub struct MergeDict {
+    values: Box<[Value]>,
+}
 
-impl Object for MergeObject {
+impl MergeDict {
+    pub fn new(values: Vec<Value>) -> Self {
+        Self {
+            values: values.into_boxed_slice(),
+        }
+    }
+}
+
+impl Object for MergeDict {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.0
-            .iter()
-            .filter_map(|x| x.get_item_opt(key))
-            .find(|x| !x.is_undefined())
+        // Look up key in reverse order (last matching dict wins)
+        for value in self.values.iter().rev() {
+            if let Ok(v) = value.get_item(key) {
+                if !v.is_undefined() {
+                    return Some(v);
+                }
+            }
+        }
+        None
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        // we collect here the whole internal object once on iteration so that
-        // we have an enumerator with a known length.
-        let items = self
-            .0
+        // Collect all keys from all dictionaries (only include maps)
+        let keys: BTreeSet<Value> = self
+            .values
             .iter()
             .filter(|x| x.kind() == ValueKind::Map)
-            .flat_map(|v| v.try_iter().ok())
+            .filter_map(|v| v.try_iter().ok())
             .flatten()
-            .collect::<BTreeSet<_>>();
-        Enumerator::Iter(Box::new(items.into_iter()))
+            .collect();
+        Enumerator::Iter(Box::new(keys.into_iter()))
+    }
+
+    fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
+        // For dictionaries, we return the total number of keys from maps only
+        Some(
+            self.values
+                .iter()
+                .filter(|x| x.kind() == ValueKind::Map)
+                .map(|v| v.len().unwrap_or(0))
+                .sum(),
+        )
+    }
+}
+
+/// List merging behavior - calculate total length for size hint
+#[derive(Debug)]
+pub struct MergeSeq {
+    values: Vec<Value>,
+    total_len: usize,
+}
+
+impl MergeSeq {
+    pub fn new(values: Vec<Value>) -> Self {
+        let total_len = values.iter().map(|v| v.len().unwrap_or(0)).sum();
+        Self { values, total_len }
+    }
+}
+
+impl Object for MergeSeq {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Seq
+    }
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        if let Some(idx) = key.as_usize() {
+            let mut current_idx = 0;
+            for value in &self.values {
+                let len = value.len().unwrap_or(0);
+                if idx < current_idx + len {
+                    return value.get_item(&Value::from(idx - current_idx)).ok();
+                }
+                current_idx += len;
+            }
+        }
+        None
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        let values = self.values.clone();
+        Enumerator::Iter(Box::new(values.into_iter().flat_map(|v| {
+            if let Ok(iter) = v.try_iter() {
+                iter.collect::<Vec<_>>().into_iter()
+            } else {
+                vec![].into_iter()
+            }
+        })))
+    }
+
+    fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
+        Some(self.total_len)
     }
 }
 
@@ -60,14 +135,13 @@ where
     I: IntoIterator<Item = V>,
     V: Into<Value>,
 {
-    let mut sources: Box<[Value]> = iter.into_iter().map(Into::into).collect();
+    let sources: Vec<Value> = iter.into_iter().map(Into::into).collect();
     // if we only have a single source, we can use it directly to avoid making
     // an unnecessary indirection.
     if sources.len() == 1 {
         sources[0].clone()
     } else {
-        sources.reverse();
-        Value::from_object(MergeObject(sources))
+        Value::from_object(MergeDict::new(sources))
     }
 }
 
