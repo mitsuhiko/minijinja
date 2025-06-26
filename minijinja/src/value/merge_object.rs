@@ -91,9 +91,9 @@ impl Object for MergeSeq {
         let values = self.values.clone();
         Enumerator::Iter(Box::new(values.into_iter().flat_map(|v| {
             if let Ok(iter) = v.try_iter() {
-                iter.collect::<Vec<_>>().into_iter()
+                Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
             } else {
-                vec![].into_iter()
+                Box::new(std::iter::empty()) as Box<dyn Iterator<Item = Value> + Send + Sync>
             }
         })))
     }
