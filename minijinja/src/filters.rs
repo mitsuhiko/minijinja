@@ -1603,7 +1603,7 @@ mod builtins {
         } else {
             // General iterator chaining behavior
             Ok(Value::make_object_iterable(all_values, |values| {
-                Box::new(values.into_iter().flat_map(|v| {
+                Box::new(values.iter().flat_map(|v| {
                     if let Ok(iter) = v.try_iter() {
                         Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
                     } else {

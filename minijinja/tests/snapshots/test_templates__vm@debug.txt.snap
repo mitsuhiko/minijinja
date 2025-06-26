@@ -74,6 +74,7 @@ State {
             "batch",
             "bool",
             "capitalize",
+            "chain",
             "count",
             "d",
             "default",
