@@ -13,6 +13,7 @@ All notable changes to MiniJinja are documented here.
 * Allow `isize` as argument type.  #799
 * MiniJinja now correctly handles `\x` escape sequences in strings
   as well as octals.  #805
+* Added a new `|chain` filter.  #807
 
 ## 2.10.2
 
