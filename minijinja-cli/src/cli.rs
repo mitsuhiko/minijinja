@@ -295,7 +295,7 @@ fn dump_info(
             )
             .collect();
             for (token, _) in tokens? {
-                writeln!(output, "{:?}", token)?;
+                writeln!(output, "{token:?}")?;
             }
         }
         "instructions" => {
@@ -329,7 +329,7 @@ fn print_instructions(
 
 fn print_expr_out(rv: Value, config: &Config, output: &mut Output) -> Result<i32, Error> {
     match config.expr_out() {
-        "print" => writeln!(output, "{}", rv)?,
+        "print" => writeln!(output, "{rv}")?,
         "json" => writeln!(output, "{}", serde_json::to_string(&rv)?)?,
         "json-pretty" => writeln!(output, "{}", serde_json::to_string_pretty(&rv)?)?,
         "status" => {
@@ -369,7 +369,7 @@ pub fn print_error(err: &Error) {
 #[cfg(feature = "toml")]
 fn print_config(config: &Config) -> Result<i32, Error> {
     let out = toml::to_string_pretty(config)?;
-    println!("{}", out);
+    println!("{out}");
     Ok(0)
 }
 

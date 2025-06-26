@@ -113,7 +113,7 @@ fn main() {
         eprintln!("no filter provided, using default one");
         "query('my_table').filter(is_active=true)".into()
     });
-    println!("filter: {}", expr);
+    println!("filter: {expr}");
     let rv = env.compile_expression(&expr).unwrap().eval(()).unwrap();
-    println!("result: {:#?}", rv);
+    println!("result: {rv:#?}");
 }

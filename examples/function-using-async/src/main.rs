@@ -86,5 +86,5 @@ async fn main() {
     .await
     .unwrap();
 
-    println!("{}", rv);
+    println!("{rv}");
 }

@@ -37,7 +37,7 @@ fn format_formats(s: &str) -> String {
     let mut formats = String::new();
 
     for (fmt, title, exts) in SUPPORTED_FORMATS.iter() {
-        write!(formats, "- {} ({}): ", fmt, title).ok();
+        write!(formats, "- {fmt} ({title}): ").ok();
         for (idx, ext) in exts.iter().enumerate() {
             if idx > 0 {
                 formats.push_str(", ");

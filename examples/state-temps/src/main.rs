@@ -17,10 +17,10 @@ struct Translations {
 
 impl Translations {
     fn load(lang: &str) -> Translations {
-        eprintln!("[info] loading language {}", lang);
+        eprintln!("[info] loading language {lang}");
         let mut rv = Translations::default();
         rv.strings.extend(
-            fs::read_to_string(format!("src/{}.txt", lang))
+            fs::read_to_string(format!("src/{lang}.txt"))
                 .unwrap()
                 .lines()
                 .filter_map(|l| l.split_once('=').map(|(k, v)| (k.into(), v.into()))),
@@ -34,7 +34,7 @@ impl Object for Translations {}
 fn translate(state: &State, key: &str) -> Option<Value> {
     let lang = state.lookup("LANG");
     let lang = lang.as_ref().and_then(|x| x.as_str()).unwrap();
-    let cache_key = format!("translation-cache:{}", lang);
+    let cache_key = format!("translation-cache:{lang}");
     let translations = state.get_or_set_temp_object(&cache_key, || Translations::load(lang));
     translations.strings.get(key).cloned().map(Value::from)
 }
@@ -49,5 +49,5 @@ fn main() {
             username => "Peter"
         })
         .unwrap();
-    println!("{}", rv);
+    println!("{rv}");
 }

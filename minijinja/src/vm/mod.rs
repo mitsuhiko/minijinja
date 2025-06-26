@@ -920,7 +920,7 @@ impl<'env> Vm<'env> {
         } else {
             Err(Error::new(
                 ErrorKind::UnknownBlock,
-                format!("block '{}' not found", name),
+                format!("block '{name}' not found"),
             ))
         }
     }
@@ -1013,7 +1013,7 @@ impl<'env> Vm<'env> {
         } else {
             Err(Error::new(
                 ErrorKind::CannotUnpack,
-                format!("sequence of wrong length (expected {}, got {})", count, n,),
+                format!("sequence of wrong length (expected {count}, got {n})",),
             ))
         }
     }
