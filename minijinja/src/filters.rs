@@ -173,8 +173,8 @@ mod builtins {
     use std::borrow::Cow;
     use std::cmp::Ordering;
     use std::fmt::Write;
+    use std::mem;
     use std::sync::Arc;
-    use std::{iter, mem};
 
     /// Converts a value to uppercase.
     ///
@@ -1494,7 +1494,8 @@ mod builtins {
         value: Value,
         others: crate::value::Rest<Value>,
     ) -> Result<Value, Error> {
-        let all_values = iter::once(value.clone())
+        let all_values = Some(value.clone())
+            .into_iter()
             .chain(others.0.iter().cloned())
             .collect::<Vec<_>>();
 
