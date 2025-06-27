@@ -68,7 +68,7 @@ impl Object for MergeSeq {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
         if let Some(idx) = key.as_usize() {
             let mut current_idx = 0;
-            for value in &self.values {
+            for value in self.values.iter() {
                 let len = value.len().unwrap_or(0);
                 if idx < current_idx + len {
                     return value.get_item(&Value::from(idx - current_idx)).ok();
