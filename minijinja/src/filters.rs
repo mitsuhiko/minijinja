@@ -113,8 +113,6 @@
 //!
 //! Some additional filters are available in the
 //! [`minijinja-contrib`](https://crates.io/crates/minijinja-contrib) crate.
-use std::sync::Arc;
-
 use crate::error::Error;
 use crate::utils::write_escaped;
 use crate::value::Value;
@@ -169,12 +167,14 @@ mod builtins {
 
     use crate::error::ErrorKind;
     use crate::utils::{safe_sort, splitn_whitespace};
+    use crate::value::merge_object::{MergeDict, MergeSeq};
     use crate::value::ops::{self, as_f64};
     use crate::value::{Enumerator, Kwargs, Object, ObjectRepr, ValueKind, ValueRepr};
     use std::borrow::Cow;
     use std::cmp::Ordering;
     use std::fmt::Write;
     use std::mem;
+    use std::sync::Arc;
 
     /// Converts a value to uppercase.
     ///
@@ -1465,6 +1465,57 @@ mod builtins {
         }
 
         Ok(Value::from(rv))
+    }
+
+    /// Chain two or more iterable objects as a single iterable object.
+    ///
+    /// If all the individual objects are dictionaries, then the final chained object
+    /// also acts like a dictionary -- you can lookup a key, or iterate over the keys
+    /// etc. Note that the dictionaries are not merged, so if there are duplicate keys,
+    /// then the lookup will return the value from the last matching dictionary in the
+    /// chain.
+    ///
+    /// If all the individual objects are sequences, then the final chained
+    /// object also acts like a list as if the lists are appended.
+    ///
+    /// Otherwise, the chained object acts like an iterator chaining individual
+    /// iterators, but it cannot be indexed.
+    ///
+    /// ```jinja
+    /// {{ users | chain(moreusers) | length }}
+    /// {% for user, info in shard0 | chain(shard1, shard2) | dictsort %}
+    ///   {{user}}: {{info}}
+    /// {% endfor %}
+    /// {{ list1 | chain(list2) | attr(1) }}
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn chain(
+        _state: &State,
+        value: Value,
+        others: crate::value::Rest<Value>,
+    ) -> Result<Value, Error> {
+        let all_values = Some(value.clone())
+            .into_iter()
+            .chain(others.0.iter().cloned())
+            .collect::<Vec<_>>();
+
+        if all_values.iter().all(|v| v.kind() == ValueKind::Map) {
+            Ok(Value::from_object(MergeDict::new(all_values)))
+        } else if all_values
+            .iter()
+            .all(|v| matches!(v.kind(), ValueKind::Seq))
+        {
+            Ok(Value::from_object(MergeSeq::new(all_values)))
+        } else {
+            // General iterator chaining behavior
+            Ok(Value::make_object_iterable(all_values, |values| {
+                Box::new(values.iter().flat_map(|v| match v.try_iter() {
+                    Ok(iter) => Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>,
+                    Err(err) => Box::new(Some(Value::from(err)).into_iter())
+                        as Box<dyn Iterator<Item = Value> + Send + Sync>,
+                })) as Box<dyn Iterator<Item = Value> + Send + Sync>
+            }))
+        }
     }
 
     /// Pretty print a variable.

@@ -16,7 +16,13 @@
     "a": "b",
     "c": "d"
   },
-  "scary_html": "<>&'"
+  "scary_html": "<>&'",
+  "list2": [4, 5, 6],
+  "list3": [7, 8],
+  "map2": {
+    "e": "f",
+    "g": "h"
+  }
 }
 ---
 lower: {{ word|lower }}
@@ -121,3 +127,9 @@ sum-empty: {{ []|sum }}
 sum-float: {{ [0.5, 1.0]|sum }}
 lines: {{ "foo\nbar\r\nbaz"|lines }}
 string: {{ [1|string, 2|string] }}
+chain-lists: {{ list|chain(list2)|list }}
+chain-multiple: {{ list|chain(list2, list3)|list }}
+chain-maps: {{ map|chain(map2) }}
+chain-and-length: {{ list|chain(list2)|length }}
+chain-iteration: {% for item in list|chain(list2) %}{{ item }}{% if not loop.last %},{% endif %}{% endfor %}
+chain-indexing: {{ (list|chain(list2))[4] }}

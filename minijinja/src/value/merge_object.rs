@@ -1,30 +1,97 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use crate::value::{Enumerator, Object, Value, ValueKind};
+use crate::value::ops::LenIterWrap;
+use crate::value::{Enumerator, Object, ObjectExt, ObjectRepr, Value, ValueKind};
 
-#[derive(Clone, Debug)]
-struct MergeObject(pub Box<[Value]>);
+/// Dictionary merging behavior - create custom object with lookup capability
+#[derive(Debug)]
+pub struct MergeDict {
+    values: Box<[Value]>,
+}
 
-impl Object for MergeObject {
+impl MergeDict {
+    pub fn new(values: Vec<Value>) -> Self {
+        Self {
+            values: values.into_boxed_slice(),
+        }
+    }
+}
+
+impl Object for MergeDict {
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.0
-            .iter()
-            .filter_map(|x| x.get_item_opt(key))
-            .find(|x| !x.is_undefined())
+        // Look up key in reverse order (last matching dict wins)
+        for value in self.values.iter().rev() {
+            if let Ok(v) = value.get_item(key) {
+                if !v.is_undefined() {
+                    return Some(v);
+                }
+            }
+        }
+        None
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        // we collect here the whole internal object once on iteration so that
-        // we have an enumerator with a known length.
-        let items = self
-            .0
+        // Collect all keys from all dictionaries (only include maps)
+        let keys: BTreeSet<Value> = self
+            .values
             .iter()
             .filter(|x| x.kind() == ValueKind::Map)
-            .flat_map(|v| v.try_iter().ok())
+            .filter_map(|v| v.try_iter().ok())
             .flatten()
-            .collect::<BTreeSet<_>>();
-        Enumerator::Iter(Box::new(items.into_iter()))
+            .collect();
+        Enumerator::Iter(Box::new(keys.into_iter()))
+    }
+}
+
+/// List merging behavior - calculate total length for size hint
+#[derive(Debug)]
+pub struct MergeSeq {
+    values: Box<[Value]>,
+    total_len: Option<usize>,
+}
+
+impl MergeSeq {
+    pub fn new(values: Vec<Value>) -> Self {
+        Self {
+            total_len: values.iter().map(|v| v.len()).sum(),
+            values: values.into_boxed_slice(),
+        }
+    }
+}
+
+impl Object for MergeSeq {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Seq
+    }
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        if let Some(idx) = key.as_usize() {
+            let mut current_idx = 0;
+            for value in self.values.iter() {
+                let len = value.len().unwrap_or(0);
+                if idx < current_idx + len {
+                    return value.get_item(&Value::from(idx - current_idx)).ok();
+                }
+                current_idx += len;
+            }
+        }
+        None
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        self.mapped_enumerator(|this| {
+            let iter = this.values.iter().flat_map(|v| match v.try_iter() {
+                Ok(iter) => Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>,
+                Err(err) => Box::new(Some(Value::from(err)).into_iter())
+                    as Box<dyn Iterator<Item = Value> + Send + Sync>,
+            });
+            if let Some(total_len) = this.total_len {
+                Box::new(LenIterWrap(total_len, iter))
+            } else {
+                Box::new(iter)
+            }
+        })
     }
 }
 
@@ -60,14 +127,13 @@ where
     I: IntoIterator<Item = V>,
     V: Into<Value>,
 {
-    let mut sources: Box<[Value]> = iter.into_iter().map(Into::into).collect();
+    let sources: Vec<Value> = iter.into_iter().map(Into::into).collect();
     // if we only have a single source, we can use it directly to avoid making
     // an unnecessary indirection.
     if sources.len() == 1 {
         sources[0].clone()
     } else {
-        sources.reverse();
-        Value::from_object(MergeObject(sources))
+        Value::from_object(MergeDict::new(sources))
     }
 }
 
