@@ -1508,12 +1508,10 @@ mod builtins {
         } else {
             // General iterator chaining behavior
             Ok(Value::make_object_iterable(all_values, |values| {
-                Box::new(values.iter().flat_map(|v| {
-                    if let Ok(iter) = v.try_iter() {
-                        Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
-                    } else {
-                        Box::new(iter::empty())
-                    }
+                Box::new(values.iter().flat_map(|v| match v.try_iter() {
+                    Ok(iter) => Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>,
+                    Err(err) => Box::new(Some(Value::from(err)).into_iter())
+                        as Box<dyn Iterator<Item = Value> + Send + Sync>,
                 })) as Box<dyn Iterator<Item = Value> + Send + Sync>
             }))
         }
