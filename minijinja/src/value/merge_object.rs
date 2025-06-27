@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use crate::value::ops::LenIterWrap;
-use crate::value::{Enumerator, Object, ObjectRepr, Value, ValueKind};
+use crate::value::{Enumerator, Object, ObjectExt, ObjectRepr, Value, ValueKind};
 
 /// Dictionary merging behavior - create custom object with lookup capability
 #[derive(Debug)]
@@ -42,30 +42,21 @@ impl Object for MergeDict {
             .collect();
         Enumerator::Iter(Box::new(keys.into_iter()))
     }
-
-    fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
-        // For dictionaries, we return the total number of keys from maps only
-        Some(
-            self.values
-                .iter()
-                .filter(|x| x.kind() == ValueKind::Map)
-                .map(|v| v.len().unwrap_or(0))
-                .sum(),
-        )
-    }
 }
 
 /// List merging behavior - calculate total length for size hint
 #[derive(Debug)]
 pub struct MergeSeq {
-    values: Vec<Value>,
+    values: Box<[Value]>,
     total_len: Option<usize>,
 }
 
 impl MergeSeq {
     pub fn new(values: Vec<Value>) -> Self {
-        let total_len = values.iter().map(|v| v.len()).sum();
-        Self { values, total_len }
+        Self {
+            total_len: values.iter().map(|v| v.len()).sum(),
+            values: values.into_boxed_slice(),
+        }
     }
 }
 
@@ -89,15 +80,17 @@ impl Object for MergeSeq {
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        let values = self.values.clone();
-        let iter = values.into_iter().flat_map(|v| {
-            v.try_iter()
-                .unwrap_or_else(|_| Value::UNDEFINED.try_iter().unwrap())
-        });
-        Enumerator::Iter(if let Some(total_len) = self.total_len {
-            Box::new(LenIterWrap(total_len, iter))
-        } else {
-            Box::new(iter)
+        self.mapped_enumerator(|this| {
+            let iter = this.values.iter().flat_map(|v| match v.try_iter() {
+                Ok(iter) => Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>,
+                Err(err) => Box::new(Some(Value::from(err)).into_iter())
+                    as Box<dyn Iterator<Item = Value> + Send + Sync>,
+            });
+            if let Some(total_len) = this.total_len {
+                Box::new(LenIterWrap(total_len, iter))
+            } else {
+                Box::new(iter)
+            }
         })
     }
 }
