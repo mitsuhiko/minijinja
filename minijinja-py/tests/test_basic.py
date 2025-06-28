@@ -524,3 +524,18 @@ def test_striptags():
     env = Environment()
     assert env.eval_expr("'<a>foo</a>'|striptags") == "foo"
     assert env.eval_expr("'<a>&auml;</a>'|striptags") == "ä"
+
+
+def test_addition():
+    class MyObj:
+        def __add__(self, other):
+            assert other == 22
+            return 42
+
+        def __sub__(self, other):
+            assert other == 11
+            return 23
+
+    env = Environment()
+    assert env.eval_expr("x + 22", x=MyObj()) == 42
+    assert env.eval_expr("x - 11", x=MyObj()) == 23

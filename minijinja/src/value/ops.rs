@@ -1,5 +1,8 @@
+use core::slice;
+
 use crate::error::{Error, ErrorKind};
 use crate::value::{DynObject, ObjectRepr, Value, ValueKind, ValueRepr};
+use crate::vm::State;
 
 const MIN_I128_AS_POS_U128: u128 = 170141183460469231731687303715884105728;
 
@@ -256,9 +259,28 @@ fn failed_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
     )
 }
 
+macro_rules! special_method_impl {
+    ($method:expr, $state:expr, $lhs:expr, $rhs:expr) => {
+        if let Some(state) = $state {
+            if let Some(obj) = $lhs.as_object() {
+                match obj.call_method(state, $method, slice::from_ref($rhs)) {
+                    Ok(rv) => return Ok(rv),
+                    Err(err) => {
+                        if err.kind() != ErrorKind::UnknownMethod {
+                            return Err(err);
+                        }
+                    }
+                }
+            }
+        }
+    };
+}
+
 macro_rules! math_binop {
-    ($name:ident, $int:ident, $float:tt) => {
-        pub fn $name(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    ($name:ident, $int:ident, $float:tt, $method:expr) => {
+        pub fn $name(state: Option<&State>, lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+            special_method_impl!($method, state, lhs, rhs);
+
             match coerce(lhs, rhs, true) {
                 Some(CoerceResult::I128(a, b)) => match a.$int(b) {
                     Some(val) => Ok(int_as_value(val)),
@@ -271,7 +293,9 @@ macro_rules! math_binop {
     }
 }
 
-pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+pub fn add(state: Option<&State>, lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    special_method_impl!("__add__", state, lhs, rhs);
+
     if matches!(lhs.kind(), ValueKind::Seq | ValueKind::Iterable)
         && matches!(rhs.kind(), ValueKind::Seq | ValueKind::Iterable)
     {
@@ -298,10 +322,12 @@ pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     }
 }
 
-math_binop!(sub, checked_sub, -);
-math_binop!(rem, checked_rem_euclid, %);
+math_binop!(sub, checked_sub, -, "__sub__");
+math_binop!(rem, checked_rem_euclid, %, "__mod__");
 
-pub fn mul(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+pub fn mul(state: Option<&State>, lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    special_method_impl!("__mul__", state, lhs, rhs);
+
     if let Some((s, n)) = lhs
         .as_str()
         .map(|s| (s, rhs))
@@ -370,7 +396,8 @@ fn repeat_iterable(n: &Value, seq: &DynObject) -> Result<Value, Error> {
     }))
 }
 
-pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+pub fn div(state: Option<&State>, lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    special_method_impl!("__truediv__", state, lhs, rhs);
     fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
         let a = some!(as_f64(lhs, true));
         let b = some!(as_f64(rhs, true));
@@ -379,7 +406,8 @@ pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     do_it(lhs, rhs).ok_or_else(|| impossible_op("/", lhs, rhs))
 }
 
-pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+pub fn int_div(state: Option<&State>, lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    special_method_impl!("__floordiv__", state, lhs, rhs);
     match coerce(lhs, rhs, true) {
         Some(CoerceResult::I128(a, b)) => {
             if b != 0 {
@@ -396,7 +424,8 @@ pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 }
 
 /// Implements a binary `pow` operation on values.
-pub fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+pub fn pow(state: Option<&State>, lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    special_method_impl!("__pow__", state, lhs, rhs);
     match coerce(lhs, rhs, true) {
         Some(CoerceResult::I128(a, b)) => {
             match TryFrom::try_from(b).ok().and_then(|b| a.checked_pow(b)) {
@@ -483,22 +512,22 @@ mod tests {
 
     #[test]
     fn test_adding() {
-        let err = add(&Value::from("a"), &Value::from(42)).unwrap_err();
+        let err = add(None, &Value::from("a"), &Value::from(42)).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: tried to use + operator on unsupported types string and number"
         );
 
         assert_eq!(
-            add(&Value::from(1), &Value::from(2)).unwrap(),
+            add(None, &Value::from(1), &Value::from(2)).unwrap(),
             Value::from(3)
         );
         assert_eq!(
-            add(&Value::from("foo"), &Value::from("bar")).unwrap(),
+            add(None, &Value::from("foo"), &Value::from("bar")).unwrap(),
             Value::from("foobar")
         );
 
-        let err = add(&Value::from(i128::MAX), &Value::from(1)).unwrap_err();
+        let err = add(None, &Value::from(i128::MAX), &Value::from(1)).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: unable to calculate 170141183460469231731687303715884105727 + 1"
@@ -507,44 +536,44 @@ mod tests {
 
     #[test]
     fn test_subtracting() {
-        let err = sub(&Value::from("a"), &Value::from(42)).unwrap_err();
+        let err = sub(None, &Value::from("a"), &Value::from(42)).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: tried to use - operator on unsupported types string and number"
         );
 
-        let err = sub(&Value::from("foo"), &Value::from("bar")).unwrap_err();
+        let err = sub(None, &Value::from("foo"), &Value::from("bar")).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: tried to use - operator on unsupported types string and string"
         );
 
         assert_eq!(
-            sub(&Value::from(2), &Value::from(1)).unwrap(),
+            sub(None, &Value::from(2), &Value::from(1)).unwrap(),
             Value::from(1)
         );
     }
 
     #[test]
     fn test_dividing() {
-        let err = div(&Value::from("a"), &Value::from(42)).unwrap_err();
+        let err = div(None, &Value::from("a"), &Value::from(42)).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: tried to use / operator on unsupported types string and number"
         );
 
-        let err = div(&Value::from("foo"), &Value::from("bar")).unwrap_err();
+        let err = div(None, &Value::from("foo"), &Value::from("bar")).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: tried to use / operator on unsupported types string and string"
         );
 
         assert_eq!(
-            div(&Value::from(100), &Value::from(2)).unwrap(),
+            div(None, &Value::from(100), &Value::from(2)).unwrap(),
             Value::from(50.0)
         );
 
-        let err = int_div(&Value::from(i128::MIN), &Value::from(-1i128)).unwrap_err();
+        let err = int_div(None, &Value::from(i128::MIN), &Value::from(-1i128)).unwrap_err();
         assert_eq!(
             err.to_string(),
             "invalid operation: unable to calculate -170141183460469231731687303715884105728 // -1"

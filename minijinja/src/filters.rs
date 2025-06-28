@@ -594,7 +594,7 @@ mod builtins {
                     format!("can only sum numbers, got {}", value.kind()),
                 ));
             }
-            rv = ok!(ops::add(&rv, &value));
+            rv = ok!(ops::add(Some(state), &rv, &value));
         }
 
         Ok(rv)
