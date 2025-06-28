@@ -167,6 +167,16 @@ cd minijinja && cargo test --test test_templates
 cd minijinja && cargo test test_function_name -- --nocapture
 ```
 
+### Commit Guidelines
+- Follow conventional commit format
+- Always run `make lint` and `make format` before committing
+- Ensure tests pass with `make test`
+
+### For New Releases
+- Make sure the next release is mentioned in CHANGLEOG.md
+- Use `scripts/bump-version.sh VERSION` to update all references to the next versino
+- Create a commit for that release and push the tags
+
 ## Warnings and Recommendations
 
 - **Workflow Recommendations**:
