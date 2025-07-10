@@ -174,7 +174,7 @@ cd minijinja && cargo test test_function_name -- --nocapture
 
 ### For New Releases
 - Make sure the next release is mentioned in CHANGLEOG.md
-- Use `scripts/bump-version.sh VERSION` to update all references to the next versino
+- Use `scripts/bump-version.sh VERSION` to update all references to the next version
 - Create a commit for that release and push the tags
 
 ## Warnings and Recommendations

@@ -113,7 +113,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// **Note on values:** The [`Value`] type implements `Serialize` and can be
     /// efficiently passed to render.  It does not undergo actual serialization.
     pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
-        // reduce total amount of code faling under mono morphization into
+        // reduce total amount of code falling under mono morphization into
         // this function, and share the rest in _render.
         self._render(Value::from_serialize(&ctx)).map(|x| x.0)
     }
@@ -139,7 +139,7 @@ impl<'env, 'source> Template<'env, 'source> {
         &self,
         ctx: S,
     ) -> Result<(String, State<'_, 'env>), Error> {
-        // reduce total amount of code faling under mono morphization into
+        // reduce total amount of code falling under mono morphization into
         // this function, and share the rest in _render.
         self._render(Value::from_serialize(&ctx))
     }

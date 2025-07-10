@@ -86,7 +86,7 @@ impl<'env, 'source> Expression<'env, 'source> {
     ///
     /// The result of the expression is returned as [`Value`].
     pub fn eval<S: Serialize>(&self, ctx: S) -> Result<Value, Error> {
-        // reduce total amount of code faling under mono morphization into
+        // reduce total amount of code falling under mono morphization into
         // this function, and share the rest in _eval.
         self._eval(Value::from_serialize(&ctx))
     }
