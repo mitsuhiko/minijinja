@@ -524,3 +524,13 @@ def test_striptags():
     env = Environment()
     assert env.eval_expr("'<a>foo</a>'|striptags") == "foo"
     assert env.eval_expr("'<a>&auml;</a>'|striptags") == "ä"
+
+
+def test_attribute_lookups():
+    class X:
+        def __getattr__(self, _):
+            raise RuntimeError('boom')
+
+    env = Environment()
+    with pytest.raises(RuntimeError, match="boom"):
+        env.eval_expr("x.foo", x=X())
