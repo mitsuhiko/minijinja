@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use minijinja::value::{DynObject, Enumerator, Object, ObjectRepr, Value, ValueKind};
 use minijinja::{AutoEscape, Error, State};
 
+use pyo3::exceptions::{PyAttributeError, PyLookupError};
 use pyo3::pybacked::PyBackedStr;
 use pyo3::sync::GILOnceCell;
 use pyo3::types::{PyDict, PyList, PySequence, PyTuple};
@@ -110,15 +111,26 @@ impl Object for DynamicObject {
             let inner = self.inner.bind(py);
             match inner.get_item(to_python_value_impl(py, key.clone()).ok()?) {
                 Ok(value) => Some(to_minijinja_value(&value)),
-                Err(_) => {
-                    if let Some(attr) = key.as_str() {
-                        if is_safe_attr(attr) {
-                            if let Ok(rv) = inner.getattr(attr) {
-                                return Some(to_minijinja_value(&rv));
+                Err(err) => {
+                    // Check if this is a lookup error that should be handled gracefully
+                    if err.is_instance_of::<PyLookupError>(py) {
+                        // For lookup errors, try attribute access as fallback
+                        if let Some(attr) = key.as_str() {
+                            if is_safe_attr(attr) {
+                                match inner.getattr(attr) {
+                                    Ok(rv) => return Some(to_minijinja_value(&rv)),
+                                    Err(attr_err) => {
+                                        if !attr_err.is_instance_of::<PyAttributeError>(py) {
+                                            return Some(Value::from(to_minijinja_error(attr_err)));
+                                        }
+                                    }
+                                }
                             }
                         }
+                        None
+                    } else {
+                        Some(Value::from(to_minijinja_error(err)))
                     }
-                    None
                 }
             }
         })
