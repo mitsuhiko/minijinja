@@ -7,3 +7,12 @@ negative-range: {{ range(-5, 5) }}
 negative-start: {{ range(-3, 3, 2) }}
 negative-step: {{ range(5, -5, -2) }}
 negative-step-off: {{ range(5, -4, -2) }}
+
+zip-none-is-undef: {{ zip() is undefined }}
+zip-one: {{ zip([0,1]) }}
+zip-one-is-iterable: {{ zip([0,1]) is iterable }}
+zip-two: {{ zip([0,1],["a","b"]) }}
+zip-two-is-iterable: {{ zip([0,1],["a","b"]) is iterable }}
+zip-mismatch: {{ zip([0,1],["a"]) }}
+zip-mismatch-length: {{ zip([0,1],["a"]) | length }}
+zip-mismatch-empty: {{ zip([0,1],[]) | length }}

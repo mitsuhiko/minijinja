@@ -299,12 +299,12 @@ impl Object for BoxedFunction {
 
 #[cfg(feature = "builtins")]
 mod builtins {
-    use std::cmp::Ordering;
+    use std::cmp::{min, Ordering};
 
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::value::{Rest, ValueMap, ValueRepr};
+    use crate::value::{Rest, ValueIter, ValueMap, ValueRepr};
 
     /// Returns a range.
     ///
@@ -473,6 +473,92 @@ mod builtins {
             }
         }
         Ok(Value::from_object(ns))
+    }
+
+    /// Combine a number of iterable objects into a single iterable object.
+    ///
+    /// If given two or more iterable objects, the zipped object acts like an
+    /// iterator yielding the n-th element of each of the input iterators as a
+    /// sequence. For iterators of different lengths, the shortest iterator
+    /// defines the length of this iterable.
+    ///
+    /// If no input iterator is given, this returns an undefined value. If one
+    /// iterator is given, this returns that iterator.
+    ///
+    /// ```jinja
+    /// {% for letter, number in zip(["a", "b", "c"], [0, 1, 2] %}
+    ///   {{letter}}: {{number}}
+    /// {% endfor %}
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn zip(mut values: Rest<Value>) -> Result<Value, Error> {
+        if values.0.is_empty() {
+            return Ok(Value::UNDEFINED);
+        } else if values.0.len() == 1 {
+            return Ok(values.0.pop().unwrap());
+        }
+
+        struct ZipIter {
+            iters: Vec<ValueIter>,
+        }
+
+        impl Iterator for ZipIter {
+            type Item = Value;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                let mut end = false;
+                let values = self
+                    .iters
+                    .iter_mut()
+                    .map(|vi| {
+                        vi.next().unwrap_or_else(|| {
+                            end = true;
+                            Value::UNDEFINED
+                        })
+                    })
+                    .collect::<Vec<_>>();
+                if end {
+                    None
+                } else {
+                    Some(Value::from(values))
+                }
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                let Some(first) = self.iters.first() else {
+                    return (0, Some(0));
+                };
+                let (mut all_l, mut all_u) = first.size_hint();
+                for vi in self.iters.iter().skip(1) {
+                    let (l, u) = vi.size_hint();
+                    all_l = min(all_l, l);
+                    if let Some(u) = u {
+                        if let Some(au) = all_u {
+                            all_u = Some(min(au, u));
+                        }
+                    } else {
+                        all_u = None;
+                    }
+                }
+                (all_l, all_u)
+            }
+        }
+
+        let iters: Result<Vec<_>, _> = values
+            .0
+            .into_iter()
+            .enumerate()
+            .map(|(i, v)| {
+                v.try_iter().map_err(|err| {
+                    Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("cannot convert value {i} to list"),
+                    )
+                    .with_source(err)
+                })
+            })
+            .collect();
+        Ok(Value::from_iter(ZipIter { iters: iters? }))
     }
 }
 

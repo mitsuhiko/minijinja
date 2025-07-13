@@ -69,5 +69,8 @@ fn test_known_variables() {
     let state = env.empty_state();
     let mut vars = state.known_variables();
     vars.sort();
-    assert_eq!(vars, vec!["debug", "dict", "foo", "namespace", "range"]);
+    assert_eq!(
+        vars,
+        vec!["debug", "dict", "foo", "namespace", "range", "zip"]
+    );
 }

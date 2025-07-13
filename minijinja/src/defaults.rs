@@ -219,6 +219,7 @@ pub(crate) fn get_globals() -> BTreeMap<Cow<'static, str>, Value> {
             "namespace".into(),
             BoxedFunction::new(functions::namespace).to_value(),
         );
+        rv.insert("zip".into(), BoxedFunction::new(functions::zip).to_value());
     }
 
     rv
