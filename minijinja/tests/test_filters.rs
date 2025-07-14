@@ -157,3 +157,75 @@ fn test_chain_indexing() {
     let result = tmpl.render(context!()).unwrap();
     assert_eq!(result, "3");
 }
+
+#[test]
+fn test_zip_basic() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{{ [1, 2, 3] | zip(['a', 'b', 'c']) | list }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"[[1, "a"], [2, "b"], [3, "c"]]"#);
+}
+
+#[test]
+fn test_zip_different_lengths() {
+    let env = Environment::new();
+    // Should stop at the shortest iterable
+    let tmpl = env
+        .template_from_str("{{ [1, 2] | zip(['a', 'b', 'c']) | list }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"[[1, "a"], [2, "b"]]"#);
+}
+
+#[test]
+fn test_zip_multiple_iterables() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{{ [1, 2, 3] | zip(['a', 'b', 'c'], ['x', 'y', 'z']) | list }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"[[1, "a", "x"], [2, "b", "y"], [3, "c", "z"]]"#);
+}
+
+#[test]
+fn test_zip_with_iteration() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{% for num, letter in [1, 2, 3] | zip(['a', 'b', 'c']) %}{{ num }}{{ letter }}{% endfor %}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, "1a2b3c");
+}
+
+#[test]
+fn test_zip_empty_list() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{{ [] | zip([1, 2, 3]) | list }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, "[]");
+}
+
+#[test]
+fn test_zip_non_iterable_error() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str("{{ [1, 2, 3] | zip(42) | list }}")
+        .unwrap();
+    let err = tmpl.render(context!()).unwrap_err();
+    assert!(err.to_string().contains("zip filter argument must be iterable"));
+}
+
+#[test]
+fn test_zip_single_iterable() {
+    let env = Environment::new();
+    // Zip with no additional arguments should return list of single-element tuples
+    let tmpl = env
+        .template_from_str("{{ [1, 2, 3] | zip() | list }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, "[[1], [2], [3]]");
+}

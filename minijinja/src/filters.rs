@@ -1518,6 +1518,96 @@ mod builtins {
         }
     }
 
+    /// Zip multiple iterables into tuples.
+    ///
+    /// This filter works like the Python `zip` function. It takes one or more
+    /// iterables and returns an iterable of tuples where each tuple contains
+    /// one element from each input iterable. The iteration stops when the
+    /// shortest iterable is exhausted.
+    ///
+    /// ```jinja
+    /// {{ [1, 2, 3]|zip(['a', 'b', 'c']) }}
+    /// -> [(1, 'a'), (2, 'b'), (3, 'c')]
+    ///
+    /// {{ [1, 2]|zip(['a', 'b', 'c'], ['x', 'y', 'z']) }}
+    /// -> [(1, 'a', 'x'), (2, 'b', 'y')]
+    /// ```
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn zip(
+        _state: &State,
+        value: Value,
+        others: crate::value::Rest<Value>,
+    ) -> Result<Value, Error> {
+        use crate::value::ops::LenIterWrap;
+        
+        let all_values = Some(value)
+            .into_iter()
+            .chain(others.0)
+            .collect::<Vec<_>>();
+
+        // Validate all values are iterable and calculate minimum length
+        let mut min_len: Option<usize> = None;
+        for val in &all_values {
+            match val.try_iter() {
+                Ok(_) => {
+                    // If all values have known lengths, track the minimum
+                    if let Some(len) = val.len() {
+                        min_len = Some(match min_len {
+                            None => len,
+                            Some(current_min) => current_min.min(len),
+                        });
+                    } else {
+                        // If any value doesn't have a known length, we can't know the zip length
+                        min_len = None;
+                        break;
+                    }
+                }
+                Err(_) => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("zip filter argument must be iterable, got {}", val.kind()),
+                    ));
+                }
+            }
+        }
+
+        let known_len = min_len;
+        Ok(Value::make_object_iterable(all_values, move |values| {
+            let iter = std::iter::from_fn({
+                let mut iters: Vec<_> = values
+                    .iter()
+                    .map(|val| {
+                        val.try_iter()
+                            .ok()
+                            .map(|iter| Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>)
+                    })
+                    .collect::<Option<Vec<_>>>()
+                    .unwrap_or_default();
+                
+                move || {
+                    if iters.is_empty() {
+                        return None;
+                    }
+                    
+                    let mut tuple = Vec::new();
+                    for iter in &mut iters {
+                        match iter.next() {
+                            Some(val) => tuple.push(val),
+                            None => return None,
+                        }
+                    }
+                    Some(Value::from(tuple))
+                }
+            });
+            
+            if let Some(len) = known_len {
+                Box::new(LenIterWrap(len, iter)) as Box<dyn Iterator<Item = Value> + Send + Sync>
+            } else {
+                Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
+            }
+        }))
+    }
+
     /// Pretty print a variable.
     ///
     /// This is useful for debugging as it better shows what's inside an object.

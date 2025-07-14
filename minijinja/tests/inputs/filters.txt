@@ -133,3 +133,9 @@ chain-maps: {{ map|chain(map2) }}
 chain-and-length: {{ list|chain(list2)|length }}
 chain-iteration: {% for item in list|chain(list2) %}{{ item }}{% if not loop.last %},{% endif %}{% endfor %}
 chain-indexing: {{ (list|chain(list2))[4] }}
+zip-lists: {{ list|zip(list2)|list }}
+zip-multiple: {{ list|zip(list2, list3)|list }}
+zip-different-lengths: {{ list|zip(other_list)|list }}
+zip-iteration: {% for a, b in list|zip(list2) %}{{ a }}-{{ b }}{% if not loop.last %},{% endif %}{% endfor %}
+zip-empty: {{ []|zip(list)|list }}
+zip-single: {{ list|zip()|list }}
