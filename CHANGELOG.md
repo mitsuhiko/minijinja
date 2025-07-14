@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## 2.12.0
 
 * Item or attribute lookup will no longer swallow all errors in Python.  #814
+* Added `|zip` filter.  #818
 
 ## 2.11.0
 

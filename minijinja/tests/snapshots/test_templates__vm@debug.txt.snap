@@ -1,5 +1,6 @@
 ---
 source: minijinja/tests/test_templates.rs
+assertion_line: 137
 description: "{% with f = range %}{% for x in f(upper) %}{{ debug() }}{% endfor %}{% endwith %}\n---\n{{ debug(none) }}\n---\n{{ debug(true, false, 42) }}\n---\n{{ debug([debug, 42]) }}"
 info:
   upper: 1
@@ -116,6 +117,7 @@ State {
             "unique",
             "upper",
             "urlencode",
+            "zip",
         ],
         templates: [
             "a_plus_b.txt",
