@@ -3,3 +3,5 @@ target
 profile.json
 **/snapshots/*.new
 **/*.pending-snap
+
+/todos/worktrees/
