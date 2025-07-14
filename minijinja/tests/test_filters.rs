@@ -216,7 +216,9 @@ fn test_zip_non_iterable_error() {
         .template_from_str("{{ [1, 2, 3] | zip(42) | list }}")
         .unwrap();
     let err = tmpl.render(context!()).unwrap_err();
-    assert!(err.to_string().contains("zip filter argument must be iterable"));
+    assert!(err
+        .to_string()
+        .contains("zip filter argument must be iterable"));
 }
 
 #[test]
