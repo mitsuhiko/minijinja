@@ -734,7 +734,7 @@
 //! ## `{% break %}` / `{% continue %}`
 //!
 //! If MiniJinja was compiled with the `loop_controls` feature, it’s possible to
-//! use `break`` and `continue`` in loops.  When break is reached, the loop is
+//! use `break` and `continue` in loops.  When break is reached, the loop is
 //! terminated; if continue is reached, the processing is stopped and continues
 //! with the next iteration.
 //!
