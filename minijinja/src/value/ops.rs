@@ -87,13 +87,13 @@ fn get_offset_and_len<F: FnOnce() -> usize>(
     if start < 0 || stop.map_or(true, |x| x < 0) {
         let end = end();
         let start = if start < 0 {
-            (end as i64 + start) as usize
+            std::cmp::max(0, end as i64 + start) as usize
         } else {
             start as usize
         };
         let stop = match stop {
             None => end,
-            Some(x) if x < 0 => (end as i64 + x) as usize,
+            Some(x) if x < 0 => std::cmp::max(0, end as i64 + x) as usize,
             Some(x) => x as usize,
         };
         (start, stop.saturating_sub(start))
@@ -589,6 +589,44 @@ mod tests {
         assert_eq!(
             slice(v.clone(), Value::from(()), Value::from(()), Value::from(-2)).unwrap(),
             Value::from(vec![9, 7, 5, 3, 1])
+        );
+
+        // [:-8:] - from index 0 to -8
+        assert_eq!(
+            slice(v.clone(), Value::from(()), Value::from(-8), Value::from(())).unwrap(),
+            Value::from(vec![0, 1])
+        );
+
+        // [-8::] - from index -8 to the end
+        assert_eq!(
+            slice(v.clone(), Value::from(-8), Value::from(()), Value::from(())).unwrap(),
+            Value::from(vec![2, 3, 4, 5, 6, 7, 8, 9])
+        );
+
+        // [-11::] - from index -11 to the end, which is the same as [::]
+        // because the start index is before the start of the vector
+        assert_eq!(
+            slice(
+                v.clone(),
+                Value::from(-11),
+                Value::from(()),
+                Value::from(())
+            )
+            .unwrap(),
+            Value::from(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+        );
+
+        // [:-11:] - from index -11 to the end, which is the same as [:0:]
+        // because the end index is before the start of the vector
+        assert_eq!(
+            slice(
+                v.clone(),
+                Value::from(()),
+                Value::from(-11),
+                Value::from(())
+            )
+            .unwrap(),
+            Value::from(Vec::<usize>::new())
         );
 
         // [2::-2] - from index 2 to start, reverse with step of 2
