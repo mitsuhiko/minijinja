@@ -362,6 +362,18 @@ fn test_wordwrap() {
         .unwrap(),
         "This-is-a-\nhyphenated\n-word"
     );
+
+    // Test NOT breaking on hyphens
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordwrap(width=10, break_on_hyphens=false) }}",
+            context! {
+                text => "This-is-a-hyphenated-word"
+            }
+        )
+        .unwrap(),
+        "This-is-a-hyphenated-word"
+    );
 }
 
 #[test]

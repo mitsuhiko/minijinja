@@ -280,10 +280,19 @@ pub fn wordwrap(value: &Value, kwargs: Kwargs) -> Result<Value, Error> {
     let wrapstring = kwargs.get::<Option<&str>>("wrapstring")?.unwrap_or("\n");
     kwargs.assert_all_used()?;
 
-    let mut options = WrapOptions::new(width).break_words(break_long_words);
+    let mut options = WrapOptions::new(width);
 
     if break_on_hyphens {
-        options = options.word_splitter(WordSplitter::HyphenSplitter);
+        options = options
+            .word_splitter(WordSplitter::HyphenSplitter)
+            .break_words(break_long_words);
+    } else {
+        // When break_on_hyphens is false, we want to preserve hyphenated words entirely.
+        // So we disable hyphen splitting and also disable breaking long words to ensure
+        // hyphenated words stay together.
+        options = options
+            .word_splitter(WordSplitter::NoHyphenation)
+            .break_words(false);
     }
 
     // Handle empty/whitespace-only input
