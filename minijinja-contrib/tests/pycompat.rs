@@ -9,6 +9,16 @@ fn eval_expr(expr: &str) -> Value {
     env.compile_expression(expr).unwrap().eval(()).unwrap()
 }
 
+fn eval_err_expr(expr: &str) -> String {
+    let mut env = Environment::new();
+    env.set_unknown_method_callback(unknown_method_callback);
+    env.compile_expression(expr)
+        .unwrap()
+        .eval(())
+        .unwrap_err()
+        .to_string()
+}
+
 #[test]
 fn test_string_methods() {
     assert_eq!(eval_expr("'foo'.upper()").as_str(), Some("FOO"));
@@ -72,4 +82,12 @@ fn test_dict_methods() {
 #[test]
 fn test_list_methods() {
     assert!(eval_expr("[1, 2, 2, 3].count(2) == 2").is_true());
+}
+
+#[test]
+fn test_errors() {
+    assert!(eval_err_expr("'abc'.split(1, 2)").contains("value is not a string"));
+    assert!(eval_err_expr("'abc'.startswith(1)")
+        .contains("startswith argument must be string or a tuple of strings, not number"));
+    assert!(eval_err_expr("{'x': 42}.get()").contains("missing argument"));
 }
