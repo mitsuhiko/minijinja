@@ -231,3 +231,63 @@ fn test_zip_single_iterable() {
     let result = tmpl.render(context!()).unwrap();
     assert_eq!(result, "[[1], [2], [3]]");
 }
+
+#[test]
+fn test_sort_keys() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str(
+            r"{{ [{'a': 1, 'b': 2, 'c': 5}, {'a': 2, 'b': 1, 'c': 6}] | sort(keys=['b', 'a']) }}",
+        )
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(
+        result,
+        r#"[{"a": 2, "b": 1, "c": 6}, {"a": 1, "b": 2, "c": 5}]"#
+    );
+}
+
+#[test]
+fn test_sort_keys_reverse() {
+    let env = Environment::new();
+    let ctx = context! {
+        cities => vec![
+            context!(name => "Sydney", country => "Australia"),
+            context!(name => "Sydney", country => "Canada"),
+            context!(name => "Kochi", country => "India"),
+            context!(name => "Kochi", country => "Japan"),
+        ]
+    };
+    let tmpl = env
+        .template_from_str(
+            "{{ cities | sort(keys=['name', 'country'], reverse=true) \
+             | map(attribute='country')}}",
+        )
+        .unwrap();
+    let result = tmpl.render(ctx).unwrap();
+    assert_eq!(result, r#"["Canada", "Australia", "Japan", "India"]"#);
+}
+
+#[test]
+fn test_sort_keys_single() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str(r"{{ [{'a': 1, 'b': 2}, {'a': 2, 'b': 1}] | sort(keys=['b']) }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"[{"a": 2, "b": 1}, {"a": 1, "b": 2}]"#);
+}
+
+#[test]
+fn test_sort_attribute_and_keys_error() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str(
+            r"{{ [{'a': 1, 'b': 2}, {'a': 2, 'b': 1}] | sort(attribute='a', keys=['b', 'a']) }}",
+        )
+        .unwrap();
+    let err = tmpl.render(context!()).unwrap_err();
+    assert!(err
+        .to_string()
+        .contains("cannot use 'attribute' and 'keys' together"));
+}
