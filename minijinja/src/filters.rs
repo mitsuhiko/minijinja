@@ -376,7 +376,20 @@ mod builtins {
         v.reverse()
     }
 
-    /// Trims a value
+    /// Trims a string.
+    ///
+    /// By default, it trims leading and trailing whitespaces:
+    ///
+    /// ```jinja
+    /// {{ "  non-space characters  " | trim }} -> "non-space characters"
+    /// ```
+    ///
+    /// You can also remove a character sequence.  All the prefixes and suffixes
+    /// matching the sequence are removed:
+    ///
+    /// ```jinja
+    /// {{ "1212foo12bar1212" | trim("12") }} -> "foo12bar"
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn trim(s: Cow<'_, str>, chars: Option<Cow<'_, str>>) -> String {
         match chars {
