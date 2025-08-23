@@ -145,8 +145,14 @@ use crate::vm::State;
 /// impl Object for DynamicContext {
 ///     fn get_value(self: &Arc<Self>, field: &Value) -> Option<Value> {
 ///         match field.as_str()? {
+///             #[cfg(not(target_os = "wasi"))]
 ///             "pid" => Some(Value::from(std::process::id())),
+///             #[cfg(target_os = "wasi")]
+///             "pid" => Some(Value::from(1234_u32)), // Mock PID for WASI
+///             #[cfg(not(target_os = "wasi"))]
 ///             "env" => Some(Value::from_iter(std::env::vars())),
+///             #[cfg(target_os = "wasi")]
+///             "env" => Some(Value::from_iter([("HOME".to_string(), "/home/user".to_string())])), // Mock env for WASI
 ///             "magic" => Some(Value::from(self.magic)),
 ///             _ => None,
 ///         }
