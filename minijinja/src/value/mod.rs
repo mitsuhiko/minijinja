@@ -1598,7 +1598,7 @@ impl Value {
                                 if callback_err.kind() == ErrorKind::UnknownMethod {
                                     err = callback_err;
                                 } else {
-                                    return Err(err);
+                                    return Err(callback_err);
                                 }
                             }
                         }
