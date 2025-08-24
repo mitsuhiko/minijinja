@@ -13,6 +13,9 @@ pub(crate) fn no_auto_escape(_: &str) -> AutoEscape {
     AutoEscape::None
 }
 
+/// These are extensions on template names that are ignored for the auto escape logic.
+const IGNORED_EXTENSIONS: [&str; 3] = [".j2", ".jinja2", ".jinja"];
+
 /// The default logic for auto escaping based on file extension.
 ///
 /// * [`Html`](AutoEscape::Html): `.html`, `.htm`, `.xml`
@@ -22,10 +25,17 @@ pub(crate) fn no_auto_escape(_: &str) -> AutoEscape {
 )]
 /// * [`None`](AutoEscape::None): _all others_
 ///
-/// Additionally `.j2` as final extension is ignored. So `.html.j2` is the
-/// considered the same as `.html`.
-pub fn default_auto_escape_callback(name: &str) -> AutoEscape {
-    match name.strip_suffix(".j2").unwrap_or(name).rsplit('.').next() {
+/// Additionally `.j2`, `.jinja` and `.jinja2` as final extension is ignored. So
+/// `.html.j2` is the considered the same as `.html`.
+pub fn default_auto_escape_callback(mut name: &str) -> AutoEscape {
+    for ext in IGNORED_EXTENSIONS {
+        if let Some(stripped) = name.strip_suffix(ext) {
+            name = stripped;
+            break;
+        }
+    }
+
+    match name.rsplit('.').next() {
         Some("html" | "htm" | "xml") => AutoEscape::Html,
         #[cfg(feature = "json")]
         Some("json" | "json5" | "js" | "yaml" | "yml") => AutoEscape::Json,
@@ -242,6 +252,38 @@ mod unit_tests {
         assert_eq!(default_auto_escape_callback("foo.htm.j2"), AutoEscape::Html);
         assert_eq!(default_auto_escape_callback("foo.txt"), AutoEscape::None);
         assert_eq!(default_auto_escape_callback("foo.txt.j2"), AutoEscape::None);
+
+        assert_eq!(
+            default_auto_escape_callback("foo.html.jinja"),
+            AutoEscape::Html
+        );
+        assert_eq!(
+            default_auto_escape_callback("foo.htm.jinja"),
+            AutoEscape::Html
+        );
+        assert_eq!(
+            default_auto_escape_callback("foo.txt.jinja"),
+            AutoEscape::None
+        );
+
+        assert_eq!(
+            default_auto_escape_callback("foo.html.jinja2"),
+            AutoEscape::Html
+        );
+        assert_eq!(
+            default_auto_escape_callback("foo.htm.jinja2"),
+            AutoEscape::Html
+        );
+        assert_eq!(
+            default_auto_escape_callback("foo.txt.jinja2"),
+            AutoEscape::None
+        );
+
+        // only one is removed
+        assert_eq!(
+            default_auto_escape_callback("foo.html.j2.jinja"),
+            AutoEscape::None
+        );
 
         #[cfg(feature = "json")]
         {
