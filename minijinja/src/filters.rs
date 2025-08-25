@@ -739,7 +739,8 @@ mod builtins {
     /// The filter accepts a few keyword arguments:
     ///
     /// * `case_sensitive`: set to `true` to make the sorting of strings case sensitive.
-    /// * `attribute`: can be set to an attribute or dotted path to sort by that attribute
+    /// * `attribute`: can be set to an attribute or dotted path to sort by that attribute.
+    ///   can be a comma-separated list of attributes forming a composite key like "age, name".
     /// * `reverse`: set to `true` to sort in reverse.
     ///
     /// ```jinja
@@ -749,6 +750,8 @@ mod builtins {
     /// {{ users|sort(attribute="age") }}
     /// # Sort users by age attribute in ascending order.
     /// {{ users|sort(attribute="age", reverse=true) }}
+    /// # Sort cities by their name, and sort those with the same name by their state.
+    /// {{ cities|sort(attribute="name, state") }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn sort(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
@@ -756,14 +759,45 @@ mod builtins {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }))
         .collect::<Vec<_>>();
+
         let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
+
         if let Some(attr) = ok!(kwargs.get::<Option<&str>>("attribute")) {
-            safe_sort(&mut items, |a, b| {
-                match (a.get_path(attr), b.get_path(attr)) {
-                    (Ok(a), Ok(b)) => cmp_helper(&a, &b, case_sensitive),
-                    _ => Ordering::Equal,
-                }
-            })?;
+            let keys: Vec<_> = attr
+                .split(',')
+                .filter_map(|key| {
+                    let trimmed = key.trim();
+                    if !key.is_empty() {
+                        Some(trimmed)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            if keys.len() > 1 {
+                // More than one keys
+                safe_sort(&mut items, |a, b| {
+                    let key_a = Value::from_iter(
+                        keys.iter()
+                            .map(|k| a.get_path_or_default(k, &Value::UNDEFINED)),
+                    );
+                    let key_b = Value::from_iter(
+                        keys.iter()
+                            .map(|k| b.get_path_or_default(k, &Value::UNDEFINED)),
+                    );
+                    cmp_helper(&key_a, &key_b, case_sensitive)
+                })?;
+            } else {
+                // Fast path for a more common case of single key
+                let key = if !keys.is_empty() { keys[0] } else { attr };
+                safe_sort(&mut items, |a, b| {
+                    match (a.get_path(key), b.get_path(key)) {
+                        (Ok(a), Ok(b)) => cmp_helper(&a, &b, case_sensitive),
+                        _ => Ordering::Equal,
+                    }
+                })?;
+            }
         } else {
             safe_sort(&mut items, |a, b| cmp_helper(a, b, case_sensitive))?;
         }
