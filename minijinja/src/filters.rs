@@ -740,7 +740,7 @@ mod builtins {
     ///
     /// * `case_sensitive`: set to `true` to make the sorting of strings case sensitive.
     /// * `attribute`: can be set to an attribute or dotted path to sort by that attribute.
-    ///    can be a comma-separated list of attributes forming a composite key like "age, name".
+    ///   can be a comma-separated list of attributes forming a composite key like "age, name".
     /// * `reverse`: set to `true` to sort in reverse.
     ///
     /// ```jinja
