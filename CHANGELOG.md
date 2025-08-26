@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.13.0
+
+* Added multi-key support to the `|sort` filter.  #827
+
 ## 2.12.0
 
 * Item or attribute lookup will no longer swallow all errors in Python.  #814
