@@ -15,6 +15,8 @@ MiniJinja is a powerful Jinja2-compatible template engine for Rust with minimal 
 - **examples/** - Various usage examples and demos
 - **benchmarks/** - Performance benchmarks
 
+It's quite likely that this project is checked out as `minijinja`.  Do not confuse `minijinja` with `minijinja/minijinja` in that case.
+
 ## Essential Commands
 
 ### Building and Testing
