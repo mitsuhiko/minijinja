@@ -716,11 +716,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_tuple_or_expression(&mut self, span: Span) -> Result<ast::Expr<'a>, Error> {
-        // MiniJinja does not really have tuples, but it treats the tuple
-        // syntax the same as lists.
+        // Parse tuple expressions as actual tuples now
         if skip_token!(self, Token::ParenClose) {
-            return Ok(ast::Expr::List(Spanned::new(
-                ast::List { items: vec![] },
+            return Ok(ast::Expr::Tuple(Spanned::new(
+                ast::Tuple { items: vec![] },
                 self.stream.expand_span(span),
             )));
         }
@@ -737,8 +736,8 @@ impl<'a> Parser<'a> {
                 }
                 items.push(ok!(self.parse_expr()));
             }
-            expr = ast::Expr::List(Spanned::new(
-                ast::List { items },
+            expr = ast::Expr::Tuple(Spanned::new(
+                ast::Tuple { items },
                 self.stream.expand_span(span),
             ));
         } else {

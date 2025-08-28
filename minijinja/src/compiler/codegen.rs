@@ -714,6 +714,13 @@ impl<'source> CodeGenerator<'source> {
                 }
                 self.add(Instruction::BuildList(Some(l.items.len())));
             }
+            ast::Expr::Tuple(t) => {
+                self.set_line_from_span(t.span());
+                for item in &t.items {
+                    self.compile_expr(item);
+                }
+                self.add(Instruction::BuildTuple(Some(t.items.len())));
+            }
             ast::Expr::Map(m) => {
                 self.set_line_from_span(m.span());
                 assert_eq!(m.keys.len(), m.values.len());
