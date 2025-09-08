@@ -18,8 +18,8 @@ use minijinja::{Error, ErrorKind, Value};
 ///
 /// The formatting spec's syntax follows the grammar below:
 ///
-/// ```
-/// format_spec: [[fill] align]['+']['#']['0'][width]['.' precision][type]
+/// ```text
+/// format_spec: [[fill]align]['+']['#']['0'][width]['.'precision][type]
 /// fill: character
 /// align: '<' | '>' | '^'
 /// width: digit+
@@ -40,7 +40,7 @@ use minijinja::{Error, ErrorKind, Value};
 ///
 /// # Fill and align
 ///
-/// An optional fill character and alignment can be specified in conjuction with the
+/// An optional fill character and alignment can be specified in conjunction with the
 /// `width` parameter, specifying how the text should be aligned and which character
 /// should fill up the remaining space if needed.
 ///
@@ -58,7 +58,7 @@ use minijinja::{Error, ErrorKind, Value};
 /// | ------ | ------- |
 /// | `<`    | left-aligned within the available space (default for most values) |
 /// | `>`    | right-aligned within the available space (default for numbers) |
-/// | `^`    | centered within the available space (default for numbers) |
+/// | `^`    | centered within the available space |
 ///
 /// Note that fill and align parameters are meaningless if minimum `width` is not
 /// specified, and so are ignored if `width` is missing.
@@ -136,14 +136,14 @@ use minijinja::{Error, ErrorKind, Value};
 ///
 /// | Type | Meaning |
 /// | ---- | ------- |
-/// | `b`  | Binary format. Prints integer in radix 2. |
+/// | `b`  | Binary format. Prints integer in base 2. |
 /// | `e`  | Scientific notation. Prints integer of floating point number in scientific notation with significand and exponent separated by lower-case `e`.  Significand is printed as per the specified `precision`, or using `6` digits precision by default. |
 /// | `E`  | Scientific notation. Same as `F`, but uses upper-case `E` as a separator. |
 /// | `f`  | Fixed-point notation. Prints integer or floating point number in decimal with exactly `precision` digits following the decimal point. Uses `6` digits if `precision` is not provided in the spec. |
 /// | `F`  | Fixed-point notation. Same as `f`, but prints `nan` as `NAN`, and `inf` as `INF`. |
-/// | `o`  | Octal format. Prints integer in radix 8. |
-/// | `x`  | Hexadecimal format. Prints integer in radix 16 using lowercase alphabet. |
-/// | `X`  | Hexadecimal format. Prints integer in radix 16 using uppercase alphabet. |
+/// | `o`  | Octal format. Prints integer in base 8. |
+/// | `x`  | Hexadecimal format. Prints integer in base 16 using lowercase alphabet. |
+/// | `X`  | Hexadecimal format. Prints integer in base 16 using uppercase alphabet. |
 ///
 /// Note that for `b`, `o`, and `x` (or `X`) formats, a negative number is printed as
 /// `-` sign followed by the number's absolute value in the specified radix (and
