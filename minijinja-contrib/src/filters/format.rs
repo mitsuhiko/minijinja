@@ -205,7 +205,7 @@ struct FormatSpec {
     zero_padded: bool,
     width: Option<usize>,
     precision: Option<usize>,
-    typ: Type,
+    ty: Type,
 }
 
 impl FormatSpec {
@@ -217,13 +217,13 @@ impl FormatSpec {
         } else if let Ok(fp) = f64::try_from(val.clone()) {
             self.format_float(fp)
         } else {
-            if Type::Default != self.typ {
+            if Type::Default != self.ty {
                 return Err(Error::new(
                     ErrorKind::InvalidOperation,
                     format!(
                         "{} cannot be formatted in {}",
                         val.kind(),
-                        self.typ.description()
+                        self.ty.description()
                     ),
                 ));
             }
@@ -247,7 +247,7 @@ impl FormatSpec {
     }
 
     fn format_bool(&self, val: bool) -> String {
-        if let Type::Default = self.typ {
+        if let Type::Default = self.ty {
             // format "true" or "false" as a regular string, but without truncating
             self.apply_padding(format!("{val}"), Align::Left)
         } else {
@@ -274,7 +274,7 @@ impl FormatSpec {
             ""
         };
 
-        let number = match &self.typ {
+        let number = match &self.ty {
             Type::Binary => format!("{val:b}"),
             Type::Octal => format!("{val:o}"),
             Type::LowerHex => format!("{val:x}"),
@@ -315,7 +315,7 @@ impl FormatSpec {
             ""
         };
 
-        match &self.typ {
+        match &self.ty {
             Type::Default => {
                 if val.is_nan() {
                     // Sign has no meaning for NaN, so never print it
@@ -399,7 +399,7 @@ impl FormatSpec {
                 ErrorKind::InvalidOperation,
                 format!(
                     "'float' value cannot be formatted in {}",
-                    self.typ.description()
+                    self.ty.description()
                 ),
             )),
         }
@@ -407,7 +407,7 @@ impl FormatSpec {
 
     fn format_number(&self, number: &str, sign: &str) -> String {
         let radix = if self.alternate_form {
-            match &self.typ {
+            match &self.ty {
                 Type::Default | Type::LowerE | Type::UpperE | Type::LowerF | Type::UpperF => "",
                 Type::Binary => "0b",
                 Type::Octal => "0o",
@@ -486,7 +486,7 @@ fn parse_spec(input: &str) -> Result<FormatSpec, Error> {
         width = Some(0);
     }
     let (remaining, precision) = parse_precision(remaining)?;
-    let (remaining, typ) = parse_type(remaining);
+    let (remaining, ty) = parse_type(remaining);
 
     if !remaining.is_empty() {
         Err(Error::new(
@@ -504,7 +504,7 @@ fn parse_spec(input: &str) -> Result<FormatSpec, Error> {
             zero_padded,
             width,
             precision,
-            typ,
+            ty,
         })
     }
 }
@@ -604,7 +604,7 @@ fn parse_precision(input: &str) -> Result<(&str, Option<usize>), Error> {
 }
 
 fn parse_type(input: &str) -> (&str, Type) {
-    let typ = match input.chars().next() {
+    let ty = match input.chars().next() {
         Some('b') => Type::Binary,
         Some('e') => Type::LowerE,
         Some('E') => Type::UpperE,
@@ -615,7 +615,7 @@ fn parse_type(input: &str) -> (&str, Type) {
         Some('X') => Type::UpperHex,
         _ => return (input, Type::Default),
     };
-    (&input[1..], typ)
+    (&input[1..], ty)
 }
 
 #[cfg(test)]
@@ -642,7 +642,7 @@ mod tests {
                 zero_padded: false,
                 width: Some(10),
                 precision: None,
-                typ: Type::Default,
+                ty: Type::Default,
             }
         );
 
@@ -666,7 +666,7 @@ mod tests {
                 zero_padded: true,
                 width: Some(10),
                 precision: None,
-                typ: Type::LowerHex
+                ty: Type::LowerHex
             }
         );
 
@@ -684,7 +684,7 @@ mod tests {
                 zero_padded: false,
                 width: Some(10),
                 precision: None,
-                typ: Type::UpperHex
+                ty: Type::UpperHex
             }
         );
 
@@ -698,7 +698,7 @@ mod tests {
                 zero_padded: false,
                 width: Some(4),
                 precision: Some(2),
-                typ: Type::LowerF
+                ty: Type::LowerF
             }
         );
     }
