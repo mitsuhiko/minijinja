@@ -432,7 +432,7 @@ impl<'env> Vm<'env> {
                 Instruction::Lte => op_binop!(<=),
                 Instruction::Not => {
                     a = stack.pop();
-                    stack.push(Value::from(!a.is_true()));
+                    stack.push(Value::from(!ctx_ok!(undefined_behavior.is_true(&a))));
                 }
                 Instruction::StringConcat => {
                     a = stack.pop();
