@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## 2.13.0
 
 * Added multi-key support to the `|sort` filter.  #827
+* Fix `not undefined` with strict undefined behavior.  #838
 
 ## 2.12.0
 
