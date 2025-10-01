@@ -175,7 +175,7 @@ cd minijinja && cargo test test_function_name -- --nocapture
 - Ensure tests pass with `make test`
 
 ### For New Releases
-- Make sure the next release is mentioned in CHANGLEOG.md
+- Make sure the next release is mentioned in CHANGELOG.md
 - Use `scripts/bump-version.sh VERSION` to update all references to the next version
 - Create a commit for that release and push the tags
 
