@@ -419,7 +419,7 @@ impl Environment {
                     let rv = callback
                         .call(py, py_args, py_kwargs.as_ref())
                         .map_err(to_minijinja_error)?;
-                    if rv.is(&py.NotImplemented()) {
+                    if rv.is(py.NotImplemented()) {
                         Ok(None)
                     } else {
                         Ok(Some(to_minijinja_value(rv.bind(py))))
