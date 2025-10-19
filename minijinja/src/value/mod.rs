@@ -745,7 +745,7 @@ impl Value {
     /// Extracts a contained error.
     ///
     /// An invalid value carres an error internally and will reveal that error
-    /// at a later point when iteracted with.  This is used to carry
+    /// at a later point when interacted with.  This is used to carry
     /// serialization errors or failures that happen when the engine otherwise
     /// assumes an infallible operation such as iteration.
     pub(crate) fn validate(self) -> Result<Value, Error> {
