@@ -145,10 +145,7 @@ jobs:
           uv python install "$TARGET"
           PYTHON_BIN=$(uv python find "$TARGET")
           echo "$(dirname "$PYTHON_BIN")" >> "$GITHUB_PATH"
-          "$PYTHON_BIN" - <<'PY'
-import sys
-print("Free threading:", not sys._is_gil_enabled())
-PY
+          "$PYTHON_BIN" -c "import sys; print('Free threading:', not sys._is_gil_enabled())"
       - name: Test
         run: make python-test
 
