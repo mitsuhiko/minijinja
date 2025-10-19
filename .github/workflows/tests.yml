@@ -141,7 +141,7 @@ jobs:
         if: matrix.variant == 'freethreaded'
         run: |
           set -euo pipefail
-          TARGET=cpython-3.13.7+freethreaded-x86_64-unknown-linux-gnu
+          TARGET=cpython-3.13.7+freethreaded-linux-x86_64-gnu
           uv python install "$TARGET"
           PYTHON_BIN=$(uv python find "$TARGET")
           echo "$(dirname "$PYTHON_BIN")" >> "$GITHUB_PATH"
