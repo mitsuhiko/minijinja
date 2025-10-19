@@ -231,7 +231,7 @@ impl Environment {
         self.inner.lock().unwrap().env.add_filter(
             name.to_string(),
             move |state: &State, args: Rest<Value>| -> Result<Value, Error> {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     bind_state(state, || {
                         let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
@@ -263,7 +263,7 @@ impl Environment {
         self.inner.lock().unwrap().env.add_test(
             name.to_string(),
             move |state: &State, args: Rest<Value>| -> Result<bool, Error> {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     bind_state(state, || {
                         let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
@@ -290,7 +290,7 @@ impl Environment {
         self.inner.lock().unwrap().env.add_function(
             name.to_string(),
             move |state: &State, args: Rest<Value>| -> Result<Value, Error> {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     bind_state(state, || {
                         let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
@@ -329,12 +329,12 @@ impl Environment {
 
     /// The set of known global variables.
     #[getter]
-    pub fn globals(&self, py: Python<'_>) -> PyResult<PyObject> {
+    pub fn globals(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let rv = PyDict::new(py);
         for (key, value) in self.inner.lock().unwrap().env.globals() {
             rv.set_item(key, to_python_value(value)?)?;
         }
-        Ok(rv.into())
+        Ok(rv.unbind())
     }
 
     /// Sets an auto escape callback.
@@ -356,7 +356,7 @@ impl Environment {
         inner
             .env
             .set_auto_escape_callback(move |name: &str| -> AutoEscape {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let py_args = PyTuple::new(py, [name]).unwrap();
                     let rv = match callback.call(py, py_args, None) {
                         Ok(value) => value,
@@ -411,7 +411,7 @@ impl Environment {
         let mut inner = self.inner.lock().unwrap();
         inner.finalizer_callback = Some(callback.clone_ref(py));
         inner.env.set_formatter(move |output, state, value| {
-            Python::with_gil(|py| -> Result<(), Error> {
+            Python::attach(|py| -> Result<(), Error> {
                 let maybe_new_value = bind_state(state, || -> Result<_, Error> {
                     let args = std::slice::from_ref(value);
                     let (py_args, py_kwargs) =
@@ -467,7 +467,7 @@ impl Environment {
 
         if let Some(callback) = callback {
             inner.env.set_loader(move |name| {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let callback = callback.bind(py);
                     let rv = callback
                         .call1(PyTuple::new(py, [name]).unwrap())
@@ -509,7 +509,7 @@ impl Environment {
         let mut inner = self.inner.lock().unwrap();
         inner.path_join_callback = Some(callback.clone_ref(py));
         inner.env.set_path_join_callback(move |name, parent| {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 let callback = callback.bind(py);
                 match callback.call1(PyTuple::new(py, [name, parent]).unwrap()) {
                     Ok(rv) => Cow::Owned(rv.to_string()),
@@ -719,7 +719,7 @@ impl Environment {
             .unwrap_or_else(|| context!());
         bind_environment(slf.as_ptr(), || {
             let inner = slf.inner.clone();
-            py.allow_threads(move || {
+            py.detach(move || {
                 let inner = inner.lock().unwrap();
                 let tmpl = inner.env.get_template(template_name).map_err(to_py_error)?;
                 tmpl.render(ctx).map_err(to_py_error)
@@ -780,7 +780,7 @@ impl Environment {
                 .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
                 .unwrap_or_else(|| context!());
             let inner = slf.inner.clone();
-            py.allow_threads(move || {
+            py.detach(move || {
                 inner
                     .lock()
                     .unwrap()
@@ -804,7 +804,7 @@ impl Environment {
             let ctx = ctx
                 .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
                 .unwrap_or_else(|| context!());
-            py.allow_threads(move || {
+            py.detach(move || {
                 let inner = inner.lock().unwrap();
                 let expr = inner
                     .env

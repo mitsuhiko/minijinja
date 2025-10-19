@@ -399,7 +399,8 @@ def test_undeclared_variables():
 
 def test_loop_controls():
     env = Environment()
-    rv = env.render_str("""
+    rv = env.render_str(
+        """
     {% for x in [1, 2, 3, 4, 5] %}
       {% if x == 1 %}
         {% continue %}
@@ -408,7 +409,8 @@ def test_loop_controls():
       {% endif %}
       {{ x }}
     {% endfor %}
-    """)
+    """
+    )
     assert rv.split() == ["2"]
 
 
@@ -529,7 +531,7 @@ def test_striptags():
 def test_attribute_lookups():
     class X:
         def __getattr__(self, _):
-            raise RuntimeError('boom')
+            raise RuntimeError("boom")
 
     env = Environment()
     with pytest.raises(RuntimeError, match="boom"):

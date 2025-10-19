@@ -4,10 +4,10 @@ use std::cell::RefCell;
 use minijinja::{Error, ErrorKind};
 use pyo3::ffi::PyErr_WriteUnraisable;
 use pyo3::prelude::*;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::PyTuple;
 
-static TEMPLATE_ERROR: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static TEMPLATE_ERROR: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 thread_local! {
     static STASHED_ERROR: RefCell<Option<PyErr>> = const { RefCell::new(None) };
@@ -96,7 +96,7 @@ pub fn report_unraisable(py: Python<'_>, err: PyErr) {
 }
 
 fn make_error(err: Error) -> PyErr {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let template_error: &Py<PyAny> = TEMPLATE_ERROR.get_or_init(py, || {
             let module = py.import("minijinja._internal").unwrap();
             let err = module.getattr("make_error").unwrap();
