@@ -122,8 +122,12 @@ jobs:
         run: make wasi-test
 
   test-python:
-    name: Test Python binding
+    name: Test Python binding (${{ matrix.variant }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [default, freethreaded]
 
     steps:
       - uses: actions/checkout@v4
@@ -131,6 +135,17 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
+      - uses: astral-sh/setup-uv@v3
+        if: matrix.variant == 'freethreaded'
+      - name: Install free-threaded Python
+        if: matrix.variant == 'freethreaded'
+        run: |
+          set -euo pipefail
+          TARGET=cpython-3.13.7+freethreaded-linux-x86_64-gnu
+          uv python install "$TARGET"
+          PYTHON_BIN=$(uv python find "$TARGET")
+          echo "$(dirname "$PYTHON_BIN")" >> "$GITHUB_PATH"
+          "$PYTHON_BIN" -c "import sys; print('Free threading:', not sys._is_gil_enabled())"
       - name: Test
         run: make python-test
 

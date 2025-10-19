@@ -8,7 +8,7 @@ use minijinja::{AutoEscape, Error, State};
 
 use pyo3::exceptions::{PyAttributeError, PyLookupError, PyTypeError};
 use pyo3::pybacked::PyBackedStr;
-use pyo3::sync::GILOnceCell;
+use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyDict, PyList, PySequence, PyTuple};
 use pyo3::{prelude::*, IntoPyObjectExt};
 
@@ -16,7 +16,7 @@ use crate::error_support::{to_minijinja_error, to_py_error};
 use crate::state::{bind_state, StateRef};
 
 static AUTO_ESCAPE_CACHE: Mutex<BTreeMap<String, AutoEscape>> = Mutex::new(BTreeMap::new());
-static MARK_SAFE: GILOnceCell<Py<PyAny>> = GILOnceCell::new();
+static MARK_SAFE: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 fn is_safe_attr(name: &str) -> bool {
     !name.starts_with('_')
@@ -38,15 +38,15 @@ impl DynamicObject {
 
 impl fmt::Debug for DynamicObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Python::with_gil(|py| write!(f, "{}", self.inner.bind(py)))
+        Python::attach(|py| write!(f, "{}", self.inner.bind(py)))
     }
 }
 
 impl Object for DynamicObject {
     fn repr(self: &Arc<Self>) -> ObjectRepr {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let inner = self.inner.bind(py);
-            if inner.downcast::<PySequence>().is_ok() {
+            if inner.cast::<PySequence>().is_ok() {
                 ObjectRepr::Seq
             } else if is_dictish(inner) {
                 ObjectRepr::Map
@@ -62,11 +62,11 @@ impl Object for DynamicObject {
     where
         Self: Sized + 'static,
     {
-        Python::with_gil(|py| write!(f, "{}", self.inner.bind(py)))
+        Python::attach(|py| write!(f, "{}", self.inner.bind(py)))
     }
 
     fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
-        Python::with_gil(|py| -> Result<Value, Error> {
+        Python::attach(|py| -> Result<Value, Error> {
             bind_state(state, || {
                 let inner = self.inner.bind(py);
                 let (py_args, py_kwargs) =
@@ -92,7 +92,7 @@ impl Object for DynamicObject {
                 "insecure method call",
             ));
         }
-        Python::with_gil(|py| -> Result<Value, Error> {
+        Python::attach(|py| -> Result<Value, Error> {
             bind_state(state, || {
                 let inner = self.inner.bind(py);
                 let (py_args, py_kwargs) =
@@ -107,7 +107,7 @@ impl Object for DynamicObject {
     }
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let inner = self.inner.bind(py);
             match inner.get_item(to_python_value_impl(py, key.clone()).ok()?) {
                 Ok(value) => Some(to_minijinja_value(&value)),
@@ -140,7 +140,7 @@ impl Object for DynamicObject {
     fn custom_cmp(self: &Arc<Self>, other: &DynObject) -> Option<Ordering> {
         // Attention: this can violate the requirements of custom_cmp,
         // namely that it implements a total order.
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let self_inner = self.inner.bind(py);
             let other = other.downcast_ref::<DynamicObject>()?;
             let other_inner = other.inner.bind(py);
@@ -149,16 +149,16 @@ impl Object for DynamicObject {
     }
 
     fn is_true(self: &Arc<Self>) -> bool {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let inner = self.inner.bind(py);
             inner.is_truthy().unwrap_or(true)
         })
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let inner = self.inner.bind(py);
-            if inner.downcast::<PySequence>().is_ok() {
+            if inner.cast::<PySequence>().is_ok() {
                 Enumerator::Seq(inner.len().unwrap_or(0))
             } else if let Ok(iter) = inner.try_iter() {
                 Enumerator::Values(
@@ -203,7 +203,7 @@ pub fn to_minijinja_value(value: &Bound<'_, PyAny>) -> Value {
 }
 
 pub fn to_python_value(value: Value) -> PyResult<Py<PyAny>> {
-    Python::with_gil(|py| to_python_value_impl(py, value))
+    Python::attach(|py| to_python_value_impl(py, value))
 }
 
 fn mark_string_safe(py: Python<'_>, value: &str) -> PyResult<Py<PyAny>> {

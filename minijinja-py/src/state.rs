@@ -56,7 +56,7 @@ impl StateRef {
             state
                 .lookup(name)
                 .map(to_python_value)
-                .unwrap_or_else(|| Ok(Python::with_gil(|py| py.None())))
+                .unwrap_or_else(|| Ok(Python::attach(|py| py.None())))
         })
     }
 
@@ -73,7 +73,7 @@ impl StateRef {
                         state.set_temp(name, val.clone());
                         to_python_value(val)
                     } else {
-                        Ok(Python::with_gil(|py| py.None()))
+                        Ok(Python::attach(|py| py.None()))
                     }
                 }
             }
@@ -87,7 +87,7 @@ impl StateRef {
             state
                 .set_temp(name, to_minijinja_value(value))
                 .map(to_python_value)
-                .unwrap_or_else(|| Ok(Python::with_gil(|py| py.None())))
+                .unwrap_or_else(|| Ok(Python::attach(|py| py.None())))
         })
     }
 }

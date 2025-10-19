@@ -5,7 +5,7 @@ mod error_support;
 mod state;
 mod typeconv;
 
-#[pymodule]
+#[pymodule(gil_used = false)]
 fn _lowlevel(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<environment::Environment>()?;
     m.add_class::<state::StateRef>()?;

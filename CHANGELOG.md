@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 * Added multi-key support to the `|sort` filter.  #827
 * Fix `not undefined` with strict undefined behavior.  #838
+* Added support for free threading Python.  #841
 
 ## 2.12.0
 
