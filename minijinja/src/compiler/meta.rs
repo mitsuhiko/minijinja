@@ -186,6 +186,7 @@ fn tracker_visit_expr<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a
                 .for_each(|x| tracker_visit_callarg(x, state));
         }
         ast::Expr::List(expr) => expr.items.iter().for_each(|x| tracker_visit_expr(x, state)),
+        ast::Expr::Tuple(expr) => expr.items.iter().for_each(|x| tracker_visit_expr(x, state)),
         ast::Expr::Map(expr) => expr.keys.iter().zip(expr.values.iter()).for_each(|(k, v)| {
             tracker_visit_expr(k, state);
             tracker_visit_expr(v, state);
@@ -197,6 +198,7 @@ fn track_assign<'a>(expr: &ast::Expr<'a>, state: &mut AssignmentTracker<'a>) {
     match expr {
         ast::Expr::Var(var) => state.assign(var.id),
         ast::Expr::List(list) => list.items.iter().for_each(|x| track_assign(x, state)),
+        ast::Expr::Tuple(tuple) => tuple.items.iter().for_each(|x| track_assign(x, state)),
         _ => {}
     }
 }
