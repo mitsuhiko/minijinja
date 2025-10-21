@@ -57,23 +57,24 @@ const env = new Environment();
 
 // Resolve relative paths like "./partial.html" against the parent template
 env.setPathJoinCallback((name, parent) => {
-  const joined = path.join(path.dirname(parent), name);
+  const parentDir = parent ? path.dirname(parent) : process.cwd();
+  const joined = path.resolve(parentDir, name);
   return joined.replace(/\\\\/g, '/');
 });
 
 // Synchronous loader: return template source or null/undefined if missing
-const baseDir = path.resolve("./templates");
 env.setLoader((name) => {
   try {
-    return fs.readFileSync(path.join(baseDir, name), "utf8");
+    return fs.readFileSync(name, "utf8");
   } catch {
     return null;
   }
 });
 
 // Example: main in-memory, include from disk under ./templates/dir/inc.html
-env.addTemplate("dir/main.html", "Hello {% include './inc.html' %}!");
-console.log(env.renderTemplate("dir/main.html", { value: "World" }));
+const templatePath = path.resolve(process.cwd(), "templates/dir/main.html");
+env.addTemplate(templatePath, "Hello {% include './inc.html' %}!");
+console.log(env.renderTemplate(templatePath, { value: "World" }));
 // -> Hello [World]!
 ```
 
