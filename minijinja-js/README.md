@@ -46,6 +46,37 @@ const result = env.renderTemplate('index.html', { name: 'World' });
 console.log(result);
 ```
 
+Resolve includes/extends from the filesystem (Node, etc...):
+
+```typescript
+import { Environment } from "minijinja-js";
+import fs from "node:fs";
+import path from "node:path";
+
+const env = new Environment();
+
+// Resolve relative paths like "./partial.html" against the parent template
+env.setPathJoinCallback((name, parent) => {
+  const joined = path.join(path.dirname(parent), name);
+  return joined.replace(/\\\\/g, '/');
+});
+
+// Synchronous loader: return template source or null/undefined if missing
+const baseDir = path.resolve("./templates");
+env.setLoader((name) => {
+  try {
+    return fs.readFileSync(path.join(baseDir, name), "utf8");
+  } catch {
+    return null;
+  }
+});
+
+// Example: main in-memory, include from disk under ./templates/dir/inc.html
+env.addTemplate("dir/main.html", "Hello {% include './inc.html' %}!");
+console.log(env.renderTemplate("dir/main.html", { value: "World" }));
+// -> Hello [World]!
+```
+
 Evaluate an expression:
 
 ```typescript
@@ -74,6 +105,7 @@ others probably not so much.  You might run into the following:
 
 * Access of the template engine state from JavaScript is not possible.
 * You cannot register a custom auto escape callback or a finalizer
+* The loader is synchronous; use sync I/O in Node etc... (e.g. `fs.readFileSync`)
 * If the engine panics, the WASM runtime corrupts.
 
 ## Sponsor

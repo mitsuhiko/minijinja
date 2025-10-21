@@ -1,5 +1,6 @@
 import assert from "assert";
 import { expect } from "chai";
+import path from "node:path";
 import { Environment } from "../dist/node/minijinja_js.js";
 
 describe("minijinja-js", () => {
@@ -95,6 +96,58 @@ No referenced variables
     });
   });
 
+  describe("loader", () => {
+    it("should resolve includes via setLoader", () => {
+      const env = new Environment();
+      env.setLoader((name) => {
+        if (name === "inc.html") {
+          return "[include: {{ value }}]";
+        }
+        return null;
+      });
+      env.addTemplate("main.html", "Hello {% include 'inc.html' %}!");
+      const result = env.renderTemplate("main.html", { value: "World" });
+      expect(result).to.equal("Hello [include: World]!");
+    });
+
+    it("should propagate loader errors", () => {
+      const env = new Environment();
+      env.setLoader((_name) => {
+        throw new Error("boom");
+      });
+      env.addTemplate("main.html", "{% include 'x' %}");
+      expect(() => env.renderTemplate("main.html", {})).to.throw(
+        /loader threw error: /
+      );
+    });
+
+    it("should error on invalid return types", () => {
+      const env = new Environment();
+      env.setLoader((_name) => 42);
+      env.addTemplate("main.html", "{% include 'x' %}");
+      expect(() => env.renderTemplate("main.html", {})).to.throw(
+        "loader must return a string or null/undefined"
+      );
+    });
+  });
+
+  describe("path join", () => {
+    it("should join relative include paths", () => {
+      const env = new Environment();
+      env.setPathJoinCallback((name, parent) => {
+        const joined = path.join(path.dirname(parent), name);
+        // Normalize to forward slashes so test is platform-independent
+        return joined.replace(/\\\\/g, '/');
+      });
+      env.setLoader((name) => {
+        if (name === "dir/inc.html") return "[{{ value }}]";
+        return null;
+      });
+      env.addTemplate("dir/main.html", "Hello {% include './inc.html' %}!");
+      const rv = env.renderTemplate("dir/main.html", { value: "World" });
+      expect(rv).to.equal("Hello [World]!");
+    });
+  });
   describe("tests", () => {
     it("should add a test", () => {
       const env = new Environment();
