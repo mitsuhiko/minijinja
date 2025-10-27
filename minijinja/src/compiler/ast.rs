@@ -142,6 +142,7 @@ pub enum Expr<'a> {
     GetItem(Spanned<GetItem<'a>>),
     Call(Spanned<Call<'a>>),
     List(Spanned<List<'a>>),
+    Tuple(Spanned<Tuple<'a>>),
     Map(Spanned<Map<'a>>),
 }
 
@@ -161,6 +162,7 @@ impl fmt::Debug for Expr<'_> {
             Expr::GetItem(s) => fmt::Debug::fmt(s, f),
             Expr::Call(s) => fmt::Debug::fmt(s, f),
             Expr::List(s) => fmt::Debug::fmt(s, f),
+            Expr::Tuple(s) => fmt::Debug::fmt(s, f),
             Expr::Map(s) => fmt::Debug::fmt(s, f),
         }
     }
@@ -179,6 +181,7 @@ impl Expr<'_> {
             | Expr::GetItem(_) => "expression",
             Expr::Call(_) => "call",
             Expr::List(_) => "list literal",
+            Expr::Tuple(_) => "tuple literal",
             Expr::Map(_) => "map literal",
             Expr::Test(_) => "test expression",
             Expr::Filter(_) => "filter expression",
@@ -199,6 +202,7 @@ impl Expr<'_> {
             Expr::GetItem(s) => s.span(),
             Expr::Call(s) => s.span(),
             Expr::List(s) => s.span(),
+            Expr::Tuple(s) => s.span(),
             Expr::Map(s) => s.span(),
         }
     }
@@ -207,6 +211,7 @@ impl Expr<'_> {
         match self {
             Expr::Const(c) => Some(c.value.clone()),
             Expr::List(l) => l.as_const(),
+            Expr::Tuple(t) => t.as_const(),
             Expr::Map(m) => m.as_const(),
             Expr::UnaryOp(c) => match c.op {
                 UnaryOpKind::Not => c.expr.as_const().map(|value| Value::from(!value.is_true())),
@@ -564,6 +569,33 @@ impl List<'_> {
         });
 
         Some(Value::from(sequence.collect::<Vec<_>>()))
+    }
+}
+
+/// Creates a tuple of values.
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
+pub struct Tuple<'a> {
+    pub items: Vec<Expr<'a>>,
+}
+
+impl Tuple<'_> {
+    pub fn as_const(&self) -> Option<Value> {
+        use crate::value::Tuple as ValueTuple;
+
+        if !self.items.iter().all(|x| matches!(x, Expr::Const(_))) {
+            return None;
+        }
+
+        let items = self.items.iter();
+        let sequence = items.filter_map(|expr| match expr {
+            Expr::Const(v) => Some(v.value.clone()),
+            _ => None,
+        });
+
+        Some(Value::from_object(ValueTuple::from(
+            sequence.collect::<Vec<_>>(),
+        )))
     }
 }
 
