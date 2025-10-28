@@ -1648,6 +1648,19 @@ mod builtins {
     pub fn pprint(value: &Value) -> String {
         format!("{value:#?}")
     }
+
+    /// Apply the given values to a [printf-style] format string.
+    ///
+    /// ```jinja
+    /// {{ "%s, %s!"|format(greeting, name) }}
+    /// -> Hello, World!
+    /// ```
+    ///
+    /// [printf-style]: https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn format(format_str: Value, format_args: Rest<Value>) -> Result<String, Error> {
+        crate::format_utils::printf_style_format(format_str, format_args)
+    }
 }
 
 #[cfg(feature = "builtins")]

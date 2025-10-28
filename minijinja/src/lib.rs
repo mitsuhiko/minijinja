@@ -212,6 +212,7 @@ mod defaults;
 mod environment;
 mod error;
 mod expression;
+mod format_utils;
 mod output;
 mod template;
 mod utils;
