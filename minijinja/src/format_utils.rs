@@ -1,6 +1,22 @@
 use crate::value::{Rest, ValueKind};
 use crate::{Error, ErrorKind, Value};
 
+/// This enum indicates the style of the format string passed to the
+/// [`format_filter`] function.
+///
+/// Like jinja2, minijinja also supports two flavours of string formatting:
+/// - printf-style: `{{ "%s, %s!"|format(greeting, name) }}`
+/// - str.format style: `{{ "{}, {}!".format(greeting, name) }}` (through `minijinja-contrib`'s `pycompat` feature)
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum FormatStyle {
+    /// Printf-style format string as described
+    /// [here](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
+    Printf,
+    /// `str.format` style format string, described
+    /// [here](https://docs.python.org/3/library/string.html#format-string-syntax)
+    StrFormat,
+}
+
 // Token produced by the format string parser
 #[derive(Debug)]
 enum Token<'src> {
@@ -82,7 +98,7 @@ struct FormatSpec {
     ty: Type,
 
     // Whether this spec is parsed from a printf-style format string
-    printf_style: bool,
+    format_style: FormatStyle,
     location: usize,
 }
 
@@ -142,15 +158,10 @@ impl FormatSpec {
                 // precision (i.e. without truncating)
                 Ok(self.apply_padding(format!("{val}"), Align::Left))
             }
-            Type::String => {
-                if self.printf_style {
-                    // Format "true" or "false" as a regular string, ignoring the
-                    // precision (i.e. without truncating)
-                    Ok(self.apply_padding(format!("{val}"), Align::Right))
-                } else {
-                    Err(self.type_conversion_err("bool", Type::String))
-                }
-            }
+            Type::String => match self.format_style {
+                FormatStyle::Printf => Ok(self.apply_padding(format!("{val}"), Align::Right)),
+                FormatStyle::StrFormat => Err(self.type_conversion_err("bool", Type::String)),
+            },
             Type::Default
             | Type::Binary
             | Type::Decimal
@@ -167,10 +178,9 @@ impl FormatSpec {
     fn format_str(&self, text: String) -> Result<String, Error> {
         match self.ty {
             Type::Default | Type::String => {
-                let default_align = if self.printf_style {
-                    Align::Right
-                } else {
-                    Align::Left
+                let default_align = match self.format_style {
+                    FormatStyle::Printf => Align::Right,
+                    FormatStyle::StrFormat => Align::Left,
                 };
 
                 if let Some(p) = &self.precision {
@@ -210,7 +220,7 @@ impl FormatSpec {
             Type::UpperHex => format!("{val:X}"),
             Type::Default | Type::Decimal => format!("{val}"),
             Type::String => {
-                if self.printf_style {
+                if let FormatStyle::Printf = self.format_style {
                     // printf-style formatting in Python ignores sign character flag
                     // '+' when combined with 's' format.
                     sign = if is_negative { "-" } else { "" };
@@ -257,7 +267,7 @@ impl FormatSpec {
         };
 
         match self.ty {
-            Type::String if !self.printf_style => {
+            Type::String if FormatStyle::Printf != self.format_style => {
                 Err(self.type_conversion_err("float", Type::String))
             }
             Type::Default | Type::String => {
@@ -429,52 +439,16 @@ impl FormatSpec {
     }
 }
 
-// Type representing a printf-style format string input. It provides token interface
-// over the raw string through its `next_token` method.
-struct PrintfStyleInput<'s> {
+struct Cursor<'s> {
     source: &'s str,
     current_offset: usize,
 }
 
-impl<'s> PrintfStyleInput<'s> {
+impl<'s> Cursor<'s> {
     fn new(source: &'s str) -> Self {
         Self {
             source,
             current_offset: 0,
-        }
-    }
-
-    fn next_token(&mut self) -> Result<Option<Token<'s>>, Error> {
-        let mut offset = 0;
-        let mut found_spec = false;
-        let bytes = self.rest_bytes();
-        loop {
-            match bytes.get(offset) {
-                Some(b'%') => {
-                    // check for escape sequence
-                    if let Some(b'%') = bytes.get(offset + 1) {
-                        // jump over %%
-                        offset += 2;
-                    } else {
-                        // start of format spec, break without jumping the %
-                        found_spec = true;
-                        break;
-                    }
-                }
-                Some(_) => {
-                    offset += 1;
-                }
-                None => break,
-            }
-        }
-        if offset > 0 {
-            let tok = Token::Literal(self.advance(offset));
-            Ok(Some(tok))
-        } else if found_spec {
-            let tok = Token::Replace(self.replacement_field()?);
-            Ok(Some(tok))
-        } else {
-            Ok(None)
         }
     }
 
@@ -504,11 +478,145 @@ impl<'s> PrintfStyleInput<'s> {
         }
     }
 
+    #[inline]
     fn is_end(&self) -> bool {
         self.source.len() == self.current_offset
     }
 
-    // Top-level parser using the following grammar:
+    #[inline]
+    fn position(&self) -> usize {
+        self.current_offset
+    }
+
+    #[inline]
+    fn source(&self) -> &'s str {
+        self.source
+    }
+}
+
+struct Tokenizer<'s> {
+    cursor: Cursor<'s>,
+    format_style: FormatStyle,
+}
+
+impl<'s> Tokenizer<'s> {
+    fn new(source: &'s str, format_style: FormatStyle) -> Self {
+        Self {
+            cursor: Cursor::new(source),
+            format_style,
+        }
+    }
+
+    fn next_token(&mut self) -> Result<Option<Token<'s>>, Error> {
+        let mut offset = 0;
+        let mut found_spec = false;
+        let bytes = self.cursor.rest_bytes();
+        let delimiter = match self.format_style {
+            FormatStyle::Printf => b'%',
+            FormatStyle::StrFormat => b'{',
+        };
+
+        loop {
+            match bytes.get(offset) {
+                Some(c) if *c == delimiter => {
+                    // check for escape sequence
+                    match bytes.get(offset + 1) {
+                        Some(n) if *n == delimiter => {
+                            // jump over escape sequence
+                            offset += 2;
+                        }
+                        _ => {
+                            // start of format spec, break without consuming the delimiter
+                            found_spec = true;
+                            break;
+                        }
+                    }
+                }
+                Some(_) => {
+                    offset += 1;
+                }
+                None => break,
+            }
+        }
+        if offset > 0 {
+            let tok = Token::Literal(self.cursor.advance(offset));
+            Ok(Some(tok))
+        } else if found_spec {
+            let field = match self.format_style {
+                FormatStyle::Printf => printf_style::replacement_field(&mut self.cursor)?,
+                FormatStyle::StrFormat => todo!(),
+            };
+            Ok(Some(Token::Replace(field)))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+fn parse_number(cursor: &mut Cursor) -> Result<Option<usize>, Error> {
+    let digit_count = cursor
+        .rest_bytes()
+        .iter()
+        .take_while(|c| c.is_ascii_digit())
+        .count();
+    if digit_count == 0 {
+        Ok(None)
+    } else {
+        let num_str = cursor.advance(digit_count);
+        let num = num_str.parse::<usize>().map_err(|e| {
+            Error::new(
+                ErrorKind::InvalidOperation,
+                format!(
+                    "invalid integer in the format string at offset {}",
+                    cursor.position()
+                ),
+            )
+            .with_source(e)
+        })?;
+        Ok(Some(num))
+    }
+}
+
+fn parse_type(cursor: &mut Cursor) -> Result<Type, Error> {
+    let t = match cursor.rest_bytes().get(0) {
+        Some(b'd') => Type::Decimal,
+        Some(b'i') => Type::Decimal,
+        Some(b'e') => Type::LowerE,
+        Some(b'E') => Type::UpperE,
+        Some(b'f') => Type::LowerF,
+        Some(b'F') => Type::UpperF,
+        Some(b'o') => Type::Octal,
+        Some(b'x') => Type::LowerHex,
+        Some(b'X') => Type::UpperHex,
+        Some(b's') => Type::String,
+        Some(c) => {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!(
+                    "invalid conversion type '{}' in format spec at offset {}",
+                    *c as char,
+                    cursor.position()
+                ),
+            ))
+        }
+        None => {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!(
+                    "incomplete format spec at offset {}; missing conversion type",
+                    cursor.position()
+                ),
+            ))
+        }
+    };
+    cursor.advance(1);
+    Ok(t)
+}
+
+mod printf_style {
+    use super::*;
+
+    // Printf-style field parser parsing the following grammar:
     //
     // replacement_field -> '%' [key] format_spec
     // key -> '(' char* ')'
@@ -519,25 +627,25 @@ impl<'s> PrintfStyleInput<'s> {
     // number -> [0-9]+
     // len_modifier -> 'h' | 'l' | 'L'
     // type -> 'd' | 'i' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 's'
-    fn replacement_field(&mut self) -> Result<ReplacementField<'s>, Error> {
+    pub fn replacement_field<'s>(cursor: &mut Cursor<'s>) -> Result<ReplacementField<'s>, Error> {
         // consume '%'
-        self.advance(1);
+        cursor.advance(1);
 
-        let field_name = self.key()?.map(FieldName::MappingKey);
-        let spec = self.format_spec()?;
+        let field_name = parse_key(cursor)?.map(FieldName::MappingKey);
+        let spec = parse_format_spec(cursor)?;
         Ok(ReplacementField {
             field_name,
             format_spec: Some(spec),
         })
     }
 
-    fn key(&mut self) -> Result<Option<&'s str>, Error> {
-        if self.advance_if(b'(') {
-            let start = self.current_offset;
+    fn parse_key<'s>(cursor: &mut Cursor<'s>) -> Result<Option<&'s str>, Error> {
+        if cursor.advance_if(b'(') {
+            let start = cursor.position();
             loop {
-                if self.advance_if(b')') {
+                if cursor.advance_if(b')') {
                     break;
-                } else if self.is_end() {
+                } else if cursor.is_end() {
                     return Err(Error::new(
                         ErrorKind::InvalidOperation,
                         format!(
@@ -546,20 +654,19 @@ impl<'s> PrintfStyleInput<'s> {
                         ),
                     ));
                 } else {
-                    self.advance(1);
+                    cursor.advance(1);
                 }
             }
             // don't include the closing ')' in the key
-            let end = self.current_offset - 1;
-            Ok(Some(&self.source[start..end]))
+            let end = cursor.position() - 1;
+            Ok(Some(&cursor.source()[start..end]))
         } else {
             Ok(None)
         }
     }
 
-    fn format_spec(&mut self) -> Result<FormatSpec, Error> {
-        let location = self.current_offset;
-        let printf_style = true;
+    fn parse_format_spec(cursor: &mut Cursor) -> Result<FormatSpec, Error> {
+        let location = cursor.position();
         let mut fill_align = None;
         let mut print_sign = false;
         let mut space_before_positive_num = false;
@@ -567,7 +674,7 @@ impl<'s> PrintfStyleInput<'s> {
         let mut zero_padded = false;
 
         loop {
-            match self.rest_bytes().get(0) {
+            match cursor.rest_bytes().get(0) {
                 Some(b'#') => alternate_form = true,
                 Some(b'0') => zero_padded = true,
                 Some(b'-') => {
@@ -580,7 +687,7 @@ impl<'s> PrintfStyleInput<'s> {
                 Some(b'+') => print_sign = true,
                 _ => break,
             }
-            self.advance(1);
+            cursor.advance(1);
         }
 
         if print_sign {
@@ -596,7 +703,7 @@ impl<'s> PrintfStyleInput<'s> {
             zero_padded = false;
         }
 
-        let mut width = self.number()?;
+        let mut width = parse_number(cursor)?;
         if zero_padded && width.is_none() {
             // if '0' is not followed by width (i.e. digit+), then it should be parsed as
             // a width, not as zero-padding.
@@ -604,15 +711,15 @@ impl<'s> PrintfStyleInput<'s> {
             width = Some(0);
         }
 
-        let precision = self
+        let precision = cursor
             .advance_if(b'.')
-            .then(|| self.number())
+            .then(|| parse_number(cursor))
             .transpose()?
             .flatten();
 
         // length modifier is ignored in Python
-        self.len_modifier();
-        let ty = self.typ()?;
+        parse_len_modifier(cursor);
+        let ty = parse_type(cursor)?;
         Ok(FormatSpec {
             fill_align,
             print_sign,
@@ -622,81 +729,82 @@ impl<'s> PrintfStyleInput<'s> {
             width,
             precision,
             ty,
-            printf_style,
+            format_style: FormatStyle::Printf,
             location,
         })
     }
 
-    fn len_modifier(&mut self) {
-        match self.rest_bytes().get(0) {
+    fn parse_len_modifier(cursor: &mut Cursor) {
+        match cursor.rest_bytes().get(0) {
             Some(b'h') | Some(b'l') | Some(b'L') => {
-                self.advance(1);
+                cursor.advance(1);
             }
             _ => (),
         }
     }
 
-    fn number(&mut self) -> Result<Option<usize>, Error> {
-        let digit_count = self
-            .rest_bytes()
-            .iter()
-            .take_while(|c| c.is_ascii_digit())
-            .count();
-        if digit_count == 0 {
-            Ok(None)
-        } else {
-            let num_str = self.advance(digit_count);
-            let num = num_str.parse::<usize>().map_err(|e| {
-                Error::new(
-                    ErrorKind::InvalidOperation,
-                    format!(
-                        "invalid integer in the format string at offset {}",
-                        self.current_offset
-                    ),
-                )
-                .with_source(e)
-            })?;
-            Ok(Some(num))
-        }
-    }
+    pub fn format(format_str: &str, args: Rest<Value>) -> Result<String, Error> {
+        let mut input = Tokenizer::new(format_str, FormatStyle::Printf);
+        let mut result = String::new();
+        let mut arg_index = 0;
 
-    fn typ(&mut self) -> Result<Type, Error> {
-        let t = match self.rest_bytes().get(0) {
-            Some(b'd') => Type::Decimal,
-            Some(b'i') => Type::Decimal,
-            Some(b'e') => Type::LowerE,
-            Some(b'E') => Type::UpperE,
-            Some(b'f') => Type::LowerF,
-            Some(b'F') => Type::UpperF,
-            Some(b'o') => Type::Octal,
-            Some(b'x') => Type::LowerHex,
-            Some(b'X') => Type::UpperHex,
-            Some(b's') => Type::String,
-            Some(c) => {
-                return Err(Error::new(
-                    ErrorKind::InvalidOperation,
-                    format!(
-                        "invalid conversion type '{}' in format spec at offset {}",
-                        *c as char, self.current_offset
-                    ),
-                ))
+        fn missing_arg_err(location: usize) -> Error {
+            Error::new(
+                ErrorKind::InvalidOperation,
+                format!(
+                    "missing an argument for format spec at offset '{}'",
+                    location
+                ),
+            )
+        }
+
+        while let Some(token) = input.next_token()? {
+            match token {
+                Token::Literal(lit) => result.push_str(lit),
+                Token::Replace(ReplacementField {
+                    field_name,
+                    format_spec,
+                }) => {
+                    let spec = format_spec.expect("printf-style format must specify a spec");
+                    let arg = {
+                        if let Some(FieldName::MappingKey(key)) = field_name {
+                            // only a mapping as an argument is expected, and the key must be
+                            // read from the provided mapping.
+                            if let Some(arg) = args.0.get(0) {
+                                if arg.kind() != ValueKind::Map {
+                                    return Err(Error::new(
+                                        ErrorKind::InvalidOperation,
+                                        "format argument must be a mapping",
+                                    ));
+                                }
+
+                                match arg.get_attr(key).ok() {
+                                    Some(val) if !val.is_undefined() => val,
+                                    _ => return Err(missing_arg_err(spec.location)),
+                                }
+                            } else {
+                                return Err(missing_arg_err(spec.location));
+                            }
+                        } else if let Some(arg) = args.0.get(arg_index) {
+                            arg_index += 1;
+                            arg.clone()
+                        } else {
+                            return Err(missing_arg_err(spec.location));
+                        }
+                    };
+                    result.push_str(&spec.format(&arg)?);
+                }
             }
-            None => {
-                return Err(Error::new(
-                    ErrorKind::InvalidOperation,
-                    format!(
-                        "incomplete format spec at offset {}; missing conversion type",
-                        self.current_offset
-                    ),
-                ))
-            }
-        };
-        self.advance(1);
-        Ok(t)
+        }
+        Ok(result)
     }
 }
 
-pub fn printf_style_format(format_str: Value, format_args: Rest<Value>) -> Result<String, Error> {
+pub fn format_filter(
+    style: FormatStyle,
+    format_str: Value,
+    args: Rest<Value>,
+) -> Result<String, Error> {
     let format_str = format_str.as_str().ok_or_else(|| {
         Error::new(
             ErrorKind::InvalidOperation,
@@ -707,57 +815,8 @@ pub fn printf_style_format(format_str: Value, format_args: Rest<Value>) -> Resul
         )
     })?;
 
-    let mut input = PrintfStyleInput::new(format_str);
-    let mut result = String::new();
-    let mut arg_index = 0;
-
-    fn missing_arg_err(location: usize) -> Error {
-        Error::new(
-            ErrorKind::InvalidOperation,
-            format!(
-                "missing an argument for format spec at offset '{}'",
-                location
-            ),
-        )
+    match style {
+        FormatStyle::Printf => printf_style::format(format_str, args),
+        FormatStyle::StrFormat => todo!(),
     }
-
-    while let Some(token) = input.next_token()? {
-        match token {
-            Token::Literal(lit) => result.push_str(lit),
-            Token::Replace(ReplacementField {
-                field_name,
-                format_spec,
-            }) => {
-                let spec = format_spec.expect("printf-style format must specify a spec");
-                let arg = {
-                    if let Some(FieldName::MappingKey(key)) = field_name {
-                        // only a mapping as an argument is expected, and the key must be
-                        // read from the provided mapping.
-                        if let Some(arg) = format_args.0.get(0) {
-                            if arg.kind() != ValueKind::Map {
-                                return Err(Error::new(
-                                    ErrorKind::InvalidOperation,
-                                    "format argument must be a mapping",
-                                ));
-                            }
-
-                            match arg.get_attr(key).ok() {
-                                Some(val) if !val.is_undefined() => val,
-                                _ => return Err(missing_arg_err(spec.location)),
-                            }
-                        } else {
-                            return Err(missing_arg_err(spec.location));
-                        }
-                    } else if let Some(arg) = format_args.0.get(arg_index) {
-                        arg_index += 1;
-                        arg.clone()
-                    } else {
-                        return Err(missing_arg_err(spec.location));
-                    }
-                };
-                result.push_str(&spec.format(&arg)?);
-            }
-        }
-    }
-    Ok(result)
 }
