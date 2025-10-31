@@ -71,6 +71,91 @@ fn test_string_methods() {
 }
 
 #[test]
+fn test_str_format() {
+    // check sign
+    assert_eq!(eval_expr("'{:+d}'.format(123)").as_str(), Some("+123"));
+    assert_eq!(eval_expr("'{:+d}'.format(-123)").as_str(), Some("-123"));
+    assert_eq!(eval_expr("'{}'.format(-123)").as_str(), Some("-123"));
+    assert_eq!(eval_expr("'{: d}'.format(123)").as_str(), Some(" 123"));
+    assert_eq!(eval_expr("'{: d}'.format(-123)").as_str(), Some("-123"));
+
+    // check align and padding
+    assert_eq!(eval_expr("'{:=<5}'.format(123)").as_str(), Some("123=="));
+    assert_eq!(eval_expr("'{:<5}'.format(123)").as_str(), Some("123  "));
+    assert_eq!(eval_expr("'{:=^5}'.format(123)").as_str(), Some("=123="));
+    assert_eq!(eval_expr("'{:=^5}'.format(12)").as_str(), Some("=12=="));
+    assert_eq!(eval_expr("'{:^5}'.format(12)").as_str(), Some(" 12  "));
+    assert_eq!(eval_expr("'{:=>5}'.format(12)").as_str(), Some("===12"));
+    assert_eq!(eval_expr("'{:>>5d}'.format(-12)").as_str(), Some(">>-12"));
+    assert_eq!(
+        eval_expr("'{:👍<6}'.format('Good')").as_str(),
+        Some("Good👍👍")
+    );
+
+    // check different radix
+    assert_eq!(eval_expr("'{:b}'.format(16)").as_str(), Some("10000"));
+    assert_eq!(eval_expr("'{:#b}'.format(17)").as_str(), Some("0b10001"));
+    assert_eq!(eval_expr("'{:#8b}'.format(17)").as_str(), Some(" 0b10001"));
+    assert_eq!(eval_expr("'{:<#8b}'.format(17)").as_str(), Some("0b10001 "));
+    assert_eq!(eval_expr("'{:#08b}'.format(17)").as_str(), Some("0b010001"));
+    assert_eq!(
+        eval_expr("'{:+#08b}'.format(17)").as_str(),
+        Some("+0b10001")
+    );
+    assert_eq!(eval_expr("'{:#b}'.format(-16)").as_str(), Some("-0b10000"));
+    assert_eq!(eval_expr("'{:o}'.format(8)").as_str(), Some("10"));
+    assert_eq!(eval_expr("'{:#o}'.format(8)").as_str(), Some("0o10"));
+    assert_eq!(eval_expr("'{:x}'.format(127)").as_str(), Some("7f"));
+    assert_eq!(eval_expr("'{:#X}'.format(127)").as_str(), Some("0X7F"));
+
+    assert_eq!(eval_expr("'{:f}'.format(3.14)").as_str(), Some("3.140000"));
+    assert_eq!(eval_expr("'{:.2f}'.format(2.7)").as_str(), Some("2.70"));
+    assert_eq!(eval_expr("'{:.2e}'.format(2.7)").as_str(), Some("2.70e0"));
+    assert_eq!(eval_expr("'{:.3E}'.format(2.7)").as_str(), Some("2.700E0"));
+
+    assert_eq!(
+        eval_expr("'{:s} {:}!'.format('Hello', 'world')").as_str(),
+        Some("Hello world!")
+    );
+    assert_eq!(
+        eval_expr("'{0:<7s},{0:=>7}'.format('Hello')").as_str(),
+        Some("Hello  ,==Hello")
+    );
+
+    // test indexed args
+    assert_eq!(
+        eval_expr("'({0:d}, {1:d}, {2})'.format(1, 2, 3)").as_str(),
+        Some("(1, 2, 3)")
+    );
+    assert_eq!(
+        eval_expr("'({:}, {:d}, {:02d})'.format(1,2,3)").as_str(),
+        Some("(1, 2, 03)")
+    );
+    assert!(eval_err_expr("'({1:d}, {0:d}, {})'.format(1, 2, 3)")
+        .contains("cannot switch from manual field specification to automatic numbering"));
+    assert!(eval_err_expr("'({:d}, {0:d}, {})'.format(1, 2, 3)")
+        .contains("cannot switch from automatic numbering to manual field specification"));
+
+    // test attr access
+    assert_eq!(
+        eval_expr("'({l[1]}, {d[k]}, {d.l[0][k2]})'.format(l=[10, 11], d={'k':0, 'l':[{'k2':1}]})")
+            .as_str(),
+        Some("(11, 0, 1)")
+    );
+    assert_eq!(
+        eval_expr("'({0[1]}, {1.k}, {1.l[0].k2})'.format([10, 11], {'k':0, 'l':[{'k2':1}]})")
+            .as_str(),
+        Some("(11, 0, 1)")
+    );
+
+    // test mix of indexed and keyed args
+    assert_eq!(
+        eval_expr("'({1:d},{0:d},{key:d})'.format(1, 2, key=42)").as_str(),
+        Some("(2,1,42)")
+    );
+}
+
+#[test]
 fn test_dict_methods() {
     assert!(eval_expr("{'x': 42}.keys()|list == ['x']").is_true());
     assert!(eval_expr("{'x': 42}.values()|list == [42]").is_true());
