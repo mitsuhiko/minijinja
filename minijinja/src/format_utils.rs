@@ -1,4 +1,4 @@
-use crate::value::{Rest, ValueKind};
+use crate::value::ValueKind;
 use crate::{Error, ErrorKind, Value};
 
 /// This enum indicates the style of the format string passed to the
@@ -17,6 +17,19 @@ pub enum FormatStyle {
     StrFormat,
 }
 
+/// A helper function to apply a set of values to a given format string.  The format
+/// string could be in one of the two styles specified by the [`FormatStyle`] enum.
+pub fn format_filter(
+    style: FormatStyle,
+    format_str: &str,
+    args: &[Value],
+) -> Result<String, Error> {
+    match style {
+        FormatStyle::Printf => printf_style::format(format_str, args),
+        FormatStyle::StrFormat => str_format_style::format(format_str, args),
+    }
+}
+
 // Token produced by the format string parser
 #[derive(Debug)]
 enum Token<'src> {
@@ -26,10 +39,16 @@ enum Token<'src> {
     Replace(ReplacementField<'src>),
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum PathElem<'src> {
+    Attr(&'src str),
+    Key(&'src str),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum FieldName<'src> {
-    Ident(&'src str),
-    Digit(usize),
+    Kwarg(&'src str, Vec<PathElem<'src>>),
+    Positional(usize, Vec<PathElem<'src>>),
     MappingKey(&'src str),
 }
 
@@ -37,6 +56,7 @@ enum FieldName<'src> {
 struct ReplacementField<'src> {
     field_name: Option<FieldName<'src>>,
     format_spec: Option<FormatSpec>,
+    location: usize,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -439,6 +459,8 @@ impl FormatSpec {
     }
 }
 
+// Cursor over the input format string, providing helper functions to parser
+// implementations of two different format styles.
 struct Cursor<'s> {
     source: &'s str,
     current_offset: usize,
@@ -494,6 +516,9 @@ impl<'s> Cursor<'s> {
     }
 }
 
+// Top-level tokenizer producing `Token`s out of the input format string. It invokes
+// the style-specific parser to produce the `Replace` token when a replacement field
+// is encountered.
 struct Tokenizer<'s> {
     cursor: Cursor<'s>,
     format_style: FormatStyle,
@@ -544,7 +569,7 @@ impl<'s> Tokenizer<'s> {
         } else if found_spec {
             let field = match self.format_style {
                 FormatStyle::Printf => printf_style::replacement_field(&mut self.cursor)?,
-                FormatStyle::StrFormat => todo!(),
+                FormatStyle::StrFormat => str_format_style::replacement_field(&mut self.cursor)?,
             };
             Ok(Some(Token::Replace(field)))
         } else {
@@ -577,10 +602,11 @@ fn parse_number(cursor: &mut Cursor) -> Result<Option<usize>, Error> {
     }
 }
 
-fn parse_type(cursor: &mut Cursor) -> Result<Type, Error> {
+fn parse_type(cursor: &mut Cursor, style: FormatStyle) -> Result<Type, Error> {
     let t = match cursor.rest_bytes().get(0) {
+        Some(b'b') if FormatStyle::StrFormat == style => Type::Binary,
         Some(b'd') => Type::Decimal,
-        Some(b'i') => Type::Decimal,
+        Some(b'i') if FormatStyle::Printf == style => Type::Decimal,
         Some(b'e') => Type::LowerE,
         Some(b'E') => Type::UpperE,
         Some(b'f') => Type::LowerF,
@@ -589,6 +615,10 @@ fn parse_type(cursor: &mut Cursor) -> Result<Type, Error> {
         Some(b'x') => Type::LowerHex,
         Some(b'X') => Type::UpperHex,
         Some(b's') => Type::String,
+        Some(b'}') if FormatStyle::StrFormat == style => {
+            // end of spec, return without consuming '}'
+            return Ok(Type::Default);
+        }
         Some(c) => {
             return Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -613,7 +643,31 @@ fn parse_type(cursor: &mut Cursor) -> Result<Type, Error> {
     Ok(t)
 }
 
+fn parse_till<'s>(cursor: &mut Cursor<'s>, end_delim: u8) -> Result<&'s str, Error> {
+    let start = cursor.position();
+    loop {
+        if cursor.advance_if(end_delim) {
+            break;
+        } else if cursor.is_end() {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!(
+                    "incomplete format key at offset {}; missing closing '{}'",
+                    start, end_delim as char
+                ),
+            ));
+        } else {
+            cursor.advance(1);
+        }
+    }
+    // don't include the closing delimiter
+    let end = cursor.position() - 1;
+    Ok(&cursor.source()[start..end])
+}
+
 mod printf_style {
+    // module implementing prinf-style specific parser and formatter functions.
+
     use super::*;
 
     // Printf-style field parser parsing the following grammar:
@@ -628,6 +682,7 @@ mod printf_style {
     // len_modifier -> 'h' | 'l' | 'L'
     // type -> 'd' | 'i' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 's'
     pub fn replacement_field<'s>(cursor: &mut Cursor<'s>) -> Result<ReplacementField<'s>, Error> {
+        let location = cursor.position();
         // consume '%'
         cursor.advance(1);
 
@@ -636,30 +691,13 @@ mod printf_style {
         Ok(ReplacementField {
             field_name,
             format_spec: Some(spec),
+            location,
         })
     }
 
     fn parse_key<'s>(cursor: &mut Cursor<'s>) -> Result<Option<&'s str>, Error> {
         if cursor.advance_if(b'(') {
-            let start = cursor.position();
-            loop {
-                if cursor.advance_if(b')') {
-                    break;
-                } else if cursor.is_end() {
-                    return Err(Error::new(
-                        ErrorKind::InvalidOperation,
-                        format!(
-                            "incomplete format key at offset {}; missing enclosing ')'",
-                            start
-                        ),
-                    ));
-                } else {
-                    cursor.advance(1);
-                }
-            }
-            // don't include the closing ')' in the key
-            let end = cursor.position() - 1;
-            Ok(Some(&cursor.source()[start..end]))
+            Ok(Some(parse_till(cursor, b')')?))
         } else {
             Ok(None)
         }
@@ -719,7 +757,7 @@ mod printf_style {
 
         // length modifier is ignored in Python
         parse_len_modifier(cursor);
-        let ty = parse_type(cursor)?;
+        let ty = parse_type(cursor, FormatStyle::Printf)?;
         Ok(FormatSpec {
             fill_align,
             print_sign,
@@ -743,7 +781,10 @@ mod printf_style {
         }
     }
 
-    pub fn format(format_str: &str, args: Rest<Value>) -> Result<String, Error> {
+    // Do prinf-style formatting. Parse the format string and apply values from args
+    // to the fields found in the string, by formatting the value according to the
+    // spec found in the field.
+    pub fn format(format_str: &str, args: &[Value]) -> Result<String, Error> {
         let mut input = Tokenizer::new(format_str, FormatStyle::Printf);
         let mut result = String::new();
         let mut arg_index = 0;
@@ -764,13 +805,14 @@ mod printf_style {
                 Token::Replace(ReplacementField {
                     field_name,
                     format_spec,
+                    ..
                 }) => {
                     let spec = format_spec.expect("printf-style format must specify a spec");
                     let arg = {
                         if let Some(FieldName::MappingKey(key)) = field_name {
                             // only a mapping as an argument is expected, and the key must be
                             // read from the provided mapping.
-                            if let Some(arg) = args.0.get(0) {
+                            if let Some(arg) = args.get(0) {
                                 if arg.kind() != ValueKind::Map {
                                     return Err(Error::new(
                                         ErrorKind::InvalidOperation,
@@ -785,7 +827,7 @@ mod printf_style {
                             } else {
                                 return Err(missing_arg_err(spec.location));
                             }
-                        } else if let Some(arg) = args.0.get(arg_index) {
+                        } else if let Some(arg) = args.get(arg_index) {
                             arg_index += 1;
                             arg.clone()
                         } else {
@@ -800,23 +842,333 @@ mod printf_style {
     }
 }
 
-pub fn format_filter(
-    style: FormatStyle,
-    format_str: Value,
-    args: Rest<Value>,
-) -> Result<String, Error> {
-    let format_str = format_str.as_str().ok_or_else(|| {
-        Error::new(
-            ErrorKind::InvalidOperation,
-            format!(
-                "format filter argument must be a string, found {}",
-                format_str.kind()
-            ),
-        )
-    })?;
+mod str_format_style {
+    // module implementing `str.format`-style specific parser and formatter
+    // functions.
 
-    match style {
-        FormatStyle::Printf => printf_style::format(format_str, args),
-        FormatStyle::StrFormat => todo!(),
+    use super::*;
+    use crate::value::{from_args, Kwargs};
+
+    // Field parser parsing the following grammar:
+    //
+    // replacement_field -> '{' [field_name] [':' format_spec] '}'
+    // field_name -> arg_name path
+    // arg_name -> identifier | number
+    // path -> ('.' identifier | '[' elem_index ']')*
+    // elem_index -> number | char*
+    // format_spec -> [options] [width] ['.' precision] [type]
+    // options -> [[fill] align] [sign] ['#'] ['0']
+    // fill -> char
+    // align -> '<' | '>' | '^'
+    // sign -> '+' | '-' | ' '
+    // width -> number
+    // precision -> number
+    // number -> [0-9]+
+    // type -> 'b' | 'd' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 's'
+    pub fn replacement_field<'s>(cursor: &mut Cursor<'s>) -> Result<ReplacementField<'s>, Error> {
+        let location = cursor.position();
+        // consume '{'
+        cursor.advance(1);
+        let field_name = parse_field_name(cursor)?;
+        let format_spec = if cursor.advance_if(b':') {
+            Some(parse_format_spec(cursor)?)
+        } else {
+            None
+        };
+
+        if cursor.advance_if(b'}') {
+            Ok(ReplacementField {
+                field_name,
+                format_spec,
+                location,
+            })
+        } else {
+            let err = if let Some(&n) = cursor.rest_bytes().get(0) {
+                format!(
+                    "expected closing '}}' in format spec at offset {}; found '{}'",
+                    location, n as char
+                )
+            } else {
+                format!("missing closing '}}' in format spec at offset {}", location)
+            };
+            Err(Error::new(ErrorKind::InvalidOperation, err))
+        }
+    }
+
+    fn parse_field_name<'s>(cursor: &mut Cursor<'s>) -> Result<Option<FieldName<'s>>, Error> {
+        if let Some(num) = parse_number(cursor)? {
+            Ok(Some(FieldName::Positional(num, parse_path(cursor)?)))
+        } else if let Some(ident) = parse_identifier(cursor) {
+            Ok(Some(FieldName::Kwarg(ident, parse_path(cursor)?)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn parse_path<'s>(cursor: &mut Cursor<'s>) -> Result<Vec<PathElem<'s>>, Error> {
+        let mut elems = Vec::new();
+        loop {
+            if cursor.advance_if(b'.') {
+                if let Some(attr) = parse_identifier(cursor) {
+                    elems.push(PathElem::Attr(attr));
+                } else {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!(
+                            "missing attribute name after '.' in format spec at offset {}",
+                            cursor.position()
+                        ),
+                    ));
+                }
+            } else if cursor.advance_if(b'[') {
+                let key = parse_till(cursor, b']')?;
+                elems.push(PathElem::Key(key))
+            } else {
+                break;
+            }
+        }
+        Ok(elems)
+    }
+
+    fn parse_identifier<'s>(cursor: &mut Cursor<'s>) -> Option<&'s str> {
+        let ident_chars = cursor
+            .rest_bytes()
+            .iter()
+            .enumerate()
+            .take_while(|&(idx, &c)| {
+                if c == b'_' {
+                    true
+                } else if idx == 0 {
+                    c.is_ascii_alphabetic()
+                } else {
+                    c.is_ascii_alphanumeric()
+                }
+            })
+            .count();
+
+        if ident_chars > 0 {
+            Some(cursor.advance(ident_chars))
+        } else {
+            None
+        }
+    }
+
+    fn parse_format_spec(cursor: &mut Cursor) -> Result<FormatSpec, Error> {
+        let location = cursor.position();
+        let mut print_sign = false;
+        let mut space_before_positive_num = false;
+        let fill_align = parse_fill_align(cursor);
+
+        if cursor.advance_if(b'+') {
+            print_sign = true;
+        } else if cursor.advance_if(b' ') {
+            space_before_positive_num = true;
+        } else {
+            cursor.advance_if(b'-');
+        }
+
+        let alternate_form = cursor.advance_if(b'#');
+        let mut zero_padded = cursor.advance_if(b'0');
+
+        let mut width = parse_number(cursor)?;
+        if zero_padded && width.is_none() {
+            // if '0' is not followed by width (i.e. digit+), then it should be parsed as
+            // a width, not as zero-padding.
+            zero_padded = false;
+            width = Some(0);
+        }
+
+        let precision = cursor
+            .advance_if(b'.')
+            .then(|| parse_number(cursor))
+            .transpose()?
+            .flatten();
+
+        let ty = parse_type(cursor, FormatStyle::StrFormat)?;
+        Ok(FormatSpec {
+            fill_align,
+            print_sign,
+            space_before_positive_num,
+            alternate_form,
+            zero_padded,
+            width,
+            precision,
+            ty,
+            format_style: FormatStyle::StrFormat,
+            location,
+        })
+    }
+
+    fn parse_fill_align(cursor: &mut Cursor) -> Option<FillAlign> {
+        let maybe_fill = cursor.rest().chars().next();
+        let maybe_align = cursor.rest().chars().nth(1);
+
+        let (consumed, fa) = match (maybe_fill, maybe_align) {
+            (Some(f), Some('<')) => (
+                f.len_utf8() + 1,
+                FillAlign {
+                    fill: Some(f),
+                    align: Align::Left,
+                },
+            ),
+            (Some(f), Some('>')) => (
+                f.len_utf8() + 1,
+                FillAlign {
+                    fill: Some(f),
+                    align: Align::Right,
+                },
+            ),
+            (Some(f), Some('^')) => (
+                f.len_utf8() + 1,
+                FillAlign {
+                    fill: Some(f),
+                    align: Align::Center,
+                },
+            ),
+            (Some('<'), _) => (
+                1,
+                FillAlign {
+                    fill: None,
+                    align: Align::Left,
+                },
+            ),
+            (Some('>'), _) => (
+                1,
+                FillAlign {
+                    fill: None,
+                    align: Align::Right,
+                },
+            ),
+            (Some('^'), _) => (
+                1,
+                FillAlign {
+                    fill: None,
+                    align: Align::Center,
+                },
+            ),
+            (_, _) => return None,
+        };
+
+        cursor.advance(consumed);
+        Some(fa)
+    }
+
+    fn get_nested_val(root: &Value, path: &[PathElem]) -> Result<Value, Error> {
+        let mut curr = root.clone();
+        for elem in path {
+            curr = match elem {
+                PathElem::Attr(attr) => curr.get_attr(attr)?,
+                PathElem::Key(index) => {
+                    if let Ok(num) = index.parse::<usize>() {
+                        curr.get_item_by_index(num)?
+                    } else {
+                        curr.get_attr(index)?
+                    }
+                }
+            };
+        }
+        if curr.is_undefined() {
+            Err(Error::from(ErrorKind::UndefinedError))
+        } else {
+            Ok(curr)
+        }
+    }
+
+    // Do str.format style formatting. Parse the format string and apply values from
+    // args to the fields found in the string, by formatting the value according to
+    // the spec found in the field.
+    pub fn format(format_str: &str, args: &[Value]) -> Result<String, Error> {
+        let mut input = Tokenizer::new(format_str, FormatStyle::StrFormat);
+        let mut result = String::new();
+
+        fn missing_arg_err(location: usize, source: Option<Error>) -> Error {
+            let err = Error::new(
+                ErrorKind::InvalidOperation,
+                format!(
+                    "argument not found for format field at offset {}",
+                    location
+                ),
+            );
+
+            if let Some(cause) = source {
+                err.with_source(cause)
+            } else {
+                err
+            }
+        }
+
+        fn switch_err(location: usize, from: &str, to: &str) -> Error {
+            Error::new(
+                ErrorKind::InvalidOperation,
+                format!("cannot switch from {from} to {to} in field at offset {location}"),
+            )
+        }
+
+        let (args, kwargs): (&[Value], Kwargs) = from_args(args)?;
+        let mut arg_index = 0;
+        let mut auto_numbering = false;
+        let mut manual_numbering = false;
+
+        while let Some(token) = input.next_token()? {
+            match token {
+                Token::Literal(lit) => result.push_str(lit),
+                Token::Replace(ReplacementField {
+                    field_name,
+                    format_spec,
+                    location,
+                }) => {
+                    // find the right argument to replace the field with
+                    let arg = match field_name {
+                        Some(FieldName::Kwarg(key, path)) => {
+                            let val = kwargs
+                                .peek::<Value>(key)
+                                .map_err(|e| missing_arg_err(location, Some(e)))?;
+                            get_nested_val(&val, &path)
+                                .map_err(|e| missing_arg_err(location, Some(e)))?
+                        }
+                        Some(FieldName::Positional(index, path)) => {
+                            manual_numbering = true;
+                            if auto_numbering {
+                                return Err(switch_err(
+                                    location,
+                                    "automatic numbering",
+                                    "manual field specification",
+                                ));
+                            }
+                            let val = args
+                                .get(index)
+                                .ok_or_else(|| missing_arg_err(location, None))?;
+                            get_nested_val(val, &path)
+                                .map_err(|e| missing_arg_err(location, Some(e)))?
+                        }
+                        None => {
+                            auto_numbering = true;
+                            if manual_numbering {
+                                return Err(switch_err(
+                                    location,
+                                    "manual field specification",
+                                    "automatic numbering",
+                                ));
+                            }
+                            let val = args
+                                .get(arg_index)
+                                .ok_or_else(|| missing_arg_err(location, None))?;
+                            arg_index += 1;
+                            val.clone()
+                        }
+                        Some(FieldName::MappingKey(_)) => unreachable!(),
+                    };
+
+                    // apply the spec to the replacement value, and insert the
+                    // formatted result into final string
+                    if let Some(spec) = format_spec {
+                        result.push_str(&spec.format(&arg)?);
+                    } else {
+                        result.push_str(&format!("{arg}"))
+                    }
+                }
+            }
+        }
+        Ok(result)
     }
 }

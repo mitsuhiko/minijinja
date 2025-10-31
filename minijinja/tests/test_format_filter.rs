@@ -265,13 +265,6 @@ fn test_format_with_mapping_arg() {
 fn test_format_error() {
     let env = Environment::new();
 
-    let expr = env.compile_expression("42|format('arg')").unwrap();
-    assert!(expr
-        .eval(())
-        .unwrap_err()
-        .to_string()
-        .contains("format filter argument must be a string, found number"));
-
     let expr = env
         .compile_expression("'missing type: %04' | format('arg')")
         .unwrap();

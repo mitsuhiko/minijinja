@@ -1659,8 +1659,8 @@ mod builtins {
     ///
     /// [printf-style]: https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn format(format_str: Value, format_args: Rest<Value>) -> Result<String, Error> {
-        format_filter(FormatStyle::Printf, format_str, format_args)
+    pub fn format(format_str: &str, format_args: Rest<Value>) -> Result<String, Error> {
+        format_filter(FormatStyle::Printf, format_str, &format_args)
     }
 }
 
