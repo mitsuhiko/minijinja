@@ -163,16 +163,12 @@ fn test_str_format() {
         eval_expr("'{{{{ {} }}}} {{'.format(1)").as_str(),
         Some("{{ 1 }} {")
     );
-    assert_eq!(
-        eval_expr("'}} and }}'.format(1)").as_str(),
-        Some("} and }")
-    );
+    assert_eq!(eval_expr("'}} and }}'.format(1)").as_str(), Some("} and }"));
     assert!(
         eval_err_expr("'{'.format(1)").contains("missing closing '}' in format spec at offset 0")
     );
-    assert!(eval_err_expr("'}'.format(1)").contains(
-        "invalid single '}' in format string at offset 0; use escape sequence '}}'"
-    ));
+    assert!(eval_err_expr("'}'.format(1)")
+        .contains("invalid single '}' in format string at offset 0; use escape sequence '}}'"));
 }
 
 #[test]
