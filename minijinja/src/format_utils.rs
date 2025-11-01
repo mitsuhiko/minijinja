@@ -708,7 +708,9 @@ mod printf_style {
     // number -> [0-9]+
     // len_modifier -> 'h' | 'l' | 'L'
     // type -> 'd' | 'i' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 's'
-    pub fn replacement_field<'s>(cursor: &mut Cursor<'s>) -> Result<ReplacementField<'s>, Error> {
+    pub(super) fn replacement_field<'s>(
+        cursor: &mut Cursor<'s>,
+    ) -> Result<ReplacementField<'s>, Error> {
         let location = cursor.position();
         // consume '%'
         cursor.advance(1);
@@ -811,7 +813,7 @@ mod printf_style {
     // Do printf-style formatting. Parse the format string and apply values from args
     // to the fields found in the string, by formatting the value according to the
     // spec found in the field.
-    pub fn format(format_str: &str, args: &[Value]) -> Result<String, Error> {
+    pub(super) fn format(format_str: &str, args: &[Value]) -> Result<String, Error> {
         let mut input = Tokenizer::new(format_str, FormatStyle::Printf);
         let mut result = String::new();
         let mut arg_index = 0;
@@ -892,7 +894,9 @@ mod str_format_style {
     // precision -> number
     // number -> [0-9]+
     // type -> 'b' | 'd' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 's'
-    pub fn replacement_field<'s>(cursor: &mut Cursor<'s>) -> Result<ReplacementField<'s>, Error> {
+    pub(super) fn replacement_field<'s>(
+        cursor: &mut Cursor<'s>,
+    ) -> Result<ReplacementField<'s>, Error> {
         let location = cursor.position();
         // consume '{'
         cursor.advance(1);
@@ -1104,7 +1108,7 @@ mod str_format_style {
     // Do str.format style formatting. Parse the format string and apply values from
     // args to the fields found in the string, by formatting the value according to
     // the spec found in the field.
-    pub fn format(format_str: &str, args: &[Value]) -> Result<String, Error> {
+    pub(super) fn format(format_str: &str, args: &[Value]) -> Result<String, Error> {
         let mut input = Tokenizer::new(format_str, FormatStyle::StrFormat);
         let mut result = String::new();
 
