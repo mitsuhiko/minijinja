@@ -535,6 +535,7 @@ impl<'s> Tokenizer<'s> {
     fn next_token(&mut self) -> Result<Option<Token<'s>>, Error> {
         let mut offset = 0;
         let mut found_spec = false;
+        let mut escape_seq = false;
         let bytes = self.cursor.rest_bytes();
         let delimiter = match self.format_style {
             FormatStyle::Printf => b'%',
@@ -547,13 +548,35 @@ impl<'s> Tokenizer<'s> {
                     // check for escape sequence
                     match bytes.get(offset + 1) {
                         Some(n) if *n == delimiter => {
-                            // jump over escape sequence
-                            offset += 2;
+                            // Parse the first char from the pair (%%) or ({{) as part of the
+                            // ongoing literal token, and end the token. If the escape sequence
+                            // is followed by more literal text, the next token produced will
+                            // also be the literal covering it. The second char in the seq is
+                            // consumed below after token is prepared.
+                            escape_seq = true;
+                            offset += 1;
+                            break;
                         }
                         _ => {
                             // start of format spec, break without consuming the delimiter
                             found_spec = true;
                             break;
+                        }
+                    }
+                }
+                Some(b'}') if FormatStyle::StrFormat == self.format_style => {
+                    match bytes.get(offset + 1) {
+                        Some(b'}') => {
+                            escape_seq = true;
+                            offset += 1;
+                            break;
+                        }
+                        _ => {
+                            let msg = format!(
+                                "invalid single '}}' in format string \
+                                 at offset {offset}; use escape sequence '}}}}'"
+                            );
+                            return Err(Error::new(ErrorKind::InvalidOperation, msg));
                         }
                     }
                 }
@@ -565,6 +588,10 @@ impl<'s> Tokenizer<'s> {
         }
         if offset > 0 {
             let tok = Token::Literal(self.cursor.advance(offset));
+            if escape_seq {
+                // consume the second char of seq before proceeding
+                self.cursor.advance(1);
+            }
             Ok(Some(tok))
         } else if found_spec {
             let field = match self.format_style {
@@ -1084,10 +1111,7 @@ mod str_format_style {
         fn missing_arg_err(location: usize, source: Option<Error>) -> Error {
             let err = Error::new(
                 ErrorKind::InvalidOperation,
-                format!(
-                    "argument not found for format field at offset {}",
-                    location
-                ),
+                format!("argument not found for format field at offset {}", location),
             );
 
             if let Some(cause) = source {

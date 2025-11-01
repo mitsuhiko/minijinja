@@ -153,6 +153,26 @@ fn test_str_format() {
         eval_expr("'({1:d},{0:d},{key:d})'.format(1, 2, key=42)").as_str(),
         Some("(2,1,42)")
     );
+
+    // test escape sequences
+    assert_eq!(
+        eval_expr("'{0:d}:{{boo}}'.format(1)").as_str(),
+        Some("1:{boo}")
+    );
+    assert_eq!(
+        eval_expr("'{{{{ {} }}}} {{'.format(1)").as_str(),
+        Some("{{ 1 }} {")
+    );
+    assert_eq!(
+        eval_expr("'}} and }}'.format(1)").as_str(),
+        Some("} and }")
+    );
+    assert!(
+        eval_err_expr("'{'.format(1)").contains("missing closing '}' in format spec at offset 0")
+    );
+    assert!(eval_err_expr("'}'.format(1)").contains(
+        "invalid single '}' in format string at offset 0; use escape sequence '}}'"
+    ));
 }
 
 #[test]

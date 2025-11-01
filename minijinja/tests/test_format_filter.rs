@@ -14,6 +14,15 @@ fn eval_expr(env: &Environment, expr: &str) -> String {
     expr.eval(context! {}).unwrap().to_string()
 }
 
+fn eval_err_expr(expr: &str) -> String {
+    Environment::new()
+        .compile_expression(expr)
+        .unwrap()
+        .eval(())
+        .unwrap_err()
+        .to_string()
+}
+
 #[test]
 fn test_format_integer_in_decimal() {
     let env = Environment::new();
@@ -262,24 +271,26 @@ fn test_format_with_mapping_arg() {
 }
 
 #[test]
-fn test_format_error() {
+fn test_format_escaping() {
     let env = Environment::new();
 
-    let expr = env
-        .compile_expression("'missing type: %04' | format('arg')")
-        .unwrap();
-    assert!(expr
-        .eval(())
-        .unwrap_err()
-        .to_string()
-        .contains("missing conversion type"));
+    assert_eq!(eval_expr(&env, "'%% %d'|format(42)"), "% 42");
+    assert_eq!(eval_expr(&env, "'%%%d'|format(42)"), "%42");
+    assert_eq!(
+        eval_expr(&env, "'first %% second %% consecutive %%%% %d'|format(42)"),
+        "first % second % consecutive %% 42"
+    );
+}
 
-    let expr = env
-        .compile_expression("'missing type: %a' | format('arg')")
-        .unwrap();
-    assert!(expr
-        .eval(())
-        .unwrap_err()
-        .to_string()
+#[test]
+fn test_format_error() {
+    assert!(
+        eval_err_expr("'missing type: %04' | format('arg')").contains("missing conversion type")
+    );
+
+    assert!(eval_err_expr("'missing type: %a' | format('arg')")
         .contains("invalid conversion type 'a' in format spec"));
+
+    assert!(eval_err_expr("'% %s' | format('arg')")
+        .contains("invalid conversion type '%' in format spec"));
 }
