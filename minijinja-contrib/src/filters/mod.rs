@@ -6,11 +6,9 @@ use minijinja::{Error, ErrorKind};
 
 #[cfg(feature = "datetime")]
 mod datetime;
-mod format;
 
 #[cfg(feature = "datetime")]
 pub use self::datetime::*;
-pub use self::format::fmt;
 
 #[cfg(feature = "html_entities")]
 use crate::html_entities::HTML_ENTITIES;

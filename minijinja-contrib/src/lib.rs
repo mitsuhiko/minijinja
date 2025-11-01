@@ -42,7 +42,6 @@ pub fn add_to_environment(env: &mut Environment) {
     env.add_filter("filesizeformat", filters::filesizeformat);
     env.add_filter("truncate", filters::truncate);
     env.add_filter("striptags", filters::striptags);
-    env.add_filter("fmt", filters::fmt);
     #[cfg(feature = "wordcount")]
     {
         env.add_filter("wordcount", filters::wordcount);
