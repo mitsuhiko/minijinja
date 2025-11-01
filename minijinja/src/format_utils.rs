@@ -693,7 +693,7 @@ fn parse_till<'s>(cursor: &mut Cursor<'s>, end_delim: u8) -> Result<&'s str, Err
 }
 
 mod printf_style {
-    // module implementing prinf-style specific parser and formatter functions.
+    // module implementing printf-style specific parser and formatter functions.
 
     use super::*;
 
@@ -808,7 +808,7 @@ mod printf_style {
         }
     }
 
-    // Do prinf-style formatting. Parse the format string and apply values from args
+    // Do printf-style formatting. Parse the format string and apply values from args
     // to the fields found in the string, by formatting the value according to the
     // spec found in the field.
     pub fn format(format_str: &str, args: &[Value]) -> Result<String, Error> {
