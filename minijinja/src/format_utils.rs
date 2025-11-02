@@ -595,8 +595,10 @@ impl<'s> Tokenizer<'s> {
             Ok(Some(tok))
         } else if found_spec {
             let field = match self.format_style {
-                FormatStyle::Printf => printf_style::replacement_field(&mut self.cursor)?,
-                FormatStyle::StrFormat => str_format_style::replacement_field(&mut self.cursor)?,
+                FormatStyle::Printf => ok!(printf_style::replacement_field(&mut self.cursor)),
+                FormatStyle::StrFormat => {
+                    ok!(str_format_style::replacement_field(&mut self.cursor))
+                }
             };
             Ok(Some(Token::Replace(field)))
         } else {
@@ -615,7 +617,7 @@ fn parse_number(cursor: &mut Cursor) -> Result<Option<usize>, Error> {
         Ok(None)
     } else {
         let num_str = cursor.advance(digit_count);
-        let num = num_str.parse::<usize>().map_err(|e| {
+        let num = ok!(num_str.parse::<usize>().map_err(|e| {
             Error::new(
                 ErrorKind::InvalidOperation,
                 format!(
@@ -624,7 +626,7 @@ fn parse_number(cursor: &mut Cursor) -> Result<Option<usize>, Error> {
                 ),
             )
             .with_source(e)
-        })?;
+        }));
         Ok(Some(num))
     }
 }
@@ -715,8 +717,8 @@ mod printf_style {
         // consume '%'
         cursor.advance(1);
 
-        let field_name = parse_key(cursor)?.map(FieldName::MappingKey);
-        let spec = parse_format_spec(cursor)?;
+        let field_name = ok!(parse_key(cursor)).map(FieldName::MappingKey);
+        let spec = ok!(parse_format_spec(cursor));
         Ok(ReplacementField {
             field_name,
             format_spec: Some(spec),
@@ -726,7 +728,7 @@ mod printf_style {
 
     fn parse_key<'s>(cursor: &mut Cursor<'s>) -> Result<Option<&'s str>, Error> {
         if cursor.advance_if(b'(') {
-            Ok(Some(parse_till(cursor, b')')?))
+            Ok(Some(ok!(parse_till(cursor, b')'))))
         } else {
             Ok(None)
         }
@@ -770,7 +772,7 @@ mod printf_style {
             zero_padded = false;
         }
 
-        let mut width = parse_number(cursor)?;
+        let mut width = ok!(parse_number(cursor));
         if zero_padded && width.is_none() {
             // if '0' is not followed by width (i.e. digit+), then it should be parsed as
             // a width, not as zero-padding.
@@ -786,7 +788,7 @@ mod printf_style {
 
         // length modifier is ignored in Python
         parse_len_modifier(cursor);
-        let ty = parse_type(cursor, FormatStyle::Printf)?;
+        let ty = ok!(parse_type(cursor, FormatStyle::Printf));
         Ok(FormatSpec {
             fill_align,
             print_sign,
@@ -828,7 +830,7 @@ mod printf_style {
             )
         }
 
-        while let Some(token) = input.next_token()? {
+        while let Some(token) = ok!(input.next_token()) {
             match token {
                 Token::Literal(lit) => result.push_str(lit),
                 Token::Replace(ReplacementField {
@@ -863,7 +865,7 @@ mod printf_style {
                             return Err(missing_arg_err(spec.location));
                         }
                     };
-                    result.push_str(&spec.format(&arg)?);
+                    result.push_str(&ok!(spec.format(&arg)));
                 }
             }
         }
@@ -900,9 +902,9 @@ mod str_format_style {
         let location = cursor.position();
         // consume '{'
         cursor.advance(1);
-        let field_name = parse_field_name(cursor)?;
+        let field_name = ok!(parse_field_name(cursor));
         let format_spec = if cursor.advance_if(b':') {
-            Some(parse_format_spec(cursor)?)
+            Some(ok!(parse_format_spec(cursor)))
         } else {
             None
         };
@@ -927,8 +929,8 @@ mod str_format_style {
     }
 
     fn parse_field_name<'s>(cursor: &mut Cursor<'s>) -> Result<Option<FieldName<'s>>, Error> {
-        if let Some(num) = parse_number(cursor)? {
-            Ok(Some(FieldName::Positional(num, parse_path(cursor)?)))
+        if let Some(num) = ok!(parse_number(cursor)) {
+            Ok(Some(FieldName::Positional(num, ok!(parse_path(cursor)))))
         } else if let Some(ident) = parse_identifier(cursor) {
             Ok(Some(FieldName::Kwarg(ident, parse_path(cursor)?)))
         } else {
@@ -952,7 +954,7 @@ mod str_format_style {
                     ));
                 }
             } else if cursor.advance_if(b'[') {
-                let key = parse_till(cursor, b']')?;
+                let key = ok!(parse_till(cursor, b']'));
                 elems.push(PathElem::Key(key))
             } else {
                 break;
@@ -1001,7 +1003,7 @@ mod str_format_style {
         let alternate_form = cursor.advance_if(b'#');
         let mut zero_padded = cursor.advance_if(b'0');
 
-        let mut width = parse_number(cursor)?;
+        let mut width = ok!(parse_number(cursor));
         if zero_padded && width.is_none() {
             // if '0' is not followed by width (i.e. digit+), then it should be parsed as
             // a width, not as zero-padding.
@@ -1015,7 +1017,7 @@ mod str_format_style {
             .transpose()?
             .flatten();
 
-        let ty = parse_type(cursor, FormatStyle::StrFormat)?;
+        let ty = ok!(parse_type(cursor, FormatStyle::StrFormat));
         Ok(FormatSpec {
             fill_align,
             print_sign,
@@ -1088,12 +1090,12 @@ mod str_format_style {
         let mut curr = root.clone();
         for elem in path {
             curr = match elem {
-                PathElem::Attr(attr) => curr.get_attr(attr)?,
+                PathElem::Attr(attr) => ok!(curr.get_attr(attr)),
                 PathElem::Key(index) => {
                     if let Ok(num) = index.parse::<usize>() {
-                        curr.get_item_by_index(num)?
+                        ok!(curr.get_item_by_index(num))
                     } else {
-                        curr.get_attr(index)?
+                        ok!(curr.get_attr(index))
                     }
                 }
             };
@@ -1132,12 +1134,12 @@ mod str_format_style {
             )
         }
 
-        let (args, kwargs): (&[Value], Kwargs) = from_args(args)?;
+        let (args, kwargs): (&[Value], Kwargs) = ok!(from_args(args));
         let mut arg_index = 0;
         let mut auto_numbering = false;
         let mut manual_numbering = false;
 
-        while let Some(token) = input.next_token()? {
+        while let Some(token) = ok!(input.next_token()) {
             match token {
                 Token::Literal(lit) => result.push_str(lit),
                 Token::Replace(ReplacementField {
@@ -1148,11 +1150,11 @@ mod str_format_style {
                     // find the right argument to replace the field with
                     let arg = match field_name {
                         Some(FieldName::Kwarg(key, path)) => {
-                            let val = kwargs
+                            let val = ok!(kwargs
                                 .peek::<Value>(key)
-                                .map_err(|e| missing_arg_err(location, Some(e)))?;
-                            get_nested_val(&val, &path)
-                                .map_err(|e| missing_arg_err(location, Some(e)))?
+                                .map_err(|e| missing_arg_err(location, Some(e))));
+                            ok!(get_nested_val(&val, &path)
+                                .map_err(|e| missing_arg_err(location, Some(e))))
                         }
                         Some(FieldName::Positional(index, path)) => {
                             manual_numbering = true;
@@ -1163,11 +1165,11 @@ mod str_format_style {
                                     "manual field specification",
                                 ));
                             }
-                            let val = args
+                            let val = ok!(args
                                 .get(index)
-                                .ok_or_else(|| missing_arg_err(location, None))?;
-                            get_nested_val(val, &path)
-                                .map_err(|e| missing_arg_err(location, Some(e)))?
+                                .ok_or_else(|| missing_arg_err(location, None)));
+                            ok!(get_nested_val(val, &path)
+                                .map_err(|e| missing_arg_err(location, Some(e))))
                         }
                         None => {
                             auto_numbering = true;
@@ -1178,9 +1180,9 @@ mod str_format_style {
                                     "automatic numbering",
                                 ));
                             }
-                            let val = args
+                            let val = ok!(args
                                 .get(arg_index)
-                                .ok_or_else(|| missing_arg_err(location, None))?;
+                                .ok_or_else(|| missing_arg_err(location, None)));
                             arg_index += 1;
                             val.clone()
                         }
@@ -1190,7 +1192,7 @@ mod str_format_style {
                     // apply the spec to the replacement value, and insert the
                     // formatted result into final string
                     if let Some(spec) = format_spec {
-                        result.push_str(&spec.format(&arg)?);
+                        result.push_str(&ok!(spec.format(&arg)));
                     } else {
                         result.push_str(&format!("{arg}"))
                     }
