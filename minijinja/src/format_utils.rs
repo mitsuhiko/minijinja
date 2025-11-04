@@ -1,3 +1,6 @@
+use std::fmt::{Display, LowerExp};
+use std::num::FpCategory;
+
 use crate::value::ValueKind;
 use crate::{Error, ErrorKind, Value};
 
@@ -84,6 +87,8 @@ enum Type {
     UpperE,
     LowerF,
     UpperF,
+    LowerG,
+    UpperG,
     String,
 }
 
@@ -92,14 +97,16 @@ impl Type {
         match self {
             Type::Default => "",
             Type::Binary => "binary format ('b')",
-            Type::LowerE => "scientific notation ('e')",
-            Type::UpperE => "scientific notation ('E')",
-            Type::LowerF => "fixed-point notation ('f')",
-            Type::UpperF => "fixed-point notation ('F')",
             Type::Octal => "octal format ('o')",
             Type::LowerHex => "hex format ('x')",
             Type::UpperHex => "hex format ('X')",
             Type::Decimal => "decimal format ('d')",
+            Type::LowerE => "scientific notation ('e')",
+            Type::UpperE => "scientific notation ('E')",
+            Type::LowerF => "fixed-point notation ('f')",
+            Type::UpperF => "fixed-point notation ('F')",
+            Type::LowerG => "general format ('g')",
+            Type::UpperG => "general format ('G')",
             Type::String => "string format ('s')",
         }
     }
@@ -191,7 +198,9 @@ impl FormatSpec {
             | Type::LowerE
             | Type::UpperE
             | Type::LowerF
-            | Type::UpperF => self.format_integer(if val { 1 } else { 0 }, false),
+            | Type::UpperF
+            | Type::LowerG
+            | Type::UpperG => self.format_integer(if val { 1 } else { 0 }, false),
         }
     }
 
@@ -218,7 +227,71 @@ impl FormatSpec {
             | Type::LowerE
             | Type::UpperE
             | Type::LowerF
-            | Type::UpperF => Err(self.type_conversion_err("string", self.ty)),
+            | Type::UpperF
+            | Type::LowerG
+            | Type::UpperG => Err(self.type_conversion_err("string", self.ty)),
+        }
+    }
+
+    // Format the number in scientific form, and extract mantissa and exponent
+    // parts. Exponent produced by Rust's fmt lib doesn't exactly match the format
+    // used by Python's formatting utils, so this function returns it as an integer
+    // and callers format it further. Also, the integer exponent is used to decide
+    // `f` vs. `e` formats when the general format (`g`) is used.
+    fn mantissa_and_exp<T: LowerExp>(val: T, precision: usize) -> (String, i32) {
+        format!("{val:.precision$e}")
+            .rsplit_once('e')
+            .map(|(m, e)| {
+                (
+                    m.to_owned(),
+                    e.parse::<i32>().expect("exponent must be an integer"),
+                )
+            })
+            .expect("scientific number must of XXeYY form")
+    }
+
+    // If precision is zero, the decimal point is omitted unless `#` option is used
+    fn fix_decimal_point(&self, mut num: String) -> String {
+        if let Some(0) = self.precision {
+            if self.alternate_form {
+                num.push('.');
+            }
+        }
+        num
+    }
+
+    // If '#' option is not used, remove insignificant trailing zeros from the
+    // floating point number for the general format. Also remove the decimal point if
+    // there are no significant digits left after it.
+    fn remove_insignificants<'a>(&self, num: &'a str) -> &'a str {
+        if !self.alternate_form && num.contains('.') {
+            num.trim_end_matches('0').trim_end_matches('.')
+        } else {
+            num
+        }
+    }
+
+    fn number_in_general_format<T: Display + LowerExp + Copy>(
+        &self,
+        val: T,
+        is_uppercase: bool,
+    ) -> String {
+        let precision = self
+            .precision
+            .map(|p| if p == 0 { 1 } else { p })
+            .unwrap_or(6);
+
+        let (manti, exp) = Self::mantissa_and_exp(val, precision - 1);
+        if exp >= -4 && exp < precision as i32 {
+            let decimal_places = (precision as i32 - 1 - exp) as usize;
+            let num = format!("{val:.decimal_places$}");
+            self.remove_insignificants(&num).to_owned()
+        } else {
+            format!(
+                "{}{}{exp:+03}",
+                self.remove_insignificants(&manti),
+                if is_uppercase { 'E' } else { 'e' }
+            )
         }
     }
 
@@ -250,29 +323,28 @@ impl FormatSpec {
                 }
             }
             Type::LowerE => {
-                if let Some(p) = &self.precision {
-                    format!("{:.p$e}", val as f64)
-                } else {
-                    format!("{:.6e}", val as f64)
-                }
+                let (mant, exp) = Self::mantissa_and_exp(val, self.precision.unwrap_or(6));
+                format!("{}e{exp:+03}", self.fix_decimal_point(mant))
             }
             Type::UpperE => {
-                if let Some(p) = &self.precision {
-                    format!("{:.p$E}", val as f64)
-                } else {
-                    format!("{:.6E}", val as f64)
-                }
+                let (mant, exp) = Self::mantissa_and_exp(val, self.precision.unwrap_or(6));
+                format!("{}E{exp:+03}", self.fix_decimal_point(mant))
             }
             Type::LowerF | Type::UpperF => {
-                if let Some(p) = &self.precision {
-                    format!("{:.p$}", val as f64)
+                let prec = self.precision.unwrap_or(6);
+                let num = if prec != 0 {
+                    format!("{}.{:0prec$}", val, 0)
                 } else {
-                    format!("{:.6}", val as f64)
-                }
+                    format!("{}", val)
+                };
+                self.fix_decimal_point(num)
+            }
+            Type::LowerG | Type::UpperG => {
+                self.number_in_general_format(val, self.ty == Type::UpperG)
             }
         };
 
-        Ok(self.format_number(number, sign, false))
+        Ok(self.format_number(&number, sign))
     }
 
     fn format_float(&self, val: f64) -> Result<String, Error> {
@@ -290,118 +362,105 @@ impl FormatSpec {
             Type::String if FormatStyle::Printf != self.format_style => {
                 Err(self.type_conversion_err("float", Type::String))
             }
-            Type::Default | Type::String => {
-                if val.is_nan() {
-                    // Sign has no meaning for NaN, so never print it
-                    Ok(self.format_number("nan".to_string(), "", true))
-                } else if val.is_infinite() {
-                    Ok(self.format_number("inf".to_string(), sign, true))
-                } else {
-                    let num = if let Some(p) = &self.precision {
-                        format!("{:.p$}", val.abs())
-                    } else {
-                        let mut fl_num = format!("{}", val.abs());
-                        if !fl_num.contains('.') {
-                            fl_num.push_str(".0");
-                        }
-                        fl_num
-                    };
-                    Ok(self.format_number(num, sign, false))
+            Type::Default | Type::String => match val.classify() {
+                FpCategory::Nan => Ok(self.format_number("nan", "")),
+                FpCategory::Infinite => Ok(self.format_number("inf", sign)),
+                FpCategory::Zero => Ok(self.format_number("0", sign)),
+                FpCategory::Subnormal | FpCategory::Normal => {
+                    let mut num = self.number_in_general_format(val.abs(), false);
+                    if !num.contains(['.', 'e', 'E']) {
+                        num.push_str(".0");
+                    }
+                    Ok(self.format_number(&num, sign))
                 }
-            }
+            },
             Type::LowerE => {
                 if val.is_nan() {
                     // Sign has no meaning for NaN, so never print it
-                    Ok(self.format_number("nan".to_string(), "", true))
+                    Ok(self.format_number("nan", ""))
                 } else if val.is_infinite() {
-                    Ok(self.format_number("inf".to_string(), sign, true))
+                    Ok(self.format_number("inf", sign))
                 } else {
-                    let num = if let Some(p) = &self.precision {
-                        format!("{:.p$e}", val.abs())
-                    } else {
-                        format!("{:.6e}", val.abs())
-                    };
-                    Ok(self.format_number(num, sign, false))
+                    let precision = self.precision.unwrap_or(6);
+                    let (mant, exp) = Self::mantissa_and_exp(val.abs(), precision);
+                    let num = format!("{}e{exp:+03}", self.fix_decimal_point(mant));
+                    Ok(self.format_number(&num, sign))
                 }
             }
             Type::UpperE => {
                 if val.is_nan() {
                     // Sign has no meaning for NaN, so never print it
-                    Ok(self.format_number("NAN".to_string(), "", true))
+                    Ok(self.format_number("NAN", ""))
                 } else if val.is_infinite() {
-                    Ok(self.format_number("INF".to_string(), sign, true))
+                    Ok(self.format_number("INF", sign))
                 } else {
-                    let num = if let Some(p) = &self.precision {
-                        format!("{:.p$E}", val.abs())
-                    } else {
-                        format!("{:.6E}", val.abs())
-                    };
-                    Ok(self.format_number(num, sign, false))
+                    let precision = self.precision.unwrap_or(6);
+                    let (mant, exp) = Self::mantissa_and_exp(val.abs(), precision);
+                    let num = format!("{}E{exp:+03}", self.fix_decimal_point(mant));
+                    Ok(self.format_number(&num, sign))
                 }
             }
             Type::LowerF => {
                 if val.is_nan() {
                     // Sign has no meaning for NaN, so never print it
-                    Ok(self.format_number("nan".to_string(), "", true))
+                    Ok(self.format_number("nan", ""))
                 } else if val.is_infinite() {
-                    Ok(self.format_number("inf".to_string(), sign, true))
+                    Ok(self.format_number("inf", sign))
                 } else {
-                    let num = if let Some(p) = &self.precision {
-                        format!("{:.p$}", val.abs())
-                    } else {
-                        format!("{:.6}", val.abs())
-                    };
-                    Ok(self.format_number(num, sign, false))
+                    let prec = self.precision.unwrap_or(6);
+                    let num = self.fix_decimal_point(format!("{:.prec$}", val.abs()));
+                    Ok(self.format_number(&num, sign))
                 }
             }
             Type::UpperF => {
                 if val.is_nan() {
                     // Sign has no meaning for NaN, so never print it
-                    Ok(self.format_number("NAN".to_string(), "", true))
+                    Ok(self.format_number("NAN", ""))
                 } else if val.is_infinite() {
-                    Ok(self.format_number("INF".to_string(), sign, true))
+                    Ok(self.format_number("INF", sign))
                 } else {
-                    let num = if let Some(p) = &self.precision {
-                        format!("{:.p$}", val.abs())
-                    } else {
-                        format!("{:.6}", val.abs())
-                    };
-                    Ok(self.format_number(num, sign, false))
+                    let prec = self.precision.unwrap_or(6);
+                    let num = self.fix_decimal_point(format!("{:.prec$}", val.abs()));
+                    Ok(self.format_number(&num, sign))
                 }
             }
+
+            Type::LowerG => match val.classify() {
+                FpCategory::Nan => Ok(self.format_number("nan", "")),
+                FpCategory::Infinite => Ok(self.format_number("inf", sign)),
+                FpCategory::Zero => Ok(self.format_number("0", sign)),
+                FpCategory::Subnormal | FpCategory::Normal => {
+                    let num = self.number_in_general_format(val.abs(), false);
+                    Ok(self.format_number(&num, sign))
+                }
+            },
+            Type::UpperG => match val.classify() {
+                FpCategory::Nan => Ok(self.format_number("NAN", "")),
+                FpCategory::Infinite => Ok(self.format_number("INF", sign)),
+                FpCategory::Zero => Ok(self.format_number("0", sign)),
+                FpCategory::Subnormal | FpCategory::Normal => {
+                    let num = self.number_in_general_format(val.abs(), true);
+                    Ok(self.format_number(&num, sign))
+                }
+            },
             Type::Binary | Type::Octal | Type::LowerHex | Type::UpperHex | Type::Decimal => {
                 Err(self.type_conversion_err("float", self.ty))
             }
         }
     }
 
-    fn format_number(&self, mut number: String, sign: &str, nan_or_inf: bool) -> String {
-        let mut radix = "";
-
-        // process alternate form flag `#`
-        if self.alternate_form {
+    fn format_number(&self, number: &str, sign: &str) -> String {
+        let radix = if self.alternate_form {
             match self.ty {
-                Type::Default | Type::String | Type::Decimal => {}
-
-                Type::LowerE | Type::UpperE | Type::LowerF | Type::UpperF => match self.precision {
-                    Some(0) if !nan_or_inf => {
-                        // Python inserts trailing '.' if precision is zero and alternate form is used
-                        let coeff_end = number
-                            .as_bytes()
-                            .iter()
-                            .take_while(|c| !matches!(c, b'e' | b'E'))
-                            .count();
-                        number.insert(coeff_end, '.');
-                    }
-                    _ => {}
-                },
-
-                Type::Binary => radix = "0b",
-                Type::Octal => radix = "0o",
-                Type::LowerHex => radix = "0x",
-                Type::UpperHex => radix = "0X",
+                Type::Binary => "0b",
+                Type::Octal => "0o",
+                Type::LowerHex => "0x",
+                Type::UpperHex => "0X",
+                _ => "",
             }
-        }
+        } else {
+            ""
+        };
 
         if self.zero_padded {
             let min_width = self
@@ -640,6 +699,8 @@ fn parse_type(cursor: &mut Cursor, style: FormatStyle) -> Result<Type, Error> {
         Some(b'E') => Type::UpperE,
         Some(b'f') => Type::LowerF,
         Some(b'F') => Type::UpperF,
+        Some(b'g') => Type::LowerG,
+        Some(b'G') => Type::UpperG,
         Some(b'o') => Type::Octal,
         Some(b'x') => Type::LowerHex,
         Some(b'X') => Type::UpperHex,
@@ -709,7 +770,7 @@ mod printf_style {
     // precision -> number | '*'
     // number -> [0-9]+
     // len_modifier -> 'h' | 'l' | 'L'
-    // type -> 'd' | 'i' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 's'
+    // type -> 'd' | 'i' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 'g' | 'G' | 's'
     pub(super) fn replacement_field<'s>(
         cursor: &mut Cursor<'s>,
     ) -> Result<ReplacementField<'s>, Error> {
@@ -895,7 +956,7 @@ mod str_format_style {
     // width -> number
     // precision -> number
     // number -> [0-9]+
-    // type -> 'b' | 'd' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 's'
+    // type -> 'b' | 'd' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 'g' | 'G' | 's'
     pub(super) fn replacement_field<'s>(
         cursor: &mut Cursor<'s>,
     ) -> Result<ReplacementField<'s>, Error> {

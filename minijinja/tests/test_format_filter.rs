@@ -137,21 +137,21 @@ fn test_format_integer_as_float() {
     let env = Environment::new();
     assert_eq!(format_val(&env, 42, "f"), "42.000000");
     assert_eq!(format_val(&env, 42, "F"), "42.000000");
-    assert_eq!(format_val(&env, 42, "e"), "4.200000e1");
-    assert_eq!(format_val(&env, 42, "E"), "4.200000E1");
+    assert_eq!(format_val(&env, 42, "e"), "4.200000e+01");
+    assert_eq!(format_val(&env, 42, "E"), "4.200000E+01");
     assert_eq!(format_val(&env, 42, ".3f"), "42.000");
-    assert_eq!(format_val(&env, 42, ".2e"), "4.20e1");
-    assert_eq!(format_val(&env, 420, ".2e"), "4.20e2");
-    assert_eq!(format_val(&env, u64::MAX, ".2e"), "1.84e19");
+    assert_eq!(format_val(&env, 42, ".2e"), "4.20e+01");
+    assert_eq!(format_val(&env, 420, ".2e"), "4.20e+02");
+    assert_eq!(format_val(&env, u64::MAX, ".2e"), "1.84e+19");
     assert_eq!(format_val(&env, -42, ".2f"), "-42.00");
 
     // test zero precision
     assert_eq!(format_val(&env, 42, ".0f"), "42");
     assert_eq!(format_val(&env, 42, "#.0f"), "42.");
-    assert_eq!(format_val(&env, 42, ".0e"), "4e1");
-    assert_eq!(format_val(&env, 42, "#.0e"), "4.e1");
-    assert_eq!(format_val(&env, 42, ".0E"), "4E1");
-    assert_eq!(format_val(&env, 42, "#.0E"), "4.E1");
+    assert_eq!(format_val(&env, 42, ".0e"), "4e+01");
+    assert_eq!(format_val(&env, 42, "#.0e"), "4.e+01");
+    assert_eq!(format_val(&env, 42, ".0E"), "4E+01");
+    assert_eq!(format_val(&env, 42, "#.0E"), "4.E+01");
 }
 
 #[test]
@@ -163,10 +163,10 @@ fn test_format_float() {
     // test 'f' and 'e' conversions with different width and zero padding
     assert_eq!(format_val(&env, PI, "f"), "3.141593");
     assert_eq!(format_val(&env, PI, ".2f"), "3.14");
-    assert_eq!(format_val(&env, PI, "e"), "3.141593e0");
-    assert_eq!(format_val(&env, PI, ".2E"), "3.14E0");
+    assert_eq!(format_val(&env, PI, "e"), "3.141593e+00");
+    assert_eq!(format_val(&env, PI, ".2E"), "3.14E+00");
     assert_eq!(format_val(&env, PI, "010.4f"), "00003.1416");
-    assert_eq!(format_val(&env, PI, "010.4e"), "003.1416e0");
+    assert_eq!(format_val(&env, PI, "012.4e"), "003.1416e+00");
     assert_eq!(format_val(&env, PI, "6.2f"), "  3.14");
     assert_eq!(format_val(&env, PI, "-6.2f"), "3.14  ");
     assert_eq!(format_val(&env, 1.0 / 5.0, "f"), "0.200000");
@@ -175,8 +175,8 @@ fn test_format_float() {
     // test zero precision
     assert_eq!(format_val(&env, PI, ".0f"), "3");
     assert_eq!(format_val(&env, PI, "#.0f"), "3.");
-    assert_eq!(format_val(&env, PI, ".0e"), "3e0");
-    assert_eq!(format_val(&env, PI, "#.0e"), "3.e0");
+    assert_eq!(format_val(&env, PI, ".0e"), "3e+00");
+    assert_eq!(format_val(&env, PI, "#.0e"), "3.e+00");
 
     // test inf and -inf
     assert_eq!(format_val(&env, f64::INFINITY, "f"), "inf");
@@ -198,6 +198,75 @@ fn test_format_float() {
     assert_eq!(format_val(&env, f64::NAN, "F"), "NAN");
     assert_eq!(format_val(&env, f64::NAN, "e"), "nan");
     assert_eq!(format_val(&env, f64::NAN, "E"), "NAN");
+
+    assert_eq!(format_val(&env, f64::MIN, ".4e"), "-1.7977e+308");
+    assert_eq!(format_val(&env, f64::MIN_POSITIVE, ".4e"), "2.2251e-308");
+    assert_eq!(format_val(&env, f64::MAX, ".2e"), "1.80e+308");
+    assert_eq!(format_val(&env, f32::MIN, ".5E"), "-3.40282E+38");
+    assert_eq!(format_val(&env, f32::MIN_POSITIVE, ".4E"), "1.1755E-38");
+    assert_eq!(format_val(&env, f32::MAX, ".2E"), "3.40E+38");
+}
+
+#[test]
+fn test_format_general() {
+    let env = Environment::new();
+    assert_eq!(format_val(&env, 123.456, "g"), "123.456");
+    assert_eq!(format_val(&env, 123.000, "g"), "123");
+    assert_eq!(format_val(&env, 120.0, "g"), "120");
+    assert_eq!(format_val(&env, 1234.012, "g"), "1234.01");
+    assert_eq!(format_val(&env, 12345.1234, "g"), "12345.1");
+    assert_eq!(format_val(&env, 123456.1234, "g"), "123456");
+    assert_eq!(format_val(&env, 1234564.1234, "g"), "1.23456e+06");
+    assert_eq!(format_val(&env, 12345678.1234, "g"), "1.23457e+07");
+    assert_eq!(format_val(&env, 12345000.00, "g"), "1.2345e+07");
+    assert_eq!(format_val(&env, 12345000.00, "G"), "1.2345E+07");
+
+    assert_eq!(format_val(&env, 0.123456, "g"), "0.123456");
+    assert_eq!(format_val(&env, 0.0123456, "g"), "0.0123456");
+    assert_eq!(format_val(&env, 0.00123456, "g"), "0.00123456");
+    assert_eq!(format_val(&env, 0.000123456, "g"), "0.000123456");
+    assert_eq!(format_val(&env, 0.000123, "g"), "0.000123");
+    assert_eq!(format_val(&env, 0.0000123456, "g"), "1.23456e-05");
+    assert_eq!(format_val(&env, 0.0000123, "g"), "1.23e-05");
+    assert_eq!(format_val(&env, 0.0000123456789, "g"), "1.23457e-05");
+    assert_eq!(format_val(&env, 0.0000000456789, "g"), "4.56789e-08");
+    assert_eq!(format_val(&env, 0.0000000456780, "g"), "4.5678e-08");
+    assert_eq!(format_val(&env, 0.00000004, "g"), "4e-08");
+    assert_eq!(format_val(&env, 0.00000004, "#g"), "4.00000e-08");
+
+    assert_eq!(format_val(&env, 123.456, ".2g"), "1.2e+02");
+    assert_eq!(format_val(&env, 123.456, ".2g"), "1.2e+02");
+    assert_eq!(format_val(&env, 1000, ".4g"), "1000");
+    assert_eq!(format_val(&env, 1000, ".3g"), "1e+03");
+    assert_eq!(format_val(&env, 1000.00, ".4g"), "1000");
+    assert_eq!(format_val(&env, 1000.10, ".5g"), "1000.1");
+    assert_eq!(format_val(&env, 1000.10, ".6g"), "1000.1");
+    assert_eq!(format_val(&env, 123456789.1234, ".6g"), "1.23457e+08");
+    assert_eq!(format_val(&env, 123456789.1234, ".10g"), "123456789.1");
+    assert_eq!(format_val(&env, 0.123456, ".2g"), "0.12");
+    assert_eq!(format_val(&env, 0.00012345, ".4g"), "0.0001234");
+    assert_eq!(format_val(&env, 0.000012345, ".4g"), "1.234e-05");
+    assert_eq!(format_val(&env, 123.456, ".0g"), "1e+02");
+    assert_eq!(format_val(&env, 0.456, ".0g"), "0.5");
+
+    assert_eq!(format_val(&env, -123.456, "g"), "-123.456");
+    assert_eq!(format_val(&env, -123.456, ".2g"), "-1.2e+02");
+    assert_eq!(format_val(&env, -1000, ".4g"), "-1000");
+    assert_eq!(format_val(&env, -100.100, ".4g"), "-100.1");
+    assert_eq!(format_val(&env, -123456789.1234, "15g"), "   -1.23457e+08");
+    assert_eq!(format_val(&env, -123456789.1234, "015g"), "-0001.23457e+08");
+    assert_eq!(format_val(&env, -0.123456, "g"), "-0.123456");
+    assert_eq!(format_val(&env, -0.0000123456, "g"), "-1.23456e-05");
+    assert_eq!(format_val(&env, -0.0000123456, "09.2g"), "-01.2e-05");
+
+    assert_eq!(format_val(&env, 0.0_f64, "g"), "0");
+    assert_eq!(format_val(&env, -0.0_f64, "g"), "-0");
+    assert_eq!(format_val(&env, f64::NAN, "g"), "nan");
+    assert_eq!(format_val(&env, f64::NAN, "G"), "NAN");
+    assert_eq!(format_val(&env, f64::INFINITY, "g"), "inf");
+    assert_eq!(format_val(&env, f64::INFINITY, "G"), "INF");
+    assert_eq!(format_val(&env, f64::NEG_INFINITY, "g"), "-inf");
+    assert_eq!(format_val(&env, f64::NEG_INFINITY, "G"), "-INF");
 }
 
 #[test]

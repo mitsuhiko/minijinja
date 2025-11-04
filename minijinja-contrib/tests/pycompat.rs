@@ -110,8 +110,39 @@ fn test_str_format() {
 
     assert_eq!(eval_expr("'{:f}'.format(3.14)").as_str(), Some("3.140000"));
     assert_eq!(eval_expr("'{:.2f}'.format(2.7)").as_str(), Some("2.70"));
-    assert_eq!(eval_expr("'{:.2e}'.format(2.7)").as_str(), Some("2.70e0"));
-    assert_eq!(eval_expr("'{:.3E}'.format(2.7)").as_str(), Some("2.700E0"));
+    assert_eq!(eval_expr("'{:.2e}'.format(2.7)").as_str(), Some("2.70e+00"));
+    assert_eq!(
+        eval_expr("'{:.3E}'.format(2.7)").as_str(),
+        Some("2.700E+00")
+    );
+    assert_eq!(
+        eval_expr("'{:g}'.format(3.141593)").as_str(),
+        Some("3.14159")
+    );
+    assert_eq!(
+        eval_expr("'{:g}'.format(3141593)").as_str(),
+        Some("3.14159e+06")
+    );
+    assert_eq!(
+        eval_expr("'{:g}'.format(3141593)").as_str(),
+        Some("3.14159e+06")
+    );
+    assert_eq!(
+        eval_expr("'{:>10g}'.format(0.3141593)").as_str(),
+        Some("  0.314159")
+    );
+    assert_eq!(
+        eval_expr("'{:=<10g}'.format(0.3141593)").as_str(),
+        Some("0.314159==")
+    );
+    assert_eq!(
+        eval_expr("'{:+G}'.format(0.00003141593)").as_str(),
+        Some("+3.14159E-05")
+    );
+    assert_eq!(eval_expr("'{:}'.format(0.00000004)").as_str(), Some("4e-08"));
+    // assert_eq!(eval_expr("'{}'.format(0.00000004)").as_str(), Some("4e-08"));
+    assert_eq!(eval_expr("'{}'.format(0.0004)").as_str(), Some("0.0004"));
+    assert_eq!(eval_expr("'{}'.format(100.00)").as_str(), Some("100.0"));
 
     assert_eq!(
         eval_expr("'{:s} {:}!'.format('Hello', 'world')").as_str(),
