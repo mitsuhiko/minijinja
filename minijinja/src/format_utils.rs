@@ -58,7 +58,7 @@ enum FieldName<'src> {
 #[derive(Debug, PartialEq, Eq)]
 struct ReplacementField<'src> {
     field_name: Option<FieldName<'src>>,
-    format_spec: Option<FormatSpec>,
+    format_spec: FormatSpec,
     location: usize,
 }
 
@@ -782,7 +782,7 @@ mod printf_style {
         let spec = ok!(parse_format_spec(cursor));
         Ok(ReplacementField {
             field_name,
-            format_spec: Some(spec),
+            format_spec: spec,
             location,
         })
     }
@@ -899,7 +899,6 @@ mod printf_style {
                     format_spec,
                     ..
                 }) => {
-                    let spec = format_spec.expect("printf-style format must specify a spec");
                     let arg = {
                         if let Some(FieldName::MappingKey(key)) = field_name {
                             // only a mapping as an argument is expected, and the key must be
@@ -914,19 +913,19 @@ mod printf_style {
 
                                 match arg.get_attr(key).ok() {
                                     Some(val) if !val.is_undefined() => val,
-                                    _ => return Err(missing_arg_err(spec.location)),
+                                    _ => return Err(missing_arg_err(format_spec.location)),
                                 }
                             } else {
-                                return Err(missing_arg_err(spec.location));
+                                return Err(missing_arg_err(format_spec.location));
                             }
                         } else if let Some(arg) = args.get(arg_index) {
                             arg_index += 1;
                             arg.clone()
                         } else {
-                            return Err(missing_arg_err(spec.location));
+                            return Err(missing_arg_err(format_spec.location));
                         }
                     };
-                    result.push_str(&ok!(spec.format(&arg)));
+                    result.push_str(&ok!(format_spec.format(&arg)));
                 }
             }
         }
@@ -965,9 +964,21 @@ mod str_format_style {
         cursor.advance(1);
         let field_name = ok!(parse_field_name(cursor));
         let format_spec = if cursor.advance_if(b':') {
-            Some(ok!(parse_format_spec(cursor)))
+            ok!(parse_format_spec(cursor))
         } else {
-            None
+            // spec is missing in the input, so use the default options
+            FormatSpec {
+                fill_align: None,
+                print_sign: false,
+                space_before_positive_num: false,
+                alternate_form: false,
+                zero_padded: false,
+                width: None,
+                precision: None,
+                ty: Type::Default,
+                format_style: FormatStyle::StrFormat,
+                location,
+            }
         };
 
         if cursor.advance_if(b'}') {
@@ -1252,11 +1263,7 @@ mod str_format_style {
 
                     // apply the spec to the replacement value, and insert the
                     // formatted result into final string
-                    if let Some(spec) = format_spec {
-                        result.push_str(&ok!(spec.format(&arg)));
-                    } else {
-                        result.push_str(&format!("{arg}"))
-                    }
+                    result.push_str(&ok!(format_spec.format(&arg)));
                 }
             }
         }

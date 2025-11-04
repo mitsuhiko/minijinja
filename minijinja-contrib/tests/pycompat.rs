@@ -139,8 +139,11 @@ fn test_str_format() {
         eval_expr("'{:+G}'.format(0.00003141593)").as_str(),
         Some("+3.14159E-05")
     );
-    assert_eq!(eval_expr("'{:}'.format(0.00000004)").as_str(), Some("4e-08"));
-    // assert_eq!(eval_expr("'{}'.format(0.00000004)").as_str(), Some("4e-08"));
+    assert_eq!(
+        eval_expr("'{:}'.format(0.00000004)").as_str(),
+        Some("4e-08")
+    );
+    assert_eq!(eval_expr("'{}'.format(0.00000004)").as_str(), Some("4e-08"));
     assert_eq!(eval_expr("'{}'.format(0.0004)").as_str(), Some("0.0004"));
     assert_eq!(eval_expr("'{}'.format(100.00)").as_str(), Some("100.0"));
 
