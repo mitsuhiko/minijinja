@@ -4,24 +4,30 @@ use std::num::FpCategory;
 use crate::value::ValueKind;
 use crate::{Error, ErrorKind, Value};
 
-/// This enum indicates the style of the format string passed to the
-/// [`format_filter`] function.
+/// Controls the style of the format string.
 ///
-/// Like jinja2, minijinja also supports two flavours of string formatting:
+/// Like jinja2, minijinja supports two styles of string formatting:
 /// - printf-style: `{{ "%s, %s!"|format(greeting, name) }}`
-/// - str.format style: `{{ "{}, {}!".format(greeting, name) }}` (through `minijinja-contrib`'s `pycompat` feature)
+/// - `str.format()` style: `{{ "{}, {}!".format(greeting, name) }}`
+///
+/// The [`format_filter`] function implements both the styles, and you can invoke a
+/// particular style of formatting by passing this enum as an argument.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FormatStyle {
-    /// Printf-style format string as described
+    /// Printf-style format string, described
     /// [here](https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting)
     Printf,
-    /// `str.format` style format string, described
+    /// `str.format()` style format string, described
     /// [here](https://docs.python.org/3/library/string.html#format-string-syntax)
     StrFormat,
 }
 
-/// A helper function to apply a set of values to a given format string.  The format
-/// string could be in one of the two styles specified by the [`FormatStyle`] enum.
+/// A helper function to apply a set of values to a given format string.
+///
+/// The function supports two styles of formatting as described by the
+/// [`FormatStyle`] enum.  It is used to implement the `format` builtin filter,
+/// compatible with jinja2, and to implement the `str.format()` function in Python
+/// compatibility support in minijinja-contrib.
 pub fn format_filter(
     style: FormatStyle,
     format_str: &str,
@@ -123,9 +129,8 @@ struct FormatSpec {
     width: Option<usize>,
     precision: Option<usize>,
     ty: Type,
-
-    // Whether this spec is parsed from a printf-style format string
     format_style: FormatStyle,
+    // offset within the input string where this spec begins
     location: usize,
 }
 
