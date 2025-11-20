@@ -574,8 +574,8 @@ impl FormatSpec {
         let grouped_prefix = Self::group(&zero_padded_prefix, sep, group_width);
 
         // Trim extra chars from the beginning of the padded and grouped prefix.
-        let trim_indx = grouped_prefix.len() - prefix.len() - fill_width;
-        let grouped_prefix = &grouped_prefix[trim_indx..];
+        let trim_index = grouped_prefix.len() - prefix.len() - fill_width;
+        let grouped_prefix = &grouped_prefix[trim_index..];
         format!(
             "{}{grouped_prefix}{grouped_suffix}",
             if grouped_prefix.starts_with(sep) {
