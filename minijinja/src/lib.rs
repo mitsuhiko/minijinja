@@ -212,6 +212,8 @@ mod defaults;
 mod environment;
 mod error;
 mod expression;
+#[cfg(feature = "builtins")]
+mod format_utils;
 mod output;
 mod template;
 mod utils;
@@ -239,6 +241,9 @@ pub use self::expression::Expression;
 pub use self::output::Output;
 pub use self::template::Template;
 pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
+
+#[cfg(feature = "builtins")]
+pub use self::format_utils::{format_filter, FormatStyle};
 
 /// Re-export for convenience.
 pub use self::value::Value;

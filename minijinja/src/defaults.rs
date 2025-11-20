@@ -123,6 +123,7 @@ pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, Value> {
         rv.insert("chain".into(), Value::from_function(filters::chain));
         rv.insert("zip".into(), Value::from_function(filters::zip));
         rv.insert("pprint".into(), Value::from_function(filters::pprint));
+        rv.insert("format".into(), Value::from_function(filters::format));
 
         #[cfg(feature = "json")]
         {
