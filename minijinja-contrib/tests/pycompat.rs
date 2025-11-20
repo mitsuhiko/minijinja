@@ -203,6 +203,54 @@ fn test_str_format() {
     );
     assert!(eval_err_expr("'}'.format(1)")
         .contains("invalid single '}' in format string at offset 0; use escape sequence '}}'"));
+
+    // test grouping
+    assert_eq!(eval_expr("'{:,}'.format(123)").as_str(), Some("123"));
+    assert_eq!(eval_expr("'{:,}'.format(1234)").as_str(), Some("1,234"));
+    assert_eq!(eval_expr("'{:_}'.format(1234)").as_str(), Some("1_234"));
+    assert_eq!(eval_expr("'{:_}'.format(123456)").as_str(), Some("123_456"));
+    assert_eq!(
+        eval_expr("'{:,}'.format(10000000)").as_str(),
+        Some("10,000,000")
+    );
+    assert_eq!(eval_expr("'{:010,}'.format(123456)").as_str(), Some("00,123,456"));
+    assert_eq!(eval_expr("'{:08,}'.format(1234)").as_str(), Some("0,001,234"));
+    assert_eq!(eval_expr("'{:04,}'.format(123)").as_str(), Some("0,123"));
+    assert_eq!(eval_expr("'{:_b}'.format(42)").as_str(), Some("10_1010"));
+    assert_eq!(
+        eval_expr("'{:_b}'.format(0b11001001)").as_str(),
+        Some("1100_1001")
+    );
+    assert_eq!(
+        eval_expr("'{:_b}'.format(0b111001001)").as_str(),
+        Some("1_1100_1001")
+    );
+    assert_eq!(
+        eval_expr("'{:_b}'.format(0b1100111001001)").as_str(),
+        Some("1_1001_1100_1001")
+    );
+    assert_eq!(eval_expr("'{:#_o}'.format(0o1776)").as_str(), Some("0o1776"));
+    assert_eq!(eval_expr("'{:#_o}'.format(0o17765)").as_str(), Some("0o1_7765"));
+    assert_eq!(eval_expr("'{:#010_o}'.format(0o17765)").as_str(), Some("0o001_7765"));
+    assert_eq!(eval_expr("'{:_x}'.format(0x12ff0ef7)").as_str(), Some("12ff_0ef7"));
+    assert_eq!(eval_expr("'{:#_x}'.format(0xfff12ff0ef7)").as_str(), Some("0xfff_12ff_0ef7"));
+    assert_eq!(eval_expr("'{:#10_X}'.format(0x123456)").as_str(), Some(" 0X12_3456"));
+    assert_eq!(eval_expr("'{:#010_X}'.format(0x123456)").as_str(), Some("0X012_3456"));
+    assert_eq!(eval_expr("'{:#014_X}'.format(0x123456)").as_str(), Some("0X00_0012_3456"));
+    assert_eq!(eval_expr("'{:,f}'.format(12345.6789)").as_str(), Some("12,345.678900"));
+    assert_eq!(eval_expr("'{:_F}'.format(1234567.6789)").as_str(), Some("1_234_567.678900"));
+    assert_eq!(eval_expr("'{:,e}'.format(1234567.6789)").as_str(), Some("1.234568e+06"));
+    assert_eq!(eval_expr("'{:,.2e}'.format(123.45)").as_str(), Some("1.23e+02"));
+    assert_eq!(eval_expr("'{:010,.2e}'.format(123.45)").as_str(), Some("001.23e+02"));
+    assert_eq!(eval_expr("'{:011,.2e}'.format(123.45)").as_str(), Some("0,001.23e+02"));
+    assert_eq!(eval_expr("'{:09,.0e}'.format(1)").as_str(), Some("0,001e+00"));
+    assert_eq!(eval_expr("'{:09,.0E}'.format(1)").as_str(), Some("0,001E+00"));
+    assert_eq!(eval_expr("'{:#09,.0E}'.format(1)").as_str(), Some("0,001.E+00"));
+    assert_eq!(eval_expr("'{:_g}'.format(1234.56)").as_str(), Some("1_234.56"));
+    assert_eq!(eval_expr("'{:09_g}'.format(1234.56)").as_str(), Some("01_234.56"));
+    assert!(eval_err_expr("'{:,x}'.format(1)")
+            .contains("',' cannot be specified with hex format"));
+
 }
 
 #[test]

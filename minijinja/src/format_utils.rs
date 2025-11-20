@@ -118,6 +118,12 @@ impl Type {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum Separator {
+    Comma,
+    Underscore,
+}
+
 // Captures format spec for both printf-style and str.format style format strings.
 #[derive(Debug, PartialEq, Eq)]
 struct FormatSpec {
@@ -127,6 +133,7 @@ struct FormatSpec {
     alternate_form: bool,
     zero_padded: bool,
     width: Option<usize>,
+    integer_grouping: Option<Separator>,
     precision: Option<usize>,
     ty: Type,
     format_style: FormatStyle,
@@ -290,13 +297,75 @@ impl FormatSpec {
         if exp >= -4 && exp < precision as i32 {
             let decimal_places = (precision as i32 - 1 - exp) as usize;
             let num = format!("{val:.decimal_places$}");
-            self.remove_insignificants(&num).to_owned()
+            self.group_decimal_num(self.remove_insignificants(&num).to_owned())
         } else {
-            format!(
-                "{}{}{exp:+03}",
-                self.remove_insignificants(&manti),
-                if is_uppercase { 'E' } else { 'e' }
-            )
+            let manti = self.group_decimal_num(self.remove_insignificants(&manti).to_owned());
+            format!("{manti}{}{exp:+03}", if is_uppercase { 'E' } else { 'e' })
+        }
+    }
+
+    // Group the digits in a given number into chunks of size `group_size`, separated
+    // by the given `separator` char. The function doesn't interpret the number
+    // string in any way, so the caller must make sure that it contains only [0-9]
+    // digits to avoid malformed grouping.
+    fn group(num: &str, separator: char, group_size: usize) -> String {
+        let prefix_len = num.len() % group_size;
+        let mut grouped = num[0..prefix_len].to_string();
+        let mut digits = num[prefix_len..].chars();
+
+        while digits.as_str() != "" {
+            if !grouped.is_empty() {
+                grouped.push(separator);
+            }
+            grouped.extend(digits.by_ref().take(group_size));
+        }
+        grouped
+    }
+
+    // Group the digits of a given number according to the requested format. The
+    // number string is assumed to be in one of the binary encoding formats: `b`,
+    // `o`, `x` or `X`.
+    fn group_binary_num(&self, number: String) -> Result<String, Error> {
+        let (separator, size) = match self.integer_grouping {
+            Some(Separator::Comma) => {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!(
+                        "invalid format spec at offset {}; ',' cannot be specified with {}",
+                        self.location,
+                        self.ty.description()
+                    ),
+                ))
+            }
+            Some(Separator::Underscore) => ('_', 4),
+            None => return Ok(number),
+        };
+
+        Ok(Self::group(&number, separator, size))
+    }
+
+    // Group the digits of a given number according to the requested format. The
+    // number string is assumed to be in decimal form: `xxx[. [yyy] ]`. This means in
+    // case of scientific form (`e` or `E`), only the mantissa should be passed.
+    fn group_decimal_num(&self, number: String) -> String {
+        let separator = match self.integer_grouping {
+            Some(Separator::Comma) => ',',
+            Some(Separator::Underscore) => '_',
+            None => return number,
+        };
+
+        let mut has_decimal_point = true;
+        let (integer, fraction) = number.split_once('.').unwrap_or_else(|| {
+            has_decimal_point = false;
+            (&number, "")
+        });
+
+        let integer = Self::group(integer, separator, 3);
+
+        if has_decimal_point {
+            format!("{integer}.{fraction}")
+        } else {
+            integer
         }
     }
 
@@ -312,11 +381,11 @@ impl FormatSpec {
         };
 
         let number = match self.ty {
-            Type::Binary => format!("{val:b}"),
-            Type::Octal => format!("{val:o}"),
-            Type::LowerHex => format!("{val:x}"),
-            Type::UpperHex => format!("{val:X}"),
-            Type::Default | Type::Decimal => format!("{val}"),
+            Type::Binary => ok!(self.group_binary_num(format!("{val:b}"))),
+            Type::Octal => ok!(self.group_binary_num(format!("{val:o}"))),
+            Type::LowerHex => ok!(self.group_binary_num(format!("{val:x}"))),
+            Type::UpperHex => ok!(self.group_binary_num(format!("{val:X}"))),
+            Type::Default | Type::Decimal => self.group_decimal_num(format!("{val}")),
             Type::String => {
                 if let FormatStyle::Printf = self.format_style {
                     // printf-style formatting in Python ignores sign character flag
@@ -329,11 +398,13 @@ impl FormatSpec {
             }
             Type::LowerE => {
                 let (mant, exp) = Self::mantissa_and_exp(val, self.precision.unwrap_or(6));
-                format!("{}e{exp:+03}", self.fix_decimal_point(mant))
+                let mant = self.group_decimal_num(self.fix_decimal_point(mant));
+                format!("{mant}e{exp:+03}")
             }
             Type::UpperE => {
                 let (mant, exp) = Self::mantissa_and_exp(val, self.precision.unwrap_or(6));
-                format!("{}E{exp:+03}", self.fix_decimal_point(mant))
+                let mant = self.group_decimal_num(self.fix_decimal_point(mant));
+                format!("{mant}E{exp:+03}")
             }
             Type::LowerF | Type::UpperF => {
                 let prec = self.precision.unwrap_or(6);
@@ -342,7 +413,7 @@ impl FormatSpec {
                 } else {
                     format!("{}", val)
                 };
-                self.fix_decimal_point(num)
+                self.group_decimal_num(self.fix_decimal_point(num))
             }
             Type::LowerG | Type::UpperG => {
                 self.number_in_general_format(val, self.ty == Type::UpperG)
@@ -388,7 +459,8 @@ impl FormatSpec {
                 } else {
                     let precision = self.precision.unwrap_or(6);
                     let (mant, exp) = Self::mantissa_and_exp(val.abs(), precision);
-                    let num = format!("{}e{exp:+03}", self.fix_decimal_point(mant));
+                    let mant = self.group_decimal_num(self.fix_decimal_point(mant));
+                    let num = format!("{mant}e{exp:+03}");
                     Ok(self.format_number(&num, sign))
                 }
             }
@@ -401,7 +473,8 @@ impl FormatSpec {
                 } else {
                     let precision = self.precision.unwrap_or(6);
                     let (mant, exp) = Self::mantissa_and_exp(val.abs(), precision);
-                    let num = format!("{}E{exp:+03}", self.fix_decimal_point(mant));
+                    let mant = self.group_decimal_num(self.fix_decimal_point(mant));
+                    let num = format!("{mant}E{exp:+03}");
                     Ok(self.format_number(&num, sign))
                 }
             }
@@ -413,7 +486,8 @@ impl FormatSpec {
                     Ok(self.format_number("inf", sign))
                 } else {
                     let prec = self.precision.unwrap_or(6);
-                    let num = self.fix_decimal_point(format!("{:.prec$}", val.abs()));
+                    let num = format!("{:.prec$}", val.abs());
+                    let num = self.group_decimal_num(self.fix_decimal_point(num));
                     Ok(self.format_number(&num, sign))
                 }
             }
@@ -425,7 +499,8 @@ impl FormatSpec {
                     Ok(self.format_number("INF", sign))
                 } else {
                     let prec = self.precision.unwrap_or(6);
-                    let num = self.fix_decimal_point(format!("{:.prec$}", val.abs()));
+                    let num = format!("{:.prec$}", val.abs());
+                    let num = self.group_decimal_num(self.fix_decimal_point(num));
                     Ok(self.format_number(&num, sign))
                 }
             }
@@ -454,6 +529,63 @@ impl FormatSpec {
         }
     }
 
+    // Prepend the given number with '0's to fill the given minimum width. The
+    // `fill_width` is the number of zeros to be inserted, except if grouping option
+    // (`,` or `_`) is used, in which case the zeros are also grouped according to
+    // the number they're attached to, and the group character is accounted in the
+    // minimum width.
+    //
+    // For example, applying zero padding to `1,234` with fill_width of 4 (meaning
+    // total width of 9, including 5 chars in the number) will result in `0,001,234`.
+    //
+    // An extra '0' is prepended to avoid returning a malformed number starting with
+    // a group separator.
+    //
+    // For example, `1,234` with fill_width of 3 will result in `0,001,234` with 9
+    // characters, and not `,001,234`. This is ok since it's more than the requested
+    // minimum overall width of 8.
+    fn apply_zero_padding(&self, num: &str, fill_width: usize) -> String {
+        let (sep, group_width) = match self.integer_grouping {
+            Some(Separator::Comma) => (',', 3),
+            Some(Separator::Underscore) => match self.ty {
+                Type::Binary | Type::Octal | Type::LowerHex | Type::UpperHex => ('_', 4),
+                _ => ('_', 3),
+            },
+            None => return format!("{}{num}", "0".repeat(fill_width)),
+        };
+
+        // Find the length of the integer prefix that should be extended with '0'
+        // padding and then get grouped according to the requested format. For
+        // example, `12` is the target prefix in `12,345`, `12,345.67`, `12.345`,
+        // `12.34e+02`, and `12e+02`.
+        //
+        // Find the first group separator before decimal point '.' in the number,
+        // meaning in the integer part. If there's no decimal point, then find it
+        // before `e` or `E` in case scientific form with zero-precision is used.
+        // Return the entire integer part if separator is not found.
+        let first_separator = if let Some(point) = num.find('.') {
+            num[0..point].find(sep).unwrap_or(point)
+        } else {
+            num.find(sep).or(num.find(['e', 'E'])).unwrap_or(num.len())
+        };
+
+        let (prefix, grouped_suffix) = num.split_at(first_separator);
+        let zero_padded_prefix = format!("{}{prefix}", "0".repeat(fill_width));
+        let grouped_prefix = Self::group(&zero_padded_prefix, sep, group_width);
+
+        // Trim extra chars from the beginning of the padded and grouped prefix.
+        let trim_indx = grouped_prefix.len() - prefix.len() - fill_width;
+        let grouped_prefix = &grouped_prefix[trim_indx..];
+        format!(
+            "{}{grouped_prefix}{grouped_suffix}",
+            if grouped_prefix.starts_with(sep) {
+                "0"
+            } else {
+                ""
+            }
+        )
+    }
+
     fn format_number(&self, number: &str, sign: &str) -> String {
         let radix = if self.alternate_form {
             match self.ty {
@@ -474,8 +606,10 @@ impl FormatSpec {
             let curr_width = sign.len() + radix.len() + number.len();
             if curr_width < min_width {
                 let fill_width = min_width - curr_width;
-                let filler = "0".repeat(fill_width);
-                format!("{sign}{radix}{filler}{number}")
+                format!(
+                    "{sign}{radix}{}",
+                    self.apply_zero_padding(number, fill_width)
+                )
             } else {
                 format!("{sign}{radix}{number}")
             }
@@ -862,6 +996,7 @@ mod printf_style {
             alternate_form,
             zero_padded,
             width,
+            integer_grouping: None,
             precision,
             ty,
             format_style: FormatStyle::Printf,
@@ -952,11 +1087,12 @@ mod str_format_style {
     // arg_name -> identifier | number
     // path -> ('.' identifier | '[' elem_index ']')*
     // elem_index -> number | char*
-    // format_spec -> [options] [width] ['.' precision] [type]
+    // format_spec -> [options] [width] [grouping] ['.' precision] [type]
     // options -> [[fill] align] [sign] ['#'] ['0']
     // fill -> char
     // align -> '<' | '>' | '^'
     // sign -> '+' | '-' | ' '
+    // grouping -> ',' | '_'
     // width -> number
     // precision -> number
     // number -> [0-9]+
@@ -979,6 +1115,7 @@ mod str_format_style {
                 alternate_form: false,
                 zero_padded: false,
                 width: None,
+                integer_grouping: None,
                 precision: None,
                 ty: Type::Default,
                 format_style: FormatStyle::StrFormat,
@@ -1088,6 +1225,14 @@ mod str_format_style {
             width = Some(0);
         }
 
+        let integer_grouping = if cursor.advance_if(b',') {
+            Some(Separator::Comma)
+        } else if cursor.advance_if(b'_') {
+            Some(Separator::Underscore)
+        } else {
+            None
+        };
+
         let precision = cursor
             .advance_if(b'.')
             .then(|| parse_number(cursor))
@@ -1102,6 +1247,7 @@ mod str_format_style {
             alternate_form,
             zero_padded,
             width,
+            integer_grouping,
             precision,
             ty,
             format_style: FormatStyle::StrFormat,
