@@ -166,6 +166,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
+    use crate::format_utils::{format_filter, FormatStyle};
     use crate::utils::{safe_sort, splitn_whitespace};
     use crate::value::merge_object::{MergeDict, MergeSeq};
     use crate::value::ops::{self, as_f64, LenIterWrap};
@@ -1647,6 +1648,30 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn pprint(value: &Value) -> String {
         format!("{value:#?}")
+    }
+
+    /// Apply the given values to a [printf-style] format string.
+    ///
+    /// ```jinja
+    /// {{ "%s, %s!"|format(greeting, name) }}
+    /// -> Hello, World!
+    /// ```
+    ///
+    /// In many cases, the [str.format()] style could be more convenient than the
+    /// printf-style formatting:
+    ///
+    /// ```jinja
+    /// {{ "{}, {name}!".format(greeting, name="Alice") }}
+    /// -> Hello, Alice!
+    /// ```
+    ///
+    /// This option is available through `minijinja-contrib`'s `pycompat` feature.
+    ///
+    /// [printf-style]: https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting
+    /// [str.format()]: https://docs.python.org/3/library/string.html#format-string-syntax
+    #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+    pub fn format(format_str: &str, format_args: Rest<Value>) -> Result<String, Error> {
+        format_filter(FormatStyle::Printf, format_str, &format_args)
     }
 }
 
