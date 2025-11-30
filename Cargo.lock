@@ -1945,7 +1945,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "2.12.0"
+version = "2.13.0"
 dependencies = [
  "aho-corasick",
  "indexmap",
@@ -1964,7 +1964,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-autoreload"
-version = "2.12.0"
+version = "2.13.0"
 dependencies = [
  "minijinja",
  "notify",
@@ -1972,14 +1972,14 @@ dependencies = [
 
 [[package]]
 name = "minijinja-cabi"
-version = "2.12.0"
+version = "2.13.0"
 dependencies = [
  "minijinja",
 ]
 
 [[package]]
 name = "minijinja-cli"
-version = "2.12.0"
+version = "2.13.0"
 dependencies = [
  "anyhow",
  "ciborium",
@@ -2007,7 +2007,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-contrib"
-version = "2.12.0"
+version = "2.13.0"
 dependencies = [
  "chrono",
  "insta",
@@ -2022,11 +2022,11 @@ dependencies = [
 
 [[package]]
 name = "minijinja-embed"
-version = "2.12.0"
+version = "2.13.0"
 
 [[package]]
 name = "minijinja-js"
-version = "2.12.0"
+version = "2.13.0"
 dependencies = [
  "console_error_panic_hook",
  "fragile",
@@ -2041,7 +2041,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-py"
-version = "2.12.0"
+version = "2.13.0"
 dependencies = [
  "minijinja",
  "minijinja-contrib",
