@@ -5,8 +5,10 @@ All notable changes to MiniJinja are documented here.
 ## 2.13.0
 
 * Added multi-key support to the `|sort` filter.  #827
+* Added `format` filter and `str.format` method for pycompat.  #835
 * Fix `not undefined` with strict undefined behavior.  #838
 * Added support for free threading Python.  #841
+* Added `setLoader` and `setPathJoinCallback` to the JavaScript bindings.  #842
 
 ## 2.12.0
 
