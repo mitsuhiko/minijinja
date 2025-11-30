@@ -66,26 +66,15 @@ git push origin main && git push origin $ARGUMENTS
 
 **Important:** Do NOT automatically push. Let the user review the commit and tag first.
 
-### 8. Publishing to crates.io (optional)
-
-After the user has pushed the release, they can publish to crates.io using:
-
-```bash
-./scripts/publish-all.sh
-```
-
-This publishes the crates in the correct dependency order:
-1. minijinja
-2. minijinja-autoreload
-3. minijinja-embed
-4. minijinja-contrib
-5. minijinja-cli
-
-**Note:** The user needs to be logged in to crates.io (`cargo login`) before publishing.
+Once the tag is pushed, GitHub Actions will automatically:
+- Publish all crates to crates.io (`publish-crates.yml`)
+- Create a GitHub Release with built binaries (`release.yml`)
+- Publish minijinja-js to npm (`publish-npm.yml`)
+- Build and publish minijinja-py wheels to PyPI (`build-wheels.yml`)
 
 ## Notes
 
 - Always use explicit version numbers (e.g., `2.7.0`), not release types like `patch`/`minor`/`major`
 - Ensure CHANGELOG.md is updated before running this command
 - The user should review all changes before pushing
-- Python (minijinja-py) and JavaScript (minijinja-js) packages are published separately through their respective ecosystems
+- All publishing is automated via GitHub Actions when the tag is pushed
