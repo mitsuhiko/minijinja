@@ -192,11 +192,12 @@ impl Environment {
         self.inner.set_loader(move |name| {
             let js_name = JsValue::from_str(name);
             let func = fragile_func.get();
-            let rv = func
-                .call1(&JsValue::NULL, &js_name)
-                .map_err(|err| Error::new(ErrorKind::InvalidOperation, format!(
-                    "loader threw error: {:?}", err
-                )))?;
+            let rv = func.call1(&JsValue::NULL, &js_name).map_err(|err| {
+                Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("loader threw error: {:?}", err),
+                )
+            })?;
 
             if rv.is_undefined() || rv.is_null() {
                 return Ok(None);
@@ -219,16 +220,21 @@ impl Environment {
     #[wasm_bindgen]
     pub fn setPathJoinCallback(&mut self, func: Function) {
         let fragile_func = Fragile::new(func);
-        self.inner.set_path_join_callback(move |name, parent| -> Cow<'_, str> {
-            let func = fragile_func.get();
-            match func.call2(&JsValue::NULL, &JsValue::from_str(name), &JsValue::from_str(parent)) {
-                Ok(rv) => match rv.as_string() {
-                    Some(s) => Cow::Owned(s),
-                    None => Cow::Borrowed(name),
-                },
-                Err(_e) => Cow::Borrowed(name),
-            }
-        });
+        self.inner
+            .set_path_join_callback(move |name, parent| -> Cow<'_, str> {
+                let func = fragile_func.get();
+                match func.call2(
+                    &JsValue::NULL,
+                    &JsValue::from_str(name),
+                    &JsValue::from_str(parent),
+                ) {
+                    Ok(rv) => match rv.as_string() {
+                        Some(s) => Cow::Owned(s),
+                        None => Cow::Borrowed(name),
+                    },
+                    Err(_e) => Cow::Borrowed(name),
+                }
+            });
     }
 }
 
