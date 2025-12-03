@@ -876,6 +876,32 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parses a tuple expression (comma-separated values) without parentheses.
+    /// This is used for the RHS of tuple unpacking in set statements.
+    fn parse_tuple_expr(&mut self) -> Result<ast::Expr<'a>, Error> {
+        let span = self.stream.current_span();
+        let mut items = vec![ok!(self.parse_expr())];
+        let mut is_tuple = false;
+
+        while matches_token!(self, Token::Comma) {
+            is_tuple = true;
+            ok!(self.stream.next()); // consume the comma
+            if matches_token!(self, Token::BlockEnd) {
+                break;
+            }
+            items.push(ok!(self.parse_expr()));
+        }
+
+        if !is_tuple && items.len() == 1 {
+            Ok(items.into_iter().next().unwrap())
+        } else {
+            Ok(ast::Expr::List(Spanned::new(
+                ast::List { items },
+                self.stream.expand_span(span),
+            )))
+        }
+    }
+
     fn parse_for_stmt(&mut self) -> Result<ast::ForLoop<'a>, Error> {
         let old_in_loop = std::mem::replace(&mut self.in_loop, true);
         let target = ok!(self.parse_assignment());
@@ -959,12 +985,41 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_set(&mut self) -> Result<SetParseResult<'a>, Error> {
-        let (target, in_paren) = if skip_token!(self, Token::ParenOpen) {
+        let (target, in_paren, is_tuple) = if skip_token!(self, Token::ParenOpen) {
             let assign = ok!(self.parse_assignment());
             expect_token!(self, Token::ParenClose, "`)`");
-            (assign, true)
+            let is_tuple = matches!(assign, ast::Expr::List(_));
+            (assign, true, is_tuple)
         } else {
-            (ok!(self.parse_assign_name(true)), false)
+            // Parse the first target, allowing dotted names for single assignment
+            let first_target = ok!(self.parse_assign_name(true));
+
+            // Check if we have a comma, indicating tuple unpacking
+            if matches_token!(self, Token::Comma) {
+                // Tuple unpacking mode: collect all targets
+                let span = self.stream.current_span();
+                let mut items = vec![first_target];
+
+                while skip_token!(self, Token::Comma) {
+                    // Check for trailing comma before assignment
+                    if matches_token!(self, Token::Assign) {
+                        break;
+                    }
+                    // Subsequent targets cannot have dots (consistent with Jinja2)
+                    items.push(ok!(self.parse_assign_name(false)));
+                }
+
+                (
+                    ast::Expr::List(Spanned::new(
+                        ast::List { items },
+                        self.stream.expand_span(span),
+                    )),
+                    false,
+                    true,
+                )
+            } else {
+                (first_target, false, false)
+            }
         };
 
         if !in_paren && matches_token!(self, Token::BlockEnd | Token::Pipe) {
@@ -983,7 +1038,12 @@ impl<'a> Parser<'a> {
             }))
         } else {
             expect_token!(self, Token::Assign, "assignment operator");
-            let expr = ok!(self.parse_expr());
+            // If the target is a tuple, parse the RHS as a tuple expression too
+            let expr = if is_tuple {
+                ok!(self.parse_tuple_expr())
+            } else {
+                ok!(self.parse_expr())
+            };
             Ok(SetParseResult::Set(ast::Set { target, expr }))
         }
     }
