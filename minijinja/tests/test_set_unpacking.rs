@@ -1,5 +1,3 @@
-//! Minimal regression for tuple unpacking in set statements.
-
 use minijinja::Environment;
 
 #[test]
@@ -27,8 +25,5 @@ fn test_set_unpacked_no_parens() {
             (),
         )
         .unwrap();
-    assert_eq!(
-        result,
-        "values: a=, b=, c=true, d=default"
-    );
+    assert_eq!(result, "values: a=, b=, c=true, d=default");
 }
