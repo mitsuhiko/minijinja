@@ -837,7 +837,7 @@ impl<'a> Parser<'a> {
         Ok(rv)
     }
 
-    fn parse_assignment(&mut self) -> Result<ast::Expr<'a>, Error> {
+    fn parse_assignment(&mut self, dotted: bool) -> Result<ast::Expr<'a>, Error> {
         let span = self.stream.current_span();
         let mut items = Vec::new();
         let mut is_tuple = false;
@@ -853,11 +853,11 @@ impl<'a> Parser<'a> {
                 break;
             }
             items.push(if skip_token!(self, Token::ParenOpen) {
-                let rv = ok!(self.parse_assignment());
+                let rv = ok!(self.parse_assignment(dotted));
                 expect_token!(self, Token::ParenClose, "`)`");
                 rv
             } else {
-                ok!(self.parse_assign_name(false))
+                ok!(self.parse_assign_name(dotted))
             });
             if matches_token!(self, Token::Comma) {
                 is_tuple = true;
@@ -878,7 +878,7 @@ impl<'a> Parser<'a> {
 
     fn parse_for_stmt(&mut self) -> Result<ast::ForLoop<'a>, Error> {
         let old_in_loop = std::mem::replace(&mut self.in_loop, true);
-        let target = ok!(self.parse_assignment());
+        let target = ok!(self.parse_assignment(false));
         expect_token!(self, Token::Ident("in"), "in");
         let iter = ok!(self.parse_expr_noif());
         let filter_expr = if skip_token!(self, Token::Ident("if")) {
@@ -941,7 +941,7 @@ impl<'a> Parser<'a> {
                 expect_token!(self, Token::Comma, "comma");
             }
             let target = if skip_token!(self, Token::ParenOpen) {
-                let assign = ok!(self.parse_assignment());
+                let assign = ok!(self.parse_assignment(false));
                 expect_token!(self, Token::ParenClose, "`)`");
                 assign
             } else {
@@ -959,15 +959,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_set(&mut self) -> Result<SetParseResult<'a>, Error> {
-        let (target, in_paren) = if skip_token!(self, Token::ParenOpen) {
-            let assign = ok!(self.parse_assignment());
-            expect_token!(self, Token::ParenClose, "`)`");
-            (assign, true)
-        } else {
-            (ok!(self.parse_assign_name(true)), false)
-        };
+        let target = ok!(self.parse_assignment(true));
 
-        if !in_paren && matches_token!(self, Token::BlockEnd | Token::Pipe) {
+        if matches_token!(self, Token::BlockEnd | Token::Pipe) {
             let filter = if skip_token!(self, Token::Pipe) {
                 Some(ok!(self.parse_filter_chain()))
             } else {
@@ -983,7 +977,29 @@ impl<'a> Parser<'a> {
             }))
         } else {
             expect_token!(self, Token::Assign, "assignment operator");
+
+            // Parse RHS - single expression or comma-separated tuple
             let expr = ok!(self.parse_expr());
+            let expr = if skip_token!(self, Token::Comma) {
+                let span = self.stream.current_span();
+                let mut items = vec![expr];
+                loop {
+                    if matches_token!(self, Token::BlockEnd) {
+                        break;
+                    }
+                    items.push(ok!(self.parse_expr()));
+                    if !skip_token!(self, Token::Comma) {
+                        break;
+                    }
+                }
+                ast::Expr::List(Spanned::new(
+                    ast::List { items },
+                    self.stream.expand_span(span),
+                ))
+            } else {
+                expr
+            };
+
             Ok(SetParseResult::Set(ast::Set { target, expr }))
         }
     }
