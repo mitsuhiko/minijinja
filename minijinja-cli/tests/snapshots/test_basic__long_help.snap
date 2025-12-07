@@ -283,7 +283,7 @@ Advanced:
           
           This defaults to 'print' which means that the expression's result is written to stdout.
           'json' (and 'json-pretty') does mostly the same but writes the result as JSON result
-          instead with one as a one-liner, the second in prett printing. 'status' exits the program
+          instead with one as a one-liner, the second in pretty printing. 'status' exits the program
           with the result as a status code.  If the result is not a number it will first convert the
           result into a bool and then exits as 0 if it was true, 1 otherwise.
           
