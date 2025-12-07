@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Added support for tuple unpacking in `{% set %}` statements.  #847
+
 ## 2.13.0
 
 * Added multi-key support to the `|sort` filter.  #827
