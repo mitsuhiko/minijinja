@@ -25,7 +25,7 @@ Ok(
                 raw: "\n",
             } @ 1:15-2:0,
             EmitExpr {
-                expr: List {
+                expr: Tuple {
                     items: [
                         Const {
                             value: 1,
@@ -43,7 +43,7 @@ Ok(
                 raw: "\n",
             } @ 2:15-3:0,
             EmitExpr {
-                expr: List {
+                expr: Tuple {
                     items: [
                         Const {
                             value: 1,
@@ -55,7 +55,7 @@ Ok(
                 raw: "\n",
             } @ 3:10-4:0,
             EmitExpr {
-                expr: List {
+                expr: Tuple {
                     items: [],
                 } @ 4:3-4:5,
             } @ 4:0-4:5,
