@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 2.14.0
 
 * Added support for tuple unpacking in `{% set %}` statements.  #847
 
