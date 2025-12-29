@@ -116,7 +116,7 @@ the engine is used so you can see how it's utilized:
 * Data and Processing:
   * **[Cube](https://cube.dev/docs/product/data-modeling/dynamic/jinja)** uses it [for data modelling](https://github.com/cube-js/cube/tree/db11c121c77c663845242366d3d972b9bc30ae54/packages/cubejs-backend-native/src/template/mj_value)
   * **[PRQL](https://prql-lang.org/)** uses it [to handle DBT style pipelines](https://github.com/PRQL/prql/blob/59fb3cc4b9b6c9e195c928b1ba1134e2c5706ea3/prqlc/prqlc/src/cli/jinja.rs#L21)
-  * **[qsv](https://qsv.dathere.com)** uses it [to render templates from CSV files](https://github.com/jqnatividad/qsv/blob/master/src/cmd/template.rs#L2) and to [construct payloads to post to web services](https://github.com/jqnatividad/qsv/blob/master/src/cmd/fetchpost.rs#L3).
+  * **[qsv](https://qsv.dathere.com)** uses it [to render templates from CSV files](https://github.com/jqnatividad/qsv/blob/master/src/cmd/template.rs#L2), to [construct payloads to post to web services](https://github.com/jqnatividad/qsv/blob/master/src/cmd/fetchpost.rs#L3) and to [infer Data Dictionaries, Descriptions & Tags or Chat with your data](https://github.com/dathere/qsv/blob/master/src/cmd/describegpt.rs#L2).
 
 * HTML Generation:
   * **[Zine](https://github.com/zineland/zine)** uses it to [generate static HTML](https://github.com/zineland/zine/blob/17285efe9f9a63b79a42a738b54d4d730b8cd551/src/engine.rs#L8)
