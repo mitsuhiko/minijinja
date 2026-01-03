@@ -307,10 +307,10 @@ fn map_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, Err
             }))
         }
         "get" => {
-            let (key,): (&Value,) = from_args(args)?;
+            let (key, default): (&Value, Option<Value>) = from_args(args)?;
             Ok(match obj.get_value(key) {
                 Some(value) => value,
-                None => Value::from(()),
+                None => default.unwrap_or_else(|| Value::from(())),
             })
         }
         _ => Err(Error::from(ErrorKind::UnknownMethod)),
