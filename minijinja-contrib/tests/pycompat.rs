@@ -77,6 +77,8 @@ fn test_dict_methods() {
     assert!(eval_expr("{'x': 42}.items()|list == [('x', 42)]").is_true());
     assert!(eval_expr("{'x': 42}.get('x') == 42").is_true());
     assert!(eval_expr("{'x': 42}.get('y') is none").is_true());
+    assert!(eval_expr("{'x': 42}.get('x', 47) == 42").is_true());
+    assert!(eval_expr("{'x': 42}.get('y', 47) == 47").is_true());
 }
 
 #[test]
