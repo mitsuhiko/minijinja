@@ -3,6 +3,7 @@ package minijinja
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/url"
 	"sort"
 	"strings"
@@ -24,6 +25,10 @@ func registerDefaultFilters(env *Environment) {
 	env.AddFilter("safe", filterSafe)
 	env.AddFilter("escape", filterEscape)
 	env.AddFilter("e", filterEscape) // alias
+	env.AddFilter("string", filterString)
+	env.AddFilter("bool", filterBool)
+	env.AddFilter("split", filterSplit)
+	env.AddFilter("lines", filterLines)
 
 	// List/sequence filters
 	env.AddFilter("length", filterLength)
@@ -45,6 +50,9 @@ func registerDefaultFilters(env *Environment) {
 	env.AddFilter("reject", filterReject)
 	env.AddFilter("selectattr", filterSelectAttr)
 	env.AddFilter("rejectattr", filterRejectAttr)
+	env.AddFilter("groupby", filterGroupBy)
+	env.AddFilter("chain", filterChain)
+	env.AddFilter("zip", filterZip)
 
 	// Numeric filters
 	env.AddFilter("abs", filterAbs)
@@ -146,7 +154,21 @@ func filterCapitalize(_ *State, val value.Value, _ []value.Value, _ map[string]v
 
 func filterTitle(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
-		return value.FromString(strings.Title(s)), nil
+		// Title case: capitalize after whitespace and some punctuation
+		var result strings.Builder
+		capitalizeNext := true
+		for _, r := range s {
+			if unicode.IsSpace(r) || r == '-' || r == '_' || r == ':' || r == ',' || r == '.' {
+				capitalizeNext = true
+				result.WriteRune(r)
+			} else if capitalizeNext {
+				result.WriteRune(unicode.ToUpper(r))
+				capitalizeNext = false
+			} else {
+				result.WriteRune(unicode.ToLower(r))
+			}
+		}
+		return value.FromString(result.String()), nil
 	}
 	return val, nil
 }
@@ -233,6 +255,112 @@ func filterEscape(_ *State, val value.Value, _ []value.Value, _ map[string]value
 	return value.FromSafeString(EscapeHTML(val.String())), nil
 }
 
+func filterString(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	if val.Kind() == value.KindString {
+		return val, nil
+	}
+	return value.FromString(val.String()), nil
+}
+
+func filterBool(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	return value.FromBool(val.IsTrue()), nil
+}
+
+func filterSplit(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+	s, ok := val.AsString()
+	if !ok {
+		return value.FromSlice(nil), nil
+	}
+
+	// Get split pattern
+	var splitOn *string
+	if len(args) > 0 && !args[0].IsNone() {
+		if sp, ok := args[0].AsString(); ok {
+			splitOn = &sp
+		}
+	}
+
+	// Get max splits
+	maxSplits := -1
+	if len(args) > 1 {
+		if m, ok := args[1].AsInt(); ok {
+			maxSplits = int(m) + 1 // Go's SplitN uses count, not number of splits
+		}
+	}
+
+	var parts []string
+	if splitOn == nil {
+		// Split on whitespace
+		if maxSplits <= 0 {
+			parts = strings.Fields(s)
+		} else {
+			// Custom split with max, keeping empty strings filtered
+			parts = splitWhitespaceN(s, maxSplits)
+		}
+	} else {
+		if maxSplits <= 0 {
+			parts = strings.Split(s, *splitOn)
+		} else {
+			parts = strings.SplitN(s, *splitOn, maxSplits)
+		}
+	}
+
+	result := make([]value.Value, len(parts))
+	for i, p := range parts {
+		result[i] = value.FromString(p)
+	}
+	return value.FromIterator(value.NewIterator("split", result)), nil
+}
+
+func splitWhitespaceN(s string, n int) []string {
+	var result []string
+	start := -1
+	for i, r := range s {
+		if unicode.IsSpace(r) {
+			if start >= 0 {
+				result = append(result, s[start:i])
+				start = -1
+				if len(result) >= n-1 {
+					// Find next non-space and take rest
+					for j := i; j < len(s); j++ {
+						if !unicode.IsSpace(rune(s[j])) {
+							result = append(result, s[j:])
+							return result
+						}
+					}
+					return result
+				}
+			}
+		} else {
+			if start < 0 {
+				start = i
+			}
+		}
+	}
+	if start >= 0 {
+		result = append(result, s[start:])
+	}
+	return result
+}
+
+func filterLines(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	s, ok := val.AsString()
+	if !ok {
+		return value.FromSlice(nil), nil
+	}
+
+	// Normalize line endings and split
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+	lines := strings.Split(s, "\n")
+
+	result := make([]value.Value, len(lines))
+	for i, line := range lines {
+		result[i] = value.FromString(line)
+	}
+	return value.FromSlice(result), nil
+}
+
 func filterLength(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if l, ok := val.Len(); ok {
 		return value.FromInt(int64(l)), nil
@@ -271,13 +399,12 @@ func filterReverse(_ *State, val value.Value, _ []value.Value, _ map[string]valu
 		for i, item := range items {
 			result[len(items)-1-i] = item
 		}
-		// Return an iterator, not a sequence - this matches Rust MiniJinja behavior
 		return value.FromIterator(value.NewIterator("reversed", result)), nil
 	}
 	return val, nil
 }
 
-func filterSort(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func filterSort(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -295,11 +422,47 @@ func filterSort(_ *State, val value.Value, args []value.Value, kwargs map[string
 		}
 	}
 
+	caseSensitive := false
+	if cs, ok := kwargs["case_sensitive"]; ok {
+		if b, ok := cs.AsBool(); ok {
+			caseSensitive = b
+		}
+	}
+
+	// Get attribute for sorting
+	var attrName string
+	if attr, ok := kwargs["attribute"]; ok {
+		if s, ok := attr.AsString(); ok {
+			attrName = s
+		}
+	}
+
 	result := make([]value.Value, len(items))
 	copy(result, items)
 
-	sort.Slice(result, func(i, j int) bool {
-		cmp, ok := result[i].Compare(result[j])
+	sort.SliceStable(result, func(i, j int) bool {
+		a, b := result[i], result[j]
+
+		// Apply attribute if specified
+		if attrName != "" {
+			a = getDeepAttr(a, attrName)
+			b = getDeepAttr(b, attrName)
+		}
+
+		// Case-insensitive string comparison
+		if !caseSensitive {
+			if s1, ok1 := a.AsString(); ok1 {
+				if s2, ok2 := b.AsString(); ok2 {
+					cmp := strings.Compare(strings.ToLower(s1), strings.ToLower(s2))
+					if reverse {
+						return cmp > 0
+					}
+					return cmp < 0
+				}
+			}
+		}
+
+		cmp, ok := a.Compare(b)
 		if !ok {
 			return false
 		}
@@ -310,6 +473,29 @@ func filterSort(_ *State, val value.Value, args []value.Value, kwargs map[string
 	})
 
 	return value.FromSlice(result), nil
+}
+
+// getDeepAttr gets a nested attribute (supports "a.b.0" syntax)
+func getDeepAttr(v value.Value, path string) value.Value {
+	parts := strings.Split(path, ".")
+	for _, part := range parts {
+		// Try as integer index first
+		if idx, err := parseInt(part); err == nil {
+			v = v.GetItem(value.FromInt(idx))
+		} else {
+			v = v.GetAttr(part)
+		}
+		if v.IsUndefined() {
+			return v
+		}
+	}
+	return v
+}
+
+func parseInt(s string) (int64, error) {
+	var n int64
+	_, err := fmt.Sscanf(s, "%d", &n)
+	return n, err
 }
 
 func filterJoin(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
@@ -338,16 +524,32 @@ func filterList(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 	return value.FromSlice(nil), nil
 }
 
-func filterUnique(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func filterUnique(_ *State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
 	}
 
+	caseSensitive := false
+	if cs, ok := kwargs["case_sensitive"]; ok {
+		if b, ok := cs.AsBool(); ok {
+			caseSensitive = b
+		}
+	}
+
 	seen := make(map[string]bool)
 	var result []value.Value
 	for _, item := range items {
-		key := item.Repr()
+		var key string
+		if !caseSensitive {
+			if s, ok := item.AsString(); ok {
+				key = strings.ToLower(s)
+			} else {
+				key = item.Repr()
+			}
+		} else {
+			key = item.Repr()
+		}
 		if !seen[key] {
 			seen[key] = true
 			result = append(result, item)
@@ -484,10 +686,8 @@ func filterSlice(_ *State, val value.Value, args []value.Value, _ map[string]val
 		copy(slice, items[offset:offset+size])
 
 		// Fill if needed for last slice
-		if !fillWith.IsUndefined() && i == sliceCount-1 && size < baseSize+1 {
-			for len(slice) < baseSize+1 {
-				slice = append(slice, fillWith)
-			}
+		if !fillWith.IsUndefined() && i >= remainder && i == sliceCount-1 && remainder > 0 {
+			slice = append(slice, fillWith)
 		}
 
 		result = append(result, value.FromSlice(slice))
@@ -502,6 +702,14 @@ func filterMap(state *State, val value.Value, args []value.Value, kwargs map[str
 		return val, nil
 	}
 
+	// Check for filter name as first positional arg
+	var filterName string
+	if len(args) > 0 {
+		if s, ok := args[0].AsString(); ok {
+			filterName = s
+		}
+	}
+
 	// Get attribute name
 	var attrName string
 	if attr, ok := kwargs["attribute"]; ok {
@@ -510,13 +718,36 @@ func filterMap(state *State, val value.Value, args []value.Value, kwargs map[str
 		}
 	}
 
-	if attrName == "" {
-		return val, fmt.Errorf("map filter requires 'attribute' argument")
+	// Get default value
+	defaultVal := value.Undefined()
+	if def, ok := kwargs["default"]; ok {
+		defaultVal = def
 	}
 
 	var result []value.Value
 	for _, item := range items {
-		result = append(result, item.GetAttr(attrName))
+		var mapped value.Value
+		if attrName != "" {
+			// Attribute mapping with dot notation support
+			mapped = getDeepAttr(item, attrName)
+			if mapped.IsUndefined() && !defaultVal.IsUndefined() {
+				mapped = defaultVal
+			}
+		} else if filterName != "" {
+			// Filter mapping
+			filterFn, ok := state.env.getFilter(filterName)
+			if !ok {
+				return val, fmt.Errorf("unknown filter: %s", filterName)
+			}
+			var err error
+			mapped, err = filterFn(state, item, args[1:], kwargs)
+			if err != nil {
+				return val, err
+			}
+		} else {
+			return val, fmt.Errorf("map filter requires 'attribute' or filter name argument")
+		}
+		result = append(result, mapped)
 	}
 	return value.FromSlice(result), nil
 }
@@ -527,9 +758,31 @@ func filterSelect(state *State, val value.Value, args []value.Value, kwargs map[
 		return val, nil
 	}
 
+	// Get test name if provided
+	var testName string
+	if len(args) > 0 {
+		if s, ok := args[0].AsString(); ok {
+			testName = s
+		}
+	}
+
 	var result []value.Value
 	for _, item := range items {
-		if item.IsTrue() {
+		var keep bool
+		if testName != "" {
+			testFn, ok := state.env.getTest(testName)
+			if !ok {
+				return val, fmt.Errorf("unknown test: %s", testName)
+			}
+			var err error
+			keep, err = testFn(state, item, args[1:])
+			if err != nil {
+				return val, err
+			}
+		} else {
+			keep = item.IsTrue()
+		}
+		if keep {
 			result = append(result, item)
 		}
 	}
@@ -542,9 +795,31 @@ func filterReject(state *State, val value.Value, args []value.Value, kwargs map[
 		return val, nil
 	}
 
+	// Get test name if provided
+	var testName string
+	if len(args) > 0 {
+		if s, ok := args[0].AsString(); ok {
+			testName = s
+		}
+	}
+
 	var result []value.Value
 	for _, item := range items {
-		if !item.IsTrue() {
+		var reject bool
+		if testName != "" {
+			testFn, ok := state.env.getTest(testName)
+			if !ok {
+				return val, fmt.Errorf("unknown test: %s", testName)
+			}
+			var err error
+			reject, err = testFn(state, item, args[1:])
+			if err != nil {
+				return val, err
+			}
+		} else {
+			reject = item.IsTrue()
+		}
+		if !reject {
 			result = append(result, item)
 		}
 	}
@@ -562,10 +837,32 @@ func filterSelectAttr(state *State, val value.Value, args []value.Value, kwargs 
 	}
 	attrName, _ := args[0].AsString()
 
+	// Get test name if provided (second arg)
+	var testName string
+	if len(args) > 1 {
+		if s, ok := args[1].AsString(); ok {
+			testName = s
+		}
+	}
+
 	var result []value.Value
 	for _, item := range items {
 		attr := item.GetAttr(attrName)
-		if attr.IsTrue() {
+		var keep bool
+		if testName != "" {
+			testFn, ok := state.env.getTest(testName)
+			if !ok {
+				return val, fmt.Errorf("unknown test: %s", testName)
+			}
+			var err error
+			keep, err = testFn(state, attr, args[2:])
+			if err != nil {
+				return val, err
+			}
+		} else {
+			keep = attr.IsTrue()
+		}
+		if keep {
 			result = append(result, item)
 		}
 	}
@@ -583,12 +880,221 @@ func filterRejectAttr(state *State, val value.Value, args []value.Value, kwargs 
 	}
 	attrName, _ := args[0].AsString()
 
+	// Get test name if provided (second arg)
+	var testName string
+	if len(args) > 1 {
+		if s, ok := args[1].AsString(); ok {
+			testName = s
+		}
+	}
+
 	var result []value.Value
 	for _, item := range items {
 		attr := item.GetAttr(attrName)
-		if !attr.IsTrue() {
+		var reject bool
+		if testName != "" {
+			testFn, ok := state.env.getTest(testName)
+			if !ok {
+				return val, fmt.Errorf("unknown test: %s", testName)
+			}
+			var err error
+			reject, err = testFn(state, attr, args[2:])
+			if err != nil {
+				return val, err
+			}
+		} else {
+			reject = attr.IsTrue()
+		}
+		if !reject {
 			result = append(result, item)
 		}
+	}
+	return value.FromSlice(result), nil
+}
+
+func filterGroupBy(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	items := val.Iter()
+	if items == nil {
+		return val, nil
+	}
+
+	// Get attribute name
+	var attrName string
+	if len(args) > 0 {
+		if s, ok := args[0].AsString(); ok {
+			attrName = s
+		}
+	}
+	if attr, ok := kwargs["attribute"]; ok {
+		if s, ok := attr.AsString(); ok {
+			attrName = s
+		}
+	}
+	if attrName == "" {
+		return val, fmt.Errorf("groupby requires attribute name")
+	}
+
+	// Get default value
+	defaultVal := value.Undefined()
+	if def, ok := kwargs["default"]; ok {
+		defaultVal = def
+	}
+	if len(args) > 1 && defaultVal.IsUndefined() {
+		defaultVal = args[1]
+	}
+
+	// Case sensitivity
+	caseSensitive := false
+	if cs, ok := kwargs["case_sensitive"]; ok {
+		if b, ok := cs.AsBool(); ok {
+			caseSensitive = b
+		}
+	}
+
+	// Group items
+	type group struct {
+		grouper value.Value
+		list    []value.Value
+	}
+	var groups []group
+	groupIndex := make(map[string]int)
+
+	for _, item := range items {
+		grouper := getDeepAttr(item, attrName)
+		if grouper.IsUndefined() {
+			grouper = defaultVal
+		}
+
+		// Create key for grouping
+		var key string
+		if !caseSensitive {
+			if s, ok := grouper.AsString(); ok {
+				key = strings.ToLower(s)
+			} else {
+				key = grouper.Repr()
+			}
+		} else {
+			key = grouper.Repr()
+		}
+
+		if idx, ok := groupIndex[key]; ok {
+			groups[idx].list = append(groups[idx].list, item)
+		} else {
+			groupIndex[key] = len(groups)
+			groups = append(groups, group{grouper: grouper, list: []value.Value{item}})
+		}
+	}
+
+	// Convert to value
+	result := make([]value.Value, len(groups))
+	for i, g := range groups {
+		result[i] = value.FromObject(&groupObject{
+			grouper: g.grouper,
+			list:    g.list,
+		})
+	}
+	return value.FromSlice(result), nil
+}
+
+// groupObject represents a group in groupby filter
+type groupObject struct {
+	grouper value.Value
+	list    []value.Value
+}
+
+func (g *groupObject) GetAttr(name string) value.Value {
+	switch name {
+	case "grouper":
+		return g.grouper
+	case "list":
+		return value.FromSlice(g.list)
+	}
+	return value.Undefined()
+}
+
+func (g *groupObject) String() string {
+	return fmt.Sprintf("(%s, %v)", g.grouper.Repr(), g.list)
+}
+
+func filterChain(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+	// Get items from first value
+	items := val.Iter()
+	if items == nil {
+		items = []value.Value{}
+	}
+
+	// Chain all arguments
+	for _, arg := range args {
+		argItems := arg.Iter()
+		if argItems != nil {
+			items = append(items, argItems...)
+		}
+	}
+
+	// Return as iterable to support length, indexing, etc.
+	return value.FromObject(&chainObject{items: items}), nil
+}
+
+// chainObject allows chained iterables to support length and indexing
+type chainObject struct {
+	items []value.Value
+}
+
+func (c *chainObject) GetAttr(name string) value.Value {
+	return value.Undefined()
+}
+
+func (c *chainObject) Iter() []value.Value {
+	return c.items
+}
+
+func (c *chainObject) Len() (int, bool) {
+	return len(c.items), true
+}
+
+func (c *chainObject) GetItem(key value.Value) value.Value {
+	if idx, ok := key.AsInt(); ok {
+		if idx < 0 {
+			idx = int64(len(c.items)) + idx
+		}
+		if idx >= 0 && idx < int64(len(c.items)) {
+			return c.items[idx]
+		}
+	}
+	return value.Undefined()
+}
+
+func filterZip(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+	// Collect all sequences
+	seqs := [][]value.Value{val.Iter()}
+	for _, arg := range args {
+		seqs = append(seqs, arg.Iter())
+	}
+
+	// Find minimum length
+	minLen := math.MaxInt
+	for _, seq := range seqs {
+		if seq == nil {
+			minLen = 0
+			break
+		}
+		if len(seq) < minLen {
+			minLen = len(seq)
+		}
+	}
+
+	if minLen == 0 || minLen == math.MaxInt {
+		return value.FromSlice(nil), nil
+	}
+
+	// Zip
+	result := make([]value.Value, minLen)
+	for i := 0; i < minLen; i++ {
+		tuple := make([]value.Value, len(seqs))
+		for j, seq := range seqs {
+			tuple[j] = seq[i]
+		}
+		result[i] = value.FromSlice(tuple)
 	}
 	return value.FromSlice(result), nil
 }
@@ -624,6 +1130,12 @@ func filterInt(_ *State, val value.Value, args []value.Value, kwargs map[string]
 	if f, ok := val.AsFloat(); ok {
 		return value.FromInt(int64(f)), nil
 	}
+	if b, ok := val.AsBool(); ok {
+		if b {
+			return value.FromInt(1), nil
+		}
+		return value.FromInt(0), nil
+	}
 	if s, ok := val.AsString(); ok {
 		s = strings.TrimSpace(s)
 		var i int64
@@ -645,6 +1157,12 @@ func filterFloat(_ *State, val value.Value, args []value.Value, kwargs map[strin
 
 	if f, ok := val.AsFloat(); ok {
 		return value.FromFloat(f), nil
+	}
+	if b, ok := val.AsBool(); ok {
+		if b {
+			return value.FromFloat(1.0), nil
+		}
+		return value.FromFloat(0.0), nil
 	}
 	if s, ok := val.AsString(); ok {
 		s = strings.TrimSpace(s)
@@ -686,18 +1204,15 @@ func filterRound(_ *State, val value.Value, args []value.Value, kwargs map[strin
 		}
 	}
 
-	multiplier := 1.0
-	for i := 0; i < precision; i++ {
-		multiplier *= 10
-	}
+	multiplier := math.Pow(10, float64(precision))
 
 	switch method {
 	case "floor":
-		f = float64(int64(f*multiplier)) / multiplier
+		f = math.Floor(f*multiplier) / multiplier
 	case "ceil":
-		f = float64(int64(f*multiplier+0.9999999999)) / multiplier
+		f = math.Ceil(f*multiplier) / multiplier
 	default: // common
-		f = float64(int64(f*multiplier+0.5)) / multiplier
+		f = math.Round(f*multiplier) / multiplier
 	}
 
 	if precision == 0 {
@@ -896,8 +1411,6 @@ func filterTojson(_ *State, val value.Value, args []value.Value, kwargs map[stri
 	native := valueToNative(val)
 
 	// Check for indent option
-	// If first arg is bool: true = indent 2, false = no indent
-	// If first arg is int: that number of spaces
 	indent := ""
 	if len(args) > 0 {
 		if b, ok := args[0].AsBool(); ok {
@@ -939,7 +1452,7 @@ func valueToNative(v value.Value) interface{} {
 		b, _ := v.AsBool()
 		return b
 	case value.KindNumber:
-		if i, ok := v.AsInt(); ok {
+		if i, ok := v.AsInt(); ok && v.IsActualInt() {
 			return i
 		}
 		f, _ := v.AsFloat()
@@ -967,6 +1480,24 @@ func valueToNative(v value.Value) interface{} {
 }
 
 func filterUrlencode(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	// Check if it's a map (dict) - encode as query string
+	if m, ok := val.AsMap(); ok {
+		var parts []string
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			v := m[k]
+			if v.IsNone() {
+				continue
+			}
+			parts = append(parts, url.QueryEscape(k)+"="+url.QueryEscape(v.String()))
+		}
+		return value.FromString(strings.Join(parts, "&")), nil
+	}
+
 	s, ok := val.AsString()
 	if !ok {
 		s = val.String()
@@ -1098,17 +1629,14 @@ func testNumber(_ *State, val value.Value, _ []value.Value) (bool, error) {
 }
 
 func testInteger(_ *State, val value.Value, _ []value.Value) (bool, error) {
-	// An integer is a number that is stored as int64 (not float64)
 	_, ok := val.AsInt()
 	if !ok {
 		return false, nil
 	}
-	// Also ensure it's not stored as a float
 	return val.IsActualInt(), nil
 }
 
 func testFloat(_ *State, val value.Value, _ []value.Value) (bool, error) {
-	// A float is a number stored as float64
 	return val.IsActualFloat(), nil
 }
 
@@ -1124,8 +1652,6 @@ func testSameAs(_ *State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
-	// sameas checks for identity, not equality
-	// For primitive types this is the same as equality with strict type checking
 	return val.SameAs(args[0]), nil
 }
 
@@ -1134,7 +1660,6 @@ func testLower(_ *State, val value.Value, _ []value.Value) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	// Check if all characters are lowercase (like Rust's is_lowercase)
 	for _, r := range s {
 		if !unicode.IsLower(r) && unicode.IsLetter(r) {
 			return false, nil
@@ -1148,7 +1673,6 @@ func testUpper(_ *State, val value.Value, _ []value.Value) (bool, error) {
 	if !ok {
 		return false, nil
 	}
-	// Check if all characters are uppercase (like Rust's is_uppercase)
 	for _, r := range s {
 		if !unicode.IsUpper(r) && unicode.IsLetter(r) {
 			return false, nil
@@ -1251,12 +1775,34 @@ func fnRange(_ *State, args []value.Value, kwargs map[string]value.Value) (value
 			result = append(result, value.FromInt(i))
 		}
 	}
-	// Return an iterator, not a sequence - this matches Rust MiniJinja behavior
 	return value.FromIterator(value.NewIterator("range", result)), nil
 }
 
 func fnDict(_ *State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	result := make(map[string]value.Value)
+
+	// First, copy from first positional argument if it's a map
+	if len(args) > 0 {
+		if m, ok := args[0].AsMap(); ok {
+			for k, v := range m {
+				result[k] = v
+			}
+		} else {
+			// Try to iterate as items
+			items := args[0].Iter()
+			if items != nil {
+				for _, item := range items {
+					if pair, ok := item.AsSlice(); ok && len(pair) == 2 {
+						if k, ok := pair[0].AsString(); ok {
+							result[k] = pair[1]
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Then apply kwargs (overwriting)
 	for k, v := range kwargs {
 		result[k] = v
 	}
@@ -1344,10 +1890,21 @@ func (j *joinerCallable) Call(args []value.Value, kwargs map[string]value.Value)
 	return value.FromString(j.sep), nil
 }
 
-func fnNamespace(_ *State, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func fnNamespace(_ *State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	ns := &namespaceValue{
 		data: make(map[string]value.Value),
 	}
+
+	// If first argument is a map, copy from it
+	if len(args) > 0 {
+		if m, ok := args[0].AsMap(); ok {
+			for k, v := range m {
+				ns.data[k] = v
+			}
+		}
+	}
+
+	// Apply kwargs
 	for k, v := range kwargs {
 		ns.data[k] = v
 	}
@@ -1370,15 +1927,44 @@ func (n *namespaceValue) SetAttr(name string, val value.Value) {
 	n.data[name] = val
 }
 
-func fnDebug(state *State, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func (n *namespaceValue) String() string {
 	var parts []string
-	parts = append(parts, fmt.Sprintf("Template: %s", state.name))
-	parts = append(parts, "Variables:")
+	keys := make([]string, 0, len(n.data))
+	for k := range n.data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%s", k, n.data[k].Repr()))
+	}
+	return "Namespace(" + strings.Join(parts, ", ") + ")"
+}
+
+func fnDebug(state *State, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+	// If arguments provided, debug those values
+	if len(args) > 0 {
+		var parts []string
+		for _, arg := range args {
+			parts = append(parts, arg.Repr())
+		}
+		return value.FromString(strings.Join(parts, ", ")), nil
+	}
+
+	// Otherwise debug the current state
+	var parts []string
+	parts = append(parts, fmt.Sprintf("State {"))
+	parts = append(parts, fmt.Sprintf("  name: %q,", state.name))
+	parts = append(parts, "  current variables: {")
+
+	// Collect variables from scopes
 	for i := len(state.scopes) - 1; i >= 0; i-- {
 		for k, v := range state.scopes[i] {
-			parts = append(parts, fmt.Sprintf("  %s = %s", k, v.Repr()))
+			parts = append(parts, fmt.Sprintf("    %s: %s,", k, v.Repr()))
 		}
 	}
+	parts = append(parts, "  }")
+	parts = append(parts, "}")
+
 	return value.FromString(strings.Join(parts, "\n")), nil
 }
 

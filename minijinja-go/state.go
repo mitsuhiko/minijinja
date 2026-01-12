@@ -2,6 +2,7 @@ package minijinja
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/parser"
@@ -19,7 +20,7 @@ type State struct {
 	macros       map[string]*parser.Macro
 	out          *strings.Builder
 	depth        int
-	currentBlock string              // name of block currently being rendered
+	currentBlock string                            // name of block currently being rendered
 	loopRecurse  func(value.Value) (string, error) // for recursive loops
 }
 
@@ -31,31 +32,39 @@ type blockStack struct {
 
 // macroCallable wraps a macro for callable invocation
 type macroCallable struct {
-	macro *parser.Macro
-	state *State
+	macro  *parser.Macro
+	state  *State
+	caller value.Value // caller value if this is a call block macro
 }
 
 func (m *macroCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	// Convert args to CallArgs format
-	callArgs := make([]parser.CallArg, 0, len(args)+len(kwargs))
-	for _, arg := range args {
-		callArgs = append(callArgs, parser.CallArg{
-			Kind:  parser.CallArgPos,
-			Value: &parser.Const{Value: arg.Raw()},
-		})
-	}
-	for name, val := range kwargs {
-		callArgs = append(callArgs, parser.CallArg{
-			Kind:  parser.CallArgKwarg,
-			Name:  name,
-			Value: &parser.Const{Value: val.Raw()},
-		})
-	}
-
-	return m.state.callMacroWithValues(m.macro, args, kwargs)
+	return m.state.callMacroWithValues(m.macro, args, kwargs, m.caller)
 }
 
-func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// GetAttr returns macro properties
+func (m *macroCallable) GetAttr(name string) value.Value {
+	switch name {
+	case "name":
+		return value.FromString(m.macro.Name)
+	case "arguments":
+		argNames := make([]value.Value, len(m.macro.Args))
+		for i, arg := range m.macro.Args {
+			if v, ok := arg.(*parser.Var); ok {
+				argNames[i] = value.FromString(v.ID)
+			}
+		}
+		return value.FromSlice(argNames)
+	case "caller":
+		return value.FromBool(m.caller != value.Undefined())
+	}
+	return value.Undefined()
+}
+
+func (m *macroCallable) String() string {
+	return fmt.Sprintf("<macro %s>", m.macro.Name)
+}
+
+func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwargs map[string]value.Value, caller value.Value) (value.Value, error) {
 	s.depth++
 	if s.depth > maxRecursion {
 		return value.Undefined(), NewError(ErrInvalidOperation, "recursion limit exceeded")
@@ -94,6 +103,11 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 		}
 	}
 
+	// Set caller if provided
+	if !caller.IsUndefined() {
+		s.Set("caller", caller)
+	}
+
 	// Capture output
 	oldOut := s.out
 	s.out = &strings.Builder{}
@@ -109,34 +123,138 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 	return value.FromSafeString(result), nil
 }
 
-// LoopState holds information about the current loop iteration.
-type LoopState struct {
-	Index     int   // 1-based index
-	Index0    int   // 0-based index
-	RevIndex  int   // reverse 1-based index
-	RevIndex0 int   // reverse 0-based index
-	First     bool  // is first iteration
-	Last      bool  // is last iteration
-	Length    int   // total length
-	Depth     int   // nesting depth (1-based)
-	Depth0    int   // nesting depth (0-based)
-	Cycle     []value.Value // cycle values
+// loopObject is the loop variable object that supports cycle() and previtem/nextitem
+type loopObject struct {
+	index     int           // 0-based index
+	length    int           // total length
+	depth     int           // nesting depth (0-based)
+	items     []value.Value // all items for previtem/nextitem
+	changed   *value.Value  // last value for changed()
+	recurseFn func(value.Value) (string, error)
 }
 
-// ToValue converts LoopState to a Value.
-func (l *LoopState) ToValue() value.Value {
-	m := map[string]value.Value{
-		"index":     value.FromInt(int64(l.Index)),
-		"index0":    value.FromInt(int64(l.Index0)),
-		"revindex":  value.FromInt(int64(l.RevIndex)),
-		"revindex0": value.FromInt(int64(l.RevIndex0)),
-		"first":     value.FromBool(l.First),
-		"last":      value.FromBool(l.Last),
-		"length":    value.FromInt(int64(l.Length)),
-		"depth":     value.FromInt(int64(l.Depth)),
-		"depth0":    value.FromInt(int64(l.Depth0)),
+func (l *loopObject) GetAttr(name string) value.Value {
+	switch name {
+	case "index":
+		return value.FromInt(int64(l.index + 1))
+	case "index0":
+		return value.FromInt(int64(l.index))
+	case "revindex":
+		return value.FromInt(int64(l.length - l.index))
+	case "revindex0":
+		return value.FromInt(int64(l.length - l.index - 1))
+	case "first":
+		return value.FromBool(l.index == 0)
+	case "last":
+		return value.FromBool(l.index == l.length-1)
+	case "length":
+		return value.FromInt(int64(l.length))
+	case "depth":
+		return value.FromInt(int64(l.depth + 1))
+	case "depth0":
+		return value.FromInt(int64(l.depth))
+	case "previtem":
+		if l.index > 0 {
+			return l.items[l.index-1]
+		}
+		return value.Undefined()
+	case "nextitem":
+		if l.index < l.length-1 {
+			return l.items[l.index+1]
+		}
+		return value.Undefined()
+	case "cycle":
+		return value.FromCallable(&loopCycleCallable{loop: l})
+	case "changed":
+		return value.FromCallable(&loopChangedCallable{loop: l})
 	}
-	return value.FromMap(m)
+	return value.Undefined()
+}
+
+func (l *loopObject) String() string {
+	return fmt.Sprintf("<loop %d/%d>", l.index, l.length)
+}
+
+// loopCycleCallable implements loop.cycle()
+type loopCycleCallable struct {
+	loop *loopObject
+}
+
+func (c *loopCycleCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	if len(args) == 0 {
+		return value.Undefined(), nil
+	}
+	idx := c.loop.index % len(args)
+	return args[idx], nil
+}
+
+// loopChangedCallable implements loop.changed()
+type loopChangedCallable struct {
+	loop *loopObject
+}
+
+func (c *loopChangedCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	// Create a comparable representation of args
+	newVal := value.FromSlice(args)
+	if c.loop.changed == nil {
+		c.loop.changed = &newVal
+		return value.FromBool(true), nil
+	}
+	changed := !newVal.Equal(*c.loop.changed)
+	if changed {
+		c.loop.changed = &newVal
+	}
+	return value.FromBool(changed), nil
+}
+
+// selfObject provides access to blocks via self.blockname()
+type selfObject struct {
+	state *State
+}
+
+func (so *selfObject) GetAttr(name string) value.Value {
+	// Return a callable that renders the block
+	return value.FromCallable(&blockCallable{
+		state:     so.state,
+		blockName: name,
+	})
+}
+
+// blockCallable renders a block when called
+type blockCallable struct {
+	state     *State
+	blockName string
+}
+
+func (bc *blockCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	bs := bc.state.blocks[bc.blockName]
+	if bs == nil || len(bs.layers) == 0 {
+		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("block '%s' not found", bc.blockName))
+	}
+
+	// Capture output
+	oldOut := bc.state.out
+	bc.state.out = &strings.Builder{}
+
+	oldBlock := bc.state.currentBlock
+	bc.state.currentBlock = bc.blockName
+
+	bc.state.pushScope()
+	for _, stmt := range bs.layers[0] {
+		if err := bc.state.evalStmt(stmt); err != nil {
+			bc.state.popScope()
+			bc.state.currentBlock = oldBlock
+			bc.state.out = oldOut
+			return value.Undefined(), err
+		}
+	}
+	bc.state.popScope()
+
+	result := bc.state.out.String()
+	bc.state.out = oldOut
+	bc.state.currentBlock = oldBlock
+
+	return value.FromSafeString(result), nil
 }
 
 const maxRecursion = 500
@@ -164,6 +282,11 @@ func newState(env *Environment, name, source string, ctx value.Value) *State {
 
 // Lookup looks up a variable in the current scope chain.
 func (s *State) Lookup(name string) value.Value {
+	// Special handling for "self"
+	if name == "self" {
+		return value.FromObject(&selfObject{state: s})
+	}
+
 	// Search scopes from inner to outer
 	for i := len(s.scopes) - 1; i >= 0; i-- {
 		if v, ok := s.scopes[i][name]; ok {
@@ -302,6 +425,9 @@ func (s *State) evalStmt(stmt parser.Stmt) error {
 	case *parser.Break:
 		return errBreak
 
+	case *parser.CallBlock:
+		return s.evalCallBlock(st)
+
 	default:
 		return fmt.Errorf("unsupported statement type: %T", stmt)
 	}
@@ -392,23 +518,19 @@ func (s *State) evalForLoop(loop *parser.ForLoop) error {
 
 			oldOut := s.out
 			s.out = &strings.Builder{}
-			
-			for i, item := range nestedItems {
-				s.unpackTarget(loop.Target, item)
-				
-				loopState := &LoopState{
-					Index:     i + 1,
-					Index0:    i,
-					RevIndex:  len(nestedItems) - i,
-					RevIndex0: len(nestedItems) - i - 1,
-					First:     i == 0,
-					Last:      i == len(nestedItems)-1,
-					Length:    len(nestedItems),
-					Depth:     s.depth,
-					Depth0:    s.depth - 1,
+
+			for i := range nestedItems {
+				s.unpackTarget(loop.Target, nestedItems[i])
+
+				loopObj := &loopObject{
+					index:     i,
+					length:    len(nestedItems),
+					depth:     s.depth - 1,
+					items:     nestedItems,
+					recurseFn: s.loopRecurse,
 				}
-				s.Set("loop", loopState.ToValue())
-				
+				s.Set("loop", value.FromObject(loopObj))
+
 				for _, stmt := range loop.Body {
 					err := s.evalStmt(stmt)
 					if err == errContinue {
@@ -425,7 +547,7 @@ func (s *State) evalForLoop(loop *parser.ForLoop) error {
 					}
 				}
 			}
-			
+
 			result := s.out.String()
 			s.out = oldOut
 			return result, nil
@@ -433,22 +555,18 @@ func (s *State) evalForLoop(loop *parser.ForLoop) error {
 		defer func() { s.loopRecurse = oldRecurse }()
 	}
 
-	for i, item := range items {
-		s.unpackTarget(loop.Target, item)
+	for i := range items {
+		s.unpackTarget(loop.Target, items[i])
 
-		// Set loop variable
-		loopState := &LoopState{
-			Index:     i + 1,
-			Index0:    i,
-			RevIndex:  len(items) - i,
-			RevIndex0: len(items) - i - 1,
-			First:     i == 0,
-			Last:      i == len(items)-1,
-			Length:    len(items),
-			Depth:     s.depth,
-			Depth0:    s.depth - 1,
+		// Set loop variable as an object
+		loopObj := &loopObject{
+			index:     i,
+			length:    len(items),
+			depth:     s.depth - 1,
+			items:     items,
+			recurseFn: s.loopRecurse,
 		}
-		s.Set("loop", loopState.ToValue())
+		s.Set("loop", value.FromObject(loopObj))
 
 		for _, stmt := range loop.Body {
 			err := s.evalStmt(stmt)
@@ -854,9 +972,10 @@ func (s *State) createModule(tmpl *parser.Template) value.Value {
 func (s *State) makeMacroCallable(macro *parser.Macro) value.Value {
 	// Store a reference to the macro that can be called later
 	// We use a special "callable" value type
-	return value.FromCallable(&macroCallable{
-		macro: macro,
-		state: s,
+	return value.FromObject(&macroCallable{
+		macro:  macro,
+		state:  s,
+		caller: value.Undefined(),
 	})
 }
 
@@ -915,6 +1034,101 @@ func (s *State) evalAutoEscape(ae *parser.AutoEscape) error {
 	}
 	s.autoEscape = oldEscape
 	return nil
+}
+
+func (s *State) evalCallBlock(cb *parser.CallBlock) error {
+	// Evaluate the call expression to get the macro
+	callExpr := cb.Call
+
+	// Get the macro being called
+	var macro *parser.Macro
+	var macroName string
+
+	if v, ok := callExpr.Expr.(*parser.Var); ok {
+		macroName = v.ID
+		if m, ok := s.macros[macroName]; ok {
+			macro = m
+		}
+	}
+
+	if macro == nil {
+		// Try to evaluate as a callable
+		expr, err := s.evalExpr(callExpr.Expr)
+		if err != nil {
+			return err
+		}
+		if mc, ok := expr.AsObject(); ok {
+			if macroC, ok := mc.(*macroCallable); ok {
+				macro = macroC.macro
+			}
+		}
+	}
+
+	if macro == nil {
+		return NewError(ErrInvalidOperation, "call block requires a macro")
+	}
+
+	// Create a caller callable that renders the call block body
+	// MacroDecl holds the caller's body and arguments
+	callerCallable := &callerCallable{
+		state: s,
+		body:  cb.MacroDecl.Body,
+		args:  cb.MacroDecl.Args,
+	}
+
+	// Evaluate call arguments
+	args, kwargs, err := s.evalCallArgs(callExpr.Args)
+	if err != nil {
+		return err
+	}
+
+	// Call the macro with the caller
+	result, err := s.callMacroWithValues(macro, args, kwargs, value.FromCallable(callerCallable))
+	if err != nil {
+		return err
+	}
+
+	s.writeValue(result)
+	return nil
+}
+
+// callerCallable represents the caller() function inside a macro invoked via call block
+type callerCallable struct {
+	state *State
+	body  []parser.Stmt
+	args  []parser.Expr // macro args from the call block declaration
+}
+
+func (c *callerCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	c.state.pushScope()
+	defer c.state.popScope()
+
+	// Bind arguments to the caller's parameters
+	for i, argExpr := range c.args {
+		if v, ok := argExpr.(*parser.Var); ok {
+			if i < len(args) {
+				c.state.Set(v.ID, args[i])
+			} else {
+				c.state.Set(v.ID, value.Undefined())
+			}
+		}
+	}
+
+	// Capture output
+	oldOut := c.state.out
+	c.state.out = &strings.Builder{}
+
+	for _, stmt := range c.body {
+		if err := c.state.evalStmt(stmt); err != nil {
+			c.state.out = oldOut
+			return value.Undefined(), err
+		}
+	}
+
+	result := c.state.out.String()
+	c.state.out = oldOut
+
+	return value.FromSafeString(result), nil
 }
 
 func (s *State) writeValue(val value.Value) {
@@ -1575,4 +1789,32 @@ func (s *State) applyFilterCallArgs(name string, val value.Value, callArgs []par
 	}
 
 	return filterFn(s, val, args, kwargs)
+}
+
+// debugObject represents the debug() function result with proper repr
+type debugObject struct {
+	repr string
+}
+
+func (d *debugObject) GetAttr(name string) value.Value {
+	return value.Undefined()
+}
+
+func (d *debugObject) String() string {
+	return d.repr
+}
+
+// Stringer interface for namespace output
+type namespaceStringer interface {
+	String() string
+}
+
+// Helper to get sorted keys from scope
+func sortedScopeKeys(scope map[string]value.Value) []string {
+	keys := make([]string, 0, len(scope))
+	for k := range scope {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

@@ -642,8 +642,12 @@ func (v Value) Len() (int, bool) {
 		return len(d), true
 	case []Value:
 		return len(d), true
+	case *Iterator:
+		return len(d.items), true
 	case map[string]Value:
 		return len(d), true
+	case LenGetter:
+		return d.Len()
 	default:
 		return 0, false
 	}
@@ -659,6 +663,15 @@ func (v Value) GetItem(key Value) Value {
 			}
 			if idx >= 0 && idx < int64(len(d)) {
 				return d[idx]
+			}
+		}
+	case *Iterator:
+		if idx, ok := key.AsInt(); ok {
+			if idx < 0 {
+				idx = int64(len(d.items)) + idx
+			}
+			if idx >= 0 && idx < int64(len(d.items)) {
+				return d.items[idx]
 			}
 		}
 	case map[string]Value:
@@ -687,6 +700,8 @@ func (v Value) GetItem(key Value) Value {
 				return FromString(string(runes[idx]))
 			}
 		}
+	case ItemGetter:
+		return d.GetItem(key)
 	}
 	return Undefined()
 }
@@ -718,6 +733,21 @@ func (v Value) AsMutableObject() (MutableObject, bool) {
 		return o, true
 	}
 	return nil, false
+}
+
+// Iterable is an interface for objects that can be iterated.
+type Iterable interface {
+	Iter() []Value
+}
+
+// LenGetter is an interface for objects that have a length.
+type LenGetter interface {
+	Len() (int, bool)
+}
+
+// ItemGetter is an interface for objects that support item access.
+type ItemGetter interface {
+	GetItem(key Value) Value
 }
 
 // Iter returns an iterator over the value's items.
@@ -752,6 +782,8 @@ func (v Value) Iter() []Value {
 			result[i] = FromString(string(r))
 		}
 		return result
+	case Iterable:
+		return d.Iter()
 	default:
 		return nil
 	}

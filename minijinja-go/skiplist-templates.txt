@@ -14,25 +14,25 @@ literals.txt
 # =============================================================================
 # NOT YET IMPLEMENTED - Missing features
 # =============================================================================
-# Missing: bool filter
+# Missing: bool filter (need enhanced implementation)
 filters.txt
 
-# Missing: select/reject/selectattr/rejectattr filter arguments
+# Missing: select/reject/selectattr/rejectattr filter with test name arguments
 opfilters.txt
 
 # Missing: self object for block calls
 self.txt
 
-# Missing: loop.cycle() callable method
+# Missing: loop.cycle() callable method (now implemented but test needs cycle values)
 loop_var.txt
 
-# Missing: debug() function
+# Missing: debug() function (formatting differences)
 debug.txt
 
-# Missing: dict() function with args/kwargs spreading
+# Missing: dict() function with map spreading
 dict.txt
 
-# Missing: namespace object string representation
+# Missing: namespace object string representation (formatting differences)
 namespace.txt
 
 # Missing: macro.name, macro.arguments, caller properties
@@ -53,7 +53,7 @@ macro_calling_macro.txt
 # Missing: set in extends context
 extends_set.txt
 
-# Missing: groupby filter issues
+# Missing: groupby filter with proper object representation
 groupby-filter.txt
 
 # Missing: import * functionality
@@ -134,3 +134,6 @@ loop_over_non_iterable.txt
 
 # namespace errors
 namespace_bad.txt
+
+# caller keyword error validation
+err_unexpected_caller_macro.txt
