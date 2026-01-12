@@ -720,3 +720,312 @@ func TestForLoopFilter(t *testing.T) {
 		t.Errorf("expected '345', got %q", result)
 	}
 }
+
+// --- Template Inheritance Tests ---
+
+func TestTemplateExtends(t *testing.T) {
+	env := NewEnvironment()
+	err := env.AddTemplate("base.html", `<html>{% block content %}default{% endblock %}</html>`)
+	if err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+
+	tmpl, err := env.TemplateFromString(`{% extends "base.html" %}{% block content %}Hello World{% endblock %}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "<html>Hello World</html>" {
+		t.Errorf("expected '<html>Hello World</html>', got %q", result)
+	}
+}
+
+func TestTemplateExtendsWithSuper(t *testing.T) {
+	env := NewEnvironment()
+	err := env.AddTemplate("base.html", `{% block content %}BASE{% endblock %}`)
+	if err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+
+	tmpl, err := env.TemplateFromString(`{% extends "base.html" %}{% block content %}{{ super() }}:CHILD{% endblock %}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "BASE:CHILD" {
+		t.Errorf("expected 'BASE:CHILD', got %q", result)
+	}
+}
+
+func TestTemplateExtendsMultipleLevels(t *testing.T) {
+	env := NewEnvironment()
+	err := env.AddTemplate("base.html", `[{% block content %}BASE{% endblock %}]`)
+	if err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+	err = env.AddTemplate("middle.html", `{% extends "base.html" %}{% block content %}MIDDLE{% endblock %}`)
+	if err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+
+	tmpl, err := env.TemplateFromString(`{% extends "middle.html" %}{% block content %}CHILD{% endblock %}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "[CHILD]" {
+		t.Errorf("expected '[CHILD]', got %q", result)
+	}
+}
+
+func TestTemplateExtendsWithVariable(t *testing.T) {
+	env := NewEnvironment()
+	err := env.AddTemplate("base.html", `Hello {% block name %}World{% endblock %}!`)
+	if err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+
+	tmpl, err := env.TemplateFromString(`{% extends "base.html" %}{% block name %}{{ name }}{% endblock %}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(map[string]any{"name": "Alice"})
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "Hello Alice!" {
+		t.Errorf("expected 'Hello Alice!', got %q", result)
+	}
+}
+
+// --- Import Tests ---
+
+func TestImport(t *testing.T) {
+	env := NewEnvironment()
+	err := env.AddTemplate("forms.html", `{% macro input(name) %}<input name="{{ name }}">{% endmacro %}`)
+	if err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+
+	tmpl, err := env.TemplateFromString(`{% import "forms.html" as forms %}{{ forms.input("test") }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != `<input name="test">` {
+		t.Errorf("expected '<input name=\"test\">', got %q", result)
+	}
+}
+
+func TestFromImport(t *testing.T) {
+	env := NewEnvironment()
+	err := env.AddTemplate("forms.html", `{% macro input(name) %}<input name="{{ name }}">{% endmacro %}{% macro button(text) %}<button>{{ text }}</button>{% endmacro %}`)
+	if err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+
+	tmpl, err := env.TemplateFromString(`{% from "forms.html" import input, button %}{{ input("test") }}{{ button("Click") }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != `<input name="test"><button>Click</button>` {
+		t.Errorf("expected '<input name=\"test\"><button>Click</button>', got %q", result)
+	}
+}
+
+func TestFromImportWithAlias(t *testing.T) {
+	env := NewEnvironment()
+	err := env.AddTemplate("forms.html", `{% macro input(name) %}<input name="{{ name }}">{% endmacro %}`)
+	if err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+
+	tmpl, err := env.TemplateFromString(`{% from "forms.html" import input as inp %}{{ inp("test") }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != `<input name="test">` {
+		t.Errorf("expected '<input name=\"test\">', got %q", result)
+	}
+}
+
+// --- Loop Recursion Tests ---
+
+func TestLoopRecursion(t *testing.T) {
+	env := NewEnvironment()
+	// The recursive loop re-applies the loop body to nested children
+	tmpl, err := env.TemplateFromString(`{% for item in items recursive %}{{ item.name }}{% if item.children %}({{ loop(item.children) }}){% endif %}{% endfor %}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(map[string]any{
+		"items": []map[string]any{
+			{"name": "A", "children": []map[string]any{
+				{"name": "A1", "children": nil},
+				{"name": "A2", "children": nil},
+			}},
+			{"name": "B", "children": nil},
+		},
+	})
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "A(A1A2)B" {
+		t.Errorf("expected 'A(A1A2)B', got %q", result)
+	}
+}
+
+// --- Advanced Filters Tests ---
+
+func TestTojsonFilter(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		ctx      map[string]any
+		expected string
+	}{
+		{`{{ value|tojson }}`, map[string]any{"value": "hello"}, `"hello"`},
+		{`{{ value|tojson }}`, map[string]any{"value": 42}, `42`},
+		{`{{ value|tojson }}`, map[string]any{"value": []int{1, 2, 3}}, `[1,2,3]`},
+		{`{{ value|tojson }}`, map[string]any{"value": map[string]any{"a": 1}}, `{"a":1}`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(test.ctx)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
+func TestUrlencodeFilter(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		ctx      map[string]any
+		expected string
+	}{
+		{`{{ value|urlencode }}`, map[string]any{"value": "hello world"}, `hello+world`},
+		{`{{ value|urlencode }}`, map[string]any{"value": "a=b&c=d"}, `a%3Db%26c%3Dd`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(test.ctx)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
+// --- Callable Objects Tests ---
+
+func TestCallableObject(t *testing.T) {
+	env := NewEnvironment()
+
+	// Add a cycler that actually works as a callable
+	tmpl, err := env.TemplateFromString(`{% set c = cycler("odd", "even") %}{{ c.next() }} {{ c.next() }} {{ c.next() }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "odd even odd" {
+		t.Errorf("expected 'odd even odd', got %q", result)
+	}
+}
+
+func TestJoinerCallable(t *testing.T) {
+	env := NewEnvironment()
+
+	tmpl, err := env.TemplateFromString(`{% set j = joiner(", ") %}{% for item in items %}{{ j() }}{{ item }}{% endfor %}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(map[string]any{
+		"items": []string{"a", "b", "c"},
+	})
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "a, b, c" {
+		t.Errorf("expected 'a, b, c', got %q", result)
+	}
+}
+
+// --- Namespace Tests ---
+
+func TestNamespace(t *testing.T) {
+	env := NewEnvironment()
+
+	tmpl, err := env.TemplateFromString(`{% set ns = namespace(count=0) %}{% for i in range(3) %}{% set ns.count = ns.count + 1 %}{% endfor %}{{ ns.count }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "3" {
+		t.Errorf("expected '3', got %q", result)
+	}
+}

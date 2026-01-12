@@ -1,7 +1,9 @@
 package minijinja
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -59,6 +61,10 @@ func registerDefaultFilters(env *Environment) {
 	env.AddFilter("attr", filterAttr)
 	env.AddFilter("indent", filterIndent)
 	env.AddFilter("pprint", filterPprint)
+
+	// JSON and URL filters
+	env.AddFilter("tojson", filterTojson)
+	env.AddFilter("urlencode", filterUrlencode)
 }
 
 func registerDefaultTests(env *Environment) {
@@ -872,6 +878,79 @@ func filterPprint(_ *State, val value.Value, _ []value.Value, _ map[string]value
 	return value.FromString(val.Repr()), nil
 }
 
+func filterTojson(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	// Convert value to Go native type for JSON serialization
+	native := valueToNative(val)
+	
+	// Check for indent option
+	indent := ""
+	if len(args) > 0 {
+		if i, ok := args[0].AsInt(); ok {
+			indent = strings.Repeat(" ", int(i))
+		}
+	}
+	if i, ok := kwargs["indent"]; ok {
+		if n, ok := i.AsInt(); ok {
+			indent = strings.Repeat(" ", int(n))
+		}
+	}
+
+	var data []byte
+	var err error
+	if indent != "" {
+		data, err = json.MarshalIndent(native, "", indent)
+	} else {
+		data, err = json.Marshal(native)
+	}
+	if err != nil {
+		return value.Undefined(), err
+	}
+	return value.FromSafeString(string(data)), nil
+}
+
+func valueToNative(v value.Value) interface{} {
+	switch v.Kind() {
+	case value.KindUndefined, value.KindNone:
+		return nil
+	case value.KindBool:
+		b, _ := v.AsBool()
+		return b
+	case value.KindNumber:
+		if i, ok := v.AsInt(); ok {
+			return i
+		}
+		f, _ := v.AsFloat()
+		return f
+	case value.KindString:
+		s, _ := v.AsString()
+		return s
+	case value.KindSeq:
+		items, _ := v.AsSlice()
+		result := make([]interface{}, len(items))
+		for i, item := range items {
+			result[i] = valueToNative(item)
+		}
+		return result
+	case value.KindMap:
+		m, _ := v.AsMap()
+		result := make(map[string]interface{})
+		for k, val := range m {
+			result[k] = valueToNative(val)
+		}
+		return result
+	default:
+		return v.String()
+	}
+}
+
+func filterUrlencode(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	s, ok := val.AsString()
+	if !ok {
+		s = val.String()
+	}
+	return value.FromString(url.QueryEscape(s)), nil
+}
+
 // --- Tests ---
 
 func testDefined(_ *State, val value.Value, _ []value.Value) (bool, error) {
@@ -1083,8 +1162,57 @@ func fnDict(_ *State, args []value.Value, kwargs map[string]value.Value) (value.
 }
 
 func fnCycler(_ *State, args []value.Value, _ map[string]value.Value) (value.Value, error) {
-	// Return a simple cycler as a sequence for now
-	return value.FromSlice(args), nil
+	return value.FromObject(&cyclerObject{
+		items: args,
+		index: 0,
+	}), nil
+}
+
+// cyclerObject implements a cycler that cycles through values
+type cyclerObject struct {
+	items []value.Value
+	index int
+}
+
+func (c *cyclerObject) GetAttr(name string) value.Value {
+	switch name {
+	case "next":
+		return value.FromCallable(&cyclerNextCallable{cycler: c})
+	case "current":
+		if len(c.items) == 0 {
+			return value.Undefined()
+		}
+		idx := c.index
+		if idx == 0 {
+			idx = len(c.items)
+		}
+		return c.items[idx-1]
+	case "reset":
+		return value.FromCallable(&cyclerResetCallable{cycler: c})
+	}
+	return value.Undefined()
+}
+
+type cyclerNextCallable struct {
+	cycler *cyclerObject
+}
+
+func (c *cyclerNextCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	if len(c.cycler.items) == 0 {
+		return value.Undefined(), nil
+	}
+	result := c.cycler.items[c.cycler.index]
+	c.cycler.index = (c.cycler.index + 1) % len(c.cycler.items)
+	return result, nil
+}
+
+type cyclerResetCallable struct {
+	cycler *cyclerObject
+}
+
+func (c *cyclerResetCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	c.cycler.index = 0
+	return value.Undefined(), nil
 }
 
 func fnJoiner(_ *State, args []value.Value, _ map[string]value.Value) (value.Value, error) {
@@ -1094,16 +1222,50 @@ func fnJoiner(_ *State, args []value.Value, _ map[string]value.Value) (value.Val
 			sep = s
 		}
 	}
-	// Return the separator - actual joiner behavior would need callable support
-	return value.FromString(sep), nil
+	return value.FromCallable(&joinerCallable{
+		sep:   sep,
+		first: true,
+	}), nil
+}
+
+// joinerCallable implements a joiner that returns separator after first call
+type joinerCallable struct {
+	sep   string
+	first bool
+}
+
+func (j *joinerCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	if j.first {
+		j.first = false
+		return value.FromString(""), nil
+	}
+	return value.FromString(j.sep), nil
 }
 
 func fnNamespace(_ *State, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	result := make(map[string]value.Value)
-	for k, v := range kwargs {
-		result[k] = v
+	ns := &namespaceValue{
+		data: make(map[string]value.Value),
 	}
-	return value.FromMap(result), nil
+	for k, v := range kwargs {
+		ns.data[k] = v
+	}
+	return value.FromObject(ns), nil
+}
+
+// namespaceValue is a mutable namespace object
+type namespaceValue struct {
+	data map[string]value.Value
+}
+
+func (n *namespaceValue) GetAttr(name string) value.Value {
+	if v, ok := n.data[name]; ok {
+		return v
+	}
+	return value.Undefined()
+}
+
+func (n *namespaceValue) SetAttr(name string, val value.Value) {
+	n.data[name] = val
 }
 
 func fnDebug(state *State, _ []value.Value, _ map[string]value.Value) (value.Value, error) {

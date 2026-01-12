@@ -10,15 +10,97 @@ import (
 
 // State holds the evaluation state during template rendering.
 type State struct {
-	env        *Environment
-	name       string
-	source     string
-	autoEscape AutoEscape
-	scopes     []map[string]value.Value
-	blocks     map[string][]parser.Stmt
-	macros     map[string]*parser.Macro
-	out        *strings.Builder
-	depth      int
+	env          *Environment
+	name         string
+	source       string
+	autoEscape   AutoEscape
+	scopes       []map[string]value.Value
+	blocks       map[string]*blockStack
+	macros       map[string]*parser.Macro
+	out          *strings.Builder
+	depth        int
+	currentBlock string              // name of block currently being rendered
+	loopRecurse  func(value.Value) (string, error) // for recursive loops
+}
+
+// blockStack manages the inheritance chain for a single block
+type blockStack struct {
+	layers [][]parser.Stmt // stack of block implementations (child first)
+	index  int             // current index in stack
+}
+
+// macroCallable wraps a macro for callable invocation
+type macroCallable struct {
+	macro *parser.Macro
+	state *State
+}
+
+func (m *macroCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	// Convert args to CallArgs format
+	callArgs := make([]parser.CallArg, 0, len(args)+len(kwargs))
+	for _, arg := range args {
+		callArgs = append(callArgs, parser.CallArg{
+			Kind:  parser.CallArgPos,
+			Value: &parser.Const{Value: arg.Raw()},
+		})
+	}
+	for name, val := range kwargs {
+		callArgs = append(callArgs, parser.CallArg{
+			Kind:  parser.CallArgKwarg,
+			Name:  name,
+			Value: &parser.Const{Value: val.Raw()},
+		})
+	}
+
+	return m.state.callMacroWithValues(m.macro, args, kwargs)
+}
+
+func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	s.pushScope()
+	defer s.popScope()
+
+	// Bind arguments
+	for i, arg := range macro.Args {
+		if varArg, ok := arg.(*parser.Var); ok {
+			// Check if provided as kwarg
+			if val, ok := kwargs[varArg.ID]; ok {
+				s.Set(varArg.ID, val)
+				continue
+			}
+			// Check if provided as positional arg
+			if i < len(args) {
+				s.Set(varArg.ID, args[i])
+			} else if i-len(macro.Args)+len(macro.Defaults) >= 0 {
+				// Use default value
+				defaultIdx := i - len(macro.Args) + len(macro.Defaults)
+				if defaultIdx >= 0 && defaultIdx < len(macro.Defaults) {
+					val, err := s.evalExpr(macro.Defaults[defaultIdx])
+					if err != nil {
+						return value.Undefined(), err
+					}
+					s.Set(varArg.ID, val)
+				} else {
+					s.Set(varArg.ID, value.Undefined())
+				}
+			} else {
+				s.Set(varArg.ID, value.Undefined())
+			}
+		}
+	}
+
+	// Capture output
+	oldOut := s.out
+	s.out = &strings.Builder{}
+	for _, stmt := range macro.Body {
+		if err := s.evalStmt(stmt); err != nil {
+			s.out = oldOut
+			return value.Undefined(), err
+		}
+	}
+	result := s.out.String()
+	s.out = oldOut
+
+	return value.FromSafeString(result), nil
 }
 
 // LoopState holds information about the current loop iteration.
@@ -68,7 +150,7 @@ func newState(env *Environment, name, source string, ctx value.Value) *State {
 		source:     source,
 		autoEscape: env.autoEscapeFunc(name),
 		scopes:     []map[string]value.Value{rootScope},
-		blocks:     make(map[string][]parser.Stmt),
+		blocks:     make(map[string]*blockStack),
 		macros:     make(map[string]*parser.Macro),
 		out:        &strings.Builder{},
 	}
@@ -110,6 +192,38 @@ func (s *State) popScope() {
 
 // eval evaluates a template AST.
 func (s *State) eval(tmpl *parser.Template) (string, error) {
+	// First, check if this template extends another
+	// If so, collect all blocks first, then process extends
+	var extendsStmt *parser.Extends
+	for _, stmt := range tmpl.Children {
+		if ext, ok := stmt.(*parser.Extends); ok {
+			extendsStmt = ext
+			break
+		}
+	}
+
+	if extendsStmt != nil {
+		// Collect all blocks from this (child) template first
+		for _, stmt := range tmpl.Children {
+			if block, ok := stmt.(*parser.Block); ok {
+				s.blocks[block.Name] = &blockStack{
+					layers: [][]parser.Stmt{block.Body},
+					index:  0,
+				}
+			}
+			// Also process macros
+			if macro, ok := stmt.(*parser.Macro); ok {
+				s.macros[macro.Name] = macro
+			}
+		}
+		// Now process extends
+		if err := s.evalExtends(extendsStmt); err != nil && err != errExtendsExecuted {
+			return "", err
+		}
+		return s.out.String(), nil
+	}
+
+	// Non-extending template - evaluate normally
 	for _, stmt := range tmpl.Children {
 		if err := s.evalStmt(stmt); err != nil {
 			return "", err
@@ -148,18 +262,16 @@ func (s *State) evalStmt(stmt parser.Stmt) error {
 		return s.evalSetBlock(st)
 
 	case *parser.Block:
-		// Store block for inheritance
-		s.blocks[st.Name] = st.Body
-		// Evaluate in place (for non-extending templates)
-		for _, child := range st.Body {
-			if err := s.evalStmt(child); err != nil {
-				return err
-			}
-		}
-		return nil
+		return s.evalBlock(st)
 
 	case *parser.Extends:
 		return s.evalExtends(st)
+
+	case *parser.Import:
+		return s.evalImport(st)
+
+	case *parser.FromImport:
+		return s.evalFromImport(st)
 
 	case *parser.Include:
 		return s.evalInclude(st)
@@ -256,6 +368,59 @@ func (s *State) evalForLoop(loop *parser.ForLoop) error {
 		s.depth--
 	}()
 
+	// Set up recursive loop function if needed
+	var oldRecurse func(value.Value) (string, error)
+	if loop.Recursive {
+		oldRecurse = s.loopRecurse
+		s.loopRecurse = func(iterValue value.Value) (string, error) {
+			nestedItems := iterValue.Iter()
+			if nestedItems == nil {
+				return "", nil
+			}
+
+			oldOut := s.out
+			s.out = &strings.Builder{}
+			
+			for i, item := range nestedItems {
+				s.unpackTarget(loop.Target, item)
+				
+				loopState := &LoopState{
+					Index:     i + 1,
+					Index0:    i,
+					RevIndex:  len(nestedItems) - i,
+					RevIndex0: len(nestedItems) - i - 1,
+					First:     i == 0,
+					Last:      i == len(nestedItems)-1,
+					Length:    len(nestedItems),
+					Depth:     s.depth,
+					Depth0:    s.depth - 1,
+				}
+				s.Set("loop", loopState.ToValue())
+				
+				for _, stmt := range loop.Body {
+					err := s.evalStmt(stmt)
+					if err == errContinue {
+						break
+					}
+					if err == errBreak {
+						result := s.out.String()
+						s.out = oldOut
+						return result, nil
+					}
+					if err != nil {
+						s.out = oldOut
+						return "", err
+					}
+				}
+			}
+			
+			result := s.out.String()
+			s.out = oldOut
+			return result, nil
+		}
+		defer func() { s.loopRecurse = oldRecurse }()
+	}
+
 	for i, item := range items {
 		s.unpackTarget(loop.Target, item)
 
@@ -303,6 +468,15 @@ func (s *State) unpackTarget(target parser.Expr, val value.Value) {
 					s.unpackTarget(item, value.Undefined())
 				}
 			}
+		}
+	case *parser.GetAttr:
+		// Handle attribute assignment (e.g., ns.count = value)
+		obj, err := s.evalExpr(t.Expr)
+		if err != nil {
+			return
+		}
+		if mutableObj, ok := obj.AsMutableObject(); ok {
+			mutableObj.SetAttr(t.Name, val)
 		}
 	}
 }
@@ -387,8 +561,120 @@ func (s *State) evalSetBlock(block *parser.SetBlock) error {
 }
 
 func (s *State) evalExtends(ext *parser.Extends) error {
-	// TODO: Implement template inheritance
-	return NewError(ErrInvalidOperation, "extends not yet implemented")
+	nameVal, err := s.evalExpr(ext.Name)
+	if err != nil {
+		return err
+	}
+
+	name, ok := nameVal.AsString()
+	if !ok {
+		return NewError(ErrInvalidOperation, "extends name must be a string")
+	}
+
+	// Load the parent template
+	parentTmpl, err := s.env.GetTemplate(name)
+	if err != nil {
+		return err
+	}
+
+	s.depth++
+	if s.depth > maxRecursion {
+		return NewError(ErrInvalidOperation, "recursion limit exceeded")
+	}
+	defer func() { s.depth-- }()
+
+	// Check if parent also extends another template
+	var parentExtendsStmt *parser.Extends
+	for _, stmt := range parentTmpl.compiled.ast.Children {
+		if ext, ok := stmt.(*parser.Extends); ok {
+			parentExtendsStmt = ext
+			break
+		}
+	}
+
+	// Collect parent blocks - add them as fallback layers
+	for _, stmt := range parentTmpl.compiled.ast.Children {
+		if block, ok := stmt.(*parser.Block); ok {
+			if bs, exists := s.blocks[block.Name]; exists {
+				// Append parent block to the end (child is at index 0)
+				bs.layers = append(bs.layers, block.Body)
+			} else {
+				// This is a parent-only block (no child override)
+				s.blocks[block.Name] = &blockStack{
+					layers: [][]parser.Stmt{block.Body},
+					index:  0,
+				}
+			}
+		}
+		// Also collect macros from parent
+		if macro, ok := stmt.(*parser.Macro); ok {
+			if _, exists := s.macros[macro.Name]; !exists {
+				s.macros[macro.Name] = macro
+			}
+		}
+	}
+
+	// If parent extends another template, process that first
+	if parentExtendsStmt != nil {
+		if err := s.evalExtends(parentExtendsStmt); err != nil && err != errExtendsExecuted {
+			return err
+		}
+		return errExtendsExecuted
+	}
+
+	// Render the root parent template
+	for _, stmt := range parentTmpl.compiled.ast.Children {
+		// Skip extends (already handled)
+		if _, isExtends := stmt.(*parser.Extends); isExtends {
+			continue
+		}
+		if err := s.evalStmt(stmt); err != nil {
+			return err
+		}
+	}
+
+	return errExtendsExecuted
+}
+
+// errExtendsExecuted signals that extends was executed
+var errExtendsExecuted = fmt.Errorf("extends executed")
+
+func (s *State) evalBlock(block *parser.Block) error {
+	// When we encounter a block, render using the block stack
+	bs := s.blocks[block.Name]
+	if bs == nil || len(bs.layers) == 0 {
+		// No override - render the current block's content
+		s.pushScope()
+		oldBlock := s.currentBlock
+		s.currentBlock = block.Name
+		for _, stmt := range block.Body {
+			if err := s.evalStmt(stmt); err != nil {
+				s.popScope()
+				s.currentBlock = oldBlock
+				return err
+			}
+		}
+		s.popScope()
+		s.currentBlock = oldBlock
+		return nil
+	}
+
+	// Render from the top of the stack (child-most block)
+	oldBlock := s.currentBlock
+	s.currentBlock = block.Name
+	bs.index = 0
+
+	s.pushScope()
+	for _, stmt := range bs.layers[0] {
+		if err := s.evalStmt(stmt); err != nil {
+			s.popScope()
+			s.currentBlock = oldBlock
+			return err
+		}
+	}
+	s.popScope()
+	s.currentBlock = oldBlock
+	return nil
 }
 
 func (s *State) evalInclude(inc *parser.Include) error {
@@ -431,6 +717,135 @@ func (s *State) evalInclude(inc *parser.Include) error {
 	_, err = childState.eval(tmpl.compiled.ast)
 	s.depth--
 	return err
+}
+
+func (s *State) evalImport(imp *parser.Import) error {
+	// Evaluate the template path expression
+	pathVal, err := s.evalExpr(imp.Expr)
+	if err != nil {
+		return err
+	}
+
+	path, ok := pathVal.AsString()
+	if !ok {
+		return NewError(ErrInvalidOperation, "import path must be a string")
+	}
+
+	// Load and parse the template
+	tmpl, err := s.env.GetTemplate(path)
+	if err != nil {
+		return err
+	}
+
+	// Create a module object with all macros from the template
+	module := s.createModule(tmpl.compiled.ast)
+
+	// Get the alias name
+	var aliasName string
+	if varExpr, ok := imp.Name.(*parser.Var); ok {
+		aliasName = varExpr.ID
+	} else if constExpr, ok := imp.Name.(*parser.Const); ok {
+		if name, ok := constExpr.Value.(string); ok {
+			aliasName = name
+		}
+	}
+	if aliasName == "" {
+		return NewError(ErrInvalidOperation, "import alias must be a name")
+	}
+
+	// Set the module in current scope
+	s.Set(aliasName, module)
+	return nil
+}
+
+func (s *State) evalFromImport(frm *parser.FromImport) error {
+	// Evaluate the template path expression
+	pathVal, err := s.evalExpr(frm.Expr)
+	if err != nil {
+		return err
+	}
+
+	path, ok := pathVal.AsString()
+	if !ok {
+		return NewError(ErrInvalidOperation, "import path must be a string")
+	}
+
+	// Load and parse the template
+	tmpl, err := s.env.GetTemplate(path)
+	if err != nil {
+		return err
+	}
+
+	// Create a temporary state to collect macros
+	module := s.createModule(tmpl.compiled.ast)
+	moduleMap, ok := module.AsMap()
+	if !ok {
+		moduleMap = make(map[string]value.Value)
+	}
+
+	// Import each named item
+	for _, name := range frm.Names {
+		var importName string
+		if varExpr, ok := name.Name.(*parser.Var); ok {
+			importName = varExpr.ID
+		} else if constExpr, ok := name.Name.(*parser.Const); ok {
+			if n, ok := constExpr.Value.(string); ok {
+				importName = n
+			}
+		}
+		if importName == "" {
+			return NewError(ErrInvalidOperation, "import name must be an identifier")
+		}
+
+		// Get the alias (or use the same name)
+		aliasName := importName
+		if name.Alias != nil {
+			if varExpr, ok := name.Alias.(*parser.Var); ok {
+				aliasName = varExpr.ID
+			} else if constExpr, ok := name.Alias.(*parser.Const); ok {
+				if n, ok := constExpr.Value.(string); ok {
+					aliasName = n
+				}
+			}
+		}
+
+		// Get the item from the module
+		if item, exists := moduleMap[importName]; exists {
+			s.Set(aliasName, item)
+		} else {
+			return NewError(ErrUndefinedVar, fmt.Sprintf("%s not found in %s", importName, path))
+		}
+	}
+
+	return nil
+}
+
+func (s *State) createModule(tmpl *parser.Template) value.Value {
+	// Collect all macros from the template
+	macros := make(map[string]*parser.Macro)
+	for _, stmt := range tmpl.Children {
+		if macro, ok := stmt.(*parser.Macro); ok {
+			macros[macro.Name] = macro
+		}
+	}
+
+	// Create a callable map for the module
+	module := make(map[string]value.Value)
+	for name, macro := range macros {
+		// Create a macro callable
+		module[name] = s.makeMacroCallable(macro)
+	}
+
+	return value.FromMap(module)
+}
+
+func (s *State) makeMacroCallable(macro *parser.Macro) value.Value {
+	// Store a reference to the macro that can be called later
+	// We use a special "callable" value type
+	return value.FromCallable(&macroCallable{
+		macro: macro,
+		state: s,
+	})
 }
 
 func (s *State) evalFilterBlock(block *parser.FilterBlock) error {
@@ -735,6 +1150,27 @@ func (s *State) evalGetItem(gi *parser.GetItem) (value.Value, error) {
 func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 	// Check if it's a function call
 	if v, ok := call.Expr.(*parser.Var); ok {
+		// Check for super() call
+		if v.ID == "super" {
+			return s.evalSuper()
+		}
+
+		// Check for loop() recursive call
+		if v.ID == "loop" && s.loopRecurse != nil {
+			if len(call.Args) != 1 {
+				return value.Undefined(), NewError(ErrInvalidOperation, "loop() takes exactly 1 argument")
+			}
+			arg, err := s.evalExpr(call.Args[0].Value)
+			if err != nil {
+				return value.Undefined(), err
+			}
+			result, err := s.loopRecurse(arg)
+			if err != nil {
+				return value.Undefined(), err
+			}
+			return value.FromSafeString(result), nil
+		}
+
 		// Check for macro
 		if macro, ok := s.macros[v.ID]; ok {
 			return s.callMacroWithArgs(macro, call.Args)
@@ -748,10 +1184,83 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 			}
 			return fn(s, args, kwargs)
 		}
+
+		// Check if variable is callable
+		val := s.Lookup(v.ID)
+		if callable, ok := val.AsCallable(); ok {
+			args, kwargs, err := s.evalCallArgs(call.Args)
+			if err != nil {
+				return value.Undefined(), err
+			}
+			return callable.Call(args, kwargs)
+		}
 	}
 
-	// Evaluate the expression and try to call it
+	// Evaluate the expression to get a callable
+	expr, err := s.evalExpr(call.Expr)
+	if err != nil {
+		return value.Undefined(), err
+	}
+
+	// Check if it's a callable value
+	if callable, ok := expr.AsCallable(); ok {
+		args, kwargs, err := s.evalCallArgs(call.Args)
+		if err != nil {
+			return value.Undefined(), err
+		}
+		return callable.Call(args, kwargs)
+	}
+
+	// Check if it's a method call on a map (like module.macro())
+	if getAttr, ok := call.Expr.(*parser.GetAttr); ok {
+		obj, err := s.evalExpr(getAttr.Expr)
+		if err != nil {
+			return value.Undefined(), err
+		}
+		attr := obj.GetAttr(getAttr.Name)
+		if callable, ok := attr.AsCallable(); ok {
+			args, kwargs, err := s.evalCallArgs(call.Args)
+			if err != nil {
+				return value.Undefined(), err
+			}
+			return callable.Call(args, kwargs)
+		}
+	}
+
 	return value.Undefined(), NewError(ErrUnknownFunction, "unknown callable").WithSpan(call.Span())
+}
+
+func (s *State) evalSuper() (value.Value, error) {
+	if s.currentBlock == "" {
+		return value.Undefined(), NewError(ErrInvalidOperation, "super() can only be used inside a block")
+	}
+
+	bs := s.blocks[s.currentBlock]
+	if bs == nil || bs.index+1 >= len(bs.layers) {
+		return value.Undefined(), NewError(ErrInvalidOperation, "no parent block exists")
+	}
+
+	// Move to the parent block
+	bs.index++
+	defer func() { bs.index-- }()
+
+	// Capture output
+	oldOut := s.out
+	s.out = &strings.Builder{}
+
+	s.pushScope()
+	for _, stmt := range bs.layers[bs.index] {
+		if err := s.evalStmt(stmt); err != nil {
+			s.popScope()
+			s.out = oldOut
+			return value.Undefined(), err
+		}
+	}
+	s.popScope()
+
+	result := s.out.String()
+	s.out = oldOut
+	return value.FromSafeString(result), nil
 }
 
 func (s *State) evalCallArgs(callArgs []parser.CallArg) ([]value.Value, map[string]value.Value, error) {

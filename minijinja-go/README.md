@@ -52,50 +52,127 @@ func main() {
 
 ## Features
 
-### Implemented
+### Template Syntax
 
-- **Template Syntax**
-  - Variable expressions: `{{ name }}`
-  - Comments: `{# comment #}`
-  - Control structures: `{% if %}`, `{% for %}`, `{% set %}`, `{% with %}`
-  - Macros: `{% macro %}` / `{% call %}`
-  - Template inclusion: `{% include %}`
-  - Filter blocks: `{% filter %}`
-  - Auto-escaping: `{% autoescape %}`
+- Variable expressions: `{{ name }}`
+- Comments: `{# comment #}`
+- Control structures: `{% if %}`, `{% for %}`, `{% set %}`, `{% with %}`
+- Template inheritance: `{% extends %}`, `{% block %}`, `{{ super() }}`
+- Macros: `{% macro %}` / `{% call %}`
+- Template inclusion: `{% include %}`
+- Import statements: `{% import %}`, `{% from ... import %}`
+- Filter blocks: `{% filter %}`
+- Auto-escaping: `{% autoescape %}`
+- Loop controls: `{% break %}`, `{% continue %}`
+- Recursive loops: `{% for ... recursive %}`
 
-- **Expressions**
-  - Literals: strings, numbers, booleans, lists, dicts
-  - Arithmetic: `+`, `-`, `*`, `/`, `//`, `%`, `**`
-  - Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`
-  - Logical: `and`, `or`, `not`
-  - Membership: `in`
-  - Concatenation: `~`
-  - Conditional: `x if cond else y`
+### Expressions
 
-- **Filters** (50+)
-  - String: `upper`, `lower`, `capitalize`, `title`, `trim`, `replace`
-  - List: `first`, `last`, `length`, `reverse`, `sort`, `join`, `unique`
-  - Math: `abs`, `int`, `float`, `round`, `sum`, `min`, `max`
-  - Dict: `items`, `keys`, `values`, `dictsort`
-  - And many more...
+- Literals: strings, numbers, booleans, lists, dicts
+- Arithmetic: `+`, `-`, `*`, `/`, `//`, `%`, `**`
+- Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`
+- Logical: `and`, `or`, `not`
+- Membership: `in`
+- Concatenation: `~`
+- Conditional: `x if cond else y`
+- Slicing: `seq[1:3]`, `seq[::2]`
 
-- **Tests**
-  - `defined`, `undefined`, `none`
-  - `true`, `false`
-  - `odd`, `even`, `divisibleby`
-  - `eq`, `ne`, `lt`, `le`, `gt`, `ge`
-  - `string`, `number`, `sequence`, `mapping`, `iterable`
-  - `startingwith`, `endingwith`, `containing`
+### Filters (50+)
 
-- **Functions**
-  - `range()`, `dict()`, `namespace()`, `debug()`, `lipsum()`
+- String: `upper`, `lower`, `capitalize`, `title`, `trim`, `replace`, `safe`, `escape`
+- List: `first`, `last`, `length`, `reverse`, `sort`, `join`, `unique`, `batch`, `slice`
+- Math: `abs`, `int`, `float`, `round`, `sum`, `min`, `max`
+- Dict: `items`, `keys`, `values`, `dictsort`
+- Serialization: `tojson`
+- URL: `urlencode`
+- Formatting: `indent`, `pprint`
+- Selection: `map`, `select`, `reject`, `selectattr`, `rejectattr`
 
-### Not Yet Implemented
+### Tests
 
-- Template inheritance (`{% extends %}`, `{% block %}`)
-- Import statements (`{% import %}`, `{% from ... import %}`)
-- Custom syntax delimiters (configurable but not tested)
-- Some advanced filters
+- `defined`, `undefined`, `none`
+- `true`, `false`
+- `odd`, `even`, `divisibleby`
+- `eq`, `ne`, `lt`, `le`, `gt`, `ge`
+- `string`, `number`, `sequence`, `mapping`, `iterable`
+- `startingwith`, `endingwith`, `containing`
+- `in`
+
+### Functions
+
+- `range()` - generate sequences
+- `dict()` - create dictionaries
+- `namespace()` - create mutable namespaces
+- `cycler()` - cycle through values
+- `joiner()` - join with separators
+- `debug()` - debug output
+- `lipsum()` - lorem ipsum text
+
+## Template Inheritance
+
+MiniJinja-Go supports template inheritance with `extends`, `block`, and `super()`:
+
+```html
+{# base.html #}
+<html>
+<head><title>{% block title %}Default{% endblock %}</title></head>
+<body>
+{% block content %}{% endblock %}
+</body>
+</html>
+```
+
+```html
+{# child.html #}
+{% extends "base.html" %}
+{% block title %}My Page{% endblock %}
+{% block content %}
+<h1>Welcome!</h1>
+<p>This is my page content.</p>
+{% endblock %}
+```
+
+Use `{{ super() }}` to include the parent block's content:
+
+```html
+{% block content %}
+{{ super() }}
+<p>Additional content</p>
+{% endblock %}
+```
+
+## Macros and Imports
+
+Define reusable macros:
+
+```html
+{# forms.html #}
+{% macro input(name, type="text") %}
+<input type="{{ type }}" name="{{ name }}">
+{% endmacro %}
+
+{% macro button(text) %}
+<button>{{ text }}</button>
+{% endmacro %}
+```
+
+Import and use them:
+
+```html
+{# Full import #}
+{% import "forms.html" as forms %}
+{{ forms.input("username") }}
+{{ forms.button("Submit") }}
+
+{# Selective import #}
+{% from "forms.html" import input, button %}
+{{ input("email", type="email") }}
+{{ button("Send") }}
+
+{# Import with alias #}
+{% from "forms.html" import input as text_input %}
+{{ text_input("name") }}
+```
 
 ## Auto-Escaping
 
@@ -112,17 +189,51 @@ result, _ := tmpl.Render(map[string]any{
 
 Use the `safe` filter to mark content as safe:
 
-```go
-tmpl, _ := env.TemplateFromNamedString("page.html", "{{ content|safe }}")
+```html
+{{ content|safe }}
+```
+
+## Callable Objects
+
+### Cycler
+
+Cycle through a list of values:
+
+```html
+{% set c = cycler("odd", "even") %}
+{% for item in items %}
+<tr class="{{ c.next() }}">{{ item }}</tr>
+{% endfor %}
+```
+
+### Joiner
+
+Add separators between items:
+
+```html
+{% set j = joiner(", ") %}
+{% for item in items %}{{ j() }}{{ item }}{% endfor %}
+```
+
+### Namespace
+
+Create mutable namespaces for use across scopes:
+
+```html
+{% set ns = namespace(count=0) %}
+{% for item in items %}
+  {% set ns.count = ns.count + 1 %}
+{% endfor %}
+Total: {{ ns.count }}
 ```
 
 ## Custom Filters
 
 ```go
 env := minijinja.NewEnvironment()
-env.AddFilter("double", func(state *minijinja.State, val minijinja.Value, args []minijinja.Value, kwargs map[string]minijinja.Value) (minijinja.Value, error) {
+env.AddFilter("double", func(state *minijinja.State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
     if i, ok := val.AsInt(); ok {
-        return minijinja.FromInt(i * 2), nil
+        return value.FromInt(i * 2), nil
     }
     return val, nil
 })
@@ -132,8 +243,8 @@ env.AddFilter("double", func(state *minijinja.State, val minijinja.Value, args [
 
 ```go
 env := minijinja.NewEnvironment()
-env.AddFunction("now", func(state *minijinja.State, args []minijinja.Value, kwargs map[string]minijinja.Value) (minijinja.Value, error) {
-    return minijinja.FromString(time.Now().Format(time.RFC3339)), nil
+env.AddFunction("now", func(state *minijinja.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+    return value.FromString(time.Now().Format(time.RFC3339)), nil
 })
 ```
 

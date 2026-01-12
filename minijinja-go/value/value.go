@@ -9,6 +9,22 @@ import (
 	"strings"
 )
 
+// Callable is an interface for callable objects.
+type Callable interface {
+	Call(args []Value, kwargs map[string]Value) (Value, error)
+}
+
+// Object is an interface for custom objects with attribute access.
+type Object interface {
+	GetAttr(name string) Value
+}
+
+// MutableObject is an object that supports attribute assignment.
+type MutableObject interface {
+	Object
+	SetAttr(name string, val Value)
+}
+
 // ValueKind describes the type of a Value.
 type ValueKind int
 
@@ -22,6 +38,7 @@ const (
 	KindSeq
 	KindMap
 	KindIterable
+	KindCallable
 	KindPlain
 	KindInvalid
 )
@@ -46,6 +63,8 @@ func (k ValueKind) String() string {
 		return "map"
 	case KindIterable:
 		return "iterator"
+	case KindCallable:
+		return "callable"
 	case KindPlain:
 		return "plain object"
 	case KindInvalid:
@@ -130,6 +149,16 @@ func FromSlice(v []Value) Value {
 // FromMap creates a Value from a map of string to Value.
 func FromMap(v map[string]Value) Value {
 	return Value{data: v}
+}
+
+// FromCallable creates a Value from a Callable.
+func FromCallable(c Callable) Value {
+	return Value{data: c}
+}
+
+// FromObject creates a Value from an Object.
+func FromObject(o Object) Value {
+	return Value{data: o}
 }
 
 // FromAny creates a Value from any Go value using reflection.
@@ -247,9 +276,27 @@ func (v Value) Kind() ValueKind {
 		return KindSeq
 	case map[string]Value:
 		return KindMap
+	case Callable:
+		return KindCallable
+	case Object:
+		return KindPlain // Objects are plain objects
 	default:
 		return KindPlain
 	}
+}
+
+// AsCallable returns the Callable if this value is callable.
+func (v Value) AsCallable() (Callable, bool) {
+	if c, ok := v.data.(Callable); ok {
+		return c, true
+	}
+	return nil, false
+}
+
+// IsCallable returns true if this value is callable.
+func (v Value) IsCallable() bool {
+	_, ok := v.data.(Callable)
+	return ok
 }
 
 // IsUndefined returns true if the value is undefined.
@@ -521,8 +568,26 @@ func (v Value) GetAttr(name string) Value {
 		if val, ok := d[name]; ok {
 			return val
 		}
+	case Object:
+		return d.GetAttr(name)
 	}
 	return Undefined()
+}
+
+// AsObject returns the Object if this value wraps one.
+func (v Value) AsObject() (Object, bool) {
+	if o, ok := v.data.(Object); ok {
+		return o, true
+	}
+	return nil, false
+}
+
+// AsMutableObject returns the MutableObject if this value wraps one.
+func (v Value) AsMutableObject() (MutableObject, bool) {
+	if o, ok := v.data.(MutableObject); ok {
+		return o, true
+	}
+	return nil, false
 }
 
 // Iter returns an iterator over the value's items.
