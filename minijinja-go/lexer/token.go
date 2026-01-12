@@ -21,7 +21,8 @@ const (
 	// Literals
 	TokenIdent   // identifier
 	TokenString  // "string" or 'string'
-	TokenInteger // 123
+	TokenInteger // 123 (fits in u64)
+	TokenInt128  // big integers (> u64)
 	TokenFloat   // 123.45
 
 	// Operators
@@ -137,7 +138,8 @@ var tokenTypeNames = map[TokenType]string{
 	TokenCommentEnd:       "CommentEnd",
 	TokenIdent:            "Ident",
 	TokenString:           "String",
-	TokenInteger:          "Integer",
+	TokenInteger:          "Int",
+	TokenInt128:           "Int128",
 	TokenFloat:            "Float",
 	TokenPlus:             "Plus",
 	TokenMinus:            "Minus",
@@ -231,6 +233,8 @@ func (t Token) FormatForSnapshot(source string) string {
 		return fmt.Sprintf("Str(%q)\n  %q", t.Value, tokenSource)
 	case TokenInteger:
 		return fmt.Sprintf("Int(%s)\n  %q", t.Value, tokenSource)
+	case TokenInt128:
+		return fmt.Sprintf("Int128(%s)\n  %q", t.Value, tokenSource)
 	case TokenFloat:
 		return fmt.Sprintf("Float(%s)\n  %q", t.Value, tokenSource)
 	default:

@@ -49,6 +49,7 @@ func ParseTestInputFile(path string) (*TestInput, error) {
 
 // ParseTestInput parses test input content.
 // Format: JSON context\n---\ntemplate
+// For lexer tests, the JSON is typically just settings (no $settings wrapper).
 func ParseTestInput(content string) (*TestInput, error) {
 	input := &TestInput{
 		Context: make(map[string]any),
@@ -56,13 +57,27 @@ func ParseTestInput(content string) (*TestInput, error) {
 
 	parts := strings.SplitN(content, "\n---\n", 2)
 
-	// Parse JSON context
+	// Parse JSON 
 	if len(parts) >= 1 && strings.TrimSpace(parts[0]) != "" {
-		if err := json.Unmarshal([]byte(parts[0]), &input.Context); err != nil {
-			return nil, err
+		jsonStr := parts[0]
+		
+		// First try to parse as settings directly (for lexer tests)
+		// This is the format: {"keep_trailing_newline": true, ...}
+		input.Settings = &TestSettings{}
+		if err := json.Unmarshal([]byte(jsonStr), input.Settings); err == nil {
+			// Successfully parsed as settings
+			// Check if it actually had any settings fields set
+			// by also parsing as generic map to get context
+			json.Unmarshal([]byte(jsonStr), &input.Context)
+		} else {
+			// Fall back to parsing as context
+			input.Settings = nil
+			if err := json.Unmarshal([]byte(jsonStr), &input.Context); err != nil {
+				return nil, err
+			}
 		}
 
-		// Extract $settings if present
+		// Also check for $settings key (for template tests)
 		if settingsRaw, ok := input.Context["$settings"]; ok {
 			settingsJSON, err := json.Marshal(settingsRaw)
 			if err != nil {

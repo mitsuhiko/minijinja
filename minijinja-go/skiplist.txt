@@ -7,35 +7,5 @@
 # Test names follow the pattern: category@filename.txt
 
 # =============================================================================
-# LEXER TESTS
+# LEXER TESTS - All passing!
 # =============================================================================
-
-# --- Line statement/comment prefix (not yet implemented) ---
-lexer@line-comment.txt
-lexer@line-statement.txt
-
-# --- Trailing newline handling (keep_trailing_newline setting) ---
-lexer@basic.txt
-lexer@single_brace.txt
-lexer@keep-trailing-newlines.txt
-
-# --- Whitespace trimming ({%- -%} {{- -}}) ---
-lexer@block-filter.txt
-lexer@whitespace.txt
-
-# --- lstrip_blocks / trim_blocks settings ---
-lexer@lstrip-blocks.txt
-lexer@lstrip-blocks-comment.txt
-lexer@lstrip-blocks-keep-inline-space.txt
-lexer@lstrip-blocks-preserve.txt
-lexer@lstrip-blocks-raw.txt
-lexer@trim-blocks.loop.txt
-
-# --- Numeric literals (underscores, hex, octal, binary, int128) ---
-lexer@literals.txt
-
-# --- Brace balancing in nested structures ---
-lexer@parent-balance.txt
-
-# --- Raw blocks ({% raw %}...{% endraw %}) ---
-lexer@raw.txt
