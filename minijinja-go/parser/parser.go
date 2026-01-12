@@ -48,18 +48,15 @@ type Parser struct {
 }
 
 // Parse parses a template string and returns the AST or an error.
-func Parse(source, filename string) Result {
-	syntaxCfg := lexer.DefaultSyntax()
-	whitespaceCfg := lexer.DefaultWhitespace()
-
-	tokens, err := lexer.Tokenize(source, syntaxCfg, whitespaceCfg)
+func Parse(source, filename string, syntax lexer.SyntaxConfig, whitespace lexer.WhitespaceConfig) (*Template, error) {
+	tokens, err := lexer.Tokenize(source, syntax, whitespace)
 	if err != nil {
-		return Result{Err: &Error{
+		return nil, &Error{
 			Kind:   "SyntaxError",
 			Detail: err.Error(),
 			Name:   filename,
 			Line:   1,
-		}}
+		}
 	}
 
 	p := &Parser{
@@ -70,7 +67,22 @@ func Parse(source, filename string) Result {
 
 	tmpl, parseErr := p.parse()
 	if parseErr != nil {
-		return Result{Err: parseErr}
+		return nil, parseErr
+	}
+	return tmpl, nil
+}
+
+// ParseDefault parses a template string using default config and returns the AST or an error.
+func ParseDefault(source, filename string) Result {
+	syntaxCfg := lexer.DefaultSyntax()
+	whitespaceCfg := lexer.DefaultWhitespace()
+
+	tmpl, err := Parse(source, filename, syntaxCfg, whitespaceCfg)
+	if err != nil {
+		if e, ok := err.(*Error); ok {
+			return Result{Err: e}
+		}
+		return Result{Err: &Error{Kind: "ParseError", Detail: err.Error(), Name: filename}}
 	}
 	return Result{Template: tmpl}
 }

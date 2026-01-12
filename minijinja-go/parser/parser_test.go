@@ -52,7 +52,7 @@ func TestParser(t *testing.T) {
 			template := string(content)
 
 			// Parse
-			result := Parse(template, inputName)
+			result := ParseDefault(template, inputName)
 
 			// Format output
 			actual := FormatResult(result)
@@ -111,7 +111,7 @@ func diffStrings(expected, actual string) string {
 
 // TestParserBasic is a simple sanity check.
 func TestParserBasic(t *testing.T) {
-	result := Parse("Hello {{ name }}!", "test.html")
+	result := ParseDefault("Hello {{ name }}!", "test.html")
 	if result.Err != nil {
 		t.Fatalf("unexpected error: %v", result.Err)
 	}
