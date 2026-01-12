@@ -3,6 +3,7 @@ package value
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"strings"
 )
 
@@ -11,11 +12,20 @@ func (v Value) Neg() (Value, error) {
 	switch d := v.data.(type) {
 	case int64:
 		return FromInt(-d), nil
+	case bigIntValue:
+		result := new(big.Int).Neg(d.Int)
+		return FromBigInt(result), nil
 	case float64:
 		return FromFloat(-d), nil
 	default:
 		return Undefined(), fmt.Errorf("cannot negate %s", v.Kind())
 	}
+}
+
+// isActualInt returns true if the value is stored as an int64, not a float64.
+func isActualInt(v Value) bool {
+	_, ok := v.data.(int64)
+	return ok
 }
 
 // Add performs addition or string concatenation.
@@ -33,11 +43,9 @@ func (v Value) Add(other Value) (Value, error) {
 	// Numeric addition
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {
-			// Prefer int if both are ints
-			if i1, ok1 := v.AsInt(); ok1 {
-				if i2, ok2 := other.AsInt(); ok2 {
-					return FromInt(i1 + i2), nil
-				}
+			// Return int only if both are actual ints (not floats)
+			if isActualInt(v) && isActualInt(other) {
+				return FromInt(int64(f1 + f2)), nil
 			}
 			return FromFloat(f1 + f2), nil
 		}
@@ -60,10 +68,9 @@ func (v Value) Add(other Value) (Value, error) {
 func (v Value) Sub(other Value) (Value, error) {
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {
-			if i1, ok1 := v.AsInt(); ok1 {
-				if i2, ok2 := other.AsInt(); ok2 {
-					return FromInt(i1 - i2), nil
-				}
+			// Return int only if both are actual ints
+			if isActualInt(v) && isActualInt(other) {
+				return FromInt(int64(f1 - f2)), nil
 			}
 			return FromFloat(f1 - f2), nil
 		}
@@ -91,9 +98,19 @@ func (v Value) Mul(other Value) (Value, error) {
 		}
 	}
 
-	// Sequence repetition
+	// Sequence repetition (seq * n)
 	if seq, ok := v.AsSlice(); ok {
 		if n, ok := other.AsInt(); ok && n >= 0 {
+			result := make([]Value, 0, len(seq)*int(n))
+			for i := int64(0); i < n; i++ {
+				result = append(result, seq...)
+			}
+			return FromSlice(result), nil
+		}
+	}
+	// Sequence repetition (n * seq)
+	if n, ok := v.AsInt(); ok && n >= 0 {
+		if seq, ok := other.AsSlice(); ok {
 			result := make([]Value, 0, len(seq)*int(n))
 			for i := int64(0); i < n; i++ {
 				result = append(result, seq...)
@@ -105,10 +122,9 @@ func (v Value) Mul(other Value) (Value, error) {
 	// Numeric multiplication
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {
-			if i1, ok1 := v.AsInt(); ok1 {
-				if i2, ok2 := other.AsInt(); ok2 {
-					return FromInt(i1 * i2), nil
-				}
+			// Return int only if both are actual ints
+			if isActualInt(v) && isActualInt(other) {
+				return FromInt(int64(f1 * f2)), nil
 			}
 			return FromFloat(f1 * f2), nil
 		}
@@ -130,14 +146,19 @@ func (v Value) Div(other Value) (Value, error) {
 	return Undefined(), fmt.Errorf("cannot divide %s by %s", v.Kind(), other.Kind())
 }
 
-// FloorDiv performs integer division.
+// FloorDiv performs floor division.
 func (v Value) FloorDiv(other Value) (Value, error) {
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {
 			if f2 == 0 {
 				return Undefined(), fmt.Errorf("division by zero")
 			}
-			return FromInt(int64(math.Floor(f1 / f2))), nil
+			result := math.Floor(f1 / f2)
+			// Return int only if both operands are actual ints
+			if isActualInt(v) && isActualInt(other) {
+				return FromInt(int64(result)), nil
+			}
+			return FromFloat(result), nil
 		}
 	}
 	return Undefined(), fmt.Errorf("cannot floor divide %s by %s", v.Kind(), other.Kind())
@@ -183,6 +204,14 @@ func (v Value) Pow(other Value) (Value, error) {
 	return Undefined(), fmt.Errorf("cannot compute power of %s and %s", v.Kind(), other.Kind())
 }
 
+// boolToFloat converts a bool to float for coercion (false=0, true=1)
+func boolToFloat(b bool) float64 {
+	if b {
+		return 1.0
+	}
+	return 0.0
+}
+
 // Equal returns true if two values are equal.
 func (v Value) Equal(other Value) bool {
 	// Undefined is only equal to undefined
@@ -195,12 +224,22 @@ func (v Value) Equal(other Value) bool {
 		return v.IsNone() && other.IsNone()
 	}
 
-	// Bool comparison
+	// Bool comparison (including coercion with numbers)
 	if b1, ok := v.AsBool(); ok {
 		if b2, ok := other.AsBool(); ok {
 			return b1 == b2
 		}
+		// Bool vs number: coerce bool to float
+		if f2, ok := other.AsFloat(); ok {
+			return boolToFloat(b1) == f2
+		}
 		return false
+	}
+	// Number vs bool
+	if f1, ok := v.AsFloat(); ok {
+		if b2, ok := other.AsBool(); ok {
+			return f1 == boolToFloat(b2)
+		}
 	}
 
 	// Numeric comparison
@@ -255,7 +294,62 @@ func (v Value) Equal(other Value) bool {
 }
 
 // Compare returns -1 if v < other, 0 if equal, 1 if v > other.
+// Unlike Equal, Compare uses kind ordering first (like Rust's Ord).
 func (v Value) Compare(other Value) (int, bool) {
+	// Compare by kind first (like Rust)
+	// Kind order: Undefined < None < Bool < Number < String < Bytes < Seq < Map
+	kindOrder := func(k ValueKind) int {
+		switch k {
+		case KindUndefined:
+			return 0
+		case KindNone:
+			return 1
+		case KindBool:
+			return 2
+		case KindNumber:
+			return 3
+		case KindString:
+			return 4
+		case KindBytes:
+			return 5
+		case KindSeq:
+			return 6
+		case KindMap:
+			return 7
+		default:
+			return 8
+		}
+	}
+
+	k1, k2 := kindOrder(v.Kind()), kindOrder(other.Kind())
+	if k1 < k2 {
+		return -1, true
+	}
+	if k1 > k2 {
+		return 1, true
+	}
+
+	// Same kind - do value comparison
+	// Bool comparison
+	if b1, ok := v.AsBool(); ok {
+		if b2, ok := other.AsBool(); ok {
+			i1, i2 := 0, 0
+			if b1 {
+				i1 = 1
+			}
+			if b2 {
+				i2 = 1
+			}
+			if i1 < i2 {
+				return -1, true
+			}
+			if i1 > i2 {
+				return 1, true
+			}
+			return 0, true
+		}
+	}
+
 	// Numeric comparison
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {

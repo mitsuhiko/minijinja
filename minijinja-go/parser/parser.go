@@ -738,9 +738,15 @@ func (p *Parser) parsePrimary() (Expr, *Error) {
 		return &Const{Value: val, span: p.expandSpan(span)}, nil
 
 	case lexer.TokenInteger:
-		// Parse as int64
-		val, _ := strconv.ParseInt(tok.Value, 0, 64)
-		return &Const{Value: val, span: span}, nil
+		// Parse as int64 first
+		val, err := strconv.ParseInt(tok.Value, 0, 64)
+		if err == nil {
+			return &Const{Value: val, span: span}, nil
+		}
+		// Overflow - parse as big.Int
+		bi := new(big.Int)
+		bi.SetString(tok.Value, 0)
+		return &Const{Value: &BigInt{bi}, span: span}, nil
 
 	case lexer.TokenInt128:
 		// Parse as big.Int

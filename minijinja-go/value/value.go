@@ -4,6 +4,7 @@ package value
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"reflect"
 	"sort"
 	"strings"
@@ -136,6 +137,16 @@ func FromSafeString(v string) Value {
 // safeString is a string that should not be escaped.
 type safeString string
 
+// bigIntValue wraps a big.Int for large integer values.
+type bigIntValue struct {
+	*big.Int
+}
+
+// FromBigInt creates a Value from a big.Int.
+func FromBigInt(v *big.Int) Value {
+	return Value{data: bigIntValue{v}}
+}
+
 // FromBytes creates a Value from a byte slice.
 func FromBytes(v []byte) Value {
 	return Value{data: v}
@@ -189,7 +200,12 @@ func fromReflectValue(rv reflect.Value) Value {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return FromInt(int64(rv.Uint()))
 	case reflect.Float32, reflect.Float64:
-		return FromFloat(rv.Float())
+		f := rv.Float()
+		// Convert whole number floats to integers for consistency with JSON parsing
+		if f == math.Trunc(f) && f >= math.MinInt64 && f <= math.MaxInt64 {
+			return FromInt(int64(f))
+		}
+		return FromFloat(f)
 	case reflect.String:
 		return FromString(rv.String())
 	case reflect.Slice:
@@ -266,7 +282,7 @@ func (v Value) Kind() ValueKind {
 		return KindNone
 	case bool:
 		return KindBool
-	case int64, float64:
+	case int64, float64, bigIntValue:
 		return KindNumber
 	case string, safeString:
 		return KindString
@@ -351,6 +367,8 @@ func (v Value) String() string {
 		return "false"
 	case int64:
 		return fmt.Sprintf("%d", d)
+	case bigIntValue:
+		return d.String()
 	case float64:
 		// Match Jinja2's float formatting
 		if d == math.Trunc(d) && math.Abs(d) < 1e15 {
@@ -399,6 +417,8 @@ func (v Value) Repr() string {
 		return "false"
 	case int64:
 		return fmt.Sprintf("%d", d)
+	case bigIntValue:
+		return d.String()
 	case float64:
 		if d == math.Trunc(d) && math.Abs(d) < 1e15 {
 			return fmt.Sprintf("%.1f", d)
@@ -436,6 +456,77 @@ func (v Value) Repr() string {
 func (v Value) IsSafe() bool {
 	_, ok := v.data.(safeString)
 	return ok
+}
+
+// IsActualInt returns true if the value is stored as an integer (not a float).
+// This distinguishes 42 from 42.0.
+func (v Value) IsActualInt() bool {
+	_, ok := v.data.(int64)
+	return ok
+}
+
+// IsActualFloat returns true if the value is stored as a float64.
+func (v Value) IsActualFloat() bool {
+	_, ok := v.data.(float64)
+	return ok
+}
+
+// SameAs checks if two values are identical (stricter than equality).
+// For objects and sequences/maps, checks if they are the same instance.
+// For primitives, checks type match and value equality.
+func (v Value) SameAs(other Value) bool {
+	// Check if either is an object
+	if obj1, ok1 := v.AsObject(); ok1 {
+		if obj2, ok2 := other.AsObject(); ok2 {
+			// Both are objects - check if same instance
+			return obj1 == obj2
+		}
+		return false
+	}
+	if _, ok := other.AsObject(); ok {
+		return false
+	}
+
+	// For sequences and maps, check pointer identity
+	// Two different slice/map literals are never "same as" each other
+	if v.Kind() == KindSeq || v.Kind() == KindMap {
+		// In Go, we can't easily check slice/map identity, so we use
+		// the address of the underlying data. Two freshly created slices
+		// will have different addresses.
+		// For this to work correctly, we need to compare the actual slice headers
+		if s1, ok1 := v.data.([]Value); ok1 {
+			if s2, ok2 := other.data.([]Value); ok2 {
+				// Check if they point to the same underlying array
+				if len(s1) == 0 && len(s2) == 0 {
+					return true // Empty slices are "same"
+				}
+				if len(s1) > 0 && len(s2) > 0 {
+					return &s1[0] == &s2[0]
+				}
+				return false
+			}
+		}
+		if m1, ok1 := v.data.(map[string]Value); ok1 {
+			if m2, ok2 := other.data.(map[string]Value); ok2 {
+				// For maps, we can compare the map headers directly
+				// But Go maps don't expose their identity easily
+				// The safest approach: two map literals are never the same
+				// unless they're the exact same variable
+				// Use unsafe pointer comparison
+				return &m1 == &m2
+			}
+		}
+		return false
+	}
+
+	// For primitives - check kind and int/float distinction
+	if v.Kind() != other.Kind() {
+		return false
+	}
+	if v.IsActualInt() != other.IsActualInt() {
+		return false
+	}
+	return v.Equal(other)
 }
 
 // AsString returns the string value if it is one.

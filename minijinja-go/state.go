@@ -979,6 +979,8 @@ func (s *State) evalConst(c *parser.Const) value.Value {
 		return value.FromFloat(v)
 	case string:
 		return value.FromString(v)
+	case *parser.BigInt:
+		return value.FromBigInt(v.Int)
 	default:
 		return value.FromAny(v)
 	}

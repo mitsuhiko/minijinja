@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/value"
 )
@@ -86,12 +87,23 @@ func registerDefaultTests(env *Environment) {
 	env.AddTest("in", testIn)
 	env.AddTest("string", testString)
 	env.AddTest("number", testNumber)
+	env.AddTest("integer", testInteger)
+	env.AddTest("int", testInteger) // alias
+	env.AddTest("float", testFloat)
+	env.AddTest("boolean", testBoolean)
 	env.AddTest("sequence", testSequence)
 	env.AddTest("mapping", testMapping)
 	env.AddTest("iterable", testIterable)
 	env.AddTest("startingwith", testStartingWith)
 	env.AddTest("endingwith", testEndingWith)
 	env.AddTest("containing", testContaining)
+	env.AddTest("safe", testSafe)
+	env.AddTest("escaped", testSafe) // alias
+	env.AddTest("sameas", testSameAs)
+	env.AddTest("lower", testLower)
+	env.AddTest("upper", testUpper)
+	env.AddTest("filter", testFilter)
+	env.AddTest("test", testTest)
 }
 
 func registerDefaultFunctions(env *Environment) {
@@ -881,16 +893,26 @@ func filterPprint(_ *State, val value.Value, _ []value.Value, _ map[string]value
 func filterTojson(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	// Convert value to Go native type for JSON serialization
 	native := valueToNative(val)
-	
+
 	// Check for indent option
+	// If first arg is bool: true = indent 2, false = no indent
+	// If first arg is int: that number of spaces
 	indent := ""
 	if len(args) > 0 {
-		if i, ok := args[0].AsInt(); ok {
+		if b, ok := args[0].AsBool(); ok {
+			if b {
+				indent = "  " // 2 spaces for true
+			}
+		} else if i, ok := args[0].AsInt(); ok {
 			indent = strings.Repeat(" ", int(i))
 		}
 	}
 	if i, ok := kwargs["indent"]; ok {
-		if n, ok := i.AsInt(); ok {
+		if b, ok := i.AsBool(); ok {
+			if b {
+				indent = "  "
+			}
+		} else if n, ok := i.AsInt(); ok {
 			indent = strings.Repeat(" ", int(n))
 		}
 	}
@@ -1072,6 +1094,84 @@ func testString(_ *State, val value.Value, _ []value.Value) (bool, error) {
 
 func testNumber(_ *State, val value.Value, _ []value.Value) (bool, error) {
 	return val.Kind() == value.KindNumber, nil
+}
+
+func testInteger(_ *State, val value.Value, _ []value.Value) (bool, error) {
+	// An integer is a number that is stored as int64 (not float64)
+	_, ok := val.AsInt()
+	if !ok {
+		return false, nil
+	}
+	// Also ensure it's not stored as a float
+	return val.IsActualInt(), nil
+}
+
+func testFloat(_ *State, val value.Value, _ []value.Value) (bool, error) {
+	// A float is a number stored as float64
+	return val.IsActualFloat(), nil
+}
+
+func testBoolean(_ *State, val value.Value, _ []value.Value) (bool, error) {
+	return val.Kind() == value.KindBool, nil
+}
+
+func testSafe(_ *State, val value.Value, _ []value.Value) (bool, error) {
+	return val.IsSafe(), nil
+}
+
+func testSameAs(_ *State, val value.Value, args []value.Value) (bool, error) {
+	if len(args) < 1 {
+		return false, nil
+	}
+	// sameas checks for identity, not equality
+	// For primitive types this is the same as equality with strict type checking
+	return val.SameAs(args[0]), nil
+}
+
+func testLower(_ *State, val value.Value, _ []value.Value) (bool, error) {
+	s, ok := val.AsString()
+	if !ok {
+		return false, nil
+	}
+	// Check if all characters are lowercase (like Rust's is_lowercase)
+	for _, r := range s {
+		if !unicode.IsLower(r) && unicode.IsLetter(r) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func testUpper(_ *State, val value.Value, _ []value.Value) (bool, error) {
+	s, ok := val.AsString()
+	if !ok {
+		return false, nil
+	}
+	// Check if all characters are uppercase (like Rust's is_uppercase)
+	for _, r := range s {
+		if !unicode.IsUpper(r) && unicode.IsLetter(r) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func testFilter(state *State, val value.Value, _ []value.Value) (bool, error) {
+	name, ok := val.AsString()
+	if !ok {
+		return false, nil
+	}
+	_, exists := state.env.getFilter(name)
+	return exists, nil
+}
+
+func testTest(state *State, val value.Value, _ []value.Value) (bool, error) {
+	name, ok := val.AsString()
+	if !ok {
+		return false, nil
+	}
+	_, exists := state.env.getTest(name)
+	return exists, nil
 }
 
 func testSequence(_ *State, val value.Value, _ []value.Value) (bool, error) {
