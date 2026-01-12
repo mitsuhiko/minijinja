@@ -56,6 +56,12 @@ func (m *macroCallable) Call(args []value.Value, kwargs map[string]value.Value) 
 }
 
 func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	s.depth++
+	if s.depth > maxRecursion {
+		return value.Undefined(), NewError(ErrInvalidOperation, "recursion limit exceeded")
+	}
+	defer func() { s.depth-- }()
+
 	s.pushScope()
 	defer s.popScope()
 
@@ -373,6 +379,12 @@ func (s *State) evalForLoop(loop *parser.ForLoop) error {
 	if loop.Recursive {
 		oldRecurse = s.loopRecurse
 		s.loopRecurse = func(iterValue value.Value) (string, error) {
+			s.depth++
+			if s.depth > maxRecursion {
+				return "", NewError(ErrInvalidOperation, "recursion limit exceeded")
+			}
+			defer func() { s.depth-- }()
+
 			nestedItems := iterValue.Iter()
 			if nestedItems == nil {
 				return "", nil
@@ -1284,6 +1296,12 @@ func (s *State) evalCallArgs(callArgs []parser.CallArg) ([]value.Value, map[stri
 }
 
 func (s *State) callMacroWithArgs(macro *parser.Macro, callArgs []parser.CallArg) (value.Value, error) {
+	s.depth++
+	if s.depth > maxRecursion {
+		return value.Undefined(), NewError(ErrInvalidOperation, "recursion limit exceeded")
+	}
+	defer func() { s.depth-- }()
+
 	s.pushScope()
 	defer s.popScope()
 

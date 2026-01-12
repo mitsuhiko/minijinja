@@ -142,6 +142,28 @@ type bigIntValue struct {
 	*big.Int
 }
 
+// Iterator represents a lazy iterator value.
+// Unlike sequences, iterators are consumed when iterated and don't have a length.
+type Iterator struct {
+	items []Value
+	name  string // e.g., "range", "reversed"
+}
+
+// NewIterator creates a new iterator from items.
+func NewIterator(name string, items []Value) *Iterator {
+	return &Iterator{items: items, name: name}
+}
+
+// FromIterator creates a Value from an Iterator.
+func FromIterator(iter *Iterator) Value {
+	return Value{data: iter}
+}
+
+// Items returns the iterator's items (consuming it conceptually).
+func (i *Iterator) Items() []Value {
+	return i.items
+}
+
 // FromBigInt creates a Value from a big.Int.
 func FromBigInt(v *big.Int) Value {
 	return Value{data: bigIntValue{v}}
@@ -292,6 +314,8 @@ func (v Value) Kind() ValueKind {
 		return KindSeq
 	case map[string]Value:
 		return KindMap
+	case *Iterator:
+		return KindIterable
 	case Callable:
 		return KindCallable
 	case Object:
@@ -371,6 +395,15 @@ func (v Value) String() string {
 		return d.String()
 	case float64:
 		// Match Jinja2's float formatting
+		if math.IsInf(d, 1) {
+			return "inf"
+		}
+		if math.IsInf(d, -1) {
+			return "-inf"
+		}
+		if math.IsNaN(d) {
+			return "nan"
+		}
 		if d == math.Trunc(d) && math.Abs(d) < 1e15 {
 			return fmt.Sprintf("%.1f", d)
 		}
@@ -384,6 +417,12 @@ func (v Value) String() string {
 	case []Value:
 		var parts []string
 		for _, item := range d {
+			parts = append(parts, item.Repr())
+		}
+		return "[" + strings.Join(parts, ", ") + "]"
+	case *Iterator:
+		var parts []string
+		for _, item := range d.items {
 			parts = append(parts, item.Repr())
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
@@ -686,6 +725,8 @@ func (v Value) Iter() []Value {
 	switch d := v.data.(type) {
 	case []Value:
 		return d
+	case *Iterator:
+		return d.items
 	case map[string]Value:
 		keys := make([]string, 0, len(d))
 		for k := range d {

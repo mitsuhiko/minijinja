@@ -271,7 +271,8 @@ func filterReverse(_ *State, val value.Value, _ []value.Value, _ map[string]valu
 		for i, item := range items {
 			result[len(items)-1-i] = item
 		}
-		return value.FromSlice(result), nil
+		// Return an iterator, not a sequence - this matches Rust MiniJinja behavior
+		return value.FromIterator(value.NewIterator("reversed", result)), nil
 	}
 	return val, nil
 }
@@ -1233,7 +1234,7 @@ func fnRange(_ *State, args []value.Value, kwargs map[string]value.Value) (value
 		stop, _ = args[1].AsInt()
 		step, _ = args[2].AsInt()
 	default:
-		return value.FromSlice(nil), nil
+		return value.FromIterator(value.NewIterator("range", nil)), nil
 	}
 
 	if step == 0 {
@@ -1250,7 +1251,8 @@ func fnRange(_ *State, args []value.Value, kwargs map[string]value.Value) (value
 			result = append(result, value.FromInt(i))
 		}
 	}
-	return value.FromSlice(result), nil
+	// Return an iterator, not a sequence - this matches Rust MiniJinja behavior
+	return value.FromIterator(value.NewIterator("range", result)), nil
 }
 
 func fnDict(_ *State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {

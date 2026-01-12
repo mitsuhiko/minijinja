@@ -98,22 +98,22 @@ func (v Value) Mul(other Value) (Value, error) {
 		}
 	}
 
-	// Sequence repetition (seq * n)
-	if seq, ok := v.AsSlice(); ok {
+	// Sequence/Iterator repetition (seq * n)
+	if items := v.Iter(); items != nil && v.Kind() != KindString {
 		if n, ok := other.AsInt(); ok && n >= 0 {
-			result := make([]Value, 0, len(seq)*int(n))
+			result := make([]Value, 0, len(items)*int(n))
 			for i := int64(0); i < n; i++ {
-				result = append(result, seq...)
+				result = append(result, items...)
 			}
 			return FromSlice(result), nil
 		}
 	}
-	// Sequence repetition (n * seq)
+	// Sequence/Iterator repetition (n * seq)
 	if n, ok := v.AsInt(); ok && n >= 0 {
-		if seq, ok := other.AsSlice(); ok {
-			result := make([]Value, 0, len(seq)*int(n))
+		if items := other.Iter(); items != nil && other.Kind() != KindString {
+			result := make([]Value, 0, len(items)*int(n))
 			for i := int64(0); i < n; i++ {
-				result = append(result, seq...)
+				result = append(result, items...)
 			}
 			return FromSlice(result), nil
 		}
@@ -137,7 +137,9 @@ func (v Value) Mul(other Value) (Value, error) {
 func (v Value) Div(other Value) (Value, error) {
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {
-			if f2 == 0 {
+			// Float division by zero returns inf/-inf/NaN like Rust
+			// Only error on integer division by zero
+			if f2 == 0 && isActualInt(v) && isActualInt(other) {
 				return Undefined(), fmt.Errorf("division by zero")
 			}
 			return FromFloat(f1 / f2), nil

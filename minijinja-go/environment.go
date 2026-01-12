@@ -1,7 +1,7 @@
 package minijinja
 
 import (
-	"html"
+	"strings"
 	"sync"
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/lexer"
@@ -269,6 +269,27 @@ func (t *Template) RenderValue(ctx value.Value) (string, error) {
 }
 
 // EscapeHTML escapes a string for HTML.
+// This escapes <, >, &, ", ', and / to match Rust MiniJinja behavior.
 func EscapeHTML(s string) string {
-	return html.EscapeString(s)
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch r {
+		case '<':
+			b.WriteString("&lt;")
+		case '>':
+			b.WriteString("&gt;")
+		case '&':
+			b.WriteString("&amp;")
+		case '"':
+			b.WriteString("&quot;")
+		case '\'':
+			b.WriteString("&#x27;")
+		case '/':
+			b.WriteString("&#x2f;")
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
