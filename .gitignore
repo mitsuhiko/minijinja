@@ -3,3 +3,6 @@ target
 profile.json
 **/snapshots/*.new
 **/*.pending-snap
+
+# Go
+minijinja-go/vendor/
