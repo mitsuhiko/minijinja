@@ -977,6 +977,30 @@ func (l *Lexer) lexString(quote byte) (*Token, bool, error) {
 				}
 				sb.WriteByte(byte(val))
 				l.advance(2)
+			case 'u':
+				// Unicode escape \uNNNN (4 hex digits)
+				if len(l.rest()) < 4 {
+					return nil, false, l.syntaxError("invalid unicode escape")
+				}
+				hex := l.rest()[:4]
+				val, err := strconv.ParseUint(hex, 16, 32)
+				if err != nil {
+					return nil, false, l.syntaxError("invalid unicode escape")
+				}
+				sb.WriteRune(rune(val))
+				l.advance(4)
+			case 'U':
+				// Unicode escape \UNNNNNNNN (8 hex digits)
+				if len(l.rest()) < 8 {
+					return nil, false, l.syntaxError("invalid unicode escape")
+				}
+				hex := l.rest()[:8]
+				val, err := strconv.ParseUint(hex, 16, 32)
+				if err != nil {
+					return nil, false, l.syntaxError("invalid unicode escape")
+				}
+				sb.WriteRune(rune(val))
+				l.advance(8)
 			default:
 				// Unknown escape, keep both characters
 				sb.WriteByte('\\')
