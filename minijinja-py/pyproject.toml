@@ -23,6 +23,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Topic :: Text Processing :: Markup :: HTML",
     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Typing :: Typed",
 ]
 
 [project.urls]
