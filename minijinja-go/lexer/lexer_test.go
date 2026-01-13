@@ -15,16 +15,9 @@ const (
 	rustTestsDir  = "../../minijinja/tests"
 	lexerInputDir = "../../minijinja/tests/lexer-inputs"
 	snapshotDir   = "../../minijinja/tests/snapshots"
-	skipListFile  = "../skiplist.txt"
 )
 
 func TestLexer(t *testing.T) {
-	// Load skip list
-	skipList, err := testutil.LoadSkipList(skipListFile)
-	if err != nil {
-		t.Fatalf("failed to load skip list: %v", err)
-	}
-
 	// Find all lexer input files
 	inputs, err := filepath.Glob(filepath.Join(lexerInputDir, "*.txt"))
 	if err != nil {
@@ -37,14 +30,8 @@ func TestLexer(t *testing.T) {
 
 	for _, inputPath := range inputs {
 		inputName := filepath.Base(inputPath)
-		testName := "lexer@" + inputName
 
 		t.Run(inputName, func(t *testing.T) {
-			// Check skip list
-			if skipList[testName] || skipList[inputName] {
-				t.Skipf("skipped via skiplist.txt")
-			}
-
 			// Parse input file
 			input, err := testutil.ParseTestInputFile(inputPath)
 			if err != nil {

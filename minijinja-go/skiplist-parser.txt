@@ -1,2 +1,0 @@
-# Parser tests to skip
-# Add test names here (one per line) to skip them

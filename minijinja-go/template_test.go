@@ -13,21 +13,14 @@ import (
 )
 
 const (
-	rustInputDir     = "../minijinja/tests/inputs"
-	rustRefsDir      = "../minijinja/tests/inputs/refs"
-	rustSnapshotDir  = "../minijinja/tests/snapshots"
-	goInputDir       = "testdata/inputs"
-	goSnapshotDir    = "testdata/snapshots"
-	templateSkipList = "skiplist-templates.txt"
+	rustInputDir    = "../minijinja/tests/inputs"
+	rustRefsDir     = "../minijinja/tests/inputs/refs"
+	rustSnapshotDir = "../minijinja/tests/snapshots"
+	goInputDir      = "testdata/inputs"
+	goSnapshotDir   = "testdata/snapshots"
 )
 
 func TestTemplates(t *testing.T) {
-	// Load skip list
-	skipList, err := testutil.LoadSkipList(templateSkipList)
-	if err != nil {
-		t.Fatalf("failed to load skip list: %v", err)
-	}
-
 	// Load reference templates (shared templates used by other tests)
 	refTemplates := make(map[string]string)
 	refFiles, _ := filepath.Glob(filepath.Join(rustRefsDir, "*"))
@@ -54,14 +47,8 @@ func TestTemplates(t *testing.T) {
 
 	for _, inputPath := range inputs {
 		inputName := filepath.Base(inputPath)
-		testName := "vm@" + inputName
 
 		t.Run(inputName, func(t *testing.T) {
-			// Check skip list
-			if skipList[testName] || skipList[inputName] {
-				t.Skipf("skipped via skiplist-templates.txt")
-			}
-
 			// Check for Go-specific input file (takes priority over Rust input)
 			actualInputPath := inputPath
 			goInputPath := filepath.Join(goInputDir, inputName)

@@ -117,30 +117,6 @@ func parseQuotedString(s string) string {
 	return s
 }
 
-// LoadSkipList loads a skip list file (one test name per line, # for comments).
-func LoadSkipList(path string) (map[string]bool, error) {
-	skipList := make(map[string]bool)
-
-	content, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return skipList, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	scanner := bufio.NewScanner(strings.NewReader(string(content)))
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		skipList[line] = true
-	}
-
-	return skipList, nil
-}
-
 // FindSnapshotFile finds the snapshot file for a given test.
 func FindSnapshotFile(snapshotDir, testPrefix, inputFile string) string {
 	// Insta naming convention: test_name__subtest@inputfile.snap

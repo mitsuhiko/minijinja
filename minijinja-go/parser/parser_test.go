@@ -14,16 +14,9 @@ const (
 	rustTestsDir   = "../../minijinja/tests"
 	parserInputDir = "../../minijinja/tests/parser-inputs"
 	snapshotDir    = "../../minijinja/tests/snapshots"
-	skipListFile   = "../skiplist-parser.txt"
 )
 
 func TestParser(t *testing.T) {
-	// Load skip list
-	skipList, err := testutil.LoadSkipList(skipListFile)
-	if err != nil {
-		t.Fatalf("failed to load skip list: %v", err)
-	}
-
 	// Find all parser input files
 	inputs, err := filepath.Glob(filepath.Join(parserInputDir, "*.txt"))
 	if err != nil {
@@ -36,14 +29,8 @@ func TestParser(t *testing.T) {
 
 	for _, inputPath := range inputs {
 		inputName := filepath.Base(inputPath)
-		testName := "parser@" + inputName
 
 		t.Run(inputName, func(t *testing.T) {
-			// Check skip list
-			if skipList[testName] || skipList[inputName] {
-				t.Skipf("skipped via skiplist-parser.txt")
-			}
-
 			// Read input file (raw template, no JSON)
 			content, err := os.ReadFile(inputPath)
 			if err != nil {
