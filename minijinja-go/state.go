@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/parser"
-	"github.com/mitsuhiko/minijinja/minijinja-go/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/parser"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
 // State holds the evaluation state during template rendering.

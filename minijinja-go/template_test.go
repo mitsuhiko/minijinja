@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/internal/testutil"
-	"github.com/mitsuhiko/minijinja/minijinja-go/lexer"
-	"github.com/mitsuhiko/minijinja/minijinja-go/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/testutil"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
 const (

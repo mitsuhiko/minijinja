@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/internal/testutil"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/testutil"
 )
 
 const (

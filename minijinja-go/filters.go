@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
 // FilterUpper converts a value to uppercase.

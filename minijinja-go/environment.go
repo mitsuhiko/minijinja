@@ -4,9 +4,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/lexer"
-	"github.com/mitsuhiko/minijinja/minijinja-go/parser"
-	"github.com/mitsuhiko/minijinja/minijinja-go/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/parser"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
 // AutoEscape determines the auto-escaping strategy.

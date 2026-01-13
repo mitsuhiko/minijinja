@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/lexer"
 )
 
 const maxRecursion = 150

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
 // TestDefined checks if a value is defined.

@@ -3,7 +3,7 @@ package minijinja
 import (
 	"fmt"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/lexer"
 )
 
 // ErrorKind describes the type of error that occurred during template processing.
