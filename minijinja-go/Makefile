@@ -24,3 +24,17 @@ lint:
 .PHONY: format
 format:
 	@gofmt -w .
+
+.PHONY: doc
+doc:
+	@echo "Building documentation..."
+	@godoc -http=:6060 &
+	@sleep 2
+	@echo "Documentation server running at http://localhost:6060"
+
+.PHONY: doc-open
+doc-open:
+	@echo "Opening documentation in browser..."
+	@godoc -http=:6060 &
+	@sleep 2
+	@open http://localhost:6060/pkg

@@ -1,4 +1,57 @@
 // Package value provides a dynamic value type for the template engine.
+//
+// The value package implements MiniJinja's dynamic type system, which allows
+// templates to work with values of different types (strings, numbers, lists,
+// maps, etc.) without compile-time type information.
+//
+// # Core Concepts
+//
+// The Value type is the central type in this package. It can hold any Go value
+// and provides methods for type checking, conversion, and operations. Values
+// can be created from Go primitives using constructor functions like FromInt,
+// FromString, FromSlice, etc.
+//
+// # Type System
+//
+// MiniJinja supports the following value kinds:
+//   - Undefined: Represents a missing or undefined value
+//   - None: Represents null/nil
+//   - Bool: Boolean true/false
+//   - Number: Integers and floating-point numbers
+//   - String: UTF-8 text strings (safe or unsafe for auto-escaping)
+//   - Bytes: Binary data
+//   - Seq: Ordered sequences (arrays/slices)
+//   - Map: Key-value mappings (dictionaries/objects)
+//   - Iterable: Lazy iterators
+//   - Callable: Functions and macros
+//   - Plain: Custom objects with attribute access
+//
+// # Example Usage
+//
+//	// Create values from Go types
+//	name := value.FromString("World")
+//	count := value.FromInt(42)
+//	items := value.FromSlice([]value.Value{
+//	    value.FromString("apple"),
+//	    value.FromString("banana"),
+//	})
+//
+//	// Create a map/dict value
+//	context := value.FromMap(map[string]value.Value{
+//	    "name":  name,
+//	    "count": count,
+//	    "items": items,
+//	})
+//
+//	// Type checking
+//	if name.Kind() == value.KindString {
+//	    fmt.Println("It's a string!")
+//	}
+//
+//	// Conversion
+//	if s, ok := name.AsString(); ok {
+//	    fmt.Println("String value:", s)
+//	}
 package value
 
 import (
@@ -11,37 +64,182 @@ import (
 	"strings"
 )
 
-// Callable is an interface for callable objects.
+// Callable is an interface for callable objects like functions and macros.
+//
+// Types that implement Callable can be invoked from templates using the
+// call syntax: {{ my_function(arg1, arg2) }} or {{ my_macro(key=value) }}.
+//
+// Example implementation:
+//
+//	type myCallable struct{}
+//
+//	func (m *myCallable) Call(args []Value, kwargs map[string]Value) (Value, error) {
+//	    // Process positional arguments
+//	    if len(args) > 0 {
+//	        fmt.Println("First arg:", args[0].String())
+//	    }
+//	    // Process keyword arguments
+//	    if name, ok := kwargs["name"]; ok {
+//	        fmt.Println("Name:", name.String())
+//	    }
+//	    return FromString("result"), nil
+//	}
 type Callable interface {
+	// Call invokes the callable with positional and keyword arguments.
+	//
+	// The args slice contains positional arguments in order.
+	// The kwargs map contains keyword arguments by name.
+	//
+	// Returns the result value and any error that occurred.
 	Call(args []Value, kwargs map[string]Value) (Value, error)
 }
 
 // Object is an interface for custom objects with attribute access.
+//
+// Types that implement Object can expose attributes that can be accessed
+// from templates using dot notation: {{ obj.attribute_name }}.
+//
+// This is useful for exposing Go structs and custom types to templates
+// with specific attribute access semantics.
+//
+// Example implementation:
+//
+//	type User struct {
+//	    Username string
+//	    Email    string
+//	}
+//
+//	func (u *User) GetAttr(name string) Value {
+//	    switch name {
+//	    case "username":
+//	        return FromString(u.Username)
+//	    case "email":
+//	        return FromString(u.Email)
+//	    default:
+//	        return Undefined()
+//	    }
+//	}
 type Object interface {
+	// GetAttr returns the value of the named attribute.
+	//
+	// If the attribute doesn't exist, returns Undefined().
 	GetAttr(name string) Value
 }
 
 // MutableObject is an object that supports attribute assignment.
+//
+// Types that implement MutableObject can have their attributes set from
+// templates, typically via {% set obj.attr = value %} syntax.
+//
+// This is primarily used for special objects like namespace() that need
+// to support attribute assignment across scopes.
+//
+// Example implementation:
+//
+//	type Namespace struct {
+//	    attrs map[string]Value
+//	}
+//
+//	func (n *Namespace) GetAttr(name string) Value {
+//	    if v, ok := n.attrs[name]; ok {
+//	        return v
+//	    }
+//	    return Undefined()
+//	}
+//
+//	func (n *Namespace) SetAttr(name string, val Value) {
+//	    n.attrs[name] = val
+//	}
 type MutableObject interface {
 	Object
+	// SetAttr sets the value of the named attribute.
 	SetAttr(name string, val Value)
 }
 
 // ValueKind describes the type of a Value.
+//
+// ValueKind is used to determine what type of data a Value contains without
+// needing to perform type assertions. This allows for efficient type checking
+// in templates and filters.
+//
+// Example usage:
+//
+//	val := FromString("hello")
+//	if val.Kind() == KindString {
+//	    s, _ := val.AsString()
+//	    fmt.Println("String:", s)
+//	}
 type ValueKind int
 
 const (
+	// KindUndefined represents an undefined or missing value.
+	//
+	// Undefined values are returned when accessing non-existent variables,
+	// attributes, or items. In templates, undefined values typically render
+	// as empty strings unless strict undefined behavior is enabled.
 	KindUndefined ValueKind = iota
+
+	// KindNone represents a null/nil value.
+	//
+	// None is the equivalent of null in JSON, nil in Go, or None in Python.
+	// It's used to explicitly represent the absence of a value.
 	KindNone
+
+	// KindBool represents a boolean value (true or false).
+	//
+	// Boolean values are used in conditionals and logic operations.
 	KindBool
+
+	// KindNumber represents a numeric value (integer or floating-point).
+	//
+	// Numbers can be either int64 or float64 internally, and support
+	// arithmetic operations.
 	KindNumber
+
+	// KindString represents a text string.
+	//
+	// Strings can be either safe (pre-escaped) or unsafe (need escaping).
+	// Safe strings are marked internally and won't be escaped again by
+	// auto-escaping.
 	KindString
+
+	// KindBytes represents binary data.
+	//
+	// Bytes are similar to strings but represent raw binary data rather
+	// than UTF-8 text.
 	KindBytes
+
+	// KindSeq represents an ordered sequence (array/list).
+	//
+	// Sequences can be iterated over and indexed by integer position.
 	KindSeq
+
+	// KindMap represents a key-value mapping (dict/object).
+	//
+	// Maps associate string keys with values and can be accessed using
+	// dot notation or bracket notation in templates.
 	KindMap
+
+	// KindIterable represents a lazy iterator.
+	//
+	// Iterables are special sequences that are consumed when iterated.
+	// They may not have a known length and can only be iterated once.
 	KindIterable
+
+	// KindCallable represents a callable object (function/macro).
+	//
+	// Callables can be invoked with arguments from templates.
 	KindCallable
+
+	// KindPlain represents a custom object with attribute access.
+	//
+	// Plain objects implement the Object interface and expose attributes
+	// that can be accessed from templates.
 	KindPlain
+
+	// KindInvalid represents an invalid or corrupt value.
+	//
+	// This is rarely encountered and typically indicates an internal error.
 	KindInvalid
 )
 
@@ -77,11 +275,67 @@ func (k ValueKind) String() string {
 }
 
 // Value represents a dynamically typed value in the template engine.
+//
+// Value is the core type used throughout MiniJinja for representing template
+// data. It can hold any Go value and provides methods for type checking,
+// conversion, and operations.
+//
+// Values are immutable for primitive types (strings, numbers, booleans) but
+// sequences and maps are referenced, meaning modifications to the underlying
+// Go slice or map will be visible through the Value.
+//
+// # Creating Values
+//
+// Values are typically created using constructor functions:
+//
+//	str := FromString("hello")
+//	num := FromInt(42)
+//	list := FromSlice([]Value{str, num})
+//	dict := FromMap(map[string]Value{"key": str})
+//
+// Go values can also be automatically converted using FromAny:
+//
+//	val := FromAny(map[string]interface{}{
+//	    "name": "Alice",
+//	    "age": 30,
+//	})
+//
+// # Type Checking
+//
+// Use the Kind() method to check the type:
+//
+//	if val.Kind() == KindString {
+//	    // It's a string
+//	}
+//
+// Or use type-specific checking methods:
+//
+//	if val.IsUndefined() { /* ... */ }
+//	if val.IsTrue() { /* ... */ }
+//
+// # Type Conversion
+//
+// Use As* methods to convert to specific types:
+//
+//	if s, ok := val.AsString(); ok {
+//	    fmt.Println("String value:", s)
+//	}
+//	if i, ok := val.AsInt(); ok {
+//	    fmt.Println("Integer value:", i)
+//	}
+//
+// # Operations
+//
+// Values support various operations defined in ops.go:
+//
+//	result, err := val1.Add(val2)  // arithmetic
+//	cmp, ok := val1.Compare(val2)  // comparison
+//	contains := val.Contains(item) // containment
 type Value struct {
 	data any
 }
 
-// internal marker types
+// internal marker types for special values
 type undefinedType struct{}
 type noneType struct{}
 
@@ -91,51 +345,120 @@ var (
 )
 
 // Undefined returns the undefined value.
+//
+// Undefined represents a missing or non-existent value. In templates,
+// undefined values typically render as empty strings unless strict
+// undefined behavior is enabled.
+//
+// Example usage:
+//
+//	// Return undefined from a custom object
+//	func (obj *MyObject) GetAttr(name string) Value {
+//	    if name == "existing" {
+//	        return FromString("value")
+//	    }
+//	    return Undefined()  // attribute doesn't exist
+//	}
 func Undefined() Value {
 	return Value{data: undefinedVal}
 }
 
-// None returns the none value.
+// None returns the none/null value.
+//
+// None represents an explicit null value, equivalent to null in JSON,
+// nil in Go, or None in Python.
+//
+// Example usage:
+//
+//	context := FromMap(map[string]Value{
+//	    "name": FromString("Alice"),
+//	    "age":  None(),  // explicitly null
+//	})
 func None() Value {
 	return Value{data: noneVal}
 }
 
-// True returns a true boolean value.
+// True returns the boolean true value.
+//
+// This is a convenience function equivalent to FromBool(true).
 func True() Value {
 	return Value{data: true}
 }
 
-// False returns a false boolean value.
+// False returns the boolean false value.
+//
+// This is a convenience function equivalent to FromBool(false).
 func False() Value {
 	return Value{data: false}
 }
 
-// FromBool creates a Value from a bool.
+// FromBool creates a Value from a boolean.
+//
+// Example usage:
+//
+//	isActive := FromBool(true)
+//	// In template: {% if isActive %}...{% endif %}
 func FromBool(v bool) Value {
 	return Value{data: v}
 }
 
 // FromInt creates a Value from an int64.
+//
+// Integer values support arithmetic operations and can be compared.
+//
+// Example usage:
+//
+//	count := FromInt(42)
+//	// In template: {{ count + 1 }}  -> 43
 func FromInt(v int64) Value {
 	return Value{data: v}
 }
 
 // FromFloat creates a Value from a float64.
+//
+// Floating-point values support arithmetic operations. Special values
+// like infinity and NaN are handled according to Go's float64 semantics.
+//
+// Example usage:
+//
+//	price := FromFloat(19.99)
+//	// In template: {{ price * 1.2 }}  -> 23.988
 func FromFloat(v float64) Value {
 	return Value{data: v}
 }
 
 // FromString creates a Value from a string.
+//
+// String values are not marked as safe and will be escaped by auto-escaping
+// if enabled. For pre-escaped HTML, use FromSafeString instead.
+//
+// Example usage:
+//
+//	name := FromString("Alice")
+//	// In template: {{ name }}  -> Alice
+//	html := FromString("<b>Bold</b>")
+//	// In template with escaping: {{ html }}  -> &lt;b&gt;Bold&lt;/b&gt;
 func FromString(v string) Value {
 	return Value{data: v}
 }
 
 // FromSafeString creates a Value from a safe (pre-escaped) string.
+//
+// Safe strings are marked as already escaped and will not be escaped again
+// by auto-escaping. This is useful when you want to include HTML or other
+// markup that should be rendered as-is.
+//
+// Example usage:
+//
+//	html := FromSafeString("<b>Bold</b>")
+//	// In template with escaping: {{ html }}  -> <b>Bold</b>
+//
+// Use this with caution - ensure the string is actually safe to prevent XSS.
 func FromSafeString(v string) Value {
 	return Value{data: safeString(v)}
 }
 
-// safeString is a string that should not be escaped.
+// safeString is an internal wrapper for strings that should not be escaped.
 type safeString string
 
 // bigIntValue wraps a big.Int for large integer values.
@@ -243,37 +566,155 @@ func (i *OneShotIterator) String() string {
 	return "<iterator>"
 }
 
-// FromBigInt creates a Value from a big.Int.
+// FromBigInt creates a Value from a big.Int for arbitrary-precision integers.
+//
+// Big integers are used when values exceed the range of int64. They support
+// the same arithmetic operations as regular integers.
+//
+// Example usage:
+//
+//	large := new(big.Int)
+//	large.SetString("123456789012345678901234567890", 10)
+//	val := FromBigInt(large)
+//	// In template: {{ val + 1 }}
 func FromBigInt(v *big.Int) Value {
 	return Value{data: bigIntValue{v}}
 }
 
 // FromBytes creates a Value from a byte slice.
+//
+// Byte values represent binary data. They can be used for non-text content
+// and are distinct from strings (which are UTF-8 text).
+//
+// Example usage:
+//
+//	data := FromBytes([]byte{0x48, 0x65, 0x6c, 0x6c, 0x6f})
+//	// In template: {{ data }}  -> Hello
 func FromBytes(v []byte) Value {
 	return Value{data: v}
 }
 
 // FromSlice creates a Value from a slice of Values.
+//
+// Slices represent ordered sequences (arrays/lists) that can be iterated
+// over and indexed by position. They correspond to arrays in JSON and
+// lists in Python.
+//
+// Example usage:
+//
+//	items := FromSlice([]Value{
+//	    FromString("apple"),
+//	    FromString("banana"),
+//	    FromString("cherry"),
+//	})
+//	// In template: {% for item in items %}{{ item }}{% endfor %}
+//	// In template: {{ items[0] }}  -> apple
+//	// In template: {{ items|length }}  -> 3
 func FromSlice(v []Value) Value {
 	return Value{data: v}
 }
 
 // FromMap creates a Value from a map of string to Value.
+//
+// Maps represent key-value associations (dictionaries/objects) that can be
+// accessed using dot notation or bracket notation in templates. They
+// correspond to objects in JSON and dicts in Python.
+//
+// Example usage:
+//
+//	user := FromMap(map[string]Value{
+//	    "name":  FromString("Alice"),
+//	    "age":   FromInt(30),
+//	    "email": FromString("alice@example.com"),
+//	})
+//	// In template: {{ user.name }}  -> Alice
+//	// In template: {{ user["age"] }}  -> 30
+//	// In template: {% for key in user %}{{ key }}{% endfor %}
 func FromMap(v map[string]Value) Value {
 	return Value{data: v}
 }
 
 // FromCallable creates a Value from a Callable.
+//
+// Callables can be invoked from templates using function call syntax.
+// This is useful for exposing custom functions to templates.
+//
+// Example usage:
+//
+//	type MyFunc struct{}
+//	func (f *MyFunc) Call(args []Value, kwargs map[string]Value) (Value, error) {
+//	    return FromString("Hello!"), nil
+//	}
+//
+//	fn := FromCallable(&MyFunc{})
+//	context := FromMap(map[string]Value{"greet": fn})
+//	// In template: {{ greet() }}  -> Hello!
 func FromCallable(c Callable) Value {
 	return Value{data: c}
 }
 
 // FromObject creates a Value from an Object.
+//
+// Objects expose attributes that can be accessed from templates using dot
+// notation. This is useful for exposing custom types with specific attribute
+// access semantics.
+//
+// Example usage:
+//
+//	type User struct {
+//	    Name string
+//	    Age  int
+//	}
+//
+//	func (u *User) GetAttr(name string) Value {
+//	    switch name {
+//	    case "name": return FromString(u.Name)
+//	    case "age": return FromInt(int64(u.Age))
+//	    default: return Undefined()
+//	    }
+//	}
+//
+//	user := &User{Name: "Alice", Age: 30}
+//	val := FromObject(user)
+//	// In template: {{ user.name }}  -> Alice
 func FromObject(o Object) Value {
 	return Value{data: o}
 }
 
 // FromAny creates a Value from any Go value using reflection.
+//
+// FromAny automatically converts Go types to their corresponding Value types:
+//   - nil -> None()
+//   - bool -> FromBool()
+//   - int types -> FromInt()
+//   - uint types -> FromInt()
+//   - float types -> FromFloat()
+//   - string -> FromString()
+//   - []byte -> FromBytes()
+//   - slices/arrays -> FromSlice() (recursively)
+//   - maps -> FromMap() (recursively)
+//   - structs -> FromMap() (using exported fields and json tags)
+//   - pointers/interfaces -> dereference and convert
+//
+// This is the most convenient way to convert Go data to Values, but it
+// uses reflection and may be slower than using specific constructors.
+//
+// Example usage:
+//
+//	data := FromAny(map[string]interface{}{
+//	    "name": "Alice",
+//	    "age":  30,
+//	    "tags": []string{"admin", "user"},
+//	})
+//	// Equivalent to:
+//	// FromMap(map[string]Value{
+//	//     "name": FromString("Alice"),
+//	//     "age": FromInt(30),
+//	//     "tags": FromSlice([]Value{
+//	//         FromString("admin"),
+//	//         FromString("user"),
+//	//     }),
+//	// })
 func FromAny(v any) Value {
 	if v == nil {
 		return None()
