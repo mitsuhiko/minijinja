@@ -673,6 +673,10 @@ func filterSlice(_ *State, val value.Value, args []value.Value, _ map[string]val
 	length := len(items)
 	baseSize := length / sliceCount
 	remainder := length % sliceCount
+	maxSize := baseSize
+	if remainder > 0 {
+		maxSize++
+	}
 
 	var result []value.Value
 	offset := 0
@@ -685,9 +689,11 @@ func filterSlice(_ *State, val value.Value, args []value.Value, _ map[string]val
 		slice := make([]value.Value, size)
 		copy(slice, items[offset:offset+size])
 
-		// Fill if needed for last slice
-		if !fillWith.IsUndefined() && i >= remainder && i == sliceCount-1 && remainder > 0 {
-			slice = append(slice, fillWith)
+		// Fill slices to the maximum size when requested
+		if !fillWith.IsUndefined() && len(slice) < maxSize {
+			for len(slice) < maxSize {
+				slice = append(slice, fillWith)
+			}
 		}
 
 		result = append(result, value.FromSlice(slice))
@@ -712,7 +718,9 @@ func filterMap(state *State, val value.Value, args []value.Value, kwargs map[str
 
 	// Get attribute name
 	var attrName string
+	attrValue := value.Undefined()
 	if attr, ok := kwargs["attribute"]; ok {
+		attrValue = attr
 		if s, ok := attr.AsString(); ok {
 			attrName = s
 		}
@@ -727,9 +735,13 @@ func filterMap(state *State, val value.Value, args []value.Value, kwargs map[str
 	var result []value.Value
 	for _, item := range items {
 		var mapped value.Value
-		if attrName != "" {
+		if !attrValue.IsUndefined() {
 			// Attribute mapping with dot notation support
-			mapped = getDeepAttr(item, attrName)
+			if attrName != "" {
+				mapped = getDeepAttr(item, attrName)
+			} else {
+				mapped = item.GetItem(attrValue)
+			}
 			if mapped.IsUndefined() && !defaultVal.IsUndefined() {
 				mapped = defaultVal
 			}
@@ -752,6 +764,25 @@ func filterMap(state *State, val value.Value, args []value.Value, kwargs map[str
 	return value.FromSlice(result), nil
 }
 
+func normalizeTestName(name string) string {
+	switch name {
+	case "==":
+		return "eq"
+	case "!=":
+		return "ne"
+	case ">":
+		return "gt"
+	case ">=":
+		return "ge"
+	case "<":
+		return "lt"
+	case "<=":
+		return "le"
+	default:
+		return name
+	}
+}
+
 func filterSelect(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
@@ -762,7 +793,7 @@ func filterSelect(state *State, val value.Value, args []value.Value, kwargs map[
 	var testName string
 	if len(args) > 0 {
 		if s, ok := args[0].AsString(); ok {
-			testName = s
+			testName = normalizeTestName(s)
 		}
 	}
 
@@ -799,7 +830,7 @@ func filterReject(state *State, val value.Value, args []value.Value, kwargs map[
 	var testName string
 	if len(args) > 0 {
 		if s, ok := args[0].AsString(); ok {
-			testName = s
+			testName = normalizeTestName(s)
 		}
 	}
 
@@ -841,7 +872,7 @@ func filterSelectAttr(state *State, val value.Value, args []value.Value, kwargs 
 	var testName string
 	if len(args) > 1 {
 		if s, ok := args[1].AsString(); ok {
-			testName = s
+			testName = normalizeTestName(s)
 		}
 	}
 
@@ -884,7 +915,7 @@ func filterRejectAttr(state *State, val value.Value, args []value.Value, kwargs 
 	var testName string
 	if len(args) > 1 {
 		if s, ok := args[1].AsString(); ok {
-			testName = s
+			testName = normalizeTestName(s)
 		}
 	}
 
@@ -951,49 +982,111 @@ func filterGroupBy(_ *State, val value.Value, args []value.Value, kwargs map[str
 		}
 	}
 
+	// Sort items by group key
+	sorted := make([]value.Value, len(items))
+	copy(sorted, items)
+
+	sort.SliceStable(sorted, func(i, j int) bool {
+		left := groupByValue(sorted[i], attrName, defaultVal)
+		right := groupByValue(sorted[j], attrName, defaultVal)
+		return compareGroupBy(left, right, caseSensitive) < 0
+	})
+
 	// Group items
-	type group struct {
-		grouper value.Value
-		list    []value.Value
-	}
-	var groups []group
-	groupIndex := make(map[string]int)
+	var result []value.Value
+	var currentGrouper value.Value
+	var currentList []value.Value
+	hasGroup := false
 
-	for _, item := range items {
-		grouper := getDeepAttr(item, attrName)
-		if grouper.IsUndefined() {
-			grouper = defaultVal
+	for _, item := range sorted {
+		groupValue := groupByValue(item, attrName, defaultVal)
+		if !hasGroup {
+			currentGrouper = groupValue
+			currentList = []value.Value{item}
+			hasGroup = true
+			continue
 		}
 
-		// Create key for grouping
-		var key string
-		if !caseSensitive {
-			if s, ok := grouper.AsString(); ok {
-				key = strings.ToLower(s)
-			} else {
-				key = grouper.Repr()
-			}
-		} else {
-			key = grouper.Repr()
+		if !groupByEqual(currentGrouper, groupValue, caseSensitive) {
+			result = append(result, value.FromObject(&groupObject{
+				grouper: currentGrouper,
+				list:    currentList,
+			}))
+			currentGrouper = groupValue
+			currentList = []value.Value{item}
+			continue
 		}
 
-		if idx, ok := groupIndex[key]; ok {
-			groups[idx].list = append(groups[idx].list, item)
-		} else {
-			groupIndex[key] = len(groups)
-			groups = append(groups, group{grouper: grouper, list: []value.Value{item}})
-		}
+		currentGrouper = groupValue
+		currentList = append(currentList, item)
 	}
 
-	// Convert to value
-	result := make([]value.Value, len(groups))
-	for i, g := range groups {
-		result[i] = value.FromObject(&groupObject{
-			grouper: g.grouper,
-			list:    g.list,
-		})
+	if hasGroup {
+		result = append(result, value.FromObject(&groupObject{
+			grouper: currentGrouper,
+			list:    currentList,
+		}))
 	}
+
 	return value.FromSlice(result), nil
+}
+
+func groupByValue(item value.Value, attrName string, defaultVal value.Value) value.Value {
+	grouper := getDeepAttr(item, attrName)
+	if grouper.IsUndefined() {
+		grouper = defaultVal
+	}
+	return grouper
+}
+
+func compareGroupBy(a, b value.Value, caseSensitive bool) int {
+	if !caseSensitive {
+		if s1, ok := a.AsString(); ok {
+			if s2, ok := b.AsString(); ok {
+				lowerCmp := strings.Compare(strings.ToLower(s1), strings.ToLower(s2))
+				if lowerCmp != 0 {
+					return lowerCmp
+				}
+				if s1 != s2 {
+					rank1 := caseRank(s1)
+					rank2 := caseRank(s2)
+					if rank1 != rank2 {
+						if rank1 < rank2 {
+							return -1
+						}
+						return 1
+					}
+					return strings.Compare(s1, s2)
+				}
+				return 0
+			}
+		}
+	}
+	if cmp, ok := a.Compare(b); ok {
+		return cmp
+	}
+	return strings.Compare(a.Repr(), b.Repr())
+}
+
+func groupByEqual(a, b value.Value, caseSensitive bool) bool {
+	if !caseSensitive {
+		if s1, ok := a.AsString(); ok {
+			if s2, ok := b.AsString(); ok {
+				return strings.EqualFold(s1, s2)
+			}
+		}
+	}
+	if cmp, ok := a.Compare(b); ok {
+		return cmp == 0
+	}
+	return a.Repr() == b.Repr()
+}
+
+func caseRank(s string) int {
+	if s == strings.ToLower(s) {
+		return 1
+	}
+	return 0
 }
 
 // groupObject represents a group in groupby filter
@@ -1012,11 +1105,56 @@ func (g *groupObject) GetAttr(name string) value.Value {
 	return value.Undefined()
 }
 
+func (g *groupObject) Iter() []value.Value {
+	return []value.Value{g.grouper, value.FromSlice(g.list)}
+}
+
+func (g *groupObject) Len() (int, bool) {
+	return 2, true
+}
+
+func (g *groupObject) GetItem(key value.Value) value.Value {
+	if idx, ok := key.AsInt(); ok {
+		switch idx {
+		case 0:
+			return g.grouper
+		case 1:
+			return value.FromSlice(g.list)
+		}
+	}
+	return value.Undefined()
+}
+
 func (g *groupObject) String() string {
-	return fmt.Sprintf("(%s, %v)", g.grouper.Repr(), g.list)
+	listRepr := value.FromSlice(g.list).Repr()
+	return fmt.Sprintf("[%s, %s]", g.grouper.Repr(), listRepr)
 }
 
 func filterChain(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+	allValues := append([]value.Value{val}, args...)
+
+	allMaps := true
+	allSeq := true
+	for _, v := range allValues {
+		if _, ok := v.AsMap(); !ok {
+			allMaps = false
+		}
+		if _, ok := v.AsSlice(); !ok {
+			allSeq = false
+		}
+	}
+
+	if allMaps {
+		merged := make(map[string]value.Value)
+		for _, v := range allValues {
+			m, _ := v.AsMap()
+			for k, val := range m {
+				merged[k] = val
+			}
+		}
+		return value.FromMap(merged), nil
+	}
+
 	// Get items from first value
 	items := val.Iter()
 	if items == nil {
@@ -1029,6 +1167,10 @@ func filterChain(_ *State, val value.Value, args []value.Value, _ map[string]val
 		if argItems != nil {
 			items = append(items, argItems...)
 		}
+	}
+
+	if allSeq {
+		return value.FromSlice(items), nil
 	}
 
 	// Return as iterable to support length, indexing, etc.
@@ -1216,6 +1358,9 @@ func filterRound(_ *State, val value.Value, args []value.Value, kwargs map[strin
 	}
 
 	if precision == 0 {
+		if val.IsActualFloat() {
+			return value.FromFloat(f), nil
+		}
 		return value.FromInt(int64(f)), nil
 	}
 	return value.FromFloat(f), nil
@@ -1403,7 +1548,50 @@ func filterIndent(_ *State, val value.Value, args []value.Value, kwargs map[stri
 }
 
 func filterPprint(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	return value.FromString(val.Repr()), nil
+	return value.FromString(pprintValue(val, 0)), nil
+}
+
+func pprintValue(val value.Value, indent int) string {
+	pad := strings.Repeat(" ", indent)
+	switch val.Kind() {
+	case value.KindSeq:
+		items, _ := val.AsSlice()
+		if len(items) == 0 {
+			return "[]"
+		}
+		var sb strings.Builder
+		sb.WriteString("[\n")
+		for _, item := range items {
+			sb.WriteString(strings.Repeat(" ", indent+4))
+			sb.WriteString(pprintValue(item, indent+4))
+			sb.WriteString(",\n")
+		}
+		sb.WriteString(pad)
+		sb.WriteString("]")
+		return sb.String()
+	case value.KindMap:
+		m, _ := val.AsMap()
+		if len(m) == 0 {
+			return "{}"
+		}
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		var sb strings.Builder
+		sb.WriteString("{\n")
+		for _, k := range keys {
+			sb.WriteString(strings.Repeat(" ", indent+4))
+			sb.WriteString(fmt.Sprintf("%q: %s,", k, pprintValue(m[k], indent+4)))
+			sb.WriteString("\n")
+		}
+		sb.WriteString(pad)
+		sb.WriteString("}")
+		return sb.String()
+	default:
+		return val.Repr()
+	}
 }
 
 func filterTojson(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
@@ -1441,7 +1629,9 @@ func filterTojson(_ *State, val value.Value, args []value.Value, kwargs map[stri
 	if err != nil {
 		return value.Undefined(), err
 	}
-	return value.FromSafeString(string(data)), nil
+	jsonStr := string(data)
+	jsonStr = strings.ReplaceAll(jsonStr, "'", "\\u0027")
+	return value.FromSafeString(jsonStr), nil
 }
 
 func valueToNative(v value.Value) interface{} {
@@ -1479,6 +1669,13 @@ func valueToNative(v value.Value) interface{} {
 	}
 }
 
+func urlencodeString(input string) string {
+	escaped := url.QueryEscape(input)
+	escaped = strings.ReplaceAll(escaped, "+", "%20")
+	escaped = strings.ReplaceAll(escaped, "%2F", "/")
+	return escaped
+}
+
 func filterUrlencode(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	// Check if it's a map (dict) - encode as query string
 	if m, ok := val.AsMap(); ok {
@@ -1493,7 +1690,7 @@ func filterUrlencode(_ *State, val value.Value, _ []value.Value, _ map[string]va
 			if v.IsNone() {
 				continue
 			}
-			parts = append(parts, url.QueryEscape(k)+"="+url.QueryEscape(v.String()))
+			parts = append(parts, urlencodeString(k)+"="+urlencodeString(v.String()))
 		}
 		return value.FromString(strings.Join(parts, "&")), nil
 	}
@@ -1502,7 +1699,7 @@ func filterUrlencode(_ *State, val value.Value, _ []value.Value, _ map[string]va
 	if !ok {
 		s = val.String()
 	}
-	return value.FromString(url.QueryEscape(s)), nil
+	return value.FromString(urlencodeString(s)), nil
 }
 
 // --- Tests ---

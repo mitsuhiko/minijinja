@@ -32,9 +32,14 @@ type blockStack struct {
 
 // macroCallable wraps a macro for callable invocation
 type macroCallable struct {
-	macro  *parser.Macro
-	state  *State
-	caller value.Value // caller value if this is a call block macro
+	macro     *parser.Macro
+	state     *State
+	caller    value.Value // caller value if this is a call block macro
+	hasCaller bool
+}
+
+func newMacroCallable(state *State, macro *parser.Macro, caller value.Value) *macroCallable {
+	return &macroCallable{macro: macro, state: state, caller: caller, hasCaller: macroUsesCaller(macro)}
 }
 
 func (m *macroCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
@@ -55,13 +60,211 @@ func (m *macroCallable) GetAttr(name string) value.Value {
 		}
 		return value.FromSlice(argNames)
 	case "caller":
-		return value.FromBool(m.caller != value.Undefined())
+		return value.FromBool(m.hasCaller)
 	}
 	return value.Undefined()
 }
 
 func (m *macroCallable) String() string {
 	return fmt.Sprintf("<macro %s>", m.macro.Name)
+}
+
+// functionCallable wraps a global function for callable usage in templates.
+type functionCallable struct {
+	state *State
+	fn    FunctionFunc
+}
+
+func (f *functionCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	return f.fn(f.state, args, kwargs)
+}
+
+func macroUsesCaller(macro *parser.Macro) bool {
+	for _, stmt := range macro.Body {
+		if stmtUsesCaller(stmt) {
+			return true
+		}
+	}
+	return false
+}
+
+func stmtUsesCaller(stmt parser.Stmt) bool {
+	switch st := stmt.(type) {
+	case *parser.EmitExpr:
+		return exprUsesCaller(st.Expr)
+	case *parser.ForLoop:
+		if exprUsesCaller(st.Target) || exprUsesCaller(st.Iter) || exprUsesCaller(st.FilterExpr) {
+			return true
+		}
+		for _, bodyStmt := range st.Body {
+			if stmtUsesCaller(bodyStmt) {
+				return true
+			}
+		}
+		for _, bodyStmt := range st.ElseBody {
+			if stmtUsesCaller(bodyStmt) {
+				return true
+			}
+		}
+	case *parser.IfCond:
+		if exprUsesCaller(st.Expr) {
+			return true
+		}
+		for _, bodyStmt := range st.TrueBody {
+			if stmtUsesCaller(bodyStmt) {
+				return true
+			}
+		}
+		for _, bodyStmt := range st.FalseBody {
+			if stmtUsesCaller(bodyStmt) {
+				return true
+			}
+		}
+	case *parser.WithBlock:
+		for _, assignment := range st.Assignments {
+			if exprUsesCaller(assignment.Target) || exprUsesCaller(assignment.Value) {
+				return true
+			}
+		}
+		for _, bodyStmt := range st.Body {
+			if stmtUsesCaller(bodyStmt) {
+				return true
+			}
+		}
+	case *parser.Set:
+		return exprUsesCaller(st.Target) || exprUsesCaller(st.Expr)
+	case *parser.SetBlock:
+		if exprUsesCaller(st.Target) || exprUsesCaller(st.Filter) {
+			return true
+		}
+		for _, bodyStmt := range st.Body {
+			if stmtUsesCaller(bodyStmt) {
+				return true
+			}
+		}
+	case *parser.Block:
+		for _, bodyStmt := range st.Body {
+			if stmtUsesCaller(bodyStmt) {
+				return true
+			}
+		}
+	case *parser.Extends:
+		return exprUsesCaller(st.Name)
+	case *parser.Import:
+		return exprUsesCaller(st.Expr) || exprUsesCaller(st.Name)
+	case *parser.FromImport:
+		if exprUsesCaller(st.Expr) {
+			return true
+		}
+		for _, name := range st.Names {
+			if exprUsesCaller(name.Name) || exprUsesCaller(name.Alias) {
+				return true
+			}
+		}
+		return false
+	case *parser.Include:
+		return exprUsesCaller(st.Name)
+	case *parser.Macro:
+		for _, bodyStmt := range st.Body {
+			if stmtUsesCaller(bodyStmt) {
+				return true
+			}
+		}
+	case *parser.FilterBlock:
+		if exprUsesCaller(st.Filter) {
+			return true
+		}
+		for _, bodyStmt := range st.Body {
+			if stmtUsesCaller(bodyStmt) {
+				return true
+			}
+		}
+	case *parser.AutoEscape:
+		if exprUsesCaller(st.Enabled) {
+			return true
+		}
+		for _, bodyStmt := range st.Body {
+			if stmtUsesCaller(bodyStmt) {
+				return true
+			}
+		}
+	case *parser.Do:
+		return exprUsesCaller(st.Call)
+	case *parser.CallBlock:
+		if exprUsesCaller(st.Call) {
+			return true
+		}
+		for _, bodyStmt := range st.MacroDecl.Body {
+			if stmtUsesCaller(bodyStmt) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func exprUsesCaller(expr parser.Expr) bool {
+	switch e := expr.(type) {
+	case *parser.Var:
+		return e.ID == "caller"
+	case *parser.UnaryOp:
+		return exprUsesCaller(e.Expr)
+	case *parser.BinOp:
+		return exprUsesCaller(e.Left) || exprUsesCaller(e.Right)
+	case *parser.IfExpr:
+		return exprUsesCaller(e.TestExpr) || exprUsesCaller(e.TrueExpr) || exprUsesCaller(e.FalseExpr)
+	case *parser.Filter:
+		if exprUsesCaller(e.Expr) {
+			return true
+		}
+		for _, arg := range e.Args {
+			if exprUsesCaller(arg.Value) {
+				return true
+			}
+		}
+	case *parser.Test:
+		if exprUsesCaller(e.Expr) {
+			return true
+		}
+		for _, arg := range e.Args {
+			if exprUsesCaller(arg.Value) {
+				return true
+			}
+		}
+	case *parser.GetAttr:
+		return exprUsesCaller(e.Expr)
+	case *parser.GetItem:
+		return exprUsesCaller(e.Expr) || exprUsesCaller(e.SubscriptExpr)
+	case *parser.Call:
+		if exprUsesCaller(e.Expr) {
+			return true
+		}
+		for _, arg := range e.Args {
+			if exprUsesCaller(arg.Value) {
+				return true
+			}
+		}
+	case *parser.List:
+		for _, item := range e.Items {
+			if exprUsesCaller(item) {
+				return true
+			}
+		}
+	case *parser.Map:
+		for _, item := range e.Keys {
+			if exprUsesCaller(item) {
+				return true
+			}
+		}
+		for _, item := range e.Values {
+			if exprUsesCaller(item) {
+				return true
+			}
+		}
+	case *parser.Slice:
+		return exprUsesCaller(e.Expr) || exprUsesCaller(e.Start) || exprUsesCaller(e.Stop) || exprUsesCaller(e.Step)
+	}
+	return false
 }
 
 func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwargs map[string]value.Value, caller value.Value) (value.Value, error) {
@@ -294,9 +497,19 @@ func (s *State) Lookup(name string) value.Value {
 		}
 	}
 
+	// Check macros
+	if macro, ok := s.macros[name]; ok {
+		return value.FromCallable(newMacroCallable(s, macro, value.Undefined()))
+	}
+
 	// Check globals
 	if v, ok := s.env.getGlobal(name); ok {
 		return v
+	}
+
+	// Check functions as callables
+	if fn, ok := s.env.getFunction(name); ok {
+		return value.FromCallable(&functionCallable{state: s, fn: fn})
 	}
 
 	return value.Undefined()
@@ -590,13 +803,21 @@ func (s *State) unpackTarget(target parser.Expr, val value.Value) {
 	case *parser.Var:
 		s.Set(t.ID, val)
 	case *parser.List:
-		if items, ok := val.AsSlice(); ok {
+		items, ok := val.AsSlice()
+		if !ok {
+			items = val.Iter()
+		}
+		if items != nil {
 			for i, item := range t.Items {
 				if i < len(items) {
 					s.unpackTarget(item, items[i])
 				} else {
 					s.unpackTarget(item, value.Undefined())
 				}
+			}
+		} else {
+			for _, item := range t.Items {
+				s.unpackTarget(item, value.Undefined())
 			}
 		}
 	case *parser.GetAttr:
@@ -772,7 +993,14 @@ var errExtendsExecuted = fmt.Errorf("extends executed")
 func (s *State) evalBlock(block *parser.Block) error {
 	// When we encounter a block, render using the block stack
 	bs := s.blocks[block.Name]
-	if bs == nil || len(bs.layers) == 0 {
+	if bs == nil {
+		bs = &blockStack{
+			layers: [][]parser.Stmt{block.Body},
+			index:  0,
+		}
+		s.blocks[block.Name] = bs
+	}
+	if len(bs.layers) == 0 {
 		// No override - render the current block's content
 		s.pushScope()
 		oldBlock := s.currentBlock
@@ -1097,6 +1325,28 @@ type callerCallable struct {
 	state *State
 	body  []parser.Stmt
 	args  []parser.Expr // macro args from the call block declaration
+}
+
+func (c *callerCallable) GetAttr(name string) value.Value {
+	switch name {
+	case "name":
+		return value.FromString("caller")
+	case "arguments":
+		argNames := make([]value.Value, len(c.args))
+		for i, arg := range c.args {
+			if v, ok := arg.(*parser.Var); ok {
+				argNames[i] = value.FromString(v.ID)
+			}
+		}
+		return value.FromSlice(argNames)
+	case "caller":
+		return value.False()
+	}
+	return value.Undefined()
+}
+
+func (c *callerCallable) String() string {
+	return "<macro caller>"
 }
 
 func (c *callerCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {

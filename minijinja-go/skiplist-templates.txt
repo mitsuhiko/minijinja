@@ -14,17 +14,8 @@ literals.txt
 # =============================================================================
 # NOT YET IMPLEMENTED - Missing features
 # =============================================================================
-# Missing: bool filter (need enhanced implementation)
-filters.txt
-
-# Missing: select/reject/selectattr/rejectattr filter with test name arguments
-opfilters.txt
-
-# Missing: self object for block calls
-self.txt
-
-# Missing: loop.cycle() callable method (now implemented but test needs cycle values)
-loop_var.txt
+# Missing: function argument spreading (a, *args, **kwargs)
+calls-and-literals.txt
 
 # Missing: debug() function (formatting differences)
 debug.txt
@@ -35,26 +26,12 @@ dict.txt
 # Missing: namespace object string representation (formatting differences)
 namespace.txt
 
-# Missing: macro.name, macro.arguments, caller properties
-macro_basic.txt
-macro_caller.txt
-macro_caller_methods.txt
-
-# Missing: call block with caller
-call.txt
-
-# Missing: function argument spreading (a, *args, **kwargs)
-calls-and-literals.txt
-
 # Missing: macro calling another macro issues
 do_macro_calling_macro.txt
 macro_calling_macro.txt
 
 # Missing: set in extends context
 extends_set.txt
-
-# Missing: groupby filter with proper object representation
-groupby-filter.txt
 
 # Missing: import * functionality
 import_all.txt

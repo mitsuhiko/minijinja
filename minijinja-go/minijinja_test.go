@@ -950,7 +950,7 @@ func TestUrlencodeFilter(t *testing.T) {
 		ctx      map[string]any
 		expected string
 	}{
-		{`{{ value|urlencode }}`, map[string]any{"value": "hello world"}, `hello+world`},
+		{`{{ value|urlencode }}`, map[string]any{"value": "hello world"}, `hello%20world`},
 		{`{{ value|urlencode }}`, map[string]any{"value": "a=b&c=d"}, `a%3Db%26c%3Dd`},
 	}
 
