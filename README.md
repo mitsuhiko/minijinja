@@ -1,6 +1,6 @@
 <div align="center">
   <img src="https://github.com/mitsuhiko/minijinja/raw/main/artwork/logo.png" alt="" width=320>
-  <p><strong>MiniJinja: a powerful template engine for Rust with minimal dependencies</strong></p>
+  <p><strong>MiniJinja: a powerful template engine with minimal dependencies</strong></p>
 
 [![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
 [![Crates.io](https://img.shields.io/crates/d/minijinja.svg)](https://crates.io/crates/minijinja)
@@ -9,9 +9,12 @@
 
 </div>
 
-MiniJinja is a powerful but minimal dependency template engine for Rust which
-is based on the syntax and behavior of the
+MiniJinja is a powerful but minimal dependency template engine
+which is based on the syntax and behavior of the
 [Jinja2](https://jinja.palletsprojects.com/) template engine for Python.
+
+It's implemented in [Rust](https://github.com/mitsuhiko/minijinja/tree/main/minijinja) and [Go](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-go) and is also available via WASM for [JavaScript](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-js)
+and as a [Python extension module](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py) and as a [command line utility](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli).
 
 It's supports all `serde` types and only has it as a single required
 dependency. It supports [a range of features from Jinja2](https://github.com/mitsuhiko/minijinja/blob/main/COMPATIBILITY.md)

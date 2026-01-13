@@ -1,0 +1,1 @@
+../../.claude/commands/update-changelog.md

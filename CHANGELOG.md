@@ -2,6 +2,12 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Added `py.typed` marker for PEP 561 typing support in Python bindings.  #853
+* Added optional default argument to `map.get()` method in pycompat.  #852
+* Added a go language port.  #854
+
 ## 2.14.0
 
 * Added support for tuple unpacking in `{% set %}` statements.  #847
