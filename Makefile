@@ -24,6 +24,11 @@ test: test-msrv test-cli test-go
 	@echo "CARGO TEST MINIJINJA-CONTRIB ALL FEATURES"
 	@cd minijinja-contrib; cargo test --all-features
 
+.PHONY: test-rust
+test-rust: test-msrv test-cli
+	@echo "CARGO TEST MINIJINJA-CONTRIB ALL FEATURES"
+	@cd minijinja-contrib; cargo test --all-features
+
 .PHONY: test-go
 test-go:
 	@echo "GO TEST MINIJINJA-GO"

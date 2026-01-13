@@ -31,15 +31,12 @@ jobs:
         with:
           toolchain: nightly
       - uses: Swatinem/rust-cache@v2
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
       - name: Wipe Cargo.lock
         run: rm Cargo.lock
       - name: Check
         run: make check
       - name: Test
-        run: make test
+        run: make test-rust
       - name: -Znext-solver
         run: RUSTFLAGS="-Znext-solver" cargo check --all --all-features
 
@@ -103,13 +100,10 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
       - name: Remove Cargo.lock
         run: rm Cargo.lock
       - name: Test
-        run: make test
+        run: make test-rust
 
   test-wasi:
     name: Test on WASI
