@@ -20,9 +20,19 @@ test-msrv:
 	@cd minijinja; cargo test --all-features
 
 .PHONY: test
-test: test-msrv test-cli
+test: test-msrv test-cli test-go
 	@echo "CARGO TEST MINIJINJA-CONTRIB ALL FEATURES"
 	@cd minijinja-contrib; cargo test --all-features
+
+.PHONY: test-rust
+test-rust: test-msrv test-cli
+	@echo "CARGO TEST MINIJINJA-CONTRIB ALL FEATURES"
+	@cd minijinja-contrib; cargo test --all-features
+
+.PHONY: test-go
+test-go:
+	@echo "GO TEST MINIJINJA-GO"
+	@cd minijinja-go; go test -v ./...
 
 .PHONY: wasi-test
 wasi-test:

@@ -1,6 +1,6 @@
 [workspace]
 members = ["minijinja", "examples/*", "benchmarks", "minijinja-*"]
-exclude = ["examples/README.md"]
+exclude = ["examples/README.md", "minijinja-go"]
 resolver = "2"
 
 [profile.release]
