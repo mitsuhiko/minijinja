@@ -12,26 +12,63 @@ import (
 	"github.com/mitsuhiko/minijinja/minijinja-go/value"
 )
 
-// Built-in filter implementations. These mirror the Rust MiniJinja filters.
-
-// filterUpper implements the built-in `upper` filter.
-func filterUpper(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterUpper converts a value to uppercase.
+//
+// This filter converts the entire string to uppercase characters.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("upper", FilterUpper)
+//
+// Template usage:
+//
+//	<h1>{{ chapter.title|upper }}</h1>
+//
+// Note: This filter only works on string values. Non-string values are returned
+// unchanged.
+func FilterUpper(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		return value.FromString(strings.ToUpper(s)), nil
 	}
 	return val, nil
 }
 
-// filterLower implements the built-in `lower` filter.
-func filterLower(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterLower converts a value to lowercase.
+//
+// This filter converts the entire string to lowercase characters.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("lower", FilterLower)
+//
+// Template usage:
+//
+//	<h1>{{ chapter.title|lower }}</h1>
+func FilterLower(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		return value.FromString(strings.ToLower(s)), nil
 	}
 	return val, nil
 }
 
-// filterCapitalize implements the built-in `capitalize` filter.
-func filterCapitalize(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterCapitalize converts the first character to uppercase and the rest to lowercase.
+//
+// This filter converts a string by uppercasing only the first character and
+// lowercasing all remaining characters. This is different from FilterTitle which
+// capitalizes the first letter of each word.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("capitalize", FilterCapitalize)
+//
+// Template usage:
+//
+//	{{ "hello WORLD"|capitalize }}
+//	  -> "Hello world"
+func FilterCapitalize(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		if len(s) == 0 {
 			return val, nil
@@ -43,10 +80,24 @@ func filterCapitalize(_ *State, val value.Value, _ []value.Value, _ map[string]v
 	return val, nil
 }
 
-// filterTitle implements the built-in `title` filter.
-func filterTitle(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterTitle converts a value to title case.
+//
+// This filter converts a string to title case by capitalizing the first letter
+// of each word and lowercasing all other letters. Words are defined as sequences
+// of characters separated by whitespace or common punctuation.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("title", FilterTitle)
+//
+// Template usage:
+//
+//	<h1>{{ chapter.title|title }}</h1>
+//	{{ "hello world"|title }}
+//	  -> "Hello World"
+func FilterTitle(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
-		// Title case: capitalize after whitespace and some punctuation
 		var result strings.Builder
 		capitalizeNext := true
 		for _, r := range s {
@@ -65,8 +116,23 @@ func filterTitle(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 	return val, nil
 }
 
-// filterTrim implements the built-in `trim` filter.
-func filterTrim(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterTrim strips leading and trailing characters from a string.
+//
+// By default, it strips whitespace characters. You can optionally provide
+// a string of characters to trim as the first argument.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("trim", FilterTrim)
+//
+// Template usage:
+//
+//	{{ "  hello  "|trim }}
+//	  -> "hello"
+//	{{ "xxxhelloxxx"|trim("x") }}
+//	  -> "hello"
+func FilterTrim(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		chars := " \t\n\r"
 		if len(args) > 0 {
@@ -79,8 +145,23 @@ func filterTrim(_ *State, val value.Value, args []value.Value, _ map[string]valu
 	return val, nil
 }
 
-// filterReplace implements the built-in `replace` filter.
-func filterReplace(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterReplace replaces occurrences of a substring with another string.
+//
+// This filter replaces all occurrences of the first parameter with the second.
+// Optionally, you can provide a third parameter to limit the number of replacements.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("replace", FilterReplace)
+//
+// Template usage:
+//
+//	{{ "Hello World"|replace("Hello", "Goodbye") }}
+//	  -> "Goodbye World"
+//	{{ "aaa"|replace("a", "b", 2) }}
+//	  -> "bba"
+func FilterReplace(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		if len(args) < 2 {
 			return val, fmt.Errorf("replace requires old and new arguments")
@@ -98,8 +179,27 @@ func filterReplace(_ *State, val value.Value, args []value.Value, _ map[string]v
 	return val, nil
 }
 
-// filterDefault implements the built-in `default` filter.
-func filterDefault(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterDefault provides a default value if the input is undefined or none.
+//
+// If the value is undefined or none, it returns the provided default value.
+// Setting the optional second parameter to true will also treat empty/falsy
+// values as undefined.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("default", FilterDefault)
+//
+// Template usage:
+//
+//	{{ my_variable|default("default value") }}
+//	{{ ""|default("empty", true) }}
+//	  -> "empty"
+//
+// Keyword arguments:
+//   - default: The default value to use
+//   - boolean: If true, treat falsy values as undefined
+func FilterDefault(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	if val.IsUndefined() || val.IsNone() {
 		if len(args) > 0 {
 			return args[0], nil
@@ -133,16 +233,46 @@ func filterDefault(_ *State, val value.Value, args []value.Value, kwargs map[str
 	return val, nil
 }
 
-// filterSafe implements the built-in `safe` filter.
-func filterSafe(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterSafe marks a value as safe for auto-escaping.
+//
+// When a value is marked as safe, it will not be automatically escaped
+// when rendered in templates with auto-escaping enabled.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("safe", FilterSafe)
+//
+// Template usage:
+//
+//	{{ html_content|safe }}
+//
+// Warning: Only use this filter on values you trust to contain safe HTML.
+// Using it on untrusted content can lead to security vulnerabilities.
+func FilterSafe(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		return value.FromSafeString(s), nil
 	}
 	return value.FromSafeString(val.String()), nil
 }
 
-// filterEscape implements the built-in `escape` filter.
-func filterEscape(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterEscape escapes a string for safe HTML output.
+//
+// By default, this filter is also registered under the alias "e". If the value
+// is already marked as safe, it is returned unchanged. Otherwise, it escapes
+// HTML special characters.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("escape", FilterEscape)
+//
+// Template usage:
+//
+//	{{ user_input|escape }}
+//	{{ "<script>alert('xss')</script>"|e }}
+//	  -> "&lt;script&gt;alert('xss')&lt;/script&gt;"
+func FilterEscape(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if val.IsSafe() {
 		return val, nil
 	}
@@ -152,21 +282,72 @@ func filterEscape(_ *State, val value.Value, _ []value.Value, _ map[string]value
 	return value.FromSafeString(EscapeHTML(val.String())), nil
 }
 
-// filterString implements the built-in `string` filter.
-func filterString(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterString converts a value into a string if it's not one already.
+//
+// If the value is already a string (and marked as safe if applicable),
+// that value is preserved. Otherwise, the value is converted to its
+// string representation.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("string", FilterString)
+//
+// Template usage:
+//
+//	{{ 42|string }}
+//	  -> "42"
+func FilterString(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if val.Kind() == value.KindString {
 		return val, nil
 	}
 	return value.FromString(val.String()), nil
 }
 
-// filterBool implements the built-in `bool` filter.
-func filterBool(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterBool converts a value into a boolean.
+//
+// This filter evaluates the truthiness of a value according to MiniJinja's
+// rules: non-zero numbers, non-empty strings, and non-empty collections
+// are true.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("bool", FilterBool)
+//
+// Template usage:
+//
+//	{{ 42|bool }}
+//	  -> true
+//	{{ ""|bool }}
+//	  -> false
+func FilterBool(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	return value.FromBool(val.IsTrue()), nil
 }
 
-// filterSplit implements the built-in `split` filter.
-func filterSplit(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterSplit splits a string into a list of substrings.
+//
+// If no split pattern is provided or it's none, the string is split on
+// whitespace with multiple spaces removed. Otherwise, the string is split
+// using the provided separator.
+//
+// The optional second parameter defines the maximum number of splits
+// (following Python conventions where 1 means one split and two resulting items).
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("split", FilterSplit)
+//
+// Template usage:
+//
+//	{{ "hello world"|split }}
+//	  -> ["hello", "world"]
+//	{{ "a,b,c"|split(",") }}
+//	  -> ["a", "b", "c"]
+//	{{ "a,b,c,d"|split(",", 2) }}
+//	  -> ["a", "b", "c,d"]
+func FilterSplit(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	s, ok := val.AsString()
 	if !ok {
 		return value.FromSlice(nil), nil
@@ -184,7 +365,7 @@ func filterSplit(_ *State, val value.Value, args []value.Value, _ map[string]val
 	maxSplits := -1
 	if len(args) > 1 {
 		if m, ok := args[1].AsInt(); ok {
-			maxSplits = int(m) + 1 // Go's SplitN uses count, not number of splits
+			maxSplits = int(m) + 1
 		}
 	}
 
@@ -194,7 +375,6 @@ func filterSplit(_ *State, val value.Value, args []value.Value, _ map[string]val
 		if maxSplits <= 0 {
 			parts = strings.Fields(s)
 		} else {
-			// Custom split with max, keeping empty strings filtered
 			parts = splitWhitespaceN(s, maxSplits)
 		}
 	} else {
@@ -243,8 +423,21 @@ func splitWhitespaceN(s string, n int) []string {
 	return result
 }
 
-// filterLines implements the built-in `lines` filter.
-func filterLines(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterLines splits a string into lines.
+//
+// The newline character is removed in the process. This function supports
+// both Windows (CRLF) and UNIX (LF) style newlines.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("lines", FilterLines)
+//
+// Template usage:
+//
+//	{{ "foo\nbar\nbaz"|lines }}
+//	  -> ["foo", "bar", "baz"]
+func FilterLines(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	s, ok := val.AsString()
 	if !ok {
 		return value.FromSlice(nil), nil
@@ -262,16 +455,45 @@ func filterLines(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 	return value.FromSlice(result), nil
 }
 
-// filterLength implements the built-in `length` filter.
-func filterLength(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterLength returns the number of items in a collection or string.
+//
+// This filter works on sequences, maps, and strings. For strings, it returns
+// the number of characters. This filter is also commonly available under the
+// alias "count".
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("length", FilterLength)
+//
+// Template usage:
+//
+//	<p>{{ users|length }} users found</p>
+//	{{ "hello"|length }}
+//	  -> 5
+func FilterLength(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if l, ok := val.Len(); ok {
 		return value.FromInt(int64(l)), nil
 	}
 	return value.FromInt(0), nil
 }
 
-// filterFirst implements the built-in `first` filter.
-func filterFirst(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterFirst returns the first item from an iterable.
+//
+// If the iterable is empty, undefined is returned.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("first", FilterFirst)
+//
+// Template usage:
+//
+//	<dl>
+//	  <dt>primary email
+//	  <dd>{{ user.email_addresses|first|default('no email') }}
+//	</dl>
+func FilterFirst(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if len(items) > 0 {
 		return items[0], nil
@@ -279,8 +501,27 @@ func filterFirst(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 	return value.Undefined(), nil
 }
 
-// filterLast implements the built-in `last` filter.
-func filterLast(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterLast returns the last item from an iterable.
+//
+// If the iterable is empty, undefined is returned.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("last", FilterLast)
+//
+// Template usage:
+//
+//	<h2>Most Recent Update</h2>
+//	{% with update = updates|last %}
+//	  <dl>
+//	    <dt>Location
+//	    <dd>{{ update.location }}
+//	    <dt>Status
+//	    <dd>{{ update.status }}
+//	  </dl>
+//	{% endwith %}
+func FilterLast(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if len(items) > 0 {
 		return items[len(items)-1], nil
@@ -288,8 +529,24 @@ func filterLast(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 	return value.Undefined(), nil
 }
 
-// filterReverse implements the built-in `reverse` filter.
-func filterReverse(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterReverse reverses an iterable or string.
+//
+// For strings, this reverses the characters. For iterables, it reverses
+// the order of items.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("reverse", FilterReverse)
+//
+// Template usage:
+//
+//	{% for user in users|reverse %}
+//	  <li>{{ user.name }}
+//	{% endfor %}
+//	{{ "hello"|reverse }}
+//	  -> "olleh"
+func FilterReverse(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		runes := []rune(s)
 		for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
@@ -309,8 +566,27 @@ func filterReverse(_ *State, val value.Value, _ []value.Value, _ map[string]valu
 	return val, nil
 }
 
-// filterSort implements the built-in `sort` filter.
-func filterSort(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterSort sorts an iterable.
+//
+// The filter accepts several keyword arguments to control sorting behavior:
+//
+//   - reverse: set to true to sort in descending order
+//   - case_sensitive: set to true for case-sensitive string sorting (default: false)
+//   - attribute: can be set to an attribute name or dotted path to sort by that attribute
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("sort", FilterSort)
+//
+// Template usage:
+//
+//	{{ [3, 1, 2]|sort }}
+//	  -> [1, 2, 3]
+//	{{ users|sort(attribute="age") }}
+//	{{ users|sort(attribute="age", reverse=true) }}
+//	{{ cities|sort(attribute="name, state") }}
+func FilterSort(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -404,8 +680,22 @@ func parseInt(s string) (int64, error) {
 	return n, err
 }
 
-// filterJoin implements the built-in `join` filter.
-func filterJoin(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterJoin concatenates items from an iterable into a string.
+//
+// The optional first parameter is the separator string to use between items.
+// If not provided, items are concatenated directly without a separator.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("join", FilterJoin)
+//
+// Template usage:
+//
+//	{{ ["a", "b", "c"]|join(", ") }}
+//	  -> "a, b, c"
+//	{{ items|join }}
+func FilterJoin(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -423,8 +713,24 @@ func filterJoin(_ *State, val value.Value, args []value.Value, _ map[string]valu
 	return value.FromString(strings.Join(parts, sep)), nil
 }
 
-// filterList implements the built-in `list` filter.
-func filterList(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterList converts a value into a list.
+//
+// If the value is already a list, it's returned unchanged. For maps, this
+// returns a list of keys. For strings, this returns the characters. If the
+// value is undefined, an empty list is returned.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("list", FilterList)
+//
+// Template usage:
+//
+//	{{ "abc"|list }}
+//	  -> ["a", "b", "c"]
+//	{{ range(5)|list }}
+//	  -> [0, 1, 2, 3, 4]
+func FilterList(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items != nil {
 		return value.FromSlice(items), nil
@@ -432,8 +738,26 @@ func filterList(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 	return value.FromSlice(nil), nil
 }
 
-// filterUnique implements the built-in `unique` filter.
-func filterUnique(_ *State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterUnique returns unique items from an iterable.
+//
+// The unique items are yielded in the same order as their first occurrence.
+// The filter will not detect duplicate objects or arrays, only primitives.
+//
+// Keyword arguments:
+//   - case_sensitive: set to true for case-sensitive comparison (default: false)
+//   - attribute: operate on an attribute instead of the value itself
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("unique", FilterUnique)
+//
+// Template usage:
+//
+//	{{ ["a", "b", "a", "c"]|unique }}
+//	  -> ["a", "b", "c"]
+//	{{ users|unique(attribute="city") }}
+func FilterUnique(_ *State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -467,8 +791,20 @@ func filterUnique(_ *State, val value.Value, _ []value.Value, kwargs map[string]
 	return value.FromSlice(result), nil
 }
 
-// filterMin implements the built-in `min` filter.
-func filterMin(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterMin returns the smallest item from an iterable.
+//
+// If the iterable is empty, undefined is returned.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("min", FilterMin)
+//
+// Template usage:
+//
+//	{{ [1, 2, 3, 4]|min }}
+//	  -> 1
+func FilterMin(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil || len(items) == 0 {
 		return value.Undefined(), nil
@@ -483,8 +819,20 @@ func filterMin(_ *State, val value.Value, _ []value.Value, _ map[string]value.Va
 	return minVal, nil
 }
 
-// filterMax implements the built-in `max` filter.
-func filterMax(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterMax returns the largest item from an iterable.
+//
+// If the iterable is empty, undefined is returned.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("max", FilterMax)
+//
+// Template usage:
+//
+//	{{ [1, 2, 3, 4]|max }}
+//	  -> 4
+func FilterMax(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil || len(items) == 0 {
 		return value.Undefined(), nil
@@ -499,8 +847,22 @@ func filterMax(_ *State, val value.Value, _ []value.Value, _ map[string]value.Va
 	return maxVal, nil
 }
 
-// filterSum implements the built-in `sum` filter.
-func filterSum(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterSum sums up all numeric values in an iterable.
+//
+// The optional first parameter provides a start value (default is 0).
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("sum", FilterSum)
+//
+// Template usage:
+//
+//	{{ [1, 2, 3]|sum }}
+//	  -> 6
+//	{{ values|sum(100) }}
+//	  -> sum of values + 100
+func FilterSum(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return value.FromInt(0), nil
@@ -522,8 +884,32 @@ func filterSum(_ *State, val value.Value, args []value.Value, _ map[string]value
 	return result, nil
 }
 
-// filterBatch implements the built-in `batch` filter.
-func filterBatch(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterBatch batches items into groups of a given size.
+//
+// This filter works like FilterSlice but in the other direction. It returns
+// a list of lists with the given number of items. If you provide a second
+// parameter, it's used to fill up missing items in the last batch.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("batch", FilterBatch)
+//
+// Template usage:
+//
+//	<table>
+//	{% for row in items|batch(3, " ") %}
+//	  <tr>
+//	  {% for column in row %}
+//	    <td>{{ column }}</td>
+//	  {% endfor %}
+//	  </tr>
+//	{% endfor %}
+//	</table>
+//
+// Keyword arguments:
+//   - fill_with: value to use for filling incomplete batches
+func FilterBatch(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -564,8 +950,29 @@ func filterBatch(_ *State, val value.Value, args []value.Value, kwargs map[strin
 	return value.FromSlice(result), nil
 }
 
-// filterSlice implements the built-in `slice` filter.
-func filterSlice(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterSlice slices an iterable into a given number of columns.
+//
+// This filter works like FilterBatch but slices into columns instead of rows.
+// If you pass a second argument, it's used to fill missing values on the
+// last iteration.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("slice", FilterSlice)
+//
+// Template usage:
+//
+//	<div class="columnwrapper">
+//	{% for column in items|slice(3) %}
+//	  <ul class="column-{{ loop.index }}">
+//	  {% for item in column %}
+//	    <li>{{ item }}</li>
+//	  {% endfor %}
+//	  </ul>
+//	{% endfor %}
+//	</div>
+func FilterSlice(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return value.Undefined(), NewError(ErrInvalidOperation, "cannot slice non-iterable")
@@ -616,8 +1023,30 @@ func filterSlice(_ *State, val value.Value, args []value.Value, _ map[string]val
 	return value.FromSlice(result), nil
 }
 
-// filterMap implements the built-in `map` filter.
-func filterMap(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterMap applies a filter to a sequence or looks up an attribute.
+//
+// This is useful when dealing with lists of objects where you're only
+// interested in a specific value. You can either map an attribute or apply
+// a filter to each item.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("map", FilterMap)
+//
+// Template usage (attribute mapping):
+//
+//	{{ users|map(attribute="username")|join(", ") }}
+//	{{ users|map(attribute="address.city", default="Unknown")|join }}
+//
+// Template usage (filter mapping):
+//
+//	{{ titles|map("lower")|join(", ") }}
+//
+// Keyword arguments:
+//   - attribute: name or dotted path of attribute to extract
+//   - default: value to use when attribute is missing
+func FilterMap(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -698,8 +1127,23 @@ func normalizeTestName(name string) string {
 	}
 }
 
-// filterSelect implements the built-in `select` filter.
-func filterSelect(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterSelect filters a sequence by applying a test.
+//
+// This creates a new sequence containing only values that pass the test.
+// If no test is specified, items are evaluated for truthiness.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("select", FilterSelect)
+//
+// Template usage:
+//
+//	{{ [1, 2, 3, 4]|select("odd") }}
+//	  -> [1, 3]
+//	{{ [false, null, 42]|select }}
+//	  -> [42]
+func FilterSelect(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -736,8 +1180,21 @@ func filterSelect(state *State, val value.Value, args []value.Value, kwargs map[
 	return value.FromSlice(result), nil
 }
 
-// filterReject implements the built-in `reject` filter.
-func filterReject(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterReject filters a sequence by rejecting values that pass a test.
+//
+// This is the inverse of FilterSelect - it creates a new sequence containing
+// only values that fail the test.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("reject", FilterReject)
+//
+// Template usage:
+//
+//	{{ [1, 2, 3, 4]|reject("odd") }}
+//	  -> [2, 4]
+func FilterReject(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -774,8 +1231,23 @@ func filterReject(state *State, val value.Value, args []value.Value, kwargs map[
 	return value.FromSlice(result), nil
 }
 
-// filterSelectAttr implements the built-in `selectattr` filter.
-func filterSelectAttr(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterSelectAttr filters a sequence by testing an attribute.
+//
+// This is like FilterSelect but tests an attribute of each object instead
+// of the object itself.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("selectattr", FilterSelectAttr)
+//
+// Template usage:
+//
+//	{{ users|selectattr("is_active") }}
+//	  -> all users where x.is_active is true
+//	{{ users|selectattr("id", "even") }}
+//	  -> users with even IDs
+func FilterSelectAttr(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -818,8 +1290,23 @@ func filterSelectAttr(state *State, val value.Value, args []value.Value, kwargs 
 	return value.FromSlice(result), nil
 }
 
-// filterRejectAttr implements the built-in `rejectattr` filter.
-func filterRejectAttr(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterRejectAttr filters a sequence by rejecting items where an attribute passes a test.
+//
+// This is like FilterReject but tests an attribute of each object instead
+// of the object itself.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("rejectattr", FilterRejectAttr)
+//
+// Template usage:
+//
+//	{{ users|rejectattr("is_active") }}
+//	  -> all users where x.is_active is false
+//	{{ users|rejectattr("id", "even") }}
+//	  -> users with odd IDs
+func FilterRejectAttr(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -862,8 +1349,32 @@ func filterRejectAttr(state *State, val value.Value, args []value.Value, kwargs 
 	return value.FromSlice(result), nil
 }
 
-// filterGroupBy implements the built-in `groupby` filter.
-func filterGroupBy(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterGroupBy groups a sequence of objects by a common attribute.
+//
+// The attribute can use dot notation for nested access. Items are automatically
+// sorted first. Each group is returned as a tuple/object with "grouper" and "list"
+// attributes.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("groupby", FilterGroupBy)
+//
+// Template usage:
+//
+//	<ul>{% for city, items in users|groupby("city") %}
+//	  <li>{{ city }}
+//	    <ul>{% for user in items %}
+//	      <li>{{ user.name }}
+//	    {% endfor %}</ul>
+//	  </li>
+//	{% endfor %}</ul>
+//
+// Keyword arguments:
+//   - attribute: name or dotted path of attribute to group by
+//   - default: value to use when attribute is missing
+//   - case_sensitive: if true, sort in a case-sensitive manner (default: false)
+func FilterGroupBy(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -1050,8 +1561,25 @@ func (g *groupObject) String() string {
 	return fmt.Sprintf("[%s, %s]", g.grouper.Repr(), listRepr)
 }
 
-// filterChain implements the built-in `chain` filter.
-func filterChain(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterChain chains multiple iterables into a single iterable.
+//
+// If all objects are maps, the result acts like a merged map (with later
+// values overriding earlier ones for duplicate keys). If all objects are
+// sequences, the result acts like an appended list. Otherwise, it creates
+// a chained iterator.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("chain", FilterChain)
+//
+// Template usage:
+//
+//	{{ list1|chain(list2, list3)|length }}
+//	{% for user in shard0|chain(shard1, shard2) %}
+//	  {{ user.name }}
+//	{% endfor %}
+func FilterChain(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	allValues := append([]value.Value{val}, args...)
 
 	allMaps := true
@@ -1127,8 +1655,24 @@ func (c *chainObject) GetItem(key value.Value) value.Value {
 	return value.Undefined()
 }
 
-// filterZip implements the built-in `zip` filter.
-func filterZip(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterZip zips multiple iterables into tuples.
+//
+// This works like Python's zip function. It takes one or more iterables and
+// returns an iterable of tuples where each tuple contains one element from
+// each input. Iteration stops when the shortest iterable is exhausted.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("zip", FilterZip)
+//
+// Template usage:
+//
+//	{{ [1, 2, 3]|zip(["a", "b", "c"]) }}
+//	  -> [(1, "a"), (2, "b"), (3, "c")]
+//	{{ [1, 2]|zip(["a", "b", "c"], ["x", "y", "z"]) }}
+//	  -> [(1, "a", "x"), (2, "b", "y")]
+func FilterZip(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	// Collect all sequences
 	seqs := [][]value.Value{val.Iter()}
 	for _, arg := range args {
@@ -1163,8 +1707,20 @@ func filterZip(_ *State, val value.Value, args []value.Value, _ map[string]value
 	return value.FromSlice(result), nil
 }
 
-// filterAbs implements the built-in `abs` filter.
-func filterAbs(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterAbs returns the absolute value of a number.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("abs", FilterAbs)
+//
+// Template usage:
+//
+//	{{ -42|abs }}
+//	  -> 42
+//	{{ 3.14|abs }}
+//	  -> 3.14
+func FilterAbs(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if i, ok := val.AsInt(); ok {
 		if i < 0 {
 			return value.FromInt(-i), nil
@@ -1180,8 +1736,27 @@ func filterAbs(_ *State, val value.Value, _ []value.Value, _ map[string]value.Va
 	return val, nil
 }
 
-// filterInt implements the built-in `int` filter.
-func filterInt(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterInt converts a value to an integer.
+//
+// String values are parsed as integers. Float values are truncated.
+// Boolean true becomes 1, false becomes 0. If conversion fails, the
+// optional default value is returned (default: 0).
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("int", FilterInt)
+//
+// Template usage:
+//
+//	{{ "42"|int }}
+//	  -> 42
+//	{{ "invalid"|int(default=0) }}
+//	  -> 0
+//
+// Keyword arguments:
+//   - default: value to return if conversion fails
+func FilterInt(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	defaultVal := value.FromInt(0)
 	if len(args) > 0 {
 		defaultVal = args[0]
@@ -1212,8 +1787,27 @@ func filterInt(_ *State, val value.Value, args []value.Value, kwargs map[string]
 	return defaultVal, nil
 }
 
-// filterFloat implements the built-in `float` filter.
-func filterFloat(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterFloat converts a value to a float.
+//
+// String values are parsed as floats. Integer values are converted to floats.
+// Boolean true becomes 1.0, false becomes 0.0. If conversion fails, the
+// optional default value is returned (default: 0.0).
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("float", FilterFloat)
+//
+// Template usage:
+//
+//	{{ "42.5"|float }}
+//	  -> 42.5
+//	{{ "invalid"|float(default=0.0) }}
+//	  -> 0.0
+//
+// Keyword arguments:
+//   - default: value to return if conversion fails
+func FilterFloat(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	defaultVal := value.FromFloat(0.0)
 	if len(args) > 0 {
 		defaultVal = args[0]
@@ -1241,8 +1835,30 @@ func filterFloat(_ *State, val value.Value, args []value.Value, kwargs map[strin
 	return defaultVal, nil
 }
 
-// filterRound implements the built-in `round` filter.
-func filterRound(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterRound rounds a number to a given precision.
+//
+// The first parameter specifies the precision (default is 0). The second
+// optional parameter specifies the rounding method: "common" (default),
+// "floor", or "ceil".
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("round", FilterRound)
+//
+// Template usage:
+//
+//	{{ 42.55|round }}
+//	  -> 43
+//	{{ 42.55|round(1) }}
+//	  -> 42.6
+//	{{ 42.55|round(method="floor") }}
+//	  -> 42
+//
+// Keyword arguments:
+//   - precision: number of decimal places (default: 0)
+//   - method: rounding method - "common", "floor", or "ceil" (default: "common")
+func FilterRound(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	f, ok := val.AsFloat()
 	if !ok {
 		return val, nil
@@ -1292,8 +1908,25 @@ func filterRound(_ *State, val value.Value, args []value.Value, kwargs map[strin
 	return value.FromFloat(f), nil
 }
 
-// filterItems implements the built-in `items` filter.
-func filterItems(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterItems returns an iterable of key-value pairs from a map.
+//
+// This converts a map into a list of [key, value] tuples. The keys are
+// sorted alphabetically.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("items", FilterItems)
+//
+// Template usage:
+//
+//	<dl>
+//	{% for key, value in my_dict|items %}
+//	  <dt>{{ key }}
+//	  <dd>{{ value }}
+//	{% endfor %}
+//	</dl>
+func FilterItems(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if m, ok := val.AsMap(); ok {
 		keys := make([]string, 0, len(m))
 		for k := range m {
@@ -1313,8 +1946,19 @@ func filterItems(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 	return value.FromSlice(nil), nil
 }
 
-// filterKeys implements the built-in `keys` filter.
-func filterKeys(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterKeys returns a list of keys from a map.
+//
+// The keys are sorted alphabetically.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("keys", FilterKeys)
+//
+// Template usage:
+//
+//	{{ my_dict|keys }}
+func FilterKeys(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if m, ok := val.AsMap(); ok {
 		keys := make([]string, 0, len(m))
 		for k := range m {
@@ -1331,8 +1975,19 @@ func filterKeys(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 	return value.FromSlice(nil), nil
 }
 
-// filterValues implements the built-in `values` filter.
-func filterValues(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterValues returns a list of values from a map.
+//
+// The values are returned in the same order as the sorted keys.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("values", FilterValues)
+//
+// Template usage:
+//
+//	{{ my_dict|values }}
+func FilterValues(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if m, ok := val.AsMap(); ok {
 		keys := make([]string, 0, len(m))
 		for k := range m {
@@ -1349,8 +2004,26 @@ func filterValues(_ *State, val value.Value, _ []value.Value, _ map[string]value
 	return value.FromSlice(nil), nil
 }
 
-// filterDictSort implements the built-in `dictsort` filter.
-func filterDictSort(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterDictSort sorts a map by keys or values.
+//
+// Returns a list of [key, value] pairs sorted by key (default) or by value.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("dictsort", FilterDictSort)
+//
+// Template usage:
+//
+//	{% for key, value in my_dict|dictsort %}
+//	  {{ key }}: {{ value }}
+//	{% endfor %}
+//
+// Keyword arguments:
+//   - by: set to "value" to sort by value instead of key (default: "key")
+//   - reverse: set to true to sort in descending order
+//   - case_sensitive: set to true for case-sensitive sorting (default: false)
+func FilterDictSort(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	if m, ok := val.AsMap(); ok {
 		keys := make([]string, 0, len(m))
 		for k := range m {
@@ -1436,8 +2109,21 @@ func filterDictSort(_ *State, val value.Value, args []value.Value, kwargs map[st
 	return value.FromSlice(nil), nil
 }
 
-// filterAttr implements the built-in `attr` filter.
-func filterAttr(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterAttr looks up an attribute by name.
+//
+// This is equivalent to using the [] operator in MiniJinja. It's provided
+// for compatibility with Jinja2.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("attr", FilterAttr)
+//
+// Template usage:
+//
+//	{{ value|attr("key") }}
+//	  -> same as value["key"] or value.key
+func FilterAttr(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if len(args) < 1 {
 		return value.Undefined(), fmt.Errorf("attr filter requires attribute name")
 	}
@@ -1445,8 +2131,29 @@ func filterAttr(_ *State, val value.Value, args []value.Value, _ map[string]valu
 	return val.GetAttr(name), nil
 }
 
-// filterIndent implements the built-in `indent` filter.
-func filterIndent(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterIndent indents each line of a string with spaces.
+//
+// The first parameter sets the indentation width (default: 4). The second
+// optional parameter determines whether to indent the first line (default: false).
+// The third optional parameter determines whether to indent blank lines (default: false).
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("indent", FilterIndent)
+//
+// Template usage:
+//
+//	config:
+//	{{ yaml_content|indent(2) }}
+//	{{ yaml_content|indent(2, true) }}
+//	{{ yaml_content|indent(2, true, true) }}
+//
+// Keyword arguments:
+//   - width: number of spaces to indent (default: 4)
+//   - first: whether to indent the first line (default: false)
+//   - blank: whether to indent blank lines (default: false)
+func FilterIndent(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	s, ok := val.AsString()
 	if !ok {
 		return val, nil
@@ -1502,8 +2209,20 @@ func filterIndent(_ *State, val value.Value, args []value.Value, kwargs map[stri
 	return value.FromString(strings.Join(lines, "\n")), nil
 }
 
-// filterPprint implements the built-in `pprint` filter.
-func filterPprint(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterPprint pretty-prints a value for debugging.
+//
+// This is useful for debugging templates as it formats values in a more
+// readable way than the default string representation.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("pprint", FilterPprint)
+//
+// Template usage:
+//
+//	<pre>{{ complex_object|pprint }}</pre>
+func FilterPprint(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	return value.FromString(pprintValue(val, 0)), nil
 }
 
@@ -1550,8 +2269,28 @@ func pprintValue(val value.Value, indent int) string {
 	}
 }
 
-// filterTojson implements the built-in `tojson` filter.
-func filterTojson(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+// FilterTojson serializes a value to JSON.
+//
+// The resulting value is safe to use in HTML as special characters are escaped.
+// The optional parameter controls indentation: true for 2 spaces, or an integer
+// for custom indentation.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("tojson", FilterTojson)
+//
+// Template usage:
+//
+//	<script>
+//	  const CONFIG = {{ config|tojson }};
+//	</script>
+//	<a href="#" data-info='{{ info|tojson }}'>...</a>
+//	{{ data|tojson(indent=2) }}
+//
+// Keyword arguments:
+//   - indent: true for 2-space indent, or integer for custom indent
+func FilterTojson(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	// Convert value to Go native type for JSON serialization
 	native := valueToNative(val)
 
@@ -1640,8 +2379,23 @@ func urlencodeString(input string) string {
 	return escaped
 }
 
-// filterUrlencode implements the built-in `urlencode` filter.
-func filterUrlencode(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+// FilterUrlencode URL-encodes a value.
+//
+// If given a map, it encodes the parameters into a query string. Otherwise,
+// it encodes the stringified value. None and undefined values in maps are
+// skipped.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddFilter("urlencode", FilterUrlencode)
+//
+// Template usage:
+//
+//	<a href="/search?{{ {"q": "my search", "lang": "en"}|urlencode }}">
+//	{{ "hello world"|urlencode }}
+//	  -> "hello%20world"
+func FilterUrlencode(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	// Check if it's a map (dict) - encode as query string
 	if m, ok := val.AsMap(); ok {
 		var parts []string
