@@ -9,6 +9,7 @@ import (
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/internal/testutil"
 	"github.com/mitsuhiko/minijinja/minijinja-go/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/value"
 )
 
 const (
@@ -73,6 +74,13 @@ func TestTemplates(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to parse input: %v", err)
 			}
+			input.Context["one_shot_iterator"] = value.FromOneShotIterator(
+				value.NewOneShotIterator([]value.Value{
+					value.FromInt(0),
+					value.FromInt(1),
+					value.FromInt(2),
+				}),
+			)
 
 			// Create environment
 			env := NewEnvironment()
@@ -102,6 +110,10 @@ func TestTemplates(t *testing.T) {
 					LstripBlocks:        input.Settings.LstripBlocks,
 					TrimBlocks:          input.Settings.TrimBlocks,
 				})
+				switch input.Settings.Undefined {
+				case "strict":
+					env.SetUndefinedBehavior(UndefinedStrict)
+				}
 			}
 
 			// Add reference templates
@@ -113,6 +125,9 @@ func TestTemplates(t *testing.T) {
 
 			// Add get_args function (used by some tests)
 			env.AddFunction("get_args", func(state *State, args []Value, kwargs map[string]Value) (Value, error) {
+				if len(kwargs) > 0 {
+					args = append(args, FromMap(kwargs))
+				}
 				return FromSlice(args), nil
 			})
 

@@ -7,12 +7,17 @@ import (
 	"strings"
 )
 
+var minI128AsU128 = new(big.Int).Lsh(big.NewInt(1), 127)
+
 // Neg performs unary negation.
 func (v Value) Neg() (Value, error) {
 	switch d := v.data.(type) {
 	case int64:
 		return FromInt(-d), nil
 	case bigIntValue:
+		if d.Int.Sign() >= 0 && d.Int.Cmp(minI128AsU128) == 0 {
+			return FromBigInt(new(big.Int).Set(d.Int)), nil
+		}
 		result := new(big.Int).Neg(d.Int)
 		return FromBigInt(result), nil
 	case float64:

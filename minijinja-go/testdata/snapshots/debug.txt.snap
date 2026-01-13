@@ -1,0 +1,19 @@
+---
+source: minijinja-go
+---
+State {
+  name: "debug.txt",
+  current variables: {
+    loop: <loop 0/1>,
+    x: 0,
+    f: <function range>,
+    one_shot_iterator: <iterator>,
+    upper: 1,
+  }
+}
+---
+none
+---
+true, false, 42
+---
+[<function debug>, 42]

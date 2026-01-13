@@ -1174,17 +1174,14 @@ done:
 	value, parseErr := strconv.ParseUint(parseStr, radix, 64)
 
 	if parseErr != nil {
-		// Number too large for u64, emit as Int128
-		// For display, we need to convert to decimal if it's hex/oct/bin
+		// Number too large for u64, emit as Int128 if within u128
+		bigVal := new(big.Int)
+		_, ok := bigVal.SetString(parseStr, radix)
+		if !ok || bigVal.BitLen() > 128 {
+			return nil, false, l.syntaxError("invalid integer (too large)")
+		}
 		if radix != 10 {
-			// Use big.Int to convert
-			bigVal := new(big.Int)
-			_, ok := bigVal.SetString(parseStr, radix)
-			if !ok {
-				return nil, false, l.syntaxError("invalid integer (too large)")
-			}
-			tok := l.makeToken(TokenInt128, bigVal.String())
-			return &tok, false, nil
+			parseStr = bigVal.String()
 		}
 		tok := l.makeToken(TokenInt128, parseStr)
 		return &tok, false, nil

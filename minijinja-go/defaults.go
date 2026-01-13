@@ -654,7 +654,7 @@ func filterBatch(_ *State, val value.Value, args []value.Value, kwargs map[strin
 func filterSlice(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
-		return val, nil
+		return value.Undefined(), NewError(ErrInvalidOperation, "cannot slice non-iterable")
 	}
 
 	sliceCount := 1
@@ -1451,12 +1451,34 @@ func filterDictSort(_ *State, val value.Value, args []value.Value, kwargs map[st
 			}
 		}
 
+		caseSensitive := false
+		if cs, ok := kwargs["case_sensitive"]; ok {
+			if b, ok := cs.AsBool(); ok {
+				caseSensitive = b
+			}
+		}
+
+		cmpValues := func(a, b value.Value) int {
+			if !caseSensitive {
+				if s1, ok := a.AsString(); ok {
+					if s2, ok := b.AsString(); ok {
+						lowerCmp := strings.Compare(strings.ToLower(s1), strings.ToLower(s2))
+						if lowerCmp != 0 {
+							return lowerCmp
+						}
+						return strings.Compare(s1, s2)
+					}
+				}
+			}
+			if cmp, ok := a.Compare(b); ok {
+				return cmp
+			}
+			return strings.Compare(a.Repr(), b.Repr())
+		}
+
 		if byValue {
 			sort.Slice(keys, func(i, j int) bool {
-				cmp, ok := m[keys[i]].Compare(m[keys[j]])
-				if !ok {
-					return keys[i] < keys[j]
-				}
+				cmp := cmpValues(m[keys[i]], m[keys[j]])
 				if reverse {
 					return cmp > 0
 				}
@@ -1464,10 +1486,11 @@ func filterDictSort(_ *State, val value.Value, args []value.Value, kwargs map[st
 			})
 		} else {
 			sort.Slice(keys, func(i, j int) bool {
+				cmp := cmpValues(value.FromString(keys[i]), value.FromString(keys[j]))
 				if reverse {
-					return keys[i] > keys[j]
+					return cmp > 0
 				}
-				return keys[i] < keys[j]
+				return cmp < 0
 			})
 		}
 
@@ -1665,6 +1688,13 @@ func valueToNative(v value.Value) interface{} {
 		}
 		return result
 	default:
+		if m, ok := v.AsMap(); ok {
+			result := make(map[string]interface{})
+			for k, val := range m {
+				result[k] = valueToNative(val)
+			}
+			return result
+		}
 		return v.String()
 	}
 }
@@ -1730,14 +1760,20 @@ func testFalse(_ *State, val value.Value, _ []value.Value) (bool, error) {
 	return false, nil
 }
 
-func testOdd(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func testOdd(_ *State, val value.Value, args []value.Value) (bool, error) {
+	if len(args) > 0 {
+		return false, NewError(ErrInvalidOperation, "odd test expects no arguments")
+	}
 	if i, ok := val.AsInt(); ok {
 		return i%2 != 0, nil
 	}
 	return false, nil
 }
 
-func testEven(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func testEven(_ *State, val value.Value, args []value.Value) (bool, error) {
+	if len(args) > 0 {
+		return false, NewError(ErrInvalidOperation, "even test expects no arguments")
+	}
 	if i, ok := val.AsInt(); ok {
 		return i%2 == 0, nil
 	}
@@ -1962,6 +1998,21 @@ func fnRange(_ *State, args []value.Value, kwargs map[string]value.Value) (value
 		return value.Undefined(), fmt.Errorf("range step cannot be zero")
 	}
 
+	length := int64(0)
+	if step > 0 {
+		if stop > start {
+			length = (stop-start + step - 1) / step
+		}
+	} else {
+		if stop < start {
+			negStep := -step
+			length = (start-stop + negStep - 1) / negStep
+		}
+	}
+	if length > 100000 {
+		return value.Undefined(), NewError(ErrInvalidOperation, "range has too many elements")
+	}
+
 	var result []value.Value
 	if step > 0 {
 		for i := start; i < stop; i += step {
@@ -2098,6 +2149,8 @@ func fnNamespace(_ *State, args []value.Value, kwargs map[string]value.Value) (v
 			for k, v := range m {
 				ns.data[k] = v
 			}
+		} else if !args[0].IsUndefined() && !args[0].IsNone() {
+			return value.Undefined(), NewError(ErrInvalidOperation, "namespace expects a mapping")
 		}
 	}
 
@@ -2125,16 +2178,21 @@ func (n *namespaceValue) SetAttr(name string, val value.Value) {
 }
 
 func (n *namespaceValue) String() string {
-	var parts []string
 	keys := make([]string, 0, len(n.data))
 	for k := range n.data {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+
+	parts := make([]string, 0, len(keys))
 	for _, k := range keys {
-		parts = append(parts, fmt.Sprintf("%s=%s", k, n.data[k].Repr()))
+		parts = append(parts, fmt.Sprintf("%q: %s", k, n.data[k].Repr()))
 	}
-	return "Namespace(" + strings.Join(parts, ", ") + ")"
+	return "{" + strings.Join(parts, ", ") + "}"
+}
+
+func (n *namespaceValue) Map() map[string]value.Value {
+	return n.data
 }
 
 func fnDebug(state *State, args []value.Value, _ map[string]value.Value) (value.Value, error) {
@@ -2155,8 +2213,13 @@ func fnDebug(state *State, args []value.Value, _ map[string]value.Value) (value.
 
 	// Collect variables from scopes
 	for i := len(state.scopes) - 1; i >= 0; i-- {
-		for k, v := range state.scopes[i] {
-			parts = append(parts, fmt.Sprintf("    %s: %s,", k, v.Repr()))
+		keys := make([]string, 0, len(state.scopes[i]))
+		for k := range state.scopes[i] {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			parts = append(parts, fmt.Sprintf("    %s: %s,", k, state.scopes[i][k].Repr()))
 		}
 	}
 	parts = append(parts, "  }")

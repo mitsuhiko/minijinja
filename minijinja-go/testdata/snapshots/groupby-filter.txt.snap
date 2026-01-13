@@ -1,0 +1,21 @@
+
+  - London:
+    - First post in London
+  - No City:
+    - no city!?
+  - vienna:
+    - First post in Vienna
+    - Second post in Vienna
+    - First post in lowercase Vienna
+--
+  - :
+    - no city!?
+  - London:
+    - First post in London
+  - Vienna:
+    - First post in Vienna
+    - Second post in Vienna
+  - vienna:
+    - First post in lowercase Vienna
+--
+["AAA", [{"text": "no city!?"}]]

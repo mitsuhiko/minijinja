@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -164,6 +165,84 @@ func (i *Iterator) Items() []Value {
 	return i.items
 }
 
+// OneShotIterator represents an iterator that is consumed as it is iterated.
+type OneShotIterator struct {
+	items    []Value
+	pos      int
+	buffered *Value
+}
+
+// NewOneShotIterator creates a new one-shot iterator from items.
+func NewOneShotIterator(items []Value) *OneShotIterator {
+	return &OneShotIterator{items: items}
+}
+
+// FromOneShotIterator creates a Value from a one-shot iterator.
+func FromOneShotIterator(iter *OneShotIterator) Value {
+	return Value{data: iter}
+}
+
+// Next returns the next item, consuming it.
+func (i *OneShotIterator) Next() (Value, bool) {
+	if i.buffered != nil {
+		val := *i.buffered
+		i.buffered = nil
+		return val, true
+	}
+	if i.pos >= len(i.items) {
+		return Value{}, false
+	}
+	val := i.items[i.pos]
+	i.pos++
+	return val, true
+}
+
+// Peek returns the next item and consumes it for future iterations.
+func (i *OneShotIterator) Peek() Value {
+	if i.buffered != nil {
+		return *i.buffered
+	}
+	if i.pos >= len(i.items) {
+		return Undefined()
+	}
+	val := i.items[i.pos]
+	i.pos++
+	i.buffered = &val
+	return val
+}
+
+// Remaining returns the count of remaining items.
+func (i *OneShotIterator) Remaining() int {
+	remaining := len(i.items) - i.pos
+	if i.buffered != nil {
+		remaining++
+	}
+	return remaining
+}
+
+// Drain returns remaining items and consumes them.
+func (i *OneShotIterator) Drain() []Value {
+	var result []Value
+	if i.buffered != nil {
+		result = append(result, *i.buffered)
+		i.buffered = nil
+	}
+	if i.pos < len(i.items) {
+		result = append(result, i.items[i.pos:]...)
+		i.pos = len(i.items)
+	}
+	return result
+}
+
+// DiscardBuffered drops a peeked item.
+func (i *OneShotIterator) DiscardBuffered() {
+	i.buffered = nil
+}
+
+func (i *OneShotIterator) String() string {
+	return "<iterator>"
+}
+
 // FromBigInt creates a Value from a big.Int.
 func FromBigInt(v *big.Int) Value {
 	return Value{data: bigIntValue{v}}
@@ -212,6 +291,11 @@ func FromAny(v any) Value {
 func fromReflectValue(rv reflect.Value) Value {
 	if !rv.IsValid() {
 		return None()
+	}
+	if rv.CanInterface() {
+		if val, ok := rv.Interface().(Value); ok {
+			return val
+		}
 	}
 
 	switch rv.Kind() {
@@ -475,6 +559,10 @@ func (v Value) Repr() string {
 			parts = append(parts, item.Repr())
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
+	case *Iterator:
+		return "<iterator>"
+	case *OneShotIterator:
+		return "<iterator>"
 	case map[string]Value:
 		var parts []string
 		keys := make([]string, 0, len(d))
@@ -483,12 +571,21 @@ func (v Value) Repr() string {
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			parts = append(parts, fmt.Sprintf("%q: %s", k, d[k].Repr()))
+			parts = append(parts, fmt.Sprintf("%s: %s", formatMapKey(k), d[k].Repr()))
 		}
 		return "{" + strings.Join(parts, ", ") + "}"
 	default:
 		return fmt.Sprintf("%v", d)
 	}
+}
+
+func formatMapKey(key string) string {
+	if i, err := strconv.ParseInt(key, 10, 64); err == nil {
+		if strconv.FormatInt(i, 10) == key {
+			return key
+		}
+	}
+	return fmt.Sprintf("%q", key)
 }
 
 // IsSafe returns true if this is a safe string.
@@ -628,6 +725,9 @@ func (v Value) AsMap() (map[string]Value, bool) {
 	if m, ok := v.data.(map[string]Value); ok {
 		return m, true
 	}
+	if m, ok := v.data.(MapGetter); ok {
+		return m.Map(), true
+	}
 	return nil, false
 }
 
@@ -748,6 +848,11 @@ type LenGetter interface {
 // ItemGetter is an interface for objects that support item access.
 type ItemGetter interface {
 	GetItem(key Value) Value
+}
+
+// MapGetter is an interface for objects that expose mapping data.
+type MapGetter interface {
+	Map() map[string]Value
 }
 
 // Iter returns an iterator over the value's items.

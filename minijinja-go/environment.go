@@ -17,6 +17,14 @@ const (
 	AutoEscapeHTML
 )
 
+// UndefinedBehavior determines how undefined variables are handled.
+type UndefinedBehavior int
+
+const (
+	UndefinedLenient UndefinedBehavior = iota
+	UndefinedStrict
+)
+
 // FilterFunc is the signature for filter functions.
 // It receives the value to filter, the arguments, and the state.
 type FilterFunc func(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error)
@@ -43,8 +51,9 @@ type Environment struct {
 	functions      map[string]FunctionFunc
 	loader         LoaderFunc
 	autoEscapeFunc AutoEscapeFunc
-	syntaxConfig   lexer.SyntaxConfig
-	wsConfig       lexer.WhitespaceConfig
+	syntaxConfig      lexer.SyntaxConfig
+	wsConfig          lexer.WhitespaceConfig
+	undefinedBehavior UndefinedBehavior
 }
 
 type compiledTemplate struct {
@@ -74,8 +83,9 @@ func NewEnvironment() *Environment {
 			}
 			return AutoEscapeNone
 		},
-		syntaxConfig: lexer.DefaultSyntax(),
-		wsConfig:     lexer.DefaultWhitespace(),
+		syntaxConfig:      lexer.DefaultSyntax(),
+		wsConfig:          lexer.DefaultWhitespace(),
+		undefinedBehavior: UndefinedLenient,
 	}
 
 	// Register default filters
@@ -99,8 +109,9 @@ func EmptyEnvironment() *Environment {
 		autoEscapeFunc: func(name string) AutoEscape {
 			return AutoEscapeNone
 		},
-		syntaxConfig: lexer.DefaultSyntax(),
-		wsConfig:     lexer.DefaultWhitespace(),
+		syntaxConfig:      lexer.DefaultSyntax(),
+		wsConfig:          lexer.DefaultWhitespace(),
+		undefinedBehavior: UndefinedLenient,
 	}
 }
 
@@ -215,6 +226,11 @@ func (e *Environment) SetSyntax(config lexer.SyntaxConfig) {
 // SetWhitespace sets the whitespace configuration.
 func (e *Environment) SetWhitespace(config lexer.WhitespaceConfig) {
 	e.wsConfig = config
+}
+
+// SetUndefinedBehavior sets how undefined variables are handled.
+func (e *Environment) SetUndefinedBehavior(behavior UndefinedBehavior) {
+	e.undefinedBehavior = behavior
 }
 
 // getFilter returns a filter by name.
