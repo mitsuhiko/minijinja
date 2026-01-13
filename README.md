@@ -52,7 +52,7 @@ powered by a WASM build of MiniJinja.
 * Support for [dynamic runtime objects](https://docs.rs/minijinja/latest/minijinja/value/trait.Object.html) with methods and dynamic attributes
 * [Descriptive errors](https://github.com/mitsuhiko/minijinja/tree/main/examples/error)
 * Bindings for [JavaScript](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-js),
-  [Python](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py), and [C](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cabi)
+  [Python](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py), [Go](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-go), and [C](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cabi)
 * Comes with a handy [CLI](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli)
 * [Compiles to WebAssembly](https://github.com/mitsuhiko/minijinja-playground/blob/main/src/lib.rs)
 
@@ -97,6 +97,8 @@ If you are stuck with `MiniJinja`, have suggestions or need help, you can use th
   available to Python
 * [minijinja-js](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-js): makes MiniJinja
   available to JavaScript via WASM (for Node and Browser)
+* [minijinja-go](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-go): a native Go
+  implementation of MiniJinja
 * [minijinja-cli](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli): a command line utility.
 * [minijinja-cabi](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cabi): a C binding to MiniJinja.
 

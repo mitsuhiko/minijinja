@@ -27,14 +27,8 @@ format:
 
 .PHONY: doc
 doc:
-	@echo "Building documentation..."
-	@godoc -http=:6060 &
-	@sleep 2
-	@echo "Documentation server running at http://localhost:6060"
+	@go doc -all .
 
 .PHONY: doc-open
 doc-open:
-	@echo "Opening documentation in browser..."
-	@godoc -http=:6060 &
-	@sleep 2
-	@open http://localhost:6060/pkg
+	@go doc -http
