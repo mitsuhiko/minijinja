@@ -270,7 +270,7 @@ mod builtins {
         })
     }
 
-    fn cmp_helper(a: &Value, b: &Value, case_sensitive: bool) -> Ordering {
+    fn cmp_helper(a: &Value, b: &Value, case_sensitive: bool, reverse: bool) -> Ordering {
         if !case_sensitive {
             if let (Some(a), Some(b)) = (a.as_str(), b.as_str()) {
                 #[cfg(feature = "unicode")]
@@ -283,7 +283,11 @@ mod builtins {
                 }
             }
         }
-        a.cmp(b)
+        if reverse {
+            a.cmp(b).reverse()
+        } else {
+            a.cmp(b)
+        }
     }
 
     /// Dict sorting functionality.
@@ -306,16 +310,14 @@ mod builtins {
 
         let by_value = matches!(ok!(kwargs.get("by")), Some("value"));
         let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
+        let reverse = ok!(kwargs.get::<Option<bool>>("reverse")).unwrap_or(false);
         let mut rv: Vec<_> = ok!(v.try_iter())
             .map(|key| (key.clone(), v.get_item(&key).unwrap_or(Value::UNDEFINED)))
             .collect();
         safe_sort(&mut rv, |a, b| {
             let (a, b) = if by_value { (&a.1, &b.1) } else { (&a.0, &b.0) };
-            cmp_helper(a, b, case_sensitive)
+            cmp_helper(a, b, case_sensitive, reverse)
         })?;
-        if let Some(true) = ok!(kwargs.get("reverse")) {
-            rv.reverse();
-        }
         kwargs.assert_all_used()?;
         Ok(rv
             .into_iter()
@@ -762,6 +764,7 @@ mod builtins {
         .collect::<Vec<_>>();
 
         let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
+        let reverse = ok!(kwargs.get::<Option<bool>>("reverse")).unwrap_or(false);
 
         if let Some(attr) = ok!(kwargs.get::<Option<&str>>("attribute")) {
             let keys: Vec<_> = attr
@@ -787,23 +790,20 @@ mod builtins {
                         keys.iter()
                             .map(|k| b.get_path_or_default(k, &Value::UNDEFINED)),
                     );
-                    cmp_helper(&key_a, &key_b, case_sensitive)
+                    cmp_helper(&key_a, &key_b, case_sensitive, reverse)
                 })?;
             } else {
                 // Fast path for a more common case of single key
                 let key = if !keys.is_empty() { keys[0] } else { attr };
                 safe_sort(&mut items, |a, b| {
                     match (a.get_path(key), b.get_path(key)) {
-                        (Ok(a), Ok(b)) => cmp_helper(&a, &b, case_sensitive),
+                        (Ok(a), Ok(b)) => cmp_helper(&a, &b, case_sensitive, reverse),
                         _ => Ordering::Equal,
                     }
                 })?;
             }
         } else {
-            safe_sort(&mut items, |a, b| cmp_helper(a, b, case_sensitive))?;
-        }
-        if let Some(true) = ok!(kwargs.get("reverse")) {
-            items.reverse();
+            safe_sort(&mut items, |a, b| cmp_helper(a, b, case_sensitive, reverse))?;
         }
         ok!(kwargs.assert_all_used());
         Ok(Value::from(items))
@@ -1396,7 +1396,7 @@ mod builtins {
         safe_sort(&mut items, |a, b| {
             let a = a.get_path_or_default(attr, &default);
             let b = b.get_path_or_default(attr, &default);
-            cmp_helper(&a, &b, case_sensitive)
+            cmp_helper(&a, &b, case_sensitive, false)
         })?;
         ok!(kwargs.assert_all_used());
 
@@ -1436,7 +1436,7 @@ mod builtins {
         for item in items {
             let group_by = item.get_path_or_default(attr, &default);
             if let Some(ref last_grouper) = grouper {
-                if cmp_helper(last_grouper, &group_by, case_sensitive) != Ordering::Equal {
+                if cmp_helper(last_grouper, &group_by, case_sensitive, false) != Ordering::Equal {
                     rv.push(Value::from_object(GroupTuple {
                         grouper: last_grouper.clone(),
                         list: std::mem::take(&mut list),
