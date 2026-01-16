@@ -277,3 +277,16 @@ fn test_sort_attribute_list_single() {
     let result = tmpl.render(context!()).unwrap();
     assert_eq!(result, r#"[{"a": 2, "b": 1}, {"a": 1, "b": 2}]"#);
 }
+
+#[test]
+fn test_sort_attribute_stable_reverse() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str(
+            "{{ [[0, 1], [1, 1], [3, 2], [5, 2]] \
+            | sort(attribute='1', reverse=true) }}",
+        )
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"[[3, 2], [5, 2], [0, 1], [1, 1]]"#);
+}
