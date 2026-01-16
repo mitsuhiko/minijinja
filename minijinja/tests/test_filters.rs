@@ -321,3 +321,32 @@ fn test_sort_stable_reverse() {
         r#"[{"a": 1, "b": 1, "c": 1}, {"a": 1, "b": 1, "c": 2}]"#
     );
 }
+
+#[test]
+fn test_sort_strings() {
+    let env = Environment::new();
+
+    let tmpl = env
+        .template_from_str("{{ ['aa', 'CC', 'bb'] | sort }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"["aa", "bb", "CC"]"#);
+
+    let tmpl = env
+        .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(reverse=True) }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"["CC", "bb", "aa"]"#);
+
+    let tmpl = env
+        .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(case_sensitive=True) }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"["CC", "aa", "bb"]"#);
+
+    let tmpl = env
+        .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(case_sensitive=True, reverse=True) }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"["bb", "aa", "CC"]"#);
+}
