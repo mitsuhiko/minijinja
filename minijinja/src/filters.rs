@@ -271,22 +271,27 @@ mod builtins {
     }
 
     fn cmp_helper(a: &Value, b: &Value, case_sensitive: bool, reverse: bool) -> Ordering {
-        if !case_sensitive {
+        let ordering = if !case_sensitive {
             if let (Some(a), Some(b)) = (a.as_str(), b.as_str()) {
                 #[cfg(feature = "unicode")]
                 {
-                    return unicase::UniCase::new(a).cmp(&unicase::UniCase::new(b));
+                    unicase::UniCase::new(a).cmp(&unicase::UniCase::new(b))
                 }
                 #[cfg(not(feature = "unicode"))]
                 {
-                    return a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase());
+                    a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase())
                 }
+            } else {
+                a.cmp(b)
             }
-        }
-        if reverse {
-            a.cmp(b).reverse()
         } else {
             a.cmp(b)
+        };
+
+        if reverse {
+            ordering.reverse()
+        } else {
+            ordering
         }
     }
 
