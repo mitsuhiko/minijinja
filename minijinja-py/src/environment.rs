@@ -181,6 +181,7 @@ impl Environment {
             "strict" => UndefinedBehavior::Strict,
             "lenient" => UndefinedBehavior::Lenient,
             "chainable" => UndefinedBehavior::Chainable,
+            "semi_strict" => UndefinedBehavior::SemiStrict,
             _ => {
                 return Err(PyRuntimeError::new_err(
                     "invalid value for undefined behavior",
@@ -198,6 +199,7 @@ impl Environment {
             UndefinedBehavior::Lenient => "lenient",
             UndefinedBehavior::Chainable => "chainable",
             UndefinedBehavior::Strict => "strict",
+            UndefinedBehavior::SemiStrict => "semi_strict",
             _ => {
                 return Err(PyRuntimeError::new_err(
                     "invalid value for undefined behavior",
