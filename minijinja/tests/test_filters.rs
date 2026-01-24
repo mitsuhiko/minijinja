@@ -277,3 +277,76 @@ fn test_sort_attribute_list_single() {
     let result = tmpl.render(context!()).unwrap();
     assert_eq!(result, r#"[{"a": 2, "b": 1}, {"a": 1, "b": 2}]"#);
 }
+
+#[test]
+fn test_sort_stable_reverse() {
+    let env = Environment::new();
+
+    // Test sorting a list of 2-tuples using 0th element as the key, in reverse
+    // order. The sort should be stable and preserve the relative order of the
+    // equivalent keys.
+    let test_cases = [
+        ("[[1, 2], [1, 3], [1, 4]]", "[[1, 2], [1, 3], [1, 4]]"),
+        ("[[1, 2], [1, 3], [2, 4]]", "[[2, 4], [1, 2], [1, 3]]"),
+        ("[[3, 1], [2, 2], [1, 3]]", "[[3, 1], [2, 2], [1, 3]]"),
+        ("[[3, 3], [2, 2], [1, 1]]", "[[3, 3], [2, 2], [1, 1]]"),
+        ("[[1, 2], [2, 2], [3, 2]]", "[[3, 2], [2, 2], [1, 2]]"),
+        (
+            "[[1, 2], [3, 3], [2, 4], [3, 4]]",
+            "[[3, 3], [3, 4], [2, 4], [1, 2]]",
+        ),
+        (
+            "[[1, 2], [2, 2], [3, 2], [1, 1], [2, 2], [3, 3]]",
+            "[[3, 2], [3, 3], [2, 2], [2, 2], [1, 2], [1, 1]]",
+        ),
+    ];
+
+    for (input, expected) in test_cases {
+        let stmt = format!("{{{{ {input} | sort(attribute='0', reverse=true) }}}}");
+        let tmpl = env.template_from_str(&stmt).unwrap();
+        let result = tmpl.render(context!()).unwrap();
+        assert_eq!(result, expected);
+    }
+
+    // Test stable reverse-sorting with multi-attribute key.
+    let tmpl = env
+        .template_from_str(
+            "{{ [{'a': 1, 'b': 1, 'c': 1}, {'a': 1, 'b': 1, 'c': 2}] \
+             | sort(attribute='a,b', reverse=true) }}",
+        )
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(
+        result,
+        r#"[{"a": 1, "b": 1, "c": 1}, {"a": 1, "b": 1, "c": 2}]"#
+    );
+}
+
+#[test]
+fn test_sort_strings() {
+    let env = Environment::new();
+
+    let tmpl = env
+        .template_from_str("{{ ['aa', 'CC', 'bb'] | sort }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"["aa", "bb", "CC"]"#);
+
+    let tmpl = env
+        .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(reverse=True) }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"["CC", "bb", "aa"]"#);
+
+    let tmpl = env
+        .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(case_sensitive=True) }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"["CC", "aa", "bb"]"#);
+
+    let tmpl = env
+        .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(case_sensitive=True, reverse=True) }}")
+        .unwrap();
+    let result = tmpl.render(context!()).unwrap();
+    assert_eq!(result, r#"["bb", "aa", "CC"]"#);
+}
