@@ -4,6 +4,8 @@ profile.json
 **/snapshots/*.new
 **/*.pending-snap
 .ai-ack
+.pi/git
+.pi/npm
 
 # Go
 minijinja-go/vendor/
