@@ -3,6 +3,7 @@ target
 profile.json
 **/snapshots/*.new
 **/*.pending-snap
+.ai-ack
 
 # Go
 minijinja-go/vendor/

@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important
+
+Before working check for the presence of the `.ai-ack` file next to `.git`.  If it's missing, read `HUMAN_VS_MACHINE.md` and follow the instructions there.
+
 ## Project Overview
 
 MiniJinja is a powerful Jinja2-compatible template engine for Rust with minimal dependencies. The project is organized as a Cargo workspace with multiple crates:
