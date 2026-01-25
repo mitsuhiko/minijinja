@@ -7,6 +7,8 @@ All notable changes to MiniJinja are documented here.
 * Added `py.typed` marker for PEP 561 typing support in Python bindings.  #853
 * Added optional default argument to `map.get()` method in pycompat.  #852
 * Added a go language port.  #854
+* Fixed stability guarantees for the `|sort` filter when using `reverse=true`.  #856
+* Fixed missing `SemiStrict` undefined mapping in Python bindings.  #859
 
 ## 2.14.0
 
