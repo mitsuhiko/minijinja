@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
 )
 
 // Lexer tokenizes Jinja2 template source code.
@@ -16,14 +18,14 @@ type Lexer struct {
 	col        uint16 // current column (0-indexed at line start)
 	startLine  uint16
 	startCol   uint16
-	syntax     SyntaxConfig
-	whitespace WhitespaceConfig
+	syntax     syntax.SyntaxConfig
+	whitespace syntax.WhitespaceConfig
 
 	// State tracking
-	stack                   []lexerState
-	trimLeadingWhitespace   bool
-	pendingStartMarker      *pendingMarker
-	parenBalance            int
+	stack                 []lexerState
+	trimLeadingWhitespace bool
+	pendingStartMarker    *pendingMarker
+	parenBalance          int
 }
 
 type lexerState int
@@ -54,9 +56,9 @@ const (
 type whitespaceMode int
 
 const (
-	wsDefault whitespaceMode = iota
-	wsPreserve // +
-	wsRemove   // -
+	wsDefault  whitespaceMode = iota
+	wsPreserve                // +
+	wsRemove                  // -
 )
 
 func whitespaceFromByte(b byte) whitespaceMode {
@@ -71,7 +73,7 @@ func whitespaceFromByte(b byte) whitespaceMode {
 }
 
 // New creates a new Lexer for the given input.
-func New(input string, syntax SyntaxConfig, whitespace WhitespaceConfig) *Lexer {
+func New(input string, syntax syntax.SyntaxConfig, whitespace syntax.WhitespaceConfig) *Lexer {
 	source := input
 	// Strip trailing newline if not keeping it (like Rust does)
 	if !whitespace.KeepTrailingNewline {
@@ -94,7 +96,7 @@ func New(input string, syntax SyntaxConfig, whitespace WhitespaceConfig) *Lexer 
 }
 
 // Tokenize returns all tokens from the input.
-func Tokenize(input string, syntax SyntaxConfig, whitespace WhitespaceConfig) ([]Token, error) {
+func Tokenize(input string, syntax syntax.SyntaxConfig, whitespace syntax.WhitespaceConfig) ([]Token, error) {
 	l := New(input, syntax, whitespace)
 	return l.All()
 }
@@ -226,7 +228,7 @@ func (l *Lexer) tokenizeRoot() (*Token, bool, error) {
 			peeked := l.rest()[:offset]
 			trimmed := lstripBlock(peeked)
 			lead = l.advance(len(trimmed))
-			span = l.span() // Span ends here, before the stripped whitespace
+			span = l.span()                       // Span ends here, before the stripped whitespace
 			l.advance(len(peeked) - len(trimmed)) // Skip the whitespace
 		} else {
 			lead = l.advance(offset)
@@ -269,52 +271,55 @@ func (l *Lexer) findStartMarker() *markerMatch {
 	offset := 0
 
 	for offset < len(rest) {
-		// Find the earliest of: {{ {% {# line_statement_prefix line_comment_prefix
-		braceIdx := strings.IndexByte(rest[offset:], '{')
-		if braceIdx >= 0 {
-			braceIdx += offset
+		// Find the earliest occurrence of any configured delimiter
+		varIdx := strings.Index(rest[offset:], l.syntax.VarStart)
+		if varIdx >= 0 {
+			varIdx += offset
+		}
+		blockIdx := strings.Index(rest[offset:], l.syntax.BlockStart)
+		if blockIdx >= 0 {
+			blockIdx += offset
+		}
+		commentIdx := strings.Index(rest[offset:], l.syntax.CommentStart)
+		if commentIdx >= 0 {
+			commentIdx += offset
 		}
 
 		// Check for line statement/comment prefix (must be at start of line)
 		lineMarker := l.findLineMarker(rest, offset)
 
-		// Determine which comes first
-		if braceIdx < 0 && lineMarker == nil {
-			return nil
-		}
-
-		if lineMarker != nil && (braceIdx < 0 || lineMarker.offset <= braceIdx) {
-			return lineMarker
-		}
-
-		if braceIdx < 0 {
-			return lineMarker
-		}
-
-		// Process brace marker
-		idx := braceIdx
-		if idx+1 >= len(rest) {
-			return nil
-		}
-
-		nextChar := rest[idx+1]
+		// Find the earliest match
+		bestIdx := -1
 		var marker startMarker
 		var baseLen int
 
-		switch nextChar {
-		case '{':
+		if varIdx >= 0 && (bestIdx < 0 || varIdx < bestIdx) {
+			bestIdx = varIdx
 			marker = markerVariable
-			baseLen = 2
-		case '%':
-			marker = markerBlock
-			baseLen = 2
-		case '#':
-			marker = markerComment
-			baseLen = 2
-		default:
-			offset = idx + 1
-			continue
+			baseLen = len(l.syntax.VarStart)
 		}
+		if blockIdx >= 0 && (bestIdx < 0 || blockIdx < bestIdx) {
+			bestIdx = blockIdx
+			marker = markerBlock
+			baseLen = len(l.syntax.BlockStart)
+		}
+		if commentIdx >= 0 && (bestIdx < 0 || commentIdx < bestIdx) {
+			bestIdx = commentIdx
+			marker = markerComment
+			baseLen = len(l.syntax.CommentStart)
+		}
+
+		// Check if line marker comes first
+		if lineMarker != nil && (bestIdx < 0 || lineMarker.offset <= bestIdx) {
+			return lineMarker
+		}
+
+		// If no marker found
+		if bestIdx < 0 {
+			return lineMarker
+		}
+
+		idx := bestIdx
 
 		// Check for whitespace control character
 		var ws whitespaceMode
@@ -395,7 +400,16 @@ func (l *Lexer) findLineMarker(rest string, offset int) *markerMatch {
 			// Check for line statement prefix
 			if strings.HasPrefix(rest[i:], lineStatementPrefix) {
 				// Check if this is earlier than the line comment match
-				if bestMatch == nil || lineStart < bestMatch.offset {
+				// Compare actual prefix positions, not line start positions
+				if bestMatch == nil || prefixStart < bestMatch.offset {
+					// If at same position and line comment prefix starts with line statement prefix,
+					// keep the line comment (it's more specific)
+					if bestMatch != nil && prefixStart == bestMatch.offset &&
+						bestMatch.marker == markerLineComment &&
+						strings.HasPrefix(lineCommentPrefix, lineStatementPrefix) {
+						// Keep line comment
+						break
+					}
 					bestMatch = &markerMatch{
 						offset:      lineStart,
 						marker:      markerLineStatement,
@@ -417,8 +431,6 @@ func (l *Lexer) findLineMarker(rest string, offset int) *markerMatch {
 	// In that case, ## should win because it's longer
 	if bestMatch != nil && bestMatch.marker == markerLineComment && lineStatementPrefix != "" {
 		// Check if there's a line statement that comes BEFORE the line comment
-		// but the line comment has a longer prefix (e.g., ## vs #)
-		// In that case, we need to check the actual character sequence
 		lcOffset := bestMatch.offset
 		for i := offset; i <= lcOffset; i++ {
 			// Check if we're at start of line
@@ -443,8 +455,9 @@ func (l *Lexer) findLineMarker(rest string, offset int) *markerMatch {
 
 			// Check for line statement prefix
 			if j < len(rest) && strings.HasPrefix(rest[j:], lineStatementPrefix) {
-				// Found a line statement - check if it's earlier or at same position as line comment
-				if lineStart < lcOffset {
+				// Found a line statement - check if it comes before the line comment
+				// Compare actual prefix positions
+				if prefixStart < lcOffset {
 					bestMatch = &markerMatch{
 						offset:      lineStart,
 						marker:      markerLineStatement,
@@ -453,10 +466,11 @@ func (l *Lexer) findLineMarker(rest string, offset int) *markerMatch {
 						prefixStart: prefixStart - lineStart,
 					}
 					break
-				} else if lineStart == lcOffset && strings.HasPrefix(lineCommentPrefix, lineStatementPrefix) {
+				} else if prefixStart == lcOffset && strings.HasPrefix(lineCommentPrefix, lineStatementPrefix) {
 					// Same position but line comment prefix is longer (e.g., ## includes #)
 					// Keep line comment (it's more specific)
-				} else if lineStart == lcOffset {
+					break
+				} else if prefixStart == lcOffset {
 					// Same position, line statement wins if it's not a prefix of line comment
 					bestMatch = &markerMatch{
 						offset:      lineStart,
@@ -559,7 +573,7 @@ func (l *Lexer) handleRawTag(wsStart whitespaceMode) (*Token, bool, error) {
 			return nil, false, l.syntaxError("unexpected end of raw block")
 		}
 		blockIdx += ptr // Convert to absolute position in rest
-		
+
 		// Position right after {%
 		afterBlockStart := blockIdx + len(l.syntax.BlockStart)
 
@@ -608,7 +622,7 @@ func (l *Lexer) handleRawTag(wsStart whitespaceMode) (*Token, bool, error) {
 			}
 			return &tok, false, nil
 		}
-		
+
 		ptr = afterBlockStart
 	}
 }

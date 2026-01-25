@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/testutil"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
@@ -61,13 +61,17 @@ func TestTemplates(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to parse input: %v", err)
 			}
-			input.Context["one_shot_iterator"] = value.FromOneShotIterator(
-				value.NewOneShotIterator([]value.Value{
+			input.Context["one_shot_iterator"] = value.MakeOneShotIterator(func(yield func(value.Value) bool) {
+				for _, item := range []value.Value{
 					value.FromInt(0),
 					value.FromInt(1),
 					value.FromInt(2),
-				}),
-			)
+				} {
+					if !yield(item) {
+						return
+					}
+				}
+			})
 
 			// Create environment
 			env := NewEnvironment()
@@ -75,7 +79,7 @@ func TestTemplates(t *testing.T) {
 			// Configure environment from settings
 			if input.Settings != nil {
 				if input.Settings.HasMarkers() {
-					env.SetSyntax(lexer.SyntaxConfig{
+					env.SetSyntax(syntax.SyntaxConfig{
 						BlockStart:          input.Settings.Markers[0],
 						BlockEnd:            input.Settings.Markers[1],
 						VarStart:            input.Settings.Markers[2],
@@ -86,13 +90,13 @@ func TestTemplates(t *testing.T) {
 						LineCommentPrefix:   input.Settings.LineCommentPrefix,
 					})
 				} else if input.Settings.LineStatementPrefix != "" || input.Settings.LineCommentPrefix != "" {
-					syntax := lexer.DefaultSyntax()
-					syntax.LineStatementPrefix = input.Settings.LineStatementPrefix
-					syntax.LineCommentPrefix = input.Settings.LineCommentPrefix
-					env.SetSyntax(syntax)
+					syntaxConfig := syntax.DefaultSyntax()
+					syntaxConfig.LineStatementPrefix = input.Settings.LineStatementPrefix
+					syntaxConfig.LineCommentPrefix = input.Settings.LineCommentPrefix
+					env.SetSyntax(syntaxConfig)
 				}
 
-				env.SetWhitespace(lexer.WhitespaceConfig{
+				env.SetWhitespace(syntax.WhitespaceConfig{
 					KeepTrailingNewline: input.Settings.KeepTrailingNewline,
 					LstripBlocks:        input.Settings.LstripBlocks,
 					TrimBlocks:          input.Settings.TrimBlocks,

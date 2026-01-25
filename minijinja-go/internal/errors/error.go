@@ -1,9 +1,9 @@
-package minijinja
+package errors
 
 import (
 	"fmt"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
 )
 
 // ErrorKind describes the type of error that occurred during template processing.
@@ -119,6 +119,9 @@ const (
 	// This error occurs when {% include %} encounters problems such as
 	// invalid template names or recursion issues.
 	ErrBadInclude
+
+	// ErrOutOfFuel indicates template execution ran out of fuel.
+	ErrOutOfFuel
 )
 
 // String returns a human-readable string representation of the error kind.
@@ -148,6 +151,8 @@ func (k ErrorKind) String() string {
 		return "too many arguments"
 	case ErrBadInclude:
 		return "bad include"
+	case ErrOutOfFuel:
+		return "out of fuel"
 	default:
 		return "error"
 	}
@@ -181,7 +186,7 @@ type Error struct {
 
 	// Span indicates the location in the source where the error occurred.
 	// May be nil if location information is not available.
-	Span *lexer.Span
+	Span *syntax.Span
 
 	// Name is the template name where the error occurred.
 	// May be empty for templates created from strings without names.
@@ -200,9 +205,10 @@ type Error struct {
 // is available.
 //
 // Example output:
-//     syntax error: unexpected end of template (at example.html line 5)
-//     undefined variable: name 'foo' is not defined (at line 12)
-//     invalid operation: cannot add string and number
+//
+//	syntax error: unexpected end of template (at example.html line 5)
+//	undefined variable: name 'foo' is not defined (at line 12)
+//	invalid operation: cannot add string and number
 func (e *Error) Error() string {
 	if e.Name != "" && e.Span != nil {
 		return fmt.Sprintf("%s: %s (at %s line %d)", e.Kind, e.Message, e.Name, e.Span.StartLine)
@@ -220,9 +226,9 @@ func (e *Error) Error() string {
 //
 // Example:
 //
-//	func myFilter(state *minijinja.State, value minijinja.Value, args []minijinja.Value) (minijinja.Value, error) {
+//	func myFilter(state minijinja.FilterState, value minijinja.Value, args []minijinja.Value) (minijinja.Value, error) {
 //	    if len(args) < 1 {
-//	        return minijinja.Undefined(), minijinja.NewError(
+//	        return value.Undefined(), minijinja.NewError(
 //	            minijinja.ErrMissingArgument,
 //	            "myfilter requires at least 1 argument")
 //	    }
@@ -241,7 +247,7 @@ func NewError(kind ErrorKind, msg string) *Error {
 //
 //	return minijinja.NewError(minijinja.ErrSyntax, "unexpected token").
 //	    WithSpan(token.Span())
-func (e *Error) WithSpan(span lexer.Span) *Error {
+func (e *Error) WithSpan(span syntax.Span) *Error {
 	e.Span = &span
 	return e
 }

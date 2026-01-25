@@ -57,10 +57,10 @@ func ParseTestInput(content string) (*TestInput, error) {
 
 	parts := strings.SplitN(content, "\n---\n", 2)
 
-	// Parse JSON 
+	// Parse JSON
 	if len(parts) >= 1 && strings.TrimSpace(parts[0]) != "" {
 		jsonStr := parts[0]
-		
+
 		// First try to parse as settings directly (for lexer tests)
 		// This is the format: {"keep_trailing_newline": true, ...}
 		input.Settings = &TestSettings{}

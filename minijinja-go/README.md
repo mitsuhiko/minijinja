@@ -169,7 +169,7 @@ Use `{{ super() }}` to include the parent block's content:
 
 ```go
 env := minijinja.NewEnvironment()
-env.AddFilter("double", func(state *minijinja.State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+env.AddFilter("double", func(state minijinja.FilterState, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
     if i, ok := val.AsInt(); ok {
         return value.FromInt(i * 2), nil
     }
@@ -201,9 +201,31 @@ env.SetLoader(func(name string) (string, error) {
 tmpl, err := env.GetTemplate("index.html")
 ```
 
+## Context Support
+
+MiniJinja for Go supports Go's `context.Context` for cancellation, timeouts, and passing request-scoped values:
+
+```go
+// Use RenderCtx to pass a context
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+result, err := tmpl.RenderCtx(ctx, data)
+
+// Access the context in custom filters/functions via State.Context()
+env.AddFunction("request_id", func(state *minijinja.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+    ctx := state.Context()
+    if id, ok := ctx.Value(requestIDKey{}).(string); ok {
+        return value.FromString(id), nil
+    }
+    return value.FromString("unknown"), nil
+})
+```
+
 ## Auto-Escaping
 
-MiniJinja for Go automatically escapes HTML in templates with `.html`, `.htm`, or `.xml` extensions:
+MiniJinja for Go automatically escapes HTML in templates with `.html`, `.htm`, or `.xml` extensions, and
+serializes values as JSON for `.json`, `.json5`, `.js`, `.yaml`, and `.yml` files. The `.j2`, `.jinja`, and
+`.jinja2` suffixes are ignored when determining the default auto-escape mode:
 
 ```go
 env := minijinja.NewEnvironment()

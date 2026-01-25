@@ -573,6 +573,9 @@ Example:
 
 After an endautoescape the behavior is reverted to what it was before.
 
+The tag accepts boolean values or the strings "html", "json", or "none" to force a
+specific escaping mode.
+
 The exact auto escaping behavior is determined by the value of AutoEscape set to the
 environment.
 
@@ -613,7 +616,7 @@ Likewise, a loop that stops processing after the 10th iteration:
 
 # Custom Delimiters
 
-MiniJinja supports custom delimiters via the lexer.SyntaxConfig. You can override
+MiniJinja supports custom delimiters via the syntax.SyntaxConfig. You can override
 the syntax configuration for templates by setting different delimiters. The end
 markers can be shared, but the start markers need to be distinct. It would thus not
 be valid to configure {{ to be the marker for both variables and blocks.
@@ -621,7 +624,7 @@ be valid to configure {{ to be the marker for both variables and blocks.
 Go example:
 
 	env := minijinja.NewEnvironment()
-	env.SetSyntax(lexer.SyntaxConfig{
+	env.SetSyntax(syntax.SyntaxConfig{
 	    BlockStart:   "\\BLOCK{",
 	    BlockEnd:     "}",
 	    VarStart:     "\\VAR{",
@@ -645,10 +648,10 @@ comments are an alternative syntax feature where blocks can be placed on their o
 if they are opened with a configured prefix. They must appear on their own line but can
 be prefixed with whitespace. Line comments are similar but they can also be trailing.
 
-To use line statements and comments they need to be configured via lexer.SyntaxConfig:
+To use line statements and comments they need to be configured via syntax.SyntaxConfig:
 
 	env := minijinja.NewEnvironment()
-	env.SetSyntax(lexer.SyntaxConfig{
+	env.SetSyntax(syntax.SyntaxConfig{
 	    BlockStart:          "{%",
 	    BlockEnd:            "%}",
 	    VarStart:            "{{",

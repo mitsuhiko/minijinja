@@ -1,4 +1,5 @@
-package lexer
+// Package syntax provides template syntax configuration types.
+package syntax
 
 // SyntaxConfig holds the delimiters and prefixes for template syntax.
 //
@@ -18,7 +19,7 @@ package lexer
 //
 // You can customize delimiters to avoid conflicts. For example, for LaTeX:
 //
-//	config := lexer.SyntaxConfig{
+//	config := syntax.SyntaxConfig{
 //	    BlockStart:   "\\BLOCK{",
 //	    BlockEnd:     "}",
 //	    VarStart:     "\\VAR{",
@@ -36,7 +37,7 @@ package lexer
 //
 // Example with line syntax:
 //
-//	config := lexer.SyntaxConfig{
+//	config := syntax.SyntaxConfig{
 //	    BlockStart:          "{%",
 //	    BlockEnd:            "%}",
 //	    VarStart:            "{{",
@@ -56,22 +57,22 @@ package lexer
 //
 // See the syntax documentation for more details.
 type SyntaxConfig struct {
-	// BlockStart is the opening delimiter for blocks (default: "{%").
+	// BlockStart is the opening delimiter for blocks (default: "{%" ).
 	BlockStart string
 
-	// BlockEnd is the closing delimiter for blocks (default: "%}").
+	// BlockEnd is the closing delimiter for blocks (default: "%}" ).
 	BlockEnd string
 
-	// VarStart is the opening delimiter for variables (default: "{{").
+	// VarStart is the opening delimiter for variables (default: "{{" ).
 	VarStart string
 
-	// VarEnd is the closing delimiter for variables (default: "}}").
+	// VarEnd is the closing delimiter for variables (default: "}}" ).
 	VarEnd string
 
-	// CommentStart is the opening delimiter for comments (default: "{#").
+	// CommentStart is the opening delimiter for comments (default: "{#" ).
 	CommentStart string
 
-	// CommentEnd is the closing delimiter for comments (default: "#}").
+	// CommentEnd is the closing delimiter for comments (default: "#}" ).
 	CommentEnd string
 
 	// LineStatementPrefix is the prefix for line statements (default: "").
@@ -94,7 +95,7 @@ type SyntaxConfig struct {
 //
 // Example:
 //
-//	config := lexer.DefaultSyntax()
+//	config := syntax.DefaultSyntax()
 //	// Use with: env.SetSyntax(config)
 func DefaultSyntax() SyntaxConfig {
 	return SyntaxConfig{
@@ -142,7 +143,7 @@ func DefaultSyntax() SyntaxConfig {
 //
 // With TrimBlocks=true and LstripBlocks=true:
 //
-//	config := lexer.WhitespaceConfig{
+//	config := syntax.WhitespaceConfig{
 //	    TrimBlocks:  true,
 //	    LstripBlocks: true,
 //	}
@@ -192,7 +193,7 @@ type WhitespaceConfig struct {
 //
 // Example:
 //
-//	config := lexer.DefaultWhitespace()
+//	config := syntax.DefaultWhitespace()
 //	// Use with: env.SetWhitespace(config)
 func DefaultWhitespace() WhitespaceConfig {
 	return WhitespaceConfig{

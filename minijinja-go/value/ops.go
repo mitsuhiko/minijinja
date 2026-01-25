@@ -405,6 +405,13 @@ func (v Value) Compare(other Value) (int, bool) {
 		}
 	}
 
+	// Object comparison using ObjectWithCmp
+	if obj1, ok := v.AsObject(); ok {
+		if obj2, ok := other.AsObject(); ok {
+			return CompareObjects(obj1, obj2)
+		}
+	}
+
 	return 0, false
 }
 

@@ -45,7 +45,7 @@
 //	})
 //
 //	// Add custom filters
-//	env.AddFilter("reverse", FilterReverse)
+//	env.AddFilter("reverse", filters.FilterReverse)
 //
 //	// Add custom functions
 //	env.AddFunction("range", FunctionRange)
@@ -58,9 +58,9 @@
 //
 // Filters transform values in templates:
 //
-//	func MyFilter(state *minijinja.State, value minijinja.Value, args []minijinja.Value) (minijinja.Value, error) {
+//	func MyFilter(state minijinja.FilterState, value minijinja.Value, args []minijinja.Value) (minijinja.Value, error) {
 //	    // Transform value
-//	    return minijinja.FromString("transformed"), nil
+//	    return value.FromString("transformed"), nil
 //	}
 //	env.AddFilter("myfilter", MyFilter)
 //	// In template: {{ value|myfilter }}
@@ -69,7 +69,7 @@
 //
 //	func MyFunction(state *minijinja.State, args []minijinja.Value, kwargs map[string]minijinja.Value) (minijinja.Value, error) {
 //	    // Process arguments
-//	    return minijinja.FromString("result"), nil
+//	    return value.FromString("result"), nil
 //	}
 //	env.AddFunction("myfunc", MyFunction)
 //	// In template: {{ myfunc(arg1, arg2, key=value) }}
@@ -91,10 +91,10 @@
 // The Value type represents dynamically-typed template values:
 //
 //	// Create values
-//	str := minijinja.FromString("hello")
-//	num := minijinja.FromInt(42)
-//	list := minijinja.FromSlice([]minijinja.Value{str, num})
-//	dict := minijinja.FromMap(map[string]minijinja.Value{
+//	str := value.FromString("hello")
+//	num := value.FromInt(42)
+//	list := value.FromSlice([]minijinja.Value{str, num})
+//	dict := value.FromMap(map[string]minijinja.Value{
 //	    "name": str,
 //	    "age": num,
 //	})
@@ -149,7 +149,7 @@
 //
 //   - syntax.go: Comprehensive syntax documentation
 //   - environment.go: Environment configuration
-//   - filters.go: Built-in filters
+//   - filters package: Built-in filters
 //   - tests.go: Built-in tests
 //   - value package: Dynamic value system
 package minijinja
@@ -177,17 +177,27 @@ const (
 	KindMap       = value.KindMap
 )
 
-// Value constructors
-var (
-	Undefined      = value.Undefined
-	None           = value.None
-	FromBool       = value.FromBool
-	FromInt        = value.FromInt
-	FromFloat      = value.FromFloat
-	FromString     = value.FromString
-	FromSafeString = value.FromSafeString
-	FromBytes      = value.FromBytes
-	FromSlice      = value.FromSlice
-	FromMap        = value.FromMap
-	FromAny        = value.FromAny
-)
+// FromMap creates a Value from a map of string to Value.
+func FromMap(v map[string]Value) Value {
+	return value.FromMap(v)
+}
+
+// FromSlice creates a Value from a slice of Value.
+func FromSlice(v []Value) Value {
+	return value.FromSlice(v)
+}
+
+// MergeMaps merges multiple map-like values into a single lazy map object.
+//
+// Later values override earlier ones when keys overlap. Values are converted
+// using value.FromAny, so maps, structs, and objects can be passed directly.
+func MergeMaps(values ...any) Value {
+	if len(values) == 0 {
+		return value.MergeMaps()
+	}
+	sources := make([]value.Value, len(values))
+	for i, v := range values {
+		sources[i] = value.FromAny(v)
+	}
+	return value.MergeMaps(sources...)
+}

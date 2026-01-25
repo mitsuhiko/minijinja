@@ -73,7 +73,7 @@ import (
 //
 //	type myCallable struct{}
 //
-//	func (m *myCallable) Call(args []Value, kwargs map[string]Value) (Value, error) {
+//	func (m *myCallable) Call(state State, args []Value, kwargs map[string]Value) (Value, error) {
 //	    // Process positional arguments
 //	    if len(args) > 0 {
 //	        fmt.Println("First arg:", args[0].String())
@@ -87,11 +87,12 @@ import (
 type Callable interface {
 	// Call invokes the callable with positional and keyword arguments.
 	//
+	// The state provides access to the template rendering context.
 	// The args slice contains positional arguments in order.
 	// The kwargs map contains keyword arguments by name.
 	//
 	// Returns the result value and any error that occurred.
-	Call(args []Value, kwargs map[string]Value) (Value, error)
+	Call(state State, args []Value, kwargs map[string]Value) (Value, error)
 }
 
 // Object is an interface for custom objects with attribute access.
@@ -488,84 +489,6 @@ func (i *Iterator) Items() []Value {
 	return i.items
 }
 
-// OneShotIterator represents an iterator that is consumed as it is iterated.
-type OneShotIterator struct {
-	items    []Value
-	pos      int
-	buffered *Value
-}
-
-// NewOneShotIterator creates a new one-shot iterator from items.
-func NewOneShotIterator(items []Value) *OneShotIterator {
-	return &OneShotIterator{items: items}
-}
-
-// FromOneShotIterator creates a Value from a one-shot iterator.
-func FromOneShotIterator(iter *OneShotIterator) Value {
-	return Value{data: iter}
-}
-
-// Next returns the next item, consuming it.
-func (i *OneShotIterator) Next() (Value, bool) {
-	if i.buffered != nil {
-		val := *i.buffered
-		i.buffered = nil
-		return val, true
-	}
-	if i.pos >= len(i.items) {
-		return Value{}, false
-	}
-	val := i.items[i.pos]
-	i.pos++
-	return val, true
-}
-
-// Peek returns the next item and consumes it for future iterations.
-func (i *OneShotIterator) Peek() Value {
-	if i.buffered != nil {
-		return *i.buffered
-	}
-	if i.pos >= len(i.items) {
-		return Undefined()
-	}
-	val := i.items[i.pos]
-	i.pos++
-	i.buffered = &val
-	return val
-}
-
-// Remaining returns the count of remaining items.
-func (i *OneShotIterator) Remaining() int {
-	remaining := len(i.items) - i.pos
-	if i.buffered != nil {
-		remaining++
-	}
-	return remaining
-}
-
-// Drain returns remaining items and consumes them.
-func (i *OneShotIterator) Drain() []Value {
-	var result []Value
-	if i.buffered != nil {
-		result = append(result, *i.buffered)
-		i.buffered = nil
-	}
-	if i.pos < len(i.items) {
-		result = append(result, i.items[i.pos:]...)
-		i.pos = len(i.items)
-	}
-	return result
-}
-
-// DiscardBuffered drops a peeked item.
-func (i *OneShotIterator) DiscardBuffered() {
-	i.buffered = nil
-}
-
-func (i *OneShotIterator) String() string {
-	return "<iterator>"
-}
-
 // FromBigInt creates a Value from a big.Int for arbitrary-precision integers.
 //
 // Big integers are used when values exceed the range of int64. They support
@@ -724,6 +647,9 @@ func FromAny(v any) Value {
 	if val, ok := v.(Value); ok {
 		return val
 	}
+	if obj, ok := v.(Object); ok {
+		return FromObject(obj)
+	}
 
 	rv := reflect.ValueOf(v)
 	return fromReflectValue(rv)
@@ -822,7 +748,7 @@ func fromStruct(rv reflect.Value) Value {
 
 // Kind returns the kind of value.
 func (v Value) Kind() ValueKind {
-	switch v.data.(type) {
+	switch d := v.data.(type) {
 	case undefinedType:
 		return KindUndefined
 	case noneType:
@@ -844,24 +770,57 @@ func (v Value) Kind() ValueKind {
 	case Callable:
 		return KindCallable
 	case Object:
-		return KindPlain // Objects are plain objects
+		// Check ObjectRepr to determine the appropriate kind
+		switch GetObjectRepr(d) {
+		case ObjectReprSeq:
+			return KindSeq
+		case ObjectReprMap:
+			return KindMap
+		case ObjectReprIterable:
+			return KindIterable
+		default:
+			return KindPlain
+		}
 	default:
 		return KindPlain
 	}
 }
 
 // AsCallable returns the Callable if this value is callable.
+// This returns true for both Callable and CallableObject implementations.
 func (v Value) AsCallable() (Callable, bool) {
 	if c, ok := v.data.(Callable); ok {
 		return c, true
 	}
+	// Also check for CallableObject and wrap it
+	if obj, ok := v.data.(Object); ok {
+		if co, ok := obj.(CallableObject); ok {
+			return &callableObjectWrapper{co}, true
+		}
+	}
 	return nil, false
+}
+
+// callableObjectWrapper wraps a CallableObject as a Callable
+type callableObjectWrapper struct {
+	obj CallableObject
+}
+
+func (w *callableObjectWrapper) Call(state State, args []Value, kwargs map[string]Value) (Value, error) {
+	return w.obj.ObjectCall(state, args, kwargs)
 }
 
 // IsCallable returns true if this value is callable.
 func (v Value) IsCallable() bool {
-	_, ok := v.data.(Callable)
-	return ok
+	if _, ok := v.data.(Callable); ok {
+		return true
+	}
+	if obj, ok := v.data.(Object); ok {
+		if _, ok := obj.(CallableObject); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // IsUndefined returns true if the value is undefined.
@@ -897,6 +856,8 @@ func (v Value) IsTrue() bool {
 		return len(d) > 0
 	case map[string]Value:
 		return len(d) > 0
+	case Object:
+		return GetObjectTruth(d)
 	default:
 		return true
 	}
@@ -1002,8 +963,6 @@ func (v Value) Repr() string {
 		return "[" + strings.Join(parts, ", ") + "]"
 	case *Iterator:
 		return "<iterator>"
-	case *OneShotIterator:
-		return "<iterator>"
 	case map[string]Value:
 		var parts []string
 		keys := make([]string, 0, len(d))
@@ -1064,33 +1023,21 @@ func (v Value) SameAs(other Value) bool {
 		return false
 	}
 
-	// For sequences and maps, check pointer identity
-	// Two different slice/map literals are never "same as" each other
+	// For sequences and maps, check pointer identity.
+	// Two different slice/map literals are never "same as" each other.
 	if v.Kind() == KindSeq || v.Kind() == KindMap {
-		// In Go, we can't easily check slice/map identity, so we use
-		// the address of the underlying data. Two freshly created slices
-		// will have different addresses.
-		// For this to work correctly, we need to compare the actual slice headers
+		// In Go, slice identity is determined by the full slice header.
+		// Compare pointer, length, and capacity to ensure reslices don't match.
 		if s1, ok1 := v.data.([]Value); ok1 {
 			if s2, ok2 := other.data.([]Value); ok2 {
-				// Check if they point to the same underlying array
-				if len(s1) == 0 && len(s2) == 0 {
-					return true // Empty slices are "same"
-				}
-				if len(s1) > 0 && len(s2) > 0 {
-					return &s1[0] == &s2[0]
-				}
-				return false
+				return reflect.ValueOf(s1).Pointer() == reflect.ValueOf(s2).Pointer() &&
+					len(s1) == len(s2) &&
+					cap(s1) == cap(s2)
 			}
 		}
 		if m1, ok1 := v.data.(map[string]Value); ok1 {
 			if m2, ok2 := other.data.(map[string]Value); ok2 {
-				// For maps, we can compare the map headers directly
-				// But Go maps don't expose their identity easily
-				// The safest approach: two map literals are never the same
-				// unless they're the exact same variable
-				// Use unsafe pointer comparison
-				return &m1 == &m2
+				return reflect.ValueOf(m1).Pointer() == reflect.ValueOf(m2).Pointer()
 			}
 		}
 		return false
@@ -1189,6 +1136,11 @@ func (v Value) Len() (int, bool) {
 		return len(d), true
 	case LenGetter:
 		return d.Len()
+	case Object:
+		if length := GetObjectLen(d); length >= 0 {
+			return length, true
+		}
+		return 0, false
 	default:
 		return 0, false
 	}
@@ -1243,6 +1195,25 @@ func (v Value) GetItem(key Value) Value {
 		}
 	case ItemGetter:
 		return d.GetItem(key)
+	case Object:
+		// Check for SeqObject for index access
+		if idx, ok := key.AsInt(); ok {
+			if so, ok := d.(SeqObject); ok {
+				length := so.SeqLen()
+				if idx < 0 {
+					idx = int64(length) + idx
+				}
+				if idx >= 0 && idx < int64(length) {
+					return so.SeqItem(int(idx))
+				}
+				return Undefined()
+			}
+		}
+		// Fall through to attribute access for string keys
+		if s, ok := key.AsString(); ok {
+			return d.GetAttr(s)
+		}
+		return Undefined()
 	}
 	return Undefined()
 }
@@ -1330,6 +1301,16 @@ func (v Value) Iter() []Value {
 		return result
 	case Iterable:
 		return d.Iter()
+	case Object:
+		// Check for new object iteration interfaces
+		if seq := IterateObject(d); seq != nil {
+			var result []Value
+			for item := range seq {
+				result = append(result, item)
+			}
+			return result
+		}
+		return nil
 	default:
 		return nil
 	}

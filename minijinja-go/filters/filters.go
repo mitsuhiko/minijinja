@@ -1,6 +1,8 @@
-package minijinja
+// Package filters provides MiniJinja's built-in filters.
+package filters
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -9,8 +11,27 @@ import (
 	"strings"
 	"unicode"
 
+	mjerrors "github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/errors"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
+
+// State provides access to the runtime context for filters and tests.
+//
+// It is implemented by *minijinja.State and exposes helper methods for
+// looking up filters and tests by name.
+type State interface {
+	Context() context.Context
+	Lookup(name string) value.Value
+	Name() string
+	GetFilter(name string) (FilterFunc, bool)
+	GetTest(name string) (TestFunc, bool)
+}
+
+// FilterFunc is the signature for filter functions.
+type FilterFunc func(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error)
+
+// TestFunc is the signature for test functions.
+type TestFunc func(state State, val value.Value, args []value.Value) (bool, error)
 
 // FilterUpper converts a value to uppercase.
 //
@@ -18,7 +39,7 @@ import (
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("upper", FilterUpper)
 //
 // Template usage:
@@ -27,7 +48,7 @@ import (
 //
 // Note: This filter only works on string values. Non-string values are returned
 // unchanged.
-func FilterUpper(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterUpper(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		return value.FromString(strings.ToUpper(s)), nil
 	}
@@ -40,13 +61,13 @@ func FilterUpper(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("lower", FilterLower)
 //
 // Template usage:
 //
 //	<h1>{{ chapter.title|lower }}</h1>
-func FilterLower(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterLower(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		return value.FromString(strings.ToLower(s)), nil
 	}
@@ -61,14 +82,14 @@ func FilterLower(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("capitalize", FilterCapitalize)
 //
 // Template usage:
 //
 //	{{ "hello WORLD"|capitalize }}
 //	  -> "Hello world"
-func FilterCapitalize(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterCapitalize(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		if len(s) == 0 {
 			return val, nil
@@ -88,7 +109,7 @@ func FilterCapitalize(_ *State, val value.Value, _ []value.Value, _ map[string]v
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("title", FilterTitle)
 //
 // Template usage:
@@ -96,7 +117,7 @@ func FilterCapitalize(_ *State, val value.Value, _ []value.Value, _ map[string]v
 //	<h1>{{ chapter.title|title }}</h1>
 //	{{ "hello world"|title }}
 //	  -> "Hello World"
-func FilterTitle(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterTitle(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		var result strings.Builder
 		capitalizeNext := true
@@ -123,7 +144,7 @@ func FilterTitle(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("trim", FilterTrim)
 //
 // Template usage:
@@ -132,7 +153,7 @@ func FilterTitle(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 //	  -> "hello"
 //	{{ "xxxhelloxxx"|trim("x") }}
 //	  -> "hello"
-func FilterTrim(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterTrim(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		chars := " \t\n\r"
 		if len(args) > 0 {
@@ -152,7 +173,7 @@ func FilterTrim(_ *State, val value.Value, args []value.Value, _ map[string]valu
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("replace", FilterReplace)
 //
 // Template usage:
@@ -161,7 +182,7 @@ func FilterTrim(_ *State, val value.Value, args []value.Value, _ map[string]valu
 //	  -> "Goodbye World"
 //	{{ "aaa"|replace("a", "b", 2) }}
 //	  -> "bba"
-func FilterReplace(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterReplace(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		if len(args) < 2 {
 			return val, fmt.Errorf("replace requires old and new arguments")
@@ -179,6 +200,149 @@ func FilterReplace(_ *State, val value.Value, args []value.Value, _ map[string]v
 	return val, nil
 }
 
+// FilterFormat applies printf-style formatting to a string.
+//
+// Example:
+//
+//	{{ "%s, %s!"|format(greeting, name) }}
+func FilterFormat(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+	formatStr, ok := val.AsString()
+	if !ok {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "format filter expects a string")
+	}
+
+	formatted, err := formatPrintf(formatStr, args)
+	if err != nil {
+		return value.Undefined(), err
+	}
+	return value.FromString(formatted), nil
+}
+
+func formatPrintf(formatStr string, args []value.Value) (string, error) {
+	var out strings.Builder
+	argIndex := 0
+
+	for i := 0; i < len(formatStr); {
+		if formatStr[i] != '%' {
+			out.WriteByte(formatStr[i])
+			i++
+			continue
+		}
+		if i+1 < len(formatStr) && formatStr[i+1] == '%' {
+			out.WriteByte('%')
+			i += 2
+			continue
+		}
+
+		location := i
+		i++
+
+		key := ""
+		if i < len(formatStr) && formatStr[i] == '(' {
+			end := strings.IndexByte(formatStr[i+1:], ')')
+			if end < 0 {
+				return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, "incomplete format key")
+			}
+			key = formatStr[i+1 : i+1+end]
+			i += end + 2
+		}
+
+		flagsStart := i
+		for i < len(formatStr) && strings.ContainsRune("#0- +", rune(formatStr[i])) {
+			i++
+		}
+		flags := formatStr[flagsStart:i]
+
+		widthStart := i
+		for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
+			i++
+		}
+		width := formatStr[widthStart:i]
+
+		precision := ""
+		if i < len(formatStr) && formatStr[i] == '.' {
+			i++
+			precStart := i
+			for i < len(formatStr) && formatStr[i] >= '0' && formatStr[i] <= '9' {
+				i++
+			}
+			precision = formatStr[precStart:i]
+		}
+
+		if i < len(formatStr) && (formatStr[i] == 'h' || formatStr[i] == 'l' || formatStr[i] == 'L') {
+			i++
+		}
+
+		if i >= len(formatStr) {
+			return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, "incomplete format specifier")
+		}
+		verb := formatStr[i]
+		i++
+
+		if !strings.ContainsRune("diouxXeEfFgGs", rune(verb)) {
+			return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("invalid format verb '%c'", verb))
+		}
+
+		var arg value.Value
+		if key != "" {
+			if len(args) == 0 {
+				return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("missing an argument for format spec at offset %d", location))
+			}
+			mapping, ok := args[0].AsMap()
+			if !ok {
+				return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, "format argument must be a mapping")
+			}
+			mapped, ok := mapping[key]
+			if !ok || mapped.IsUndefined() {
+				return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("missing an argument for format spec at offset %d", location))
+			}
+			arg = mapped
+		} else {
+			if argIndex >= len(args) {
+				return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("missing an argument for format spec at offset %d", location))
+			}
+			arg = args[argIndex]
+			argIndex++
+		}
+
+		formatted, err := formatPrintfValue(arg, flags, width, precision, verb, location)
+		if err != nil {
+			return "", err
+		}
+		out.WriteString(formatted)
+	}
+
+	return out.String(), nil
+}
+
+func formatPrintfValue(val value.Value, flags, width, precision string, verb byte, location int) (string, error) {
+	format := "%" + flags + width
+	if precision != "" {
+		format += "." + precision
+	}
+	format += string(verb)
+
+	switch verb {
+	case 's':
+		return fmt.Sprintf(format, val.String()), nil
+	case 'd', 'i', 'o', 'x', 'X':
+		if i, ok := val.AsInt(); ok {
+			return fmt.Sprintf(format, i), nil
+		}
+		return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("invalid format spec at offset %d", location))
+	case 'e', 'E', 'f', 'F', 'g', 'G':
+		if f, ok := val.AsFloat(); ok {
+			return fmt.Sprintf(format, f), nil
+		}
+		if i, ok := val.AsInt(); ok {
+			return fmt.Sprintf(format, float64(i)), nil
+		}
+		return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("invalid format spec at offset %d", location))
+	default:
+		return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("invalid format spec at offset %d", location))
+	}
+}
+
 // FilterDefault provides a default value if the input is undefined or none.
 //
 // If the value is undefined or none, it returns the provided default value.
@@ -187,7 +351,7 @@ func FilterReplace(_ *State, val value.Value, args []value.Value, _ map[string]v
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("default", FilterDefault)
 //
 // Template usage:
@@ -199,7 +363,7 @@ func FilterReplace(_ *State, val value.Value, args []value.Value, _ map[string]v
 // Keyword arguments:
 //   - default: The default value to use
 //   - boolean: If true, treat falsy values as undefined
-func FilterDefault(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterDefault(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	if val.IsUndefined() || val.IsNone() {
 		if len(args) > 0 {
 			return args[0], nil
@@ -240,7 +404,7 @@ func FilterDefault(_ *State, val value.Value, args []value.Value, kwargs map[str
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("safe", FilterSafe)
 //
 // Template usage:
@@ -249,7 +413,7 @@ func FilterDefault(_ *State, val value.Value, args []value.Value, kwargs map[str
 //
 // Warning: Only use this filter on values you trust to contain safe HTML.
 // Using it on untrusted content can lead to security vulnerabilities.
-func FilterSafe(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterSafe(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		return value.FromSafeString(s), nil
 	}
@@ -264,7 +428,7 @@ func FilterSafe(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("escape", FilterEscape)
 //
 // Template usage:
@@ -272,7 +436,7 @@ func FilterSafe(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 //	{{ user_input|escape }}
 //	{{ "<script>alert('xss')</script>"|e }}
 //	  -> "&lt;script&gt;alert('xss')&lt;/script&gt;"
-func FilterEscape(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterEscape(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if val.IsSafe() {
 		return val, nil
 	}
@@ -280,6 +444,31 @@ func FilterEscape(_ *State, val value.Value, _ []value.Value, _ map[string]value
 		return value.FromSafeString(EscapeHTML(s)), nil
 	}
 	return value.FromSafeString(EscapeHTML(val.String())), nil
+}
+
+// EscapeHTML escapes a string for safe use in HTML.
+func EscapeHTML(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch r {
+		case '<':
+			b.WriteString("&lt;")
+		case '>':
+			b.WriteString("&gt;")
+		case '&':
+			b.WriteString("&amp;")
+		case '"':
+			b.WriteString("&quot;")
+		case '\'':
+			b.WriteString("&#x27;")
+		case '/':
+			b.WriteString("&#x2f;")
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // FilterString converts a value into a string if it's not one already.
@@ -290,14 +479,14 @@ func FilterEscape(_ *State, val value.Value, _ []value.Value, _ map[string]value
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("string", FilterString)
 //
 // Template usage:
 //
 //	{{ 42|string }}
 //	  -> "42"
-func FilterString(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterString(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if val.Kind() == value.KindString {
 		return val, nil
 	}
@@ -312,7 +501,7 @@ func FilterString(_ *State, val value.Value, _ []value.Value, _ map[string]value
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("bool", FilterBool)
 //
 // Template usage:
@@ -321,7 +510,7 @@ func FilterString(_ *State, val value.Value, _ []value.Value, _ map[string]value
 //	  -> true
 //	{{ ""|bool }}
 //	  -> false
-func FilterBool(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterBool(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	return value.FromBool(val.IsTrue()), nil
 }
 
@@ -336,7 +525,7 @@ func FilterBool(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("split", FilterSplit)
 //
 // Template usage:
@@ -347,7 +536,7 @@ func FilterBool(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 //	  -> ["a", "b", "c"]
 //	{{ "a,b,c,d"|split(",", 2) }}
 //	  -> ["a", "b", "c,d"]
-func FilterSplit(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterSplit(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	s, ok := val.AsString()
 	if !ok {
 		return value.FromSlice(nil), nil
@@ -430,14 +619,14 @@ func splitWhitespaceN(s string, n int) []string {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("lines", FilterLines)
 //
 // Template usage:
 //
 //	{{ "foo\nbar\nbaz"|lines }}
 //	  -> ["foo", "bar", "baz"]
-func FilterLines(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterLines(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	s, ok := val.AsString()
 	if !ok {
 		return value.FromSlice(nil), nil
@@ -463,7 +652,7 @@ func FilterLines(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("length", FilterLength)
 //
 // Template usage:
@@ -471,7 +660,7 @@ func FilterLines(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 //	<p>{{ users|length }} users found</p>
 //	{{ "hello"|length }}
 //	  -> 5
-func FilterLength(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterLength(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if l, ok := val.Len(); ok {
 		return value.FromInt(int64(l)), nil
 	}
@@ -484,7 +673,7 @@ func FilterLength(_ *State, val value.Value, _ []value.Value, _ map[string]value
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("first", FilterFirst)
 //
 // Template usage:
@@ -493,7 +682,7 @@ func FilterLength(_ *State, val value.Value, _ []value.Value, _ map[string]value
 //	  <dt>primary email
 //	  <dd>{{ user.email_addresses|first|default('no email') }}
 //	</dl>
-func FilterFirst(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterFirst(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if len(items) > 0 {
 		return items[0], nil
@@ -507,7 +696,7 @@ func FilterFirst(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("last", FilterLast)
 //
 // Template usage:
@@ -521,7 +710,7 @@ func FilterFirst(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 //	    <dd>{{ update.status }}
 //	  </dl>
 //	{% endwith %}
-func FilterLast(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterLast(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if len(items) > 0 {
 		return items[len(items)-1], nil
@@ -536,7 +725,7 @@ func FilterLast(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("reverse", FilterReverse)
 //
 // Template usage:
@@ -546,7 +735,7 @@ func FilterLast(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 //	{% endfor %}
 //	{{ "hello"|reverse }}
 //	  -> "olleh"
-func FilterReverse(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterReverse(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		runes := []rune(s)
 		for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
@@ -576,7 +765,7 @@ func FilterReverse(_ *State, val value.Value, _ []value.Value, _ map[string]valu
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("sort", FilterSort)
 //
 // Template usage:
@@ -586,7 +775,7 @@ func FilterReverse(_ *State, val value.Value, _ []value.Value, _ map[string]valu
 //	{{ users|sort(attribute="age") }}
 //	{{ users|sort(attribute="age", reverse=true) }}
 //	{{ cities|sort(attribute="name, state") }}
-func FilterSort(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterSort(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -687,7 +876,7 @@ func parseInt(s string) (int64, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("join", FilterJoin)
 //
 // Template usage:
@@ -695,7 +884,7 @@ func parseInt(s string) (int64, error) {
 //	{{ ["a", "b", "c"]|join(", ") }}
 //	  -> "a, b, c"
 //	{{ items|join }}
-func FilterJoin(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterJoin(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -721,7 +910,7 @@ func FilterJoin(_ *State, val value.Value, args []value.Value, _ map[string]valu
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("list", FilterList)
 //
 // Template usage:
@@ -730,7 +919,7 @@ func FilterJoin(_ *State, val value.Value, args []value.Value, _ map[string]valu
 //	  -> ["a", "b", "c"]
 //	{{ range(5)|list }}
 //	  -> [0, 1, 2, 3, 4]
-func FilterList(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterList(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items != nil {
 		return value.FromSlice(items), nil
@@ -749,7 +938,7 @@ func FilterList(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("unique", FilterUnique)
 //
 // Template usage:
@@ -757,7 +946,7 @@ func FilterList(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 //	{{ ["a", "b", "a", "c"]|unique }}
 //	  -> ["a", "b", "c"]
 //	{{ users|unique(attribute="city") }}
-func FilterUnique(_ *State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterUnique(_ State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -797,14 +986,14 @@ func FilterUnique(_ *State, val value.Value, _ []value.Value, kwargs map[string]
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("min", FilterMin)
 //
 // Template usage:
 //
 //	{{ [1, 2, 3, 4]|min }}
 //	  -> 1
-func FilterMin(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterMin(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil || len(items) == 0 {
 		return value.Undefined(), nil
@@ -825,14 +1014,14 @@ func FilterMin(_ *State, val value.Value, _ []value.Value, _ map[string]value.Va
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("max", FilterMax)
 //
 // Template usage:
 //
 //	{{ [1, 2, 3, 4]|max }}
 //	  -> 4
-func FilterMax(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterMax(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil || len(items) == 0 {
 		return value.Undefined(), nil
@@ -853,7 +1042,7 @@ func FilterMax(_ *State, val value.Value, _ []value.Value, _ map[string]value.Va
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("sum", FilterSum)
 //
 // Template usage:
@@ -862,7 +1051,7 @@ func FilterMax(_ *State, val value.Value, _ []value.Value, _ map[string]value.Va
 //	  -> 6
 //	{{ values|sum(100) }}
 //	  -> sum of values + 100
-func FilterSum(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterSum(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return value.FromInt(0), nil
@@ -892,7 +1081,7 @@ func FilterSum(_ *State, val value.Value, args []value.Value, _ map[string]value
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("batch", FilterBatch)
 //
 // Template usage:
@@ -909,7 +1098,7 @@ func FilterSum(_ *State, val value.Value, args []value.Value, _ map[string]value
 //
 // Keyword arguments:
 //   - fill_with: value to use for filling incomplete batches
-func FilterBatch(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterBatch(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -958,7 +1147,7 @@ func FilterBatch(_ *State, val value.Value, args []value.Value, kwargs map[strin
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("slice", FilterSlice)
 //
 // Template usage:
@@ -972,10 +1161,10 @@ func FilterBatch(_ *State, val value.Value, args []value.Value, kwargs map[strin
 //	  </ul>
 //	{% endfor %}
 //	</div>
-func FilterSlice(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterSlice(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
-		return value.Undefined(), NewError(ErrInvalidOperation, "cannot slice non-iterable")
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot slice non-iterable")
 	}
 
 	sliceCount := 1
@@ -1031,7 +1220,7 @@ func FilterSlice(_ *State, val value.Value, args []value.Value, _ map[string]val
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("map", FilterMap)
 //
 // Template usage (attribute mapping):
@@ -1046,7 +1235,7 @@ func FilterSlice(_ *State, val value.Value, args []value.Value, _ map[string]val
 // Keyword arguments:
 //   - attribute: name or dotted path of attribute to extract
 //   - default: value to use when attribute is missing
-func FilterMap(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterMap(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -1091,7 +1280,7 @@ func FilterMap(state *State, val value.Value, args []value.Value, kwargs map[str
 			}
 		} else if filterName != "" {
 			// Filter mapping
-			filterFn, ok := state.env.getFilter(filterName)
+			filterFn, ok := state.GetFilter(filterName)
 			if !ok {
 				return val, fmt.Errorf("unknown filter: %s", filterName)
 			}
@@ -1134,7 +1323,7 @@ func normalizeTestName(name string) string {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("select", FilterSelect)
 //
 // Template usage:
@@ -1143,7 +1332,7 @@ func normalizeTestName(name string) string {
 //	  -> [1, 3]
 //	{{ [false, null, 42]|select }}
 //	  -> [42]
-func FilterSelect(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterSelect(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -1161,7 +1350,7 @@ func FilterSelect(state *State, val value.Value, args []value.Value, kwargs map[
 	for _, item := range items {
 		var keep bool
 		if testName != "" {
-			testFn, ok := state.env.getTest(testName)
+			testFn, ok := state.GetTest(testName)
 			if !ok {
 				return val, fmt.Errorf("unknown test: %s", testName)
 			}
@@ -1187,14 +1376,14 @@ func FilterSelect(state *State, val value.Value, args []value.Value, kwargs map[
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("reject", FilterReject)
 //
 // Template usage:
 //
 //	{{ [1, 2, 3, 4]|reject("odd") }}
 //	  -> [2, 4]
-func FilterReject(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterReject(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -1212,7 +1401,7 @@ func FilterReject(state *State, val value.Value, args []value.Value, kwargs map[
 	for _, item := range items {
 		var reject bool
 		if testName != "" {
-			testFn, ok := state.env.getTest(testName)
+			testFn, ok := state.GetTest(testName)
 			if !ok {
 				return val, fmt.Errorf("unknown test: %s", testName)
 			}
@@ -1238,7 +1427,7 @@ func FilterReject(state *State, val value.Value, args []value.Value, kwargs map[
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("selectattr", FilterSelectAttr)
 //
 // Template usage:
@@ -1247,7 +1436,7 @@ func FilterReject(state *State, val value.Value, args []value.Value, kwargs map[
 //	  -> all users where x.is_active is true
 //	{{ users|selectattr("id", "even") }}
 //	  -> users with even IDs
-func FilterSelectAttr(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterSelectAttr(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -1271,7 +1460,7 @@ func FilterSelectAttr(state *State, val value.Value, args []value.Value, kwargs 
 		attr := item.GetAttr(attrName)
 		var keep bool
 		if testName != "" {
-			testFn, ok := state.env.getTest(testName)
+			testFn, ok := state.GetTest(testName)
 			if !ok {
 				return val, fmt.Errorf("unknown test: %s", testName)
 			}
@@ -1297,7 +1486,7 @@ func FilterSelectAttr(state *State, val value.Value, args []value.Value, kwargs 
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("rejectattr", FilterRejectAttr)
 //
 // Template usage:
@@ -1306,7 +1495,7 @@ func FilterSelectAttr(state *State, val value.Value, args []value.Value, kwargs 
 //	  -> all users where x.is_active is false
 //	{{ users|rejectattr("id", "even") }}
 //	  -> users with odd IDs
-func FilterRejectAttr(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterRejectAttr(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -1330,7 +1519,7 @@ func FilterRejectAttr(state *State, val value.Value, args []value.Value, kwargs 
 		attr := item.GetAttr(attrName)
 		var reject bool
 		if testName != "" {
-			testFn, ok := state.env.getTest(testName)
+			testFn, ok := state.GetTest(testName)
 			if !ok {
 				return val, fmt.Errorf("unknown test: %s", testName)
 			}
@@ -1357,7 +1546,7 @@ func FilterRejectAttr(state *State, val value.Value, args []value.Value, kwargs 
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("groupby", FilterGroupBy)
 //
 // Template usage:
@@ -1374,7 +1563,7 @@ func FilterRejectAttr(state *State, val value.Value, args []value.Value, kwargs 
 //   - attribute: name or dotted path of attribute to group by
 //   - default: value to use when attribute is missing
 //   - case_sensitive: if true, sort in a case-sensitive manner (default: false)
-func FilterGroupBy(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterGroupBy(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
@@ -1570,7 +1759,7 @@ func (g *groupObject) String() string {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("chain", FilterChain)
 //
 // Template usage:
@@ -1579,7 +1768,7 @@ func (g *groupObject) String() string {
 //	{% for user in shard0|chain(shard1, shard2) %}
 //	  {{ user.name }}
 //	{% endfor %}
-func FilterChain(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterChain(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	allValues := append([]value.Value{val}, args...)
 
 	allMaps := true
@@ -1663,7 +1852,7 @@ func (c *chainObject) GetItem(key value.Value) value.Value {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("zip", FilterZip)
 //
 // Template usage:
@@ -1672,7 +1861,7 @@ func (c *chainObject) GetItem(key value.Value) value.Value {
 //	  -> [(1, "a"), (2, "b"), (3, "c")]
 //	{{ [1, 2]|zip(["a", "b", "c"], ["x", "y", "z"]) }}
 //	  -> [(1, "a", "x"), (2, "b", "y")]
-func FilterZip(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterZip(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	// Collect all sequences
 	seqs := [][]value.Value{val.Iter()}
 	for _, arg := range args {
@@ -1711,7 +1900,7 @@ func FilterZip(_ *State, val value.Value, args []value.Value, _ map[string]value
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("abs", FilterAbs)
 //
 // Template usage:
@@ -1720,7 +1909,7 @@ func FilterZip(_ *State, val value.Value, args []value.Value, _ map[string]value
 //	  -> 42
 //	{{ 3.14|abs }}
 //	  -> 3.14
-func FilterAbs(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterAbs(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if i, ok := val.AsInt(); ok {
 		if i < 0 {
 			return value.FromInt(-i), nil
@@ -1744,7 +1933,7 @@ func FilterAbs(_ *State, val value.Value, _ []value.Value, _ map[string]value.Va
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("int", FilterInt)
 //
 // Template usage:
@@ -1756,7 +1945,7 @@ func FilterAbs(_ *State, val value.Value, _ []value.Value, _ map[string]value.Va
 //
 // Keyword arguments:
 //   - default: value to return if conversion fails
-func FilterInt(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterInt(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	defaultVal := value.FromInt(0)
 	if len(args) > 0 {
 		defaultVal = args[0]
@@ -1795,7 +1984,7 @@ func FilterInt(_ *State, val value.Value, args []value.Value, kwargs map[string]
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("float", FilterFloat)
 //
 // Template usage:
@@ -1807,7 +1996,7 @@ func FilterInt(_ *State, val value.Value, args []value.Value, kwargs map[string]
 //
 // Keyword arguments:
 //   - default: value to return if conversion fails
-func FilterFloat(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterFloat(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	defaultVal := value.FromFloat(0.0)
 	if len(args) > 0 {
 		defaultVal = args[0]
@@ -1843,7 +2032,7 @@ func FilterFloat(_ *State, val value.Value, args []value.Value, kwargs map[strin
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("round", FilterRound)
 //
 // Template usage:
@@ -1858,7 +2047,7 @@ func FilterFloat(_ *State, val value.Value, args []value.Value, kwargs map[strin
 // Keyword arguments:
 //   - precision: number of decimal places (default: 0)
 //   - method: rounding method - "common", "floor", or "ceil" (default: "common")
-func FilterRound(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	f, ok := val.AsFloat()
 	if !ok {
 		return val, nil
@@ -1915,7 +2104,7 @@ func FilterRound(_ *State, val value.Value, args []value.Value, kwargs map[strin
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("items", FilterItems)
 //
 // Template usage:
@@ -1926,7 +2115,7 @@ func FilterRound(_ *State, val value.Value, args []value.Value, kwargs map[strin
 //	  <dd>{{ value }}
 //	{% endfor %}
 //	</dl>
-func FilterItems(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterItems(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if m, ok := val.AsMap(); ok {
 		keys := make([]string, 0, len(m))
 		for k := range m {
@@ -1952,13 +2141,13 @@ func FilterItems(_ *State, val value.Value, _ []value.Value, _ map[string]value.
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("keys", FilterKeys)
 //
 // Template usage:
 //
 //	{{ my_dict|keys }}
-func FilterKeys(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterKeys(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if m, ok := val.AsMap(); ok {
 		keys := make([]string, 0, len(m))
 		for k := range m {
@@ -1981,13 +2170,13 @@ func FilterKeys(_ *State, val value.Value, _ []value.Value, _ map[string]value.V
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("values", FilterValues)
 //
 // Template usage:
 //
 //	{{ my_dict|values }}
-func FilterValues(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterValues(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if m, ok := val.AsMap(); ok {
 		keys := make([]string, 0, len(m))
 		for k := range m {
@@ -2010,7 +2199,7 @@ func FilterValues(_ *State, val value.Value, _ []value.Value, _ map[string]value
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("dictsort", FilterDictSort)
 //
 // Template usage:
@@ -2023,7 +2212,7 @@ func FilterValues(_ *State, val value.Value, _ []value.Value, _ map[string]value
 //   - by: set to "value" to sort by value instead of key (default: "key")
 //   - reverse: set to true to sort in descending order
 //   - case_sensitive: set to true for case-sensitive sorting (default: false)
-func FilterDictSort(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterDictSort(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	if m, ok := val.AsMap(); ok {
 		keys := make([]string, 0, len(m))
 		for k := range m {
@@ -2116,14 +2305,14 @@ func FilterDictSort(_ *State, val value.Value, args []value.Value, kwargs map[st
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("attr", FilterAttr)
 //
 // Template usage:
 //
 //	{{ value|attr("key") }}
 //	  -> same as value["key"] or value.key
-func FilterAttr(_ *State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterAttr(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if len(args) < 1 {
 		return value.Undefined(), fmt.Errorf("attr filter requires attribute name")
 	}
@@ -2139,7 +2328,7 @@ func FilterAttr(_ *State, val value.Value, args []value.Value, _ map[string]valu
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("indent", FilterIndent)
 //
 // Template usage:
@@ -2153,7 +2342,7 @@ func FilterAttr(_ *State, val value.Value, args []value.Value, _ map[string]valu
 //   - width: number of spaces to indent (default: 4)
 //   - first: whether to indent the first line (default: false)
 //   - blank: whether to indent blank lines (default: false)
-func FilterIndent(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterIndent(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	s, ok := val.AsString()
 	if !ok {
 		return val, nil
@@ -2216,13 +2405,13 @@ func FilterIndent(_ *State, val value.Value, args []value.Value, kwargs map[stri
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("pprint", FilterPprint)
 //
 // Template usage:
 //
 //	<pre>{{ complex_object|pprint }}</pre>
-func FilterPprint(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterPprint(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	return value.FromString(pprintValue(val, 0)), nil
 }
 
@@ -2277,7 +2466,7 @@ func pprintValue(val value.Value, indent int) string {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("tojson", FilterTojson)
 //
 // Template usage:
@@ -2290,7 +2479,7 @@ func pprintValue(val value.Value, indent int) string {
 //
 // Keyword arguments:
 //   - indent: true for 2-space indent, or integer for custom indent
-func FilterTojson(_ *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterTojson(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	// Convert value to Go native type for JSON serialization
 	native := valueToNative(val)
 
@@ -2387,7 +2576,7 @@ func urlencodeString(input string) string {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddFilter("urlencode", FilterUrlencode)
 //
 // Template usage:
@@ -2395,7 +2584,7 @@ func urlencodeString(input string) string {
 //	<a href="/search?{{ {"q": "my search", "lang": "en"}|urlencode }}">
 //	{{ "hello world"|urlencode }}
 //	  -> "hello%20world"
-func FilterUrlencode(_ *State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterUrlencode(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	// Check if it's a map (dict) - encode as query string
 	if m, ok := val.AsMap(); ok {
 		var parts []string

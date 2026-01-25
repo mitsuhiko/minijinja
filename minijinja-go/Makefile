@@ -11,7 +11,7 @@ summary:
 	@echo "=== MiniJinja-Go Test Summary ==="
 	@echo ""
 	@echo "Lexer tests:"
-	@go test -v ./lexer/... 2>&1 | grep -E '^\s+--- ' | sort | uniq -c
+	@go test -v ./internal/lexer/... 2>&1 | grep -E '^\s+--- ' | sort | uniq -c
 	@echo ""
 	@echo "Skip list entries:"
 	@grep -v '^#' skiplist.txt | grep -v '^$$' | wc -l | xargs echo "  "

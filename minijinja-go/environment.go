@@ -1,11 +1,15 @@
 package minijinja
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"strings"
 	"sync"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/lexer"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/parser"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/filters"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/parser"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
@@ -13,16 +17,89 @@ import (
 //
 // This configures what kind of automatic escaping should happen for a template.
 // The default behavior is to look at the file extension to determine the escaping.
-type AutoEscape int
+type AutoEscape struct {
+	kind autoEscapeKind
+	name string
+}
+
+// autoEscapeKind identifies the auto-escape mode.
+type autoEscapeKind int
 
 const (
+	autoEscapeNone autoEscapeKind = iota
+	autoEscapeHTML
+	autoEscapeJSON
+	autoEscapeCustom
+)
+
+var (
 	// AutoEscapeNone disables automatic escaping.
-	AutoEscapeNone AutoEscape = iota
-	
+	AutoEscapeNone = AutoEscape{kind: autoEscapeNone}
+
 	// AutoEscapeHTML enables HTML/XML escaping.
 	// This escapes <, >, &, ", ', and / characters.
-	AutoEscapeHTML
+	AutoEscapeHTML = AutoEscape{kind: autoEscapeHTML}
+
+	// AutoEscapeJSON enables JSON escaping/serialization.
+	AutoEscapeJSON = AutoEscape{kind: autoEscapeJSON}
 )
+
+// AutoEscapeCustom enables a custom auto-escape mode by name.
+//
+// Custom auto-escape requires a custom formatter to render values.
+func AutoEscapeCustom(name string) AutoEscape {
+	return AutoEscape{kind: autoEscapeCustom, name: name}
+}
+
+// IsNone returns true if auto-escaping is disabled.
+func (a AutoEscape) IsNone() bool {
+	return a.kind == autoEscapeNone
+}
+
+// IsHTML returns true if HTML escaping is enabled.
+func (a AutoEscape) IsHTML() bool {
+	return a.kind == autoEscapeHTML
+}
+
+// IsJSON returns true if JSON escaping is enabled.
+func (a AutoEscape) IsJSON() bool {
+	return a.kind == autoEscapeJSON
+}
+
+// IsCustom returns true if a custom auto-escape mode is active.
+func (a AutoEscape) IsCustom() bool {
+	return a.kind == autoEscapeCustom
+}
+
+// CustomName returns the custom auto-escape name if set.
+func (a AutoEscape) CustomName() string {
+	return a.name
+}
+
+var ignoredAutoEscapeSuffixes = []string{".j2", ".jinja2", ".jinja"}
+
+func defaultAutoEscape(name string) AutoEscape {
+	for _, ext := range ignoredAutoEscapeSuffixes {
+		if strings.HasSuffix(name, ext) {
+			name = strings.TrimSuffix(name, ext)
+			break
+		}
+	}
+
+	dot := strings.LastIndex(name, ".")
+	if dot == -1 || dot+1 >= len(name) {
+		return AutoEscapeNone
+	}
+
+	switch name[dot+1:] {
+	case "html", "htm", "xml":
+		return AutoEscapeHTML
+	case "json", "json5", "js", "yaml", "yml":
+		return AutoEscapeJSON
+	default:
+		return AutoEscapeNone
+	}
+}
 
 // UndefinedBehavior determines how undefined variables are handled.
 //
@@ -34,11 +111,21 @@ const (
 	// They will render as empty strings and can be tested with the 'is defined' test.
 	// This is the default behavior and matches Jinja2.
 	UndefinedLenient UndefinedBehavior = iota
-	
+
 	// UndefinedStrict causes an error when undefined values are encountered.
 	// This is stricter than Jinja2 and helps catch template errors early.
 	UndefinedStrict
 )
+
+// FilterState provides access to filter/test lookup during rendering.
+//
+// This is implemented by *State and passed to filter and test functions.
+type FilterState = filters.State
+
+// TestState provides access to filter/test lookup during rendering.
+//
+// This is implemented by *State and passed to test functions.
+type TestState = filters.State
 
 // FilterFunc is the signature for filter functions.
 //
@@ -48,14 +135,14 @@ const (
 //
 // Example filter that converts to uppercase:
 //
-//	env.AddFilter("upper", func(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+//	env.AddFilter("upper", func(state FilterState, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 //	    s, err := val.AsString()
 //	    if err != nil {
 //	        return value.Undefined(), err
 //	    }
 //	    return value.FromString(strings.ToUpper(s)), nil
 //	})
-type FilterFunc func(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error)
+type FilterFunc = filters.FilterFunc
 
 // TestFunc is the signature for test functions.
 //
@@ -65,14 +152,14 @@ type FilterFunc func(state *State, val value.Value, args []value.Value, kwargs m
 //
 // Example test that checks if a number is even:
 //
-//	env.AddTest("even", func(state *State, val value.Value, args []value.Value) (bool, error) {
+//	env.AddTest("even", func(state TestState, val value.Value, args []value.Value) (bool, error) {
 //	    n, err := val.AsInt()
 //	    if err != nil {
 //	        return false, err
 //	    }
 //	    return n%2 == 0, nil
 //	})
-type TestFunc func(state *State, val value.Value, args []value.Value) (bool, error)
+type TestFunc = filters.TestFunc
 
 // FunctionFunc is the signature for global functions.
 //
@@ -121,13 +208,44 @@ type FunctionFunc func(state *State, args []value.Value, kwargs map[string]value
 //	})
 type LoaderFunc func(name string) (string, error)
 
+// PathJoinFunc is a function that joins template paths.
+//
+// This is used to resolve relative includes and extends. The first argument
+// is the template name being requested, and the second is the parent template
+// name that initiated the load.
+//
+// Example:
+//
+//	env.SetPathJoinCallback(func(name, parent string) string {
+//		parts := strings.Split(parent, "/")
+//		if len(parts) > 0 {
+//			parts = parts[:len(parts)-1]
+//		}
+//		for _, segment := range strings.Split(name, "/") {
+//			switch segment {
+//			case ".":
+//				continue
+//			case "..":
+//				if len(parts) > 0 {
+//					parts = parts[:len(parts)-1]
+//				}
+//			default:
+//				parts = append(parts, segment)
+//			}
+//		}
+//		return strings.Join(parts, "/")
+//	})
+type PathJoinFunc func(name, parent string) string
+
 // AutoEscapeFunc determines auto-escaping based on template name.
 //
 // This function is invoked when templates are loaded into the environment to determine
 // the default auto-escaping behavior. The function is invoked with the name of the
 // template and should return the appropriate AutoEscape setting.
 //
-// The default implementation enables HTML escaping for .html, .htm, and .xml files.
+// The default implementation enables HTML escaping for .html, .htm, and .xml files
+// and JSON escaping for .json, .json5, .js, .yaml, and .yml files. The
+// .j2/.jinja/.jinja2 suffixes are ignored when determining the mode.
 //
 // Example that enables escaping for SVG files:
 //
@@ -154,17 +272,22 @@ type AutoEscapeFunc func(name string) AutoEscape
 // - EmptyEnvironment creates a completely blank environment with no filters,
 // tests, globals, or default auto-escaping logic.
 type Environment struct {
-	templates      map[string]*compiledTemplate
-	templatesMu    sync.RWMutex
-	filters        map[string]FilterFunc
-	tests          map[string]TestFunc
-	globals        map[string]value.Value
-	functions      map[string]FunctionFunc
-	loader         LoaderFunc
-	autoEscapeFunc AutoEscapeFunc
-	syntaxConfig      lexer.SyntaxConfig
-	wsConfig          lexer.WhitespaceConfig
+	templates         map[string]*compiledTemplate
+	templatesMu       sync.RWMutex
+	filters           map[string]FilterFunc
+	tests             map[string]TestFunc
+	globals           map[string]value.Value
+	functions         map[string]FunctionFunc
+	loader            LoaderFunc
+	autoEscapeFunc    AutoEscapeFunc
+	pathJoinCallback  PathJoinFunc
+	syntaxConfig      syntax.SyntaxConfig
+	wsConfig          syntax.WhitespaceConfig
 	undefinedBehavior UndefinedBehavior
+	recursionLimit    int
+	debug             bool
+	formatter         FormatterFunc
+	fuel              *uint64
 }
 
 type compiledTemplate struct {
@@ -195,27 +318,17 @@ type compiledTemplate struct {
 //	// output: "Hello World!"
 func NewEnvironment() *Environment {
 	env := &Environment{
-		templates: make(map[string]*compiledTemplate),
-		filters:   make(map[string]FilterFunc),
-		tests:     make(map[string]TestFunc),
-		globals:   make(map[string]value.Value),
-		functions: make(map[string]FunctionFunc),
-		autoEscapeFunc: func(name string) AutoEscape {
-			// Default: escape HTML files
-			if len(name) > 5 && name[len(name)-5:] == ".html" {
-				return AutoEscapeHTML
-			}
-			if len(name) > 4 && name[len(name)-4:] == ".htm" {
-				return AutoEscapeHTML
-			}
-			if len(name) > 4 && name[len(name)-4:] == ".xml" {
-				return AutoEscapeHTML
-			}
-			return AutoEscapeNone
-		},
-		syntaxConfig:      lexer.DefaultSyntax(),
-		wsConfig:          lexer.DefaultWhitespace(),
+		templates:         make(map[string]*compiledTemplate),
+		filters:           make(map[string]FilterFunc),
+		tests:             make(map[string]TestFunc),
+		globals:           make(map[string]value.Value),
+		functions:         make(map[string]FunctionFunc),
+		autoEscapeFunc:    defaultAutoEscape,
+		syntaxConfig:      syntax.DefaultSyntax(),
+		wsConfig:          syntax.DefaultWhitespace(),
 		undefinedBehavior: UndefinedLenient,
+		recursionLimit:    maxRecursion,
+		fuel:              nil,
 	}
 
 	// Register default filters
@@ -250,9 +363,11 @@ func EmptyEnvironment() *Environment {
 		autoEscapeFunc: func(name string) AutoEscape {
 			return AutoEscapeNone
 		},
-		syntaxConfig:      lexer.DefaultSyntax(),
-		wsConfig:          lexer.DefaultWhitespace(),
+		syntaxConfig:      syntax.DefaultSyntax(),
+		wsConfig:          syntax.DefaultWhitespace(),
 		undefinedBehavior: UndefinedLenient,
+		recursionLimit:    maxRecursion,
+		fuel:              nil,
 	}
 }
 
@@ -323,7 +438,10 @@ func (e *Environment) GetTemplate(name string) (*Template, error) {
 	if e.loader != nil {
 		source, err := e.loader(name)
 		if err != nil {
-			return nil, NewError(ErrTemplateNotFound, name)
+			if templErr, ok := err.(*Error); ok && templErr.Kind == ErrTemplateNotFound {
+				return nil, templErr
+			}
+			return nil, fmt.Errorf("loader error for %q: %w", name, err)
 		}
 		if err := e.AddTemplate(name, source); err != nil {
 			return nil, err
@@ -414,6 +532,38 @@ func (e *Environment) SetLoader(loader LoaderFunc) {
 	e.loader = loader
 }
 
+// RemoveTemplate removes a template by name from the environment cache.
+func (e *Environment) RemoveTemplate(name string) {
+	e.templatesMu.Lock()
+	delete(e.templates, name)
+	e.templatesMu.Unlock()
+}
+
+// ClearTemplates removes all templates from the environment cache.
+//
+// This is useful with loaders to force reloading templates.
+func (e *Environment) ClearTemplates() {
+	e.templatesMu.Lock()
+	e.templates = make(map[string]*compiledTemplate)
+	e.templatesMu.Unlock()
+}
+
+// Templates returns the currently loaded templates by name.
+//
+// The returned map is a snapshot copy of the current template cache.
+func (e *Environment) Templates() map[string]*Template {
+	e.templatesMu.RLock()
+	result := make(map[string]*Template, len(e.templates))
+	for name, compiled := range e.templates {
+		result[name] = &Template{
+			env:      e,
+			compiled: compiled,
+		}
+	}
+	e.templatesMu.RUnlock()
+	return result
+}
+
 // AddFilter registers a filter function.
 //
 // Filter functions are functions that can be applied to values in templates
@@ -423,7 +573,7 @@ func (e *Environment) SetLoader(loader LoaderFunc) {
 // Example:
 //
 //	env := NewEnvironment()
-//	env.AddFilter("shout", func(state *State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+//	env.AddFilter("shout", func(state FilterState, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 //	    s, err := val.AsString()
 //	    if err != nil {
 //	        return value.Undefined(), err
@@ -445,7 +595,7 @@ func (e *Environment) AddFilter(name string, f FilterFunc) {
 // Example:
 //
 //	env := NewEnvironment()
-//	env.AddTest("positive", func(state *State, val value.Value, args []value.Value) (bool, error) {
+//	env.AddTest("positive", func(state TestState, val value.Value, args []value.Value) (bool, error) {
 //	    n, err := val.AsInt()
 //	    if err != nil {
 //	        return false, err
@@ -518,6 +668,13 @@ func (e *Environment) SetAutoEscapeFunc(f AutoEscapeFunc) {
 	e.autoEscapeFunc = f
 }
 
+// SetPathJoinCallback sets a callback to join template paths.
+//
+// This is used to implement relative template resolution for include/extends.
+func (e *Environment) SetPathJoinCallback(f PathJoinFunc) {
+	e.pathJoinCallback = f
+}
+
 // SetSyntax sets the syntax configuration for the environment.
 //
 // This setting is used whenever a template is loaded into the environment.
@@ -528,7 +685,7 @@ func (e *Environment) SetAutoEscapeFunc(f AutoEscapeFunc) {
 // Example:
 //
 //	env := NewEnvironment()
-//	syntax := lexer.SyntaxConfig{
+//	syntax := syntax.SyntaxConfig{
 //	    BlockStart:    "<%",
 //	    BlockEnd:      "%>",
 //	    VariableStart: "<<",
@@ -537,7 +694,7 @@ func (e *Environment) SetAutoEscapeFunc(f AutoEscapeFunc) {
 //	    CommentEnd:    "#>",
 //	}
 //	env.SetSyntax(syntax)
-func (e *Environment) SetSyntax(config lexer.SyntaxConfig) {
+func (e *Environment) SetSyntax(config syntax.SyntaxConfig) {
 	e.syntaxConfig = config
 }
 
@@ -551,13 +708,13 @@ func (e *Environment) SetSyntax(config lexer.SyntaxConfig) {
 // Example:
 //
 //	env := NewEnvironment()
-//	ws := lexer.WhitespaceConfig{
+//	ws := syntax.WhitespaceConfig{
 //	    KeepTrailingNewline: true,
 //	    TrimBlocks:          true,
 //	    LStripBlocks:        true,
 //	}
 //	env.SetWhitespace(ws)
-func (e *Environment) SetWhitespace(config lexer.WhitespaceConfig) {
+func (e *Environment) SetWhitespace(config syntax.WhitespaceConfig) {
 	e.wsConfig = config
 }
 
@@ -574,6 +731,48 @@ func (e *Environment) SetWhitespace(config lexer.WhitespaceConfig) {
 //	// Now any undefined variable will cause an error
 func (e *Environment) SetUndefinedBehavior(behavior UndefinedBehavior) {
 	e.undefinedBehavior = behavior
+}
+
+// SetRecursionLimit sets the maximum recursion depth for template evaluation.
+//
+// The limit is capped at the default maximum of 500 to avoid stack overflows.
+func (e *Environment) SetRecursionLimit(limit int) {
+	if limit < 0 {
+		limit = 0
+	}
+	if limit > maxRecursion {
+		limit = maxRecursion
+	}
+	e.recursionLimit = limit
+}
+
+// SetDebug enables or disables debug mode.
+//
+// When enabled, errors include template name and source information to aid debugging.
+func (e *Environment) SetDebug(enabled bool) {
+	e.debug = enabled
+}
+
+// SetFuel sets the optional fuel limit for template evaluation.
+//
+// When set to a non-nil value, each evaluation step consumes fuel and rendering
+// fails with ErrOutOfFuel once the budget is exhausted. Pass nil to disable
+// fuel tracking.
+func (e *Environment) SetFuel(fuel *uint64) {
+	if fuel == nil {
+		e.fuel = nil
+		return
+	}
+	val := *fuel
+	e.fuel = &val
+}
+
+// Fuel returns the configured fuel limit and whether it is enabled.
+func (e *Environment) Fuel() (uint64, bool) {
+	if e.fuel == nil {
+		return 0, false
+	}
+	return *e.fuel, true
 }
 
 // getFilter returns a filter by name.
@@ -600,12 +799,19 @@ func (e *Environment) getGlobal(name string) (value.Value, bool) {
 	return v, ok
 }
 
+func (e *Environment) joinTemplatePath(name, parent string) string {
+	if e.pathJoinCallback != nil {
+		return e.pathJoinCallback(name, parent)
+	}
+	return name
+}
+
 // Template represents a compiled template.
 //
 // Templates are created by loading them from the environment using GetTemplate,
 // or by parsing strings with TemplateFromString or TemplateFromNamedString.
-// Once you have a template, you can render it with a context using the Render
-// or RenderValue methods.
+// Once you have a template, you can render it with a context using Render
+// or RenderCtx.
 type Template struct {
 	env      *Environment
 	compiled *compiledTemplate
@@ -634,7 +840,8 @@ func (t *Template) Source() string {
 // to a template value.
 //
 // This method returns the rendered output as a string, or an error if rendering
-// failed.
+// failed. It uses context.Background() internally. For cancellation support
+// or passing request-scoped values, use RenderCtx instead.
 //
 // Example:
 //
@@ -646,26 +853,21 @@ func (t *Template) Source() string {
 //	}
 //	fmt.Println(output) // Output: Hello World!
 func (t *Template) Render(ctx any) (string, error) {
-	return t.RenderValue(value.FromAny(ctx))
+	return t.RenderCtx(context.Background(), ctx)
 }
 
-// RenderValue renders the template with a Value context.
+// RenderCtx renders the template with the given context and a context.Context.
 //
-// This is like Render but takes a value.Value directly instead of converting
-// from a Go value. This can be more efficient if you already have a Value
-// or need more control over the conversion process.
+// The context.Context can be used for cancellation, timeouts, and passing
+// request-scoped values to custom filters and functions via State.Context().
 //
 // Example:
 //
-//	env := NewEnvironment()
-//	tmpl, _ := env.TemplateFromString("Hello {{ name }}!")
-//	ctx := value.FromMap(map[string]value.Value{
-//	    "name": value.FromString("World"),
-//	})
-//	output, _ := tmpl.RenderValue(ctx)
-//	fmt.Println(output) // Output: Hello World!
-func (t *Template) RenderValue(ctx value.Value) (string, error) {
-	state := newState(t.env, t.compiled.name, t.compiled.source, ctx)
+//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+//	defer cancel()
+//	output, err := tmpl.RenderCtx(ctx, map[string]any{"name": "World"})
+func (t *Template) RenderCtx(goCtx context.Context, ctx any) (string, error) {
+	state := newState(goCtx, t.env, t.compiled.name, t.compiled.source, value.FromAny(ctx))
 	return state.eval(t.compiled.ast)
 }
 
@@ -690,25 +892,111 @@ func (t *Template) RenderValue(ctx value.Value) (string, error) {
 //	escaped := EscapeHTML("<script>alert('XSS')</script>")
 //	// Result: &lt;script&gt;alert(&#x27;XSS&#x27;)&lt;&#x2f;script&gt;
 func EscapeHTML(s string) string {
-	var b strings.Builder
-	b.Grow(len(s))
-	for _, r := range s {
-		switch r {
-		case '<':
-			b.WriteString("&lt;")
-		case '>':
-			b.WriteString("&gt;")
-		case '&':
-			b.WriteString("&amp;")
-		case '"':
-			b.WriteString("&quot;")
-		case '\'':
-			b.WriteString("&#x27;")
-		case '/':
-			b.WriteString("&#x2f;")
-		default:
-			b.WriteRune(r)
-		}
+	return filters.EscapeHTML(s)
+}
+
+// FormatterFunc is the signature for custom output formatters.
+//
+// A formatter controls how values are converted to strings when output
+// in templates. It receives the state, the value to format, and an escape
+// function that should be called if the value needs escaping.
+//
+// Example that treats None as empty string:
+//
+//	env.SetFormatter(func(state *State, val value.Value, escape func(string) string) string {
+//	    if val.IsNone() {
+//	        return ""
+//	    }
+//	    s := val.String()
+//	    if !val.IsSafe() {
+//	        s = escape(s)
+//	    }
+//	    return s
+//	})
+type FormatterFunc func(state *State, val value.Value, escape func(string) string) string
+
+// SetFormatter sets a custom output formatter.
+//
+// The formatter is called whenever a value is output in a template (i.e., {{ value }}).
+// This allows customizing how values are converted to strings and escaped.
+//
+// Example that treats None as undefined (renders as empty):
+//
+//	env.SetFormatter(func(state *State, val value.Value, escape func(string) string) string {
+//	    if val.IsNone() {
+//	        return ""  // Treat None like undefined
+//	    }
+//	    s := val.String()
+//	    if !val.IsSafe() {
+//	        s = escape(s)
+//	    }
+//	    return s
+//	})
+func (e *Environment) SetFormatter(f FormatterFunc) {
+	e.formatter = f
+}
+
+// EvalToState evaluates the template and returns its state.
+//
+// This is useful when you need to:
+//   - Render specific blocks of a template
+//   - Call macros programmatically
+//   - Inspect template exports
+//
+// The template is evaluated but the output is discarded. You can then
+// use the returned State to render blocks, call macros, etc.
+//
+// Example:
+//
+//	env := NewEnvironment()
+//	env.AddTemplate("page.html", `
+//	    {% block title %}Default Title{% endblock %}
+//	    {% block body %}Default Body{% endblock %}
+//	    {% macro greet(name) %}Hello {{ name }}!{% endmacro %}
+//	    {% set version = "1.0" %}
+//	`)
+//	tmpl, _ := env.GetTemplate("page.html")
+//	state, _ := tmpl.EvalToState(map[string]any{"user": "John"})
+//
+//	title, _ := state.RenderBlock("title")
+//	greeting, _ := state.CallMacro("greet", value.FromString("World"))
+//	exports := state.Exports()
+func (t *Template) EvalToState(ctx any) (*State, error) {
+	return t.EvalToStateCtx(context.Background(), ctx)
+}
+
+// EvalToStateCtx evaluates the template with a context.Context and returns its state.
+func (t *Template) EvalToStateCtx(goCtx context.Context, ctx any) (*State, error) {
+	state := newState(goCtx, t.env, t.compiled.name, t.compiled.source, value.FromAny(ctx))
+
+	// Evaluate the template (this populates blocks, macros, and variables)
+	_, err := state.eval(t.compiled.ast)
+	if err != nil {
+		return nil, err
 	}
-	return b.String()
+
+	return state, nil
+}
+
+// RenderToWrite renders the template and writes the output to the given writer.
+//
+// This is useful for streaming output directly to a response writer or file
+// without buffering the entire output in memory.
+//
+// Example:
+//
+//	tmpl, _ := env.GetTemplate("large_report.html")
+//	file, _ := os.Create("report.html")
+//	defer file.Close()
+//	err := tmpl.RenderToWrite(map[string]any{"data": largeData}, file)
+func (t *Template) RenderToWrite(ctx any, w io.Writer) error {
+	return t.RenderToWriteCtx(context.Background(), ctx, w)
+}
+
+// RenderToWriteCtx renders the template with a context.Context and writes to the given writer.
+func (t *Template) RenderToWriteCtx(goCtx context.Context, ctx any, w io.Writer) error {
+	state := newState(goCtx, t.env, t.compiled.name, t.compiled.source, value.FromAny(ctx))
+	state.out = ioStringWriter{w: w}
+	_, err := state.eval(t.compiled.ast)
+	return err
 }

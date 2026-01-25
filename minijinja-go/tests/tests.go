@@ -1,10 +1,13 @@
-package minijinja
+// Package tests provides MiniJinja's built-in tests.
+package tests
 
 import (
 	"fmt"
 	"strings"
 	"unicode"
 
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/filters"
+	mjerrors "github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/errors"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
@@ -14,7 +17,7 @@ import (
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("defined", TestDefined)
 //
 // Template usage:
@@ -22,7 +25,7 @@ import (
 //	{% if my_variable is defined %}
 //	  {{ my_variable }}
 //	{% endif %}
-func TestDefined(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestDefined(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	return !val.IsUndefined(), nil
 }
 
@@ -32,7 +35,7 @@ func TestDefined(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("undefined", TestUndefined)
 //
 // Template usage:
@@ -40,7 +43,7 @@ func TestDefined(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	{% if my_variable is undefined %}
 //	  Variable not set
 //	{% endif %}
-func TestUndefined(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestUndefined(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	return val.IsUndefined(), nil
 }
 
@@ -50,7 +53,7 @@ func TestUndefined(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("none", TestNone)
 //
 // Template usage:
@@ -58,7 +61,7 @@ func TestUndefined(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	{% if value is none %}
 //	  Value is null
 //	{% endif %}
-func TestNone(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestNone(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	return val.IsNone(), nil
 }
 
@@ -69,7 +72,7 @@ func TestNone(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("true", TestTrue)
 //
 // Template usage:
@@ -77,7 +80,7 @@ func TestNone(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	{% if value is true %}
 //	  Value is exactly true
 //	{% endif %}
-func TestTrue(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestTrue(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	if b, ok := val.AsBool(); ok {
 		return b, nil
 	}
@@ -90,7 +93,7 @@ func TestTrue(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("false", TestFalse)
 //
 // Template usage:
@@ -98,7 +101,7 @@ func TestTrue(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	{% if value is false %}
 //	  Value is exactly false
 //	{% endif %}
-func TestFalse(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestFalse(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	if b, ok := val.AsBool(); ok {
 		return !b, nil
 	}
@@ -111,7 +114,7 @@ func TestFalse(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("odd", TestOdd)
 //
 // Template usage:
@@ -124,9 +127,9 @@ func TestFalse(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	  -> true
 //	{{ 42 is odd }}
 //	  -> false
-func TestOdd(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestOdd(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) > 0 {
-		return false, NewError(ErrInvalidOperation, "odd test expects no arguments")
+		return false, mjerrors.NewError(mjerrors.ErrInvalidOperation, "odd test expects no arguments")
 	}
 	if i, ok := val.AsInt(); ok {
 		return i%2 != 0, nil
@@ -140,7 +143,7 @@ func TestOdd(_ *State, val value.Value, args []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("even", TestEven)
 //
 // Template usage:
@@ -155,9 +158,9 @@ func TestOdd(_ *State, val value.Value, args []value.Value) (bool, error) {
 //	  -> true
 //	{{ 41 is even }}
 //	  -> false
-func TestEven(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestEven(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) > 0 {
-		return false, NewError(ErrInvalidOperation, "even test expects no arguments")
+		return false, mjerrors.NewError(mjerrors.ErrInvalidOperation, "even test expects no arguments")
 	}
 	if i, ok := val.AsInt(); ok {
 		return i%2 == 0, nil
@@ -171,7 +174,7 @@ func TestEven(_ *State, val value.Value, args []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("divisibleby", TestDivisibleBy)
 //
 // Template usage:
@@ -184,7 +187,7 @@ func TestEven(_ *State, val value.Value, args []value.Value) (bool, error) {
 //	  -> true
 //	{{ 42 is divisibleby(5) }}
 //	  -> false
-func TestDivisibleBy(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestDivisibleBy(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, fmt.Errorf("divisibleby test requires argument")
 	}
@@ -205,7 +208,7 @@ func TestDivisibleBy(_ *State, val value.Value, args []value.Value) (bool, error
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("eq", TestEq)
 //
 // Template usage:
@@ -214,7 +217,7 @@ func TestDivisibleBy(_ *State, val value.Value, args []value.Value) (bool, error
 //	  -> true
 //	{{ [1, 2, 3]|select("==", 1) }}
 //	  -> [1]
-func TestEq(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestEq(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
@@ -230,7 +233,7 @@ func TestEq(_ *State, val value.Value, args []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("ne", TestNe)
 //
 // Template usage:
@@ -239,7 +242,7 @@ func TestEq(_ *State, val value.Value, args []value.Value) (bool, error) {
 //	  -> true
 //	{{ [1, 2, 3]|select("!=", 1) }}
 //	  -> [2, 3]
-func TestNe(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestNe(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
@@ -255,7 +258,7 @@ func TestNe(_ *State, val value.Value, args []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("lt", TestLt)
 //
 // Template usage:
@@ -264,7 +267,7 @@ func TestNe(_ *State, val value.Value, args []value.Value) (bool, error) {
 //	  -> true
 //	{{ [1, 2, 3]|select("<", 2) }}
 //	  -> [1]
-func TestLt(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestLt(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
@@ -283,7 +286,7 @@ func TestLt(_ *State, val value.Value, args []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("le", TestLe)
 //
 // Template usage:
@@ -292,7 +295,7 @@ func TestLt(_ *State, val value.Value, args []value.Value) (bool, error) {
 //	  -> true
 //	{{ [1, 2, 3]|select("<=", 2) }}
 //	  -> [1, 2]
-func TestLe(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestLe(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
@@ -311,7 +314,7 @@ func TestLe(_ *State, val value.Value, args []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("gt", TestGt)
 //
 // Template usage:
@@ -320,7 +323,7 @@ func TestLe(_ *State, val value.Value, args []value.Value) (bool, error) {
 //	  -> true
 //	{{ [1, 2, 3]|select(">", 2) }}
 //	  -> [3]
-func TestGt(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestGt(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
@@ -339,7 +342,7 @@ func TestGt(_ *State, val value.Value, args []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("ge", TestGe)
 //
 // Template usage:
@@ -348,7 +351,7 @@ func TestGt(_ *State, val value.Value, args []value.Value) (bool, error) {
 //	  -> true
 //	{{ [1, 2, 3]|select(">=", 2) }}
 //	  -> [2, 3]
-func TestGe(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestGe(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
@@ -365,7 +368,7 @@ func TestGe(_ *State, val value.Value, args []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("in", TestIn)
 //
 // Template usage:
@@ -374,7 +377,7 @@ func TestGe(_ *State, val value.Value, args []value.Value) (bool, error) {
 //	  -> true
 //	{{ [1, 2, 3]|select("in", [1, 2]) }}
 //	  -> [1, 2]
-func TestIn(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestIn(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
@@ -387,7 +390,7 @@ func TestIn(_ *State, val value.Value, args []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("string", TestString)
 //
 // Template usage:
@@ -396,7 +399,7 @@ func TestIn(_ *State, val value.Value, args []value.Value) (bool, error) {
 //	  -> true
 //	{{ 42 is string }}
 //	  -> false
-func TestString(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestString(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	return val.Kind() == value.KindString, nil
 }
 
@@ -406,7 +409,7 @@ func TestString(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("number", TestNumber)
 //
 // Template usage:
@@ -415,7 +418,7 @@ func TestString(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	  -> true
 //	{{ "42" is number }}
 //	  -> false
-func TestNumber(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestNumber(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	return val.Kind() == value.KindNumber, nil
 }
 
@@ -426,7 +429,7 @@ func TestNumber(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("integer", TestInteger)
 //
 // Template usage:
@@ -435,7 +438,7 @@ func TestNumber(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	  -> true
 //	{{ 42.0 is integer }}
 //	  -> false
-func TestInteger(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestInteger(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	_, ok := val.AsInt()
 	if !ok {
 		return false, nil
@@ -449,7 +452,7 @@ func TestInteger(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("float", TestFloat)
 //
 // Template usage:
@@ -458,7 +461,7 @@ func TestInteger(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	  -> true
 //	{{ 42 is float }}
 //	  -> false
-func TestFloat(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestFloat(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	return val.IsActualFloat(), nil
 }
 
@@ -469,7 +472,7 @@ func TestFloat(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("boolean", TestBoolean)
 //
 // Template usage:
@@ -478,7 +481,7 @@ func TestFloat(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	  -> true
 //	{{ 1 is boolean }}
 //	  -> false
-func TestBoolean(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestBoolean(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	return val.Kind() == value.KindBool, nil
 }
 
@@ -489,14 +492,14 @@ func TestBoolean(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("safe", TestSafe)
 //
 // Template usage:
 //
 //	{{ "<hello>"|escape is safe }}
 //	  -> true
-func TestSafe(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestSafe(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	return val.IsSafe(), nil
 }
 
@@ -507,7 +510,7 @@ func TestSafe(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("sameas", TestSameAs)
 //
 // Template usage:
@@ -516,7 +519,7 @@ func TestSafe(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	  -> false
 //	{{ false is sameas(false) }}
 //	  -> true
-func TestSameAs(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestSameAs(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
@@ -529,7 +532,7 @@ func TestSameAs(_ *State, val value.Value, args []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("lower", TestLower)
 //
 // Template usage:
@@ -538,7 +541,7 @@ func TestSameAs(_ *State, val value.Value, args []value.Value) (bool, error) {
 //	  -> true
 //	{{ "Foo" is lower }}
 //	  -> false
-func TestLower(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestLower(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	s, ok := val.AsString()
 	if !ok {
 		return false, nil
@@ -557,7 +560,7 @@ func TestLower(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("upper", TestUpper)
 //
 // Template usage:
@@ -566,7 +569,7 @@ func TestLower(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	  -> true
 //	{{ "Foo" is upper }}
 //	  -> false
-func TestUpper(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestUpper(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	s, ok := val.AsString()
 	if !ok {
 		return false, nil
@@ -585,7 +588,7 @@ func TestUpper(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("filter", TestFilter)
 //
 // Template usage:
@@ -593,12 +596,12 @@ func TestUpper(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	{% if "tojson" is filter %}
 //	  JSON serialization available
 //	{% endif %}
-func TestFilter(state *State, val value.Value, _ []value.Value) (bool, error) {
+func TestFilter(state filters.State, val value.Value, _ []value.Value) (bool, error) {
 	name, ok := val.AsString()
 	if !ok {
 		return false, nil
 	}
-	_, exists := state.env.getFilter(name)
+	_, exists := state.GetFilter(name)
 	return exists, nil
 }
 
@@ -608,7 +611,7 @@ func TestFilter(state *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("test", TestTest)
 //
 // Template usage:
@@ -616,12 +619,12 @@ func TestFilter(state *State, val value.Value, _ []value.Value) (bool, error) {
 //	{% if "greaterthan" is test %}
 //	  Comparison tests available
 //	{% endif %}
-func TestTest(state *State, val value.Value, _ []value.Value) (bool, error) {
+func TestTest(state filters.State, val value.Value, _ []value.Value) (bool, error) {
 	name, ok := val.AsString()
 	if !ok {
 		return false, nil
 	}
-	_, exists := state.env.getTest(name)
+	_, exists := state.GetTest(name)
 	return exists, nil
 }
 
@@ -631,7 +634,7 @@ func TestTest(state *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("sequence", TestSequence)
 //
 // Template usage:
@@ -640,7 +643,7 @@ func TestTest(state *State, val value.Value, _ []value.Value) (bool, error) {
 //	  -> true
 //	{{ 42 is sequence }}
 //	  -> false
-func TestSequence(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestSequence(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	return val.Kind() == value.KindSeq, nil
 }
 
@@ -650,7 +653,7 @@ func TestSequence(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("mapping", TestMapping)
 //
 // Template usage:
@@ -659,7 +662,7 @@ func TestSequence(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	  -> true
 //	{{ [1, 2, 3] is mapping }}
 //	  -> false
-func TestMapping(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestMapping(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	return val.Kind() == value.KindMap, nil
 }
 
@@ -669,7 +672,7 @@ func TestMapping(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("iterable", TestIterable)
 //
 // Template usage:
@@ -678,7 +681,7 @@ func TestMapping(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	  -> true
 //	{{ 42 is iterable }}
 //	  -> false
-func TestIterable(_ *State, val value.Value, _ []value.Value) (bool, error) {
+func TestIterable(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
 	return val.Iter() != nil, nil
 }
 
@@ -688,7 +691,7 @@ func TestIterable(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("startingwith", TestStartingWith)
 //
 // Template usage:
@@ -697,7 +700,7 @@ func TestIterable(_ *State, val value.Value, _ []value.Value) (bool, error) {
 //	  -> true
 //	{{ "foobar" is startingwith("bar") }}
 //	  -> false
-func TestStartingWith(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestStartingWith(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
@@ -715,7 +718,7 @@ func TestStartingWith(_ *State, val value.Value, args []value.Value) (bool, erro
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("endingwith", TestEndingWith)
 //
 // Template usage:
@@ -724,7 +727,7 @@ func TestStartingWith(_ *State, val value.Value, args []value.Value) (bool, erro
 //	  -> true
 //	{{ "foobar" is endingwith("foo") }}
 //	  -> false
-func TestEndingWith(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestEndingWith(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
@@ -743,7 +746,7 @@ func TestEndingWith(_ *State, val value.Value, args []value.Value) (bool, error)
 //
 // Example:
 //
-//	env := NewEnvironment()
+//	env := minijinja.NewEnvironment()
 //	env.AddTest("containing", TestContaining)
 //
 // Template usage:
@@ -752,7 +755,7 @@ func TestEndingWith(_ *State, val value.Value, args []value.Value) (bool, error)
 //	  -> true
 //	{{ [1, 2, 3] is containing(2) }}
 //	  -> true
-func TestContaining(_ *State, val value.Value, args []value.Value) (bool, error) {
+func TestContaining(_ filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}

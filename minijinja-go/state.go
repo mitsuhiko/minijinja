@@ -1,28 +1,392 @@
 package minijinja
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
+	"sync"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/parser"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/parser"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
 // State holds the evaluation state during template rendering.
+//
+// The State is passed to filters, tests, and functions to provide access
+// to the rendering context. It provides methods for looking up variables,
+// accessing the environment, and retrieving the context.Context.
+//
+// State is also returned by Template.EvalToState(), allowing you to
+// render individual blocks, call macros, and inspect template exports
+// after evaluation.
 type State struct {
-	env          *Environment
-	name         string
-	source       string
-	autoEscape   AutoEscape
-	scopes       []map[string]value.Value
-	blocks       map[string]*blockStack
-	macros       map[string]*macroDefinition
-	out          *strings.Builder
-	depth        int
-	currentBlock string                            // name of block currently being rendered
+	ctx               context.Context
+	env               *Environment
+	name              string
+	source            string
+	autoEscape        AutoEscape
+	scopes            []map[string]value.Value
+	blocks            map[string]*blockStack
+	macros            map[string]*macroDefinition
+	out               outputWriter
+	depth             int
+	currentBlock      string                            // name of block currently being rendered
 	loopRecurse       func(value.Value) (string, error) // for recursive loops
 	undefinedBehavior UndefinedBehavior
+	temps             *tempStore
+	fuelTracker       *fuelTracker
+	rootContext       value.Value
+}
+
+type outputWriter interface {
+	WriteString(string) (int, error)
+}
+
+type ioStringWriter struct {
+	w io.Writer
+}
+
+func (w ioStringWriter) WriteString(s string) (int, error) {
+	return io.WriteString(w.w, s)
+}
+
+// Context returns the context.Context associated with this rendering operation.
+//
+// This context can be used for cancellation, timeouts, and passing request-scoped
+// values to custom filters and functions.
+//
+// Example usage in a custom filter:
+//
+//	env.AddFilter("fetch_data", func(state FilterState, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+//	    ctx := state.Context()
+//	    // Use ctx for database queries, HTTP requests, etc.
+//	    select {
+//	    case <-ctx.Done():
+//	        return value.Undefined(), ctx.Err()
+//	    default:
+//	        // Continue processing
+//	    }
+//	    return value.FromString("result"), nil
+//	})
+func (s *State) Context() context.Context {
+	if s.ctx == nil {
+		return context.Background()
+	}
+	return s.ctx
+}
+
+// Env returns the Environment associated with this rendering operation.
+//
+// This can be used by custom filters and functions to access environment
+// configuration or load additional templates.
+func (s *State) Env() *Environment {
+	return s.env
+}
+
+// GetFilter returns a registered filter by name.
+func (s *State) GetFilter(name string) (FilterFunc, bool) {
+	return s.env.getFilter(name)
+}
+
+// GetTest returns a registered test by name.
+func (s *State) GetTest(name string) (TestFunc, bool) {
+	return s.env.getTest(name)
+}
+
+// Name returns the name of the template currently being rendered.
+func (s *State) Name() string {
+	return s.name
+}
+
+// AutoEscape returns the current auto-escape setting for this template.
+func (s *State) AutoEscape() AutoEscape {
+	return s.autoEscape
+}
+
+// FuelLevels returns the consumed and remaining fuel if fuel tracking is enabled.
+func (s *State) FuelLevels() (consumed, remaining uint64, ok bool) {
+	if s.fuelTracker == nil {
+		return 0, 0, false
+	}
+	return s.fuelTracker.consumedFuel(), s.fuelTracker.remainingFuel(), true
+}
+
+// UndefinedBehavior returns the undefined behavior setting for this template.
+func (s *State) UndefinedBehavior() UndefinedBehavior {
+	return s.undefinedBehavior
+}
+
+// RenderBlock renders a specific block by name.
+//
+// This is useful for rendering parts of a template, such as for
+// AJAX responses or email subjects. Only available after EvalToState.
+//
+// Example:
+//
+//	state, _ := tmpl.EvalToState(ctx)
+//	title, err := state.RenderBlock("title")
+func (s *State) RenderBlock(name string) (string, error) {
+	bs := s.blocks[name]
+	if bs == nil || len(bs.layers) == 0 {
+		return "", NewError(ErrInvalidOperation, "block not found: "+name)
+	}
+
+	// Capture output
+	oldOut := s.out
+	builder := &strings.Builder{}
+	s.out = builder
+
+	oldBlock := s.currentBlock
+	s.currentBlock = name
+
+	s.pushScope()
+	for _, stmt := range bs.layers[0] {
+		if err := s.evalStmt(stmt); err != nil {
+			s.popScope()
+			s.currentBlock = oldBlock
+			s.out = oldOut
+			return "", err
+		}
+	}
+	s.popScope()
+
+	result := builder.String()
+	s.out = oldOut
+	s.currentBlock = oldBlock
+
+	return result, nil
+}
+
+// CallMacro calls a macro by name with the given arguments.
+//
+// Example:
+//
+//	state, _ := tmpl.EvalToState(ctx)
+//	result, err := state.CallMacro("render_item", value.FromString("hello"))
+func (s *State) CallMacro(name string, args ...value.Value) (value.Value, error) {
+	macro, ok := s.macros[name]
+	if !ok {
+		return value.Undefined(), NewError(ErrInvalidOperation, "macro not found: "+name)
+	}
+	return newMacroCallableFromDefinition(macro, value.Undefined()).Call(s, args, nil)
+}
+
+// CallMacroKw calls a macro by name with positional and keyword arguments.
+//
+// Example:
+//
+//	state, _ := tmpl.EvalToState(ctx)
+//	result, err := state.CallMacroKw("render_input",
+//	    []value.Value{value.FromString("username")},
+//	    map[string]value.Value{"type": value.FromString("email")},
+//	)
+func (s *State) CallMacroKw(name string, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	macro, ok := s.macros[name]
+	if !ok {
+		return value.Undefined(), NewError(ErrInvalidOperation, "macro not found: "+name)
+	}
+	return newMacroCallableFromDefinition(macro, value.Undefined()).Call(s, args, kwargs)
+}
+
+// Exports returns all exported variables from the template.
+//
+// Exports are variables set at the top level of the template using {% set %}.
+// This also includes macros defined in the template.
+//
+// Example:
+//
+//	state, _ := tmpl.EvalToState(ctx)
+//	exports := state.Exports()
+//	for name, val := range exports {
+//	    fmt.Printf("%s = %v\n", name, val)
+//	}
+func (s *State) Exports() map[string]value.Value {
+	exports := make(map[string]value.Value)
+
+	// Get variables from the top-level scope
+	if len(s.scopes) > 0 {
+		for k, v := range s.scopes[0] {
+			exports[k] = v
+		}
+	}
+
+	if !s.rootContext.IsUndefined() {
+		if obj, ok := s.rootContext.AsObject(); ok {
+			if m, ok := obj.(value.MapObject); ok {
+				for _, key := range m.Keys() {
+					exports[key] = s.rootContext.GetAttr(key)
+				}
+			}
+		}
+	}
+
+	// Also include macros as exports
+	for name, macro := range s.macros {
+		exports[name] = value.FromCallable(newMacroCallableFromDefinition(macro, value.Undefined()))
+	}
+
+	return exports
+}
+
+// KnownVariables returns a list of all known variables in the current state.
+//
+// This includes variables from all scopes, macros, and globals/functions from
+// the environment. This is mostly useful for introspection.
+func (s *State) KnownVariables() []string {
+	seen := make(map[string]struct{})
+	for i := len(s.scopes) - 1; i >= 0; i-- {
+		for key := range s.scopes[i] {
+			if _, ok := seen[key]; !ok {
+				seen[key] = struct{}{}
+			}
+		}
+	}
+	if !s.rootContext.IsUndefined() {
+		if obj, ok := s.rootContext.AsObject(); ok {
+			if m, ok := obj.(value.MapObject); ok {
+				for _, key := range m.Keys() {
+					if _, ok := seen[key]; !ok {
+						seen[key] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+	for name := range s.macros {
+		if _, ok := seen[name]; !ok {
+			seen[name] = struct{}{}
+		}
+	}
+	for name := range s.env.globals {
+		if _, ok := seen[name]; !ok {
+			seen[name] = struct{}{}
+		}
+	}
+	for name := range s.env.functions {
+		if _, ok := seen[name]; !ok {
+			seen[name] = struct{}{}
+		}
+	}
+
+	vars := make([]string, 0, len(seen))
+	for name := range seen {
+		vars = append(vars, name)
+	}
+	sort.Strings(vars)
+	return vars
+}
+
+// BlockNames returns the names of all blocks defined in the template.
+func (s *State) BlockNames() []string {
+	names := make([]string, 0, len(s.blocks))
+	for name := range s.blocks {
+		names = append(names, name)
+	}
+	return names
+}
+
+// MacroNames returns the names of all macros defined in the template.
+func (s *State) MacroNames() []string {
+	names := make([]string, 0, len(s.macros))
+	for name := range s.macros {
+		names = append(names, name)
+	}
+	return names
+}
+
+// CurrentBlock returns the name of the block currently being rendered.
+// Returns empty string if not inside a block.
+func (s *State) CurrentBlock() string {
+	return s.currentBlock
+}
+
+// RenderBlockToWrite renders a specific block and writes the output to the given writer.
+func (s *State) RenderBlockToWrite(name string, w io.Writer) error {
+	result, err := s.RenderBlock(name)
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(w, result)
+	return err
+}
+
+// ApplyFilter invokes a filter with the given value and arguments.
+//
+// Example:
+//
+//	result, err := state.ApplyFilter("upper", value.FromString("hello"), nil, nil)
+//	// result is "HELLO"
+func (s *State) ApplyFilter(name string, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	filterFn, ok := s.env.getFilter(name)
+	if !ok {
+		return value.Undefined(), NewError(ErrUnknownFilter, name)
+	}
+	return filterFn(s, val, args, kwargs)
+}
+
+// PerformTest invokes a test with the given value and arguments.
+//
+// Example:
+//
+//	result, err := state.PerformTest("even", value.FromInt(42), nil)
+//	// result is true
+func (s *State) PerformTest(name string, val value.Value, args []value.Value) (bool, error) {
+	testFn, ok := s.env.getTest(name)
+	if !ok {
+		return false, NewError(ErrUnknownTest, name)
+	}
+	return testFn(s, val, args)
+}
+
+// Format renders a value using the environment formatter and current auto-escape.
+//
+// This mirrors how values are written during template rendering, but returns
+// the resulting string instead of writing to the output.
+func (s *State) Format(val value.Value) (string, error) {
+	return s.formatValue(val, true)
+}
+
+// GetTemp retrieves a temporary value stored in the state.
+//
+// Temps are not scoped and exist for the lifetime of the render operation.
+// They are useful for sharing state between filters or functions.
+func (s *State) GetTemp(name string) (value.Value, bool) {
+	if s.temps == nil {
+		return value.Undefined(), false
+	}
+	s.temps.mu.Lock()
+	defer s.temps.mu.Unlock()
+	v, ok := s.temps.values[name]
+	return v, ok
+}
+
+// SetTemp stores a temporary value and returns the previous value if present.
+//
+// For more information see GetTemp.
+func (s *State) SetTemp(name string, val value.Value) (value.Value, bool) {
+	if s.temps == nil {
+		s.temps = &tempStore{values: make(map[string]value.Value)}
+	}
+	s.temps.mu.Lock()
+	defer s.temps.mu.Unlock()
+	old, ok := s.temps.values[name]
+	s.temps.values[name] = val
+	return old, ok
+}
+
+// GetTemplate fetches a template by name from the environment.
+// This is a convenience method equivalent to state.Env().GetTemplate(name).
+func (s *State) GetTemplate(name string) (*Template, error) {
+	return s.env.GetTemplate(name)
+}
+
+type tempStore struct {
+	mu     sync.Mutex
+	values map[string]value.Value
 }
 
 // blockStack manages the inheritance chain for a single block
@@ -72,7 +436,8 @@ func newMacroCallableFromDefinition(def *macroDefinition, caller value.Value) *m
 	}
 }
 
-func (m *macroCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func (m *macroCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	_ = state // macro uses its captured state
 	oldScopes := m.state.scopes
 	m.state.scopes = cloneScopes(m.scopes)
 	defer func() {
@@ -111,7 +476,8 @@ type functionCallable struct {
 	name  string
 }
 
-func (f *functionCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func (f *functionCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	_ = state // function uses its captured state
 	return f.fn(f.state, args, kwargs)
 }
 
@@ -312,7 +678,7 @@ func exprUsesCaller(expr parser.Expr) bool {
 
 func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwargs map[string]value.Value, caller value.Value) (value.Value, error) {
 	s.depth++
-	if s.depth > maxRecursion {
+	if s.depth > s.recursionLimit() {
 		return value.Undefined(), NewError(ErrInvalidOperation, "recursion limit exceeded")
 	}
 	defer func() { s.depth-- }()
@@ -373,14 +739,15 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 
 	// Capture output
 	oldOut := s.out
-	s.out = &strings.Builder{}
+	builder := &strings.Builder{}
+	s.out = builder
 	for _, stmt := range macro.Body {
 		if err := s.evalStmt(stmt); err != nil {
 			s.out = oldOut
 			return value.Undefined(), err
 		}
 	}
-	result := s.out.String()
+	result := builder.String()
 	s.out = oldOut
 
 	return value.FromSafeString(result), nil
@@ -388,14 +755,15 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 
 // loopObject is the loop variable object that supports cycle() and previtem/nextitem
 type loopObject struct {
-	index     int           // 0-based index
-	length    int           // total length
-	depth     int           // nesting depth (0-based)
-	items     []value.Value // all items for previtem/nextitem
-	changed   *value.Value  // last value for changed()
-	prevItem  value.Value
-	oneShot   *value.OneShotIterator
-	recurseFn func(value.Value) (string, error)
+	index      int           // 0-based index
+	length     int           // total length (-1 for unknown)
+	depth      int           // nesting depth (0-based)
+	items      []value.Value // all items for previtem/nextitem
+	changed    *value.Value  // last value for changed()
+	prevItem   value.Value   // previous item (for pull iterators)
+	pullIter   value.PullIterator // pull-based iterator
+	peekedNext *value.Value       // peeked next item for pullIter
+	recurseFn  func(value.Value) (string, error)
 }
 
 func (l *loopObject) GetAttr(name string) value.Value {
@@ -405,21 +773,33 @@ func (l *loopObject) GetAttr(name string) value.Value {
 	case "index0":
 		return value.FromInt(int64(l.index))
 	case "revindex":
+		if l.length < 0 {
+			return value.Undefined()
+		}
 		return value.FromInt(int64(l.length - l.index))
 	case "revindex0":
+		if l.length < 0 {
+			return value.Undefined()
+		}
 		return value.FromInt(int64(l.length - l.index - 1))
 	case "first":
 		return value.FromBool(l.index == 0)
 	case "last":
+		if l.length < 0 {
+			return value.Undefined()
+		}
 		return value.FromBool(l.index == l.length-1)
 	case "length":
+		if l.length < 0 {
+			return value.Undefined()
+		}
 		return value.FromInt(int64(l.length))
 	case "depth":
 		return value.FromInt(int64(l.depth + 1))
 	case "depth0":
 		return value.FromInt(int64(l.depth))
 	case "previtem":
-		if l.oneShot != nil {
+		if l.pullIter != nil {
 			return l.prevItem
 		}
 		if l.index > 0 {
@@ -427,8 +807,19 @@ func (l *loopObject) GetAttr(name string) value.Value {
 		}
 		return value.Undefined()
 	case "nextitem":
-		if l.oneShot != nil {
-			return l.oneShot.Peek()
+		if l.pullIter != nil {
+			// For pull iterators, we need to peek the next item
+			// Note: This consumes the item from the pull iterator!
+			if l.peekedNext == nil {
+				next, ok := l.pullIter.PullNext()
+				if ok {
+					l.peekedNext = &next
+				}
+			}
+			if l.peekedNext != nil {
+				return *l.peekedNext
+			}
+			return value.Undefined()
 		}
 		if l.index < l.length-1 {
 			return l.items[l.index+1]
@@ -446,7 +837,8 @@ func (l *loopObject) String() string {
 	return fmt.Sprintf("<loop %d/%d>", l.index, l.length)
 }
 
-func (l *loopObject) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func (l *loopObject) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	_ = state
 	if l.recurseFn == nil {
 		return value.Undefined(), NewError(ErrInvalidOperation, "loop recursion cannot be called this way")
 	}
@@ -481,7 +873,8 @@ type loopCycleCallable struct {
 	loop *loopObject
 }
 
-func (c *loopCycleCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func (c *loopCycleCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	_ = state
 	if len(args) == 0 {
 		return value.Undefined(), nil
 	}
@@ -494,7 +887,8 @@ type loopChangedCallable struct {
 	loop *loopObject
 }
 
-func (c *loopChangedCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func (c *loopChangedCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	_ = state
 	// Create a comparable representation of args
 	newVal := value.FromSlice(args)
 	if c.loop.changed == nil {
@@ -527,7 +921,8 @@ type blockCallable struct {
 	blockName string
 }
 
-func (bc *blockCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func (bc *blockCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	_ = state
 	bs := bc.state.blocks[bc.blockName]
 	if bs == nil || len(bs.layers) == 0 {
 		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("block '%s' not found", bc.blockName))
@@ -535,7 +930,8 @@ func (bc *blockCallable) Call(args []value.Value, kwargs map[string]value.Value)
 
 	// Capture output
 	oldOut := bc.state.out
-	bc.state.out = &strings.Builder{}
+	builder := &strings.Builder{}
+	bc.state.out = builder
 
 	oldBlock := bc.state.currentBlock
 	bc.state.currentBlock = bc.blockName
@@ -551,7 +947,7 @@ func (bc *blockCallable) Call(args []value.Value, kwargs map[string]value.Value)
 	}
 	bc.state.popScope()
 
-	result := bc.state.out.String()
+	result := builder.String()
 	bc.state.out = oldOut
 	bc.state.currentBlock = oldBlock
 
@@ -560,26 +956,76 @@ func (bc *blockCallable) Call(args []value.Value, kwargs map[string]value.Value)
 
 const maxRecursion = 500
 
-func newState(env *Environment, name, source string, ctx value.Value) *State {
+func newState(goCtx context.Context, env *Environment, name, source string, ctx value.Value) *State {
 	// Initialize root scope with context
 	rootScope := make(map[string]value.Value)
+	rootContext := value.Undefined()
 	if m, ok := ctx.AsMap(); ok {
 		for k, v := range m {
 			rootScope[k] = v
 		}
+	} else if obj, ok := ctx.AsObject(); ok {
+		if _, ok := obj.(value.MapObject); ok || value.GetObjectRepr(obj) == value.ObjectReprMap {
+			rootContext = ctx
+		}
+	}
+
+	var tracker *fuelTracker
+	if env != nil && env.fuel != nil {
+		tracker = newFuelTracker(*env.fuel)
 	}
 
 	return &State{
-		env:        env,
-		name:       name,
-		source:     source,
-		autoEscape: env.autoEscapeFunc(name),
-		scopes:     []map[string]value.Value{rootScope},
+		ctx:               goCtx,
+		env:               env,
+		name:              name,
+		source:            source,
+		autoEscape:        env.autoEscapeFunc(name),
+		scopes:            []map[string]value.Value{rootScope},
 		blocks:            make(map[string]*blockStack),
 		macros:            make(map[string]*macroDefinition),
 		out:               &strings.Builder{},
 		undefinedBehavior: env.undefinedBehavior,
+		temps:             &tempStore{values: make(map[string]value.Value)},
+		fuelTracker:       tracker,
+		rootContext:       rootContext,
 	}
+}
+
+func (s *State) outputString() string {
+	if b, ok := s.out.(*strings.Builder); ok {
+		return b.String()
+	}
+	return ""
+}
+
+func (s *State) consumeFuel() error {
+	if s.fuelTracker == nil {
+		return nil
+	}
+	return s.fuelTracker.consume(1)
+}
+
+func (s *State) recursionLimit() int {
+	if s.env == nil {
+		return maxRecursion
+	}
+	return s.env.recursionLimit
+}
+
+func (s *State) decorateError(err error) error {
+	if err == nil || s.env == nil || !s.env.debug {
+		return err
+	}
+	if templErr, ok := err.(*Error); ok {
+		if templErr.Name == "" {
+			templErr.WithName(s.name)
+		}
+		if templErr.Source == "" {
+			templErr.WithSource(s.source)
+		}
+	}
+	return err
 }
 
 // Lookup looks up a variable in the current scope chain.
@@ -592,6 +1038,12 @@ func (s *State) Lookup(name string) value.Value {
 	// Search scopes from inner to outer
 	for i := len(s.scopes) - 1; i >= 0; i-- {
 		if v, ok := s.scopes[i][name]; ok {
+			return v
+		}
+	}
+
+	if !s.rootContext.IsUndefined() {
+		if v := s.rootContext.GetAttr(name); !v.IsUndefined() {
 			return v
 		}
 	}
@@ -639,7 +1091,7 @@ func (s *State) eval(tmpl *parser.Template) (string, error) {
 	for _, stmt := range tmpl.Children {
 		if ext, ok := stmt.(*parser.Extends); ok {
 			if extendsStmt != nil {
-				return "", NewError(ErrInvalidOperation, "tried to extend a second time in a template")
+				return "", s.decorateError(NewError(ErrInvalidOperation, "tried to extend a second time in a template"))
 			}
 			extendsStmt = ext
 		}
@@ -665,43 +1117,49 @@ func (s *State) eval(tmpl *parser.Template) (string, error) {
 			switch st := stmt.(type) {
 			case *parser.Set:
 				if err := s.evalSet(st); err != nil {
-					return "", err
+					return "", s.decorateError(err)
 				}
 			case *parser.SetBlock:
 				if err := s.evalSetBlock(st); err != nil {
-					return "", err
+					return "", s.decorateError(err)
 				}
 			case *parser.Import:
 				if err := s.evalImport(st); err != nil {
-					return "", err
+					return "", s.decorateError(err)
 				}
 			case *parser.FromImport:
 				if err := s.evalFromImport(st); err != nil {
-					return "", err
+					return "", s.decorateError(err)
 				}
 			}
 		}
 
 		// Now process extends
 		if err := s.evalExtends(extendsStmt); err != nil && err != errExtendsExecuted {
-			return "", err
+			return "", s.decorateError(err)
 		}
-		return s.out.String(), nil
+		return s.outputString(), nil
 	}
 
 	// Non-extending template - evaluate normally
 	for _, stmt := range tmpl.Children {
 		if err := s.evalStmt(stmt); err != nil {
-			return "", err
+			return "", s.decorateError(err)
 		}
 	}
-	return s.out.String(), nil
+	return s.outputString(), nil
 }
 
 func (s *State) evalStmt(stmt parser.Stmt) error {
+	if err := s.consumeFuel(); err != nil {
+		return err
+	}
+
 	switch st := stmt.(type) {
 	case *parser.EmitRaw:
-		s.out.WriteString(st.Raw)
+		if _, err := s.out.WriteString(st.Raw); err != nil {
+			return err
+		}
 		return nil
 
 	case *parser.EmitExpr:
@@ -709,8 +1167,7 @@ func (s *State) evalStmt(stmt parser.Stmt) error {
 		if err != nil {
 			return err
 		}
-		s.writeValue(val)
-		return nil
+		return s.writeValue(val)
 
 	case *parser.ForLoop:
 		return s.evalForLoop(st)
@@ -782,12 +1239,23 @@ func (s *State) evalForLoop(loop *parser.ForLoop) error {
 		return err
 	}
 
-	if oneShot, ok := iter.Raw().(*value.OneShotIterator); ok {
-		if loop.Recursive || loop.FilterExpr != nil {
-			items := oneShot.Drain()
-			return s.evalForLoopItems(loop, items)
+	// Check for PullIterator (new one-shot iterator interface)
+	if obj, ok := iter.AsObject(); ok {
+		if pull, ok := obj.(value.PullIterator); ok {
+			if loop.Recursive || loop.FilterExpr != nil {
+				// Need to collect all items for recursive/filtered loops
+				var items []value.Value
+				for {
+					v, ok := pull.PullNext()
+					if !ok {
+						break
+					}
+					items = append(items, v)
+				}
+				return s.evalForLoopItems(loop, items)
+			}
+			return s.evalForLoopPull(loop, pull)
 		}
-		return s.evalForLoopOneShot(loop, oneShot)
 	}
 
 	items := iter.Iter()
@@ -805,8 +1273,11 @@ func (s *State) evalForLoop(loop *parser.ForLoop) error {
 	return s.evalForLoopItems(loop, items)
 }
 
-func (s *State) evalForLoopOneShot(loop *parser.ForLoop, iter *value.OneShotIterator) error {
-	if iter.Remaining() == 0 {
+// evalForLoopPull handles iteration over PullIterator (new one-shot iterator interface).
+// Unlike evalForLoopItems, this pulls items one at a time, allowing partial consumption.
+func (s *State) evalForLoopPull(loop *parser.ForLoop, pull value.PullIterator) error {
+	// Check if iterator is empty first
+	if pull.PullDone() {
 		if loop.ElseBody != nil {
 			for _, stmt := range loop.ElseBody {
 				if err := s.evalStmt(stmt); err != nil {
@@ -818,7 +1289,7 @@ func (s *State) evalForLoopOneShot(loop *parser.ForLoop, iter *value.OneShotIter
 	}
 
 	s.depth++
-	if s.depth > maxRecursion {
+	if s.depth > s.recursionLimit() {
 		return NewError(ErrInvalidOperation, "recursion limit exceeded")
 	}
 
@@ -830,8 +1301,21 @@ func (s *State) evalForLoopOneShot(loop *parser.ForLoop, iter *value.OneShotIter
 
 	index := 0
 	prevItem := value.Undefined()
+	var peekedItem *value.Value // Track peeked item across loop iterations
+
 	for {
-		item, ok := iter.Next()
+		var item value.Value
+		var ok bool
+
+		// If we have a peeked item from loop.nextitem, use it
+		if peekedItem != nil {
+			item = *peekedItem
+			peekedItem = nil
+			ok = true
+		} else {
+			item, ok = pull.PullNext()
+		}
+
 		if !ok {
 			break
 		}
@@ -839,13 +1323,14 @@ func (s *State) evalForLoopOneShot(loop *parser.ForLoop, iter *value.OneShotIter
 			return err
 		}
 
+		// For pull iterators, length is unknown (-1)
 		loopObj := &loopObject{
 			index:     index,
-			length:    index + iter.Remaining() + 1,
+			length:    -1, // Unknown length
 			depth:     s.depth - 1,
 			items:     nil,
 			prevItem:  prevItem,
-			oneShot:   iter,
+			pullIter:  pull,
 			recurseFn: s.loopRecurse,
 		}
 		s.Set("loop", value.FromObject(loopObj))
@@ -856,12 +1341,18 @@ func (s *State) evalForLoopOneShot(loop *parser.ForLoop, iter *value.OneShotIter
 				break
 			}
 			if err == errBreak {
-				iter.DiscardBuffered()
+				// Items remain in the pull iterator for potential future use
 				return nil
 			}
 			if err != nil {
 				return err
 			}
+		}
+
+		// If loop.nextitem was accessed, it consumed the next item
+		// We need to capture it for the next iteration
+		if loopObj.peekedNext != nil {
+			peekedItem = loopObj.peekedNext
 		}
 
 		prevItem = item
@@ -907,7 +1398,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 	}
 
 	s.depth++
-	if s.depth > maxRecursion {
+	if s.depth > s.recursionLimit() {
 		return NewError(ErrInvalidOperation, "recursion limit exceeded")
 	}
 
@@ -923,7 +1414,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 		oldRecurse = s.loopRecurse
 		s.loopRecurse = func(iterValue value.Value) (string, error) {
 			s.depth++
-			if s.depth > maxRecursion {
+			if s.depth > s.recursionLimit() {
 				return "", NewError(ErrInvalidOperation, "recursion limit exceeded")
 			}
 			defer func() { s.depth-- }()
@@ -940,7 +1431,8 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 			}
 
 			oldOut := s.out
-			s.out = &strings.Builder{}
+			builder := &strings.Builder{}
+			s.out = builder
 
 			for i := range nestedItems {
 				if err := s.unpackLoopTarget(loop.Target, nestedItems[i]); err != nil {
@@ -963,7 +1455,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 						break
 					}
 					if err == errBreak {
-						result := s.out.String()
+						result := builder.String()
 						s.out = oldOut
 						return result, nil
 					}
@@ -974,7 +1466,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 				}
 			}
 
-			result := s.out.String()
+			result := builder.String()
 			s.out = oldOut
 			return result, nil
 		}
@@ -1118,14 +1610,15 @@ func (s *State) evalSet(set *parser.Set) error {
 func (s *State) evalSetBlock(block *parser.SetBlock) error {
 	// Capture output
 	oldOut := s.out
-	s.out = &strings.Builder{}
+	builder := &strings.Builder{}
+	s.out = builder
 	for _, stmt := range block.Body {
 		if err := s.evalStmt(stmt); err != nil {
 			s.out = oldOut
 			return err
 		}
 	}
-	captured := s.out.String()
+	captured := builder.String()
 	s.out = oldOut
 
 	result := value.FromString(captured)
@@ -1154,14 +1647,16 @@ func (s *State) evalExtends(ext *parser.Extends) error {
 		return NewError(ErrInvalidOperation, "extends name must be a string")
 	}
 
+	resolvedName := s.env.joinTemplatePath(name, s.name)
+
 	// Load the parent template
-	parentTmpl, err := s.env.GetTemplate(name)
+	parentTmpl, err := s.env.GetTemplate(resolvedName)
 	if err != nil {
 		return err
 	}
 
 	s.depth++
-	if s.depth > maxRecursion {
+	if s.depth > s.recursionLimit() {
 		return NewError(ErrInvalidOperation, "recursion limit exceeded")
 	}
 	defer func() { s.depth-- }()
@@ -1313,28 +1808,32 @@ func (s *State) evalInclude(inc *parser.Include) error {
 }
 
 func (s *State) includeTemplate(name string) error {
-	tmpl, err := s.env.GetTemplate(name)
+	resolvedName := s.env.joinTemplatePath(name, s.name)
+	tmpl, err := s.env.GetTemplate(resolvedName)
 	if err != nil {
 		return err
 	}
 
 	s.depth++
-	if s.depth > maxRecursion {
+	if s.depth > s.recursionLimit() {
 		return NewError(ErrInvalidOperation, "recursion limit exceeded")
 	}
 
 	// Create new state with isolated scope
 	childState := &State{
-		env:        s.env,
-		name:       tmpl.compiled.name,
-		source:     tmpl.compiled.source,
-		autoEscape: s.env.autoEscapeFunc(tmpl.compiled.name),
-		scopes:     cloneScopes(s.scopes),
+		ctx:               s.ctx,
+		env:               s.env,
+		name:              tmpl.compiled.name,
+		source:            tmpl.compiled.source,
+		autoEscape:        s.env.autoEscapeFunc(tmpl.compiled.name),
+		scopes:            cloneScopes(s.scopes),
 		blocks:            s.blocks,
 		macros:            s.macros,
 		out:               s.out,
 		depth:             s.depth,
 		undefinedBehavior: s.undefinedBehavior,
+		temps:             s.temps,
+		fuelTracker:       s.fuelTracker,
 	}
 	if len(childState.scopes) > 0 {
 		childState.scopes[len(childState.scopes)-1] = cloneScopeMap(childState.scopes[len(childState.scopes)-1])
@@ -1367,8 +1866,10 @@ func (s *State) evalImport(imp *parser.Import) error {
 		return NewError(ErrInvalidOperation, "import path must be a string")
 	}
 
+	resolvedPath := s.env.joinTemplatePath(path, s.name)
+
 	// Load and parse the template
-	tmpl, err := s.env.GetTemplate(path)
+	tmpl, err := s.env.GetTemplate(resolvedPath)
 	if err != nil {
 		return err
 	}
@@ -1409,8 +1910,10 @@ func (s *State) evalFromImport(frm *parser.FromImport) error {
 		return NewError(ErrInvalidOperation, "import path must be a string")
 	}
 
+	resolvedPath := s.env.joinTemplatePath(path, s.name)
+
 	// Load and parse the template
-	tmpl, err := s.env.GetTemplate(path)
+	tmpl, err := s.env.GetTemplate(resolvedPath)
 	if err != nil {
 		return err
 	}
@@ -1464,16 +1967,19 @@ func (s *State) evalFromImport(frm *parser.FromImport) error {
 
 func (s *State) createModule(tmpl *compiledTemplate) (value.Value, error) {
 	moduleState := &State{
-		env:        s.env,
-		name:       tmpl.name,
-		source:     tmpl.source,
-		autoEscape: s.env.autoEscapeFunc(tmpl.name),
-		scopes:     cloneScopes(s.scopes),
+		ctx:               s.ctx,
+		env:               s.env,
+		name:              tmpl.name,
+		source:            tmpl.source,
+		autoEscape:        s.env.autoEscapeFunc(tmpl.name),
+		scopes:            cloneScopes(s.scopes),
 		blocks:            make(map[string]*blockStack),
 		macros:            make(map[string]*macroDefinition),
 		out:               &strings.Builder{},
 		depth:             s.depth,
 		undefinedBehavior: s.undefinedBehavior,
+		temps:             s.temps,
+		fuelTracker:       s.fuelTracker,
 	}
 	moduleState.pushScope()
 
@@ -1538,18 +2044,19 @@ func (s *State) evalFilterBlock(block *parser.FilterBlock) error {
 	// Capture output
 	oldOut := s.out
 	oldEscape := s.autoEscape
-	s.out = &strings.Builder{}
+	builder := &strings.Builder{}
+	s.out = builder
 	for _, stmt := range block.Body {
 		if err := s.evalStmt(stmt); err != nil {
 			s.out = oldOut
 			return err
 		}
 	}
-	captured := s.out.String()
+	captured := builder.String()
 	s.out = oldOut
 
 	capturedVal := value.FromString(captured)
-	if oldEscape != AutoEscapeNone {
+	if !oldEscape.IsNone() {
 		capturedVal = value.FromSafeString(captured)
 	}
 
@@ -1558,7 +2065,9 @@ func (s *State) evalFilterBlock(block *parser.FilterBlock) error {
 		return err
 	}
 
-	s.writeValue(result)
+	if err := s.writeValue(result); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1572,7 +2081,11 @@ func (s *State) evalAutoEscape(ae *parser.AutoEscape) error {
 
 	if b, ok := val.AsBool(); ok {
 		if b {
-			s.autoEscape = AutoEscapeHTML
+			if oldEscape.IsNone() {
+				s.autoEscape = AutoEscapeHTML
+			} else {
+				s.autoEscape = oldEscape
+			}
 		} else {
 			s.autoEscape = AutoEscapeNone
 		}
@@ -1580,11 +2093,15 @@ func (s *State) evalAutoEscape(ae *parser.AutoEscape) error {
 		switch str {
 		case "html":
 			s.autoEscape = AutoEscapeHTML
+		case "json":
+			s.autoEscape = AutoEscapeJSON
 		case "none":
 			s.autoEscape = AutoEscapeNone
 		default:
-			s.autoEscape = AutoEscapeHTML
+			return NewError(ErrInvalidOperation, "invalid value to autoescape tag").WithSpan(ae.Span())
 		}
+	} else {
+		return NewError(ErrInvalidOperation, "invalid value to autoescape tag").WithSpan(ae.Span())
 	}
 
 	for _, stmt := range ae.Body {
@@ -1651,12 +2168,14 @@ func (s *State) evalCallBlock(cb *parser.CallBlock) error {
 	}
 
 	// Call the macro with the caller
-	result, err := newMacroCallableFromDefinition(macroDef, value.FromCallable(callerCallable)).Call(args, kwargs)
+	result, err := newMacroCallableFromDefinition(macroDef, value.FromCallable(callerCallable)).Call(s, args, kwargs)
 	if err != nil {
 		return err
 	}
 
-	s.writeValue(result)
+	if err := s.writeValue(result); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1689,7 +2208,8 @@ func (c *callerCallable) String() string {
 	return "<macro caller>"
 }
 
-func (c *callerCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func (c *callerCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	_ = state
 	c.state.pushScope()
 	defer c.state.popScope()
 
@@ -1706,7 +2226,8 @@ func (c *callerCallable) Call(args []value.Value, kwargs map[string]value.Value)
 
 	// Capture output
 	oldOut := c.state.out
-	c.state.out = &strings.Builder{}
+	builder := &strings.Builder{}
+	c.state.out = builder
 
 	for _, stmt := range c.body {
 		if err := c.state.evalStmt(stmt); err != nil {
@@ -1715,25 +2236,76 @@ func (c *callerCallable) Call(args []value.Value, kwargs map[string]value.Value)
 		}
 	}
 
-	result := c.state.out.String()
+	result := builder.String()
 	c.state.out = oldOut
 
 	return value.FromSafeString(result), nil
 }
 
-func (s *State) writeValue(val value.Value) {
+func (s *State) writeValue(val value.Value) error {
+	str, err := s.formatValue(val, false)
+	if err != nil {
+		return err
+	}
+	_, err = s.out.WriteString(str)
+	return err
+}
+
+func (s *State) formatValue(val value.Value, strictUndefined bool) (string, error) {
 	if val.IsUndefined() {
-		return
+		if strictUndefined && s.undefinedBehavior == UndefinedStrict {
+			return "", NewError(ErrUndefinedVar, "undefined value")
+		}
+		return "", nil
 	}
 
-	str := val.String()
-	if s.autoEscape == AutoEscapeHTML && !val.IsSafe() {
-		str = EscapeHTML(str)
+	// Use custom formatter if set
+	if s.env.formatter != nil {
+		escape := func(str string) string {
+			if s.autoEscape.IsHTML() {
+				return EscapeHTML(str)
+			}
+			return str
+		}
+		return s.env.formatter(s, val, escape), nil
 	}
-	s.out.WriteString(str)
+
+	if val.IsSafe() {
+		return val.String(), nil
+	}
+
+	switch {
+	case s.autoEscape.IsNone():
+		return val.String(), nil
+	case s.autoEscape.IsHTML():
+		return EscapeHTML(val.String()), nil
+	case s.autoEscape.IsJSON():
+		return formatJSONValue(val)
+	case s.autoEscape.IsCustom():
+		return "", NewError(ErrInvalidOperation, fmt.Sprintf("Default formatter does not know how to format to custom format '%s'", s.autoEscape.CustomName()))
+	default:
+		return val.String(), nil
+	}
+}
+
+func formatJSONValue(val value.Value) (string, error) {
+	native := valueToNative(val)
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(native); err != nil {
+		return "", NewError(ErrInvalidOperation, "unable to format to JSON")
+	}
+	out := buf.String()
+	out = strings.TrimSuffix(out, "\n")
+	return out, nil
 }
 
 func (s *State) evalExpr(expr parser.Expr) (value.Value, error) {
+	if err := s.consumeFuel(); err != nil {
+		return value.Undefined(), err
+	}
+
 	switch e := expr.(type) {
 	case *parser.Const:
 		return s.evalConst(e), nil
@@ -1806,6 +2378,19 @@ func (s *State) evalConst(c *parser.Const) value.Value {
 	}
 }
 
+func wrapEvalError(err error, span parser.Span) error {
+	if err == nil {
+		return nil
+	}
+	if templErr, ok := err.(*Error); ok {
+		if templErr.Span == nil {
+			templErr.WithSpan(span)
+		}
+		return templErr
+	}
+	return NewError(ErrInvalidOperation, err.Error()).WithSpan(span)
+}
+
 func (s *State) evalUnaryOp(op *parser.UnaryOp) (value.Value, error) {
 	val, err := s.evalExpr(op.Expr)
 	if err != nil {
@@ -1816,9 +2401,13 @@ func (s *State) evalUnaryOp(op *parser.UnaryOp) (value.Value, error) {
 	case parser.UnaryNot:
 		return value.FromBool(!val.IsTrue()), nil
 	case parser.UnaryNeg:
-		return val.Neg()
+		rv, err := val.Neg()
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		return rv, nil
 	default:
-		return value.Undefined(), fmt.Errorf("unknown unary operator")
+		return value.Undefined(), NewError(ErrInvalidOperation, "unknown unary operator").WithSpan(op.Span())
 	}
 }
 
@@ -1864,42 +2453,70 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 		if cmp, ok := left.Compare(right); ok {
 			return value.FromBool(cmp < 0), nil
 		}
-		return value.Undefined(), fmt.Errorf("cannot compare %s and %s", left.Kind(), right.Kind())
+		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("cannot compare %s and %s", left.Kind(), right.Kind())).WithSpan(op.Span())
 	case parser.BinOpLte:
 		if cmp, ok := left.Compare(right); ok {
 			return value.FromBool(cmp <= 0), nil
 		}
-		return value.Undefined(), fmt.Errorf("cannot compare %s and %s", left.Kind(), right.Kind())
+		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("cannot compare %s and %s", left.Kind(), right.Kind())).WithSpan(op.Span())
 	case parser.BinOpGt:
 		if cmp, ok := left.Compare(right); ok {
 			return value.FromBool(cmp > 0), nil
 		}
-		return value.Undefined(), fmt.Errorf("cannot compare %s and %s", left.Kind(), right.Kind())
+		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("cannot compare %s and %s", left.Kind(), right.Kind())).WithSpan(op.Span())
 	case parser.BinOpGte:
 		if cmp, ok := left.Compare(right); ok {
 			return value.FromBool(cmp >= 0), nil
 		}
-		return value.Undefined(), fmt.Errorf("cannot compare %s and %s", left.Kind(), right.Kind())
+		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("cannot compare %s and %s", left.Kind(), right.Kind())).WithSpan(op.Span())
 	case parser.BinOpAdd:
-		return left.Add(right)
+		rv, err := left.Add(right)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		return rv, nil
 	case parser.BinOpSub:
-		return left.Sub(right)
+		rv, err := left.Sub(right)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		return rv, nil
 	case parser.BinOpMul:
-		return left.Mul(right)
+		rv, err := left.Mul(right)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		return rv, nil
 	case parser.BinOpDiv:
-		return left.Div(right)
+		rv, err := left.Div(right)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		return rv, nil
 	case parser.BinOpFloorDiv:
-		return left.FloorDiv(right)
+		rv, err := left.FloorDiv(right)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		return rv, nil
 	case parser.BinOpRem:
-		return left.Rem(right)
+		rv, err := left.Rem(right)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		return rv, nil
 	case parser.BinOpPow:
-		return left.Pow(right)
+		rv, err := left.Pow(right)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		return rv, nil
 	case parser.BinOpConcat:
 		return left.Concat(right), nil
 	case parser.BinOpIn:
 		return value.FromBool(right.Contains(left)), nil
 	default:
-		return value.Undefined(), fmt.Errorf("unknown binary operator: %v", op.Op)
+		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("unknown binary operator: %v", op.Op)).WithSpan(op.Span())
 	}
 }
 
@@ -2005,7 +2622,7 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 			if err != nil {
 				return value.Undefined(), err
 			}
-			return newMacroCallableFromDefinition(macro, value.Undefined()).Call(args, kwargs)
+			return newMacroCallableFromDefinition(macro, value.Undefined()).Call(s, args, kwargs)
 		}
 
 		// Check for function
@@ -2024,7 +2641,7 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 			if err != nil {
 				return value.Undefined(), err
 			}
-			return callable.Call(args, kwargs)
+			return callable.Call(s, args, kwargs)
 		}
 	}
 
@@ -2040,7 +2657,18 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), err
 		}
-		return callable.Call(args, kwargs)
+		return callable.Call(s, args, kwargs)
+	}
+
+	// Check if it's a CallableObject (object that can be called directly)
+	if obj, ok := expr.AsObject(); ok {
+		if co, ok := obj.(value.CallableObject); ok {
+			args, kwargs, err := s.evalCallArgs(call.Args)
+			if err != nil {
+				return value.Undefined(), err
+			}
+			return co.ObjectCall(s, args, kwargs)
+		}
 	}
 
 	// Check if it's a method call on a map (like module.macro())
@@ -2049,13 +2677,29 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), err
 		}
+
+		// Check if object supports method calls directly
+		if objVal, ok := obj.AsObject(); ok {
+			if mc, ok := objVal.(value.MethodCallable); ok {
+				args, kwargs, err := s.evalCallArgs(call.Args)
+				if err != nil {
+					return value.Undefined(), err
+				}
+				result, err := mc.CallMethod(s, getAttr.Name, args, kwargs)
+				if err != value.ErrUnknownMethod {
+					return result, err
+				}
+				// Fall through to try GetAttr
+			}
+		}
+
 		attr := obj.GetAttr(getAttr.Name)
 		if callable, ok := attr.AsCallable(); ok {
 			args, kwargs, err := s.evalCallArgs(call.Args)
 			if err != nil {
 				return value.Undefined(), err
 			}
-			return callable.Call(args, kwargs)
+			return callable.Call(s, args, kwargs)
 		}
 	}
 
@@ -2078,7 +2722,8 @@ func (s *State) evalSuper() (value.Value, error) {
 
 	// Capture output
 	oldOut := s.out
-	s.out = &strings.Builder{}
+	builder := &strings.Builder{}
+	s.out = builder
 
 	s.pushScope()
 	for _, stmt := range bs.layers[bs.index] {
@@ -2090,7 +2735,7 @@ func (s *State) evalSuper() (value.Value, error) {
 	}
 	s.popScope()
 
-	result := s.out.String()
+	result := builder.String()
 	s.out = oldOut
 	return value.FromSafeString(result), nil
 }

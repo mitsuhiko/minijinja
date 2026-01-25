@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/lexer"
 )
 
 // Span represents a location range in source code.
@@ -38,8 +38,8 @@ type Template struct {
 	span     Span
 }
 
-func (t *Template) node()     {}
-func (t *Template) stmt()     {}
+func (t *Template) node()      {}
+func (t *Template) stmt()      {}
 func (t *Template) Span() Span { return t.span }
 
 // EmitRaw outputs raw template text.
@@ -48,8 +48,8 @@ type EmitRaw struct {
 	span Span
 }
 
-func (e *EmitRaw) node()     {}
-func (e *EmitRaw) stmt()     {}
+func (e *EmitRaw) node()      {}
+func (e *EmitRaw) stmt()      {}
 func (e *EmitRaw) Span() Span { return e.span }
 
 // EmitExpr outputs an expression result.
@@ -58,8 +58,8 @@ type EmitExpr struct {
 	span Span
 }
 
-func (e *EmitExpr) node()     {}
-func (e *EmitExpr) stmt()     {}
+func (e *EmitExpr) node()      {}
+func (e *EmitExpr) stmt()      {}
 func (e *EmitExpr) Span() Span { return e.span }
 
 // ForLoop represents a for loop.
@@ -73,8 +73,8 @@ type ForLoop struct {
 	span       Span
 }
 
-func (f *ForLoop) node()     {}
-func (f *ForLoop) stmt()     {}
+func (f *ForLoop) node()      {}
+func (f *ForLoop) stmt()      {}
 func (f *ForLoop) Span() Span { return f.span }
 
 // IfCond represents an if/elif/else condition.
@@ -85,8 +85,8 @@ type IfCond struct {
 	span      Span
 }
 
-func (i *IfCond) node()     {}
-func (i *IfCond) stmt()     {}
+func (i *IfCond) node()      {}
+func (i *IfCond) stmt()      {}
 func (i *IfCond) Span() Span { return i.span }
 
 // WithBlock represents a with block.
@@ -101,8 +101,8 @@ type Assignment struct {
 	Value  Expr
 }
 
-func (w *WithBlock) node()     {}
-func (w *WithBlock) stmt()     {}
+func (w *WithBlock) node()      {}
+func (w *WithBlock) stmt()      {}
 func (w *WithBlock) Span() Span { return w.span }
 
 // Set represents a variable assignment.
@@ -112,8 +112,8 @@ type Set struct {
 	span   Span
 }
 
-func (s *Set) node()     {}
-func (s *Set) stmt()     {}
+func (s *Set) node()      {}
+func (s *Set) stmt()      {}
 func (s *Set) Span() Span { return s.span }
 
 // SetBlock represents a set block (capture).
@@ -124,8 +124,8 @@ type SetBlock struct {
 	span   Span
 }
 
-func (s *SetBlock) node()     {}
-func (s *SetBlock) stmt()     {}
+func (s *SetBlock) node()      {}
+func (s *SetBlock) stmt()      {}
 func (s *SetBlock) Span() Span { return s.span }
 
 // AutoEscape represents an autoescape block.
@@ -135,8 +135,8 @@ type AutoEscape struct {
 	span    Span
 }
 
-func (a *AutoEscape) node()     {}
-func (a *AutoEscape) stmt()     {}
+func (a *AutoEscape) node()      {}
+func (a *AutoEscape) stmt()      {}
 func (a *AutoEscape) Span() Span { return a.span }
 
 // FilterBlock represents a filter block.
@@ -146,8 +146,8 @@ type FilterBlock struct {
 	span   Span
 }
 
-func (f *FilterBlock) node()     {}
-func (f *FilterBlock) stmt()     {}
+func (f *FilterBlock) node()      {}
+func (f *FilterBlock) stmt()      {}
 func (f *FilterBlock) Span() Span { return f.span }
 
 // Block represents a template block for inheritance.
@@ -157,8 +157,8 @@ type Block struct {
 	span Span
 }
 
-func (b *Block) node()     {}
-func (b *Block) stmt()     {}
+func (b *Block) node()      {}
+func (b *Block) stmt()      {}
 func (b *Block) Span() Span { return b.span }
 
 // Extends represents an extends directive.
@@ -167,8 +167,8 @@ type Extends struct {
 	span Span
 }
 
-func (e *Extends) node()     {}
-func (e *Extends) stmt()     {}
+func (e *Extends) node()      {}
+func (e *Extends) stmt()      {}
 func (e *Extends) Span() Span { return e.span }
 
 // Include represents an include directive.
@@ -178,8 +178,8 @@ type Include struct {
 	span          Span
 }
 
-func (i *Include) node()     {}
-func (i *Include) stmt()     {}
+func (i *Include) node()      {}
+func (i *Include) stmt()      {}
 func (i *Include) Span() Span { return i.span }
 
 // Import represents a full module import.
@@ -189,8 +189,8 @@ type Import struct {
 	span Span
 }
 
-func (i *Import) node()     {}
-func (i *Import) stmt()     {}
+func (i *Import) node()      {}
+func (i *Import) stmt()      {}
 func (i *Import) Span() Span { return i.span }
 
 // FromImport represents a from ... import statement.
@@ -205,8 +205,8 @@ type ImportName struct {
 	Alias Expr // optional
 }
 
-func (f *FromImport) node()     {}
-func (f *FromImport) stmt()     {}
+func (f *FromImport) node()      {}
+func (f *FromImport) stmt()      {}
 func (f *FromImport) Span() Span { return f.span }
 
 // Macro represents a macro definition.
@@ -218,8 +218,8 @@ type Macro struct {
 	span     Span
 }
 
-func (m *Macro) node()     {}
-func (m *Macro) stmt()     {}
+func (m *Macro) node()      {}
+func (m *Macro) stmt()      {}
 func (m *Macro) Span() Span { return m.span }
 
 // CallBlock represents a call block.
@@ -231,8 +231,8 @@ type CallBlock struct {
 	span      Span
 }
 
-func (c *CallBlock) node()     {}
-func (c *CallBlock) stmt()     {}
+func (c *CallBlock) node()      {}
+func (c *CallBlock) stmt()      {}
 func (c *CallBlock) Span() Span { return c.span }
 
 // Do represents a do statement.
@@ -242,8 +242,8 @@ type Do struct {
 	span     Span
 }
 
-func (d *Do) node()     {}
-func (d *Do) stmt()     {}
+func (d *Do) node()      {}
+func (d *Do) stmt()      {}
 func (d *Do) Span() Span { return d.span }
 
 // Continue represents a continue statement.
@@ -251,8 +251,8 @@ type Continue struct {
 	span Span
 }
 
-func (c *Continue) node()     {}
-func (c *Continue) stmt()     {}
+func (c *Continue) node()      {}
+func (c *Continue) stmt()      {}
 func (c *Continue) Span() Span { return c.span }
 
 // Break represents a break statement.
@@ -260,8 +260,8 @@ type Break struct {
 	span Span
 }
 
-func (b *Break) node()     {}
-func (b *Break) stmt()     {}
+func (b *Break) node()      {}
+func (b *Break) stmt()      {}
 func (b *Break) Span() Span { return b.span }
 
 // --- Expression Types ---
@@ -272,8 +272,8 @@ type Var struct {
 	span Span
 }
 
-func (v *Var) node()     {}
-func (v *Var) expr()     {}
+func (v *Var) node()      {}
+func (v *Var) expr()      {}
 func (v *Var) Span() Span { return v.span }
 
 // Const represents a constant value.
@@ -282,8 +282,8 @@ type Const struct {
 	span  Span
 }
 
-func (c *Const) node()     {}
-func (c *Const) expr()     {}
+func (c *Const) node()      {}
+func (c *Const) expr()      {}
 func (c *Const) Span() Span { return c.span }
 
 // UnaryOpKind represents the type of unary operator.
@@ -311,8 +311,8 @@ type UnaryOp struct {
 	span Span
 }
 
-func (u *UnaryOp) node()     {}
-func (u *UnaryOp) expr()     {}
+func (u *UnaryOp) node()      {}
+func (u *UnaryOp) expr()      {}
 func (u *UnaryOp) Span() Span { return u.span }
 
 // BinOpKind represents the type of binary operator.
@@ -386,8 +386,8 @@ type BinOp struct {
 	span  Span
 }
 
-func (b *BinOp) node()     {}
-func (b *BinOp) expr()     {}
+func (b *BinOp) node()      {}
+func (b *BinOp) expr()      {}
 func (b *BinOp) Span() Span { return b.span }
 
 // IfExpr represents a conditional expression (ternary).
@@ -398,8 +398,8 @@ type IfExpr struct {
 	span      Span
 }
 
-func (i *IfExpr) node()     {}
-func (i *IfExpr) expr()     {}
+func (i *IfExpr) node()      {}
+func (i *IfExpr) expr()      {}
 func (i *IfExpr) Span() Span { return i.span }
 
 // Filter represents a filter application.
@@ -410,8 +410,8 @@ type Filter struct {
 	span Span
 }
 
-func (f *Filter) node()     {}
-func (f *Filter) expr()     {}
+func (f *Filter) node()      {}
+func (f *Filter) expr()      {}
 func (f *Filter) Span() Span { return f.span }
 
 // Test represents a test expression.
@@ -422,8 +422,8 @@ type Test struct {
 	span Span
 }
 
-func (t *Test) node()     {}
-func (t *Test) expr()     {}
+func (t *Test) node()      {}
+func (t *Test) expr()      {}
 func (t *Test) Span() Span { return t.span }
 
 // GetAttr represents attribute access (x.y).
@@ -433,8 +433,8 @@ type GetAttr struct {
 	span Span
 }
 
-func (g *GetAttr) node()     {}
-func (g *GetAttr) expr()     {}
+func (g *GetAttr) node()      {}
+func (g *GetAttr) expr()      {}
 func (g *GetAttr) Span() Span { return g.span }
 
 // GetItem represents subscript access (x[y]).
@@ -444,8 +444,8 @@ type GetItem struct {
 	span          Span
 }
 
-func (g *GetItem) node()     {}
-func (g *GetItem) expr()     {}
+func (g *GetItem) node()      {}
+func (g *GetItem) expr()      {}
 func (g *GetItem) Span() Span { return g.span }
 
 // Slice represents a slice operation.
@@ -457,8 +457,8 @@ type Slice struct {
 	span  Span
 }
 
-func (s *Slice) node()     {}
-func (s *Slice) expr()     {}
+func (s *Slice) node()      {}
+func (s *Slice) expr()      {}
 func (s *Slice) Span() Span { return s.span }
 
 // Call represents a function/method call.
@@ -468,8 +468,8 @@ type Call struct {
 	span Span
 }
 
-func (c *Call) node()     {}
-func (c *Call) expr()     {}
+func (c *Call) node()      {}
+func (c *Call) expr()      {}
 func (c *Call) Span() Span { return c.span }
 
 // CallArgKind represents the type of call argument.
@@ -495,8 +495,8 @@ type List struct {
 	span  Span
 }
 
-func (l *List) node()     {}
-func (l *List) expr()     {}
+func (l *List) node()      {}
+func (l *List) expr()      {}
 func (l *List) Span() Span { return l.span }
 
 // Map represents a map/dict literal.
@@ -506,8 +506,8 @@ type Map struct {
 	span   Span
 }
 
-func (m *Map) node()     {}
-func (m *Map) expr()     {}
+func (m *Map) node()      {}
+func (m *Map) expr()      {}
 func (m *Map) Span() Span { return m.span }
 
 // --- Debug Output (matching Rust's format) ---

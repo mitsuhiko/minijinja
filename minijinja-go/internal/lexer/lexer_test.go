@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/testutil"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
 )
 
 const (
-	// Paths relative to lexer package directory (minijinja-go/lexer/)
-	rustTestsDir  = "../../minijinja/tests"
-	lexerInputDir = "../../minijinja/tests/lexer-inputs"
-	snapshotDir   = "../../minijinja/tests/snapshots"
+	// Paths relative to lexer package directory (minijinja-go/internal/lexer/)
+	rustTestsDir  = "../../../minijinja/tests"
+	lexerInputDir = "../../../minijinja/tests/lexer-inputs"
+	snapshotDir   = "../../../minijinja/tests/snapshots"
 )
 
 func TestLexer(t *testing.T) {
@@ -39,8 +40,8 @@ func TestLexer(t *testing.T) {
 			}
 
 			// Build config from settings
-			syntaxCfg := DefaultSyntax()
-			whitespaceCfg := DefaultWhitespace()
+			syntaxCfg := syntax.DefaultSyntax()
+			whitespaceCfg := syntax.DefaultWhitespace()
 
 			if input.Settings != nil {
 				if input.Settings.HasMarkers() {
@@ -137,7 +138,7 @@ func diffStrings(expected, actual string) string {
 // TestLexerBasic is a simple sanity check.
 func TestLexerBasic(t *testing.T) {
 	input := "Hello {{ name }}!"
-	tokens, err := Tokenize(input, DefaultSyntax(), DefaultWhitespace())
+	tokens, err := Tokenize(input, syntax.DefaultSyntax(), syntax.DefaultWhitespace())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

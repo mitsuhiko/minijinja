@@ -1,8 +1,11 @@
 package minijinja
 
 import (
+	"context"
 	"strings"
 	"testing"
+
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
 func TestVersion(t *testing.T) {
@@ -389,6 +392,39 @@ func TestTests(t *testing.T) {
 		}
 		if result != test.expected {
 			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
+func TestOperatorAliasTests(t *testing.T) {
+	env := NewEnvironment()
+
+	aliases := []string{
+		"equalto",
+		"==",
+		"ne",
+		"!=",
+		"lessthan",
+		"<",
+		"le",
+		"<=",
+		"greaterthan",
+		">",
+		"ge",
+		">=",
+	}
+
+	for _, alias := range aliases {
+		tmpl, err := env.TemplateFromString("{{ '" + alias + "' is test }}")
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", alias, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", alias, err)
+		}
+		if result != "true" {
+			t.Errorf("alias %q: expected \"true\", got %q", alias, result)
 		}
 	}
 }
@@ -1027,5 +1063,245 @@ func TestNamespace(t *testing.T) {
 
 	if result != "3" {
 		t.Errorf("expected '3', got %q", result)
+	}
+}
+
+// --- Context Tests ---
+
+func TestRenderCtx(t *testing.T) {
+	env := NewEnvironment()
+
+	// Add a function that accesses the context
+	type ctxKey string
+	env.AddFunction("get_value", func(state *State, args []Value, kwargs map[string]Value) (Value, error) {
+		ctx := state.Context()
+		if v, ok := ctx.Value(ctxKey("test")).(string); ok {
+			return value.FromString(v), nil
+		}
+		return value.FromString("not found"), nil
+	})
+
+	tmpl, err := env.TemplateFromString(`{{ get_value() }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	// Test with context value
+	ctx := context.WithValue(context.Background(), ctxKey("test"), "hello from context")
+	result, err := tmpl.RenderCtx(ctx, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "hello from context" {
+		t.Errorf("expected 'hello from context', got %q", result)
+	}
+
+	// Test without context value (using Render)
+	result2, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result2 != "not found" {
+		t.Errorf("expected 'not found', got %q", result2)
+	}
+}
+
+func TestStateAccessors(t *testing.T) {
+	env := NewEnvironment()
+
+	var capturedState *State
+	env.AddFunction("capture_state", func(state *State, args []Value, kwargs map[string]Value) (Value, error) {
+		capturedState = state
+		return value.FromString("ok"), nil
+	})
+
+	tmpl, err := env.TemplateFromNamedString("test.html", `{{ capture_state() }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	ctx := context.Background()
+	_, err = tmpl.RenderCtx(ctx, nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	// Test State accessors
+	if capturedState.Name() != "test.html" {
+		t.Errorf("expected template name 'test.html', got %q", capturedState.Name())
+	}
+
+	if capturedState.Env() != env {
+		t.Error("State.Env() should return the environment")
+	}
+
+	if capturedState.Context() != ctx {
+		t.Error("State.Context() should return the context")
+	}
+
+	if capturedState.AutoEscape() != AutoEscapeHTML {
+		t.Error("State.AutoEscape() should be HTML for .html files")
+	}
+}
+
+// --- One-Shot Iterator Tests ---
+
+func TestOneShotIterator(t *testing.T) {
+	env := NewEnvironment()
+
+	// Create a one-shot iterator
+	iter := value.MakeOneShotIterator(func(yield func(value.Value) bool) {
+		for i := 0; i < 5; i++ {
+			if !yield(value.FromInt(int64(i))) {
+				return
+			}
+		}
+	})
+
+	env.AddGlobal("one_shot", iter)
+
+	// Test that it can be iterated
+	tmpl, err := env.TemplateFromString(`{% for item in one_shot %}[{{ item }}]{% endfor %}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	expected := "[0][1][2][3][4]"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+
+	// Test that loop.length is unknown (uses default)
+	iter2 := value.MakeOneShotIterator(func(yield func(value.Value) bool) {
+		for i := 0; i < 3; i++ {
+			if !yield(value.FromInt(int64(i))) {
+				return
+			}
+		}
+	})
+
+	env2 := NewEnvironment()
+	env2.AddGlobal("one_shot", iter2)
+
+	tmpl2, err := env2.TemplateFromString(`{% for item in one_shot %}- {{ item }}: {{ loop.length|default("?") }}
+{% endfor %}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result2, err := tmpl2.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	expected2 := `- 0: ?
+- 1: ?
+- 2: ?
+`
+	if result2 != expected2 {
+		t.Errorf("expected %q, got %q", expected2, result2)
+	}
+}
+
+func TestOneShotIteratorPartialConsumption(t *testing.T) {
+	env := NewEnvironment()
+
+	// Create a one-shot iterator - must create fresh for each test
+	makeIter := func() value.Value {
+		return value.MakeOneShotIterator(func(yield func(value.Value) bool) {
+			for i := 0; i < 5; i++ {
+				if !yield(value.FromInt(int64(i))) {
+					return
+				}
+			}
+		})
+	}
+
+	// Test partial consumption with break, then continue
+	env.AddGlobal("one_shot", makeIter())
+
+	tmpl, err := env.TemplateFromString(
+		`{% for item in one_shot %}{{ item }}{% if item == 1 %}{% break %}{% endif %}{% endfor %}` +
+			`|{% for item in one_shot %}{{ item }}{% endfor %}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	// First loop: 0, 1 (then break)
+	// Second loop: 2, 3, 4 (remaining items)
+	expected := "01|234"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestOneShotIteratorConsumed(t *testing.T) {
+	env := NewEnvironment()
+
+	// Create a one-shot iterator
+	iter := value.MakeOneShotIterator(func(yield func(value.Value) bool) {
+		for i := 0; i < 3; i++ {
+			if !yield(value.FromInt(int64(i))) {
+				return
+			}
+		}
+	})
+
+	env.AddGlobal("one_shot", iter)
+
+	// Test that second iteration yields nothing after full consumption
+	tmpl, err := env.TemplateFromString(
+		`{% for item in one_shot %}{{ item }}{% endfor %}` +
+			`|{% for item in one_shot %}{{ item }}{% endfor %}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	// First loop: 0, 1, 2
+	// Second loop: nothing (consumed)
+	expected := "012|"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestOneShotIteratorString(t *testing.T) {
+	env := NewEnvironment()
+
+	iter := value.MakeOneShotIterator(func(yield func(value.Value) bool) {
+		yield(value.FromInt(1))
+	})
+
+	env.AddGlobal("one_shot", iter)
+
+	tmpl, err := env.TemplateFromString(`{{ one_shot }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "<iterator>" {
+		t.Errorf("expected '<iterator>', got %q", result)
 	}
 }

@@ -5,7 +5,8 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
 )
 
 const maxRecursion = 150
@@ -19,10 +20,10 @@ var reservedNames = map[string]bool{
 
 // Error represents a parse error.
 type Error struct {
-	Kind    string
-	Detail  string
-	Name    string
-	Line    uint16
+	Kind   string
+	Detail string
+	Name   string
+	Line   uint16
 }
 
 func (e *Error) Error() string {
@@ -48,8 +49,8 @@ type Parser struct {
 }
 
 // Parse parses a template string and returns the AST or an error.
-func Parse(source, filename string, syntax lexer.SyntaxConfig, whitespace lexer.WhitespaceConfig) (*Template, error) {
-	tokens, err := lexer.Tokenize(source, syntax, whitespace)
+func Parse(source, filename string, syntaxConfig syntax.SyntaxConfig, whitespaceConfig syntax.WhitespaceConfig) (*Template, error) {
+	tokens, err := lexer.Tokenize(source, syntaxConfig, whitespaceConfig)
 	if err != nil {
 		return nil, &Error{
 			Kind:   "SyntaxError",
@@ -74,8 +75,8 @@ func Parse(source, filename string, syntax lexer.SyntaxConfig, whitespace lexer.
 
 // ParseDefault parses a template string using default config and returns the AST or an error.
 func ParseDefault(source, filename string) Result {
-	syntaxCfg := lexer.DefaultSyntax()
-	whitespaceCfg := lexer.DefaultWhitespace()
+	syntaxCfg := syntax.DefaultSyntax()
+	whitespaceCfg := syntax.DefaultWhitespace()
 
 	tmpl, err := Parse(source, filename, syntaxCfg, whitespaceCfg)
 	if err != nil {

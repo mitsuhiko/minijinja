@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	rustTestsDir   = "../../minijinja/tests"
-	parserInputDir = "../../minijinja/tests/parser-inputs"
-	snapshotDir    = "../../minijinja/tests/snapshots"
+	rustTestsDir   = "../../../minijinja/tests"
+	parserInputDir = "../../../minijinja/tests/parser-inputs"
+	snapshotDir    = "../../../minijinja/tests/snapshots"
 )
 
 func TestParser(t *testing.T) {

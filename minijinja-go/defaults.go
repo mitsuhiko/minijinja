@@ -5,109 +5,120 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/filters"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v2/tests"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
 func registerDefaultFilters(env *Environment) {
 	// String filters
-	env.AddFilter("upper", FilterUpper)
-	env.AddFilter("lower", FilterLower)
-	env.AddFilter("capitalize", FilterCapitalize)
-	env.AddFilter("title", FilterTitle)
-	env.AddFilter("trim", FilterTrim)
-	env.AddFilter("replace", FilterReplace)
-	env.AddFilter("default", FilterDefault)
-	env.AddFilter("d", FilterDefault) // alias
-	env.AddFilter("safe", FilterSafe)
-	env.AddFilter("escape", FilterEscape)
-	env.AddFilter("e", FilterEscape) // alias
-	env.AddFilter("string", FilterString)
-	env.AddFilter("bool", FilterBool)
-	env.AddFilter("split", FilterSplit)
-	env.AddFilter("lines", FilterLines)
+	env.AddFilter("upper", filters.FilterUpper)
+	env.AddFilter("lower", filters.FilterLower)
+	env.AddFilter("capitalize", filters.FilterCapitalize)
+	env.AddFilter("title", filters.FilterTitle)
+	env.AddFilter("trim", filters.FilterTrim)
+	env.AddFilter("replace", filters.FilterReplace)
+	env.AddFilter("format", filters.FilterFormat)
+	env.AddFilter("default", filters.FilterDefault)
+	env.AddFilter("d", filters.FilterDefault) // alias
+	env.AddFilter("safe", filters.FilterSafe)
+	env.AddFilter("escape", filters.FilterEscape)
+	env.AddFilter("e", filters.FilterEscape) // alias
+	env.AddFilter("string", filters.FilterString)
+	env.AddFilter("bool", filters.FilterBool)
+	env.AddFilter("split", filters.FilterSplit)
+	env.AddFilter("lines", filters.FilterLines)
 
 	// List/sequence filters
-	env.AddFilter("length", FilterLength)
-	env.AddFilter("count", FilterLength) // alias
-	env.AddFilter("first", FilterFirst)
-	env.AddFilter("last", FilterLast)
-	env.AddFilter("reverse", FilterReverse)
-	env.AddFilter("sort", FilterSort)
-	env.AddFilter("join", FilterJoin)
-	env.AddFilter("list", FilterList)
-	env.AddFilter("unique", FilterUnique)
-	env.AddFilter("min", FilterMin)
-	env.AddFilter("max", FilterMax)
-	env.AddFilter("sum", FilterSum)
-	env.AddFilter("batch", FilterBatch)
-	env.AddFilter("slice", FilterSlice)
-	env.AddFilter("map", FilterMap)
-	env.AddFilter("select", FilterSelect)
-	env.AddFilter("reject", FilterReject)
-	env.AddFilter("selectattr", FilterSelectAttr)
-	env.AddFilter("rejectattr", FilterRejectAttr)
-	env.AddFilter("groupby", FilterGroupBy)
-	env.AddFilter("chain", FilterChain)
-	env.AddFilter("zip", FilterZip)
+	env.AddFilter("length", filters.FilterLength)
+	env.AddFilter("count", filters.FilterLength) // alias
+	env.AddFilter("first", filters.FilterFirst)
+	env.AddFilter("last", filters.FilterLast)
+	env.AddFilter("reverse", filters.FilterReverse)
+	env.AddFilter("sort", filters.FilterSort)
+	env.AddFilter("join", filters.FilterJoin)
+	env.AddFilter("list", filters.FilterList)
+	env.AddFilter("unique", filters.FilterUnique)
+	env.AddFilter("min", filters.FilterMin)
+	env.AddFilter("max", filters.FilterMax)
+	env.AddFilter("sum", filters.FilterSum)
+	env.AddFilter("batch", filters.FilterBatch)
+	env.AddFilter("slice", filters.FilterSlice)
+	env.AddFilter("map", filters.FilterMap)
+	env.AddFilter("select", filters.FilterSelect)
+	env.AddFilter("reject", filters.FilterReject)
+	env.AddFilter("selectattr", filters.FilterSelectAttr)
+	env.AddFilter("rejectattr", filters.FilterRejectAttr)
+	env.AddFilter("groupby", filters.FilterGroupBy)
+	env.AddFilter("chain", filters.FilterChain)
+	env.AddFilter("zip", filters.FilterZip)
 
 	// Numeric filters
-	env.AddFilter("abs", FilterAbs)
-	env.AddFilter("int", FilterInt)
-	env.AddFilter("float", FilterFloat)
-	env.AddFilter("round", FilterRound)
+	env.AddFilter("abs", filters.FilterAbs)
+	env.AddFilter("int", filters.FilterInt)
+	env.AddFilter("float", filters.FilterFloat)
+	env.AddFilter("round", filters.FilterRound)
 
 	// Dict filters
-	env.AddFilter("items", FilterItems)
-	env.AddFilter("keys", FilterKeys)
-	env.AddFilter("values", FilterValues)
-	env.AddFilter("dictsort", FilterDictSort)
+	env.AddFilter("items", filters.FilterItems)
+	env.AddFilter("keys", filters.FilterKeys)
+	env.AddFilter("values", filters.FilterValues)
+	env.AddFilter("dictsort", filters.FilterDictSort)
 
 	// Other filters
-	env.AddFilter("attr", FilterAttr)
-	env.AddFilter("indent", FilterIndent)
-	env.AddFilter("pprint", FilterPprint)
+	env.AddFilter("attr", filters.FilterAttr)
+	env.AddFilter("indent", filters.FilterIndent)
+	env.AddFilter("pprint", filters.FilterPprint)
 
 	// JSON and URL filters
-	env.AddFilter("tojson", FilterTojson)
-	env.AddFilter("urlencode", FilterUrlencode)
+	env.AddFilter("tojson", filters.FilterTojson)
+	env.AddFilter("urlencode", filters.FilterUrlencode)
 }
 
 func registerDefaultTests(env *Environment) {
-	env.AddTest("defined", TestDefined)
-	env.AddTest("undefined", TestUndefined)
-	env.AddTest("none", TestNone)
-	env.AddTest("true", TestTrue)
-	env.AddTest("false", TestFalse)
-	env.AddTest("odd", TestOdd)
-	env.AddTest("even", TestEven)
-	env.AddTest("divisibleby", TestDivisibleBy)
-	env.AddTest("eq", TestEq)
-	env.AddTest("equalto", TestEq)
-	env.AddTest("ne", TestNe)
-	env.AddTest("lt", TestLt)
-	env.AddTest("le", TestLe)
-	env.AddTest("gt", TestGt)
-	env.AddTest("ge", TestGe)
-	env.AddTest("in", TestIn)
-	env.AddTest("string", TestString)
-	env.AddTest("number", TestNumber)
-	env.AddTest("integer", TestInteger)
-	env.AddTest("int", TestInteger) // alias
-	env.AddTest("float", TestFloat)
-	env.AddTest("boolean", TestBoolean)
-	env.AddTest("sequence", TestSequence)
-	env.AddTest("mapping", TestMapping)
-	env.AddTest("iterable", TestIterable)
-	env.AddTest("startingwith", TestStartingWith)
-	env.AddTest("endingwith", TestEndingWith)
-	env.AddTest("containing", TestContaining)
-	env.AddTest("safe", TestSafe)
-	env.AddTest("escaped", TestSafe) // alias
-	env.AddTest("sameas", TestSameAs)
-	env.AddTest("lower", TestLower)
-	env.AddTest("upper", TestUpper)
-	env.AddTest("filter", TestFilter)
-	env.AddTest("test", TestTest)
+	env.AddTest("defined", tests.TestDefined)
+	env.AddTest("undefined", tests.TestUndefined)
+	env.AddTest("none", tests.TestNone)
+	env.AddTest("true", tests.TestTrue)
+	env.AddTest("false", tests.TestFalse)
+	env.AddTest("odd", tests.TestOdd)
+	env.AddTest("even", tests.TestEven)
+	env.AddTest("divisibleby", tests.TestDivisibleBy)
+	env.AddTest("eq", tests.TestEq)
+	env.AddTest("equalto", tests.TestEq)
+	env.AddTest("==", tests.TestEq)
+	env.AddTest("ne", tests.TestNe)
+	env.AddTest("!=", tests.TestNe)
+	env.AddTest("lt", tests.TestLt)
+	env.AddTest("lessthan", tests.TestLt)
+	env.AddTest("<", tests.TestLt)
+	env.AddTest("le", tests.TestLe)
+	env.AddTest("<=", tests.TestLe)
+	env.AddTest("gt", tests.TestGt)
+	env.AddTest("greaterthan", tests.TestGt)
+	env.AddTest(">", tests.TestGt)
+	env.AddTest("ge", tests.TestGe)
+	env.AddTest(">=", tests.TestGe)
+	env.AddTest("in", tests.TestIn)
+	env.AddTest("string", tests.TestString)
+	env.AddTest("number", tests.TestNumber)
+	env.AddTest("integer", tests.TestInteger)
+	env.AddTest("int", tests.TestInteger) // alias
+	env.AddTest("float", tests.TestFloat)
+	env.AddTest("boolean", tests.TestBoolean)
+	env.AddTest("sequence", tests.TestSequence)
+	env.AddTest("mapping", tests.TestMapping)
+	env.AddTest("iterable", tests.TestIterable)
+	env.AddTest("startingwith", tests.TestStartingWith)
+	env.AddTest("endingwith", tests.TestEndingWith)
+	env.AddTest("containing", tests.TestContaining)
+	env.AddTest("safe", tests.TestSafe)
+	env.AddTest("escaped", tests.TestSafe) // alias
+	env.AddTest("sameas", tests.TestSameAs)
+	env.AddTest("lower", tests.TestLower)
+	env.AddTest("upper", tests.TestUpper)
+	env.AddTest("filter", tests.TestFilter)
+	env.AddTest("test", tests.TestTest)
 }
 
 func registerDefaultFunctions(env *Environment) {
@@ -119,7 +130,6 @@ func registerDefaultFunctions(env *Environment) {
 	env.AddFunction("debug", fnDebug)
 	env.AddFunction("lipsum", fnLipsum)
 }
-
 
 // --- Functions ---
 
@@ -147,12 +157,12 @@ func fnRange(_ *State, args []value.Value, kwargs map[string]value.Value) (value
 	length := int64(0)
 	if step > 0 {
 		if stop > start {
-			length = (stop-start + step - 1) / step
+			length = (stop - start + step - 1) / step
 		}
 	} else {
 		if stop < start {
 			negStep := -step
-			length = (start-stop + negStep - 1) / negStep
+			length = (start - stop + negStep - 1) / negStep
 		}
 	}
 	if length > 100000 {
@@ -239,7 +249,8 @@ type cyclerNextCallable struct {
 	cycler *cyclerObject
 }
 
-func (c *cyclerNextCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func (c *cyclerNextCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	_ = state
 	if len(c.cycler.items) == 0 {
 		return value.Undefined(), nil
 	}
@@ -252,7 +263,8 @@ type cyclerResetCallable struct {
 	cycler *cyclerObject
 }
 
-func (c *cyclerResetCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func (c *cyclerResetCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	_ = state
 	c.cycler.index = 0
 	return value.Undefined(), nil
 }
@@ -276,7 +288,8 @@ type joinerCallable struct {
 	first bool
 }
 
-func (j *joinerCallable) Call(args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func (j *joinerCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	_ = state
 	if j.first {
 		j.first = false
 		return value.FromString(""), nil
@@ -366,6 +379,17 @@ func fnDebug(state *State, args []value.Value, _ map[string]value.Value) (value.
 		sort.Strings(keys)
 		for _, k := range keys {
 			parts = append(parts, fmt.Sprintf("    %s: %s,", k, state.scopes[i][k].Repr()))
+		}
+	}
+	if !state.rootContext.IsUndefined() {
+		if obj, ok := state.rootContext.AsObject(); ok {
+			if m, ok := obj.(value.MapObject); ok {
+				keys := m.Keys()
+				sort.Strings(keys)
+				for _, k := range keys {
+					parts = append(parts, fmt.Sprintf("    %s: %s,", k, state.rootContext.GetAttr(k).Repr()))
+				}
+			}
 		}
 	}
 	parts = append(parts, "  }")
