@@ -81,55 +81,6 @@ func main() {
 go get github.com/mitsuhiko/minijinja/minijinja-go/v2
 ```
 
-## Template Syntax
-
-MiniJinja for Go supports the full Jinja2 template syntax:
-
-* **Variable expressions:** `{{ name }}`
-* **Comments:** `{# comment #}`
-* **Control structures:** `{% if %}`, `{% for %}`, `{% set %}`, `{% with %}`
-* **Template inheritance:** `{% extends %}`, `{% block %}`, `{{ super() }}`
-* **Macros:** `{% macro %}` / `{% call %}`
-* **Template inclusion:** `{% include %}`
-* **Import statements:** `{% import %}`, `{% from ... import %}`
-* **Filter blocks:** `{% filter %}`
-* **Auto-escaping:** `{% autoescape %}`
-* **Loop controls:** `{% break %}`, `{% continue %}`
-* **Recursive loops:** `{% for ... recursive %}`
-
-## Built-in Features
-
-### Filters (50+)
-
-* **String:** `upper`, `lower`, `capitalize`, `title`, `trim`, `replace`, `safe`, `escape`
-* **List:** `first`, `last`, `length`, `reverse`, `sort`, `join`, `unique`, `batch`, `slice`
-* **Math:** `abs`, `int`, `float`, `round`, `sum`, `min`, `max`
-* **Dict:** `items`, `dictsort`
-* **Serialization:** `tojson`
-* **URL:** `urlencode`
-* **Formatting:** `indent`, `pprint`
-* **Selection:** `map`, `select`, `reject`, `selectattr`, `rejectattr`
-
-### Tests
-
-* `defined`, `undefined`, `none`
-* `true`, `false`
-* `odd`, `even`, `divisibleby`
-* `eq`, `ne`, `lt`, `le`, `gt`, `ge`
-* `string`, `number`, `sequence`, `mapping`, `iterable`
-* `startingwith`, `endingwith`, `containing`
-* `in`
-
-### Functions
-
-* `range()` - generate sequences
-* `dict()` - create dictionaries
-* `namespace()` - create mutable namespaces
-* `cycler()` - cycle through values
-* `joiner()` - join with separators
-* `debug()` - debug output
-* `lipsum()` - lorem ipsum text
-
 ## Template Inheritance
 
 MiniJinja for Go supports full template inheritance with `extends`, `block`, and `super()`:
@@ -164,6 +115,8 @@ Use `{{ super() }}` to include the parent block's content:
 ```
 
 ## Custom Filters and Functions
+
+In addition to the filters supported out of the box, you can register your own ones:
 
 ### Custom Filters
 
