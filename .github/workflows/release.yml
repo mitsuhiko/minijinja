@@ -287,6 +287,19 @@ jobs:
           echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
 
           gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - name: Prewarm pkg.go.dev
+        shell: bash
+        run: |
+          version="${{ needs.plan.outputs.tag }}"
+          version="${version##*/}"
+          if [[ "$version" != v* ]]; then
+            version="v${version}"
+          fi
+          GOPROXY=proxy.golang.org go list -m github.com/mitsuhiko/minijinja/minijinja-go/v2@"$version"
 
   announce:
     needs:

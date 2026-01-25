@@ -85,6 +85,8 @@ func main() {
 go get github.com/mitsuhiko/minijinja/minijinja-go/v2
 ```
 
+Documentation: https://pkg.go.dev/github.com/mitsuhiko/minijinja/minijinja-go/v2
+
 ## Template Inheritance
 
 MiniJinja for Go supports full template inheritance with `extends`, `block`, and `super()`:
