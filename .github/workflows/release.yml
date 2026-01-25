@@ -287,6 +287,26 @@ jobs:
           echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
 
           gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+      - name: Tag Go module release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ needs.plan.outputs.tag }}"
+          version="${version##*/}"
+          if [[ "$version" != v* ]]; then
+            version="v${version}"
+          fi
+          go_tag="minijinja-go/${version}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${go_tag}" >/dev/null 2>&1; then
+            echo "Go tag ${go_tag} already exists"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git tag "${go_tag}" "${GITHUB_SHA}"
+          git push origin "refs/tags/${go_tag}"
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
