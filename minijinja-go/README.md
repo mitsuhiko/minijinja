@@ -29,10 +29,14 @@ existing ecosystem of editor integrations.
 
 ## AI Disclosure
 
-This is alpha software which has been automatically ported from Rust go Go with the help of
-Opus 4.5 and Codex 5.2.  The API might still change and there will be further validation about
-some of the choices made.  It passes the reference tests from the Rust implementation with
-minor adjustments however.
+This is alpha software which has been automatically ported from Rust go Go with
+the help of Opus 4.5 and Codex 5.2.  The API might still change and there will
+be further validation about some of the choices made.  It passes the reference
+tests from the Rust implementation with minor adjustments however.
+
+The implementation intentionally diverges from Rust to make sense in the Go.  One
+significant departure has been that unlike the Rust implementation which uses a
+bytecode interpreter VM, this is just an AST walker.
 
 ## Example
 
@@ -186,7 +190,7 @@ tmpl, _ := env.TemplateFromNamedString("page.html", "{{ content }}")
 result, _ := tmpl.Render(map[string]any{
     "content": "<script>alert('xss')</script>",
 })
-// Result: &lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;
+// Result: &lt;script&gt;alert(&#x27;xss&#x27;)&lt;&#x2f;script&gt;
 ```
 
 Use the `safe` filter to mark content as safe:
