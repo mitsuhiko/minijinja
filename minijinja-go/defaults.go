@@ -61,8 +61,6 @@ func registerDefaultFilters(env *Environment) {
 
 	// Dict filters
 	env.AddFilter("items", filters.FilterItems)
-	env.AddFilter("keys", filters.FilterKeys)
-	env.AddFilter("values", filters.FilterValues)
 	env.AddFilter("dictsort", filters.FilterDictSort)
 
 	// Other filters

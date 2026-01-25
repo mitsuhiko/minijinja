@@ -104,7 +104,7 @@ MiniJinja for Go supports the full Jinja2 template syntax:
 * **String:** `upper`, `lower`, `capitalize`, `title`, `trim`, `replace`, `safe`, `escape`
 * **List:** `first`, `last`, `length`, `reverse`, `sort`, `join`, `unique`, `batch`, `slice`
 * **Math:** `abs`, `int`, `float`, `round`, `sum`, `min`, `max`
-* **Dict:** `items`, `keys`, `values`, `dictsort`
+* **Dict:** `items`, `dictsort`
 * **Serialization:** `tojson`
 * **URL:** `urlencode`
 * **Formatting:** `indent`, `pprint`

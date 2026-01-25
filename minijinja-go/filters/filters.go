@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -343,9 +344,9 @@ func formatPrintfValue(val value.Value, flags, width, precision string, verb byt
 	}
 }
 
-// FilterDefault provides a default value if the input is undefined or none.
+// FilterDefault provides a default value if the input is undefined.
 //
-// If the value is undefined or none, it returns the provided default value.
+// If the value is undefined, it returns the provided default value.
 // Setting the optional second parameter to true will also treat empty/falsy
 // values as undefined.
 //
@@ -359,17 +360,14 @@ func formatPrintfValue(val value.Value, flags, width, precision string, verb byt
 //	{{ my_variable|default("default value") }}
 //	{{ ""|default("empty", true) }}
 //	  -> "empty"
-//
-// Keyword arguments:
-//   - default: The default value to use
-//   - boolean: If true, treat falsy values as undefined
 func FilterDefault(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	if val.IsUndefined() || val.IsNone() {
+	if len(kwargs) > 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
+	}
+
+	if val.IsUndefined() {
 		if len(args) > 0 {
 			return args[0], nil
-		}
-		if def, ok := kwargs["default"]; ok {
-			return def, nil
 		}
 		return value.FromString(""), nil
 	}
@@ -379,11 +377,6 @@ func FilterDefault(_ State, val value.Value, args []value.Value, kwargs map[stri
 	if len(args) > 1 {
 		if b, ok := args[1].AsBool(); ok {
 			checkBool = b
-		}
-	}
-	if b, ok := kwargs["boolean"]; ok {
-		if bb, ok := b.AsBool(); ok {
-			checkBool = bb
 		}
 	}
 
@@ -781,12 +774,11 @@ func FilterSort(state State, val value.Value, args []value.Value, kwargs map[str
 		return val, nil
 	}
 
-	reverse := false
 	if len(args) > 0 {
-		if b, ok := args[0].AsBool(); ok {
-			reverse = b
-		}
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
 	}
+
+	reverse := false
 	if r, ok := kwargs["reverse"]; ok {
 		if b, ok := r.AsBool(); ok {
 			reverse = b
@@ -959,18 +951,32 @@ func FilterUnique(_ State, val value.Value, _ []value.Value, kwargs map[string]v
 		}
 	}
 
+	attrName := ""
+	if attr, ok := kwargs["attribute"]; ok {
+		if s, ok := attr.AsString(); ok {
+			attrName = s
+		} else {
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "attribute must be a string")
+		}
+	}
+
 	seen := make(map[string]bool)
 	var result []value.Value
 	for _, item := range items {
+		valueToCompare := item
+		if attrName != "" {
+			valueToCompare = getDeepAttr(item, attrName)
+		}
+
 		var key string
 		if !caseSensitive {
-			if s, ok := item.AsString(); ok {
+			if s, ok := valueToCompare.AsString(); ok {
 				key = strings.ToLower(s)
 			} else {
-				key = item.Repr()
+				key = valueToCompare.Repr()
 			}
 		} else {
-			key = item.Repr()
+			key = valueToCompare.Repr()
 		}
 		if !seen[key] {
 			seen[key] = true
@@ -1095,9 +1101,6 @@ func FilterSum(_ State, val value.Value, args []value.Value, _ map[string]value.
 //	  </tr>
 //	{% endfor %}
 //	</table>
-//
-// Keyword arguments:
-//   - fill_with: value to use for filling incomplete batches
 func FilterBatch(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
@@ -1111,12 +1114,13 @@ func FilterBatch(_ State, val value.Value, args []value.Value, kwargs map[string
 		}
 	}
 
+	if len(kwargs) > 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
+	}
+
 	fillWith := value.Undefined()
 	if len(args) > 1 {
 		fillWith = args[1]
-	}
-	if f, ok := kwargs["fill_with"]; ok {
-		fillWith = f
 	}
 
 	var result []value.Value
@@ -1928,8 +1932,8 @@ func FilterAbs(_ State, val value.Value, _ []value.Value, _ map[string]value.Val
 // FilterInt converts a value to an integer.
 //
 // String values are parsed as integers. Float values are truncated.
-// Boolean true becomes 1, false becomes 0. If conversion fails, the
-// optional default value is returned (default: 0).
+// Boolean true becomes 1, false becomes 0. If conversion fails, an
+// error is returned.
 //
 // Example:
 //
@@ -1940,20 +1944,17 @@ func FilterAbs(_ State, val value.Value, _ []value.Value, _ map[string]value.Val
 //
 //	{{ "42"|int }}
 //	  -> 42
-//	{{ "invalid"|int(default=0) }}
-//	  -> 0
-//
-// Keyword arguments:
-//   - default: value to return if conversion fails
 func FilterInt(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	defaultVal := value.FromInt(0)
 	if len(args) > 0 {
-		defaultVal = args[0]
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
 	}
-	if d, ok := kwargs["default"]; ok {
-		defaultVal = d
+	if len(kwargs) > 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
 	}
 
+	if val.IsUndefined() || val.IsNone() {
+		return value.FromInt(0), nil
+	}
 	if i, ok := val.AsInt(); ok {
 		return value.FromInt(i), nil
 	}
@@ -1967,20 +1968,24 @@ func FilterInt(_ State, val value.Value, args []value.Value, kwargs map[string]v
 		return value.FromInt(0), nil
 	}
 	if s, ok := val.AsString(); ok {
-		s = strings.TrimSpace(s)
-		var i int64
-		if _, err := fmt.Sscanf(s, "%d", &i); err == nil {
+		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
 			return value.FromInt(i), nil
 		}
+		if f, err := strconv.ParseFloat(s, 64); err == nil {
+			return value.FromInt(int64(f)), nil
+		} else {
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, err.Error())
+		}
 	}
-	return defaultVal, nil
+
+	return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("cannot convert %s to integer", val.Kind()))
 }
 
 // FilterFloat converts a value to a float.
 //
 // String values are parsed as floats. Integer values are converted to floats.
-// Boolean true becomes 1.0, false becomes 0.0. If conversion fails, the
-// optional default value is returned (default: 0.0).
+// Boolean true becomes 1.0, false becomes 0.0. If conversion fails, an
+// error is returned.
 //
 // Example:
 //
@@ -1991,20 +1996,17 @@ func FilterInt(_ State, val value.Value, args []value.Value, kwargs map[string]v
 //
 //	{{ "42.5"|float }}
 //	  -> 42.5
-//	{{ "invalid"|float(default=0.0) }}
-//	  -> 0.0
-//
-// Keyword arguments:
-//   - default: value to return if conversion fails
 func FilterFloat(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	defaultVal := value.FromFloat(0.0)
 	if len(args) > 0 {
-		defaultVal = args[0]
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
 	}
-	if d, ok := kwargs["default"]; ok {
-		defaultVal = d
+	if len(kwargs) > 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
 	}
 
+	if val.IsUndefined() || val.IsNone() {
+		return value.FromFloat(0.0), nil
+	}
 	if f, ok := val.AsFloat(); ok {
 		return value.FromFloat(f), nil
 	}
@@ -2015,20 +2017,19 @@ func FilterFloat(_ State, val value.Value, args []value.Value, kwargs map[string
 		return value.FromFloat(0.0), nil
 	}
 	if s, ok := val.AsString(); ok {
-		s = strings.TrimSpace(s)
-		var f float64
-		if _, err := fmt.Sscanf(s, "%f", &f); err == nil {
+		if f, err := strconv.ParseFloat(s, 64); err == nil {
 			return value.FromFloat(f), nil
+		} else {
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, err.Error())
 		}
 	}
-	return defaultVal, nil
+
+	return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("cannot convert %s to float", val.Kind()))
 }
 
 // FilterRound rounds a number to a given precision.
 //
-// The first parameter specifies the precision (default is 0). The second
-// optional parameter specifies the rounding method: "common" (default),
-// "floor", or "ceil".
+// The first parameter specifies the precision (default is 0).
 //
 // Example:
 //
@@ -2038,62 +2039,38 @@ func FilterFloat(_ State, val value.Value, args []value.Value, kwargs map[string
 // Template usage:
 //
 //	{{ 42.55|round }}
-//	  -> 43
+//	  -> 43.0
 //	{{ 42.55|round(1) }}
 //	  -> 42.6
-//	{{ 42.55|round(method="floor") }}
-//	  -> 42
-//
-// Keyword arguments:
-//   - precision: number of decimal places (default: 0)
-//   - method: rounding method - "common", "floor", or "ceil" (default: "common")
 func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	if len(args) > 1 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
+	}
+	if len(kwargs) > 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
+	}
+
+	if val.IsActualInt() {
+		return val, nil
+	}
+
 	f, ok := val.AsFloat()
 	if !ok {
-		return val, nil
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("cannot round value (%s)", val.Kind()))
 	}
 
 	precision := 0
 	if len(args) > 0 {
 		if p, ok := args[0].AsInt(); ok {
 			precision = int(p)
-		}
-	}
-	if p, ok := kwargs["precision"]; ok {
-		if pp, ok := p.AsInt(); ok {
-			precision = int(pp)
-		}
-	}
-
-	method := "common"
-	if len(args) > 1 {
-		if m, ok := args[1].AsString(); ok {
-			method = m
-		}
-	}
-	if m, ok := kwargs["method"]; ok {
-		if mm, ok := m.AsString(); ok {
-			method = mm
+		} else {
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "precision must be an integer")
 		}
 	}
 
 	multiplier := math.Pow(10, float64(precision))
+	f = math.Round(f*multiplier) / multiplier
 
-	switch method {
-	case "floor":
-		f = math.Floor(f*multiplier) / multiplier
-	case "ceil":
-		f = math.Ceil(f*multiplier) / multiplier
-	default: // common
-		f = math.Round(f*multiplier) / multiplier
-	}
-
-	if precision == 0 {
-		if val.IsActualFloat() {
-			return value.FromFloat(f), nil
-		}
-		return value.FromInt(int64(f)), nil
-	}
 	return value.FromFloat(f), nil
 }
 
@@ -2219,12 +2196,11 @@ func FilterDictSort(_ State, val value.Value, args []value.Value, kwargs map[str
 			keys = append(keys, k)
 		}
 
-		byValue := false
-		if len(args) > 1 {
-			if b, ok := args[1].AsBool(); ok {
-				byValue = b
-			}
+		if len(args) > 0 {
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
 		}
+
+		byValue := false
 		if b, ok := kwargs["by"]; ok {
 			if s, ok := b.AsString(); ok && s == "value" {
 				byValue = true
@@ -2232,11 +2208,6 @@ func FilterDictSort(_ State, val value.Value, args []value.Value, kwargs map[str
 		}
 
 		reverse := false
-		if len(args) > 2 {
-			if b, ok := args[2].AsBool(); ok {
-				reverse = b
-			}
-		}
 		if b, ok := kwargs["reverse"]; ok {
 			if bb, ok := b.AsBool(); ok {
 				reverse = bb
@@ -2337,26 +2308,20 @@ func FilterAttr(_ State, val value.Value, args []value.Value, _ map[string]value
 //	{{ yaml_content|indent(2) }}
 //	{{ yaml_content|indent(2, true) }}
 //	{{ yaml_content|indent(2, true, true) }}
-//
-// Keyword arguments:
-//   - width: number of spaces to indent (default: 4)
-//   - first: whether to indent the first line (default: false)
-//   - blank: whether to indent blank lines (default: false)
 func FilterIndent(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	s, ok := val.AsString()
 	if !ok {
 		return val, nil
 	}
 
+	if len(kwargs) > 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
+	}
+
 	width := 4
 	if len(args) > 0 {
 		if w, ok := args[0].AsInt(); ok {
 			width = int(w)
-		}
-	}
-	if w, ok := kwargs["width"]; ok {
-		if ww, ok := w.AsInt(); ok {
-			width = int(ww)
 		}
 	}
 
@@ -2366,21 +2331,11 @@ func FilterIndent(_ State, val value.Value, args []value.Value, kwargs map[strin
 			first = b
 		}
 	}
-	if f, ok := kwargs["first"]; ok {
-		if ff, ok := f.AsBool(); ok {
-			first = ff
-		}
-	}
 
 	blank := false
 	if len(args) > 2 {
 		if b, ok := args[2].AsBool(); ok {
 			blank = b
-		}
-	}
-	if b, ok := kwargs["blank"]; ok {
-		if bb, ok := b.AsBool(); ok {
-			blank = bb
 		}
 	}
 

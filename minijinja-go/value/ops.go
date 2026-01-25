@@ -104,23 +104,15 @@ func (v Value) Mul(other Value) (Value, error) {
 	}
 
 	// Sequence/Iterator repetition (seq * n)
-	if items := v.Iter(); items != nil && v.Kind() != KindString {
-		if n, ok := other.AsInt(); ok && n >= 0 {
-			result := make([]Value, 0, len(items)*int(n))
-			for i := int64(0); i < n; i++ {
-				result = append(result, items...)
-			}
-			return FromSlice(result), nil
+	if n, ok := other.AsInt(); ok {
+		if v.Kind() == KindSeq || v.Kind() == KindIterable {
+			return repeatIterable(v, n)
 		}
 	}
 	// Sequence/Iterator repetition (n * seq)
-	if n, ok := v.AsInt(); ok && n >= 0 {
-		if items := other.Iter(); items != nil && other.Kind() != KindString {
-			result := make([]Value, 0, len(items)*int(n))
-			for i := int64(0); i < n; i++ {
-				result = append(result, items...)
-			}
-			return FromSlice(result), nil
+	if n, ok := v.AsInt(); ok {
+		if other.Kind() == KindSeq || other.Kind() == KindIterable {
+			return repeatIterable(other, n)
 		}
 	}
 
@@ -136,6 +128,26 @@ func (v Value) Mul(other Value) (Value, error) {
 	}
 
 	return Undefined(), fmt.Errorf("cannot multiply %s and %s", v.Kind(), other.Kind())
+}
+
+func repeatIterable(seq Value, n int64) (Value, error) {
+	if n < 0 {
+		return Undefined(), fmt.Errorf("sequences and iterables can only be multiplied with integers")
+	}
+	if _, ok := seq.Len(); !ok {
+		return Undefined(), fmt.Errorf("cannot repeat unsized iterables")
+	}
+
+	items := seq.Iter()
+	if items == nil {
+		return Undefined(), fmt.Errorf("cannot repeat unsized iterables")
+	}
+
+	result := make([]Value, 0, len(items)*int(n))
+	for i := int64(0); i < n; i++ {
+		result = append(result, items...)
+	}
+	return FromSlice(result), nil
 }
 
 // Div performs division.
