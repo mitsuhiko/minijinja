@@ -14,15 +14,14 @@ import (
 )
 
 func main() {
-	// Get the template directory (relative to this example)
-	// In a real application, this might be a config value or flag
-	templateDir := "./templates"
-
-	// Create the template directory and sample files for this example
-	if err := setupTemplates(templateDir); err != nil {
+	baseDir, err := findExampleDir()
+	if err != nil {
 		log.Fatal(err)
 	}
-	defer os.RemoveAll(templateDir) // Clean up after demo
+
+	// Get the template directory (relative to this example)
+	// In a real application, this might be a config value or flag
+	templateDir := filepath.Join(baseDir, "templates")
 
 	env := minijinja.NewEnvironment()
 
@@ -88,49 +87,15 @@ func main() {
 	fmt.Println(result2)
 }
 
-// setupTemplates creates sample template files for this example
-func setupTemplates(dir string) error {
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+func findExampleDir() (string, error) {
+	candidates := []string{
+		".",
+		filepath.Join(".", "examples", "loader"),
 	}
-
-	// Base template
-	base := `<!DOCTYPE html>
-<html>
-<head><title>{% block title %}Default{% endblock %}</title></head>
-<body>
-{% block content %}{% endblock %}
-</body>
-</html>
-`
-	if err := os.WriteFile(filepath.Join(dir, "base.html"), []byte(base), 0644); err != nil {
-		return err
+	for _, candidate := range candidates {
+		if _, err := os.Stat(filepath.Join(candidate, "templates", "index.html")); err == nil {
+			return candidate, nil
+		}
 	}
-
-	// Index template
-	index := `<h1>{{ title }}</h1>
-<p>{{ message }}</p>
-<ul>
-{% for item in items %}
-  <li>{{ item }}</li>
-{% endfor %}
-</ul>
-`
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte(index), 0644); err != nil {
-		return err
-	}
-
-	// Page template (extends base)
-	page := `{% extends "base.html" %}
-{% block title %}{{ page_title }}{% endblock %}
-{% block content %}
-<h1>{{ page_title }}</h1>
-<p>{{ content }}</p>
-{% endblock %}
-`
-	if err := os.WriteFile(filepath.Join(dir, "page.html"), []byte(page), 0644); err != nil {
-		return err
-	}
-
-	return nil
+	return "", fmt.Errorf("could not locate loader example templates")
 }

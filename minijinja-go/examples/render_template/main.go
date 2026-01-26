@@ -22,7 +22,14 @@ func main() {
 	flag.StringVar(&templatePath, "t", "", "path to a template file to render (shorthand)")
 	flag.Parse()
 
-	if contextPath == "" || templatePath == "" {
+	if contextPath == "" && templatePath == "" {
+		baseDir, err := findExampleDir()
+		if err != nil {
+			log.Fatal(err)
+		}
+		contextPath = filepath.Join(baseDir, "users.json")
+		templatePath = filepath.Join(baseDir, "users.html")
+	} else if contextPath == "" || templatePath == "" {
 		flag.Usage()
 		log.Fatal("context and template paths are required")
 	}
@@ -58,4 +65,17 @@ func main() {
 	}
 
 	fmt.Println(result)
+}
+
+func findExampleDir() (string, error) {
+	candidates := []string{
+		".",
+		filepath.Join(".", "examples", "render_template"),
+	}
+	for _, candidate := range candidates {
+		if _, err := os.Stat(filepath.Join(candidate, "users.json")); err == nil {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("could not locate render-template example files")
 }

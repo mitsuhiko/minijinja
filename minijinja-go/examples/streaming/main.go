@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -45,12 +46,12 @@ func main() {
 
 	err := env.AddTemplate("response.txt", template)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	tmpl, err := env.GetTemplate("response.txt")
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// Render to stdout using streaming
@@ -59,6 +60,6 @@ func main() {
 		"stream": generateItems(),
 	}, os.Stdout)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
