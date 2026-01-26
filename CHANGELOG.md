@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 2.15.0
 
 * Added `py.typed` marker for PEP 561 typing support in Python bindings.  #853
 * Added optional default argument to `map.get()` method in pycompat.  #852
