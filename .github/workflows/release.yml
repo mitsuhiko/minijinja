@@ -319,7 +319,10 @@ jobs:
           if [[ "$version" != v* ]]; then
             version="v${version}"
           fi
+          # Warm the Go module proxy
           GOPROXY=proxy.golang.org go list -m github.com/mitsuhiko/minijinja/minijinja-go/v2@"$version"
+          # Trigger pkg.go.dev to index the module
+          curl -s -X POST "https://pkg.go.dev/fetch/github.com/mitsuhiko/minijinja/minijinja-go/v2@$version"
 
   announce:
     needs:
