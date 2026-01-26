@@ -55,7 +55,8 @@ powered by a WASM build of MiniJinja.
 * Support for [dynamic runtime objects](https://docs.rs/minijinja/latest/minijinja/value/trait.Object.html) with methods and dynamic attributes
 * [Descriptive errors](https://github.com/mitsuhiko/minijinja/tree/main/examples/error)
 * Bindings for [JavaScript](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-js),
-  [Python](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py), [Go](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-go), and [C](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cabi)
+  [Python](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py), and [C](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cabi)
+* Also available for [Go](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-go)
 * Comes with a handy [CLI](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli)
 * [Compiles to WebAssembly](https://github.com/mitsuhiko/minijinja-playground/blob/main/src/lib.rs)
 
