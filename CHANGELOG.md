@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.15.1
+
+* Re-release of 2.15.0 because of a bad release.
+
 ## 2.15.0
 
 * Added `py.typed` marker for PEP 561 typing support in Python bindings.  #853
