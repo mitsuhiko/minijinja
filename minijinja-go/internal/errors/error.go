@@ -122,6 +122,9 @@ const (
 
 	// ErrOutOfFuel indicates template execution ran out of fuel.
 	ErrOutOfFuel
+
+	// ErrEvalBlock indicates an error occurred while evaluating a super block.
+	ErrEvalBlock
 )
 
 // String returns a human-readable string representation of the error kind.
@@ -153,6 +156,8 @@ func (k ErrorKind) String() string {
 		return "bad include"
 	case ErrOutOfFuel:
 		return "out of fuel"
+	case ErrEvalBlock:
+		return "could not render block"
 	default:
 		return "error"
 	}
@@ -195,6 +200,12 @@ type Error struct {
 	// Source is the template source code.
 	// Used for error display and debugging.
 	Source string
+
+	// DebugInfo contains captured debug information when debug mode is enabled.
+	DebugInfo *DebugInfo
+
+	// Cause is the wrapped source error, if any.
+	Cause error
 }
 
 // Error returns a formatted error message string.
@@ -217,6 +228,31 @@ func (e *Error) Error() string {
 		return fmt.Sprintf("%s: %s (at line %d)", e.Kind, e.Message, e.Span.StartLine)
 	}
 	return fmt.Sprintf("%s: %s", e.Kind, e.Message)
+}
+
+// Format implements fmt.Formatter to provide detailed error output with debug info.
+//
+// Use %+v to include debug information, or %#v to include debug information
+// and a chained error stack.
+func (e *Error) Format(f fmt.State, verb rune) {
+	switch verb {
+	case 'v':
+		if f.Flag('#') {
+			formatErrorWithDebug(f, e, true)
+			return
+		}
+		if f.Flag('+') {
+			formatErrorWithDebug(f, e, false)
+			return
+		}
+		_, _ = fmt.Fprint(f, e.Error())
+	case 's':
+		_, _ = fmt.Fprint(f, e.Error())
+	case 'q':
+		_, _ = fmt.Fprintf(f, "%q", e.Error())
+	default:
+		_, _ = fmt.Fprint(f, e.Error())
+	}
 }
 
 // NewError creates a new error with the given kind and message.
@@ -279,4 +315,21 @@ func (e *Error) WithName(name string) *Error {
 func (e *Error) WithSource(source string) *Error {
 	e.Source = source
 	return e
+}
+
+// WithDebugInfo attaches debug information to the error.
+func (e *Error) WithDebugInfo(info DebugInfo) *Error {
+	e.DebugInfo = &info
+	return e
+}
+
+// WithCause attaches another error as the cause of this error.
+func (e *Error) WithCause(err error) *Error {
+	e.Cause = err
+	return e
+}
+
+// Unwrap returns the wrapped cause error, if any.
+func (e *Error) Unwrap() error {
+	return e.Cause
 }

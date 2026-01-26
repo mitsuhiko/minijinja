@@ -25,6 +25,7 @@ const (
 	ErrTooManyArguments = errors.ErrTooManyArguments
 	ErrBadInclude       = errors.ErrBadInclude
 	ErrOutOfFuel        = errors.ErrOutOfFuel
+	ErrEvalBlock        = errors.ErrEvalBlock
 )
 
 // NewError creates a new error with the given kind and message.

@@ -1,6 +1,6 @@
 .PHONY: test
 test:
-	@go test -v ./... 2>&1 | grep -E '(^ok|^FAIL|^\s+--- )'
+	@go test -v ./...
 
 .PHONY: test-all
 test-all:

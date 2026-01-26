@@ -272,8 +272,8 @@ func TestRecursionLimit(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected recursion error")
 	}
-	if tmplErr, ok := err.(*Error); !ok || tmplErr.Kind != ErrInvalidOperation {
-		t.Fatalf("expected invalid operation error, got %v", err)
+	if tmplErr, ok := err.(*Error); !ok || tmplErr.Kind != ErrBadInclude {
+		t.Fatalf("expected bad include error, got %v", err)
 	}
 }
 

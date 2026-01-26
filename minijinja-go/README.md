@@ -79,6 +79,10 @@ func main() {
 }
 ```
 
+## More Examples
+
+- `examples/error_stacktrace`: demonstrates debug stacktraces with template snippets, locals, and chained include errors.
+
 ## Installation
 
 ```bash

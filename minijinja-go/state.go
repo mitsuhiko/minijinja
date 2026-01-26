@@ -755,12 +755,12 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 
 // loopObject is the loop variable object that supports cycle() and previtem/nextitem
 type loopObject struct {
-	index      int           // 0-based index
-	length     int           // total length (-1 for unknown)
-	depth      int           // nesting depth (0-based)
-	items      []value.Value // all items for previtem/nextitem
-	changed    *value.Value  // last value for changed()
-	prevItem   value.Value   // previous item (for pull iterators)
+	index      int                // 0-based index
+	length     int                // total length (-1 for unknown)
+	depth      int                // nesting depth (0-based)
+	items      []value.Value      // all items for previtem/nextitem
+	changed    *value.Value       // last value for changed()
+	prevItem   value.Value        // previous item (for pull iterators)
 	pullIter   value.PullIterator // pull-based iterator
 	peekedNext *value.Value       // peeked next item for pullIter
 	recurseFn  func(value.Value) (string, error)
@@ -1014,18 +1014,7 @@ func (s *State) recursionLimit() int {
 }
 
 func (s *State) decorateError(err error) error {
-	if err == nil || s.env == nil || !s.env.debug {
-		return err
-	}
-	if templErr, ok := err.(*Error); ok {
-		if templErr.Name == "" {
-			templErr.WithName(s.name)
-		}
-		if templErr.Source == "" {
-			templErr.WithSource(s.source)
-		}
-	}
-	return err
+	return s.attachErrorInfo(err, nil)
 }
 
 // Lookup looks up a variable in the current scope chain.
@@ -1150,8 +1139,15 @@ func (s *State) eval(tmpl *parser.Template) (string, error) {
 	return s.outputString(), nil
 }
 
-func (s *State) evalStmt(stmt parser.Stmt) error {
-	if err := s.consumeFuel(); err != nil {
+func (s *State) evalStmt(stmt parser.Stmt) (err error) {
+	if s.env != nil && s.env.debug {
+		defer func() {
+			if err != nil {
+				err = s.attachErrorInfo(err, stmt)
+			}
+		}()
+	}
+	if err = s.consumeFuel(); err != nil {
 		return err
 	}
 
@@ -1773,7 +1769,10 @@ func (s *State) evalInclude(inc *parser.Include) error {
 			if inc.IgnoreMissing && isTemplateNotFound(err) {
 				return nil
 			}
-			return err
+			if isTemplateNotFound(err) {
+				return err
+			}
+			return wrapIncludeError(err, inc.Span(), name)
 		}
 		return nil
 	}
@@ -1789,8 +1788,11 @@ func (s *State) evalInclude(inc *parser.Include) error {
 				continue
 			}
 			if err := s.includeTemplate(name); err != nil {
-				lastErr = err
-				continue
+				if isTemplateNotFound(err) {
+					lastErr = err
+					continue
+				}
+				return wrapIncludeError(err, inc.Span(), name)
 			}
 			return nil
 		}
@@ -1852,6 +1854,14 @@ func isTemplateNotFound(err error) bool {
 		return templErr.Kind == ErrTemplateNotFound
 	}
 	return false
+}
+
+func wrapIncludeError(err error, span parser.Span, name string) error {
+	tmplName := name
+	if templErr, ok := err.(*Error); ok && templErr.Name != "" {
+		tmplName = templErr.Name
+	}
+	return NewError(ErrBadInclude, fmt.Sprintf("error in %q", tmplName)).WithSpan(span).WithCause(err)
 }
 
 func (s *State) evalImport(imp *parser.Import) error {
@@ -2301,8 +2311,15 @@ func formatJSONValue(val value.Value) (string, error) {
 	return out, nil
 }
 
-func (s *State) evalExpr(expr parser.Expr) (value.Value, error) {
-	if err := s.consumeFuel(); err != nil {
+func (s *State) evalExpr(expr parser.Expr) (rv value.Value, err error) {
+	if s.env != nil && s.env.debug {
+		defer func() {
+			if err != nil {
+				err = s.attachErrorInfo(err, expr)
+			}
+		}()
+	}
+	if err = s.consumeFuel(); err != nil {
 		return value.Undefined(), err
 	}
 
@@ -2597,7 +2614,7 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 	if v, ok := call.Expr.(*parser.Var); ok {
 		// Check for super() call
 		if v.ID == "super" {
-			return s.evalSuper()
+			return s.evalSuper(call.Span())
 		}
 
 		// Check for loop() recursive call
@@ -2706,14 +2723,14 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 	return value.Undefined(), NewError(ErrUnknownFunction, "unknown callable").WithSpan(call.Span())
 }
 
-func (s *State) evalSuper() (value.Value, error) {
+func (s *State) evalSuper(span parser.Span) (value.Value, error) {
 	if s.currentBlock == "" {
-		return value.Undefined(), NewError(ErrInvalidOperation, "super() can only be used inside a block")
+		return value.Undefined(), NewError(ErrInvalidOperation, "super() can only be used inside a block").WithSpan(span)
 	}
 
 	bs := s.blocks[s.currentBlock]
 	if bs == nil || bs.index+1 >= len(bs.layers) {
-		return value.Undefined(), NewError(ErrInvalidOperation, "no parent block exists")
+		return value.Undefined(), NewError(ErrInvalidOperation, "no parent block exists").WithSpan(span)
 	}
 
 	// Move to the parent block
@@ -2730,7 +2747,7 @@ func (s *State) evalSuper() (value.Value, error) {
 		if err := s.evalStmt(stmt); err != nil {
 			s.popScope()
 			s.out = oldOut
-			return value.Undefined(), err
+			return value.Undefined(), NewError(ErrEvalBlock, "error in super block").WithSpan(span).WithCause(err)
 		}
 	}
 	s.popScope()
