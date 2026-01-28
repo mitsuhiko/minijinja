@@ -66,6 +66,9 @@ pub enum Instruction<'source> {
     /// Builds a list of the last n pairs on the stack.
     BuildList(Option<usize>),
 
+    /// Builds a tuple of the last n pairs on the stack.
+    BuildTuple(Option<usize>),
+
     /// Unpacks a list into N stack items.
     UnpackList(usize),
 
