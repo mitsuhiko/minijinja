@@ -120,6 +120,42 @@ func (s *State) UndefinedBehavior() UndefinedBehavior {
 	return s.undefinedBehavior
 }
 
+func (s *State) isStrictUndefined() bool {
+	return s.undefinedBehavior == UndefinedStrict
+}
+
+func (s *State) isStrictOrSemiStrict() bool {
+	return s.undefinedBehavior == UndefinedStrict || s.undefinedBehavior == UndefinedSemiStrict
+}
+
+func (s *State) handleUndefined(parentWasUndefined bool) (value.Value, error) {
+	switch s.undefinedBehavior {
+	case UndefinedChainable:
+		return value.Undefined(), nil
+	case UndefinedLenient, UndefinedSemiStrict, UndefinedStrict:
+		if parentWasUndefined {
+			return value.Undefined(), NewError(ErrUndefinedVar, "undefined value")
+		}
+		return value.Undefined(), nil
+	default:
+		return value.Undefined(), nil
+	}
+}
+
+func (s *State) isTrue(val value.Value) (bool, error) {
+	if val.IsUndefined() && s.isStrictUndefined() && !val.IsSilentUndefined() {
+		return false, NewError(ErrUndefinedVar, "undefined value")
+	}
+	return val.IsTrue(), nil
+}
+
+func (s *State) assertIterable(val value.Value) error {
+	if val.IsUndefined() && s.isStrictOrSemiStrict() && !val.IsSilentUndefined() {
+		return NewError(ErrUndefinedVar, "undefined value")
+	}
+	return nil
+}
+
 // RenderBlock renders a specific block by name.
 //
 // This is useful for rendering parts of a template, such as for
@@ -1257,8 +1293,8 @@ func (s *State) evalForLoop(loop *parser.ForLoop) error {
 	items := iter.Iter()
 	if items == nil {
 		if iter.IsUndefined() || iter.IsNone() {
-			if iter.IsUndefined() && s.undefinedBehavior == UndefinedStrict {
-				return NewError(ErrUndefinedVar, "undefined value")
+			if err := s.assertIterable(iter); err != nil {
+				return err
 			}
 			items = []value.Value{}
 		} else {
@@ -1373,7 +1409,12 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 				s.popScope()
 				return err
 			}
-			if cond.IsTrue() {
+			truthy, err := s.isTrue(cond)
+			if err != nil {
+				s.popScope()
+				return wrapEvalError(err, loop.FilterExpr.Span())
+			}
+			if truthy {
 				filtered = append(filtered, item)
 			}
 		}
@@ -1421,6 +1462,9 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 			nestedItems := iterValue.Iter()
 			if nestedItems == nil {
 				if iterValue.IsUndefined() || iterValue.IsNone() {
+					if err := s.assertIterable(iterValue); err != nil {
+						return "", err
+					}
 					return "", nil
 				}
 				return "", NewError(ErrInvalidOperation, "cannot recurse because of non-iterable value")
@@ -1558,7 +1602,12 @@ func (s *State) evalIfCond(cond *parser.IfCond) error {
 		return err
 	}
 
-	if val.IsTrue() {
+	truthy, err := s.isTrue(val)
+	if err != nil {
+		return wrapEvalError(err, cond.Span())
+	}
+
+	if truthy {
 		for _, stmt := range cond.TrueBody {
 			if err := s.evalStmt(stmt); err != nil {
 				return err
@@ -2253,7 +2302,7 @@ func (c *callerCallable) Call(state value.State, args []value.Value, kwargs map[
 }
 
 func (s *State) writeValue(val value.Value) error {
-	str, err := s.formatValue(val, false)
+	str, err := s.formatValue(val, true)
 	if err != nil {
 		return err
 	}
@@ -2263,7 +2312,7 @@ func (s *State) writeValue(val value.Value) error {
 
 func (s *State) formatValue(val value.Value, strictUndefined bool) (string, error) {
 	if val.IsUndefined() {
-		if strictUndefined && s.undefinedBehavior == UndefinedStrict {
+		if strictUndefined && s.isStrictOrSemiStrict() && !val.IsSilentUndefined() {
 			return "", NewError(ErrUndefinedVar, "undefined value")
 		}
 		return "", nil
@@ -2328,11 +2377,7 @@ func (s *State) evalExpr(expr parser.Expr) (rv value.Value, err error) {
 		return s.evalConst(e), nil
 
 	case *parser.Var:
-		val := s.Lookup(e.ID)
-		if val.IsUndefined() && s.undefinedBehavior == UndefinedStrict {
-			return value.Undefined(), NewError(ErrUndefinedVar, "undefined value").WithSpan(e.Span())
-		}
-		return val, nil
+		return s.Lookup(e.ID), nil
 
 	case *parser.UnaryOp:
 		return s.evalUnaryOp(e)
@@ -2416,7 +2461,11 @@ func (s *State) evalUnaryOp(op *parser.UnaryOp) (value.Value, error) {
 
 	switch op.Op {
 	case parser.UnaryNot:
-		return value.FromBool(!val.IsTrue()), nil
+		truthy, err := s.isTrue(val)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		return value.FromBool(!truthy), nil
 	case parser.UnaryNeg:
 		rv, err := val.Neg()
 		if err != nil {
@@ -2435,7 +2484,11 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), err
 		}
-		if !left.IsTrue() {
+		truthy, err := s.isTrue(left)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		if !truthy {
 			return left, nil
 		}
 		return s.evalExpr(op.Right)
@@ -2446,7 +2499,11 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), err
 		}
-		if left.IsTrue() {
+		truthy, err := s.isTrue(left)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		if truthy {
 			return left, nil
 		}
 		return s.evalExpr(op.Right)
@@ -2531,6 +2588,9 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 	case parser.BinOpConcat:
 		return left.Concat(right), nil
 	case parser.BinOpIn:
+		if err := s.assertIterable(right); err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
 		return value.FromBool(right.Contains(left)), nil
 	default:
 		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("unknown binary operator: %v", op.Op)).WithSpan(op.Span())
@@ -2543,14 +2603,19 @@ func (s *State) evalIfExpr(ie *parser.IfExpr) (value.Value, error) {
 		return value.Undefined(), err
 	}
 
-	if cond.IsTrue() {
+	truthy, err := s.isTrue(cond)
+	if err != nil {
+		return value.Undefined(), wrapEvalError(err, ie.Span())
+	}
+
+	if truthy {
 		return s.evalExpr(ie.TrueExpr)
 	}
 
 	if ie.FalseExpr != nil {
 		return s.evalExpr(ie.FalseExpr)
 	}
-	return value.Undefined(), nil
+	return value.SilentUndefined(), nil
 }
 
 func (s *State) evalTest(test *parser.Test) (value.Value, error) {
@@ -2589,7 +2654,11 @@ func (s *State) evalGetAttr(ga *parser.GetAttr) (value.Value, error) {
 		return value.Undefined(), err
 	}
 	if val.IsUndefined() {
-		return value.Undefined(), NewError(ErrUndefinedVar, "undefined value").WithSpan(ga.Span())
+		val, err := s.handleUndefined(true)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, ga.Span())
+		}
+		return val, nil
 	}
 	return val.GetAttr(ga.Name), nil
 }
@@ -2600,7 +2669,11 @@ func (s *State) evalGetItem(gi *parser.GetItem) (value.Value, error) {
 		return value.Undefined(), err
 	}
 	if val.IsUndefined() {
-		return value.Undefined(), NewError(ErrUndefinedVar, "undefined value").WithSpan(gi.Span())
+		val, err := s.handleUndefined(true)
+		if err != nil {
+			return value.Undefined(), wrapEvalError(err, gi.Span())
+		}
+		return val, nil
 	}
 	key, err := s.evalExpr(gi.SubscriptExpr)
 	if err != nil {

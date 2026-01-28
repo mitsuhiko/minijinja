@@ -11,6 +11,20 @@ import (
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
 )
 
+type undefinedBehaviorProvider interface {
+	UndefinedBehavior() value.UndefinedBehavior
+}
+
+func undefinedBehavior(state filters.State) value.UndefinedBehavior {
+	if state == nil {
+		return value.UndefinedLenient
+	}
+	if provider, ok := state.(undefinedBehaviorProvider); ok {
+		return provider.UndefinedBehavior()
+	}
+	return value.UndefinedLenient
+}
+
 // TestDefined checks if a value is defined.
 //
 // Returns true if the value is not undefined.
@@ -377,11 +391,16 @@ func TestGe(_ filters.State, val value.Value, args []value.Value) (bool, error) 
 //	  -> true
 //	{{ [1, 2, 3]|select("in", [1, 2]) }}
 //	  -> [1, 2]
-func TestIn(_ filters.State, val value.Value, args []value.Value) (bool, error) {
+func TestIn(state filters.State, val value.Value, args []value.Value) (bool, error) {
 	if len(args) < 1 {
 		return false, nil
 	}
-	return args[0].Contains(val), nil
+	container := args[0]
+	behavior := undefinedBehavior(state)
+	if container.IsUndefined() && (behavior == value.UndefinedStrict || behavior == value.UndefinedSemiStrict) && !container.IsSilentUndefined() {
+		return false, mjerrors.NewError(mjerrors.ErrUndefinedVar, "undefined value")
+	}
+	return container.Contains(val), nil
 }
 
 // TestString checks if a value is a string.

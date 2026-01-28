@@ -337,12 +337,15 @@ type Value struct {
 }
 
 // internal marker types for special values
-type undefinedType struct{}
+type undefinedType struct{
+	silent bool
+}
 type noneType struct{}
 
 var (
-	undefinedVal = undefinedType{}
-	noneVal      = noneType{}
+	undefinedVal       = undefinedType{}
+	silentUndefinedVal = undefinedType{silent: true}
+	noneVal            = noneType{}
 )
 
 // Undefined returns the undefined value.
@@ -362,6 +365,15 @@ var (
 //	}
 func Undefined() Value {
 	return Value{data: undefinedVal}
+}
+
+// SilentUndefined returns an undefined value that does not trigger strict
+// undefined errors when rendered or evaluated for truthiness.
+//
+// This is used internally for expressions like "a if cond" where the
+// false branch is omitted.
+func SilentUndefined() Value {
+	return Value{data: silentUndefinedVal}
 }
 
 // None returns the none/null value.
@@ -827,6 +839,15 @@ func (v Value) IsCallable() bool {
 func (v Value) IsUndefined() bool {
 	_, ok := v.data.(undefinedType)
 	return ok
+}
+
+// IsSilentUndefined returns true if the value is an undefined value that
+// should not trigger strict undefined errors.
+func (v Value) IsSilentUndefined() bool {
+	if u, ok := v.data.(undefinedType); ok {
+		return u.silent
+	}
+	return false
 }
 
 // IsNone returns true if the value is none.

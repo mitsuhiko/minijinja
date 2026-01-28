@@ -104,17 +104,24 @@ func defaultAutoEscape(name string) AutoEscape {
 // UndefinedBehavior determines how undefined variables are handled.
 //
 // This controls the runtime behavior of undefined values in the template engine.
-type UndefinedBehavior int
+// The type is shared with the value package to allow filters to inspect it.
+type UndefinedBehavior = value.UndefinedBehavior
 
 const (
 	// UndefinedLenient allows undefined values to be used in templates.
 	// They will render as empty strings and can be tested with the 'is defined' test.
 	// This is the default behavior and matches Jinja2.
-	UndefinedLenient UndefinedBehavior = iota
+	UndefinedLenient = value.UndefinedLenient
+
+	// UndefinedChainable allows chained access on undefined values without erroring.
+	UndefinedChainable = value.UndefinedChainable
+
+	// UndefinedSemiStrict is strict for printing/iteration, but lenient for truthiness.
+	UndefinedSemiStrict = value.UndefinedSemiStrict
 
 	// UndefinedStrict causes an error when undefined values are encountered.
 	// This is stricter than Jinja2 and helps catch template errors early.
-	UndefinedStrict
+	UndefinedStrict = value.UndefinedStrict
 )
 
 // FilterState provides access to filter/test lookup during rendering.

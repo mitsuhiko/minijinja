@@ -104,6 +104,10 @@ func TestTemplates(t *testing.T) {
 				switch input.Settings.Undefined {
 				case "strict":
 					env.SetUndefinedBehavior(UndefinedStrict)
+				case "semi-strict", "semi_strict":
+					env.SetUndefinedBehavior(UndefinedSemiStrict)
+				case "chainable":
+					env.SetUndefinedBehavior(UndefinedChainable)
 				}
 			}
 

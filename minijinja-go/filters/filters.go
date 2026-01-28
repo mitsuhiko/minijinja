@@ -34,6 +34,20 @@ type FilterFunc func(state State, val value.Value, args []value.Value, kwargs ma
 // TestFunc is the signature for test functions.
 type TestFunc func(state State, val value.Value, args []value.Value) (bool, error)
 
+type undefinedBehaviorProvider interface {
+	UndefinedBehavior() value.UndefinedBehavior
+}
+
+func undefinedBehavior(state State) value.UndefinedBehavior {
+	if state == nil {
+		return value.UndefinedLenient
+	}
+	if provider, ok := state.(undefinedBehaviorProvider); ok {
+		return provider.UndefinedBehavior()
+	}
+	return value.UndefinedLenient
+}
+
 // FilterUpper converts a value to uppercase.
 //
 // This filter converts the entire string to uppercase characters.
@@ -503,7 +517,11 @@ func FilterString(_ State, val value.Value, _ []value.Value, _ map[string]value.
 //	  -> true
 //	{{ ""|bool }}
 //	  -> false
-func FilterBool(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterBool(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	behavior := undefinedBehavior(state)
+	if val.IsUndefined() && behavior == value.UndefinedStrict && !val.IsSilentUndefined() {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrUndefinedVar, "undefined value")
+	}
 	return value.FromBool(val.IsTrue()), nil
 }
 
@@ -911,7 +929,15 @@ func FilterJoin(_ State, val value.Value, args []value.Value, _ map[string]value
 //	  -> ["a", "b", "c"]
 //	{{ range(5)|list }}
 //	  -> [0, 1, 2, 3, 4]
-func FilterList(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterList(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	if val.IsUndefined() {
+		behavior := undefinedBehavior(state)
+		if (behavior == value.UndefinedStrict || behavior == value.UndefinedSemiStrict) && !val.IsSilentUndefined() {
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot convert value to list")
+		}
+		return value.FromSlice(nil), nil
+	}
+
 	items := val.Iter()
 	if items != nil {
 		return value.FromSlice(items), nil
