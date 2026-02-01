@@ -1,9 +1,10 @@
 #![cfg(feature = "builtins")]
-use minijinja::value::Value;
+use minijinja::value::{Value, ValueKind};
 use minijinja::{args, context, Environment};
 use similar_asserts::assert_eq;
 
 use minijinja::filters::{abs, indent};
+use minijinja::{escape_formatter, AutoEscape};
 
 #[test]
 fn test_filter_with_non() {
@@ -349,4 +350,35 @@ fn test_sort_strings() {
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
     assert_eq!(result, r#"["bb", "aa", "CC"]"#);
+}
+
+#[test]
+fn test_escape_filter_custom_formatter() {
+    let mut env = Environment::new();
+    env.set_auto_escape_callback(|_| AutoEscape::Custom("Markdown"));
+    env.set_formatter(|out, state, value| {
+        if value.is_safe() && value.kind() == ValueKind::String {
+            return out
+                .write_str(value.as_str().unwrap_or_default())
+                .map_err(minijinja::Error::from);
+        }
+
+        match state.auto_escape() {
+            AutoEscape::Custom("Markdown") => {
+                let escaped = value.to_string().replace('*', "\\*");
+                write!(out, "{escaped}").map_err(minijinja::Error::from)
+            }
+            _ => escape_formatter(out, state, value),
+        }
+    });
+
+    let tmpl = env.template_from_str("{{ value|e }}").unwrap();
+    let result = tmpl.render(context! { value => "*" }).unwrap();
+    assert_eq!(result, "\\*");
+
+    let tmpl = env
+        .template_from_str("{% autoescape false %}{{ value|e }}{% endautoescape %}")
+        .unwrap();
+    let result = tmpl.render(context! { value => "*" }).unwrap();
+    assert_eq!(result, "\\*");
 }
