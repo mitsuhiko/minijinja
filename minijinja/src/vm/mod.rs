@@ -403,6 +403,16 @@ impl<'env> Vm<'env> {
                     v.reverse();
                     stack.push(Value::from_object(v))
                 }
+                Instruction::BuildTuple(n) => {
+                    use crate::value::Tuple;
+                    let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
+                    let mut v = Vec::with_capacity(untrusted_size_hint(count));
+                    for _ in 0..count {
+                        v.push(stack.pop());
+                    }
+                    v.reverse();
+                    stack.push(Value::from_object(Tuple::from(v)))
+                }
                 Instruction::UnpackList(count) => {
                     ctx_ok!(self.unpack_list(&mut stack, *count));
                 }

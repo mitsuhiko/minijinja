@@ -690,6 +690,81 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
     }
 }
 
+/// A tuple wrapper that renders as Python-style tuples.
+///
+/// This type works exactly like `Vec<T>` functionally but when
+/// rendered it displays as `(item1, item2, ...)` instead of
+/// `[item1, item2, ...]`. It's used internally to represent
+/// tuple expressions from templates.
+///
+/// ```
+/// # use minijinja::value::{Value, Tuple};
+/// let tuple = Tuple::from(vec![Value::from(1), Value::from(2)]);
+/// let value = Value::from_object(tuple);
+/// assert_eq!(value.to_string(), "(1, 2)");
+/// ```
+#[derive(Debug, Clone)]
+pub struct Tuple(pub Vec<Value>);
+
+impl From<Vec<Value>> for Tuple {
+    fn from(vec: Vec<Value>) -> Self {
+        Tuple(vec)
+    }
+}
+
+impl From<&[Value]> for Tuple {
+    fn from(slice: &[Value]) -> Self {
+        Tuple(slice.to_vec())
+    }
+}
+
+impl Deref for Tuple {
+    type Target = Vec<Value>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Tuple {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Object for Tuple {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Seq
+    }
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        key.as_usize().and_then(|i| self.0.get(i).cloned())
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Seq(self.0.len())
+    }
+
+    fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
+        Some(self.0.len())
+    }
+
+    fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("(")?;
+        for (idx, value) in self.0.iter().enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
+            }
+            std::fmt::Display::fmt(value, f)?;
+        }
+        // Special case: single item tuple needs trailing comma
+        if self.0.len() == 1 {
+            f.write_str(",")?;
+        }
+        f.write_str(")")
+    }
+}
+
 /// Utility to accept keyword arguments.
 ///
 /// Keyword arguments are represented as regular values as the last argument
