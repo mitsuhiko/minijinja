@@ -2138,64 +2138,6 @@ func FilterItems(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 	return value.FromSlice(nil), nil
 }
 
-// FilterKeys returns a list of keys from a map.
-//
-// The keys are sorted alphabetically.
-//
-// Example:
-//
-//	env := minijinja.NewEnvironment()
-//	env.AddFilter("keys", FilterKeys)
-//
-// Template usage:
-//
-//	{{ my_dict|keys }}
-func FilterKeys(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	if m, ok := val.AsMap(); ok {
-		keys := make([]string, 0, len(m))
-		for k := range m {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		result := make([]value.Value, len(keys))
-		for i, k := range keys {
-			result[i] = value.FromString(k)
-		}
-		return value.FromSlice(result), nil
-	}
-	return value.FromSlice(nil), nil
-}
-
-// FilterValues returns a list of values from a map.
-//
-// The values are returned in the same order as the sorted keys.
-//
-// Example:
-//
-//	env := minijinja.NewEnvironment()
-//	env.AddFilter("values", FilterValues)
-//
-// Template usage:
-//
-//	{{ my_dict|values }}
-func FilterValues(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	if m, ok := val.AsMap(); ok {
-		keys := make([]string, 0, len(m))
-		for k := range m {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		result := make([]value.Value, len(keys))
-		for i, k := range keys {
-			result[i] = m[k]
-		}
-		return value.FromSlice(result), nil
-	}
-	return value.FromSlice(nil), nil
-}
-
 // FilterDictSort sorts a map by keys or values.
 //
 // Returns a list of [key, value] pairs sorted by key (default) or by value.
