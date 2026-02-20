@@ -58,6 +58,34 @@ jobs:
           name: wheels-linux-${{ matrix.target }}
           path: dist
 
+  linux-musl:
+    name: Linux musl Wheels
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [i686, x86_64, armv7l, aarch64]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Wipe Config
+        run: |
+          rm .cargo/config.toml
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist -m minijinja-py/Cargo.toml --interpreter "3.9"
+          manylinux: musllinux_1_2
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux-musl-${{ matrix.target }}
+          path: dist
+
   windows:
     name: Windows Wheels
     runs-on: windows-latest
@@ -106,6 +134,7 @@ jobs:
       - sdist
       - windows
       - linux
+      - linux-musl
       - macos
     env:
       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
