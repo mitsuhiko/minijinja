@@ -2,6 +2,13 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.16.0
+
+* Added musllinux wheel builds for Python release artifacts.
+* Fixed `|escape` to honor custom formatters.  #861
+* Aligned undefined behavior handling in the Go port with Rust.
+* Removed non-Rust `keys` and `values` filters from the Go port for parity.  #863
+
 ## 2.15.1
 
 * Re-release of 2.15.0 because of a bad release.
