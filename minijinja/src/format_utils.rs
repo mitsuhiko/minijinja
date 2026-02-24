@@ -95,6 +95,7 @@ enum Type {
     UpperF,
     LowerG,
     UpperG,
+    Char,
     String,
 }
 
@@ -113,6 +114,7 @@ impl Type {
             Type::UpperF => "fixed-point notation ('F')",
             Type::LowerG => "general format ('g')",
             Type::UpperG => "general format ('G')",
+            Type::Char => "character format ('c')",
             Type::String => "string format ('s')",
         }
     }
@@ -212,7 +214,8 @@ impl FormatSpec {
             | Type::LowerF
             | Type::UpperF
             | Type::LowerG
-            | Type::UpperG => self.format_integer(if val { 1 } else { 0 }, false),
+            | Type::UpperG
+            | Type::Char => self.format_integer(if val { 1 } else { 0 }, false),
         }
     }
 
@@ -231,6 +234,20 @@ impl FormatSpec {
                 }
                 Ok(self.apply_padding(text, default_align))
             }
+            Type::Char => match self.format_style {
+                // this is to keep consitency with errors in corresponding python functions used by jinja2
+                FormatStyle::StrFormat => Err(self.type_conversion_err("string", self.ty)),
+                FormatStyle::Printf => {
+                    let mut chars = text.chars();
+                    match (chars.next(), chars.next()) {
+                        (Some(c), None) => Ok(self.format_char(c)),
+                        _ => Err(Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!("{} requires integer or char", self.ty.description()),
+                        )),
+                    }
+                }
+            },
             Type::Binary
             | Type::Decimal
             | Type::Octal
@@ -386,6 +403,32 @@ impl FormatSpec {
             Type::LowerHex => ok!(self.group_binary_num(format!("{val:x}"))),
             Type::UpperHex => ok!(self.group_binary_num(format!("{val:X}"))),
             Type::Default | Type::Decimal => self.group_decimal_num(format!("{val}")),
+            Type::Char => {
+                if is_negative {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("{} arg not in range(0x110000)", self.ty.description()),
+                    ));
+                }
+                if self.format_style == FormatStyle::StrFormat
+                    && (self.print_sign || self.space_before_positive_num)
+                {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("sign flags are not allowed with {}", self.ty.description()),
+                    ));
+                }
+                let c = u32::try_from(val)
+                    .ok()
+                    .and_then(std::char::from_u32)
+                    .ok_or_else(|| {
+                        Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!("{} arg not in range(0x110000)", self.ty.description()),
+                        )
+                    })?;
+                return Ok(self.format_char(c));
+            }
             Type::String => {
                 if let FormatStyle::Printf = self.format_style {
                     // printf-style formatting in Python ignores sign character flag
@@ -523,9 +566,12 @@ impl FormatSpec {
                     Ok(self.format_number(&num, sign))
                 }
             },
-            Type::Binary | Type::Octal | Type::LowerHex | Type::UpperHex | Type::Decimal => {
-                Err(self.type_conversion_err("float", self.ty))
-            }
+            Type::Binary
+            | Type::Octal
+            | Type::LowerHex
+            | Type::UpperHex
+            | Type::Decimal
+            | Type::Char => Err(self.type_conversion_err("float", self.ty)),
         }
     }
 
@@ -616,6 +662,35 @@ impl FormatSpec {
         } else {
             let unpadded = format!("{sign}{radix}{number}");
             self.apply_padding(unpadded, Align::Right)
+        }
+    }
+
+    fn format_char(&self, c: char) -> String {
+        match self.format_style {
+            FormatStyle::Printf => {
+                let align = self
+                    .fill_align
+                    .as_ref()
+                    .map(|fa| fa.align)
+                    .unwrap_or(Align::Right);
+                self.apply_padding(c.to_string(), align)
+            }
+            FormatStyle::StrFormat => {
+                if let Some(fa) = &self.fill_align {
+                    self.apply_padding(c.to_string(), fa.align)
+                } else if self.zero_padded {
+                    let curr_width = c.len_utf8();
+                    if let Some(min_width) = self.width {
+                        if curr_width < min_width {
+                            let fill_width = min_width - curr_width;
+                            return format!("{}{c}", "0".repeat(fill_width));
+                        }
+                    }
+                    c.to_string()
+                } else {
+                    self.apply_padding(c.to_string(), Align::Left)
+                }
+            }
         }
     }
 
@@ -843,6 +918,7 @@ fn parse_type(cursor: &mut Cursor, style: FormatStyle) -> Result<Type, Error> {
         Some(b'o') => Type::Octal,
         Some(b'x') => Type::LowerHex,
         Some(b'X') => Type::UpperHex,
+        Some(b'c') => Type::Char,
         Some(b's') => Type::String,
         Some(b'}') if FormatStyle::StrFormat == style => {
             // end of spec, return without consuming '}'
@@ -909,7 +985,7 @@ mod printf_style {
     // precision -> number | '*'
     // number -> [0-9]+
     // len_modifier -> 'h' | 'l' | 'L'
-    // type -> 'd' | 'i' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 'g' | 'G' | 's'
+    // type -> 'd' | 'i' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 'g' | 'G' | 'c' | 's'
     pub(super) fn replacement_field<'s>(
         cursor: &mut Cursor<'s>,
     ) -> Result<ReplacementField<'s>, Error> {
@@ -1096,7 +1172,7 @@ mod str_format_style {
     // width -> number
     // precision -> number
     // number -> [0-9]+
-    // type -> 'b' | 'd' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 'g' | 'G' | 's'
+    // type -> 'b' | 'd' | 'o' | 'x' | 'X' | 'e' | 'E' | 'f' | 'F' | 'g' | 'G' | 'c' | 's'
     pub(super) fn replacement_field<'s>(
         cursor: &mut Cursor<'s>,
     ) -> Result<ReplacementField<'s>, Error> {

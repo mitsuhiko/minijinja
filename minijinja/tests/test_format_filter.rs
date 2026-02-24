@@ -286,6 +286,42 @@ fn test_format_bool() {
 }
 
 #[test]
+fn test_format_char() {
+    let env = Environment::new();
+
+    assert_eq!(format_val(&env, 65, "c"), "A");
+    assert_eq!(format_val(&env, 97, "c"), "a");
+    assert_eq!(format_val(&env, 0x1f600, "c"), "😀");
+
+    assert_eq!(format_val(&env, "a", "c"), "a");
+
+    // Check padding: 0 flag is ignored for %c in printf
+    assert_eq!(format_val(&env, 97, "5c"), "    a");
+    assert_eq!(format_val(&env, 97, "05c"), "    a"); // zero-padding ignored
+    assert_eq!(format_val(&env, 97, "-5c"), "a    ");
+    assert_eq!(format_val(&env, 97, "-05c"), "a    "); // zero-padding ignored
+
+    assert_eq!(format_val(&env, true, "c"), "\x01");
+    assert_eq!(format_val(&env, false, "c"), "\x00");
+}
+
+#[test]
+fn test_format_char_error() {
+    assert!(eval_err_expr("'%c' | format('abc')")
+        .contains("character format ('c') requires integer or char"));
+    assert!(eval_err_expr("'%c' | format('')")
+        .contains("character format ('c') requires integer or char"));
+
+    assert!(eval_err_expr("'%c' | format(97.0)")
+        .contains("'float' cannot be formatted in character format ('c')"));
+
+    assert!(eval_err_expr("'%c' | format(2000000)")
+        .contains("character format ('c') arg not in range(0x110000)"));
+    assert!(eval_err_expr("'%c' | format(-1)")
+        .contains("character format ('c') arg not in range(0x110000)"));
+}
+
+#[test]
 fn test_format_str() {
     let env = Environment::new();
 
