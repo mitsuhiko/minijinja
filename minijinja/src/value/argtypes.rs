@@ -566,6 +566,16 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
+
+    fn from_state_and_value(
+        state: Option<&'a State>,
+        value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
+        if let (Some(state), Some(value)) = (state, value) {
+            ok!(state.undefined_behavior().assert_value_not_undefined(value));
+        }
+        Ok((ok!(Self::from_value(value)), 1))
+    }
 }
 
 impl<'a> ArgType<'a> for &Value {
@@ -977,6 +987,16 @@ impl<'a> ArgType<'a> for String {
             }
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
+    }
+
+    fn from_state_and_value(
+        state: Option<&'a State>,
+        value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
+        if let (Some(state), Some(value)) = (state, value) {
+            ok!(state.undefined_behavior().assert_value_not_undefined(value));
+        }
+        Ok((ok!(Self::from_value(value)), 1))
     }
 
     fn from_value_owned(value: Value) -> Result<Self, Error> {
