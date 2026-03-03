@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed strict and semi-strict undefined handling so string-coercing filter/function arguments also fail for nested `Rest<String>` and `Vec<String>` conversions.  #877
+* Fixed Python CI/build compatibility with newer `maturin` by moving stripping from global config to release wheel build arguments.
+
 ## 2.16.0
 
 * Added musllinux wheel builds for Python release artifacts.
