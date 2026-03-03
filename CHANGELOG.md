@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 2.17.0
 
 * Added `'c'` (character) format type support for format filters and `str.format`-style formatting.  #868
 * Added prebuilt `minijinja-cli` release targets for `aarch64-pc-windows-msvc` (Windows ARM64) and `armv7-unknown-linux-gnueabihf`.
