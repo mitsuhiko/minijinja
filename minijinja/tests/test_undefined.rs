@@ -43,6 +43,14 @@ fn test_lenient_undefined() {
 fn test_semi_strict_undefined() {
     let mut env = Environment::new();
     env.set_undefined_behavior(UndefinedBehavior::SemiStrict);
+    env.add_filter(
+        "test_rest_join",
+        |_state: &State, values: minijinja::value::Rest<String>| -> String { values.join("|") },
+    );
+    env.add_filter(
+        "test_vec_join",
+        |_state: &State, values: Vec<String>| -> String { values.join("|") },
+    );
 
     assert_eq!(
         env.render_str("{{ true.missing_attribute }}", ())
@@ -100,12 +108,65 @@ fn test_semi_strict_undefined() {
             .kind(),
         ErrorKind::UndefinedError
     );
+    assert_eq!(
+        env.render_str("{{ undefined|upper }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined|int }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined|float }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined|string }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined|test_rest_join }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ [undefined]|test_vec_join }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    // bool follows is_true semantics: SemiStrict allows it (returns false), Strict errors
+    assert_eq!(render!(in env, "{{ undefined|bool }}"), "false");
+    // none|int should still work (undefined check only applies to undefined, not none)
+    assert_eq!(render!(in env, "{{ none|int }}"), "0");
+    assert_eq!(
+        env.render_str("{{ undefined|default('FALLBACK') }}", ())
+            .unwrap(),
+        "FALLBACK"
+    );
 }
 
 #[test]
 fn test_strict_undefined() {
     let mut env = Environment::new();
     env.set_undefined_behavior(UndefinedBehavior::Strict);
+    env.add_filter(
+        "test_rest_join",
+        |_state: &State, values: minijinja::value::Rest<String>| -> String { values.join("|") },
+    );
+    env.add_filter(
+        "test_vec_join",
+        |_state: &State, values: Vec<String>| -> String { values.join("|") },
+    );
 
     assert_eq!(
         env.render_str("{{ true.missing_attribute }}", ())
@@ -173,6 +234,55 @@ fn test_strict_undefined() {
             .unwrap_err()
             .kind(),
         ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined|upper }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined|int }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined|float }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined|bool }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined|string }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined|test_rest_join }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ [undefined]|test_vec_join }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    // none|int should still work (only undefined is rejected)
+    assert_eq!(render!(in env, "{{ none|int }}"), "0");
+    assert_eq!(
+        env.render_str("{{ undefined|default('FALLBACK') }}", ())
+            .unwrap(),
+        "FALLBACK"
     );
 }
 

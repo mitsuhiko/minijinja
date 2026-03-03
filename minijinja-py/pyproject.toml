@@ -34,7 +34,6 @@ Repository = "https://github.com/mitsuhiko/minijinja"
 [tool.maturin]
 module-name = "minijinja._lowlevel"
 python-source = "python"
-strip = true
 
 [tool.pyright]
 include = ["python/**/*.pyi"]
