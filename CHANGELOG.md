@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Added `'c'` (character) format type support for format filters and `str.format`-style formatting.  #868
+* Added prebuilt `minijinja-cli` release targets for `aarch64-pc-windows-msvc` (Windows ARM64) and `armv7-unknown-linux-gnueabihf`.
 * Fixed strict and semi-strict undefined handling so string-coercing filter/function arguments also fail for nested `Rest<String>` and `Vec<String>` conversions.  #877
 * Fixed Python CI/build compatibility with newer `maturin` by moving stripping from global config to release wheel build arguments.
 
