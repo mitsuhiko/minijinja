@@ -105,6 +105,56 @@ fn test_format_floats() {
 }
 
 #[test]
+fn test_format_char() {
+    assert_eq!(eval_expr("'{:c}'.format(65)").as_str(), Some("A"));
+    assert_eq!(eval_expr("'{:c}'.format(97)").as_str(), Some("a"));
+    assert_eq!(eval_expr("'{:c}'.format(128512)").as_str(), Some("😀"));
+
+    assert_eq!(eval_expr("'{:5c}'.format(97)").as_str(), Some("    a"));
+    assert_eq!(eval_expr("'{:>5c}'.format(97)").as_str(), Some("    a"));
+    assert_eq!(eval_expr("'{:3c}'.format(128512)").as_str(), Some("  😀"));
+
+    assert_eq!(eval_expr("'{:c}'.format(True)").as_str(), Some("\x01"));
+    assert_eq!(eval_expr("'{:c}'.format(False)").as_str(), Some("\x00"));
+}
+
+#[test]
+fn test_format_char_zero_padding() {
+    assert_eq!(eval_expr("'{:05c}'.format(97)").as_str(), Some("0000a"));
+    // unicode code points still count as one character for width calculation
+    assert_eq!(eval_expr("'{:03c}'.format(128512)").as_str(), Some("00😀"));
+
+    assert_eq!(eval_expr("'{:0>5c}'.format(97)").as_str(), Some("0000a"));
+    assert_eq!(eval_expr("'{:0^5c}'.format(97)").as_str(), Some("00a00"));
+
+    // check that '0' flag forces Right alignment even without '>'
+    assert_eq!(eval_expr("'{:05c}'.format(97)").as_str(), Some("0000a"));
+}
+
+#[test]
+fn test_format_char_error() {
+    assert!(eval_err_expr("'{:c}'.format('abc')")
+        .contains("'string' cannot be formatted in character format ('c')"));
+
+    assert!(eval_err_expr("'{:c}'.format(97.0)")
+        .contains("'float' cannot be formatted in character format ('c')"));
+
+    assert!(eval_err_expr("'{:#c}'.format(97)")
+        .contains("'#' cannot be specified with character format ('c')"));
+    assert!(eval_err_expr("'{:,c}'.format(97)")
+        .contains("',' cannot be specified with character format ('c')"));
+    assert!(eval_err_expr("'{:_c}'.format(97)")
+        .contains("'_' cannot be specified with character format ('c')"));
+    assert!(eval_err_expr("'{:-c}'.format(97)")
+        .contains("sign flags are not allowed with character format ('c')"));
+
+    assert!(eval_err_expr("'{:c}'.format(2000000)")
+        .contains("character format ('c') arg not in range(0x110000)"));
+    assert!(eval_err_expr("'{:c}'.format(-1)")
+        .contains("character format ('c') arg not in range(0x110000)"));
+}
+
+#[test]
 fn test_format_string() {
     assert_eq!(
         eval_expr("'{:s} {:}!'.format('Hello', 'world')").as_str(),
