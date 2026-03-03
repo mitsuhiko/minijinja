@@ -410,13 +410,37 @@ impl FormatSpec {
                         format!("{} arg not in range(0x110000)", self.ty.description()),
                     ));
                 }
-                if self.format_style == FormatStyle::StrFormat
-                    && (self.print_sign || self.space_before_positive_num)
-                {
-                    return Err(Error::new(
-                        ErrorKind::InvalidOperation,
-                        format!("sign flags are not allowed with {}", self.ty.description()),
-                    ));
+                if self.format_style == FormatStyle::StrFormat {
+                    if self.print_sign || self.space_before_positive_num {
+                        return Err(Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!("sign flags are not allowed with {}", self.ty.description()),
+                        ));
+                    }
+                    if self.alternate_form {
+                        return Err(Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!(
+                                "invalid format spec at offset {}; '#' cannot be specified with {}",
+                                self.location,
+                                self.ty.description()
+                            ),
+                        ));
+                    }
+                    if let Some(sep) = self.integer_grouping {
+                        return Err(Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!(
+                                "invalid format spec at offset {}; '{}' cannot be specified with {}",
+                                self.location,
+                                match sep {
+                                    Separator::Comma => ',',
+                                    Separator::Underscore => '_',
+                                },
+                                self.ty.description()
+                            ),
+                        ));
+                    }
                 }
                 let c = u32::try_from(val)
                     .ok()
@@ -673,29 +697,32 @@ impl FormatSpec {
                     .as_ref()
                     .map(|fa| fa.align)
                     .unwrap_or(Align::Right);
-                self.apply_padding(c.to_string(), align)
+                self.apply_padding_with_width(c.to_string(), align, 1)
             }
             FormatStyle::StrFormat => {
                 if let Some(fa) = &self.fill_align {
-                    self.apply_padding(c.to_string(), fa.align)
+                    self.apply_padding_with_width(c.to_string(), fa.align, 1)
                 } else if self.zero_padded {
-                    let curr_width = c.len_utf8();
                     if let Some(min_width) = self.width {
-                        if curr_width < min_width {
-                            let fill_width = min_width - curr_width;
+                        if 1 < min_width {
+                            let fill_width = min_width - 1;
                             return format!("{}{c}", "0".repeat(fill_width));
                         }
                     }
                     c.to_string()
                 } else {
-                    self.apply_padding(c.to_string(), Align::Left)
+                    self.apply_padding_with_width(c.to_string(), Align::Right, 1)
                 }
             }
         }
     }
 
-    fn apply_padding(&self, text: String, default_align: Align) -> String {
-        let curr_width = text.len();
+    fn apply_padding_with_width(
+        &self,
+        text: String,
+        default_align: Align,
+        curr_width: usize,
+    ) -> String {
         if let Some(min_width) = &self.width {
             if curr_width < *min_width {
                 let fill_width = min_width - curr_width;
@@ -729,6 +756,11 @@ impl FormatSpec {
             }
         }
         text
+    }
+
+    fn apply_padding(&self, text: String, default_align: Align) -> String {
+        let curr_width = text.len();
+        self.apply_padding_with_width(text, default_align, curr_width)
     }
 }
 
@@ -1280,14 +1312,15 @@ mod str_format_style {
         let location = cursor.position();
         let mut print_sign = false;
         let mut space_before_positive_num = false;
+        let mut minus_sign = false;
         let fill_align = parse_fill_align(cursor);
 
         if cursor.advance_if(b'+') {
             print_sign = true;
         } else if cursor.advance_if(b' ') {
             space_before_positive_num = true;
-        } else {
-            cursor.advance_if(b'-');
+        } else if cursor.advance_if(b'-') {
+            minus_sign = true;
         }
 
         let alternate_form = cursor.advance_if(b'#');
@@ -1316,6 +1349,45 @@ mod str_format_style {
             .flatten();
 
         let ty = ok!(parse_type(cursor, FormatStyle::StrFormat));
+
+        if ty == Type::Char {
+            if print_sign || space_before_positive_num || minus_sign {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!(
+                        "invalid format spec at offset {}; sign flags are not allowed with {}",
+                        location,
+                        ty.description()
+                    ),
+                ));
+            }
+            if alternate_form {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!(
+                        "invalid format spec at offset {}; '#' cannot be specified with {}",
+                        location,
+                        ty.description()
+                    ),
+                ));
+            }
+            if let Some(grouping) = integer_grouping {
+                let sep = match grouping {
+                    Separator::Comma => ',',
+                    Separator::Underscore => '_',
+                };
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!(
+                        "invalid format spec at offset {}; '{}' cannot be specified with {}",
+                        location,
+                        sep,
+                        ty.description()
+                    ),
+                ));
+            }
+        }
+
         Ok(FormatSpec {
             fill_align,
             print_sign,

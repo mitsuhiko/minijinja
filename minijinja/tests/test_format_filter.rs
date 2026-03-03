@@ -300,6 +300,7 @@ fn test_format_char() {
     assert_eq!(format_val(&env, 97, "05c"), "    a"); // zero-padding ignored
     assert_eq!(format_val(&env, 97, "-5c"), "a    ");
     assert_eq!(format_val(&env, 97, "-05c"), "a    "); // zero-padding ignored
+    assert_eq!(format_val(&env, 0x1f600, "5c"), "    😀");
 
     assert_eq!(format_val(&env, true, "c"), "\x01");
     assert_eq!(format_val(&env, false, "c"), "\x00");
