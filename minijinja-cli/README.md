@@ -34,12 +34,14 @@ Or download a binary manually:
 
 - [aarch64-apple-darwin](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-aarch64-apple-darwin.tar.xz) (Apple Silicon macOS)
 - [x86_64-apple-darwin](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-apple-darwin.tar.xz) (Intel macOS)
-- [x86_64-pc-windows-msvc](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-pc-widows-msvc.zip) (x64 Windows)
-- [i686-pc-windows-msvc](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-i686-pc-widows-msvc.zip) (x86 Windows)
+- [x86_64-pc-windows-msvc](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-pc-windows-msvc.zip) (x64 Windows)
+- [aarch64-pc-windows-msvc](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-aarch64-pc-windows-msvc.zip) (ARM64 Windows)
+- [i686-pc-windows-msvc](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-i686-pc-windows-msvc.zip) (x86 Windows)
 - [x86_64-unknown-linux-gnu](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-unknown-linux-gnu.tar.xz) (x64 Linux, GNU)
 - [x86_64-unknown-linux-musl](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-x86_64-unknown-linux-musl.tar.xz) (x64 Linux, MUSL)
 - [i686-unknown-linux-gnu](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-i686-unknown-linux-gnu.tar.xz) (x86 Linux, GNU)
 - [i686-unknown-linux-musl](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-i686-unknown-linux-musl.tar.xz) (x86 Linux, MUSL)
+- [armv7-unknown-linux-gnueabihf](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-armv7-unknown-linux-gnueabihf.tar.xz) (ARMv7 Linux, GNU hard-float)
 - [aarch64-unknown-linux-gnu](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-aarch64-unknown-linux-gnu.tar.xz) (ARM64 Linux, GNU)
 - [aarch64-unknown-linux-musl](https://github.com/mitsuhiko/minijinja/releases/latest/download/minijinja-cli-aarch64-unknown-linux-musl.tar.xz) (ARM64 Linux, MUSL)
 
