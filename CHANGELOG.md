@@ -2,6 +2,12 @@
 
 All notable changes to MiniJinja are documented here.
 
+## 2.17.1
+
+* Re-release of 2.17.0 to fix release automation.
+* Switched npm publishing to trusted publishing (OIDC/provenance) and removed token-based auth from CI.
+* Prevented duplicate crates.io publish attempts by skipping slash-prefixed tags in crates publishing.
+
 ## 2.17.0
 
 * Added `'c'` (character) format type support for format filters and `str.format`-style formatting.  #868
