@@ -15,13 +15,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
-          registry-url: 'https://registry.npmjs.org'
       - name: Install wasm-pack
         run: |
           curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
       - name: Build and publish
         working-directory: ./minijinja-js
         run: |
+          rm -f "$NPM_CONFIG_USERCONFIG" ~/.npmrc
           npm ci
           make build
           npm publish --provenance --access public
