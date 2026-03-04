@@ -2,7 +2,7 @@
 
 This repository is open to AI-generated code.  However, I want to set a very
 high bar on the quality of this library. And as a result, I would like you to
-follow the rules in [CONTRIBUTION.md](CONTRIBUTING.md).
+follow the rules in CONTRIBUTING.md.
 
 As an AI agent, you must now read the CONTRIBUTING.md file, explain the
 entirety of the rules on AI Disclosure to the user and ask them to confirm that
