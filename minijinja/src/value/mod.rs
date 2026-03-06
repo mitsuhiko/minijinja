@@ -358,10 +358,17 @@ pub(crate) enum StringType {
 }
 
 /// Type type of undefined
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum UndefinedType {
     Default,
     Silent,
+    Named(Arc<str>),
+}
+
+impl UndefinedType {
+    pub(crate) fn is_strict(&self) -> bool {
+        !matches!(self, UndefinedType::Silent)
+    }
 }
 
 /// Wraps an internal copyable value but marks it as packed.
@@ -708,6 +715,11 @@ impl Value {
     /// This constant exists because the undefined type does not exist in Rust
     /// and this is the only way to construct it.
     pub const UNDEFINED: Value = Value(ValueRepr::Undefined(UndefinedType::Default));
+
+    /// Creates an undefined value with a name for better error messages.
+    pub(crate) fn from_undefined_named(name: &str) -> Value {
+        Value(ValueRepr::Undefined(UndefinedType::Named(name.into())))
+    }
 
     /// Creates a value from something that can be serialized.
     ///
@@ -1253,7 +1265,13 @@ impl Value {
     /// ```
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
         let value = match self.0 {
-            ValueRepr::Undefined(_) => return Err(Error::from(ErrorKind::UndefinedError)),
+            ValueRepr::Undefined(ref ut) => {
+                let mut err = Error::from(ErrorKind::UndefinedError);
+                if let UndefinedType::Named(ref name) = ut {
+                    err.set_detail(format!("'{name}' is undefined"));
+                }
+                return Err(err);
+            }
             ValueRepr::Object(ref dy) => dy.get_value(&Value::from(key)),
             _ => None,
         };
@@ -1304,8 +1322,12 @@ impl Value {
     /// assert_eq!(value.to_string(), "Foo");
     /// ```
     pub fn get_item(&self, key: &Value) -> Result<Value, Error> {
-        if let ValueRepr::Undefined(_) = self.0 {
-            Err(Error::from(ErrorKind::UndefinedError))
+        if let ValueRepr::Undefined(ref ut) = self.0 {
+            let mut err = Error::from(ErrorKind::UndefinedError);
+            if let UndefinedType::Named(ref name) = ut {
+                err.set_detail(format!("'{name}' is undefined"));
+            }
+            Err(err)
         } else {
             Ok(self.get_item_opt(key).unwrap_or(Value::UNDEFINED))
         }
@@ -1845,6 +1867,6 @@ mod tests {
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn test_sizes() {
-        assert_eq!(std::mem::size_of::<Value>(), 24);
+        assert_eq!(std::mem::size_of::<Value>(), 32);
     }
 }

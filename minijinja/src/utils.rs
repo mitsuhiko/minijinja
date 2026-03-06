@@ -202,7 +202,7 @@ impl UndefinedBehavior {
         }
     }
 
-    /// Checks that undefined cannot be coerced into a concrete type (e.g. string).
+    /// Checks that undefined cannot be coerced into a concrete type ( e.g. string).
     ///
     /// This is called when an undefined value is passed to a filter or function
     /// argument that expects a concrete type.  Filters that explicitly handle

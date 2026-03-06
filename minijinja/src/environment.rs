@@ -807,13 +807,18 @@ impl<'source> Environment<'source> {
         out: &mut Output,
     ) -> Result<(), Error> {
         match (self.undefined_behavior, &value.0) {
-            // this intentionally does not check for SilentUndefined.  SilentUndefined is
-            // exclusively used in the missing else condition of an if expression to match
-            // Jinja2 behavior.  Those go straight to the formatter.
             (
                 UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict,
                 &ValueRepr::Undefined(UndefinedType::Default),
             ) => Err(Error::from(ErrorKind::UndefinedError)),
+            (
+                UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict,
+                &ValueRepr::Undefined(UndefinedType::Named(ref name)),
+            ) => {
+                let mut err = Error::from(ErrorKind::UndefinedError);
+                err.set_detail(format!("'{name}' is undefined"));
+                Err(err)
+            }
             _ => (self.formatter)(out, state, value),
         }
     }

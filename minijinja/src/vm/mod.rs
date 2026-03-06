@@ -322,7 +322,7 @@ impl<'env> Vm<'env> {
                 Instruction::Lookup(name) => {
                     stack.push(assert_valid!(state
                         .lookup(name)
-                        .unwrap_or(Value::UNDEFINED)));
+                        .unwrap_or_else(|| Value::from_undefined_named(name))));
                 }
                 Instruction::GetAttr(name) => {
                     a = stack.pop();
