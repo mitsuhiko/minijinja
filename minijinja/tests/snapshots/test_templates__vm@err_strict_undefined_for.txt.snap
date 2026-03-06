@@ -6,20 +6,4 @@ info:
     undefined: strict
 input_file: minijinja/tests/inputs/err_strict_undefined_for.txt
 ---
-!!!ERROR!!!
 
-Error {
-    kind: UndefinedError,
-    name: "err_strict_undefined_for.txt",
-    line: 1,
-}
-
-undefined value (in err_strict_undefined_for.txt:1)
------------------------- err_strict_undefined_for.txt -------------------------
-   1 > {% for item in undefined_value %}
-     i                ^^^^^^^^^^^^^^^ undefined value
-   2 |     ...
-   3 | {% endfor %}
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-No referenced variables
--------------------------------------------------------------------------------

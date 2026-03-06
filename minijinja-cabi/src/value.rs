@@ -41,14 +41,14 @@ where
 #[repr(C)]
 pub struct mj_value {
     // Motivation on the size here: The size of `Value` is really not
-    // known and since cbindgen has no way to guarantee us a matching
-    // size we have to be creative.  The dominating type size wise is
-    // most likely going to be SmallStr which is a u8+[u8; 22] plus the
+    // known since cbindgen has no way to guarantee us a matching
+    // size we have to be creative.  The dominating type size wise in
+    // most likely going to be SmallStr which in a u8+[u8; 22] plus the
     // enum discriminant (u8).
     //
     // We are going with u64 here for alignment reasons which is likely
     // to be a good default across platforms.
-    _opaque: [u64; 3],
+    _opaque: [u64; 4],
 }
 
 impl mj_value {
@@ -60,7 +60,7 @@ impl mj_value {
 impl From<Value> for mj_value {
     fn from(value: Value) -> Self {
         mj_value {
-            _opaque: unsafe { transmute::<Value, [u64; 3]>(value) },
+            _opaque: unsafe { transmute::<Value, [u64; 4]>(value) },
         }
     }
 }
@@ -75,7 +75,7 @@ impl Deref for mj_value {
     type Target = Value;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { transmute(&self._opaque) }
+        unsafe { transmute::<[u64; 4], &Value>(&self._opaque) }
     }
 }
 
@@ -413,7 +413,7 @@ ffi_fn! {
 ffi_fn! {
     /// Decrements the refcount
     unsafe fn mj_value_decref(_scope, value: *mut mj_value) {
-        let mut value: ManuallyDrop<Value> = transmute((*value)._opaque);
+        let mut value: ManuallyDrop<Value> = transmute::<[u64; 4], ManuallyDrop<Value>>((*value)._opaque);
         ManuallyDrop::drop(&mut value);
     }
 }

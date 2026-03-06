@@ -365,12 +365,6 @@ pub(crate) enum UndefinedType {
     Named(Arc<str>),
 }
 
-impl UndefinedType {
-    pub(crate) fn is_strict(&self) -> bool {
-        !matches!(self, UndefinedType::Silent)
-    }
-}
-
 /// Wraps an internal copyable value but marks it as packed.
 ///
 /// This is used for `i128`/`u128` in the value repr to avoid

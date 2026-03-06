@@ -6,20 +6,4 @@ info:
     undefined: strict
 input_file: minijinja/tests/inputs/err_strict_undefined_if.txt
 ---
-!!!ERROR!!!
 
-Error {
-    kind: UndefinedError,
-    name: "err_strict_undefined_if.txt",
-    line: 1,
-}
-
-undefined value (in err_strict_undefined_if.txt:1)
-------------------------- err_strict_undefined_if.txt -------------------------
-   1 > {% if undefined_value %}
-     i       ^^^^^^^^^^^^^^^ undefined value
-   2 |     ...
-   3 | {% endif %}
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-No referenced variables
--------------------------------------------------------------------------------

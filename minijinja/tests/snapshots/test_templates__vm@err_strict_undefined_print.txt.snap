@@ -10,11 +10,12 @@ input_file: minijinja/tests/inputs/err_strict_undefined_print.txt
 
 Error {
     kind: UndefinedError,
+    detail: "'undefined_value' is undefined",
     name: "err_strict_undefined_print.txt",
     line: 1,
 }
 
-undefined value (in err_strict_undefined_print.txt:1)
+undefined value: 'undefined_value' is undefined (in err_strict_undefined_print.txt:1)
 ----------------------- err_strict_undefined_print.txt ------------------------
    1 > {{ undefined_value }}
      i    ^^^^^^^^^^^^^^^ undefined value
