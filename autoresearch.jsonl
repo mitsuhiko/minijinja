@@ -1,0 +1,1 @@
+{"type":"config","name":"Optimize MiniJinja render benchmark (all_elements)","metricName":"render_ns","metricUnit":"ns","bestDirection":"lower"}
