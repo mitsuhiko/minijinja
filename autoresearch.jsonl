@@ -39,3 +39,6 @@
 {"run":38,"commit":"6f787f7","metric":35623.05,"metrics":{},"status":"discard","description":"Tried static-str context map keys with direct Object impl for BTreeMap<&'static str, _> to eliminate key allocations","timestamp":1773441763496,"segment":0}
 {"run":39,"commit":"6f787f7","metric":0,"metrics":{},"status":"crash","description":"Prototype context! ContextMap object failed to compile due Debug impl using wrong iterator item type","timestamp":1773441847850,"segment":0}
 {"run":40,"commit":"6f787f7","metric":37391.27,"metrics":{},"status":"discard","description":"Tested custom Vec-backed ContextMap object for context! macro to avoid tree map overhead","timestamp":1773441871836,"segment":0}
+{"run":41,"commit":"8801478","metric":35078.12,"metrics":{},"status":"keep","description":"Match ValueRepr::String/SmallStr directly in small Value-map string lookup fast path","timestamp":1773441943979,"segment":0}
+{"run":42,"commit":"8801478","metric":35244.14,"metrics":{},"status":"discard","description":"Tried manual loop instead of find_map closure for small Value-map string-key lookup","timestamp":1773441975094,"segment":0}
+{"run":43,"commit":"8801478","metric":36531.58,"metrics":{},"status":"discard","description":"Tried thread-local Arc<str> key interning in context! builder to avoid repeated Arc allocations","timestamp":1773442027883,"segment":0}

@@ -187,7 +187,10 @@ impl Object for Loop {
     }
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        let key = some!(key.as_str());
+        self.get_value_by_str(some!(key.as_str()))
+    }
+
+    fn get_value_by_str(self: &Arc<Self>, key: &str) -> Option<Value> {
         let idx = self.idx.load(Ordering::Relaxed) as u64;
         // if we never iterated, then all attributes are undefined.
         // this can happen in some rare circumstances where the engine
