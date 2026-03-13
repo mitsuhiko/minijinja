@@ -44,4 +44,5 @@ The optimization target is runtime execution (render path), not compile/parse sp
 - Replaced VM `Locals` backing store from `BTreeMap` to a compact `Vec<(&str, Value)>` with linear lookup/update. This significantly improved small-scope local variable access (common in loops).
 - Preallocated `Locals` with small capacity and tuned it (`Vec::with_capacity(32)`) to avoid early reallocations for typical loop/local scopes.
 - Tuned VM value stack initial capacity from 16 to 24 for this workload, reducing stack growth overhead during evaluation.
+- Tuned context frame-stack initial capacity from 32 to 40, which reduced frame vector growth overhead in this workload.
 - Expanded the autoresearch harness to emit additional secondary metrics (`parse_ns`, `compile_ns`) for overfitting guardrails while keeping `render_ns` as primary.

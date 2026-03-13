@@ -81,3 +81,14 @@
 {"run":80,"commit":"de4d929","metric":31879.23,"metrics":{},"status":"discard","description":"Control run on unchanged code showed lower render time; treated as measurement variance","timestamp":1773443888842,"segment":0}
 {"run":81,"commit":"de4d929","metric":32457.68,"metrics":{},"status":"discard","description":"Tried Vec-accumulate then collect-to-BTreeMap strategy in context! builder instead of direct BTreeMap inserts","timestamp":1773443949650,"segment":0}
 {"run":82,"commit":"de4d929","metric":31859.38,"metrics":{},"status":"discard","description":"Initial run for VM stack capacity 24 showed strong improvement; running confirmation","timestamp":1773443999490,"segment":0}
+{"run":83,"commit":"791d5b5","metric":31828.45,"metrics":{},"status":"keep","description":"Tune VM evaluation stack initial capacity from 16 to 24","timestamp":1773444029216,"segment":0}
+{"run":84,"commit":"791d5b5","metric":32525.07,"metrics":{},"status":"discard","description":"Tried VM stack initial capacity 20 (vs 24)","timestamp":1773444055769,"segment":0}
+{"run":85,"commit":"791d5b5","metric":32272.79,"metrics":{},"status":"discard","description":"Tried VM stack initial capacity 28 (vs 24)","timestamp":1773444084495,"segment":0}
+{"run":86,"commit":"791d5b5","metric":31931.31,"metrics":{},"status":"discard","description":"Tried VM stack initial capacity 22 (vs 24)","timestamp":1773444117439,"segment":0}
+{"run":87,"commit":"791d5b5","metric":31948.24,"metrics":{},"status":"discard","description":"Tried VM stack initial capacity 26 (vs 24)","timestamp":1773444149976,"segment":0}
+{"run":88,"commit":"791d5b5","metric":31885.42,"metrics":{},"status":"discard","description":"Retested Locals initial capacity 40 under new stack-capacity-24 baseline","timestamp":1773444180540,"segment":0}
+{"run":89,"commit":"791d5b5","metric":31801.76,"metrics":{},"status":"discard","description":"Tried Locals initial capacity 36 (first run showed marginal improvement, awaiting confirmation)","timestamp":1773444213668,"segment":0}
+{"run":90,"commit":"791d5b5","metric":32178.06,"metrics":{},"status":"discard","description":"Confirmation run for Locals capacity 36 regressed; keeping capacity 32","timestamp":1773444220960,"segment":0}
+{"run":91,"commit":"791d5b5","metric":31902.02,"metrics":{},"status":"discard","description":"Tried reducing Context frame-stack initial capacity from 32 to 16","timestamp":1773444315072,"segment":0}
+{"run":92,"commit":"791d5b5","metric":31859.38,"metrics":{},"status":"discard","description":"Tried reducing Context frame-stack initial capacity from 32 to 24","timestamp":1773444340379,"segment":0}
+{"run":93,"commit":"791d5b5","metric":31688.15,"metrics":{},"status":"discard","description":"Initial run for Context frame-stack capacity 40 showed improvement; running confirmation","timestamp":1773444381682,"segment":0}
