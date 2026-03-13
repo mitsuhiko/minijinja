@@ -39,6 +39,7 @@ The optimization target is runtime execution (render path), not compile/parse sp
 - Added `Object::get_value_by_str` and routed attribute lookup through it to avoid constructing temporary `Value` keys for string attribute access.
 - Switched hidden `context!` internal map representation from `ValueMap` (`BTreeMap<Value, Value>`) to `BTreeMap<Arc<str>, Value>`, reducing key conversion overhead during context construction and lookup.
 - Specialized small `Value`-keyed map string lookup by matching directly on `ValueRepr::String`/`SmallStr` instead of calling generic `as_str` conversion.
+- Tuned small-map linear-scan threshold in `Value`-keyed map string lookup from `<=8` to `<=12` for better mixed-size map behavior.
 - Added `Loop::get_value_by_str` override and routed `get_value` through it, removing temporary `Value` key construction for frequent `loop.<attr>` lookups.
 - Replaced VM `Locals` backing store from `BTreeMap` to a compact `Vec<(&str, Value)>` with linear lookup/update. This significantly improved small-scope local variable access (common in loops).
 - Preallocated `Locals` with small capacity and tuned it (`Vec::with_capacity(32)`) to avoid early reallocations for typical loop/local scopes.

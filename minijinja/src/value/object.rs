@@ -872,7 +872,7 @@ macro_rules! impl_value_map {
 
             #[inline(always)]
             fn get_value_by_str(self: &Arc<Self>, key: &str) -> Option<Value> {
-                if self.len() <= 8 {
+                if self.len() <= 12 {
                     self.iter().find_map(|(k, v)| match &k.0 {
                         ValueRepr::String(s, _) if &**s == key => Some(v.clone().into()),
                         ValueRepr::SmallStr(s) if s.as_str() == key => Some(v.clone().into()),
