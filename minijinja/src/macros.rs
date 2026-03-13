@@ -23,22 +23,24 @@ macro_rules! some {
 /// Hidden utility module for the [`context!`](crate::context!) macro.
 #[doc(hidden)]
 pub mod __context {
-    use crate::value::{Value, ValueMap};
+    use crate::value::Value;
     use crate::Environment;
+    use std::collections::BTreeMap;
     use std::rc::Rc;
+    use std::sync::Arc;
 
     #[inline(always)]
-    pub fn make() -> ValueMap {
-        ValueMap::default()
+    pub fn make() -> BTreeMap<Arc<str>, Value> {
+        BTreeMap::default()
     }
 
     #[inline(always)]
-    pub fn add(ctx: &mut ValueMap, key: &'static str, value: Value) {
+    pub fn add(ctx: &mut BTreeMap<Arc<str>, Value>, key: &'static str, value: Value) {
         ctx.insert(key.into(), value);
     }
 
     #[inline(always)]
-    pub fn build(ctx: ValueMap) -> Value {
+    pub fn build(ctx: BTreeMap<Arc<str>, Value>) -> Value {
         Value::from_object(ctx)
     }
 

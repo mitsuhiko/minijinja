@@ -1,0 +1,2 @@
+- Investigate a compact `Value` representation (likely NaN-boxing or tagged-pointer scheme) to reduce per-value footprint from 24 bytes and improve VM stack/cache density. This is a large architectural change and needs a dedicated correctness/perf campaign.
+- Explore a split representation for map keys in `ValueMap` (string-key fast map for common context objects + generic `Value` key fallback) to remove repeated string->`Value` conversions in attribute-heavy templates.

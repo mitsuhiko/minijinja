@@ -35,3 +35,6 @@ The optimization target is runtime execution (render path), not compile/parse sp
 - Added an ASCII no-op fast path to `upper` filter (`return v.into_owned()` when no lowercase ASCII exists). Big win on this workload (many numeric `item|upper` calls), ~7% faster.
 - Added `needs_html_escaping` pre-check and direct `out.write_str` fast path for unescaped strings. This avoids `write!`/`Display` overhead for common safe-looking strings and improved render throughput by another ~4%.
 - Added `formatter_is_default` fast path in `Environment::format` to call `write_escaped` directly and skip dynamic formatter dispatch when default formatter is active.
+- Added VM-side `Emit` specialization for default formatter to bypass `Environment::format` call overhead in the hottest output path.
+- Added `Object::get_value_by_str` and routed attribute lookup through it to avoid constructing temporary `Value` keys for string attribute access.
+- Switched hidden `context!` internal map representation from `ValueMap` (`BTreeMap<Value, Value>`) to `BTreeMap<Arc<str>, Value>`, reducing key conversion overhead during context construction and lookup.
