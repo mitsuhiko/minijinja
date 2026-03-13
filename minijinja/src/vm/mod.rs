@@ -10,9 +10,11 @@ use crate::compiler::instructions::{
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::output::{CaptureMode, Output};
-use crate::utils::{untrusted_size_hint, AutoEscape, UndefinedBehavior};
+use crate::utils::{untrusted_size_hint, write_escaped, AutoEscape, UndefinedBehavior};
 use crate::value::namespace_object::Namespace;
-use crate::value::{ops, value_map_with_capacity, Kwargs, ObjectRepr, Value, ValueMap};
+use crate::value::{
+    ops, value_map_with_capacity, Kwargs, ObjectRepr, UndefinedType, Value, ValueMap, ValueRepr,
+};
 use crate::vm::context::{Frame, Stack};
 use crate::vm::loop_object::{Loop, LoopState};
 use crate::vm::state::BlockStack;
@@ -314,7 +316,21 @@ impl<'env> Vm<'env> {
                     ok!(out.write_str(val).map_err(Error::from));
                 }
                 Instruction::Emit => {
-                    ctx_ok!(self.env.format(&stack.pop(), state, out));
+                    let value = stack.pop();
+                    if self.env.is_default_formatter() {
+                        if matches!(
+                            (undefined_behavior, &value.0),
+                            (
+                                UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict,
+                                ValueRepr::Undefined(UndefinedType::Default)
+                            )
+                        ) {
+                            bail!(Error::from(ErrorKind::UndefinedError));
+                        }
+                        ctx_ok!(write_escaped(out, state.auto_escape.get(), &value));
+                    } else {
+                        ctx_ok!(self.env.format(&value, state, out));
+                    }
                 }
                 Instruction::StoreLocal(name) => {
                     state.ctx.store(name, stack.pop());

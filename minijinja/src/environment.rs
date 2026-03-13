@@ -799,6 +799,11 @@ impl<'source> Environment<'source> {
         (self.templates.template_config.default_auto_escape)(name)
     }
 
+    #[inline(always)]
+    pub(crate) fn is_default_formatter(&self) -> bool {
+        self.formatter_is_default
+    }
+
     /// Formats a value into the final format.
     ///
     /// This step is called finalization in Jinja2 but since we are writing into

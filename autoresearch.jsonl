@@ -10,3 +10,8 @@
 {"run":9,"commit":"32b2042","metric":36980.8,"metrics":{},"status":"discard","description":"Tried simpler any(matches!) implementation for needs_html_escaping byte scan","timestamp":1773439870725,"segment":0}
 {"run":10,"commit":"32b2042","metric":36764.98,"metrics":{},"status":"discard","description":"Control run without code changes to re-check variance after recent edits","timestamp":1773439902177,"segment":0}
 {"run":11,"commit":"32b2042","metric":36984.05,"metrics":{},"status":"discard","description":"Second control run; observed benchmark noise drifting higher on current machine load","timestamp":1773439905593,"segment":0}
+{"run":12,"commit":"743233a","metric":36029.95,"metrics":{},"status":"keep","description":"Bypass formatter callback for default formatter using formatter_is_default fast path","timestamp":1773440014172,"segment":0}
+{"run":13,"commit":"743233a","metric":36296.22,"metrics":{},"status":"discard","description":"Tried force-inlining Environment::format after adding default formatter fast path","timestamp":1773440043834,"segment":0}
+{"run":14,"commit":"743233a","metric":36603.19,"metrics":{},"status":"discard","description":"Rewrote undefined-check match in Environment::format as early-return if branch","timestamp":1773440083368,"segment":0}
+{"run":15,"commit":"743233a","metric":36776.37,"metrics":{},"status":"discard","description":"Forced inline on get_or_lookup_local cache helper in VM","timestamp":1773440168813,"segment":0}
+{"run":16,"commit":"743233a","metric":36418.95,"metrics":{},"status":"discard","description":"Added aggressive inlining hints to VM stack push/pop and call-arg helpers","timestamp":1773440216510,"segment":0}
