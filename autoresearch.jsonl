@@ -2,3 +2,5 @@
 {"run":1,"commit":"d6e822b","metric":40876.3,"metrics":{},"status":"keep","description":"Set up autoresearch harness and recorded baseline render benchmark","timestamp":1773439303738,"segment":0}
 {"run":2,"commit":"d6e822b","metric":40879.88,"metrics":{},"status":"discard","description":"Measured baseline noise floor without code changes","timestamp":1773439336590,"segment":0}
 {"run":3,"commit":"d6e822b","metric":41628.59,"metrics":{},"status":"discard","description":"Tried Output fast-path branches for string targets to avoid trait dispatch in write_str/write_char","timestamp":1773439443712,"segment":0}
+{"run":4,"commit":"6df6c1c","metric":37906.9,"metrics":{},"status":"keep","description":"Optimize upper filter with ASCII no-op fast path to avoid redundant case conversion","timestamp":1773439516019,"segment":0}
+{"run":5,"commit":"6df6c1c","metric":38273.11,"metrics":{},"status":"discard","description":"Tried ASCII-specific to_ascii_uppercase path in upper filter for lowercase ASCII strings","timestamp":1773439554975,"segment":0}

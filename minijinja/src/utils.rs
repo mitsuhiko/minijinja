@@ -28,9 +28,25 @@ pub(crate) fn untrusted_size_hint(value: usize) -> usize {
     value.min(1024)
 }
 
+#[inline(always)]
+fn needs_html_escaping(s: &str) -> bool {
+    for &b in s.as_bytes() {
+        if b.wrapping_sub(b'"') <= b'>' - b'"' {
+            if matches!(b, b'<' | b'>' | b'&' | b'"' | b'\'' | b'/') {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
     if let Some(s) = value.as_str() {
-        write!(out, "{}", HtmlEscape(s))
+        if !needs_html_escaping(s) {
+            out.write_str(s)
+        } else {
+            write!(out, "{}", HtmlEscape(s))
+        }
     } else if matches!(
         value.kind(),
         ValueKind::Undefined | ValueKind::None | ValueKind::Bool | ValueKind::Number
