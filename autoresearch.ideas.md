@@ -1,2 +1,3 @@
 - Investigate a compact `Value` representation (likely NaN-boxing or tagged-pointer scheme) to reduce per-value footprint from 24 bytes and improve VM stack/cache density. This is a large architectural change and needs a dedicated correctness/perf campaign.
-- Explore a split representation for map keys in `ValueMap` (string-key fast map for common context objects + generic `Value` key fallback) to remove repeated string->`Value` conversions in attribute-heavy templates.
+- Explore bypassing serde roundtrip when render context is already `Value`/`&Value` (new API or internal fast path), since current `from_serialize` path likely still costs in hot loops.
+- Prototype a hybrid map object for template contexts with native string-key storage plus optional generic-`Value` fallback for uncommon keys, to generalize the context! string-key win beyond the macro-generated case.

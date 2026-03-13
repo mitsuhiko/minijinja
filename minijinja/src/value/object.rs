@@ -7,7 +7,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{mapped_enumerator, Value};
+use crate::value::{mapped_enumerator, Value, ValueRepr};
 use crate::vm::State;
 
 /// A trait that represents a dynamic object.
@@ -873,8 +873,11 @@ macro_rules! impl_value_map {
             #[inline(always)]
             fn get_value_by_str(self: &Arc<Self>, key: &str) -> Option<Value> {
                 if self.len() <= 8 {
-                    self.iter()
-                        .find_map(|(k, v)| (k.as_str() == Some(key)).then(|| v.clone().into()))
+                    self.iter().find_map(|(k, v)| match &k.0 {
+                        ValueRepr::String(s, _) if &**s == key => Some(v.clone().into()),
+                        ValueRepr::SmallStr(s) if s.as_str() == key => Some(v.clone().into()),
+                        _ => None,
+                    })
                 } else {
                     self.get(&Value::from(key)).cloned().map(|v| v.into())
                 }
