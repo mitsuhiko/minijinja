@@ -31,3 +31,5 @@ The optimization target is runtime execution (render path), not compile/parse sp
 
 ## What's Been Tried
 - Initial setup with dedicated benchmark harness for fast render-loop iteration.
+- Tried an `Output` string-target fast path with extra branching in `write_str`/`write_char`; it regressed (~+1.8%), likely from branch overhead in the hottest path.
+- Added an ASCII no-op fast path to `upper` filter (`return v.into_owned()` when no lowercase ASCII exists). Big win on this workload (many numeric `item|upper` calls), ~7% faster.

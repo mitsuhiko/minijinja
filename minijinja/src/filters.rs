@@ -195,6 +195,9 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn upper(v: Cow<'_, str>) -> String {
+        if v.is_ascii() && !v.bytes().any(|x| x.is_ascii_lowercase()) {
+            return v.into_owned();
+        }
         v.to_uppercase()
     }
 

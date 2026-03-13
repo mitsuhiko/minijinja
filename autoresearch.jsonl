@@ -1,1 +1,4 @@
 {"type":"config","name":"Optimize MiniJinja render benchmark (all_elements)","metricName":"render_ns","metricUnit":"ns","bestDirection":"lower"}
+{"run":1,"commit":"d6e822b","metric":40876.3,"metrics":{},"status":"keep","description":"Set up autoresearch harness and recorded baseline render benchmark","timestamp":1773439303738,"segment":0}
+{"run":2,"commit":"d6e822b","metric":40879.88,"metrics":{},"status":"discard","description":"Measured baseline noise floor without code changes","timestamp":1773439336590,"segment":0}
+{"run":3,"commit":"d6e822b","metric":41628.59,"metrics":{},"status":"discard","description":"Tried Output fast-path branches for string targets to avoid trait dispatch in write_str/write_char","timestamp":1773439443712,"segment":0}
