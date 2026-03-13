@@ -183,6 +183,15 @@ pub trait Object: fmt::Debug + Send + Sync {
         None
     }
 
+    /// Given a string key, looks up the associated value.
+    ///
+    /// By default this creates a temporary value and calls [`get_value`](Self::get_value).
+    /// Implementors can override this to avoid temporary allocations for common
+    /// string-key lookups.
+    fn get_value_by_str(self: &Arc<Self>, key: &str) -> Option<Value> {
+        self.get_value(&Value::from(key))
+    }
+
     /// Enumerates the object.
     ///
     /// The engine uses the returned enumerator to implement iteration and
@@ -628,6 +637,8 @@ type_erase! {
 
         fn get_value(&self, key: &Value) -> Option<Value>;
 
+        fn get_value_by_str(&self, key: &str) -> Option<Value>;
+
         fn enumerate(&self) -> Enumerator;
 
         fn is_true(&self) -> bool;
@@ -781,6 +792,11 @@ macro_rules! impl_str_map_helper {
                 self.get(some!(key.as_str())).cloned().map(|v| v.into())
             }
 
+            #[inline(always)]
+            fn get_value_by_str(self: &Arc<Self>, key: &str) -> Option<Value> {
+                self.get(key).cloned().map(|v| v.into())
+            }
+
             fn enumerate(self: &Arc<Self>) -> Enumerator {
                 self.$enumerator(|this| Box::new(this.keys().map(|x| Value::from(x as &str))))
             }
@@ -852,6 +868,16 @@ macro_rules! impl_value_map {
             #[inline(always)]
             fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
                 self.get(key).cloned().map(|v| v.into())
+            }
+
+            #[inline(always)]
+            fn get_value_by_str(self: &Arc<Self>, key: &str) -> Option<Value> {
+                if self.len() <= 8 {
+                    self.iter()
+                        .find_map(|(k, v)| (k.as_str() == Some(key)).then(|| v.clone().into()))
+                } else {
+                    self.get(&Value::from(key)).cloned().map(|v| v.into())
+                }
             }
 
             fn enumerate(self: &Arc<Self>) -> Enumerator {

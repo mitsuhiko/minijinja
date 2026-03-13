@@ -1254,7 +1254,7 @@ impl Value {
     pub fn get_attr(&self, key: &str) -> Result<Value, Error> {
         let value = match self.0 {
             ValueRepr::Undefined(_) => return Err(Error::from(ErrorKind::UndefinedError)),
-            ValueRepr::Object(ref dy) => dy.get_value(&Value::from(key)),
+            ValueRepr::Object(ref dy) => dy.get_value_by_str(key),
             _ => None,
         };
 
@@ -1269,7 +1269,7 @@ impl Value {
     /// also not be created.
     pub(crate) fn get_attr_fast(&self, key: &str) -> Option<Value> {
         match self.0 {
-            ValueRepr::Object(ref dy) => dy.get_value(&Value::from(key)),
+            ValueRepr::Object(ref dy) => dy.get_value_by_str(key),
             _ => None,
         }
     }
