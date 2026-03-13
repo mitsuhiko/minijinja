@@ -6,7 +6,7 @@ The optimization target is runtime execution (render path), not compile/parse sp
 
 ## Metrics
 - **Primary**: `render_ns` (ns, lower is better)
-- **Secondary**: `render_mean_ns`
+- **Secondary**: `render_mean_ns`, `parse_ns`, `compile_ns`
 
 ## How to Run
 `./autoresearch.sh` — emits `METRIC name=number` lines.
@@ -40,3 +40,6 @@ The optimization target is runtime execution (render path), not compile/parse sp
 - Switched hidden `context!` internal map representation from `ValueMap` (`BTreeMap<Value, Value>`) to `BTreeMap<Arc<str>, Value>`, reducing key conversion overhead during context construction and lookup.
 - Specialized small `Value`-keyed map string lookup by matching directly on `ValueRepr::String`/`SmallStr` instead of calling generic `as_str` conversion.
 - Added `Loop::get_value_by_str` override and routed `get_value` through it, removing temporary `Value` key construction for frequent `loop.<attr>` lookups.
+- Replaced VM `Locals` backing store from `BTreeMap` to a compact `Vec<(&str, Value)>` with linear lookup/update. This significantly improved small-scope local variable access (common in loops).
+- Preallocated `Locals` with small capacity and tuned it (`Vec::with_capacity(32)`) to avoid early reallocations for typical loop/local scopes.
+- Expanded the autoresearch harness to emit additional secondary metrics (`parse_ns`, `compile_ns`) for overfitting guardrails while keeping `render_ns` as primary.
