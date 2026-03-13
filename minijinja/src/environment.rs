@@ -12,7 +12,7 @@ use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::expression::Expression;
 use crate::output::Output;
 use crate::template::{CompiledTemplate, CompiledTemplateRef, Template, TemplateConfig};
-use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
+use crate::utils::{write_escaped, AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
 use crate::value::{FunctionArgs, FunctionResult, UndefinedType, Value, ValueRepr};
 use crate::vm::State;
 use crate::{defaults, functions};
@@ -54,6 +54,7 @@ pub struct Environment<'source> {
     pub(crate) unknown_method_callback: Option<Arc<UnknownMethodFunc>>,
     undefined_behavior: UndefinedBehavior,
     formatter: Arc<FormatterFunc>,
+    formatter_is_default: bool,
     #[cfg(feature = "debug")]
     debug: bool,
     #[cfg(feature = "fuel")]
@@ -106,6 +107,7 @@ impl<'source> Environment<'source> {
             unknown_method_callback: None,
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
+            formatter_is_default: true,
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
             #[cfg(feature = "fuel")]
@@ -128,6 +130,7 @@ impl<'source> Environment<'source> {
             unknown_method_callback: None,
             undefined_behavior: UndefinedBehavior::default(),
             formatter: Arc::new(defaults::escape_formatter),
+            formatter_is_default: true,
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
             #[cfg(feature = "fuel")]
@@ -550,6 +553,7 @@ impl<'source> Environment<'source> {
         F: Fn(&mut Output, &State, &Value) -> Result<(), Error> + 'static + Sync + Send,
     {
         self.formatter = Arc::new(f);
+        self.formatter_is_default = false;
     }
 
     /// Enable or disable the debug mode.
@@ -814,7 +818,13 @@ impl<'source> Environment<'source> {
                 UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict,
                 &ValueRepr::Undefined(UndefinedType::Default),
             ) => Err(Error::from(ErrorKind::UndefinedError)),
-            _ => (self.formatter)(out, state, value),
+            _ => {
+                if self.formatter_is_default {
+                    write_escaped(out, state.auto_escape(), value)
+                } else {
+                    (self.formatter)(out, state, value)
+                }
+            }
         }
     }
 

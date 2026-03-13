@@ -4,3 +4,9 @@
 {"run":3,"commit":"d6e822b","metric":41628.59,"metrics":{},"status":"discard","description":"Tried Output fast-path branches for string targets to avoid trait dispatch in write_str/write_char","timestamp":1773439443712,"segment":0}
 {"run":4,"commit":"6df6c1c","metric":37906.9,"metrics":{},"status":"keep","description":"Optimize upper filter with ASCII no-op fast path to avoid redundant case conversion","timestamp":1773439516019,"segment":0}
 {"run":5,"commit":"6df6c1c","metric":38273.11,"metrics":{},"status":"discard","description":"Tried ASCII-specific to_ascii_uppercase path in upper filter for lowercase ASCII strings","timestamp":1773439554975,"segment":0}
+{"run":6,"commit":"32b2042","metric":36304.36,"metrics":{},"status":"keep","description":"Add html-escape precheck and direct write_str fast path for strings without escapable chars","timestamp":1773439625728,"segment":0}
+{"run":7,"commit":"32b2042","metric":36454.1,"metrics":{},"status":"discard","description":"Specialized HTML formatter for primitive ValueRepr variants to bypass Value Display dispatch","timestamp":1773439690635,"segment":0}
+{"run":8,"commit":"32b2042","metric":37220.38,"metrics":{},"status":"discard","description":"Attempted to force-inline write_with_html_escaping in utils hot path","timestamp":1773439824687,"segment":0}
+{"run":9,"commit":"32b2042","metric":36980.8,"metrics":{},"status":"discard","description":"Tried simpler any(matches!) implementation for needs_html_escaping byte scan","timestamp":1773439870725,"segment":0}
+{"run":10,"commit":"32b2042","metric":36764.98,"metrics":{},"status":"discard","description":"Control run without code changes to re-check variance after recent edits","timestamp":1773439902177,"segment":0}
+{"run":11,"commit":"32b2042","metric":36984.05,"metrics":{},"status":"discard","description":"Second control run; observed benchmark noise drifting higher on current machine load","timestamp":1773439905593,"segment":0}

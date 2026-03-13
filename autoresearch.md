@@ -34,3 +34,4 @@ The optimization target is runtime execution (render path), not compile/parse sp
 - Tried an `Output` string-target fast path with extra branching in `write_str`/`write_char`; it regressed (~+1.8%), likely from branch overhead in the hottest path.
 - Added an ASCII no-op fast path to `upper` filter (`return v.into_owned()` when no lowercase ASCII exists). Big win on this workload (many numeric `item|upper` calls), ~7% faster.
 - Added `needs_html_escaping` pre-check and direct `out.write_str` fast path for unescaped strings. This avoids `write!`/`Display` overhead for common safe-looking strings and improved render throughput by another ~4%.
+- Added `formatter_is_default` fast path in `Environment::format` to call `write_escaped` directly and skip dynamic formatter dispatch when default formatter is active.
