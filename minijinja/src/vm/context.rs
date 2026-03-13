@@ -80,7 +80,7 @@ pub(crate) struct Stack {
 impl Default for Stack {
     fn default() -> Stack {
         Stack {
-            values: Vec::with_capacity(16),
+            values: Vec::with_capacity(24),
         }
     }
 }

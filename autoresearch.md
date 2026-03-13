@@ -43,4 +43,5 @@ The optimization target is runtime execution (render path), not compile/parse sp
 - Added `Loop::get_value_by_str` override and routed `get_value` through it, removing temporary `Value` key construction for frequent `loop.<attr>` lookups.
 - Replaced VM `Locals` backing store from `BTreeMap` to a compact `Vec<(&str, Value)>` with linear lookup/update. This significantly improved small-scope local variable access (common in loops).
 - Preallocated `Locals` with small capacity and tuned it (`Vec::with_capacity(32)`) to avoid early reallocations for typical loop/local scopes.
+- Tuned VM value stack initial capacity from 16 to 24 for this workload, reducing stack growth overhead during evaluation.
 - Expanded the autoresearch harness to emit additional secondary metrics (`parse_ns`, `compile_ns`) for overfitting guardrails while keeping `render_ns` as primary.
