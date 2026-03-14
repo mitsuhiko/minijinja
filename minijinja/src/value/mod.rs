@@ -207,7 +207,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 
-use serde::ser::{Serialize, SerializeTupleStruct, Serializer};
+use serde::ser::{Serialize, Serializer};
 
 use crate::error::{Error, ErrorKind};
 use crate::functions;
@@ -1707,12 +1707,9 @@ impl Serialize for Value {
             });
             VALUE_HANDLES.with(|handles| handles.borrow_mut().insert(handle, self.clone()));
 
-            // we serialize this into a tuple struct as a form of in-band signalling
-            // we can detect.  This also will fail with a somewhat acceptable error
-            // for flattening operations.  See https://github.com/mitsuhiko/minijinja/issues/222
-            let mut s = ok!(serializer.serialize_tuple_struct(VALUE_HANDLE_MARKER, 1));
-            ok!(s.serialize_field(&handle));
-            return s.end();
+            // We serialize this into a newtype struct as in-band signaling
+            // so ValueSerializer can recover the cloned value via the handle registry.
+            return serializer.serialize_newtype_struct(VALUE_HANDLE_MARKER, &handle);
         }
 
         match self.0 {

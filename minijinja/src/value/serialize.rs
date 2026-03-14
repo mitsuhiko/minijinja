@@ -149,12 +149,20 @@ impl Serializer for ValueSerializer {
 
     fn serialize_newtype_struct<T>(
         self,
-        _name: &'static str,
+        name: &'static str,
         value: &T,
     ) -> Result<Value, InvalidValue>
     where
         T: Serialize + ?Sized,
     {
+        if name == VALUE_HANDLE_MARKER {
+            let handle = transform(value).as_usize().map(|x| x as u32);
+            return VALUE_HANDLES.with(|handles| {
+                handle
+                    .and_then(|h| handles.borrow_mut().remove(h))
+                    .ok_or_else(|| InvalidValue("value handle not in registry".into()))
+            });
+        }
         Ok(transform(value))
     }
 
@@ -187,13 +195,11 @@ impl Serializer for ValueSerializer {
 
     fn serialize_tuple_struct(
         self,
-        name: &'static str,
+        _name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleStruct, InvalidValue> {
-        Ok(if name == VALUE_HANDLE_MARKER {
-            SerializeTupleStruct::Handle(None)
-        } else {
-            SerializeTupleStruct::Fields(Vec::with_capacity(untrusted_size_hint(len)))
+        Ok(SerializeTupleStruct {
+            fields: Vec::with_capacity(untrusted_size_hint(len)),
         })
     }
 
@@ -283,9 +289,8 @@ impl ser::SerializeTuple for SerializeTuple {
     }
 }
 
-pub enum SerializeTupleStruct {
-    Handle(Option<u32>),
-    Fields(Vec<Value>),
+pub struct SerializeTupleStruct {
+    fields: Vec<Value>,
 }
 
 impl ser::SerializeTupleStruct for SerializeTupleStruct {
@@ -296,26 +301,12 @@ impl ser::SerializeTupleStruct for SerializeTupleStruct {
     where
         T: Serialize + ?Sized,
     {
-        match self {
-            SerializeTupleStruct::Handle(ref mut handle) => {
-                *handle = transform(value).as_usize().map(|x| x as u32);
-            }
-            SerializeTupleStruct::Fields(ref mut fields) => {
-                fields.push(transform(value));
-            }
-        }
+        self.fields.push(transform(value));
         Ok(())
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        match self {
-            SerializeTupleStruct::Handle(handle) => VALUE_HANDLES.with(|handles| {
-                handle
-                    .and_then(|h| handles.borrow_mut().remove(h))
-                    .ok_or_else(|| InvalidValue("value handle not in registry".into()))
-            }),
-            SerializeTupleStruct::Fields(fields) => Ok(Value::from_object(fields)),
-        }
+        Ok(Value::from_object(self.fields))
     }
 }
 
