@@ -548,7 +548,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_args(&mut self) -> Result<Vec<ast::CallArg<'a>>, Error> {
-        let mut args = Vec::new();
+        let mut args = Vec::with_capacity(4);
         let mut first_span = None;
         let mut has_kwargs = false;
 
@@ -673,7 +673,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_list_expr(&mut self, span: Span) -> Result<ast::Expr<'a>, Error> {
-        let mut items = Vec::new();
+        let mut items = Vec::with_capacity(4);
         loop {
             if skip_token!(self, Token::BracketClose) {
                 break;
@@ -693,8 +693,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_map_expr(&mut self, span: Span) -> Result<ast::Expr<'a>, Error> {
-        let mut keys = Vec::new();
-        let mut values = Vec::new();
+        let mut keys = Vec::with_capacity(4);
+        let mut values = Vec::with_capacity(4);
         loop {
             if skip_token!(self, Token::BraceClose) {
                 break;
@@ -839,7 +839,7 @@ impl<'a> Parser<'a> {
 
     fn parse_assignment(&mut self, dotted: bool) -> Result<ast::Expr<'a>, Error> {
         let span = self.stream.current_span();
-        let mut items = Vec::new();
+        let mut items = Vec::with_capacity(2);
         let mut is_tuple = false;
 
         loop {
@@ -934,7 +934,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_with_block(&mut self) -> Result<ast::WithBlock<'a>, Error> {
-        let mut assignments = Vec::new();
+        let mut assignments = Vec::with_capacity(4);
 
         while !matches_token!(self, Token::BlockEnd) {
             if !assignments.is_empty() {
@@ -1113,7 +1113,7 @@ impl<'a> Parser<'a> {
     #[cfg(feature = "multi_template")]
     fn parse_from_import(&mut self) -> Result<ast::FromImport<'a>, Error> {
         let expr = ok!(self.parse_expr());
-        let mut names = Vec::new();
+        let mut names = Vec::with_capacity(4);
         expect_token!(self, Token::Ident("import"), "import");
         loop {
             if ok!(self.skip_context_marker()) || matches_token!(self, Token::BlockEnd) {
@@ -1204,8 +1204,8 @@ impl<'a> Parser<'a> {
     fn parse_macro(&mut self) -> Result<ast::Macro<'a>, Error> {
         let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier");
         expect_token!(self, Token::ParenOpen, "`(`");
-        let mut args = Vec::new();
-        let mut defaults = Vec::new();
+        let mut args = Vec::with_capacity(4);
+        let mut defaults = Vec::with_capacity(4);
         ok!(self.parse_macro_args_and_defaults(&mut args, &mut defaults));
         self.parse_macro_or_call_block_body(args, defaults, Some(name))
     }
@@ -1213,8 +1213,8 @@ impl<'a> Parser<'a> {
     #[cfg(feature = "macros")]
     fn parse_call_block(&mut self) -> Result<ast::CallBlock<'a>, Error> {
         let span = self.stream.last_span();
-        let mut args = Vec::new();
-        let mut defaults = Vec::new();
+        let mut args = Vec::with_capacity(4);
+        let mut defaults = Vec::with_capacity(4);
         if skip_token!(self, Token::ParenOpen) {
             ok!(self.parse_macro_args_and_defaults(&mut args, &mut defaults));
         }
@@ -1247,7 +1247,7 @@ impl<'a> Parser<'a> {
         &mut self,
         end_check: &dyn Fn(&Token) -> bool,
     ) -> Result<Vec<ast::Stmt<'a>>, Error> {
-        let mut rv = Vec::new();
+        let mut rv = Vec::with_capacity(16);
         while let Some((token, span)) = ok!(self.stream.next()) {
             match token {
                 Token::TemplateData(raw) => {
