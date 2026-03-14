@@ -369,16 +369,17 @@ impl<'s> Tokenizer<'s> {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn rest(&self) -> &'s str {
         &self.source[self.current_offset..]
     }
 
-    #[inline]
+    #[inline(always)]
     fn rest_bytes(&self) -> &'s [u8] {
         &self.source.as_bytes()[self.current_offset..]
     }
 
+    #[inline(always)]
     fn advance(&mut self, bytes: usize) -> &'s str {
         let skipped = &self.rest()[..bytes];
         for c in skipped.chars() {
