@@ -35,7 +35,7 @@ const SMALL_INT_FORMAT_CACHE_LIMIT: usize = 256;
 fn small_u64_format(value: u64) -> Option<&'static str> {
     static CACHE: OnceLock<Vec<Box<str>>> = OnceLock::new();
 
-    if value as usize >= SMALL_INT_FORMAT_CACHE_LIMIT {
+    if value >= SMALL_INT_FORMAT_CACHE_LIMIT as u64 {
         return None;
     }
 
@@ -559,6 +559,24 @@ mod tests {
     use super::*;
 
     use similar_asserts::assert_eq;
+
+    #[test]
+    fn test_small_u64_format_cache_bounds() {
+        assert_eq!(small_u64_format(0), Some("0"));
+
+        let last_cached = (SMALL_INT_FORMAT_CACHE_LIMIT - 1) as u64;
+        let expected = (SMALL_INT_FORMAT_CACHE_LIMIT - 1).to_string();
+        assert_eq!(small_u64_format(last_cached), Some(expected.as_str()));
+
+        assert_eq!(small_u64_format(SMALL_INT_FORMAT_CACHE_LIMIT as u64), None);
+    }
+
+    #[test]
+    fn test_small_u64_format_large_values_are_not_cached() {
+        // This value wraps to 0 when cast to usize on 32-bit targets.
+        assert_eq!(small_u64_format(u64::from(u32::MAX) + 1), None);
+        assert_eq!(small_u64_format(u64::MAX), None);
+    }
 
     #[test]
     fn test_html_escape() {
