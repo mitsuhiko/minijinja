@@ -322,27 +322,16 @@ pub fn serializing_for_value() -> bool {
     INTERNAL_SERIALIZATION.with(|flag| flag.get())
 }
 
-struct InternalSerializationGuard {
+struct InternalSerializationGuard<'a> {
+    flag: &'a Cell<bool>,
     reset_on_drop: bool,
 }
 
-impl Drop for InternalSerializationGuard {
+impl Drop for InternalSerializationGuard<'_> {
     fn drop(&mut self) {
         if self.reset_on_drop {
-            INTERNAL_SERIALIZATION.with(|flag| flag.set(false));
+            self.flag.set(false);
         }
-    }
-}
-
-#[inline(always)]
-fn mark_internal_serialization() -> InternalSerializationGuard {
-    let old = INTERNAL_SERIALIZATION.with(|flag| {
-        let old = flag.get();
-        flag.set(true);
-        old
-    });
-    InternalSerializationGuard {
-        reset_on_drop: !old,
     }
 }
 
@@ -785,8 +774,14 @@ impl Value {
     /// [`deserialize`](serde::Deserialize::deserialize) method of a type that supports
     /// serde deserialization.
     pub fn from_serialize<T: Serialize>(value: T) -> Value {
-        let _serialization_guard = mark_internal_serialization();
-        transform(value)
+        INTERNAL_SERIALIZATION.with(|flag| {
+            let old = flag.replace(true);
+            let _serialization_guard = InternalSerializationGuard {
+                flag,
+                reset_on_drop: !old,
+            };
+            transform(value)
+        })
     }
 
     /// Extracts a contained error.
