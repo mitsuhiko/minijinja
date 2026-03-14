@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 use std::fmt;
+use std::mem;
 
 use crate::compiler::ast::{self, Spanned};
 use crate::compiler::lexer::{Tokenizer, WhitespaceConfig};
@@ -95,7 +96,7 @@ enum SetParseResult<'a> {
 
 struct TokenStream<'a> {
     tokenizer: Tokenizer<'a>,
-    current: Option<Result<(Token<'a>, Span), Error>>,
+    current: Result<Option<(Token<'a>, Span)>, Error>,
     last_span: Span,
 }
 
@@ -110,7 +111,7 @@ impl<'a> TokenStream<'a> {
     ) -> TokenStream<'a> {
         let mut tokenizer =
             Tokenizer::new(source, filename, in_expr, syntax_config, whitespace_config);
-        let current = tokenizer.next_token().transpose();
+        let current = tokenizer.next_token();
         TokenStream {
             tokenizer,
             current,
@@ -121,25 +122,31 @@ impl<'a> TokenStream<'a> {
     /// Advance the stream.
     #[inline(always)]
     pub fn next(&mut self) -> Result<Option<(Token<'a>, Span)>, Error> {
-        let rv = self.current.take();
-        self.current = self.tokenizer.next_token().transpose();
+        let rv = mem::replace(&mut self.current, self.tokenizer.next_token());
         match rv {
-            Some(Ok((token, span))) => {
+            Ok(Some((token, span))) => {
                 self.last_span = span;
                 Ok(Some((token, span)))
             }
-            Some(Err(err)) => Err(err),
-            None => Ok(None),
+            Ok(None) => Ok(None),
+            Err(err) => Err(err),
         }
     }
 
     /// Look at the current token
     #[inline(always)]
     pub fn current(&mut self) -> Result<Option<(&Token<'a>, Span)>, Error> {
+        if self.current.is_err() {
+            return match mem::replace(&mut self.current, Ok(None)) {
+                Err(err) => Err(err),
+                _ => unreachable!(),
+            };
+        }
+
         match self.current {
-            Some(Ok(ref tok)) => Ok(Some((&tok.0, tok.1))),
-            Some(Err(_)) => Err(self.current.take().unwrap().unwrap_err()),
-            None => Ok(None),
+            Ok(Some((ref token, span))) => Ok(Some((token, span))),
+            Ok(None) => Ok(None),
+            Err(_) => unreachable!(),
         }
     }
 
@@ -155,10 +162,9 @@ impl<'a> TokenStream<'a> {
     /// Returns the current span.
     #[inline(always)]
     pub fn current_span(&self) -> Span {
-        if let Some(Ok((_, span))) = self.current {
-            span
-        } else {
-            self.last_span
+        match self.current {
+            Ok(Some((_, span))) => span,
+            _ => self.last_span,
         }
     }
 
