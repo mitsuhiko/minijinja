@@ -176,3 +176,4 @@
 {"run":49,"commit":"62de878","metric":22383.47,"metrics":{},"status":"discard","description":"Tried shrinking small-integer HTML output cache from 256 to 128; misses on mid-range loop indices regressed render","timestamp":1773451862516,"segment":0}
 {"run":50,"commit":"62de878","metric":21802.73,"metrics":{},"status":"discard","description":"Tried expanding small-integer HTML output cache from 256 to 512; no measurable improvement","timestamp":1773451893488,"segment":0}
 {"type":"config","name":"Optimize MiniJinja render benchmark (multi-workload)","metricName":"render_ns","metricUnit":"ns","bestDirection":"lower"}
+{"run":1,"commit":"409a1a5","metric":78718.42,"metrics":{},"status":"keep","description":"Baseline run on multi-workload autoresearch harness (all_elements + string_heavy + macro_heavy) after reinitializing target","timestamp":1773484287607,"segment":2}

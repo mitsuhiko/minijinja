@@ -812,6 +812,7 @@ macro_rules! impl_str_map {
     ($map_type:ident, $enumerator:ident) => {
         impl_str_map_helper!($map_type, String, $enumerator);
         impl_str_map_helper!($map_type, Arc<str>, $enumerator);
+        impl_str_map_helper!($map_type, &'static str, $enumerator);
 
         impl<V> From<$map_type<String, V>> for Value
         where

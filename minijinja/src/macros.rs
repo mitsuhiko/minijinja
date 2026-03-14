@@ -27,20 +27,19 @@ pub mod __context {
     use crate::Environment;
     use std::collections::BTreeMap;
     use std::rc::Rc;
-    use std::sync::Arc;
 
     #[inline(always)]
-    pub fn make() -> BTreeMap<Arc<str>, Value> {
+    pub fn make() -> BTreeMap<&'static str, Value> {
         BTreeMap::default()
     }
 
     #[inline(always)]
-    pub fn add(ctx: &mut BTreeMap<Arc<str>, Value>, key: &'static str, value: Value) {
-        ctx.insert(key.into(), value);
+    pub fn add(ctx: &mut BTreeMap<&'static str, Value>, key: &'static str, value: Value) {
+        ctx.insert(key, value);
     }
 
     #[inline(always)]
-    pub fn build(ctx: BTreeMap<Arc<str>, Value>) -> Value {
+    pub fn build(ctx: BTreeMap<&'static str, Value>) -> Value {
         Value::from_object(ctx)
     }
 
