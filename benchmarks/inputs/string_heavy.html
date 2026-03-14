@@ -1,0 +1,38 @@
+<article class="post">
+  <h1>{{ post.title|title }}</h1>
+  <p class="meta">
+    By {{ post.author.name }} &middot;
+    {{ post.date }} &middot;
+    {{ post.tags|join(", ") }}
+  </p>
+  <div class="summary">{{ post.summary }}</div>
+  <div class="body">
+    {% for paragraph in post.paragraphs %}
+      <p>{{ paragraph }}</p>
+    {% endfor %}
+  </div>
+  <aside class="sidebar">
+    <h3>{{ post.author.name|upper }}'s Recent Posts</h3>
+    <ul>
+      {% for related in post.author.recent_posts %}
+        <li>
+          <a href="{{ related.url }}" title="{{ related.title }}">
+            {{ related.title }}
+          </a>
+          <span class="date">{{ related.date }}</span>
+          {% if related.featured %}
+            <span class="badge">Featured</span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </aside>
+  <footer>
+    <p>Filed under:
+      {% for tag in post.tags %}
+        <a href="/tags/{{ tag|lower|replace(" ", "-") }}">{{ tag }}</a>{% if not loop.last %}, {% endif %}
+      {% endfor %}
+    </p>
+    <p>{{ post.footer_note|default("No additional notes.") }}</p>
+  </footer>
+</article>

@@ -1,0 +1,70 @@
+{% macro field(name, value, type="text") %}
+  <div class="field">
+    <label for="{{ name }}">{{ name|title|replace("_", " ") }}</label>
+    {% if type == "textarea" %}
+      <textarea id="{{ name }}" name="{{ name }}">{{ value|default("") }}</textarea>
+    {% elif type == "select" %}
+      <select id="{{ name }}" name="{{ name }}">
+        {% for opt in value %}
+          <option value="{{ opt.value }}"{% if opt.selected %} selected{% endif %}>{{ opt.label }}</option>
+        {% endfor %}
+      </select>
+    {% else %}
+      <input type="{{ type }}" id="{{ name }}" name="{{ name }}" value="{{ value|default("") }}">
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro card(item) %}
+  <div class="card{% if item.featured %} card--featured{% endif %}">
+    <h3>{{ item.title }}</h3>
+    <p>{{ item.description }}</p>
+    <dl>
+      {% for key, val in item.metadata|items %}
+        <dt>{{ key|title }}</dt>
+        <dd>{{ val }}</dd>
+      {% endfor %}
+    </dl>
+    {% if item.actions %}
+      <div class="actions">
+        {% for action in item.actions %}
+          <a href="{{ action.url }}" class="btn btn-{{ action.style|default("default") }}">
+            {{ action.label }}
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+<main>
+  <h1>{{ page.title }}</h1>
+  <form method="post" action="{{ page.form_action }}">
+    {{ field("first_name", user.first_name) }}
+    {{ field("last_name", user.last_name) }}
+    {{ field("email", user.email, type="text") }}
+    {{ field("bio", user.bio, type="textarea") }}
+    {{ field("role", user.role_options, type="select") }}
+    <button type="submit">Save</button>
+  </form>
+
+  <section class="items">
+    <h2>{{ page.items_title }}</h2>
+    {% for item in items %}
+      {{ card(item) }}
+    {% endfor %}
+  </section>
+
+  {% if notifications %}
+    <aside class="notifications">
+      {% for note in notifications %}
+        <div class="notification notification--{{ note.level }}">
+          <strong>{{ note.title }}</strong>: {{ note.message }}
+          {% if note.action %}
+            <a href="{{ note.action.url }}">{{ note.action.label }}</a>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </aside>
+  {% endif %}
+</main>
