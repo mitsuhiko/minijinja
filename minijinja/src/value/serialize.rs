@@ -57,10 +57,15 @@ impl serde::ser::Error for InvalidValue {
 ///
 /// This neither fails nor panics.  For objects that cannot be represented
 /// the value might be represented as a half broken error object.
+#[cold]
+fn to_invalid_value(invalid: InvalidValue) -> Value {
+    Value::from(Error::new(ErrorKind::BadSerialization, invalid.0))
+}
+
 pub fn transform<T: Serialize>(value: T) -> Value {
     match value.serialize(ValueSerializer) {
         Ok(rv) => rv,
-        Err(invalid) => Value::from(Error::new(ErrorKind::BadSerialization, invalid.0)),
+        Err(invalid) => to_invalid_value(invalid),
     }
 }
 
