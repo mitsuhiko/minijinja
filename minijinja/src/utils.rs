@@ -48,6 +48,21 @@ fn small_u64_format(value: u64) -> Option<&'static str> {
 }
 
 #[inline(always)]
+fn is_ascii_integer_str(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    if bytes.is_empty() {
+        return false;
+    }
+
+    let (first, rest) = bytes.split_first().unwrap();
+    if *first == b'-' {
+        !rest.is_empty() && rest.iter().all(|b| b.is_ascii_digit())
+    } else {
+        first.is_ascii_digit() && rest.iter().all(|b| b.is_ascii_digit())
+    }
+}
+
+#[inline(always)]
 fn needs_html_escaping(s: &str) -> bool {
     for &b in s.as_bytes() {
         if b.wrapping_sub(b'"') <= b'>' - b'"' {
@@ -78,6 +93,13 @@ fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
             return out.write_str(if v { "true" } else { "false" });
         }
         _ => {}
+    }
+
+    if let ValueRepr::SmallStr(ref s) = value.0 {
+        let s = s.as_str();
+        if is_ascii_integer_str(s) {
+            return out.write_str(s);
+        }
     }
 
     if let Some(s) = value.as_str() {
