@@ -1,3 +1,3 @@
-- Extend compile-path buffer reuse beyond `pending_block`/`span_stack` to include instruction metadata buffers (`line_infos` / debug spans) while preserving diagnostics.
-- Explore a conservative non-loader template-store micro-optimization that avoids overfitting (no unchanged-source compile skips) and does not regress render lookups.
-- Evaluate an optional median-of-N wrapper for `comparison_ns` runs (same workload repeated) to reduce noise in keep/discard decisions.
+- Extend compile-time buffer reuse from `pending_block`/`span_stack` to additional compile scratch state only when it can be done without adding drop-time overhead (current direct `Instructions` metadata pooling regressed guardrails).
+- Explore low-risk parser/token-stream hot-path simplifications that avoid added branching (focus on `next/current` state transitions and error-path isolation).
+- Add an optional median-of-N wrapper mode for `comparison_ns` runs (same workload repeated) to improve keep/discard robustness under compile-side noise.
