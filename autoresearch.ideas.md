@@ -1,2 +1,5 @@
-- Add an internal fast path for `Template::render(Value)` / `render(&Value)` to bypass `Value::from_serialize` roundtrips when callers already provide a `Value`.
-- Prototype a lightweight internal value repr for `context!` static-key maps (preserving map iteration semantics) to avoid `Arc<DynObject>` boxing overhead on every nested context object.
+- Add a lexer fast path for raw data segments: scan ahead to the next delimiter start (`{`) and emit a single data token instead of per-byte branching in the hot loop.
+- Reduce parser allocation churn by pre-sizing key vectors (statements, expressions, argument lists) using lightweight token-count heuristics.
+- Avoid unnecessary string allocations in parse/codegen by borrowing identifier slices where possible and only allocating when escaping/normalization is required.
+- Pre-allocate codegen instruction and constant buffers from AST-size estimates to reduce `Vec` growth and cloning during bytecode emission.
+- Optimize `Environment::add_template` compile path to avoid duplicate template-name/source cloning between parse and codegen stages.
