@@ -175,3 +175,4 @@
 {"run":48,"commit":"62de878","metric":21778.32,"metrics":{},"status":"discard","description":"Control rerun on numeric HTML output fast path confirms stable ~21.7us band","timestamp":1773451807653,"segment":0}
 {"run":49,"commit":"62de878","metric":22383.47,"metrics":{},"status":"discard","description":"Tried shrinking small-integer HTML output cache from 256 to 128; misses on mid-range loop indices regressed render","timestamp":1773451862516,"segment":0}
 {"run":50,"commit":"62de878","metric":21802.73,"metrics":{},"status":"discard","description":"Tried expanding small-integer HTML output cache from 256 to 512; no measurable improvement","timestamp":1773451893488,"segment":0}
+{"type":"config","name":"Optimize MiniJinja render benchmark (multi-workload)","metricName":"render_ns","metricUnit":"ns","bestDirection":"lower"}
