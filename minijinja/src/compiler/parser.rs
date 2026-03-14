@@ -119,6 +119,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Advance the stream.
+    #[inline(always)]
     pub fn next(&mut self) -> Result<Option<(Token<'a>, Span)>, Error> {
         let rv = self.current.take();
         self.current = self.tokenizer.next_token().transpose();
@@ -129,6 +130,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Look at the current token
+    #[inline(always)]
     pub fn current(&mut self) -> Result<Option<(&Token<'a>, Span)>, Error> {
         match self.current {
             Some(Ok(ref tok)) => Ok(Some((&tok.0, tok.1))),

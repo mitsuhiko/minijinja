@@ -1,4 +1,3 @@
-- Replace `Tokenizer`'s heap-backed state stack with a small inline stack (plus overflow fallback) to eliminate per-parse Vec allocation and growth overhead.
-- Explore parser-side pooled allocation for short-lived AST vectors (statement lists, expression lists) to reduce repeated allocator churn while preserving spans/diagnostics.
-- Design a compile-path template-store insertion fast path that leaves `get_template` lookup behavior identical in hot render loops (avoid render regressions seen in prior single-template storage experiments).
-- Investigate lighter-weight codegen location metadata recording (line/span) that preserves diagnostics but reduces compile-time bookkeeping work.
+- Investigate a lightweight template-store path for non-loader environments that improves repeated `add_template` updates without slowing `get_template` in render hot loops.
+- Explore parser/codegen allocation reuse shared across compilations (e.g., recyclable instruction/span buffers) while preserving diagnostics and template semantics.
+- Evaluate an optional median-of-N wrapper for `comparison_ns` runs (same workload repeated) to reduce compile-side noise and make keep/discard decisions more robust.
