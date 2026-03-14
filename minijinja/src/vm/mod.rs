@@ -185,6 +185,10 @@ impl<'env> Vm<'env> {
     ) -> Result<Option<Value>, Error> {
         let initial_auto_escape = state.auto_escape.get();
         let undefined_behavior = state.undefined_behavior();
+        let strict_undefined = matches!(
+            undefined_behavior,
+            UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict
+        );
         let mut auto_escape_stack = vec![];
         let mut next_loop_recursion_jump = None;
         let mut loaded_filters = [None; MAX_LOCALS];
@@ -318,13 +322,9 @@ impl<'env> Vm<'env> {
                 Instruction::Emit => {
                     let value = stack.pop();
                     if self.env.is_default_formatter() {
-                        if matches!(
-                            (undefined_behavior, &value.0),
-                            (
-                                UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict,
-                                ValueRepr::Undefined(UndefinedType::Default)
-                            )
-                        ) {
+                        if strict_undefined
+                            && matches!(value.0, ValueRepr::Undefined(UndefinedType::Default))
+                        {
                             bail!(Error::from(ErrorKind::UndefinedError));
                         }
                         ctx_ok!(write_escaped(out, state.auto_escape.get(), &value));
