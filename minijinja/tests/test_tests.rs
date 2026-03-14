@@ -14,3 +14,23 @@ fn test_basics() {
     let state = env.empty_state();
     assert!(state.perform_test("test", args!(23, 23)).unwrap());
 }
+
+#[test]
+fn test_dotted_test_name() {
+    let mut env = Environment::new();
+    env.add_test("foo.bar.baz", |value: i32| value == 42);
+
+    let rv = env
+        .template_from_str("{{ 42 is foo.bar.baz }}")
+        .unwrap()
+        .render(())
+        .unwrap();
+    assert_eq!(rv, "true");
+
+    let rv = env
+        .template_from_str("{{ 42 is foo . bar . baz }}")
+        .unwrap()
+        .render(())
+        .unwrap();
+    assert_eq!(rv, "true");
+}

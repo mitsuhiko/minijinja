@@ -226,6 +226,12 @@ fn test_custom_filter() {
 }
 
 #[test]
+fn test_dotted_integer_lookup() {
+    assert_eq!(render!("{{ [1, 2].0 }}"), "1");
+    assert_eq!(render!("{{ [1, 2].1 }}"), "2");
+}
+
+#[test]
 fn test_items_and_dictsort_with_structs() {
     #[derive(Debug, Clone)]
     struct MyStruct;
