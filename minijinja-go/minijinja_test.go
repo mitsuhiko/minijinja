@@ -53,6 +53,23 @@ func TestVariableTypes(t *testing.T) {
 	}
 }
 
+func TestDottedIntegerLookup(t *testing.T) {
+	env := NewEnvironment()
+	tmpl, err := env.TemplateFromString("{{ [1, 2].0 }} {{ [1, 2].1 }}")
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "1 2" {
+		t.Errorf("expected '1 2', got %q", result)
+	}
+}
+
 func TestForLoop(t *testing.T) {
 	env := NewEnvironment()
 	tmpl, err := env.TemplateFromString("{% for item in items %}{{ item }}{% endfor %}")

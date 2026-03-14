@@ -524,11 +524,29 @@ func (p *Parser) parsePostfix(expr Expr, span Span) (Expr, *Error) {
 		nextSpan := p.currentSpan()
 		switch {
 		case p.skip(lexer.TokenDot):
-			name, _, err := p.expectIdent("identifier")
-			if err != nil {
-				return nil, err
+			tok := p.advance()
+			if tok == nil {
+				return nil, p.unexpectedEOF("identifier or integer")
 			}
-			expr = &GetAttr{Expr: expr, Name: name, span: p.expandSpan(span)}
+			switch tok.Type {
+			case lexer.TokenIdent:
+				expr = &GetAttr{Expr: expr, Name: tok.Value, span: p.expandSpan(span)}
+			case lexer.TokenInteger:
+				// Parse as int64 first, fall back to big.Int on overflow.
+				if val, err := strconv.ParseInt(tok.Value, 0, 64); err == nil {
+					expr = &GetItem{Expr: expr, SubscriptExpr: &Const{Value: val, span: tok.Span}, span: p.expandSpan(span)}
+				} else {
+					bi := new(big.Int)
+					bi.SetString(tok.Value, 0)
+					expr = &GetItem{Expr: expr, SubscriptExpr: &Const{Value: &BigInt{bi}, span: tok.Span}, span: p.expandSpan(span)}
+				}
+			case lexer.TokenInt128:
+				bi := new(big.Int)
+				bi.SetString(tok.Value, 0)
+				expr = &GetItem{Expr: expr, SubscriptExpr: &Const{Value: &BigInt{bi}, span: tok.Span}, span: p.expandSpan(span)}
+			default:
+				return nil, p.unexpected(tokenDescription(tok), "identifier or integer")
+			}
 
 		case p.skip(lexer.TokenBracketOpen):
 			var start, stop, step Expr

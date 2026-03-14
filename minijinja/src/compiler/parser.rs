@@ -406,11 +406,34 @@ impl<'a> Parser<'a> {
             match ok!(self.stream.current()) {
                 Some((Token::Dot, _)) => {
                     ok!(self.stream.next());
-                    let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier");
-                    expr = ast::Expr::GetAttr(Spanned::new(
-                        ast::GetAttr { name, expr },
-                        self.stream.expand_span(span),
-                    ));
+                    match ok!(self.stream.next()) {
+                        Some((Token::Ident(name), _)) => {
+                            expr = ast::Expr::GetAttr(Spanned::new(
+                                ast::GetAttr { name, expr },
+                                self.stream.expand_span(span),
+                            ));
+                        }
+                        Some((Token::Int(idx), idx_span)) => {
+                            expr = ast::Expr::GetItem(Spanned::new(
+                                ast::GetItem {
+                                    expr,
+                                    subscript_expr: make_const(Value::from(idx), idx_span),
+                                },
+                                self.stream.expand_span(span),
+                            ));
+                        }
+                        Some((Token::Int128(idx), idx_span)) => {
+                            expr = ast::Expr::GetItem(Spanned::new(
+                                ast::GetItem {
+                                    expr,
+                                    subscript_expr: make_const(Value::from(*idx), idx_span),
+                                },
+                                self.stream.expand_span(span),
+                            ));
+                        }
+                        Some((token, _)) => return Err(unexpected(token, "identifier or integer")),
+                        None => return Err(unexpected_eof("identifier or integer")),
+                    }
                 }
                 Some((Token::BracketOpen, _)) => {
                     ok!(self.stream.next());
