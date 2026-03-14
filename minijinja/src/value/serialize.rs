@@ -311,7 +311,7 @@ impl ser::SerializeTupleStruct for SerializeTupleStruct {
         match self {
             SerializeTupleStruct::Handle(handle) => VALUE_HANDLES.with(|handles| {
                 handle
-                    .and_then(|h| handles.borrow_mut().remove(&h))
+                    .and_then(|h| handles.borrow_mut().remove(h))
                     .ok_or_else(|| InvalidValue("value handle not in registry".into()))
             }),
             SerializeTupleStruct::Fields(fields) => Ok(Value::from_object(fields)),

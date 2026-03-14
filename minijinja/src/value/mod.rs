@@ -257,13 +257,50 @@ pub(crate) fn value_map_with_capacity(capacity: usize) -> ValueMap {
     }
 }
 
+pub(crate) struct ValueHandleRegistry {
+    single: Option<(u32, Value)>,
+    overflow: BTreeMap<u32, Value>,
+}
+
+impl ValueHandleRegistry {
+    const fn new() -> Self {
+        Self {
+            single: None,
+            overflow: BTreeMap::new(),
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn insert(&mut self, handle: u32, value: Value) {
+        if self.single.is_none() && self.overflow.is_empty() {
+            self.single = Some((handle, value));
+            return;
+        }
+
+        if let Some((other_handle, other_value)) = self.single.take() {
+            self.overflow.insert(other_handle, other_value);
+        }
+        self.overflow.insert(handle, value);
+    }
+
+    #[inline(always)]
+    pub(crate) fn remove(&mut self, handle: u32) -> Option<Value> {
+        if let Some((single_handle, _)) = self.single {
+            if single_handle == handle {
+                return self.single.take().map(|(_, value)| value);
+            }
+        }
+        self.overflow.remove(&handle)
+    }
+}
+
 thread_local! {
     static INTERNAL_SERIALIZATION: Cell<bool> = const { Cell::new(false) };
 
     // This should be an AtomicU64 but sadly 32bit targets do not necessarily have
     // AtomicU64 available.
     static LAST_VALUE_HANDLE: Cell<u32> = const { Cell::new(0) };
-    static VALUE_HANDLES: RefCell<BTreeMap<u32, Value>> = const { RefCell::new(BTreeMap::new()) };
+    static VALUE_HANDLES: RefCell<ValueHandleRegistry> = const { RefCell::new(ValueHandleRegistry::new()) };
 }
 
 /// Function that returns true when serialization for [`Value`] is taking place.
