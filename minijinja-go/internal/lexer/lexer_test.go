@@ -165,3 +165,50 @@ func TestLexerBasic(t *testing.T) {
 		}
 	}
 }
+
+func TestLexerStringEscapeCompatibility(t *testing.T) {
+	tests := []struct {
+		name       string
+		template   string
+		expected   string
+		expectFail bool
+	}{
+		{name: "unknown escape is preserved", template: "{{ '\\s' }}", expected: "\\s"},
+		{name: "octal escape", template: "{{ '\\1' }}", expected: "\x01"},
+		{name: "multi-digit octal escape", template: "{{ '\\123' }}", expected: "S"},
+		{name: "hex escape", template: "{{ '\\x41' }}", expected: "A"},
+		{name: "invalid octal overflow", template: "{{ '\\400' }}", expectFail: true},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			tokens, err := Tokenize(test.template, syntax.DefaultSyntax(), syntax.DefaultWhitespace())
+			if test.expectFail {
+				if err == nil {
+					t.Fatalf("expected lexer error for template %q", test.template)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected lexer error: %v", err)
+			}
+
+			var stringTokens []Token
+			for _, tok := range tokens {
+				if tok.Type == TokenString {
+					stringTokens = append(stringTokens, tok)
+				}
+			}
+
+			if len(stringTokens) != 1 {
+				t.Fatalf("expected exactly one string token, got %d", len(stringTokens))
+			}
+
+			if got := stringTokens[0].Value; got != test.expected {
+				t.Fatalf("unexpected string token value: got %q, want %q", got, test.expected)
+			}
+		})
+	}
+}

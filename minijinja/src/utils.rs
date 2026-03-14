@@ -381,7 +381,10 @@ impl Unescaper {
                             let val = ok!(self.parse_octal_byte(d, &mut char_iter));
                             ok!(self.push_char(val as char));
                         }
-                        _ => return Err(ErrorKind::BadEscape.into()),
+                        _ => {
+                            ok!(self.push_char('\\'));
+                            ok!(self.push_char(d));
+                        }
                     },
                 }
             } else {
@@ -460,7 +463,7 @@ impl Unescaper {
     }
 }
 
-/// Un-escape a string, following JSON rules.
+/// Un-escape a string, following Jinja-compatible string escape rules.
 pub fn unescape(s: &str) -> Result<String, Error> {
     Unescaper {
         out: String::new(),
@@ -580,6 +583,13 @@ mod tests {
         assert_eq!(unescape(r"foo\x42bar").unwrap(), "fooBbar");
         assert_eq!(unescape(r"\x0a").unwrap(), "\n");
         assert_eq!(unescape(r"\x0d").unwrap(), "\r");
+
+        // Unknown escapes are preserved as-is for Jinja compatibility.
+        assert_eq!(unescape(r"\s").unwrap(), r"\s");
+        assert_eq!(unescape(r"\q").unwrap(), r"\q");
+        assert_eq!(unescape(r"foo\sbar").unwrap(), r"foo\sbar");
+        assert_eq!(unescape(r"\8").unwrap(), r"\8");
+        assert_eq!(unescape(r"\9").unwrap(), r"\9");
 
         // Test truncation
         assert!(unescape(r"\x").is_err()); // truncated \x
