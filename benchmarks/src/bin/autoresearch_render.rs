@@ -201,9 +201,27 @@ fn main() {
     let rounds = 41;
     let iters = 128;
 
-    let render_all_elements_ns = bench_median_ns(|| { std::hint::black_box(do_render_all_elements(&env1)); }, rounds, iters);
-    let render_string_heavy_ns = bench_median_ns(|| { std::hint::black_box(do_render_string_heavy(&env2)); }, rounds, iters);
-    let render_macro_heavy_ns = bench_median_ns(|| { std::hint::black_box(do_render_macro_heavy(&env3)); }, rounds, iters);
+    let render_all_elements_ns = bench_median_ns(
+        || {
+            std::hint::black_box(do_render_all_elements(&env1));
+        },
+        rounds,
+        iters,
+    );
+    let render_string_heavy_ns = bench_median_ns(
+        || {
+            std::hint::black_box(do_render_string_heavy(&env2));
+        },
+        rounds,
+        iters,
+    );
+    let render_macro_heavy_ns = bench_median_ns(
+        || {
+            std::hint::black_box(do_render_macro_heavy(&env3));
+        },
+        rounds,
+        iters,
+    );
 
     let render_total_ns = render_all_elements_ns + render_string_heavy_ns + render_macro_heavy_ns;
 
