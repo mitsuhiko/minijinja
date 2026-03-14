@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use crate::error::Error;
 use crate::filters;
@@ -138,9 +138,11 @@ fn build_builtin_filters() -> BTreeMap<Cow<'static, str>, Value> {
     rv
 }
 
-pub(crate) fn get_builtin_filters() -> BTreeMap<Cow<'static, str>, Value> {
-    static FILTERS: OnceLock<BTreeMap<Cow<'static, str>, Value>> = OnceLock::new();
-    FILTERS.get_or_init(build_builtin_filters).clone()
+pub(crate) fn get_builtin_filters() -> Arc<BTreeMap<Cow<'static, str>, Value>> {
+    static FILTERS: OnceLock<Arc<BTreeMap<Cow<'static, str>, Value>>> = OnceLock::new();
+    FILTERS
+        .get_or_init(|| Arc::new(build_builtin_filters()))
+        .clone()
 }
 
 fn build_builtin_tests() -> BTreeMap<Cow<'static, str>, Value> {
@@ -214,9 +216,9 @@ fn build_builtin_tests() -> BTreeMap<Cow<'static, str>, Value> {
     rv
 }
 
-pub(crate) fn get_builtin_tests() -> BTreeMap<Cow<'static, str>, Value> {
-    static TESTS: OnceLock<BTreeMap<Cow<'static, str>, Value>> = OnceLock::new();
-    TESTS.get_or_init(build_builtin_tests).clone()
+pub(crate) fn get_builtin_tests() -> Arc<BTreeMap<Cow<'static, str>, Value>> {
+    static TESTS: OnceLock<Arc<BTreeMap<Cow<'static, str>, Value>>> = OnceLock::new();
+    TESTS.get_or_init(|| Arc::new(build_builtin_tests())).clone()
 }
 
 fn build_globals() -> BTreeMap<Cow<'static, str>, Value> {
@@ -246,9 +248,9 @@ fn build_globals() -> BTreeMap<Cow<'static, str>, Value> {
     rv
 }
 
-pub(crate) fn get_globals() -> BTreeMap<Cow<'static, str>, Value> {
-    static GLOBALS: OnceLock<BTreeMap<Cow<'static, str>, Value>> = OnceLock::new();
-    GLOBALS.get_or_init(build_globals).clone()
+pub(crate) fn get_globals() -> Arc<BTreeMap<Cow<'static, str>, Value>> {
+    static GLOBALS: OnceLock<Arc<BTreeMap<Cow<'static, str>, Value>>> = OnceLock::new();
+    GLOBALS.get_or_init(|| Arc::new(build_globals())).clone()
 }
 
 #[cfg(test)]

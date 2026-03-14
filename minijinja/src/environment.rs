@@ -70,9 +70,9 @@ const MAX_RECURSION: usize = 500;
 #[derive(Clone)]
 pub struct Environment<'source> {
     templates: TemplateStore<'source>,
-    filters: BTreeMap<Cow<'source, str>, Value>,
-    tests: BTreeMap<Cow<'source, str>, Value>,
-    globals: BTreeMap<Cow<'source, str>, Value>,
+    filters: Arc<BTreeMap<Cow<'source, str>, Value>>,
+    tests: Arc<BTreeMap<Cow<'source, str>, Value>>,
+    globals: Arc<BTreeMap<Cow<'source, str>, Value>>,
     path_join_callback: Option<Arc<PathJoinFunc>>,
     pub(crate) unknown_method_callback: Option<Arc<UnknownMethodFunc>>,
     undefined_behavior: UndefinedBehavior,
@@ -728,12 +728,12 @@ impl<'source> Environment<'source> {
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.filters.insert(name.into(), Value::from_function(f));
+        Arc::make_mut(&mut self.filters).insert(name.into(), Value::from_function(f));
     }
 
     /// Removes a filter by name.
     pub fn remove_filter(&mut self, name: &str) {
-        self.filters.remove(name);
+        Arc::make_mut(&mut self.filters).remove(name);
     }
 
     /// Adds a new test function.
@@ -748,12 +748,12 @@ impl<'source> Environment<'source> {
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.tests.insert(name.into(), Value::from_function(f));
+        Arc::make_mut(&mut self.tests).insert(name.into(), Value::from_function(f));
     }
 
     /// Removes a test by name.
     pub fn remove_test(&mut self, name: &str) {
-        self.tests.remove(name);
+        Arc::make_mut(&mut self.tests).remove(name);
     }
 
     /// Adds a new global function.
@@ -781,12 +781,12 @@ impl<'source> Environment<'source> {
         N: Into<Cow<'source, str>>,
         V: Into<Value>,
     {
-        self.globals.insert(name.into(), value.into());
+        Arc::make_mut(&mut self.globals).insert(name.into(), value.into());
     }
 
     /// Removes a global function or variable by name.
     pub fn remove_global(&mut self, name: &str) {
-        self.globals.remove(name);
+        Arc::make_mut(&mut self.globals).remove(name);
     }
 
     /// Returns an iterator of all global variables.
