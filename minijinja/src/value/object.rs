@@ -794,12 +794,7 @@ macro_rules! impl_str_map_helper {
 
             #[inline(always)]
             fn get_value_by_str(self: &Arc<Self>, key: &str) -> Option<Value> {
-                if self.len() <= 8 {
-                    self.iter()
-                        .find_map(|(map_key, value)| (&**map_key == key).then(|| value.clone().into()))
-                } else {
-                    self.get(key).cloned().map(|v| v.into())
-                }
+                self.get(key).cloned().map(|v| v.into())
             }
 
             fn enumerate(self: &Arc<Self>) -> Enumerator {
@@ -813,11 +808,44 @@ macro_rules! impl_str_map_helper {
     };
 }
 
+macro_rules! impl_static_str_map_helper {
+    ($map_type:ident, $enumerator:ident) => {
+        impl<V> Object for $map_type<&'static str, V>
+        where
+            V: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+        {
+            #[inline(always)]
+            fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+                self.get(some!(key.as_str())).cloned().map(|v| v.into())
+            }
+
+            #[inline(always)]
+            fn get_value_by_str(self: &Arc<Self>, key: &str) -> Option<Value> {
+                if self.len() <= 8 {
+                    self.iter().find_map(|(map_key, value)| {
+                        (*map_key == key).then(|| value.clone().into())
+                    })
+                } else {
+                    self.get(key).cloned().map(|v| v.into())
+                }
+            }
+
+            fn enumerate(self: &Arc<Self>) -> Enumerator {
+                self.$enumerator(|this| Box::new(this.keys().map(|x| Value::from(*x))))
+            }
+
+            fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
+                Some(self.len())
+            }
+        }
+    };
+}
+
 macro_rules! impl_str_map {
     ($map_type:ident, $enumerator:ident) => {
         impl_str_map_helper!($map_type, String, $enumerator);
         impl_str_map_helper!($map_type, Arc<str>, $enumerator);
-        impl_str_map_helper!($map_type, &'static str, $enumerator);
+        impl_static_str_map_helper!($map_type, $enumerator);
 
         impl<V> From<$map_type<String, V>> for Value
         where
