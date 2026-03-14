@@ -934,7 +934,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_with_block(&mut self) -> Result<ast::WithBlock<'a>, Error> {
-        let mut assignments = Vec::with_capacity(4);
+        let mut assignments = Vec::with_capacity(2);
 
         while !matches_token!(self, Token::BlockEnd) {
             if !assignments.is_empty() {
