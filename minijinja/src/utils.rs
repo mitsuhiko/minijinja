@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::iter::{once, repeat};
 use std::str::Chars;
+use std::sync::OnceLock;
 
 use crate::error::{Error, ErrorKind};
 use crate::value::{StringType, UndefinedType, Value, ValueIter, ValueKind, ValueRepr};
@@ -28,6 +29,24 @@ pub(crate) fn untrusted_size_hint(value: usize) -> usize {
     value.min(1024)
 }
 
+const SMALL_INT_FORMAT_CACHE_LIMIT: usize = 256;
+
+#[inline(always)]
+fn small_u64_format(value: u64) -> Option<&'static str> {
+    static CACHE: OnceLock<Vec<Box<str>>> = OnceLock::new();
+
+    if value as usize >= SMALL_INT_FORMAT_CACHE_LIMIT {
+        return None;
+    }
+
+    let cache = CACHE.get_or_init(|| {
+        (0..SMALL_INT_FORMAT_CACHE_LIMIT)
+            .map(|n| n.to_string().into_boxed_str())
+            .collect::<Vec<_>>()
+    });
+    Some(cache[value as usize].as_ref())
+}
+
 #[inline(always)]
 fn needs_html_escaping(s: &str) -> bool {
     for &b in s.as_bytes() {
@@ -41,6 +60,26 @@ fn needs_html_escaping(s: &str) -> bool {
 }
 
 fn write_with_html_escaping(out: &mut Output, value: &Value) -> fmt::Result {
+    match value.0 {
+        ValueRepr::U64(v) => {
+            return match small_u64_format(v) {
+                Some(s) => out.write_str(s),
+                None => write!(out, "{v}"),
+            }
+        }
+        ValueRepr::I64(v) if v >= 0 => {
+            return match small_u64_format(v as u64) {
+                Some(s) => out.write_str(s),
+                None => write!(out, "{v}"),
+            }
+        }
+        ValueRepr::I64(v) => return write!(out, "{v}"),
+        ValueRepr::Bool(v) => {
+            return out.write_str(if v { "true" } else { "false" });
+        }
+        _ => {}
+    }
+
     if let Some(s) = value.as_str() {
         if !needs_html_escaping(s) {
             out.write_str(s)
