@@ -495,14 +495,35 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
+    fn parse_filter_test_name(&mut self) -> Result<(&'a str, Span), Error> {
+        let (first_segment, span) = expect_token!(self, Token::Ident(name) => name, "identifier");
+        let start_offset = span.start_offset as usize;
+        let mut end_offset = span.end_offset as usize;
+        let mut is_dotted = false;
+
+        while skip_token!(self, Token::Dot) {
+            let (_, segment_span) = expect_token!(self, Token::Ident(name) => name, "identifier");
+            end_offset = segment_span.end_offset as usize;
+            is_dotted = true;
+        }
+
+        if is_dotted {
+            Ok((
+                &self.stream.tokenizer.source()[start_offset..end_offset],
+                self.stream.expand_span(span),
+            ))
+        } else {
+            Ok((first_segment, span))
+        }
+    }
+
     fn parse_filter_expr(&mut self, expr: ast::Expr<'a>) -> Result<ast::Expr<'a>, Error> {
         let mut expr = expr;
         loop {
             match ok!(self.stream.current()) {
                 Some((Token::Pipe, _)) => {
                     ok!(self.stream.next());
-                    let (name, span) =
-                        expect_token!(self, Token::Ident(name) => name, "identifier");
+                    let (name, span) = ok!(self.parse_filter_test_name());
                     let args = if matches_token!(self, Token::ParenOpen) {
                         ok!(self.parse_args())
                     } else {
@@ -520,8 +541,7 @@ impl<'a> Parser<'a> {
                 Some((Token::Ident("is"), _)) => {
                     ok!(self.stream.next());
                     let negated = skip_token!(self, Token::Ident("not"));
-                    let (name, span) =
-                        expect_token!(self, Token::Ident(name) => name, "identifier");
+                    let (name, span) = ok!(self.parse_filter_test_name());
                     let args = if matches_token!(self, Token::ParenOpen) {
                         ok!(self.parse_args())
                     } else if matches_token!(
@@ -1071,7 +1091,7 @@ impl<'a> Parser<'a> {
             if filter.is_some() {
                 expect_token!(self, Token::Pipe, "`|`");
             }
-            let (name, span) = expect_token!(self, Token::Ident(name) => name, "identifier");
+            let (name, span) = ok!(self.parse_filter_test_name());
             let args = if matches_token!(self, Token::ParenOpen) {
                 ok!(self.parse_args())
             } else {

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::mem;
 
@@ -70,6 +71,16 @@ where
         let val = some!(f());
         vec[idx as usize] = Some(val);
         Some(val)
+    }
+}
+
+fn normalize_filter_test_name(name: &str) -> Cow<'_, str> {
+    if name.as_bytes().iter().any(|b| b.is_ascii_whitespace()) {
+        let mut normalized = String::with_capacity(name.len());
+        normalized.extend(name.chars().filter(|c| !c.is_ascii_whitespace()));
+        Cow::Owned(normalized)
+    } else {
+        Cow::Borrowed(name)
     }
 }
 
@@ -534,14 +545,15 @@ impl<'env> Vm<'env> {
                     stack.push(out.end_capture(state.auto_escape.get()));
                 }
                 Instruction::ApplyFilter(name, arg_count, local_id) => {
+                    let normalized_name = normalize_filter_test_name(name);
                     let filter =
                         ctx_ok!(get_or_lookup_local(&mut loaded_filters, *local_id, || {
-                            state.env().get_filter(name)
+                            state.env().get_filter(normalized_name.as_ref())
                         })
                         .ok_or_else(|| {
                             Error::new(
                                 ErrorKind::UnknownFilter,
-                                format!("filter {name} is unknown"),
+                                format!("filter {} is unknown", normalized_name.as_ref()),
                             )
                         }));
                     let args = stack.get_call_args(*arg_count);
@@ -551,11 +563,15 @@ impl<'env> Vm<'env> {
                     stack.push(a);
                 }
                 Instruction::PerformTest(name, arg_count, local_id) => {
+                    let normalized_name = normalize_filter_test_name(name);
                     let test = ctx_ok!(get_or_lookup_local(&mut loaded_tests, *local_id, || {
-                        state.env().get_test(name)
+                        state.env().get_test(normalized_name.as_ref())
                     })
                     .ok_or_else(|| {
-                        Error::new(ErrorKind::UnknownTest, format!("test {name} is unknown"))
+                        Error::new(
+                            ErrorKind::UnknownTest,
+                            format!("test {} is unknown", normalized_name.as_ref()),
+                        )
                     }));
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();

@@ -33,6 +33,26 @@ fn test_filter_with_non() {
 }
 
 #[test]
+fn test_dotted_filter_name() {
+    let mut env = Environment::new();
+    env.add_filter("foo.bar.baz", |value: String| format!("<{value}>"));
+
+    let rv = env
+        .template_from_str("{{ 'hello'|foo.bar.baz }}")
+        .unwrap()
+        .render(context!())
+        .unwrap();
+    assert_eq!(rv, "<hello>");
+
+    let rv = env
+        .template_from_str("{{ 'hello'|foo . bar . baz }}")
+        .unwrap()
+        .render(context!())
+        .unwrap();
+    assert_eq!(rv, "<hello>");
+}
+
+#[test]
 fn test_indent_one_empty_line() {
     let teststring = String::from("\n");
     assert_eq!(indent(teststring, 2, None, None), String::from(""));

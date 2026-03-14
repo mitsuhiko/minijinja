@@ -330,6 +330,11 @@ impl<'s> Tokenizer<'s> {
         self.filename
     }
 
+    /// Returns the source.
+    pub fn source(&self) -> &'s str {
+        self.source
+    }
+
     /// Produces the next token from the tokenizer.
     pub fn next_token(&mut self) -> Result<Option<(Token<'s>, Span)>, Error> {
         loop {
