@@ -218,23 +218,6 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn title(v: Cow<'_, str>) -> String {
-        if v.is_ascii() {
-            let mut rv = String::with_capacity(v.len());
-            let mut capitalize = true;
-            for b in v.bytes() {
-                if b.is_ascii_punctuation() || b.is_ascii_whitespace() {
-                    rv.push(b as char);
-                    capitalize = true;
-                } else if capitalize {
-                    rv.push((b as char).to_ascii_uppercase());
-                    capitalize = false;
-                } else {
-                    rv.push((b as char).to_ascii_lowercase());
-                }
-            }
-            return rv;
-        }
-
         let mut rv = String::new();
         let mut capitalize = true;
         for c in v.chars() {
