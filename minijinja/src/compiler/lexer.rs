@@ -297,6 +297,13 @@ impl<'s> Tokenizer<'s> {
         syntax_config: SyntaxConfig,
         whitespace_config: WhitespaceConfig,
     ) -> Tokenizer<'s> {
+        let mut stack = Vec::with_capacity(8);
+        stack.push(if in_expr {
+            LexerState::Variable
+        } else {
+            LexerState::Template
+        });
+
         let mut source = input;
         if !whitespace_config.keep_trailing_newline {
             if source.ends_with('\n') {
@@ -309,11 +316,7 @@ impl<'s> Tokenizer<'s> {
         Tokenizer {
             source,
             filename,
-            stack: vec![if in_expr {
-                LexerState::Variable
-            } else {
-                LexerState::Template
-            }],
+            stack,
             current_line: 1,
             current_col: 0,
             current_offset: 0,

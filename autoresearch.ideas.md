@@ -1,5 +1,4 @@
-- Add a default-syntax lexer specialization in `tokenize_root`/`find_start_marker` that avoids custom-syntax branching and delimiter indirection on the common `{%/{{/{#` path.
-- Prototype lightweight parser token-count heuristics to size `subparse` statement vectors more accurately than a fixed `Vec::with_capacity(16)`.
-- Explore reducing codegen location bookkeeping overhead (`line_infos` / `span_infos`) by skipping redundant writes in long same-line instruction runs.
-- Evaluate whether `CompiledTemplate::_new_impl` can avoid duplicate syntax/auto-escape callback work on the hot `Environment::add_template` path without changing behavior.
-- Revisit non-loader template store fast paths only if a design can keep render guardrails flat (previous single-template fast path regressed render).
+- Use adaptive codegen subgenerator capacities based on block-body AST size instead of fixed defaults, to reduce over-allocation without hurting larger blocks.
+- Specialize lexer comment/raw delimiter search for default 2-byte delimiters (`%}`, `#}`, `{%`) instead of generic `memstr` window scans.
+- Explore parser-side lightweight arenas or pooled vectors for short-lived AST node lists while preserving spans/diagnostics.
+- Investigate a compile-path-only template-store insertion optimization that keeps `get_template` runtime path identical (to avoid the render regressions seen with single-template storage fast paths).
