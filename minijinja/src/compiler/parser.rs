@@ -123,10 +123,14 @@ impl<'a> TokenStream<'a> {
     pub fn next(&mut self) -> Result<Option<(Token<'a>, Span)>, Error> {
         let rv = self.current.take();
         self.current = self.tokenizer.next_token().transpose();
-        if let Some(Ok((_, span))) = rv {
-            self.last_span = span;
+        match rv {
+            Some(Ok((token, span))) => {
+                self.last_span = span;
+                Ok(Some((token, span)))
+            }
+            Some(Err(err)) => Err(err),
+            None => Ok(None),
         }
-        rv.transpose()
     }
 
     /// Look at the current token
