@@ -48,7 +48,7 @@ enum PendingBlock {
     },
 }
 
-const CODEGEN_POOL_MAX_ITEMS: usize = 32;
+const CODEGEN_POOL_MAX_ITEMS: usize = 64;
 const CODEGEN_POOLED_MAX_CAPACITY: usize = 64;
 
 thread_local! {

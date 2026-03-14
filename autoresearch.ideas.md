@@ -1,3 +1,3 @@
-- Investigate a lightweight template-store path for non-loader environments that improves repeated `add_template` updates without slowing `get_template` in render hot loops.
-- Explore parser/codegen allocation reuse shared across compilations (e.g., recyclable instruction/span buffers) while preserving diagnostics and template semantics.
-- Evaluate an optional median-of-N wrapper for `comparison_ns` runs (same workload repeated) to reduce compile-side noise and make keep/discard decisions more robust.
+- Extend compile-path buffer reuse beyond `pending_block`/`span_stack` to include instruction metadata buffers (`line_infos` / debug spans) while preserving diagnostics.
+- Explore a conservative non-loader template-store micro-optimization that avoids overfitting (no unchanged-source compile skips) and does not regress render lookups.
+- Evaluate an optional median-of-N wrapper for `comparison_ns` runs (same workload repeated) to reduce noise in keep/discard decisions.
