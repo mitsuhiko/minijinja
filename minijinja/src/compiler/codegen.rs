@@ -64,9 +64,9 @@ impl<'source> CodeGenerator<'source> {
         CodeGenerator {
             instructions: Instructions::new(file, source),
             blocks: BTreeMap::new(),
-            pending_block: Vec::with_capacity(32),
+            pending_block: Vec::with_capacity(8),
             current_line: 0,
-            span_stack: Vec::with_capacity(32),
+            span_stack: Vec::with_capacity(8),
             filter_local_ids: BTreeMap::new(),
             test_local_ids: BTreeMap::new(),
             raw_template_bytes: 0,
