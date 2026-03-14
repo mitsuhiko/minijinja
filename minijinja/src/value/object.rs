@@ -794,7 +794,12 @@ macro_rules! impl_str_map_helper {
 
             #[inline(always)]
             fn get_value_by_str(self: &Arc<Self>, key: &str) -> Option<Value> {
-                self.get(key).cloned().map(|v| v.into())
+                if self.len() <= 8 {
+                    self.iter()
+                        .find_map(|(map_key, value)| (&**map_key == key).then(|| value.clone().into()))
+                } else {
+                    self.get(key).cloned().map(|v| v.into())
+                }
             }
 
             fn enumerate(self: &Arc<Self>) -> Enumerator {
