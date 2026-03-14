@@ -1,5 +1,5 @@
-- Add a lexer fast path for raw data segments: scan ahead to the next delimiter start (`{`) and emit a single data token instead of per-byte branching in the hot loop.
-- Reduce parser allocation churn by pre-sizing key vectors (statements, expressions, argument lists) using lightweight token-count heuristics.
-- Avoid unnecessary string allocations in parse/codegen by borrowing identifier slices where possible and only allocating when escaping/normalization is required.
-- Pre-allocate codegen instruction and constant buffers from AST-size estimates to reduce `Vec` growth and cloning during bytecode emission.
-- Optimize `Environment::add_template` compile path to avoid duplicate template-name/source cloning between parse and codegen stages.
+- Add a default-syntax lexer specialization in `tokenize_root`/`find_start_marker` that avoids custom-syntax branching and delimiter indirection on the common `{%/{{/{#` path.
+- Prototype lightweight parser token-count heuristics to size `subparse` statement vectors more accurately than a fixed `Vec::with_capacity(16)`.
+- Explore reducing codegen location bookkeeping overhead (`line_infos` / `span_infos`) by skipping redundant writes in long same-line instruction runs.
+- Evaluate whether `CompiledTemplate::_new_impl` can avoid duplicate syntax/auto-escape callback work on the hot `Environment::add_template` path without changing behavior.
+- Revisit non-loader template store fast paths only if a design can keep render guardrails flat (previous single-template fast path regressed render).

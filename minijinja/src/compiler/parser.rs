@@ -548,7 +548,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_args(&mut self) -> Result<Vec<ast::CallArg<'a>>, Error> {
-        let mut args = Vec::with_capacity(4);
+        let mut args = Vec::new();
         let mut first_span = None;
         let mut has_kwargs = false;
 
