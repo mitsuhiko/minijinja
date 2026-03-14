@@ -1,3 +1,0 @@
-{"run":1,"commit":"88155be","metric":7592.69,"metrics":{},"status":"discard","description":"Retest of removing clear() in CodeGenerator recycle paths (run 2): closer to best but still slower and guardrail string_heavy rose","timestamp":1773521932424,"segment":0}
-{"run":2,"commit":"88155be","metric":7733.16,"metrics":{},"status":"discard","description":"Retest of removing clear() in CodeGenerator recycle paths (run 3): regression confirmed, no robust win","timestamp":1773521939476,"segment":0}
-{"type":"config","name":"Optimize MiniJinja comparison benchmark (compile+render)","metricName":"comparison_ns","metricUnit":"ns","bestDirection":"lower"}

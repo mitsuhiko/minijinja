@@ -1,3 +1,0 @@
-- Extend compile-time buffer reuse from `pending_block`/`span_stack` to additional compile scratch state only when it can be done without adding drop-time overhead (current direct `Instructions` metadata pooling regressed guardrails).
-- Explore low-risk parser/token-stream hot-path simplifications that avoid added branching (focus on `next/current` state transitions and error-path isolation).
-- Add an optional median-of-N wrapper mode for `comparison_ns` runs (same workload repeated) to improve keep/discard robustness under compile-side noise.
