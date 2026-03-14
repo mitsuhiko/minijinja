@@ -1,3 +1,2 @@
 - Add an internal fast path for `Template::render(Value)` / `render(&Value)` to bypass `Value::from_serialize` roundtrips when callers already provide a `Value`.
 - Prototype a lightweight internal value repr for `context!` static-key maps (preserving map iteration semantics) to avoid `Arc<DynObject>` boxing overhead on every nested context object.
-- Revisit macro call argument handling (`vm/macro_object.rs`) to avoid per-call `BTreeSet` tracking when there are no kwargs/caller kwargs.

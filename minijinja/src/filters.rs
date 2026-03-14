@@ -288,7 +288,7 @@ mod builtins {
             return v.into_owned();
         }
 
-        if !from.is_empty() && !v.contains(from) {
+        if from.len() > 1 && !v.contains(from) {
             return v.into_owned();
         }
 
