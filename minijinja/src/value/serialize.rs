@@ -220,10 +220,10 @@ impl Serializer for ValueSerializer {
     fn serialize_struct(
         self,
         _name: &'static str,
-        len: usize,
+        _len: usize,
     ) -> Result<Self::SerializeStruct, InvalidValue> {
         Ok(SerializeStruct {
-            fields: value_map_with_capacity(len),
+            fields: BTreeMap::new(),
         })
     }
 
@@ -390,7 +390,7 @@ impl ser::SerializeMap for SerializeMap {
 }
 
 pub struct SerializeStruct {
-    fields: ValueMap,
+    fields: BTreeMap<&'static str, Value>,
 }
 
 impl ser::SerializeStruct for SerializeStruct {
@@ -401,7 +401,7 @@ impl ser::SerializeStruct for SerializeStruct {
     where
         T: Serialize + ?Sized,
     {
-        self.fields.insert(key.into(), transform(value));
+        self.fields.insert(key, transform(value));
         Ok(())
     }
 
