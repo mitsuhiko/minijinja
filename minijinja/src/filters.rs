@@ -195,6 +195,9 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn upper(v: Cow<'_, str>) -> String {
+        if v.is_ascii() && !v.bytes().any(|x| x.is_ascii_lowercase()) {
+            return v.into_owned();
+        }
         v.to_uppercase()
     }
 
@@ -261,7 +264,18 @@ mod builtins {
         from: Cow<'_, str>,
         to: Cow<'_, str>,
     ) -> String {
-        v.replace(&from as &str, &to as &str)
+        let from = from.as_ref();
+        let to = to.as_ref();
+
+        if from == to {
+            return v.into_owned();
+        }
+
+        if from.len() > 1 && !v.contains(from) {
+            return v.into_owned();
+        }
+
+        v.replace(from, to)
     }
 
     /// Returns the "length" of the value

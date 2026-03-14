@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use serde::Serialize;
 
@@ -11,8 +11,10 @@ use crate::compiler::parser::parse_expr;
 use crate::error::{attach_basic_debug_info, Error, ErrorKind};
 use crate::expression::Expression;
 use crate::output::Output;
-use crate::template::{CompiledTemplate, CompiledTemplateRef, Template, TemplateConfig};
-use crate::utils::{AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
+use crate::template::{
+    AutoEscapeFunc, CompiledTemplate, CompiledTemplateRef, Template, TemplateConfig,
+};
+use crate::utils::{write_escaped, AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
 use crate::value::{FunctionArgs, FunctionResult, UndefinedType, Value, ValueRepr};
 use crate::vm::State;
 use crate::{defaults, functions};
@@ -21,6 +23,27 @@ type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + 
 type PathJoinFunc = dyn for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Sync + Send;
 type UnknownMethodFunc =
     dyn Fn(&State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send;
+
+fn default_auto_escape_callback() -> Arc<AutoEscapeFunc> {
+    static DEFAULT_AUTO_ESCAPE: OnceLock<Arc<AutoEscapeFunc>> = OnceLock::new();
+    DEFAULT_AUTO_ESCAPE
+        .get_or_init(|| Arc::new(defaults::default_auto_escape_callback))
+        .clone()
+}
+
+fn no_auto_escape_callback() -> Arc<AutoEscapeFunc> {
+    static NO_AUTO_ESCAPE: OnceLock<Arc<AutoEscapeFunc>> = OnceLock::new();
+    NO_AUTO_ESCAPE
+        .get_or_init(|| Arc::new(defaults::no_auto_escape))
+        .clone()
+}
+
+fn default_formatter() -> Arc<FormatterFunc> {
+    static FORMATTER: OnceLock<Arc<FormatterFunc>> = OnceLock::new();
+    FORMATTER
+        .get_or_init(|| Arc::new(defaults::escape_formatter))
+        .clone()
+}
 
 /// The maximum recursion in the VM.  Normally each stack frame
 /// adds one to this counter (eg: every time a frame is added).
@@ -47,13 +70,14 @@ const MAX_RECURSION: usize = 500;
 #[derive(Clone)]
 pub struct Environment<'source> {
     templates: TemplateStore<'source>,
-    filters: BTreeMap<Cow<'source, str>, Value>,
-    tests: BTreeMap<Cow<'source, str>, Value>,
-    globals: BTreeMap<Cow<'source, str>, Value>,
+    filters: Arc<BTreeMap<Cow<'source, str>, Value>>,
+    tests: Arc<BTreeMap<Cow<'source, str>, Value>>,
+    globals: Arc<BTreeMap<Cow<'source, str>, Value>>,
     path_join_callback: Option<Arc<PathJoinFunc>>,
     pub(crate) unknown_method_callback: Option<Arc<UnknownMethodFunc>>,
     undefined_behavior: UndefinedBehavior,
     formatter: Arc<FormatterFunc>,
+    formatter_is_default: bool,
     #[cfg(feature = "debug")]
     debug: bool,
     #[cfg(feature = "fuel")]
@@ -96,16 +120,15 @@ impl<'source> Environment<'source> {
     )]
     pub fn new() -> Environment<'source> {
         Environment {
-            templates: TemplateStore::new(TemplateConfig::new(Arc::new(
-                defaults::default_auto_escape_callback,
-            ))),
+            templates: TemplateStore::new(TemplateConfig::new(default_auto_escape_callback())),
             filters: defaults::get_builtin_filters(),
             tests: defaults::get_builtin_tests(),
             globals: defaults::get_globals(),
             path_join_callback: None,
             unknown_method_callback: None,
             undefined_behavior: UndefinedBehavior::default(),
-            formatter: Arc::new(defaults::escape_formatter),
+            formatter: default_formatter(),
+            formatter_is_default: true,
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
             #[cfg(feature = "fuel")]
@@ -120,14 +143,15 @@ impl<'source> Environment<'source> {
     /// logic for auto escaping configured.
     pub fn empty() -> Environment<'source> {
         Environment {
-            templates: TemplateStore::new(TemplateConfig::new(Arc::new(defaults::no_auto_escape))),
+            templates: TemplateStore::new(TemplateConfig::new(no_auto_escape_callback())),
             filters: Default::default(),
             tests: Default::default(),
             globals: Default::default(),
             path_join_callback: None,
             unknown_method_callback: None,
             undefined_behavior: UndefinedBehavior::default(),
-            formatter: Arc::new(defaults::escape_formatter),
+            formatter: default_formatter(),
+            formatter_is_default: true,
             #[cfg(feature = "debug")]
             debug: cfg!(debug_assertions),
             #[cfg(feature = "fuel")]
@@ -550,6 +574,7 @@ impl<'source> Environment<'source> {
         F: Fn(&mut Output, &State, &Value) -> Result<(), Error> + 'static + Sync + Send,
     {
         self.formatter = Arc::new(f);
+        self.formatter_is_default = false;
     }
 
     /// Enable or disable the debug mode.
@@ -703,12 +728,12 @@ impl<'source> Environment<'source> {
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.filters.insert(name.into(), Value::from_function(f));
+        Arc::make_mut(&mut self.filters).insert(name.into(), Value::from_function(f));
     }
 
     /// Removes a filter by name.
     pub fn remove_filter(&mut self, name: &str) {
-        self.filters.remove(name);
+        Arc::make_mut(&mut self.filters).remove(name);
     }
 
     /// Adds a new test function.
@@ -723,12 +748,12 @@ impl<'source> Environment<'source> {
         Rv: FunctionResult,
         Args: for<'a> FunctionArgs<'a>,
     {
-        self.tests.insert(name.into(), Value::from_function(f));
+        Arc::make_mut(&mut self.tests).insert(name.into(), Value::from_function(f));
     }
 
     /// Removes a test by name.
     pub fn remove_test(&mut self, name: &str) {
-        self.tests.remove(name);
+        Arc::make_mut(&mut self.tests).remove(name);
     }
 
     /// Adds a new global function.
@@ -756,12 +781,12 @@ impl<'source> Environment<'source> {
         N: Into<Cow<'source, str>>,
         V: Into<Value>,
     {
-        self.globals.insert(name.into(), value.into());
+        Arc::make_mut(&mut self.globals).insert(name.into(), value.into());
     }
 
     /// Removes a global function or variable by name.
     pub fn remove_global(&mut self, name: &str) {
-        self.globals.remove(name);
+        Arc::make_mut(&mut self.globals).remove(name);
     }
 
     /// Returns an iterator of all global variables.
@@ -795,6 +820,11 @@ impl<'source> Environment<'source> {
         (self.templates.template_config.default_auto_escape)(name)
     }
 
+    #[inline(always)]
+    pub(crate) fn is_default_formatter(&self) -> bool {
+        self.formatter_is_default
+    }
+
     /// Formats a value into the final format.
     ///
     /// This step is called finalization in Jinja2 but since we are writing into
@@ -814,7 +844,13 @@ impl<'source> Environment<'source> {
                 UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict,
                 &ValueRepr::Undefined(UndefinedType::Default),
             ) => Err(Error::from(ErrorKind::UndefinedError)),
-            _ => (self.formatter)(out, state, value),
+            _ => {
+                if self.formatter_is_default {
+                    write_escaped(out, state.auto_escape(), value)
+                } else {
+                    (self.formatter)(out, state, value)
+                }
+            }
         }
     }
 
