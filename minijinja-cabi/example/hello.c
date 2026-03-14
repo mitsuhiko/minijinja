@@ -38,6 +38,7 @@ seq: {{ seq }}");
         char *vs = mj_value_to_str(v);
         fprintf(stderr, "value %d: %s\n", ++idx, vs);
         mj_str_free(vs);
+        mj_value_decref(&v);
     }
     mj_value_iter_free(iter);
 

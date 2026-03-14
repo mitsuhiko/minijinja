@@ -184,7 +184,13 @@ ffi_fn! {
         key: *const c_char,
         value: mj_value
     ) -> bool {
-        mj_value_set_key(slf, Value::from(scope.get_str(key)?).into(), value)
+        let value = value.into_value();
+        let key = Value::from(scope.get_str(key)?);
+        with_cow(slf, |map: &mut BTreeMap<Value, Value>| {
+            map.insert(key, value);
+            Ok(())
+        })?;
+        true
     }
 }
 
@@ -198,9 +204,11 @@ ffi_fn! {
         key: mj_value,
         value: mj_value
     ) -> bool {
+        let key = key.into_value();
+        let value = value.into_value();
         // TODO: make this work with other ValueMap types too.
         with_cow(slf, |map: &mut BTreeMap<Value, Value>| {
-            map.insert(key.into_value(), value.into_value());
+            map.insert(key, value);
             Ok(())
         })?;
         true
@@ -216,8 +224,9 @@ ffi_fn! {
         slf: &mut mj_value,
         value: mj_value,
     ) -> bool {
+        let value = value.into_value();
         with_cow(slf, |seq: &mut Vec<Value>| {
-            seq.push(value.into_value());
+            seq.push(value);
             Ok(())
         })?;
         true
@@ -353,12 +362,17 @@ ffi_fn! {
 ffi_fn! {
     /// Looks up an element by a string index in an object.
     unsafe fn mj_value_get_by_str(_scope, value: mj_value, key: *const c_char) -> mj_value {
-        let key = CStr::from_ptr(key);
-        if let Ok(key) = key.to_str() {
-            value.get_attr(key).unwrap_or_default()
-        } else {
+        if key.is_null() {
             Value::UNDEFINED
-        }.into()
+        } else {
+            let key = CStr::from_ptr(key);
+            if let Ok(key) = key.to_str() {
+                value.get_attr(key).unwrap_or_default()
+            } else {
+                Value::UNDEFINED
+            }
+        }
+        .into()
     }
 }
 
@@ -398,23 +412,29 @@ ffi_fn! {
 ffi_fn! {
     /// Ends the iteration and deallocates the iterator
     unsafe fn mj_value_iter_free(_scope, iter: *mut mj_value_iter) {
-        let _ = Box::from_raw(iter);
+        if !iter.is_null() {
+            let _ = Box::from_raw(iter);
+        }
     }
 }
 
 ffi_fn! {
     /// Increments the refcount
     unsafe fn mj_value_incref(_scope, value: *mut mj_value) {
-        let value: &Value = &*value;
-        let _ = ManuallyDrop::new(value.clone());
+        if !value.is_null() {
+            let value: &Value = &*value;
+            let _ = ManuallyDrop::new(value.clone());
+        }
     }
 }
 
 ffi_fn! {
     /// Decrements the refcount
     unsafe fn mj_value_decref(_scope, value: *mut mj_value) {
-        let mut value: ManuallyDrop<Value> = transmute((*value)._opaque);
-        ManuallyDrop::drop(&mut value);
+        if !value.is_null() {
+            let mut value: ManuallyDrop<Value> = transmute((*value)._opaque);
+            ManuallyDrop::drop(&mut value);
+        }
     }
 }
 

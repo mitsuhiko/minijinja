@@ -78,8 +78,9 @@ ffi_fn! {
         name: *const c_char,
         ctx: mj_value
     ) -> *mut c_char {
+        let ctx = ctx.into_value();
         let t = (*env).0.get_template(scope.get_str(name)?)?;
-        let rv = t.render(ctx.into_value())?;
+        let rv = t.render(ctx)?;
         CString::new(rv).map_err(|_| {
             Error::new(ErrorKind::InvalidOperation, "template rendered null bytes")
         })?.into_raw()
@@ -97,10 +98,11 @@ ffi_fn! {
         source: *const c_char,
         ctx: mj_value
     ) -> *mut c_char {
+        let ctx = ctx.into_value();
         let rv = (*env).0.render_named_str(
             scope.get_str(name)?,
             scope.get_str(source)?,
-            ctx.into_value()
+            ctx
         )?;
         CString::new(rv).map_err(|_| {
             Error::new(ErrorKind::InvalidOperation, "template rendered null bytes")
@@ -116,8 +118,9 @@ ffi_fn! {
         expr: *const c_char,
         ctx: mj_value
     ) -> mj_value {
+        let ctx = ctx.into_value();
         let expr = (*env).0.compile_expression(scope.get_str(expr)?)?;
-        expr.eval(ctx.into_value())?.into()
+        expr.eval(ctx)?.into()
     }
 }
 
@@ -197,12 +200,12 @@ ffi_fn! {
 ffi_fn! {
     /// Sets the syntax to defaults.
     unsafe fn mj_syntax_config_default(_scope, syntax: &mut mj_syntax_config) {
-        syntax.block_start = "{%".as_ptr() as *const _;
-        syntax.block_end = "%}".as_ptr() as *const _;
-        syntax.variable_start = "{{".as_ptr() as *const _;
-        syntax.variable_end = "}}".as_ptr() as *const _;
-        syntax.comment_start = "{#".as_ptr() as *const _;
-        syntax.comment_end = "#}".as_ptr() as *const _;
+        syntax.block_start = b"{%\0".as_ptr() as *const _;
+        syntax.block_end = b"%}\0".as_ptr() as *const _;
+        syntax.variable_start = b"{{\0".as_ptr() as *const _;
+        syntax.variable_end = b"}}\0".as_ptr() as *const _;
+        syntax.comment_start = b"{#\0".as_ptr() as *const _;
+        syntax.comment_end = b"#}\0".as_ptr() as *const _;
         syntax.line_statement_prefix = ptr::null();
         syntax.line_comment_prefix = ptr::null();
     }

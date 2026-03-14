@@ -8,6 +8,8 @@ All notable changes to MiniJinja are documented here.
 * Added support for dotted filter and test names (including `foo . bar . baz`) for Jinja compatibility.  #879
 * Fixed string escape handling to preserve unknown escapes (such as `\s`) for Jinja compatibility in Rust and Go.  #880
 * Improved generic performance across template parsing, compilation, and rendering.
+* Fixed `minijinja-cabi` ownership and pointer-safety issues that could leak `mj_value`
+  values on error paths.
 
 ## 2.17.1
 
