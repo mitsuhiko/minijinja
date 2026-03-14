@@ -167,6 +167,9 @@ macro_rules! __context_pair {
     ($ctx:ident, $key:ident) => {{
         $crate::__context_pair!($ctx, $key => $key);
     }};
+    ($ctx:ident, $key:ident => $value:literal) => {
+        $crate::__context::add(&mut $ctx, stringify!($key), $crate::value::Value::from($value));
+    };
     ($ctx:ident, $key:ident => context! { $($inner:tt)* }) => {
         $crate::__context::add(&mut $ctx, stringify!($key), $crate::context! { $($inner)* });
     };
