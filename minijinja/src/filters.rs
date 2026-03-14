@@ -281,7 +281,18 @@ mod builtins {
         from: Cow<'_, str>,
         to: Cow<'_, str>,
     ) -> String {
-        v.replace(&from as &str, &to as &str)
+        let from = from.as_ref();
+        let to = to.as_ref();
+
+        if from == to {
+            return v.into_owned();
+        }
+
+        if !from.is_empty() && !v.contains(from) {
+            return v.into_owned();
+        }
+
+        v.replace(from, to)
     }
 
     /// Returns the "length" of the value
