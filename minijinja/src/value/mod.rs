@@ -211,7 +211,6 @@ use serde::ser::{Serialize, SerializeTupleStruct, Serializer};
 
 use crate::error::{Error, ErrorKind};
 use crate::functions;
-use crate::utils::OnDrop;
 use crate::value::ops::as_f64;
 use crate::value::serialize::transform;
 use crate::vm::State;
@@ -323,17 +322,28 @@ pub fn serializing_for_value() -> bool {
     INTERNAL_SERIALIZATION.with(|flag| flag.get())
 }
 
-fn mark_internal_serialization() -> impl Drop {
+struct InternalSerializationGuard {
+    reset_on_drop: bool,
+}
+
+impl Drop for InternalSerializationGuard {
+    fn drop(&mut self) {
+        if self.reset_on_drop {
+            INTERNAL_SERIALIZATION.with(|flag| flag.set(false));
+        }
+    }
+}
+
+#[inline(always)]
+fn mark_internal_serialization() -> InternalSerializationGuard {
     let old = INTERNAL_SERIALIZATION.with(|flag| {
         let old = flag.get();
         flag.set(true);
         old
     });
-    OnDrop::new(move || {
-        if !old {
-            INTERNAL_SERIALIZATION.with(|flag| flag.set(false));
-        }
-    })
+    InternalSerializationGuard {
+        reset_on_drop: !old,
+    }
 }
 
 /// Describes the kind of value.
