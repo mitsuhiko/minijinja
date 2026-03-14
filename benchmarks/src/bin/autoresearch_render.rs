@@ -64,8 +64,8 @@ fn main() {
 
     // Warmup to avoid startup noise.
     for _ in 0..100 {
-        std::hint::black_box(do_parse());
-        std::hint::black_box(do_compile());
+        do_parse();
+        do_compile();
         std::hint::black_box(do_render(&env));
     }
 

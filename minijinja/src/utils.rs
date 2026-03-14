@@ -65,10 +65,10 @@ fn is_ascii_integer_str(s: &str) -> bool {
 #[inline(always)]
 fn needs_html_escaping(s: &str) -> bool {
     for &b in s.as_bytes() {
-        if b.wrapping_sub(b'"') <= b'>' - b'"' {
-            if matches!(b, b'<' | b'>' | b'&' | b'"' | b'\'' | b'/') {
-                return true;
-            }
+        if b.wrapping_sub(b'"') <= b'>' - b'"'
+            && matches!(b, b'<' | b'>' | b'&' | b'"' | b'\'' | b'/')
+        {
+            return true;
         }
     }
     false
