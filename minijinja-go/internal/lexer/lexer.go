@@ -977,8 +977,22 @@ func (l *Lexer) lexString(quote byte) (*Token, bool, error) {
 				sb.WriteByte('\'')
 			case '"':
 				sb.WriteByte('"')
-			case '0':
-				sb.WriteByte(0)
+			case '0', '1', '2', '3', '4', '5', '6', '7':
+				// Octal escape \NNN (up to 3 octal digits total)
+				octal := []byte{escaped}
+				for i := 0; i < 2 && !l.atEnd(); i++ {
+					next := l.rest()[0]
+					if next < '0' || next > '7' {
+						break
+					}
+					octal = append(octal, next)
+					l.advance(1)
+				}
+				val, err := strconv.ParseUint(string(octal), 8, 8)
+				if err != nil {
+					return nil, false, l.syntaxError("bad string escape")
+				}
+				sb.WriteByte(byte(val))
 			case 'x':
 				// Hex escape \xNN
 				if len(l.rest()) < 2 {

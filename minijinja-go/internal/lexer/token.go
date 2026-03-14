@@ -3,6 +3,7 @@ package lexer
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
 )
@@ -227,6 +228,9 @@ func (t Token) FormatForSnapshot(source string) string {
 	case TokenIdent:
 		return fmt.Sprintf("Ident(%q)\n  %q", t.Value, tokenSource)
 	case TokenString:
+		if strings.Contains(tokenSource, "\\") {
+			return fmt.Sprintf("String(%q)\n  %q", t.Value, tokenSource)
+		}
 		return fmt.Sprintf("Str(%q)\n  %q", t.Value, tokenSource)
 	case TokenInteger:
 		return fmt.Sprintf("Int(%s)\n  %q", t.Value, tokenSource)

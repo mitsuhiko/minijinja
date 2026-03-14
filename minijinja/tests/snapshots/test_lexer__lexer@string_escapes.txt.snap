@@ -1,0 +1,43 @@
+---
+source: minijinja/tests/test_lexer.rs
+description: "{{ '\\s' }}\n{{ \"\\s\" }}\n{{ '\\8' }}\n{{ '\\q' }}\n{{ '\\x41' }}"
+input_file: minijinja/tests/lexer-inputs/string_escapes.txt
+---
+VariableStart
+  "{{"
+String("\\s")
+  "'\\s'"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+String("\\s")
+  "\"\\s\""
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+String("\\8")
+  "'\\8'"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+String("\\q")
+  "'\\q'"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+String("A")
+  "'\\x41'"
+VariableEnd
+  "}}"
