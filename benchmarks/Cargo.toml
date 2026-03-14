@@ -13,6 +13,7 @@ minijinja = { path = "../minijinja", default-features = false, features = [
     "unstable_machinery",
     "multi_template",
     "builtins",
+    "macros",
     "serde",
 ] }
 serde = { version = "1.0.152", features = ["derive"] }
