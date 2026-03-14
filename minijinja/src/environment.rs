@@ -870,21 +870,12 @@ mod basic_store {
     #[derive(Clone)]
     pub(crate) struct BasicStore<'source> {
         pub template_config: TemplateConfig,
-        single: Option<(&'source str, Arc<CompiledTemplate<'source>>)>,
         map: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
     }
 
     impl fmt::Debug for BasicStore<'_> {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            if self.map.is_empty() {
-                let mut ds = f.debug_set();
-                if let Some((name, _)) = self.single.as_ref() {
-                    ds.entry(name);
-                }
-                ds.finish()
-            } else {
-                BTreeMapKeysDebug(&self.map).fmt(f)
-            }
+            BTreeMapKeysDebug(&self.map).fmt(f)
         }
     }
 
@@ -892,64 +883,31 @@ mod basic_store {
         pub fn new(template_config: TemplateConfig) -> BasicStore<'source> {
             BasicStore {
                 template_config,
-                single: None,
                 map: BTreeMap::default(),
             }
         }
 
         pub fn insert(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
-            let compiled = Arc::new(ok!(CompiledTemplate::new(
+            self.map.insert(
                 name,
-                source,
-                &self.template_config
-            )));
-
-            if self.map.is_empty() {
-                match self.single {
-                    Some((single_name, ref mut single_template)) if single_name == name => {
-                        *single_template = compiled;
-                    }
-                    Some((single_name, _)) => {
-                        let (_, single_template) = self.single.take().unwrap();
-                        self.map.insert(single_name, single_template);
-                        self.map.insert(name, compiled);
-                    }
-                    None => {
-                        self.single = Some((name, compiled));
-                    }
-                }
-            } else {
-                self.map.insert(name, compiled);
-            }
-
+                Arc::new(ok!(CompiledTemplate::new(
+                    name,
+                    source,
+                    &self.template_config
+                ))),
+            );
             Ok(())
         }
 
         pub fn remove(&mut self, name: &str) {
-            if self.map.is_empty() {
-                if self.single.as_ref().is_some_and(|(single_name, _)| *single_name == name) {
-                    self.single = None;
-                }
-            } else {
-                self.map.remove(name);
-                if self.map.len() == 1 {
-                    self.single = self.map.pop_first();
-                }
-            }
+            self.map.remove(name);
         }
 
         pub fn clear(&mut self) {
-            self.single = None;
             self.map.clear();
         }
 
         pub fn get(&self, name: &str) -> Result<&CompiledTemplate<'source>, Error> {
-            if let Some((single_name, template)) = self.single.as_ref() {
-                if *single_name == name {
-                    return Ok(template);
-                }
-            }
-
             self.map
                 .get(name)
                 .map(|x| &**x)
@@ -957,10 +915,7 @@ mod basic_store {
         }
 
         pub fn iter(&self) -> impl Iterator<Item = (&str, &CompiledTemplate<'source>)> {
-            self.single
-                .iter()
-                .map(|(name, template)| (*name, &**template))
-                .chain(self.map.iter().map(|(name, template)| (*name, &**template)))
+            self.map.iter().map(|(name, template)| (*name, &**template))
         }
     }
 }
