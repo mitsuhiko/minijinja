@@ -218,7 +218,9 @@ fn build_builtin_tests() -> BTreeMap<Cow<'static, str>, Value> {
 
 pub(crate) fn get_builtin_tests() -> Arc<BTreeMap<Cow<'static, str>, Value>> {
     static TESTS: OnceLock<Arc<BTreeMap<Cow<'static, str>, Value>>> = OnceLock::new();
-    TESTS.get_or_init(|| Arc::new(build_builtin_tests())).clone()
+    TESTS
+        .get_or_init(|| Arc::new(build_builtin_tests()))
+        .clone()
 }
 
 fn build_globals() -> BTreeMap<Cow<'static, str>, Value> {
