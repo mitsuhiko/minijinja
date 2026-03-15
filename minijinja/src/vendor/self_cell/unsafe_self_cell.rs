@@ -1,12 +1,7 @@
-#![allow(
-    clippy::missing_safety_doc,
-    clippy::needless_lifetimes,
-    unexpected_cfgs
-)]
+#![allow(clippy::missing_safety_doc, clippy::needless_lifetimes)]
 
 use core::marker::PhantomData;
-use core::mem;
-use core::ptr::{drop_in_place, read, NonNull};
+use core::ptr::{drop_in_place, NonNull};
 
 extern crate alloc;
 
@@ -58,12 +53,6 @@ impl<ContainedIn, Owner, DependentStatic> UnsafeSelfCell<ContainedIn, Owner, Dep
 
     // Calling any of these *unsafe* functions with the wrong Dependent type is UB.
 
-    pub unsafe fn borrow_owner<'a, Dependent>(&'a self) -> &'a Owner {
-        let joined_ptr = self.joined_void_ptr.cast::<JoinedCell<Owner, Dependent>>();
-
-        &(*joined_ptr.as_ptr()).owner
-    }
-
     pub unsafe fn borrow_dependent<'a, Dependent>(&'a self) -> &'a Dependent {
         let joined_ptr = self.joined_void_ptr.cast::<JoinedCell<Owner, Dependent>>();
 
@@ -97,30 +86,6 @@ impl<ContainedIn, Owner, DependentStatic> UnsafeSelfCell<ContainedIn, Owner, Dep
         // Dropping owner
         // and deallocating
         // due to _guard at end of scope.
-    }
-
-    pub unsafe fn into_owner<Dependent>(self) -> Owner {
-        let joined_ptr = self.joined_void_ptr.cast::<JoinedCell<Owner, Dependent>>();
-
-        // In case drop_in_place(...dependent) fails
-        let drop_guard = OwnerAndCellDropGuard::new(joined_ptr);
-
-        // Drop dependent
-        drop_in_place(&mut (*joined_ptr.as_ptr()).dependent);
-
-        mem::forget(drop_guard);
-
-        let owner_ptr: *const Owner = &(*joined_ptr.as_ptr()).owner;
-
-        // Move owner out so it can be returned.
-        // Must not read before dropping dependent!! (Which happened above.)
-        let owner = read(owner_ptr);
-
-        // Deallocate JoinedCell
-        let layout = Layout::new::<JoinedCell<Owner, Dependent>>();
-        dealloc(self.joined_void_ptr.as_ptr(), layout);
-
-        owner
     }
 }
 
@@ -186,43 +151,13 @@ impl<Owner, Dependent> Drop for OwnerAndCellDropGuard<Owner, Dependent> {
     }
 }
 
-// Older versions of rust do not support addr_of_mut!. What we want to do here
-// is to emulate the behavior of that macro by going (incorrectly) via a
-// reference cast. Technically this is UB, but testing does not show the older
-// compiler versions (ab)using this. For discussions about this behavior see
-// https://github.com/Voultapher/self_cell/pull/31 and
-// https://github.com/Voultapher/self_cell/issues/30 and
-// https://github.com/Voultapher/self_cell/pull/33
-//
-// Because of 'procedural macros cannot expand to macro definitions'
-// we have wrap this in functions.
+// Because of 'procedural macros cannot expand to macro definitions' we wrap
+// field pointer acquisition in a helper function.
 impl<Owner, Dependent> JoinedCell<Owner, Dependent> {
     #[doc(hidden)]
-    #[cfg(not(feature = "old_rust"))]
     pub unsafe fn _field_pointers(this: *mut Self) -> (*mut Owner, *mut Dependent) {
         let owner_ptr = core::ptr::addr_of_mut!((*this).owner);
         let dependent_ptr = core::ptr::addr_of_mut!((*this).dependent);
-
-        (owner_ptr, dependent_ptr)
-    }
-
-    #[doc(hidden)]
-    #[cfg(feature = "old_rust")]
-    #[rustversion::since(1.51)]
-    pub unsafe fn _field_pointers(this: *mut Self) -> (*mut Owner, *mut Dependent) {
-        let owner_ptr = core::ptr::addr_of_mut!((*this).owner);
-        let dependent_ptr = core::ptr::addr_of_mut!((*this).dependent);
-
-        (owner_ptr, dependent_ptr)
-    }
-
-    #[doc(hidden)]
-    #[cfg(feature = "old_rust")]
-    #[rustversion::before(1.51)]
-    pub unsafe fn _field_pointers(this: *mut Self) -> (*mut Owner, *mut Dependent) {
-        // See comment above, technically this is UB.
-        let owner_ptr = &mut (*this).owner as *mut Owner;
-        let dependent_ptr = &mut (*this).dependent as *mut Dependent;
 
         (owner_ptr, dependent_ptr)
     }
