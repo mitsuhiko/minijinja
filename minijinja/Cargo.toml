@@ -67,6 +67,7 @@ internal_safe_search = []
 aho-corasick = { version = "1.0", default-features = false, optional = true }
 serde = "1.0.130"
 v_htmlescape = { version = "0.15.8", optional = true }
+
 serde_json = { version = "1.0.68", optional = true }
 percent-encoding = { version = "2.2.0", optional = true }
 indexmap = { version = "2.2.0", optional = true }

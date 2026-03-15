@@ -195,9 +195,9 @@ impl<'template, 'env> State<'template, 'env> {
     /// # let mut env = Environment::new();
     /// # env.add_template("hello", "{% block hi %}Hello {{ name }}!{% endblock %}")?;
     /// let tmpl = env.get_template("hello")?;
-    /// let rv = tmpl
-    ///     .eval_to_state(context!(name => "John"))?
-    ///     .render_block("hi")?;
+    /// let mut rendered = tmpl
+    ///     .render_captured(context!(name => "John"))?;
+    /// let rv = rendered.with_state_mut(|state| state.render_block("hi"))?;
     /// println!("{}", rv);
     /// # Ok(()) }
     /// ```

@@ -64,8 +64,8 @@ fn main() {
         unused => 42
     });
 
-    let (rv, state) = template.render_and_return_state(ctx).unwrap();
-    println!("{rv}");
+    let rendered = template.render_captured(ctx).unwrap();
+    println!("{}", rendered.output());
 
     // we need to make a copy here to not deadlock when we try to lookup
     // on the state later.
@@ -75,6 +75,7 @@ fn main() {
     println!("not found in context: {all_undefined:?}");
 
     // to filter out globals we need to make another lookup:
+    let state = rendered.state();
     let undefined = all_undefined
         .iter()
         .filter(|x| state.lookup(x).is_none())

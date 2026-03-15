@@ -106,7 +106,8 @@ fn test_macro_passing() {
     let tmpl = env
         .template_from_str("{% macro m(a) %}{{ a }}{% endmacro %}")
         .unwrap();
-    let (_, state) = tmpl.render_and_return_state(()).unwrap();
+    let rendered = tmpl.render_captured(()).unwrap();
+    let state = rendered.state();
     let m = state.lookup("m").unwrap();
     assert_eq!(m.get_attr("name").unwrap().as_str(), Some("m"));
     let rv = m.call(&state, args!(42)).unwrap();

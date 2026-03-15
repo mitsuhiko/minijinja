@@ -8,8 +8,8 @@
 ))]
 use std::collections::BTreeMap;
 use std::fmt::Write;
+use std::fs;
 use std::sync::Arc;
-use std::{env, fs};
 
 use insta::assert_snapshot;
 use minijinja::syntax::SyntaxConfig;
@@ -175,8 +175,8 @@ fn test_vm_block_fragments() {
             let template = env.get_template(filename).unwrap();
 
             match template
-                .eval_to_state(&ctx)
-                .and_then(|mut x| x.render_block("fragment"))
+                .render_captured(&ctx)
+                .and_then(|mut x| x.with_state_mut(|state| state.render_block("fragment")))
             {
                 Ok(mut rendered) => {
                     rendered.push('\n');
@@ -581,7 +581,11 @@ fn test_block_fragments() {
     let tmpl = env.get_template("demo").unwrap();
 
     let rv_a = tmpl.render(()).unwrap();
-    let rv_b = tmpl.eval_to_state(()).unwrap().render_block("foo").unwrap();
+    let rv_b = tmpl
+        .render_captured(())
+        .unwrap()
+        .with_state_mut(|state| state.render_block("foo"))
+        .unwrap();
 
     assert_eq!(rv_a, "I am outside the fragmentfooSo am I!");
     assert_eq!(rv_b, "foo");
@@ -600,20 +604,22 @@ fn test_state() {
     )
     .unwrap();
     let template = env.get_template("foo.html").unwrap();
-    let mut state = template
-        .eval_to_state(context! {
+    let mut rendered = template
+        .render_captured(context! {
             variable => 23
         })
         .unwrap();
-    assert!(state.lookup("range").is_some());
-    assert!(!state.exports().contains(&"range"));
-    assert_eq!(state.lookup("global"), Some(Value::from(23 * 2)));
-    assert_eq!(state.call_macro("something", &[]).unwrap(), "46");
-    assert_eq!(state.render_block("baz").unwrap(), "[46]");
+    assert!(rendered.state().lookup("range").is_some());
+    assert!(!rendered.state().exports().contains(&"range"));
+    assert_eq!(rendered.state().lookup("global"), Some(Value::from(23 * 2)));
+    rendered.with_state_mut(|state| {
+        assert_eq!(state.call_macro("something", &[]).unwrap(), "46");
+        assert_eq!(state.render_block("baz").unwrap(), "[46]");
+    });
 }
 
 #[test]
-#[allow(unused_mut)]
+#[allow(unused_mut, deprecated)]
 fn test_render_and_return_state() {
     let mut env = Environment::new();
     #[cfg(feature = "fuel")]
@@ -633,6 +639,22 @@ fn test_render_and_return_state() {
     {
         assert_eq!(state.fuel_levels(), Some((26, 74)));
     }
+}
+
+#[test]
+fn test_render_captured() {
+    let env = Environment::new();
+    let rendered = env
+        .template_from_str("{% set foo = 42 %}{% macro bar() %}x{{ foo }}{% endmacro %}")
+        .unwrap()
+        .render_captured(())
+        .unwrap();
+    assert_eq!(rendered.output(), "");
+    assert_eq!(rendered.state().lookup("foo"), Some(Value::from(42)));
+    assert_eq!(
+        rendered.state().call_macro("bar", &[]).ok().as_deref(),
+        Some("x42")
+    );
 }
 
 #[test]
