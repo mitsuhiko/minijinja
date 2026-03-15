@@ -70,7 +70,7 @@ static void ts_fail(const char *file, int line, const char *expr, const char *ms
 
 static bool TS_UNUSED ts_silence_stderr_begin(int *saved_fd)
 {
-    int current_fd = dup(fileno(stderr));
+    int current_fd = dup(STDERR_FILENO);
     if (current_fd < 0) {
         return false;
     }
@@ -81,7 +81,7 @@ static bool TS_UNUSED ts_silence_stderr_begin(int *saved_fd)
         return false;
     }
 
-    if (dup2(devnull_fd, fileno(stderr)) < 0) {
+    if (dup2(devnull_fd, STDERR_FILENO) < 0) {
         close(devnull_fd);
         close(current_fd);
         return false;
@@ -95,7 +95,7 @@ static bool TS_UNUSED ts_silence_stderr_begin(int *saved_fd)
 static void TS_UNUSED ts_silence_stderr_end(int saved_fd)
 {
     fflush(stderr);
-    dup2(saved_fd, fileno(stderr));
+    dup2(saved_fd, STDERR_FILENO);
     close(saved_fd);
 }
 
