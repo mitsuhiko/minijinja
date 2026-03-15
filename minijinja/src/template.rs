@@ -80,7 +80,7 @@ self_cell! {
 ///
 /// When created from [`render_captured`](Template::render_captured)
 /// the [`output`](Self::output) contains the rendered string.  When created from
-/// [`render_capturedd_to`](Template::render_capturedd_to) the output is
+/// [`render_captured_to`](Template::render_captured_to) the output is
 /// an empty string as the output was written to the provided writer.
 pub struct Captured<'source> {
     cell: CapturedCell<'source>,
@@ -102,7 +102,7 @@ impl fmt::Debug for Captured<'_> {
 impl<'source> Captured<'source> {
     /// Returns the rendered output.
     ///
-    /// When created from [`render_capturedd_to`](Template::render_capturedd_to)
+    /// When created from [`render_captured_to`](Template::render_captured_to)
     /// this returns an empty string.
     pub fn output(&self) -> &str {
         self.cell.borrow_dependent().output.as_str()
@@ -124,7 +124,7 @@ impl<'source> Captured<'source> {
 
     /// Consumes the capture and returns the rendered output string.
     ///
-    /// When created from [`render_capturedd_to`](Template::render_capturedd_to)
+    /// When created from [`render_captured_to`](Template::render_captured_to)
     /// this returns an empty string.
     pub fn into_output(mut self) -> String {
         self.cell
@@ -264,12 +264,12 @@ impl<'env, 'source> Template<'env, 'source> {
     /// let captured = env
     ///     .template_from_str("{% set x = 42 %}Hello!")
     ///     .unwrap()
-    ///     .render_capturedd_to((), &mut buf)
+    ///     .render_captured_to((), &mut buf)
     ///     .unwrap();
     /// assert_eq!(std::str::from_utf8(&buf).unwrap(), "Hello!");
     /// assert_eq!(captured.output(), "");
     /// ```
-    pub fn render_capturedd_to<S: Serialize, W: io::Write>(
+    pub fn render_captured_to<S: Serialize, W: io::Write>(
         &self,
         ctx: S,
         w: W,
