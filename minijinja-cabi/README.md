@@ -11,6 +11,12 @@ For an example look into [hello.c](example/hello.c).
 
 The C header at `include/minijinja.h` is maintained manually.
 
+Run C ABI smoke tests with:
+
+```bash
+make test
+```
+
 ```c
 #include <minijinja.h>
 #include <stdio.h>

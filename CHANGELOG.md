@@ -14,6 +14,8 @@ All notable changes to MiniJinja are documented here.
   globals, loaders, path joining, auto-escape configuration, and fuel limits.
 * Switched `minijinja-cabi` header maintenance to manual source-based syncing and
   removed cbindgen-based generation tooling.
+* Added lightweight C smoke tests for `minijinja-cabi` (via `make -C minijinja-cabi test`)
+  and wired them into top-level testing and CI.
 
 ## 2.17.1
 
