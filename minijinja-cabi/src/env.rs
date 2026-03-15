@@ -482,6 +482,18 @@ pub struct mj_syntax_config {
     line_comment_prefix: *const c_char,
 }
 
+const DEFAULT_BLOCK_START: &[u8] = b"{%\0";
+const DEFAULT_BLOCK_END: &[u8] = b"%}\0";
+const DEFAULT_VARIABLE_START: &[u8] = b"{{\0";
+const DEFAULT_VARIABLE_END: &[u8] = b"}}\0";
+const DEFAULT_COMMENT_START: &[u8] = b"{#\0";
+const DEFAULT_COMMENT_END: &[u8] = b"#}\0";
+
+#[inline]
+const fn c_char_ptr(bytes: &'static [u8]) -> *const c_char {
+    bytes.as_ptr() as *const c_char
+}
+
 ffi_fn! {
     /// Reconfigures the syntax.
     unsafe fn mj_env_set_syntax_config(scope, env: *mut mj_env, syntax: &mj_syntax_config) -> bool {
@@ -515,12 +527,12 @@ ffi_fn! {
 ffi_fn! {
     /// Sets the syntax to defaults.
     unsafe fn mj_syntax_config_default(_scope, syntax: &mut mj_syntax_config) {
-        syntax.block_start = b"{%\0".as_ptr() as *const _;
-        syntax.block_end = b"%}\0".as_ptr() as *const _;
-        syntax.variable_start = b"{{\0".as_ptr() as *const _;
-        syntax.variable_end = b"}}\0".as_ptr() as *const _;
-        syntax.comment_start = b"{#\0".as_ptr() as *const _;
-        syntax.comment_end = b"#}\0".as_ptr() as *const _;
+        syntax.block_start = c_char_ptr(DEFAULT_BLOCK_START);
+        syntax.block_end = c_char_ptr(DEFAULT_BLOCK_END);
+        syntax.variable_start = c_char_ptr(DEFAULT_VARIABLE_START);
+        syntax.variable_end = c_char_ptr(DEFAULT_VARIABLE_END);
+        syntax.comment_start = c_char_ptr(DEFAULT_COMMENT_START);
+        syntax.comment_end = c_char_ptr(DEFAULT_COMMENT_END);
         syntax.line_statement_prefix = ptr::null();
         syntax.line_comment_prefix = ptr::null();
     }
