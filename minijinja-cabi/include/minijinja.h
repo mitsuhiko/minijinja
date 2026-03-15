@@ -105,6 +105,9 @@ typedef struct mj_value {
 
 /*
  Callback used for custom functions, filters and tests.
+
+ Returns `true` on success and writes the return value into `rv_out`.
+ Returns `false` on failure.
  */
 typedef bool (*mj_value_callback)(void *userdata,
                                   const struct mj_value *args,
@@ -123,11 +126,15 @@ typedef enum mj_auto_escape (*mj_auto_escape_callback)(void *userdata, const cha
 
 /*
  Callback used for loading template source by name.
+
+ Return `NULL` if the template was not found.
  */
 typedef const char *(*mj_loader_callback)(void *userdata, const char *name);
 
 /*
  Callback used to join include paths.
+
+ Return `NULL` to indicate an error.
  */
 typedef const char *(*mj_path_join_callback)(void *userdata, const char *name, const char *parent);
 
@@ -171,6 +178,8 @@ bool mj_env_add_function(struct mj_env *env,
 
 /*
  Adds a global value to the environment.
+
+ Takes ownership of the given value.
  */
 MINIJINJA_API bool mj_env_add_global(struct mj_env *env, const char *name, struct mj_value value);
 
@@ -224,6 +233,8 @@ MINIJINJA_API bool mj_env_remove_template(struct mj_env *env, const char *name);
 
 /*
  Renders a template from a named string.
+
+ Takes ownership of the given context.
  */
 MINIJINJA_API
 char *mj_env_render_named_str(const struct mj_env *env,
@@ -233,6 +244,8 @@ char *mj_env_render_named_str(const struct mj_env *env,
 
 /*
  Renders a template registered on the environment.
+
+ Takes ownership of the given context.
  */
 MINIJINJA_API
 char *mj_env_render_template(const struct mj_env *env,

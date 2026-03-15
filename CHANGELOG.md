@@ -12,6 +12,8 @@ All notable changes to MiniJinja are documented here.
   values on error paths.
 * Added high-priority `minijinja-cabi` APIs for callback-based functions/filters/tests,
   globals, loaders, path joining, auto-escape configuration, and fuel limits.
+* Switched `minijinja-cabi` header maintenance to manual source-based syncing and
+  removed cbindgen-based generation tooling.
 
 ## 2.17.1
 

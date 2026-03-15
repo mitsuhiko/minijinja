@@ -41,8 +41,8 @@ where
 #[repr(C)]
 pub struct mj_value {
     // Motivation on the size here: The size of `Value` is really not
-    // known and since cbindgen has no way to guarantee us a matching
-    // size we have to be creative.  The dominating type size wise is
+    // known and the C header must expose a matching size, so we have
+    // to be creative.  The dominating type size wise is
     // most likely going to be SmallStr which is a u8+[u8; 22] plus the
     // enum discriminant (u8).
     //
