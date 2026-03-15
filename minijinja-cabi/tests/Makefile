@@ -1,6 +1,6 @@
 TARGET_DIR=../../target/debug
 BUILD_DIR=.build
-TESTS=test_basic test_callbacks test_loader_fuel
+TESTS=test_basic test_callbacks test_loader_fuel test_values test_env_config test_errors
 
 CFLAGS?=-std=c11 -Wall -Wextra -Werror
 

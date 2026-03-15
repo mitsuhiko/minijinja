@@ -15,7 +15,8 @@ All notable changes to MiniJinja are documented here.
 * Switched `minijinja-cabi` header maintenance to manual source-based syncing and
   removed cbindgen-based generation tooling.
 * Added lightweight C smoke tests for `minijinja-cabi` (via `make -C minijinja-cabi test`)
-  and wired them into top-level testing and CI.
+  with coverage across all exported C ABI functions, and wired them into top-level
+  testing and CI.
 
 ## 2.17.1
 

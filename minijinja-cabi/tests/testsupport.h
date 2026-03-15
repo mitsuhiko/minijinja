@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <fcntl.h>
+#include <unistd.h>
+
 static int ts_failures = 0;
 
 static void ts_fail(const char *file, int line, const char *expr, const char *msg)
@@ -58,6 +61,43 @@ static void ts_fail(const char *file, int line, const char *expr, const char *ms
             ts_fail(__FILE__, __LINE__, #actual " == " #expected, ts_msg_);                    \
         }                                                                                        \
     } while (0)
+
+#if defined(__GNUC__) || defined(__clang__)
+#define TS_UNUSED __attribute__((unused))
+#else
+#define TS_UNUSED
+#endif
+
+static bool TS_UNUSED ts_silence_stderr_begin(int *saved_fd)
+{
+    int current_fd = dup(fileno(stderr));
+    if (current_fd < 0) {
+        return false;
+    }
+
+    int devnull_fd = open("/dev/null", O_WRONLY);
+    if (devnull_fd < 0) {
+        close(current_fd);
+        return false;
+    }
+
+    if (dup2(devnull_fd, fileno(stderr)) < 0) {
+        close(devnull_fd);
+        close(current_fd);
+        return false;
+    }
+
+    close(devnull_fd);
+    *saved_fd = current_fd;
+    return true;
+}
+
+static void TS_UNUSED ts_silence_stderr_end(int saved_fd)
+{
+    fflush(stderr);
+    dup2(saved_fd, fileno(stderr));
+    close(saved_fd);
+}
 
 static int ts_finish(void)
 {
