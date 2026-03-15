@@ -2265,6 +2265,9 @@ func FilterAttr(_ State, val value.Value, args []value.Value, _ map[string]value
 // optional parameter determines whether to indent the first line (default: false).
 // The third optional parameter determines whether to indent blank lines (default: false).
 //
+// Parameters can also be provided as keyword arguments for Jinja2 compatibility:
+// width, first, and blank.
+//
 // Example:
 //
 //	env := minijinja.NewEnvironment()
@@ -2276,14 +2279,11 @@ func FilterAttr(_ State, val value.Value, args []value.Value, _ map[string]value
 //	{{ yaml_content|indent(2) }}
 //	{{ yaml_content|indent(2, true) }}
 //	{{ yaml_content|indent(2, true, true) }}
+//	{{ yaml_content|indent(width=4, first=true, blank=false) }}
 func FilterIndent(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	s, ok := val.AsString()
 	if !ok {
 		return val, nil
-	}
-
-	if len(kwargs) > 0 {
-		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
 	}
 
 	width := 4
@@ -2291,6 +2291,11 @@ func FilterIndent(_ State, val value.Value, args []value.Value, kwargs map[strin
 		if w, ok := args[0].AsInt(); ok {
 			width = int(w)
 		}
+	} else if v, ok := kwargs["width"]; ok {
+		if w, ok := v.AsInt(); ok {
+			width = int(w)
+		}
+		delete(kwargs, "width")
 	}
 
 	first := false
@@ -2298,6 +2303,11 @@ func FilterIndent(_ State, val value.Value, args []value.Value, kwargs map[strin
 		if b, ok := args[1].AsBool(); ok {
 			first = b
 		}
+	} else if v, ok := kwargs["first"]; ok {
+		if b, ok := v.AsBool(); ok {
+			first = b
+		}
+		delete(kwargs, "first")
 	}
 
 	blank := false
@@ -2305,6 +2315,15 @@ func FilterIndent(_ State, val value.Value, args []value.Value, kwargs map[strin
 		if b, ok := args[2].AsBool(); ok {
 			blank = b
 		}
+	} else if v, ok := kwargs["blank"]; ok {
+		if b, ok := v.AsBool(); ok {
+			blank = b
+		}
+		delete(kwargs, "blank")
+	}
+
+	if len(kwargs) > 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
 	}
 
 	indent := strings.Repeat(" ", width)

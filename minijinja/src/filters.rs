@@ -1083,13 +1083,21 @@ mod builtins {
     /// {{ global_config|indent(2,true) }}     # indent whole Value with two spaces
     /// {{ global_config|indent(2,true,true)}} # indent whole Value and all blank lines
     /// ```
+    ///
+    /// The parameters can also be provided as keyword arguments for
+    /// compatibility with Jinja2: `width`, `first`, and `blank`.
+    ///
+    /// ```jinja
+    /// {{ global_config|indent(width=4, first=true, blank=false) }}
+    /// ```
     #[cfg_attr(docsrs, doc(cfg(all(feature = "builtins"))))]
     pub fn indent(
         mut value: String,
-        width: usize,
+        width: Option<usize>,
         indent_first_line: Option<bool>,
         indent_blank_lines: Option<bool>,
-    ) -> String {
+        kwargs: Kwargs,
+    ) -> Result<String, Error> {
         fn strip_trailing_newline(input: &mut String) {
             if input.ends_with('\n') {
                 input.truncate(input.len() - 1);
@@ -1099,17 +1107,31 @@ mod builtins {
             }
         }
 
+        let width: usize = match width {
+            Some(width) => width,
+            None => ok!(kwargs.get::<Option<usize>>("width")).unwrap_or(4),
+        };
+        let indent_first_line: bool = match indent_first_line {
+            Some(v) => v,
+            None => ok!(kwargs.get::<Option<bool>>("first")).unwrap_or(false),
+        };
+        let indent_blank_lines: bool = match indent_blank_lines {
+            Some(v) => v,
+            None => ok!(kwargs.get::<Option<bool>>("blank")).unwrap_or(false),
+        };
+        ok!(kwargs.assert_all_used());
+
         strip_trailing_newline(&mut value);
         let indent_with = " ".repeat(width);
         let mut output = String::new();
         let mut iterator = value.split('\n');
-        if !indent_first_line.unwrap_or(false) {
+        if !indent_first_line {
             output.push_str(iterator.next().unwrap());
             output.push('\n');
         }
         for line in iterator {
             if line.is_empty() {
-                if indent_blank_lines.unwrap_or(false) {
+                if indent_blank_lines {
                     output.push_str(&indent_with);
                 }
             } else {
@@ -1118,7 +1140,7 @@ mod builtins {
             output.push('\n');
         }
         strip_trailing_newline(&mut output);
-        output
+        Ok(output)
     }
 
     /// URL encodes a value.

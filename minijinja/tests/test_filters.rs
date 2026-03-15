@@ -1,5 +1,5 @@
 #![cfg(feature = "builtins")]
-use minijinja::value::{Value, ValueKind};
+use minijinja::value::{Kwargs, Value, ValueKind};
 use minijinja::{args, context, Environment};
 use similar_asserts::assert_eq;
 
@@ -55,20 +55,47 @@ fn test_dotted_filter_name() {
 #[test]
 fn test_indent_one_empty_line() {
     let teststring = String::from("\n");
-    assert_eq!(indent(teststring, 2, None, None), String::from(""));
+    assert_eq!(
+        indent(
+            teststring,
+            Some(2),
+            None,
+            None,
+            Kwargs::from_iter([] as [(&str, Value); 0])
+        )
+        .unwrap(),
+        String::from("")
+    );
 }
 
 #[test]
 fn test_indent_one_line() {
     let teststring = String::from("test\n");
-    assert_eq!(indent(teststring, 2, None, None), String::from("test"));
+    assert_eq!(
+        indent(
+            teststring,
+            Some(2),
+            None,
+            None,
+            Kwargs::from_iter([] as [(&str, Value); 0])
+        )
+        .unwrap(),
+        String::from("test")
+    );
 }
 
 #[test]
 fn test_indent() {
     let teststring = String::from("test\ntest1\n\ntest2\n");
     assert_eq!(
-        indent(teststring, 2, None, None),
+        indent(
+            teststring,
+            Some(2),
+            None,
+            None,
+            Kwargs::from_iter([] as [(&str, Value); 0])
+        )
+        .unwrap(),
         String::from("test\n  test1\n\n  test2")
     );
 }
@@ -77,7 +104,14 @@ fn test_indent() {
 fn test_indent_with_indented_first_line() {
     let teststring = String::from("test\ntest1\n\ntest2\n");
     assert_eq!(
-        indent(teststring, 2, Some(true), None),
+        indent(
+            teststring,
+            Some(2),
+            Some(true),
+            None,
+            Kwargs::from_iter([] as [(&str, Value); 0])
+        )
+        .unwrap(),
         String::from("  test\n  test1\n\n  test2")
     );
 }
@@ -86,7 +120,14 @@ fn test_indent_with_indented_first_line() {
 fn test_indent_with_indented_blank_line() {
     let teststring = String::from("test\ntest1\n\ntest2\n");
     assert_eq!(
-        indent(teststring, 2, None, Some(true)),
+        indent(
+            teststring,
+            Some(2),
+            None,
+            Some(true),
+            Kwargs::from_iter([] as [(&str, Value); 0])
+        )
+        .unwrap(),
         String::from("test\n  test1\n  \n  test2")
     );
 }
@@ -95,7 +136,14 @@ fn test_indent_with_indented_blank_line() {
 fn test_indent_with_all_indented() {
     let teststring = String::from("test\ntest1\n\ntest2\n");
     assert_eq!(
-        indent(teststring, 2, Some(true), Some(true)),
+        indent(
+            teststring,
+            Some(2),
+            Some(true),
+            Some(true),
+            Kwargs::from_iter([] as [(&str, Value); 0])
+        )
+        .unwrap(),
         String::from("  test\n  test1\n  \n  test2")
     );
 }
