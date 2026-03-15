@@ -19,6 +19,14 @@
 
 
 /*
+ Auto escaping modes for callback-based configuration.
+ */
+typedef enum mj_auto_escape {
+  MJ_AUTO_ESCAPE_NONE,
+  MJ_AUTO_ESCAPE_HTML,
+} mj_auto_escape;
+
+/*
  The kind of error that occurred.
  */
 typedef enum mj_err_kind {
@@ -96,6 +104,34 @@ typedef struct mj_value {
 } mj_value;
 
 /*
+ Callback used for custom functions, filters and tests.
+ */
+typedef bool (*mj_value_callback)(void *userdata,
+                                  const struct mj_value *args,
+                                  uintptr_t argc,
+                                  struct mj_value *rv_out);
+
+/*
+ Callback used for user data cleanup.
+ */
+typedef void (*mj_user_data_free)(void *userdata);
+
+/*
+ Callback used to select auto escaping for a template name.
+ */
+typedef enum mj_auto_escape (*mj_auto_escape_callback)(void *userdata, const char *name);
+
+/*
+ Callback used for loading template source by name.
+ */
+typedef const char *(*mj_loader_callback)(void *userdata, const char *name);
+
+/*
+ Callback used to join include paths.
+ */
+typedef const char *(*mj_path_join_callback)(void *userdata, const char *name, const char *parent);
+
+/*
  Allows one to override the syntax elements.
  */
 typedef struct mj_syntax_config {
@@ -114,9 +150,49 @@ extern "C" {
 #endif // __cplusplus
 
 /*
+ Registers a C callback as filter.
+ */
+MINIJINJA_API
+bool mj_env_add_filter(struct mj_env *env,
+                       const char *name,
+                       mj_value_callback callback,
+                       void *userdata,
+                       mj_user_data_free free_func);
+
+/*
+ Registers a C callback as template function.
+ */
+MINIJINJA_API
+bool mj_env_add_function(struct mj_env *env,
+                         const char *name,
+                         mj_value_callback callback,
+                         void *userdata,
+                         mj_user_data_free free_func);
+
+/*
+ Adds a global value to the environment.
+ */
+MINIJINJA_API bool mj_env_add_global(struct mj_env *env, const char *name, struct mj_value value);
+
+/*
  Registers a template with the environment.
  */
 MINIJINJA_API bool mj_env_add_template(struct mj_env *env, const char *name, const char *source);
+
+/*
+ Registers a C callback as test.
+ */
+MINIJINJA_API
+bool mj_env_add_test(struct mj_env *env,
+                     const char *name,
+                     mj_value_callback callback,
+                     void *userdata,
+                     mj_user_data_free free_func);
+
+/*
+ Clears the fuel budget.
+ */
+MINIJINJA_API void mj_env_clear_fuel(struct mj_env *env);
 
 /*
  Clears all templates.
@@ -164,9 +240,23 @@ char *mj_env_render_template(const struct mj_env *env,
                              struct mj_value ctx);
 
 /*
+ Configures a callback for auto escaping.
+ */
+MINIJINJA_API
+bool mj_env_set_auto_escape_callback(struct mj_env *env,
+                                     mj_auto_escape_callback callback,
+                                     void *userdata,
+                                     mj_user_data_free free_func);
+
+/*
  Enables or disables debug mode.
  */
 MINIJINJA_API void mj_env_set_debug(struct mj_env *env, bool val);
+
+/*
+ Sets the fuel budget for expression evaluation and rendering.
+ */
+MINIJINJA_API void mj_env_set_fuel(struct mj_env *env, uint64_t fuel);
 
 /*
  Preserve the trailing newline when rendering templates.
@@ -174,9 +264,27 @@ MINIJINJA_API void mj_env_set_debug(struct mj_env *env, bool val);
 MINIJINJA_API void mj_env_set_keep_trailing_newline(struct mj_env *env, bool val);
 
 /*
+ Configures a callback-based template loader.
+ */
+MINIJINJA_API
+bool mj_env_set_loader(struct mj_env *env,
+                       mj_loader_callback callback,
+                       void *userdata,
+                       mj_user_data_free free_func);
+
+/*
  Enables or disables the `lstrip_blocks` feature.
  */
 MINIJINJA_API void mj_env_set_lstrip_blocks(struct mj_env *env, bool val);
+
+/*
+ Configures a callback for joining include paths.
+ */
+MINIJINJA_API
+bool mj_env_set_path_join_callback(struct mj_env *env,
+                                   mj_path_join_callback callback,
+                                   void *userdata,
+                                   mj_user_data_free free_func);
 
 /*
  Changes the recursion limit.

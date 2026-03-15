@@ -10,6 +10,8 @@ All notable changes to MiniJinja are documented here.
 * Improved generic performance across template parsing, compilation, and rendering.
 * Fixed `minijinja-cabi` ownership and pointer-safety issues that could leak `mj_value`
   values on error paths.
+* Added high-priority `minijinja-cabi` APIs for callback-based functions/filters/tests,
+  globals, loaders, path joining, auto-escape configuration, and fuel limits.
 
 ## 2.17.1
 
