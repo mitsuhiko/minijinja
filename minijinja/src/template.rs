@@ -321,8 +321,8 @@ impl<'env, 'source> Template<'env, 'source> {
 
     /// Renders the template into an [`io::Write`].
     ///
-    /// This works exactly like [`render`](Self::render) but instead writes the template
-    /// as it's evaluating into an [`io::Write`].
+    /// This works exactly like [`render`](Self::render), but writes the template
+    /// into an [`io::Write`] as it is evaluated.
     ///
     /// ```
     /// # use minijinja::{Environment, context};
@@ -402,7 +402,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// Returns a set of all undeclared variables in the template.
     ///
     /// This returns a set of all variables that might be looked up
-    /// at runtime by the template.  Since this is runs a static
+    /// at runtime by the template.  Since this runs a static
     /// analysis, the actual control flow is not considered.  This
     /// also cannot take into account what happens due to includes,
     /// imports or extending.  If `nested` is set to `true`, then also

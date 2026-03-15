@@ -46,9 +46,9 @@ fn default_formatter() -> Arc<FormatterFunc> {
 }
 
 /// The maximum recursion in the VM.  Normally each stack frame
-/// adds one to this counter (eg: every time a frame is added).
+/// adds one to this counter (e.g., every time a frame is added).
 /// However in some situations more depth is pushed if the cost
-/// of the stack frame is higher.  Raising this above this limit
+/// of the stack frame is higher.  Raising this limit
 /// requires enabling the `stacker` feature.
 const MAX_RECURSION: usize = 500;
 
@@ -192,8 +192,9 @@ impl<'source> Environment<'source> {
     /// env.add_template_owned("index.html".to_string(), "Hello {{ name }}!".to_string()).unwrap();
     /// ```
     ///
-    /// **Note**: the name is a bit of a misnomer as this API also allows to borrow too as
-    /// the parameters are actually [`Cow`].  This method fails if the template has a syntax error.
+    /// **Note**: the name is a bit of a misnomer as this API also allows borrowing,
+    /// as the parameters are actually [`Cow`].  This method fails if the template
+    /// has a syntax error.
     pub fn add_template_owned<N, S>(&mut self, name: N, source: S) -> Result<(), Error>
     where
         N: Into<Cow<'source, str>>,
@@ -407,8 +408,7 @@ impl<'source> Environment<'source> {
 
     /// Loads a template from a string.
     ///
-    /// In some cases you really only need to work with (eg: render) a template to be
-    /// rendered once only.
+    /// In some cases you only need to work with (e.g., render) a template once.
     ///
     /// ```
     /// # use minijinja::{Environment, context};
@@ -492,7 +492,7 @@ impl<'source> Environment<'source> {
     /// invoked with the name of the template and can make an initial auto
     /// escaping decision based on that.  The default implementation
     /// ([`default_auto_escape_callback`](defaults::default_auto_escape_callback))
-    /// turn on escaping depending on the file extension.
+    /// turns on escaping depending on the file extension.
     ///
     /// ```
     /// # use minijinja::{Environment, AutoEscape};
@@ -675,9 +675,9 @@ impl<'source> Environment<'source> {
 
     /// Compiles an expression.
     ///
-    /// This lets one compile an expression in the template language and
-    /// receive the output.  This lets one use the expressions of the language
-    /// be used as a minimal scripting language.  For more information and an
+    /// This lets you compile an expression in the template language and evaluate it.
+    /// This makes it possible to use the language's expressions as a minimal
+    /// scripting language.  For more information and an
     /// example see [`Expression`].
     pub fn compile_expression(&self, expr: &'source str) -> Result<Expression<'_, 'source>, Error> {
         self._compile_expression(expr)

@@ -1002,7 +1002,7 @@ mod builtins {
     /// This filter is only available if the `json` feature is enabled.  The resulting
     /// value is safe to use in HTML as well as it will not contain any special HTML
     /// characters.  The optional parameter to the filter can be set to `true` to enable
-    /// pretty printing.  Not that the `"` character is left unchanged as it's the
+    /// pretty printing.  Note that the `"` character is left unchanged as it's the
     /// JSON string delimiter.  If you want to pass JSON serialized this way into an
     /// HTTP attribute use single quoted HTML attributes:
     ///
@@ -1068,13 +1068,13 @@ mod builtins {
         })
     }
 
-    /// Indents Value with spaces
+    /// Indents a value with spaces.
     ///
     /// The first optional parameter to the filter can be set to `true` to
     /// indent the first line. The parameter defaults to false.
-    /// the second optional parameter to the filter can be set to `true`
+    /// The second optional parameter to the filter can be set to `true`
     /// to indent blank lines. The parameter defaults to false.
-    /// This filter is useful, if you want to template yaml-files
+    /// This filter is useful if you want to template YAML files.
     ///
     /// ```jinja
     /// example:
