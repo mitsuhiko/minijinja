@@ -227,5 +227,3 @@ impl<Owner, Dependent> JoinedCell<Owner, Dependent> {
         (owner_ptr, dependent_ptr)
     }
 }
-
-

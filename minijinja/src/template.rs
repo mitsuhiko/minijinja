@@ -1,7 +1,7 @@
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Deref;
 use std::sync::Arc;
-use std::cell::RefCell;
 use std::{fmt, io};
 
 use crate::vendor::self_cell::self_cell;
@@ -85,10 +85,6 @@ self_cell! {
 pub struct Captured<'source> {
     cell: CapturedCell<'source>,
 }
-
-/// Deprecated alias for [`Captured`].
-#[deprecated(since = "2.18.0", note = "renamed to Captured")]
-pub type RenderedTemplate<'source> = Captured<'source>;
 
 impl fmt::Debug for Captured<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -240,17 +236,13 @@ impl<'env, 'source> Template<'env, 'source> {
     /// assert_eq!(rendered.output(), "");
     /// assert_eq!(rendered.state().lookup("x"), Some(Value::from(42)));
     /// ```
-    pub fn render_captured<S: Serialize>(
-        &self,
-        ctx: S,
-    ) -> Result<Captured<'source>, Error> {
+    pub fn render_captured<S: Serialize>(&self, ctx: S) -> Result<Captured<'source>, Error> {
         self.clone()
             ._capture_state(Value::from_serialize(&ctx), true)
     }
 
-
-    /// Like [`render_to_write`](Self::render_to_write) but keeps the template
-    /// alive with the returned state.
+    /// Like [`render`](Self::render) but writes to an [`io::Write`] and keeps
+    /// the template alive with the returned state.
     ///
     /// This is useful when working with temporary template handles and
     /// the state needs to be inspected afterwards.  The [`output`](Captured::output)
@@ -317,8 +309,7 @@ impl<'env, 'source> Template<'env, 'source> {
         let cell = ok!(CapturedCell::try_new(
             this,
             move |template| -> Result<CapturedData<'_>, Error> {
-                let (_, state) =
-                    ok!(template._eval(root, &mut Output::new(&mut *w.borrow_mut())));
+                let (_, state) = ok!(template._eval(root, &mut Output::new(&mut *w.borrow_mut())));
                 Ok(CapturedData {
                     output: String::new(),
                     state,
@@ -331,8 +322,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// Renders the template into an [`io::Write`].
     ///
     /// This works exactly like [`render`](Self::render) but instead writes the template
-    /// as it's evaluating into an [`io::Write`].  It also returns the [`State`] like
-    /// [`render_captured`](Self::render_captured) does.
+    /// as it's evaluating into an [`io::Write`].
     ///
     /// ```
     /// # use minijinja::{Environment, context};
@@ -346,6 +336,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ///
     /// **Note on values:** The [`Value`] type implements `Serialize` and can be
     /// efficiently passed to render.  It does not undergo actual serialization.
+    #[deprecated(since = "2.18.0", note = "use render_captured_to instead")]
     pub fn render_to_write<S: Serialize, W: io::Write>(
         &self,
         ctx: S,

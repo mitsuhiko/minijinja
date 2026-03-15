@@ -26,7 +26,7 @@ fn main() {
     env.add_template("response.txt", TEMPLATE).unwrap();
     let template = env.get_template("response.txt").unwrap();
     template
-        .render_to_write(
+        .render_captured_to(
             context! {
                 stream => Value::make_one_shot_iterator(generate_items())
             },

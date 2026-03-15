@@ -238,8 +238,6 @@ pub use self::environment::Environment;
 pub use self::error::{Error, ErrorKind};
 pub use self::expression::Expression;
 pub use self::output::Output;
-#[allow(deprecated)]
-pub use self::template::RenderedTemplate;
 pub use self::template::{Captured, Template};
 pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
 

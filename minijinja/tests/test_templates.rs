@@ -658,16 +658,20 @@ fn test_render_captured() {
 }
 
 #[test]
-fn test_render_to_write_state() {
+fn test_render_captured_to() {
     let env = Environment::new();
     let tmpl = env
         .template_from_str("{% set foo = 42 %}{% macro bar() %}x{% endmacro %}root")
         .unwrap();
     let mut out = Vec::<u8>::new();
-    let state = tmpl.render_to_write((), &mut out).unwrap();
+    let captured = tmpl.render_captured_to((), &mut out).unwrap();
     assert_eq!(String::from_utf8_lossy(&out), "root");
-    assert_eq!(state.lookup("foo"), Some(Value::from(42)));
-    assert_eq!(state.call_macro("bar", &[]).ok().as_deref(), Some("x"));
+    assert_eq!(captured.output(), "");
+    assert_eq!(captured.state().lookup("foo"), Some(Value::from(42)));
+    assert_eq!(
+        captured.state().call_macro("bar", &[]).ok().as_deref(),
+        Some("x")
+    );
 }
 
 #[test]
@@ -710,7 +714,7 @@ fn test_invalid_value_iteration() {
         .template_from_str("{% for item in iter %}[{{ item }}]{% endfor %}")
         .unwrap();
     let err = t
-        .render_to_write(
+        .render_captured_to(
             context! { iter => Value::from_object(FailingIteration) },
             &mut out,
         )

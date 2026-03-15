@@ -20,8 +20,8 @@ All notable changes to MiniJinja are documented here.
 * Added `render_captured` and `render_captured_to` methods on `Template` which
   return a `Captured` type holding the rendered output and the template state.
 * Added `into_output` method on `Captured` to consume and return the output string.
-* Deprecated `render_and_return_state`, `eval_to_state`, and `RenderedTemplate`
-  in favor of the new `render_captured` / `Captured` API.
+* Deprecated `render_and_return_state`, `eval_to_state`, and `render_to_write`
+  in favor of the new `render_captured` / `render_captured_to` / `Captured` API.
 
 ## 2.17.1
 
