@@ -1,15 +1,12 @@
 #![allow(
     clippy::missing_safety_doc,
     clippy::needless_lifetimes,
-    dead_code,
     unexpected_cfgs
 )]
 
-use core::cell::UnsafeCell;
 use core::marker::PhantomData;
 use core::mem;
 use core::ptr::{drop_in_place, read, NonNull};
-use core::sync::atomic::{AtomicBool, Ordering};
 
 extern crate alloc;
 
@@ -231,87 +228,4 @@ impl<Owner, Dependent> JoinedCell<Owner, Dependent> {
     }
 }
 
-/// Wrapper type that allows creating a self-referential type that hold a mutable borrow `&mut T`.
-///
-/// Example usage:
-///
-/// ```ignore
-/// use self_cell::{self_cell, MutBorrow};
-///
-/// type MutStringRef<'a> = &'a mut String;
-///
-/// self_cell!(
-///     struct MutStringCell {
-///         owner: MutBorrow<String>,
-///
-///         #[covariant]
-///         dependent: MutStringRef,
-///     }
-/// );
-///
-/// let mut cell = MutStringCell::new(MutBorrow::new("abc".into()), |owner| owner.borrow_mut());
-/// cell.with_dependent_mut(|_owner, dependent| {
-///     assert_eq!(dependent, &"abc");
-///     dependent.pop();
-///     assert_eq!(dependent, &"ab");
-/// });
-///
-/// let recovered_owner: String = cell.into_owner().into_inner();
-/// assert_eq!(recovered_owner, "ab");
-/// ```
-pub struct MutBorrow<T> {
-    // Private on purpose.
-    is_locked: AtomicBool,
-    value: UnsafeCell<T>,
-}
 
-impl<T> MutBorrow<T> {
-    /// Constructs a new `MutBorrow`.
-    pub fn new(value: T) -> Self {
-        // Use the Rust type system to model an affine type that can only go from unlocked -> locked
-        // but never the other way around.
-        Self {
-            is_locked: AtomicBool::new(false),
-            value: UnsafeCell::new(value),
-        }
-    }
-
-    /// Obtains a mutable reference to the underlying data.
-    ///
-    /// This function can only sensibly be used in the builder function. Afterwards, it's impossible
-    /// to access the inner value, with the exception of [`MutBorrow::into_inner`].
-    ///
-    /// # Panics
-    ///
-    /// Will panic if called anywhere but in the dependent constructor. Will also panic if called
-    /// more than once.
-    #[allow(clippy::mut_from_ref)]
-    pub fn borrow_mut(&self) -> &mut T {
-        // Ensure this function can only be called once.
-        // Relaxed should be fine, because only one thread could ever read `false` anyway,
-        // so further synchronization is pointless.
-        let was_locked = self.is_locked.swap(true, Ordering::Relaxed);
-
-        if was_locked {
-            panic!("Tried to access locked MutBorrow")
-        } else {
-            // SAFETY: `self.is_locked` starts out as locked and can never be unlocked again, which
-            // guarantees that this function can only be called once. And the `self.value` being
-            // private ensures that there are no other references to it.
-            unsafe { &mut *self.value.get() }
-        }
-    }
-
-    /// Consumes `self` and returns the wrapped value.
-    pub fn into_inner(self) -> T {
-        self.value.into_inner()
-    }
-}
-
-// SAFETY: The reasoning why it is safe to share `MutBorrow` across threads is as follows: The
-// `AtomicBool` `is_locked` ensures that only ever exactly one thread can get access to the inner
-// value. In that sense it works like a critical section, that begins when `borrow_mut()` is called
-// and that ends when the outer `MutBorrow` is dropped. Once one thread acquired the unique
-// reference through `borrow_mut()` no other interaction with the inner value MUST ever be possible
-// while the outer `MutBorrow` is alive.
-unsafe impl<T: Send> Sync for MutBorrow<T> {}

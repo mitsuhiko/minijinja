@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_imports, unused_mut)]
+#![allow(unused_imports, unused_mut)]
 
 //! # Overview
 //!
@@ -801,5 +801,3 @@ pub(crate) use _self_cell_try_new_body;
 pub(crate) use _self_cell_try_new_or_recover;
 pub(crate) use _self_cell_try_new_or_recover_body;
 pub(crate) use self_cell;
-
-pub(crate) use unsafe_self_cell::MutBorrow;
