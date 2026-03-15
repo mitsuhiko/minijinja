@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 2.18.0
 
 * Added keyword argument support (`width`, `first`, `blank`) to the `indent` filter for Jinja2 compatibility in Rust and Go.  #864
 * Added support for dotted integer lookup (for example `foo.0`) in Rust and Go for Jinja compatibility.  #881
