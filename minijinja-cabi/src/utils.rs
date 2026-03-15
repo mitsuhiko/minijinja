@@ -63,11 +63,11 @@ impl Scope {
 }
 
 pub(crate) fn catch<F: FnOnce(&Scope) -> Result<R, Error>, R: AbiResult>(f: F) -> R {
-    LAST_ERROR.with_borrow_mut(|x| *x = None);
+    LAST_ERROR.with(|x| *x.borrow_mut() = None);
     match f(&Scope) {
         Ok(result) => result,
         Err(err) => {
-            LAST_ERROR.with_borrow_mut(|x| *x = Some(err));
+            LAST_ERROR.with(|x| *x.borrow_mut() = Some(err));
             R::err_value()
         }
     }

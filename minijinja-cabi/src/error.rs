@@ -13,20 +13,21 @@ thread_local! {
 /// Returns `true` if there is currently an error.
 #[no_mangle]
 pub extern "C" fn mj_err_is_set() -> bool {
-    LAST_ERROR.with_borrow(|x| x.is_some())
+    LAST_ERROR.with(|x| x.borrow().is_some())
 }
 
 /// Clears the current error.
 #[no_mangle]
 pub extern "C" fn mj_err_clear() {
-    LAST_ERROR.with_borrow_mut(|x| *x = None);
+    LAST_ERROR.with(|x| *x.borrow_mut() = None);
 }
 
 /// Prints the error to stderr.
 #[no_mangle]
 pub extern "C" fn mj_err_print() -> bool {
-    LAST_ERROR.with_borrow(|x| {
-        if let Some(err) = x {
+    LAST_ERROR.with(|x| {
+        let x = x.borrow();
+        if let Some(err) = x.as_ref() {
             eprintln!("error: {err}");
             if err.name().is_some() {
                 eprintln!("{}", err.display_debug_info());
@@ -55,8 +56,9 @@ pub extern "C" fn mj_err_print() -> bool {
 #[no_mangle]
 pub unsafe extern "C" fn mj_err_get_debug_info() -> *mut c_char {
     LAST_ERROR
-        .with_borrow(|x| {
-            x.as_ref()
+        .with(|x| {
+            x.borrow()
+                .as_ref()
                 .and_then(|x| {
                     let mut info = String::new();
                     if x.name().is_some() {
@@ -92,8 +94,9 @@ pub unsafe extern "C" fn mj_err_get_debug_info() -> *mut c_char {
 #[no_mangle]
 pub unsafe extern "C" fn mj_err_get_detail() -> *mut c_char {
     LAST_ERROR
-        .with_borrow(|x| {
-            x.as_ref()
+        .with(|x| {
+            x.borrow()
+                .as_ref()
                 .and_then(|x| x.detail())
                 .and_then(|detail| CString::new(detail).ok())
                 .map(|cstr| cstr.into_raw())
@@ -107,8 +110,9 @@ pub unsafe extern "C" fn mj_err_get_detail() -> *mut c_char {
 #[no_mangle]
 pub unsafe extern "C" fn mj_err_get_template_name() -> *mut c_char {
     LAST_ERROR
-        .with_borrow(|x| {
-            x.as_ref()
+        .with(|x| {
+            x.borrow()
+                .as_ref()
                 .and_then(|x| x.name())
                 .and_then(|name| CString::new(name).ok())
                 .map(|cstr| cstr.into_raw())
@@ -120,7 +124,7 @@ pub unsafe extern "C" fn mj_err_get_template_name() -> *mut c_char {
 #[no_mangle]
 pub unsafe extern "C" fn mj_err_get_line() -> u32 {
     LAST_ERROR
-        .with_borrow(|x| x.as_ref().and_then(|x| x.line()))
+        .with(|x| x.borrow().as_ref().and_then(|x| x.line()))
         .unwrap_or(0) as _
 }
 
@@ -180,8 +184,9 @@ impl TryFrom<ErrorKind> for mj_err_kind {
 #[no_mangle]
 pub unsafe extern "C" fn mj_err_get_kind() -> mj_err_kind {
     LAST_ERROR
-        .with_borrow(|x| {
-            x.as_ref()
+        .with(|x| {
+            x.borrow()
+                .as_ref()
                 .and_then(|x| mj_err_kind::try_from(x.kind()).ok())
         })
         .unwrap_or(mj_err_kind::MJ_ERR_KIND_UNKNOWN)
