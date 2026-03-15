@@ -176,8 +176,7 @@ impl<'source> Environment<'source> {
     /// Note that there are situations where the interface of this method is
     /// too restrictive as you need to hold on to the strings for the lifetime
     /// of the environment. To avoid this restriction use
-    /// [`add_template_owned`](Self::add_template_owned), which is available
-    /// when the `loader` feature is enabled.
+    /// [`add_template_owned`](Self::add_template_owned).
     pub fn add_template(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
         self.templates.insert(name, source)
     }
@@ -195,8 +194,6 @@ impl<'source> Environment<'source> {
     ///
     /// **Note**: the name is a bit of a misnomer as this API also allows to borrow too as
     /// the parameters are actually [`Cow`].  This method fails if the template has a syntax error.
-    #[cfg(feature = "loader")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "loader")))]
     pub fn add_template_owned<N, S>(&mut self, name: N, source: S) -> Result<(), Error>
     where
         N: Into<Cow<'source, str>>,
@@ -233,8 +230,6 @@ impl<'source> Environment<'source> {
     ///     env
     /// }
     /// ```
-    #[cfg(feature = "loader")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "loader")))]
     pub fn set_loader<F>(&mut self, f: F)
     where
         F: Fn(&str) -> Result<Option<String>, Error> + Send + Sync + 'static,
@@ -693,8 +688,6 @@ impl<'source> Environment<'source> {
     ///
     /// This works exactly like [`compile_expression`](Self::compile_expression) but
     /// lets you pass an owned string without capturing the lifetime.
-    #[cfg(feature = "loader")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "loader")))]
     pub fn compile_expression_owned<E>(&self, expr: E) -> Result<Expression<'_, 'source>, Error>
     where
         E: Into<Cow<'source, str>>,
@@ -863,65 +856,4 @@ impl<'source> Environment<'source> {
     }
 }
 
-#[cfg(not(feature = "loader"))]
-mod basic_store {
-    use super::*;
-
-    #[derive(Clone)]
-    pub(crate) struct BasicStore<'source> {
-        pub template_config: TemplateConfig,
-        map: BTreeMap<&'source str, Arc<CompiledTemplate<'source>>>,
-    }
-
-    impl fmt::Debug for BasicStore<'_> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            BTreeMapKeysDebug(&self.map).fmt(f)
-        }
-    }
-
-    impl<'source> BasicStore<'source> {
-        pub fn new(template_config: TemplateConfig) -> BasicStore<'source> {
-            BasicStore {
-                template_config,
-                map: BTreeMap::default(),
-            }
-        }
-
-        pub fn insert(&mut self, name: &'source str, source: &'source str) -> Result<(), Error> {
-            self.map.insert(
-                name,
-                Arc::new(ok!(CompiledTemplate::new(
-                    name,
-                    source,
-                    &self.template_config
-                ))),
-            );
-            Ok(())
-        }
-
-        pub fn remove(&mut self, name: &str) {
-            self.map.remove(name);
-        }
-
-        pub fn clear(&mut self) {
-            self.map.clear();
-        }
-
-        pub fn get(&self, name: &str) -> Result<&CompiledTemplate<'source>, Error> {
-            self.map
-                .get(name)
-                .map(|x| &**x)
-                .ok_or_else(|| Error::new_not_found(name))
-        }
-
-        pub fn iter(&self) -> impl Iterator<Item = (&str, &CompiledTemplate<'source>)> {
-            self.map.iter().map(|(name, template)| (*name, &**template))
-        }
-    }
-}
-
-#[cfg(not(feature = "loader"))]
-use self::basic_store::BasicStore as TemplateStore;
-
-#[cfg(feature = "loader")]
 use crate::loader::LoaderStore as TemplateStore;

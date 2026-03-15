@@ -1952,7 +1952,6 @@ dependencies = [
  "insta",
  "memo-map",
  "percent-encoding",
- "self_cell",
  "serde",
  "serde_json",
  "similar-asserts",
@@ -2832,12 +2831,6 @@ version = "0.1.0"
 dependencies = [
  "minijinja",
 ]
-
-[[package]]
-name = "self_cell"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f7d95a54511e0c7be3f51e8867aa8cf35148d7b9445d44de2f943e2b206e749"
 
 [[package]]
 name = "serde"
