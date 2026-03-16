@@ -284,6 +284,11 @@ fn test_strict_undefined() {
             .unwrap(),
         "FALLBACK"
     );
+    // comparison with undefined should error
+    assert_eq!(
+        env.render_str("{{ x == 'foo' }}", ()).unwrap_err().kind(),
+        ErrorKind::UndefinedError
+    );
 }
 
 #[test]
