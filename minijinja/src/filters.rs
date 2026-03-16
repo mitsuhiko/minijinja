@@ -525,13 +525,30 @@ mod builtins {
     /// <p>{{ ""|default("string was empty", true) }}</p>
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn default(value: &Value, other: Option<Value>, lax: Option<bool>) -> Value {
-        if value.is_undefined() {
-            other.unwrap_or_else(|| Value::from(""))
-        } else if lax.unwrap_or(false) && !value.is_true() {
-            other.unwrap_or_else(|| Value::from(""))
+    pub fn default(
+        state: &State,
+        value: &Value,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Value, Error> {
+        let other = args.first();
+        let lax = args.get(1).and_then(|v| bool::try_from(v.clone()).ok());
+        let use_other = if value.is_undefined() {
+            true
         } else {
-            value.clone()
+            lax.unwrap_or(false) && !value.is_true()
+        };
+        if use_other {
+            match other {
+                Some(other) => {
+                    state
+                        .undefined_behavior()
+                        .assert_value_not_undefined(other)?;
+                    Ok(other.clone())
+                }
+                None => Ok(Value::from("")),
+            }
+        } else {
+            Ok(value.clone())
         }
     }
 
