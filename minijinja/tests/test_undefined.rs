@@ -284,6 +284,13 @@ fn test_strict_undefined() {
             .unwrap(),
         "FALLBACK"
     );
+    // default with undefined fallback should still error
+    assert_eq!(
+        env.render_str("{{ foo|default(bar) }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
 }
 
 #[test]
