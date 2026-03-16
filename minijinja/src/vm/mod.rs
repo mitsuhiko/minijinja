@@ -464,6 +464,10 @@ impl<'env> Vm<'env> {
                 Instruction::StringConcat => {
                     a = stack.pop();
                     b = stack.pop();
+                    if strict_undefined {
+                        ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                        ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                    }
                     stack.push(ops::string_concat(b, &a));
                 }
                 Instruction::In => {
