@@ -280,6 +280,10 @@ impl<'env> Vm<'env> {
                 ($op:tt) => {{
                     b = stack.pop();
                     a = stack.pop();
+                    if strict_undefined {
+                        ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                        ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                    }
                     stack.push(Value::from(a $op b));
                 }};
             }
