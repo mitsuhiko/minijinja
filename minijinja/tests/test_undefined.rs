@@ -284,6 +284,11 @@ fn test_strict_undefined() {
             .unwrap(),
         "FALLBACK"
     );
+    // string concatenation with undefined should error
+    assert_eq!(
+        env.render_str("{{ x ~ y }}", ()).unwrap_err().kind(),
+        ErrorKind::UndefinedError
+    );
 }
 
 #[test]
