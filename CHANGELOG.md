@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed strict undefined behavior for comparison operators (such as `==`), string concatenation (`~`), and undefined needles in the `in` operator to better match Jinja2.  #886 #888
+* Fixed the `default` filter in strict undefined mode so an explicitly passed undefined fallback argument errors instead of being treated like a missing argument.  #887
+
 ## 2.18.0
 
 * Added keyword argument support (`width`, `first`, `blank`) to the `indent` filter for Jinja2 compatibility in Rust and Go.  #864

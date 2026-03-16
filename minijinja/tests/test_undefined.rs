@@ -153,6 +153,20 @@ fn test_semi_strict_undefined() {
             .unwrap(),
         "FALLBACK"
     );
+    assert_eq!(
+        env.render_str("{{ foo == 'foo' }}", ()).unwrap_err().kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ foo ~ 'x' }}", ()).unwrap_err().kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ foo|default(bar) }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
 }
 
 #[test]
@@ -231,6 +245,18 @@ fn test_strict_undefined() {
     );
     assert_eq!(
         env.render_str("{{ 42 in undefined }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined in [1, 2, 3] }}", ())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        env.render_str("{{ undefined in 'abc' }}", ())
             .unwrap_err()
             .kind(),
         ErrorKind::UndefinedError
