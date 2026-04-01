@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+## 2.19.0
+
 * Fixed strict undefined behavior for comparison operators (such as `==`), string concatenation (`~`), and undefined needles in the `in` operator to better match Jinja2.  #886 #888
 * Fixed the `default` filter in strict undefined mode so an explicitly passed undefined fallback argument errors instead of being treated like a missing argument.  #887
 
