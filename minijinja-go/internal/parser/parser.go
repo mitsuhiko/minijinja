@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/lexer"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
@@ -1417,6 +1418,16 @@ func (p *Parser) parseBlock() (*Block, *Error) {
 		return nil, err
 	}
 
+	if p.matchesKeyword("scoped") {
+		p.advance()
+	}
+
+	required := false
+	if p.matchesKeyword("required") {
+		p.advance()
+		required = true
+	}
+
 	if p.blocks[name] {
 		return nil, p.syntaxError(fmt.Sprintf("block '%s' defined twice", name))
 	}
@@ -1434,6 +1445,10 @@ func (p *Parser) parseBlock() (*Block, *Error) {
 	}
 	p.advance() // consume endblock
 
+	if required && !isWhitespaceOnlyBlockBody(body) {
+		return nil, p.syntaxError("Required blocks can only contain comments or whitespace")
+	}
+
 	// Check for optional trailing block name
 	if tok := p.current(); tok != nil && tok.Type == lexer.TokenIdent {
 		if tok.Value != name {
@@ -1442,7 +1457,17 @@ func (p *Parser) parseBlock() (*Block, *Error) {
 		p.advance()
 	}
 
-	return &Block{Name: name, Body: body}, nil
+	return &Block{Name: name, Required: required, Body: body}, nil
+}
+
+func isWhitespaceOnlyBlockBody(body []Stmt) bool {
+	for _, stmt := range body {
+		raw, ok := stmt.(*EmitRaw)
+		if !ok || strings.TrimSpace(raw.Raw) != "" {
+			return false
+		}
+	}
+	return true
 }
 
 func (p *Parser) parseExtends() (*Extends, *Error) {

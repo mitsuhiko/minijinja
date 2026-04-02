@@ -1,0 +1,4 @@
+{}
+---
+{% extends "required_layout.txt" %}
+{% block body %}Provide steps to demonstrate the bug.{% endblock %}

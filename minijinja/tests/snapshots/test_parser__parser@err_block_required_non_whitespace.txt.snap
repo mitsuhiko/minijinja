@@ -1,0 +1,13 @@
+---
+source: minijinja/tests/test_parser.rs
+description: "{% block body required %}x{% endblock %}"
+input_file: minijinja/tests/parser-inputs/err_block_required_non_whitespace.txt
+---
+Err(
+    Error {
+        kind: SyntaxError,
+        detail: "Required blocks can only contain comments or whitespace",
+        name: "err_block_required_non_whitespace.txt",
+        line: 1,
+    },
+)

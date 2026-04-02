@@ -1,0 +1,7 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{% extends \"required_mid.txt\" %}"
+info: {}
+input_file: minijinja/tests/inputs/required_block_intermediate_required.txt
+---
+before[ ]after

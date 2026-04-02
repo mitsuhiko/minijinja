@@ -170,6 +170,9 @@ func (s *State) RenderBlock(name string) (string, error) {
 	if bs == nil || len(bs.layers) == 0 {
 		return "", NewError(ErrInvalidOperation, "block not found: "+name)
 	}
+	if len(bs.layers) == 1 && bs.layers[0].required {
+		return "", NewError(ErrInvalidOperation, fmt.Sprintf("Required block '%s' not found", name))
+	}
 
 	// Capture output
 	oldOut := s.out
@@ -180,7 +183,7 @@ func (s *State) RenderBlock(name string) (string, error) {
 	s.currentBlock = name
 
 	s.pushScope()
-	for _, stmt := range bs.layers[0] {
+	for _, stmt := range bs.layers[0].body {
 		if err := s.evalStmt(stmt); err != nil {
 			s.popScope()
 			s.currentBlock = oldBlock
@@ -427,8 +430,13 @@ type tempStore struct {
 
 // blockStack manages the inheritance chain for a single block
 type blockStack struct {
-	layers [][]parser.Stmt // stack of block implementations (child first)
-	index  int             // current index in stack
+	layers []blockLayer // stack of block implementations (child first)
+	index  int          // current index in stack
+}
+
+type blockLayer struct {
+	body     []parser.Stmt
+	required bool
 }
 
 type macroDefinition struct {
@@ -963,6 +971,9 @@ func (bc *blockCallable) Call(state value.State, args []value.Value, kwargs map[
 	if bs == nil || len(bs.layers) == 0 {
 		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("block '%s' not found", bc.blockName))
 	}
+	if len(bs.layers) == 1 && bs.layers[0].required {
+		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("Required block '%s' not found", bc.blockName))
+	}
 
 	// Capture output
 	oldOut := bc.state.out
@@ -973,7 +984,7 @@ func (bc *blockCallable) Call(state value.State, args []value.Value, kwargs map[
 	bc.state.currentBlock = bc.blockName
 
 	bc.state.pushScope()
-	for _, stmt := range bs.layers[0] {
+	for _, stmt := range bs.layers[0].body {
 		if err := bc.state.evalStmt(stmt); err != nil {
 			bc.state.popScope()
 			bc.state.currentBlock = oldBlock
@@ -1127,7 +1138,7 @@ func (s *State) eval(tmpl *parser.Template) (string, error) {
 		for _, stmt := range tmpl.Children {
 			if block, ok := stmt.(*parser.Block); ok {
 				s.blocks[block.Name] = &blockStack{
-					layers: [][]parser.Stmt{block.Body},
+					layers: []blockLayer{{body: block.Body, required: block.Required}},
 					index:  0,
 				}
 			}
@@ -1720,11 +1731,11 @@ func (s *State) evalExtends(ext *parser.Extends) error {
 		if block, ok := stmt.(*parser.Block); ok {
 			if bs, exists := s.blocks[block.Name]; exists {
 				// Append parent block to the end (child is at index 0)
-				bs.layers = append(bs.layers, block.Body)
+				bs.layers = append(bs.layers, blockLayer{body: block.Body, required: block.Required})
 			} else {
 				// This is a parent-only block (no child override)
 				s.blocks[block.Name] = &blockStack{
-					layers: [][]parser.Stmt{block.Body},
+					layers: []blockLayer{{body: block.Body, required: block.Required}},
 					index:  0,
 				}
 			}
@@ -1767,10 +1778,13 @@ func (s *State) evalBlock(block *parser.Block) error {
 	bs := s.blocks[block.Name]
 	if bs == nil {
 		bs = &blockStack{
-			layers: [][]parser.Stmt{block.Body},
+			layers: []blockLayer{{body: block.Body, required: block.Required}},
 			index:  0,
 		}
 		s.blocks[block.Name] = bs
+	}
+	if len(bs.layers) == 1 && bs.layers[0].required {
+		return NewError(ErrInvalidOperation, fmt.Sprintf("Required block '%s' not found", block.Name)).WithSpan(block.Span())
 	}
 	if len(bs.layers) == 0 {
 		// No override - render the current block's content
@@ -1795,7 +1809,7 @@ func (s *State) evalBlock(block *parser.Block) error {
 	bs.index = 0
 
 	s.pushScope()
-	for _, stmt := range bs.layers[0] {
+	for _, stmt := range bs.layers[0].body {
 		if err := s.evalStmt(stmt); err != nil {
 			s.popScope()
 			s.currentBlock = oldBlock
@@ -2816,7 +2830,7 @@ func (s *State) evalSuper(span parser.Span) (value.Value, error) {
 	s.out = builder
 
 	s.pushScope()
-	for _, stmt := range bs.layers[bs.index] {
+	for _, stmt := range bs.layers[bs.index].body {
 		if err := s.evalStmt(stmt); err != nil {
 			s.popScope()
 			s.out = oldOut

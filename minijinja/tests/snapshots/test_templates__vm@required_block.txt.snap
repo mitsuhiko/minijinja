@@ -1,0 +1,7 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{% extends \"required_layout.txt\" %}\n{% block body %}Provide steps to demonstrate the bug.{% endblock %}"
+info: {}
+input_file: minijinja/tests/inputs/required_block.txt
+---
+before[Provide steps to demonstrate the bug.]after

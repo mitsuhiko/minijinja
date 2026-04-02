@@ -16,6 +16,7 @@ Ok(
             } @ 1:27-2:0,
             Block {
                 name: "title",
+                required: false,
                 body: [
                     EmitRaw {
                         raw: "new title",
@@ -27,6 +28,7 @@ Ok(
             } @ 2:40-3:0,
             Block {
                 name: "body",
+                required: false,
                 body: [
                     EmitRaw {
                         raw: "new body",

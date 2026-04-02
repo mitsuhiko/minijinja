@@ -1,0 +1,13 @@
+---
+source: minijinja/tests/test_parser.rs
+description: "{% block body required scoped %}{% endblock %}"
+input_file: minijinja/tests/parser-inputs/err_block_required_bad_order.txt
+---
+Err(
+    Error {
+        kind: SyntaxError,
+        detail: "unexpected identifier, expected end of block",
+        name: "err_block_required_bad_order.txt",
+        line: 1,
+    },
+)

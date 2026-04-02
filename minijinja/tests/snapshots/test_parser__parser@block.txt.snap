@@ -11,6 +11,7 @@ Ok(
             } @ 1:0-1:7,
             Block {
                 name: "title",
+                required: false,
                 body: [],
             } @ 1:10-1:35,
             EmitRaw {
@@ -18,6 +19,7 @@ Ok(
             } @ 1:38-2:0,
             Block {
                 name: "body",
+                required: false,
                 body: [
                     EmitRaw {
                         raw: "\n    foo\n",

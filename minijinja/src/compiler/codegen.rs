@@ -461,6 +461,7 @@ impl<'source> CodeGenerator<'source> {
         for node in &block.body {
             sub.compile_stmt(node);
         }
+        sub.instructions.mark_required_block(block.required);
         let instructions = self.finish_subgenerator(sub);
         self.blocks.insert(block.name, instructions);
         self.add(Instruction::CallBlock(block.name));

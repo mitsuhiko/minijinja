@@ -304,6 +304,7 @@ pub struct SetBlock<'a> {
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Block<'a> {
     pub name: &'a str,
+    pub required: bool,
     pub body: Vec<Stmt<'a>>,
 }
 

@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Added support for Jinja-style `required` blocks in Rust and Go, including `scoped required` parsing compatibility and validation that required blocks only contain whitespace or comments.
+
 ## 2.19.0
 
 * Fixed strict undefined behavior for comparison operators (such as `==`), string concatenation (`~`), and undefined needles in the `in` operator to better match Jinja2.  #886 #888

@@ -1066,6 +1066,15 @@ impl<'a> Parser<'a> {
         }
         let old_in_loop = std::mem::replace(&mut self.in_loop, false);
         let (name, _) = expect_token!(self, Token::Ident(name) => name, "identifier");
+        if matches_token!(self, Token::Ident("scoped")) {
+            ok!(self.stream.next());
+        }
+        let required = if matches_token!(self, Token::Ident("required")) {
+            ok!(self.stream.next());
+            true
+        } else {
+            false
+        };
         if !self.blocks.insert(name) {
             syntax_error!("block '{}' defined twice", name);
         }
@@ -1073,6 +1082,15 @@ impl<'a> Parser<'a> {
         expect_token!(self, Token::BlockEnd, "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endblock"))));
         ok!(self.stream.next());
+
+        if required
+            && !body.iter().all(|stmt| match stmt {
+                ast::Stmt::EmitRaw(raw) => raw.raw.trim().is_empty(),
+                _ => false,
+            })
+        {
+            syntax_error!("Required blocks can only contain comments or whitespace");
+        }
 
         if let Some((Token::Ident(trailing_name), _)) = ok!(self.stream.current()) {
             if *trailing_name != name {
@@ -1086,7 +1104,11 @@ impl<'a> Parser<'a> {
         }
         self.in_loop = old_in_loop;
 
-        Ok(ast::Block { name, body })
+        Ok(ast::Block {
+            name,
+            required,
+            body,
+        })
     }
     fn parse_auto_escape(&mut self) -> Result<ast::AutoEscape<'a>, Error> {
         let enabled = ok!(self.parse_expr());

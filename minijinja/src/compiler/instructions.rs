@@ -265,6 +265,7 @@ pub struct Instructions<'source> {
     span_infos: Vec<SpanInfo>,
     name: &'source str,
     source: &'source str,
+    required_block: bool,
 }
 
 pub(crate) static EMPTY_INSTRUCTIONS: Instructions<'static> = Instructions {
@@ -274,6 +275,7 @@ pub(crate) static EMPTY_INSTRUCTIONS: Instructions<'static> = Instructions {
     span_infos: Vec::new(),
     name: "<unknown>",
     source: "",
+    required_block: false,
 };
 
 impl<'source> Instructions<'source> {
@@ -286,6 +288,7 @@ impl<'source> Instructions<'source> {
             span_infos: Vec::with_capacity(128),
             name,
             source,
+            required_block: false,
         }
     }
 
@@ -315,6 +318,14 @@ impl<'source> Instructions<'source> {
         let rv = self.instructions.len();
         self.instructions.push(instr);
         rv as u32
+    }
+
+    pub(crate) fn mark_required_block(&mut self, required: bool) {
+        self.required_block = required;
+    }
+
+    pub(crate) fn is_required_block(&self) -> bool {
+        self.required_block
     }
 
     fn add_line_record(&mut self, instr: u32, line: u16) {

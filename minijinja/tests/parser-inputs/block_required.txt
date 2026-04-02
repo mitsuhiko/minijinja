@@ -1,0 +1,4 @@
+{% block body required %}
+  {# comment #}
+{% endblock %}
+{% block sidebar scoped required %}{% endblock %}

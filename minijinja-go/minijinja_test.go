@@ -868,6 +868,97 @@ func TestTemplateExtendsWithVariable(t *testing.T) {
 	}
 }
 
+func TestRequiredBlockErrorsWithoutOverride(t *testing.T) {
+	env := NewEnvironment()
+	if err := env.AddTemplate("page.txt", `before[{% block body required %}{% endblock %}]after`); err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+	if err := env.AddTemplate("issue.txt", `{% extends "page.txt" %}`); err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+
+	for _, name := range []string{"page.txt", "issue.txt"} {
+		tmpl, err := env.GetTemplate(name)
+		if err != nil {
+			t.Fatalf("get template error: %v", err)
+		}
+		_, err = tmpl.Render(nil)
+		if err == nil || !strings.Contains(err.Error(), "Required block 'body' not found") {
+			t.Fatalf("expected required block error for %s, got %v", name, err)
+		}
+	}
+}
+
+func TestRequiredBlockCanBeOverriddenAcrossInheritance(t *testing.T) {
+	env := NewEnvironment()
+	if err := env.AddTemplate("page.txt", `before[{% block body required %}{% endblock %}]after`); err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+	if err := env.AddTemplate("issue.txt", `{% extends "page.txt" %}`); err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+	if err := env.AddTemplate("bug_report.txt", `{% extends "issue.txt" %}{% block body %}Provide steps to demonstrate the bug.{% endblock %}`); err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+
+	tmpl, err := env.GetTemplate("bug_report.txt")
+	if err != nil {
+		t.Fatalf("get template error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "before[Provide steps to demonstrate the bug.]after" {
+		t.Fatalf("unexpected render result: %q", result)
+	}
+}
+
+func TestIntermediateRequiredBlockCountsAsOverride(t *testing.T) {
+	env := NewEnvironment()
+	if err := env.AddTemplate("page.txt", `before[{% block body required %}{% endblock %}]after`); err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+	if err := env.AddTemplate("issue.txt", `{% extends "page.txt" %}{% block body required %} {% endblock %}`); err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+	if err := env.AddTemplate("bug_report.txt", `{% extends "issue.txt" %}`); err != nil {
+		t.Fatalf("add template error: %v", err)
+	}
+
+	for _, name := range []string{"issue.txt", "bug_report.txt"} {
+		tmpl, err := env.GetTemplate(name)
+		if err != nil {
+			t.Fatalf("get template error: %v", err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Fatalf("render error for %s: %v", name, err)
+		}
+		if result != "before[ ]after" {
+			t.Fatalf("unexpected render result for %s: %q", name, result)
+		}
+	}
+}
+
+func TestRequiredBlockValidation(t *testing.T) {
+	env := NewEnvironment()
+
+	if _, err := env.TemplateFromString(`{% block body required %}x{% endblock %}`); err == nil || !strings.Contains(err.Error(), "Required blocks can only contain comments or whitespace") {
+		t.Fatalf("expected required block validation error, got %v", err)
+	}
+
+	if _, err := env.TemplateFromString(`{% block body scoped required %}{% endblock %}`); err != nil {
+		t.Fatalf("expected scoped required to parse, got %v", err)
+	}
+
+	if _, err := env.TemplateFromString(`{% block body required scoped %}{% endblock %}`); err == nil {
+		t.Fatalf("expected bad modifier order to fail")
+	}
+}
+
 // --- Import Tests ---
 
 func TestImport(t *testing.T) {

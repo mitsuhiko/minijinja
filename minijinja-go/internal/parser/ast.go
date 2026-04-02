@@ -152,9 +152,10 @@ func (f *FilterBlock) Span() Span { return f.span }
 
 // Block represents a template block for inheritance.
 type Block struct {
-	Name string
-	Body []Stmt
-	span Span
+	Name     string
+	Required bool
+	Body     []Stmt
+	span     Span
 }
 
 func (b *Block) node()      {}
@@ -721,6 +722,8 @@ func DebugString(n Node, indent int) string {
 		sb.WriteString("Block {\n")
 		sb.WriteString(ind1)
 		sb.WriteString(fmt.Sprintf("name: %q,\n", v.Name))
+		sb.WriteString(ind1)
+		sb.WriteString(fmt.Sprintf("required: %v,\n", v.Required))
 		sb.WriteString(ind1)
 		sb.WriteString("body: ")
 		sb.WriteString(debugStmtList(v.Body, indent+1))

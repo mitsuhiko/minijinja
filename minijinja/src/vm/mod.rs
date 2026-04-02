@@ -718,7 +718,7 @@ impl<'env> Vm<'env> {
                 #[cfg(feature = "multi_template")]
                 Instruction::CallBlock(name) => {
                     if parent_instructions.is_none() && !out.is_discarding() {
-                        self.call_block(name, state, out)?;
+                        ctx_ok!(self.call_block(name, state, out));
                     }
                 }
                 #[cfg(feature = "macros")]
@@ -947,6 +947,12 @@ impl<'env> Vm<'env> {
         out: &mut Output,
     ) -> Result<Option<Value>, Error> {
         if let Some((name, block_stack)) = state.blocks.get_key_value(name) {
+            if block_stack.len() == 1 && block_stack.instructions().is_required_block() {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("Required block '{name}' not found"),
+                ));
+            }
             let old_block = state.current_block.replace(name);
             let old_instructions =
                 mem::replace(&mut state.instructions, block_stack.instructions());
