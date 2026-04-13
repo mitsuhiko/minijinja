@@ -468,6 +468,7 @@ impl<'template, 'env> BlockStack<'template, 'env> {
         self.instructions.get(self.depth).copied().unwrap()
     }
 
+    #[cfg(feature = "multi_template")]
     pub fn len(&self) -> usize {
         self.instructions.len()
     }

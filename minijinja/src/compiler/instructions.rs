@@ -265,6 +265,7 @@ pub struct Instructions<'source> {
     span_infos: Vec<SpanInfo>,
     name: &'source str,
     source: &'source str,
+    #[cfg(feature = "multi_template")]
     required_block: bool,
 }
 
@@ -275,6 +276,7 @@ pub(crate) static EMPTY_INSTRUCTIONS: Instructions<'static> = Instructions {
     span_infos: Vec::new(),
     name: "<unknown>",
     source: "",
+    #[cfg(feature = "multi_template")]
     required_block: false,
 };
 
@@ -288,6 +290,7 @@ impl<'source> Instructions<'source> {
             span_infos: Vec::with_capacity(128),
             name,
             source,
+            #[cfg(feature = "multi_template")]
             required_block: false,
         }
     }
@@ -320,10 +323,12 @@ impl<'source> Instructions<'source> {
         rv as u32
     }
 
+    #[cfg(feature = "multi_template")]
     pub(crate) fn mark_required_block(&mut self, required: bool) {
         self.required_block = required;
     }
 
+    #[cfg(feature = "multi_template")]
     pub(crate) fn is_required_block(&self) -> bool {
         self.required_block
     }
