@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+## 2.20.0
+
 * Added support for Jinja-style `required` blocks in Rust and Go, including `scoped required` parsing compatibility and validation that required blocks only contain whitespace or comments.
 * Added support for chained comparisons (for example `a < b < c`) in Rust and Go to match Jinja/Python semantics.
 * Fixed dotted integer lookup in the middle of attribute chains (for example `foo.0.bar`) for Jinja compatibility.  #900
