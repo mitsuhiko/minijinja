@@ -42,9 +42,16 @@ fn test_expression_owned() {
 }
 
 #[test]
-fn test_expression_bug() {
+fn test_trailing_garbage_rejected() {
     let env = Environment::new();
-    assert!(env.compile_expression("42.blahadsf()").is_err());
+    assert!(env.compile_expression("42 blahadsf").is_err());
+}
+
+#[test]
+fn test_int_method_call_compiles() {
+    let env = Environment::new();
+    let expr = env.compile_expression("42.blahadsf()").unwrap();
+    assert!(expr.eval(()).is_err());
 }
 
 #[test]

@@ -232,6 +232,45 @@ fn test_dotted_integer_lookup() {
 }
 
 #[test]
+fn test_dotted_integer_lookup_midchain() {
+    assert_eq!(
+        render!("{{ msgs.0.role }}", msgs => vec![context!(role => "user")]),
+        "user"
+    );
+    assert_eq!(
+        render!("{{ rows.10.name }}",
+                rows => (0..=10).map(|i| context!(name => format!("r{i}")))
+                                .collect::<Vec<_>>()),
+        "r10"
+    );
+    assert_eq!(
+        render!("{{ rows.1_000.name }}",
+                rows => vec![context!(name => "r1000"); 1001]),
+        "r1000"
+    );
+    assert_eq!(
+        render!("{{ data.0._meta }}", data => vec![context!(_meta => "x")]),
+        "x"
+    );
+
+    assert_eq!(render!("{{ 1.0 + 0 }}"), "1.0");
+    assert_eq!(render!("{{ 42. + 0 }}"), "42.0");
+    assert_eq!(render!("{{ 1.e5 }}"), "100000.0");
+    assert_eq!(render!("{{ 1.E5 }}"), "100000.0");
+    assert_eq!(render!("{{ 1.e+5 }}"), "100000.0");
+    assert_eq!(render!("{{ 1.E-3 }}"), "0.001");
+}
+
+#[test]
+#[cfg(feature = "unicode")]
+fn test_dotted_integer_lookup_midchain_unicode() {
+    assert_eq!(
+        render!("{{ data.0.α }}", data => vec![context!(α => "ok")]),
+        "ok"
+    );
+}
+
+#[test]
 fn test_items_and_dictsort_with_structs() {
     #[derive(Debug, Clone)]
     struct MyStruct;
