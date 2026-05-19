@@ -316,6 +316,42 @@ func (u *UnaryOp) node()      {}
 func (u *UnaryOp) expr()      {}
 func (u *UnaryOp) Span() Span { return u.span }
 
+// CompareOpKind represents the type of comparison operator.
+type CompareOpKind int
+
+const (
+	CompareOpEq CompareOpKind = iota
+	CompareOpNe
+	CompareOpLt
+	CompareOpLte
+	CompareOpGt
+	CompareOpGte
+	CompareOpIn
+	CompareOpNotIn
+)
+
+func (k CompareOpKind) String() string {
+	switch k {
+	case CompareOpEq:
+		return "Eq"
+	case CompareOpNe:
+		return "Ne"
+	case CompareOpLt:
+		return "Lt"
+	case CompareOpLte:
+		return "Lte"
+	case CompareOpGt:
+		return "Gt"
+	case CompareOpGte:
+		return "Gte"
+	case CompareOpIn:
+		return "In"
+	case CompareOpNotIn:
+		return "NotIn"
+	}
+	return "?"
+}
+
 // BinOpKind represents the type of binary operator.
 type BinOpKind int
 
@@ -390,6 +426,23 @@ type BinOp struct {
 func (b *BinOp) node()      {}
 func (b *BinOp) expr()      {}
 func (b *BinOp) Span() Span { return b.span }
+
+// CompareOp represents a comparison operand in a chained comparison.
+type CompareOp struct {
+	Op   CompareOpKind
+	Expr Expr
+}
+
+// Compare represents a chained comparison expression.
+type Compare struct {
+	Expr Expr
+	Ops  []CompareOp
+	span Span
+}
+
+func (c *Compare) node()      {}
+func (c *Compare) expr()      {}
+func (c *Compare) Span() Span { return c.span }
 
 // IfExpr represents a conditional expression (ternary).
 type IfExpr struct {
@@ -904,6 +957,37 @@ func DebugString(n Node, indent int) string {
 		sb.WriteString("right: ")
 		sb.WriteString(DebugString(v.Right, indent+1))
 		sb.WriteString(",\n")
+		sb.WriteString(ind)
+		sb.WriteString("}")
+		sb.WriteString(FormatSpan(v.span))
+		return sb.String()
+
+	case *Compare:
+		var sb strings.Builder
+		sb.WriteString("Compare {\n")
+		sb.WriteString(ind1)
+		sb.WriteString("expr: ")
+		sb.WriteString(DebugString(v.Expr, indent+1))
+		sb.WriteString(",\n")
+		sb.WriteString(ind1)
+		sb.WriteString("ops: [")
+		if len(v.Ops) > 0 {
+			sb.WriteString("\n")
+			for _, op := range v.Ops {
+				sb.WriteString(ind2)
+				sb.WriteString("CompareOp {\n")
+				sb.WriteString(strings.Repeat("    ", indent+3))
+				sb.WriteString(fmt.Sprintf("op: %s,\n", op.Op))
+				sb.WriteString(strings.Repeat("    ", indent+3))
+				sb.WriteString("expr: ")
+				sb.WriteString(DebugString(op.Expr, indent+3))
+				sb.WriteString(",\n")
+				sb.WriteString(ind2)
+				sb.WriteString("},\n")
+			}
+			sb.WriteString(ind1)
+		}
+		sb.WriteString("],\n")
 		sb.WriteString(ind)
 		sb.WriteString("}")
 		sb.WriteString(FormatSpan(v.span))

@@ -21,6 +21,21 @@ pub type LocalId = u8;
 /// The maximum number of filters/tests that can be cached.
 pub const MAX_LOCALS: usize = 50;
 
+/// A comparison operation.
+#[derive(Copy, Clone)]
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
+pub enum CompareOp {
+    Eq,
+    Ne,
+    Lt,
+    Lte,
+    Gt,
+    Gte,
+    In,
+    NotIn,
+}
+
 /// Represents an instruction for the VM.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 #[cfg_attr(
@@ -126,6 +141,9 @@ pub enum Instruction<'source> {
 
     /// Performs a containment check
     In,
+
+    /// Performs a comparison and preserves the right operand for chained comparisons.
+    CompareAndPreserve(CompareOp),
 
     /// Apply a filter.
     ApplyFilter(&'source str, Option<u16>, LocalId),

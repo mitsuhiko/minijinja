@@ -111,6 +111,11 @@ func collectReferencedNamesExpr(expr parser.Expr, referenced map[string]struct{}
 	case *parser.BinOp:
 		collectReferencedNamesExpr(e.Left, referenced)
 		collectReferencedNamesExpr(e.Right, referenced)
+	case *parser.Compare:
+		collectReferencedNamesExpr(e.Expr, referenced)
+		for _, op := range e.Ops {
+			collectReferencedNamesExpr(op.Expr, referenced)
+		}
 	case *parser.IfExpr:
 		collectReferencedNamesExpr(e.TestExpr, referenced)
 		collectReferencedNamesExpr(e.TrueExpr, referenced)

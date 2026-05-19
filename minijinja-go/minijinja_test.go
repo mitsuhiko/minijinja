@@ -70,6 +70,66 @@ func TestDottedIntegerLookup(t *testing.T) {
 	}
 }
 
+func TestChainedComparisons(t *testing.T) {
+	tests := []struct {
+		template string
+		ctx      map[string]any
+		expect   string
+	}{
+		{`{{ x not in y != z }}`, map[string]any{"x": "foo", "y": "bar", "z": "foo"}, "true"},
+		{`{{ x not in y != y }}`, map[string]any{"x": "foo", "y": "bar"}, "false"},
+		{`{{ lhs != rhs != lhs }}`, map[string]any{"lhs": 1, "rhs": 2}, "true"},
+		{`{{ needle in haystack in seq }}`, map[string]any{"needle": "o", "haystack": "foo", "seq": []string{"foo"}}, "true"},
+		{`{{ needle in haystack == true }}`, map[string]any{"needle": "f", "haystack": "foo"}, "false"},
+	}
+
+	for _, test := range tests {
+		env := NewEnvironment()
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(test.ctx)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expect {
+			t.Errorf("expected %q for %q, got %q", test.expect, test.template, result)
+		}
+	}
+
+	env := NewEnvironment()
+	counter := 0
+	env.AddFunction("inc", func(state *State, args []Value, kwargs map[string]Value) (Value, error) {
+		counter++
+		return value.FromInt(int64(counter)), nil
+	})
+
+	tmpl, err := env.TemplateFromString(`{{ 0 < inc() < 2 }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if result != "true" || counter != 1 {
+		t.Errorf("expected true and one inc() call, got result=%q counter=%d", result, counter)
+	}
+
+	tmpl, err = env.TemplateFromString(`{{ 2 < inc() < fail() }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	result, err = tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if result != "false" || counter != 2 {
+		t.Errorf("expected false and one additional inc() call, got result=%q counter=%d", result, counter)
+	}
+}
+
 func TestForLoop(t *testing.T) {
 	env := NewEnvironment()
 	tmpl, err := env.TemplateFromString("{% for item in items %}{{ item }}{% endfor %}")

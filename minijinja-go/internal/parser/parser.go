@@ -355,9 +355,10 @@ func (p *Parser) parseCompare() (Expr, *Error) {
 		return nil, err
 	}
 
+	ops := []CompareOp{}
 	for {
-		var op BinOpKind
-		negated := false
+		var op CompareOpKind
+		isNotIn := false
 
 		tok := p.current()
 		if tok == nil {
@@ -366,35 +367,35 @@ func (p *Parser) parseCompare() (Expr, *Error) {
 
 		switch tok.Type {
 		case lexer.TokenEq:
-			op = BinOpEq
+			op = CompareOpEq
 		case lexer.TokenNe:
-			op = BinOpNe
+			op = CompareOpNe
 		case lexer.TokenLt:
-			op = BinOpLt
+			op = CompareOpLt
 		case lexer.TokenLe:
-			op = BinOpLte
+			op = CompareOpLte
 		case lexer.TokenGt:
-			op = BinOpGt
+			op = CompareOpGt
 		case lexer.TokenGe:
-			op = BinOpGte
+			op = CompareOpGte
 		case lexer.TokenIdent:
 			if tok.Value == "in" {
-				op = BinOpIn
+				op = CompareOpIn
 			} else if tok.Value == "not" {
 				p.advance()
 				if err := p.expectKeyword("in", "in"); err != nil {
 					return nil, err
 				}
-				op = BinOpIn
-				negated = true
+				op = CompareOpNotIn
+				isNotIn = true
 			} else {
-				return expr, nil
+				return buildCompareExpr(expr, ops, p.expandSpan(span)), nil
 			}
 		default:
-			return expr, nil
+			return buildCompareExpr(expr, ops, p.expandSpan(span)), nil
 		}
 
-		if !negated {
+		if !isNotIn {
 			p.advance()
 		}
 
@@ -402,13 +403,49 @@ func (p *Parser) parseCompare() (Expr, *Error) {
 		if err != nil {
 			return nil, err
 		}
-		expr = &BinOp{Op: op, Left: expr, Right: right, span: p.expandSpan(span)}
-		if negated {
-			expr = &UnaryOp{Op: UnaryNot, Expr: expr, span: p.expandSpan(span)}
-		}
-		span = p.lastSpan
+		ops = append(ops, CompareOp{Op: op, Expr: right})
 	}
-	return expr, nil
+	return buildCompareExpr(expr, ops, p.expandSpan(span)), nil
+}
+
+func buildCompareExpr(expr Expr, ops []CompareOp, span Span) Expr {
+	switch len(ops) {
+	case 0:
+		return expr
+	case 1:
+		op := ops[0]
+		binOp, negated := compareOpToBinOp(op.Op)
+		expr = &BinOp{Op: binOp, Left: expr, Right: op.Expr, span: span}
+		if negated {
+			return &UnaryOp{Op: UnaryNot, Expr: expr, span: span}
+		}
+		return expr
+	default:
+		return &Compare{Expr: expr, Ops: ops, span: span}
+	}
+}
+
+func compareOpToBinOp(op CompareOpKind) (BinOpKind, bool) {
+	switch op {
+	case CompareOpEq:
+		return BinOpEq, false
+	case CompareOpNe:
+		return BinOpNe, false
+	case CompareOpLt:
+		return BinOpLt, false
+	case CompareOpLte:
+		return BinOpLte, false
+	case CompareOpGt:
+		return BinOpGt, false
+	case CompareOpGte:
+		return BinOpGte, false
+	case CompareOpIn:
+		return BinOpIn, false
+	case CompareOpNotIn:
+		return BinOpIn, true
+	default:
+		return BinOpEq, false
+	}
 }
 
 func (p *Parser) parseMath1() (Expr, *Error) {

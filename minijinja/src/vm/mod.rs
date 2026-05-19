@@ -6,7 +6,7 @@ use std::mem;
 use std::sync::Arc;
 
 use crate::compiler::instructions::{
-    Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR, MAX_LOCALS,
+    CompareOp, Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR, MAX_LOCALS,
 };
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
@@ -478,6 +478,54 @@ impl<'env> Vm<'env> {
                     ctx_ok!(state.undefined_behavior().assert_iterable(&a));
                     ctx_ok!(state.undefined_behavior().assert_value_not_undefined(&b));
                     stack.push(ctx_ok!(ops::contains(&a, &b)));
+                }
+                Instruction::CompareAndPreserve(op) => {
+                    b = stack.pop();
+                    a = stack.pop();
+                    let result = match op {
+                        CompareOp::Eq => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a == b
+                        }
+                        CompareOp::Ne => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a != b
+                        }
+                        CompareOp::Lt => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a < b
+                        }
+                        CompareOp::Lte => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a <= b
+                        }
+                        CompareOp::Gt => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a > b
+                        }
+                        CompareOp::Gte => {
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                            a >= b
+                        }
+                        CompareOp::In | CompareOp::NotIn => {
+                            ctx_ok!(undefined_behavior.assert_iterable(&b));
+                            ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
+                            let contains = ctx_ok!(ops::contains(&b, &a)).is_true();
+                            if matches!(op, CompareOp::NotIn) {
+                                !contains
+                            } else {
+                                contains
+                            }
+                        }
+                    };
+                    stack.push(b);
+                    stack.push(Value::from(result));
                 }
                 Instruction::Neg => {
                     a = stack.pop();

@@ -232,6 +232,47 @@ fn test_dotted_integer_lookup() {
 }
 
 #[test]
+fn test_chained_comparisons() {
+    assert_eq!(
+        render!("{{ x not in y != z }}", x => "foo", y => "bar", z => "foo"),
+        "true"
+    );
+    assert_eq!(
+        render!("{{ x not in y != y }}", x => "foo", y => "bar"),
+        "false"
+    );
+    assert_eq!(
+        render!("{{ lhs != rhs != lhs }}", lhs => 1, rhs => 2),
+        "true"
+    );
+    assert_eq!(
+        render!("{{ needle in haystack in seq }}", needle => "o", haystack => "foo", seq => vec!["foo"]),
+        "true"
+    );
+    assert_eq!(
+        render!("{{ needle in haystack == true }}", needle => "f", haystack => "foo"),
+        "false"
+    );
+
+    fn inc(state: &State) -> Value {
+        let old = state
+            .get_temp("chained_comparison_counter")
+            .unwrap_or_else(|| Value::from(0i64));
+        let new = Value::from(i64::try_from(old).unwrap() + 1);
+        state.set_temp("chained_comparison_counter", new.clone());
+        new
+    }
+
+    let mut env = Environment::new();
+    env.add_function("inc", inc);
+    assert_eq!(env.render_str("{{ 0 < inc() < 2 }}", ()).unwrap(), "true");
+    assert_eq!(
+        env.render_str("{{ 2 < inc() < fail() }}", ()).unwrap(),
+        "false"
+    );
+}
+
+#[test]
 fn test_dotted_integer_lookup_midchain() {
     assert_eq!(
         render!("{{ msgs.0.role }}", msgs => vec![context!(role => "user")]),

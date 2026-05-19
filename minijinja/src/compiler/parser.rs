@@ -335,49 +335,73 @@ impl<'a> Parser<'a> {
     });
 
     fn parse_compare(&mut self) -> Result<ast::Expr<'a>, Error> {
-        let mut span = self.stream.last_span();
-        let mut expr = ok!(self.parse_math1());
+        let span = self.stream.last_span();
+        let expr = ok!(self.parse_math1());
+        let mut ops = Vec::new();
         loop {
-            let mut negated = false;
             let op = match ok!(self.stream.current()) {
-                Some((Token::Eq, _)) => ast::BinOpKind::Eq,
-                Some((Token::Ne, _)) => ast::BinOpKind::Ne,
-                Some((Token::Lt, _)) => ast::BinOpKind::Lt,
-                Some((Token::Lte, _)) => ast::BinOpKind::Lte,
-                Some((Token::Gt, _)) => ast::BinOpKind::Gt,
-                Some((Token::Gte, _)) => ast::BinOpKind::Gte,
-                Some((Token::Ident("in"), _)) => ast::BinOpKind::In,
+                Some((Token::Eq, _)) => ast::CompareOpKind::Eq,
+                Some((Token::Ne, _)) => ast::CompareOpKind::Ne,
+                Some((Token::Lt, _)) => ast::CompareOpKind::Lt,
+                Some((Token::Lte, _)) => ast::CompareOpKind::Lte,
+                Some((Token::Gt, _)) => ast::CompareOpKind::Gt,
+                Some((Token::Gte, _)) => ast::CompareOpKind::Gte,
+                Some((Token::Ident("in"), _)) => ast::CompareOpKind::In,
                 Some((Token::Ident("not"), _)) => {
                     ok!(self.stream.next());
                     expect_token!(self, Token::Ident("in"), "in");
-                    negated = true;
-                    ast::BinOpKind::In
+                    ast::CompareOpKind::NotIn
                 }
                 _ => break,
             };
-            if !negated {
+            if !matches!(op, ast::CompareOpKind::NotIn) {
                 ok!(self.stream.next());
             }
-            expr = ast::Expr::BinOp(Spanned::new(
-                ast::BinOp {
-                    op,
-                    left: expr,
-                    right: ok!(self.parse_math1()),
-                },
-                self.stream.expand_span(span),
-            ));
-            if negated {
-                expr = ast::Expr::UnaryOp(Spanned::new(
-                    ast::UnaryOp {
-                        op: ast::UnaryOpKind::Not,
-                        expr,
+            ops.push(ast::CompareOp {
+                op,
+                expr: ok!(self.parse_math1()),
+            });
+        }
+
+        Ok(match ops.len() {
+            0 => expr,
+            1 => {
+                let op = ops.pop().unwrap();
+                let (binop, negated) = match op.op {
+                    ast::CompareOpKind::Eq => (ast::BinOpKind::Eq, false),
+                    ast::CompareOpKind::Ne => (ast::BinOpKind::Ne, false),
+                    ast::CompareOpKind::Lt => (ast::BinOpKind::Lt, false),
+                    ast::CompareOpKind::Lte => (ast::BinOpKind::Lte, false),
+                    ast::CompareOpKind::Gt => (ast::BinOpKind::Gt, false),
+                    ast::CompareOpKind::Gte => (ast::BinOpKind::Gte, false),
+                    ast::CompareOpKind::In => (ast::BinOpKind::In, false),
+                    ast::CompareOpKind::NotIn => (ast::BinOpKind::In, true),
+                };
+                let expr = ast::Expr::BinOp(Spanned::new(
+                    ast::BinOp {
+                        op: binop,
+                        left: expr,
+                        right: op.expr,
                     },
                     self.stream.expand_span(span),
                 ));
+                if negated {
+                    ast::Expr::UnaryOp(Spanned::new(
+                        ast::UnaryOp {
+                            op: ast::UnaryOpKind::Not,
+                            expr,
+                        },
+                        self.stream.expand_span(span),
+                    ))
+                } else {
+                    expr
+                }
             }
-            span = self.stream.last_span();
-        }
-        Ok(expr)
+            _ => ast::Expr::Compare(Spanned::new(
+                ast::Compare { expr, ops },
+                self.stream.expand_span(span),
+            )),
+        })
     }
 
     binop!(parse_math1, parse_concat, {

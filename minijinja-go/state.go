@@ -664,6 +664,15 @@ func exprUsesCaller(expr parser.Expr) bool {
 		return exprUsesCaller(e.Expr)
 	case *parser.BinOp:
 		return exprUsesCaller(e.Left) || exprUsesCaller(e.Right)
+	case *parser.Compare:
+		if exprUsesCaller(e.Expr) {
+			return true
+		}
+		for _, op := range e.Ops {
+			if exprUsesCaller(op.Expr) {
+				return true
+			}
+		}
 	case *parser.IfExpr:
 		return exprUsesCaller(e.TestExpr) || exprUsesCaller(e.TrueExpr) || exprUsesCaller(e.FalseExpr)
 	case *parser.Filter:
@@ -2399,6 +2408,9 @@ func (s *State) evalExpr(expr parser.Expr) (rv value.Value, err error) {
 	case *parser.BinOp:
 		return s.evalBinOp(e)
 
+	case *parser.Compare:
+		return s.evalCompare(e)
+
 	case *parser.IfExpr:
 		return s.evalIfExpr(e)
 
@@ -2609,6 +2621,66 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 	default:
 		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("unknown binary operator: %v", op.Op)).WithSpan(op.Span())
 	}
+}
+
+func (s *State) evalCompare(c *parser.Compare) (value.Value, error) {
+	left, err := s.evalExpr(c.Expr)
+	if err != nil {
+		return value.Undefined(), err
+	}
+
+	for _, op := range c.Ops {
+		right, err := s.evalExpr(op.Expr)
+		if err != nil {
+			return value.Undefined(), err
+		}
+		result, err := s.evalCompareOp(op.Op, left, right, c.Span())
+		if err != nil {
+			return value.Undefined(), err
+		}
+		if !result {
+			return value.FromBool(false), nil
+		}
+		left = right
+	}
+	return value.FromBool(true), nil
+}
+
+func (s *State) evalCompareOp(op parser.CompareOpKind, left, right value.Value, span parser.Span) (bool, error) {
+	switch op {
+	case parser.CompareOpEq:
+		return left.Equal(right), nil
+	case parser.CompareOpNe:
+		return !left.Equal(right), nil
+	case parser.CompareOpLt:
+		if cmp, ok := left.Compare(right); ok {
+			return cmp < 0, nil
+		}
+	case parser.CompareOpLte:
+		if cmp, ok := left.Compare(right); ok {
+			return cmp <= 0, nil
+		}
+	case parser.CompareOpGt:
+		if cmp, ok := left.Compare(right); ok {
+			return cmp > 0, nil
+		}
+	case parser.CompareOpGte:
+		if cmp, ok := left.Compare(right); ok {
+			return cmp >= 0, nil
+		}
+	case parser.CompareOpIn, parser.CompareOpNotIn:
+		if err := s.assertIterable(right); err != nil {
+			return false, wrapEvalError(err, span)
+		}
+		contains := right.Contains(left)
+		if op == parser.CompareOpNotIn {
+			return !contains, nil
+		}
+		return contains, nil
+	default:
+		return false, NewError(ErrInvalidOperation, fmt.Sprintf("unknown comparison operator: %v", op)).WithSpan(span)
+	}
+	return false, NewError(ErrInvalidOperation, fmt.Sprintf("cannot compare %s and %s", left.Kind(), right.Kind())).WithSpan(span)
 }
 
 func (s *State) evalIfExpr(ie *parser.IfExpr) (value.Value, error) {
