@@ -1,5 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use minijinja::machinery::parse;
+use minijinja::value::Value;
 use minijinja::{context, Environment, State};
 
 fn do_parse() {
@@ -37,6 +38,20 @@ fn do_render(env: &Environment) {
     .unwrap();
 }
 
+fn bench_loop_map_items(c: &mut Criterion) {
+    let env = create_real_env();
+    let tmpl = env.get_template("map_items.jinja").unwrap();
+    let ctx = context! {
+        employees => (0..10000).map(|i| (i, format!("Person{i}"))).collect::<Value>(),
+    };
+    c.bench_function("loop_map_items", |b| {
+        b.iter(|| {
+            tmpl.render_captured_to(ctx.clone(), std::io::sink())
+                .unwrap()
+        });
+    });
+}
+
 fn create_real_env() -> Environment<'static> {
     let mut env = Environment::new();
     env.add_template("footer.html", include_str!("../inputs/footer.html"))
@@ -46,6 +61,8 @@ fn create_real_env() -> Environment<'static> {
         include_str!("../inputs/all_elements.html"),
     )
     .unwrap();
+    env.add_template("map_items.jinja", include_str!("../inputs/map_items.jinja"))
+        .unwrap();
     env.add_filter("asset_url", |_: &State, value: String| Ok(value));
     env.add_function("current_year", |_: &State| Ok(2022));
     env
@@ -58,6 +75,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let env = create_real_env();
         b.iter(|| do_render(&env));
     });
+    bench_loop_map_items(c);
 }
 
 criterion_group!(benches, criterion_benchmark);
