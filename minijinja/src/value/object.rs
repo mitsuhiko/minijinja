@@ -346,7 +346,7 @@ macro_rules! impl_object_helpers {
                     if let ObjectRepr::Map = self.repr() {
                         Some(Box::new(iter.map(|(key, _)| key)))
                     } else {
-                        Some(Box::new(iter.map(|(key, val)| vec![key, val].into())))
+                        Some(Box::new(iter.map(|(key, val)| [key, val].into())))
                     }
                 }
                 Enumerator::RevIter(iter) => Some(Box::new(iter)),
@@ -354,7 +354,7 @@ macro_rules! impl_object_helpers {
                     if let ObjectRepr::Map = self.repr() {
                         Some(Box::new(iter.map(|(key, _)| key)))
                     } else {
-                        Some(Box::new(iter.map(|(key, val)| vec![key, val].into())))
+                        Some(Box::new(iter.map(|(key, val)| [key, val].into())))
                     }
                 }
                 Enumerator::Str(s) => Some(Box::new(s.iter().copied().map(Value::from))),
@@ -1173,4 +1173,31 @@ mod preserve_order_impls {
     use indexmap::IndexMap;
 
     impl_value_map!(IndexMap, mapped_rev_key_value_enumerator);
+}
+
+impl<T, const N: usize> Object for [T; N]
+where
+    T: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+{
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Seq
+    }
+
+    #[inline(always)]
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        self.get(some!(key.as_usize())).cloned().map(|v| v.into())
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Seq(N)
+    }
+}
+
+impl<T, const N : usize> From<[T; N]> for Value
+where
+    T: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+{
+    fn from(value: [T; N]) -> Self {
+        Value::from_object(value)
+    }
 }
