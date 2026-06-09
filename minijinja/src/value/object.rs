@@ -1193,7 +1193,7 @@ where
     }
 }
 
-impl<T, const N : usize> From<[T; N]> for Value
+impl<T, const N: usize> From<[T; N]> for Value
 where
     T: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
 {

@@ -1443,7 +1443,7 @@ impl Value {
                     let mut v = if let ObjectRepr::Map = o.repr() {
                         iter.map(|(k, _)| k).collect::<Vec<_>>()
                     } else {
-                        iter.map(|(k, v)| vec![k, v].into()).collect::<Vec<_>>()
+                        iter.map(|(k, v)| [k, v].into()).collect::<Vec<_>>()
                     };
                     v.reverse();
                     Some(Value::make_object_iterable(v, move |v| {
@@ -1476,7 +1476,7 @@ impl Value {
                                 Box::new(iter.map(|(k, _)| k))
                                     as Box<dyn Iterator<Item = Value> + Send + Sync>
                             } else {
-                                Box::new(iter.map(|(k, v)| vec![k, v].into()))
+                                Box::new(iter.map(|(k, v)| [k, v].into()))
                                     as Box<dyn Iterator<Item = Value> + Send + Sync>
                             }
                         } else {
