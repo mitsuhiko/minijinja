@@ -275,6 +275,21 @@ pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     if matches!(lhs.kind(), ValueKind::Seq | ValueKind::Iterable)
         && matches!(rhs.kind(), ValueKind::Seq | ValueKind::Iterable)
     {
+        // When both operands have a known length, eagerly materialize the
+        // concatenation into a flat sequence (matching CPython/Jinja2 `list +
+        // list` semantics).  This keeps the result a shallow `Seq` so a chain
+        // of `seq = seq + [x]` does not accumulate nested lazy iterables that
+        // recurse one native stack frame per concatenation when later
+        // enumerated (for example via `Value::len()`), which overflows the
+        // stack for long chains.
+        if let (Some(a), Some(b)) = (lhs.len(), rhs.len()) {
+            let mut rv = Vec::with_capacity(a.saturating_add(b));
+            rv.extend(ok!(lhs.try_iter()));
+            rv.extend(ok!(rhs.try_iter()));
+            return Ok(Value::from(rv));
+        }
+        // Fall back to lazy chaining for unsized iterables to preserve their
+        // laziness (and avoid materializing potentially unbounded streams).
         let lhs = lhs.clone();
         let rhs = rhs.clone();
         return Ok(Value::make_iterable(move || {
@@ -503,6 +518,53 @@ mod tests {
             err.to_string(),
             "invalid operation: unable to calculate 170141183460469231731687303715884105727 + 1"
         );
+    }
+
+    #[test]
+    fn test_repeated_seq_add_does_not_overflow_stack() {
+        // Regression test for repeated sequence concatenation, for example a
+        // chat-template accumulator `messages = messages + [m]` applied for
+        // many turns.  Each `+` must not build an unbounded chain of lazy
+        // iterables, otherwise enumerating the result (for example via
+        // `{{ messages | length }}` -> `Value::len()`) recurses one native
+        // frame per concatenation and overflows the stack.  Run on a small
+        // (1 MiB) stack so the regression aborts deterministically rather than
+        // depending on the platform default stack size.
+        let handle = std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let n = 5000;
+                let mut acc = Value::from(Vec::<Value>::new());
+                for i in 0..n {
+                    acc = add(&acc, &Value::from(vec![Value::from(i)])).unwrap();
+                }
+                // The crash path: `|length` -> `Value::len()`.
+                assert_eq!(acc.len(), Some(n));
+                // Iteration must also work and stay correct.
+                assert_eq!(acc.try_iter().unwrap().count(), n);
+            })
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_unsized_iterable_add_stays_lazy() {
+        // An unsized iterable (no exact size hint) must NOT be eagerly
+        // materialized; the lazy-chaining fallback must still apply so adding
+        // to a potentially-unbounded stream stays lazy.
+        let unsized_iter = Value::make_iterable(|| (0i64..).take_while(|&x| x < 3));
+        assert_eq!(unsized_iter.len(), None, "precondition: operand is unsized");
+        let res = add(&unsized_iter, &Value::from(vec![Value::from(99)])).unwrap();
+        // Result is still a lazy iterable with unknown length...
+        assert_eq!(res.kind(), ValueKind::Iterable);
+        assert_eq!(res.len(), None);
+        // ...but iterates to the correct concatenated contents.
+        let got: Vec<i64> = res
+            .try_iter()
+            .unwrap()
+            .map(|v| i64::try_from(v).unwrap())
+            .collect();
+        assert_eq!(got, vec![0, 1, 2, 99]);
     }
 
     #[test]
