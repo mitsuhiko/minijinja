@@ -521,6 +521,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        target_os = "wasi",
+        ignore = "std::thread::Builder::spawn is unsupported on WASI"
+    )]
     fn test_repeated_seq_add_does_not_overflow_stack() {
         // Regression test for repeated sequence concatenation, for example a
         // chat-template accumulator `messages = messages + [m]` applied for
