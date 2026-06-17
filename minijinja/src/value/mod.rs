@@ -624,6 +624,85 @@ fn f64_total_cmp(left: f64, right: f64) -> Ordering {
     left.cmp(&right)
 }
 
+fn cmp_f64(left: f64, right: f64) -> Ordering {
+    if left == right {
+        Ordering::Equal
+    } else {
+        f64_total_cmp(left, right)
+    }
+}
+
+#[derive(Copy, Clone)]
+enum Number {
+    I128(i128),
+    U128(u128),
+    F64(f64),
+}
+
+fn number(value: &Value) -> Option<Number> {
+    Some(match &value.0 {
+        ValueRepr::U64(x) => Number::U128(*x as u128),
+        ValueRepr::U128(x) => Number::U128(x.0),
+        ValueRepr::I64(x) => Number::I128(*x as i128),
+        ValueRepr::I128(x) => Number::I128(x.0),
+        ValueRepr::F64(x) => Number::F64(*x),
+        _ => return None,
+    })
+}
+
+fn cmp_i128_u128(left: i128, right: u128) -> Ordering {
+    if left < 0 {
+        Ordering::Less
+    } else {
+        (left as u128).cmp(&right)
+    }
+}
+
+fn cmp_f64_i128(left: f64, right: i128) -> Ordering {
+    match cmp_f64(left, right as f64) {
+        Ordering::Equal if left.is_finite() => {
+            if left >= i128::MAX as f64 {
+                Ordering::Greater
+            } else {
+                let trunc = left.trunc();
+                (trunc as i128)
+                    .cmp(&right)
+                    .then_with(|| left.partial_cmp(&trunc).unwrap())
+            }
+        }
+        rv => rv,
+    }
+}
+
+fn cmp_f64_u128(left: f64, right: u128) -> Ordering {
+    match cmp_f64(left, right as f64) {
+        Ordering::Equal if left.is_finite() => {
+            if left < 0.0 {
+                Ordering::Less
+            } else if left >= u128::MAX as f64 {
+                Ordering::Greater
+            } else {
+                (left as u128).cmp(&right)
+            }
+        }
+        rv => rv,
+    }
+}
+
+fn cmp_numbers(left: &Value, right: &Value) -> Ordering {
+    match (number(left).unwrap(), number(right).unwrap()) {
+        (Number::F64(a), Number::F64(b)) => cmp_f64(a, b),
+        (Number::F64(a), Number::I128(b)) => cmp_f64_i128(a, b),
+        (Number::I128(a), Number::F64(b)) => cmp_f64_i128(b, a).reverse(),
+        (Number::F64(a), Number::U128(b)) => cmp_f64_u128(a, b),
+        (Number::U128(a), Number::F64(b)) => cmp_f64_u128(b, a).reverse(),
+        (Number::I128(a), Number::I128(b)) => a.cmp(&b),
+        (Number::U128(a), Number::U128(b)) => a.cmp(&b),
+        (Number::I128(a), Number::U128(b)) => cmp_i128_u128(a, b),
+        (Number::U128(a), Number::I128(b)) => cmp_i128_u128(b, a).reverse(),
+    }
+}
+
 impl Ord for Value {
     fn cmp(&self, other: &Self) -> Ordering {
         let kind_ordering = self.kind().cmp(&other.kind());
@@ -638,6 +717,7 @@ impl Ord for Value {
                 a.as_str().cmp(b.as_str())
             }
             (&ValueRepr::Bytes(ref a), &ValueRepr::Bytes(ref b)) => a.cmp(b),
+            _ if self.is_number() && other.is_number() => cmp_numbers(self, other),
             _ => match ops::coerce(self, other, false) {
                 Some(ops::CoerceResult::F64(a, b)) => f64_total_cmp(a, b),
                 Some(ops::CoerceResult::I128(a, b)) => a.cmp(&b),
@@ -1888,5 +1968,24 @@ mod tests {
     #[cfg(target_pointer_width = "64")]
     fn test_sizes() {
         assert_eq!(std::mem::size_of::<Value>(), 24);
+    }
+
+    #[test]
+    fn test_cmp_number_no_exact_coercion() {
+        let pow53 = 9007199254740992_i64;
+        let value = Value::from(pow53 + 1);
+
+        assert!(Value::from(1.0) < value);
+        assert!(value > Value::from(1.0));
+
+        let exact_float = Value::from(pow53 as f64);
+        let exact_int = Value::from(pow53);
+        assert_eq!(exact_float.cmp(&exact_int), Ordering::Equal);
+        assert_eq!(exact_float.cmp(&value), Ordering::Less);
+        assert_eq!(exact_int.cmp(&value), Ordering::Less);
+
+        let huge = Value::from(u128::MAX);
+        assert!(Value::from(0_u128) < huge);
+        assert!(Value::from(1_i64) < huge);
     }
 }
