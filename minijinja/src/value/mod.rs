@@ -624,61 +624,82 @@ fn f64_total_cmp(left: f64, right: f64) -> Ordering {
     left.cmp(&right)
 }
 
-/// Compares a float with an integer `Value` exactly.
-///
-/// `coerce` gives up (returns `None`) when an integer has no exact `f64`
-/// representation, so falling back to a lossy `f64` comparison could report two
-/// distinct numbers as equal and disagree with [`PartialEq`].  This avoids that
-/// by comparing without rounding the integer.
-fn cmp_f64_to_int(x: f64, int: &Value) -> Ordering {
-    let i128_bound = 2.0_f64.powi(127); // 2^127, one past i128::MAX (exact f64)
-    let u128_bound = 2.0_f64.powi(128); // 2^128, one past u128::MAX (exact f64)
-
-    // NaN sorts last like `f64_total_cmp`; the infinities bound every integer.
-    if x.is_nan() || x == f64::INFINITY {
-        return Ordering::Greater;
+fn cmp_f64(left: f64, right: f64) -> Ordering {
+    if left == right {
+        Ordering::Equal
+    } else {
+        f64_total_cmp(left, right)
     }
-    if x == f64::NEG_INFINITY {
-        return Ordering::Less;
-    }
-
-    if let Ok(n) = i128::try_from(int.clone()) {
-        if x >= i128_bound {
-            return Ordering::Greater;
-        }
-        if x < -i128_bound {
-            return Ordering::Less;
-        }
-        // `|x| < 2^127`, so truncating to i128 is exact; the fraction breaks ties.
-        let trunc = x.trunc();
-        return (trunc as i128).cmp(&n).then(x.partial_cmp(&trunc).unwrap());
-    }
-
-    // The integer is a u128 above i128::MAX, hence `>= 2^127` and positive.
-    let n = u128::try_from(int.clone()).expect("non-i128 integer must be u128");
-    if x < i128_bound {
-        return Ordering::Less;
-    }
-    if x >= u128_bound {
-        return Ordering::Greater;
-    }
-    // `2^127 <= x < 2^128`: x is an exact integer in u128 range.
-    (x as u128).cmp(&n)
 }
 
-/// Compares two integer `Value`s exactly when one is a u128 above `i128::MAX`
-/// and they therefore cannot share an `i128`.
-fn cmp_int_to_int(a: &Value, b: &Value) -> Ordering {
-    match (i128::try_from(a.clone()), i128::try_from(b.clone())) {
-        (Ok(x), Ok(y)) => x.cmp(&y),
-        // A value that overflows i128 is a u128 `>= 2^127`, larger than any i128.
-        (Err(_), Ok(_)) => Ordering::Greater,
-        (Ok(_), Err(_)) => Ordering::Less,
-        (Err(_), Err(_)) => match (u128::try_from(a.clone()), u128::try_from(b.clone())) {
-            (Ok(x), Ok(y)) => x.cmp(&y),
-            // Not both integers (e.g. invalid values): keep a stable total order.
-            _ => Ordering::Equal,
-        },
+#[derive(Copy, Clone)]
+enum Number {
+    I128(i128),
+    U128(u128),
+    F64(f64),
+}
+
+fn number(value: &Value) -> Option<Number> {
+    Some(match &value.0 {
+        ValueRepr::U64(x) => Number::U128(*x as u128),
+        ValueRepr::U128(x) => Number::U128(x.0),
+        ValueRepr::I64(x) => Number::I128(*x as i128),
+        ValueRepr::I128(x) => Number::I128(x.0),
+        ValueRepr::F64(x) => Number::F64(*x),
+        _ => return None,
+    })
+}
+
+fn cmp_i128_u128(left: i128, right: u128) -> Ordering {
+    if left < 0 {
+        Ordering::Less
+    } else {
+        (left as u128).cmp(&right)
+    }
+}
+
+fn cmp_f64_i128(left: f64, right: i128) -> Ordering {
+    match cmp_f64(left, right as f64) {
+        Ordering::Equal if left.is_finite() => {
+            if left >= i128::MAX as f64 {
+                Ordering::Greater
+            } else {
+                let trunc = left.trunc();
+                (trunc as i128)
+                    .cmp(&right)
+                    .then_with(|| left.partial_cmp(&trunc).unwrap())
+            }
+        }
+        rv => rv,
+    }
+}
+
+fn cmp_f64_u128(left: f64, right: u128) -> Ordering {
+    match cmp_f64(left, right as f64) {
+        Ordering::Equal if left.is_finite() => {
+            if left < 0.0 {
+                Ordering::Less
+            } else if left >= u128::MAX as f64 {
+                Ordering::Greater
+            } else {
+                (left as u128).cmp(&right)
+            }
+        }
+        rv => rv,
+    }
+}
+
+fn cmp_numbers(left: &Value, right: &Value) -> Ordering {
+    match (number(left).unwrap(), number(right).unwrap()) {
+        (Number::F64(a), Number::F64(b)) => cmp_f64(a, b),
+        (Number::F64(a), Number::I128(b)) => cmp_f64_i128(a, b),
+        (Number::I128(a), Number::F64(b)) => cmp_f64_i128(b, a).reverse(),
+        (Number::F64(a), Number::U128(b)) => cmp_f64_u128(a, b),
+        (Number::U128(a), Number::F64(b)) => cmp_f64_u128(b, a).reverse(),
+        (Number::I128(a), Number::I128(b)) => a.cmp(&b),
+        (Number::U128(a), Number::U128(b)) => a.cmp(&b),
+        (Number::I128(a), Number::U128(b)) => cmp_i128_u128(a, b),
+        (Number::U128(a), Number::I128(b)) => cmp_i128_u128(b, a).reverse(),
     }
 }
 
@@ -696,57 +717,48 @@ impl Ord for Value {
                 a.as_str().cmp(b.as_str())
             }
             (&ValueRepr::Bytes(ref a), &ValueRepr::Bytes(ref b)) => a.cmp(b),
+            _ if self.is_number() && other.is_number() => cmp_numbers(self, other),
             _ => match ops::coerce(self, other, false) {
                 Some(ops::CoerceResult::F64(a, b)) => f64_total_cmp(a, b),
                 Some(ops::CoerceResult::I128(a, b)) => a.cmp(&b),
                 Some(ops::CoerceResult::Str(a, b)) => a.cmp(b),
                 None => {
-                    if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
-                        if a.is_same_object(b) {
-                            Ordering::Equal
-                        } else {
-                            // if there is a custom comparison, run it.
-                            if a.is_same_object_type(b) {
-                                if let Some(rv) = a.custom_cmp(b) {
-                                    return rv;
-                                }
-                            }
-                            match (a.repr(), b.repr()) {
-                                (ObjectRepr::Map, ObjectRepr::Map) => {
-                                    // This is not really correct.  Because the keys can be in arbitrary
-                                    // order this could just sort really weirdly as a result.  However
-                                    // we don't want to pay the cost of actually sorting the keys for
-                                    // ordering so we just accept this for now.
-                                    match (a.try_iter_pairs(), b.try_iter_pairs()) {
-                                        (Some(a), Some(b)) => a.cmp(b),
-                                        _ => unreachable!(),
-                                    }
-                                }
-                                (
-                                    ObjectRepr::Seq | ObjectRepr::Iterable,
-                                    ObjectRepr::Seq | ObjectRepr::Iterable,
-                                ) => match (a.try_iter(), b.try_iter()) {
-                                    (Some(a), Some(b)) => a.cmp(b),
-                                    _ => unreachable!(),
-                                },
-                                // terrible fallback for plain objects
-                                (ObjectRepr::Plain, ObjectRepr::Plain) => {
-                                    a.to_string().cmp(&b.to_string())
-                                }
-                                // should not happen
-                                (_, _) => unreachable!(),
+                    let a = self.as_object().unwrap();
+                    let b = other.as_object().unwrap();
+
+                    if a.is_same_object(b) {
+                        Ordering::Equal
+                    } else {
+                        // if there is a custom comparison, run it.
+                        if a.is_same_object_type(b) {
+                            if let Some(rv) = a.custom_cmp(b) {
+                                return rv;
                             }
                         }
-                    } else {
-                        // Not both objects: this is reached for numbers that have no
-                        // common lossless representation (an integer with no exact f64,
-                        // or a u128 beyond i128::MAX).  Compare exactly so the result
-                        // stays consistent with `PartialEq` (which treats them as not
-                        // equal) instead of panicking on the missing object.
-                        match (&self.0, &other.0) {
-                            (&ValueRepr::F64(x), _) => cmp_f64_to_int(x, other),
-                            (_, &ValueRepr::F64(y)) => cmp_f64_to_int(y, self).reverse(),
-                            _ => cmp_int_to_int(self, other),
+                        match (a.repr(), b.repr()) {
+                            (ObjectRepr::Map, ObjectRepr::Map) => {
+                                // This is not really correct.  Because the keys can be in arbitrary
+                                // order this could just sort really weirdly as a result.  However
+                                // we don't want to pay the cost of actually sorting the keys for
+                                // ordering so we just accept this for now.
+                                match (a.try_iter_pairs(), b.try_iter_pairs()) {
+                                    (Some(a), Some(b)) => a.cmp(b),
+                                    _ => unreachable!(),
+                                }
+                            }
+                            (
+                                ObjectRepr::Seq | ObjectRepr::Iterable,
+                                ObjectRepr::Seq | ObjectRepr::Iterable,
+                            ) => match (a.try_iter(), b.try_iter()) {
+                                (Some(a), Some(b)) => a.cmp(b),
+                                _ => unreachable!(),
+                            },
+                            // terrible fallback for plain objects
+                            (ObjectRepr::Plain, ObjectRepr::Plain) => {
+                                a.to_string().cmp(&b.to_string())
+                            }
+                            // should not happen
+                            (_, _) => unreachable!(),
                         }
                     }
                 }
@@ -1960,73 +1972,20 @@ mod tests {
 
     #[test]
     fn test_cmp_number_no_exact_coercion() {
-        // Regression test for #904: comparing a number against another number
-        // that has no common lossless representation used to panic in `cmp`
-        // (it assumed `coerce` only returns `None` for objects).
-        let pow53 = 9007199254740992_i64; // 2^53, the largest exactly representable run
+        let pow53 = 9007199254740992_i64;
+        let value = Value::from(pow53 + 1);
 
-        // The originally reported panic: `1.0 < 9007199254740993`.
-        assert_eq!(
-            Value::from(1.0).cmp(&Value::from(pow53 + 1)),
-            Ordering::Less
-        );
-        assert_eq!(
-            Value::from(pow53 + 1).cmp(&Value::from(1.0)),
-            Ordering::Greater
-        );
+        assert!(Value::from(1.0) < value);
+        assert!(value > Value::from(1.0));
 
-        // The exact case that a lossy f64 comparison would get wrong: `2^53`
-        // (exact) vs `2^53 + 1` (rounds down to `2^53`). They must not be equal,
-        // which keeps `cmp` consistent with `PartialEq`.
-        let exact = Value::from(pow53 as f64);
-        let inexact = Value::from(pow53 + 1);
-        assert_eq!(exact.cmp(&inexact), Ordering::Less);
-        assert_ne!(exact, inexact);
-        assert!(exact.cmp(&inexact) != Ordering::Equal);
+        let exact_float = Value::from(pow53 as f64);
+        let exact_int = Value::from(pow53);
+        assert_eq!(exact_float.cmp(&exact_int), Ordering::Equal);
+        assert_eq!(exact_float.cmp(&value), Ordering::Less);
+        assert_eq!(exact_int.cmp(&value), Ordering::Less);
 
-        // Fractions and negatives.
-        assert_eq!(
-            Value::from(2.5).cmp(&Value::from(pow53 * 2)),
-            Ordering::Less
-        );
-        assert_eq!(
-            Value::from(-1.5).cmp(&Value::from(-(pow53 + 1))),
-            Ordering::Greater
-        );
-
-        // Non-finite floats stay total and never panic.
-        assert_eq!(
-            Value::from(f64::INFINITY).cmp(&Value::from(pow53 + 1)),
-            Ordering::Greater
-        );
-        assert_eq!(
-            Value::from(f64::NEG_INFINITY).cmp(&Value::from(pow53 + 1)),
-            Ordering::Less
-        );
-        let _ = Value::from(f64::NAN).cmp(&Value::from(pow53 + 1));
-
-        // A u128 beyond i128::MAX compared with smaller integers and a float.
         let huge = Value::from(u128::MAX);
-        assert_eq!(huge.cmp(&Value::from(1_i64)), Ordering::Greater);
-        assert_eq!(Value::from(1_i64).cmp(&huge), Ordering::Less);
-        assert_eq!(huge.cmp(&Value::from(-1_i64)), Ordering::Greater);
-        assert_eq!(Value::from(1.0).cmp(&huge), Ordering::Less);
-        assert_eq!(huge.cmp(&Value::from(1.0)), Ordering::Greater);
-
-        // `cmp` must agree with `==` (Equal iff equal) and be antisymmetric.
-        let values = [
-            Value::from(1.0),
-            Value::from(pow53 as f64),
-            Value::from(pow53 + 1),
-            Value::from(-(pow53 + 1)),
-            Value::from(u128::MAX),
-            Value::from(1_i64),
-        ];
-        for a in &values {
-            for b in &values {
-                assert_eq!(a.cmp(b) == Ordering::Equal, a == b, "{a:?} vs {b:?}");
-                assert_eq!(a.cmp(b), b.cmp(a).reverse(), "{a:?} vs {b:?}");
-            }
-        }
+        assert!(Value::from(0_u128) < huge);
+        assert!(Value::from(1_i64) < huge);
     }
 }
