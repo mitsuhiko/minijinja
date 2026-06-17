@@ -1519,12 +1519,46 @@ impl Value {
                         Box::new(v.iter().cloned())
                     }))
                 }
+                Enumerator::KeyValueIter(iter) => {
+                    let mut v = if let ObjectRepr::Map = o.repr() {
+                        iter.map(|(k, _)| k).collect::<Vec<_>>()
+                    } else {
+                        iter.map(|(k, v)| [k, v].into()).collect::<Vec<_>>()
+                    };
+                    v.reverse();
+                    Some(Value::make_object_iterable(v, move |v| {
+                        Box::new(v.iter().cloned())
+                    }))
+                }
                 Enumerator::RevIter(rev_iter) => {
                     let for_restart = self.clone();
                     let iter = Mutex::new(Some(rev_iter));
                     Some(Value::make_iterable(move || {
                         if let Some(iter) = iter.lock().unwrap().take() {
                             Box::new(iter) as Box<dyn Iterator<Item = Value> + Send + Sync>
+                        } else {
+                            match for_restart.reverse().and_then(|x| x.try_iter()) {
+                                Ok(iterable) => Box::new(iterable)
+                                    as Box<dyn Iterator<Item = Value> + Send + Sync>,
+                                Err(err) => Box::new(Some(Value::from(err)).into_iter())
+                                    as Box<dyn Iterator<Item = Value> + Send + Sync>,
+                            }
+                        }
+                    }))
+                }
+                Enumerator::RevKeyValueIter(rev_iter) => {
+                    let for_restart = self.clone();
+                    let iter = Mutex::new(Some(rev_iter));
+                    let repr = o.repr();
+                    Some(Value::make_iterable(move || {
+                        if let Some(iter) = iter.lock().unwrap().take() {
+                            if let ObjectRepr::Map = repr {
+                                Box::new(iter.map(|(k, _)| k))
+                                    as Box<dyn Iterator<Item = Value> + Send + Sync>
+                            } else {
+                                Box::new(iter.map(|(k, v)| [k, v].into()))
+                                    as Box<dyn Iterator<Item = Value> + Send + Sync>
+                            }
                         } else {
                             match for_restart.reverse().and_then(|x| x.try_iter()) {
                                 Ok(iterable) => Box::new(iterable)

@@ -341,18 +341,19 @@ mod builtins {
         let by_value = matches!(ok!(kwargs.get("by")), Some("value"));
         let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
         let reverse = ok!(kwargs.get::<Option<bool>>("reverse")).unwrap_or(false);
-        let mut rv: Vec<_> = ok!(v.try_iter())
-            .map(|key| (key.clone(), v.get_item(&key).unwrap_or(Value::UNDEFINED)))
-            .collect();
+        let mut rv: Vec<_> = if let Some(iter) = v.as_object().and_then(|v| v.try_iter_pairs()) {
+            iter.collect()
+        } else {
+            ok!(v.try_iter())
+                .map(|key| (key.clone(), v.get_item(&key).unwrap_or(Value::UNDEFINED)))
+                .collect()
+        };
         safe_sort(&mut rv, |a, b| {
             let (a, b) = if by_value { (&a.1, &b.1) } else { (&a.0, &b.0) };
             cmp_helper(a, b, case_sensitive, reverse)
         })?;
         kwargs.assert_all_used()?;
-        Ok(rv
-            .into_iter()
-            .map(|(k, v)| Value::from(vec![k, v]))
-            .collect())
+        Ok(rv.into_iter().map(|(k, v)| Value::from([k, v])).collect())
     }
 
     /// Returns an iterable of pairs (items) from a mapping.
@@ -377,7 +378,7 @@ mod builtins {
         if v.kind() == ValueKind::Map {
             Ok(Value::make_object_iterable(v.clone(), |v| {
                 match v.as_object().and_then(|v| v.try_iter_pairs()) {
-                    Some(iter) => Box::new(iter.map(|(key, value)| Value::from(vec![key, value]))),
+                    Some(iter) => Box::new(iter.map(|(key, value)| Value::from([key, value]))),
                     None => Box::new(
                         // this really should not happen unless the object changes it's shape
                         // after the initial check
