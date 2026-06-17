@@ -1,4 +1,5 @@
 use crate::error::{Error, ErrorKind};
+use crate::value::merge_object::MergeSeq;
 use crate::value::{DynObject, ObjectRepr, Value, ValueKind, ValueRepr};
 
 const MIN_I128_AS_POS_U128: u128 = 170141183460469231731687303715884105728;
@@ -271,21 +272,37 @@ macro_rules! math_binop {
     }
 }
 
+fn seq_concat_len(lhs: &Value, rhs: &Value) -> Option<usize> {
+    lhs.len()?.checked_add(rhs.len()?)
+}
+
+fn materialize_seq_concat(lhs: &Value, rhs: &Value, len: usize) -> Result<Value, Error> {
+    let mut rv = Vec::with_capacity(len);
+    rv.extend(ok!(lhs.try_iter()));
+    rv.extend(ok!(rhs.try_iter()));
+    Ok(Value::from(rv))
+}
+
 pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     if matches!(lhs.kind(), ValueKind::Seq | ValueKind::Iterable)
         && matches!(rhs.kind(), ValueKind::Seq | ValueKind::Iterable)
     {
-        let lhs = lhs.clone();
-        let rhs = rhs.clone();
-        return Ok(Value::make_iterable(move || {
-            if let Ok(lhs) = lhs.try_iter() {
-                if let Ok(rhs) = rhs.try_iter() {
-                    return Box::new(lhs.chain(rhs))
-                        as Box<dyn Iterator<Item = Value> + Send + Sync>;
-                }
+        let values = vec![lhs.clone(), rhs.clone()];
+        let depth = MergeSeq::depth_for_values(&values);
+
+        // Keep sequence concatenation lazy by default.  The one case where we
+        // materialize eagerly is when repeated `seq = seq + [x]` has built a
+        // chain deep enough that later iteration or drop would risk one native
+        // stack frame per concatenation.  Only do that for sized operands;
+        // unsized iterables may represent streams and must not be consumed, so
+        // `MergeSeq` flattens only its own lazy structure instead.
+        if depth > MergeSeq::MAX_DEPTH {
+            if let Some(len) = seq_concat_len(lhs, rhs) {
+                return materialize_seq_concat(lhs, rhs, len);
             }
-            Box::new(None.into_iter()) as Box<dyn Iterator<Item = Value> + Send + Sync>
-        }));
+        }
+
+        return Ok(Value::from_object(MergeSeq::new_iterable(values)));
     }
     match coerce(lhs, rhs, true) {
         Some(CoerceResult::I128(a, b)) => a
@@ -503,6 +520,120 @@ mod tests {
             err.to_string(),
             "invalid operation: unable to calculate 170141183460469231731687303715884105727 + 1"
         );
+    }
+
+    #[test]
+    #[cfg_attr(
+        target_os = "wasi",
+        ignore = "std::thread::Builder::spawn is unsupported on WASI"
+    )]
+    fn test_repeated_seq_add_does_not_overflow_stack() {
+        // Regression test for repeated sequence concatenation, for example a
+        // chat-template accumulator `messages = messages + [m]` applied for
+        // many turns.  `+` may stay lazy, but must not build an unbounded chain
+        // of lazy iterables, otherwise enumerating the result (for example via
+        // `{{ messages | length }}` -> `Value::len()`) recurses one native frame
+        // per concatenation and overflows the stack.  Run on a small (1 MiB)
+        // stack so the regression aborts deterministically rather than
+        // depending on the platform default stack size.
+        let handle = std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let n = 5000;
+                let mut acc = Value::from(Vec::<Value>::new());
+                for i in 0..n {
+                    acc = add(&acc, &Value::from(vec![Value::from(i)])).unwrap();
+                }
+                // The crash path: `|length` -> `Value::len()`.
+                assert_eq!(acc.len(), Some(n));
+                // Iteration must also work and stay correct.
+                assert_eq!(acc.try_iter().unwrap().count(), n);
+
+                let mut acc = Value::make_iterable(|| (0i64..).take_while(|_| false));
+                for i in 0..n {
+                    acc = add(&acc, &Value::from(vec![Value::from(i)])).unwrap();
+                }
+                // Unsized iterables cannot be eagerly materialized to cut off
+                // nesting, so iterating the lazy concat object must flatten its
+                // own nested concat nodes without recursion.
+                assert_eq!(acc.len(), None);
+                assert_eq!(acc.try_iter().unwrap().count(), n);
+            })
+            .unwrap();
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_sized_iterable_add_stays_lazy() {
+        struct CountingIter {
+            next_count: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+            idx: usize,
+            len: usize,
+        }
+
+        impl Iterator for CountingIter {
+            type Item = Value;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                if self.idx == self.len {
+                    return None;
+                }
+                let idx = self.idx;
+                self.idx += 1;
+                self.next_count
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Some(Value::from(idx as i64))
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                let remaining = self.len - self.idx;
+                (remaining, Some(remaining))
+            }
+        }
+
+        let next_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let lhs_next_count = next_count.clone();
+        let lhs = Value::make_iterable(move || CountingIter {
+            next_count: lhs_next_count.clone(),
+            idx: 0,
+            len: 2,
+        });
+        let rhs = Value::from(vec![Value::from(2), Value::from(3)]);
+
+        let res = add(&lhs, &rhs).unwrap();
+        assert_eq!(next_count.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+        // Length remains known without consuming either side.
+        assert_eq!(res.len(), Some(4));
+        assert_eq!(next_count.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+        let got: Vec<i64> = res
+            .try_iter()
+            .unwrap()
+            .map(|v| i64::try_from(v).unwrap())
+            .collect();
+        assert_eq!(got, vec![0, 1, 2, 3]);
+        assert_eq!(next_count.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn test_unsized_iterable_add_stays_lazy() {
+        // An unsized iterable (no exact size hint) must NOT be eagerly
+        // materialized; the lazy-chaining fallback must still apply so adding
+        // to a potentially-unbounded stream stays lazy.
+        let unsized_iter = Value::make_iterable(|| (0i64..).take_while(|&x| x < 3));
+        assert_eq!(unsized_iter.len(), None, "precondition: operand is unsized");
+        let res = add(&unsized_iter, &Value::from(vec![Value::from(99)])).unwrap();
+        // Result is still a lazy iterable with unknown length...
+        assert_eq!(res.kind(), ValueKind::Iterable);
+        assert_eq!(res.len(), None);
+        // ...but iterates to the correct concatenated contents.
+        let got: Vec<i64> = res
+            .try_iter()
+            .unwrap()
+            .map(|v| i64::try_from(v).unwrap())
+            .collect();
+        assert_eq!(got, vec![0, 1, 2, 99]);
     }
 
     #[test]

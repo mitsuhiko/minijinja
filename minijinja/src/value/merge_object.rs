@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::fmt;
 use std::sync::Arc;
 
 use crate::value::ops::LenIterWrap;
@@ -45,27 +46,81 @@ impl Object for MergeDict {
 }
 
 /// List merging behavior - calculate total length for size hint
-#[derive(Debug)]
 pub struct MergeSeq {
     values: Box<[Value]>,
     total_len: Option<usize>,
+    repr: ObjectRepr,
+    depth: usize,
+}
+
+impl fmt::Debug for MergeSeq {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("<iterator>").finish()
+    }
 }
 
 impl MergeSeq {
+    pub(crate) const MAX_DEPTH: usize = 32;
+
     pub fn new(values: Vec<Value>) -> Self {
+        Self::with_repr(values, ObjectRepr::Seq)
+    }
+
+    pub(crate) fn new_iterable(values: Vec<Value>) -> Self {
+        Self::with_repr(values, ObjectRepr::Iterable)
+    }
+
+    fn with_repr(mut values: Vec<Value>, repr: ObjectRepr) -> Self {
+        let mut depth = Self::depth_for_values(&values);
+        if depth > Self::MAX_DEPTH {
+            let mut flattened = Vec::new();
+            for value in values.iter() {
+                Self::push_flattened_value(value, &mut flattened);
+            }
+            values = flattened;
+            depth = Self::depth_for_values(&values);
+        }
+
         Self {
             total_len: values.iter().map(|v| v.len()).sum(),
             values: values.into_boxed_slice(),
+            repr,
+            depth,
+        }
+    }
+
+    pub(crate) fn depth_for_values(values: &[Value]) -> usize {
+        values
+            .iter()
+            .filter_map(|value| value.downcast_object_ref::<Self>())
+            .map(|seq| seq.depth)
+            .max()
+            .unwrap_or(0)
+            .saturating_add(1)
+    }
+
+    fn push_flattened_value(value: &Value, values: &mut Vec<Value>) {
+        let mut pending = vec![value.clone()];
+        while let Some(value) = pending.pop() {
+            if let Some(seq) = value.downcast_object_ref::<Self>() {
+                pending.extend(seq.values.iter().rev().cloned());
+            } else {
+                values.push(value);
+            }
         }
     }
 }
 
 impl Object for MergeSeq {
     fn repr(self: &Arc<Self>) -> ObjectRepr {
-        ObjectRepr::Seq
+        self.repr
     }
 
     fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        if self.repr != ObjectRepr::Seq {
+            return None;
+        }
+
         if let Some(idx) = key.as_usize() {
             let mut current_idx = 0;
             for value in self.values.iter() {
