@@ -5,6 +5,8 @@ All notable changes to MiniJinja are documented here.
 ## Unreleased
 
 * Fixed a panic when comparing two numbers that have no common lossless representation, such as a float against an integer that cannot be represented exactly as `f64` (for example `1.0 < 9007199254740993`).  #904
+* Fixed a stack overflow caused by repeated sequence concatenation.  #907
+* Improved performance of iteration over map items.  #906
 
 ## 2.20.0
 
