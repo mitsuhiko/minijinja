@@ -236,6 +236,33 @@ impl Environment {
                 }
             });
     }
+
+    /// Sets a callback to determine the auto escaping behavior for a template.
+    ///
+    /// The callback receives the template name and should return one of the
+    /// strings `"html"`, `"json"`, or `"none"`.  Any other string is treated as
+    /// a custom auto escape format (which requires a custom formatter to be
+    /// useful).  Returning `null`/`undefined` or throwing disables auto
+    /// escaping for that template.
+    #[wasm_bindgen]
+    pub fn setAutoEscapeCallback(&mut self, func: Function) {
+        let fragile_func = Fragile::new(func);
+        self.inner.set_auto_escape_callback(move |name| {
+            let func = fragile_func.get();
+            let rv = match func.call1(&JsValue::NULL, &JsValue::from_str(name)) {
+                Ok(rv) => rv,
+                Err(_) => return mj::AutoEscape::None,
+            };
+            match rv.as_string().as_deref() {
+                Some("html") => mj::AutoEscape::Html,
+                Some("json") => mj::AutoEscape::Json,
+                Some("none") | None => mj::AutoEscape::None,
+                Some(other) => {
+                    mj::AutoEscape::Custom(Box::leak(other.to_string().into_boxed_str()))
+                }
+            }
+        });
+    }
 }
 
 #[wasm_bindgen]
