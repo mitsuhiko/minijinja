@@ -28,7 +28,7 @@ Ok(
                         } @ 2:11-2:12,
                     ],
                 } @ 2:8-2:12,
-                expr: List {
+                expr: Tuple {
                     items: [
                         Const {
                             value: 1,
