@@ -480,22 +480,24 @@ mod builtins {
     /// rather than Rust ones so `1` means one split and two resulting items.
     ///
     /// ```jinja
-    /// {{ "hello world"|split|list }}
+    /// {{ "hello world"|split }}
     ///     -> ["hello", "world"]
     ///
-    /// {{ "c,s,v"|split(",")|list }}
+    /// {{ "c,s,v"|split(",") }}
     ///     -> ["c", "s", "v"]
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn split(s: Arc<str>, split: Option<Arc<str>>, maxsplits: Option<i64>) -> Value {
         let maxsplits = maxsplits.and_then(|x| if x >= 0 { Some(x as usize + 1) } else { None });
 
-        Value::make_object_iterable((s, split), move |(s, split)| match (split, maxsplits) {
-            (None, None) => Box::new(s.split_whitespace().map(Value::from)),
-            (Some(split), None) => Box::new(s.split(split as &str).map(Value::from)),
-            (None, Some(n)) => Box::new(splitn_whitespace(s, n).map(Value::from)),
-            (Some(split), Some(n)) => Box::new(s.splitn(n, split as &str).map(Value::from)),
-        })
+        // Materialize into a sequence (like `lines`) so negative indexing and
+        // slicing work, e.g. `("1.2.3"|split("."))[-1]`.
+        match (split, maxsplits) {
+            (None, None) => Value::from_iter(s.split_whitespace().map(Value::from)),
+            (Some(sep), None) => Value::from_iter(s.split(sep.as_ref()).map(Value::from)),
+            (None, Some(n)) => Value::from_iter(splitn_whitespace(&s, n).map(Value::from)),
+            (Some(sep), Some(n)) => Value::from_iter(s.splitn(n, sep.as_ref()).map(Value::from)),
+        }
     }
 
     /// Splits a string into lines.

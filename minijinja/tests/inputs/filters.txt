@@ -127,6 +127,11 @@ split-at-and: {{ three_words|split(" and ")|list }}
 split-n-ws: {{ three_words|split(none, 1)|list }}
 split-n-d: {{ three_words|split("d", 1)|list }}
 split-n-ws-filter-empty: {{ "  foo    bar baz  "|split(none, 1)|list }}
+split-neg-index: {{ ("1.2.3"|split("."))[-1] }}
+split-neg-2: {{ ("1.2.3"|split("."))[-2] }}
+split-neg-slice: {{ ("1.2.3"|split("."))[-1:] }}
+split-pos-slice: {{ ("1.2.3"|split("."))[1:] }}
+split-as-seq: {{ "1.2.3"|split(".") }}
 sum: {{ range(10)|sum }}
 sum-empty: {{ []|sum }}
 sum-float: {{ [0.5, 1.0]|sum }}
