@@ -4,6 +4,5 @@ description: "{{ none }}\n{{ undefined }}"
 info: {}
 input_file: minijinja/tests/inputs/undefined.txt
 ---
-none
-
+None
 
