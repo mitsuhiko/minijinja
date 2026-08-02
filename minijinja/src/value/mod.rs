@@ -689,7 +689,12 @@ fn cmp_f64_u128(left: f64, right: u128) -> Ordering {
     }
 }
 
-fn cmp_numbers(left: &Value, right: &Value) -> Ordering {
+// This is only needed when `coerce` cannot find a common lossless numeric
+// representation.  Keep it out of line so the rare fallback does not bloat the
+// hot comparison path.
+#[cold]
+#[inline(never)]
+fn cmp_uncoercible_numbers(left: &Value, right: &Value) -> Ordering {
     match (number(left).unwrap(), number(right).unwrap()) {
         (Number::F64(a), Number::F64(b)) => cmp_f64(a, b),
         (Number::F64(a), Number::I128(b)) => cmp_f64_i128(a, b),
@@ -717,12 +722,18 @@ impl Ord for Value {
                 a.as_str().cmp(b.as_str())
             }
             (&ValueRepr::Bytes(ref a), &ValueRepr::Bytes(ref b)) => a.cmp(b),
-            _ if self.is_number() && other.is_number() => cmp_numbers(self, other),
+            // `coerce` represents two u128 values as i128, which reverses the
+            // order if only one of them exceeds i128::MAX.
+            (&ValueRepr::U128(a), &ValueRepr::U128(b)) => { a.0 }.cmp(&{ b.0 }),
             _ => match ops::coerce(self, other, false) {
-                Some(ops::CoerceResult::F64(a, b)) => f64_total_cmp(a, b),
+                Some(ops::CoerceResult::F64(a, b)) => cmp_f64(a, b),
                 Some(ops::CoerceResult::I128(a, b)) => a.cmp(&b),
                 Some(ops::CoerceResult::Str(a, b)) => a.cmp(b),
                 None => {
+                    if self.is_number() && other.is_number() {
+                        return cmp_uncoercible_numbers(self, other);
+                    }
+
                     let a = self.as_object().unwrap();
                     let b = other.as_object().unwrap();
 
