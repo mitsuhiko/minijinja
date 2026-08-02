@@ -9,6 +9,7 @@ info:
     - d
 input_file: minijinja/tests/inputs/loop_var.txt
 ---
+
   a (1 of 4)
     first=True
     last=False
@@ -44,3 +45,5 @@ input_file: minijinja/tests/inputs/loop_var.txt
     cycle=even
     previtem=c
     nextitem=
+
+

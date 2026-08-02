@@ -11,3 +11,4 @@ input_file: minijinja/tests/inputs/namespace.txt
 {"found": True}
 ---
 {"found": True}
+

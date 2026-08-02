@@ -4,6 +4,8 @@ description: "{% macro render_dialog(title, class='dialog') -%}\n    <div class=
 info: {}
 input_file: minijinja/tests/inputs/macro_caller.txt
 ---
+
+
 <div class="dialog">
         <h2>Hello World</h2>
         <div class="contents">
@@ -15,3 +17,4 @@ input_file: minijinja/tests/inputs/macro_caller.txt
     </div>
 
 caller: True
+
