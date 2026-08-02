@@ -589,7 +589,7 @@ func FilterSplit(_ State, val value.Value, args []value.Value, _ map[string]valu
 	for i, p := range parts {
 		result[i] = value.FromString(p)
 	}
-	return value.FromIterator(value.NewIterator("split", result)), nil
+	return value.FromSlice(result), nil
 }
 
 func splitWhitespaceN(s string, n int) []string {
