@@ -79,6 +79,26 @@ fn test_dict_methods() {
     assert!(eval_expr("{'x': 42}.get('y') is none").is_true());
     assert!(eval_expr("{'x': 42}.get('x', 47) == 42").is_true());
     assert!(eval_expr("{'x': 42}.get('y', 47) == 47").is_true());
+    assert!(eval_expr(
+        "{'items': 'FIELD', 'x': 42}.items()|list == [('items', 'FIELD'), ('x', 42)]"
+    )
+    .is_true());
+
+    let mut env = Environment::new();
+    env.set_unknown_method_callback(unknown_method_callback);
+    env.add_global("item_fn", Value::from_function(|| 42));
+    assert!(env
+        .compile_expression("{'items': item_fn, 'x': 23}.items()|list|length == 2")
+        .unwrap()
+        .eval(())
+        .unwrap()
+        .is_true());
+    assert!(env
+        .compile_expression("{'items': item_fn}['items']() == 42")
+        .unwrap()
+        .eval(())
+        .unwrap()
+        .is_true());
 }
 
 #[test]

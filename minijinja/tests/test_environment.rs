@@ -181,6 +181,11 @@ fn test_unknown_method_callback() {
     let rv = env.render_str("{{ {'x': 42}.items() }}", ()).unwrap();
     assert_snapshot!(rv, @r###"[["x", 42]]"###);
 
+    let rv = env
+        .render_str("{{ {'items': 'field', 'x': 42}.items() | length }}", ())
+        .unwrap();
+    assert_eq!(rv, "2");
+
     let err = env.render_str("{{ [].does_not_exist() }}", ()).unwrap_err();
     assert_eq!(err.kind(), ErrorKind::UnknownMethod);
     assert_eq!(

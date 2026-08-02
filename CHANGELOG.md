@@ -2,6 +2,12 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed Python-compatible dict methods being shadowed by same-named map keys.  #903
+* Fixed loop-local assignments leaking into subsequent iterations in Rust and Go.  #912
+* Changed rendering of none and boolean values to `None`, `True`, and `False` for Jinja2 compatibility in Rust and Go.  #913
+
 ## 2.21.0
 
 * Fixed a panic when comparing two numbers that have no common lossless representation, such as a float against an integer that cannot be represented exactly as `f64` (for example `1.0 < 9007199254740993`).  #904

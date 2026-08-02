@@ -253,10 +253,7 @@ pub trait Object: fmt::Debug + Send + Sync {
         method: &str,
         args: &[Value],
     ) -> Result<Value, Error> {
-        if let Some(value) = self.get_value(&Value::from(method)) {
-            return value.call(state, args);
-        }
-
+        let (_, _, _) = (state, method, args);
         Err(Error::from(ErrorKind::UnknownMethod))
     }
 

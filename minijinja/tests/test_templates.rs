@@ -785,6 +785,10 @@ fn test_functions() {
         @"42"
     );
     assert_snapshot!(
+        render!("{{ {'f': f}.f() }}", f => Value::from_function(|| -> i32 { 42 })),
+        @"42"
+    );
+    assert_snapshot!(
         render!("{{ f() }}", f => Value::from_function(|| -> Option<i32> { None })),
         @"None"
     );

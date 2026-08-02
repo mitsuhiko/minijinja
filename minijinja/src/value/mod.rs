@@ -1738,7 +1738,9 @@ impl Value {
     /// Calls a method on the value.
     ///
     /// The name of the method is `name`, the arguments passed are in the `args`
-    /// slice.
+    /// slice.  Method lookup first tries methods implemented by the object, then
+    /// the environment's unknown method callback, and finally a callable value
+    /// stored under `name` on the object.
     pub fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         match self._call_method(state, name, args) {
             Ok(rv) => Ok(rv),
@@ -1759,6 +1761,17 @@ impl Value {
                             }
                         }
                     }
+                    // Calling values stored on objects by using method syntax is
+                    // supported as a fallback.  This must happen after the unknown
+                    // method callback so that type methods take precedence over
+                    // same-named items, as they do in Jinja2.
+                    if let Some(value) = self
+                        .as_object()
+                        .and_then(|object| object.get_value(&Value::from(name)))
+                    {
+                        return value.call(state, args);
+                    }
+
                     if err.detail().is_none() {
                         err.set_detail(format!("{} has no method named {}", self.kind(), name));
                     }
