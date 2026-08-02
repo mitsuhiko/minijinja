@@ -74,11 +74,7 @@ enum Command<'a> {
 }
 
 fn parse_command(line: &str) -> Option<Command<'_>> {
-    let line = if let Some(rest) = line.strip_prefix('.') {
-        rest.trim()
-    } else {
-        return None;
-    };
+    let line = line.strip_prefix('.')?.trim();
     match line {
         "exit" | "quit" => return Some(Command::Quit),
         "help" => return Some(Command::Help),
