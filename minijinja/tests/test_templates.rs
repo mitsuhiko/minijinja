@@ -235,23 +235,23 @@ fn test_dotted_integer_lookup() {
 fn test_chained_comparisons() {
     assert_eq!(
         render!("{{ x not in y != z }}", x => "foo", y => "bar", z => "foo"),
-        "true"
+        "True"
     );
     assert_eq!(
         render!("{{ x not in y != y }}", x => "foo", y => "bar"),
-        "false"
+        "False"
     );
     assert_eq!(
         render!("{{ lhs != rhs != lhs }}", lhs => 1, rhs => 2),
-        "true"
+        "True"
     );
     assert_eq!(
         render!("{{ needle in haystack in seq }}", needle => "o", haystack => "foo", seq => vec!["foo"]),
-        "true"
+        "True"
     );
     assert_eq!(
         render!("{{ needle in haystack == true }}", needle => "f", haystack => "foo"),
-        "false"
+        "False"
     );
 
     fn inc(state: &State) -> Value {
@@ -265,10 +265,10 @@ fn test_chained_comparisons() {
 
     let mut env = Environment::new();
     env.add_function("inc", inc);
-    assert_eq!(env.render_str("{{ 0 < inc() < 2 }}", ()).unwrap(), "true");
+    assert_eq!(env.render_str("{{ 0 < inc() < 2 }}", ()).unwrap(), "True");
     assert_eq!(
         env.render_str("{{ 2 < inc() < fail() }}", ()).unwrap(),
-        "false"
+        "False"
     );
 }
 
@@ -763,6 +763,22 @@ fn test_render_captured_to() {
 }
 
 #[test]
+fn test_primitive_rendering() {
+    assert_eq!(
+        render!("{{ none }}|{{ true }}|{{ false }}"),
+        "None|True|False"
+    );
+    assert_eq!(render!("{{ [none, true, false] }}"), "[None, True, False]");
+
+    let mut env = Environment::new();
+    env.set_auto_escape_callback(|_| minijinja::AutoEscape::Html);
+    assert_eq!(
+        render!(in env, "{{ none }}|{{ true }}|{{ false }}"),
+        "None|True|False"
+    );
+}
+
+#[test]
 fn test_functions() {
     assert_snapshot!(
         render!("{{ f() }}", f => Value::from_function(|| -> i32 { 42 })),
@@ -858,5 +874,5 @@ fn test_test_caching() {
     )
     .unwrap();
     let rv = env.get_template("child.txt").unwrap().render(()).unwrap();
-    assert_eq!(rv, "false");
+    assert_eq!(rv, "False");
 }

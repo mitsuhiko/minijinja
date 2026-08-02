@@ -195,12 +195,16 @@ impl FormatSpec {
 
         match self.ty {
             Type::Default if !treat_as_integer => {
-                // Format "true" or "false" as a regular string, ignoring the
+                // Format "True" or "False" as a regular string, ignoring the
                 // precision (i.e. without truncating)
-                Ok(self.apply_padding(format!("{val}"), Align::Left))
+                let text = if val { "True" } else { "False" };
+                Ok(self.apply_padding(text.to_owned(), Align::Left))
             }
             Type::String => match self.format_style {
-                FormatStyle::Printf => Ok(self.apply_padding(format!("{val}"), Align::Right)),
+                FormatStyle::Printf => {
+                    let text = if val { "True" } else { "False" };
+                    Ok(self.apply_padding(text.to_owned(), Align::Right))
+                }
                 FormatStyle::StrFormat => Err(self.type_conversion_err("bool", Type::String)),
             },
             Type::Default

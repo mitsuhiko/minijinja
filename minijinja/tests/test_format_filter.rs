@@ -273,8 +273,8 @@ fn test_format_general() {
 fn test_format_bool() {
     let env = Environment::new();
 
-    assert_eq!(format_val(&env, false, "s"), "false");
-    assert_eq!(format_val(&env, true, "s"), "true");
+    assert_eq!(format_val(&env, false, "s"), "False");
+    assert_eq!(format_val(&env, true, "s"), "True");
     assert_eq!(format_val(&env, true, ".2d"), "1");
     assert_eq!(format_val(&env, true, "-5d"), "1    ");
     assert_eq!(format_val(&env, false, "5d"), "    0");

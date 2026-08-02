@@ -3,10 +3,9 @@ source: minijinja/tests/test_templates.rs
 description: "name: {{ user.name }}\nactive: {{ user.is_active }}"
 info:
   user:
-    is_active: true
     name: Peter
+    is_active: true
 input_file: minijinja/tests/inputs/getattr.txt
 ---
 name: Peter
-active: true
-
+active: True

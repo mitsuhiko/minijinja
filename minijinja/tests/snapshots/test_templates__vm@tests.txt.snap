@@ -13,50 +13,50 @@ info:
   string: aha
 input_file: minijinja/tests/inputs/tests.txt
 ---
-even: true
-odd: false
-undefined: false
-defined: true
-undefined2: true
-defined2: false
-none: true
-not-none: true
-number-int: true
-number-float: true
-integer-int: true
-integer-float: false
-float-int: false
-float-float: true
-not-seq: false
-seq: true
-reverse-not-seq: false
-iterable: true
-iterable-reverse: true
-string-iterable: true
-not-iterable: false
-not-map: false
-map: true
-string: true
-not-string: false
-starts-with-a: true
-starts-with-a-noparen: true
-ends-with-ha: true
-ends-with-ha-noparen: true
-not-safe: false
-safe: true
-is-true: true | false
-is-false: true | false
-is-filter: true | false
-is-test: true | false
-is-boolean: true | false
-is-divisibleby: true | false
-is-divisibleby-noparen: true | false
-is-lower: true | false
-is-upper: false | true
-seq-same-as: false
-seq-same-as-noparen: false
-const-same-as: true
-const-same-as-noparen: true
-int-same-as: false
-int-same-as-noparen: false
-neg-int-same-as-noparen: true
+even: True
+odd: False
+undefined: False
+defined: True
+undefined2: True
+defined2: False
+none: True
+not-none: True
+number-int: True
+number-float: True
+integer-int: True
+integer-float: False
+float-int: False
+float-float: True
+not-seq: False
+seq: True
+reverse-not-seq: False
+iterable: True
+iterable-reverse: True
+string-iterable: True
+not-iterable: False
+not-map: False
+map: True
+string: True
+not-string: False
+starts-with-a: True
+starts-with-a-noparen: True
+ends-with-ha: True
+ends-with-ha-noparen: True
+not-safe: False
+safe: True
+is-true: True | False
+is-false: True | False
+is-filter: True | False
+is-test: True | False
+is-boolean: True | False
+is-divisibleby: True | False
+is-divisibleby-noparen: True | False
+is-lower: True | False
+is-upper: False | True
+seq-same-as: False
+seq-same-as-noparen: False
+const-same-as: True
+const-same-as-noparen: True
+int-same-as: False
+int-same-as-noparen: False
+neg-int-same-as-noparen: True

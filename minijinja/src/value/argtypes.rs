@@ -563,7 +563,7 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
                 ValueRepr::SmallStr(ref s) => Cow::Borrowed(s.as_str()),
                 ValueRepr::U64(v) => Cow::Owned(v.to_string()),
                 ValueRepr::I64(v) => Cow::Owned(v.to_string()),
-                ValueRepr::Bool(v) => Cow::Owned(v.to_string()),
+                ValueRepr::Bool(v) => Cow::Borrowed(if v { "True" } else { "False" }),
                 _ => {
                     if value.is_kwargs() {
                         return Err(Error::new(
