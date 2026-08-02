@@ -24,7 +24,7 @@ Ok(
                             id: "baz",
                         } @ 1:18-1:21,
                         right: Const {
-                            value: true,
+                            value: True,
                         } @ 1:25-1:29,
                     } @ 1:15-1:29,
                 } @ 1:3-1:29,

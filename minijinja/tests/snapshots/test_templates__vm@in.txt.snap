@@ -11,10 +11,10 @@ info:
   word: bird
 input_file: minijinja/tests/inputs/in.txt
 ---
-true
-true
-true
-false
-false
-false
+True
+True
+True
+False
+False
+False
 

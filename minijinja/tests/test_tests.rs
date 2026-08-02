@@ -25,12 +25,12 @@ fn test_dotted_test_name() {
         .unwrap()
         .render(())
         .unwrap();
-    assert_eq!(rv, "true");
+    assert_eq!(rv, "True");
 
     let rv = env
         .template_from_str("{{ 42 is foo . bar . baz }}")
         .unwrap()
         .render(())
         .unwrap();
-    assert_eq!(rv, "true");
+    assert_eq!(rv, "True");
 }

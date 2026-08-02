@@ -16,5 +16,5 @@ input_file: minijinja/tests/inputs/macro_caller.txt
         </div>
     </div>
 
-caller: true
+caller: True
 

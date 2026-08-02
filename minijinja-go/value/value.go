@@ -337,7 +337,7 @@ type Value struct {
 }
 
 // internal marker types for special values
-type undefinedType struct{
+type undefinedType struct {
 	silent bool
 }
 type noneType struct{}
@@ -890,12 +890,12 @@ func (v Value) String() string {
 	case undefinedType:
 		return ""
 	case noneType:
-		return "none"
+		return "None"
 	case bool:
 		if d {
-			return "true"
+			return "True"
 		}
-		return "false"
+		return "False"
 	case int64:
 		return fmt.Sprintf("%d", d)
 	case bigIntValue:
@@ -955,12 +955,12 @@ func (v Value) Repr() string {
 	case undefinedType:
 		return "undefined"
 	case noneType:
-		return "none"
+		return "None"
 	case bool:
 		if d {
-			return "true"
+			return "True"
 		}
-		return "false"
+		return "False"
 	case int64:
 		return fmt.Sprintf("%d", d)
 	case bigIntValue:

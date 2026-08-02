@@ -164,8 +164,8 @@ func TestValueSort(t *testing.T) {
 		return cmp < 0
 	})
 
-	// Expected order: false, true, 30, 80, 99, 100, 1000.0
-	expected := []string{"false", "true", "30", "80", "99", "100", "1000.0"}
+	// Expected order: False, True, 30, 80, 99, 100, 1000.0
+	expected := []string{"False", "True", "30", "80", "99", "100", "1000.0"}
 	for i, v := range values {
 		if v.String() != expected[i] {
 			t.Errorf("values[%d] = %v, want %s", i, v.String(), expected[i])
@@ -569,8 +569,8 @@ func TestValueRepr(t *testing.T) {
 		want string
 	}{
 		{Undefined(), "undefined"},
-		{None(), "none"},
-		{FromBool(true), "true"},
+		{None(), "None"},
+		{FromBool(true), "True"},
 		{FromInt(42), "42"},
 		{FromFloat(3.14), "3.14"},
 		{FromString("hello"), `"hello"`},

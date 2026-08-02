@@ -90,7 +90,7 @@ def test_test_state():
         "template-name",
         bar=23,
     )
-    assert rv == "true"
+    assert rv == "True"
 
 
 def test_temps():

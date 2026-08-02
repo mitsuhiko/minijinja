@@ -4,8 +4,8 @@ description: "{{ true }}\n{{ false }}\n{{ null }}\n{{ 1.0 }}\n{{ 2 }}\n{{ [1, 2,
 info: {}
 input_file: minijinja/tests/inputs/literals.txt
 ---
-true
-false
+True
+False
 
 1.0
 2

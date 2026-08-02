@@ -11,8 +11,8 @@ input_file: minijinja/tests/inputs/loop_var.txt
 ---
 
   a (1 of 4)
-    first=true
-    last=false
+    first=True
+    last=False
     revindex=4
     revindex0=3
     cycle=odd
@@ -20,8 +20,8 @@ input_file: minijinja/tests/inputs/loop_var.txt
     nextitem=b
 
   b (2 of 4)
-    first=false
-    last=false
+    first=False
+    last=False
     revindex=3
     revindex0=2
     cycle=even
@@ -29,8 +29,8 @@ input_file: minijinja/tests/inputs/loop_var.txt
     nextitem=c
 
   c (3 of 4)
-    first=false
-    last=false
+    first=False
+    last=False
     revindex=2
     revindex0=1
     cycle=odd
@@ -38,8 +38,8 @@ input_file: minijinja/tests/inputs/loop_var.txt
     nextitem=d
 
   d (4 of 4)
-    first=false
-    last=true
+    first=False
+    last=True
     revindex=1
     revindex0=0
     cycle=even

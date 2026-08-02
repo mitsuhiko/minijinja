@@ -474,11 +474,11 @@ impl fmt::Debug for ValueRepr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ValueRepr::Undefined(_) => f.write_str("undefined"),
-            ValueRepr::Bool(ref val) => fmt::Debug::fmt(val, f),
+            ValueRepr::Bool(val) => f.write_str(if val { "True" } else { "False" }),
             ValueRepr::U64(ref val) => fmt::Debug::fmt(val, f),
             ValueRepr::I64(ref val) => fmt::Debug::fmt(val, f),
             ValueRepr::F64(ref val) => fmt::Debug::fmt(val, f),
-            ValueRepr::None => f.write_str("none"),
+            ValueRepr::None => f.write_str("None"),
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {val}>"),
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
@@ -777,7 +777,7 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             ValueRepr::Undefined(_) => Ok(()),
-            ValueRepr::Bool(val) => val.fmt(f),
+            ValueRepr::Bool(val) => f.write_str(if val { "True" } else { "False" }),
             ValueRepr::U64(val) => val.fmt(f),
             ValueRepr::I64(val) => val.fmt(f),
             ValueRepr::F64(val) => {
@@ -793,7 +793,7 @@ impl fmt::Display for Value {
                     write!(f, "{num}")
                 }
             }
-            ValueRepr::None => f.write_str("none"),
+            ValueRepr::None => f.write_str("None"),
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {val}>"),
             ValueRepr::I128(val) => write!(f, "{}", { val.0 }),
             ValueRepr::String(ref val, _) => write!(f, "{val}"),

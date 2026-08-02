@@ -8,5 +8,5 @@ input_file: minijinja/tests/inputs/ifexpr.txt
 42
 23
 
-true
+True
 

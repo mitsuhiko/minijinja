@@ -12,8 +12,8 @@ State {
   }
 }
 ---
-none
+None
 ---
-true, false, 42
+True, False, 42
 ---
 [<function debug>, 42]

@@ -8,7 +8,7 @@ input_file: minijinja/tests/inputs/namespace.txt
 ---
 {"foo": {"bar": 42}}
 ---
-{"found": true}
+{"found": True}
 ---
-{"found": true}
+{"found": True}
 

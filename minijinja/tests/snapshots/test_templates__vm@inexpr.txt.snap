@@ -8,8 +8,8 @@ info:
     - 3
 input_file: minijinja/tests/inputs/inexpr.txt
 ---
-true
-false
-false
-true
+True
+False
+False
+True
 

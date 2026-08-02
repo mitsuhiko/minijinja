@@ -52,11 +52,11 @@ list-from-list: [1, 2, 3]
 list-from-map: ["a", "c"]
 list-from-word: ["B", "i", "r", "d"]
 list-from-undefined: []
-bool-empty-string: false
-bool-non-empty-string: true
-bool-empty-list: false
-bool-non-empty-list: true
-bool-undefined: false
+bool-empty-string: False
+bool-non-empty-string: True
+bool-empty-list: False
+bool-non-empty-list: True
+bool-undefined: False
 map-length: 2
 string-length: 4
 string-count: 4
@@ -68,27 +68,27 @@ join-default: 123
 join-pipe: 1|2|3
 join_string: B-i-r-d
 join-empty-strings: ||blub|||42
-default: true
+default: True
 default-value: 42
 default-value-falsy: b
-d: true
+d: True
 d-value: 42
 first-list: 1
 first-word: B
-first-undefined: true
+first-undefined: True
 last-list: 3
 last-word: d
-last-undefined: true
+last-undefined: True
 min: 1
 max: 111
 sort: [1, 2, 4, 9, 111]
 sort-reverse: [111, 9, 4, 2, 1]
 sort-case-insensitive: ["a", "B", "C", "z"]
 sort-case-sensitive: ["B", "C", "a", "z"]
-sort-case-insensitive-mixed: [false, true, 0, 1, "false", "False", "true", "True"]
-sort-case-sensitive-mixed: [false, true, 0, 1, "False", "True", "false", "true"]
+sort-case-insensitive-mixed: [False, True, 0, 1, "false", "False", "true", "True"]
+sort-case-sensitive-mixed: [False, True, 0, 1, "False", "True", "false", "true"]
 sort-attribute [{"name": "a"}, {"name": "b"}]
-d: true
+d: True
 json: {"a":"b","c":"d"}
 json-pretty: {
   "a": "b",
@@ -118,14 +118,14 @@ select-odd: [1, 3, 5]
 select-truthy: [42, 23, "aha"]
 reject-truthy: [undefined, undefined, 0, ""]
 reject-odd: [2, 4, 6]
-select-attr: [{"active": true, "key": 1}]
-reject-attr: [{"active": false, "key": 2}]
-select-attr: [{"active": false, "key": 2}]
-reject-attr: [{"active": true, "key": 1}]
+select-attr: [{"active": True, "key": 1}]
+reject-attr: [{"active": False, "key": 2}]
+select-attr: [{"active": False, "key": 2}]
+reject-attr: [{"active": True, "key": 1}]
 map-maps: [1, 2, 3, 4, 5]
-map-attr: [1, 2, none]
+map-attr: [1, 2, None]
 map-attr-undefined: [1, 2, undefined]
-map-attr-deep: [1, 2, none]
+map-attr-deep: [1, 2, None]
 map-attr-int: [999, 2]
 attr-filter: b
 unique-filter: [1, 4, 3, 0, 5]

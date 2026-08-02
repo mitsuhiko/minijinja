@@ -8,5 +8,5 @@ info:
 input_file: minijinja/tests/inputs/getattr.txt
 ---
 name: Peter
-active: true
+active: True
 
