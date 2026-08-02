@@ -33,7 +33,7 @@ func TestBasicRender(t *testing.T) {
 
 func TestVariableTypes(t *testing.T) {
 	env := NewEnvironment()
-	tmpl, err := env.TemplateFromString("{{ str }} {{ num }} {{ float }} {{ bool }}")
+	tmpl, err := env.TemplateFromString("{{ str }} {{ num }} {{ float }} {{ bool }} {{ none }} {{ false }}")
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
@@ -48,8 +48,20 @@ func TestVariableTypes(t *testing.T) {
 		t.Fatalf("render error: %v", err)
 	}
 
-	if result != "hello 42 3.14 true" {
-		t.Errorf("expected 'hello 42 3.14 true', got %q", result)
+	if result != "hello 42 3.14 True None False" {
+		t.Errorf("expected Jinja2 primitive rendering, got %q", result)
+	}
+
+	tmpl, err = env.TemplateFromNamedString("test.html", "{{ none }}|{{ true }}|{{ false }}")
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	result, err = tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if result != "None|True|False" {
+		t.Errorf("expected Jinja2 primitive rendering with autoescaping, got %q", result)
 	}
 }
 
@@ -76,11 +88,11 @@ func TestChainedComparisons(t *testing.T) {
 		ctx      map[string]any
 		expect   string
 	}{
-		{`{{ x not in y != z }}`, map[string]any{"x": "foo", "y": "bar", "z": "foo"}, "true"},
-		{`{{ x not in y != y }}`, map[string]any{"x": "foo", "y": "bar"}, "false"},
-		{`{{ lhs != rhs != lhs }}`, map[string]any{"lhs": 1, "rhs": 2}, "true"},
-		{`{{ needle in haystack in seq }}`, map[string]any{"needle": "o", "haystack": "foo", "seq": []string{"foo"}}, "true"},
-		{`{{ needle in haystack == true }}`, map[string]any{"needle": "f", "haystack": "foo"}, "false"},
+		{`{{ x not in y != z }}`, map[string]any{"x": "foo", "y": "bar", "z": "foo"}, "True"},
+		{`{{ x not in y != y }}`, map[string]any{"x": "foo", "y": "bar"}, "False"},
+		{`{{ lhs != rhs != lhs }}`, map[string]any{"lhs": 1, "rhs": 2}, "True"},
+		{`{{ needle in haystack in seq }}`, map[string]any{"needle": "o", "haystack": "foo", "seq": []string{"foo"}}, "True"},
+		{`{{ needle in haystack == true }}`, map[string]any{"needle": "f", "haystack": "foo"}, "False"},
 	}
 
 	for _, test := range tests {
@@ -113,8 +125,8 @@ func TestChainedComparisons(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render error: %v", err)
 	}
-	if result != "true" || counter != 1 {
-		t.Errorf("expected true and one inc() call, got result=%q counter=%d", result, counter)
+	if result != "True" || counter != 1 {
+		t.Errorf("expected True and one inc() call, got result=%q counter=%d", result, counter)
 	}
 
 	tmpl, err = env.TemplateFromString(`{{ 2 < inc() < fail() }}`)
@@ -125,8 +137,8 @@ func TestChainedComparisons(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render error: %v", err)
 	}
-	if result != "false" || counter != 2 {
-		t.Errorf("expected false and one additional inc() call, got result=%q counter=%d", result, counter)
+	if result != "False" || counter != 2 {
+		t.Errorf("expected False and one additional inc() call, got result=%q counter=%d", result, counter)
 	}
 }
 
@@ -318,13 +330,13 @@ func TestComparisons(t *testing.T) {
 		template string
 		expected string
 	}{
-		{"{{ 1 == 1 }}", "true"},
-		{"{{ 1 != 2 }}", "true"},
-		{"{{ 1 < 2 }}", "true"},
-		{"{{ 2 > 1 }}", "true"},
-		{"{{ 1 <= 1 }}", "true"},
-		{"{{ 2 >= 2 }}", "true"},
-		{"{{ 1 == 2 }}", "false"},
+		{"{{ 1 == 1 }}", "True"},
+		{"{{ 1 != 2 }}", "True"},
+		{"{{ 1 < 2 }}", "True"},
+		{"{{ 2 > 1 }}", "True"},
+		{"{{ 1 <= 1 }}", "True"},
+		{"{{ 2 >= 2 }}", "True"},
+		{"{{ 1 == 2 }}", "False"},
 	}
 
 	for _, test := range tests {
@@ -349,12 +361,12 @@ func TestLogicalOperators(t *testing.T) {
 		template string
 		expected string
 	}{
-		{"{{ true and true }}", "true"},
-		{"{{ true and false }}", "false"},
-		{"{{ false or true }}", "true"},
-		{"{{ false or false }}", "false"},
-		{"{{ not true }}", "false"},
-		{"{{ not false }}", "true"},
+		{"{{ true and true }}", "True"},
+		{"{{ true and false }}", "False"},
+		{"{{ false or true }}", "True"},
+		{"{{ false or false }}", "False"},
+		{"{{ not true }}", "False"},
+		{"{{ not false }}", "True"},
 	}
 
 	for _, test := range tests {
@@ -463,16 +475,16 @@ func TestTests(t *testing.T) {
 		ctx      map[string]any
 		expected string
 	}{
-		{"{{ x is defined }}", map[string]any{"x": 1}, "true"},
-		{"{{ y is defined }}", map[string]any{"x": 1}, "false"},
-		{"{{ x is undefined }}", map[string]any{"x": 1}, "false"},
-		{"{{ y is undefined }}", map[string]any{"x": 1}, "true"},
-		{"{{ none is none }}", nil, "true"},
-		{"{{ 1 is none }}", nil, "false"},
-		{"{{ 3 is odd }}", nil, "true"},
-		{"{{ 4 is even }}", nil, "true"},
-		{"{{ 10 is divisibleby(5) }}", nil, "true"},
-		{"{{ 10 is divisibleby(3) }}", nil, "false"},
+		{"{{ x is defined }}", map[string]any{"x": 1}, "True"},
+		{"{{ y is defined }}", map[string]any{"x": 1}, "False"},
+		{"{{ x is undefined }}", map[string]any{"x": 1}, "False"},
+		{"{{ y is undefined }}", map[string]any{"x": 1}, "True"},
+		{"{{ none is none }}", nil, "True"},
+		{"{{ 1 is none }}", nil, "False"},
+		{"{{ 3 is odd }}", nil, "True"},
+		{"{{ 4 is even }}", nil, "True"},
+		{"{{ 10 is divisibleby(5) }}", nil, "True"},
+		{"{{ 10 is divisibleby(3) }}", nil, "False"},
 	}
 
 	for _, test := range tests {
@@ -517,8 +529,8 @@ func TestOperatorAliasTests(t *testing.T) {
 		if err != nil {
 			t.Fatalf("render error for %q: %v", alias, err)
 		}
-		if result != "true" {
-			t.Errorf("alias %q: expected \"true\", got %q", alias, result)
+		if result != "True" {
+			t.Errorf("alias %q: expected \"True\", got %q", alias, result)
 		}
 	}
 }
@@ -531,10 +543,10 @@ func TestInOperator(t *testing.T) {
 		ctx      map[string]any
 		expected string
 	}{
-		{"{{ 'a' in 'abc' }}", nil, "true"},
-		{"{{ 'd' in 'abc' }}", nil, "false"},
-		{"{{ 1 in [1,2,3] }}", nil, "true"},
-		{"{{ 4 in [1,2,3] }}", nil, "false"},
+		{"{{ 'a' in 'abc' }}", nil, "True"},
+		{"{{ 'd' in 'abc' }}", nil, "False"},
+		{"{{ 1 in [1,2,3] }}", nil, "True"},
+		{"{{ 4 in [1,2,3] }}", nil, "False"},
 	}
 
 	for _, test := range tests {

@@ -112,7 +112,7 @@ int main(void)
 
     TS_ASSERT_MSG(rendered != NULL, "callback render failed");
     if (rendered) {
-        TS_ASSERT_STR_EQ(rendered, "42|hi!|true|G");
+        TS_ASSERT_STR_EQ(rendered, "42|hi!|True|G");
         mj_str_free(rendered);
     }
 

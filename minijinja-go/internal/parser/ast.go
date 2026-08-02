@@ -1192,9 +1192,12 @@ func debugCallInner(c *Call, indent int) string {
 func formatValue(v interface{}) string {
 	switch val := v.(type) {
 	case nil:
-		return "()"
+		return "None"
 	case bool:
-		return fmt.Sprintf("%v", val)
+		if val {
+			return "True"
+		}
+		return "False"
 	case string:
 		return fmt.Sprintf("%q", val)
 	case int64:

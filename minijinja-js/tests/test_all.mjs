@@ -153,7 +153,7 @@ No referenced variables
       const env = new Environment();
       env.addTest("hello", (x) => x == "hello");
       const result = env.renderStr("{{ 'hello' is hello }}", {});
-      expect(result).to.equal("true");
+      expect(result).to.equal("True");
     });
   });
 
