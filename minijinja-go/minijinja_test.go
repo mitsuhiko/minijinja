@@ -149,6 +149,23 @@ func TestForLoop(t *testing.T) {
 	}
 }
 
+func TestLoopLocalsDoNotPersistBetweenIterations(t *testing.T) {
+	env := NewEnvironment()
+	tmpl, err := env.TemplateFromString("{% for x in [1, 2] %}{% if loop.first %}{% set y = x %}{% endif %}[{{ y }}]{% endfor %}")
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+
+	if result != "[1][]" {
+		t.Errorf("expected '[1][]', got %q", result)
+	}
+}
+
 func TestForLoopWithIndex(t *testing.T) {
 	env := NewEnvironment()
 	tmpl, err := env.TemplateFromString("{% for item in items %}{{ loop.index }}:{{ item }} {% endfor %}")
