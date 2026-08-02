@@ -722,6 +722,14 @@ fn test_render_and_return_state() {
 }
 
 #[test]
+fn test_loop_locals_do_not_persist_between_iterations() {
+    assert_eq!(
+        render!("{% for x in [1, 2] %}{% if loop.first %}{% set y = x %}{% endif %}[{{ y }}]{% endfor %}"),
+        "[1][]"
+    );
+}
+
+#[test]
 fn test_render_captured() {
     let env = Environment::new();
     let rendered = env

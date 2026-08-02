@@ -1121,6 +1121,11 @@ func (s *State) pushScope() {
 	s.scopes = append(s.scopes, make(map[string]value.Value))
 }
 
+// resetScope clears the current scope.
+func (s *State) resetScope() {
+	clear(s.scopes[len(s.scopes)-1])
+}
+
 // popScope removes the current scope.
 func (s *State) popScope() {
 	if len(s.scopes) > 1 {
@@ -1371,6 +1376,7 @@ func (s *State) evalForLoopPull(loop *parser.ForLoop, pull value.PullIterator) e
 		if !ok {
 			break
 		}
+		s.resetScope()
 		if err := s.unpackLoopTarget(loop.Target, item); err != nil {
 			return err
 		}
@@ -1495,6 +1501,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 			s.out = builder
 
 			for i := range nestedItems {
+				s.resetScope()
 				if err := s.unpackLoopTarget(loop.Target, nestedItems[i]); err != nil {
 					s.out = oldOut
 					return "", err
@@ -1534,6 +1541,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 	}
 
 	for i := range items {
+		s.resetScope()
 		if err := s.unpackLoopTarget(loop.Target, items[i]); err != nil {
 			return err
 		}
