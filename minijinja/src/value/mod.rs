@@ -1205,6 +1205,7 @@ impl Value {
     /// It exists so built-ins can preserve their shared-state behavior while
     /// forwarding mutable state to nested calls.  Public callers should use
     /// [`from_function`](Self::from_function) with either `&State` or `&mut State`.
+    #[cfg(feature = "builtins")]
     pub(crate) fn from_variant_function<F, MutF, Rv, MutRv, Args, MutArgs>(
         f: F,
         mut_f: MutF,
