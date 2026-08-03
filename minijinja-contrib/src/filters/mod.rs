@@ -87,7 +87,16 @@ pub fn random(state: &minijinja::State, seq: &Value) -> Result<Value, Error> {
     if matches!(seq.kind(), ValueKind::Seq | ValueKind::String) {
         let len = seq.len().unwrap_or(0);
         let idx = crate::rand::XorShiftRng::for_state(state).next_usize(len);
-        seq.get_item_by_index(idx)
+        let selected = seq.get_item_by_index(idx)?;
+        if seq.kind() == ValueKind::String && seq.is_safe() {
+            if let Some(value) = selected.as_str() {
+                Ok(Value::from_safe_string(value.to_string()))
+            } else {
+                Ok(selected)
+            }
+        } else {
+            Ok(selected)
+        }
     } else {
         Err(Error::new(
             ErrorKind::InvalidOperation,
@@ -172,9 +181,9 @@ pub fn filesizeformat(value: f64, binary: Option<bool>) -> String {
 ///     leeway=2
 /// ) }}
 /// ```
-pub fn truncate(state: &State, value: &Value, kwargs: Kwargs) -> Result<String, Error> {
+pub fn truncate(state: &State, value: &Value, kwargs: Kwargs) -> Result<Value, Error> {
     if matches!(value.kind(), ValueKind::None | ValueKind::Undefined) {
-        return Ok("".into());
+        return Ok(Value::from(""));
     }
 
     let s = value.as_str().ok_or_else(|| {
@@ -186,7 +195,11 @@ pub fn truncate(state: &State, value: &Value, kwargs: Kwargs) -> Result<String, 
 
     let length = kwargs.get::<Option<usize>>("length")?.unwrap_or(255);
     let killwords = kwargs.get::<Option<bool>>("killwords")?.unwrap_or_default();
-    let end = kwargs.get::<Option<&str>>("end")?.unwrap_or("...");
+    let default_end = Value::from("...");
+    let end = kwargs.get::<Option<&Value>>("end")?.unwrap_or(&default_end);
+    let end_str = end
+        .as_str()
+        .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "value is not a string"))?;
     let leeway = kwargs.get::<Option<usize>>("leeway")?.unwrap_or_else(|| {
         state
             .lookup("TRUNCATE_LEEWAY")
@@ -196,7 +209,7 @@ pub fn truncate(state: &State, value: &Value, kwargs: Kwargs) -> Result<String, 
 
     kwargs.assert_all_used()?;
 
-    let end_len = end.chars().count();
+    let end_len = end_str.chars().count();
     if length < end_len {
         return Err(Error::new(
             ErrorKind::InvalidOperation,
@@ -205,7 +218,7 @@ pub fn truncate(state: &State, value: &Value, kwargs: Kwargs) -> Result<String, 
     }
 
     if s.chars().count() <= length + leeway {
-        return Ok(s.to_string());
+        return Ok(value.clone());
     }
 
     let trunc_pos = length - end_len;
@@ -218,10 +231,28 @@ pub fn truncate(state: &State, value: &Value, kwargs: Kwargs) -> Result<String, 
             None => chars.iter().collect(),
         }
     };
-    let mut result = String::with_capacity(truncated.len() + end.len());
-    result.push_str(&truncated);
-    result.push_str(end);
-    Ok(result)
+
+    if value.is_safe() || end.is_safe() {
+        let mut result = String::new();
+        if value.is_safe() {
+            result.push_str(&truncated);
+        } else {
+            let escaped = minijinja::filters::escape(state, &Value::from(truncated))?;
+            result.push_str(escaped.as_str().unwrap());
+        }
+        if end.is_safe() {
+            result.push_str(end_str);
+        } else {
+            let escaped = minijinja::filters::escape(state, &Value::from(end_str))?;
+            result.push_str(escaped.as_str().unwrap());
+        }
+        Ok(Value::from_safe_string(result))
+    } else {
+        let mut result = String::with_capacity(truncated.len() + end_str.len());
+        result.push_str(&truncated);
+        result.push_str(end_str);
+        Ok(Value::from(result))
+    }
 }
 
 /// Counts the words in a string.

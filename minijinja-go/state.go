@@ -107,6 +107,11 @@ func (s *State) AutoEscape() AutoEscape {
 	return s.autoEscape
 }
 
+// AutoEscapeEnabled reports whether the current scope has automatic escaping enabled.
+func (s *State) AutoEscapeEnabled() bool {
+	return !s.autoEscape.IsNone()
+}
+
 // FuelLevels returns the consumed and remaining fuel if fuel tracking is enabled.
 func (s *State) FuelLevels() (consumed, remaining uint64, ok bool) {
 	if s.fuelTracker == nil {
@@ -387,6 +392,31 @@ func (s *State) PerformTest(name string, val value.Value, args []value.Value) (b
 // the resulting string instead of writing to the output.
 func (s *State) Format(val value.Value) (string, error) {
 	return s.formatValue(val, true)
+}
+
+// FormatEscaped formats a value for insertion into a safe string.
+//
+// The current auto-escape mode is used when active. If escaping is disabled in
+// the current scope, the template's initial mode is used, falling back to HTML.
+func (s *State) FormatEscaped(val value.Value) (string, error) {
+	if val.IsSafe() {
+		return val.String(), nil
+	}
+
+	autoEscape := s.autoEscape
+	if autoEscape.IsNone() {
+		if s.env != nil {
+			autoEscape = s.env.autoEscapeFunc(s.name)
+		}
+		if autoEscape.IsNone() {
+			autoEscape = AutoEscapeHTML
+		}
+	}
+
+	oldAutoEscape := s.autoEscape
+	s.autoEscape = autoEscape
+	defer func() { s.autoEscape = oldAutoEscape }()
+	return s.formatValue(val, false)
 }
 
 // GetTemp retrieves a temporary value stored in the state.

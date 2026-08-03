@@ -48,6 +48,48 @@ func undefinedBehavior(state State) value.UndefinedBehavior {
 	return value.UndefinedLenient
 }
 
+type autoEscapeProvider interface {
+	AutoEscapeEnabled() bool
+}
+
+type valueFormatter interface {
+	Format(value.Value) (string, error)
+}
+
+type escapedValueFormatter interface {
+	FormatEscaped(value.Value) (string, error)
+}
+
+func autoEscapeEnabled(state State) bool {
+	provider, ok := state.(autoEscapeProvider)
+	return ok && provider.AutoEscapeEnabled()
+}
+
+func formatForSafeOutput(state State, val value.Value, forceEscape bool) (string, error) {
+	if val.IsSafe() {
+		return val.String(), nil
+	}
+	if forceEscape {
+		if formatter, ok := state.(escapedValueFormatter); ok {
+			return formatter.FormatEscaped(val)
+		}
+		if !autoEscapeEnabled(state) {
+			return EscapeHTML(val.String()), nil
+		}
+	}
+	if formatter, ok := state.(valueFormatter); ok {
+		return formatter.Format(val)
+	}
+	return EscapeHTML(val.String()), nil
+}
+
+func preserveSafety(input value.Value, output string) value.Value {
+	if input.IsSafe() {
+		return value.FromSafeString(output)
+	}
+	return value.FromString(output)
+}
+
 // FilterUpper converts a value to uppercase.
 //
 // This filter converts the entire string to uppercase characters.
@@ -65,7 +107,7 @@ func undefinedBehavior(state State) value.UndefinedBehavior {
 // unchanged.
 func FilterUpper(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
-		return value.FromString(strings.ToUpper(s)), nil
+		return preserveSafety(val, strings.ToUpper(s)), nil
 	}
 	return val, nil
 }
@@ -84,7 +126,7 @@ func FilterUpper(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 //	<h1>{{ chapter.title|lower }}</h1>
 func FilterLower(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
-		return value.FromString(strings.ToLower(s)), nil
+		return preserveSafety(val, strings.ToLower(s)), nil
 	}
 	return val, nil
 }
@@ -106,12 +148,12 @@ func FilterLower(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 //	  -> "Hello world"
 func FilterCapitalize(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
-		if len(s) == 0 {
+		runes := []rune(s)
+		if len(runes) == 0 {
 			return val, nil
 		}
-		runes := []rune(strings.ToLower(s))
-		runes[0] = []rune(strings.ToUpper(string(runes[0])))[0]
-		return value.FromString(string(runes)), nil
+		output := strings.ToUpper(string(runes[0])) + strings.ToLower(string(runes[1:]))
+		return preserveSafety(val, output), nil
 	}
 	return val, nil
 }
@@ -176,7 +218,7 @@ func FilterTrim(_ State, val value.Value, args []value.Value, _ map[string]value
 				chars = c
 			}
 		}
-		return value.FromString(strings.Trim(s, chars)), nil
+		return preserveSafety(val, strings.Trim(s, chars)), nil
 	}
 	return val, nil
 }
@@ -197,7 +239,7 @@ func FilterTrim(_ State, val value.Value, args []value.Value, _ map[string]value
 //	  -> "Goodbye World"
 //	{{ "aaa"|replace("a", "b", 2) }}
 //	  -> "bba"
-func FilterReplace(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterReplace(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		if len(args) < 2 {
 			return val, fmt.Errorf("replace requires old and new arguments")
@@ -210,6 +252,20 @@ func FilterReplace(_ State, val value.Value, args []value.Value, _ map[string]va
 				count = int(c)
 			}
 		}
+
+		safetyAware := autoEscapeEnabled(state) && (val.IsSafe() || args[0].IsSafe() || args[1].IsSafe())
+		if safetyAware {
+			var err error
+			s, err = formatForSafeOutput(state, val, false)
+			if err != nil {
+				return value.Undefined(), err
+			}
+			new, err = formatForSafeOutput(state, args[1], false)
+			if err != nil {
+				return value.Undefined(), err
+			}
+			return value.FromSafeString(strings.Replace(s, old, new, count)), nil
+		}
 		return value.FromString(strings.Replace(s, old, new, count)), nil
 	}
 	return val, nil
@@ -220,20 +276,47 @@ func FilterReplace(_ State, val value.Value, args []value.Value, _ map[string]va
 // Example:
 //
 //	{{ "%s, %s!"|format(greeting, name) }}
-func FilterFormat(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterFormat(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	formatStr, ok := val.AsString()
 	if !ok {
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "format filter expects a string")
 	}
 
-	formatted, err := formatPrintf(formatStr, args)
+	var transform func(value.Value, byte) (value.Value, error)
+	if val.IsSafe() {
+		transform = func(arg value.Value, verb byte) (value.Value, error) {
+			if verb == 'c' {
+				return value.Undefined(), mjerrors.NewError(
+					mjerrors.ErrInvalidOperation,
+					"character formatting is not supported for safe format strings",
+				)
+			}
+			if arg.IsSafe() || arg.Kind() == value.KindBool || arg.Kind() == value.KindNumber {
+				return arg, nil
+			}
+			escaped, err := formatForSafeOutput(state, arg, true)
+			if err != nil {
+				return value.Undefined(), err
+			}
+			return value.FromString(escaped), nil
+		}
+	}
+
+	formatted, err := formatPrintfWith(formatStr, args, transform)
 	if err != nil {
 		return value.Undefined(), err
+	}
+	if val.IsSafe() {
+		return value.FromSafeString(formatted), nil
 	}
 	return value.FromString(formatted), nil
 }
 
 func formatPrintf(formatStr string, args []value.Value) (string, error) {
+	return formatPrintfWith(formatStr, args, nil)
+}
+
+func formatPrintfWith(formatStr string, args []value.Value, transform func(value.Value, byte) (value.Value, error)) (string, error) {
 	var out strings.Builder
 	argIndex := 0
 
@@ -294,7 +377,7 @@ func formatPrintf(formatStr string, args []value.Value) (string, error) {
 		verb := formatStr[i]
 		i++
 
-		if !strings.ContainsRune("diouxXeEfFgGs", rune(verb)) {
+		if !strings.ContainsRune("cdiouxXeEfFgGs", rune(verb)) {
 			return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("invalid format verb '%c'", verb))
 		}
 
@@ -320,6 +403,14 @@ func formatPrintf(formatStr string, args []value.Value) (string, error) {
 			argIndex++
 		}
 
+		if transform != nil {
+			var err error
+			arg, err = transform(arg, verb)
+			if err != nil {
+				return "", err
+			}
+		}
+
 		formatted, err := formatPrintfValue(arg, flags, width, precision, verb, location)
 		if err != nil {
 			return "", err
@@ -340,6 +431,37 @@ func formatPrintfValue(val value.Value, flags, width, precision string, verb byt
 	switch verb {
 	case 's':
 		return fmt.Sprintf(format, val.String()), nil
+	case 'c':
+		var char rune
+		switch {
+		case val.IsActualInt():
+			i, _ := val.AsInt()
+			if i < 0 || i > unicode.MaxRune || i >= 0xd800 && i <= 0xdfff {
+				return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, "character format ('c') arg not in range(0x110000)")
+			}
+			char = rune(i)
+		case val.Kind() == value.KindBool:
+			b, _ := val.AsBool()
+			if b {
+				char = 1
+			}
+		case val.Kind() == value.KindString:
+			s, _ := val.AsString()
+			runes := []rune(s)
+			if len(runes) != 1 {
+				return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, "character format ('c') requires integer or char")
+			}
+			char = runes[0]
+		default:
+			return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, "character format ('c') requires integer or char")
+		}
+		charStr := string(char)
+		widthValue, _ := strconv.Atoi(width)
+		padding := strings.Repeat(" ", max(0, widthValue-1))
+		if strings.Contains(flags, "-") {
+			return charStr + padding, nil
+		}
+		return padding + charStr, nil
 	case 'd', 'i', 'o', 'x', 'X':
 		if i, ok := val.AsInt(); ok {
 			return fmt.Sprintf(format, i), nil
@@ -427,11 +549,11 @@ func FilterSafe(_ State, val value.Value, _ []value.Value, _ map[string]value.Va
 	return value.FromSafeString(val.String()), nil
 }
 
-// FilterEscape escapes a string for safe HTML output.
+// FilterEscape escapes a string for safe output.
 //
 // By default, this filter is also registered under the alias "e". If the value
-// is already marked as safe, it is returned unchanged. Otherwise, it escapes
-// HTML special characters.
+// is already marked as safe, it is returned unchanged. Otherwise, it uses the
+// current auto-escape mode, falling back to HTML.
 //
 // Example:
 //
@@ -443,14 +565,15 @@ func FilterSafe(_ State, val value.Value, _ []value.Value, _ map[string]value.Va
 //	{{ user_input|escape }}
 //	{{ "<script>alert('xss')</script>"|e }}
 //	  -> "&lt;script&gt;alert('xss')&lt;/script&gt;"
-func FilterEscape(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterEscape(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if val.IsSafe() {
 		return val, nil
 	}
-	if s, ok := val.AsString(); ok {
-		return value.FromSafeString(EscapeHTML(s)), nil
+	escaped, err := formatForSafeOutput(state, val, true)
+	if err != nil {
+		return value.Undefined(), err
 	}
-	return value.FromSafeString(EscapeHTML(val.String())), nil
+	return value.FromSafeString(escaped), nil
 }
 
 // EscapeHTML escapes a string for safe use in HTML.
@@ -550,7 +673,11 @@ func FilterBool(state State, val value.Value, _ []value.Value, _ map[string]valu
 func FilterSplit(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	s, ok := val.AsString()
 	if !ok {
-		return value.FromSlice(nil), nil
+		if bytes, isBytes := val.Raw().([]byte); isBytes {
+			s = strings.ToValidUTF8(string(bytes), "\uFFFD")
+		} else {
+			return value.FromSlice(nil), nil
+		}
 	}
 
 	// Get split pattern
@@ -587,7 +714,7 @@ func FilterSplit(_ State, val value.Value, args []value.Value, _ map[string]valu
 
 	result := make([]value.Value, len(parts))
 	for i, p := range parts {
-		result[i] = value.FromString(p)
+		result[i] = preserveSafety(val, p)
 	}
 	return value.FromSlice(result), nil
 }
@@ -640,17 +767,30 @@ func splitWhitespaceN(s string, n int) []string {
 func FilterLines(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	s, ok := val.AsString()
 	if !ok {
-		return value.FromSlice(nil), nil
+		if bytes, isBytes := val.Raw().([]byte); isBytes {
+			s = strings.ToValidUTF8(string(bytes), "\uFFFD")
+		} else {
+			return value.FromSlice(nil), nil
+		}
 	}
 
-	// Normalize line endings and split
-	s = strings.ReplaceAll(s, "\r\n", "\n")
-	s = strings.ReplaceAll(s, "\r", "\n")
-	lines := strings.Split(s, "\n")
+	var lines []string
+	if s != "" {
+		lines = strings.Split(s, "\n")
+		if strings.HasSuffix(s, "\n") {
+			lines = lines[:len(lines)-1]
+		}
+		for i := 0; i < len(lines)-1; i++ {
+			lines[i] = strings.TrimSuffix(lines[i], "\r")
+		}
+		if strings.HasSuffix(s, "\r\n") && len(lines) > 0 {
+			lines[len(lines)-1] = strings.TrimSuffix(lines[len(lines)-1], "\r")
+		}
+	}
 
 	result := make([]value.Value, len(lines))
 	for i, line := range lines {
-		result[i] = value.FromString(line)
+		result[i] = preserveSafety(val, line)
 	}
 	return value.FromSlice(result), nil
 }
@@ -722,6 +862,13 @@ func FilterFirst(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 //	  </dl>
 //	{% endwith %}
 func FilterLast(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	if s, ok := val.AsString(); ok {
+		runes := []rune(s)
+		if len(runes) > 0 {
+			return preserveSafety(val, string(runes[len(runes)-1])), nil
+		}
+		return value.Undefined(), nil
+	}
 	items := val.Iter()
 	if len(items) > 0 {
 		return items[len(items)-1], nil
@@ -752,7 +899,14 @@ func FilterReverse(_ State, val value.Value, _ []value.Value, _ map[string]value
 		for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
 			runes[i], runes[j] = runes[j], runes[i]
 		}
-		return value.FromString(string(runes)), nil
+		return preserveSafety(val, string(runes)), nil
+	}
+	if bytes, ok := val.Raw().([]byte); ok {
+		result := append([]byte(nil), bytes...)
+		for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
+			result[i], result[j] = result[j], result[i]
+		}
+		return value.FromBytes(result), nil
 	}
 
 	items := val.Iter()
@@ -894,22 +1048,60 @@ func parseInt(s string) (int64, error) {
 //	{{ ["a", "b", "c"]|join(", ") }}
 //	  -> "a, b, c"
 //	{{ items|join }}
-func FilterJoin(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterJoin(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
 	if items == nil {
 		return val, nil
 	}
 
 	sep := ""
+	sepSafe := false
 	if len(args) > 0 {
 		sep, _ = args[0].AsString()
+		sepSafe = args[0].IsSafe()
 	}
 
+	if !autoEscapeEnabled(state) {
+		parts := make([]string, len(items))
+		for i, item := range items {
+			parts[i] = item.String()
+		}
+		return value.FromString(strings.Join(parts, sep)), nil
+	}
+
+	outputSafe := sepSafe
+	if !outputSafe {
+		for _, item := range items {
+			if item.IsSafe() {
+				outputSafe = true
+				break
+			}
+		}
+	}
+	if !outputSafe {
+		parts := make([]string, len(items))
+		for i, item := range items {
+			parts[i] = item.String()
+		}
+		return value.FromString(strings.Join(parts, sep)), nil
+	}
+
+	if !sepSafe && len(args) > 0 {
+		var err error
+		sep, err = formatForSafeOutput(state, args[0], false)
+		if err != nil {
+			return value.Undefined(), err
+		}
+	}
 	parts := make([]string, len(items))
 	for i, item := range items {
-		parts[i] = item.String()
+		var err error
+		parts[i], err = formatForSafeOutput(state, item, false)
+		if err != nil {
+			return value.Undefined(), err
+		}
 	}
-	return value.FromString(strings.Join(parts, sep)), nil
+	return value.FromSafeString(strings.Join(parts, sep)), nil
 }
 
 // FilterList converts a value into a list.
@@ -2326,6 +2518,8 @@ func FilterIndent(_ State, val value.Value, args []value.Value, kwargs map[strin
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
 	}
 
+	s = strings.TrimSuffix(s, "\n")
+	s = strings.TrimSuffix(s, "\r")
 	indent := strings.Repeat(" ", width)
 	lines := strings.Split(s, "\n")
 	for i, line := range lines {
@@ -2337,7 +2531,7 @@ func FilterIndent(_ State, val value.Value, args []value.Value, kwargs map[strin
 		}
 		lines[i] = indent + line
 	}
-	return value.FromString(strings.Join(lines, "\n")), nil
+	return preserveSafety(val, strings.Join(lines, "\n")), nil
 }
 
 // FilterPprint pretty-prints a value for debugging.

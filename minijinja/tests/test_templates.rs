@@ -1,3 +1,6 @@
+// The Unicode lookup test intentionally uses Greek alpha, which is visually
+// confusable with an ASCII identifier elsewhere in this test crate.
+#![allow(confusable_idents, mixed_script_confusables)]
 #![cfg(all(
     feature = "multi_template",
     feature = "macros",

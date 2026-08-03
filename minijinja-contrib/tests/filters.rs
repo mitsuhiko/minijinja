@@ -1,4 +1,4 @@
-use minijinja::{context, Environment};
+use minijinja::{context, AutoEscape, Environment, Value};
 use minijinja_contrib::filters::{pluralize, striptags};
 use similar_asserts::assert_eq;
 
@@ -105,6 +105,10 @@ fn test_random() {
 
     insta::assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ [1, 2, 3, 4]|random }}"), @"1");
     insta::assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ 'HelloWorld'|random }}"), @"H");
+
+    let state = env.empty_state();
+    let result = random(&state, &Value::from_safe_string("HelloWorld".into())).unwrap();
+    assert!(result.is_safe());
 }
 
 #[test]
@@ -201,6 +205,54 @@ fn test_truncate() {
             .to_string(),
         "invalid operation: expected length >= 3, got 1 (in <string>:1)"
     );
+}
+
+#[test]
+fn test_truncate_preserves_and_composes_safety() {
+    use minijinja::value::Kwargs;
+    use minijinja_contrib::filters::truncate;
+
+    let mut env = Environment::new();
+    env.set_auto_escape_callback(|_| AutoEscape::Html);
+    let template = env.template_from_str("").unwrap();
+    let state = template.new_state();
+
+    let result = truncate(
+        &state,
+        &Value::from_safe_string("Hello <b>World</b>".into()),
+        Kwargs::from_iter([
+            ("length", Value::from(12)),
+            ("killwords", Value::from(true)),
+            ("end", Value::from("<i>")),
+            ("leeway", Value::from(0)),
+        ]),
+    )
+    .unwrap();
+    assert!(result.is_safe());
+    assert_eq!(result.as_str(), Some("Hello <b>&lt;i&gt;"));
+
+    let result = truncate(
+        &state,
+        &Value::from("<b>Hello World</b>"),
+        Kwargs::from_iter([
+            ("length", Value::from(10)),
+            ("killwords", Value::from(true)),
+            ("end", Value::from_safe_string("<i>".into())),
+            ("leeway", Value::from(0)),
+        ]),
+    )
+    .unwrap();
+    assert!(result.is_safe());
+    assert_eq!(result.as_str(), Some("&lt;b&gt;Hell<i>"));
+
+    let result = truncate(
+        &state,
+        &Value::from_safe_string("short".into()),
+        Kwargs::from_iter([] as [(&str, Value); 0]),
+    )
+    .unwrap();
+    assert!(result.is_safe());
+    assert_eq!(result.as_str(), Some("short"));
 }
 
 #[test]

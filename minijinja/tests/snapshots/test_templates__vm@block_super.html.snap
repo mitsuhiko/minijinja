@@ -5,13 +5,9 @@ info:
   var: foo
 input_file: minijinja/tests/inputs/block_super.html
 ---
-
   <p>New Content</p>
   
   <p>Default Content</p>
 
   
-  &lt;P&gt;DEFAULT CONTENT&lt;&#x2f;P&gt;
-
-
-
+  <P>DEFAULT CONTENT</P>

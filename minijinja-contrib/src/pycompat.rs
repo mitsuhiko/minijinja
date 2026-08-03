@@ -1,4 +1,4 @@
-use minijinja::value::{from_args, ValueKind};
+use minijinja::value::{from_args, StringInput, ValueKind};
 use minijinja::{format_filter, Error, ErrorKind, FormatStyle, State, Value};
 
 /// An unknown method callback implementing python methods on primitives.
@@ -47,20 +47,25 @@ use minijinja::{format_filter, Error, ErrorKind, FormatStyle, State, Value};
 /// * `str.upper`
 #[cfg_attr(docsrs, doc(cfg(feature = "pycompat")))]
 pub fn unknown_method_callback(
-    _state: &State,
+    state: &State,
     value: &Value,
     method: &str,
     args: &[Value],
 ) -> Result<Value, Error> {
     match value.kind() {
-        ValueKind::String => string_methods(value, method, args),
+        ValueKind::String => string_methods(state, value, method, args),
         ValueKind::Map => map_methods(value, method, args),
         ValueKind::Seq => seq_methods(value, method, args),
         _ => Err(Error::from(ErrorKind::UnknownMethod)),
     }
 }
 
-fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, Error> {
+fn string_methods(
+    state: &State,
+    value: &Value,
+    method: &str,
+    args: &[Value],
+) -> Result<Value, Error> {
     let Some(s) = value.as_str() else {
         return Err(Error::from(ErrorKind::UnknownMethod));
     };
@@ -147,7 +152,7 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
             let (sep, maxsplits) = from_args(args)?;
             // one shall not call into these filters.  However we consider ourselves
             // privileged.
-            Ok(minijinja::filters::split(s.into(), sep, maxsplits)
+            Ok(minijinja::filters::split(value, sep, maxsplits)?
                 .try_iter()?
                 .collect::<Value>())
         }
@@ -172,7 +177,9 @@ fn string_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, 
             let () = from_args(args)?;
             // one shall not call into these filters.  However we consider ourselves
             // privileged.
-            Ok(Value::from(minijinja::filters::capitalize(s.into())))
+            Ok(minijinja::filters::capitalize(StringInput::new(
+                state, value,
+            )?))
         }
         "count" => {
             let (what,): (&str,) = from_args(args)?;
