@@ -727,7 +727,7 @@ pub enum Enumerator {
     /// which incurs unnecessary cost of the map lookup.  This enumerator avoids the
     /// cost.
     ///
-    /// For [`ObjectRepr::Iter`], the iteration behavior is consistent with the
+    /// For [`ObjectRepr::Iterable`], the iteration behavior is consistent with the
     /// `Iter` alternative, i.e. the iteration is over the values, which in this case
     /// is (key, value) pairs.
     ///
