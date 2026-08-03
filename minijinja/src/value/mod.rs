@@ -1198,6 +1198,28 @@ impl Value {
         functions::BoxedFunction::new(f).to_value()
     }
 
+    /// Creates a callable value with separate shared and mutable implementations.
+    ///
+    /// This is intentionally internal because the two implementations could
+    /// otherwise produce different behavior depending on how the value is called.
+    /// It exists so built-ins can preserve their shared-state behavior while
+    /// forwarding mutable state to nested calls.  Public callers should use
+    /// [`from_function`](Self::from_function) with either `&State` or `&mut State`.
+    pub(crate) fn from_variant_function<F, MutF, Rv, MutRv, Args, MutArgs>(
+        f: F,
+        mut_f: MutF,
+    ) -> Value
+    where
+        F: functions::Function<Rv, Args>,
+        MutF: functions::Function<MutRv, MutArgs>,
+        Rv: FunctionResult,
+        MutRv: FunctionResult,
+        Args: for<'a> FunctionArgs<'a>,
+        MutArgs: for<'a> FunctionArgs<'a>,
+    {
+        functions::BoxedFunction::new_with_state_variants(f, mut_f).to_value()
+    }
+
     /// Returns the kind of the value.
     ///
     /// This can be used to determine what's in the value before trying to

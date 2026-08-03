@@ -199,6 +199,27 @@ mod builtins {
     use std::mem;
     use std::sync::Arc;
 
+    enum StateAccess<'a, 'template, 'env> {
+        Shared(&'a State<'template, 'env>),
+        Mutable(&'a mut State<'template, 'env>),
+    }
+
+    impl<'a, 'template, 'env> StateAccess<'a, 'template, 'env> {
+        fn state(&self) -> &State<'template, 'env> {
+            match self {
+                StateAccess::Shared(state) => state,
+                StateAccess::Mutable(state) => state,
+            }
+        }
+
+        fn call(&mut self, value: &Value, args: &[Value]) -> Result<Value, Error> {
+            match self {
+                StateAccess::Shared(state) => value.call(state, args),
+                StateAccess::Mutable(state) => value.call_mut_state(state, args),
+            }
+        }
+    }
+
     /// Converts a value to uppercase.
     ///
     /// ```jinja
@@ -1307,7 +1328,7 @@ mod builtins {
     }
 
     fn select_or_reject(
-        state: &State,
+        mut state: StateAccess<'_, '_, '_>,
         invert: bool,
         value: Value,
         attr: Option<Cow<'_, str>>,
@@ -1317,13 +1338,14 @@ mod builtins {
         let mut rv = vec![];
         let test = if let Some(test_name) = test_name {
             Some(ok!(state
+                .state()
                 .env()
                 .get_test(&test_name)
                 .ok_or_else(|| Error::from(ErrorKind::UnknownTest))))
         } else {
             None
         };
-        for value in ok!(state.undefined_behavior().try_iter(value)) {
+        for value in ok!(state.state().undefined_behavior().try_iter(value)) {
             let test_value = if let Some(ref attr) = attr {
                 ok!(value.get_path(attr))
             } else {
@@ -1334,7 +1356,7 @@ mod builtins {
                     .into_iter()
                     .chain(args.0.iter().cloned())
                     .collect::<Vec<_>>();
-                ok!(test.call(state, &new_args)).is_true()
+                ok!(state.call(test, &new_args)).is_true()
             } else {
                 test_value.is_true()
             };
@@ -1363,7 +1385,30 @@ mod builtins {
         test_name: Option<Cow<'_, str>>,
         args: crate::value::Rest<Value>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, false, value, None, test_name, args)
+        select_or_reject(
+            StateAccess::Shared(state),
+            false,
+            value,
+            None,
+            test_name,
+            args,
+        )
+    }
+
+    pub(crate) fn select_mut(
+        state: &mut State,
+        value: Value,
+        test_name: Option<Cow<'_, str>>,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
+        select_or_reject(
+            StateAccess::Mutable(state),
+            false,
+            value,
+            None,
+            test_name,
+            args,
+        )
     }
 
     /// Creates a new sequence of values of which an attribute passes a test.
@@ -1383,7 +1428,31 @@ mod builtins {
         test_name: Option<Cow<'_, str>>,
         args: crate::value::Rest<Value>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, false, value, Some(attr), test_name, args)
+        select_or_reject(
+            StateAccess::Shared(state),
+            false,
+            value,
+            Some(attr),
+            test_name,
+            args,
+        )
+    }
+
+    pub(crate) fn selectattr_mut(
+        state: &mut State,
+        value: Value,
+        attr: Cow<'_, str>,
+        test_name: Option<Cow<'_, str>>,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
+        select_or_reject(
+            StateAccess::Mutable(state),
+            false,
+            value,
+            Some(attr),
+            test_name,
+            args,
+        )
     }
 
     /// Creates a new sequence of values that don't pass a test.
@@ -1396,7 +1465,30 @@ mod builtins {
         test_name: Option<Cow<'_, str>>,
         args: crate::value::Rest<Value>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, true, value, None, test_name, args)
+        select_or_reject(
+            StateAccess::Shared(state),
+            true,
+            value,
+            None,
+            test_name,
+            args,
+        )
+    }
+
+    pub(crate) fn reject_mut(
+        state: &mut State,
+        value: Value,
+        test_name: Option<Cow<'_, str>>,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
+        select_or_reject(
+            StateAccess::Mutable(state),
+            true,
+            value,
+            None,
+            test_name,
+            args,
+        )
     }
 
     /// Creates a new sequence of values of which an attribute does not pass a test.
@@ -1416,7 +1508,31 @@ mod builtins {
         test_name: Option<Cow<'_, str>>,
         args: crate::value::Rest<Value>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, true, value, Some(attr), test_name, args)
+        select_or_reject(
+            StateAccess::Shared(state),
+            true,
+            value,
+            Some(attr),
+            test_name,
+            args,
+        )
+    }
+
+    pub(crate) fn rejectattr_mut(
+        state: &mut State,
+        value: Value,
+        attr: Cow<'_, str>,
+        test_name: Option<Cow<'_, str>>,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
+        select_or_reject(
+            StateAccess::Mutable(state),
+            true,
+            value,
+            Some(attr),
+            test_name,
+            args,
+        )
     }
 
     /// Applies a filter to a sequence of objects or looks up an attribute.
@@ -1451,6 +1567,22 @@ mod builtins {
         value: Value,
         args: crate::value::Rest<Value>,
     ) -> Result<Vec<Value>, Error> {
+        map_impl(StateAccess::Shared(state), value, args)
+    }
+
+    pub(crate) fn map_mut(
+        state: &mut State,
+        value: Value,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
+        map_impl(StateAccess::Mutable(state), value, args)
+    }
+
+    fn map_impl(
+        mut state: StateAccess<'_, '_, '_>,
+        value: Value,
+        args: crate::value::Rest<Value>,
+    ) -> Result<Vec<Value>, Error> {
         let mut rv = Vec::with_capacity(value.len().unwrap_or(0));
 
         // attribute mapping
@@ -1465,7 +1597,7 @@ mod builtins {
             } else {
                 Value::UNDEFINED
             };
-            for value in ok!(state.undefined_behavior().try_iter(value)) {
+            for value in ok!(state.state().undefined_behavior().try_iter(value)) {
                 let sub_val = match attr.as_str() {
                     Some(path) => value.get_path(path),
                     None => value.get_item(&attr),
@@ -1495,15 +1627,16 @@ mod builtins {
         }));
 
         let filter = ok!(state
+            .state()
             .env()
             .get_filter(filter_name)
             .ok_or_else(|| Error::from(ErrorKind::UnknownFilter)));
-        for value in ok!(state.undefined_behavior().try_iter(value)) {
+        for value in ok!(state.state().undefined_behavior().try_iter(value)) {
             let new_args = Some(value.clone())
                 .into_iter()
                 .chain(args.iter().skip(1).cloned())
                 .collect::<Vec<_>>();
-            rv.push(ok!(filter.call(state, &new_args)));
+            rv.push(ok!(state.call(filter, &new_args)));
         }
         Ok(rv)
     }

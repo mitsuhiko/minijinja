@@ -1,6 +1,6 @@
 #![cfg(feature = "builtins")]
 use minijinja::value::{Kwargs, StringInput, Value, ValueKind};
-use minijinja::{args, context, Environment};
+use minijinja::{args, context, Environment, State};
 use similar_asserts::assert_eq;
 
 use minijinja::filters::abs;
@@ -506,6 +506,78 @@ fn test_zip_single_iterable() {
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
     assert_eq!(result, "[[1], [2], [3]]");
+}
+
+#[test]
+fn test_higher_order_filters_propagate_mutable_state() {
+    fn stateful_double(state: &mut State, value: i64) -> i64 {
+        let count = state
+            .get_temp("filter_calls")
+            .and_then(|value| i64::try_from(value).ok())
+            .unwrap_or_default()
+            + 1;
+        state.set_temp("filter_calls", Value::from(count));
+        value * 2
+    }
+
+    fn stateful_odd(state: &mut State, value: i64) -> bool {
+        let count = state
+            .get_temp("test_calls")
+            .and_then(|value| i64::try_from(value).ok())
+            .unwrap_or_default()
+            + 1;
+        state.set_temp("test_calls", Value::from(count));
+        value % 2 != 0
+    }
+
+    fn call_counts(state: &State) -> String {
+        format!(
+            "{}:{}",
+            state.get_temp("filter_calls").unwrap_or_default(),
+            state.get_temp("test_calls").unwrap_or_default()
+        )
+    }
+
+    let mut env = Environment::new();
+    env.add_filter("stateful_double", stateful_double);
+    env.add_test("stateful_odd", stateful_odd);
+    env.add_function("call_counts", call_counts);
+    let result = env
+        .template_from_str(
+            "{{ [1, 2, 3]|map('stateful_double')|list }}|\
+             {{ [1, 2, 3, 4]|select('stateful_odd')|list }}|{{ call_counts() }}",
+        )
+        .unwrap()
+        .render(())
+        .unwrap();
+    assert_eq!(result, "[2, 4, 6]|[1, 3]|3:4");
+
+    // The original shared-state implementation remains usable through the
+    // public State API.
+    let state = env.empty_state();
+    let result = state
+        .apply_filter(
+            "map",
+            args!(
+                Value::from_iter([Value::from("a"), Value::from("b")]),
+                "upper"
+            ),
+        )
+        .unwrap();
+    assert_eq!(result.to_string(), r#"["A", "B"]"#);
+
+    let mut state = env.empty_state();
+    let result = state
+        .apply_filter_mut(
+            "map",
+            args!(
+                Value::from_iter([Value::from(1), Value::from(2)]),
+                "stateful_double"
+            ),
+        )
+        .unwrap();
+    assert_eq!(result.to_string(), "[2, 4]");
+    assert_eq!(state.get_temp("filter_calls"), Some(Value::from(2)));
 }
 
 #[test]

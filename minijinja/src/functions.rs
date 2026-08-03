@@ -396,6 +396,30 @@ impl BoxedFunction {
         )
     }
 
+    /// Creates a boxed function with separate shared and mutable implementations.
+    #[cfg(feature = "builtins")]
+    pub(crate) fn new_with_state_variants<F, MutF, Rv, MutRv, Args, MutArgs>(
+        f: F,
+        mut_f: MutF,
+    ) -> BoxedFunction
+    where
+        F: Function<Rv, Args>,
+        MutF: Function<MutRv, MutArgs>,
+        Rv: FunctionResult,
+        MutRv: FunctionResult,
+        Args: for<'a> FunctionArgs<'a>,
+        MutArgs: for<'a> FunctionArgs<'a>,
+    {
+        BoxedFunction(
+            Arc::new(move |state, args| match state {
+                StateAccess::Shared(state) => f.invoke(state, args, SealedMarker),
+                StateAccess::Mutable(state) => mut_f.invoke_mut(state, args, SealedMarker),
+            }),
+            #[cfg(feature = "debug")]
+            std::any::type_name::<F>(),
+        )
+    }
+
     /// Invokes the function.
     pub fn invoke(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
         (self.0)(StateAccess::Shared(state), args)

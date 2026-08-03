@@ -107,17 +107,26 @@ fn build_builtin_filters() -> BTreeMap<Cow<'static, str>, Value> {
         rv.insert("slice".into(), Value::from_function(filters::slice));
         rv.insert("sum".into(), Value::from_function(filters::sum));
         rv.insert("indent".into(), Value::from_function(filters::indent));
-        rv.insert("select".into(), Value::from_function(filters::select));
-        rv.insert("reject".into(), Value::from_function(filters::reject));
+        rv.insert(
+            "select".into(),
+            Value::from_variant_function(filters::select, filters::select_mut),
+        );
+        rv.insert(
+            "reject".into(),
+            Value::from_variant_function(filters::reject, filters::reject_mut),
+        );
         rv.insert(
             "selectattr".into(),
-            Value::from_function(filters::selectattr),
+            Value::from_variant_function(filters::selectattr, filters::selectattr_mut),
         );
         rv.insert(
             "rejectattr".into(),
-            Value::from_function(filters::rejectattr),
+            Value::from_variant_function(filters::rejectattr, filters::rejectattr_mut),
         );
-        rv.insert("map".into(), Value::from_function(filters::map));
+        rv.insert(
+            "map".into(),
+            Value::from_variant_function(filters::map, filters::map_mut),
+        );
         rv.insert("groupby".into(), Value::from_function(filters::groupby));
         rv.insert("unique".into(), Value::from_function(filters::unique));
         rv.insert("chain".into(), Value::from_function(filters::chain));
