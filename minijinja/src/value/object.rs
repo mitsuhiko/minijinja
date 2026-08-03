@@ -240,6 +240,18 @@ pub trait Object: fmt::Debug + Send + Sync {
         ))
     }
 
+    /// The engine calls this to invoke the object with mutable state.
+    ///
+    /// The default implementation delegates to [`call`](Self::call).  Objects
+    /// which need mutable access to the state can override this method.
+    fn call_mut_state(
+        self: &Arc<Self>,
+        state: &mut State<'_, '_>,
+        args: &[Value],
+    ) -> Result<Value, Error> {
+        self.call(state, args)
+    }
+
     /// The engine calls this to invoke a method on the object.
     ///
     /// The default implementation returns an
@@ -255,6 +267,19 @@ pub trait Object: fmt::Debug + Send + Sync {
     ) -> Result<Value, Error> {
         let (_, _, _) = (state, method, args);
         Err(Error::from(ErrorKind::UnknownMethod))
+    }
+
+    /// The engine calls this to invoke a method with mutable state.
+    ///
+    /// The default implementation delegates to [`call_method`](Self::call_method).
+    /// Objects which need mutable access to the state can override this method.
+    fn call_method_mut_state(
+        self: &Arc<Self>,
+        state: &mut State<'_, '_>,
+        method: &str,
+        args: &[Value],
+    ) -> Result<Value, Error> {
+        self.call_method(state, method, args)
     }
 
     /// Custom comparison of this object against another object of the same type.
@@ -841,9 +866,22 @@ type_erase! {
             args: &[Value]
         ) -> Result<Value, Error>;
 
+        fn call_mut_state(
+            &self,
+            state: &mut State<'_, '_>,
+            args: &[Value]
+        ) -> Result<Value, Error>;
+
         fn call_method(
             &self,
             state: &State<'_, '_>,
+            method: &str,
+            args: &[Value]
+        ) -> Result<Value, Error>;
+
+        fn call_method_mut_state(
+            &self,
+            state: &mut State<'_, '_>,
             method: &str,
             args: &[Value]
         ) -> Result<Value, Error>;

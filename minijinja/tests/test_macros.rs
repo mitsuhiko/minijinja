@@ -1,12 +1,12 @@
 #![cfg(feature = "macros")]
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
 use minijinja::value::{Kwargs, Object, Value};
-use minijinja::{args, context, render, Environment, ErrorKind};
+use minijinja::{args, context, render, Environment, Error, ErrorKind, State};
 
 #[test]
 fn test_context() {
@@ -106,12 +106,18 @@ fn test_macro_passing() {
     let tmpl = env
         .template_from_str("{% macro m(a) %}{{ a }}{% endmacro %}")
         .unwrap();
-    let rendered = tmpl.render_captured(()).unwrap();
+    let mut rendered = tmpl.render_captured(()).unwrap();
     let state = rendered.state();
     let m = state.lookup("m").unwrap();
     assert_eq!(m.get_attr("name").unwrap().as_str(), Some("m"));
-    let rv = m.call(&state, args!(42)).unwrap();
+    let rv = m.call(state, args!(42)).unwrap();
     assert_eq!(rv.as_str(), Some("42"));
+    assert_eq!(
+        rendered
+            .with_state_mut(|state| state.call_macro_mut("m", args!(23)))
+            .unwrap(),
+        "23"
+    );
 
     // if we call the macro on an empty state it errors
     let empty_state = env.empty_state();
@@ -247,4 +253,38 @@ fn test_unenclosed_resolve() {
         )
         .unwrap();
     assert_snapshot!(rv, @"render global|ctx global|");
+}
+
+#[test]
+fn test_macro_reuses_mutable_state() {
+    #[derive(Debug, Default)]
+    struct StateProbe(AtomicUsize);
+
+    impl Object for StateProbe {
+        fn call_mut_state(
+            self: &Arc<Self>,
+            state: &mut State<'_, '_>,
+            _args: &[Value],
+        ) -> Result<Value, Error> {
+            let ptr = state as *mut State<'_, '_> as usize;
+            match self
+                .0
+                .compare_exchange(0, ptr, Ordering::Relaxed, Ordering::Relaxed)
+            {
+                Ok(_) => {}
+                Err(previous) => assert_eq!(previous, ptr),
+            }
+            Ok(Value::from(""))
+        }
+    }
+
+    let mut env = Environment::new();
+    env.add_global("probe", Value::from_object(StateProbe::default()));
+    let rv = env
+        .render_str(
+            "{{ probe() }}{% macro test() %}{{ probe() }}{% endmacro %}{{ test() }}",
+            (),
+        )
+        .unwrap();
+    assert_eq!(rv, "");
 }

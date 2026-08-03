@@ -69,6 +69,10 @@
 //! env.add_filter("append_template", append_template);
 //! ```
 //!
+//! Filters which need to modify the state can instead take `&mut State`.  A
+//! mutable state must be the filter's first parameter and can only be requested
+//! once.
+//!
 //! # Filter configuration
 //!
 //! The recommended pattern for filters to change their behavior is to leverage global

@@ -181,6 +181,20 @@ impl<'template, 'env> State<'template, 'env> {
         f.call(self, args).map(Into::into)
     }
 
+    /// Looks up a global macro and calls it with mutable state.
+    ///
+    /// This works like [`call_macro`](Self::call_macro), but permits callbacks
+    /// invoked by the macro to modify the state.
+    #[cfg(feature = "macros")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+    pub fn call_macro_mut(&mut self, name: &str, args: &[Value]) -> Result<String, Error> {
+        let f = ok!(self.lookup(name).ok_or_else(|| Error::new(
+            crate::error::ErrorKind::UnknownFunction,
+            "macro not found"
+        )));
+        f.call_mut_state(self, args).map(Into::into)
+    }
+
     /// Renders a block with the given name into a string.
     ///
     /// This method works like [`Template::render`](crate::Template::render) but
@@ -279,6 +293,17 @@ impl<'template, 'env> State<'template, 'env> {
         }
     }
 
+    /// Invokes a filter with mutable state.
+    ///
+    /// This works like [`apply_filter`](Self::apply_filter), but permits the
+    /// filter to modify the state.
+    pub fn apply_filter_mut(&mut self, filter: &str, args: &[Value]) -> Result<Value, Error> {
+        match self.env().get_filter(filter) {
+            Some(filter) => filter.call_mut_state(self, args),
+            None => Err(Error::from(ErrorKind::UnknownFilter)),
+        }
+    }
+
     /// Invokes a test function on a value.
     ///
     /// ```
@@ -293,6 +318,17 @@ impl<'template, 'env> State<'template, 'env> {
     pub fn perform_test(&self, test: &str, args: &[Value]) -> Result<bool, Error> {
         match self.env().get_test(test) {
             Some(test) => test.call(self, args).map(|x| x.is_true()),
+            None => Err(Error::from(ErrorKind::UnknownTest)),
+        }
+    }
+
+    /// Invokes a test function with mutable state.
+    ///
+    /// This works like [`perform_test`](Self::perform_test), but permits the
+    /// test to modify the state.
+    pub fn perform_test_mut(&mut self, test: &str, args: &[Value]) -> Result<bool, Error> {
+        match self.env().get_test(test) {
+            Some(test) => test.call_mut_state(self, args).map(|x| x.is_true()),
             None => Err(Error::from(ErrorKind::UnknownTest)),
         }
     }

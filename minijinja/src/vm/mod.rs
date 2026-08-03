@@ -156,6 +156,49 @@ impl<'env> Vm<'env> {
         )
     }
 
+    /// Evaluates a macro by temporarily switching the active state.
+    #[cfg(feature = "macros")]
+    pub fn eval_macro_mut<'template>(
+        &self,
+        state: &mut State<'template, 'env>,
+        macro_id: usize,
+        out: &mut Output,
+        closure: Value,
+        caller: Option<Value>,
+        args: Vec<Value>,
+    ) -> Result<Option<Value>, Error> {
+        let &(instructions, pc) = &state.macros[macro_id];
+        let context_base = state.ctx.clone_base();
+        let mut ctx = Context::new_with_frame(self.env, Frame::new(context_base));
+        ok!(ctx.push_frame(Frame::new(closure)));
+        if let Some(caller) = caller {
+            ctx.store("caller", caller);
+        }
+        ok!(ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST));
+
+        let old_ctx = mem::replace(&mut state.ctx, ctx);
+        let old_current_block = state.current_block.take();
+        let old_auto_escape = state.auto_escape.get();
+        let old_instructions = mem::replace(&mut state.instructions, instructions);
+        let old_blocks = mem::take(&mut state.blocks);
+        let old_loaded_templates = mem::take(&mut state.loaded_templates);
+        // Keeping a second reference forces BuildMacro to use copy-on-write.
+        // This ensures that macros declared during this invocation remain local
+        // just as they do when eval_macro constructs a temporary state.
+        let old_macros = state.macros.clone();
+
+        let rv = self.do_eval(state, out, Stack::from(args), pc);
+
+        state.ctx = old_ctx;
+        state.current_block = old_current_block;
+        state.auto_escape.set(old_auto_escape);
+        state.instructions = old_instructions;
+        state.blocks = old_blocks;
+        state.loaded_templates = old_loaded_templates;
+        state.macros = old_macros;
+        rv
+    }
+
     /// This is the actual evaluation loop that works with a specific context.
     #[inline(always)]
     fn eval_state(
@@ -627,7 +670,7 @@ impl<'env> Vm<'env> {
                         }));
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
-                    a = ctx_ok!(filter.call(state, args));
+                    a = ctx_ok!(filter.call_mut_state(state, args));
                     stack.drop_top(arg_count);
                     stack.push(a);
                 }
@@ -644,7 +687,7 @@ impl<'env> Vm<'env> {
                     }));
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
-                    a = ctx_ok!(test.call(state, args));
+                    a = ctx_ok!(test.call_mut_state(state, args));
                     stack.drop_top(arg_count);
                     stack.push(Value::from(a.is_true()));
                 }
@@ -672,7 +715,7 @@ impl<'env> Vm<'env> {
                             }
                             recurse_loop!(true, loop_object);
                         } else {
-                            ctx_ok!(func.call(state, args))
+                            ctx_ok!(func.call_mut_state(state, args))
                         }
                     } else {
                         bail!(Error::new(
@@ -687,14 +730,14 @@ impl<'env> Vm<'env> {
                 Instruction::CallMethod(name, arg_count) => {
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
-                    a = ctx_ok!(args[0].call_method(state, name, &args[1..]));
+                    a = ctx_ok!(args[0].call_method_mut_state(state, name, &args[1..]));
                     stack.drop_top(arg_count);
                     stack.push(a);
                 }
                 Instruction::CallObject(arg_count) => {
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
-                    a = ctx_ok!(args[0].call(state, &args[1..]));
+                    a = ctx_ok!(args[0].call_mut_state(state, &args[1..]));
                     stack.drop_top(arg_count);
                     stack.push(a);
                 }

@@ -7,7 +7,7 @@ use insta::{assert_debug_snapshot, assert_snapshot};
 use similar_asserts::assert_eq;
 
 use minijinja::value::{DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value, ValueKind};
-use minijinja::{args, context, render, Environment, Error, ErrorKind};
+use minijinja::{args, context, render, Environment, Error, ErrorKind, State};
 
 #[test]
 fn test_sort() {
@@ -380,6 +380,123 @@ fn test_filter_basics() {
             .unwrap(),
         Value::from(65)
     );
+}
+
+#[test]
+fn test_functions_with_mutable_state() {
+    fn increment(state: &mut State, by: u64) -> u64 {
+        let old = state
+            .get_temp("counter")
+            .and_then(|value| u64::try_from(value).ok())
+            .unwrap_or(0);
+        state.set_temp("counter", Value::from(old + by));
+        old + by
+    }
+
+    fn prefix(state: &mut State, value: &str) -> String {
+        format!("{}:{value}", state.name())
+    }
+
+    fn matches_counter(state: &mut State, value: u64) -> bool {
+        state.get_temp("counter") == Some(Value::from(value))
+    }
+
+    let mut env = Environment::new();
+    env.add_function("increment", increment);
+    env.add_function("state_name", |state: &mut State| state.name().to_owned());
+    env.add_filter("prefix", prefix);
+    env.add_test("matches_counter", matches_counter);
+    let rv = env
+        .template_from_str(
+            "{{ increment(2) }} {{ increment(3) }} {{ state_name() }} {{ 'x'|prefix }} {{ 5 is matches_counter }}",
+        )
+        .unwrap()
+        .render(())
+        .unwrap();
+    assert_eq!(rv, "2 5 <string> <string>:x True");
+
+    let mut state = env.empty_state();
+    assert_eq!(
+        state.apply_filter("prefix", args!("x")).unwrap_err().kind(),
+        ErrorKind::InvalidOperation
+    );
+    assert!(state
+        .apply_filter_mut("prefix", args!("x"))
+        .unwrap()
+        .to_string()
+        .ends_with(":x"));
+    assert!(!state.perform_test_mut("matches_counter", args!(5)).unwrap());
+}
+
+#[test]
+fn test_mutable_state_value_calls() {
+    fn increment(state: &mut State, by: u64) -> u64 {
+        let old = state
+            .get_temp("counter")
+            .and_then(|value| u64::try_from(value).ok())
+            .unwrap_or(0);
+        state.set_temp("counter", Value::from(old + by));
+        old + by
+    }
+
+    let env = Environment::new();
+    let mut state = env.empty_state();
+    let value = Value::from_function(increment);
+    assert_eq!(
+        value.call(&state, args!(1)).unwrap_err().kind(),
+        ErrorKind::InvalidOperation
+    );
+    assert_eq!(
+        value.call_mut_state(&mut state, args!(2)).unwrap(),
+        Value::from(2)
+    );
+    assert_eq!(
+        value.call_mut_state(&mut state, args!(3)).unwrap(),
+        Value::from(5)
+    );
+}
+
+#[test]
+fn test_mutable_state_object_calls() {
+    #[derive(Debug)]
+    struct Callable;
+
+    impl Object for Callable {
+        fn call_mut_state(
+            self: &Arc<Self>,
+            state: &mut State<'_, '_>,
+            _args: &[Value],
+        ) -> Result<Value, Error> {
+            state.set_temp("called", Value::from(true));
+            Ok(Value::from("called"))
+        }
+
+        fn call_method_mut_state(
+            self: &Arc<Self>,
+            state: &mut State<'_, '_>,
+            method: &str,
+            _args: &[Value],
+        ) -> Result<Value, Error> {
+            state.set_temp("method", Value::from(method));
+            Ok(Value::from(method))
+        }
+    }
+
+    let env = Environment::new();
+    let mut state = env.empty_state();
+    let value = Value::from_object(Callable);
+    assert_eq!(
+        value.call_mut_state(&mut state, args!()).unwrap(),
+        Value::from("called")
+    );
+    assert_eq!(state.get_temp("called"), Some(Value::from(true)));
+    assert_eq!(
+        value
+            .call_method_mut_state(&mut state, "ping", args!())
+            .unwrap(),
+        Value::from("ping")
+    );
+    assert_eq!(state.get_temp("method"), Some(Value::from("ping")));
 }
 
 #[test]

@@ -97,14 +97,26 @@ env.add_function("is_adult", is_adult);
 //! called from Rust code as their exact interface (arguments and return types)
 //! might change from one MiniJinja version to another.
 use std::fmt;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::error::Error;
+use crate::error::{Error, ErrorKind};
 use crate::utils::SealedMarker;
 use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, ObjectRepr, Value};
 use crate::vm::State;
 
-type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
+enum StateAccess<'a, 'template, 'env> {
+    Shared(&'a State<'template, 'env>),
+    Mutable(&'a mut State<'template, 'env>),
+}
+
+type FuncFunc = dyn for<'a, 'template, 'env> Fn(
+        StateAccess<'a, 'template, 'env>,
+        &'a [Value],
+    ) -> Result<Value, Error>
+    + Sync
+    + Send
+    + 'static;
 
 /// A boxed function.
 #[derive(Clone)]
@@ -115,7 +127,8 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 /// This trait is used by the [`add_function`](crate::Environment::add_function)
 /// method to abstract over different types of functions.
 ///
-/// Functions which at the very least accept the [`State`] by reference as first
+/// Functions can optionally accept the [`State`] by immutable reference as an
+/// implicit parameter.  They can instead take `&mut State` as their first
 /// parameter and additionally up to 4 further parameters.  They share much of
 /// their interface with [`filters`](crate::filters).
 ///
@@ -162,6 +175,30 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 /// {{ include_file("filename.txt") }}
 /// ```
 ///
+/// # Mutable State
+///
+/// A function which needs to modify the execution state can take `&mut State`
+/// as its first parameter.  Unlike `&State`, mutable state must be the first
+/// parameter and can only be requested once.
+///
+/// ```rust
+/// # use minijinja::Environment;
+/// use minijinja::{State, Value};
+///
+/// fn counter(state: &mut State) -> i64 {
+///     let value = state
+///         .get_temp("counter")
+///         .and_then(|value| i64::try_from(value).ok())
+///         .unwrap_or_default()
+///         + 1;
+///     state.set_temp("counter", Value::from(value));
+///     value
+/// }
+///
+/// # let mut env = Environment::new();
+/// env.add_function("counter", counter);
+/// ```
+///
 /// # Variadic
 ///
 /// ```
@@ -198,9 +235,25 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 /// {{ "Foo Bar Baz"|substr(4, 7) }} -> Bar
 /// ```
 pub trait Function<Rv, Args: for<'a> FunctionArgs<'a>>: Send + Sync + 'static {
-    /// Calls a function with the given arguments.
+    /// Calls a function with the given arguments and immutable state.
     #[doc(hidden)]
-    fn invoke(&self, args: <Args as FunctionArgs<'_>>::Output, _: SealedMarker) -> Rv;
+    fn invoke<'a>(
+        &self,
+        state: &'a State,
+        values: &'a [Value],
+        _: SealedMarker,
+    ) -> Result<Value, Error>;
+
+    /// Calls a function with the given arguments and mutable state.
+    #[doc(hidden)]
+    fn invoke_mut<'a>(
+        &self,
+        state: &'a mut State,
+        values: &'a [Value],
+        _: SealedMarker,
+    ) -> Result<Value, Error> {
+        self.invoke(state, values, SealedMarker)
+    }
 }
 
 // This is necessary to avoid a bug in the trait solver. See
@@ -230,10 +283,14 @@ macro_rules! tuple_impls {
             Rv: FunctionResult,
             $($name: for<'a> ArgType<'a>,)*
         {
-            // Need to allow this lint for the one-element tuple case.
-            #[allow(clippy::needless_lifetimes)]
-            fn invoke<'a>(&self, args: ($(<$name as ArgType<'a>>::Output,)*), _: SealedMarker) -> Rv {
-                self.invoke_nested(args)
+            fn invoke<'a>(
+                &self,
+                state: &'a State,
+                values: &'a [Value],
+                _: SealedMarker,
+            ) -> Result<Value, Error> {
+                self.invoke_nested(ok!(<($($name,)*)>::from_values(Some(state), values)))
+                    .into_result()
             }
         }
     };
@@ -246,6 +303,81 @@ tuple_impls! { A B C }
 tuple_impls! { A B C D }
 tuple_impls! { A B C D E }
 
+/// Internal argument marker for functions receiving mutable state.
+#[doc(hidden)]
+pub struct FunctionArgsWithMutState<Args>(PhantomData<fn() -> Args>);
+
+impl<'a, Args> FunctionArgs<'a> for FunctionArgsWithMutState<Args>
+where
+    Args: FunctionArgs<'a>,
+{
+    type Output = Args::Output;
+
+    fn from_values(_state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
+        Args::from_values(None, values)
+    }
+}
+
+trait FunctionMutHelper<Rv, Args> {
+    fn invoke_nested_mut(&self, state: &mut State<'_, '_>, args: Args) -> Rv;
+}
+
+macro_rules! tuple_mut_impls {
+    ( $( $name:ident )* ) => {
+        impl<Func, Rv, $($name),*> FunctionMutHelper<Rv, ($($name,)*)> for Func
+        where
+            Func: Fn(&mut State<'_, '_>, $($name),*) -> Rv
+        {
+            fn invoke_nested_mut(&self, state: &mut State<'_, '_>, args: ($($name,)*)) -> Rv {
+                #[allow(non_snake_case)]
+                let ($($name,)*) = args;
+                (self)(state, $($name),*)
+            }
+        }
+
+        impl<Func, Rv, $($name),*> Function<Rv, FunctionArgsWithMutState<($($name,)*)>> for Func
+        where
+            Func: Send + Sync + 'static,
+            // the crazy bounds here exist to enable borrowing in closures
+            Func: Fn(&mut State<'_, '_>, $($name),*) -> Rv
+                + for<'a> FunctionMutHelper<Rv, ($(<$name as ArgType<'a>>::Output,)*)>,
+            Rv: FunctionResult,
+            $($name: for<'a> ArgType<'a>,)*
+        {
+            fn invoke<'a>(
+                &self,
+                _state: &'a State,
+                _values: &'a [Value],
+                _: SealedMarker,
+            ) -> Result<Value, Error> {
+                Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    "function requires mutable state",
+                ))
+            }
+
+            fn invoke_mut<'a>(
+                &self,
+                state: &'a mut State,
+                values: &'a [Value],
+                _: SealedMarker,
+            ) -> Result<Value, Error> {
+                self.invoke_nested_mut(
+                    state,
+                    ok!(<($($name,)*)>::from_values(None, values)),
+                )
+                .into_result()
+            }
+        }
+    };
+}
+
+tuple_mut_impls! {}
+tuple_mut_impls! { A }
+tuple_mut_impls! { A B }
+tuple_mut_impls! { A B C }
+tuple_mut_impls! { A B C D }
+
 impl BoxedFunction {
     /// Creates a new boxed filter.
     pub fn new<F, Rv, Args>(f: F) -> BoxedFunction
@@ -255,9 +387,9 @@ impl BoxedFunction {
         Args: for<'a> FunctionArgs<'a>,
     {
         BoxedFunction(
-            Arc::new(move |state, args| -> Result<Value, Error> {
-                f.invoke(ok!(Args::from_values(Some(state), args)), SealedMarker)
-                    .into_result()
+            Arc::new(move |state, args| match state {
+                StateAccess::Shared(state) => f.invoke(state, args, SealedMarker),
+                StateAccess::Mutable(state) => f.invoke_mut(state, args, SealedMarker),
             }),
             #[cfg(feature = "debug")]
             std::any::type_name::<F>(),
@@ -266,7 +398,12 @@ impl BoxedFunction {
 
     /// Invokes the function.
     pub fn invoke(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
-        (self.0)(state, args)
+        (self.0)(StateAccess::Shared(state), args)
+    }
+
+    /// Invokes the function with mutable state.
+    pub fn invoke_mut(&self, state: &mut State, args: &[Value]) -> Result<Value, Error> {
+        (self.0)(StateAccess::Mutable(state), args)
     }
 
     /// Creates a value from a boxed function.
@@ -294,6 +431,10 @@ impl Object for BoxedFunction {
 
     fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
         self.invoke(state, args)
+    }
+
+    fn call_mut_state(self: &Arc<Self>, state: &mut State, args: &[Value]) -> Result<Value, Error> {
+        self.invoke_mut(state, args)
     }
 }
 

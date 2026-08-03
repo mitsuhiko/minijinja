@@ -1748,6 +1748,21 @@ impl Value {
         }
     }
 
+    /// Calls the value directly with mutable access to the state.
+    ///
+    /// This works like [`call`](Self::call), but permits callable objects and
+    /// functions accepting `&mut State` to modify the state.
+    pub fn call_mut_state(&self, state: &mut State, args: &[Value]) -> Result<Value, Error> {
+        if let ValueRepr::Object(ref dy) = self.0 {
+            dy.call_mut_state(state, args)
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!("value of type {} is not callable", self.kind()),
+            ))
+        }
+    }
+
     /// Calls a method on the value.
     ///
     /// The name of the method is `name`, the arguments passed are in the `args`
@@ -1794,9 +1809,64 @@ impl Value {
         }
     }
 
+    /// Calls a method on the value with mutable access to the state.
+    ///
+    /// This works like [`call_method`](Self::call_method), but permits methods
+    /// and fallback callables accepting `&mut State` to modify the state.
+    pub fn call_method_mut_state(
+        &self,
+        state: &mut State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, Error> {
+        match self._call_method_mut_state(state, name, args) {
+            Ok(rv) => Ok(rv),
+            Err(mut err) => {
+                if err.kind() == ErrorKind::UnknownMethod {
+                    if let Some(ref callback) = state.env().unknown_method_callback {
+                        match callback(state, self, name, args) {
+                            Ok(result) => return Ok(result),
+                            Err(callback_err) => {
+                                if callback_err.kind() == ErrorKind::UnknownMethod {
+                                    err = callback_err;
+                                } else {
+                                    return Err(callback_err);
+                                }
+                            }
+                        }
+                    }
+                    if let Some(value) = self
+                        .as_object()
+                        .and_then(|object| object.get_value(&Value::from(name)))
+                    {
+                        return value.call_mut_state(state, args);
+                    }
+
+                    if err.detail().is_none() {
+                        err.set_detail(format!("{} has no method named {}", self.kind(), name));
+                    }
+                }
+                Err(err)
+            }
+        }
+    }
+
     fn _call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
         if let Some(object) = self.as_object() {
             object.call_method(state, name, args)
+        } else {
+            Err(Error::from(ErrorKind::UnknownMethod))
+        }
+    }
+
+    fn _call_method_mut_state(
+        &self,
+        state: &mut State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, Error> {
+        if let Some(object) = self.as_object() {
+            object.call_method_mut_state(state, name, args)
         } else {
             Err(Error::from(ErrorKind::UnknownMethod))
         }
