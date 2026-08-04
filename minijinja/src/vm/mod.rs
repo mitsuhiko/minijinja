@@ -140,6 +140,9 @@ impl<'env> Vm<'env> {
                 instructions,
                 blocks: BTreeMap::default(),
                 temps: state.temps.clone(),
+                // Typed extensions cannot be shared from an immutable state
+                // without reintroducing interior mutability.
+                extensions: Default::default(),
                 loaded_templates: Default::default(),
                 #[cfg(feature = "macros")]
                 id: state.id,

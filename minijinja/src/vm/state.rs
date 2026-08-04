@@ -1,6 +1,7 @@
+use std::any::{Any, TypeId};
 use std::borrow::Cow;
 use std::cell::Cell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -47,6 +48,7 @@ pub struct State<'template, 'env> {
     pub(crate) auto_escape: Cell<AutoEscape>,
     pub(crate) instructions: &'template Instructions<'env>,
     pub(crate) temps: Arc<Mutex<BTreeMap<Box<str>, Value>>>,
+    pub(crate) extensions: HashMap<TypeId, Box<dyn Any + Send>>,
     pub(crate) blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
     #[allow(unused)]
     pub(crate) loaded_templates: BTreeSet<&'env str>,
@@ -88,6 +90,7 @@ impl<'template, 'env> State<'template, 'env> {
             instructions,
             blocks,
             temps: Default::default(),
+            extensions: Default::default(),
             loaded_templates: BTreeSet::new(),
             #[cfg(feature = "macros")]
             macros: Default::default(),
@@ -445,6 +448,82 @@ impl<'template, 'env> State<'template, 'env> {
             })
             .downcast_object()
             .expect("downcast unexpectedly failed. Name conflict?")
+    }
+
+    /// Returns a reference to a typed render-local extension.
+    ///
+    /// Extensions are similar to [`temps`](Self::get_temp), but store ordinary
+    /// Rust values keyed by their type.  They are useful for state that should
+    /// be shared by filters and functions for the duration of a render without
+    /// requiring a [`Value`], [`Object`], or interior mutability.  There can be
+    /// one extension of each concrete type; use a newtype when independent
+    /// values have the same underlying type.  Extension values must be `Send`
+    /// because states can be moved between threads.
+    ///
+    /// Extensions are preserved across nested evaluation that reuses the same
+    /// mutable state, such as includes, blocks, and mutable macro calls.  They
+    /// are dropped together with the state.
+    pub fn get_extension<T>(&self) -> Option<&T>
+    where
+        T: Send + 'static,
+    {
+        self.extensions
+            .get(&TypeId::of::<T>())
+            .and_then(|value| value.downcast_ref())
+    }
+
+    /// Returns a mutable reference to a typed render-local extension.
+    ///
+    /// For more information see [`get_extension`](Self::get_extension).
+    pub fn get_extension_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: Send + 'static,
+    {
+        self.extensions
+            .get_mut(&TypeId::of::<T>())
+            .and_then(|value| value.downcast_mut())
+    }
+
+    /// Returns a mutable extension, inserting it if necessary.
+    ///
+    /// If an extension of type `T` is already present, `value` is not inserted.
+    /// Extensions require mutable state so that stored values do not need a
+    /// mutex or other interior mutability.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use minijinja::State;
+    ///
+    /// #[derive(Default)]
+    /// struct Counter(usize);
+    ///
+    /// fn next(state: &mut State) -> usize {
+    ///     let counter = state.get_or_insert_extension(Counter::default());
+    ///     counter.0 += 1;
+    ///     counter.0
+    /// }
+    /// ```
+    pub fn get_or_insert_extension<T>(&mut self, value: T) -> &mut T
+    where
+        T: Send + 'static,
+    {
+        self.get_or_insert_extension_with(|| value)
+    }
+
+    /// Returns a mutable extension, inserting one from `f` if necessary.
+    ///
+    /// For more information see [`get_or_insert_extension`](Self::get_or_insert_extension).
+    pub fn get_or_insert_extension_with<T, F>(&mut self, f: F) -> &mut T
+    where
+        T: Send + 'static,
+        F: FnOnce() -> T,
+    {
+        self.extensions
+            .entry(TypeId::of::<T>())
+            .or_insert_with(|| Box::new(f()))
+            .downcast_mut()
+            .expect("extension had an unexpected type")
     }
 
     #[cfg(feature = "debug")]
