@@ -4,9 +4,12 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Changed rendering of none and boolean values to `None`, `True`, and `False` for Jinja2 compatibility in Rust and Go.  #913
+* Added `StringInput` for custom Rust filters and functions that transform strings while preserving safety provenance.
+* Fixed safety handling in string-transforming and composing filters to preserve safe strings and escape unsafe fragments in Rust and Go.
+* Fixed the `split` filter to return a sequence, enabling negative indexing and slicing in Rust and Go.  #909
 * Fixed Python-compatible dict methods being shadowed by same-named map keys.  #903
 * Fixed loop-local assignments leaking into subsequent iterations in Rust and Go.  #912
-* Changed rendering of none and boolean values to `None`, `True`, and `False` for Jinja2 compatibility in Rust and Go.  #913
 
 ## 2.21.0
 
