@@ -1,4 +1,4 @@
 package minijinja
 
 // Version is the current version of MiniJinja-Go.
-const Version = "2.21.0"
+const Version = "2.22.0"

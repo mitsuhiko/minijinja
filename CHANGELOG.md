@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 2.22.0
 
 * Changed rendering of none and boolean values to `None`, `True`, and `False` for Jinja2 compatibility in Rust and Go.  #913
 * Added `StringInput` for custom Rust filters and functions that transform strings while preserving safety provenance.
