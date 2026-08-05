@@ -45,6 +45,11 @@ def test_expression():
     assert rv == list(range(10))
 
 
+def test_non_ascii_identifier():
+    env = Environment(templates={"t": "{{ ミニ神社 }}"})
+    assert env.render_template("t", **{"ミニ神社": "minijinja"}) == "minijinja"
+
+
 def test_pass_callable():
     def magic():
         return [1, 2, 3]
