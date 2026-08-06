@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed Unicode identifiers in templates rendered through the Python bindings.
+
 ## 2.22.0
 
 * Changed rendering of none and boolean values to `None`, `True`, and `False` for Jinja2 compatibility in Rust and Go.  #913
