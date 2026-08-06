@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+## 2.23.0
+
 * Fixed Unicode identifiers in templates rendered through the Python bindings.
 
 ## 2.22.0
