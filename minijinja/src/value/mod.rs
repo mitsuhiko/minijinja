@@ -241,9 +241,11 @@ pub(crate) mod ops;
 #[cfg(not(feature = "serde"))]
 mod serde_fallback;
 mod serialize;
+mod tuple;
 
 #[cfg(feature = "deserialization")]
 pub use self::deserialize::ViaDeserialize;
+pub use self::tuple::Tuple;
 
 #[cfg(not(feature = "serde"))]
 pub use self::serde_fallback::Serialize;
@@ -540,7 +542,10 @@ impl Hash for Value {
             ValueRepr::Bool(b) => b.hash(state),
             ValueRepr::Invalid(ref e) => (e.kind(), e.detail()).hash(state),
             ValueRepr::Bytes(ref b) => b.hash(state),
-            ValueRepr::Object(ref d) => d.hash(state),
+            ValueRepr::Object(ref d) => {
+                self.is_tuple().hash(state);
+                d.hash(state);
+            }
             ValueRepr::U64(_)
             | ValueRepr::I64(_)
             | ValueRepr::F64(_)
@@ -574,6 +579,9 @@ impl PartialEq for Value {
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
                 None => {
                     if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
+                        if self.is_tuple() != other.is_tuple() {
+                            return false;
+                        }
                         if a.is_same_object(b) {
                             return true;
                         } else if a.is_same_object_type(b) {
@@ -767,6 +775,11 @@ impl Ord for Value {
 
                     let a = self.as_object().unwrap();
                     let b = other.as_object().unwrap();
+
+                    match self.is_tuple().cmp(&other.is_tuple()) {
+                        Ordering::Equal => {}
+                        rv => return rv,
+                    }
 
                     if a.is_same_object(b) {
                         Ordering::Equal
@@ -1291,6 +1304,11 @@ impl Value {
         )
     }
 
+    /// Returns `true` if the value is a tuple.
+    pub fn is_tuple(&self) -> bool {
+        self.downcast_object_ref::<Tuple>().is_some()
+    }
+
     /// Returns `true` if the map represents keyword arguments.
     pub fn is_kwargs(&self) -> bool {
         Kwargs::extract(self).is_some()
@@ -1580,7 +1598,8 @@ impl Value {
                     let mut v = if let ObjectRepr::Map = o.repr() {
                         iter.map(|(k, _)| k).collect::<Vec<_>>()
                     } else {
-                        iter.map(|(k, v)| [k, v].into()).collect::<Vec<_>>()
+                        iter.map(|(k, v)| Value::from(Tuple::from([k, v])))
+                            .collect::<Vec<_>>()
                     };
                     v.reverse();
                     Some(Value::make_object_iterable(v, move |v| {
@@ -1613,7 +1632,7 @@ impl Value {
                                 Box::new(iter.map(|(k, _)| k))
                                     as Box<dyn Iterator<Item = Value> + Send + Sync>
                             } else {
-                                Box::new(iter.map(|(k, v)| [k, v].into()))
+                                Box::new(iter.map(|(k, v)| Value::from(Tuple::from([k, v]))))
                                     as Box<dyn Iterator<Item = Value> + Send + Sync>
                             }
                         } else {

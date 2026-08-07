@@ -105,6 +105,33 @@ impl<T: Serialize> Serialize for Option<T> {
     }
 }
 
+macro_rules! impl_tuple {
+    ($($name:ident),+) => {
+        impl<$($name: Serialize),+> Serialize for ($($name,)+) {
+            #[allow(non_snake_case)]
+            fn to_value(&self, _: SealedMarker) -> Value {
+                let ($($name,)+) = self;
+                Value::from(super::Tuple::from(vec![
+                    $($name.to_value(SealedMarker),)+
+                ]))
+            }
+        }
+    };
+}
+
+impl_tuple!(A);
+impl_tuple!(A, B);
+impl_tuple!(A, B, C);
+impl_tuple!(A, B, C, D);
+impl_tuple!(A, B, C, D, E);
+impl_tuple!(A, B, C, D, E, F);
+impl_tuple!(A, B, C, D, E, F, G);
+impl_tuple!(A, B, C, D, E, F, G, H);
+impl_tuple!(A, B, C, D, E, F, G, H, I);
+impl_tuple!(A, B, C, D, E, F, G, H, I, J);
+impl_tuple!(A, B, C, D, E, F, G, H, I, J, K);
+impl_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
+
 macro_rules! impl_primitive {
     ($ty:ty) => {
         impl Serialize for $ty {
@@ -145,5 +172,8 @@ mod tests {
 
         let value = Value::from_serialize(BTreeMap::from([("key", vec![1, 2, 3])]));
         assert_eq!(value.to_string(), r#"{"key": [1, 2, 3]}"#);
+
+        let value = Value::from_serialize(("key", 42));
+        assert_eq!(value.to_string(), r#"("key", 42)"#);
     }
 }

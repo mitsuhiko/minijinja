@@ -100,7 +100,7 @@ batch: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
 batch-fill: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, "-", "-"]]
 slice: [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
 slice-fill: [[0, 1, 2, 3], [4, 5, 6, "-"], [7, 8, 9, "-"]]
-items: [["a", 1]]
+items: [("a", 1)]
 indent: "foo\n  bar\n  baz"
 indent-first-line: "  foo\n  bar\n  baz"
 indent-kwargs-width: "foo\n    bar\n    baz"
@@ -162,9 +162,9 @@ chain-maps: {"a": "b", "c": "d", "e": "f", "g": "h"}
 chain-and-length: 6
 chain-iteration: 1,2,3,4,5,6
 chain-indexing: 5
-zip-lists: [[1, 4], [2, 5], [3, 6]]
-zip-multiple: [[1, 4, 7], [2, 5, 8]]
-zip-different-lengths: [[1, 1], [2, 4], [3, 2]]
+zip-lists: [(1, 4), (2, 5), (3, 6)]
+zip-multiple: [(1, 4, 7), (2, 5, 8)]
+zip-different-lengths: [(1, 1), (2, 4), (3, 2)]
 zip-iteration: 1-4,2-5,3-6
 zip-empty: []
-zip-single: [[1], [2], [3]]
+zip-single: [(1,), (2,), (3,)]

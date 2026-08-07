@@ -390,7 +390,7 @@ fn test_chain_dicts() {
         .template_from_str("{{ {'a': 1} | chain({'b': 2}) | items | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[["a", 1], ["b", 2]]"#);
+    assert_eq!(result, r#"[("a", 1), ("b", 2)]"#);
 }
 
 #[test]
@@ -441,7 +441,7 @@ fn test_zip_basic() {
         .template_from_str("{{ [1, 2, 3] | zip(['a', 'b', 'c']) | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[[1, "a"], [2, "b"], [3, "c"]]"#);
+    assert_eq!(result, r#"[(1, "a"), (2, "b"), (3, "c")]"#);
 }
 
 #[test]
@@ -452,7 +452,7 @@ fn test_zip_different_lengths() {
         .template_from_str("{{ [1, 2] | zip(['a', 'b', 'c']) | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[[1, "a"], [2, "b"]]"#);
+    assert_eq!(result, r#"[(1, "a"), (2, "b")]"#);
 }
 
 #[test]
@@ -462,7 +462,7 @@ fn test_zip_multiple_iterables() {
         .template_from_str("{{ [1, 2, 3] | zip(['a', 'b', 'c'], ['x', 'y', 'z']) | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[[1, "a", "x"], [2, "b", "y"], [3, "c", "z"]]"#);
+    assert_eq!(result, r#"[(1, "a", "x"), (2, "b", "y"), (3, "c", "z")]"#);
 }
 
 #[test]
@@ -505,7 +505,7 @@ fn test_zip_single_iterable() {
         .template_from_str("{{ [1, 2, 3] | zip() | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, "[[1], [2], [3]]");
+    assert_eq!(result, "[(1,), (2,), (3,)]");
 }
 
 #[test]

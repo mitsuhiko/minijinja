@@ -187,7 +187,7 @@ mod builtins {
     use crate::value::merge_object::{MergeDict, MergeSeq};
     use crate::value::ops::{self, as_f64, LenIterWrap};
     use crate::value::{
-        Enumerator, Kwargs, Object, ObjectRepr, Rest, StringInput, ValueKind, ValueRepr,
+        Enumerator, Kwargs, Object, ObjectRepr, Rest, StringInput, Tuple, ValueKind, ValueRepr,
     };
     use std::borrow::Cow;
     use std::cmp::Ordering;
@@ -363,7 +363,10 @@ mod builtins {
             cmp_helper(a, b, case_sensitive, reverse)
         })?;
         kwargs.assert_all_used()?;
-        Ok(rv.into_iter().map(|(k, v)| Value::from([k, v])).collect())
+        Ok(rv
+            .into_iter()
+            .map(|(k, v)| Value::from(Tuple::from([k, v])))
+            .collect())
     }
 
     /// Returns an iterable of pairs (items) from a mapping.
@@ -388,7 +391,9 @@ mod builtins {
         if v.kind() == ValueKind::Map {
             Ok(Value::make_object_iterable(v.clone(), |v| {
                 match v.as_object().and_then(|v| v.try_iter_pairs()) {
-                    Some(iter) => Box::new(iter.map(|(key, value)| Value::from([key, value]))),
+                    Some(iter) => {
+                        Box::new(iter.map(|(key, value)| Value::from(Tuple::from([key, value]))))
+                    }
                     None => Box::new(
                         // this really should not happen unless the object changes it's shape
                         // after the initial check
@@ -1595,6 +1600,13 @@ mod builtins {
             fn enumerate(self: &Arc<Self>) -> Enumerator {
                 Enumerator::Seq(2)
             }
+
+            fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_tuple("")
+                    .field(&self.grouper)
+                    .field(&Value::from(self.list.clone()))
+                    .finish()
+            }
         }
 
         let mut rv = Vec::new();
@@ -1798,7 +1810,7 @@ mod builtins {
                             None => return None,
                         }
                     }
-                    Some(Value::from(tuple))
+                    Some(Value::from(Tuple::from(tuple)))
                 }
             });
 
