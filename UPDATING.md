@@ -10,26 +10,36 @@ MiniJinja-Go now uses the major-version module path
 to `/v3`. Its tuple values and collection rendering follow the same new
 semantics described below.
 
-## Optional Serde Support
+## Optional and Explicit Serde Support
 
 The `serde` feature now controls the `serde` dependency and remains enabled by
-default. `deserialization` and `json` enable it automatically. Projects that
-disable default features can build MiniJinja without `serde`; in that mode,
-`Value::from_serialize` and rendering APIs accept a sealed set of basic Rust
-values. Convert custom data to `Value` or implement `Object` when `serde` is
-disabled.
+default. `deserialization` and `json` enable it automatically. Rendering APIs,
+`context!`, and `args!` now convert values through `Into<Value>` rather than
+implicitly serializing them.
 
-## Value Conversion Macros
-
-`context!` and `args!` now consume their expressions. They first use
-`Into<Value>` and fall back to serialization. Pass a reference explicitly when
-the original value needs to remain usable:
+Serde conversion must be requested with the `minijinja::value::Serialize`
+wrapper:
 
 ```rust
-let users = load_users();
-let ctx = minijinja::context!(users => &users);
-use_users(users);
+use minijinja::value::{Serialize, Value};
+
+let value = Value::from(Serialize(&custom_data));
+let output = template.render(Serialize(&custom_context))?;
+let context = minijinja::context!(data => Serialize(&custom_data));
 ```
+
+`Value::from_serialize(value)` remains available with the `serde` feature as a
+shortcut for `Value::from(Serialize(value))`. Without `serde`, the wrapper and
+shortcut are unavailable; native `Into<Value>` conversions and custom `Object`
+implementations continue to work without a fallback serialization trait.
+
+`context!` and `args!` consume expressions passed through native conversions.
+Pass a reference where a supported native value should be cloned, or use
+`Serialize(&value)` for borrowed Serde data.
+
+Collecting an iterator into `Value` now always creates a sequence, including
+when the items are tuples. Use `Value::from_pairs(iter)` to explicitly create a
+map from key-value pairs.
 
 ## Tuples
 
@@ -38,9 +48,9 @@ Code that downcast tuple expressions to `Vec<Value>` must downcast to `Tuple` or
 use the generic sequence APIs. Tuples still report `ValueKind::Seq` and support
 normal sequence iteration and indexing.
 
-Rust tuples passed through `Value::from_serialize` are also preserved as tuples.
-Tuple concatenation, repetition, and slicing return tuples, while combining a
-list and a tuple with `+` is an error as it is in Python.
+Rust tuples passed through `Value::from` or explicit Serde conversion are also
+preserved as tuples. Tuple concatenation, repetition, and slicing return tuples,
+while combining a list and a tuple with `+` is an error as it is in Python.
 
 ## Value Rendering
 

@@ -34,8 +34,8 @@ crate.
 
 MiniJinja supports tuple literals and preserves tuples as a distinct sequence
 type. Tuple rendering, concatenation, repetition, and slicing follow Python's
-behavior. Rust tuples converted through `Value::from_serialize` also remain
-tuples.
+behavior. Rust tuples converted through `Value::from` or the explicit Serde
+wrapper also remain tuples.
 
 ### Keyword Arguments
 

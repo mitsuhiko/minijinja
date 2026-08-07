@@ -40,7 +40,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [recursive-for](recursive-for): demonstrates the recursive for loop.
 * [render-macro](render-macro): minimal Hello World example using the `render!` macro.
 * [render-template](render-template): CLI app that renders templates from string.
-* [render-value](render-value): Demonstrates how `Value` can be passed as `Serialize` as context.
+* [render-value](render-value): Demonstrates how `Value` can be passed directly as context.
 * [self-referential-context](self-referential-context): Shows a helper that allows self-referential contexts.
 * [state-temps](state-temps): Shows how temporaries can be used for hidden state.
 * [streaming](streaming): Demonstrates how a one-shot iterator can be used to stream results in.
