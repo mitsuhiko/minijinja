@@ -1,6 +1,6 @@
 use crate::error::{Error, ErrorKind};
 use crate::value::merge_object::MergeSeq;
-use crate::value::{DynObject, ObjectRepr, Value, ValueKind, ValueRepr};
+use crate::value::{DynObject, ObjectRepr, Tuple, Value, ValueKind, ValueRepr};
 
 const MIN_I128_AS_POS_U128: u128 = 170141183460469231731687303715884105728;
 
@@ -155,6 +155,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     }
 
     let kind = value.kind();
+    let is_tuple = value.is_tuple();
     let error = Err(Error::new(
         ErrorKind::InvalidOperation,
         format!("value of type {kind} cannot be sliced"),
@@ -202,6 +203,27 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         }
         ValueRepr::Undefined(_) | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
         ValueRepr::Object(obj) if matches!(obj.repr(), ObjectRepr::Seq | ObjectRepr::Iterable) => {
+            if is_tuple {
+                let values = obj
+                    .try_iter()
+                    .map(|iter| iter.collect::<Vec<_>>())
+                    .unwrap_or_default();
+                let values: Vec<Value> = if step > 0 {
+                    let (start, len) = get_offset_and_len(start, stop, || values.len());
+                    values
+                        .into_iter()
+                        .skip(start)
+                        .take(len)
+                        .step_by(step as usize)
+                        .collect()
+                } else {
+                    range_step_backwards(start, stop, -step as usize, values.len())
+                        .map(|idx| values[idx].clone())
+                        .collect()
+                };
+                return Ok(Value::from(Tuple::from(values)));
+            }
+
             if step > 0 {
                 let len = obj.enumerator_len().unwrap_or_default();
                 let (start, len) = get_offset_and_len(start, stop, || len);
@@ -284,6 +306,16 @@ fn materialize_seq_concat(lhs: &Value, rhs: &Value, len: usize) -> Result<Value,
 }
 
 pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
+    if lhs.is_tuple() || rhs.is_tuple() {
+        if lhs.is_tuple() && rhs.is_tuple() {
+            let mut values = Vec::with_capacity(seq_concat_len(lhs, rhs).unwrap_or_default());
+            values.extend(ok!(lhs.try_iter()));
+            values.extend(ok!(rhs.try_iter()));
+            return Ok(Value::from(Tuple::from(values)));
+        }
+        return Err(impossible_op("+", lhs, rhs));
+    }
+
     if matches!(lhs.kind(), ValueKind::Seq | ValueKind::Iterable)
         && matches!(rhs.kind(), ValueKind::Seq | ValueKind::Iterable)
     {
@@ -363,6 +395,17 @@ fn repeat_iterable(n: &Value, seq: &DynObject) -> Result<Value, Error> {
             "cannot repeat unsized iterables",
         )
     }));
+
+    if let Some(tuple) = seq.downcast_ref::<Tuple>() {
+        let capacity = ok!(len.checked_mul(n).ok_or_else(|| {
+            Error::new(ErrorKind::InvalidOperation, "repeated tuple is too large")
+        }));
+        let mut values = Vec::with_capacity(capacity);
+        for _ in 0..n {
+            values.extend(tuple.iter().cloned());
+        }
+        return Ok(Value::from(Tuple::from(values)));
+    }
 
     // This is not optimal.  We only query the enumerator for the length once
     // but we support repeated iteration.  We could both lie about our length

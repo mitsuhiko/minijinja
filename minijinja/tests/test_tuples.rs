@@ -39,6 +39,25 @@ fn test_tuple_sequence_behavior() {
 }
 
 #[test]
+fn test_tuple_operations_preserve_type() {
+    let env = Environment::new();
+    assert_eq!(
+        env.render_str("{{ (1, 2) + (3,) }}", ()).unwrap(),
+        "(1, 2, 3)"
+    );
+    assert_eq!(
+        env.render_str("{{ (1, 2) * 2 }}", ()).unwrap(),
+        "(1, 2, 1, 2)"
+    );
+    assert_eq!(env.render_str("{{ (1, 2, 3)[1:] }}", ()).unwrap(), "(2, 3)");
+    assert_eq!(
+        env.render_str("{{ (1, 2, 3)[::-1] }}", ()).unwrap(),
+        "(3, 2, 1)"
+    );
+    assert!(env.render_str("{{ [1, 2] + (3,) }}", ()).is_err());
+}
+
+#[test]
 fn test_rust_and_serde_tuples() {
     let explicit = Value::from(Tuple::from([Value::from(1), Value::from(2)]));
     assert!(explicit.is_tuple());
