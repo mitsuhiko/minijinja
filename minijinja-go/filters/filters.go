@@ -1969,7 +1969,7 @@ func (g *groupObject) GetItem(key value.Value) value.Value {
 
 func (g *groupObject) String() string {
 	listRepr := value.FromSlice(g.list).Repr()
-	return fmt.Sprintf("[%s, %s]", g.grouper.Repr(), listRepr)
+	return fmt.Sprintf("(%s, %s)", g.grouper.Repr(), listRepr)
 }
 
 // FilterChain chains multiple iterables into a single iterable.
@@ -2113,7 +2113,7 @@ func FilterZip(_ State, val value.Value, args []value.Value, _ map[string]value.
 		for j, seq := range seqs {
 			tuple[j] = seq[i]
 		}
-		result[i] = value.FromSlice(tuple)
+		result[i] = value.FromTuple(tuple)
 	}
 	return value.FromSlice(result), nil
 }
@@ -2320,7 +2320,7 @@ func FilterItems(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 
 		var result []value.Value
 		for _, k := range keys {
-			result = append(result, value.FromSlice([]value.Value{
+			result = append(result, value.FromTuple([]value.Value{
 				value.FromString(k),
 				m[k],
 			}))
@@ -2419,7 +2419,7 @@ func FilterDictSort(_ State, val value.Value, args []value.Value, kwargs map[str
 
 		var result []value.Value
 		for _, k := range keys {
-			result = append(result, value.FromSlice([]value.Value{
+			result = append(result, value.FromTuple([]value.Value{
 				value.FromString(k),
 				m[k],
 			}))
@@ -2583,7 +2583,7 @@ func pprintValue(val value.Value, indent int) string {
 		sb.WriteString("{\n")
 		for _, k := range keys {
 			sb.WriteString(strings.Repeat(" ", indent+4))
-			sb.WriteString(fmt.Sprintf("%q: %s,", k, pprintValue(m[k], indent+4)))
+			sb.WriteString(fmt.Sprintf("%s: %s,", value.FromString(k).Repr(), pprintValue(m[k], indent+4)))
 			sb.WriteString("\n")
 		}
 		sb.WriteString(pad)
@@ -2646,6 +2646,7 @@ func FilterTojson(_ State, val value.Value, args []value.Value, kwargs map[strin
 		data, err = json.MarshalIndent(native, "", indent)
 	} else {
 		data, err = json.Marshal(native)
+		data = addCompactJSONSpaces(data)
 	}
 	if err != nil {
 		return value.Undefined(), err
@@ -2653,6 +2654,31 @@ func FilterTojson(_ State, val value.Value, args []value.Value, kwargs map[strin
 	jsonStr := string(data)
 	jsonStr = strings.ReplaceAll(jsonStr, "'", "\\u0027")
 	return value.FromSafeString(jsonStr), nil
+}
+
+func addCompactJSONSpaces(data []byte) []byte {
+	result := make([]byte, 0, len(data)+len(data)/8)
+	inString := false
+	escaped := false
+	for _, ch := range data {
+		result = append(result, ch)
+		if inString {
+			if escaped {
+				escaped = false
+			} else if ch == '\\' {
+				escaped = true
+			} else if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		if ch == '"' {
+			inString = true
+		} else if ch == ',' || ch == ':' {
+			result = append(result, ' ')
+		}
+	}
+	return result
 }
 
 func valueToNative(v value.Value) interface{} {

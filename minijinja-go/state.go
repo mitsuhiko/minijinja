@@ -742,6 +742,12 @@ func exprUsesCaller(expr parser.Expr) bool {
 				return true
 			}
 		}
+	case *parser.Tuple:
+		for _, item := range e.Items {
+			if exprUsesCaller(item) {
+				return true
+			}
+		}
 	case *parser.Map:
 		for _, item := range e.Keys {
 			if exprUsesCaller(item) {
@@ -2474,6 +2480,9 @@ func (s *State) evalExpr(expr parser.Expr) (rv value.Value, err error) {
 	case *parser.List:
 		return s.evalList(e)
 
+	case *parser.Tuple:
+		return s.evalTuple(e)
+
 	case *parser.Map:
 		return s.evalMap(e)
 
@@ -3006,6 +3015,18 @@ func (s *State) evalList(list *parser.List) (value.Value, error) {
 	return value.FromSlice(items), nil
 }
 
+func (s *State) evalTuple(tuple *parser.Tuple) (value.Value, error) {
+	items := make([]value.Value, len(tuple.Items))
+	for i, item := range tuple.Items {
+		var err error
+		items[i], err = s.evalExpr(item)
+		if err != nil {
+			return value.Undefined(), err
+		}
+	}
+	return value.FromTuple(items), nil
+}
+
 func (s *State) evalMap(m *parser.Map) (value.Value, error) {
 	result := make(map[string]value.Value)
 	for i := range m.Keys {
@@ -3076,7 +3097,11 @@ func (s *State) sliceValue(val value.Value, start, stop *int64, step int64) (val
 	switch {
 	case val.Kind() == value.KindSeq:
 		items, _ := val.AsSlice()
-		return value.FromSlice(sliceSlice(items, start, stop, step)), nil
+		result := sliceSlice(items, start, stop, step)
+		if val.IsTuple() {
+			return value.FromTuple(result), nil
+		}
+		return value.FromSlice(result), nil
 	case val.Kind() == value.KindString:
 		str, _ := val.AsString()
 		runes := []rune(str)

@@ -573,8 +573,9 @@ func TestValueRepr(t *testing.T) {
 		{FromBool(true), "True"},
 		{FromInt(42), "42"},
 		{FromFloat(3.14), "3.14"},
-		{FromString("hello"), `"hello"`},
+		{FromString("hello"), `'hello'`},
 		{FromSlice([]Value{FromInt(1), FromInt(2)}), "[1, 2]"},
+		{FromTuple([]Value{FromInt(1)}), "(1,)"},
 	}
 
 	for _, tt := range tests {

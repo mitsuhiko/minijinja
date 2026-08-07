@@ -335,17 +335,7 @@ func (n *namespaceValue) SetAttr(name string, val value.Value) {
 }
 
 func (n *namespaceValue) String() string {
-	keys := make([]string, 0, len(n.data))
-	for k := range n.data {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	parts := make([]string, 0, len(keys))
-	for _, k := range keys {
-		parts = append(parts, fmt.Sprintf("%q: %s", k, n.data[k].Repr()))
-	}
-	return "{" + strings.Join(parts, ", ") + "}"
+	return value.FromMap(n.data).String()
 }
 
 func (n *namespaceValue) Map() map[string]value.Value {

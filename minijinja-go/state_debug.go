@@ -147,6 +147,10 @@ func collectReferencedNamesExpr(expr parser.Expr, referenced map[string]struct{}
 		for _, item := range e.Items {
 			collectReferencedNamesExpr(item, referenced)
 		}
+	case *parser.Tuple:
+		for _, item := range e.Items {
+			collectReferencedNamesExpr(item, referenced)
+		}
 	case *parser.Map:
 		for _, key := range e.Keys {
 			collectReferencedNamesExpr(key, referenced)

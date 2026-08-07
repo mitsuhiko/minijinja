@@ -1,0 +1,13 @@
+
+
+
+
+  closure: other closure
+  name: caller
+  args: ['a', 'b']
+  caller: False
+  a: 1
+  b: 2
+  result: [1, 2, 'other closure']
+
+

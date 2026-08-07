@@ -780,6 +780,20 @@ func TestInclude(t *testing.T) {
 	}
 }
 
+func TestTuples(t *testing.T) {
+	tmpl, err := NewEnvironment().TemplateFromString(`{{ () }}|{{ (1,) }}|{{ (1, 2) }}|{{ (1, 2)[1:] }}|{{ (1,) + (2,) }}|{{ (1,) * 2 }}|{{ (1,) == [1] }}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expected := `()|(1,)|(1, 2)|(2,)|(1, 2)|(1, 1)|False`; result != expected {
+		t.Fatalf("expected %q, got %q", expected, result)
+	}
+}
+
 func TestSlicing(t *testing.T) {
 	env := NewEnvironment()
 
@@ -1156,8 +1170,8 @@ func TestTojsonFilter(t *testing.T) {
 	}{
 		{`{{ value|tojson }}`, map[string]any{"value": "hello"}, `"hello"`},
 		{`{{ value|tojson }}`, map[string]any{"value": 42}, `42`},
-		{`{{ value|tojson }}`, map[string]any{"value": []int{1, 2, 3}}, `[1,2,3]`},
-		{`{{ value|tojson }}`, map[string]any{"value": map[string]any{"a": 1}}, `{"a":1}`},
+		{`{{ value|tojson }}`, map[string]any{"value": []int{1, 2, 3}}, `[1, 2, 3]`},
+		{`{{ value|tojson }}`, map[string]any{"value": map[string]any{"a": 1}}, `{"a": 1}`},
 	}
 
 	for _, test := range tests {

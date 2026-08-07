@@ -18,4 +18,4 @@
   - vienna:
     - First post in lowercase Vienna
 --
-["AAA", [{"text": "no city!?"}]]
+('AAA', [{'text': 'no city!?'}])
