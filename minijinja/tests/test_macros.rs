@@ -2,9 +2,9 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use insta::assert_snapshot;
 #[cfg(feature = "serde")]
 use insta::assert_debug_snapshot;
+use insta::assert_snapshot;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 use similar_asserts::assert_eq;
