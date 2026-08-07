@@ -1,5 +1,5 @@
 #![cfg(feature = "builtins")]
-use minijinja::value::{Kwargs, StringInput, Value, ValueKind};
+use minijinja::value::{Kwargs, Rest, StringInput, Value, ValueKind, ValueOrKwargs};
 use minijinja::{args, context, Environment};
 use similar_asserts::assert_eq;
 
@@ -50,6 +50,27 @@ fn test_dotted_filter_name() {
         .render(context!())
         .unwrap();
     assert_eq!(rv, "<hello>");
+}
+
+#[test]
+fn test_kwargs_require_explicit_argument_type() {
+    let mut env = Environment::new();
+    env.add_filter(
+        "optional_value",
+        |_value: Value, optional: Option<Value>| optional.unwrap_or_default(),
+    );
+    assert!(env
+        .render_str("{{ 1|optional_value(unexpected=2) }}", ())
+        .is_err());
+
+    env.add_function("accept_kwargs", |args: Rest<ValueOrKwargs>| {
+        args.last().is_some_and(|value| value.is_kwargs())
+    });
+    assert_eq!(
+        env.render_str("{{ accept_kwargs(answer=42) }}", ())
+            .unwrap(),
+        "True"
+    );
 }
 
 #[test]

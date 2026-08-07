@@ -84,10 +84,10 @@ env.add_function("is_adult", is_adult);
 //! [1, 2, {"three": 3, "four": 4}]
 //! ```
 //!
-//! If a function wants to disambiguate between a value passed as keyword argument or not,
-//! the [`Value::is_kwargs`] can be used which returns `true` if a value represents
-//! keyword arguments as opposed to just a map.  A more convenient way to work with keyword
-//! arguments is the [`Kwargs`](crate::value::Kwargs) type.
+//! Regular [`Value`] arguments reject the internal keyword-argument value. Functions that
+//! declare keyword arguments should use [`Kwargs`](crate::value::Kwargs). Variadic functions
+//! that need to forward or manually split all arguments can use
+//! [`ValueOrKwargs`](crate::value::ValueOrKwargs).
 //!
 //! # Built-in Functions
 //!
@@ -101,7 +101,9 @@ use std::sync::Arc;
 
 use crate::error::Error;
 use crate::utils::SealedMarker;
-use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, ObjectRepr, Value};
+use crate::value::{
+    ArgType, FunctionArgs, FunctionResult, Object, ObjectRepr, Value, ValueOrKwargs,
+};
 use crate::vm::State;
 
 type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
@@ -449,9 +451,10 @@ mod builtins {
     /// to an outer scope. Initial values can be provided as a dict, as keyword arguments,
     /// or both (same behavior as [`dict`]).
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn namespace(defaults: Option<Value>) -> Result<Value, Error> {
+    pub fn namespace(defaults: Option<ValueOrKwargs>) -> Result<Value, Error> {
         let ns = crate::value::namespace_object::Namespace::default();
         if let Some(defaults) = defaults {
+            let defaults = defaults.into_value();
             if let Some(pairs) = defaults
                 .as_object()
                 .filter(|x| matches!(x.repr(), ObjectRepr::Map))

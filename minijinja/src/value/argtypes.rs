@@ -107,7 +107,7 @@ where
 /// * bool: [`bool`]
 /// * string: [`String`], [`&str`], `Cow<'_, str>`, [`StringInput`], [`char`]
 /// * bytes: [`&[u8]`][`slice`]
-/// * values: [`Value`], `&Value`
+/// * values: [`Value`], `&Value`, [`ValueOrKwargs`]
 /// * vectors: [`Vec<T>`]
 /// * objects: [`DynObject`], [`Arc<T>`], `&T` (where `T` is an [`Object`])
 /// * serde deserializable: [`ViaDeserialize<T>`](crate::value::deserialize::ViaDeserialize)
@@ -707,7 +707,8 @@ impl<'a> ArgType<'a> for &Value {
     #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<&'a Value, Error> {
         match value {
-            Some(value) => Ok(value),
+            Some(value) if !value.is_kwargs() => Ok(value),
+            Some(_) => Err(unexpected_kwargs()),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
@@ -719,7 +720,8 @@ impl<'a> ArgType<'a> for &[Value] {
     #[inline(always)]
     fn from_value(value: Option<&'a Value>) -> Result<&'a [Value], Error> {
         match value {
-            Some(value) => Ok(std::slice::from_ref(value)),
+            Some(value) if !value.is_kwargs() => Ok(std::slice::from_ref(value)),
+            Some(_) => Err(unexpected_kwargs()),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
@@ -730,6 +732,9 @@ impl<'a> ArgType<'a> for &[Value] {
         offset: usize,
     ) -> Result<(&'a [Value], usize), Error> {
         let args = values.get(offset..).unwrap_or_default();
+        if args.iter().any(Value::is_kwargs) {
+            return Err(unexpected_kwargs());
+        }
         Ok((args, args.len()))
     }
 }
@@ -794,6 +799,13 @@ impl<T> Deref for Rest<T> {
 impl<T> DerefMut for Rest<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl Rest<ValueOrKwargs> {
+    /// Converts the captured arguments back into their underlying values.
+    pub fn into_values(self) -> Vec<Value> {
+        self.0.into_iter().map(ValueOrKwargs::into_value).collect()
     }
 }
 
@@ -870,9 +882,10 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
 /// positional arguments and keyword arguments:
 ///
 /// ```
-/// # use minijinja::value::{Value, Rest, Kwargs, from_args};
+/// # use minijinja::value::{Value, ValueOrKwargs, Rest, Kwargs, from_args};
 /// # use minijinja::Error;
-/// fn my_func(args: Rest<Value>) -> Result<Value, Error> {
+/// fn my_func(args: Rest<ValueOrKwargs>) -> Result<Value, Error> {
+///     let args = args.into_values();
 ///     let (args, kwargs) = from_args::<(&[Value], Kwargs)>(&args)?;
 ///     // do something with args and kwargs
 /// # todo!()
@@ -1079,18 +1092,78 @@ impl TryFrom<Value> for Kwargs {
     }
 }
 
-impl<'a> ArgType<'a> for Value {
+fn unexpected_kwargs() -> Error {
+    Error::new(ErrorKind::TooManyArguments, "unexpected keyword arguments")
+}
+
+/// An argument value that can explicitly capture keyword arguments.
+///
+/// Regular [`Value`] arguments reject the internal keyword-argument value so
+/// that misspelled or unsupported keyword arguments do not get accepted as a
+/// positional value. Use this wrapper with [`Rest`] when implementing a
+/// variadic function that needs to split positional and keyword arguments.
+#[derive(Clone, Debug)]
+pub struct ValueOrKwargs(Value);
+
+impl ValueOrKwargs {
+    /// Consumes the wrapper and returns the underlying value.
+    pub fn into_value(self) -> Value {
+        self.0
+    }
+}
+
+impl Deref for ValueOrKwargs {
+    type Target = Value;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<Value> for ValueOrKwargs {
+    fn from(value: Value) -> Self {
+        ValueOrKwargs(value)
+    }
+}
+
+impl From<ValueOrKwargs> for Value {
+    fn from(value: ValueOrKwargs) -> Self {
+        value.0
+    }
+}
+
+impl<'a> ArgType<'a> for ValueOrKwargs {
     type Output = Self;
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
         match value {
-            Some(value) => Ok(value.clone()),
+            Some(value) => Ok(ValueOrKwargs(value.clone())),
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
     }
 
     fn from_value_owned(value: Value) -> Result<Self, Error> {
-        Ok(value)
+        Ok(ValueOrKwargs(value))
+    }
+}
+
+impl<'a> ArgType<'a> for Value {
+    type Output = Self;
+
+    fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
+        match value {
+            Some(value) if !value.is_kwargs() => Ok(value.clone()),
+            Some(_) => Err(unexpected_kwargs()),
+            None => Err(Error::from(ErrorKind::MissingArgument)),
+        }
+    }
+
+    fn from_value_owned(value: Value) -> Result<Self, Error> {
+        if value.is_kwargs() {
+            Err(unexpected_kwargs())
+        } else {
+            Ok(value)
+        }
     }
 }
 
@@ -1135,7 +1208,7 @@ impl<'a> ArgType<'a> for String {
     }
 
     fn from_value_owned(value: Value) -> Result<Self, Error> {
-        Ok(value.to_string())
+        value_to_string_cow(&value).map(Cow::into_owned)
     }
 }
 
@@ -1270,6 +1343,25 @@ mod tests {
     }
 
     #[test]
+    fn test_value_rejects_kwargs() {
+        let kwargs = Value::from(Kwargs::from_iter([("foo", Value::from(1))]));
+
+        assert_eq!(
+            from_args::<(Value,)>(&[kwargs.clone()]).unwrap_err().kind(),
+            ErrorKind::TooManyArguments
+        );
+        assert_eq!(
+            from_args::<(Rest<Value>,)>(&[kwargs.clone()])
+                .unwrap_err()
+                .kind(),
+            ErrorKind::TooManyArguments
+        );
+
+        let (value,) = from_args::<(ValueOrKwargs,)>(&[kwargs]).unwrap();
+        assert!(value.is_kwargs());
+    }
+
+    #[test]
     fn test_kwargs_fails_string_conversion() {
         let kwargs = Kwargs::from_iter([("foo", Value::from(1)), ("bar", Value::from(2))]);
         let args = [Value::from(kwargs)];
@@ -1287,6 +1379,9 @@ mod tests {
             result.unwrap_err().to_string(),
             "invalid operation: cannot convert kwargs to string"
         );
+
+        let result = String::from_value_owned(args[0].clone());
+        assert!(result.is_err());
     }
 
     #[test]

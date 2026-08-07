@@ -187,7 +187,8 @@ mod builtins {
     use crate::value::merge_object::{MergeDict, MergeSeq};
     use crate::value::ops::{self, as_f64, LenIterWrap};
     use crate::value::{
-        Enumerator, Kwargs, Object, ObjectRepr, Rest, StringInput, Tuple, ValueKind, ValueRepr,
+        Enumerator, Kwargs, Object, ObjectRepr, Rest, StringInput, Tuple, ValueKind, ValueOrKwargs,
+        ValueRepr,
     };
     use std::borrow::Cow;
     use std::cmp::Ordering;
@@ -1352,7 +1353,7 @@ mod builtins {
         value: Value,
         attr: Option<Cow<'_, str>>,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
+        args: Vec<Value>,
     ) -> Result<Vec<Value>, Error> {
         let mut rv = vec![];
         let test = if let Some(test_name) = test_name {
@@ -1372,7 +1373,7 @@ mod builtins {
             let passed = if let Some(test) = test {
                 let new_args = Some(test_value)
                     .into_iter()
-                    .chain(args.0.iter().cloned())
+                    .chain(args.iter().cloned())
                     .collect::<Vec<_>>();
                 ok!(test.call(state, &new_args)).is_true()
             } else {
@@ -1401,9 +1402,9 @@ mod builtins {
         state: &State,
         value: Value,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
+        args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, false, value, None, test_name, args)
+        select_or_reject(state, false, value, None, test_name, args.into_values())
     }
 
     /// Creates a new sequence of values of which an attribute passes a test.
@@ -1421,9 +1422,16 @@ mod builtins {
         value: Value,
         attr: Cow<'_, str>,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
+        args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, false, value, Some(attr), test_name, args)
+        select_or_reject(
+            state,
+            false,
+            value,
+            Some(attr),
+            test_name,
+            args.into_values(),
+        )
     }
 
     /// Creates a new sequence of values that don't pass a test.
@@ -1434,9 +1442,9 @@ mod builtins {
         state: &State,
         value: Value,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
+        args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, true, value, None, test_name, args)
+        select_or_reject(state, true, value, None, test_name, args.into_values())
     }
 
     /// Creates a new sequence of values of which an attribute does not pass a test.
@@ -1454,9 +1462,16 @@ mod builtins {
         value: Value,
         attr: Cow<'_, str>,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
+        args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, true, value, Some(attr), test_name, args)
+        select_or_reject(
+            state,
+            true,
+            value,
+            Some(attr),
+            test_name,
+            args.into_values(),
+        )
     }
 
     /// Applies a filter to a sequence of objects or looks up an attribute.
@@ -1489,11 +1504,12 @@ mod builtins {
     pub fn map(
         state: &State,
         value: Value,
-        args: crate::value::Rest<Value>,
+        args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {
         let mut rv = Vec::with_capacity(value.len().unwrap_or(0));
 
         // attribute mapping
+        let args = args.into_values();
         let (args, kwargs): (&[Value], Kwargs) = crate::value::from_args(&args)?;
 
         if let Some(attr) = ok!(kwargs.get::<Option<Value>>("attribute")) {
@@ -1892,8 +1908,9 @@ mod builtins {
     pub fn format(
         state: &State,
         format_str: &Value,
-        format_args: Rest<Value>,
+        format_args: Rest<ValueOrKwargs>,
     ) -> Result<Value, Error> {
+        let format_args = format_args.into_values();
         let string = format_str
             .as_str()
             .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "value is not a string"))?;

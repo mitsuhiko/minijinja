@@ -223,7 +223,7 @@ use crate::value::ops::as_f64;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{
-    from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest, StringInput,
+    from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest, StringInput, ValueOrKwargs,
 };
 pub use crate::value::merge_object::merge_maps;
 pub use crate::value::object::{DynObject, Enumerator, Object, ObjectExt, ObjectRepr};

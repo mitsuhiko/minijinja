@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use insta::assert_snapshot;
 use minijinja::syntax::SyntaxConfig;
-use minijinja::value::{Enumerator, Object, ObjectRepr, Rest, Value};
+use minijinja::value::{Enumerator, Object, ObjectRepr, Rest, Value, ValueOrKwargs};
 use minijinja::{context, render, Environment, Error, ErrorKind, State, UndefinedBehavior};
 
 use serde::Deserialize;
@@ -73,8 +73,8 @@ fn test_vm() {
         let contents = std::fs::read_to_string(path).unwrap();
         let mut iter = contents.splitn(2, "\n---\n");
         let mut env = Environment::new();
-        env.add_function("get_args", |args: Rest<Value>| -> Value {
-            Value::from(args.0)
+        env.add_function("get_args", |args: Rest<ValueOrKwargs>| -> Value {
+            Value::from(args.into_values())
         });
         let ctx: Value = serde_json::from_str(iter.next().unwrap()).unwrap();
         let settings =
