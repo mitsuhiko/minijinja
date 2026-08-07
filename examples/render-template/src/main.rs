@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use argh::FromArgs;
+use minijinja::value::Serialize;
 use minijinja::Environment;
 
 /// A small application that renders a MiniJinja template.
@@ -30,7 +31,7 @@ fn execute() -> Result<(), Box<dyn std::error::Error>> {
     let ctx: serde_json::Value = serde_json::from_slice(&fs::read(&cli.context)?)?;
 
     let tmpl = env.get_template(name).unwrap();
-    println!("{}", tmpl.render(ctx)?);
+    println!("{}", tmpl.render(Serialize(ctx))?);
 
     Ok(())
 }

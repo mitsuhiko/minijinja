@@ -27,8 +27,8 @@
 //! });
 //! ```
 //!
-//! Or via the [`FromIterator`] trait which can create sequences or maps.  When
-//! given a tuple it creates maps, otherwise it makes a sequence.
+//! Or via the [`FromIterator`] trait, which creates sequences.  Maps can be
+//! created from pairs with [`Value::from_pairs`].
 //!
 //! ```
 //! # use minijinja::value::Value;
@@ -36,7 +36,7 @@
 //! let value: Value = (1..10).into_iter().collect();
 //!
 //! // collection into a map
-//! let value: Value = [("key", "value")].into_iter().collect();
+//! let value = Value::from_pairs([("key", "value")]);
 //! ```
 //!
 //! For certain types of iterators (`Send` + `Sync` + `'static`) it's also
@@ -84,19 +84,18 @@
 //!
 //! # Serde Conversions
 //!
-//! MiniJinja will usually however create values via an indirection via [`serde`] when
-//! a template is rendered or an expression is evaluated.  This can also be
-//! triggered manually by using the [`Value::from_serialize`] method:
+//! Serde conversion is available explicitly through the `Serialize` wrapper or
+//! the `Value::from_serialize` convenience method:
 //!
 //! ```
-//! # use minijinja::value::Value;
+//! # use minijinja::value::{Serialize, Value};
+//! let value = Value::from(Serialize(&[1, 2, 3]));
 //! let value = Value::from_serialize(&[1, 2, 3]);
 //! ```
 //!
-//! This feature is enabled by default but in fact optional.  If you disable default
-//! features (which means turning off the default `serde` feature), MiniJinja will
-//! instead use a custom `Serialize` trait which is only implemented for some very
-//! basic types and cannot be implemented for custom types.
+//! Rendering APIs primarily accept `Into<Value>`. Wrap custom Serde contexts in
+//! `Serialize` when passing them to those APIs. The wrapper and
+//! `Value::from_serialize` are only available when the `serde` feature is enabled.
 //!
 //! The inverse of the serialize operation is to pass a value directly as
 //! serializer to a type that supports deserialization.  This requires the
@@ -174,9 +173,9 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //!
 //! Invalid values are typically encountered in the following situations:
 //!
-//! - serialization fails with an error: this is the case when a value is crated
-//!   via [`Value::from_serialize`] and the underlying [`Serialize`] implementation
-//!   fails with an error.
+//! - serialization fails with an error: this is the case when a value is created
+//!   through `Serialize` or `Value::from_serialize` and the underlying
+//!   `serde::Serialize` implementation fails with an error.
 //! - fallible iteration: there might be situations where an iterator cannot indicate
 //!   failure ahead of iteration and must abort.  In that case the only option an
 //!   iterator in MiniJinja has is to create an invalid value.
@@ -238,8 +237,6 @@ pub(crate) mod namespace_object;
 mod object;
 pub(crate) mod ops;
 
-#[cfg(not(feature = "serde"))]
-mod serde_fallback;
 mod serialize;
 mod tuple;
 
@@ -247,11 +244,14 @@ mod tuple;
 pub use self::deserialize::ViaDeserialize;
 pub use self::tuple::Tuple;
 
-#[cfg(not(feature = "serde"))]
-pub use self::serde_fallback::Serialize;
+/// Explicitly converts a Serde-serializable value into a template value.
+///
+/// This wrapper lets [`Value::from`] and APIs accepting `Into<Value>` use
+/// Serde without making serialization the default conversion mechanism.
 #[cfg(feature = "serde")]
-#[doc(no_inline)]
-pub use serde::Serialize;
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+#[derive(Clone, Copy, Debug)]
+pub struct Serialize<T>(pub T);
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
@@ -328,14 +328,13 @@ thread_local! {
 
 /// Function that returns true when serialization for [`Value`] is taking place.
 ///
-/// MiniJinja internally creates [`Value`] objects from all values passed to the
-/// engine.  It does this by going through the regular serde serialization trait.
-/// In some cases users might want to customize the serialization specifically for
-/// MiniJinja because they want to tune the object for the template engine
-/// independently of what is normally serialized to disk.
+/// When a value is converted through the `Serialize` wrapper or
+/// `Value::from_serialize`, MiniJinja uses the regular Serde serialization
+/// trait. In some cases users might want to customize that serialization for
+/// the template engine independently of what is normally serialized to disk.
 ///
 /// This function returns `true` when MiniJinja is serializing to [`Value`] and
-/// `false` otherwise.  You can call this within your own [`Serialize`]
+/// `false` otherwise. You can call this within your own `serde::Serialize`
 /// implementation to change the output format.
 ///
 /// This is particularly useful as serialization for MiniJinja does not need to
@@ -912,58 +911,44 @@ impl Value {
     /// and this is the only way to construct it.
     pub const UNDEFINED: Value = Value(ValueRepr::Undefined(UndefinedType::Default));
 
-    /// Creates a value from something that can be serialized.
+    /// Creates a value through Serde serialization.
     ///
-    /// This is the method that MiniJinja will generally use whenever a serializable
-    /// object is passed to one of the APIs that internally want to create a value.
-    /// For instance this is what [`context!`](crate::context) and
-    /// [`render`](crate::Template::render) will use.
+    /// This is a convenience alias for `Value::from(Serialize(value))`.  Native
+    /// values should generally use [`Value::from`] directly; the [`Serialize`]
+    /// wrapper makes Serde conversion explicit where it is needed.
     ///
     /// During serialization of the value, [`serializing_for_value`] will return
     /// `true` which makes it possible to customize serialization for MiniJinja.
-    /// For more information see [`serializing_for_value`].
     ///
     /// ```
     /// # use minijinja::value::Value;
     /// let val = Value::from_serialize(&vec![1, 2, 3]);
     /// ```
     ///
-    /// This method does not fail but it might return a value that is not valid.  Such
-    /// values will when operated on fail in the template engine in most situations.
-    /// This for instance can happen if the underlying implementation of [`Serialize`]
-    /// fails.  There are also cases where invalid objects are silently hidden in the
-    /// engine today.  This is for instance the case for when keys are used in hash maps
-    /// that the engine cannot deal with.  Invalid values are considered an implementation
-    /// detail.  There is currently no API to validate a value.
+    /// This method does not fail but it might return an invalid value if the
+    /// underlying Serde implementation fails.  Invalid values fail later when
+    /// the template engine operates on them.
+    #[cfg(feature = "serde")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+    pub fn from_serialize<T: serde::Serialize>(value: T) -> Value {
+        Value::from(Serialize(value))
+    }
+
+    /// Creates a map value from an iterator of key-value pairs.
     ///
-    /// If the `deserialization` feature is enabled then the inverse of this method
-    /// is to use the [`Value`] type as serializer.  You can pass a value into the
-    /// [`deserialize`](serde::Deserialize::deserialize) method of a type that supports
-    /// serde deserialization.
-    ///
-    /// # Note on Serde and Serialize
-    ///
-    /// MiniJinja normally uses `serde` for serialization.  However in case the `serde`
-    /// feature is disabled, the [`Serialize`] trait is replaced with a minimal version
-    /// of the trait which supports basic value conversions.  It is sealed and cannot
-    /// be implemented by user types.  You will need to use the `serde` feature if you
-    /// want to implement it.
-    pub fn from_serialize<T: Serialize>(value: T) -> Value {
-        #[cfg(feature = "serde")]
-        {
-            INTERNAL_SERIALIZATION.with(|flag| {
-                let old = flag.replace(true);
-                let _serialization_guard = InternalSerializationGuard {
-                    flag,
-                    reset_on_drop: !old,
-                };
-                crate::value::serialize::transform(value)
-            })
-        }
-        #[cfg(not(feature = "serde"))]
-        {
-            value.to_value(crate::utils::SealedMarker)
-        }
+    /// Unlike collecting directly into a [`Value`], which creates a sequence,
+    /// this method interprets two-item tuples as map entries.
+    pub fn from_pairs<I, K, V>(iter: I) -> Value
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<Value>,
+        V: Into<Value>,
+    {
+        Value::from_object(
+            iter.into_iter()
+                .map(|(key, value)| (key.into(), value.into()))
+                .collect::<ValueMap>(),
+        )
     }
 
     /// Extracts a contained error.
@@ -1921,6 +1906,20 @@ impl Value {
 }
 
 #[cfg(feature = "serde")]
+impl<T: serde::Serialize> From<Serialize<T>> for Value {
+    fn from(value: Serialize<T>) -> Value {
+        INTERNAL_SERIALIZATION.with(|flag| {
+            let old = flag.replace(true);
+            let _serialization_guard = InternalSerializationGuard {
+                flag,
+                reset_on_drop: !old,
+            };
+            crate::value::serialize::transform(value.0)
+        })
+    }
+}
+
+#[cfg(feature = "serde")]
 impl serde::Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -2103,7 +2102,7 @@ mod tests {
         let x = Arc::new(X(Default::default()));
         let x_value = Value::from_dyn_object(x.clone());
         x.0.fetch_add(42, atomic::Ordering::Relaxed);
-        let x_clone = Value::from_serialize(&x_value);
+        let x_clone = Value::from(&x_value);
         x.0.fetch_add(23, atomic::Ordering::Relaxed);
 
         assert_eq!(x_value.to_string(), "65");

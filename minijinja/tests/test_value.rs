@@ -43,10 +43,10 @@ fn test_sort_different_types() {
         Value::from_iter([1, 2]),
         Value::from(80u32),
         Value::from(30i16),
-        Value::from_iter([("a", 3)]),
-        Value::from_iter([("a", 2)]),
-        Value::from_iter([("b", 0)]),
-        Value::from_iter([("b", 3)]),
+        Value::from_pairs([("a", 3)]),
+        Value::from_pairs([("a", 2)]),
+        Value::from_pairs([("b", 0)]),
+        Value::from_pairs([("b", 3)]),
         Value::from_iter([0, 2]),
         Value::from(true),
         Value::UNDEFINED,
@@ -124,7 +124,7 @@ fn test_sort_different_types() {
 #[test]
 fn test_safe_string_roundtrip() {
     let v = Value::from_safe_string("<b>HTML</b>".into());
-    let v2 = Value::from_serialize(&v);
+    let v2 = Value::from(&v);
     assert!(v.is_safe());
     assert!(v2.is_safe());
     assert_eq!(v.to_string(), v2.to_string());
@@ -133,7 +133,7 @@ fn test_safe_string_roundtrip() {
 #[test]
 fn test_undefined_roundtrip() {
     let v = Value::UNDEFINED;
-    let v2 = Value::from_serialize(&v);
+    let v2 = Value::from(&v);
     assert!(v.is_undefined());
     assert!(v2.is_undefined());
 }
@@ -546,7 +546,7 @@ fn test_make_iterable() {
 
 #[test]
 fn test_complex_key() {
-    let value = Value::from_iter([
+    let value = Value::from_pairs([
         (Value::from_iter([0u32, 0u32]), "origin"),
         (Value::from_iter([0u32, 1u32]), "right"),
     ]);
@@ -572,7 +572,7 @@ fn test_deserialize() {
         y: i32,
     }
 
-    let point_value = Value::from_iter([("x", Value::from(42)), ("y", Value::from(-23))]);
+    let point_value = Value::from_pairs([("x", Value::from(42)), ("y", Value::from(-23))]);
     let point = Point::deserialize(point_value).unwrap();
 
     assert_eq!(point, Point { x: 42, y: -23 });
@@ -622,7 +622,7 @@ fn test_via_deserialize() {
         format!("{}, {}", point.x, point.y)
     }
 
-    let point_value = Value::from_iter([("x", Value::from(42)), ("y", Value::from(-23))]);
+    let point_value = Value::from_pairs([("x", Value::from(42)), ("y", Value::from(-23))]);
 
     let mut env = Environment::new();
     env.add_filter("foo", foo);

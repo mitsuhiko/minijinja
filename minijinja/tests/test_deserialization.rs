@@ -50,7 +50,7 @@ fn test_seq_object() {
 
 #[test]
 fn test_map() {
-    let v = BTreeMap::<String, i32>::deserialize(Value::from_iter([
+    let v = BTreeMap::<String, i32>::deserialize(Value::from_pairs([
         ("foo", Value::from(1)),
         ("bar", Value::from(2)),
     ]))

@@ -223,7 +223,7 @@ impl Config {
 
     pub fn apply_to_env(&self, env: &mut Environment) -> Result<(), Error> {
         if self.env {
-            env.add_global("ENV", Value::from_iter(std::env::vars()));
+            env.add_global("ENV", Value::from_pairs(std::env::vars()));
         }
         env.set_trim_blocks(self.trim_blocks);
         env.set_lstrip_blocks(self.lstrip_blocks);

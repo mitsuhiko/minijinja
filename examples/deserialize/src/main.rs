@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use minijinja::value::{Value, ViaDeserialize};
+use minijinja::value::{Serialize as ValueSerialize, Value, ViaDeserialize};
 use minijinja::{context, Environment};
 use serde::{Deserialize, Serialize};
 
@@ -36,8 +36,8 @@ fn main() {
         "{}",
         template
             .render(context! {
-                path => std::env::current_dir().unwrap(),
-                point => &point,
+                path => ValueSerialize(std::env::current_dir().unwrap()),
+                point => ValueSerialize(&point),
             })
             .unwrap()
     );

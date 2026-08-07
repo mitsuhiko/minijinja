@@ -259,6 +259,13 @@ impl From<ValueRepr> for Value {
     }
 }
 
+impl From<&Value> for Value {
+    #[inline(always)]
+    fn from(value: &Value) -> Value {
+        value.clone()
+    }
+}
+
 impl<'a> From<&'a [u8]> for Value {
     #[inline(always)]
     fn from(val: &'a [u8]) -> Self {
@@ -317,16 +324,6 @@ impl From<()> for Value {
 impl<V: Into<Value>> FromIterator<V> for Value {
     fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
         Value::from_object(iter.into_iter().map(Into::into).collect::<Vec<Value>>())
-    }
-}
-
-impl<K: Into<Value>, V: Into<Value>> FromIterator<(K, V)> for Value {
-    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        Value::from_object(
-            iter.into_iter()
-                .map(|(k, v)| (k.into(), v.into()))
-                .collect::<ValueMap>(),
-        )
     }
 }
 
@@ -1309,6 +1306,15 @@ impl<I: Into<Value>> From<Option<I>> for Value {
             Some(value) => value.into(),
             None => Value::from(()),
         }
+    }
+}
+
+impl<I> From<&Option<I>> for Value
+where
+    I: Clone + Into<Value>,
+{
+    fn from(value: &Option<I>) -> Self {
+        Value::from(value.clone())
     }
 }
 

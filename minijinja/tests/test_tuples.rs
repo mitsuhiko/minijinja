@@ -83,7 +83,26 @@ fn test_rust_and_serde_tuples() {
     assert_eq!(explicit.to_string(), "(1, 2)");
     assert_ne!(explicit, Value::from(vec![1, 2]));
 
-    let serialized = Value::from_serialize((1, 2));
-    assert!(serialized.is_tuple());
-    assert_eq!(serialized, explicit);
+    let converted = Value::from((1, 2));
+    assert!(converted.is_tuple());
+    assert_eq!(converted, explicit);
+
+    #[cfg(feature = "serde")]
+    {
+        use minijinja::value::Serialize;
+
+        let serialized = Value::from(Serialize((1, 2)));
+        assert!(serialized.is_tuple());
+        assert_eq!(serialized, explicit);
+        assert_eq!(Value::from_serialize((1, 2)), serialized);
+    }
+}
+
+#[test]
+fn test_collecting_tuples_and_pairs() {
+    let sequence: Value = [("key", 42)].into_iter().collect();
+    assert_eq!(sequence.to_string(), "[('key', 42)]");
+
+    let map = Value::from_pairs([("key", 42)]);
+    assert_eq!(map.to_string(), "{'key': 42}");
 }

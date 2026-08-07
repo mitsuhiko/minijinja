@@ -8,7 +8,7 @@ use crate::compiler::parser::parse_expr;
 use crate::environment::Environment;
 use crate::error::Error;
 use crate::output::Output;
-use crate::value::{Serialize, Value};
+use crate::value::Value;
 use crate::vm::Vm;
 
 /// A handle to a compiled expression.
@@ -80,10 +80,10 @@ impl<'env, 'source> Expression<'env, 'source> {
     /// Evaluates the expression with some context.
     ///
     /// The result of the expression is returned as [`Value`].
-    pub fn eval<S: Serialize>(&self, ctx: S) -> Result<Value, Error> {
+    pub fn eval<V: Into<Value>>(&self, ctx: V) -> Result<Value, Error> {
         // reduce total amount of code falling under mono morphization into
         // this function, and share the rest in _eval.
-        self._eval(Value::from_serialize(ctx))
+        self._eval(ctx.into())
     }
 
     /// Returns a set of all undeclared variables in the expression.

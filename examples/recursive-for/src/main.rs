@@ -1,3 +1,4 @@
+use minijinja::value::Serialize as ValueSerialize;
 use minijinja::{context, Environment};
 use serde::Serialize;
 
@@ -27,7 +28,7 @@ fn main() {
     println!(
         "{}",
         template
-            .render(context!(nav => vec![
+            .render(context!(nav => ValueSerialize(vec![
                 Item {
                     link: "/",
                     title: "Index",
@@ -49,7 +50,7 @@ fn main() {
                         },
                     ],
                 },
-            ]))
+            ])))
             .unwrap()
     );
 }

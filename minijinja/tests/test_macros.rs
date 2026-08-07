@@ -293,7 +293,7 @@ fn test_conversions() {
     let value = context! {
         both => Both,
         from_only => FromOnly,
-        serialize_only => SerializeOnly,
+        serialize_only => minijinja::value::Serialize(SerializeOnly),
     };
     assert_debug_snapshot!(&value, @"
     {

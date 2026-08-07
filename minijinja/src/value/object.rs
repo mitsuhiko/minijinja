@@ -150,9 +150,9 @@ use crate::vm::State;
 ///             #[cfg(target_os = "wasi")]
 ///             "pid" => Some(Value::from(1234_u32)), // Mock PID for WASI
 ///             #[cfg(not(target_os = "wasi"))]
-///             "env" => Some(Value::from_iter(std::env::vars())),
+///             "env" => Some(Value::from_pairs(std::env::vars())),
 ///             #[cfg(target_os = "wasi")]
-///             "env" => Some(Value::from_iter([("HOME".to_string(), "/home/user".to_string())])), // Mock env for WASI
+///             "env" => Some(Value::from_pairs([("HOME".to_string(), "/home/user".to_string())])), // Mock env for WASI
 ///             "magic" => Some(Value::from(self.magic)),
 ///             _ => None,
 ///         }
@@ -952,6 +952,15 @@ macro_rules! impl_value_vec {
                 Value::from_object(val)
             }
         }
+
+        impl<T> From<&$vec_type<T>> for Value
+        where
+            T: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+        {
+            fn from(val: &$vec_type<T>) -> Self {
+                Value::from(val.clone())
+            }
+        }
     };
 }
 
@@ -978,6 +987,15 @@ macro_rules! impl_value_iterable {
         {
             fn from(val: $iterable_type<T>) -> Self {
                 Value::from_object(val)
+            }
+        }
+
+        impl<T> From<&$iterable_type<T>> for Value
+        where
+            T: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+        {
+            fn from(val: &$iterable_type<T>) -> Self {
+                Value::from(val.clone())
             }
         }
     };
@@ -1058,6 +1076,15 @@ macro_rules! impl_str_map {
         impl_str_map_helper!($map_type, String, $enumerator);
         impl_str_map_helper!($map_type, Arc<str>, $enumerator);
         impl_static_str_map_helper!($map_type, $enumerator);
+
+        impl<K, V> From<&$map_type<K, V>> for Value
+        where
+            $map_type<K, V>: Clone + Into<Value>,
+        {
+            fn from(val: &$map_type<K, V>) -> Self {
+                val.clone().into()
+            }
+        }
 
         impl<V> From<$map_type<String, V>> for Value
         where
@@ -1200,5 +1227,14 @@ where
 {
     fn from(value: [T; N]) -> Self {
         Value::from_object(value)
+    }
+}
+
+impl<T, const N: usize> From<&[T; N]> for Value
+where
+    T: Into<Value> + Clone + Send + Sync + fmt::Debug + 'static,
+{
+    fn from(value: &[T; N]) -> Self {
+        Value::from(value.clone())
     }
 }

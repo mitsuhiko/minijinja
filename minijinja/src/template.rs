@@ -16,7 +16,7 @@ use crate::error::{attach_basic_debug_info, Error};
 use crate::output::{Output, WriteWrapper};
 use crate::syntax::SyntaxConfig;
 use crate::utils::AutoEscape;
-use crate::value::{Serialize, Value};
+use crate::value::Value;
 use crate::vm::{prepare_blocks, Context, State, Vm};
 
 /// Callback for auto escape determination
@@ -162,9 +162,10 @@ impl<'env, 'source> Template<'env, 'source> {
     /// Renders the template into a string.
     ///
     /// The provided value is used as the initial context for the template.  It
-    /// can be any object that implements [`Serialize`](crate::value::Serialize).  You
-    /// can either create your own struct and derive `Serialize` for it or the
+    /// can be any object that implements `Into<Value>`.  The
     /// [`context!`](crate::context) macro can be used to create an ad-hoc context.
+    /// Serde values can be passed explicitly with the
+    /// `minijinja::value::Serialize` wrapper.
     ///
     /// For very large contexts and to avoid the overhead of serialization of
     /// potentially unused values, you might consider using a dynamic
@@ -182,12 +183,10 @@ impl<'env, 'source> Template<'env, 'source> {
     /// To render a single block use [`render_captured`](Self::render_captured)
     /// in combination with [`State::render_block`].
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
-    /// efficiently passed to render.  It does not undergo actual serialization.
-    pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
+    pub fn render<V: Into<Value>>(&self, ctx: V) -> Result<String, Error> {
         // reduce total amount of code falling under mono morphization into
         // this function, and share the rest in _render.
-        self._render(Value::from_serialize(ctx)).map(|x| x.0)
+        self._render(ctx.into()).map(|x| x.0)
     }
 
     /// Like [`render`](Self::render) but also return the evaluated [`State`].
@@ -205,16 +204,14 @@ impl<'env, 'source> Template<'env, 'source> {
     /// assert_eq!(state.lookup("x"), Some(Value::from(42)));
     /// ```
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
-    /// efficiently passed to render.  It does not undergo actual serialization.
     #[deprecated(since = "2.18.0", note = "use render_captured instead")]
-    pub fn render_and_return_state<S: Serialize>(
+    pub fn render_and_return_state<V: Into<Value>>(
         &self,
-        ctx: S,
+        ctx: V,
     ) -> Result<(String, State<'_, 'env>), Error> {
         // reduce total amount of code falling under mono morphization into
         // this function, and share the rest in _render.
-        self._render(Value::from_serialize(ctx))
+        self._render(ctx.into())
     }
 
     /// Like [`render`](Self::render) but also returns the evaluated [`State`]
@@ -235,9 +232,8 @@ impl<'env, 'source> Template<'env, 'source> {
     /// assert_eq!(rendered.output(), "");
     /// assert_eq!(rendered.state().lookup("x"), Some(Value::from(42)));
     /// ```
-    pub fn render_captured<S: Serialize>(&self, ctx: S) -> Result<Captured<'source>, Error> {
-        self.clone()
-            ._capture_state(Value::from_serialize(ctx), true)
+    pub fn render_captured<V: Into<Value>>(&self, ctx: V) -> Result<Captured<'source>, Error> {
+        self.clone()._capture_state(ctx.into(), true)
     }
 
     /// Like [`render`](Self::render) but writes to an [`io::Write`] and keeps
@@ -260,12 +256,12 @@ impl<'env, 'source> Template<'env, 'source> {
     /// assert_eq!(std::str::from_utf8(&buf).unwrap(), "Hello!");
     /// assert_eq!(captured.output(), "");
     /// ```
-    pub fn render_captured_to<S: Serialize, W: io::Write>(
+    pub fn render_captured_to<V: Into<Value>, W: io::Write>(
         &self,
-        ctx: S,
+        ctx: V,
         w: W,
     ) -> Result<Captured<'source>, Error> {
-        let root = Value::from_serialize(ctx);
+        let root = ctx.into();
         let w = std::cell::RefCell::new(WriteWrapper { w, err: None });
         self.clone()
             ._capture_state_with_output(root, &w)
@@ -333,16 +329,14 @@ impl<'env, 'source> Template<'env, 'source> {
     /// tmpl.render_to_write(context!(name => "John"), &mut stdout()).unwrap();
     /// ```
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
-    /// efficiently passed to render.  It does not undergo actual serialization.
     #[deprecated(since = "2.18.0", note = "use render_captured_to instead")]
-    pub fn render_to_write<S: Serialize, W: io::Write>(
+    pub fn render_to_write<V: Into<Value>, W: io::Write>(
         &self,
-        ctx: S,
+        ctx: V,
         w: W,
     ) -> Result<State<'_, 'env>, Error> {
         let mut wrapper = WriteWrapper { w, err: None };
-        self._eval(Value::from_serialize(ctx), &mut Output::new(&mut wrapper))
+        self._eval(ctx.into(), &mut Output::new(&mut wrapper))
             .map(|(_, state)| state)
             .map_err(|err| wrapper.take_err(err))
     }
@@ -369,8 +363,8 @@ impl<'env, 'source> Template<'env, 'source> {
     ///
     /// For more information see [`State`].
     #[deprecated(since = "2.18.0", note = "use render_captured instead")]
-    pub fn eval_to_state<S: Serialize>(&self, ctx: S) -> Result<State<'_, 'env>, Error> {
-        let root = Value::from_serialize(ctx);
+    pub fn eval_to_state<V: Into<Value>>(&self, ctx: V) -> Result<State<'_, 'env>, Error> {
+        let root = ctx.into();
         let mut out = Output::null();
         let vm = Vm::new(self.env);
         let state = ok!(vm.eval(

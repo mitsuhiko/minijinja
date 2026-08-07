@@ -37,9 +37,10 @@
 //! # Template Usage
 //!
 //! To use MiniJinja one needs to create an [`Environment`] and populate it with
-//! templates.  Afterwards templates can be loaded and rendered.  To pass data
-//! one can pass any serde serializable value.  The [`context!`] macro can be
-//! used to quickly construct a template context:
+//! templates. Afterwards templates can be loaded and rendered with any value
+//! implementing `Into<Value>`. Serde values can be converted explicitly with
+//! `value::Serialize`. The [`context!`] macro can be used to quickly construct
+//! a template context:
 //!
 //! ```
 //! use minijinja::{Environment, context};

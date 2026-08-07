@@ -13,7 +13,7 @@ use crate::template::{
     AutoEscapeFunc, CompiledTemplate, CompiledTemplateRef, Template, TemplateConfig,
 };
 use crate::utils::{write_escaped, AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
-use crate::value::{FunctionArgs, FunctionResult, Serialize, UndefinedType, Value, ValueRepr};
+use crate::value::{FunctionArgs, FunctionResult, UndefinedType, Value, ValueRepr};
 use crate::vm::State;
 use crate::{defaults, functions};
 
@@ -447,13 +447,11 @@ impl<'source> Environment<'source> {
     /// println!("{}", rv.unwrap());
     /// ```
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
-    /// efficiently passed to render.  It does not undergo actual serialization.
-    pub fn render_named_str<S: Serialize>(
+    pub fn render_named_str<V: Into<Value>>(
         &self,
         name: &str,
         source: &str,
-        ctx: S,
+        ctx: V,
     ) -> Result<String, Error> {
         ok!(self.template_from_named_str(name, source)).render(ctx)
     }
@@ -466,9 +464,7 @@ impl<'source> Environment<'source> {
     /// This is an alias for [`template_from_str`](Self::template_from_str) paired with
     /// [`render`](Template::render).
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
-    /// efficiently passed to render.  It does not undergo actual serialization.
-    pub fn render_str<S: Serialize>(&self, source: &str, ctx: S) -> Result<String, Error> {
+    pub fn render_str<V: Into<Value>>(&self, source: &str, ctx: V) -> Result<String, Error> {
         // reduce total amount of code falling under mono morphization into
         // this function, and share the rest in _eval.
         ok!(self.template_from_str(source)).render(ctx)

@@ -1,3 +1,4 @@
+use minijinja::value::Serialize as ValueSerialize;
 use minijinja::{context, Environment};
 use serde::Serialize;
 
@@ -19,5 +20,10 @@ fn main() {
         title: "Some title".into(),
         content: "Lorum Ipsum".into(),
     };
-    println!("{}", template.render(context!(page)).unwrap());
+    println!(
+        "{}",
+        template
+            .render(context!(page => ValueSerialize(page)))
+            .unwrap()
+    );
 }

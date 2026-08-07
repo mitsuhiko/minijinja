@@ -84,3 +84,37 @@ impl From<Tuple> for Value {
         Value::from_object(value)
     }
 }
+
+macro_rules! impl_value_tuple {
+    ($($name:ident),+) => {
+        impl<$($name: Into<Value>),+> From<($($name,)+)> for Value {
+            #[allow(non_snake_case)]
+            fn from(value: ($($name,)+)) -> Self {
+                let ($($name,)+) = value;
+                Value::from(Tuple::from(vec![$($name.into(),)+]))
+            }
+        }
+
+        impl<$($name),+> From<&($($name,)+)> for Value
+        where
+            $($name: Clone + Into<Value>),+
+        {
+            fn from(value: &($($name,)+)) -> Self {
+                Value::from(value.clone())
+            }
+        }
+    };
+}
+
+impl_value_tuple!(A);
+impl_value_tuple!(A, B);
+impl_value_tuple!(A, B, C);
+impl_value_tuple!(A, B, C, D);
+impl_value_tuple!(A, B, C, D, E);
+impl_value_tuple!(A, B, C, D, E, F);
+impl_value_tuple!(A, B, C, D, E, F, G);
+impl_value_tuple!(A, B, C, D, E, F, G, H);
+impl_value_tuple!(A, B, C, D, E, F, G, H, I);
+impl_value_tuple!(A, B, C, D, E, F, G, H, I, J);
+impl_value_tuple!(A, B, C, D, E, F, G, H, I, J, K);
+impl_value_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);

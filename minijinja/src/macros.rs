@@ -23,7 +23,7 @@ macro_rules! some {
 /// Hidden utility module for the [`context!`](crate::context!) macro.
 #[doc(hidden)]
 pub mod __context {
-    use crate::value::{Serialize, Value};
+    use crate::value::Value;
     use crate::Environment;
     use std::collections::BTreeMap;
     use std::rc::Rc;
@@ -48,26 +48,6 @@ pub mod __context {
             static ENV: Rc<Environment<'static>> = Rc::new(Environment::new());
         }
         ENV.with(|x| x.clone())
-    }
-
-    pub struct Convert<T>(pub T);
-
-    pub trait ConvertToValue<T> {
-        fn convert_to_minijinja_value(self) -> Value;
-    }
-
-    impl<T: Serialize> ConvertToValue<T> for &Convert<T> {
-        #[inline(always)]
-        fn convert_to_minijinja_value(self) -> Value {
-            Value::from_serialize(&self.0)
-        }
-    }
-
-    impl<T: Into<Value>> ConvertToValue<T> for Convert<T> {
-        #[inline(always)]
-        fn convert_to_minijinja_value(self) -> Value {
-            self.0.into()
-        }
     }
 }
 
@@ -136,11 +116,8 @@ pub mod __context {
 ///
 /// # Note on Conversions
 ///
-/// The `context!` macro is special in that it supports two forms of value
-/// conversions.  It first attempts to convert a value with `Into<Value>`
-/// and if that fails, it falls back to [`Value::from_serialize`].  This
-/// means that if you have conflicting implementations, `From<YourType> for Value`
-/// will be used first.
+/// Values are converted through `Into<Value>`. To convert a Serde value,
+/// wrap it in `minijinja::value::Serialize`.
 #[macro_export]
 macro_rules! context {
     () => {
@@ -223,9 +200,9 @@ macro_rules! __context_pair {
 /// value.call(state, args!(1, 2, foo => "bar"));
 /// ```
 ///
-/// Note that this like [`context!`](crate::context) goes through
-/// `Into<Value>` and [`Value::from_serialize`](crate::value::Value::from_serialize)
-/// for conversions.
+/// Note that this, like [`context!`](crate::context), uses `Into<Value>`
+/// for conversions. Serde values can be wrapped in
+/// `minijinja::value::Serialize`.
 #[macro_export]
 macro_rules! args {
     () => { &[][..] as &[$crate::value::Value] };
@@ -237,8 +214,7 @@ macro_rules! args {
 #[doc(hidden)]
 macro_rules! __make_value {
     ($expr:expr) => {{
-        use $crate::__context::ConvertToValue;
-        $crate::__context::Convert($expr).convert_to_minijinja_value()
+        $crate::value::Value::from($expr)
     }};
 }
 

@@ -1,3 +1,4 @@
+use minijinja::value::Serialize as ValueSerialize;
 use minijinja::{context, escape_formatter, Environment, Value};
 use serde::Serialize;
 
@@ -43,7 +44,7 @@ fn main() {
         "{}",
         template
             .render(context! {
-                foo => Foo { bar: None },
+                foo => ValueSerialize(Foo { bar: None }),
             })
             .unwrap()
     );
