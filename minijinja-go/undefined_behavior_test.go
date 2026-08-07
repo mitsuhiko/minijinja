@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
 func renderString(env *Environment, source string, ctx map[string]any) (string, error) {

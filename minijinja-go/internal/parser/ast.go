@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/lexer"
 )
 
 // Span represents a location range in source code.

@@ -12,8 +12,8 @@ import (
 	"strings"
 	"unicode"
 
-	mjerrors "github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/errors"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
+	mjerrors "github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/errors"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
 // State provides access to the runtime context for filters and tests.

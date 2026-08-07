@@ -3,6 +3,13 @@
 MiniJinja 3 aligns the value model more closely with Jinja2 and makes `serde`
 optional. The changes below may require updates when moving from MiniJinja 2.
 
+## Go Module Path
+
+MiniJinja-Go now uses the major-version module path
+`github.com/mitsuhiko/minijinja/minijinja-go/v3`. Update Go imports from `/v2`
+to `/v3`. Its tuple values and collection rendering follow the same new
+semantics described below.
+
 ## Optional Serde Support
 
 The `serde` feature now controls the `serde` dependency and remains enabled by

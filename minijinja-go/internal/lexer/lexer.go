@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/syntax"
 )
 
 // Lexer tokenizes Jinja2 template source code.

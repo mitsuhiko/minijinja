@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	minijinja "github.com/mitsuhiko/minijinja/minijinja-go/v2"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
+	minijinja "github.com/mitsuhiko/minijinja/minijinja-go/v3"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
 const templateSource = `{{ translate('GREETING') }}, {{ username }}!

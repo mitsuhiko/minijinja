@@ -1,8 +1,8 @@
 package minijinja
 
 import (
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/errors"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/errors"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
 // Error represents an error that occurred during template processing.

@@ -156,7 +156,7 @@ package minijinja
 
 // Re-export commonly used types from subpackages
 import (
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
 // Value is a dynamically typed value in the template engine.

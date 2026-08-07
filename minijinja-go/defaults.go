@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/filters"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/tests"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/filters"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/tests"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
 func registerDefaultFilters(env *Environment) {
