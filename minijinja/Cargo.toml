@@ -31,13 +31,13 @@ default = [
 
 # API features
 preserve_order = ["indexmap"]
-deserialization = []
+deserialization = ["serde"]
 debug = []
 loader = []
 unicode = ["unicode-ident", "unicase"]
 custom_syntax = ["dep:aho-corasick"]
 std_collections = []
-serde = []
+serde = ["dep:serde"]
 
 # Speedups
 speedups = ["v_htmlescape"]
@@ -51,7 +51,7 @@ loop_controls = []
 fuel = []
 
 # Extra Filters
-json = ["serde_json"]
+json = ["serde", "serde_json"]
 urlencode = ["percent-encoding"]
 
 # Deprecated features
@@ -60,12 +60,12 @@ key_interning = []
 # Internal Features that should not be used
 internal_debug = []
 unstable_machinery = ["internal_debug"]
-unstable_machinery_serde = ["unstable_machinery", "serde/derive"]
+unstable_machinery_serde = ["serde", "unstable_machinery", "serde/derive"]
 internal_safe_search = []
 
 [dependencies]
 aho-corasick = { version = "1.0", default-features = false, optional = true }
-serde = "1.0.130"
+serde = { version = "1.0.130", optional = true }
 v_htmlescape = { version = "0.15.8", optional = true }
 
 serde_json = { version = "1.0.68", optional = true }

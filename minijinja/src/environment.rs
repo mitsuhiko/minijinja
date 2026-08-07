@@ -3,8 +3,6 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, OnceLock};
 
-use serde::Serialize;
-
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
 use crate::compiler::parser::parse_expr;
@@ -15,7 +13,7 @@ use crate::template::{
     AutoEscapeFunc, CompiledTemplate, CompiledTemplateRef, Template, TemplateConfig,
 };
 use crate::utils::{write_escaped, AutoEscape, BTreeMapKeysDebug, UndefinedBehavior};
-use crate::value::{FunctionArgs, FunctionResult, UndefinedType, Value, ValueRepr};
+use crate::value::{FunctionArgs, FunctionResult, Serialize, UndefinedType, Value, ValueRepr};
 use crate::vm::State;
 use crate::{defaults, functions};
 
@@ -109,15 +107,6 @@ impl<'source> Environment<'source> {
     /// the default filters, tests and globals loaded.  If you do not want any
     /// default configuration you can use the alternative
     /// [`empty`](Environment::empty) method.
-    #[cfg_attr(
-        not(feature = "serde"),
-        deprecated(
-            since = "2.0.4",
-            note = "Attempted to instantiate an environment with serde.  Future \
-        versions of MiniJinja will require enabling the 'serde' feature to use \
-        serde types.  To silence this warning add 'serde' to the list of features of minijinja."
-        )
-    )]
     pub fn new() -> Environment<'source> {
         Environment {
             templates: TemplateStore::new(TemplateConfig::new(default_auto_escape_callback())),

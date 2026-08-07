@@ -5,7 +5,6 @@ use std::sync::Arc;
 use std::{fmt, io};
 
 use crate::vendor::self_cell::self_cell;
-use serde::Serialize;
 
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
@@ -17,7 +16,7 @@ use crate::error::{attach_basic_debug_info, Error};
 use crate::output::{Output, WriteWrapper};
 use crate::syntax::SyntaxConfig;
 use crate::utils::AutoEscape;
-use crate::value::Value;
+use crate::value::{Serialize, Value};
 use crate::vm::{prepare_blocks, Context, State, Vm};
 
 /// Callback for auto escape determination
@@ -163,7 +162,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// Renders the template into a string.
     ///
     /// The provided value is used as the initial context for the template.  It
-    /// can be any object that implements [`Serialize`](serde::Serialize).  You
+    /// can be any object that implements [`Serialize`](crate::value::Serialize).  You
     /// can either create your own struct and derive `Serialize` for it or the
     /// [`context!`](crate::context) macro can be used to create an ad-hoc context.
     ///
@@ -188,7 +187,7 @@ impl<'env, 'source> Template<'env, 'source> {
     pub fn render<S: Serialize>(&self, ctx: S) -> Result<String, Error> {
         // reduce total amount of code falling under mono morphization into
         // this function, and share the rest in _render.
-        self._render(Value::from_serialize(&ctx)).map(|x| x.0)
+        self._render(Value::from_serialize(ctx)).map(|x| x.0)
     }
 
     /// Like [`render`](Self::render) but also return the evaluated [`State`].
@@ -215,7 +214,7 @@ impl<'env, 'source> Template<'env, 'source> {
     ) -> Result<(String, State<'_, 'env>), Error> {
         // reduce total amount of code falling under mono morphization into
         // this function, and share the rest in _render.
-        self._render(Value::from_serialize(&ctx))
+        self._render(Value::from_serialize(ctx))
     }
 
     /// Like [`render`](Self::render) but also returns the evaluated [`State`]
@@ -238,7 +237,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// ```
     pub fn render_captured<S: Serialize>(&self, ctx: S) -> Result<Captured<'source>, Error> {
         self.clone()
-            ._capture_state(Value::from_serialize(&ctx), true)
+            ._capture_state(Value::from_serialize(ctx), true)
     }
 
     /// Like [`render`](Self::render) but writes to an [`io::Write`] and keeps
@@ -266,7 +265,7 @@ impl<'env, 'source> Template<'env, 'source> {
         ctx: S,
         w: W,
     ) -> Result<Captured<'source>, Error> {
-        let root = Value::from_serialize(&ctx);
+        let root = Value::from_serialize(ctx);
         let w = std::cell::RefCell::new(WriteWrapper { w, err: None });
         self.clone()
             ._capture_state_with_output(root, &w)
@@ -343,7 +342,7 @@ impl<'env, 'source> Template<'env, 'source> {
         w: W,
     ) -> Result<State<'_, 'env>, Error> {
         let mut wrapper = WriteWrapper { w, err: None };
-        self._eval(Value::from_serialize(&ctx), &mut Output::new(&mut wrapper))
+        self._eval(Value::from_serialize(ctx), &mut Output::new(&mut wrapper))
             .map(|(_, state)| state)
             .map_err(|err| wrapper.take_err(err))
     }
@@ -371,7 +370,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// For more information see [`State`].
     #[deprecated(since = "2.18.0", note = "use render_captured instead")]
     pub fn eval_to_state<S: Serialize>(&self, ctx: S) -> Result<State<'_, 'env>, Error> {
-        let root = Value::from_serialize(&ctx);
+        let root = Value::from_serialize(ctx);
         let mut out = Output::null();
         let vm = Vm::new(self.env);
         let state = ok!(vm.eval(

@@ -6,8 +6,8 @@
 //! For the most part the existence of the value type can be ignored as
 //! MiniJinja will perform the necessary conversions for you.  For instance
 //! if you write a filter that converts a string you can directly declare the
-//! filter to take a [`String`].  However for some more advanced use cases it's
-//! useful to know that this type exists.
+//! filter to take a [`String`].  However for some more advanced use cases
+//! it's useful to know that this type exists.
 //!
 //! # Basic Value Conversions
 //!
@@ -93,9 +93,14 @@
 //! let value = Value::from_serialize(&[1, 2, 3]);
 //! ```
 //!
-//! The inverse of that operation is to pass a value directly as serializer to
-//! a type that supports deserialization.  This requires the `deserialization`
-//! feature.
+//! This feature is enabled by default but in fact optional.  If you disable default
+//! features (which means turning off the default `serde` feature), MiniJinja will
+//! instead use a custom `Serialize` trait which is only implemented for some very
+//! basic types and cannot be implemented for custom types.
+//!
+//! The inverse of the serialize operation is to pass a value directly as
+//! serializer to a type that supports deserialization.  This requires the
+//! `deserialization` feature.
 //!
 #![cfg_attr(
     feature = "deserialization",
@@ -200,19 +205,21 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 // on the content module in serde::private::ser.
 
 use core::str;
+#[cfg(feature = "serde")]
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
+#[cfg(feature = "serde")]
 use std::collections::BTreeMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 
-use serde::ser::{Serialize, SerializeTupleStruct, Serializer};
+#[cfg(feature = "serde")]
+use serde::ser::SerializeTupleStruct;
 
 use crate::error::{Error, ErrorKind};
 use crate::functions;
 use crate::value::ops::as_f64;
-use crate::value::serialize::transform;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{
@@ -230,13 +237,23 @@ pub(crate) mod merge_object;
 pub(crate) mod namespace_object;
 mod object;
 pub(crate) mod ops;
+
+#[cfg(not(feature = "serde"))]
+mod serde_fallback;
 mod serialize;
 
 #[cfg(feature = "deserialization")]
 pub use self::deserialize::ViaDeserialize;
 
+#[cfg(not(feature = "serde"))]
+pub use self::serde_fallback::Serialize;
+#[cfg(feature = "serde")]
+#[doc(no_inline)]
+pub use serde::Serialize;
+
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
+#[cfg(feature = "serde")]
 const VALUE_HANDLE_MARKER: &str = "\x01__minijinja_ValueHandle";
 
 #[cfg(feature = "preserve_order")]
@@ -258,11 +275,13 @@ pub(crate) fn value_map_with_capacity(capacity: usize) -> ValueMap {
     }
 }
 
+#[cfg(feature = "serde")]
 pub(crate) struct ValueHandleRegistry {
     single: Option<(u32, Value)>,
     overflow: BTreeMap<u32, Value>,
 }
 
+#[cfg(feature = "serde")]
 impl ValueHandleRegistry {
     const fn new() -> Self {
         Self {
@@ -295,6 +314,7 @@ impl ValueHandleRegistry {
     }
 }
 
+#[cfg(feature = "serde")]
 thread_local! {
     static INTERNAL_SERIALIZATION: Cell<bool> = const { Cell::new(false) };
 
@@ -321,14 +341,23 @@ thread_local! {
 /// gets sent there, even at the cost of serializing something that cannot be
 /// deserialized.
 pub fn serializing_for_value() -> bool {
-    INTERNAL_SERIALIZATION.with(|flag| flag.get())
+    #[cfg(feature = "serde")]
+    {
+        INTERNAL_SERIALIZATION.with(|flag| flag.get())
+    }
+    #[cfg(not(feature = "serde"))]
+    {
+        false
+    }
 }
 
+#[cfg(feature = "serde")]
 struct InternalSerializationGuard<'a> {
     flag: &'a Cell<bool>,
     reset_on_drop: bool,
 }
 
+#[cfg(feature = "serde")]
 impl Drop for InternalSerializationGuard<'_> {
     fn drop(&mut self) {
         if self.reset_on_drop {
@@ -866,15 +895,30 @@ impl Value {
     /// is to use the [`Value`] type as serializer.  You can pass a value into the
     /// [`deserialize`](serde::Deserialize::deserialize) method of a type that supports
     /// serde deserialization.
+    ///
+    /// # Note on Serde and Serialize
+    ///
+    /// MiniJinja normally uses `serde` for serialization.  However in case the `serde`
+    /// feature is disabled, the [`Serialize`] trait is replaced with a minimal version
+    /// of the trait which supports basic value conversions.  It is sealed and cannot
+    /// be implemented by user types.  You will need to use the `serde` feature if you
+    /// want to implement it.
     pub fn from_serialize<T: Serialize>(value: T) -> Value {
-        INTERNAL_SERIALIZATION.with(|flag| {
-            let old = flag.replace(true);
-            let _serialization_guard = InternalSerializationGuard {
-                flag,
-                reset_on_drop: !old,
-            };
-            transform(value)
-        })
+        #[cfg(feature = "serde")]
+        {
+            INTERNAL_SERIALIZATION.with(|flag| {
+                let old = flag.replace(true);
+                let _serialization_guard = InternalSerializationGuard {
+                    flag,
+                    reset_on_drop: !old,
+                };
+                crate::value::serialize::transform(value)
+            })
+        }
+        #[cfg(not(feature = "serde"))]
+        {
+            value.to_value(crate::utils::SealedMarker)
+        }
     }
 
     /// Extracts a contained error.
@@ -1825,10 +1869,11 @@ impl Value {
     }
 }
 
-impl Serialize for Value {
+#[cfg(feature = "serde")]
+impl serde::Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::ser::Serializer,
     {
         // enable round tripping of values
         if serializing_for_value() {
