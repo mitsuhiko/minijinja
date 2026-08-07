@@ -101,9 +101,7 @@ use std::sync::Arc;
 
 use crate::error::Error;
 use crate::utils::SealedMarker;
-use crate::value::{
-    ArgType, FunctionArgs, FunctionResult, Object, ObjectRepr, Value, ValueOrKwargs,
-};
+use crate::value::{ArgType, FunctionArgs, FunctionResult, Object, ObjectRepr, Value};
 use crate::vm::State;
 
 type FuncFunc = dyn Fn(&State, &[Value]) -> Result<Value, Error> + Sync + Send + 'static;
@@ -451,7 +449,7 @@ mod builtins {
     /// to an outer scope. Initial values can be provided as a dict, as keyword arguments,
     /// or both (same behavior as [`dict`]).
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn namespace(defaults: Option<ValueOrKwargs>) -> Result<Value, Error> {
+    pub fn namespace(defaults: Option<crate::value::ValueOrKwargs>) -> Result<Value, Error> {
         let ns = crate::value::namespace_object::Namespace::default();
         if let Some(defaults) = defaults {
             let defaults = defaults.into_value();

@@ -1,4 +1,4 @@
-use minijinja::value::{from_args, StringInput, ValueKind};
+use minijinja::value::{from_args, StringInput, Tuple, ValueKind};
 use minijinja::{format_filter, Error, ErrorKind, FormatStyle, State, Value};
 
 /// An unknown method callback implementing python methods on primitives.
@@ -308,7 +308,7 @@ fn map_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, Err
             let () = from_args(args)?;
             Ok(Value::make_object_iterable(obj.clone(), |obj| {
                 match obj.try_iter_pairs() {
-                    Some(iter) => Box::new(iter.map(|(k, v)| Value::from(vec![k, v]))),
+                    Some(iter) => Box::new(iter.map(|(k, v)| Value::from(Tuple::from([k, v])))),
                     None => Box::new(None.into_iter()),
                 }
             }))
