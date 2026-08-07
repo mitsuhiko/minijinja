@@ -7,5 +7,4 @@ input_file: minijinja/tests/inputs/macro_import.txt
 ---
 missing: 
 title: The Title
-helper: ["a", "b", "The C Variable"]
-
+helper: ['a', 'b', 'The C Variable']

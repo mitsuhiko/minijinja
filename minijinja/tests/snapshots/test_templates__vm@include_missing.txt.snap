@@ -9,12 +9,12 @@ input_file: minijinja/tests/inputs/include_missing.txt
 
 Error {
     kind: TemplateNotFound,
-    detail: "tried to include non-existing template \"missing_template.txt\"",
+    detail: "tried to include non-existing template 'missing_template.txt'",
     name: "include_missing.txt",
     line: 2,
 }
 
-template not found: tried to include non-existing template "missing_template.txt" (in include_missing.txt:2)
+template not found: tried to include non-existing template 'missing_template.txt' (in include_missing.txt:2)
 ----------------------------- include_missing.txt -----------------------------
    1 | Before
    2 > {% include template %}
@@ -22,7 +22,6 @@ template not found: tried to include non-existing template "missing_template.txt
    3 | After
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
-    template: "missing_template.txt",
+    template: 'missing_template.txt',
 }
 -------------------------------------------------------------------------------
-

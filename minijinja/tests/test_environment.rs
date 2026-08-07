@@ -179,7 +179,7 @@ fn test_unknown_method_callback() {
     });
 
     let rv = env.render_str("{{ {'x': 42}.items() }}", ()).unwrap();
-    assert_snapshot!(rv, @r#"[("x", 42)]"#);
+    assert_snapshot!(rv, @"[('x', 42)]");
 
     let rv = env
         .render_str("{{ {'items': 'field', 'x': 42}.items() | length }}", ())

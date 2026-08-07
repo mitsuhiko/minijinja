@@ -48,8 +48,8 @@ double-escape: &lt;
 safe: <
 list-length: 3
 list-from-list: [1, 2, 3]
-list-from-map: ["a", "c"]
-list-from-word: ["B", "i", "r", "d"]
+list-from-map: ['a', 'c']
+list-from-word: ['B', 'i', 'r', 'd']
 list-from-undefined: []
 bool-empty-string: False
 bool-non-empty-string: True
@@ -82,13 +82,13 @@ min: 1
 max: 111
 sort: [1, 2, 4, 9, 111]
 sort-reverse: [111, 9, 4, 2, 1]
-sort-case-insensitive: ["a", "B", "C", "z"]
-sort-case-sensitive: ["B", "C", "a", "z"]
-sort-case-insensitive-mixed: [False, True, 0, 1, "false", "False", "true", "True"]
-sort-case-sensitive-mixed: [False, True, 0, 1, "False", "True", "false", "true"]
-sort-attribute [{"name": "a"}, {"name": "b"}]
+sort-case-insensitive: ['a', 'B', 'C', 'z']
+sort-case-sensitive: ['B', 'C', 'a', 'z']
+sort-case-insensitive-mixed: [False, True, 0, 1, 'false', 'False', 'true', 'True']
+sort-case-sensitive-mixed: [False, True, 0, 1, 'False', 'True', 'false', 'true']
+sort-attribute [{'name': 'a'}, {'name': 'b'}]
 d: True
-json: {"a":"b","c":"d"}
+json: {"a": "b", "c": "d"}
 json-pretty: {
   "a": "b",
   "c": "d"
@@ -97,10 +97,10 @@ json-scary-html: "\u003c\u003e\u0026\u0027"
 urlencode: hello%20world/foo-bar_baz.txt
 urlencode-kv: a=x%20y&b=2&c=3
 batch: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]]
-batch-fill: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, "-", "-"]]
+batch-fill: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, '-', '-']]
 slice: [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]]
-slice-fill: [[0, 1, 2, 3], [4, 5, 6, "-"], [7, 8, 9, "-"]]
-items: [("a", 1)]
+slice-fill: [[0, 1, 2, 3], [4, 5, 6, '-'], [7, 8, 9, '-']]
+items: [('a', 1)]
 indent: "foo\n  bar\n  baz"
 indent-first-line: "  foo\n  bar\n  baz"
 indent-kwargs-width: "foo\n    bar\n    baz"
@@ -114,13 +114,13 @@ int-round: 42
 float-round: 43.0
 float-round-prec2: 42.51
 select-odd: [1, 3, 5]
-select-truthy: [42, 23, "aha"]
-reject-truthy: [undefined, undefined, 0, ""]
+select-truthy: [42, 23, 'aha']
+reject-truthy: [undefined, undefined, 0, '']
 reject-odd: [2, 4, 6]
-select-attr: [{"active": True, "key": 1}]
-reject-attr: [{"active": False, "key": 2}]
-select-attr: [{"active": False, "key": 2}]
-reject-attr: [{"active": True, "key": 1}]
+select-attr: [{'active': True, 'key': 1}]
+reject-attr: [{'active': False, 'key': 2}]
+select-attr: [{'active': False, 'key': 2}]
+reject-attr: [{'active': True, 'key': 1}]
 map-maps: [1, 2, 3, 4, 5]
 map-attr: [1, 2, None]
 map-attr-undefined: [1, 2, undefined]
@@ -128,37 +128,37 @@ map-attr-deep: [1, 2, None]
 map-attr-int: [999, 2]
 attr-filter: b
 unique-filter: [1, 4, 3, 0, 5]
-unique-filter-ci: ["a", "b", "c", "D"]
-unique-filter-cs: ["a", "A", "b", "c", "D", "d"]
-unique-attr-filter: [{"x": 1}, {"x": 1, "y": 2}, {"x": 2}]
+unique-filter-ci: ['a', 'b', 'c', 'D']
+unique-filter-cs: ['a', 'A', 'b', 'c', 'D', 'd']
+unique-attr-filter: [{'x': 1}, {'x': 1, 'y': 2}, {'x': 2}]
 pprint-filter: [
     {
-        "name": "b",
+        'name': 'b',
     },
     {
-        "name": "a",
+        'name': 'a',
     },
 ]
 int-filter: 1, 42, -23, 42, 42, 42
 float-filter: 1.0, 42.0, -23.5, 42.5
-split: ["bird", "and", "dinosaur"]
-split-at-and: ["bird", "dinosaur"]
-split-n-ws: ["bird", "and dinosaur"]
-split-n-d: ["bir", " and dinosaur"]
-split-n-ws-filter-empty: ["foo", "bar baz  "]
+split: ['bird', 'and', 'dinosaur']
+split-at-and: ['bird', 'dinosaur']
+split-n-ws: ['bird', 'and dinosaur']
+split-n-d: ['bir', ' and dinosaur']
+split-n-ws-filter-empty: ['foo', 'bar baz  ']
 split-neg-index: 3
 split-neg-2: 2
-split-neg-slice: ["3"]
-split-pos-slice: ["2", "3"]
-split-as-seq: ["1", "2", "3"]
+split-neg-slice: ['3']
+split-pos-slice: ['2', '3']
+split-as-seq: ['1', '2', '3']
 sum: 45
 sum-empty: 0
 sum-float: 1.5
-lines: ["foo", "bar", "baz"]
-string: ["1", "2"]
+lines: ['foo', 'bar', 'baz']
+string: ['1', '2']
 chain-lists: [1, 2, 3, 4, 5, 6]
 chain-multiple: [1, 2, 3, 4, 5, 6, 7, 8]
-chain-maps: {"a": "b", "c": "d", "e": "f", "g": "h"}
+chain-maps: {'a': 'b', 'c': 'd', 'e': 'f', 'g': 'h'}
 chain-and-length: 6
 chain-iteration: 1,2,3,4,5,6
 chain-indexing: 5

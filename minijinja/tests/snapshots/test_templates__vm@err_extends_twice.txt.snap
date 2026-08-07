@@ -21,7 +21,6 @@ invalid operation: tried to extend a second time in a template (in err_extends_t
      i    ^^^^^^^^^^^^^^^^ invalid operation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Referenced variables: {
-    template: "simple_layout.txt",
+    template: 'simple_layout.txt',
 }
 -------------------------------------------------------------------------------
-

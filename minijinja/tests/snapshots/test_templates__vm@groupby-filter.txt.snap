@@ -33,4 +33,4 @@ input_file: minijinja/tests/inputs/groupby-filter.txt
   - vienna:
     - First post in lowercase Vienna
 --
-("AAA", [{"text": "no city!?"}])
+('AAA', [{'text': 'no city!?'}])

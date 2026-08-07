@@ -335,11 +335,11 @@ fn test_items_and_dictsort_with_structs() {
 
     insta::assert_snapshot!(
         minijinja::render!("{{ x|items }}", x => Value::from_object(MyStruct)),
-        @r#"[("b", "B"), ("a", "A")]"#
+        @"[('b', 'B'), ('a', 'A')]"
     );
     insta::assert_snapshot!(
         minijinja::render!("{{ x|dictsort }}", x => Value::from_object(MyStruct)),
-        @r#"[("a", "A"), ("b", "B")]"#
+        @"[('a', 'A'), ('b', 'B')]"
     );
 }
 
@@ -551,7 +551,7 @@ fn test_flattening_sub_item_shielded_print() {
     let value = env.render_str("{{ good }}", ctx).unwrap();
     assert_eq!(
         value,
-        r#"{"bad": <invalid value: could not serialize to value: can only flatten structs and maps (got a tuple struct)>}"#
+        "{'bad': <invalid value: could not serialize to value: can only flatten structs and maps (got a tuple struct)>}"
     );
 }
 

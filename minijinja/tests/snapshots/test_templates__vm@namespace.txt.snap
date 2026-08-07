@@ -4,11 +4,10 @@ description: "{%- set ns = namespace() %}\n{%- set ns.foo = 0 %}\n{%- for count 
 info: {}
 input_file: minijinja/tests/inputs/namespace.txt
 ---
-{"foo": 45}
+{'foo': 45}
 ---
-{"foo": {"bar": 42}}
+{'foo': {'bar': 42}}
 ---
-{"found": True}
+{'found': True}
 ---
-{"found": True}
-
+{'found': True}

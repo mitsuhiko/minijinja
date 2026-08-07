@@ -8,7 +8,7 @@ Ok(
         children: [
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 1:8-1:18,
                 names: [
                     (
@@ -30,7 +30,7 @@ Ok(
             } @ 1:33-2:0,
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 2:8-2:18,
                 names: [
                     (
@@ -46,7 +46,7 @@ Ok(
             } @ 2:30-3:0,
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 3:8-3:18,
                 names: [
                     (
@@ -66,7 +66,7 @@ Ok(
             } @ 3:35-4:0,
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 4:8-4:18,
                 names: [
                     (
@@ -96,7 +96,7 @@ Ok(
             } @ 4:43-5:0,
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 5:8-5:18,
                 names: [
                     (
@@ -118,7 +118,7 @@ Ok(
             } @ 5:34-6:0,
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 6:8-6:18,
                 names: [
                     (
@@ -134,7 +134,7 @@ Ok(
             } @ 6:31-7:0,
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 7:8-7:18,
                 names: [
                     (
@@ -154,7 +154,7 @@ Ok(
             } @ 7:36-8:0,
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 8:8-8:18,
                 names: [
                     (
@@ -184,7 +184,7 @@ Ok(
             } @ 8:44-9:0,
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 9:8-9:18,
                 names: [
                     (
@@ -214,7 +214,7 @@ Ok(
             } @ 9:56-10:0,
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 10:8-10:18,
                 names: [
                     (
@@ -244,7 +244,7 @@ Ok(
             } @ 10:59-11:0,
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 11:8-11:18,
                 names: [
                     (
@@ -274,7 +274,7 @@ Ok(
             } @ 11:57-12:0,
             FromImport {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 12:8-12:18,
                 names: [
                     (
@@ -304,7 +304,7 @@ Ok(
             } @ 12:60-13:0,
             Import {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 13:10-13:20,
                 name: Var {
                     id: "x",
@@ -315,7 +315,7 @@ Ok(
             } @ 13:28-14:0,
             Import {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 14:10-14:20,
                 name: Var {
                     id: "x",
@@ -326,7 +326,7 @@ Ok(
             } @ 14:41-15:0,
             Import {
                 expr: Const {
-                    value: "foo.html",
+                    value: 'foo.html',
                 } @ 15:10-15:20,
                 name: Var {
                     id: "x",

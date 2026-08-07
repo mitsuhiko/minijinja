@@ -4,5 +4,5 @@ description: "{% set x = 23 %}\n{% import 'import-mixed.txt' as module %}\n{{ mo
 info: {}
 input_file: minijinja/tests/inputs/import_all.txt
 ---
-{"output":42}
+{"output": 42}
 |||This is the body 23|||

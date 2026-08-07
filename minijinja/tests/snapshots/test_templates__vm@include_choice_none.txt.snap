@@ -8,12 +8,12 @@ input_file: minijinja/tests/inputs/include_choice_none.txt
 
 Error {
     kind: TemplateNotFound,
-    detail: "tried to include one of multiple templates, none of which existed [\"missing_template1.txt\", \"missing_template2.txt\"]",
+    detail: "tried to include one of multiple templates, none of which existed ['missing_template1.txt', 'missing_template2.txt']",
     name: "include_choice_none.txt",
     line: 2,
 }
 
-template not found: tried to include one of multiple templates, none of which existed ["missing_template1.txt", "missing_template2.txt"] (in include_choice_none.txt:2)
+template not found: tried to include one of multiple templates, none of which existed ['missing_template1.txt', 'missing_template2.txt'] (in include_choice_none.txt:2)
 --------------------------- include_choice_none.txt ---------------------------
    1 | Before
    2 > {% include ["missing_template1.txt", "missing_template2.txt"] %}
@@ -22,4 +22,3 @@ template not found: tried to include one of multiple templates, none of which ex
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 No referenced variables
 -------------------------------------------------------------------------------
-

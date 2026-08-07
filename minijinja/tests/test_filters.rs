@@ -390,7 +390,7 @@ fn test_chain_dicts() {
         .template_from_str("{{ {'a': 1} | chain({'b': 2}) | items | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[("a", 1), ("b", 2)]"#);
+    assert_eq!(result, "[('a', 1), ('b', 2)]");
 }
 
 #[test]
@@ -441,7 +441,7 @@ fn test_zip_basic() {
         .template_from_str("{{ [1, 2, 3] | zip(['a', 'b', 'c']) | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[(1, "a"), (2, "b"), (3, "c")]"#);
+    assert_eq!(result, "[(1, 'a'), (2, 'b'), (3, 'c')]");
 }
 
 #[test]
@@ -452,7 +452,7 @@ fn test_zip_different_lengths() {
         .template_from_str("{{ [1, 2] | zip(['a', 'b', 'c']) | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[(1, "a"), (2, "b")]"#);
+    assert_eq!(result, "[(1, 'a'), (2, 'b')]");
 }
 
 #[test]
@@ -462,7 +462,7 @@ fn test_zip_multiple_iterables() {
         .template_from_str("{{ [1, 2, 3] | zip(['a', 'b', 'c'], ['x', 'y', 'z']) | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[(1, "a", "x"), (2, "b", "y"), (3, "c", "z")]"#);
+    assert_eq!(result, "[(1, 'a', 'x'), (2, 'b', 'y'), (3, 'c', 'z')]");
 }
 
 #[test]
@@ -519,7 +519,7 @@ fn test_sort_attribute_list() {
     let result = tmpl.render(context!()).unwrap();
     assert_eq!(
         result,
-        r#"[{"a": 2, "b": 1, "c": 6}, {"a": 1, "b": 2, "c": 5}]"#
+        "[{'a': 2, 'b': 1, 'c': 6}, {'a': 1, 'b': 2, 'c': 5}]"
     );
 }
 
@@ -541,7 +541,7 @@ fn test_sort_attribute_list_reverse() {
         )
         .unwrap();
     let result = tmpl.render(ctx).unwrap();
-    assert_eq!(result, r#"["Canada", "Australia", "Japan", "India"]"#);
+    assert_eq!(result, "['Canada', 'Australia', 'Japan', 'India']");
 }
 
 #[test]
@@ -551,7 +551,7 @@ fn test_sort_attribute_list_single() {
         .template_from_str(r"{{ [{'a': 1, 'b': 2}, {'a': 2, 'b': 1}] | sort(attribute='b,') }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[{"a": 2, "b": 1}, {"a": 1, "b": 2}]"#);
+    assert_eq!(result, "[{'a': 2, 'b': 1}, {'a': 1, 'b': 2}]");
 }
 
 #[test]
@@ -594,7 +594,7 @@ fn test_sort_stable_reverse() {
     let result = tmpl.render(context!()).unwrap();
     assert_eq!(
         result,
-        r#"[{"a": 1, "b": 1, "c": 1}, {"a": 1, "b": 1, "c": 2}]"#
+        "[{'a': 1, 'b': 1, 'c': 1}, {'a': 1, 'b': 1, 'c': 2}]"
     );
 }
 
@@ -606,25 +606,40 @@ fn test_sort_strings() {
         .template_from_str("{{ ['aa', 'CC', 'bb'] | sort }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"["aa", "bb", "CC"]"#);
+    assert_eq!(result, "['aa', 'bb', 'CC']");
 
     let tmpl = env
         .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(reverse=True) }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"["CC", "bb", "aa"]"#);
+    assert_eq!(result, "['CC', 'bb', 'aa']");
 
     let tmpl = env
         .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(case_sensitive=True) }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"["CC", "aa", "bb"]"#);
+    assert_eq!(result, "['CC', 'aa', 'bb']");
 
     let tmpl = env
         .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(case_sensitive=True, reverse=True) }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"["bb", "aa", "CC"]"#);
+    assert_eq!(result, "['bb', 'aa', 'CC']");
+}
+
+#[test]
+#[cfg(feature = "json")]
+fn test_tojson_uses_jinja_spacing() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str(
+            r#"{{ {"function": {"name": "get_weather", "parameters": {"type": "object"}}, "type": "function"}|tojson }}"#,
+        )
+        .unwrap();
+    assert_eq!(
+        tmpl.render(()).unwrap(),
+        r#"{"function": {"name": "get_weather", "parameters": {"type": "object"}}, "type": "function"}"#
+    );
 }
 
 #[test]

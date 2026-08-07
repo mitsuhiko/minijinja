@@ -21,6 +21,24 @@ fn test_tuple_literals() {
 }
 
 #[test]
+fn test_python_compatible_collection_rendering() {
+    let env = Environment::new();
+    let source = r#"{{ [none, true, false, "plain", "has\u0027quote", "has\"quote", "both\u0027\"quotes", "\x13"] }}"#;
+    assert_eq!(
+        env.render_str(source, ()).unwrap(),
+        r#"[None, True, False, 'plain', "has'quote", 'has"quote', 'both\'"quotes', '\x13']"#
+    );
+    assert_eq!(
+        env.render_str(r#"{{ ("bar", "baz") }}"#, ()).unwrap(),
+        "('bar', 'baz')"
+    );
+    assert_eq!(
+        env.render_str(r#"{{ {"key": "value"} }}"#, ()).unwrap(),
+        "{'key': 'value'}"
+    );
+}
+
+#[test]
 fn test_tuple_sequence_behavior() {
     let env = Environment::new();
     assert_eq!(

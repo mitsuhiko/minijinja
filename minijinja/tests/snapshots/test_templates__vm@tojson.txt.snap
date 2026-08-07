@@ -4,7 +4,7 @@ description: "{{ [1, 2, 3]|tojson }}\n{{ [1, 2, 3]|tojson(true) }}\n{{ [1, 2, 3]
 info: {}
 input_file: minijinja/tests/inputs/tojson.txt
 ---
-[1,2,3]
+[1, 2, 3]
 [
   1,
   2,

@@ -1110,6 +1110,41 @@ mod builtins {
         Ok(Value::from(rv))
     }
 
+    #[cfg(feature = "json")]
+    struct JinjaJsonFormatter;
+
+    #[cfg(feature = "json")]
+    impl serde_json::ser::Formatter for JinjaJsonFormatter {
+        fn begin_array_value<W>(&mut self, writer: &mut W, first: bool) -> std::io::Result<()>
+        where
+            W: ?Sized + std::io::Write,
+        {
+            if first {
+                Ok(())
+            } else {
+                writer.write_all(b", ")
+            }
+        }
+
+        fn begin_object_key<W>(&mut self, writer: &mut W, first: bool) -> std::io::Result<()>
+        where
+            W: ?Sized + std::io::Write,
+        {
+            if first {
+                Ok(())
+            } else {
+                writer.write_all(b", ")
+            }
+        }
+
+        fn begin_object_value<W>(&mut self, writer: &mut W) -> std::io::Result<()>
+        where
+            W: ?Sized + std::io::Write,
+        {
+            writer.write_all(b": ")
+        }
+    }
+
     /// Dumps a value to JSON.
     ///
     /// This filter is only available if the `json` feature is enabled.  The resulting
@@ -1160,7 +1195,11 @@ mod builtins {
             serde::Serialize::serialize(&value, &mut s)
                 .map(|_| unsafe { String::from_utf8_unchecked(out) })
         } else {
-            serde_json::to_string(&value)
+            let mut out = Vec::<u8>::new();
+            let mut serializer =
+                serde_json::Serializer::with_formatter(&mut out, JinjaJsonFormatter);
+            serde::Serialize::serialize(&value, &mut serializer)
+                .map(|_| unsafe { String::from_utf8_unchecked(out) })
         }
         .map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot serialize to JSON").with_source(err)

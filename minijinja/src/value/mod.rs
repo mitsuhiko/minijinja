@@ -503,6 +503,38 @@ pub(crate) enum ValueRepr {
     Object(DynObject),
 }
 
+fn python_string_debug_fmt(value: &str, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let quote = if value.contains('\'') && !value.contains('"') {
+        '"'
+    } else {
+        '\''
+    };
+
+    write!(f, "{quote}")?;
+    for ch in value.chars() {
+        match ch {
+            '\'' if quote == '\'' => f.write_str("\\'")?,
+            '"' if quote == '"' => f.write_str("\\\"")?,
+            '\\' => f.write_str("\\\\")?,
+            '\n' => f.write_str("\\n")?,
+            '\r' => f.write_str("\\r")?,
+            '\t' => f.write_str("\\t")?,
+            ch if ch.is_control() => {
+                let codepoint = ch as u32;
+                if codepoint <= 0xff {
+                    write!(f, "\\x{codepoint:02x}")?;
+                } else if codepoint <= 0xffff {
+                    write!(f, "\\u{codepoint:04x}")?;
+                } else {
+                    write!(f, "\\U{codepoint:08x}")?;
+                }
+            }
+            ch => write!(f, "{ch}")?,
+        }
+    }
+    write!(f, "{quote}")
+}
+
 impl fmt::Debug for ValueRepr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
@@ -515,8 +547,8 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {val}>"),
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-            ValueRepr::String(ref val, _) => fmt::Debug::fmt(val, f),
-            ValueRepr::SmallStr(ref val) => fmt::Debug::fmt(val.as_str(), f),
+            ValueRepr::String(ref val, _) => python_string_debug_fmt(val, f),
+            ValueRepr::SmallStr(ref val) => python_string_debug_fmt(val.as_str(), f),
             ValueRepr::Bytes(ref val) => {
                 write!(f, "b'")?;
                 for &b in val.iter() {

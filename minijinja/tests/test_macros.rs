@@ -291,11 +291,11 @@ fn test_conversions() {
         from_only => FromOnly,
         serialize_only => SerializeOnly,
     };
-    assert_debug_snapshot!(&value, @r###"
+    assert_debug_snapshot!(&value, @"
     {
-        "both": "both",
-        "from_only": "from-only",
-        "serialize_only": "serialize-only",
+        'both': 'both',
+        'from_only': 'from-only',
+        'serialize_only': 'serialize-only',
     }
-    "###);
+    ");
 }
