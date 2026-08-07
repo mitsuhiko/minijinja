@@ -4,6 +4,12 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Made `serde` optional. Disabling the default `serde` feature now removes the dependency and uses built-in conversions for basic values.  #528
+* Added first-class tuple literals and a public `Tuple` value type. Tuples now preserve their type through serialization and sequence operations and render like Python tuples.  #785
+* Changed sequence and map representations to use Python-style string quoting, and changed `tojson` to use Jinja2-compatible separator spacing.  #785
+* Changed `context!` and `args!` to consume values and prefer direct `Into<Value>` conversions before serialization.
+* Changed `Value` function arguments to reject implicit keyword-argument values. Variadic functions that intentionally capture them can use `ValueOrKwargs`.  #596
+
 ## 2.23.0
 
 * Fixed Unicode identifiers in templates rendered through the Python bindings.

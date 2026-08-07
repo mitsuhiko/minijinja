@@ -32,16 +32,18 @@ crate.
 
 ### Tuples
 
-MiniJinja does not implement tuples.  The creation of tuples with tuple syntax
-instead creates lists.
+MiniJinja supports tuple literals and preserves tuples as a distinct sequence
+type. Tuple rendering, concatenation, repetition, and slicing follow Python's
+behavior. Rust tuples converted through `Value::from_serialize` also remain
+tuples.
 
 ### Keyword Arguments
 
-MiniJinja maps keyword arguments to the creation of dictionaries which are passed
-as last argument.  This is done as keyword arguments are not native to Rust and
-mapping them to filter functions is tricky.  This also means that some filters in
-MiniJinja do not accept the parameters with keyword arguments whereas in Jinja2
-they do.
+MiniJinja maps keyword arguments to a distinguished internal map passed as the
+last argument. Rust filters and functions normally declare a `Kwargs` parameter
+to consume them. A regular `Value` argument rejects this internal map so unknown
+keyword arguments cannot be mistaken for positional values; forwarding APIs can
+opt in with `ValueOrKwargs`.
 
 ### Undefined
 

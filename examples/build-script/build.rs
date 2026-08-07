@@ -4,14 +4,16 @@ use std::{env, fs};
 use minijinja::{render, Environment};
 
 fn main() {
-    // This environment has a formatter that formats unsafe values in Rust's
-    // debug format, and safe values as normal strings.
+    // This environment has a formatter that formats unsafe strings in Rust's
+    // debug format, safe values as normal strings, and other values via Debug.
     let mut env = Environment::new();
     env.set_formatter(|out, _state, value| {
-        if !value.is_safe() {
+        if value.is_safe() {
+            write!(out, "{value}")?;
+        } else if let Some(value) = value.as_str() {
             write!(out, "{value:?}")?;
         } else {
-            write!(out, "{value}")?;
+            write!(out, "{value:?}")?;
         }
         Ok(())
     });

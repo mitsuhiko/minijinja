@@ -1,3 +1,55 @@
+# Updating to MiniJinja 3
+
+MiniJinja 3 aligns the value model more closely with Jinja2 and makes `serde`
+optional. The changes below may require updates when moving from MiniJinja 2.
+
+## Optional Serde Support
+
+The `serde` feature now controls the `serde` dependency and remains enabled by
+default. `deserialization` and `json` enable it automatically. Projects that
+disable default features can build MiniJinja without `serde`; in that mode,
+`Value::from_serialize` and rendering APIs accept a sealed set of basic Rust
+values. Convert custom data to `Value` or implement `Object` when `serde` is
+disabled.
+
+## Value Conversion Macros
+
+`context!` and `args!` now consume their expressions. They first use
+`Into<Value>` and fall back to serialization. Pass a reference explicitly when
+the original value needs to remain usable:
+
+```rust
+let users = load_users();
+let ctx = minijinja::context!(users => &users);
+use_users(users);
+```
+
+## Tuples
+
+Tuple literals now produce a distinct `Tuple` value instead of a `Vec<Value>`.
+Code that downcast tuple expressions to `Vec<Value>` must downcast to `Tuple` or
+use the generic sequence APIs. Tuples still report `ValueKind::Seq` and support
+normal sequence iteration and indexing.
+
+Rust tuples passed through `Value::from_serialize` are also preserved as tuples.
+Tuple concatenation, repetition, and slicing return tuples, while combining a
+list and a tuple with `+` is an error as it is in Python.
+
+## Value Rendering
+
+Debug representations of strings, sequences, and maps now use Python-style
+quoting. This primarily changes nested rendering from double quotes to single
+quotes where possible. The `tojson` filter now inserts spaces after commas and
+colons to match Jinja2's default `json.dumps` output.
+
+## Keyword Arguments
+
+`Value`, `&Value`, `&[Value]`, and `Rest<Value>` function arguments no longer
+accept the internal keyword-argument map. Use an explicit `Kwargs` parameter for
+normal keyword arguments. Variadic forwarding functions can use
+`Rest<ValueOrKwargs>` and call `into_values()` before manually splitting or
+forwarding the arguments.
+
 # Updating to MiniJinja 2
 
 MiniJinja 2.0 is a major update to MiniJinja that changes a lot of core
