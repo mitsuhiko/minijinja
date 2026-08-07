@@ -171,9 +171,9 @@ mod tests {
         assert_eq!(value.to_string(), "[1, None, 3]");
 
         let value = Value::from_serialize(BTreeMap::from([("key", vec![1, 2, 3])]));
-        assert_eq!(value.to_string(), r#"{"key": [1, 2, 3]}"#);
+        assert_eq!(value.to_string(), "{'key': [1, 2, 3]}");
 
         let value = Value::from_serialize(("key", 42));
-        assert_eq!(value.to_string(), r#"("key", 42)"#);
+        assert_eq!(value.to_string(), "('key', 42)");
     }
 }

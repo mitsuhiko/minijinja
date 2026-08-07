@@ -2,7 +2,10 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use insta::{assert_debug_snapshot, assert_snapshot};
+use insta::assert_snapshot;
+#[cfg(feature = "serde")]
+use insta::assert_debug_snapshot;
+#[cfg(feature = "serde")]
 use serde::Serialize;
 use similar_asserts::assert_eq;
 
@@ -250,6 +253,7 @@ fn test_unenclosed_resolve() {
     assert_snapshot!(rv, @"render global|ctx global|");
 }
 
+#[cfg(feature = "serde")]
 #[test]
 fn test_conversions() {
     struct SerializeOnly;
