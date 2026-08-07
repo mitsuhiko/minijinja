@@ -122,6 +122,28 @@ fn test_sort_different_types() {
 }
 
 #[test]
+fn test_borrowed_native_conversions() {
+    use std::borrow::Cow;
+    use std::sync::Arc;
+
+    assert_eq!(Value::from(&42), Value::from(42));
+    assert_eq!(Value::from(&true), Value::from(true));
+    assert_eq!(Value::from(&()), Value::from(()));
+
+    let cow = Cow::Borrowed("cow");
+    assert_eq!(Value::from(&cow), Value::from("cow"));
+    let arc: Arc<str> = Arc::from("arc");
+    assert_eq!(Value::from(&arc), Value::from("arc"));
+    let bytes = Arc::new(vec![1, 2]);
+    assert_eq!(Value::from(&bytes).kind(), ValueKind::Bytes);
+
+    let values = [Value::from(1), Value::from(2)];
+    assert_eq!(Value::from(values.as_slice()).to_string(), "[1, 2]");
+    let tuple = minijinja::value::Tuple::from(values);
+    assert!(Value::from(&tuple).is_tuple());
+}
+
+#[test]
 fn test_safe_string_roundtrip() {
     let v = Value::from_safe_string("<b>HTML</b>".into());
     let v2 = Value::from(&v);

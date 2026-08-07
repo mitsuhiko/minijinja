@@ -308,9 +308,22 @@ impl<'a> From<Cow<'a, str>> for Value {
     }
 }
 
+impl From<&Cow<'_, str>> for Value {
+    #[inline(always)]
+    fn from(val: &Cow<'_, str>) -> Self {
+        Value::from(val.as_ref())
+    }
+}
+
 impl From<Arc<str>> for Value {
     fn from(value: Arc<str>) -> Self {
         Value(ValueRepr::String(value, StringType::Normal))
+    }
+}
+
+impl From<&Arc<str>> for Value {
+    fn from(value: &Arc<str>) -> Self {
+        Value::from(value.clone())
     }
 }
 
@@ -318,6 +331,19 @@ impl From<()> for Value {
     #[inline(always)]
     fn from(_: ()) -> Self {
         ValueRepr::None.into()
+    }
+}
+
+impl From<&()> for Value {
+    #[inline(always)]
+    fn from(_: &()) -> Self {
+        ValueRepr::None.into()
+    }
+}
+
+impl From<&[Value]> for Value {
+    fn from(value: &[Value]) -> Self {
+        value.iter().cloned().collect()
     }
 }
 
@@ -335,6 +361,19 @@ macro_rules! value_from {
                 ValueRepr::$dst(val as _).into()
             }
         }
+    };
+}
+
+macro_rules! value_from_copy_ref {
+    ($($src:ty),*) => {
+        $(
+            impl From<&$src> for Value {
+                #[inline(always)]
+                fn from(val: &$src) -> Self {
+                    Value::from(*val)
+                }
+            }
+        )*
     };
 }
 
@@ -373,6 +412,21 @@ value_from!(f32, F64);
 value_from!(f64, F64);
 value_from!(Arc<Vec<u8>>, Bytes);
 value_from!(DynObject, Object);
+value_from_copy_ref!(
+    bool, char, usize, isize, u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64
+);
+
+impl From<&Arc<Vec<u8>>> for Value {
+    fn from(value: &Arc<Vec<u8>>) -> Self {
+        Value::from(value.clone())
+    }
+}
+
+impl From<&DynObject> for Value {
+    fn from(value: &DynObject) -> Self {
+        Value::from(value.clone())
+    }
+}
 
 fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {
     Error::new(

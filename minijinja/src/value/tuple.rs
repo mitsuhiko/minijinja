@@ -85,6 +85,12 @@ impl From<Tuple> for Value {
     }
 }
 
+impl From<&Tuple> for Value {
+    fn from(value: &Tuple) -> Self {
+        Value::from(value.clone())
+    }
+}
+
 macro_rules! impl_value_tuple {
     ($($name:ident),+) => {
         impl<$($name: Into<Value>),+> From<($($name,)+)> for Value {
