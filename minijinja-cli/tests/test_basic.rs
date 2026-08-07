@@ -166,14 +166,14 @@ d:
         cli()
             .arg(tmpl.path())
             .arg(input.path()),
-        @r###"
+        @r"
     success: true
     exit_code: 0
     ----- stdout -----
-    ["value1", "from-c"]\n["value1", "value2", "value3"]
+    ['value1', 'from-c']\n['value1', 'value2', 'value3']
 
     ----- stderr -----
-    "###);
+    ");
 }
 
 #[test]
