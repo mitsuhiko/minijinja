@@ -17,6 +17,47 @@ APIs deprecated before MiniJinja 3 have been removed:
 * Replace `value::intern` with `Arc::<str>::from`. The no-op `key_interning`
   Cargo feature has also been removed.
 
+## Mutable Execution State
+
+MiniJinja now uses mutable execution state for all dynamic calls.  Registered
+functions, filters, and tests can still take `&State` when they only inspect the
+render, or take `&mut State` as their first parameter when they need to modify
+render-local data or perform nested calls:
+
+```rust
+fn inspect(state: &State, value: Value) -> Value {
+    // Shared callbacks continue to work.
+    value
+}
+
+fn count(state: &mut State, value: Value) -> Value {
+    let calls = state.get_or_insert_extension::<usize>(0);
+    *calls += 1;
+    value
+}
+```
+
+The erased calling APIs now have a single mutable path.  Update custom
+`Object::call` and `Object::call_method` implementations, as well as direct
+`Value::call` and `Value::call_method` invocations, to pass `&mut State`.
+`State::call_macro`, `State::apply_filter`, and `State::perform_test` likewise
+require mutable state.  With `Captured`, use `with_state_mut`:
+
+```rust
+let mut captured = template.render_captured(context)?;
+let result = captured.with_state_mut(|state| state.call_macro("render", &[]))?;
+```
+
+State mutation no longer uses interior mutability.  `State::set_temp` and
+`State::get_or_set_temp_object` now require `&mut State`.  For ordinary typed
+Rust data, the new `get_extension`, `get_extension_mut`, and
+`get_or_insert_extension` methods provide render-local storage without wrapping
+data in `Value` or a mutex.  Extensions persist through includes, blocks, and
+macro calls.
+
+Custom formatters and unknown-method callbacks now receive `&mut State` so they
+can use the same mutable facilities.
+
 ## Go Module Path
 
 MiniJinja-Go now uses the major-version module path
