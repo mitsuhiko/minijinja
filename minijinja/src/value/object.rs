@@ -232,7 +232,7 @@ pub trait Object: fmt::Debug + Send + Sync {
     ///
     /// The default implementation returns an
     /// [`InvalidOperation`](crate::ErrorKind::InvalidOperation) error.
-    fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
+    fn call(self: &Arc<Self>, state: &mut State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
         let (_, _) = (state, args);
         Err(Error::new(
             ErrorKind::InvalidOperation,
@@ -249,7 +249,7 @@ pub trait Object: fmt::Debug + Send + Sync {
     /// the environment.
     fn call_method(
         self: &Arc<Self>,
-        state: &State<'_, '_>,
+        state: &mut State<'_, '_>,
         method: &str,
         args: &[Value],
     ) -> Result<Value, Error> {
@@ -841,13 +841,13 @@ type_erase! {
 
         fn call(
             &self,
-            state: &State<'_, '_>,
+            state: &mut State<'_, '_>,
             args: &[Value]
         ) -> Result<Value, Error>;
 
         fn call_method(
             &self,
-            state: &State<'_, '_>,
+            state: &mut State<'_, '_>,
             method: &str,
             args: &[Value]
         ) -> Result<Value, Error>;

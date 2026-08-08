@@ -69,6 +69,10 @@
 //! env.add_filter("append_template", append_template);
 //! ```
 //!
+//! Filters which need to modify the state can instead take `&mut State`.  A
+//! mutable state must be the filter's first parameter and can only be requested
+//! once.
+//!
 //! # Filter configuration
 //!
 //! The recommended pattern for filters to change their behavior is to leverage global
@@ -1343,7 +1347,7 @@ mod builtins {
     }
 
     fn select_or_reject(
-        state: &State,
+        state: &mut State,
         invert: bool,
         value: Value,
         attr: Option<Cow<'_, str>>,
@@ -1394,7 +1398,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn select(
-        state: &State,
+        state: &mut State,
         value: Value,
         test_name: Option<Cow<'_, str>>,
         args: crate::value::Rest<ValueOrKwargs>,
@@ -1413,7 +1417,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn selectattr(
-        state: &State,
+        state: &mut State,
         value: Value,
         attr: Cow<'_, str>,
         test_name: Option<Cow<'_, str>>,
@@ -1434,7 +1438,7 @@ mod builtins {
     /// This is the inverse of [`select`].
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn reject(
-        state: &State,
+        state: &mut State,
         value: Value,
         test_name: Option<Cow<'_, str>>,
         args: crate::value::Rest<ValueOrKwargs>,
@@ -1453,7 +1457,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn rejectattr(
-        state: &State,
+        state: &mut State,
         value: Value,
         attr: Cow<'_, str>,
         test_name: Option<Cow<'_, str>>,
@@ -1497,7 +1501,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn map(
-        state: &State,
+        state: &mut State,
         value: Value,
         args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {

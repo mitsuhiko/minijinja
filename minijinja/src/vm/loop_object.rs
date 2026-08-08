@@ -130,7 +130,7 @@ impl fmt::Debug for Loop {
 }
 
 impl Object for Loop {
-    fn call(self: &Arc<Self>, _state: &State, _args: &[Value]) -> Result<Value, Error> {
+    fn call(self: &Arc<Self>, _state: &mut State, _args: &[Value]) -> Result<Value, Error> {
         // this could happen if a filter or some other code where to get hold
         // on the loop and try to call it.  The template execution itself will
         // not end up here as the CallFunction opcode has a special code path
@@ -143,7 +143,7 @@ impl Object for Loop {
 
     fn call_method(
         self: &Arc<Self>,
-        _state: &State,
+        _state: &mut State,
         name: &str,
         args: &[Value],
     ) -> Result<Value, Error> {

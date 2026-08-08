@@ -1,6 +1,6 @@
 #![cfg(feature = "builtins")]
 use minijinja::value::{Kwargs, Rest, StringInput, Value, ValueKind, ValueOrKwargs};
-use minijinja::{args, context, Environment};
+use minijinja::{args, context, Environment, State};
 use similar_asserts::assert_eq;
 
 use minijinja::filters::abs;
@@ -14,7 +14,7 @@ fn test_filter_with_non() {
 
     let mut env = Environment::new();
     env.add_filter("filter", filter);
-    let state = env.empty_state();
+    let mut state = env.empty_state();
 
     let rv = state
         .apply_filter("filter", args!(Value::UNDEFINED))
@@ -124,7 +124,7 @@ fn test_indent_preserves_safe_input() {
     let mut env = Environment::new();
     env.set_auto_escape_callback(|_| AutoEscape::Html);
 
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     let safe = state
         .apply_filter(
             "indent",
@@ -147,7 +147,7 @@ fn test_indent_preserves_safe_input() {
 #[test]
 fn test_string_filters_preserve_safety() {
     let env = Environment::new();
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     let safe = Value::from_safe_string(" Hello\nWorld ".into());
     let plain = Value::from(" Hello\nWorld ");
 
@@ -174,7 +174,7 @@ fn test_string_filters_preserve_safety() {
 #[test]
 fn test_byte_string_filter_semantics() {
     let env = Environment::new();
-    let state = env.empty_state();
+    let mut state = env.empty_state();
 
     let reversed = state
         .apply_filter(
@@ -231,7 +231,7 @@ fn test_composing_filters_escape_unsafe_fragments() {
          <b>&lt;i&gt;x&lt;&#x2f;i&gt;</b>"
     );
 
-    let state = template.new_state();
+    let mut state = template.new_state();
     let result = state
         .apply_filter(
             "replace",
@@ -320,7 +320,7 @@ fn test_join_streams_when_safety_is_known() {
     }
 
     let env = Environment::new();
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     state
         .apply_filter("join", args!(make_iterable(), ","))
         .unwrap();
@@ -328,7 +328,7 @@ fn test_join_streams_when_safety_is_known() {
     let mut env = Environment::new();
     env.set_auto_escape_callback(|_| AutoEscape::Html);
     let template = env.template_from_str("").unwrap();
-    let state = template.new_state();
+    let mut state = template.new_state();
     state
         .apply_filter(
             "join",
@@ -340,7 +340,7 @@ fn test_join_streams_when_safety_is_known() {
 #[test]
 fn test_safe_format_escapes_without_autoescape() {
     let env = Environment::new();
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     let result = state
         .apply_filter(
             "format",
@@ -527,6 +527,51 @@ fn test_zip_single_iterable() {
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
     assert_eq!(result, "[(1,), (2,), (3,)]");
+}
+
+#[test]
+fn test_higher_order_filters_propagate_mutable_state() {
+    fn stateful_double(state: &mut State, value: i64) -> i64 {
+        let count = state
+            .get_temp("filter_calls")
+            .and_then(|value| i64::try_from(value).ok())
+            .unwrap_or_default()
+            + 1;
+        state.set_temp("filter_calls", Value::from(count));
+        value * 2
+    }
+
+    fn stateful_odd(state: &mut State, value: i64) -> bool {
+        let count = state
+            .get_temp("test_calls")
+            .and_then(|value| i64::try_from(value).ok())
+            .unwrap_or_default()
+            + 1;
+        state.set_temp("test_calls", Value::from(count));
+        value % 2 != 0
+    }
+
+    fn call_counts(state: &State) -> String {
+        format!(
+            "{}:{}",
+            state.get_temp("filter_calls").unwrap_or_default(),
+            state.get_temp("test_calls").unwrap_or_default()
+        )
+    }
+
+    let mut env = Environment::new();
+    env.add_filter("stateful_double", stateful_double);
+    env.add_test("stateful_odd", stateful_odd);
+    env.add_function("call_counts", call_counts);
+    let result = env
+        .template_from_str(
+            "{{ [1, 2, 3]|map('stateful_double')|list }}|\
+             {{ [1, 2, 3, 4]|select('stateful_odd')|list }}|{{ call_counts() }}",
+        )
+        .unwrap()
+        .render(())
+        .unwrap();
+    assert_eq!(result, "[2, 4, 6]|[1, 3]|3:4");
 }
 
 #[test]

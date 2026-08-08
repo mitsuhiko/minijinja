@@ -28,29 +28,8 @@ impl fmt::Debug for Macro {
     }
 }
 
-impl Object for Macro {
-    fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Str(&["name", "arguments", "caller"])
-    }
-
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        Some(match some!(key.as_str()) {
-            "name" => self.name.clone(),
-            "arguments" => Value::from_iter(self.arg_spec.iter().cloned()),
-            "caller" => Value::from(self.caller_reference),
-            _ => return None,
-        })
-    }
-
-    fn call(self: &Arc<Self>, state: &State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
-        // we can only call macros that point to loaded template state.
-        if state.id != self.state_id {
-            return Err(Error::new(
-                ErrorKind::InvalidOperation,
-                "cannot call this macro. template state went away.",
-            ));
-        }
-
+impl Macro {
+    fn prepare_args(&self, args: &[Value]) -> Result<(Vec<Value>, Option<Value>), Error> {
         let (args, kwargs) = match args.last() {
             Some(last) => match Kwargs::extract(last) {
                 Some(kwargs) => (&args[..args.len() - 1], Some(kwargs)),
@@ -116,16 +95,35 @@ impl Object for Macro {
             }
         }
 
+        Ok((arg_values, caller))
+    }
+}
+
+impl Object for Macro {
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Str(&["name", "arguments", "caller"])
+    }
+
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        Some(match some!(key.as_str()) {
+            "name" => self.name.clone(),
+            "arguments" => Value::from_iter(self.arg_spec.iter().cloned()),
+            "caller" => Value::from(self.caller_reference),
+            _ => return None,
+        })
+    }
+
+    fn call(self: &Arc<Self>, state: &mut State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
+        if state.id != self.state_id {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "cannot call this macro. template state went away.",
+            ));
+        }
+
+        let (arg_values, caller) = ok!(self.prepare_args(args));
         let vm = Vm::new(state.env());
         let mut rv = String::new();
-
-        // This requires some explanation here.  Because we get the state as
-        // &State and not &mut State we are required to create a new state in
-        // eval_macro.  This is unfortunate but makes the calling interface more
-        // convenient for the rest of the system.  Because macros cannot return
-        // anything other than strings (most importantly they) can't return
-        // other macros this is however not an issue, as modifications in the
-        // macro cannot leak out.
         ok!(vm.eval_macro(
             state,
             self.macro_ref_id,

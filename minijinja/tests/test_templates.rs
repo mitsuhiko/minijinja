@@ -730,7 +730,7 @@ fn test_render_captured_state() {
 #[test]
 fn test_render_captured() {
     let env = Environment::new();
-    let rendered = env
+    let mut rendered = env
         .template_from_str("{% set foo = 42 %}{% macro bar() %}x{{ foo }}{% endmacro %}")
         .unwrap()
         .render_captured(())
@@ -738,7 +738,10 @@ fn test_render_captured() {
     assert_eq!(rendered.output(), "");
     assert_eq!(rendered.state().lookup("foo"), Some(Value::from(42)));
     assert_eq!(
-        rendered.state().call_macro("bar", &[]).ok().as_deref(),
+        rendered
+            .with_state_mut(|state| state.call_macro("bar", &[]))
+            .ok()
+            .as_deref(),
         Some("x42")
     );
 }
@@ -750,12 +753,15 @@ fn test_render_captured_to() {
         .template_from_str("{% set foo = 42 %}{% macro bar() %}x{% endmacro %}root")
         .unwrap();
     let mut out = Vec::<u8>::new();
-    let captured = tmpl.render_captured_to((), &mut out).unwrap();
+    let mut captured = tmpl.render_captured_to((), &mut out).unwrap();
     assert_eq!(String::from_utf8_lossy(&out), "root");
     assert_eq!(captured.output(), "");
     assert_eq!(captured.state().lookup("foo"), Some(Value::from(42)));
     assert_eq!(
-        captured.state().call_macro("bar", &[]).ok().as_deref(),
+        captured
+            .with_state_mut(|state| state.call_macro("bar", &[]))
+            .ok()
+            .as_deref(),
         Some("x")
     );
 }

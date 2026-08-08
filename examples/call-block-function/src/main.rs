@@ -3,7 +3,7 @@ use std::iter::FromIterator;
 use minijinja::value::{Kwargs, Value};
 use minijinja::{args, Environment, Error, ErrorKind, State};
 
-fn custom_loop(state: &State, num: i64, kwargs: Kwargs) -> Result<String, Error> {
+fn custom_loop(state: &mut State, num: i64, kwargs: Kwargs) -> Result<String, Error> {
     let mut rv = String::new();
     let caller = kwargs.get::<Value>("caller")?;
     kwargs.assert_all_used()?;

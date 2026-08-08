@@ -20,7 +20,7 @@ use crate::{defaults, functions};
 type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + Sync + Send;
 type PathJoinFunc = dyn for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Sync + Send;
 type UnknownMethodFunc =
-    dyn Fn(&State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send;
+    dyn Fn(&mut State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send;
 
 fn default_auto_escape_callback() -> Arc<AutoEscapeFunc> {
     static DEFAULT_AUTO_ESCAPE: OnceLock<Arc<AutoEscapeFunc>> = OnceLock::new();
@@ -340,7 +340,7 @@ impl<'source> Environment<'source> {
     /// see [minijinja_contrib::pycompat](https://docs.rs/minijinja-contrib/latest/minijinja_contrib/pycompat/).
     pub fn set_unknown_method_callback<F>(&mut self, f: F)
     where
-        F: Fn(&State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send + 'static,
+        F: Fn(&mut State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send + 'static,
     {
         self.unknown_method_callback = Some(Arc::new(f));
     }

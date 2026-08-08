@@ -1842,7 +1842,7 @@ impl Value {
     /// # let mut env = Environment::new();
     /// # env.add_template("foo", "").unwrap();
     /// # let tmpl = env.get_template("foo").unwrap();
-    /// # let state = tmpl.new_state(); let state = &state;
+    /// # let mut state = tmpl.new_state(); let state = &mut state;
     /// let func = Value::from_function(|v: i64, kwargs: Kwargs| {
     ///     v * kwargs.get::<i64>("mult").unwrap_or(1)
     /// });
@@ -1864,14 +1864,14 @@ impl Value {
     /// # let mut env = Environment::new();
     /// # env.add_template("foo", "").unwrap();
     /// # let tmpl = env.get_template("foo").unwrap();
-    /// # let state = tmpl.new_state(); let state = &state;
+    /// # let mut state = tmpl.new_state(); let state = &mut state;
     /// let func = Value::from_function(|v: i64, kwargs: Kwargs| {
     ///     v * kwargs.get::<i64>("mult").unwrap_or(1)
     /// });
     /// let rv = func.call(state, args!(42, mult => 2)).unwrap();
     /// assert_eq!(rv, Value::from(84));
     /// ```
-    pub fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    pub fn call(&self, state: &mut State, args: &[Value]) -> Result<Value, Error> {
         if let ValueRepr::Object(ref dy) = self.0 {
             dy.call(state, args)
         } else {
@@ -1888,7 +1888,12 @@ impl Value {
     /// slice.  Method lookup first tries methods implemented by the object, then
     /// the environment's unknown method callback, and finally a callable value
     /// stored under `name` on the object.
-    pub fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    pub fn call_method(
+        &self,
+        state: &mut State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, Error> {
         match self._call_method(state, name, args) {
             Ok(rv) => Ok(rv),
             Err(mut err) => {
@@ -1928,7 +1933,7 @@ impl Value {
         }
     }
 
-    fn _call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn _call_method(&self, state: &mut State, name: &str, args: &[Value]) -> Result<Value, Error> {
         if let Some(object) = self.as_object() {
             object.call_method(state, name, args)
         } else {

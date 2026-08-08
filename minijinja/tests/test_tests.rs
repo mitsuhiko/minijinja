@@ -11,7 +11,7 @@ fn test_basics() {
 
     let mut env = Environment::new();
     env.add_test("test", test);
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     assert!(state.perform_test("test", args!(23, 23)).unwrap());
 }
 

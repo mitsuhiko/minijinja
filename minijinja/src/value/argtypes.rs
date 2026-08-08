@@ -138,7 +138,9 @@ where
 ///
 /// When `&State` is used, it does not consume a passed parameter.  This means that
 /// a filter that takes `(&State, String)` actually only has one argument.  The
-/// state is passed implicitly.
+/// state is passed implicitly.  Functions can alternatively take `&mut State`
+/// as their first parameter.  Mutable state is handled specially by
+/// [`Function`](crate::functions::Function) rather than through this trait.
 pub trait ArgType<'a> {
     /// The output type of this argument.
     type Output;

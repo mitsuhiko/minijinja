@@ -47,7 +47,7 @@ pub fn cycler(items: Vec<Value>) -> Result<Value, Error> {
 
         fn call_method(
             self: &Arc<Self>,
-            _state: &State<'_, '_>,
+            _state: &mut State<'_, '_>,
             method: &str,
             args: &[Value],
         ) -> Result<Value, Error> {
@@ -106,7 +106,11 @@ pub fn joiner(sep: Option<Value>) -> Value {
             ObjectRepr::Plain
         }
 
-        fn call(self: &Arc<Self>, _state: &State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
+        fn call(
+            self: &Arc<Self>,
+            _state: &mut State<'_, '_>,
+            args: &[Value],
+        ) -> Result<Value, Error> {
             let () = from_args(args)?;
             let used = self.used.swap(true, Ordering::Relaxed);
             if used {

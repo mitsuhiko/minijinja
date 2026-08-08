@@ -13,7 +13,7 @@ struct Cycler {
 }
 
 impl Object for Cycler {
-    fn call(self: &Arc<Self>, _state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(self: &Arc<Self>, _state: &mut State, args: &[Value]) -> Result<Value, Error> {
         // we don't want any args
         let () = from_args(args)?;
         let idx = self.idx.fetch_add(1, Ordering::Relaxed);
@@ -34,7 +34,7 @@ struct Magic;
 impl Object for Magic {
     fn call_method(
         self: &Arc<Self>,
-        _state: &State,
+        _state: &mut State,
         name: &str,
         args: &[Value],
     ) -> Result<Value, Error> {

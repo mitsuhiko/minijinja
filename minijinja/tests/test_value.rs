@@ -7,7 +7,7 @@ use insta::{assert_debug_snapshot, assert_snapshot};
 use similar_asserts::assert_eq;
 
 use minijinja::value::{DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value, ValueKind};
-use minijinja::{args, context, render, Environment, Error, ErrorKind};
+use minijinja::{args, context, render, Environment, Error, ErrorKind, State};
 
 #[test]
 fn test_sort() {
@@ -360,11 +360,11 @@ fn test_call_kwargs() {
     let mut env = Environment::new();
     env.add_template("foo", "").unwrap();
     let tmpl = env.get_template("foo").unwrap();
-    let state = tmpl.new_state();
+    let mut state = tmpl.new_state();
     let val = Value::from_function(|kwargs: Kwargs| kwargs.get::<i32>("foo"));
     let rv = val
         .call(
-            &state,
+            &mut state,
             &[Kwargs::from_iter([("foo", Value::from(42))]).into()],
         )
         .unwrap();
@@ -382,10 +382,10 @@ fn test_kwargs_error() {
 fn test_return_none() {
     let env = Environment::empty();
     let val = Value::from_function(|| -> Result<(), Error> { Ok(()) });
-    let rv = val.call(&env.empty_state(), &[][..]).unwrap();
+    let rv = val.call(&mut env.empty_state(), &[][..]).unwrap();
     assert!(rv.is_none());
     let val = Value::from_function(|| ());
-    let rv = val.call(&env.empty_state(), &[][..]).unwrap();
+    let rv = val.call(&mut env.empty_state(), &[][..]).unwrap();
     assert!(rv.is_none());
 }
 
@@ -403,6 +403,107 @@ fn test_filter_basics() {
             .unwrap(),
         Value::from(65)
     );
+}
+
+#[test]
+fn test_functions_with_mutable_state() {
+    fn increment(state: &mut State, by: u64) -> u64 {
+        let old = state
+            .get_temp("counter")
+            .and_then(|value| u64::try_from(value).ok())
+            .unwrap_or(0);
+        state.set_temp("counter", Value::from(old + by));
+        old + by
+    }
+
+    fn prefix(state: &mut State, value: &str) -> String {
+        format!("{}:{value}", state.name())
+    }
+
+    fn matches_counter(state: &mut State, value: u64) -> bool {
+        state.get_temp("counter") == Some(Value::from(value))
+    }
+
+    let mut env = Environment::new();
+    env.add_function("increment", increment);
+    env.add_function("state_name", |state: &mut State| state.name().to_owned());
+    env.add_filter("prefix", prefix);
+    env.add_test("matches_counter", matches_counter);
+    let rv = env
+        .template_from_str(
+            "{{ increment(2) }} {{ increment(3) }} {{ state_name() }} {{ 'x'|prefix }} {{ 5 is matches_counter }}",
+        )
+        .unwrap()
+        .render(())
+        .unwrap();
+    assert_eq!(rv, "2 5 <string> <string>:x True");
+
+    let mut state = env.empty_state();
+    assert!(state
+        .apply_filter("prefix", args!("x"))
+        .unwrap()
+        .to_string()
+        .ends_with(":x"));
+    assert!(!state.perform_test("matches_counter", args!(5)).unwrap());
+}
+
+#[test]
+fn test_mutable_state_value_calls() {
+    fn increment(state: &mut State, by: u64) -> u64 {
+        let old = state
+            .get_temp("counter")
+            .and_then(|value| u64::try_from(value).ok())
+            .unwrap_or(0);
+        state.set_temp("counter", Value::from(old + by));
+        old + by
+    }
+
+    let env = Environment::new();
+    let mut state = env.empty_state();
+    let value = Value::from_function(increment);
+    assert_eq!(value.call(&mut state, args!(2)).unwrap(), Value::from(2));
+    assert_eq!(value.call(&mut state, args!(3)).unwrap(), Value::from(5));
+}
+
+#[test]
+fn test_mutable_state_object_calls() {
+    #[derive(Debug)]
+    struct Callable;
+
+    impl Object for Callable {
+        fn call(
+            self: &Arc<Self>,
+            state: &mut State<'_, '_>,
+            _args: &[Value],
+        ) -> Result<Value, Error> {
+            state.set_temp("called", Value::from(true));
+            Ok(Value::from("called"))
+        }
+
+        fn call_method(
+            self: &Arc<Self>,
+            state: &mut State<'_, '_>,
+            method: &str,
+            _args: &[Value],
+        ) -> Result<Value, Error> {
+            state.set_temp("method", Value::from(method));
+            Ok(Value::from(method))
+        }
+    }
+
+    let env = Environment::new();
+    let mut state = env.empty_state();
+    let value = Value::from_object(Callable);
+    assert_eq!(
+        value.call(&mut state, args!()).unwrap(),
+        Value::from("called")
+    );
+    assert_eq!(state.get_temp("called"), Some(Value::from(true)));
+    assert_eq!(
+        value.call_method(&mut state, "ping", args!()).unwrap(),
+        Value::from("ping")
+    );
+    assert_eq!(state.get_temp("method"), Some(Value::from("ping")));
 }
 
 #[test]
@@ -435,7 +536,7 @@ fn test_optional_args() {
 
     let mut env = crate::Environment::new();
     env.add_filter("add", add);
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     assert_eq!(
         state.apply_filter("add", args!(23, 42)).unwrap(),
         Value::from(65)
@@ -465,7 +566,7 @@ fn test_values_in_vec() {
     let mut env = Environment::new();
     env.add_filter("upper", upper);
     env.add_filter("sum", sum);
-    let state = env.empty_state();
+    let mut state = env.empty_state();
 
     assert_eq!(
         state.apply_filter("upper", args!("Hello World!")).unwrap(),
@@ -490,7 +591,7 @@ fn test_seq_object_borrow() {
 
     let mut env = Environment::new();
     env.add_filter("connect", connect);
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     assert_eq!(
         state
             .apply_filter(
@@ -651,7 +752,7 @@ fn test_serde_argument() {
     let mut env = Environment::new();
     env.add_filter("foo", foo);
     env.add_filter("legacy", legacy);
-    let state = env.empty_state();
+    let mut state = env.empty_state();
 
     for name in ["foo", "legacy"] {
         let rv = state

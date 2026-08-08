@@ -113,18 +113,18 @@ impl<'env> Vm<'env> {
         self.eval_state(&mut state, out).map(|x| (x, state))
     }
 
-    /// Evaluate a macro in a state.
+    /// Evaluates a macro by temporarily switching the active state.
     #[cfg(feature = "macros")]
-    pub fn eval_macro(
+    pub fn eval_macro<'template>(
         &self,
-        state: &State,
+        state: &mut State<'template, 'env>,
         macro_id: usize,
         out: &mut Output,
         closure: Value,
         caller: Option<Value>,
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
-        let (instructions, pc) = &state.macros[macro_id];
+        let &(instructions, pc) = &state.macros[macro_id];
         let context_base = state.ctx.clone_base();
         let mut ctx = Context::new_with_frame(self.env, Frame::new(context_base));
         ok!(ctx.push_frame(Frame::new(closure)));
@@ -132,28 +132,28 @@ impl<'env> Vm<'env> {
             ctx.store("caller", caller);
         }
         ok!(ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST));
-        self.do_eval(
-            &mut State {
-                ctx,
-                current_block: None,
-                auto_escape: std::cell::Cell::new(state.auto_escape()),
-                instructions,
-                blocks: BTreeMap::default(),
-                temps: state.temps.clone(),
-                loaded_templates: Default::default(),
-                #[cfg(feature = "macros")]
-                id: state.id,
-                #[cfg(feature = "macros")]
-                macros: state.macros.clone(),
-                #[cfg(feature = "macros")]
-                closure_tracker: state.closure_tracker.clone(),
-                #[cfg(feature = "fuel")]
-                fuel_tracker: state.fuel_tracker.clone(),
-            },
-            out,
-            Stack::from(args),
-            *pc,
-        )
+
+        let old_ctx = mem::replace(&mut state.ctx, ctx);
+        let old_current_block = state.current_block.take();
+        let old_auto_escape = state.auto_escape.get();
+        let old_instructions = mem::replace(&mut state.instructions, instructions);
+        let old_blocks = mem::take(&mut state.blocks);
+        let old_loaded_templates = mem::take(&mut state.loaded_templates);
+        // Keeping a second reference forces BuildMacro to use copy-on-write.
+        // This ensures that macros declared during this invocation remain local
+        // just as they do when eval_macro constructs a temporary state.
+        let old_macros = state.macros.clone();
+
+        let rv = self.do_eval(state, out, Stack::from(args), pc);
+
+        state.ctx = old_ctx;
+        state.current_block = old_current_block;
+        state.auto_escape.set(old_auto_escape);
+        state.instructions = old_instructions;
+        state.blocks = old_blocks;
+        state.loaded_templates = old_loaded_templates;
+        state.macros = old_macros;
+        rv
     }
 
     /// This is the actual evaluation loop that works with a specific context.

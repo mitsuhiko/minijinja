@@ -195,7 +195,7 @@ macro_rules! __context_pair {
 /// ```
 /// # use minijinja::{value::Value, args, Environment};
 /// # let env = Environment::default();
-/// # let state = &env.empty_state();
+/// # let state = &mut env.empty_state();
 /// # let value = Value::from(());
 /// value.call(state, args!(1, 2, foo => "bar"));
 /// ```

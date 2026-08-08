@@ -173,7 +173,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// with the passed args.
     #[cfg(feature = "macros")]
     #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
-    pub fn call_macro(&self, name: &str, args: &[Value]) -> Result<String, Error> {
+    pub fn call_macro(&mut self, name: &str, args: &[Value]) -> Result<String, Error> {
         let f = ok!(self.lookup(name).ok_or_else(|| Error::new(
             crate::error::ErrorKind::UnknownFunction,
             "macro not found"
@@ -268,11 +268,11 @@ impl<'template, 'env> State<'template, 'env> {
     /// # let mut env = Environment::new();
     /// # env.add_filter("upper", |x: &str| x.to_uppercase());
     /// # let tmpl = env.template_from_str("").unwrap();
-    /// # let state = tmpl.new_state();
+    /// # let mut state = tmpl.new_state();
     /// let rv = state.apply_filter("upper", &["hello world".into()]).unwrap();
     /// assert_eq!(rv.as_str(), Some("HELLO WORLD"));
     /// ```
-    pub fn apply_filter(&self, filter: &str, args: &[Value]) -> Result<Value, Error> {
+    pub fn apply_filter(&mut self, filter: &str, args: &[Value]) -> Result<Value, Error> {
         match self.env().get_filter(filter) {
             Some(filter) => filter.call(self, args),
             None => Err(Error::from(ErrorKind::UnknownFilter)),
@@ -286,11 +286,11 @@ impl<'template, 'env> State<'template, 'env> {
     /// # let mut env = Environment::new();
     /// # env.add_test("even", |x: i32| x % 2 == 0);
     /// # let tmpl = env.template_from_str("").unwrap();
-    /// # let state = tmpl.new_state();
+    /// # let mut state = tmpl.new_state();
     /// let rv = state.perform_test("even", &[42i32.into()]).unwrap();
     /// assert!(rv);
     /// ```
-    pub fn perform_test(&self, test: &str, args: &[Value]) -> Result<bool, Error> {
+    pub fn perform_test(&mut self, test: &str, args: &[Value]) -> Result<bool, Error> {
         match self.env().get_test(test) {
             Some(test) => test.call(self, args).map(|x| x.is_true()),
             None => Err(Error::from(ErrorKind::UnknownTest)),

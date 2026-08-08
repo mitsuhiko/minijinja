@@ -47,7 +47,7 @@ use minijinja::{format_filter, Error, ErrorKind, FormatStyle, State, Value};
 /// * `str.upper`
 #[cfg_attr(docsrs, doc(cfg(feature = "pycompat")))]
 pub fn unknown_method_callback(
-    state: &State,
+    state: &mut State,
     value: &Value,
     method: &str,
     args: &[Value],

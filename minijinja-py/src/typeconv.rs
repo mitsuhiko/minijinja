@@ -65,7 +65,7 @@ impl Object for DynamicObject {
         Python::attach(|py| write!(f, "{}", self.inner.bind(py)))
     }
 
-    fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(self: &Arc<Self>, state: &mut State, args: &[Value]) -> Result<Value, Error> {
         Python::attach(|py| -> Result<Value, Error> {
             bind_state(state, || {
                 let inner = self.inner.bind(py);
@@ -82,7 +82,7 @@ impl Object for DynamicObject {
 
     fn call_method(
         self: &Arc<Self>,
-        state: &State,
+        state: &mut State,
         name: &str,
         args: &[Value],
     ) -> Result<Value, Error> {
