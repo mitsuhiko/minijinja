@@ -92,9 +92,9 @@ impl StateRef {
     }
 }
 
-pub fn with_state<R, F: FnOnce(&State) -> PyResult<R>>(f: F) -> PyResult<R> {
+pub fn with_state<R, F: FnOnce(&mut State) -> PyResult<R>>(f: F) -> PyResult<R> {
     CURRENT_STATE.with(|handle| {
-        match unsafe { (handle.load(Ordering::Relaxed) as *const State).as_ref() } {
+        match unsafe { (handle.load(Ordering::Relaxed) as *mut State).as_mut() } {
             Some(state) => f(state),
             None => Err(PyRuntimeError::new_err(
                 "state cannot be used outside of template render",
@@ -104,9 +104,9 @@ pub fn with_state<R, F: FnOnce(&State) -> PyResult<R>>(f: F) -> PyResult<R> {
 }
 
 /// Invokes a function with the state stashed away.
-pub fn bind_state<R, F: FnOnce() -> R>(state: &State, f: F) -> R {
-    let old_handle = CURRENT_STATE
-        .with(|handle| handle.swap(state as *const _ as *mut c_void, Ordering::Relaxed));
+pub fn bind_state<R, F: FnOnce() -> R>(state: &mut State, f: F) -> R {
+    let old_handle =
+        CURRENT_STATE.with(|handle| handle.swap(state as *mut _ as *mut c_void, Ordering::Relaxed));
     let rv = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
     CURRENT_STATE.with(|handle| handle.store(old_handle, Ordering::Relaxed));
     match rv {

@@ -257,7 +257,7 @@ fn test_chained_comparisons() {
         "False"
     );
 
-    fn inc(state: &State) -> Value {
+    fn inc(state: &mut State) -> Value {
         let old = state
             .get_temp("chained_comparison_counter")
             .unwrap_or_else(|| Value::from(0i64));

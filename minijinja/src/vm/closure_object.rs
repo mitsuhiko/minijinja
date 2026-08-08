@@ -10,20 +10,20 @@ use crate::value::{Enumerator, Object, Value};
 /// exposed to the engine it's also passed to the [`track_closure`] function.
 #[derive(Default)]
 pub(crate) struct ClosureTracker {
-    closures: Mutex<Vec<Arc<Closure>>>,
+    closures: Vec<Arc<Closure>>,
 }
 
 impl ClosureTracker {
     /// This accepts a closure as value and registers it in the
     /// tracker for cycle breaking.
-    pub(crate) fn track_closure(&self, closure: Arc<Closure>) {
-        self.closures.lock().unwrap().push(closure);
+    pub(crate) fn track_closure(&mut self, closure: Arc<Closure>) {
+        self.closures.push(closure);
     }
 }
 
 impl Drop for ClosureTracker {
     fn drop(&mut self) {
-        for closure in self.closures.lock().unwrap().iter() {
+        for closure in &self.closures {
             closure.clear();
         }
     }

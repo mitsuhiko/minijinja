@@ -141,7 +141,7 @@ pub fn safe(v: String) -> Value {
 /// this filter escapes with the format that is native to the format or HTML
 /// otherwise.  This means that if the auto escape setting is set to
 /// `Json` for instance then this filter will serialize to JSON instead.
-pub fn escape(state: &State, v: &Value) -> Result<Value, Error> {
+pub fn escape(state: &mut State, v: &Value) -> Result<Value, Error> {
     if v.is_safe() {
         return Ok(v.clone());
     }
@@ -268,7 +268,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn replace(
-        state: &State,
+        state: &mut State,
         value: StringInput<'_>,
         from: StringInput<'_>,
         to: StringInput<'_>,
@@ -468,7 +468,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn join(
-        state: &State,
+        state: &mut State,
         value: &Value,
         joiner: Option<StringInput<'_>>,
     ) -> Result<Value, Error> {
@@ -488,7 +488,7 @@ mod builtins {
         }
 
         fn join_safe(
-            state: &State,
+            state: &mut State,
             iter: impl Iterator<Item = Value>,
             joiner: &str,
         ) -> Result<String, Error> {
@@ -1905,7 +1905,7 @@ mod builtins {
     /// [str.format()]: https://docs.python.org/3/library/string.html#format-string-syntax
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn format(
-        state: &State,
+        state: &mut State,
         format_str: &Value,
         format_args: Rest<ValueOrKwargs>,
     ) -> Result<Value, Error> {

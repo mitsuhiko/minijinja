@@ -31,7 +31,7 @@ impl Translations {
 
 impl Object for Translations {}
 
-fn translate(state: &State, key: &str) -> Option<Value> {
+fn translate(state: &mut State, key: &str) -> Option<Value> {
     let lang = state.lookup("LANG");
     let lang = lang.as_ref().and_then(|x| x.as_str()).unwrap();
     let cache_key = format!("translation-cache:{lang}");

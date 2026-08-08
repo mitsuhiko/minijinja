@@ -1,8 +1,8 @@
+use std::any::{Any, TypeId};
 use std::borrow::Cow;
-use std::cell::Cell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
@@ -26,12 +26,11 @@ static STATE_ID: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize
 
 /// Provides access to the current execution state of the engine.
 ///
-/// A read only reference is passed to filter functions and similar objects to
-/// allow limited interfacing with the engine.  The state is useful to look up
-/// information about the engine in filter, test or global functions.  It not
-/// only provides access to the template environment but also the context
-/// variables of the engine, the current auto escaping behavior as well as the
-/// auto escape flag.
+/// The state is passed to filters, tests, functions, and callable objects to
+/// let them interface with the engine.  Typed callbacks can request either a
+/// shared or mutable reference.  Shared access is useful for inspecting the
+/// template environment, context variables, and current auto-escaping behavior;
+/// mutable access additionally permits nested calls and render-local storage.
 ///
 /// In some testing scenarios or more advanced use cases you might need to get
 /// a [`State`].  The state is managed as part of the template execution but the
@@ -44,20 +43,21 @@ static STATE_ID: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize
 pub struct State<'template, 'env> {
     pub(crate) ctx: Context<'env>,
     pub(crate) current_block: Option<&'env str>,
-    pub(crate) auto_escape: Cell<AutoEscape>,
+    pub(crate) auto_escape: AutoEscape,
     pub(crate) instructions: &'template Instructions<'env>,
-    pub(crate) temps: Arc<Mutex<BTreeMap<Box<str>, Value>>>,
+    pub(crate) temps: BTreeMap<Box<str>, Value>,
+    pub(crate) extensions: HashMap<TypeId, Box<dyn Any + Send>>,
     pub(crate) blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
     #[allow(unused)]
     pub(crate) loaded_templates: BTreeSet<&'env str>,
     #[cfg(feature = "macros")]
     pub(crate) id: isize,
     #[cfg(feature = "macros")]
-    pub(crate) macros: std::sync::Arc<Vec<(&'template Instructions<'env>, u32)>>,
+    pub(crate) macros: Vec<(&'template Instructions<'env>, u32)>,
     #[cfg(feature = "macros")]
-    pub(crate) closure_tracker: std::sync::Arc<crate::vm::closure_object::ClosureTracker>,
+    pub(crate) closure_tracker: crate::vm::closure_object::ClosureTracker,
     #[cfg(feature = "fuel")]
-    pub(crate) fuel_tracker: Option<std::sync::Arc<FuelTracker>>,
+    pub(crate) fuel_tracker: Option<FuelTracker>,
 }
 
 impl fmt::Debug for State<'_, '_> {
@@ -65,7 +65,7 @@ impl fmt::Debug for State<'_, '_> {
         let mut ds = f.debug_struct("State");
         ds.field("name", &self.instructions.name());
         ds.field("current_block", &self.current_block);
-        ds.field("auto_escape", &self.auto_escape.get());
+        ds.field("auto_escape", &self.auto_escape);
         ds.field("ctx", &self.ctx);
         ds.field("env", &self.env());
         ds.finish()
@@ -84,10 +84,11 @@ impl<'template, 'env> State<'template, 'env> {
             #[cfg(feature = "macros")]
             id: STATE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             current_block: None,
-            auto_escape: Cell::new(auto_escape),
+            auto_escape,
             instructions,
             blocks,
             temps: Default::default(),
+            extensions: Default::default(),
             loaded_templates: BTreeSet::new(),
             #[cfg(feature = "macros")]
             macros: Default::default(),
@@ -123,21 +124,21 @@ impl<'template, 'env> State<'template, 'env> {
     /// Returns the current value of the auto escape flag.
     #[inline(always)]
     pub fn auto_escape(&self) -> AutoEscape {
-        self.auto_escape.get()
+        self.auto_escape
     }
 
     pub(crate) fn with_auto_escape<R>(
-        &self,
+        &mut self,
         auto_escape: AutoEscape,
-        f: impl FnOnce(&State<'template, 'env>) -> R,
+        f: impl FnOnce(&mut State<'template, 'env>) -> R,
     ) -> R {
-        if self.auto_escape.get() == auto_escape {
+        if self.auto_escape == auto_escape {
             return f(self);
         }
 
-        let old = self.auto_escape.replace(auto_escape);
+        let old = std::mem::replace(&mut self.auto_escape, auto_escape);
         let rv = f(self);
-        self.auto_escape.set(old);
+        self.auto_escape = old;
         rv
     }
 
@@ -204,9 +205,9 @@ impl<'template, 'env> State<'template, 'env> {
     ///
     /// Note that rendering a block is a stateful operation.  If an error
     /// is returned the module has to be re-created as the internal state
-    /// can end up corrupted.  This also means you can only render blocks
-    /// if you have a mutable reference to the state which is not possible
-    /// from within filters or similar.
+    /// can end up corrupted.  Rendering a block therefore requires mutable
+    /// access to the state.  Filters and functions can request this by taking
+    /// `&mut State` as their first parameter.
     #[cfg(feature = "multi_template")]
     #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
     pub fn render_block(&mut self, block: &str) -> Result<String, Error> {
@@ -303,11 +304,11 @@ impl<'template, 'env> State<'template, 'env> {
     /// # use minijinja::{value::Value, Environment};
     /// # let mut env = Environment::new();
     /// # let tmpl = env.template_from_str("").unwrap();
-    /// # let state = tmpl.new_state();
+    /// # let mut state = tmpl.new_state();
     /// let rv = state.format(Value::from(42)).unwrap();
     /// assert_eq!(rv, "42");
     /// ```
-    pub fn format(&self, value: Value) -> Result<String, Error> {
+    pub fn format(&mut self, value: Value) -> Result<String, Error> {
         let mut rv = String::new();
         let mut out = Output::new(&mut rv);
         self.env().format(&value, self, &mut out).map(|_| rv)
@@ -345,7 +346,7 @@ impl<'template, 'env> State<'template, 'env> {
     /// ```
     /// use minijinja::{Value, State};
     ///
-    /// fn inc(state: &State) -> Value {
+    /// fn inc(state: &mut State) -> Value {
     ///     let old = state
     ///         .get_temp("my_counter")
     ///         .unwrap_or_else(|| Value::from(0i64));
@@ -355,17 +356,14 @@ impl<'template, 'env> State<'template, 'env> {
     /// }
     /// ```
     pub fn get_temp(&self, name: &str) -> Option<Value> {
-        self.temps.lock().unwrap().get(name).cloned()
+        self.temps.get(name).cloned()
     }
 
     /// Inserts a temp and returns the old temp.
     ///
     /// For more information see [`get_temp`](Self::get_temp).
-    pub fn set_temp(&self, name: &str, value: Value) -> Option<Value> {
-        self.temps
-            .lock()
-            .unwrap()
-            .insert(name.to_owned().into(), value)
+    pub fn set_temp(&mut self, name: &str, value: Value) -> Option<Value> {
+        self.temps.insert(name.to_owned().into(), value)
     }
 
     /// Shortcut for registering an object as a temp.
@@ -385,7 +383,7 @@ impl<'template, 'env> State<'template, 'env> {
     ///
     /// impl Object for MyObject {}
     ///
-    /// fn inc(state: &State) -> Value {
+    /// fn inc(state: &mut State) -> Value {
     ///     let obj = state.get_or_set_temp_object("my_counter", MyObject::default);
     ///     let old = obj.0.fetch_add(1, Ordering::AcqRel);
     ///     Value::from(old + 1)
@@ -396,7 +394,7 @@ impl<'template, 'env> State<'template, 'env> {
     ///
     /// This will panic if the value registered under that name is not
     /// the object expected.
-    pub fn get_or_set_temp_object<O, F>(&self, name: &str, f: F) -> Arc<O>
+    pub fn get_or_set_temp_object<O, F>(&mut self, name: &str, f: F) -> Arc<O>
     where
         O: Object + 'static,
         F: FnOnce() -> O,
@@ -409,6 +407,81 @@ impl<'template, 'env> State<'template, 'env> {
             })
             .downcast_object()
             .expect("downcast unexpectedly failed. Name conflict?")
+    }
+
+    /// Returns a reference to a typed render-local extension.
+    ///
+    /// Extensions are similar to [`temps`](Self::get_temp), but store ordinary
+    /// Rust values keyed by their type.  They are useful for state that should
+    /// be shared by filters and functions for the duration of a render without
+    /// requiring a [`Value`], [`Object`], or interior mutability.  There can be
+    /// one extension of each concrete type; use a newtype when independent
+    /// values have the same underlying type.  Extension values must be `Send`
+    /// because states can be moved between threads.
+    ///
+    /// Extensions are preserved across nested evaluation, including includes,
+    /// blocks, and macro calls.  They are dropped together with the state.
+    pub fn get_extension<T>(&self) -> Option<&T>
+    where
+        T: Send + 'static,
+    {
+        self.extensions
+            .get(&TypeId::of::<T>())
+            .and_then(|value| value.downcast_ref())
+    }
+
+    /// Returns a mutable reference to a typed render-local extension.
+    ///
+    /// For more information see [`get_extension`](Self::get_extension).
+    pub fn get_extension_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: Send + 'static,
+    {
+        self.extensions
+            .get_mut(&TypeId::of::<T>())
+            .and_then(|value| value.downcast_mut())
+    }
+
+    /// Returns a mutable extension, inserting it if necessary.
+    ///
+    /// If an extension of type `T` is already present, `value` is not inserted.
+    /// Extensions require mutable state so that stored values do not need a
+    /// mutex or other interior mutability.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use minijinja::State;
+    ///
+    /// #[derive(Default)]
+    /// struct Counter(usize);
+    ///
+    /// fn next(state: &mut State) -> usize {
+    ///     let counter = state.get_or_insert_extension(Counter::default());
+    ///     counter.0 += 1;
+    ///     counter.0
+    /// }
+    /// ```
+    pub fn get_or_insert_extension<T>(&mut self, value: T) -> &mut T
+    where
+        T: Send + 'static,
+    {
+        self.get_or_insert_extension_with(|| value)
+    }
+
+    /// Returns a mutable extension, inserting one from `f` if necessary.
+    ///
+    /// For more information see [`get_or_insert_extension`](Self::get_or_insert_extension).
+    pub fn get_or_insert_extension_with<T, F>(&mut self, f: F) -> &mut T
+    where
+        T: Send + 'static,
+        F: FnOnce() -> T,
+    {
+        self.extensions
+            .entry(TypeId::of::<T>())
+            .or_insert_with(|| Box::new(f()))
+            .downcast_mut()
+            .expect("extension had an unexpected type")
     }
 
     #[cfg(feature = "debug")]

@@ -256,6 +256,9 @@ fn test_unenclosed_resolve() {
 
 #[test]
 fn test_macro_reuses_mutable_state() {
+    #[derive(Default)]
+    struct CallCount(usize);
+
     #[derive(Debug, Default)]
     struct StateProbe(AtomicUsize);
 
@@ -273,7 +276,9 @@ fn test_macro_reuses_mutable_state() {
                 Ok(_) => {}
                 Err(previous) => assert_eq!(previous, ptr),
             }
-            Ok(Value::from(""))
+            let count = state.get_or_insert_extension(CallCount::default());
+            count.0 += 1;
+            Ok(Value::from(count.0))
         }
     }
 
@@ -285,7 +290,7 @@ fn test_macro_reuses_mutable_state() {
             (),
         )
         .unwrap();
-    assert_eq!(rv, "");
+    assert_eq!(rv, "12");
 }
 
 #[cfg(feature = "serde")]

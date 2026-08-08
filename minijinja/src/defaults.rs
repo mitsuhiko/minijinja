@@ -58,7 +58,7 @@ pub fn default_auto_escape_callback(mut name: &str) -> AutoEscape {
 )]
 /// * [`None`](AutoEscape::None): no escaping
 /// * [`Custom(..)`](AutoEscape::Custom): results in an error
-pub fn escape_formatter(out: &mut Output, state: &State, value: &Value) -> Result<(), Error> {
+pub fn escape_formatter(out: &mut Output, state: &mut State, value: &Value) -> Result<(), Error> {
     write_escaped(out, state.auto_escape(), value)
 }
 

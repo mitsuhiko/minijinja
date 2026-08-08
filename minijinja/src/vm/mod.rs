@@ -135,24 +135,22 @@ impl<'env> Vm<'env> {
 
         let old_ctx = mem::replace(&mut state.ctx, ctx);
         let old_current_block = state.current_block.take();
-        let old_auto_escape = state.auto_escape.get();
+        let old_auto_escape = state.auto_escape;
         let old_instructions = mem::replace(&mut state.instructions, instructions);
         let old_blocks = mem::take(&mut state.blocks);
         let old_loaded_templates = mem::take(&mut state.loaded_templates);
-        // Keeping a second reference forces BuildMacro to use copy-on-write.
-        // This ensures that macros declared during this invocation remain local
-        // just as they do when eval_macro constructs a temporary state.
-        let old_macros = state.macros.clone();
+        // Macros declared during this invocation remain local to it.
+        let old_macro_count = state.macros.len();
 
         let rv = self.do_eval(state, out, Stack::from(args), pc);
 
         state.ctx = old_ctx;
         state.current_block = old_current_block;
-        state.auto_escape.set(old_auto_escape);
+        state.auto_escape = old_auto_escape;
         state.instructions = old_instructions;
         state.blocks = old_blocks;
         state.loaded_templates = old_loaded_templates;
-        state.macros = old_macros;
+        state.macros.truncate(old_macro_count);
         rv
     }
 
@@ -194,7 +192,7 @@ impl<'env> Vm<'env> {
         mut stack: Stack,
         mut pc: u32,
     ) -> Result<Option<Value>, Error> {
-        let initial_auto_escape = state.auto_escape.get();
+        let initial_auto_escape = state.auto_escape;
         let undefined_behavior = state.undefined_behavior();
         let strict_undefined = matches!(
             undefined_behavior,
@@ -316,7 +314,7 @@ impl<'env> Vm<'env> {
             // if the fuel consumption feature is enabled, track the fuel
             // consumption here.
             #[cfg(feature = "fuel")]
-            if let Some(ref tracker) = state.fuel_tracker {
+            if let Some(ref mut tracker) = state.fuel_tracker {
                 ctx_ok!(tracker.track(instr));
             }
 
@@ -340,7 +338,7 @@ impl<'env> Vm<'env> {
                         {
                             bail!(Error::from(ErrorKind::UndefinedError));
                         }
-                        ctx_ok!(write_escaped(out, state.auto_escape.get(), &value));
+                        ctx_ok!(write_escaped(out, state.auto_escape, &value));
                     } else {
                         ctx_ok!(self.env.format(&value, state, out));
                     }
@@ -563,7 +561,7 @@ impl<'env> Vm<'env> {
                     if let Some((target, end_capture)) = l.current_recursion_jump.take() {
                         pc = target;
                         if end_capture {
-                            stack.push(out.end_capture(state.auto_escape.get()));
+                            stack.push(out.end_capture(state.auto_escape));
                         }
                         continue;
                     }
@@ -620,19 +618,17 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::PushAutoEscape => {
                     a = stack.pop();
-                    auto_escape_stack.push(state.auto_escape.get());
-                    state
-                        .auto_escape
-                        .set(ctx_ok!(self.derive_auto_escape(a, initial_auto_escape)));
+                    auto_escape_stack.push(state.auto_escape);
+                    state.auto_escape = ctx_ok!(self.derive_auto_escape(a, initial_auto_escape));
                 }
                 Instruction::PopAutoEscape => {
-                    state.auto_escape.set(auto_escape_stack.pop().unwrap());
+                    state.auto_escape = auto_escape_stack.pop().unwrap();
                 }
                 Instruction::BeginCapture(mode) => {
                     out.begin_capture(*mode);
                 }
                 Instruction::EndCapture => {
-                    stack.push(out.end_capture(state.auto_escape.get()));
+                    stack.push(out.end_capture(state.auto_escape));
                 }
                 Instruction::ApplyFilter(name, arg_count, local_id) => {
                     let normalized_name = normalize_filter_test_name(name);
@@ -885,7 +881,7 @@ impl<'env> Vm<'env> {
             };
 
             let (new_instructions, new_blocks) = ok!(tmpl.instructions_and_blocks());
-            let old_escape = state.auto_escape.replace(tmpl.initial_auto_escape());
+            let old_escape = mem::replace(&mut state.auto_escape, tmpl.initial_auto_escape());
             let old_instructions = mem::replace(&mut state.instructions, new_instructions);
             let old_blocks = mem::replace(&mut state.blocks, prepare_blocks(new_blocks));
             // we need to make a copy of the loaded templates here as we want
@@ -906,7 +902,7 @@ impl<'env> Vm<'env> {
             }
             state.ctx.decr_depth(INCLUDE_RECURSION_COST);
             state.loaded_templates = old_loaded_templates;
-            state.auto_escape.set(old_escape);
+            state.auto_escape = old_escape;
             state.instructions = old_instructions;
             state.blocks = old_blocks;
             ok!(rv.map_err(|err| {
@@ -971,7 +967,7 @@ impl<'env> Vm<'env> {
             Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
         }));
         if capture {
-            Ok(out.end_capture(state.auto_escape.get()))
+            Ok(out.end_capture(state.auto_escape))
         } else {
             Ok(Value::UNDEFINED)
         }
@@ -1146,7 +1142,7 @@ impl<'env> Vm<'env> {
         let arg_spec = stack.pop().try_iter().unwrap().collect();
         let closure = stack.pop();
         let macro_ref_id = state.macros.len();
-        Arc::make_mut(&mut state.macros).push((state.instructions, offset));
+        state.macros.push((state.instructions, offset));
         stack.push(Value::from_object(Macro {
             name: Value::from(name),
             arg_spec,

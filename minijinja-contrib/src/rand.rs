@@ -17,14 +17,11 @@ impl Object for XorShiftRng {
 }
 
 impl XorShiftRng {
-    pub fn for_state(state: &State) -> Arc<XorShiftRng> {
-        state.get_or_set_temp_object("minijinja-contrib-rng", || {
-            XorShiftRng::new(
-                state
-                    .lookup("RAND_SEED")
-                    .and_then(|x| u64::try_from(x).ok()),
-            )
-        })
+    pub fn for_state(state: &mut State) -> Arc<XorShiftRng> {
+        let seed = state
+            .lookup("RAND_SEED")
+            .and_then(|x| u64::try_from(x).ok());
+        state.get_or_set_temp_object("minijinja-contrib-rng", || XorShiftRng::new(seed))
     }
 
     pub fn new(seed: Option<u64>) -> XorShiftRng {

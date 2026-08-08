@@ -232,7 +232,7 @@ impl Environment {
         let callback: Py<PyAny> = callback.clone().unbind();
         self.inner.lock().unwrap().env.add_filter(
             name.to_string(),
-            move |state: &State, args: Rest<ValueOrKwargs>| -> Result<Value, Error> {
+            move |state: &mut State, args: Rest<ValueOrKwargs>| -> Result<Value, Error> {
                 Python::attach(|py| {
                     bind_state(state, || {
                         let args = args.into_values();
@@ -265,7 +265,7 @@ impl Environment {
         let callback: Py<PyAny> = callback.clone().unbind();
         self.inner.lock().unwrap().env.add_test(
             name.to_string(),
-            move |state: &State, args: Rest<ValueOrKwargs>| -> Result<bool, Error> {
+            move |state: &mut State, args: Rest<ValueOrKwargs>| -> Result<bool, Error> {
                 Python::attach(|py| {
                     bind_state(state, || {
                         let args = args.into_values();
@@ -293,7 +293,7 @@ impl Environment {
         let callback: Py<PyAny> = callback.clone().unbind();
         self.inner.lock().unwrap().env.add_function(
             name.to_string(),
-            move |state: &State, args: Rest<ValueOrKwargs>| -> Result<Value, Error> {
+            move |state: &mut State, args: Rest<ValueOrKwargs>| -> Result<Value, Error> {
                 Python::attach(|py| {
                     bind_state(state, || {
                         let args = args.into_values();

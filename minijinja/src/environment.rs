@@ -17,7 +17,7 @@ use crate::value::{FunctionArgs, FunctionResult, UndefinedType, Value, ValueRepr
 use crate::vm::State;
 use crate::{defaults, functions};
 
-type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + Sync + Send;
+type FormatterFunc = dyn Fn(&mut Output, &mut State, &Value) -> Result<(), Error> + Sync + Send;
 type PathJoinFunc = dyn for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Sync + Send;
 type UnknownMethodFunc =
     dyn Fn(&mut State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send;
@@ -551,7 +551,7 @@ impl<'source> Environment<'source> {
     /// ```
     pub fn set_formatter<F>(&mut self, f: F)
     where
-        F: Fn(&mut Output, &State, &Value) -> Result<(), Error> + 'static + Sync + Send,
+        F: Fn(&mut Output, &mut State, &Value) -> Result<(), Error> + 'static + Sync + Send,
     {
         self.formatter = Arc::new(f);
         self.formatter_is_default = false;
@@ -811,7 +811,7 @@ impl<'source> Environment<'source> {
     pub(crate) fn format(
         &self,
         value: &Value,
-        state: &State,
+        state: &mut State,
         out: &mut Output,
     ) -> Result<(), Error> {
         match (self.undefined_behavior, &value.0) {

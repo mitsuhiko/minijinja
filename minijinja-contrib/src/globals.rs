@@ -137,7 +137,7 @@ pub fn joiner(sep: Option<Value>) -> Value {
 /// global context variable.
 #[cfg(feature = "rand")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand")))]
-pub fn randrange(state: &State, n: i64, m: Option<i64>) -> i64 {
+pub fn randrange(state: &mut State, n: i64, m: Option<i64>) -> i64 {
     let (lower, upper) = match m {
         None => (0, n),
         Some(m) => (n, m),
@@ -160,7 +160,7 @@ pub fn randrange(state: &State, n: i64, m: Option<i64>) -> i64 {
 #[cfg(feature = "rand")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand")))]
 pub fn lipsum(
-    state: &State,
+    state: &mut State,
     n: Option<usize>,
     kwargs: minijinja::value::Kwargs,
 ) -> Result<Value, Error> {

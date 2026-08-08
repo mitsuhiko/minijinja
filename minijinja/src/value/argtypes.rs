@@ -684,7 +684,7 @@ impl<'a> StringInput<'a> {
     ///
     /// Safe inputs are returned unchanged.  Other inputs are escaped in the
     /// same way as the [`escape`](crate::filters::escape) filter.
-    pub fn format(&self, state: &State) -> Result<Cow<'_, str>, Error> {
+    pub fn format(&self, state: &mut State) -> Result<Cow<'_, str>, Error> {
         if self.safe {
             Ok(Cow::Borrowed(self.as_str()))
         } else {

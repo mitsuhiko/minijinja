@@ -48,9 +48,9 @@ pub fn format_filter(
 pub(crate) fn format_printf_with(
     format_str: &str,
     args: &[Value],
-    transform: impl Fn(&Value, FormatConversion) -> Result<Option<Value>, Error>,
+    mut transform: impl FnMut(&Value, FormatConversion) -> Result<Option<Value>, Error>,
 ) -> Result<String, Error> {
-    printf_style::format_with(format_str, args, &transform)
+    printf_style::format_with(format_str, args, &mut transform)
 }
 
 // Token produced by the format string parser
@@ -1143,13 +1143,13 @@ mod printf_style {
     // to the fields found in the string, by formatting the value according to the
     // spec found in the field.
     pub(super) fn format(format_str: &str, args: &[Value]) -> Result<String, Error> {
-        format_with(format_str, args, &|_, _| Ok(None))
+        format_with(format_str, args, &mut |_, _| Ok(None))
     }
 
     pub(super) fn format_with(
         format_str: &str,
         args: &[Value],
-        transform: &impl Fn(&Value, FormatConversion) -> Result<Option<Value>, Error>,
+        transform: &mut impl FnMut(&Value, FormatConversion) -> Result<Option<Value>, Error>,
     ) -> Result<String, Error> {
         let mut input = Tokenizer::new(format_str, FormatStyle::Printf);
         let mut result = String::new();
