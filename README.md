@@ -18,7 +18,7 @@ as a [Python extension module](https://github.com/mitsuhiko/minijinja/tree/main/
 
 The Rust implementation does not enable `serde` by default. Optional Serde
 conversion can be enabled explicitly and used through
-`minijinja::value::Serialize`. It supports
+`minijinja::value::Serde`. It supports
 [a range of features from Jinja2](https://github.com/mitsuhiko/minijinja/blob/main/COMPATIBILITY.md)
 including inheritance, filters and more.  The goal is that it should be possible
 to use some templates in Rust programs without the fear of pulling in complex

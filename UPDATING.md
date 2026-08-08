@@ -18,25 +18,36 @@ and `json` features enable it automatically. Rendering APIs, `context!`, and
 `args!` now convert values through `Into<Value>` rather than implicitly
 serializing them.
 
-Serde conversion must be requested with the `minijinja::value::Serialize`
-wrapper:
+Serde conversion must be requested with the `minijinja::value::Serde` wrapper:
 
 ```rust
-use minijinja::value::{Serialize, Value};
+use minijinja::value::{Serde, Value};
 
-let value = Value::from(Serialize(&custom_data));
-let output = template.render(Serialize(&custom_context))?;
-let context = minijinja::context!(data => Serialize(&custom_data));
+let value = Value::from(Serde(&custom_data));
+let output = template.render(Serde(&custom_context))?;
+let context = minijinja::context!(data => Serde(&custom_data));
 ```
 
+The same wrapper deserializes function arguments into Rust types:
+
+```rust
+use minijinja::value::Serde;
+
+fn dirname(path: Serde<std::path::PathBuf>) -> String {
+    path.display().to_string()
+}
+```
+
+`Serde` replaces the former `ViaDeserialize` argument wrapper, which remains
+available as a deprecated alias.
 `Value::from_serialize(value)` remains available with the `serde` feature as a
-shortcut for `Value::from(Serialize(value))`. Without `serde`, the wrapper and
+shortcut for `Value::from(Serde(value))`. Without `serde`, the wrapper and
 shortcut are unavailable; native `Into<Value>` conversions and custom `Object`
 implementations continue to work without a fallback serialization trait.
 
 `context!` and `args!` consume expressions passed through native conversions.
 Pass a reference where a supported native value should be cloned, or use
-`Serialize(&value)` for borrowed Serde data.
+`Serde(&value)` for borrowed Serde data.
 
 Collecting an iterator into `Value` now always creates a sequence, including
 when the items are tuples. Use `Value::from_pairs(iter)` to explicitly create a
