@@ -4,6 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Removed Rust APIs deprecated before 3.0: `Template::render_and_return_state`, `Template::render_to_write`, `Template::eval_to_state`, the `Filter`, `Test`, and `TestResult` aliases, `value::intern`, and the no-op `key_interning` feature.
 * Made `serde` optional, explicit, and disabled by default. Rendering APIs now accept `Into<Value>`; enable the feature and use the `value::Serde` wrapper for Serde conversion. Disabling the feature fully removes the dependency and no longer substitutes a fallback serialization trait.  #528
 * Added first-class tuple literals and public tuple value types in Rust and Go. Tuples now preserve their type through serialization and sequence operations, render like Python tuples, and roundtrip as tuples through the Python binding. JavaScript receives evaluated tuples as arrays.  #785
 * Changed sequence and map representations in Rust and Go to use Python-style string quoting, and changed `tojson` to use Jinja2-compatible separator spacing.  #785

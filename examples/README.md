@@ -19,7 +19,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [dynamic-objects](dynamic-objects): demonstrates how to use dynamic objects in templates.
 * [embedding](embedding): shows how to use `minijina-embed` to embed templates optionally into the binary.
 * [error](error): shows the built-in error reporting support.
-* [eval-to-state](eval-to-state): Demonstrates what can be done with evaluating to state.
+* [eval-to-state](eval-to-state): Demonstrates state inspection with `render_captured`.
 * [expr](expr): demonstrates the expression evaluation support.
 * [filters](filters): Shows how to write and use custom filters and global functions.
 * [function-using-async](function-using-async): Demonstrates how tokio handle's `block_on` can be used from within a function.

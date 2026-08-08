@@ -3,6 +3,20 @@
 MiniJinja 3 aligns the value model more closely with Jinja2 and makes `serde`
 optional.  The changes below may require updates when moving from MiniJinja 2.
 
+## Removed Deprecated Rust APIs
+
+APIs deprecated before MiniJinja 3 have been removed:
+
+* Replace `Template::render_and_return_state` with `Template::render_captured`
+  and access the output and state through the returned `Captured` value.
+* Replace `Template::render_to_write` with `Template::render_captured_to`.
+* Replace `Template::eval_to_state` with `Template::render_captured`. To discard
+  output, use `render_captured_to` with `std::io::sink()`.
+* Replace the `filters::Filter` and `tests::Test` aliases with
+  `functions::Function`, and `tests::TestResult` with `value::FunctionResult`.
+* Replace `value::intern` with `Arc::<str>::from`. The no-op `key_interning`
+  Cargo feature has also been removed.
+
 ## Go Module Path
 
 MiniJinja-Go now uses the major-version module path
