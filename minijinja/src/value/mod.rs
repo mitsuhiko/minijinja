@@ -85,17 +85,21 @@
 //! # Serde Conversions
 //!
 //! Serde conversion is available explicitly through the `Serialize` wrapper or
-//! the `Value::from_serialize` convenience method:
+//! the `Value::from_serialize` convenience method when the `serde` feature is
+//! enabled.
 //!
-//! ```
-//! # use minijinja::value::{Serialize, Value};
-//! let value = Value::from(Serialize(&[1, 2, 3]));
-//! let value = Value::from_serialize(&[1, 2, 3]);
-//! ```
-//!
+#![cfg_attr(
+    feature = "serde",
+    doc = r"
+```
+# use minijinja::value::{Serialize, Value};
+let value = Value::from(Serialize(&[1, 2, 3]));
+let value = Value::from_serialize(&[1, 2, 3]);
+```
+"
+)]
 //! Rendering APIs primarily accept `Into<Value>`. Wrap custom Serde contexts in
-//! `Serialize` when passing them to those APIs. The wrapper and
-//! `Value::from_serialize` are only available when the `serde` feature is enabled.
+//! `Serialize` when passing them to those APIs.
 //!
 //! The inverse of the serialize operation is to pass a value directly as
 //! serializer to a type that supports deserialization.  This requires the

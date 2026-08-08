@@ -152,15 +152,11 @@
 //!     filter's case insensitive comparison changes to using unicode and not
 //!     ASCII rules.  Without this features only ASCII identifiers can be used
 //!     for variable names and attributes.
-//!   - `serde`: enables or disables serde support.  In current versions of MiniJinja
-//!     it's not possible to disable serde but it will become possible.  To prevent
-//!     breakage, MiniJinja warns if this feature is disabled.
 //!
 //! - **Rust Functionality:**
 //!
-//!   - `serde`: if this feature is removed the `serde` dependency is not used at all.
-//!     This restricts some value conversions that would otherwise be possible though
-//!     a large set of the engine stays functional.
+//!   - `serde`: enables Serde conversion through `value::Serialize` and
+//!     `Value::from_serialize`.  It is disabled by default.
 //!   - `debug`: if this feature is removed some debug functionality of the engine is
 //!     removed as well.  This mainly affects the quality of error reporting.
 //!   - `deserialization`: when removed this disables deserialization support for

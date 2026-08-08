@@ -37,5 +37,5 @@ unicode_categories = { version = "0.1.1", optional = true }
 [dev-dependencies]
 insta = { version = "1.38.0", features = ["glob", "serde"] }
 chrono = { version = "0.4.26", features = ["serde"] }
-minijinja = { version = "3.0.0-alpha.0", path = "../minijinja", features = ["loader"] }
+minijinja = { version = "3.0.0-alpha.0", path = "../minijinja", features = ["loader", "serde"] }
 similar-asserts = "1.4.2"

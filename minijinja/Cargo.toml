@@ -21,12 +21,10 @@ rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 default = [
     "builtins",
     "debug",
-    "deserialization",
     "macros",
     "multi_template",
     "adjacent_loop_items",
     "std_collections",
-    "serde",
 ]
 
 # API features

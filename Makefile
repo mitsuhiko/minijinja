@@ -16,8 +16,9 @@ doc:
 test-msrv:
 	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES)
 	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES),preserve_order,unicode
-	@echo "CARGO TEST WITHOUT SERDE"
-	@cd minijinja; cargo test --no-default-features --features=builtins,debug,macros,multi_template,adjacent_loop_items,std_collections --lib --tests
+	@echo "CARGO TEST DEFAULT FEATURES WITHOUT SERDE"
+	@cd minijinja; cargo test
+	@cd minijinja; ! cargo tree --edges normal | grep -Eq '(^| )serde v'
 	@echo "CARGO TEST ALL FEATURES"
 	@cd minijinja; cargo test --all-features
 	@$(MAKE) test-cabi

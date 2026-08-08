@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 
+use minijinja::value::Serialize;
 use minijinja::{Environment, Error, ErrorKind, Value};
 
 fn load_data(filename: &str) -> Result<Value, Error> {
@@ -16,7 +17,7 @@ fn load_data(filename: &str) -> Result<Value, Error> {
     })?;
     let parsed: serde_json::Value = serde_json::from_slice(&contents[..])
         .map_err(|err| Error::new(ErrorKind::InvalidOperation, "invalid JSON").with_source(err))?;
-    Ok(Value::from_serialize(parsed))
+    Ok(Value::from(Serialize(parsed)))
 }
 
 fn main() {
