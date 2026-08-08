@@ -12,10 +12,11 @@ semantics described below.
 
 ## Optional and Explicit Serde Support
 
-The `serde` feature now controls the `serde` dependency and remains enabled by
-default. `deserialization` and `json` enable it automatically. Rendering APIs,
-`context!`, and `args!` now convert values through `Into<Value>` rather than
-implicitly serializing them.
+The `serde` feature now controls the `serde` dependency and is disabled by
+default. Enable it explicitly if you use Serde conversion. The `deserialization`
+and `json` features enable it automatically. Rendering APIs, `context!`, and
+`args!` now convert values through `Into<Value>` rather than implicitly
+serializing them.
 
 Serde conversion must be requested with the `minijinja::value::Serialize`
 wrapper:
