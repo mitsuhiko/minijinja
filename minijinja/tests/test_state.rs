@@ -77,6 +77,28 @@ fn test_state_extensions() {
 }
 
 #[test]
+fn test_formatter_can_modify_state() {
+    #[derive(Default)]
+    struct FormatCount(usize);
+
+    let mut env = Environment::new();
+    env.set_formatter(|out, state, value| {
+        state.get_or_insert_extension(FormatCount::default()).0 += 1;
+        minijinja::escape_formatter(out, state, value)
+    });
+    let captured = env
+        .template_from_str("{{ 1 }}|{{ 2 }}")
+        .unwrap()
+        .render_captured(())
+        .unwrap();
+    assert_eq!(captured.output(), "1|2");
+    assert_eq!(
+        captured.state().get_extension::<FormatCount>().unwrap().0,
+        2
+    );
+}
+
+#[test]
 fn test_state_object_temps() {
     #[derive(Debug, Default)]
     struct MyObject(AtomicUsize);
