@@ -52,9 +52,6 @@ fuel = []
 json = ["serde", "serde_json"]
 urlencode = ["percent-encoding"]
 
-# Deprecated features
-key_interning = []
-
 # Internal Features that should not be used
 internal_debug = []
 unstable_machinery = ["internal_debug"]

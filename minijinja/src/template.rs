@@ -184,33 +184,6 @@ impl<'env, 'source> Template<'env, 'source> {
     /// in combination with [`State::render_block`].
     ///
     pub fn render<V: Into<Value>>(&self, ctx: V) -> Result<String, Error> {
-        // reduce total amount of code falling under mono morphization into
-        // this function, and share the rest in _render.
-        self._render(ctx.into()).map(|x| x.0)
-    }
-
-    /// Like [`render`](Self::render) but also return the evaluated [`State`].
-    ///
-    /// This can be used to inspect the [`State`] of the template post evaluation
-    /// for instance to get fuel consumption numbers or to access globally set
-    /// variables.
-    ///
-    /// ```
-    /// # use minijinja::{Environment, context, value::Value};
-    /// # let mut env = Environment::new();
-    /// let tmpl = env.template_from_str("{% set x = 42 %}Hello {{ what }}!").unwrap();
-    /// let (rv, state) = tmpl.render_and_return_state(context!{ what => "World" }).unwrap();
-    /// assert_eq!(rv, "Hello World!");
-    /// assert_eq!(state.lookup("x"), Some(Value::from(42)));
-    /// ```
-    ///
-    #[deprecated(since = "2.18.0", note = "use render_captured instead")]
-    pub fn render_and_return_state<V: Into<Value>>(
-        &self,
-        ctx: V,
-    ) -> Result<(String, State<'_, 'env>), Error> {
-        // reduce total amount of code falling under mono morphization into
-        // this function, and share the rest in _render.
         self._render(ctx.into())
     }
 
@@ -233,7 +206,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// assert_eq!(rendered.state().lookup("x"), Some(Value::from(42)));
     /// ```
     pub fn render_captured<V: Into<Value>>(&self, ctx: V) -> Result<Captured<'source>, Error> {
-        self.clone()._capture_state(ctx.into(), true)
+        self.clone()._capture_state(ctx.into())
     }
 
     /// Like [`render`](Self::render) but writes to an [`io::Write`] and keeps
@@ -268,27 +241,18 @@ impl<'env, 'source> Template<'env, 'source> {
             .map_err(|err| w.into_inner().take_err(err))
     }
 
-    fn _render(&self, root: Value) -> Result<(String, State<'_, 'env>), Error> {
+    fn _render(&self, root: Value) -> Result<String, Error> {
         let mut rv = String::with_capacity(self.compiled.buffer_size_hint);
-        self._eval(root, &mut Output::new(&mut rv))
-            .map(|(_, state)| (rv, state))
+        self._eval(root, &mut Output::new(&mut rv)).map(|_| rv)
     }
 
-    fn _capture_state(self, root: Value, capture_output: bool) -> Result<Captured<'source>, Error> {
+    fn _capture_state(self, root: Value) -> Result<Captured<'source>, Error> {
         let this: Template<'source, 'source> = self;
         let cell = ok!(CapturedCell::try_new(
             this,
             move |template| -> Result<CapturedData<'_>, Error> {
-                let mut output = if capture_output {
-                    String::with_capacity(template.compiled.buffer_size_hint)
-                } else {
-                    String::new()
-                };
-                let (_, state) = if capture_output {
-                    ok!(template._eval(root, &mut Output::new(&mut output)))
-                } else {
-                    ok!(template._eval(root, &mut Output::null()))
-                };
+                let mut output = String::with_capacity(template.compiled.buffer_size_hint);
+                let (_, state) = ok!(template._eval(root, &mut Output::new(&mut output)));
                 Ok(CapturedData { output, state })
             }
         ));
@@ -312,70 +276,6 @@ impl<'env, 'source> Template<'env, 'source> {
             }
         ));
         Ok(Captured { cell })
-    }
-
-    /// Renders the template into an [`io::Write`].
-    ///
-    /// This works exactly like [`render`](Self::render), but writes the template
-    /// into an [`io::Write`] as it is evaluated.
-    ///
-    /// ```
-    /// # use minijinja::{Environment, context};
-    /// # let mut env = Environment::new();
-    /// # env.add_template("hello", "Hello {{ name }}!").unwrap();
-    /// use std::io::stdout;
-    ///
-    /// let tmpl = env.get_template("hello").unwrap();
-    /// tmpl.render_to_write(context!(name => "John"), &mut stdout()).unwrap();
-    /// ```
-    ///
-    #[deprecated(since = "2.18.0", note = "use render_captured_to instead")]
-    pub fn render_to_write<V: Into<Value>, W: io::Write>(
-        &self,
-        ctx: V,
-        w: W,
-    ) -> Result<State<'_, 'env>, Error> {
-        let mut wrapper = WriteWrapper { w, err: None };
-        self._eval(ctx.into(), &mut Output::new(&mut wrapper))
-            .map(|(_, state)| state)
-            .map_err(|err| wrapper.take_err(err))
-    }
-
-    /// Evaluates the template into a [`State`].
-    ///
-    /// This evaluates the template, discards the output and returns the final
-    /// `State` for introspection.  From there global variables or blocks
-    /// can be accessed.  What this does is quite similar to how the engine
-    /// internally works with templates that are extended or imported from.
-    ///
-    /// ```
-    /// # use minijinja::{Environment, context};
-    /// # fn test() -> Result<(), minijinja::Error> {
-    /// # let mut env = Environment::new();
-    /// # env.add_template("hello", "")?;
-    /// let tmpl = env.get_template("hello")?;
-    /// let state = tmpl.eval_to_state(context!(name => "John"))?;
-    /// println!("{:?}", state.exports());
-    /// # Ok(()) }
-    /// ```
-    ///
-    /// If you also want to render, use [`render_captured`](Self::render_captured).
-    ///
-    /// For more information see [`State`].
-    #[deprecated(since = "2.18.0", note = "use render_captured instead")]
-    pub fn eval_to_state<V: Into<Value>>(&self, ctx: V) -> Result<State<'_, 'env>, Error> {
-        let root = ctx.into();
-        let mut out = Output::null();
-        let vm = Vm::new(self.env);
-        let state = ok!(vm.eval(
-            &self.compiled.instructions,
-            root,
-            &self.compiled.blocks,
-            &mut out,
-            self.compiled.initial_auto_escape,
-        ))
-        .1;
-        Ok(state)
     }
 
     fn _eval(

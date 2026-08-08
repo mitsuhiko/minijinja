@@ -957,12 +957,6 @@ impl Default for Value {
     }
 }
 
-#[doc(hidden)]
-#[deprecated = "This function no longer has an effect.  Use Arc::from directly."]
-pub fn intern(s: &str) -> Arc<str> {
-    Arc::from(s.to_string())
-}
-
 #[allow(clippy::len_without_is_empty)]
 impl Value {
     /// The undefined value.

@@ -124,11 +124,6 @@ use crate::value::Value;
 use crate::vm::State;
 use crate::{AutoEscape, Output};
 
-/// Deprecated alias
-#[deprecated = "Use the minijinja::functions::Function instead"]
-#[doc(hidden)]
-pub use crate::functions::Function as Filter;
-
 /// Marks a value as safe.  This converts it into a string.
 ///
 /// When a value is marked as safe, no further auto escaping will take place.

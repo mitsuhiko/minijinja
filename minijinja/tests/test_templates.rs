@@ -702,34 +702,29 @@ fn test_state() {
 }
 
 #[test]
-#[allow(unused_mut, deprecated)]
-fn test_render_and_return_state() {
-    let mut env = Environment::new();
-    #[cfg(feature = "fuel")]
-    {
-        env.set_fuel(Some(100));
-    }
-    let tmpl = env
-        .template_from_str("{% for x in range(3) %}Hello {{ name }}!\n{% endfor %}{% set x = 1 %}")
-        .unwrap();
-    let (rv, state) = tmpl
-        .render_and_return_state(context! { name => "Foo" })
-        .unwrap();
-    assert_eq!(rv, "Hello Foo!\nHello Foo!\nHello Foo!\n");
-    assert_eq!(state.lookup("x"), Some(Value::from(1)));
-
-    #[cfg(feature = "fuel")]
-    {
-        assert_eq!(state.fuel_levels(), Some((26, 74)));
-    }
-}
-
-#[test]
 fn test_loop_locals_do_not_persist_between_iterations() {
     assert_eq!(
         render!("{% for x in [1, 2] %}{% if loop.first %}{% set y = x %}{% endif %}[{{ y }}]{% endfor %}"),
         "[1][]"
     );
+}
+
+#[test]
+fn test_render_captured_state() {
+    #[allow(unused_mut)]
+    let mut env = Environment::new();
+    #[cfg(feature = "fuel")]
+    env.set_fuel(Some(100));
+
+    let tmpl = env
+        .template_from_str("{% for x in range(3) %}Hello {{ name }}!\n{% endfor %}{% set x = 1 %}")
+        .unwrap();
+    let captured = tmpl.render_captured(context! { name => "Foo" }).unwrap();
+    assert_eq!(captured.output(), "Hello Foo!\nHello Foo!\nHello Foo!\n");
+    assert_eq!(captured.state().lookup("x"), Some(Value::from(1)));
+
+    #[cfg(feature = "fuel")]
+    assert_eq!(captured.state().fuel_levels(), Some((26, 74)));
 }
 
 #[test]
