@@ -102,10 +102,22 @@ def test_method_calling():
 def test_types_passthrough():
     tup = (1, 2, 3)
     assert eval_expr("x", x=tup) == tup
+    assert eval_expr("(1, 2, 3)") == tup
+    assert eval_expr("[1, 2, 3]") == [1, 2, 3]
     assert render_str("{{ x }}", x=tup) == "(1, 2, 3)"
     assert eval_expr("x is sequence", x=tup) == True
     assert render_str("{{ x }}", x=(1, True)) == "(1, True)"
     assert eval_expr("x[0] == 42", x=[42]) == True
+
+
+def test_collection_rendering():
+    assert render_str("{{ [name, true, none] }}", name="World") == (
+        "['World', True, None]"
+    )
+    assert render_str("{{ (name, true) }}", name="World") == "('World', True)"
+    assert render_str("{{ value|tojson }}", value={"a": 1, "b": [2, 3]}) == (
+        '{"a": 1, "b": [2, 3]}'
+    )
 
 
 def test_custom_filter():

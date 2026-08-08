@@ -32,6 +32,28 @@ describe("minijinja-js", () => {
       const result = env.renderTemplate("test.txt", { name: "<b>World</b>" });
       expect(result).to.equal("Hello, <b>World</b>!");
     });
+
+    it("should use Python-compatible collection rendering", () => {
+      const env = new Environment();
+      expect(env.renderStr("{{ [name, true, none] }}", { name: "World" }))
+        .to.equal("['World', True, None]");
+      expect(env.renderStr("{{ (name, true) }}", { name: "World" }))
+        .to.equal("('World', True)");
+    });
+
+    it("should use Jinja-compatible JSON spacing", () => {
+      const env = new Environment();
+      const result = env.renderStr("{{ value|tojson }}", {
+        value: { a: 1, b: [2, 3] },
+      });
+      expect(result).to.equal('{"a": 1, "b": [2, 3]}');
+    });
+
+    it("should support semi-strict undefined behavior", () => {
+      const env = new Environment();
+      env.undefinedBehavior = "semi_strict";
+      expect(env.undefinedBehavior).to.equal("semi_strict");
+    });
   });
 
   describe("debug", () => {
@@ -70,6 +92,14 @@ No referenced variables
       assert(result instanceof Map);
       let obj = Object.fromEntries(result);
       expect(obj).to.deep.equal({ a: 1, b: 2 });
+    });
+
+    it("should return tuples as arrays", () => {
+      const env = new Environment();
+      expect(env.evalExpr("(1, name)", { name: "World" })).to.deep.equal([
+        1,
+        "World",
+      ]);
     });
 
     it("should allow passing of functions to templates", () => {
@@ -186,7 +216,7 @@ No referenced variables
       const env = new Environment();
       env.enablePyCompat();
       const result = env.renderStr("{{ {1: 2}.items() }}", {});
-      expect(result).to.equal("[[1, 2]]");
+      expect(result).to.equal("[(1, 2)]");
     });
   });
 });
