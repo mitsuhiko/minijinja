@@ -5,8 +5,7 @@
 //!
 //! MiniJinja is a powerful but minimal dependency template engine for Rust which
 //! is based on the syntax and behavior of the
-//! [Jinja2](https://jinja.palletsprojects.com/) template engine for Python.  It's
-//! implemented on top of `serde` though that dependency can be disabled.  The goal
+//! [Jinja2](https://jinja.palletsprojects.com/) template engine for Python.  The goal
 //! is to be able to render a large chunk of the Jinja2 template ecosystem from
 //! Rust with a minimal engine and to leverage an already existing ecosystem of
 //! editor integrations.
