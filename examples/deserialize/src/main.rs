@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use minijinja::value::{Serialize as ValueSerialize, Value, ViaDeserialize};
+use minijinja::value::{Serde, Value};
 use minijinja::{context, Environment};
 use serde::{Deserialize, Serialize};
 
@@ -10,14 +10,14 @@ pub struct Point {
     y: f32,
 }
 
-fn dirname(path: ViaDeserialize<PathBuf>) -> String {
+fn dirname(path: Serde<PathBuf>) -> String {
     match path.parent() {
         Some(parent) => parent.display().to_string(),
         None => "".to_string(),
     }
 }
 
-fn point_as_tuple(point: ViaDeserialize<Point>) -> Value {
+fn point_as_tuple(point: Serde<Point>) -> Value {
     Value::from(vec![point.x, point.y])
 }
 
@@ -30,20 +30,20 @@ fn main() {
 
     let point = Point { x: -1.0, y: 1.0 };
 
-    // First example: shows ViaDeserialize
+    // First example: shows Serde-powered function arguments
     let template = env.get_template("example.txt").unwrap();
     println!(
         "{}",
         template
             .render(context! {
-                path => ValueSerialize(std::env::current_dir().unwrap()),
-                point => ValueSerialize(&point),
+                path => Serde(std::env::current_dir().unwrap()),
+                point => Serde(&point),
             })
             .unwrap()
     );
 
     // Second example shows how you can deserialize directly from a value
-    let point_value = Value::from(ValueSerialize(&point));
+    let point_value = Value::from(Serde(&point));
     println!("Point serialized as value: {point_value}");
     let point_again = Point::deserialize(point_value).unwrap();
     println!("Point deserialization: {point_again:?}");

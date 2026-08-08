@@ -165,7 +165,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// can be any object that implements `Into<Value>`.  The
     /// [`context!`](crate::context) macro can be used to create an ad-hoc context.
     /// Serde values can be passed explicitly with the
-    /// `minijinja::value::Serialize` wrapper.
+    /// `minijinja::value::Serde` wrapper.
     ///
     /// For very large contexts and to avoid the overhead of serialization of
     /// potentially unused values, you might consider using a dynamic

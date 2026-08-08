@@ -585,7 +585,7 @@ fn test_complex_key() {
 #[test]
 #[cfg(feature = "deserialization")]
 fn test_deserialize() {
-    use minijinja::value::{from_args, ViaDeserialize};
+    use minijinja::value::{from_args, Serde};
     use serde::Deserialize;
 
     #[derive(Deserialize, Debug, PartialEq, Eq)]
@@ -618,11 +618,8 @@ fn test_deserialize() {
     let spu = Value::from_serialize(UnitStruct("hello".into()));
     let spt = Value::from_serialize(TaggedUnion::V("workd".into()));
 
-    let a: (
-        ViaDeserialize<SimpleEnum>,
-        ViaDeserialize<UnitStruct>,
-        ViaDeserialize<TaggedUnion>,
-    ) = from_args(args!(spe, spu, spt)).unwrap();
+    let a: (Serde<SimpleEnum>, Serde<UnitStruct>, Serde<TaggedUnion>) =
+        from_args(args!(spe, spu, spt)).unwrap();
     assert_eq!((a.0).0, SimpleEnum::B);
     assert_eq!((a.1).0, UnitStruct("hello".into()));
     assert_eq!((a.2).0, TaggedUnion::V("workd".into()));
@@ -630,8 +627,8 @@ fn test_deserialize() {
 
 #[test]
 #[cfg(feature = "deserialization")]
-fn test_via_deserialize() {
-    use minijinja::value::ViaDeserialize;
+fn test_serde_argument() {
+    use minijinja::value::Serde;
     use serde::Deserialize;
 
     #[derive(Deserialize, Debug, PartialEq, Eq)]
@@ -640,7 +637,12 @@ fn test_via_deserialize() {
         y: i32,
     }
 
-    fn foo(point: ViaDeserialize<Point>) -> String {
+    fn foo(point: Serde<Point>) -> String {
+        format!("{}, {}", point.x, point.y)
+    }
+
+    #[allow(deprecated)]
+    fn legacy(point: minijinja::value::ViaDeserialize<Point>) -> String {
         format!("{}, {}", point.x, point.y)
     }
 
@@ -648,10 +650,15 @@ fn test_via_deserialize() {
 
     let mut env = Environment::new();
     env.add_filter("foo", foo);
+    env.add_filter("legacy", legacy);
     let state = env.empty_state();
 
-    let rv = state.apply_filter("foo", args![point_value]).unwrap();
-    assert_eq!(rv.to_string(), "42, -23");
+    for name in ["foo", "legacy"] {
+        let rv = state
+            .apply_filter(name, args![point_value.clone()])
+            .unwrap();
+        assert_eq!(rv.to_string(), "42, -23");
+    }
 }
 
 #[test]

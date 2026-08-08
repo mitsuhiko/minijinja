@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use minijinja::value::Serialize as ValueSerialize;
+use minijinja::value::Serde;
 use serde::Serialize;
 
 use handlebars::handlebars_helper;
@@ -159,7 +159,7 @@ pub fn bench_compare_render(c: &mut Criterion) {
         b.iter(|| {
             env.get_template("template.html")
                 .unwrap()
-                .render(ValueSerialize(black_box(Context::default())))
+                .render(Serde(black_box(Context::default())))
                 .unwrap();
         });
     });

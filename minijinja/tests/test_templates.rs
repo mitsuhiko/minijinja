@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use insta::assert_snapshot;
 use minijinja::syntax::SyntaxConfig;
-use minijinja::value::{Enumerator, Object, ObjectRepr, Rest, Serialize, Value, ValueOrKwargs};
+use minijinja::value::{Enumerator, Object, ObjectRepr, Rest, Serde, Value, ValueOrKwargs};
 use minijinja::{context, render, Environment, Error, ErrorKind, State, UndefinedBehavior};
 
 use serde::Deserialize;
@@ -178,7 +178,7 @@ fn test_vm_block_fragments() {
             let template = env.get_template(filename).unwrap();
 
             match template
-                .render_captured(Serialize(&ctx))
+                .render_captured(Serde(&ctx))
                 .and_then(|mut x| x.with_state_mut(|state| state.render_block("fragment")))
             {
                 Ok(mut rendered) => {
@@ -483,7 +483,7 @@ fn test_flattening() {
     };
 
     let env = Environment::new();
-    env.render_str("{{ debug() }}", Serialize(ctx)).unwrap();
+    env.render_str("{{ debug() }}", Serde(ctx)).unwrap();
 }
 
 #[test]
@@ -493,7 +493,7 @@ fn test_flattening_sub_item_good() {
         more: Value::from(BTreeMap::from([("b", 23)])),
     };
 
-    let ctx = context!(bad => Serialize(bad), good => "good");
+    let ctx = context!(bad => Serde(bad), good => "good");
     let env = Environment::new();
 
     // we are not touching a bad value, so we are good
@@ -509,7 +509,7 @@ fn test_flattening_sub_item_bad_lookup() {
         more: Value::from(BTreeMap::from([("b", 23)])),
     };
 
-    let ctx = context!(bad => Serialize(bad), good => "good");
+    let ctx = context!(bad => Serde(bad), good => "good");
     let env = Environment::new();
 
     // resolving an invalid value will fail
@@ -523,7 +523,7 @@ fn test_flattening_sub_item_bad_attr() {
         more: Value::from(BTreeMap::from([("b", 23)])),
     };
 
-    let ctx = context!(good => context!(bad => Serialize(bad)));
+    let ctx = context!(good => context!(bad => Serde(bad)));
     let env = Environment::new();
 
     // resolving an invalid value will fail, even in an attribute lookup
@@ -544,7 +544,7 @@ fn test_flattening_sub_item_shielded_print() {
         more: Value::from(BTreeMap::from([("b", 23)])),
     };
 
-    let ctx = context!(good => context!(bad => Serialize(bad)));
+    let ctx = context!(good => context!(bad => Serde(bad)));
     let env = Environment::new();
 
     // this on the other hand is okay

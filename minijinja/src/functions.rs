@@ -48,14 +48,14 @@
 All arguments in custom functions must implement the [`ArgType`] trait.
 Standard types, such as `String`, `i32`, `bool`, `f64`, etc, already implement this trait.
 There are also helper types that will make it easier to extract an arguments with custom types.
-The [`ViaDeserialize<T>`](crate::value::ViaDeserialize) type, for instance, can accept any
+The [`Serde<T>`](crate::value::Serde) type, for instance, can accept any
 type `T` that implements the `Deserialize` trait from `serde`.
 
 ```rust
 # use minijinja::Environment;
 # use serde::Deserialize;
 # let mut env = Environment::new();
-use minijinja::value::ViaDeserialize;
+use minijinja::value::Serde;
 
 #[derive(Deserialize)]
 struct Person {
@@ -63,7 +63,7 @@ struct Person {
     age: i32,
 }
 
-fn is_adult(person: ViaDeserialize<Person>) -> bool {
+fn is_adult(person: Serde<Person>) -> bool {
     person.age >= 18
 }
 

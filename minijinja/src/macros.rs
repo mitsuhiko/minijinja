@@ -117,7 +117,7 @@ pub mod __context {
 /// # Note on Conversions
 ///
 /// Values are converted through `Into<Value>`. To convert a Serde value,
-/// wrap it in `minijinja::value::Serialize`.
+/// wrap it in `minijinja::value::Serde`.
 #[macro_export]
 macro_rules! context {
     () => {
@@ -202,7 +202,7 @@ macro_rules! __context_pair {
 ///
 /// Note that this, like [`context!`](crate::context), uses `Into<Value>`
 /// for conversions. Serde values can be wrapped in
-/// `minijinja::value::Serialize`.
+/// `minijinja::value::Serde`.
 #[macro_export]
 macro_rules! args {
     () => { &[][..] as &[$crate::value::Value] };

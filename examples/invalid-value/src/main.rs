@@ -1,4 +1,4 @@
-use minijinja::value::Serialize as ValueSerialize;
+use minijinja::value::Serde;
 use minijinja::{context, Environment};
 use serde::Serialize;
 
@@ -19,8 +19,8 @@ fn main() {
 
     let good = true;
     let bad = BadStruct { a: 1, b: 2 };
-    let container = context! { good, bad => ValueSerialize(bad) };
-    let ctx = context! { good, bad => ValueSerialize(bad), container };
+    let container = context! { good, bad => Serde(bad) };
+    let ctx = context! { good, bad => Serde(bad), container };
 
     for name in ["good.txt", "mixed.txt", "bad.txt"] {
         let template = env.get_template(name).unwrap();

@@ -1,4 +1,4 @@
-use minijinja::value::Serialize as ValueSerialize;
+use minijinja::value::Serde;
 use minijinja::{context, Environment};
 use serde::Serialize;
 
@@ -22,8 +22,6 @@ fn main() {
     };
     println!(
         "{}",
-        template
-            .render(context!(page => ValueSerialize(page)))
-            .unwrap()
+        template.render(context!(page => Serde(page))).unwrap()
     );
 }

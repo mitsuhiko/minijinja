@@ -110,7 +110,7 @@ where
 /// * values: [`Value`], `&Value`, [`ValueOrKwargs`]
 /// * vectors: [`Vec<T>`]
 /// * objects: [`DynObject`], [`Arc<T>`], `&T` (where `T` is an [`Object`])
-/// * serde deserializable: [`ViaDeserialize<T>`](crate::value::deserialize::ViaDeserialize)
+/// * Serde deserializable: `Serde<T>`
 /// * keyword arguments: [`Kwargs`]
 /// * leftover arguments: [`Rest<T>`]
 ///

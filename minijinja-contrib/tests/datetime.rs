@@ -1,6 +1,6 @@
 #![cfg(all(feature = "datetime", feature = "timezone"))]
 use minijinja::context;
-use minijinja::value::Serialize;
+use minijinja::value::Serde;
 use similar_asserts::assert_eq;
 use time::format_description::well_known::Iso8601;
 
@@ -72,7 +72,7 @@ fn test_datetimeformat_time_rs() {
         .compile_expression("d|datetimeformat(format=format)")
         .unwrap();
 
-    let d = Serialize(time::OffsetDateTime::from_unix_timestamp(1687624642).unwrap());
+    let d = Serde(time::OffsetDateTime::from_unix_timestamp(1687624642).unwrap());
     assert_eq!(
         expr.eval(context!(d, format => "short"))
             .unwrap()
@@ -92,7 +92,7 @@ fn test_datetimeformat_chrono() {
         .compile_expression("d|datetimeformat(format=format)")
         .unwrap();
 
-    let d = Serialize(chrono::DateTime::parse_from_rfc3339("2023-06-24T16:37:00Z").unwrap());
+    let d = Serde(chrono::DateTime::parse_from_rfc3339("2023-06-24T16:37:00Z").unwrap());
     assert_eq!(
         expr.eval(context!(d, format => "short"))
             .unwrap()
@@ -146,7 +146,7 @@ fn test_dateformat_time_rs() {
         .compile_expression("d|dateformat(format=format)")
         .unwrap();
 
-    let d = Serialize(time::Date::from_ordinal_date(2023, 42).unwrap());
+    let d = Serde(time::Date::from_ordinal_date(2023, 42).unwrap());
     assert_eq!(
         expr.eval(context!(d, format => "short"))
             .unwrap()
@@ -166,7 +166,7 @@ fn test_dateformat_chrono_rs() {
         .compile_expression("d|dateformat(format=format)")
         .unwrap();
 
-    let d = Serialize(chrono::NaiveDate::from_num_days_from_ce_opt(739073));
+    let d = Serde(chrono::NaiveDate::from_num_days_from_ce_opt(739073));
     assert_eq!(
         expr.eval(context!(d, format => "short"))
             .unwrap()
@@ -204,7 +204,7 @@ fn test_datetime_format_naive() {
         "2024-01-18T00:01:02+01:00"
     );
     assert_eq!(
-        expr.eval(context!(d => Serialize(d), format => "iso"))
+        expr.eval(context!(d => Serde(d), format => "iso"))
             .unwrap()
             .to_string(),
         "2024-01-18T00:01:02+01:00"

@@ -89,9 +89,9 @@ fn test_rust_and_serde_tuples() {
 
     #[cfg(feature = "serde")]
     {
-        use minijinja::value::Serialize;
+        use minijinja::value::Serde;
 
-        let serialized = Value::from(Serialize((1, 2)));
+        let serialized = Value::from(Serde((1, 2)));
         assert!(serialized.is_tuple());
         assert_eq!(serialized, explicit);
         assert_eq!(Value::from_serialize((1, 2)), serialized);

@@ -39,7 +39,7 @@
 //! To use MiniJinja one needs to create an [`Environment`] and populate it with
 //! templates. Afterwards templates can be loaded and rendered with any value
 //! implementing `Into<Value>`. Serde values can be converted explicitly with
-//! `value::Serialize`. The [`context!`] macro can be used to quickly construct
+//! `value::Serde`. The [`context!`] macro can be used to quickly construct
 //! a template context:
 //!
 //! ```
@@ -155,12 +155,12 @@
 //!
 //! - **Rust Functionality:**
 //!
-//!   - `serde`: enables Serde conversion through `value::Serialize` and
+//!   - `serde`: enables Serde conversion through `value::Serde` and
 //!     `Value::from_serialize`.  It is disabled by default.
 //!   - `debug`: if this feature is removed some debug functionality of the engine is
 //!     removed as well.  This mainly affects the quality of error reporting.
 //!   - `deserialization`: when removed this disables deserialization support for
-//!     the [`Value`] type, removes the `ViaDeserialize` type and the error type
+//!     the [`Value`] type, removes Serde-powered function arguments and the error type
 //!     no longer implements `serde::de::Error`.
 //!   - `std_collections`: if this feature is removed some [`Object`](crate::value::Object)
 //!     implementations for standard library collections are removed.  Only the

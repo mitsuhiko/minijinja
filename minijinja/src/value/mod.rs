@@ -84,7 +84,7 @@
 //!
 //! # Serde Conversions
 //!
-//! Serde conversion is available explicitly through the `Serialize` wrapper or
+//! Serde conversion is available explicitly through the `Serde` wrapper or
 //! the `Value::from_serialize` convenience method when the `serde` feature is
 //! enabled.
 //!
@@ -92,14 +92,14 @@
     feature = "serde",
     doc = r"
 ```
-# use minijinja::value::{Serialize, Value};
-let value = Value::from(Serialize(&[1, 2, 3]));
+# use minijinja::value::{Serde, Value};
+let value = Value::from(Serde(&[1, 2, 3]));
 let value = Value::from_serialize(&[1, 2, 3]);
 ```
 "
 )]
 //! Rendering APIs primarily accept `Into<Value>`. Wrap custom Serde contexts in
-//! `Serialize` when passing them to those APIs.
+//! `Serde` when passing them to those APIs.
 //!
 //! The inverse of the serialize operation is to pass a value directly as
 //! serializer to a type that supports deserialization.  This requires the
@@ -178,7 +178,7 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //! Invalid values are typically encountered in the following situations:
 //!
 //! - serialization fails with an error: this is the case when a value is created
-//!   through `Serialize` or `Value::from_serialize` and the underlying
+//!   through `Serde` or `Value::from_serialize` and the underlying
 //!   `serde::Serialize` implementation fails with an error.
 //! - fallible iteration: there might be situations where an iterator cannot indicate
 //!   failure ahead of iteration and must abort.  In that case the only option an
@@ -244,18 +244,65 @@ pub(crate) mod ops;
 mod serialize;
 mod tuple;
 
-#[cfg(feature = "deserialization")]
-pub use self::deserialize::ViaDeserialize;
 pub use self::tuple::Tuple;
 
-/// Explicitly converts a Serde-serializable value into a template value.
+/// Converts between a Rust type and a template value through Serde.
 ///
 /// This wrapper lets [`Value::from`] and APIs accepting `Into<Value>` use
-/// Serde without making serialization the default conversion mechanism.
+/// Serde without making serialization the default conversion mechanism.  It
+/// can also be used as a function argument to deserialize a [`Value`] into a
+/// Rust type when the `deserialization` feature is enabled.
+///
+/// ```
+/// use minijinja::value::{Serde, Value};
+///
+/// let value = Value::from(Serde(&[1, 2, 3]));
+/// ```
+#[cfg_attr(
+    feature = "deserialization",
+    doc = r#"
+As a function argument, `Serde<T>` deserializes a template value into `T`:
+
+```rust
+# use minijinja::Environment;
+# use serde::Deserialize;
+# let mut env = Environment::new();
+use minijinja::value::Serde;
+use std::path::PathBuf;
+
+fn dirname(path: Serde<PathBuf>) -> String {
+    path.display().to_string()
+}
+
+# env.add_filter("dirname", dirname);
+```
+"#
+)]
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 #[derive(Clone, Copy, Debug)]
-pub struct Serialize<T>(pub T);
+pub struct Serde<T>(pub T);
+
+#[cfg(feature = "serde")]
+impl<T> std::ops::Deref for Serde<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T> std::ops::DerefMut for Serde<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+/// Deprecated name for [`Serde`].
+#[cfg(feature = "deserialization")]
+#[deprecated(since = "3.0.0", note = "use Serde instead")]
+pub use self::Serde as ViaDeserialize;
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
@@ -332,7 +379,7 @@ thread_local! {
 
 /// Function that returns true when serialization for [`Value`] is taking place.
 ///
-/// When a value is converted through the `Serialize` wrapper or
+/// When a value is converted through the `Serde` wrapper or
 /// `Value::from_serialize`, MiniJinja uses the regular Serde serialization
 /// trait. In some cases users might want to customize that serialization for
 /// the template engine independently of what is normally serialized to disk.
@@ -917,8 +964,8 @@ impl Value {
 
     /// Creates a value through Serde serialization.
     ///
-    /// This is a convenience alias for `Value::from(Serialize(value))`.  Native
-    /// values should generally use [`Value::from`] directly; the [`Serialize`]
+    /// This is a convenience alias for `Value::from(Serde(value))`.  Native
+    /// values should generally use [`Value::from`] directly; the [`Serde`]
     /// wrapper makes Serde conversion explicit where it is needed.
     ///
     /// During serialization of the value, [`serializing_for_value`] will return
@@ -935,7 +982,7 @@ impl Value {
     #[cfg(feature = "serde")]
     #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
     pub fn from_serialize<T: serde::Serialize>(value: T) -> Value {
-        Value::from(Serialize(value))
+        Value::from(Serde(value))
     }
 
     /// Creates a map value from an iterator of key-value pairs.
@@ -1910,8 +1957,8 @@ impl Value {
 }
 
 #[cfg(feature = "serde")]
-impl<T: serde::Serialize> From<Serialize<T>> for Value {
-    fn from(value: Serialize<T>) -> Value {
+impl<T: serde::Serialize> From<Serde<T>> for Value {
+    fn from(value: Serde<T>) -> Value {
         INTERNAL_SERIALIZATION.with(|flag| {
             let old = flag.replace(true);
             let _serialization_guard = InternalSerializationGuard {
