@@ -1,22 +1,24 @@
 # Updating to MiniJinja 3
 
 MiniJinja 3 aligns the value model more closely with Jinja2 and makes `serde`
-optional. The changes below may require updates when moving from MiniJinja 2.
+optional.  The changes below may require updates when moving from MiniJinja 2.
 
 ## Go Module Path
 
 MiniJinja-Go now uses the major-version module path
-`github.com/mitsuhiko/minijinja/minijinja-go/v3`. Update Go imports from `/v2`
-to `/v3`. Its tuple values and collection rendering follow the same new
-semantics described below.
+`github.com/mitsuhiko/minijinja/minijinja-go/v3`.  Update Go imports from `/v2`
+to `/v3`.  Its tuple values and collection rendering follow the same new
+semantics described below.  Most other changes of this document do not apply
+to the Go implementation.
 
 ## Optional and Explicit Serde Support
 
 The `serde` feature now controls the `serde` dependency and is disabled by
-default. Enable it explicitly if you use Serde conversion. The `deserialization`
-and `json` features enable it automatically. Rendering APIs, `context!`, and
-`args!` now convert values through `Into<Value>` rather than implicitly
-serializing them.
+default.  You can enable it explicitly if you need to use the Serde based
+conversions but it might be unnecessary for most users.  The `deserialization`
+and `json` features enable it automatically as before.  The main rendering APIs,
+`context!`, and `args!` now convert values through `Into<Value>` rather than
+using Serde.
 
 Serde conversion must be requested with the `minijinja::value::Serde` wrapper:
 
@@ -38,49 +40,51 @@ fn dirname(path: Serde<std::path::PathBuf>) -> String {
 }
 ```
 
-`Serde` replaces the former `ViaDeserialize` argument wrapper, which remains
-available as a deprecated alias.
+The new `Serde` type replaces the former `ViaDeserialize` argument wrapper,
+which remains available as a deprecated alias.
+
 `Value::from_serialize(value)` remains available with the `serde` feature as a
 shortcut for `Value::from(Serde(value))`. Without `serde`, the wrapper and
-shortcut are unavailable; native `Into<Value>` conversions and custom `Object`
-implementations continue to work without a fallback serialization trait.
+shortcut are unavailable.
 
-`context!` and `args!` consume expressions passed through native conversions.
-Pass a reference where a supported native value should be cloned, or use
-`Serde(&value)` for borrowed Serde data.
+`context!` and `args!` consume expressions passed through native conversions via
+`Value::from`.  You can pass a reference where a supported native value should
+be cloned, or use `Serde(&value)` for borrowed Serde data.
 
 Collecting an iterator into `Value` now always creates a sequence, including
-when the items are tuples. Use `Value::from_pairs(iter)` to explicitly create a
+when the items are tuples.  Use `Value::from_pairs(iter)` to explicitly create a
 map from key-value pairs.
 
 ## Tuples
 
 Tuple literals now produce a distinct `Tuple` value instead of a `Vec<Value>`.
 Code that downcast tuple expressions to `Vec<Value>` must downcast to `Tuple` or
-use the generic sequence APIs. Tuples still report `ValueKind::Seq` and support
+use the generic sequence APIs.  Tuples still report `ValueKind::Seq` and support
 normal sequence iteration and indexing.
 
 Rust tuples passed through `Value::from` or explicit Serde conversion are also
-preserved as tuples. Tuple concatenation, repetition, and slicing return tuples,
+preserved as tuples.  Tuple concatenation, repetition, and slicing return tuples,
 while combining a list and a tuple with `+` is an error as it is in Python.
-Python tuples now remain tuples when passed through the Python binding. The
-JavaScript binding represents evaluated tuples as arrays while retaining tuple
-rendering inside templates.
+
+For the Python bindings, Python tuples now remain tuples.  The JavaScript
+binding represents evaluated tuples as arrays while retaining tuple rendering
+inside templates.
 
 ## Value Rendering
 
 Debug representations of strings, sequences, and maps now use Python-style
-quoting. This primarily changes nested rendering from double quotes to single
-quotes where possible. The `tojson` filter now inserts spaces after commas and
-colons to match Jinja2's default `json.dumps` output.
+quoting.  This primarily changes nested rendering from double quotes to single
+quotes where possible.  The `tojson` filter now inserts spaces after commas and
+colons to match Jinja2's default `json.dumps` output as this divergence has
+caused some unncessary failures in conformity tests that some people use.
 
 ## Keyword Arguments
 
 `Value`, `&Value`, `&[Value]`, and `Rest<Value>` function arguments no longer
-accept the internal keyword-argument map. Use an explicit `Kwargs` parameter for
-normal keyword arguments. Variadic forwarding functions can use
-`Rest<ValueOrKwargs>` and call `into_values()` before manually splitting or
-forwarding the arguments.
+accept the internal keyword-argument map.  You now need to use an explicit
+`Kwargs` parameter for normal keyword arguments.  Variadic forwarding functions
+can use `Rest<ValueOrKwargs>` and call `into_values()` before manually splitting
+or forwarding the arguments.
 
 # Updating to MiniJinja 2
 
