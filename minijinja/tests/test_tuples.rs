@@ -77,6 +77,17 @@ fn test_tuple_operations_preserve_type() {
 
 #[test]
 fn test_rust_and_serde_tuples() {
+    for len in 0..5 {
+        let values = (0..len).map(Value::from).collect::<Vec<_>>();
+        let tuple = Tuple::new(values.clone());
+        assert_eq!(&*tuple, values);
+        assert_eq!(tuple.clone().into_vec(), values);
+
+        let value = Value::from(tuple);
+        assert_eq!(value.len(), Some(len));
+        assert_eq!(value.try_iter().unwrap().collect::<Vec<_>>(), values);
+    }
+
     let explicit = Value::from(Tuple::from([Value::from(1), Value::from(2)]));
     assert!(explicit.is_tuple());
     assert_eq!(explicit.kind(), ValueKind::Seq);
