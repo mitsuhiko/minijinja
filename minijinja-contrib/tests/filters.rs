@@ -106,8 +106,8 @@ fn test_random() {
     insta::assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ [1, 2, 3, 4]|random }}"), @"1");
     insta::assert_snapshot!(render!(in env, r"{% set RAND_SEED = 42 %}{{ 'HelloWorld'|random }}"), @"H");
 
-    let state = env.empty_state();
-    let result = random(&state, &Value::from_safe_string("HelloWorld".into())).unwrap();
+    let mut state = env.empty_state();
+    let result = random(&mut state, &Value::from_safe_string("HelloWorld".into())).unwrap();
     assert!(result.is_safe());
 }
 
@@ -215,10 +215,10 @@ fn test_truncate_preserves_and_composes_safety() {
     let mut env = Environment::new();
     env.set_auto_escape_callback(|_| AutoEscape::Html);
     let template = env.template_from_str("").unwrap();
-    let state = template.new_state();
+    let mut state = template.new_state();
 
     let result = truncate(
-        &state,
+        &mut state,
         &Value::from_safe_string("Hello <b>World</b>".into()),
         Kwargs::from_iter([
             ("length", Value::from(12)),
@@ -232,7 +232,7 @@ fn test_truncate_preserves_and_composes_safety() {
     assert_eq!(result.as_str(), Some("Hello <b>&lt;i&gt;"));
 
     let result = truncate(
-        &state,
+        &mut state,
         &Value::from("<b>Hello World</b>"),
         Kwargs::from_iter([
             ("length", Value::from(10)),
@@ -246,7 +246,7 @@ fn test_truncate_preserves_and_composes_safety() {
     assert_eq!(result.as_str(), Some("&lt;b&gt;Hell<i>"));
 
     let result = truncate(
-        &state,
+        &mut state,
         &Value::from_safe_string("short".into()),
         Kwargs::from_iter([] as [(&str, Value); 0]),
     )
