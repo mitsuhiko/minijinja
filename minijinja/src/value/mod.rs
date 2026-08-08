@@ -559,30 +559,39 @@ fn python_string_debug_fmt(value: &str, f: &mut fmt::Formatter<'_>) -> fmt::Resu
     } else {
         '\''
     };
+    let quote_str = if quote == '\'' { "'" } else { "\"" };
 
-    write!(f, "{quote}")?;
-    for ch in value.chars() {
-        match ch {
-            '\'' if quote == '\'' => f.write_str("\\'")?,
-            '"' if quote == '"' => f.write_str("\\\"")?,
-            '\\' => f.write_str("\\\\")?,
-            '\n' => f.write_str("\\n")?,
-            '\r' => f.write_str("\\r")?,
-            '\t' => f.write_str("\\t")?,
-            ch if ch.is_control() => {
-                let codepoint = ch as u32;
-                if codepoint <= 0xff {
-                    write!(f, "\\x{codepoint:02x}")?;
-                } else if codepoint <= 0xffff {
-                    write!(f, "\\u{codepoint:04x}")?;
-                } else {
-                    write!(f, "\\U{codepoint:08x}")?;
-                }
+    f.write_str(quote_str)?;
+    let mut last = 0;
+    for (idx, ch) in value.char_indices() {
+        let escaped = match ch {
+            '\'' if quote == '\'' => Some("\\'"),
+            '"' if quote == '"' => Some("\\\""),
+            '\\' => Some("\\\\"),
+            '\n' => Some("\\n"),
+            '\r' => Some("\\r"),
+            '\t' => Some("\\t"),
+            _ => None,
+        };
+        if let Some(escaped) = escaped {
+            f.write_str(&value[last..idx])?;
+            f.write_str(escaped)?;
+            last = idx + ch.len_utf8();
+        } else if ch.is_control() {
+            f.write_str(&value[last..idx])?;
+            let codepoint = ch as u32;
+            if codepoint <= 0xff {
+                write!(f, "\\x{codepoint:02x}")?;
+            } else if codepoint <= 0xffff {
+                write!(f, "\\u{codepoint:04x}")?;
+            } else {
+                write!(f, "\\U{codepoint:08x}")?;
             }
-            ch => write!(f, "{ch}")?,
+            last = idx + ch.len_utf8();
         }
     }
-    write!(f, "{quote}")
+    f.write_str(&value[last..])?;
+    f.write_str(quote_str)
 }
 
 impl fmt::Debug for ValueRepr {
@@ -1379,7 +1388,7 @@ impl Value {
 
     /// Returns `true` if the map represents keyword arguments.
     pub fn is_kwargs(&self) -> bool {
-        Kwargs::extract(self).is_some()
+        Kwargs::is_kwargs(self)
     }
 
     /// Is this value considered true?
