@@ -1013,6 +1013,13 @@ impl Kwargs {
         }
     }
 
+    pub(crate) fn is_kwargs(value: &Value) -> bool {
+        value
+            .as_object()
+            .and_then(|x| x.downcast_ref::<KwargsValues>())
+            .is_some()
+    }
+
     /// Given a value, extracts the kwargs if there are any.
     pub(crate) fn extract(value: &Value) -> Option<Kwargs> {
         value
