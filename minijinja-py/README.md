@@ -157,8 +157,8 @@ Here is what this means for some basic types:
 
 * Python dictionaries and lists (as well as other objects that behave as sequences)
   appear in the MiniJinja side very similar to how they do in Python.
-* Tuples on the MiniJinja side are represented as lists, but will appear again as
-  tuples if passed back to Python.
+* Python tuples appear as tuples in MiniJinja, use Python-compatible tuple rendering,
+  and remain tuples when passed back to Python. Lists remain distinct from tuples.
 * Python objects are represented in MiniJinja similarly to dicts, but they retain all
   their meaningful Python APIs.  This means they stringify via `__str__` and they
   allow the MiniJinja code to call their non-underscored methods.  Note that there is

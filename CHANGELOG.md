@@ -5,9 +5,10 @@ All notable changes to MiniJinja are documented here.
 ## Unreleased
 
 * Made `serde` optional, explicit, and disabled by default. Rendering APIs now accept `Into<Value>`; enable the feature and use the `value::Serde` wrapper for Serde conversion. Disabling the feature fully removes the dependency and no longer substitutes a fallback serialization trait.  #528
-* Added first-class tuple literals and public tuple value types in Rust and Go. Tuples now preserve their type through serialization and sequence operations and render like Python tuples.  #785
+* Added first-class tuple literals and public tuple value types in Rust and Go. Tuples now preserve their type through serialization and sequence operations, render like Python tuples, and roundtrip as tuples through the Python binding. JavaScript receives evaluated tuples as arrays.  #785
 * Changed sequence and map representations in Rust and Go to use Python-style string quoting, and changed `tojson` to use Jinja2-compatible separator spacing.  #785
 * Changed the MiniJinja-Go module path from `/v2` to `/v3`.
+* Fixed the JavaScript binding's `semi_strict` undefined behavior spelling.
 * Changed `context!` and `args!` to consume values and convert exclusively through `Into<Value>`; wrap Serde values in `value::Serde`.
 * Added native Rust tuple conversions and `Value::from_pairs`. Collecting pairs directly into `Value` now creates a sequence of tuples rather than a map.
 * Replaced `ViaDeserialize` with the unified `value::Serde` adapter for both explicit serialization and function argument deserialization. `ViaDeserialize` remains as a deprecated alias.

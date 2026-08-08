@@ -63,6 +63,9 @@ normal sequence iteration and indexing.
 Rust tuples passed through `Value::from` or explicit Serde conversion are also
 preserved as tuples. Tuple concatenation, repetition, and slicing return tuples,
 while combining a list and a tuple with `+` is an error as it is in Python.
+Python tuples now remain tuples when passed through the Python binding. The
+JavaScript binding represents evaluated tuples as arrays while retaining tuple
+rendering inside templates.
 
 ## Value Rendering
 
