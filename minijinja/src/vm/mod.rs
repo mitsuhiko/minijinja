@@ -2,9 +2,6 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::mem;
 
-#[cfg(feature = "macros")]
-use std::sync::Arc;
-
 use crate::compiler::instructions::{
     CompareOp, Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR, MAX_LOCALS,
 };
@@ -21,7 +18,7 @@ use crate::vm::loop_object::{Loop, LoopState};
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
-use crate::vm::closure_object::Closure;
+use crate::vm::closure_object::{Closure, ClosureId};
 
 pub(crate) use crate::vm::context::Context;
 pub use crate::vm::state::State;
@@ -120,16 +117,24 @@ impl<'env> Vm<'env> {
         state: &mut State<'template, 'env>,
         macro_id: usize,
         out: &mut Output,
-        closure: Value,
+        closure: Option<ClosureId>,
         caller: Option<Value>,
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
         let &(instructions, pc) = &state.macros[macro_id];
         let context_base = state.ctx.clone_base();
-        let mut ctx = Context::new_with_frame(self.env, Frame::new(context_base));
-        ok!(ctx.push_frame(Frame::new(closure)));
+        let mut ctx = state
+            .macro_context_pool
+            .pop()
+            .unwrap_or_else(|| Context::new(self.env));
+        ctx.reset_with_frame(Frame::new(context_base));
+        let closure_frame = Frame {
+            closure_context: closure,
+            ..Frame::default()
+        };
+        ok!(ctx.push_frame(closure_frame));
         if let Some(caller) = caller {
-            ctx.store("caller", caller);
+            ctx.store(&mut state.closures, "caller", caller);
         }
         ok!(ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST));
 
@@ -139,18 +144,22 @@ impl<'env> Vm<'env> {
         let old_instructions = mem::replace(&mut state.instructions, instructions);
         let old_blocks = mem::take(&mut state.blocks);
         let old_loaded_templates = mem::take(&mut state.loaded_templates);
-        // Macros declared during this invocation remain local to it.
+        // Macros and closures declared during this invocation remain local to it.
         let old_macro_count = state.macros.len();
+        let old_closure_count = state.closures.len();
 
         let rv = self.do_eval(state, out, Stack::from(args), pc);
 
-        state.ctx = old_ctx;
+        let mut macro_ctx = mem::replace(&mut state.ctx, old_ctx);
+        macro_ctx.clear();
+        state.macro_context_pool.push(macro_ctx);
         state.current_block = old_current_block;
         state.auto_escape = old_auto_escape;
         state.instructions = old_instructions;
         state.blocks = old_blocks;
         state.loaded_templates = old_loaded_templates;
         state.macros.truncate(old_macro_count);
+        state.closures.truncate(old_closure_count);
         rv
     }
 
@@ -344,7 +353,12 @@ impl<'env> Vm<'env> {
                     }
                 }
                 Instruction::StoreLocal(name) => {
-                    state.ctx.store(name, stack.pop());
+                    state.ctx.store(
+                        #[cfg(feature = "macros")]
+                        &mut state.closures,
+                        name,
+                        stack.pop(),
+                    );
                 }
                 Instruction::Lookup(name) => {
                     stack.push(assert_valid!(state
@@ -794,24 +808,18 @@ impl<'env> Vm<'env> {
                 Instruction::Return => break,
                 #[cfg(feature = "macros")]
                 Instruction::Enclose(name) => {
-                    // the first time we enclose a value, we need to create a closure
-                    // and store it on the context, and add it to the closure tracker
-                    // for cycle breaking.
+                    // The first enclosed value creates a state-owned closure shared
+                    // by all macros declared in this frame.
                     if state.ctx.closure().is_none() {
-                        let closure = Arc::new(Closure::default());
-                        state.closure_tracker.track_closure(closure.clone());
+                        let closure = state.closures.len();
+                        state.closures.push(Closure::default());
                         state.ctx.reset_closure(Some(closure));
                     }
-                    state.ctx.enclose(name);
+                    state.ctx.enclose(&mut state.closures, name);
                 }
                 #[cfg(feature = "macros")]
                 Instruction::GetClosure => {
-                    stack.push(
-                        state
-                            .ctx
-                            .closure()
-                            .map_or(Value::UNDEFINED, |x| Value::from_dyn_object(x.clone())),
-                    );
+                    stack.push(state.ctx.closure().map_or(Value::UNDEFINED, Value::from));
                 }
             }
             pc += 1;
@@ -1140,7 +1148,7 @@ impl<'env> Vm<'env> {
         use crate::{compiler::instructions::MACRO_CALLER, vm::macro_object::Macro};
 
         let arg_spec = stack.pop().try_iter().unwrap().collect();
-        let closure = stack.pop();
+        let closure = stack.pop().as_usize();
         let macro_ref_id = state.macros.len();
         state.macros.push((state.instructions, offset));
         stack.push(Value::from_object(Macro {

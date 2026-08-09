@@ -255,6 +255,24 @@ fn test_unenclosed_resolve() {
 }
 
 #[test]
+fn test_macro_state_sees_enclosed_variables() {
+    let mut env = Environment::new();
+    env.add_function("is_known", |state: &State, name: &str| {
+        state
+            .known_variables()
+            .iter()
+            .any(|variable| variable == name)
+    });
+    let rv = env
+        .render_str(
+            "{% set foo = 42 %}{% macro test() %}{{ foo }}:{{ is_known('foo') }}{% endmacro %}{{ test() }}",
+            (),
+        )
+        .unwrap();
+    assert_eq!(rv, "42:True");
+}
+
+#[test]
 fn test_macro_reuses_mutable_state() {
     #[derive(Default)]
     struct CallCount(usize);

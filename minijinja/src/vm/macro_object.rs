@@ -18,7 +18,7 @@ pub(crate) struct Macro {
     // state under `state.macros`.
     pub macro_ref_id: usize,
     pub state_id: isize,
-    pub closure: Value,
+    pub closure: Option<usize>,
     pub caller_reference: bool,
 }
 
@@ -128,7 +128,7 @@ impl Object for Macro {
             state,
             self.macro_ref_id,
             &mut Output::new(&mut rv),
-            self.closure.clone(),
+            self.closure,
             caller,
             arg_values
         ));

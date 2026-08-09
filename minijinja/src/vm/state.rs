@@ -55,7 +55,9 @@ pub struct State<'template, 'env> {
     #[cfg(feature = "macros")]
     pub(crate) macros: Vec<(&'template Instructions<'env>, u32)>,
     #[cfg(feature = "macros")]
-    pub(crate) closure_tracker: crate::vm::closure_object::ClosureTracker,
+    pub(crate) closures: Vec<crate::vm::closure_object::Closure>,
+    #[cfg(feature = "macros")]
+    pub(crate) macro_context_pool: Vec<Context<'env>>,
     #[cfg(feature = "fuel")]
     pub(crate) fuel_tracker: Option<FuelTracker>,
 }
@@ -93,7 +95,9 @@ impl<'template, 'env> State<'template, 'env> {
             #[cfg(feature = "macros")]
             macros: Default::default(),
             #[cfg(feature = "macros")]
-            closure_tracker: Default::default(),
+            closures: Default::default(),
+            #[cfg(feature = "macros")]
+            macro_context_pool: Default::default(),
             #[cfg(feature = "fuel")]
             fuel_tracker: ctx.env().fuel().map(FuelTracker::new),
             ctx,
@@ -165,7 +169,11 @@ impl<'template, 'env> State<'template, 'env> {
     /// able to find it.
     #[inline(always)]
     pub fn lookup(&self, name: &str) -> Option<Value> {
-        self.ctx.load(name)
+        self.ctx.load(
+            #[cfg(feature = "macros")]
+            &self.closures,
+            name,
+        )
     }
 
     /// Looks up a global macro and calls it.
@@ -247,7 +255,11 @@ impl<'template, 'env> State<'template, 'env> {
     /// does not correctly implement enumeration), the returned list might not
     /// be complete.
     pub fn known_variables(&self) -> Vec<Cow<'_, str>> {
-        Vec::from_iter(self.ctx.known_variables(true))
+        Vec::from_iter(self.ctx.known_variables(
+            #[cfg(feature = "macros")]
+            &self.closures,
+            true,
+        ))
     }
 
     /// Fetches a template by name with path joining.

@@ -1,73 +1,30 @@
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use crate::value::{Enumerator, Object, Value};
+use crate::value::Value;
 
-/// Closure cycle breaker utility.
-///
-/// The closure tracker is a crude way to forcefully break the cycles
-/// caused by closures on teardown of the state.  Whenever a closure is
-/// exposed to the engine it's also passed to the [`track_closure`] function.
-#[derive(Default)]
-pub(crate) struct ClosureTracker {
-    closures: Vec<Arc<Closure>>,
-}
+pub(crate) type ClosureId = usize;
 
-impl ClosureTracker {
-    /// This accepts a closure as value and registers it in the
-    /// tracker for cycle breaking.
-    pub(crate) fn track_closure(&mut self, closure: Arc<Closure>) {
-        self.closures.push(closure);
-    }
-}
-
-impl Drop for ClosureTracker {
-    fn drop(&mut self) {
-        for closure in &self.closures {
-            closure.clear();
-        }
-    }
-}
-
-/// Utility to enclose values for macros.
-///
-/// See `closure` on the [`Frame`] for how it's used.
+/// Values enclosed by macros declared in one frame.
 #[derive(Debug, Default)]
 pub(crate) struct Closure {
-    values: Mutex<BTreeMap<Arc<str>, Value>>,
+    values: BTreeMap<Arc<str>, Value>,
 }
 
 impl Closure {
-    /// Stores a value by key in the closure.
-    pub fn store(&self, key: &str, value: Value) {
-        self.values.lock().unwrap().insert(Arc::from(key), value);
+    pub fn get(&self, key: &str) -> Option<Value> {
+        self.values.get(key).cloned()
     }
 
-    /// Upset a value into the closure.
-    #[cfg(feature = "macros")]
-    pub fn store_if_missing<F: FnOnce() -> Value>(&self, key: &str, f: F) {
-        let mut values = self.values.lock().unwrap();
-        if !values.contains_key(key) {
-            values.insert(Arc::from(key), f());
-        }
+    pub fn keys(&self) -> impl Iterator<Item = &str> {
+        self.values.keys().map(|key| key.as_ref())
     }
 
-    /// Clears the closure.
-    ///
-    /// This is required to break cycles.
-    pub fn clear(&self) {
-        self.values.lock().unwrap().clear();
-    }
-}
-
-impl Object for Closure {
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.values.lock().unwrap().get(key.as_str()?).cloned()
+    pub fn store(&mut self, key: &str, value: Value) {
+        self.values.insert(Arc::from(key), value);
     }
 
-    fn enumerate(self: &Arc<Self>) -> Enumerator {
-        let values = self.values.lock().unwrap();
-        let keys = values.keys().cloned().map(Value::from);
-        Enumerator::Values(keys.collect())
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.values.contains_key(key)
     }
 }
