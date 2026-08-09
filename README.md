@@ -16,15 +16,15 @@ which is based on the syntax and behavior of the
 It's implemented in [Rust](https://github.com/mitsuhiko/minijinja/tree/main/minijinja) and [Go](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-go) and is also available via WASM for [JavaScript](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-js),
 as a [Python extension module](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py), and as a [command line utility](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli).
 
-The Rust implementation does not enable `serde` by default. Optional Serde
-conversion can be enabled explicitly and used through
-`minijinja::value::Serde`. It supports
+It supports
 [a range of features from Jinja2](https://github.com/mitsuhiko/minijinja/blob/main/COMPATIBILITY.md)
 including inheritance, filters and more.  The goal is that it should be possible
 to use some templates in Rust programs without the fear of pulling in complex
 dependencies for a small problem.  Additionally it tries not to re-invent
 something but stay in line with prior art to leverage an already existing
-ecosystem of editor integrations.
+ecosystem of editor integrations.  The default build of MiniJinja is entirely
+free of dependencies, though some users might want to enable the `serde`
+dependency to enable the optional serde support.
 
 ```
 $ cargo tree
