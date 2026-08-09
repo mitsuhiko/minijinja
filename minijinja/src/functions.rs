@@ -417,11 +417,6 @@ impl BoxedFunction {
         )
     }
 
-    /// Invokes the function.
-    pub fn invoke(&self, state: &mut State, args: &[Value]) -> Result<Value, Error> {
-        (self.0)(state, args)
-    }
-
     /// Creates a value from a boxed function.
     pub fn to_value(&self) -> Value {
         Value::from_object(self.clone())
@@ -446,7 +441,7 @@ impl Object for BoxedFunction {
     }
 
     fn call(self: &Arc<Self>, state: &mut State, args: &[Value]) -> Result<Value, Error> {
-        self.invoke(state, args)
+        (self.0)(state, args)
     }
 }
 

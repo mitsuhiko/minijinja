@@ -224,9 +224,7 @@ impl<'template, 'env> State<'template, 'env> {
     #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
     pub fn render_block(&mut self, block: &str) -> Result<String, Error> {
         let mut buf = String::new();
-        crate::vm::Vm::new(self.env())
-            .call_block(block, self, &mut Output::new(&mut buf))
-            .map(|_| buf)
+        crate::vm::Vm::call_block(block, self, &mut Output::new(&mut buf)).map(|_| buf)
     }
 
     /// Renders a block with the given name into an [`io::Write`](std::io::Write).
@@ -239,8 +237,7 @@ impl<'template, 'env> State<'template, 'env> {
         W: std::io::Write,
     {
         let mut wrapper = crate::output::WriteWrapper { w, err: None };
-        crate::vm::Vm::new(self.env())
-            .call_block(block, self, &mut Output::new(&mut wrapper))
+        crate::vm::Vm::call_block(block, self, &mut Output::new(&mut wrapper))
             .map(|_| ())
             .map_err(|err| wrapper.take_err(err))
     }

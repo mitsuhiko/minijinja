@@ -122,9 +122,8 @@ impl Object for Macro {
         }
 
         let (arg_values, caller) = ok!(self.prepare_args(args));
-        let vm = Vm::new(state.env());
         let mut rv = String::new();
-        ok!(vm.eval_macro(
+        ok!(Vm::eval_macro(
             state,
             self.macro_ref_id,
             &mut Output::new(&mut rv),

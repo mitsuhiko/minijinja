@@ -392,12 +392,11 @@ impl<'env> Context<'env> {
     }
 
     /// Returns the current innermost loop state.
-    pub fn current_loop(&mut self) -> Option<&mut LoopState> {
+    pub fn current_loop(&self) -> Option<&LoopState> {
         self.stack
-            .iter_mut()
+            .iter()
             .rev()
-            .filter_map(|x| x.current_loop.as_mut())
-            .next()
+            .find_map(|frame| frame.current_loop.as_ref())
     }
 
     pub fn next_loop_item(&mut self) -> Option<Value> {

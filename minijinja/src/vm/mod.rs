@@ -107,13 +107,12 @@ impl<'env> Vm<'env> {
             instructions,
             prepare_blocks(blocks),
         );
-        self.eval_state(&mut state, out).map(|x| (x, state))
+        Self::eval_state(&mut state, out).map(|x| (x, state))
     }
 
     /// Evaluates a macro by temporarily switching the active state.
     #[cfg(feature = "macros")]
-    pub fn eval_macro<'template>(
-        &self,
+    pub(crate) fn eval_macro<'template>(
         state: &mut State<'template, 'env>,
         macro_id: usize,
         out: &mut Output,
@@ -126,7 +125,7 @@ impl<'env> Vm<'env> {
         let mut ctx = state
             .macro_context_pool
             .pop()
-            .unwrap_or_else(|| Context::new(self.env));
+            .unwrap_or_else(|| Context::new(state.env()));
         ctx.reset_with_frame(Frame::new(context_base));
         let closure_frame = Frame {
             closure_context: closure,
@@ -158,7 +157,7 @@ impl<'env> Vm<'env> {
         let old_macro_count = state.macros.len();
         let old_closure_count = state.closures.len();
 
-        let rv = self.do_eval(state, out, Stack::from(args), pc);
+        let rv = Self::do_eval(state, out, Stack::from(args), pc);
 
         let mut macro_ctx = mem::replace(&mut state.ctx, old_ctx);
         macro_ctx.clear();
@@ -175,17 +174,12 @@ impl<'env> Vm<'env> {
 
     /// This is the actual evaluation loop that works with a specific context.
     #[inline(always)]
-    fn eval_state(
-        &self,
-        state: &mut State<'_, 'env>,
-        out: &mut Output,
-    ) -> Result<Option<Value>, Error> {
-        self.do_eval(state, out, Stack::default(), 0)
+    fn eval_state(state: &mut State<'_, 'env>, out: &mut Output) -> Result<Option<Value>, Error> {
+        Self::do_eval(state, out, Stack::default(), 0)
     }
 
     /// Performs the actual evaluation, optionally with stack growth functionality.
     fn do_eval(
-        &self,
         state: &mut State<'_, 'env>,
         out: &mut Output,
         stack: Stack,
@@ -194,18 +188,17 @@ impl<'env> Vm<'env> {
         #[cfg(feature = "stacker")]
         {
             stacker::maybe_grow(32 * 1024, 1024 * 1024, || {
-                self.eval_impl(state, out, stack, pc)
+                Self::eval_impl(state, out, stack, pc)
             })
         }
         #[cfg(not(feature = "stacker"))]
         {
-            self.eval_impl(state, out, stack, pc)
+            Self::eval_impl(state, out, stack, pc)
         }
     }
 
     #[inline]
     fn eval_impl(
-        &self,
         state: &mut State<'_, 'env>,
         out: &mut Output,
         mut stack: Stack,
@@ -351,7 +344,7 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::Emit => {
                     let value = stack.pop();
-                    if self.env.is_default_formatter() {
+                    if state.env().is_default_formatter() {
                         if strict_undefined
                             && matches!(value.0, ValueRepr::Undefined(UndefinedType::Default))
                         {
@@ -359,7 +352,7 @@ impl<'env> Vm<'env> {
                         }
                         ctx_ok!(write_escaped(out, state.auto_escape, &value));
                     } else {
-                        ctx_ok!(self.env.format(&value, state, out));
+                        ctx_ok!(state.env().format(&value, state, out));
                     }
                 }
                 Instruction::StoreLocal(name) => {
@@ -443,7 +436,7 @@ impl<'env> Vm<'env> {
                 Instruction::MergeKwargs(count) => {
                     let mut kwargs_sources = Vec::from_iter((0..*count).map(|_| stack.pop()));
                     kwargs_sources.reverse();
-                    stack.push(ctx_ok!(self.merge_kwargs(kwargs_sources)));
+                    stack.push(ctx_ok!(Self::merge_kwargs(state, kwargs_sources)));
                 }
                 Instruction::BuildList(n) => {
                     let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
@@ -476,7 +469,7 @@ impl<'env> Vm<'env> {
                     stack.push(Value::from(tuple))
                 }
                 Instruction::UnpackList(count) => {
-                    ctx_ok!(self.unpack_list(&mut stack, *count));
+                    ctx_ok!(Self::unpack_list(&mut stack, *count));
                 }
                 Instruction::UnpackLists(count) => {
                     let lists = Vec::from_iter((0..*count).map(|_| stack.pop()));
@@ -597,7 +590,13 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::PushLoop(flags) => {
                     a = stack.pop();
-                    ctx_ok!(self.push_loop(state, a, *flags, pc, next_loop_recursion_jump.take()));
+                    ctx_ok!(Self::push_loop(
+                        state,
+                        a,
+                        *flags,
+                        pc,
+                        next_loop_recursion_jump.take()
+                    ));
                 }
                 Instruction::Iterate(jump_target) => {
                     match state.ctx.next_loop_item() {
@@ -643,7 +642,7 @@ impl<'env> Vm<'env> {
                 Instruction::PushAutoEscape => {
                     a = stack.pop();
                     auto_escape_stack.push(state.auto_escape);
-                    state.auto_escape = ctx_ok!(self.derive_auto_escape(a, initial_auto_escape));
+                    state.auto_escape = ctx_ok!(Self::derive_auto_escape(a, initial_auto_escape));
                 }
                 Instruction::PopAutoEscape => {
                     state.auto_escape = auto_escape_stack.pop().unwrap();
@@ -699,7 +698,7 @@ impl<'env> Vm<'env> {
                                 "super() takes no arguments",
                             ));
                         }
-                        ctx_ok!(self.perform_super(state, out, true))
+                        ctx_ok!(Self::perform_super(state, out, true))
                     } else if let Some(func) = state.lookup(name) {
                         // calling loops is a special operation that starts the recursion process.
                         // this bypasses the actual `call` implementation which would just fail
@@ -746,7 +745,7 @@ impl<'env> Vm<'env> {
                     stack.pop();
                 }
                 Instruction::FastSuper => {
-                    ctx_ok!(self.perform_super(state, out, false));
+                    ctx_ok!(Self::perform_super(state, out, false));
                 }
                 Instruction::FastRecurse => match state.ctx.current_loop() {
                     Some(l) => recurse_loop!(false, &l.object),
@@ -784,13 +783,13 @@ impl<'env> Vm<'env> {
                             "tried to extend a second time in a template"
                         ));
                     }
-                    parent_instructions = Some(ctx_ok!(self.load_blocks(a, state)));
+                    parent_instructions = Some(ctx_ok!(Self::load_blocks(a, state)));
                     out.begin_capture(CaptureMode::Discard);
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::Include(ignore_missing) => {
                     a = stack.pop();
-                    ctx_ok!(self.perform_include(a, state, out, *ignore_missing));
+                    ctx_ok!(Self::perform_include(a, state, out, *ignore_missing));
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::ExportLocals => {
@@ -807,12 +806,12 @@ impl<'env> Vm<'env> {
                 #[cfg(feature = "multi_template")]
                 Instruction::CallBlock(name) => {
                     if parent_instructions.is_none() && !out.is_discarding() {
-                        ctx_ok!(self.call_block(name, state, out));
+                        ctx_ok!(Self::call_block(name, state, out));
                     }
                 }
                 #[cfg(feature = "macros")]
                 Instruction::BuildMacro(name, offset, flags) => {
-                    self.build_macro(&mut stack, state, *offset, name, *flags);
+                    Self::build_macro(&mut stack, state, *offset, name, *flags);
                 }
                 #[cfg(feature = "macros")]
                 Instruction::Return => break,
@@ -838,10 +837,10 @@ impl<'env> Vm<'env> {
         Ok(stack.try_pop())
     }
 
-    fn merge_kwargs(&self, values: Vec<Value>) -> Result<Value, Error> {
+    fn merge_kwargs(state: &State, values: Vec<Value>) -> Result<Value, Error> {
         let mut rv = ValueMap::new();
         for value in values {
-            ok!(self.env.undefined_behavior().assert_iterable(&value));
+            ok!(state.undefined_behavior().assert_iterable(&value));
             let iter = ok!(value
                 .as_object()
                 .filter(|x| x.repr() == ObjectRepr::Map)
@@ -864,7 +863,6 @@ impl<'env> Vm<'env> {
 
     #[cfg(feature = "multi_template")]
     fn perform_include(
-        &self,
         name: Value,
         state: &mut State<'_, 'env>,
         out: &mut Output,
@@ -910,7 +908,7 @@ impl<'env> Vm<'env> {
             let old_loaded_templates = state.loaded_templates.clone();
             #[cfg(feature = "macros")]
             let old_closure = state.ctx.take_closure();
-            let rv = self.eval_state(state, out);
+            let rv = Self::eval_state(state, out);
             state.ctx.restore_stack_depth(stack_depth);
             #[cfg(feature = "macros")]
             state.ctx.reset_closure(old_closure);
@@ -949,7 +947,6 @@ impl<'env> Vm<'env> {
     }
 
     fn perform_super(
-        &self,
         state: &mut State<'_, 'env>,
         out: &mut Output,
         capture: bool,
@@ -977,7 +974,7 @@ impl<'env> Vm<'env> {
 
         let instructions = state.blocks.get(name).unwrap().instructions();
         let old_instructions = mem::replace(&mut state.instructions, instructions);
-        let rv = self.eval_state(state, out);
+        let rv = Self::eval_state(state, out);
         state.ctx.restore_stack_depth(stack_depth);
         state.instructions = old_instructions;
         state.blocks.get_mut(name).unwrap().pop();
@@ -994,7 +991,6 @@ impl<'env> Vm<'env> {
 
     #[cfg(feature = "multi_template")]
     fn load_blocks(
-        &self,
         name: Value,
         state: &mut State<'_, 'env>,
     ) -> Result<&'env Instructions<'env>, Error> {
@@ -1025,7 +1021,6 @@ impl<'env> Vm<'env> {
 
     #[cfg(feature = "multi_template")]
     pub(crate) fn call_block(
-        &self,
         name: &str,
         state: &mut State<'_, 'env>,
         out: &mut Output,
@@ -1043,7 +1038,7 @@ impl<'env> Vm<'env> {
             let old_instructions =
                 mem::replace(&mut state.instructions, block_stack.instructions());
             let old_auto_escape = state.auto_escape;
-            let rv = self.eval_state(state, out);
+            let rv = Self::eval_state(state, out);
             state.ctx.restore_stack_depth(stack_depth);
             state.instructions = old_instructions;
             state.current_block = old_block;
@@ -1058,7 +1053,6 @@ impl<'env> Vm<'env> {
     }
 
     fn derive_auto_escape(
-        &self,
         value: Value,
         initial_auto_escape: AutoEscape,
     ) -> Result<AutoEscape, Error> {
@@ -1080,7 +1074,6 @@ impl<'env> Vm<'env> {
     }
 
     fn push_loop(
-        &self,
         state: &mut State<'_, 'env>,
         iterable: Value,
         flags: u8,
@@ -1126,7 +1119,7 @@ impl<'env> Vm<'env> {
         })
     }
 
-    fn unpack_list(&self, stack: &mut Stack, count: usize) -> Result<(), Error> {
+    fn unpack_list(stack: &mut Stack, count: usize) -> Result<(), Error> {
         let top = stack.pop();
         let iter = ok!(top
             .as_object()
@@ -1151,14 +1144,7 @@ impl<'env> Vm<'env> {
     }
 
     #[cfg(feature = "macros")]
-    fn build_macro(
-        &self,
-        stack: &mut Stack,
-        state: &mut State,
-        offset: u32,
-        name: &str,
-        flags: u8,
-    ) {
+    fn build_macro(stack: &mut Stack, state: &mut State, offset: u32, name: &str, flags: u8) {
         use crate::{compiler::instructions::MACRO_CALLER, vm::macro_object::Macro};
 
         let arg_spec = stack.pop().try_iter().unwrap().collect();
