@@ -136,20 +136,27 @@ pub(crate) struct Context<'env> {
     recursion_limit: usize,
 }
 
-impl fmt::Debug for Context<'_> {
+pub(super) struct ContextDebug<'a, 'env> {
+    context: &'a Context<'env>,
+    #[cfg(feature = "macros")]
+    closures: &'a [Closure],
+}
+
+impl fmt::Debug for ContextDebug<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut vars = Vec::from_iter(self.known_variables(
+        let mut vars = Vec::from_iter(self.context.known_variables(
             #[cfg(feature = "macros")]
-            &[],
+            self.closures,
             false,
         ));
         vars.sort();
         f.debug_map()
             .entries(vars.into_iter().map(|key| {
                 let value = self
+                    .context
                     .load(
                         #[cfg(feature = "macros")]
-                        &[],
+                        self.closures,
                         &key,
                     )
                     .unwrap_or_default();
@@ -160,6 +167,17 @@ impl fmt::Debug for Context<'_> {
 }
 
 impl<'env> Context<'env> {
+    pub(super) fn debug<'a>(
+        &'a self,
+        #[cfg(feature = "macros")] closures: &'a [Closure],
+    ) -> ContextDebug<'a, 'env> {
+        ContextDebug {
+            context: self,
+            #[cfg(feature = "macros")]
+            closures,
+        }
+    }
+
     /// Creates an empty context.
     pub fn new(env: &'env Environment<'env>) -> Context<'env> {
         Context {

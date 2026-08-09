@@ -67,7 +67,13 @@ impl fmt::Debug for State<'_, '_> {
         ds.field("name", &self.instructions.name());
         ds.field("current_block", &self.current_block);
         ds.field("auto_escape", &self.auto_escape);
-        ds.field("ctx", &self.ctx);
+        ds.field(
+            "ctx",
+            &self.ctx.debug(
+                #[cfg(feature = "macros")]
+                &self.closures,
+            ),
+        );
         ds.field("env", &self.env());
         ds.finish()
     }

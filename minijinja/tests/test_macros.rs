@@ -273,6 +273,19 @@ fn test_macro_state_sees_enclosed_variables() {
 }
 
 #[test]
+fn test_macro_debug_includes_enclosed_variables() {
+    let env = Environment::new();
+    let rv = env
+        .render_str(
+            "{% set captured = 'needle' %}{% macro test() %}{{ captured }}|{{ debug() }}{% endmacro %}{{ test() }}",
+            (),
+        )
+        .unwrap();
+
+    assert!(rv.contains("\"captured\": 'needle'"), "{rv}");
+}
+
+#[test]
 fn test_macro_reuses_mutable_state() {
     #[derive(Default)]
     struct CallCount(usize);
