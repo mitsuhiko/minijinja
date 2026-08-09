@@ -10,10 +10,13 @@ pub struct XorShiftRng {
 
 impl XorShiftRng {
     pub fn for_state<'a>(state: &'a mut State<'_, '_>) -> &'a mut XorShiftRng {
-        let seed = state
-            .lookup("RAND_SEED")
-            .and_then(|x| u64::try_from(x).ok());
-        state.get_or_insert_extension(XorShiftRng::new(seed))
+        if state.get_extension::<XorShiftRng>().is_none() {
+            let seed = state
+                .lookup("RAND_SEED")
+                .and_then(|x| u64::try_from(x).ok());
+            state.get_or_insert_extension(XorShiftRng::new(seed));
+        }
+        state.get_extension_mut().unwrap()
     }
 
     pub fn new(seed: Option<u64>) -> XorShiftRng {

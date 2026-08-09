@@ -1,6 +1,6 @@
 use std::any::{Any, TypeId};
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
 
@@ -46,7 +46,7 @@ pub struct State<'template, 'env> {
     pub(crate) auto_escape: AutoEscape,
     pub(crate) instructions: &'template Instructions<'env>,
     pub(crate) temps: BTreeMap<Box<str>, Value>,
-    pub(crate) extensions: HashMap<TypeId, Box<dyn Any + Send>>,
+    pub(crate) extensions: BTreeMap<TypeId, Box<dyn Any + Send>>,
     pub(crate) blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
     #[allow(unused)]
     pub(crate) loaded_templates: BTreeSet<&'env str>,
