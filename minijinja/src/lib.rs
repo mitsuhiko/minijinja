@@ -212,8 +212,6 @@ mod defaults;
 mod environment;
 mod error;
 mod expression;
-#[cfg(feature = "builtins")]
-mod format_utils;
 mod output;
 mod template;
 mod utils;
@@ -221,6 +219,9 @@ mod vendor;
 mod vm;
 
 pub mod filters;
+#[cfg(feature = "builtins")]
+#[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+pub mod formatting;
 pub mod functions;
 pub mod syntax;
 pub mod tests;
@@ -240,9 +241,6 @@ pub use self::expression::Expression;
 pub use self::output::Output;
 pub use self::template::{Captured, Template};
 pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
-
-#[cfg(feature = "builtins")]
-pub use self::format_utils::{format_filter, FormatStyle};
 
 /// Re-export for convenience.
 pub use self::value::Value;

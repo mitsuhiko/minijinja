@@ -17,6 +17,22 @@ APIs deprecated before MiniJinja 3 have been removed:
 * Replace `value::intern` with `Arc::<str>::from`. The no-op `key_interning`
   Cargo feature has also been removed.
 
+## Formatting API
+
+The formatting helper and its style enum are no longer exported from the crate
+root. The helper was also renamed from `format_filter` to `format`, since it
+supports both the built-in `format` filter and Python-style `str.format()`:
+
+```rust
+// Old
+use minijinja::{format_filter, FormatStyle};
+
+// New
+use minijinja::formatting::{format, FormatStyle};
+```
+
+The `formatting` module is available when the `builtins` feature is enabled.
+
 ## Mutable Execution State
 
 MiniJinja now uses mutable execution state for all dynamic calls.  Registered

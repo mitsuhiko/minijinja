@@ -181,7 +181,9 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::format_utils::{format_filter, format_printf_with, FormatConversion, FormatStyle};
+    use crate::formatting::{
+        format as format_string, format_printf_with, FormatConversion, FormatStyle,
+    };
     use crate::utils::{safe_sort, splitn_whitespace};
     use crate::value::merge_object::{MergeDict, MergeSeq};
     use crate::value::ops::{self, as_f64, LenIterWrap};
@@ -1939,7 +1941,7 @@ mod builtins {
             ));
             Ok(Value::from_safe_string(output))
         } else {
-            format_filter(FormatStyle::Printf, string, &format_args).map(Value::from)
+            format_string(FormatStyle::Printf, string, &format_args).map(Value::from)
         }
     }
 }

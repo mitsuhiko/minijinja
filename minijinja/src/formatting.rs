@@ -1,3 +1,10 @@
+//! String formatting utilities.
+//!
+//! This module implements the printf-style formatting used by the built-in
+//! `format` filter and the `str.format()` style used by
+//! [`minijinja-contrib`](https://docs.rs/minijinja-contrib)'s Python
+//! compatibility support.
+
 use std::fmt::{Display, LowerExp};
 use std::num::FpCategory;
 
@@ -10,8 +17,8 @@ use crate::{Error, ErrorKind, Value};
 /// - printf-style: `{{ "%s, %s!"|format(greeting, name) }}`
 /// - `str.format()` style: `{{ "{}, {}!".format(greeting, name) }}`
 ///
-/// The [`format_filter`] function implements both the styles, and you can invoke a
-/// particular style of formatting by passing this enum as an argument.
+/// The [`format`] function implements both styles. Select the desired style by
+/// passing the corresponding variant to it.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FormatStyle {
     /// Printf-style format string, described
@@ -34,11 +41,7 @@ pub(crate) enum FormatConversion {
 /// [`FormatStyle`] enum.  It is used to implement the `format` builtin filter,
 /// compatible with jinja2, and to implement the `str.format()` function in Python
 /// compatibility support in minijinja-contrib.
-pub fn format_filter(
-    style: FormatStyle,
-    format_str: &str,
-    args: &[Value],
-) -> Result<String, Error> {
+pub fn format(style: FormatStyle, format_str: &str, args: &[Value]) -> Result<String, Error> {
     match style {
         FormatStyle::Printf => printf_style::format(format_str, args),
         FormatStyle::StrFormat => str_format_style::format(format_str, args),

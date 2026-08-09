@@ -1,5 +1,6 @@
+use minijinja::formatting::{format, FormatStyle};
 use minijinja::value::{from_args, StringInput, Tuple, ValueKind};
-use minijinja::{format_filter, Error, ErrorKind, FormatStyle, State, Value};
+use minijinja::{Error, ErrorKind, State, Value};
 
 /// An unknown method callback implementing python methods on primitives.
 ///
@@ -198,7 +199,7 @@ fn string_methods(
                 None => -1,
             }))
         }
-        "format" => format_filter(FormatStyle::StrFormat, s, args).map(Value::from),
+        "format" => format(FormatStyle::StrFormat, s, args).map(Value::from),
         "rfind" => {
             let (what,): (&str,) = from_args(args)?;
             Ok(Value::from(match s.rfind(what) {
