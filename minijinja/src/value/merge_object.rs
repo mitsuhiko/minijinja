@@ -62,6 +62,7 @@ impl fmt::Debug for MergeSeq {
 impl MergeSeq {
     pub(crate) const MAX_DEPTH: usize = 32;
 
+    #[cfg(feature = "builtins")]
     pub fn new(values: Vec<Value>) -> Self {
         Self::with_repr(values, ObjectRepr::Seq)
     }

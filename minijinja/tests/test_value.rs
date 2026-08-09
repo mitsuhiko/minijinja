@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
+use std::collections::BTreeMap;
+#[cfg(feature = "std_collections")]
+use std::collections::{BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
 use std::fmt;
 use std::sync::Arc;
 
