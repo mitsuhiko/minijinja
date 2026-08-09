@@ -138,6 +138,41 @@ fn test_render_block_restores_state_after_error() {
 }
 
 #[test]
+fn test_render_block_restores_auto_escape_after_error() {
+    #[derive(Default)]
+    struct Calls(usize);
+
+    fn fail_after_first(state: &mut State) -> Result<&'static str, Error> {
+        let calls = state.get_or_insert_extension(Calls::default());
+        calls.0 += 1;
+        if calls.0 == 1 {
+            Ok("ok")
+        } else {
+            Err(Error::new(ErrorKind::InvalidOperation, "boom"))
+        }
+    }
+
+    fn recover(state: &mut State) -> &'static str {
+        state.render_block("bad").unwrap_err();
+        "recovered"
+    }
+
+    let mut env = Environment::new();
+    env.set_auto_escape_callback(|_| minijinja::AutoEscape::Html);
+    env.add_function("fail_after_first", fail_after_first);
+    env.add_function("recover", recover);
+    let output = env
+        .template_from_str(
+            "{% block bad %}{% autoescape false %}{{ fail_after_first() }}{% endautoescape %}{% endblock %}{{ recover() }}{{ value }}",
+        )
+        .unwrap()
+        .render(minijinja::context!(value => "<em>"))
+        .unwrap();
+
+    assert_eq!(output, "okrecovered&lt;em&gt;");
+}
+
+#[test]
 fn test_render_block_restores_state_after_setup_error() {
     let mut env = Environment::new();
     env.set_recursion_limit(0);

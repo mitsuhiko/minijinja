@@ -1040,10 +1040,12 @@ impl<'env> Vm<'env> {
             let old_block = state.current_block.replace(name);
             let old_instructions =
                 mem::replace(&mut state.instructions, block_stack.instructions());
+            let old_auto_escape = state.auto_escape;
             let rv = self.eval_state(state, out);
             state.ctx.restore_stack_depth(stack_depth);
             state.instructions = old_instructions;
             state.current_block = old_block;
+            state.auto_escape = old_auto_escape;
             rv
         } else {
             Err(Error::new(
