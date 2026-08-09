@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
 use std::fmt;
@@ -6,8 +7,10 @@ use std::sync::Arc;
 use insta::{assert_debug_snapshot, assert_snapshot};
 use similar_asserts::assert_eq;
 
-use minijinja::value::{DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value, ValueKind};
-use minijinja::{args, context, render, Environment, Error, ErrorKind, State};
+use minijinja::value::{
+    ArgType, DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, StringInput, Value, ValueKind,
+};
+use minijinja::{args, context, render, Environment, Error, ErrorKind, State, UndefinedBehavior};
 
 #[test]
 fn test_sort() {
@@ -445,6 +448,78 @@ fn test_functions_with_mutable_state() {
         .to_string()
         .ends_with(":x"));
     assert!(!state.perform_test("matches_counter", args!(5)).unwrap());
+}
+
+#[test]
+fn test_mutable_state_argument_conversion_uses_state() {
+    struct LookupFromState(Value);
+
+    impl<'a> ArgType<'a> for LookupFromState {
+        type Output = Self;
+
+        fn from_value(_value: Option<&'a Value>) -> Result<Self::Output, Error> {
+            Err(Error::new(ErrorKind::InvalidOperation, "state required"))
+        }
+
+        fn from_state_and_value(
+            state: Option<&State>,
+            _value: Option<&'a Value>,
+        ) -> Result<(Self::Output, usize), Error> {
+            let value = state
+                .and_then(|state| state.lookup("conversion_value"))
+                .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "state required"))?;
+            Ok((LookupFromState(value), 1))
+        }
+    }
+
+    let mut env = Environment::new();
+    env.set_undefined_behavior(UndefinedBehavior::Strict);
+    env.add_global("conversion_value", 42);
+    env.add_filter(
+        "lookup_from_state",
+        |state: &mut State, value: LookupFromState| {
+            state.set_temp("converted", value.0.clone());
+            value.0
+        },
+    );
+    env.add_filter("string", |_: &mut State, _: String| ());
+    env.add_filter("cow", |_: &mut State, _: Cow<'_, str>| ());
+    env.add_filter("string_input", |_: &mut State, _: StringInput<'_>| ());
+    env.add_filter("rest", |_: &mut State, _: Rest<String>| ());
+    env.add_filter("vec", |_: &mut State, _: Vec<String>| ());
+
+    let mut state = env.empty_state();
+    assert_eq!(
+        state
+            .apply_filter("lookup_from_state", args!(Value::UNDEFINED))
+            .unwrap(),
+        Value::from(42)
+    );
+    assert_eq!(state.get_temp("converted"), Some(Value::from(42)));
+
+    for filter in ["string", "cow", "string_input", "rest"] {
+        assert_eq!(
+            state
+                .apply_filter(filter, args!(Value::UNDEFINED))
+                .unwrap_err()
+                .kind(),
+            ErrorKind::UndefinedError
+        );
+    }
+    assert_eq!(
+        state
+            .apply_filter("vec", args!(vec![Value::UNDEFINED]))
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        state
+            .apply_filter("replace", args!(Value::UNDEFINED, "x", "y"))
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
 }
 
 #[test]

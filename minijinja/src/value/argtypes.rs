@@ -52,7 +52,7 @@ pub trait FunctionArgs<'a> {
 
     /// Converts to function arguments from a slice of values.
     #[doc(hidden)]
-    fn from_values(state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error>;
+    fn from_values(state: Option<&State>, values: &'a [Value]) -> Result<Self::Output, Error>;
 }
 
 /// Utility function to convert a slice of values into arguments.
@@ -100,7 +100,6 @@ where
 /// types that are typically passed to filters, tests or functions.  It's
 /// implemented for the following types:
 ///
-/// * eval state: [`&State`](crate::State) (see below for notes)
 /// * unsigned integers: [`u8`], [`u16`], [`u32`], [`u64`], [`u128`], [`usize`]
 /// * signed integers: [`i8`], [`i16`], [`i32`], [`i64`], [`i128`]
 /// * floats: [`f32`], [`f64`]
@@ -134,13 +133,9 @@ where
 /// For instance you cannot implicitly borrow out of sequences which means that
 /// for instance `Vec<&str>` is not a legal argument.
 ///
-/// ## Notes on State
-///
-/// When `&State` is used, it does not consume a passed parameter.  This means that
-/// a filter that takes `(&State, String)` actually only has one argument.  The
-/// state is passed implicitly.  Functions can alternatively take `&mut State`
-/// as their first parameter.  Mutable state is handled specially by
-/// [`Function`](crate::functions::Function) rather than through this trait.
+/// State parameters are handled specially by [`Function`](crate::functions::Function)
+/// rather than through this trait.  A function can take either `&State` or
+/// `&mut State` as its first parameter without consuming a passed value.
 pub trait ArgType<'a> {
     /// The output type of this argument.
     type Output;
@@ -158,7 +153,7 @@ pub trait ArgType<'a> {
 
     #[doc(hidden)]
     fn from_state_and_value_owned(
-        _state: Option<&'a State>,
+        _state: Option<&State>,
         value: Value,
     ) -> Result<Self::Output, Error> {
         Self::from_value_owned(value)
@@ -166,7 +161,7 @@ pub trait ArgType<'a> {
 
     #[doc(hidden)]
     fn from_state_and_value(
-        _state: Option<&'a State>,
+        _state: Option<&State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
         Ok((ok!(Self::from_value(value)), 1))
@@ -175,7 +170,7 @@ pub trait ArgType<'a> {
     #[doc(hidden)]
     #[inline(always)]
     fn from_state_and_values(
-        state: Option<&'a State>,
+        state: Option<&State>,
         values: &'a [Value],
         offset: usize,
     ) -> Result<(Self::Output, usize), Error> {
@@ -196,7 +191,7 @@ macro_rules! tuple_impls {
         {
             type Output = ($($name::Output,)* $rest_name::Output ,);
 
-            fn from_values(state: Option<&'a State>, mut values: &'a [Value]) -> Result<Self::Output, Error> {
+            fn from_values(state: Option<&State>, mut values: &'a [Value]) -> Result<Self::Output, Error> {
                 #![allow(non_snake_case, unused)]
                 $( let $name; )*
                 let mut $rest_name = None;
@@ -239,7 +234,7 @@ macro_rules! tuple_impls {
 impl<'a> FunctionArgs<'a> for () {
     type Output = ();
 
-    fn from_values(_state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
+    fn from_values(_state: Option<&State>, values: &'a [Value]) -> Result<Self::Output, Error> {
         if values.is_empty() {
             Ok(())
         } else {
@@ -721,7 +716,7 @@ impl<'a> ArgType<'a> for StringInput<'_> {
     }
 
     fn from_state_and_value(
-        state: Option<&'a State>,
+        state: Option<&State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
         let value = value.ok_or_else(|| Error::from(ErrorKind::MissingArgument))?;
@@ -744,7 +739,7 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
     }
 
     fn from_state_and_value(
-        state: Option<&'a State>,
+        state: Option<&State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
         if let (Some(state), Some(value)) = (state, value) {
@@ -780,7 +775,7 @@ impl<'a> ArgType<'a> for &[Value] {
     }
 
     fn from_state_and_values(
-        _state: Option<&'a State>,
+        _state: Option<&State>,
         values: &'a [Value],
         offset: usize,
     ) -> Result<(&'a [Value], usize), Error> {
@@ -873,7 +868,7 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
     }
 
     fn from_state_and_values(
-        state: Option<&'a State>,
+        state: Option<&State>,
         values: &'a [Value],
         offset: usize,
     ) -> Result<(Self, usize), Error> {
@@ -989,7 +984,7 @@ impl<'a> ArgType<'a> for Kwargs {
     }
 
     fn from_state_and_values(
-        _state: Option<&'a State>,
+        _state: Option<&State>,
         values: &'a [Value],
         offset: usize,
     ) -> Result<(Self, usize), Error> {
@@ -1246,7 +1241,7 @@ impl<'a> ArgType<'a> for String {
     }
 
     fn from_state_and_value(
-        state: Option<&'a State>,
+        state: Option<&State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
         if let (Some(state), Some(value)) = (state, value) {
@@ -1256,7 +1251,7 @@ impl<'a> ArgType<'a> for String {
     }
 
     fn from_state_and_value_owned(
-        state: Option<&'a State>,
+        state: Option<&State>,
         value: Value,
     ) -> Result<Self::Output, Error> {
         if let Some(state) = state {
@@ -1294,7 +1289,7 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
     }
 
     fn from_state_and_value(
-        state: Option<&'a State>,
+        state: Option<&State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
         match value {

@@ -10,7 +10,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::template::Template;
 use crate::utils::{AutoEscape, UndefinedBehavior};
-use crate::value::{ArgType, Object, Value};
+use crate::value::{Object, Value};
 use crate::vm::context::Context;
 
 #[cfg(feature = "fuel")]
@@ -497,27 +497,6 @@ impl<'template, 'env> State<'template, 'env> {
                 .into_iter()
                 .filter_map(|n| Some((n.to_string(), some!(self.lookup(n)))))
                 .collect(),
-        }
-    }
-}
-
-impl<'a> ArgType<'a> for &State<'_, '_> {
-    type Output = &'a State<'a, 'a>;
-
-    fn from_value(_value: Option<&'a Value>) -> Result<Self::Output, Error> {
-        Err(Error::new(
-            ErrorKind::InvalidOperation,
-            "cannot use state type in this position",
-        ))
-    }
-
-    fn from_state_and_value(
-        state: Option<&'a State>,
-        _value: Option<&'a Value>,
-    ) -> Result<(Self::Output, usize), Error> {
-        match state {
-            None => Err(Error::new(ErrorKind::InvalidOperation, "state unavailable")),
-            Some(state) => Ok((state, 0)),
         }
     }
 }
