@@ -1411,11 +1411,13 @@ mod tests {
         let kwargs = Value::from(Kwargs::from_iter([("foo", Value::from(1))]));
 
         assert_eq!(
-            from_args::<(Value,)>(&[kwargs.clone()]).unwrap_err().kind(),
+            from_args::<(Value,)>(std::slice::from_ref(&kwargs))
+                .unwrap_err()
+                .kind(),
             ErrorKind::TooManyArguments
         );
         assert_eq!(
-            from_args::<(Rest<Value>,)>(&[kwargs.clone()])
+            from_args::<(Rest<Value>,)>(std::slice::from_ref(&kwargs))
                 .unwrap_err()
                 .kind(),
             ErrorKind::TooManyArguments
