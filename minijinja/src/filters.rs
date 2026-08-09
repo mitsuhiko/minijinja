@@ -52,10 +52,10 @@
 //!
 //! # Accessing State
 //!
-//! In some cases it can be necessary to access the execution [`State`].  Since a borrowed
-//! state implements [`ArgType`](crate::value::ArgType) it's possible to add a
-//! parameter that holds the state.  For instance the following filter appends
-//! the current template name to the string:
+//! In some cases it can be necessary to access the execution [`State`].  A filter
+//! can request shared or mutable state by taking `&State` or `&mut State` as its
+//! first parameter.  State is injected separately from the filter's value arguments.
+//! For instance, the following filter appends the current template name to the string:
 //!
 //! ```
 //! # use minijinja::Environment;

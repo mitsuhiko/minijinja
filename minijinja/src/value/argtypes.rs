@@ -133,9 +133,9 @@ where
 /// For instance you cannot implicitly borrow out of sequences which means that
 /// for instance `Vec<&str>` is not a legal argument.
 ///
-/// State parameters are handled specially by [`Function`](crate::functions::Function)
-/// rather than through this trait.  A function can take either `&State` or
-/// `&mut State` as its first parameter without consuming a passed value.
+/// State references do not implement this trait.  They are handled specially by
+/// [`Function`](crate::functions::Function): a function can take either `&State`
+/// or `&mut State` as its first parameter without consuming a passed value.
 pub trait ArgType<'a> {
     /// The output type of this argument.
     type Output;

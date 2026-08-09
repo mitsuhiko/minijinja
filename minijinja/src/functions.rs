@@ -45,7 +45,8 @@
     doc = r#"
 # Arguments in Custom Functions
 
-All arguments in custom functions must implement the [`ArgType`] trait.
+All value arguments in custom functions must implement the [`ArgType`] trait.
+An optional leading `&State` or `&mut State` parameter is handled separately.
 Standard types, such as `String`, `i32`, `bool`, `f64`, etc, already implement this trait.
 There are also helper types that will make it easier to extract an arguments with custom types.
 The [`Serde<T>`](crate::value::Serde) type, for instance, can accept any
