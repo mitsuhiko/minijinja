@@ -346,8 +346,11 @@ impl<'env> Context<'env> {
 
     /// Pushes a new layer.
     pub fn push_frame(&mut self, layer: Frame<'env>) -> Result<(), Error> {
-        ok!(self.check_depth());
         self.stack.push(layer);
+        if let Err(err) = self.check_depth() {
+            self.stack.pop();
+            return Err(err);
+        }
         Ok(())
     }
 
@@ -392,6 +395,15 @@ impl<'env> Context<'env> {
         item
     }
 
+    pub fn stack_depth(&self) -> usize {
+        self.stack.len()
+    }
+
+    pub fn restore_stack_depth(&mut self, depth: usize) {
+        debug_assert!(self.stack.len() >= depth);
+        self.stack.truncate(depth);
+    }
+
     /// The real depth of the context.
     pub fn depth(&self) -> usize {
         self.outer_stack_depth + self.stack.len()
@@ -401,7 +413,10 @@ impl<'env> Context<'env> {
     #[allow(unused)]
     pub fn incr_depth(&mut self, delta: usize) -> Result<(), Error> {
         self.outer_stack_depth += delta;
-        ok!(self.check_depth());
+        if let Err(err) = self.check_depth() {
+            self.outer_stack_depth -= delta;
+            return Err(err);
+        }
         Ok(())
     }
 

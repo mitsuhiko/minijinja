@@ -211,11 +211,10 @@ impl<'template, 'env> State<'template, 'env> {
     /// # Ok(()) }
     /// ```
     ///
-    /// Note that rendering a block is a stateful operation.  If an error
-    /// is returned the module has to be re-created as the internal state
-    /// can end up corrupted.  Rendering a block therefore requires mutable
+    /// Rendering a block is a stateful operation and therefore requires mutable
     /// access to the state.  Filters and functions can request this by taking
-    /// `&mut State` as their first parameter.
+    /// `&mut State` as their first parameter.  Execution frames are restored if
+    /// rendering fails, while explicit mutations to temps or extensions remain.
     #[cfg(feature = "multi_template")]
     #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
     pub fn render_block(&mut self, block: &str) -> Result<String, Error> {

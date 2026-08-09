@@ -132,11 +132,19 @@ impl<'env> Vm<'env> {
             closure_context: closure,
             ..Frame::default()
         };
-        ok!(ctx.push_frame(closure_frame));
+        if let Err(err) = ctx.push_frame(closure_frame) {
+            ctx.clear();
+            state.macro_context_pool.push(ctx);
+            return Err(err);
+        }
         if let Some(caller) = caller {
             ctx.store(&mut state.closures, "caller", caller);
         }
-        ok!(ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST));
+        if let Err(err) = ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST) {
+            ctx.clear();
+            state.macro_context_pool.push(ctx);
+            return Err(err);
+        }
 
         let old_ctx = mem::replace(&mut state.ctx, ctx);
         let old_current_block = state.current_block.take();
@@ -889,6 +897,8 @@ impl<'env> Vm<'env> {
             };
 
             let (new_instructions, new_blocks) = ok!(tmpl.instructions_and_blocks());
+            ok!(state.ctx.incr_depth(INCLUDE_RECURSION_COST));
+            let stack_depth = state.ctx.stack_depth();
             let old_escape = mem::replace(&mut state.auto_escape, tmpl.initial_auto_escape());
             let old_instructions = mem::replace(&mut state.instructions, new_instructions);
             let old_blocks = mem::replace(&mut state.blocks, prepare_blocks(new_blocks));
@@ -896,18 +906,12 @@ impl<'env> Vm<'env> {
             // to forget about the templates that an include triggered by the
             // time the include finishes.
             let old_loaded_templates = state.loaded_templates.clone();
-            ok!(state.ctx.incr_depth(INCLUDE_RECURSION_COST));
-            let rv;
             #[cfg(feature = "macros")]
-            {
-                let old_closure = state.ctx.take_closure();
-                rv = self.eval_state(state, out);
-                state.ctx.reset_closure(old_closure);
-            }
-            #[cfg(not(feature = "macros"))]
-            {
-                rv = self.eval_state(state, out);
-            }
+            let old_closure = state.ctx.take_closure();
+            let rv = self.eval_state(state, out);
+            state.ctx.restore_stack_depth(stack_depth);
+            #[cfg(feature = "macros")]
+            state.ctx.reset_closure(old_closure);
             state.ctx.decr_depth(INCLUDE_RECURSION_COST);
             state.loaded_templates = old_loaded_templates;
             state.auto_escape = old_escape;
@@ -952,22 +956,27 @@ impl<'env> Vm<'env> {
             Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
         }));
 
-        let block_stack = state.blocks.get_mut(name).unwrap();
-        if !block_stack.push() {
+        if !state.blocks.get_mut(name).unwrap().push() {
             return Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "no parent block exists",
             ));
         }
 
+        let stack_depth = state.ctx.stack_depth();
+        if let Err(err) = state.ctx.push_frame(Frame::default()) {
+            state.blocks.get_mut(name).unwrap().pop();
+            return Err(err);
+        }
+
         if capture {
             out.begin_capture(CaptureMode::Capture);
         }
 
-        let old_instructions = mem::replace(&mut state.instructions, block_stack.instructions());
-        ok!(state.ctx.push_frame(Frame::default()));
+        let instructions = state.blocks.get(name).unwrap().instructions();
+        let old_instructions = mem::replace(&mut state.instructions, instructions);
         let rv = self.eval_state(state, out);
-        state.ctx.pop_frame();
+        state.ctx.restore_stack_depth(stack_depth);
         state.instructions = old_instructions;
         state.blocks.get_mut(name).unwrap().pop();
 
@@ -1026,12 +1035,13 @@ impl<'env> Vm<'env> {
                     format!("Required block '{name}' not found"),
                 ));
             }
+            let stack_depth = state.ctx.stack_depth();
+            state.ctx.push_frame(Frame::default())?;
             let old_block = state.current_block.replace(name);
             let old_instructions =
                 mem::replace(&mut state.instructions, block_stack.instructions());
-            state.ctx.push_frame(Frame::default())?;
             let rv = self.eval_state(state, out);
-            state.ctx.pop_frame();
+            state.ctx.restore_stack_depth(stack_depth);
             state.instructions = old_instructions;
             state.current_block = old_block;
             rv
