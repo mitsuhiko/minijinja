@@ -1,6 +1,4 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-use minijinja::value::{Object, Value};
+use minijinja::value::Value;
 use minijinja::{Environment, Error, ErrorKind, State};
 
 #[test]
@@ -96,31 +94,6 @@ fn test_formatter_can_modify_state() {
         captured.state().get_extension::<FormatCount>().unwrap().0,
         2
     );
-}
-
-#[test]
-fn test_state_object_temps() {
-    #[derive(Debug, Default)]
-    struct MyObject(AtomicUsize);
-
-    impl Object for MyObject {}
-
-    fn inc(state: &mut State) -> Value {
-        let obj = state.get_or_set_temp_object("my_counter", MyObject::default);
-        let old = obj.0.fetch_add(1, Ordering::AcqRel);
-        Value::from(old + 1)
-    }
-
-    let mut env = Environment::new();
-    env.add_function("inc", inc);
-    env.add_template("inc.txt", "{{ inc() }}").unwrap();
-    let rv = env
-        .render_str(
-            "{{ inc() }}|{% include 'inc.txt' %}|{% if true %}{{ inc() }}{% endif %}",
-            (),
-        )
-        .unwrap();
-    assert_eq!(rv, "1|2|3");
 }
 
 #[test]

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
 
-use minijinja::value::{Object, Value};
+use minijinja::value::Value;
 use minijinja::{context, Environment, State};
 
 static TEMPLATE: &str = "\
@@ -29,13 +29,17 @@ impl Translations {
     }
 }
 
-impl Object for Translations {}
+#[derive(Default)]
+struct TranslationCache(HashMap<Arc<str>, Translations>);
 
 fn translate(state: &mut State, key: &str) -> Option<Value> {
     let lang = state.lookup("LANG");
     let lang = lang.as_ref().and_then(|x| x.as_str()).unwrap();
-    let cache_key = format!("translation-cache:{lang}");
-    let translations = state.get_or_set_temp_object(&cache_key, || Translations::load(lang));
+    let cache = state.get_or_insert_extension(TranslationCache::default());
+    let translations = cache
+        .0
+        .entry(lang.into())
+        .or_insert_with(|| Translations::load(lang));
     translations.strings.get(key).cloned().map(Value::from)
 }
 

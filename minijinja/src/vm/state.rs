@@ -2,7 +2,6 @@ use std::any::{Any, TypeId};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
-use std::sync::Arc;
 
 use crate::compiler::instructions::Instructions;
 use crate::environment::Environment;
@@ -10,7 +9,7 @@ use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::template::Template;
 use crate::utils::{AutoEscape, UndefinedBehavior};
-use crate::value::{Object, Value};
+use crate::value::Value;
 use crate::vm::context::Context;
 
 #[cfg(feature = "fuel")]
@@ -349,8 +348,10 @@ impl<'template, 'env> State<'template, 'env> {
     /// variables, temps can also be modified during evaluation by filters and
     /// functions.
     ///
-    /// Temps are values but if you want to hold complex state you can store a
-    /// custom object there.
+    /// Temps are useful for dynamically named data that needs to be represented
+    /// as a [`Value`].  For ordinary typed Rust state, prefer
+    /// [`get_or_insert_extension`](Self::get_or_insert_extension), which avoids
+    /// object wrappers and interior mutability.
     ///
     /// # Example
     ///
@@ -377,56 +378,13 @@ impl<'template, 'env> State<'template, 'env> {
         self.temps.insert(name.to_owned().into(), value)
     }
 
-    /// Shortcut for registering an object as a temp.
-    ///
-    /// If the value is already there, it's returned as an object. If it's
-    /// not there yet, the function is invoked to create it.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::sync::atomic::{AtomicUsize, Ordering};
-    /// use minijinja::{Value, State};
-    /// use minijinja::value::Object;
-    ///
-    /// #[derive(Debug, Default)]
-    /// struct MyObject(AtomicUsize);
-    ///
-    /// impl Object for MyObject {}
-    ///
-    /// fn inc(state: &mut State) -> Value {
-    ///     let obj = state.get_or_set_temp_object("my_counter", MyObject::default);
-    ///     let old = obj.0.fetch_add(1, Ordering::AcqRel);
-    ///     Value::from(old + 1)
-    /// }
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// This will panic if the value registered under that name is not
-    /// the object expected.
-    pub fn get_or_set_temp_object<O, F>(&mut self, name: &str, f: F) -> Arc<O>
-    where
-        O: Object + 'static,
-        F: FnOnce() -> O,
-    {
-        self.get_temp(name)
-            .unwrap_or_else(|| {
-                let rv = Value::from_object(f());
-                self.set_temp(name, rv.clone());
-                rv
-            })
-            .downcast_object()
-            .expect("downcast unexpectedly failed. Name conflict?")
-    }
-
     /// Returns a reference to a typed render-local extension.
     ///
     /// Extensions are similar to [`temps`](Self::get_temp), but store ordinary
     /// Rust values keyed by their type.  They are useful for state that should
     /// be shared by filters and functions for the duration of a render without
-    /// requiring a [`Value`], [`Object`], or interior mutability.  There can be
-    /// one extension of each concrete type; use a newtype when independent
+    /// requiring a [`Value`], [`crate::value::Object`], or interior mutability.
+    /// There can be one extension of each concrete type; use a newtype when independent
     /// values have the same underlying type.  Extension values must be `Send`
     /// because states can be moved between threads.
     ///

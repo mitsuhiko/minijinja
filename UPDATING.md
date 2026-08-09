@@ -48,12 +48,13 @@ let mut captured = template.render_captured(context)?;
 let result = captured.with_state_mut(|state| state.call_macro("render", &[]))?;
 ```
 
-State mutation no longer uses interior mutability.  `State::set_temp` and
-`State::get_or_set_temp_object` now require `&mut State`.  For ordinary typed
-Rust data, the new `get_extension`, `get_extension_mut`, and
-`get_or_insert_extension` methods provide render-local storage without wrapping
-data in `Value` or a mutex.  Extensions persist through includes, blocks, and
-macro calls.
+State mutation no longer uses interior mutability.  `State::set_temp` now
+requires `&mut State`, and `State::get_or_set_temp_object` was removed.  Replace
+object temps with `get_extension`, `get_extension_mut`, or
+`get_or_insert_extension`, which provide render-local typed Rust storage without
+wrapping data in `Value` or a mutex.  Named temps remain available for data that
+needs to be represented as a `Value`.  Extensions persist through includes,
+blocks, and macro calls.
 
 Custom formatters and unknown-method callbacks now receive `&mut State` so they
 can use the same mutable facilities.
