@@ -1,5 +1,7 @@
 use minijinja::value::Value;
-use minijinja::{Environment, Error, ErrorKind, State};
+use minijinja::{Environment, State};
+#[cfg(feature = "multi_template")]
+use minijinja::{Error, ErrorKind};
 
 #[test]
 fn test_state_lookup_global() {
@@ -12,6 +14,7 @@ fn test_state_lookup_global() {
     assert_eq!(rv, "[True]");
 }
 
+#[cfg(feature = "multi_template")]
 #[test]
 fn test_state_temps() {
     fn inc(state: &mut State) -> Value {
@@ -35,6 +38,7 @@ fn test_state_temps() {
     assert_eq!(rv, "1|2|3");
 }
 
+#[cfg(feature = "multi_template")]
 #[test]
 fn test_state_extensions() {
     fn assert_send<T: Send>() {}
@@ -96,6 +100,7 @@ fn test_formatter_can_modify_state() {
     );
 }
 
+#[cfg(feature = "multi_template")]
 #[test]
 fn test_render_block_restores_state_after_error() {
     #[derive(Default)]
@@ -137,6 +142,7 @@ fn test_render_block_restores_state_after_error() {
     );
 }
 
+#[cfg(feature = "multi_template")]
 #[test]
 fn test_render_block_restores_auto_escape_after_error() {
     #[derive(Default)]
@@ -172,6 +178,7 @@ fn test_render_block_restores_auto_escape_after_error() {
     assert_eq!(output, "okrecovered&lt;em&gt;");
 }
 
+#[cfg(feature = "multi_template")]
 #[test]
 fn test_render_block_restores_state_after_setup_error() {
     let mut env = Environment::new();
@@ -190,6 +197,7 @@ fn test_render_block_restores_state_after_setup_error() {
     assert_eq!(state.lookup("global"), Some(Value::from(42)));
 }
 
+#[cfg(feature = "multi_template")]
 #[test]
 fn test_include_restores_state_after_setup_error() {
     #[derive(Default)]
@@ -231,6 +239,7 @@ fn test_include_restores_state_after_setup_error() {
     );
 }
 
+#[cfg(feature = "multi_template")]
 #[test]
 fn test_super_restores_state_after_setup_error() {
     #[derive(Default)]

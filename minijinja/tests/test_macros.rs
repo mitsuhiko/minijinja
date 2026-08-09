@@ -1,5 +1,7 @@
 #![cfg(feature = "macros")]
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+#[cfg(feature = "multi_template")]
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 #[cfg(feature = "serde")]
@@ -128,6 +130,7 @@ fn test_macro_passing() {
     );
 }
 
+#[cfg(feature = "multi_template")]
 #[test]
 fn test_no_leak() {
     let dropped = Arc::new(AtomicBool::new(false));
