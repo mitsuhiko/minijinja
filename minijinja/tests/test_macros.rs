@@ -275,6 +275,25 @@ fn test_macro_state_sees_enclosed_variables() {
     assert_eq!(rv, "42:True");
 }
 
+#[cfg(feature = "multi_template")]
+#[test]
+fn test_macro_callbacks_can_render_blocks() {
+    fn render_block(state: &mut State, name: &str) -> Result<String, Error> {
+        state.render_block(name)
+    }
+
+    let mut env = Environment::new();
+    env.add_function("render_block", render_block);
+    let rv = env
+        .render_str(
+            "{% macro invoke() %}{{ render_block('body') }}{% endmacro %}{% block body %}body{% endblock %}|{{ invoke() }}|{{ render_block('body') }}",
+            (),
+        )
+        .unwrap();
+
+    assert_eq!(rv, "body|body|body");
+}
+
 #[test]
 fn test_macro_debug_includes_enclosed_variables() {
     let env = Environment::new();

@@ -150,8 +150,10 @@ impl<'env> Vm<'env> {
         let old_current_block = state.current_block.take();
         let old_auto_escape = state.auto_escape;
         let old_instructions = mem::replace(&mut state.instructions, instructions);
-        let old_blocks = mem::take(&mut state.blocks);
-        let old_loaded_templates = mem::take(&mut state.loaded_templates);
+        // Keep blocks available to callbacks during macro evaluation, but restore
+        // any structural mutations made by the macro when it returns.
+        let old_blocks = state.blocks.clone();
+        let old_loaded_templates = state.loaded_templates.clone();
         // Macros and closures declared during this invocation remain local to it.
         let old_macro_count = state.macros.len();
         let old_closure_count = state.closures.len();

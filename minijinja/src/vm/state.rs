@@ -477,7 +477,7 @@ impl<'template, 'env> State<'template, 'env> {
 }
 
 /// Tracks a block and its parents for super.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) struct BlockStack<'template, 'env> {
     instructions: Vec<&'template Instructions<'env>>,
     depth: usize,
