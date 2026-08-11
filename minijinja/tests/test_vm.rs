@@ -1,7 +1,7 @@
 #![cfg(feature = "unstable_machinery")]
 use std::collections::BTreeMap;
 
-use minijinja::machinery::{make_string_output, CodeGenerator, Instruction, Instructions, Vm};
+use minijinja::machinery::{eval, make_string_output, CodeGenerator, Instruction, Instructions};
 use minijinja::value::{Serde, Value};
 use minijinja::{AutoEscape, Environment, Error};
 
@@ -13,11 +13,11 @@ pub fn simple_eval<S: serde::Serialize>(
 ) -> Result<String, Error> {
     let env = Environment::new();
     let empty_blocks = BTreeMap::new();
-    let vm = Vm::new(&env);
     let root = Value::from(Serde(&ctx));
     let mut rv = String::new();
     let mut output = make_string_output(&mut rv);
-    vm.eval(
+    eval(
+        &env,
         instructions,
         root,
         &empty_blocks,

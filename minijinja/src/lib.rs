@@ -263,7 +263,6 @@ pub mod machinery {
     pub use crate::compiler::parser::{parse, parse_expr};
     pub use crate::compiler::tokens::{Span, Token};
     pub use crate::template::{CompiledTemplate, TemplateConfig};
-    pub use crate::vm::Vm;
 
     use crate::Output;
 
@@ -277,5 +276,16 @@ pub mod machinery {
     /// Creates an [`Output`] that writes into a string.
     pub fn make_string_output(s: &mut String) -> Output<'_> {
         Output::new(s)
+    }
+
+    pub fn eval<'env, 'template>(
+        env: &'env crate::Environment<'env>,
+        instructions: &'template Instructions<'env>,
+        root: crate::Value,
+        blocks: &'template std::collections::BTreeMap<&'env str, Instructions<'env>>,
+        out: &mut Output,
+        auto_escape: crate::AutoEscape,
+    ) -> Result<(Option<crate::Value>, crate::State<'template, 'env>), crate::Error> {
+        crate::vm::eval(env, instructions, root, blocks, out, auto_escape)
     }
 }

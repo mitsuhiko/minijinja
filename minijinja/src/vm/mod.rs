@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-#[cfg(any(feature = "macros", feature = "multi_template"))]
+#[cfg(feature = "macros")]
 use std::mem;
 
 use crate::compiler::instructions::{
@@ -17,7 +17,7 @@ use crate::value::{
 use crate::vm::context::{Frame, Stack};
 use crate::vm::loop_object::{Loop, LoopState};
 #[cfg(feature = "multi_template")]
-use crate::vm::state::BlockStack;
+use crate::vm::state::{BlockStack, BlockState};
 
 #[cfg(feature = "macros")]
 use crate::vm::closure_object::{Closure, ClosureId};
@@ -45,11 +45,7 @@ const INCLUDE_RECURSION_COST: usize = 10;
 #[cfg(feature = "macros")]
 const MACRO_RECURSION_COST: usize = 4;
 
-/// Helps to evaluate something.
-#[cfg_attr(feature = "internal_debug", derive(Debug))]
-pub struct Vm<'env> {
-    env: &'env Environment<'env>,
-}
+struct Executor<'env>(std::marker::PhantomData<&'env Environment<'env>>);
 
 #[cfg(feature = "multi_template")]
 pub(crate) fn prepare_blocks<'env, 'template>(
@@ -86,18 +82,42 @@ fn normalize_filter_test_name(name: &str) -> Cow<'_, str> {
     }
 }
 
-impl<'env> Vm<'env> {
-    /// Creates a new VM.
-    pub fn new(env: &'env Environment<'env>) -> Vm<'env> {
-        Vm { env }
-    }
+pub(crate) fn eval<'env, 'template>(
+    env: &'env Environment<'env>,
+    instructions: &'template Instructions<'env>,
+    root: Value,
+    blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
+    out: &mut Output,
+    auto_escape: AutoEscape,
+) -> Result<(Option<Value>, State<'template, 'env>), Error> {
+    Executor::eval(env, instructions, root, blocks, out, auto_escape)
+}
 
-    /// Evaluates the given inputs.
-    ///
-    /// It returns both the last value left on the stack as well as the state
-    /// at the end of the evaluation.
-    pub fn eval<'template>(
-        &self,
+#[cfg(feature = "multi_template")]
+pub(crate) fn call_block<'env>(
+    name: &str,
+    state: &mut State<'_, 'env>,
+    out: &mut Output,
+) -> Result<Option<Value>, Error> {
+    Executor::call_block(name, state, out)
+}
+
+#[cfg(feature = "macros")]
+pub(crate) fn eval_macro<'env, 'template>(
+    state: &mut State<'template, 'env>,
+    instructions_id: usize,
+    pc: u32,
+    out: &mut Output,
+    closure: Option<ClosureId>,
+    caller: Option<Value>,
+    args: Vec<Value>,
+) -> Result<Option<Value>, Error> {
+    Executor::eval_macro(state, instructions_id, pc, out, closure, caller, args)
+}
+
+impl<'env> Executor<'env> {
+    pub(crate) fn eval<'template>(
+        env: &'env Environment<'env>,
         instructions: &'template Instructions<'env>,
         root: Value,
         _blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
@@ -105,7 +125,7 @@ impl<'env> Vm<'env> {
         auto_escape: AutoEscape,
     ) -> Result<(Option<Value>, State<'template, 'env>), Error> {
         let mut state = State::new(
-            Context::new_with_frame(self.env, ok!(Frame::new_checked(root))),
+            Context::new_with_frame(env, ok!(Frame::new_checked(root))),
             auto_escape,
             instructions,
             #[cfg(feature = "multi_template")]
@@ -159,29 +179,20 @@ impl<'env> Vm<'env> {
         }
 
         let old_ctx = mem::replace(&mut state.ctx, ctx);
-        #[cfg(feature = "multi_template")]
-        let old_current_block = state.current_block.take();
-        let old_auto_escape = state.auto_escape;
-        let old_instructions = mem::replace(&mut state.instructions, instructions);
-        // Keep blocks available to callbacks during macro evaluation, but restore
-        // any structural mutations made by the macro when it returns.
-        #[cfg(feature = "multi_template")]
-        let old_blocks = state.blocks.clone();
-        #[cfg(feature = "multi_template")]
-        let old_loaded_templates = state.loaded_templates.clone();
-        let rv = Self::do_eval(state, out, Stack::from(args), pc);
+        let auto_escape = state.auto_escape;
+        let rv = state.with_execution_state(
+            instructions,
+            auto_escape,
+            #[cfg(feature = "multi_template")]
+            None,
+            #[cfg(feature = "multi_template")]
+            BlockState::Isolate,
+            |state| Self::do_eval(state, out, Stack::from(args), pc),
+        );
 
         let mut macro_ctx = mem::replace(&mut state.ctx, old_ctx);
         macro_ctx.clear();
         state.macro_context_pool.push(macro_ctx);
-        #[cfg(feature = "multi_template")]
-        {
-            state.current_block = old_current_block;
-            state.blocks = old_blocks;
-            state.loaded_templates = old_loaded_templates;
-        }
-        state.auto_escape = old_auto_escape;
-        state.instructions = old_instructions;
         rv
     }
 
@@ -918,24 +929,20 @@ impl<'env> Vm<'env> {
             let (new_instructions, new_blocks) = ok!(tmpl.instructions_and_blocks());
             ok!(state.ctx.incr_depth(INCLUDE_RECURSION_COST));
             let stack_depth = state.ctx.stack_depth();
-            let old_escape = mem::replace(&mut state.auto_escape, tmpl.initial_auto_escape());
-            let old_instructions = mem::replace(&mut state.instructions, new_instructions);
-            let old_blocks = mem::replace(&mut state.blocks, prepare_blocks(new_blocks));
-            // we need to make a copy of the loaded templates here as we want
-            // to forget about the templates that an include triggered by the
-            // time the include finishes.
-            let old_loaded_templates = state.loaded_templates.clone();
+            let current_block = state.current_block;
             #[cfg(feature = "macros")]
             let old_closure = state.ctx.take_closure();
-            let rv = Self::eval_state(state, out);
+            let rv = state.with_execution_state(
+                new_instructions,
+                tmpl.initial_auto_escape(),
+                current_block,
+                BlockState::Replace(prepare_blocks(new_blocks)),
+                |state| Self::eval_state(state, out),
+            );
             state.ctx.restore_stack_depth(stack_depth);
             #[cfg(feature = "macros")]
             state.ctx.reset_closure(old_closure);
             state.ctx.decr_depth(INCLUDE_RECURSION_COST);
-            state.loaded_templates = old_loaded_templates;
-            state.auto_escape = old_escape;
-            state.instructions = old_instructions;
-            state.blocks = old_blocks;
             ok!(rv.map_err(|err| {
                 Error::new(
                     ErrorKind::BadInclude,
@@ -993,10 +1000,16 @@ impl<'env> Vm<'env> {
         }
 
         let instructions = state.blocks.get(name).unwrap().instructions();
-        let old_instructions = mem::replace(&mut state.instructions, instructions);
-        let rv = Self::eval_state(state, out);
+        let auto_escape = state.auto_escape;
+        let current_block = state.current_block;
+        let rv = state.with_execution_state(
+            instructions,
+            auto_escape,
+            current_block,
+            BlockState::Keep,
+            |state| Self::eval_state(state, out),
+        );
         state.ctx.restore_stack_depth(stack_depth);
-        state.instructions = old_instructions;
         state.blocks.get_mut(name).unwrap().pop();
 
         ok!(rv.map_err(|err| {
@@ -1052,17 +1065,18 @@ impl<'env> Vm<'env> {
                     format!("Required block '{name}' not found"),
                 ));
             }
+            let instructions = block_stack.instructions();
+            let auto_escape = state.auto_escape;
             let stack_depth = state.ctx.stack_depth();
             state.ctx.push_frame(Frame::default())?;
-            let old_block = state.current_block.replace(name);
-            let old_instructions =
-                mem::replace(&mut state.instructions, block_stack.instructions());
-            let old_auto_escape = state.auto_escape;
-            let rv = Self::eval_state(state, out);
+            let rv = state.with_execution_state(
+                instructions,
+                auto_escape,
+                Some(name),
+                BlockState::Keep,
+                |state| Self::eval_state(state, out),
+            );
             state.ctx.restore_stack_depth(stack_depth);
-            state.instructions = old_instructions;
-            state.current_block = old_block;
-            state.auto_escape = old_auto_escape;
             rv
         } else {
             Err(Error::new(

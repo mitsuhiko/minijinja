@@ -9,7 +9,7 @@ use crate::environment::Environment;
 use crate::error::Error;
 use crate::output::Output;
 use crate::value::Value;
-use crate::vm::Vm;
+use crate::vm;
 
 /// A handle to a compiled expression.
 ///
@@ -104,7 +104,8 @@ impl<'env, 'source> Expression<'env, 'source> {
     }
 
     fn _eval(&self, root: Value) -> Result<Value, Error> {
-        Ok(ok!(Vm::new(self.env).eval(
+        Ok(ok!(vm::eval(
+            self.env,
             self.instructions(),
             root,
             &BTreeMap::new(),

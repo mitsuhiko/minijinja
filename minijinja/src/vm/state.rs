@@ -150,6 +150,72 @@ impl<'template, 'env> State<'template, 'env> {
         self.auto_escape
     }
 
+    #[cfg(any(feature = "macros", feature = "multi_template"))]
+    pub(crate) fn with_execution_state<R>(
+        &mut self,
+        instructions: &'template Instructions<'env>,
+        auto_escape: AutoEscape,
+        #[cfg(feature = "multi_template")] current_block: Option<&'env str>,
+        #[cfg(feature = "multi_template")] block_state: BlockState<'template, 'env>,
+        f: impl FnOnce(&mut State<'template, 'env>) -> R,
+    ) -> R {
+        let old_instructions = std::mem::replace(&mut self.instructions, instructions);
+        let old_auto_escape = std::mem::replace(&mut self.auto_escape, auto_escape);
+        #[cfg(feature = "multi_template")]
+        let old_current_block = std::mem::replace(&mut self.current_block, current_block);
+        #[cfg(feature = "multi_template")]
+        let old_block_state = match block_state {
+            BlockState::Keep => None,
+            #[cfg(feature = "macros")]
+            BlockState::Isolate => Some(SavedBlockState::Isolated(
+                self.blocks
+                    .iter()
+                    .map(|(name, block)| BlockCheckpoint {
+                        name,
+                        instruction_count: block.instructions.len(),
+                        depth: block.depth,
+                    })
+                    .collect(),
+                self.loaded_templates.clone(),
+            )),
+            BlockState::Replace(blocks) => Some(SavedBlockState::Replaced(
+                std::mem::replace(&mut self.blocks, blocks),
+                self.loaded_templates.clone(),
+            )),
+        };
+
+        let rv = f(self);
+
+        self.instructions = old_instructions;
+        self.auto_escape = old_auto_escape;
+        #[cfg(feature = "multi_template")]
+        {
+            self.current_block = old_current_block;
+            match old_block_state {
+                #[cfg(feature = "macros")]
+                Some(SavedBlockState::Isolated(checkpoint, loaded_templates)) => {
+                    self.blocks.retain(|name, _| {
+                        checkpoint
+                            .binary_search_by_key(name, |entry| entry.name)
+                            .is_ok()
+                    });
+                    for entry in checkpoint {
+                        let block = self.blocks.get_mut(entry.name).unwrap();
+                        block.instructions.truncate(entry.instruction_count);
+                        block.depth = entry.depth;
+                    }
+                    self.loaded_templates = loaded_templates;
+                }
+                Some(SavedBlockState::Replaced(blocks, loaded_templates)) => {
+                    self.blocks = blocks;
+                    self.loaded_templates = loaded_templates;
+                }
+                None => {}
+            }
+        }
+        rv
+    }
+
     pub(crate) fn with_auto_escape<R>(
         &mut self,
         auto_escape: AutoEscape,
@@ -240,7 +306,7 @@ impl<'template, 'env> State<'template, 'env> {
     #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
     pub fn render_block(&mut self, block: &str) -> Result<String, Error> {
         let mut buf = String::new();
-        crate::vm::Vm::call_block(block, self, &mut Output::new(&mut buf)).map(|_| buf)
+        crate::vm::call_block(block, self, &mut Output::new(&mut buf)).map(|_| buf)
     }
 
     /// Renders a block with the given name into an [`io::Write`](std::io::Write).
@@ -253,7 +319,7 @@ impl<'template, 'env> State<'template, 'env> {
         W: std::io::Write,
     {
         let mut wrapper = crate::output::WriteWrapper { w, err: None };
-        crate::vm::Vm::call_block(block, self, &mut Output::new(&mut wrapper))
+        crate::vm::call_block(block, self, &mut Output::new(&mut wrapper))
             .map(|_| ())
             .map_err(|err| wrapper.take_err(err))
     }
@@ -508,6 +574,31 @@ impl<'a> ArgType<'a> for &State<'_, '_> {
             Some(state) => Ok((state, 0)),
         }
     }
+}
+
+#[cfg(all(feature = "macros", feature = "multi_template"))]
+struct BlockCheckpoint<'env> {
+    name: &'env str,
+    instruction_count: usize,
+    depth: usize,
+}
+
+#[cfg(feature = "multi_template")]
+enum SavedBlockState<'template, 'env> {
+    #[cfg(feature = "macros")]
+    Isolated(Vec<BlockCheckpoint<'env>>, BTreeSet<&'env str>),
+    Replaced(
+        BTreeMap<&'env str, BlockStack<'template, 'env>>,
+        BTreeSet<&'env str>,
+    ),
+}
+
+#[cfg(feature = "multi_template")]
+pub(crate) enum BlockState<'template, 'env> {
+    Keep,
+    #[cfg(feature = "macros")]
+    Isolate,
+    Replace(BTreeMap<&'env str, BlockStack<'template, 'env>>),
 }
 
 /// Tracks a block and its parents for super.

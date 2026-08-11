@@ -6,8 +6,8 @@ use crate::error::{Error, ErrorKind};
 use crate::output::Output;
 use crate::utils::AutoEscape;
 use crate::value::{Enumerator, Kwargs, Object, Value};
+use crate::vm;
 use crate::vm::state::State;
-use crate::vm::Vm;
 
 pub(crate) struct Macro {
     pub name: Value,
@@ -123,7 +123,7 @@ impl Object for Macro {
 
         let (arg_values, caller) = ok!(self.prepare_args(args));
         let mut rv = String::new();
-        ok!(Vm::eval_macro(
+        ok!(vm::eval_macro(
             state,
             self.instructions_id,
             self.offset,

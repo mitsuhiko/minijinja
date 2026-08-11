@@ -19,7 +19,7 @@ use crate::utils::AutoEscape;
 use crate::value::Value;
 #[cfg(feature = "multi_template")]
 use crate::vm::prepare_blocks;
-use crate::vm::{Context, State, Vm};
+use crate::vm::{self, Context, State};
 
 /// Callback for auto escape determination
 pub type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
@@ -285,7 +285,8 @@ impl<'env, 'source> Template<'env, 'source> {
         root: Value,
         out: &mut Output,
     ) -> Result<(Option<Value>, State<'_, 'env>), Error> {
-        Vm::new(self.env).eval(
+        vm::eval(
+            self.env,
             &self.compiled.instructions,
             root,
             &self.compiled.blocks,
