@@ -1,5 +1,5 @@
-DOC_FEATURES=loader,json,urlencode,custom_syntax,fuel
-TEST_FEATURES=unstable_machinery,builtins,loader,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax,deserialization,serde,loop_controls
+DOC_FEATURES=json,urlencode,custom_syntax,fuel
+TEST_FEATURES=unstable_machinery,builtins,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax,deserialization,serde,loop_controls
 
 .PHONY: all
 all: test
@@ -91,10 +91,6 @@ check:
 	@cd minijinja; cargo check --all-features
 	@echo "check custom-delimiters:"
 	@cd minijinja; cargo check --features=custom_syntax
-	@echo "check custom-delimiters+loader:"
-	@cd minijinja; cargo check --features=custom_syntax,loader
-	@echo "check loader:"
-	@cd minijinja; cargo check --features=loader
 	@echo "check macro only:"
 	@cd minijinja; cargo check --no-default-features --features macros
 	@echo "check multi_template only:"

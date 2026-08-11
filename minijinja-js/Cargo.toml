@@ -26,7 +26,7 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 wasm-bindgen-test = "0.3.47"
 
 [dependencies]
-minijinja = { path = "../minijinja", features = ["loader", "json", "deserialization", "fuel"] }
+minijinja = { path = "../minijinja", features = ["json", "deserialization", "fuel"] }
 fragile = "2.0.0"
 js-sys = "0.3.77"
 minijinja-contrib = { version = "3.0.0-alpha.0", path = "../minijinja-contrib", features = ["pycompat"] }

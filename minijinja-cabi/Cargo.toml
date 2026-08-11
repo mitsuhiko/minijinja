@@ -7,4 +7,4 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-minijinja = { version = "3.0.0-alpha.0", path = "../minijinja", features = ["loader", "custom_syntax", "fuel"] }
+minijinja = { version = "3.0.0-alpha.0", path = "../minijinja", features = ["custom_syntax", "fuel"] }

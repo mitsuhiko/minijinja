@@ -29,7 +29,6 @@ fn test_expression() {
 }
 
 #[test]
-#[cfg(feature = "loader")]
 fn test_expression_owned() {
     let env = Environment::new();
     let expr: minijinja::Expression<'_, 'static> = env

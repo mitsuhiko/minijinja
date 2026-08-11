@@ -16,6 +16,8 @@ APIs deprecated before MiniJinja 3 have been removed:
   `functions::Function`, and `tests::TestResult` with `value::FunctionResult`.
 * Replace `value::intern` with `Arc::<str>::from`. The no-op `key_interning`
   Cargo feature has also been removed.
+* Remove the no-op `loader` Cargo feature from dependency declarations. Loader
+  APIs remain available unconditionally.
 
 ## Formatting API
 
@@ -112,8 +114,7 @@ fn dirname(path: Serde<std::path::PathBuf>) -> String {
 }
 ```
 
-The new `Serde` type replaces the former `ViaDeserialize` argument wrapper,
-which remains available as a deprecated alias.
+The new `Serde` type replaces the former `ViaDeserialize` argument wrapper.
 
 `Value::from_serialize` has been removed. Replace it with the explicit `Serde`
 wrapper:

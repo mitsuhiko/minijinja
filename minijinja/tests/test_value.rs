@@ -858,24 +858,13 @@ fn test_serde_argument() {
         format!("{}, {}", point.x, point.y)
     }
 
-    #[allow(deprecated)]
-    fn legacy(point: minijinja::value::ViaDeserialize<Point>) -> String {
-        format!("{}, {}", point.x, point.y)
-    }
-
     let point_value = Value::from_pairs([("x", Value::from(42)), ("y", Value::from(-23))]);
 
     let mut env = Environment::new();
     env.add_filter("foo", foo);
-    env.add_filter("legacy", legacy);
     let mut state = env.empty_state();
-
-    for name in ["foo", "legacy"] {
-        let rv = state
-            .apply_filter(name, args![point_value.clone()])
-            .unwrap();
-        assert_eq!(rv.to_string(), "42, -23");
-    }
+    let rv = state.apply_filter("foo", args![point_value]).unwrap();
+    assert_eq!(rv.to_string(), "42, -23");
 }
 
 #[test]

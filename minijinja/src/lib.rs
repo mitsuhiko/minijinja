@@ -169,7 +169,6 @@
 //!
 //! - `fuel`: enables the `fuel` feature which makes the engine track fuel consumption which
 //!   can be used to better protect against expensive templates.
-//! - `loader`: retained for backwards compatibility and now a no-op.
 //! - `custom_syntax`: when this feature is enabled, custom delimiters are supported by
 //!   the parser.
 //! - `preserve_order`: When enable the internal value implementation uses an indexmap

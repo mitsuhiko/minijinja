@@ -297,11 +297,6 @@ impl<T> std::ops::DerefMut for Serde<T> {
     }
 }
 
-/// Deprecated name for [`Serde`].
-#[cfg(feature = "deserialization")]
-#[deprecated(since = "3.0.0", note = "use Serde instead")]
-pub use self::Serde as ViaDeserialize;
-
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
 #[cfg(feature = "serde")]
