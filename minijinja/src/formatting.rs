@@ -17,7 +17,7 @@ use crate::{Error, ErrorKind, Value};
 /// - printf-style: `{{ "%s, %s!"|format(greeting, name) }}`
 /// - `str.format()` style: `{{ "{}, {}!".format(greeting, name) }}`
 ///
-/// The [`format`] function implements both styles. Select the desired style by
+/// The [`format()`] function implements both styles. Select the desired style by
 /// passing the corresponding variant to it.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FormatStyle {
