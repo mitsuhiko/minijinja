@@ -115,9 +115,18 @@ fn dirname(path: Serde<std::path::PathBuf>) -> String {
 The new `Serde` type replaces the former `ViaDeserialize` argument wrapper,
 which remains available as a deprecated alias.
 
-`Value::from_serialize(value)` remains available with the `serde` feature as a
-shortcut for `Value::from(Serde(value))`. Without `serde`, the wrapper and
-shortcut are unavailable.
+`Value::from_serialize` has been removed. Replace it with the explicit `Serde`
+wrapper:
+
+```rust
+// Old
+let value = Value::from_serialize(&custom_data);
+
+// New
+let value = Value::from(Serde(&custom_data));
+```
+
+The `Serde` wrapper is unavailable when the `serde` feature is disabled.
 
 `context!` and `args!` consume expressions passed through native conversions via
 `Value::from`.  You can pass a reference where a supported native value should

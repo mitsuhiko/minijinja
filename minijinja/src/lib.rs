@@ -154,8 +154,8 @@
 //!
 //! - **Rust Functionality:**
 //!
-//!   - `serde`: enables Serde conversion through `value::Serde` and
-//!     `Value::from_serialize`.  It is disabled by default.
+//!   - `serde`: enables Serde conversion through `value::Serde`. It is disabled
+//!     by default.
 //!   - `debug`: if this feature is removed some debug functionality of the engine is
 //!     removed as well.  This mainly affects the quality of error reporting.
 //!   - `deserialization`: when removed this disables deserialization support for

@@ -831,9 +831,9 @@ fn test_deserialize() {
     #[derive(Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq)]
     struct UnitStruct(String);
 
-    let spe = Value::from_serialize(SimpleEnum::B);
-    let spu = Value::from_serialize(UnitStruct("hello".into()));
-    let spt = Value::from_serialize(TaggedUnion::V("workd".into()));
+    let spe = Value::from(Serde(SimpleEnum::B));
+    let spu = Value::from(Serde(UnitStruct("hello".into())));
+    let spt = Value::from(Serde(TaggedUnion::V("workd".into())));
 
     let a: (Serde<SimpleEnum>, Serde<UnitStruct>, Serde<TaggedUnion>) =
         from_args(args!(spe, spu, spt)).unwrap();
@@ -986,8 +986,10 @@ fn test_reverse() {
     assert_snapshot!(Value::from("abc").reverse().unwrap(), @"cba");
     #[cfg(feature = "serde")]
     {
+        use minijinja::value::Serde;
+
         // bytes
-        assert_snapshot!(Value::from_serialize(b"abc").reverse().unwrap(), @"[99, 98, 97]");
+        assert_snapshot!(Value::from(Serde(b"abc")).reverse().unwrap(), @"[99, 98, 97]");
     }
     // undefined
     assert!(Value::UNDEFINED.reverse().unwrap().is_undefined());

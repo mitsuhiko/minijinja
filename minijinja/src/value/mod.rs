@@ -84,9 +84,8 @@
 //!
 //! # Serde Conversions
 //!
-//! Serde conversion is available explicitly through the `Serde` wrapper or
-//! the `Value::from_serialize` convenience method when the `serde` feature is
-//! enabled.
+//! Serde conversion is available explicitly through the `Serde` wrapper when
+//! the `serde` feature is enabled.
 //!
 #![cfg_attr(
     feature = "serde",
@@ -94,7 +93,6 @@
 ```
 # use minijinja::value::{Serde, Value};
 let value = Value::from(Serde(&[1, 2, 3]));
-let value = Value::from_serialize(&[1, 2, 3]);
 ```
 "
 )]
@@ -178,8 +176,8 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //! Invalid values are typically encountered in the following situations:
 //!
 //! - serialization fails with an error: this is the case when a value is created
-//!   through `Serde` or `Value::from_serialize` and the underlying
-//!   `serde::Serialize` implementation fails with an error.
+//!   through `Serde` and the underlying `serde::Serialize` implementation fails
+//!   with an error.
 //! - fallible iteration: there might be situations where an iterator cannot indicate
 //!   failure ahead of iteration and must abort.  In that case the only option an
 //!   iterator in MiniJinja has is to create an invalid value.
@@ -379,10 +377,10 @@ thread_local! {
 
 /// Function that returns true when serialization for [`Value`] is taking place.
 ///
-/// When a value is converted through the `Serde` wrapper or
-/// `Value::from_serialize`, MiniJinja uses the regular Serde serialization
-/// trait. In some cases users might want to customize that serialization for
-/// the template engine independently of what is normally serialized to disk.
+/// When a value is converted through the `Serde` wrapper, MiniJinja uses the
+/// regular Serde serialization trait. In some cases users might want to customize
+/// that serialization for the template engine independently of what is normally
+/// serialized to disk.
 ///
 /// This function returns `true` when MiniJinja is serializing to [`Value`] and
 /// `false` otherwise. You can call this within your own `serde::Serialize`
@@ -964,29 +962,6 @@ impl Value {
     /// This constant exists because the undefined type does not exist in Rust
     /// and this is the only way to construct it.
     pub const UNDEFINED: Value = Value(ValueRepr::Undefined(UndefinedType::Default));
-
-    /// Creates a value through Serde serialization.
-    ///
-    /// This is a convenience alias for `Value::from(Serde(value))`.  Native
-    /// values should generally use [`Value::from`] directly; the [`Serde`]
-    /// wrapper makes Serde conversion explicit where it is needed.
-    ///
-    /// During serialization of the value, [`serializing_for_value`] will return
-    /// `true` which makes it possible to customize serialization for MiniJinja.
-    ///
-    /// ```
-    /// # use minijinja::value::Value;
-    /// let val = Value::from_serialize(&vec![1, 2, 3]);
-    /// ```
-    ///
-    /// This method does not fail but it might return an invalid value if the
-    /// underlying Serde implementation fails.  Invalid values fail later when
-    /// the template engine operates on them.
-    #[cfg(feature = "serde")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-    pub fn from_serialize<T: serde::Serialize>(value: T) -> Value {
-        Value::from(Serde(value))
-    }
 
     /// Creates a map value from an iterator of key-value pairs.
     ///
