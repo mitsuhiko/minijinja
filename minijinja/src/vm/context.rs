@@ -132,6 +132,7 @@ impl From<Vec<Value>> for Stack {
 pub(crate) struct Context<'env> {
     env: &'env Environment<'env>,
     stack: Vec<Frame<'env>>,
+    #[cfg(any(feature = "macros", feature = "multi_template"))]
     outer_stack_depth: usize,
     recursion_limit: usize,
 }
@@ -183,6 +184,7 @@ impl<'env> Context<'env> {
         Context {
             env,
             stack: Vec::with_capacity(40),
+            #[cfg(any(feature = "macros", feature = "multi_template"))]
             outer_stack_depth: 0,
             recursion_limit: env.recursion_limit(),
         }
@@ -412,22 +414,31 @@ impl<'env> Context<'env> {
         item
     }
 
+    #[cfg(feature = "multi_template")]
     pub fn stack_depth(&self) -> usize {
         self.stack.len()
     }
 
+    #[cfg(feature = "multi_template")]
     pub fn restore_stack_depth(&mut self, depth: usize) {
         debug_assert!(self.stack.len() >= depth);
         self.stack.truncate(depth);
     }
 
     /// The real depth of the context.
+    #[cfg(any(feature = "macros", feature = "multi_template"))]
     pub fn depth(&self) -> usize {
         self.outer_stack_depth + self.stack.len()
     }
 
+    /// The real depth of the context.
+    #[cfg(not(any(feature = "macros", feature = "multi_template")))]
+    pub fn depth(&self) -> usize {
+        self.stack.len()
+    }
+
     /// Increase the stack depth.
-    #[allow(unused)]
+    #[cfg(any(feature = "macros", feature = "multi_template"))]
     pub fn incr_depth(&mut self, delta: usize) -> Result<(), Error> {
         self.outer_stack_depth += delta;
         if let Err(err) = self.check_depth() {
@@ -438,7 +449,7 @@ impl<'env> Context<'env> {
     }
 
     /// Decrease the stack depth.
-    #[allow(unused)]
+    #[cfg(feature = "multi_template")]
     pub fn decr_depth(&mut self, delta: usize) {
         self.outer_stack_depth -= delta;
     }

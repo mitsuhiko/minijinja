@@ -570,10 +570,12 @@ impl<'source> CodeGenerator<'source> {
             self.set_line_from_span(expr.expr.span());
             match call.identify_call() {
                 ast::CallType::Function(name) => {
+                    #[cfg(feature = "multi_template")]
                     if name == "super" && call.args.is_empty() {
                         self.add_with_span(Instruction::FastSuper, call.span());
                         return;
-                    } else if name == "loop" && call.args.len() == 1 {
+                    }
+                    if name == "loop" && call.args.len() == 1 {
                         self.compile_call_args(std::slice::from_ref(&call.args[0]), 0, None);
                         self.add_with_span(Instruction::FastRecurse, call.span());
                         return;

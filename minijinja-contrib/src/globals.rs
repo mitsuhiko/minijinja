@@ -1,7 +1,6 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
-#[allow(unused)]
 use minijinja::value::Value;
 use minijinja::value::{from_args, Object, ObjectRepr};
 use minijinja::{Error, ErrorKind, State};

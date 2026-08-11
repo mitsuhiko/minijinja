@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+#[cfg(any(feature = "macros", feature = "multi_template"))]
 use std::mem;
 
 use crate::compiler::instructions::{
@@ -15,6 +16,7 @@ use crate::value::{
 };
 use crate::vm::context::{Frame, Stack};
 use crate::vm::loop_object::{Loop, LoopState};
+#[cfg(feature = "multi_template")]
 use crate::vm::state::BlockStack;
 
 #[cfg(feature = "macros")]
@@ -49,6 +51,7 @@ pub struct Vm<'env> {
     env: &'env Environment<'env>,
 }
 
+#[cfg(feature = "multi_template")]
 pub(crate) fn prepare_blocks<'env, 'template>(
     blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
 ) -> BTreeMap<&'env str, BlockStack<'template, 'env>> {
@@ -97,7 +100,7 @@ impl<'env> Vm<'env> {
         &self,
         instructions: &'template Instructions<'env>,
         root: Value,
-        blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
+        _blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
         out: &mut Output,
         auto_escape: AutoEscape,
     ) -> Result<(Option<Value>, State<'template, 'env>), Error> {
@@ -105,7 +108,8 @@ impl<'env> Vm<'env> {
             Context::new_with_frame(self.env, ok!(Frame::new_checked(root))),
             auto_escape,
             instructions,
-            prepare_blocks(blocks),
+            #[cfg(feature = "multi_template")]
+            prepare_blocks(_blocks),
         );
         Self::eval_state(&mut state, out).map(|x| (x, state))
     }
@@ -155,23 +159,29 @@ impl<'env> Vm<'env> {
         }
 
         let old_ctx = mem::replace(&mut state.ctx, ctx);
+        #[cfg(feature = "multi_template")]
         let old_current_block = state.current_block.take();
         let old_auto_escape = state.auto_escape;
         let old_instructions = mem::replace(&mut state.instructions, instructions);
         // Keep blocks available to callbacks during macro evaluation, but restore
         // any structural mutations made by the macro when it returns.
+        #[cfg(feature = "multi_template")]
         let old_blocks = state.blocks.clone();
+        #[cfg(feature = "multi_template")]
         let old_loaded_templates = state.loaded_templates.clone();
         let rv = Self::do_eval(state, out, Stack::from(args), pc);
 
         let mut macro_ctx = mem::replace(&mut state.ctx, old_ctx);
         macro_ctx.clear();
         state.macro_context_pool.push(macro_ctx);
-        state.current_block = old_current_block;
+        #[cfg(feature = "multi_template")]
+        {
+            state.current_block = old_current_block;
+            state.blocks = old_blocks;
+            state.loaded_templates = old_loaded_templates;
+        }
         state.auto_escape = old_auto_escape;
         state.instructions = old_instructions;
-        state.blocks = old_blocks;
-        state.loaded_templates = old_loaded_templates;
         rv
     }
 
@@ -694,14 +704,19 @@ impl<'env> Vm<'env> {
                 Instruction::CallFunction(name, arg_count) => {
                     let args = stack.get_call_args(*arg_count);
                     // super is a special function reserved for super-ing into blocks.
-                    let rv = if *name == "super" {
-                        if !args.is_empty() {
-                            bail!(Error::new(
-                                ErrorKind::InvalidOperation,
-                                "super() takes no arguments",
-                            ));
+                    let rv = if cfg!(feature = "multi_template") && *name == "super" {
+                        #[cfg(feature = "multi_template")]
+                        {
+                            if !args.is_empty() {
+                                bail!(Error::new(
+                                    ErrorKind::InvalidOperation,
+                                    "super() takes no arguments",
+                                ));
+                            }
+                            ctx_ok!(Self::perform_super(state, out, true))
                         }
-                        ctx_ok!(Self::perform_super(state, out, true))
+                        #[cfg(not(feature = "multi_template"))]
+                        unreachable!()
                     } else if let Some(func) = state.lookup(name) {
                         // calling loops is a special operation that starts the recursion process.
                         // this bypasses the actual `call` implementation which would just fail
@@ -747,6 +762,7 @@ impl<'env> Vm<'env> {
                 Instruction::DiscardTop => {
                     stack.pop();
                 }
+                #[cfg(feature = "multi_template")]
                 Instruction::FastSuper => {
                     ctx_ok!(Self::perform_super(state, out, false));
                 }
@@ -949,6 +965,7 @@ impl<'env> Vm<'env> {
         }
     }
 
+    #[cfg(feature = "multi_template")]
     fn perform_super(
         state: &mut State<'_, 'env>,
         out: &mut Output,

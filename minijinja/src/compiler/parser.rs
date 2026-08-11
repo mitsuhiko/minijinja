@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+#[cfg(feature = "multi_template")]
 use std::collections::BTreeSet;
 use std::fmt;
 use std::mem;
@@ -177,11 +178,15 @@ impl<'a> TokenStream<'a> {
 
 struct Parser<'a> {
     stream: TokenStream<'a>,
-    #[allow(unused)]
+    #[cfg(all(feature = "macros", feature = "multi_template"))]
     in_macro: bool,
-    #[allow(unused)]
+    #[cfg(any(
+        feature = "loop_controls",
+        feature = "macros",
+        feature = "multi_template"
+    ))]
     in_loop: bool,
-    #[allow(unused)]
+    #[cfg(feature = "multi_template")]
     blocks: BTreeSet<&'a str>,
     depth: usize,
 }
@@ -259,8 +264,15 @@ impl<'a> Parser<'a> {
     ) -> Parser<'a> {
         Parser {
             stream: TokenStream::new(source, filename, in_expr, syntax_config, whitespace_config),
+            #[cfg(all(feature = "macros", feature = "multi_template"))]
             in_macro: false,
+            #[cfg(any(
+                feature = "loop_controls",
+                feature = "macros",
+                feature = "multi_template"
+            ))]
             in_loop: false,
+            #[cfg(feature = "multi_template")]
             blocks: BTreeSet::new(),
             depth: 0,
         }
@@ -954,6 +966,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_for_stmt(&mut self) -> Result<ast::ForLoop<'a>, Error> {
+        #[cfg(any(
+            feature = "loop_controls",
+            feature = "macros",
+            feature = "multi_template"
+        ))]
         let old_in_loop = std::mem::replace(&mut self.in_loop, true);
         let target = ok!(self.parse_assignment(false));
         expect_token!(self, Token::Ident("in"), "in");
@@ -973,7 +990,14 @@ impl<'a> Parser<'a> {
             Vec::new()
         };
         ok!(self.stream.next());
-        self.in_loop = old_in_loop;
+        #[cfg(any(
+            feature = "loop_controls",
+            feature = "macros",
+            feature = "multi_template"
+        ))]
+        {
+            self.in_loop = old_in_loop;
+        }
         Ok(ast::ForLoop {
             target,
             iter,
@@ -1083,6 +1107,7 @@ impl<'a> Parser<'a> {
 
     #[cfg(feature = "multi_template")]
     fn parse_block(&mut self) -> Result<ast::Block<'a>, Error> {
+        #[cfg(feature = "macros")]
         if self.in_macro {
             syntax_error!("block tags in macros are not allowed");
         }
@@ -1282,13 +1307,17 @@ impl<'a> Parser<'a> {
     ) -> Result<ast::Macro<'a>, Error> {
         expect_token!(self, Token::BlockEnd, "end of block");
         let old_in_loop = std::mem::replace(&mut self.in_loop, false);
+        #[cfg(feature = "multi_template")]
         let old_in_macro = std::mem::replace(&mut self.in_macro, true);
         let body = ok!(self.subparse(&|tok| match tok {
             Token::Ident("endmacro") if name.is_some() => true,
             Token::Ident("endcall") if name.is_none() => true,
             _ => false,
         }));
-        self.in_macro = old_in_macro;
+        #[cfg(feature = "multi_template")]
+        {
+            self.in_macro = old_in_macro;
+        }
         self.in_loop = old_in_loop;
         ok!(self.stream.next());
         Ok(ast::Macro {

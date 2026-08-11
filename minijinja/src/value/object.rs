@@ -964,7 +964,7 @@ macro_rules! impl_value_vec {
     };
 }
 
-#[allow(unused)]
+#[cfg(feature = "std_collections")]
 macro_rules! impl_value_iterable {
     ($iterable_type:ident, $enumerator:ident) => {
         impl<T> Object for $iterable_type<T>

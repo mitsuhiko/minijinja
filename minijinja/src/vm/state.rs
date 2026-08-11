@@ -1,6 +1,8 @@
 use std::any::{Any, TypeId};
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+#[cfg(feature = "multi_template")]
+use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::compiler::instructions::Instructions;
@@ -40,13 +42,15 @@ static STATE_ID: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize
 /// as there might be lifetimes added or removed between releases.
 pub struct State<'template, 'env> {
     pub(crate) ctx: Context<'env>,
+    #[cfg(feature = "multi_template")]
     pub(crate) current_block: Option<&'env str>,
     pub(crate) auto_escape: AutoEscape,
     pub(crate) instructions: &'template Instructions<'env>,
     pub(crate) temps: BTreeMap<Box<str>, Value>,
     pub(crate) extensions: BTreeMap<TypeId, Box<dyn Any + Send>>,
+    #[cfg(feature = "multi_template")]
     pub(crate) blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
-    #[allow(unused)]
+    #[cfg(feature = "multi_template")]
     pub(crate) loaded_templates: BTreeSet<&'env str>,
     #[cfg(feature = "macros")]
     pub(crate) id: isize,
@@ -70,6 +74,7 @@ impl fmt::Debug for State<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ds = f.debug_struct("State");
         ds.field("name", &self.instructions.name());
+        #[cfg(feature = "multi_template")]
         ds.field("current_block", &self.current_block);
         ds.field("auto_escape", &self.auto_escape);
         ds.field(
@@ -90,17 +95,20 @@ impl<'template, 'env> State<'template, 'env> {
         ctx: Context<'env>,
         auto_escape: AutoEscape,
         instructions: &'template Instructions<'env>,
-        blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
+        #[cfg(feature = "multi_template")] blocks: BTreeMap<&'env str, BlockStack<'template, 'env>>,
     ) -> State<'template, 'env> {
         State {
             #[cfg(feature = "macros")]
             id: STATE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            #[cfg(feature = "multi_template")]
             current_block: None,
             auto_escape,
             instructions,
+            #[cfg(feature = "multi_template")]
             blocks,
             temps: Default::default(),
             extensions: Default::default(),
+            #[cfg(feature = "multi_template")]
             loaded_templates: BTreeSet::new(),
             #[cfg(feature = "macros")]
             macro_instructions: Default::default(),
@@ -120,6 +128,7 @@ impl<'template, 'env> State<'template, 'env> {
             Context::new(env),
             AutoEscape::None,
             &crate::compiler::instructions::EMPTY_INSTRUCTIONS,
+            #[cfg(feature = "multi_template")]
             BTreeMap::new(),
         )
     }
@@ -163,6 +172,8 @@ impl<'template, 'env> State<'template, 'env> {
     }
 
     /// Returns the name of the innermost block.
+    #[cfg(feature = "multi_template")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "multi_template")))]
     #[inline(always)]
     pub fn current_block(&self) -> Option<&str> {
         self.current_block
@@ -500,12 +511,14 @@ impl<'a> ArgType<'a> for &State<'_, '_> {
 }
 
 /// Tracks a block and its parents for super.
+#[cfg(feature = "multi_template")]
 #[derive(Clone, Default)]
 pub(crate) struct BlockStack<'template, 'env> {
     instructions: Vec<&'template Instructions<'env>>,
     depth: usize,
 }
 
+#[cfg(feature = "multi_template")]
 impl<'template, 'env> BlockStack<'template, 'env> {
     pub fn new(instructions: &'template Instructions<'env>) -> BlockStack<'template, 'env> {
         BlockStack {

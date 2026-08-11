@@ -17,7 +17,9 @@ use crate::output::{Output, WriteWrapper};
 use crate::syntax::SyntaxConfig;
 use crate::utils::AutoEscape;
 use crate::value::Value;
-use crate::vm::{prepare_blocks, Context, State, Vm};
+#[cfg(feature = "multi_template")]
+use crate::vm::prepare_blocks;
+use crate::vm::{Context, State, Vm};
 
 /// Callback for auto escape determination
 pub type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
@@ -338,6 +340,7 @@ impl<'env, 'source> Template<'env, 'source> {
             Context::new(self.env),
             self.compiled.initial_auto_escape,
             &self.compiled.instructions,
+            #[cfg(feature = "multi_template")]
             prepare_blocks(&self.compiled.blocks),
         )
     }

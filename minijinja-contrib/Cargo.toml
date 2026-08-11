@@ -18,8 +18,8 @@ all-features = true
 [features]
 default = []
 pycompat = ["minijinja/builtins"]
-datetime = ["time"]
-timezone = ["time-tz"]
+datetime = ["time", "serde"]
+timezone = ["datetime", "time-tz"]
 rand = []
 html_entities = []
 wordcount = ["unicode_categories"]
@@ -28,7 +28,7 @@ unicode_wordwrap = ["wordwrap", "textwrap/unicode-linebreak", "textwrap/unicode-
 
 [dependencies]
 minijinja = { version = "3.0.0-alpha.0", path = "../minijinja", default-features = false }
-serde = "1.0.164"
+serde = { version = "1.0.164", optional = true }
 textwrap = { version = "0.16.2", optional = true, default-features = false, features = ["smawk"] }
 time = { version = "0.3.35", optional = true, features = ["serde", "formatting", "parsing"] }
 time-tz = { version = "2.0.0", features = ["db"], optional = true }

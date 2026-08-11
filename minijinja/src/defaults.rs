@@ -224,8 +224,9 @@ pub(crate) fn get_builtin_tests() -> Arc<BTreeMap<Cow<'static, str>, Value>> {
 }
 
 fn build_globals() -> BTreeMap<Cow<'static, str>, Value> {
-    #[allow(unused_mut)]
-    let mut rv = BTreeMap::new();
+    let rv = BTreeMap::new();
+    #[cfg(feature = "builtins")]
+    let mut rv = rv;
     #[cfg(feature = "builtins")]
     {
         use crate::functions::{self, BoxedFunction};

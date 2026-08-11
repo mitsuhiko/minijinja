@@ -220,6 +220,7 @@ pub enum Instruction<'source> {
     DiscardTop,
 
     /// A fast super instruction without intermediate capturing.
+    #[cfg(feature = "multi_template")]
     FastSuper,
 
     /// A fast loop recurse instruction without intermediate capturing.
@@ -469,15 +470,8 @@ impl<'source> Instructions<'source> {
         rv
     }
 
-    /// Returns the number of instructions
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.instructions.len()
-    }
-
-    /// Do we have any instructions?
-    #[allow(unused)]
-    pub fn is_empty(&self) -> bool {
-        self.instructions.is_empty()
     }
 }
 
