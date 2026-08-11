@@ -8,7 +8,7 @@ use crate::value::Value;
 use crate::vm::loop_object::LoopState;
 
 #[cfg(feature = "macros")]
-use crate::vm::closure_object::{Closure, ClosureId};
+use crate::vm::{Closure, ClosureId};
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
 
@@ -199,9 +199,8 @@ impl<'env> Context<'env> {
 
     #[cfg(feature = "macros")]
     pub fn reset_with_frame(&mut self, frame: Frame<'env>) {
-        self.stack.clear();
+        self.clear();
         self.stack.push(frame);
-        self.outer_stack_depth = 0;
     }
 
     #[cfg(feature = "macros")]
@@ -226,7 +225,7 @@ impl<'env> Context<'env> {
         let top = self.stack.last_mut().unwrap();
         #[cfg(feature = "macros")]
         if let Some(closure) = top.closure {
-            closures[closure].store(key, value.clone());
+            closures[closure].insert(key, value.clone());
         }
         top.locals.insert(key, value);
     }
@@ -236,11 +235,11 @@ impl<'env> Context<'env> {
     /// All macros declared on a certain level reuse the same closure.  This is
     /// done to emulate the behavior of how scopes work in Jinja2 in Python.
     #[cfg(feature = "macros")]
-    pub fn enclose(&mut self, closures: &mut [Closure<'env>], key: &'env str) {
+    pub fn enclose(&self, closures: &mut [Closure<'env>], key: &'env str) {
         let closure = self.stack.last().unwrap().closure.unwrap();
         if !closures[closure].contains_key(key) {
             let value = self.load(closures, key).unwrap_or(Value::UNDEFINED);
-            closures[closure].store(key, value);
+            closures[closure].insert(key, value);
         }
     }
 
@@ -301,7 +300,7 @@ impl<'env> Context<'env> {
             #[cfg(feature = "macros")]
             if let Some(closure) = frame.closure_context {
                 if let Some(value) = closures.get(closure).and_then(|closure| closure.get(key)) {
-                    return Some(value);
+                    return Some(value.clone());
                 }
             }
 
@@ -324,13 +323,11 @@ impl<'env> Context<'env> {
         let mut seen = HashSet::<Cow<'_, str>>::new();
         for frame in self.stack.iter().rev() {
             for key in frame.locals.keys() {
-                if !seen.contains(&Cow::Borrowed(*key)) {
-                    seen.insert(Cow::Borrowed(key));
-                }
+                seen.insert(Cow::Borrowed(*key));
             }
 
             if let Some(ref l) = frame.current_loop {
-                if l.with_loop_var && !seen.contains("loop") {
+                if l.with_loop_var {
                     seen.insert(Cow::Borrowed("loop"));
                 }
             }
@@ -338,11 +335,7 @@ impl<'env> Context<'env> {
             #[cfg(feature = "macros")]
             if let Some(closure) = frame.closure_context {
                 if let Some(closure) = closures.get(closure) {
-                    for key in closure.keys() {
-                        if !seen.contains(key) {
-                            seen.insert(Cow::Owned(key.to_owned()));
-                        }
-                    }
+                    seen.extend(closure.keys().map(|key| Cow::Borrowed(*key)));
                 }
             }
 
@@ -415,12 +408,12 @@ impl<'env> Context<'env> {
     }
 
     #[cfg(feature = "multi_template")]
-    pub fn stack_depth(&self) -> usize {
+    pub(super) fn stack_depth(&self) -> usize {
         self.stack.len()
     }
 
     #[cfg(feature = "multi_template")]
-    pub fn restore_stack_depth(&mut self, depth: usize) {
+    pub(super) fn restore_stack_depth(&mut self, depth: usize) {
         debug_assert!(self.stack.len() >= depth);
         self.stack.truncate(depth);
     }

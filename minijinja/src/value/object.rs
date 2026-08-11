@@ -7,7 +7,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{mapped_enumerator, Tuple, Value, ValueRepr};
+use crate::value::{mapped_enumerator, Value, ValueRepr};
 use crate::vm::State;
 
 /// A trait that represents a dynamic object.
@@ -343,9 +343,7 @@ macro_rules! impl_object_helpers {
                     if let ObjectRepr::Map = self.repr() {
                         Some(Box::new(iter.map(|(key, _)| key)))
                     } else {
-                        Some(Box::new(
-                            iter.map(|(key, val)| Value::from(Tuple::from([key, val]))),
-                        ))
+                        Some(Box::new(iter.map(Value::from)))
                     }
                 }
                 Enumerator::RevIter(iter) => Some(Box::new(iter)),
@@ -353,9 +351,7 @@ macro_rules! impl_object_helpers {
                     if let ObjectRepr::Map = self.repr() {
                         Some(Box::new(iter.map(|(key, _)| key)))
                     } else {
-                        Some(Box::new(
-                            iter.map(|(key, val)| Value::from(Tuple::from([key, val]))),
-                        ))
+                        Some(Box::new(iter.map(Value::from)))
                     }
                 }
                 Enumerator::Str(s) => Some(Box::new(s.iter().copied().map(Value::from))),

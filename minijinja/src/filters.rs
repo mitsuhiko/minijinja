@@ -365,10 +365,7 @@ mod builtins {
             cmp_helper(a, b, case_sensitive, reverse)
         })?;
         kwargs.assert_all_used()?;
-        Ok(rv
-            .into_iter()
-            .map(|(k, v)| Value::from(Tuple::from([k, v])))
-            .collect())
+        Ok(rv.into_iter().map(Value::from).collect())
     }
 
     /// Returns an iterable of pairs (items) from a mapping.
@@ -393,9 +390,7 @@ mod builtins {
         if v.kind() == ValueKind::Map {
             Ok(Value::make_object_iterable(v.clone(), |v| {
                 match v.as_object().and_then(|v| v.try_iter_pairs()) {
-                    Some(iter) => {
-                        Box::new(iter.map(|(key, value)| Value::from(Tuple::from([key, value]))))
-                    }
+                    Some(iter) => Box::new(iter.map(Value::from)),
                     None => Box::new(
                         // this really should not happen unless the object changes it's shape
                         // after the initial check
@@ -1147,6 +1142,17 @@ mod builtins {
         }
     }
 
+    #[cfg(feature = "json")]
+    fn serialize_json<F>(value: &Value, formatter: F) -> serde_json::Result<String>
+    where
+        F: serde_json::ser::Formatter,
+    {
+        let mut output = Vec::new();
+        let mut serializer = serde_json::Serializer::with_formatter(&mut output, formatter);
+        serde::Serialize::serialize(value, &mut serializer)?;
+        Ok(String::from_utf8(output).expect("JSON serializer emitted invalid UTF-8"))
+    }
+
     /// Dumps a value to JSON.
     ///
     /// This filter is only available if the `json` feature is enabled.  The resulting
@@ -1190,18 +1196,13 @@ mod builtins {
         };
         ok!(args.assert_all_used());
         if let Some(indent) = indent {
-            let mut out = Vec::<u8>::new();
             let indentation = " ".repeat(indent);
-            let formatter = serde_json::ser::PrettyFormatter::with_indent(indentation.as_bytes());
-            let mut s = serde_json::Serializer::with_formatter(&mut out, formatter);
-            serde::Serialize::serialize(&value, &mut s)
-                .map(|_| unsafe { String::from_utf8_unchecked(out) })
+            serialize_json(
+                value,
+                serde_json::ser::PrettyFormatter::with_indent(indentation.as_bytes()),
+            )
         } else {
-            let mut out = Vec::<u8>::new();
-            let mut serializer =
-                serde_json::Serializer::with_formatter(&mut out, JinjaJsonFormatter);
-            serde::Serialize::serialize(&value, &mut serializer)
-                .map(|_| unsafe { String::from_utf8_unchecked(out) })
+            serialize_json(value, JinjaJsonFormatter)
         }
         .map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot serialize to JSON").with_source(err)
@@ -1660,7 +1661,7 @@ mod builtins {
             fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.debug_tuple("")
                     .field(&self.grouper)
-                    .field(&Value::from(self.list.clone()))
+                    .field(&self.list)
                     .finish()
             }
         }

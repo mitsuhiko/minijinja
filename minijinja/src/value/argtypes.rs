@@ -1383,80 +1383,48 @@ impl<'a> ArgType<'a> for String {
     }
 }
 
+fn convert_vec<T>(
+    value: Option<&Value>,
+    convert: impl FnMut(Value) -> Result<T, Error>,
+) -> Result<Vec<T>, Error> {
+    let Some(value) = value else {
+        return Ok(Vec::new());
+    };
+    value
+        .as_object()
+        .filter(|object| matches!(object.repr(), ObjectRepr::Seq | ObjectRepr::Iterable))
+        .and_then(|object| object.try_iter())
+        .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "not iterable"))?
+        .map(convert)
+        .collect()
+}
+
 impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
     type Output = Vec<T>;
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
-        match value {
-            None => Ok(Vec::new()),
-            Some(value) => {
-                let iter = ok!(value
-                    .as_object()
-                    .filter(|x| matches!(x.repr(), ObjectRepr::Seq | ObjectRepr::Iterable))
-                    .and_then(|x| x.try_iter())
-                    .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not iterable") }));
-                let mut rv = Vec::new();
-                for value in iter {
-                    rv.push(ok!(T::from_value_owned(value)));
-                }
-                Ok(rv)
-            }
-        }
+        convert_vec(value, T::from_value_owned)
     }
 
     fn from_state_and_value(
         state: Option<&'a State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
-        match value {
-            None => Ok((Vec::new(), 1)),
-            Some(value) => {
-                let iter = ok!(value
-                    .as_object()
-                    .filter(|x| matches!(x.repr(), ObjectRepr::Seq | ObjectRepr::Iterable))
-                    .and_then(|x| x.try_iter())
-                    .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not iterable") }));
-                let mut rv = Vec::new();
-                for value in iter {
-                    rv.push(ok!(T::from_state_and_value_owned(state, value)));
-                }
-                Ok((rv, 1))
-            }
-        }
+        convert_vec(value, |value| T::from_state_and_value_owned(state, value)).map(|rv| (rv, 1))
     }
 
     fn from_state_and_value_mut(
         state: Option<&State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
-        match value {
-            None => Ok((Vec::new(), 1)),
-            Some(value) => {
-                let iter = ok!(value
-                    .as_object()
-                    .filter(|x| matches!(x.repr(), ObjectRepr::Seq | ObjectRepr::Iterable))
-                    .and_then(|x| x.try_iter())
-                    .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not iterable") }));
-                let mut rv = Vec::new();
-                for value in iter {
-                    rv.push(ok!(T::from_state_and_value_owned_mut(state, value)));
-                }
-                Ok((rv, 1))
-            }
-        }
+        convert_vec(value, |value| {
+            T::from_state_and_value_owned_mut(state, value)
+        })
+        .map(|rv| (rv, 1))
     }
 
     fn from_value_owned(value: Value) -> Result<Self, Error> {
-        let iter = ok!(value
-            .as_object()
-            .filter(|x| matches!(x.repr(), ObjectRepr::Seq | ObjectRepr::Iterable))
-            .and_then(|x| x.try_iter())
-            .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not iterable") }));
-        let mut rv = Vec::new();
-        for value in iter {
-            rv.push(ok!(T::from_value_owned(value)));
-        }
-        Ok(rv)
+        convert_vec(Some(&value), T::from_value_owned)
     }
 }
 

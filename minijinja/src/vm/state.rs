@@ -63,7 +63,7 @@ pub struct State<'template, 'env> {
     // can escape an invocation through namespaces, temps, or extensions, so
     // these entries must not be truncated or reused while the state is alive.
     #[cfg(feature = "macros")]
-    pub(crate) closures: Vec<crate::vm::closure_object::Closure<'env>>,
+    pub(crate) closures: Vec<crate::vm::Closure<'env>>,
     #[cfg(feature = "macros")]
     pub(crate) macro_context_pool: Vec<Context<'env>>,
     #[cfg(feature = "fuel")]
@@ -159,6 +159,12 @@ impl<'template, 'env> State<'template, 'env> {
         #[cfg(feature = "multi_template")] block_state: BlockState<'template, 'env>,
         f: impl FnOnce(&mut State<'template, 'env>) -> R,
     ) -> R {
+        #[cfg(feature = "multi_template")]
+        let stack_depth = match block_state {
+            #[cfg(feature = "macros")]
+            BlockState::Isolate => None,
+            _ => Some(self.ctx.stack_depth()),
+        };
         let old_instructions = std::mem::replace(&mut self.instructions, instructions);
         let old_auto_escape = std::mem::replace(&mut self.auto_escape, auto_escape);
         #[cfg(feature = "multi_template")]
@@ -186,6 +192,10 @@ impl<'template, 'env> State<'template, 'env> {
 
         let rv = f(self);
 
+        #[cfg(feature = "multi_template")]
+        if let Some(stack_depth) = stack_depth {
+            self.ctx.restore_stack_depth(stack_depth);
+        }
         self.instructions = old_instructions;
         self.auto_escape = old_auto_escape;
         #[cfg(feature = "multi_template")]
@@ -603,7 +613,7 @@ pub(crate) enum BlockState<'template, 'env> {
 
 /// Tracks a block and its parents for super.
 #[cfg(feature = "multi_template")]
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub(crate) struct BlockStack<'template, 'env> {
     instructions: Vec<&'template Instructions<'env>>,
     depth: usize,
@@ -622,7 +632,6 @@ impl<'template, 'env> BlockStack<'template, 'env> {
         self.instructions.get(self.depth).copied().unwrap()
     }
 
-    #[cfg(feature = "multi_template")]
     pub fn len(&self) -> usize {
         self.instructions.len()
     }
@@ -641,7 +650,6 @@ impl<'template, 'env> BlockStack<'template, 'env> {
         self.depth = self.depth.checked_sub(1).unwrap()
     }
 
-    #[cfg(feature = "multi_template")]
     pub fn append_instructions(&mut self, instructions: &'template Instructions<'env>) {
         self.instructions.push(instructions);
     }

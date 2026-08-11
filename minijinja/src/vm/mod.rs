@@ -19,14 +19,14 @@ use crate::vm::loop_object::{Loop, LoopState};
 #[cfg(feature = "multi_template")]
 use crate::vm::state::{BlockStack, BlockState};
 
-#[cfg(feature = "macros")]
-use crate::vm::closure_object::{Closure, ClosureId};
-
 pub(crate) use crate::vm::context::Context;
 pub use crate::vm::state::State;
 
 #[cfg(feature = "macros")]
-mod closure_object;
+type ClosureId = usize;
+#[cfg(feature = "macros")]
+type Closure<'env> = BTreeMap<&'env str, Value>;
+
 mod context;
 #[cfg(feature = "fuel")]
 mod fuel;
@@ -851,7 +851,7 @@ impl<'env> Executor<'env> {
                     // by all macros declared in this frame.
                     if state.ctx.closure().is_none() {
                         let closure = state.closures.len();
-                        state.closures.push(Closure::default());
+                        state.closures.push(Closure::new());
                         state.ctx.reset_closure(Some(closure));
                     }
                     state.ctx.enclose(&mut state.closures, name);
@@ -928,7 +928,6 @@ impl<'env> Executor<'env> {
 
             let (new_instructions, new_blocks) = ok!(tmpl.instructions_and_blocks());
             ok!(state.ctx.incr_depth(INCLUDE_RECURSION_COST));
-            let stack_depth = state.ctx.stack_depth();
             let current_block = state.current_block;
             #[cfg(feature = "macros")]
             let old_closure = state.ctx.take_closure();
@@ -939,7 +938,6 @@ impl<'env> Executor<'env> {
                 BlockState::Replace(prepare_blocks(new_blocks)),
                 |state| Self::eval_state(state, out),
             );
-            state.ctx.restore_stack_depth(stack_depth);
             #[cfg(feature = "macros")]
             state.ctx.reset_closure(old_closure);
             state.ctx.decr_depth(INCLUDE_RECURSION_COST);
@@ -989,12 +987,10 @@ impl<'env> Executor<'env> {
             ));
         }
 
-        let stack_depth = state.ctx.stack_depth();
         if let Err(err) = state.ctx.push_frame(Frame::default()) {
             state.blocks.get_mut(name).unwrap().pop();
             return Err(err);
         }
-
         if capture {
             out.begin_capture(CaptureMode::Capture);
         }
@@ -1009,7 +1005,7 @@ impl<'env> Executor<'env> {
             BlockState::Keep,
             |state| Self::eval_state(state, out),
         );
-        state.ctx.restore_stack_depth(stack_depth);
+        state.ctx.pop_frame();
         state.blocks.get_mut(name).unwrap().pop();
 
         ok!(rv.map_err(|err| {
@@ -1067,17 +1063,16 @@ impl<'env> Executor<'env> {
             }
             let instructions = block_stack.instructions();
             let auto_escape = state.auto_escape;
-            let stack_depth = state.ctx.stack_depth();
-            state.ctx.push_frame(Frame::default())?;
-            let rv = state.with_execution_state(
+            state.with_execution_state(
                 instructions,
                 auto_escape,
                 Some(name),
                 BlockState::Keep,
-                |state| Self::eval_state(state, out),
-            );
-            state.ctx.restore_stack_depth(stack_depth);
-            rv
+                |state| {
+                    ok!(state.ctx.push_frame(Frame::default()));
+                    Self::eval_state(state, out)
+                },
+            )
         } else {
             Err(Error::new(
                 ErrorKind::UnknownBlock,

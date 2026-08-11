@@ -620,6 +620,21 @@ pub enum CallArg<'a> {
     KwargSplat(Expr<'a>),
 }
 
+fn const_values(items: &[Expr<'_>]) -> Option<Vec<Value>> {
+    if !items.iter().all(|expr| matches!(expr, Expr::Const(_))) {
+        return None;
+    }
+    Some(
+        items
+            .iter()
+            .filter_map(|expr| match expr {
+                Expr::Const(value) => Some(value.value.clone()),
+                _ => None,
+            })
+            .collect(),
+    )
+}
+
 /// Creates a list of values.
 #[cfg_attr(feature = "internal_debug", derive(Debug))]
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
@@ -629,17 +644,7 @@ pub struct List<'a> {
 
 impl List<'_> {
     pub fn as_const(&self) -> Option<Value> {
-        if !self.items.iter().all(|x| matches!(x, Expr::Const(_))) {
-            return None;
-        }
-
-        let items = self.items.iter();
-        let sequence = items.filter_map(|expr| match expr {
-            Expr::Const(v) => Some(v.value.clone()),
-            _ => None,
-        });
-
-        Some(Value::from(sequence.collect::<Vec<_>>()))
+        Some(Value::from(const_values(&self.items)?))
     }
 }
 
@@ -652,21 +657,9 @@ pub struct Tuple<'a> {
 
 impl Tuple<'_> {
     pub fn as_const(&self) -> Option<Value> {
-        use crate::value::Tuple as ValueTuple;
-
-        if !self.items.iter().all(|x| matches!(x, Expr::Const(_))) {
-            return None;
-        }
-
-        let items = self.items.iter();
-        let sequence = items.filter_map(|expr| match expr {
-            Expr::Const(v) => Some(v.value.clone()),
-            _ => None,
-        });
-
-        Some(Value::from_object(ValueTuple::from(
-            sequence.collect::<Vec<_>>(),
-        )))
+        Some(Value::from(crate::value::Tuple::from(const_values(
+            &self.items,
+        )?)))
     }
 }
 

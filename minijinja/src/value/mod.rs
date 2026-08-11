@@ -385,15 +385,10 @@ thread_local! {
 /// support deserialization.  So it becomes possible to completely change what
 /// gets sent there, even at the cost of serializing something that cannot be
 /// deserialized.
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 pub fn serializing_for_value() -> bool {
-    #[cfg(feature = "serde")]
-    {
-        INTERNAL_SERIALIZATION.with(|flag| flag.get())
-    }
-    #[cfg(not(feature = "serde"))]
-    {
-        false
-    }
+    INTERNAL_SERIALIZATION.with(|flag| flag.get())
 }
 
 #[cfg(feature = "serde")]
@@ -1639,8 +1634,7 @@ impl Value {
                     let mut v = if let ObjectRepr::Map = o.repr() {
                         iter.map(|(k, _)| k).collect::<Vec<_>>()
                     } else {
-                        iter.map(|(k, v)| Value::from(Tuple::from([k, v])))
-                            .collect::<Vec<_>>()
+                        iter.map(Value::from).collect::<Vec<_>>()
                     };
                     v.reverse();
                     Some(Value::make_object_iterable(v, move |v| {
@@ -1673,7 +1667,7 @@ impl Value {
                                 Box::new(iter.map(|(k, _)| k))
                                     as Box<dyn Iterator<Item = Value> + Send + Sync>
                             } else {
-                                Box::new(iter.map(|(k, v)| Value::from(Tuple::from([k, v]))))
+                                Box::new(iter.map(Value::from))
                                     as Box<dyn Iterator<Item = Value> + Send + Sync>
                             }
                         } else {
