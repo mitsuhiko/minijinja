@@ -140,7 +140,7 @@ pub(crate) struct Context<'env> {
 pub(super) struct ContextDebug<'a, 'env> {
     context: &'a Context<'env>,
     #[cfg(feature = "macros")]
-    closures: &'a [Closure],
+    closures: &'a [Closure<'env>],
 }
 
 impl fmt::Debug for ContextDebug<'_, '_> {
@@ -170,7 +170,7 @@ impl fmt::Debug for ContextDebug<'_, '_> {
 impl<'env> Context<'env> {
     pub(super) fn debug<'a>(
         &'a self,
-        #[cfg(feature = "macros")] closures: &'a [Closure],
+        #[cfg(feature = "macros")] closures: &'a [Closure<'env>],
     ) -> ContextDebug<'a, 'env> {
         ContextDebug {
             context: self,
@@ -219,7 +219,7 @@ impl<'env> Context<'env> {
     /// Stores a variable in the context.
     pub fn store(
         &mut self,
-        #[cfg(feature = "macros")] closures: &mut [Closure],
+        #[cfg(feature = "macros")] closures: &mut [Closure<'env>],
         key: &'env str,
         value: Value,
     ) {
@@ -236,7 +236,7 @@ impl<'env> Context<'env> {
     /// All macros declared on a certain level reuse the same closure.  This is
     /// done to emulate the behavior of how scopes work in Jinja2 in Python.
     #[cfg(feature = "macros")]
-    pub fn enclose(&mut self, closures: &mut [Closure], key: &str) {
+    pub fn enclose(&mut self, closures: &mut [Closure<'env>], key: &'env str) {
         let closure = self.stack.last().unwrap().closure.unwrap();
         if !closures[closure].contains_key(key) {
             let value = self.load(closures, key).unwrap_or(Value::UNDEFINED);
@@ -282,7 +282,7 @@ impl<'env> Context<'env> {
     /// Looks up a variable in the context.
     pub fn load(
         &self,
-        #[cfg(feature = "macros")] closures: &[Closure],
+        #[cfg(feature = "macros")] closures: &[Closure<'env>],
         key: &str,
     ) -> Option<Value> {
         for frame in self.stack.iter().rev() {
@@ -318,7 +318,7 @@ impl<'env> Context<'env> {
     /// Returns an iterable of all declared variables.
     pub fn known_variables(
         &self,
-        #[cfg(feature = "macros")] closures: &[Closure],
+        #[cfg(feature = "macros")] closures: &[Closure<'env>],
         with_globals: bool,
     ) -> HashSet<Cow<'_, str>> {
         let mut seen = HashSet::<Cow<'_, str>>::new();

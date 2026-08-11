@@ -63,7 +63,7 @@ pub struct State<'template, 'env> {
     // can escape an invocation through namespaces, temps, or extensions, so
     // these entries must not be truncated or reused while the state is alive.
     #[cfg(feature = "macros")]
-    pub(crate) closures: Vec<crate::vm::closure_object::Closure>,
+    pub(crate) closures: Vec<crate::vm::closure_object::Closure<'env>>,
     #[cfg(feature = "macros")]
     pub(crate) macro_context_pool: Vec<Context<'env>>,
     #[cfg(feature = "fuel")]

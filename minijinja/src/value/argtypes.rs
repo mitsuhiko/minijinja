@@ -219,6 +219,45 @@ pub trait ArgType<'a> {
     }
 }
 
+macro_rules! convert_function_args {
+    ($state:expr, $values:expr, $convert:ident, ($($name:ident,)*), $rest_name:ident) => {{
+        #![allow(non_snake_case)]
+        let mut values = $values;
+        $(let $name;)*
+        let mut $rest_name = None;
+        let mut idx = 0;
+
+        // A trailing type such as Kwargs is read first so that conversions such
+        // as from_args::<(&[Value], Kwargs)> can split the argument list.
+        let rest_first = $rest_name::is_trailing() && !values.is_empty();
+        if rest_first {
+            let (val, offset) = ok!($rest_name::$convert(
+                $state,
+                values,
+                values.len() - 1,
+            ));
+            $rest_name = Some(val);
+            values = &values[..values.len() - offset];
+        }
+        $(
+            let (val, offset) = ok!($name::$convert($state, values, idx));
+            $name = val;
+            idx += offset;
+        )*
+        if !rest_first {
+            let (val, offset) = ok!($rest_name::$convert($state, values, idx));
+            $rest_name = Some(val);
+            idx += offset;
+        }
+
+        if values.get(idx).is_some() {
+            Err(Error::from(ErrorKind::TooManyArguments))
+        } else {
+            Ok(($($name,)* $rest_name.expect("trailing argument was not converted"),))
+        }
+    }};
+}
+
 macro_rules! tuple_impls {
     ( $( $name:ident )* * $rest_name:ident ) => {
         impl<'a, $($name,)* $rest_name> FunctionArgs<'a> for ($($name,)* $rest_name,)
@@ -226,72 +265,24 @@ macro_rules! tuple_impls {
         {
             type Output = ($($name::Output,)* $rest_name::Output ,);
 
-            fn from_values(state: Option<&'a State>, mut values: &'a [Value]) -> Result<Self::Output, Error> {
-                #![allow(non_snake_case, unused)]
-                $( let $name; )*
-                let mut $rest_name = None;
-                let mut idx = 0;
-
-                // special case: the last type is marked trailing (eg: for Kwargs) and we have at
-                // least one value.  In that case we need to read it first before going to the rest
-                // of the arguments.  This is needed to support from_args::<(&[Value], Kwargs)>
-                // or similar.
-                let rest_first = $rest_name::is_trailing() && !values.is_empty();
-                if rest_first {
-                    let (val, offset) = ok!($rest_name::from_state_and_values(state, values, values.len() - 1));
-                    $rest_name = Some(val);
-                    values = &values[..values.len() - offset];
-                }
-                $(
-                    let (val, offset) = ok!($name::from_state_and_values(state, values, idx));
-                    $name = val;
-                    idx += offset;
-                )*
-
-                if !rest_first {
-                    let (val, offset) = ok!($rest_name::from_state_and_values(state, values, idx));
-                    $rest_name = Some(val);
-                    idx += offset;
-                }
-
-                if values.get(idx).is_some() {
-                    Err(Error::from(ErrorKind::TooManyArguments))
-                } else {
-                    // SAFETY: this is safe because both no matter what `rest_first` is set to
-                    // the rest_name variable is set at this point.
-                    Ok(($($name,)* unsafe { $rest_name.unwrap_unchecked() },))
-                }
+            fn from_values(state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
+                convert_function_args!(
+                    state,
+                    values,
+                    from_state_and_values,
+                    ($($name,)*),
+                    $rest_name
+                )
             }
 
-            fn from_values_mut(state: Option<&State>, mut values: &'a [Value]) -> Result<Self::Output, Error> {
-                #![allow(non_snake_case, unused)]
-                $( let $name; )*
-                let mut $rest_name = None;
-                let mut idx = 0;
-
-                let rest_first = $rest_name::is_trailing() && !values.is_empty();
-                if rest_first {
-                    let (val, offset) = ok!($rest_name::from_state_and_values_mut(state, values, values.len() - 1));
-                    $rest_name = Some(val);
-                    values = &values[..values.len() - offset];
-                }
-                $(
-                    let (val, offset) = ok!($name::from_state_and_values_mut(state, values, idx));
-                    $name = val;
-                    idx += offset;
-                )*
-
-                if !rest_first {
-                    let (val, offset) = ok!($rest_name::from_state_and_values_mut(state, values, idx));
-                    $rest_name = Some(val);
-                    idx += offset;
-                }
-
-                if values.get(idx).is_some() {
-                    Err(Error::from(ErrorKind::TooManyArguments))
-                } else {
-                    Ok(($($name,)* unsafe { $rest_name.unwrap_unchecked() },))
-                }
+            fn from_values_mut(state: Option<&State>, values: &'a [Value]) -> Result<Self::Output, Error> {
+                convert_function_args!(
+                    state,
+                    values,
+                    from_state_and_values_mut,
+                    ($($name,)*),
+                    $rest_name
+                )
             }
         }
     };

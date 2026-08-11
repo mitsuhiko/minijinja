@@ -148,7 +148,7 @@ macro_rules! impl_value_tuple {
             #[allow(non_snake_case)]
             fn from(value: ($($name,)+)) -> Self {
                 let ($($name,)+) = value;
-                Value::from(Tuple::from(vec![$($name.into(),)+]))
+                Value::from(Tuple::from([$($name.into(),)+]))
             }
         }
 
