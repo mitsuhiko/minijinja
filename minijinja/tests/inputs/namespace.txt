@@ -17,3 +17,6 @@
 ---
 {% set ns = namespace({"found": true}) %}
 {{- ns }}
+---
+{% set ns = namespace(value='yes' if true else 'no') %}
+{{- ns }}
