@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed conditional expressions in keyword arguments (for example `f(a=x if x else 'd')`) for Jinja2 compatibility in Rust and Go. #922
+
 ## 2.23.0
 
 * Fixed Unicode identifiers in templates rendered through the Python bindings.

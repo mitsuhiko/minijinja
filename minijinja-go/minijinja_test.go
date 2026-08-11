@@ -142,6 +142,34 @@ func TestChainedComparisons(t *testing.T) {
 	}
 }
 
+func TestKwargConditionalExpression(t *testing.T) {
+	tests := []struct {
+		template string
+		ctx      map[string]any
+		expect   string
+	}{
+		{`{{ namespace(name=x if x else 'd').name }}`, map[string]any{"x": "v"}, "v"},
+		{`{{ dict(a=x if x).a is undefined }}`, map[string]any{"x": ""}, "True"},
+		{`{{ dict(a=1 if false else 2, b=3) }}`, nil, `{"a": 2, "b": 3}`},
+		{`{{ 'x\ny'|indent(width=w if w else 2) }}`, map[string]any{"w": 4}, "x\n    y"},
+	}
+
+	for _, test := range tests {
+		env := NewEnvironment()
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(test.ctx)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expect {
+			t.Errorf("expected %q for %q, got %q", test.expect, test.template, result)
+		}
+	}
+}
+
 func TestForLoop(t *testing.T) {
 	env := NewEnvironment()
 	tmpl, err := env.TemplateFromString("{% for item in items %}{{ item }}{% endfor %}")

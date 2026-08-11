@@ -315,6 +315,26 @@ fn test_dotted_integer_lookup_midchain_unicode() {
 }
 
 #[test]
+fn test_kwarg_conditional_expression() {
+    assert_eq!(
+        render!("{{ namespace(name=x if x else 'd').name }}", x => "v"),
+        "v"
+    );
+    assert_eq!(
+        render!("{{ dict(a=1 if false else 2, b=3) }}"),
+        r#"{"a": 2, "b": 3}"#
+    );
+    assert_eq!(
+        render!("{{ dict(a=x if x).a is undefined }}", x => ""),
+        "True"
+    );
+    assert_eq!(
+        render!("{{ 'x\ny'|indent(width=w if w else 2) }}", w => 4),
+        "x\n    y"
+    );
+}
+
+#[test]
 fn test_items_and_dictsort_with_structs() {
     #[derive(Debug, Clone)]
     struct MyStruct;

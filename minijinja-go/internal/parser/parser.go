@@ -734,7 +734,7 @@ func (p *Parser) parseArgs() ([]CallArg, *Error) {
 			// Check for keyword argument
 			if v, ok := expr.(*Var); ok && p.skip(lexer.TokenAssign) {
 				hasKwargs = true
-				value, err := p.parseExprNoIf()
+				value, err := p.parseExpr()
 				if err != nil {
 					return nil, err
 				}
