@@ -202,6 +202,100 @@ fn test_nested_macro_bug() {
     assert_snapshot!(rv.trim(), @"42");
 }
 
+#[test]
+fn test_nested_macro_can_escape_invocation() {
+    let rv = render!(
+        r#"
+        {%- set first = namespace() -%}
+        {%- set second = namespace() -%}
+        {%- macro outer(target, value) -%}
+            {%- macro inner() -%}{{ value }}{%- endmacro -%}
+            {%- set target.inner = inner -%}
+        {%- endmacro -%}
+        {{- outer(first, "first") -}}
+        {{- outer(second, "second") -}}
+        {{- first.inner() }}|{{ second.inner() -}}
+        "#
+    );
+    assert_eq!(rv, "first|second");
+}
+
+#[test]
+fn test_nested_macro_can_escape_into_state() {
+    fn stash(state: &mut State, value: Value) -> &'static str {
+        state.set_temp("macro", value);
+        ""
+    }
+
+    fn call_stashed(state: &mut State) -> Result<Value, Error> {
+        let value = state.get_temp("macro").unwrap();
+        value.call(state, &[])
+    }
+
+    let mut env = Environment::new();
+    env.add_function("stash", stash);
+    env.add_function("call_stashed", call_stashed);
+    let rv = env
+        .render_str(
+            r#"
+            {%- macro outer(value) -%}
+                {%- macro inner() -%}{{ value }}{%- endmacro -%}
+                {{- stash(inner) -}}
+            {%- endmacro -%}
+            {{- outer("captured") -}}
+            {{- call_stashed() -}}
+            "#,
+            (),
+        )
+        .unwrap();
+    assert_eq!(rv, "captured");
+}
+
+#[cfg(feature = "multi_template")]
+#[test]
+fn test_escaped_macro_survives_failed_invocation() {
+    #[derive(Default)]
+    struct Calls(usize);
+
+    fn stash(state: &mut State, value: Value) -> Result<&'static str, Error> {
+        state.set_temp("macro", value);
+        let calls = state.get_or_insert_extension(Calls::default());
+        calls.0 += 1;
+        if calls.0 == 1 {
+            Ok("")
+        } else {
+            Err(Error::new(ErrorKind::InvalidOperation, "boom"))
+        }
+    }
+
+    let mut env = Environment::new();
+    env.add_function("stash", stash);
+    let mut captured = env
+        .template_from_str(
+            r#"
+            {%- block body -%}
+                {%- macro outer(value) -%}
+                    {%- macro inner() -%}{{ value }}{%- endmacro -%}
+                    {{- stash(inner) -}}
+                {%- endmacro -%}
+                {{- outer("captured") -}}
+            {%- endblock -%}
+            "#,
+        )
+        .unwrap()
+        .render_captured(())
+        .unwrap();
+
+    captured
+        .with_state_mut(|state| state.render_block("body"))
+        .unwrap_err();
+    let value = captured.state().get_temp("macro").unwrap();
+    let rv = captured
+        .with_state_mut(|state| value.call(state, &[]))
+        .unwrap();
+    assert_eq!(rv.as_str(), Some("captured"));
+}
+
 /// https://github.com/mitsuhiko/minijinja/issues/434
 #[test]
 fn test_caller_bug() {

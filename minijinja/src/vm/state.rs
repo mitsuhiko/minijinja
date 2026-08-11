@@ -15,11 +15,10 @@ use crate::vm::context::Context;
 #[cfg(feature = "fuel")]
 use crate::vm::fuel::FuelTracker;
 
-/// When macros are used, the state carries an `id` counter.  Whenever a state is
-/// created, the counter is incremented.  This exists because macros can keep a reference
-/// to instructions from another state by index.  Without this counter it would
-/// be possible for a macro to be called with a different state (different id)
-/// which mean we likely panic.
+/// When macros are used, the state carries an `id` counter. Whenever a state is
+/// created, the counter is incremented. Macro values use this ID to ensure that
+/// their render-local closures and instruction streams are only accessed through
+/// the state that owns them.
 #[cfg(feature = "macros")]
 static STATE_ID: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
 
@@ -51,8 +50,14 @@ pub struct State<'template, 'env> {
     pub(crate) loaded_templates: BTreeSet<&'env str>,
     #[cfg(feature = "macros")]
     pub(crate) id: isize,
+    // Macro values are 'static and cannot borrow their instruction stream. Keep
+    // one stable render-local mapping per instruction stream instead of adding
+    // an entry every time a lexical macro declaration executes.
     #[cfg(feature = "macros")]
-    pub(crate) macros: Vec<(&'template Instructions<'env>, u32)>,
+    pub(crate) macro_instructions: BTreeMap<usize, &'template Instructions<'env>>,
+    // Closures are region allocated for the lifetime of the state. Macro values
+    // can escape an invocation through namespaces, temps, or extensions, so
+    // these entries must not be truncated or reused while the state is alive.
     #[cfg(feature = "macros")]
     pub(crate) closures: Vec<crate::vm::closure_object::Closure>,
     #[cfg(feature = "macros")]
@@ -98,7 +103,7 @@ impl<'template, 'env> State<'template, 'env> {
             extensions: Default::default(),
             loaded_templates: BTreeSet::new(),
             #[cfg(feature = "macros")]
-            macros: Default::default(),
+            macro_instructions: Default::default(),
             #[cfg(feature = "macros")]
             closures: Default::default(),
             #[cfg(feature = "macros")]

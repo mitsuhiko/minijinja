@@ -12,11 +12,11 @@ use crate::vm::Vm;
 pub(crate) struct Macro {
     pub name: Value,
     pub arg_spec: Vec<Value>,
-    // because values need to be 'static, we can't hold a reference to the
-    // instructions that declared the macro.  Instead of that we place the
-    // reference to the macro instruction (and the jump offset) in the
-    // state under `state.macros`.
-    pub macro_ref_id: usize,
+    // Values need to be 'static, so the macro cannot directly borrow the
+    // instructions that declared it.  The instruction stream is registered
+    // once on the render state and identified by its stable address.
+    pub instructions_id: usize,
+    pub offset: u32,
     pub state_id: isize,
     pub closure: Option<usize>,
     pub caller_reference: bool,
@@ -125,7 +125,8 @@ impl Object for Macro {
         let mut rv = String::new();
         ok!(Vm::eval_macro(
             state,
-            self.macro_ref_id,
+            self.instructions_id,
+            self.offset,
             &mut Output::new(&mut rv),
             self.closure,
             caller,

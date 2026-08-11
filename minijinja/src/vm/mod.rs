@@ -114,13 +114,22 @@ impl<'env> Vm<'env> {
     #[cfg(feature = "macros")]
     pub(crate) fn eval_macro<'template>(
         state: &mut State<'template, 'env>,
-        macro_id: usize,
+        instructions_id: usize,
+        pc: u32,
         out: &mut Output,
         closure: Option<ClosureId>,
         caller: Option<Value>,
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
-        let &(instructions, pc) = &state.macros[macro_id];
+        let instructions = *state
+            .macro_instructions
+            .get(&instructions_id)
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidOperation,
+                    "cannot call this macro. template state went away.",
+                )
+            })?;
         let context_base = state.ctx.clone_base();
         let mut ctx = state
             .macro_context_pool
@@ -153,10 +162,6 @@ impl<'env> Vm<'env> {
         // any structural mutations made by the macro when it returns.
         let old_blocks = state.blocks.clone();
         let old_loaded_templates = state.loaded_templates.clone();
-        // Macros and closures declared during this invocation remain local to it.
-        let old_macro_count = state.macros.len();
-        let old_closure_count = state.closures.len();
-
         let rv = Self::do_eval(state, out, Stack::from(args), pc);
 
         let mut macro_ctx = mem::replace(&mut state.ctx, old_ctx);
@@ -167,8 +172,6 @@ impl<'env> Vm<'env> {
         state.instructions = old_instructions;
         state.blocks = old_blocks;
         state.loaded_templates = old_loaded_templates;
-        state.macros.truncate(old_macro_count);
-        state.closures.truncate(old_closure_count);
         rv
     }
 
@@ -1149,12 +1152,16 @@ impl<'env> Vm<'env> {
 
         let arg_spec = stack.pop().try_iter().unwrap().collect();
         let closure = stack.pop().as_usize();
-        let macro_ref_id = state.macros.len();
-        state.macros.push((state.instructions, offset));
+        let instructions_id = state.instructions as *const Instructions<'_> as usize;
+        state
+            .macro_instructions
+            .entry(instructions_id)
+            .or_insert(state.instructions);
         stack.push(Value::from_object(Macro {
             name: Value::from(name),
             arg_spec,
-            macro_ref_id,
+            instructions_id,
+            offset,
             state_id: state.id,
             closure,
             caller_reference: (flags & MACRO_CALLER) != 0,
