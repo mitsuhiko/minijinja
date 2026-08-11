@@ -117,10 +117,10 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 /// This trait is used by the [`add_function`](crate::Environment::add_function)
 /// method to abstract over different types of functions.
 ///
-/// Functions can optionally accept the [`State`] by immutable or mutable
-/// reference as their first parameter and additionally up to 4 further
-/// parameters.  They share much of their interface with
-/// [`filters`](crate::filters).
+/// Functions can optionally accept the [`State`] by immutable reference as an
+/// implicit parameter in any position.  They can instead take `&mut State` as
+/// their first parameter and additionally up to 4 further parameters.  They
+/// share much of their interface with [`filters`](crate::filters).
 ///
 /// A function can return any of the following types:
 ///
@@ -168,8 +168,8 @@ pub(crate) struct BoxedFunction(Arc<FuncFunc>, #[cfg(feature = "debug")] &'stati
 /// # Mutable State
 ///
 /// A function which needs to modify the execution state can take `&mut State`
-/// as its first parameter.  State references must be the first parameter and
-/// can only be requested once.
+/// as its first parameter.  Unlike `&State`, mutable state must be the first
+/// parameter and can only be requested once.
 ///
 /// ```rust
 /// # use minijinja::Environment;
@@ -282,66 +282,6 @@ tuple_impls! { A B C }
 tuple_impls! { A B C D }
 tuple_impls! { A B C D E }
 
-/// Internal argument marker for functions receiving shared state.
-#[doc(hidden)]
-pub struct FunctionArgsWithState<Args>(PhantomData<fn() -> Args>);
-
-impl<'a, Args> FunctionArgs<'a> for FunctionArgsWithState<Args>
-where
-    Args: FunctionArgs<'a>,
-{
-    type Output = Args::Output;
-
-    fn from_values(state: Option<&State>, values: &'a [Value]) -> Result<Self::Output, Error> {
-        Args::from_values(state, values)
-    }
-}
-
-trait FunctionStateHelper<Rv, Args> {
-    fn invoke_nested_state(&self, state: &State<'_, '_>, args: Args) -> Rv;
-}
-
-macro_rules! tuple_state_impls {
-    ( $( $name:ident )* ) => {
-        impl<Func, Rv, $($name),*> FunctionStateHelper<Rv, ($($name,)*)> for Func
-        where
-            Func: Fn(&State<'_, '_>, $($name),*) -> Rv
-        {
-            fn invoke_nested_state(&self, state: &State<'_, '_>, args: ($($name,)*)) -> Rv {
-                #[allow(non_snake_case)]
-                let ($($name,)*) = args;
-                (self)(state, $($name),*)
-            }
-        }
-
-        impl<Func, Rv, $($name),*> Function<Rv, FunctionArgsWithState<($($name,)*)>> for Func
-        where
-            Func: Send + Sync + 'static,
-            // the crazy bounds here exist to enable borrowing in closures
-            Func: Fn(&State<'_, '_>, $($name),*) -> Rv
-                + for<'a> FunctionStateHelper<Rv, ($(<$name as ArgType<'a>>::Output,)*)>,
-            Rv: FunctionResult,
-            $($name: for<'a> ArgType<'a>,)*
-        {
-            fn invoke<'a>(
-                &self,
-                state: &'a mut State,
-                values: &'a [Value],
-                _: SealedMarker,
-            ) -> Result<Value, Error> {
-                let args = ok!(<($($name,)*)>::from_values(Some(state), values));
-                self.invoke_nested_state(state, args).into_result()
-            }
-        }
-    };
-}
-
-tuple_state_impls! {}
-tuple_state_impls! { A }
-tuple_state_impls! { A B }
-tuple_state_impls! { A B C }
-tuple_state_impls! { A B C D }
-
 /// Internal argument marker for functions receiving mutable state.
 #[doc(hidden)]
 pub struct FunctionArgsWithMutState<Args>(PhantomData<fn() -> Args>);
@@ -352,8 +292,12 @@ where
 {
     type Output = Args::Output;
 
-    fn from_values(state: Option<&State>, values: &'a [Value]) -> Result<Self::Output, Error> {
+    fn from_values(state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
         Args::from_values(state, values)
+    }
+
+    fn from_values_mut(state: Option<&State>, values: &'a [Value]) -> Result<Self::Output, Error> {
+        Args::from_values_mut(state, values)
     }
 }
 
@@ -389,7 +333,7 @@ macro_rules! tuple_mut_impls {
                 values: &'a [Value],
                 _: SealedMarker,
             ) -> Result<Value, Error> {
-                let args = ok!(<($($name,)*)>::from_values(Some(state), values));
+                let args = ok!(<($($name,)*)>::from_values_mut(Some(state), values));
                 self.invoke_nested_mut(state, args).into_result()
             }
         }

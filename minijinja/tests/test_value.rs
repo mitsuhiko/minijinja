@@ -463,7 +463,7 @@ fn test_mutable_state_argument_conversion_uses_state() {
             Err(Error::new(ErrorKind::InvalidOperation, "state required"))
         }
 
-        fn from_state_and_value(
+        fn from_state_and_value_mut(
             state: Option<&State>,
             _value: Option<&'a Value>,
         ) -> Result<(Self::Output, usize), Error> {
@@ -521,6 +521,45 @@ fn test_mutable_state_argument_conversion_uses_state() {
             .unwrap_err()
             .kind(),
         ErrorKind::UndefinedError
+    );
+}
+
+#[test]
+fn test_shared_state_can_appear_in_any_argument_position() {
+    struct StateName<'a>(&'a str);
+
+    impl<'a> ArgType<'a> for StateName<'_> {
+        type Output = StateName<'a>;
+
+        fn from_value(_value: Option<&'a Value>) -> Result<Self::Output, Error> {
+            Err(Error::new(ErrorKind::InvalidOperation, "state required"))
+        }
+
+        fn from_state_and_value(
+            state: Option<&'a State>,
+            _value: Option<&'a Value>,
+        ) -> Result<(Self::Output, usize), Error> {
+            Ok((StateName(state.unwrap().name()), 0))
+        }
+    }
+
+    let mut env = Environment::new();
+    env.add_filter("state_last", |value: &str, state: &State| {
+        format!("{}:{value}", state.name())
+    });
+    env.add_filter("borrowed_state", |_: &Value, name: StateName<'_>| {
+        name.0.to_string()
+    });
+
+    assert_eq!(
+        env.template_from_named_str(
+            "test",
+            "{{ 'value'|state_last }}:{{ 'ignored'|borrowed_state }}",
+        )
+        .unwrap()
+        .render(())
+        .unwrap(),
+        "test:value:test"
     );
 }
 

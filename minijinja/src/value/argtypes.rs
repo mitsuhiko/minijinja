@@ -52,7 +52,13 @@ pub trait FunctionArgs<'a> {
 
     /// Converts to function arguments from a slice of values.
     #[doc(hidden)]
-    fn from_values(state: Option<&State>, values: &'a [Value]) -> Result<Self::Output, Error>;
+    fn from_values(state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error>;
+
+    /// Converts arguments for a function that receives mutable state.
+    #[doc(hidden)]
+    fn from_values_mut(_state: Option<&State>, values: &'a [Value]) -> Result<Self::Output, Error> {
+        Self::from_values(None, values)
+    }
 }
 
 /// Utility function to convert a slice of values into arguments.
@@ -133,9 +139,9 @@ where
 /// For instance you cannot implicitly borrow out of sequences which means that
 /// for instance `Vec<&str>` is not a legal argument.
 ///
-/// State references do not implement this trait.  They are handled specially by
-/// [`Function`](crate::functions::Function): a function can take either `&State`
-/// or `&mut State` as its first parameter without consuming a passed value.
+/// When `&State` is used, it does not consume a passed parameter.  Mutable state
+/// is handled specially by [`Function`](crate::functions::Function) and can only
+/// be used as the first parameter.
 pub trait ArgType<'a> {
     /// The output type of this argument.
     type Output;
@@ -153,7 +159,7 @@ pub trait ArgType<'a> {
 
     #[doc(hidden)]
     fn from_state_and_value_owned(
-        _state: Option<&State>,
+        _state: Option<&'a State>,
         value: Value,
     ) -> Result<Self::Output, Error> {
         Self::from_value_owned(value)
@@ -161,7 +167,7 @@ pub trait ArgType<'a> {
 
     #[doc(hidden)]
     fn from_state_and_value(
-        _state: Option<&State>,
+        _state: Option<&'a State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
         Ok((ok!(Self::from_value(value)), 1))
@@ -170,11 +176,40 @@ pub trait ArgType<'a> {
     #[doc(hidden)]
     #[inline(always)]
     fn from_state_and_values(
-        state: Option<&State>,
+        state: Option<&'a State>,
         values: &'a [Value],
         offset: usize,
     ) -> Result<(Self::Output, usize), Error> {
         Self::from_state_and_value(state, values.get(offset))
+    }
+
+    /// Converts an owned argument without allowing the result to borrow state.
+    #[doc(hidden)]
+    fn from_state_and_value_owned_mut(
+        _state: Option<&State>,
+        value: Value,
+    ) -> Result<Self::Output, Error> {
+        Self::from_value_owned(value)
+    }
+
+    /// Converts an argument without allowing the result to borrow state.
+    #[doc(hidden)]
+    fn from_state_and_value_mut(
+        _state: Option<&State>,
+        value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
+        Ok((ok!(Self::from_value(value)), 1))
+    }
+
+    /// Converts arguments without allowing the result to borrow state.
+    #[doc(hidden)]
+    #[inline(always)]
+    fn from_state_and_values_mut(
+        state: Option<&State>,
+        values: &'a [Value],
+        offset: usize,
+    ) -> Result<(Self::Output, usize), Error> {
+        Self::from_state_and_value_mut(state, values.get(offset))
     }
 
     #[doc(hidden)]
@@ -191,7 +226,7 @@ macro_rules! tuple_impls {
         {
             type Output = ($($name::Output,)* $rest_name::Output ,);
 
-            fn from_values(state: Option<&State>, mut values: &'a [Value]) -> Result<Self::Output, Error> {
+            fn from_values(state: Option<&'a State>, mut values: &'a [Value]) -> Result<Self::Output, Error> {
                 #![allow(non_snake_case, unused)]
                 $( let $name; )*
                 let mut $rest_name = None;
@@ -227,6 +262,37 @@ macro_rules! tuple_impls {
                     Ok(($($name,)* unsafe { $rest_name.unwrap_unchecked() },))
                 }
             }
+
+            fn from_values_mut(state: Option<&State>, mut values: &'a [Value]) -> Result<Self::Output, Error> {
+                #![allow(non_snake_case, unused)]
+                $( let $name; )*
+                let mut $rest_name = None;
+                let mut idx = 0;
+
+                let rest_first = $rest_name::is_trailing() && !values.is_empty();
+                if rest_first {
+                    let (val, offset) = ok!($rest_name::from_state_and_values_mut(state, values, values.len() - 1));
+                    $rest_name = Some(val);
+                    values = &values[..values.len() - offset];
+                }
+                $(
+                    let (val, offset) = ok!($name::from_state_and_values_mut(state, values, idx));
+                    $name = val;
+                    idx += offset;
+                )*
+
+                if !rest_first {
+                    let (val, offset) = ok!($rest_name::from_state_and_values_mut(state, values, idx));
+                    $rest_name = Some(val);
+                    idx += offset;
+                }
+
+                if values.get(idx).is_some() {
+                    Err(Error::from(ErrorKind::TooManyArguments))
+                } else {
+                    Ok(($($name,)* unsafe { $rest_name.unwrap_unchecked() },))
+                }
+            }
         }
     };
 }
@@ -234,7 +300,7 @@ macro_rules! tuple_impls {
 impl<'a> FunctionArgs<'a> for () {
     type Output = ();
 
-    fn from_values(_state: Option<&State>, values: &'a [Value]) -> Result<Self::Output, Error> {
+    fn from_values(_state: Option<&'a State>, values: &'a [Value]) -> Result<Self::Output, Error> {
         if values.is_empty() {
             Ok(())
         } else {
@@ -716,6 +782,13 @@ impl<'a> ArgType<'a> for StringInput<'_> {
     }
 
     fn from_state_and_value(
+        state: Option<&'a State>,
+        value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
+        Self::from_state_and_value_mut(state, value)
+    }
+
+    fn from_state_and_value_mut(
         state: Option<&State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
@@ -739,6 +812,13 @@ impl<'a> ArgType<'a> for Cow<'_, str> {
     }
 
     fn from_state_and_value(
+        state: Option<&'a State>,
+        value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
+        Self::from_state_and_value_mut(state, value)
+    }
+
+    fn from_state_and_value_mut(
         state: Option<&State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
@@ -775,6 +855,14 @@ impl<'a> ArgType<'a> for &[Value] {
     }
 
     fn from_state_and_values(
+        _state: Option<&'a State>,
+        values: &'a [Value],
+        offset: usize,
+    ) -> Result<(&'a [Value], usize), Error> {
+        Self::from_state_and_values_mut(None, values, offset)
+    }
+
+    fn from_state_and_values_mut(
         _state: Option<&State>,
         values: &'a [Value],
         offset: usize,
@@ -868,7 +956,7 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
     }
 
     fn from_state_and_values(
-        state: Option<&State>,
+        state: Option<&'a State>,
         values: &'a [Value],
         offset: usize,
     ) -> Result<(Self, usize), Error> {
@@ -877,6 +965,21 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Rest<T> {
             Rest(ok!(args
                 .iter()
                 .map(|v| T::from_state_and_value(state, Some(v)).map(|x| x.0))
+                .collect::<Result<_, _>>())),
+            args.len(),
+        ))
+    }
+
+    fn from_state_and_values_mut(
+        state: Option<&State>,
+        values: &'a [Value],
+        offset: usize,
+    ) -> Result<(Self, usize), Error> {
+        let args = values.get(offset..).unwrap_or_default();
+        Ok((
+            Rest(ok!(args
+                .iter()
+                .map(|v| T::from_state_and_value_mut(state, Some(v)).map(|x| x.0))
                 .collect::<Result<_, _>>())),
             args.len(),
         ))
@@ -984,6 +1087,14 @@ impl<'a> ArgType<'a> for Kwargs {
     }
 
     fn from_state_and_values(
+        _state: Option<&'a State>,
+        values: &'a [Value],
+        offset: usize,
+    ) -> Result<(Self, usize), Error> {
+        Self::from_state_and_values_mut(None, values, offset)
+    }
+
+    fn from_state_and_values_mut(
         _state: Option<&State>,
         values: &'a [Value],
         offset: usize,
@@ -1241,6 +1352,13 @@ impl<'a> ArgType<'a> for String {
     }
 
     fn from_state_and_value(
+        state: Option<&'a State>,
+        value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
+        Self::from_state_and_value_mut(state, value)
+    }
+
+    fn from_state_and_value_mut(
         state: Option<&State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
@@ -1251,6 +1369,13 @@ impl<'a> ArgType<'a> for String {
     }
 
     fn from_state_and_value_owned(
+        state: Option<&'a State>,
+        value: Value,
+    ) -> Result<Self::Output, Error> {
+        Self::from_state_and_value_owned_mut(state, value)
+    }
+
+    fn from_state_and_value_owned_mut(
         state: Option<&State>,
         value: Value,
     ) -> Result<Self::Output, Error> {
@@ -1289,7 +1414,7 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
     }
 
     fn from_state_and_value(
-        state: Option<&State>,
+        state: Option<&'a State>,
         value: Option<&'a Value>,
     ) -> Result<(Self::Output, usize), Error> {
         match value {
@@ -1303,6 +1428,27 @@ impl<'a, T: ArgType<'a, Output = T>> ArgType<'a> for Vec<T> {
                 let mut rv = Vec::new();
                 for value in iter {
                     rv.push(ok!(T::from_state_and_value_owned(state, value)));
+                }
+                Ok((rv, 1))
+            }
+        }
+    }
+
+    fn from_state_and_value_mut(
+        state: Option<&State>,
+        value: Option<&'a Value>,
+    ) -> Result<(Self::Output, usize), Error> {
+        match value {
+            None => Ok((Vec::new(), 1)),
+            Some(value) => {
+                let iter = ok!(value
+                    .as_object()
+                    .filter(|x| matches!(x.repr(), ObjectRepr::Seq | ObjectRepr::Iterable))
+                    .and_then(|x| x.try_iter())
+                    .ok_or_else(|| { Error::new(ErrorKind::InvalidOperation, "not iterable") }));
+                let mut rv = Vec::new();
+                for value in iter {
+                    rv.push(ok!(T::from_state_and_value_owned_mut(state, value)));
                 }
                 Ok((rv, 1))
             }
