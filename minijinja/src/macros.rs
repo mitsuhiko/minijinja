@@ -25,21 +25,26 @@ macro_rules! some {
 pub mod __context {
     use crate::value::Value;
     use crate::Environment;
-    use std::collections::BTreeMap;
     use std::rc::Rc;
 
+    #[cfg(not(feature = "preserve_order"))]
+    pub type ContextMap = std::collections::BTreeMap<&'static str, Value>;
+
+    #[cfg(feature = "preserve_order")]
+    pub type ContextMap = indexmap::IndexMap<&'static str, Value>;
+
     #[inline(always)]
-    pub fn make() -> BTreeMap<&'static str, Value> {
-        BTreeMap::default()
+    pub fn make() -> ContextMap {
+        ContextMap::default()
     }
 
     #[inline(always)]
-    pub fn add(ctx: &mut BTreeMap<&'static str, Value>, key: &'static str, value: Value) {
+    pub fn add(ctx: &mut ContextMap, key: &'static str, value: Value) {
         ctx.insert(key, value);
     }
 
     #[inline(always)]
-    pub fn build(ctx: BTreeMap<&'static str, Value>) -> Value {
+    pub fn build(ctx: ContextMap) -> Value {
         Value::from_object(ctx)
     }
 

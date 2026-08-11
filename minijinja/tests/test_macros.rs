@@ -248,3 +248,18 @@ fn test_unenclosed_resolve() {
         .unwrap();
     assert_snapshot!(rv, @"render global|ctx global|");
 }
+
+#[test]
+#[cfg(feature = "preserve_order")]
+fn test_context_preserves_order() {
+    let ctx = context! { zebra => 1, apple => 2 };
+    assert_snapshot!(format!("{ctx:?}"), @r#"{"zebra": 1, "apple": 2}"#);
+    assert_snapshot!(
+        ctx.try_iter()
+            .unwrap()
+            .map(|k| k.to_string())
+            .collect::<Vec<_>>()
+            .join(","),
+        @"zebra,apple"
+    );
+}

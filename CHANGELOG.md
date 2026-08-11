@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed `context!` sorting its keys when the `preserve_order` feature is enabled.  #920
+
 ## 2.23.0
 
 * Fixed Unicode identifiers in templates rendered through the Python bindings.

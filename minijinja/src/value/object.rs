@@ -1170,6 +1170,7 @@ mod preserve_order_impls {
     use indexmap::IndexMap;
 
     impl_value_map!(IndexMap, mapped_rev_key_value_enumerator);
+    impl_str_map!(IndexMap, mapped_rev_key_value_enumerator);
 }
 
 impl<T, const N: usize> Object for [T; N]
