@@ -533,6 +533,18 @@ def test_striptags():
     assert env.eval_expr("'<a>&auml;</a>'|striptags") == "ä"
 
 
+def test_wordwrap():
+    env = Environment()
+    # wordwrap is enabled by the `wordwrap` Cargo feature (enabled in
+    # minijinja-py/Cargo.toml).  Default width is 79.
+    assert env.render_str(
+        "{{ text|wordwrap(width=20) }}",
+        text="the quick brown fox jumps over the lazy dog",
+    ) == "the quick brown fox\njumps over the lazy\ndog"
+    # default width is 79 — short text is unchanged
+    assert env.eval_expr("'hello world'|wordwrap") == "hello world"
+
+
 def test_attribute_lookups():
     class X:
         def __getattr__(self, _):
