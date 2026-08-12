@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Limited string repetition to 100 MB in Rust and Go to prevent excessive memory allocations.
+
 ## 2.23.0
 
 * Fixed Unicode identifiers in templates rendered through the Python bindings.

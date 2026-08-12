@@ -1,0 +1,25 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ \"x\" * count }}"
+info:
+  count: 100000001
+input_file: minijinja/tests/inputs/err_repeat_string_too_large.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: InvalidOperation,
+    detail: "repeated string is too large",
+    name: "err_repeat_string_too_large.txt",
+    line: 1,
+}
+
+invalid operation: repeated string is too large (in err_repeat_string_too_large.txt:1)
+----------------------- err_repeat_string_too_large.txt -----------------------
+   1 > {{ "x" * count }}
+     i    ^^^^^^^^^^^ invalid operation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Referenced variables: {
+    count: 100000001,
+}
+-------------------------------------------------------------------------------
