@@ -545,6 +545,14 @@ def test_striptags():
     assert env.eval_expr("'<a>&auml;</a>'|striptags") == "ä"
 
 
+def test_wordwrap():
+    env = Environment()
+    assert (
+        env.eval_expr("text|wordwrap(width=20)", text="the quick brown fox jumps")
+        == "the quick brown fox\njumps"
+    )
+
+
 def test_attribute_lookups():
     class X:
         def __getattr__(self, _):
