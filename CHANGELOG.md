@@ -4,7 +4,6 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
-* Added the `wordwrap` filter to the Python bindings.  #885
 * Made mutable `State` the canonical path for functions, filters, tests, objects, methods, formatters, and nested macro calls. Read-only typed callbacks can continue to use `&State`; state mutation and dynamic calls now require `&mut State`. Added typed render-local extensions that persist through includes, blocks, and macros.
 * Removed `State::get_or_set_temp_object`; use typed render-local extensions instead of object wrappers and interior mutability.
 * Removed Rust APIs deprecated before 3.0: `Template::render_and_return_state`, `Template::render_to_write`, `Template::eval_to_state`, the `Filter`, `Test`, `TestResult`, and `ViaDeserialize` aliases, `value::intern`, and the no-op `key_interning` feature. The no-op `loader` feature was also removed; loader APIs remain available unconditionally.
@@ -17,6 +16,10 @@ All notable changes to MiniJinja are documented here.
 * Added native Rust tuple conversions and `Value::from_pairs`. Collecting pairs directly into `Value` now creates a sequence of tuples rather than a map.
 * Replaced `ViaDeserialize` with the unified `value::Serde` adapter for both explicit serialization and function argument deserialization.
 * Changed `Value` function arguments to reject implicit keyword-argument values. Variadic functions that intentionally capture them can use `ValueOrKwargs`.  #596
+
+## 2.24.0
+
+* Added the `wordwrap` filter to the Python bindings.  #885
 * Fixed conditional expressions in keyword argument values for Jinja2 compatibility in Rust and Go.  #921
 * Fixed `context!` sorting keys when the `preserve_order` feature is enabled.  #920
 * Limited string repetition to 100 MB in Rust and Go to prevent excessive memory allocations.
