@@ -1,0 +1,13 @@
+{
+  "x": "value",
+  "empty": "",
+  "wide": 4
+}
+---
+function-true: {{ namespace(name=x if x else 'default').name }}
+function-false: {{ namespace(name=empty if empty else 'default').name }}
+missing-else: {{ namespace(name=empty if empty).name is undefined }}
+multiple: {{ dict(a=1 if false else 2, b=3).a }}, {{ dict(a=1 if false else 2, b=3).b }}
+nested: {{ namespace(value=1 if false else 2 if false else 3).value }}
+filter: {{ 'x\ny'|indent(width=wide if wide else 2)|tojson }}
+{% macro echo(value) %}{{ value }}{% endmacro %}macro: {{ echo(value='left' if false else 'right') }}
