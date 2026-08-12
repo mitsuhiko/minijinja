@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+## 2.24.0
+
 * Added the `wordwrap` filter to the Python bindings.  #885
 * Fixed conditional expressions in keyword argument values for Jinja2 compatibility in Rust and Go.  #921
 * Fixed `context!` sorting keys when the `preserve_order` feature is enabled.  #920
