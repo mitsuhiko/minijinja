@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/syntax"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
 // DebugInfo is a snapshot of debug information captured during rendering.

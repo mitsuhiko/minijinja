@@ -13,7 +13,7 @@ Ok(
                             id: "foo",
                         } @ 1:3-1:6,
                         subscript_expr: Const {
-                            value: "bar",
+                            value: 'bar',
                         } @ 1:7-1:12,
                     } @ 1:3-1:13,
                     subscript_expr: Const {

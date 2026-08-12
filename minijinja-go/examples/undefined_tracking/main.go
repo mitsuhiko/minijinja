@@ -10,8 +10,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
 type trackedContext struct {

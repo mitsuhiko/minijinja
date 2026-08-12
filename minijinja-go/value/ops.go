@@ -56,7 +56,18 @@ func (v Value) Add(other Value) (Value, error) {
 		}
 	}
 
-	// Sequence concatenation
+	// Sequence concatenation.  Like Python, tuples only concatenate with tuples.
+	if v.IsTuple() || other.IsTuple() {
+		if v.IsTuple() && other.IsTuple() {
+			s1, _ := v.AsSlice()
+			s2, _ := other.AsSlice()
+			result := make([]Value, 0, len(s1)+len(s2))
+			result = append(result, s1...)
+			result = append(result, s2...)
+			return FromTuple(result), nil
+		}
+		return Undefined(), fmt.Errorf("cannot add %s and %s", v.Kind(), other.Kind())
+	}
 	if s1, ok := v.AsSlice(); ok {
 		if s2, ok := other.AsSlice(); ok {
 			result := make([]Value, 0, len(s1)+len(s2))
@@ -146,6 +157,9 @@ func repeatIterable(seq Value, n int64) (Value, error) {
 	result := make([]Value, 0, len(items)*int(n))
 	for i := int64(0); i < n; i++ {
 		result = append(result, items...)
+	}
+	if seq.IsTuple() {
+		return FromTuple(result), nil
 	}
 	return FromSlice(result), nil
 }
@@ -280,6 +294,9 @@ func (v Value) Equal(other Value) bool {
 	// Sequence comparison
 	if seq1, ok := v.AsSlice(); ok {
 		if seq2, ok := other.AsSlice(); ok {
+			if v.IsTuple() != other.IsTuple() {
+				return false
+			}
 			if len(seq1) != len(seq2) {
 				return false
 			}
@@ -395,9 +412,15 @@ func (v Value) Compare(other Value) (int, bool) {
 		}
 	}
 
-	// Sequence comparison (lexicographic)
+	// Sequence comparison (lexicographic).  Tuples and lists sort separately.
 	if seq1, ok := v.AsSlice(); ok {
 		if seq2, ok := other.AsSlice(); ok {
+			if v.IsTuple() != other.IsTuple() {
+				if v.IsTuple() {
+					return 1, true
+				}
+				return -1, true
+			}
 			minLen := len(seq1)
 			if len(seq2) < minLen {
 				minLen = len(seq2)
@@ -439,6 +462,12 @@ func (v Value) Contains(other Value) bool {
 			return strings.Contains(string(d), s)
 		}
 	case []Value:
+		for _, item := range d {
+			if item.Equal(other) {
+				return true
+			}
+		}
+	case tupleValue:
 		for _, item := range d {
 			if item.Equal(other) {
 				return true

@@ -519,6 +519,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "captured-state"
+version = "0.1.0"
+dependencies = [
+ "minijinja",
+]
+
+[[package]]
 name = "cast"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1068,13 +1075,6 @@ name = "error-code"
 version = "3.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dea2df4cf52843e0452895c455a1a2cfbb842a1e7329671acf418fdc53ed4c59"
-
-[[package]]
-name = "eval-to-state"
-version = "0.1.0"
-dependencies = [
- "minijinja",
-]
 
 [[package]]
 name = "expr"
@@ -1945,7 +1945,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "2.23.0"
+version = "3.0.0-alpha.0"
 dependencies = [
  "aho-corasick",
  "indexmap",
@@ -1963,7 +1963,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-autoreload"
-version = "2.23.0"
+version = "3.0.0-alpha.0"
 dependencies = [
  "minijinja",
  "notify",
@@ -1971,14 +1971,14 @@ dependencies = [
 
 [[package]]
 name = "minijinja-cabi"
-version = "2.23.0"
+version = "3.0.0-alpha.0"
 dependencies = [
  "minijinja",
 ]
 
 [[package]]
 name = "minijinja-cli"
-version = "2.23.0"
+version = "3.0.0-alpha.0"
 dependencies = [
  "anyhow",
  "ciborium",
@@ -2006,7 +2006,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-contrib"
-version = "2.23.0"
+version = "3.0.0-alpha.0"
 dependencies = [
  "chrono",
  "insta",
@@ -2021,11 +2021,11 @@ dependencies = [
 
 [[package]]
 name = "minijinja-embed"
-version = "2.23.0"
+version = "3.0.0-alpha.0"
 
 [[package]]
 name = "minijinja-js"
-version = "2.23.0"
+version = "3.0.0-alpha.0"
 dependencies = [
  "console_error_panic_hook",
  "fragile",
@@ -2033,14 +2033,13 @@ dependencies = [
  "minijinja",
  "minijinja-contrib",
  "serde-wasm-bindgen",
- "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
 
 [[package]]
 name = "minijinja-py"
-version = "2.23.0"
+version = "3.0.0-alpha.0"
 dependencies = [
  "minijinja",
  "minijinja-contrib",
@@ -2462,7 +2461,6 @@ dependencies = [
  "pyo3-build-config",
  "pyo3-ffi",
  "pyo3-macros",
- "serde",
  "unindent",
 ]
 

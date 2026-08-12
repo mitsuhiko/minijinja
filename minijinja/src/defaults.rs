@@ -58,7 +58,7 @@ pub fn default_auto_escape_callback(mut name: &str) -> AutoEscape {
 )]
 /// * [`None`](AutoEscape::None): no escaping
 /// * [`Custom(..)`](AutoEscape::Custom): results in an error
-pub fn escape_formatter(out: &mut Output, state: &State, value: &Value) -> Result<(), Error> {
+pub fn escape_formatter(out: &mut Output, state: &mut State, value: &Value) -> Result<(), Error> {
     write_escaped(out, state.auto_escape(), value)
 }
 
@@ -224,8 +224,9 @@ pub(crate) fn get_builtin_tests() -> Arc<BTreeMap<Cow<'static, str>, Value>> {
 }
 
 fn build_globals() -> BTreeMap<Cow<'static, str>, Value> {
-    #[allow(unused_mut)]
-    let mut rv = BTreeMap::new();
+    let rv = BTreeMap::new();
+    #[cfg(feature = "builtins")]
+    let mut rv = rv;
     #[cfg(feature = "builtins")]
     {
         use crate::functions::{self, BoxedFunction};

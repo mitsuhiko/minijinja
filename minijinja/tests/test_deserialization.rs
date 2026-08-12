@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use serde::{Deserialize, Serialize};
 use similar_asserts::assert_eq;
 
-use minijinja::value::{Enumerator, Object, ObjectRepr, Value};
+use minijinja::value::{Enumerator, Object, ObjectRepr, Serde, Value};
 
 #[test]
 fn test_into_deserializer() {
@@ -50,7 +50,7 @@ fn test_seq_object() {
 
 #[test]
 fn test_map() {
-    let v = BTreeMap::<String, i32>::deserialize(Value::from_iter([
+    let v = BTreeMap::<String, i32>::deserialize(Value::from_pairs([
         ("foo", Value::from(1)),
         ("bar", Value::from(2)),
     ]))
@@ -128,7 +128,7 @@ fn test_invalid() {
         }
     }
 
-    let v = Value::from_serialize(X);
+    let v = Value::from(Serde(X));
     assert_eq!(
         v.to_string(),
         "<invalid value: could not serialize to value: meh>"

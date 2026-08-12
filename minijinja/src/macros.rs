@@ -116,14 +116,8 @@ pub mod __context {
 ///
 /// # Note on Conversions
 ///
-/// This macro uses [`Value::from_serialize`](crate::Value::from_serialize)
-/// for conversions.
-///
-/// This macro currently does not move passed values.  Future versions of
-/// MiniJinja are going to change the move behavior and it's recommended to not
-/// depend on this implicit reference behavior.  You should thus pass values
-/// with `&value` if you intend on still being able to reference them
-/// after the macro invocation.
+/// Values are converted through `Into<Value>`. To convert a Serde value,
+/// wrap it in `minijinja::value::Serde`.
 #[macro_export]
 macro_rules! context {
     () => {
@@ -180,7 +174,7 @@ macro_rules! __context_pair {
         $crate::__context::add(
             &mut $ctx,
             stringify!($key),
-            $crate::value::Value::from_serialize(&$value),
+            $crate::__make_value!($value),
         );
     };
 }
@@ -201,17 +195,27 @@ macro_rules! __context_pair {
 /// ```
 /// # use minijinja::{value::Value, args, Environment};
 /// # let env = Environment::default();
-/// # let state = &env.empty_state();
+/// # let state = &mut env.empty_state();
 /// # let value = Value::from(());
 /// value.call(state, args!(1, 2, foo => "bar"));
 /// ```
 ///
-/// Note that this like [`context!`](crate::context) goes through
-/// [`Value::from_serialize`](crate::value::Value::from_serialize).
+/// Note that this, like [`context!`](crate::context), uses `Into<Value>`
+/// for conversions. Serde values can be wrapped in
+/// `minijinja::value::Serde`.
 #[macro_export]
 macro_rules! args {
     () => { &[][..] as &[$crate::value::Value] };
     ($($arg:tt)*) => { $crate::__args_helper!(branch [[$($arg)*]], [$($arg)*]) };
+}
+
+/// Converts an object into a value
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __make_value {
+    ($expr:expr) => {{
+        $crate::value::Value::from($expr)
+    }};
 }
 
 /// Utility macro for `args!`
@@ -249,17 +253,17 @@ macro_rules! __args_helper {
     // `$args` or `$kwargs` depending on type.
     (peel $args:ident, $kwargs:ident, $has_kwargs:ident, []) => {};
     (peel $args:ident, $kwargs:ident, $has_kwargs:ident, [$name:ident => $expr:expr]) => {
-        $kwargs.push((stringify!($name), $crate::value::Value::from_serialize(&$expr)));
+        $kwargs.push((stringify!($name), $crate::__make_value!($expr)));
     };
     (peel $args:ident, $kwargs:ident, $has_kwargs:ident, [$name:ident => $expr:expr, $($rest:tt)*]) => {
-        $kwargs.push((stringify!($name), $crate::value::Value::from_serialize(&$expr)));
+        $kwargs.push((stringify!($name), $crate::__make_value!($expr)));
         $crate::__args_helper!(peel $args, $kwargs, true, [$($rest)*]);
     };
     (peel $args:ident, $kwargs:ident, false, [$expr:expr]) => {
-        $args.push($crate::value::Value::from_serialize(&$expr));
+        $args.push($crate::__make_value!($expr));
     };
     (peel $args:ident, $kwargs:ident, false, [$expr:expr, $($rest:tt)*]) => {
-        $args.push($crate::value::Value::from_serialize(&$expr));
+        $args.push($crate::__make_value!($expr));
         $crate::__args_helper!(peel $args, $kwargs, false, [$($rest)*]);
     };
 }

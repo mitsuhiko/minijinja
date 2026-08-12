@@ -2,16 +2,13 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 
-#[cfg(feature = "macros")]
-use std::sync::Arc;
-
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::value::Value;
 use crate::vm::loop_object::LoopState;
 
 #[cfg(feature = "macros")]
-use crate::vm::closure_object::Closure;
+use crate::vm::{Closure, ClosureId};
 
 type Locals<'env> = BTreeMap<&'env str, Value>;
 
@@ -26,7 +23,9 @@ pub(crate) struct Frame<'env> {
     // the closure object to enclose the parent values.  This emulates the
     // behavior of closures in Jinja2.
     #[cfg(feature = "macros")]
-    pub(crate) closure: Option<Arc<Closure>>,
+    pub(crate) closure: Option<ClosureId>,
+    #[cfg(feature = "macros")]
+    pub(crate) closure_context: Option<ClosureId>,
 }
 
 impl<'env> Default for Frame<'env> {
@@ -44,6 +43,8 @@ impl<'env> Frame<'env> {
             current_loop: None,
             #[cfg(feature = "macros")]
             closure: None,
+            #[cfg(feature = "macros")]
+            closure_context: None,
         }
     }
 
@@ -131,17 +132,35 @@ impl From<Vec<Value>> for Stack {
 pub(crate) struct Context<'env> {
     env: &'env Environment<'env>,
     stack: Vec<Frame<'env>>,
+    #[cfg(any(feature = "macros", feature = "multi_template"))]
     outer_stack_depth: usize,
     recursion_limit: usize,
 }
 
-impl fmt::Debug for Context<'_> {
+pub(super) struct ContextDebug<'a, 'env> {
+    context: &'a Context<'env>,
+    #[cfg(feature = "macros")]
+    closures: &'a [Closure<'env>],
+}
+
+impl fmt::Debug for ContextDebug<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut vars = Vec::from_iter(self.known_variables(false));
+        let mut vars = Vec::from_iter(self.context.known_variables(
+            #[cfg(feature = "macros")]
+            self.closures,
+            false,
+        ));
         vars.sort();
         f.debug_map()
             .entries(vars.into_iter().map(|key| {
-                let value = self.load(&key).unwrap_or_default();
+                let value = self
+                    .context
+                    .load(
+                        #[cfg(feature = "macros")]
+                        self.closures,
+                        &key,
+                    )
+                    .unwrap_or_default();
                 (key, value)
             }))
             .finish()
@@ -149,11 +168,23 @@ impl fmt::Debug for Context<'_> {
 }
 
 impl<'env> Context<'env> {
+    pub(super) fn debug<'a>(
+        &'a self,
+        #[cfg(feature = "macros")] closures: &'a [Closure<'env>],
+    ) -> ContextDebug<'a, 'env> {
+        ContextDebug {
+            context: self,
+            #[cfg(feature = "macros")]
+            closures,
+        }
+    }
+
     /// Creates an empty context.
     pub fn new(env: &'env Environment<'env>) -> Context<'env> {
         Context {
             env,
             stack: Vec::with_capacity(40),
+            #[cfg(any(feature = "macros", feature = "multi_template"))]
             outer_stack_depth: 0,
             recursion_limit: env.recursion_limit(),
         }
@@ -166,6 +197,18 @@ impl<'env> Context<'env> {
         rv
     }
 
+    #[cfg(feature = "macros")]
+    pub fn reset_with_frame(&mut self, frame: Frame<'env>) {
+        self.clear();
+        self.stack.push(frame);
+    }
+
+    #[cfg(feature = "macros")]
+    pub fn clear(&mut self) {
+        self.stack.clear();
+        self.outer_stack_depth = 0;
+    }
+
     /// The env
     #[inline(always)]
     pub fn env(&self) -> &'env Environment<'env> {
@@ -173,38 +216,37 @@ impl<'env> Context<'env> {
     }
 
     /// Stores a variable in the context.
-    pub fn store(&mut self, key: &'env str, value: Value) {
+    pub fn store(
+        &mut self,
+        #[cfg(feature = "macros")] closures: &mut [Closure<'env>],
+        key: &'env str,
+        value: Value,
+    ) {
         let top = self.stack.last_mut().unwrap();
         #[cfg(feature = "macros")]
-        {
-            if let Some(ref closure) = top.closure {
-                closure.store(key, value.clone());
-            }
+        if let Some(closure) = top.closure {
+            closures[closure].insert(key, value.clone());
         }
         top.locals.insert(key, value);
     }
 
     /// Adds a value to a closure if missing.
     ///
-    /// All macros declare on a certain level reuse the same closure.  This is done
-    /// to emulate the behavior of how scopes work in Jinja2 in Python.  The
-    /// unfortunate downside is that this has to be done with a `Mutex`.
+    /// All macros declared on a certain level reuse the same closure.  This is
+    /// done to emulate the behavior of how scopes work in Jinja2 in Python.
     #[cfg(feature = "macros")]
-    pub fn enclose(&mut self, key: &str) {
-        self.stack
-            .last_mut()
-            .unwrap()
-            .closure
-            .as_mut()
-            .unwrap()
-            .clone()
-            .store_if_missing(key, || self.load(key).unwrap_or(Value::UNDEFINED));
+    pub fn enclose(&self, closures: &mut [Closure<'env>], key: &'env str) {
+        let closure = self.stack.last().unwrap().closure.unwrap();
+        if !closures[closure].contains_key(key) {
+            let value = self.load(closures, key).unwrap_or(Value::UNDEFINED);
+            closures[closure].insert(key, value);
+        }
     }
 
-    /// Loads the closure and returns it.
+    /// Returns the closure receiving stores in the current frame.
     #[cfg(feature = "macros")]
-    pub fn closure(&mut self) -> Option<&Arc<Closure>> {
-        self.stack.last_mut().unwrap().closure.as_ref()
+    pub fn closure(&self) -> Option<ClosureId> {
+        self.stack.last().unwrap().closure
     }
 
     /// Temporarily takes the closure.
@@ -217,13 +259,13 @@ impl<'env> Context<'env> {
     /// including in the parent template, it will not override the value seen by
     /// the macro.
     #[cfg(all(feature = "multi_template", feature = "macros"))]
-    pub fn take_closure(&mut self) -> Option<Arc<Closure>> {
+    pub fn take_closure(&mut self) -> Option<ClosureId> {
         self.stack.last_mut().unwrap().closure.take()
     }
 
     /// Puts the closure back.
     #[cfg(feature = "macros")]
-    pub fn reset_closure(&mut self, closure: Option<Arc<Closure>>) {
+    pub fn reset_closure(&mut self, closure: Option<ClosureId>) {
         self.stack.last_mut().unwrap().closure = closure;
     }
 
@@ -237,7 +279,11 @@ impl<'env> Context<'env> {
     }
 
     /// Looks up a variable in the context.
-    pub fn load(&self, key: &str) -> Option<Value> {
+    pub fn load(
+        &self,
+        #[cfg(feature = "macros")] closures: &[Closure<'env>],
+        key: &str,
+    ) -> Option<Value> {
         for frame in self.stack.iter().rev() {
             // look at locals first
             if let Some(value) = frame.locals.get(key) {
@@ -248,6 +294,13 @@ impl<'env> Context<'env> {
             if let Some(ref l) = frame.current_loop {
                 if l.with_loop_var && key == "loop" {
                     return Some(Value::from_dyn_object(l.object.clone()));
+                }
+            }
+
+            #[cfg(feature = "macros")]
+            if let Some(closure) = frame.closure_context {
+                if let Some(value) = closures.get(closure).and_then(|closure| closure.get(key)) {
+                    return Some(value.clone());
                 }
             }
 
@@ -262,18 +315,27 @@ impl<'env> Context<'env> {
     }
 
     /// Returns an iterable of all declared variables.
-    pub fn known_variables(&self, with_globals: bool) -> HashSet<Cow<'_, str>> {
+    pub fn known_variables(
+        &self,
+        #[cfg(feature = "macros")] closures: &[Closure<'env>],
+        with_globals: bool,
+    ) -> HashSet<Cow<'_, str>> {
         let mut seen = HashSet::<Cow<'_, str>>::new();
         for frame in self.stack.iter().rev() {
             for key in frame.locals.keys() {
-                if !seen.contains(&Cow::Borrowed(*key)) {
-                    seen.insert(Cow::Borrowed(key));
-                }
+                seen.insert(Cow::Borrowed(*key));
             }
 
             if let Some(ref l) = frame.current_loop {
-                if l.with_loop_var && !seen.contains("loop") {
+                if l.with_loop_var {
                     seen.insert(Cow::Borrowed("loop"));
+                }
+            }
+
+            #[cfg(feature = "macros")]
+            if let Some(closure) = frame.closure_context {
+                if let Some(closure) = closures.get(closure) {
+                    seen.extend(closure.keys().map(|key| Cow::Borrowed(*key)));
                 }
             }
 
@@ -297,8 +359,11 @@ impl<'env> Context<'env> {
 
     /// Pushes a new layer.
     pub fn push_frame(&mut self, layer: Frame<'env>) -> Result<(), Error> {
-        ok!(self.check_depth());
         self.stack.push(layer);
+        if let Err(err) = self.check_depth() {
+            self.stack.pop();
+            return Err(err);
+        }
         Ok(())
     }
 
@@ -322,12 +387,11 @@ impl<'env> Context<'env> {
     }
 
     /// Returns the current innermost loop state.
-    pub fn current_loop(&mut self) -> Option<&mut LoopState> {
+    pub fn current_loop(&self) -> Option<&LoopState> {
         self.stack
-            .iter_mut()
+            .iter()
             .rev()
-            .filter_map(|x| x.current_loop.as_mut())
-            .next()
+            .find_map(|frame| frame.current_loop.as_ref())
     }
 
     pub fn next_loop_item(&mut self) -> Option<Value> {
@@ -343,21 +407,42 @@ impl<'env> Context<'env> {
         item
     }
 
+    #[cfg(feature = "multi_template")]
+    pub(super) fn stack_depth(&self) -> usize {
+        self.stack.len()
+    }
+
+    #[cfg(feature = "multi_template")]
+    pub(super) fn restore_stack_depth(&mut self, depth: usize) {
+        debug_assert!(self.stack.len() >= depth);
+        self.stack.truncate(depth);
+    }
+
     /// The real depth of the context.
+    #[cfg(any(feature = "macros", feature = "multi_template"))]
     pub fn depth(&self) -> usize {
         self.outer_stack_depth + self.stack.len()
     }
 
+    /// The real depth of the context.
+    #[cfg(not(any(feature = "macros", feature = "multi_template")))]
+    pub fn depth(&self) -> usize {
+        self.stack.len()
+    }
+
     /// Increase the stack depth.
-    #[allow(unused)]
+    #[cfg(any(feature = "macros", feature = "multi_template"))]
     pub fn incr_depth(&mut self, delta: usize) -> Result<(), Error> {
         self.outer_stack_depth += delta;
-        ok!(self.check_depth());
+        if let Err(err) = self.check_depth() {
+            self.outer_stack_depth -= delta;
+            return Err(err);
+        }
         Ok(())
     }
 
     /// Decrease the stack depth.
-    #[allow(unused)]
+    #[cfg(feature = "multi_template")]
     pub fn decr_depth(&mut self, delta: usize) {
         self.outer_stack_depth -= delta;
     }

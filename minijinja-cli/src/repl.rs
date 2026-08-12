@@ -110,7 +110,7 @@ fn eval(
 ) -> Option<Value> {
     match env.compile_expression(line).and_then(|expr| {
         expr.eval(context!(
-            ..Value::from_iter(locals.iter().map(|x| (x.0.clone(), x.1.clone()))),
+            ..Value::from_pairs(locals.iter().map(|x| (x.0.clone(), x.1.clone()))),
             ..ctx.clone()
         ))
     }) {
@@ -126,7 +126,7 @@ fn render(env: &Environment, template: &str, ctx: &Value, locals: &BTreeMap<Stri
     match env.render_str(
         template,
         context!(
-            ..Value::from_iter(locals.iter().map(|x| (x.0.clone(), x.1.clone()))),
+            ..Value::from_pairs(locals.iter().map(|x| (x.0.clone(), x.1.clone()))),
             ..ctx.clone()
         ),
     ) {

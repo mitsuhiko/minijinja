@@ -4,7 +4,5 @@ description: "{%- include \"example_macro.txt\" %}\n{%- set d = \"should never s
 info: {}
 input_file: minijinja/tests/inputs/macro_include.txt
 ---
-
-[1, 2, 3, "closure"]
-[1, 2, "default", "closure"]
-
+[1, 2, 3, 'closure']
+[1, 2, 'default', 'closure']

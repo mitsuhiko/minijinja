@@ -1,6 +1,7 @@
 use std::hint::black_box;
 use std::time::Instant;
 
+use minijinja::value::Serde;
 use minijinja::{context, Environment};
 use serde::Serialize;
 
@@ -85,7 +86,7 @@ fn create_render_env() -> Environment<'static> {
 fn do_render(env: &Environment<'_>) -> String {
     env.get_template("template.html")
         .unwrap()
-        .render(black_box(Context::default()))
+        .render(Serde(black_box(Context::default())))
         .unwrap()
 }
 

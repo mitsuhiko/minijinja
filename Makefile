@@ -1,5 +1,5 @@
-DOC_FEATURES=loader,json,urlencode,custom_syntax,fuel
-TEST_FEATURES=unstable_machinery,builtins,loader,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax,deserialization,serde,loop_controls
+DOC_FEATURES=json,urlencode,custom_syntax,fuel
+TEST_FEATURES=unstable_machinery,builtins,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax,deserialization,serde,loop_controls
 
 .PHONY: all
 all: test
@@ -15,7 +15,10 @@ doc:
 .PHONY: test-msrv
 test-msrv:
 	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES)
-	@$(MAKE) run-tests FEATURES=$(TEST_FEATURES),preserve_order,unicode
+	@$(MAKE) run-speedup-tests FEATURES=$(TEST_FEATURES),preserve_order,unicode
+	@echo "CARGO TEST DEFAULT FEATURES WITHOUT SERDE"
+	@cd minijinja; cargo test --lib --tests
+	@cd minijinja; ! cargo tree --edges normal | grep -Eq '(^| )serde v'
 	@echo "CARGO TEST ALL FEATURES"
 	@cd minijinja; cargo test --all-features
 	@$(MAKE) test-cabi
@@ -64,13 +67,17 @@ snapshot-tests:
 run-tests:
 	@rustup component add rustfmt 2> /dev/null
 	@echo "CARGO TESTS"
-	@cd minijinja; cargo test --features=json,urlencode,internal_debug,loop_controls
-	@echo "CARGO TEST SPEEDUPS"
-	@cd minijinja; cargo test --no-default-features --features=speedups,$(TEST_FEATURES)
+	@cd minijinja; cargo test --lib --tests --features=json,urlencode,internal_debug,loop_controls
+	@$(MAKE) run-speedup-tests FEATURES=$(FEATURES)
 	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
 	@cd minijinja; cargo check --no-default-features --features=debug
 	@cd minijinja-autoreload; cargo test
 	@cd minijinja-contrib; cargo test
+
+.PHONY: run-speedup-tests
+run-speedup-tests:
+	@echo "CARGO TEST SPEEDUPS"
+	@cd minijinja; cargo test --lib --tests --no-default-features --features=speedups,$(FEATURES)
 
 .PHONY: test-cli
 test-cli:
@@ -84,10 +91,6 @@ check:
 	@cd minijinja; cargo check --all-features
 	@echo "check custom-delimiters:"
 	@cd minijinja; cargo check --features=custom_syntax
-	@echo "check custom-delimiters+loader:"
-	@cd minijinja; cargo check --features=custom_syntax,loader
-	@echo "check loader:"
-	@cd minijinja; cargo check --features=loader
 	@echo "check macro only:"
 	@cd minijinja; cargo check --no-default-features --features macros
 	@echo "check multi_template only:"

@@ -1,3 +1,10 @@
+//! String formatting utilities.
+//!
+//! This module implements the printf-style formatting used by the built-in
+//! `format` filter and the `str.format()` style used by
+//! [`minijinja-contrib`](https://docs.rs/minijinja-contrib)'s Python
+//! compatibility support.
+
 use std::fmt::{Display, LowerExp};
 use std::num::FpCategory;
 
@@ -10,8 +17,8 @@ use crate::{Error, ErrorKind, Value};
 /// - printf-style: `{{ "%s, %s!"|format(greeting, name) }}`
 /// - `str.format()` style: `{{ "{}, {}!".format(greeting, name) }}`
 ///
-/// The [`format_filter`] function implements both the styles, and you can invoke a
-/// particular style of formatting by passing this enum as an argument.
+/// The [`format()`] function implements both styles. Select the desired style by
+/// passing the corresponding variant to it.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FormatStyle {
     /// Printf-style format string, described
@@ -34,11 +41,7 @@ pub(crate) enum FormatConversion {
 /// [`FormatStyle`] enum.  It is used to implement the `format` builtin filter,
 /// compatible with jinja2, and to implement the `str.format()` function in Python
 /// compatibility support in minijinja-contrib.
-pub fn format_filter(
-    style: FormatStyle,
-    format_str: &str,
-    args: &[Value],
-) -> Result<String, Error> {
+pub fn format(style: FormatStyle, format_str: &str, args: &[Value]) -> Result<String, Error> {
     match style {
         FormatStyle::Printf => printf_style::format(format_str, args),
         FormatStyle::StrFormat => str_format_style::format(format_str, args),
@@ -48,9 +51,9 @@ pub fn format_filter(
 pub(crate) fn format_printf_with(
     format_str: &str,
     args: &[Value],
-    transform: impl Fn(&Value, FormatConversion) -> Result<Option<Value>, Error>,
+    mut transform: impl FnMut(&Value, FormatConversion) -> Result<Option<Value>, Error>,
 ) -> Result<String, Error> {
-    printf_style::format_with(format_str, args, &transform)
+    printf_style::format_with(format_str, args, &mut transform)
 }
 
 // Token produced by the format string parser
@@ -1143,13 +1146,13 @@ mod printf_style {
     // to the fields found in the string, by formatting the value according to the
     // spec found in the field.
     pub(super) fn format(format_str: &str, args: &[Value]) -> Result<String, Error> {
-        format_with(format_str, args, &|_, _| Ok(None))
+        format_with(format_str, args, &mut |_, _| Ok(None))
     }
 
     pub(super) fn format_with(
         format_str: &str,
         args: &[Value],
-        transform: &impl Fn(&Value, FormatConversion) -> Result<Option<Value>, Error>,
+        transform: &mut impl FnMut(&Value, FormatConversion) -> Result<Option<Value>, Error>,
     ) -> Result<String, Error> {
         let mut input = Tokenizer::new(format_str, FormatStyle::Printf);
         let mut result = String::new();

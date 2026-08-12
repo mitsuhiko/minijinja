@@ -6,8 +6,8 @@
 //! For the most part the existence of the value type can be ignored as
 //! MiniJinja will perform the necessary conversions for you.  For instance
 //! if you write a filter that converts a string you can directly declare the
-//! filter to take a [`String`].  However for some more advanced use cases it's
-//! useful to know that this type exists.
+//! filter to take a [`String`].  However for some more advanced use cases
+//! it's useful to know that this type exists.
 //!
 //! # Basic Value Conversions
 //!
@@ -27,8 +27,8 @@
 //! });
 //! ```
 //!
-//! Or via the [`FromIterator`] trait which can create sequences or maps.  When
-//! given a tuple it creates maps, otherwise it makes a sequence.
+//! Or via the [`FromIterator`] trait, which creates sequences.  Maps can be
+//! created from pairs with [`Value::from_pairs`].
 //!
 //! ```
 //! # use minijinja::value::Value;
@@ -36,7 +36,7 @@
 //! let value: Value = (1..10).into_iter().collect();
 //!
 //! // collection into a map
-//! let value: Value = [("key", "value")].into_iter().collect();
+//! let value = Value::from_pairs([("key", "value")]);
 //! ```
 //!
 //! For certain types of iterators (`Send` + `Sync` + `'static`) it's also
@@ -84,18 +84,24 @@
 //!
 //! # Serde Conversions
 //!
-//! MiniJinja will usually however create values via an indirection via [`serde`] when
-//! a template is rendered or an expression is evaluated.  This can also be
-//! triggered manually by using the [`Value::from_serialize`] method:
+//! Serde conversion is available explicitly through the `Serde` wrapper when
+//! the `serde` feature is enabled.
 //!
-//! ```
-//! # use minijinja::value::Value;
-//! let value = Value::from_serialize(&[1, 2, 3]);
-//! ```
+#![cfg_attr(
+    feature = "serde",
+    doc = r"
+```
+# use minijinja::value::{Serde, Value};
+let value = Value::from(Serde(&[1, 2, 3]));
+```
+"
+)]
+//! Rendering APIs primarily accept `Into<Value>`. Wrap custom Serde contexts in
+//! `Serde` when passing them to those APIs.
 //!
-//! The inverse of that operation is to pass a value directly as serializer to
-//! a type that supports deserialization.  This requires the `deserialization`
-//! feature.
+//! The inverse of the serialize operation is to pass a value directly as
+//! serializer to a type that supports deserialization.  This requires the
+//! `deserialization` feature.
 //!
 #![cfg_attr(
     feature = "deserialization",
@@ -169,9 +175,9 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //!
 //! Invalid values are typically encountered in the following situations:
 //!
-//! - serialization fails with an error: this is the case when a value is crated
-//!   via [`Value::from_serialize`] and the underlying [`Serialize`] implementation
-//!   fails with an error.
+//! - serialization fails with an error: this is the case when a value is created
+//!   through `Serde` and the underlying `serde::Serialize` implementation fails
+//!   with an error.
 //! - fallible iteration: there might be situations where an iterator cannot indicate
 //!   failure ahead of iteration and must abort.  In that case the only option an
 //!   iterator in MiniJinja has is to create an invalid value.
@@ -200,23 +206,25 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 // on the content module in serde::private::ser.
 
 use core::str;
+#[cfg(feature = "serde")]
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
+#[cfg(feature = "serde")]
 use std::collections::BTreeMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 
-use serde::ser::{Serialize, SerializeTupleStruct, Serializer};
+#[cfg(feature = "serde")]
+use serde::ser::SerializeTupleStruct;
 
 use crate::error::{Error, ErrorKind};
 use crate::functions;
 use crate::value::ops::as_f64;
-use crate::value::serialize::transform;
 use crate::vm::State;
 
 pub use crate::value::argtypes::{
-    from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest, StringInput,
+    from_args, ArgType, FunctionArgs, FunctionResult, Kwargs, Rest, StringInput, ValueOrKwargs,
 };
 pub use crate::value::merge_object::merge_maps;
 pub use crate::value::object::{DynObject, Enumerator, Object, ObjectExt, ObjectRepr};
@@ -230,13 +238,68 @@ pub(crate) mod merge_object;
 pub(crate) mod namespace_object;
 mod object;
 pub(crate) mod ops;
-mod serialize;
 
-#[cfg(feature = "deserialization")]
-pub use self::deserialize::ViaDeserialize;
+mod serialize;
+mod tuple;
+
+pub use self::tuple::Tuple;
+
+/// Converts between a Rust type and a template value through Serde.
+///
+/// This wrapper lets [`Value::from`] and APIs accepting `Into<Value>` use
+/// Serde without making serialization the default conversion mechanism.  It
+/// can also be used as a function argument to deserialize a [`Value`] into a
+/// Rust type when the `deserialization` feature is enabled.
+///
+/// ```
+/// use minijinja::value::{Serde, Value};
+///
+/// let value = Value::from(Serde(&[1, 2, 3]));
+/// ```
+#[cfg_attr(
+    feature = "deserialization",
+    doc = r#"
+As a function argument, `Serde<T>` deserializes a template value into `T`:
+
+```rust
+# use minijinja::Environment;
+# use serde::Deserialize;
+# let mut env = Environment::new();
+use minijinja::value::Serde;
+use std::path::PathBuf;
+
+fn dirname(path: Serde<PathBuf>) -> String {
+    path.display().to_string()
+}
+
+# env.add_filter("dirname", dirname);
+```
+"#
+)]
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+#[derive(Clone, Copy, Debug)]
+pub struct Serde<T>(pub T);
+
+#[cfg(feature = "serde")]
+impl<T> std::ops::Deref for Serde<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<T> std::ops::DerefMut for Serde<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
 
 // We use in-band signalling to roundtrip some internal values.  This is
 // not ideal but unfortunately there is no better system in serde today.
+#[cfg(feature = "serde")]
 const VALUE_HANDLE_MARKER: &str = "\x01__minijinja_ValueHandle";
 
 #[cfg(feature = "preserve_order")]
@@ -258,11 +321,13 @@ pub(crate) fn value_map_with_capacity(capacity: usize) -> ValueMap {
     }
 }
 
+#[cfg(feature = "serde")]
 pub(crate) struct ValueHandleRegistry {
     single: Option<(u32, Value)>,
     overflow: BTreeMap<u32, Value>,
 }
 
+#[cfg(feature = "serde")]
 impl ValueHandleRegistry {
     const fn new() -> Self {
         Self {
@@ -295,6 +360,7 @@ impl ValueHandleRegistry {
     }
 }
 
+#[cfg(feature = "serde")]
 thread_local! {
     static INTERNAL_SERIALIZATION: Cell<bool> = const { Cell::new(false) };
 
@@ -306,29 +372,32 @@ thread_local! {
 
 /// Function that returns true when serialization for [`Value`] is taking place.
 ///
-/// MiniJinja internally creates [`Value`] objects from all values passed to the
-/// engine.  It does this by going through the regular serde serialization trait.
-/// In some cases users might want to customize the serialization specifically for
-/// MiniJinja because they want to tune the object for the template engine
-/// independently of what is normally serialized to disk.
+/// When a value is converted through the `Serde` wrapper, MiniJinja uses the
+/// regular Serde serialization trait. In some cases users might want to customize
+/// that serialization for the template engine independently of what is normally
+/// serialized to disk.
 ///
 /// This function returns `true` when MiniJinja is serializing to [`Value`] and
-/// `false` otherwise.  You can call this within your own [`Serialize`]
+/// `false` otherwise. You can call this within your own `serde::Serialize`
 /// implementation to change the output format.
 ///
 /// This is particularly useful as serialization for MiniJinja does not need to
 /// support deserialization.  So it becomes possible to completely change what
 /// gets sent there, even at the cost of serializing something that cannot be
 /// deserialized.
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 pub fn serializing_for_value() -> bool {
     INTERNAL_SERIALIZATION.with(|flag| flag.get())
 }
 
+#[cfg(feature = "serde")]
 struct InternalSerializationGuard<'a> {
     flag: &'a Cell<bool>,
     reset_on_drop: bool,
 }
 
+#[cfg(feature = "serde")]
 impl Drop for InternalSerializationGuard<'_> {
     fn drop(&mut self) {
         if self.reset_on_drop {
@@ -472,6 +541,47 @@ pub(crate) enum ValueRepr {
     Object(DynObject),
 }
 
+fn python_string_debug_fmt(value: &str, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let quote = if value.contains('\'') && !value.contains('"') {
+        '"'
+    } else {
+        '\''
+    };
+    let quote_str = if quote == '\'' { "'" } else { "\"" };
+
+    f.write_str(quote_str)?;
+    let mut last = 0;
+    for (idx, ch) in value.char_indices() {
+        let escaped = match ch {
+            '\'' if quote == '\'' => Some("\\'"),
+            '"' if quote == '"' => Some("\\\""),
+            '\\' => Some("\\\\"),
+            '\n' => Some("\\n"),
+            '\r' => Some("\\r"),
+            '\t' => Some("\\t"),
+            _ => None,
+        };
+        if let Some(escaped) = escaped {
+            f.write_str(&value[last..idx])?;
+            f.write_str(escaped)?;
+            last = idx + ch.len_utf8();
+        } else if ch.is_control() {
+            f.write_str(&value[last..idx])?;
+            let codepoint = ch as u32;
+            if codepoint <= 0xff {
+                write!(f, "\\x{codepoint:02x}")?;
+            } else if codepoint <= 0xffff {
+                write!(f, "\\u{codepoint:04x}")?;
+            } else {
+                write!(f, "\\U{codepoint:08x}")?;
+            }
+            last = idx + ch.len_utf8();
+        }
+    }
+    f.write_str(&value[last..])?;
+    f.write_str(quote_str)
+}
+
 impl fmt::Debug for ValueRepr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
@@ -484,8 +594,8 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {val}>"),
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-            ValueRepr::String(ref val, _) => fmt::Debug::fmt(val, f),
-            ValueRepr::SmallStr(ref val) => fmt::Debug::fmt(val.as_str(), f),
+            ValueRepr::String(ref val, _) => python_string_debug_fmt(val, f),
+            ValueRepr::SmallStr(ref val) => python_string_debug_fmt(val.as_str(), f),
             ValueRepr::Bytes(ref val) => {
                 write!(f, "b'")?;
                 for &b in val.iter() {
@@ -511,7 +621,10 @@ impl Hash for Value {
             ValueRepr::Bool(b) => b.hash(state),
             ValueRepr::Invalid(ref e) => (e.kind(), e.detail()).hash(state),
             ValueRepr::Bytes(ref b) => b.hash(state),
-            ValueRepr::Object(ref d) => d.hash(state),
+            ValueRepr::Object(ref d) => {
+                self.is_tuple().hash(state);
+                d.hash(state);
+            }
             ValueRepr::U64(_)
             | ValueRepr::I64(_)
             | ValueRepr::F64(_)
@@ -545,6 +658,9 @@ impl PartialEq for Value {
                 Some(ops::CoerceResult::Str(a, b)) => a == b,
                 None => {
                     if let (Some(a), Some(b)) = (self.as_object(), other.as_object()) {
+                        if self.is_tuple() != other.is_tuple() {
+                            return false;
+                        }
                         if a.is_same_object(b) {
                             return true;
                         } else if a.is_same_object_type(b) {
@@ -739,6 +855,11 @@ impl Ord for Value {
                     let a = self.as_object().unwrap();
                     let b = other.as_object().unwrap();
 
+                    match self.is_tuple().cmp(&other.is_tuple()) {
+                        Ordering::Equal => {}
+                        rv => return rv,
+                    }
+
                     if a.is_same_object(b) {
                         Ordering::Equal
                     } else {
@@ -824,12 +945,6 @@ impl Default for Value {
     }
 }
 
-#[doc(hidden)]
-#[deprecated = "This function no longer has an effect.  Use Arc::from directly."]
-pub fn intern(s: &str) -> Arc<str> {
-    Arc::from(s.to_string())
-}
-
 #[allow(clippy::len_without_is_empty)]
 impl Value {
     /// The undefined value.
@@ -838,43 +953,21 @@ impl Value {
     /// and this is the only way to construct it.
     pub const UNDEFINED: Value = Value(ValueRepr::Undefined(UndefinedType::Default));
 
-    /// Creates a value from something that can be serialized.
+    /// Creates a map value from an iterator of key-value pairs.
     ///
-    /// This is the method that MiniJinja will generally use whenever a serializable
-    /// object is passed to one of the APIs that internally want to create a value.
-    /// For instance this is what [`context!`](crate::context) and
-    /// [`render`](crate::Template::render) will use.
-    ///
-    /// During serialization of the value, [`serializing_for_value`] will return
-    /// `true` which makes it possible to customize serialization for MiniJinja.
-    /// For more information see [`serializing_for_value`].
-    ///
-    /// ```
-    /// # use minijinja::value::Value;
-    /// let val = Value::from_serialize(&vec![1, 2, 3]);
-    /// ```
-    ///
-    /// This method does not fail but it might return a value that is not valid.  Such
-    /// values will when operated on fail in the template engine in most situations.
-    /// This for instance can happen if the underlying implementation of [`Serialize`]
-    /// fails.  There are also cases where invalid objects are silently hidden in the
-    /// engine today.  This is for instance the case for when keys are used in hash maps
-    /// that the engine cannot deal with.  Invalid values are considered an implementation
-    /// detail.  There is currently no API to validate a value.
-    ///
-    /// If the `deserialization` feature is enabled then the inverse of this method
-    /// is to use the [`Value`] type as serializer.  You can pass a value into the
-    /// [`deserialize`](serde::Deserialize::deserialize) method of a type that supports
-    /// serde deserialization.
-    pub fn from_serialize<T: Serialize>(value: T) -> Value {
-        INTERNAL_SERIALIZATION.with(|flag| {
-            let old = flag.replace(true);
-            let _serialization_guard = InternalSerializationGuard {
-                flag,
-                reset_on_drop: !old,
-            };
-            transform(value)
-        })
+    /// Unlike collecting directly into a [`Value`], which creates a sequence,
+    /// this method interprets two-item tuples as map entries.
+    pub fn from_pairs<I, K, V>(iter: I) -> Value
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<Value>,
+        V: Into<Value>,
+    {
+        Value::from_object(
+            iter.into_iter()
+                .map(|(key, value)| (key.into(), value.into()))
+                .collect::<ValueMap>(),
+        )
     }
 
     /// Extracts a contained error.
@@ -1247,9 +1340,14 @@ impl Value {
         )
     }
 
+    /// Returns `true` if the value is a tuple.
+    pub fn is_tuple(&self) -> bool {
+        self.downcast_object_ref::<Tuple>().is_some()
+    }
+
     /// Returns `true` if the map represents keyword arguments.
     pub fn is_kwargs(&self) -> bool {
-        Kwargs::extract(self).is_some()
+        Kwargs::is_kwargs(self)
     }
 
     /// Is this value considered true?
@@ -1536,7 +1634,7 @@ impl Value {
                     let mut v = if let ObjectRepr::Map = o.repr() {
                         iter.map(|(k, _)| k).collect::<Vec<_>>()
                     } else {
-                        iter.map(|(k, v)| [k, v].into()).collect::<Vec<_>>()
+                        iter.map(Value::from).collect::<Vec<_>>()
                     };
                     v.reverse();
                     Some(Value::make_object_iterable(v, move |v| {
@@ -1569,7 +1667,7 @@ impl Value {
                                 Box::new(iter.map(|(k, _)| k))
                                     as Box<dyn Iterator<Item = Value> + Send + Sync>
                             } else {
-                                Box::new(iter.map(|(k, v)| [k, v].into()))
+                                Box::new(iter.map(Value::from))
                                     as Box<dyn Iterator<Item = Value> + Send + Sync>
                             }
                         } else {
@@ -1708,7 +1806,7 @@ impl Value {
     /// # let mut env = Environment::new();
     /// # env.add_template("foo", "").unwrap();
     /// # let tmpl = env.get_template("foo").unwrap();
-    /// # let state = tmpl.new_state(); let state = &state;
+    /// # let mut state = tmpl.new_state(); let state = &mut state;
     /// let func = Value::from_function(|v: i64, kwargs: Kwargs| {
     ///     v * kwargs.get::<i64>("mult").unwrap_or(1)
     /// });
@@ -1730,14 +1828,14 @@ impl Value {
     /// # let mut env = Environment::new();
     /// # env.add_template("foo", "").unwrap();
     /// # let tmpl = env.get_template("foo").unwrap();
-    /// # let state = tmpl.new_state(); let state = &state;
+    /// # let mut state = tmpl.new_state(); let state = &mut state;
     /// let func = Value::from_function(|v: i64, kwargs: Kwargs| {
     ///     v * kwargs.get::<i64>("mult").unwrap_or(1)
     /// });
     /// let rv = func.call(state, args!(42, mult => 2)).unwrap();
     /// assert_eq!(rv, Value::from(84));
     /// ```
-    pub fn call(&self, state: &State, args: &[Value]) -> Result<Value, Error> {
+    pub fn call(&self, state: &mut State, args: &[Value]) -> Result<Value, Error> {
         if let ValueRepr::Object(ref dy) = self.0 {
             dy.call(state, args)
         } else {
@@ -1754,7 +1852,12 @@ impl Value {
     /// slice.  Method lookup first tries methods implemented by the object, then
     /// the environment's unknown method callback, and finally a callable value
     /// stored under `name` on the object.
-    pub fn call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    pub fn call_method(
+        &self,
+        state: &mut State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, Error> {
         match self._call_method(state, name, args) {
             Ok(rv) => Ok(rv),
             Err(mut err) => {
@@ -1794,7 +1897,7 @@ impl Value {
         }
     }
 
-    fn _call_method(&self, state: &State, name: &str, args: &[Value]) -> Result<Value, Error> {
+    fn _call_method(&self, state: &mut State, name: &str, args: &[Value]) -> Result<Value, Error> {
         if let Some(object) = self.as_object() {
             object.call_method(state, name, args)
         } else {
@@ -1825,10 +1928,25 @@ impl Value {
     }
 }
 
-impl Serialize for Value {
+#[cfg(feature = "serde")]
+impl<T: serde::Serialize> From<Serde<T>> for Value {
+    fn from(value: Serde<T>) -> Value {
+        INTERNAL_SERIALIZATION.with(|flag| {
+            let old = flag.replace(true);
+            let _serialization_guard = InternalSerializationGuard {
+                flag,
+                reset_on_drop: !old,
+            };
+            crate::value::serialize::transform(value.0)
+        })
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::ser::Serializer,
     {
         // enable round tripping of values
         if serializing_for_value() {
@@ -2007,7 +2125,7 @@ mod tests {
         let x = Arc::new(X(Default::default()));
         let x_value = Value::from_dyn_object(x.clone());
         x.0.fetch_add(42, atomic::Ordering::Relaxed);
-        let x_clone = Value::from_serialize(&x_value);
+        let x_clone = Value::from(&x_value);
         x.0.fetch_add(23, atomic::Ordering::Relaxed);
 
         assert_eq!(x_value.to_string(), "65");

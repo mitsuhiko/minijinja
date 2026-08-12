@@ -1,9 +1,13 @@
 #![cfg(feature = "builtins")]
 use std::collections::HashMap;
 
-use minijinja::{context, render, Environment, ErrorKind, State, UndefinedBehavior};
+use minijinja::{context, render, Environment, ErrorKind, State, UndefinedBehavior, Value};
 
 use similar_asserts::assert_eq;
+
+fn empty_map() -> Value {
+    Value::from_pairs(HashMap::<String, String>::new())
+}
 
 #[test]
 fn test_lenient_undefined() {
@@ -31,7 +35,7 @@ fn test_lenient_undefined() {
     assert_eq!(render!(in env, "{{ not undefined }}"), "True");
     assert_eq!(render!(in env, "{{ undefined is undefined }}"), "True");
     assert_eq!(
-        render!(in env, "{{ x.foo is undefined }}", x => HashMap::<String, String>::new()),
+        render!(in env, "{{ x.foo is undefined }}", x => empty_map()),
         "True"
     );
     assert_eq!(render!(in env, "{{ undefined|list }}"), "[]");
@@ -85,13 +89,13 @@ fn test_semi_strict_undefined() {
     assert_eq!(render!(in env, "{{ undefined is undefined }}"), "True");
     assert_eq!(render!(in env, "<{{ 42 if false }}>"), "<>");
     assert_eq!(
-        render!(in env, "{{ x.foo is undefined }}", x => HashMap::<String, String>::new()),
+        render!(in env, "{{ x.foo is undefined }}", x => empty_map()),
         "True"
     );
     assert_eq!(
         env.render_str(
             "<{% if x.foo %}...{% endif %}>",
-            context! { x => HashMap::<String, String>::new() }
+            context! { x => empty_map() }
         )
         .unwrap(),
         "<>"
@@ -225,13 +229,13 @@ fn test_strict_undefined() {
     assert_eq!(render!(in env, "{{ undefined is undefined }}"), "True");
     assert_eq!(env.render_str("<{{ 42 if false }}>", ()).unwrap(), "<>");
     assert_eq!(
-        render!(in env, "{{ x.foo is undefined }}", x => HashMap::<String, String>::new()),
+        render!(in env, "{{ x.foo is undefined }}", x => empty_map()),
         "True"
     );
     assert_eq!(
         env.render_str(
             "{% if x.foo %}...{% endif %}",
-            context! { x => HashMap::<String, String>::new() }
+            context! { x => empty_map() }
         )
         .unwrap_err()
         .kind(),
@@ -329,7 +333,7 @@ fn test_chainable_undefined() {
         "<>"
     );
     assert_eq!(
-        render!(in env, "{{ x.foo is undefined }}", x => HashMap::<String, String>::new()),
+        render!(in env, "{{ x.foo is undefined }}", x => empty_map()),
         "True"
     );
     assert_eq!(render!(in env, "{{ 'foo' is in(undefined) }}"), "False");

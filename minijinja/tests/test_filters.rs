@@ -1,6 +1,6 @@
 #![cfg(feature = "builtins")]
-use minijinja::value::{Kwargs, StringInput, Value, ValueKind};
-use minijinja::{args, context, Environment};
+use minijinja::value::{Kwargs, Rest, StringInput, Value, ValueKind, ValueOrKwargs};
+use minijinja::{args, context, Environment, State};
 use similar_asserts::assert_eq;
 
 use minijinja::filters::abs;
@@ -14,7 +14,7 @@ fn test_filter_with_non() {
 
     let mut env = Environment::new();
     env.add_filter("filter", filter);
-    let state = env.empty_state();
+    let mut state = env.empty_state();
 
     let rv = state
         .apply_filter("filter", args!(Value::UNDEFINED))
@@ -50,6 +50,27 @@ fn test_dotted_filter_name() {
         .render(context!())
         .unwrap();
     assert_eq!(rv, "<hello>");
+}
+
+#[test]
+fn test_kwargs_require_explicit_argument_type() {
+    let mut env = Environment::new();
+    env.add_filter(
+        "optional_value",
+        |_value: Value, optional: Option<Value>| optional.unwrap_or_default(),
+    );
+    assert!(env
+        .render_str("{{ 1|optional_value(unexpected=2) }}", ())
+        .is_err());
+
+    env.add_function("accept_kwargs", |args: Rest<ValueOrKwargs>| {
+        args.last().is_some_and(|value| value.is_kwargs())
+    });
+    assert_eq!(
+        env.render_str("{{ accept_kwargs(answer=42) }}", ())
+            .unwrap(),
+        "True"
+    );
 }
 
 #[test]
@@ -103,7 +124,7 @@ fn test_indent_preserves_safe_input() {
     let mut env = Environment::new();
     env.set_auto_escape_callback(|_| AutoEscape::Html);
 
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     let safe = state
         .apply_filter(
             "indent",
@@ -126,7 +147,7 @@ fn test_indent_preserves_safe_input() {
 #[test]
 fn test_string_filters_preserve_safety() {
     let env = Environment::new();
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     let safe = Value::from_safe_string(" Hello\nWorld ".into());
     let plain = Value::from(" Hello\nWorld ");
 
@@ -153,7 +174,7 @@ fn test_string_filters_preserve_safety() {
 #[test]
 fn test_byte_string_filter_semantics() {
     let env = Environment::new();
-    let state = env.empty_state();
+    let mut state = env.empty_state();
 
     let reversed = state
         .apply_filter(
@@ -210,7 +231,7 @@ fn test_composing_filters_escape_unsafe_fragments() {
          <b>&lt;i&gt;x&lt;&#x2f;i&gt;</b>"
     );
 
-    let state = template.new_state();
+    let mut state = template.new_state();
     let result = state
         .apply_filter(
             "replace",
@@ -299,7 +320,7 @@ fn test_join_streams_when_safety_is_known() {
     }
 
     let env = Environment::new();
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     state
         .apply_filter("join", args!(make_iterable(), ","))
         .unwrap();
@@ -307,7 +328,7 @@ fn test_join_streams_when_safety_is_known() {
     let mut env = Environment::new();
     env.set_auto_escape_callback(|_| AutoEscape::Html);
     let template = env.template_from_str("").unwrap();
-    let state = template.new_state();
+    let mut state = template.new_state();
     state
         .apply_filter(
             "join",
@@ -319,7 +340,7 @@ fn test_join_streams_when_safety_is_known() {
 #[test]
 fn test_safe_format_escapes_without_autoescape() {
     let env = Environment::new();
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     let result = state
         .apply_filter(
             "format",
@@ -390,7 +411,7 @@ fn test_chain_dicts() {
         .template_from_str("{{ {'a': 1} | chain({'b': 2}) | items | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[["a", 1], ["b", 2]]"#);
+    assert_eq!(result, "[('a', 1), ('b', 2)]");
 }
 
 #[test]
@@ -441,7 +462,7 @@ fn test_zip_basic() {
         .template_from_str("{{ [1, 2, 3] | zip(['a', 'b', 'c']) | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[[1, "a"], [2, "b"], [3, "c"]]"#);
+    assert_eq!(result, "[(1, 'a'), (2, 'b'), (3, 'c')]");
 }
 
 #[test]
@@ -452,7 +473,7 @@ fn test_zip_different_lengths() {
         .template_from_str("{{ [1, 2] | zip(['a', 'b', 'c']) | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[[1, "a"], [2, "b"]]"#);
+    assert_eq!(result, "[(1, 'a'), (2, 'b')]");
 }
 
 #[test]
@@ -462,7 +483,7 @@ fn test_zip_multiple_iterables() {
         .template_from_str("{{ [1, 2, 3] | zip(['a', 'b', 'c'], ['x', 'y', 'z']) | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[[1, "a", "x"], [2, "b", "y"], [3, "c", "z"]]"#);
+    assert_eq!(result, "[(1, 'a', 'x'), (2, 'b', 'y'), (3, 'c', 'z')]");
 }
 
 #[test]
@@ -505,7 +526,52 @@ fn test_zip_single_iterable() {
         .template_from_str("{{ [1, 2, 3] | zip() | list }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, "[[1], [2], [3]]");
+    assert_eq!(result, "[(1,), (2,), (3,)]");
+}
+
+#[test]
+fn test_higher_order_filters_propagate_mutable_state() {
+    fn stateful_double(state: &mut State, value: i64) -> i64 {
+        let count = state
+            .get_temp("filter_calls")
+            .and_then(|value| i64::try_from(value).ok())
+            .unwrap_or_default()
+            + 1;
+        state.set_temp("filter_calls", Value::from(count));
+        value * 2
+    }
+
+    fn stateful_odd(state: &mut State, value: i64) -> bool {
+        let count = state
+            .get_temp("test_calls")
+            .and_then(|value| i64::try_from(value).ok())
+            .unwrap_or_default()
+            + 1;
+        state.set_temp("test_calls", Value::from(count));
+        value % 2 != 0
+    }
+
+    fn call_counts(state: &State) -> String {
+        format!(
+            "{}:{}",
+            state.get_temp("filter_calls").unwrap_or_default(),
+            state.get_temp("test_calls").unwrap_or_default()
+        )
+    }
+
+    let mut env = Environment::new();
+    env.add_filter("stateful_double", stateful_double);
+    env.add_test("stateful_odd", stateful_odd);
+    env.add_function("call_counts", call_counts);
+    let result = env
+        .template_from_str(
+            "{{ [1, 2, 3]|map('stateful_double')|list }}|\
+             {{ [1, 2, 3, 4]|select('stateful_odd')|list }}|{{ call_counts() }}",
+        )
+        .unwrap()
+        .render(())
+        .unwrap();
+    assert_eq!(result, "[2, 4, 6]|[1, 3]|3:4");
 }
 
 #[test]
@@ -519,7 +585,7 @@ fn test_sort_attribute_list() {
     let result = tmpl.render(context!()).unwrap();
     assert_eq!(
         result,
-        r#"[{"a": 2, "b": 1, "c": 6}, {"a": 1, "b": 2, "c": 5}]"#
+        "[{'a': 2, 'b': 1, 'c': 6}, {'a': 1, 'b': 2, 'c': 5}]"
     );
 }
 
@@ -541,7 +607,7 @@ fn test_sort_attribute_list_reverse() {
         )
         .unwrap();
     let result = tmpl.render(ctx).unwrap();
-    assert_eq!(result, r#"["Canada", "Australia", "Japan", "India"]"#);
+    assert_eq!(result, "['Canada', 'Australia', 'Japan', 'India']");
 }
 
 #[test]
@@ -551,7 +617,7 @@ fn test_sort_attribute_list_single() {
         .template_from_str(r"{{ [{'a': 1, 'b': 2}, {'a': 2, 'b': 1}] | sort(attribute='b,') }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"[{"a": 2, "b": 1}, {"a": 1, "b": 2}]"#);
+    assert_eq!(result, "[{'a': 2, 'b': 1}, {'a': 1, 'b': 2}]");
 }
 
 #[test]
@@ -594,7 +660,7 @@ fn test_sort_stable_reverse() {
     let result = tmpl.render(context!()).unwrap();
     assert_eq!(
         result,
-        r#"[{"a": 1, "b": 1, "c": 1}, {"a": 1, "b": 1, "c": 2}]"#
+        "[{'a': 1, 'b': 1, 'c': 1}, {'a': 1, 'b': 1, 'c': 2}]"
     );
 }
 
@@ -606,25 +672,40 @@ fn test_sort_strings() {
         .template_from_str("{{ ['aa', 'CC', 'bb'] | sort }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"["aa", "bb", "CC"]"#);
+    assert_eq!(result, "['aa', 'bb', 'CC']");
 
     let tmpl = env
         .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(reverse=True) }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"["CC", "bb", "aa"]"#);
+    assert_eq!(result, "['CC', 'bb', 'aa']");
 
     let tmpl = env
         .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(case_sensitive=True) }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"["CC", "aa", "bb"]"#);
+    assert_eq!(result, "['CC', 'aa', 'bb']");
 
     let tmpl = env
         .template_from_str("{{ ['aa', 'CC', 'bb'] | sort(case_sensitive=True, reverse=True) }}")
         .unwrap();
     let result = tmpl.render(context!()).unwrap();
-    assert_eq!(result, r#"["bb", "aa", "CC"]"#);
+    assert_eq!(result, "['bb', 'aa', 'CC']");
+}
+
+#[test]
+#[cfg(feature = "json")]
+fn test_tojson_uses_jinja_spacing() {
+    let env = Environment::new();
+    let tmpl = env
+        .template_from_str(
+            r#"{{ {"function": {"name": "get_weather", "parameters": {"type": "object"}}, "type": "function"}|tojson }}"#,
+        )
+        .unwrap();
+    assert_eq!(
+        tmpl.render(()).unwrap(),
+        r#"{"function": {"name": "get_weather", "parameters": {"type": "object"}}, "type": "function"}"#
+    );
 }
 
 #[test]

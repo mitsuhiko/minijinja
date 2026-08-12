@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/syntax"
 )
 
 // TokenType represents the type of a token.

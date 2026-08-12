@@ -42,13 +42,26 @@ fn bench_loop_map_items(c: &mut Criterion) {
     let env = create_real_env();
     let tmpl = env.get_template("map_items.jinja").unwrap();
     let ctx = context! {
-        employees => (0..10000).map(|i| (i, format!("Person{i}"))).collect::<Value>(),
+        employees => Value::from_pairs((0..10000).map(|i| (i, format!("Person{i}")))),
     };
     c.bench_function("loop_map_items", |b| {
         b.iter(|| {
             tmpl.render_captured_to(ctx.clone(), std::io::sink())
                 .unwrap()
         });
+    });
+}
+
+fn bench_tuple_ops(c: &mut Criterion) {
+    let mut env = Environment::new();
+    env.add_template(
+        "tuple_ops",
+        "{% for i in range(200) %}{% set pair = (i, i + 1) %}{{ pair[0] }}{% endfor %}",
+    )
+    .unwrap();
+    let tmpl = env.get_template("tuple_ops").unwrap();
+    c.bench_function("tuple_ops", |b| {
+        b.iter(|| tmpl.render_captured_to((), std::io::sink()).unwrap());
     });
 }
 
@@ -76,6 +89,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| do_render(&env));
     });
     bench_loop_map_items(c);
+    bench_tuple_ops(c);
 }
 
 criterion_group!(benches, criterion_benchmark);

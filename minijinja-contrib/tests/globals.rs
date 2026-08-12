@@ -30,7 +30,7 @@ second: [{{ j() }}]
 joiner: {{ j }}"), @r###"
     first: []
     second: [, ]
-    joiner: Joiner { sep: ", ", used: true }
+    joiner: Joiner { sep: ', ', used: true }
     "###);
 
     assert_snapshot!(render!(in env, r"{% set j = joiner('|') -%}
@@ -39,7 +39,7 @@ second: [{{ j() }}]
 joiner: {{ j }}"), @r###"
     first: []
     second: [|]
-    joiner: Joiner { sep: "|", used: true }
+    joiner: Joiner { sep: '|', used: true }
     "###);
 }
 

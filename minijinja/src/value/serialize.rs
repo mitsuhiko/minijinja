@@ -1,3 +1,4 @@
+#![cfg(feature = "serde")]
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -307,7 +308,7 @@ impl ser::SerializeTuple for SerializeTuple {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        Ok(Value::from_object(self.elements))
+        Ok(Value::from(super::Tuple::from(self.elements)))
     }
 }
 

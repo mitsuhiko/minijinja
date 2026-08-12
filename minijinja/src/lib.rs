@@ -5,10 +5,10 @@
 //!
 //! MiniJinja is a powerful but minimal dependency template engine for Rust which
 //! is based on the syntax and behavior of the
-//! [Jinja2](https://jinja.palletsprojects.com/) template engine for Python.  It's
-//! implemented on top of [`serde`].  The goal is to be able to render a large
-//! chunk of the Jinja2 template ecosystem from Rust with a minimal engine and to
-//! leverage an already existing ecosystem of editor integrations.
+//! [Jinja2](https://jinja.palletsprojects.com/) template engine for Python.  The goal
+//! is to be able to render a large chunk of the Jinja2 template ecosystem from
+//! Rust with a minimal engine and to leverage an already existing ecosystem of
+//! editor integrations.
 //!
 //! ```jinja
 //! {% for user in users %}
@@ -36,9 +36,10 @@
 //! # Template Usage
 //!
 //! To use MiniJinja one needs to create an [`Environment`] and populate it with
-//! templates.  Afterwards templates can be loaded and rendered.  To pass data
-//! one can pass any serde serializable value.  The [`context!`] macro can be
-//! used to quickly construct a template context:
+//! templates. Afterwards templates can be loaded and rendered with any value
+//! implementing `Into<Value>`. Serde values can be converted explicitly with
+//! `value::Serde`. The [`context!`] macro can be used to quickly construct
+//! a template context:
 //!
 //! ```
 //! use minijinja::{Environment, context};
@@ -150,16 +151,15 @@
 //!     filter's case insensitive comparison changes to using unicode and not
 //!     ASCII rules.  Without this features only ASCII identifiers can be used
 //!     for variable names and attributes.
-//!   - `serde`: enables or disables serde support.  In current versions of MiniJinja
-//!     it's not possible to disable serde but it will become possible.  To prevent
-//!     breakage, MiniJinja warns if this feature is disabled.
 //!
 //! - **Rust Functionality:**
 //!
+//!   - `serde`: enables Serde conversion through `value::Serde`. It is disabled
+//!     by default.
 //!   - `debug`: if this feature is removed some debug functionality of the engine is
 //!     removed as well.  This mainly affects the quality of error reporting.
 //!   - `deserialization`: when removed this disables deserialization support for
-//!     the [`Value`] type, removes the `ViaDeserialize` type and the error type
+//!     the [`Value`] type, removes Serde-powered function arguments and the error type
 //!     no longer implements `serde::de::Error`.
 //!   - `std_collections`: if this feature is removed some [`Object`](crate::value::Object)
 //!     implementations for standard library collections are removed.  Only the
@@ -169,7 +169,6 @@
 //!
 //! - `fuel`: enables the `fuel` feature which makes the engine track fuel consumption which
 //!   can be used to better protect against expensive templates.
-//! - `loader`: retained for backwards compatibility and now a no-op.
 //! - `custom_syntax`: when this feature is enabled, custom delimiters are supported by
 //!   the parser.
 //! - `preserve_order`: When enable the internal value implementation uses an indexmap
@@ -212,8 +211,6 @@ mod defaults;
 mod environment;
 mod error;
 mod expression;
-#[cfg(feature = "builtins")]
-mod format_utils;
 mod output;
 mod template;
 mod utils;
@@ -221,6 +218,9 @@ mod vendor;
 mod vm;
 
 pub mod filters;
+#[cfg(feature = "builtins")]
+#[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
+pub mod formatting;
 pub mod functions;
 pub mod syntax;
 pub mod tests;
@@ -240,9 +240,6 @@ pub use self::expression::Expression;
 pub use self::output::Output;
 pub use self::template::{Captured, Template};
 pub use self::utils::{AutoEscape, HtmlEscape, UndefinedBehavior};
-
-#[cfg(feature = "builtins")]
-pub use self::format_utils::{format_filter, FormatStyle};
 
 /// Re-export for convenience.
 pub use self::value::Value;
@@ -266,7 +263,6 @@ pub mod machinery {
     pub use crate::compiler::parser::{parse, parse_expr};
     pub use crate::compiler::tokens::{Span, Token};
     pub use crate::template::{CompiledTemplate, TemplateConfig};
-    pub use crate::vm::Vm;
 
     use crate::Output;
 
@@ -280,5 +276,16 @@ pub mod machinery {
     /// Creates an [`Output`] that writes into a string.
     pub fn make_string_output(s: &mut String) -> Output<'_> {
         Output::new(s)
+    }
+
+    pub fn eval<'env, 'template>(
+        env: &'env crate::Environment<'env>,
+        instructions: &'template Instructions<'env>,
+        root: crate::Value,
+        blocks: &'template std::collections::BTreeMap<&'env str, Instructions<'env>>,
+        out: &mut Output,
+        auto_escape: crate::AutoEscape,
+    ) -> Result<(Option<crate::Value>, crate::State<'template, 'env>), crate::Error> {
+        crate::vm::eval(env, instructions, root, blocks, out, auto_escape)
     }
 }

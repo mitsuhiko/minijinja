@@ -11,18 +11,15 @@ fn handle_serde_error(err: serde::de::value::Error) -> Error {
     Error::new(ErrorKind::InvalidOperation, "not a valid date or timestamp").with_source(err)
 }
 
-#[allow(unused)]
 fn value_to_datetime(
     value: Value,
     state: &State,
     kwargs: &Kwargs,
     allow_date: bool,
 ) -> Result<OffsetDateTime, Error> {
-    #[allow(unused)]
     let mut timezone_already_handled = false;
 
-    #[allow(unused_mut)]
-    let (mut datetime, had_time) = if let Some(s) = value.as_str() {
+    let (datetime, had_time) = if let Some(s) = value.as_str() {
         match OffsetDateTime::parse(s, &Iso8601::PARSING) {
             Ok(dt) => (dt, true),
             Err(original_err) => match PrimitiveDateTime::parse(s, &Iso8601::PARSING) {
@@ -82,17 +79,19 @@ fn value_to_datetime(
         ));
     };
 
-    if had_time {
-        #[cfg(feature = "timezone")]
-        {
-            if !timezone_already_handled {
-                if let Some(tz) = get_timezone(state, kwargs)? {
-                    use time_tz::OffsetDateTimeExt;
-                    datetime = datetime.to_timezone(tz);
-                }
-            }
+    #[cfg(feature = "timezone")]
+    let datetime = if had_time && !timezone_already_handled {
+        if let Some(tz) = get_timezone(state, kwargs)? {
+            use time_tz::OffsetDateTimeExt;
+            datetime.to_timezone(tz)
+        } else {
+            datetime
         }
-    } else if !allow_date {
+    } else {
+        datetime
+    };
+
+    if !had_time && !allow_date {
         return Err(Error::new(
             ErrorKind::InvalidOperation,
             "filter requires time, but only received a date",
@@ -102,7 +101,6 @@ fn value_to_datetime(
     Ok(datetime)
 }
 
-#[allow(unused)]
 fn attach_timezone_to_primitive_datetime(
     state: &State<'_, '_>,
     kwargs: &Kwargs,
@@ -123,6 +121,7 @@ fn attach_timezone_to_primitive_datetime(
     }
     #[cfg(not(feature = "timezone"))]
     {
+        let _ = (state, kwargs, timezone_already_handled);
         Ok((dt.assume_utc(), true))
     }
 }

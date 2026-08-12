@@ -1,4 +1,5 @@
 use std::char::decode_utf16;
+#[cfg(feature = "builtins")]
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -524,6 +525,7 @@ pub fn splitn_whitespace(s: &str, maxsplits: usize) -> impl Iterator<Item = &str
 /// we want to catch failed sorts in a landing pad.  This is not ideal but
 /// it at least gives us error context for when invalid search operations
 /// are taking place.
+#[cfg(feature = "builtins")]
 #[cfg_attr(not(feature = "internal_safe_search"), inline)]
 pub fn safe_sort<T, F>(seq: &mut [T], f: F) -> Result<(), Error>
 where

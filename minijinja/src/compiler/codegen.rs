@@ -569,15 +569,15 @@ impl<'source> CodeGenerator<'source> {
         if let ast::Expr::Call(call) = &expr.expr {
             self.set_line_from_span(expr.expr.span());
             match call.identify_call() {
-                ast::CallType::Function(name) => {
-                    if name == "super" && call.args.is_empty() {
-                        self.add_with_span(Instruction::FastSuper, call.span());
-                        return;
-                    } else if name == "loop" && call.args.len() == 1 {
-                        self.compile_call_args(std::slice::from_ref(&call.args[0]), 0, None);
-                        self.add_with_span(Instruction::FastRecurse, call.span());
-                        return;
-                    }
+                #[cfg(feature = "multi_template")]
+                ast::CallType::Function("super") if call.args.is_empty() => {
+                    self.add_with_span(Instruction::FastSuper, call.span());
+                    return;
+                }
+                ast::CallType::Function("loop") if call.args.len() == 1 => {
+                    self.compile_call_args(std::slice::from_ref(&call.args[0]), 0, None);
+                    self.add_with_span(Instruction::FastRecurse, call.span());
+                    return;
                 }
                 #[cfg(feature = "multi_template")]
                 ast::CallType::Block(name) => {
@@ -785,6 +785,13 @@ impl<'source> CodeGenerator<'source> {
                     self.compile_expr(item);
                 }
                 self.add(Instruction::BuildList(Some(l.items.len())));
+            }
+            ast::Expr::Tuple(t) => {
+                self.set_line_from_span(t.span());
+                for item in &t.items {
+                    self.compile_expr(item);
+                }
+                self.add(Instruction::BuildTuple(Some(t.items.len())));
             }
             ast::Expr::Map(m) => {
                 self.set_line_from_span(m.span());

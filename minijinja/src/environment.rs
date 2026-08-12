@@ -3,8 +3,6 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, OnceLock};
 
-use serde::Serialize;
-
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
 use crate::compiler::parser::parse_expr;
@@ -19,10 +17,10 @@ use crate::value::{FunctionArgs, FunctionResult, UndefinedType, Value, ValueRepr
 use crate::vm::State;
 use crate::{defaults, functions};
 
-type FormatterFunc = dyn Fn(&mut Output, &State, &Value) -> Result<(), Error> + Sync + Send;
+type FormatterFunc = dyn Fn(&mut Output, &mut State, &Value) -> Result<(), Error> + Sync + Send;
 type PathJoinFunc = dyn for<'s> Fn(&'s str, &'s str) -> Cow<'s, str> + Sync + Send;
 type UnknownMethodFunc =
-    dyn Fn(&State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send;
+    dyn Fn(&mut State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send;
 
 fn default_auto_escape_callback() -> Arc<AutoEscapeFunc> {
     static DEFAULT_AUTO_ESCAPE: OnceLock<Arc<AutoEscapeFunc>> = OnceLock::new();
@@ -109,15 +107,6 @@ impl<'source> Environment<'source> {
     /// the default filters, tests and globals loaded.  If you do not want any
     /// default configuration you can use the alternative
     /// [`empty`](Environment::empty) method.
-    #[cfg_attr(
-        not(feature = "serde"),
-        deprecated(
-            since = "2.0.4",
-            note = "Attempted to instantiate an environment with serde.  Future \
-        versions of MiniJinja will require enabling the 'serde' feature to use \
-        serde types.  To silence this warning add 'serde' to the list of features of minijinja."
-        )
-    )]
     pub fn new() -> Environment<'source> {
         Environment {
             templates: TemplateStore::new(TemplateConfig::new(default_auto_escape_callback())),
@@ -351,7 +340,7 @@ impl<'source> Environment<'source> {
     /// see [minijinja_contrib::pycompat](https://docs.rs/minijinja-contrib/latest/minijinja_contrib/pycompat/).
     pub fn set_unknown_method_callback<F>(&mut self, f: F)
     where
-        F: Fn(&State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send + 'static,
+        F: Fn(&mut State, &Value, &str, &[Value]) -> Result<Value, Error> + Sync + Send + 'static,
     {
         self.unknown_method_callback = Some(Arc::new(f));
     }
@@ -458,13 +447,11 @@ impl<'source> Environment<'source> {
     /// println!("{}", rv.unwrap());
     /// ```
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
-    /// efficiently passed to render.  It does not undergo actual serialization.
-    pub fn render_named_str<S: Serialize>(
+    pub fn render_named_str<V: Into<Value>>(
         &self,
         name: &str,
         source: &str,
-        ctx: S,
+        ctx: V,
     ) -> Result<String, Error> {
         ok!(self.template_from_named_str(name, source)).render(ctx)
     }
@@ -477,9 +464,7 @@ impl<'source> Environment<'source> {
     /// This is an alias for [`template_from_str`](Self::template_from_str) paired with
     /// [`render`](Template::render).
     ///
-    /// **Note on values:** The [`Value`] type implements `Serialize` and can be
-    /// efficiently passed to render.  It does not undergo actual serialization.
-    pub fn render_str<S: Serialize>(&self, source: &str, ctx: S) -> Result<String, Error> {
+    pub fn render_str<V: Into<Value>>(&self, source: &str, ctx: V) -> Result<String, Error> {
         // reduce total amount of code falling under mono morphization into
         // this function, and share the rest in _eval.
         ok!(self.template_from_str(source)).render(ctx)
@@ -566,7 +551,7 @@ impl<'source> Environment<'source> {
     /// ```
     pub fn set_formatter<F>(&mut self, f: F)
     where
-        F: Fn(&mut Output, &State, &Value) -> Result<(), Error> + 'static + Sync + Send,
+        F: Fn(&mut Output, &mut State, &Value) -> Result<(), Error> + 'static + Sync + Send,
     {
         self.formatter = Arc::new(f);
         self.formatter_is_default = false;
@@ -826,7 +811,7 @@ impl<'source> Environment<'source> {
     pub(crate) fn format(
         &self,
         value: &Value,
-        state: &State,
+        state: &mut State,
         out: &mut Output,
     ) -> Result<(), Error> {
         match (self.undefined_behavior, &value.0) {

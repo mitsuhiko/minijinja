@@ -52,10 +52,10 @@
 //!
 //! # Accessing State
 //!
-//! In some cases it can be necessary to access the execution [`State`].  Since a borrowed
-//! state implements [`ArgType`](crate::value::ArgType) it's possible to add a
-//! parameter that holds the state.  For instance the following filter appends
-//! the current template name to the string:
+//! In some cases it can be necessary to access the execution [`State`].  A filter
+//! can request shared or mutable state by taking `&State` or `&mut State` as its
+//! first parameter.  State is injected separately from the filter's value arguments.
+//! For instance, the following filter appends the current template name to the string:
 //!
 //! ```
 //! # use minijinja::Environment;
@@ -68,6 +68,10 @@
 //!
 //! env.add_filter("append_template", append_template);
 //! ```
+//!
+//! Filters which need to modify the state can instead take `&mut State`.  A
+//! mutable state must be the filter's first parameter and can only be requested
+//! once.
 //!
 //! # Filter configuration
 //!
@@ -124,11 +128,6 @@ use crate::value::Value;
 use crate::vm::State;
 use crate::{AutoEscape, Output};
 
-/// Deprecated alias
-#[deprecated = "Use the minijinja::functions::Function instead"]
-#[doc(hidden)]
-pub use crate::functions::Function as Filter;
-
 /// Marks a value as safe.  This converts it into a string.
 ///
 /// When a value is marked as safe, no further auto escaping will take place.
@@ -142,7 +141,7 @@ pub fn safe(v: String) -> Value {
 /// this filter escapes with the format that is native to the format or HTML
 /// otherwise.  This means that if the auto escape setting is set to
 /// `Json` for instance then this filter will serialize to JSON instead.
-pub fn escape(state: &State, v: &Value) -> Result<Value, Error> {
+pub fn escape(state: &mut State, v: &Value) -> Result<Value, Error> {
     if v.is_safe() {
         return Ok(v.clone());
     }
@@ -182,12 +181,15 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::format_utils::{format_filter, format_printf_with, FormatConversion, FormatStyle};
+    use crate::formatting::{
+        format as format_string, format_printf_with, FormatConversion, FormatStyle,
+    };
     use crate::utils::{safe_sort, splitn_whitespace};
     use crate::value::merge_object::{MergeDict, MergeSeq};
     use crate::value::ops::{self, as_f64, LenIterWrap};
     use crate::value::{
-        Enumerator, Kwargs, Object, ObjectRepr, Rest, StringInput, ValueKind, ValueRepr,
+        Enumerator, Kwargs, Object, ObjectRepr, Rest, StringInput, Tuple, ValueKind, ValueOrKwargs,
+        ValueRepr,
     };
     use std::borrow::Cow;
     use std::cmp::Ordering;
@@ -268,7 +270,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn replace(
-        state: &State,
+        state: &mut State,
         value: StringInput<'_>,
         from: StringInput<'_>,
         to: StringInput<'_>,
@@ -363,7 +365,7 @@ mod builtins {
             cmp_helper(a, b, case_sensitive, reverse)
         })?;
         kwargs.assert_all_used()?;
-        Ok(rv.into_iter().map(|(k, v)| Value::from([k, v])).collect())
+        Ok(rv.into_iter().map(Value::from).collect())
     }
 
     /// Returns an iterable of pairs (items) from a mapping.
@@ -388,7 +390,7 @@ mod builtins {
         if v.kind() == ValueKind::Map {
             Ok(Value::make_object_iterable(v.clone(), |v| {
                 match v.as_object().and_then(|v| v.try_iter_pairs()) {
-                    Some(iter) => Box::new(iter.map(|(key, value)| Value::from([key, value]))),
+                    Some(iter) => Box::new(iter.map(Value::from)),
                     None => Box::new(
                         // this really should not happen unless the object changes it's shape
                         // after the initial check
@@ -463,7 +465,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn join(
-        state: &State,
+        state: &mut State,
         value: &Value,
         joiner: Option<StringInput<'_>>,
     ) -> Result<Value, Error> {
@@ -483,7 +485,7 @@ mod builtins {
         }
 
         fn join_safe(
-            state: &State,
+            state: &mut State,
             iter: impl Iterator<Item = Value>,
             joiner: &str,
         ) -> Result<String, Error> {
@@ -1105,6 +1107,52 @@ mod builtins {
         Ok(Value::from(rv))
     }
 
+    #[cfg(feature = "json")]
+    struct JinjaJsonFormatter;
+
+    #[cfg(feature = "json")]
+    impl serde_json::ser::Formatter for JinjaJsonFormatter {
+        fn begin_array_value<W>(&mut self, writer: &mut W, first: bool) -> std::io::Result<()>
+        where
+            W: ?Sized + std::io::Write,
+        {
+            if first {
+                Ok(())
+            } else {
+                writer.write_all(b", ")
+            }
+        }
+
+        fn begin_object_key<W>(&mut self, writer: &mut W, first: bool) -> std::io::Result<()>
+        where
+            W: ?Sized + std::io::Write,
+        {
+            if first {
+                Ok(())
+            } else {
+                writer.write_all(b", ")
+            }
+        }
+
+        fn begin_object_value<W>(&mut self, writer: &mut W) -> std::io::Result<()>
+        where
+            W: ?Sized + std::io::Write,
+        {
+            writer.write_all(b": ")
+        }
+    }
+
+    #[cfg(feature = "json")]
+    fn serialize_json<F>(value: &Value, formatter: F) -> serde_json::Result<String>
+    where
+        F: serde_json::ser::Formatter,
+    {
+        let mut output = Vec::new();
+        let mut serializer = serde_json::Serializer::with_formatter(&mut output, formatter);
+        serde::Serialize::serialize(value, &mut serializer)?;
+        Ok(String::from_utf8(output).expect("JSON serializer emitted invalid UTF-8"))
+    }
+
     /// Dumps a value to JSON.
     ///
     /// This filter is only available if the `json` feature is enabled.  The resulting
@@ -1148,14 +1196,13 @@ mod builtins {
         };
         ok!(args.assert_all_used());
         if let Some(indent) = indent {
-            let mut out = Vec::<u8>::new();
             let indentation = " ".repeat(indent);
-            let formatter = serde_json::ser::PrettyFormatter::with_indent(indentation.as_bytes());
-            let mut s = serde_json::Serializer::with_formatter(&mut out, formatter);
-            serde::Serialize::serialize(&value, &mut s)
-                .map(|_| unsafe { String::from_utf8_unchecked(out) })
+            serialize_json(
+                value,
+                serde_json::ser::PrettyFormatter::with_indent(indentation.as_bytes()),
+            )
         } else {
-            serde_json::to_string(&value)
+            serialize_json(value, JinjaJsonFormatter)
         }
         .map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot serialize to JSON").with_source(err)
@@ -1303,12 +1350,12 @@ mod builtins {
     }
 
     fn select_or_reject(
-        state: &State,
+        state: &mut State,
         invert: bool,
         value: Value,
         attr: Option<Cow<'_, str>>,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
+        args: Vec<Value>,
     ) -> Result<Vec<Value>, Error> {
         let mut rv = vec![];
         let test = if let Some(test_name) = test_name {
@@ -1328,7 +1375,7 @@ mod builtins {
             let passed = if let Some(test) = test {
                 let new_args = Some(test_value)
                     .into_iter()
-                    .chain(args.0.iter().cloned())
+                    .chain(args.iter().cloned())
                     .collect::<Vec<_>>();
                 ok!(test.call(state, &new_args)).is_true()
             } else {
@@ -1354,12 +1401,12 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn select(
-        state: &State,
+        state: &mut State,
         value: Value,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
+        args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, false, value, None, test_name, args)
+        select_or_reject(state, false, value, None, test_name, args.into_values())
     }
 
     /// Creates a new sequence of values of which an attribute passes a test.
@@ -1373,13 +1420,20 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn selectattr(
-        state: &State,
+        state: &mut State,
         value: Value,
         attr: Cow<'_, str>,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
+        args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, false, value, Some(attr), test_name, args)
+        select_or_reject(
+            state,
+            false,
+            value,
+            Some(attr),
+            test_name,
+            args.into_values(),
+        )
     }
 
     /// Creates a new sequence of values that don't pass a test.
@@ -1387,12 +1441,12 @@ mod builtins {
     /// This is the inverse of [`select`].
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn reject(
-        state: &State,
+        state: &mut State,
         value: Value,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
+        args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, true, value, None, test_name, args)
+        select_or_reject(state, true, value, None, test_name, args.into_values())
     }
 
     /// Creates a new sequence of values of which an attribute does not pass a test.
@@ -1406,13 +1460,20 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn rejectattr(
-        state: &State,
+        state: &mut State,
         value: Value,
         attr: Cow<'_, str>,
         test_name: Option<Cow<'_, str>>,
-        args: crate::value::Rest<Value>,
+        args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {
-        select_or_reject(state, true, value, Some(attr), test_name, args)
+        select_or_reject(
+            state,
+            true,
+            value,
+            Some(attr),
+            test_name,
+            args.into_values(),
+        )
     }
 
     /// Applies a filter to a sequence of objects or looks up an attribute.
@@ -1443,13 +1504,14 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn map(
-        state: &State,
+        state: &mut State,
         value: Value,
-        args: crate::value::Rest<Value>,
+        args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {
         let mut rv = Vec::with_capacity(value.len().unwrap_or(0));
 
         // attribute mapping
+        let args = args.into_values();
         let (args, kwargs): (&[Value], Kwargs) = crate::value::from_args(&args)?;
 
         if let Some(attr) = ok!(kwargs.get::<Option<Value>>("attribute")) {
@@ -1594,6 +1656,13 @@ mod builtins {
 
             fn enumerate(self: &Arc<Self>) -> Enumerator {
                 Enumerator::Seq(2)
+            }
+
+            fn render(self: &Arc<Self>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_tuple("")
+                    .field(&self.grouper)
+                    .field(&self.list)
+                    .finish()
             }
         }
 
@@ -1798,7 +1867,7 @@ mod builtins {
                             None => return None,
                         }
                     }
-                    Some(Value::from(tuple))
+                    Some(Value::from(Tuple::from(tuple)))
                 }
             });
 
@@ -1839,10 +1908,11 @@ mod builtins {
     /// [str.format()]: https://docs.python.org/3/library/string.html#format-string-syntax
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn format(
-        state: &State,
+        state: &mut State,
         format_str: &Value,
-        format_args: Rest<Value>,
+        format_args: Rest<ValueOrKwargs>,
     ) -> Result<Value, Error> {
+        let format_args = format_args.into_values();
         let string = format_str
             .as_str()
             .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "value is not a string"))?;
@@ -1872,7 +1942,7 @@ mod builtins {
             ));
             Ok(Value::from_safe_string(output))
         } else {
-            format_filter(FormatStyle::Printf, string, &format_args).map(Value::from)
+            format_string(FormatStyle::Printf, string, &format_args).map(Value::from)
         }
     }
 }

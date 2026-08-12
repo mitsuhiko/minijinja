@@ -1,9 +1,7 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::mem;
-
 #[cfg(feature = "macros")]
-use std::sync::Arc;
+use std::mem;
 
 use crate::compiler::instructions::{
     CompareOp, Instruction, Instructions, LOOP_FLAG_RECURSIVE, LOOP_FLAG_WITH_LOOP_VAR, MAX_LOCALS,
@@ -18,16 +16,17 @@ use crate::value::{
 };
 use crate::vm::context::{Frame, Stack};
 use crate::vm::loop_object::{Loop, LoopState};
-use crate::vm::state::BlockStack;
-
-#[cfg(feature = "macros")]
-use crate::vm::closure_object::Closure;
+#[cfg(feature = "multi_template")]
+use crate::vm::state::{BlockStack, BlockState};
 
 pub(crate) use crate::vm::context::Context;
 pub use crate::vm::state::State;
 
 #[cfg(feature = "macros")]
-mod closure_object;
+type ClosureId = usize;
+#[cfg(feature = "macros")]
+type Closure<'env> = BTreeMap<&'env str, Value>;
+
 mod context;
 #[cfg(feature = "fuel")]
 mod fuel;
@@ -46,12 +45,9 @@ const INCLUDE_RECURSION_COST: usize = 10;
 #[cfg(feature = "macros")]
 const MACRO_RECURSION_COST: usize = 4;
 
-/// Helps to evaluate something.
-#[cfg_attr(feature = "internal_debug", derive(Debug))]
-pub struct Vm<'env> {
-    env: &'env Environment<'env>,
-}
+struct Executor<'env>(std::marker::PhantomData<&'env Environment<'env>>);
 
+#[cfg(feature = "multi_template")]
 pub(crate) fn prepare_blocks<'env, 'template>(
     blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
 ) -> BTreeMap<&'env str, BlockStack<'template, 'env>> {
@@ -86,89 +82,128 @@ fn normalize_filter_test_name(name: &str) -> Cow<'_, str> {
     }
 }
 
-impl<'env> Vm<'env> {
-    /// Creates a new VM.
-    pub fn new(env: &'env Environment<'env>) -> Vm<'env> {
-        Vm { env }
-    }
+pub(crate) fn eval<'env, 'template>(
+    env: &'env Environment<'env>,
+    instructions: &'template Instructions<'env>,
+    root: Value,
+    blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
+    out: &mut Output,
+    auto_escape: AutoEscape,
+) -> Result<(Option<Value>, State<'template, 'env>), Error> {
+    Executor::eval(env, instructions, root, blocks, out, auto_escape)
+}
 
-    /// Evaluates the given inputs.
-    ///
-    /// It returns both the last value left on the stack as well as the state
-    /// at the end of the evaluation.
-    pub fn eval<'template>(
-        &self,
+#[cfg(feature = "multi_template")]
+pub(crate) fn call_block<'env>(
+    name: &str,
+    state: &mut State<'_, 'env>,
+    out: &mut Output,
+) -> Result<Option<Value>, Error> {
+    Executor::call_block(name, state, out)
+}
+
+#[cfg(feature = "macros")]
+pub(crate) fn eval_macro<'env, 'template>(
+    state: &mut State<'template, 'env>,
+    instructions_id: usize,
+    pc: u32,
+    out: &mut Output,
+    closure: Option<ClosureId>,
+    caller: Option<Value>,
+    args: Vec<Value>,
+) -> Result<Option<Value>, Error> {
+    Executor::eval_macro(state, instructions_id, pc, out, closure, caller, args)
+}
+
+impl<'env> Executor<'env> {
+    pub(crate) fn eval<'template>(
+        env: &'env Environment<'env>,
         instructions: &'template Instructions<'env>,
         root: Value,
-        blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
+        _blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
         out: &mut Output,
         auto_escape: AutoEscape,
     ) -> Result<(Option<Value>, State<'template, 'env>), Error> {
         let mut state = State::new(
-            Context::new_with_frame(self.env, ok!(Frame::new_checked(root))),
+            Context::new_with_frame(env, ok!(Frame::new_checked(root))),
             auto_escape,
             instructions,
-            prepare_blocks(blocks),
+            #[cfg(feature = "multi_template")]
+            prepare_blocks(_blocks),
         );
-        self.eval_state(&mut state, out).map(|x| (x, state))
+        Self::eval_state(&mut state, out).map(|x| (x, state))
     }
 
-    /// Evaluate a macro in a state.
+    /// Evaluates a macro by temporarily switching the active state.
     #[cfg(feature = "macros")]
-    pub fn eval_macro(
-        &self,
-        state: &State,
-        macro_id: usize,
+    pub(crate) fn eval_macro<'template>(
+        state: &mut State<'template, 'env>,
+        instructions_id: usize,
+        pc: u32,
         out: &mut Output,
-        closure: Value,
+        closure: Option<ClosureId>,
         caller: Option<Value>,
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
-        let (instructions, pc) = &state.macros[macro_id];
+        let instructions = *state
+            .macro_instructions
+            .get(&instructions_id)
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidOperation,
+                    "cannot call this macro. template state went away.",
+                )
+            })?;
         let context_base = state.ctx.clone_base();
-        let mut ctx = Context::new_with_frame(self.env, Frame::new(context_base));
-        ok!(ctx.push_frame(Frame::new(closure)));
-        if let Some(caller) = caller {
-            ctx.store("caller", caller);
+        let mut ctx = state
+            .macro_context_pool
+            .pop()
+            .unwrap_or_else(|| Context::new(state.env()));
+        ctx.reset_with_frame(Frame::new(context_base));
+        let closure_frame = Frame {
+            closure_context: closure,
+            ..Frame::default()
+        };
+        if let Err(err) = ctx.push_frame(closure_frame) {
+            ctx.clear();
+            state.macro_context_pool.push(ctx);
+            return Err(err);
         }
-        ok!(ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST));
-        self.do_eval(
-            &mut State {
-                ctx,
-                current_block: None,
-                auto_escape: std::cell::Cell::new(state.auto_escape()),
-                instructions,
-                blocks: BTreeMap::default(),
-                temps: state.temps.clone(),
-                loaded_templates: Default::default(),
-                #[cfg(feature = "macros")]
-                id: state.id,
-                #[cfg(feature = "macros")]
-                macros: state.macros.clone(),
-                #[cfg(feature = "macros")]
-                closure_tracker: state.closure_tracker.clone(),
-                #[cfg(feature = "fuel")]
-                fuel_tracker: state.fuel_tracker.clone(),
-            },
-            out,
-            Stack::from(args),
-            *pc,
-        )
+        if let Some(caller) = caller {
+            ctx.store(&mut state.closures, "caller", caller);
+        }
+        if let Err(err) = ctx.incr_depth(state.ctx.depth() + MACRO_RECURSION_COST) {
+            ctx.clear();
+            state.macro_context_pool.push(ctx);
+            return Err(err);
+        }
+
+        let old_ctx = mem::replace(&mut state.ctx, ctx);
+        let auto_escape = state.auto_escape;
+        let rv = state.with_execution_state(
+            instructions,
+            auto_escape,
+            #[cfg(feature = "multi_template")]
+            None,
+            #[cfg(feature = "multi_template")]
+            BlockState::Isolate,
+            |state| Self::do_eval(state, out, Stack::from(args), pc),
+        );
+
+        let mut macro_ctx = mem::replace(&mut state.ctx, old_ctx);
+        macro_ctx.clear();
+        state.macro_context_pool.push(macro_ctx);
+        rv
     }
 
     /// This is the actual evaluation loop that works with a specific context.
     #[inline(always)]
-    fn eval_state(
-        &self,
-        state: &mut State<'_, 'env>,
-        out: &mut Output,
-    ) -> Result<Option<Value>, Error> {
-        self.do_eval(state, out, Stack::default(), 0)
+    fn eval_state(state: &mut State<'_, 'env>, out: &mut Output) -> Result<Option<Value>, Error> {
+        Self::do_eval(state, out, Stack::default(), 0)
     }
 
     /// Performs the actual evaluation, optionally with stack growth functionality.
     fn do_eval(
-        &self,
         state: &mut State<'_, 'env>,
         out: &mut Output,
         stack: Stack,
@@ -177,24 +212,23 @@ impl<'env> Vm<'env> {
         #[cfg(feature = "stacker")]
         {
             stacker::maybe_grow(32 * 1024, 1024 * 1024, || {
-                self.eval_impl(state, out, stack, pc)
+                Self::eval_impl(state, out, stack, pc)
             })
         }
         #[cfg(not(feature = "stacker"))]
         {
-            self.eval_impl(state, out, stack, pc)
+            Self::eval_impl(state, out, stack, pc)
         }
     }
 
     #[inline]
     fn eval_impl(
-        &self,
         state: &mut State<'_, 'env>,
         out: &mut Output,
         mut stack: Stack,
         mut pc: u32,
     ) -> Result<Option<Value>, Error> {
-        let initial_auto_escape = state.auto_escape.get();
+        let initial_auto_escape = state.auto_escape;
         let undefined_behavior = state.undefined_behavior();
         let strict_undefined = matches!(
             undefined_behavior,
@@ -316,7 +350,7 @@ impl<'env> Vm<'env> {
             // if the fuel consumption feature is enabled, track the fuel
             // consumption here.
             #[cfg(feature = "fuel")]
-            if let Some(ref tracker) = state.fuel_tracker {
+            if let Some(ref mut tracker) = state.fuel_tracker {
                 ctx_ok!(tracker.track(instr));
             }
 
@@ -334,19 +368,24 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::Emit => {
                     let value = stack.pop();
-                    if self.env.is_default_formatter() {
+                    if state.env().is_default_formatter() {
                         if strict_undefined
                             && matches!(value.0, ValueRepr::Undefined(UndefinedType::Default))
                         {
                             bail!(Error::from(ErrorKind::UndefinedError));
                         }
-                        ctx_ok!(write_escaped(out, state.auto_escape.get(), &value));
+                        ctx_ok!(write_escaped(out, state.auto_escape, &value));
                     } else {
-                        ctx_ok!(self.env.format(&value, state, out));
+                        ctx_ok!(state.env().format(&value, state, out));
                     }
                 }
                 Instruction::StoreLocal(name) => {
-                    state.ctx.store(name, stack.pop());
+                    state.ctx.store(
+                        #[cfg(feature = "macros")]
+                        &mut state.closures,
+                        name,
+                        stack.pop(),
+                    );
                 }
                 Instruction::Lookup(name) => {
                     stack.push(assert_valid!(state
@@ -421,7 +460,7 @@ impl<'env> Vm<'env> {
                 Instruction::MergeKwargs(count) => {
                     let mut kwargs_sources = Vec::from_iter((0..*count).map(|_| stack.pop()));
                     kwargs_sources.reverse();
-                    stack.push(ctx_ok!(self.merge_kwargs(kwargs_sources)));
+                    stack.push(ctx_ok!(Self::merge_kwargs(state, kwargs_sources)));
                 }
                 Instruction::BuildList(n) => {
                     let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
@@ -432,8 +471,29 @@ impl<'env> Vm<'env> {
                     v.reverse();
                     stack.push(Value::from_object(v))
                 }
+                Instruction::BuildTuple(n) => {
+                    use crate::value::Tuple;
+                    let count = n.unwrap_or_else(|| stack.pop().try_into().unwrap());
+                    let tuple = match count {
+                        0 => Tuple::default(),
+                        1 => Tuple::from([stack.pop()]),
+                        2 => {
+                            let second = stack.pop();
+                            Tuple::from([stack.pop(), second])
+                        }
+                        _ => {
+                            let mut values = Vec::with_capacity(untrusted_size_hint(count));
+                            for _ in 0..count {
+                                values.push(stack.pop());
+                            }
+                            values.reverse();
+                            Tuple::from(values)
+                        }
+                    };
+                    stack.push(Value::from(tuple))
+                }
                 Instruction::UnpackList(count) => {
-                    ctx_ok!(self.unpack_list(&mut stack, *count));
+                    ctx_ok!(Self::unpack_list(&mut stack, *count));
                 }
                 Instruction::UnpackLists(count) => {
                     let lists = Vec::from_iter((0..*count).map(|_| stack.pop()));
@@ -542,7 +602,7 @@ impl<'env> Vm<'env> {
                     if let Some((target, end_capture)) = l.current_recursion_jump.take() {
                         pc = target;
                         if end_capture {
-                            stack.push(out.end_capture(state.auto_escape.get()));
+                            stack.push(out.end_capture(state.auto_escape));
                         }
                         continue;
                     }
@@ -554,7 +614,13 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::PushLoop(flags) => {
                     a = stack.pop();
-                    ctx_ok!(self.push_loop(state, a, *flags, pc, next_loop_recursion_jump.take()));
+                    ctx_ok!(Self::push_loop(
+                        state,
+                        a,
+                        *flags,
+                        pc,
+                        next_loop_recursion_jump.take()
+                    ));
                 }
                 Instruction::Iterate(jump_target) => {
                     match state.ctx.next_loop_item() {
@@ -599,19 +665,17 @@ impl<'env> Vm<'env> {
                 }
                 Instruction::PushAutoEscape => {
                     a = stack.pop();
-                    auto_escape_stack.push(state.auto_escape.get());
-                    state
-                        .auto_escape
-                        .set(ctx_ok!(self.derive_auto_escape(a, initial_auto_escape)));
+                    auto_escape_stack.push(state.auto_escape);
+                    state.auto_escape = ctx_ok!(Self::derive_auto_escape(a, initial_auto_escape));
                 }
                 Instruction::PopAutoEscape => {
-                    state.auto_escape.set(auto_escape_stack.pop().unwrap());
+                    state.auto_escape = auto_escape_stack.pop().unwrap();
                 }
                 Instruction::BeginCapture(mode) => {
                     out.begin_capture(*mode);
                 }
                 Instruction::EndCapture => {
-                    stack.push(out.end_capture(state.auto_escape.get()));
+                    stack.push(out.end_capture(state.auto_escape));
                 }
                 Instruction::ApplyFilter(name, arg_count, local_id) => {
                     let normalized_name = normalize_filter_test_name(name);
@@ -651,14 +715,19 @@ impl<'env> Vm<'env> {
                 Instruction::CallFunction(name, arg_count) => {
                     let args = stack.get_call_args(*arg_count);
                     // super is a special function reserved for super-ing into blocks.
-                    let rv = if *name == "super" {
-                        if !args.is_empty() {
-                            bail!(Error::new(
-                                ErrorKind::InvalidOperation,
-                                "super() takes no arguments",
-                            ));
+                    let rv = if cfg!(feature = "multi_template") && *name == "super" {
+                        #[cfg(feature = "multi_template")]
+                        {
+                            if !args.is_empty() {
+                                bail!(Error::new(
+                                    ErrorKind::InvalidOperation,
+                                    "super() takes no arguments",
+                                ));
+                            }
+                            ctx_ok!(Self::perform_super(state, out, true))
                         }
-                        ctx_ok!(self.perform_super(state, out, true))
+                        #[cfg(not(feature = "multi_template"))]
+                        unreachable!()
                     } else if let Some(func) = state.lookup(name) {
                         // calling loops is a special operation that starts the recursion process.
                         // this bypasses the actual `call` implementation which would just fail
@@ -704,8 +773,9 @@ impl<'env> Vm<'env> {
                 Instruction::DiscardTop => {
                     stack.pop();
                 }
+                #[cfg(feature = "multi_template")]
                 Instruction::FastSuper => {
-                    ctx_ok!(self.perform_super(state, out, false));
+                    ctx_ok!(Self::perform_super(state, out, false));
                 }
                 Instruction::FastRecurse => match state.ctx.current_loop() {
                     Some(l) => recurse_loop!(false, &l.object),
@@ -743,13 +813,13 @@ impl<'env> Vm<'env> {
                             "tried to extend a second time in a template"
                         ));
                     }
-                    parent_instructions = Some(ctx_ok!(self.load_blocks(a, state)));
+                    parent_instructions = Some(ctx_ok!(Self::load_blocks(a, state)));
                     out.begin_capture(CaptureMode::Discard);
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::Include(ignore_missing) => {
                     a = stack.pop();
-                    ctx_ok!(self.perform_include(a, state, out, *ignore_missing));
+                    ctx_ok!(Self::perform_include(a, state, out, *ignore_missing));
                 }
                 #[cfg(feature = "multi_template")]
                 Instruction::ExportLocals => {
@@ -766,35 +836,29 @@ impl<'env> Vm<'env> {
                 #[cfg(feature = "multi_template")]
                 Instruction::CallBlock(name) => {
                     if parent_instructions.is_none() && !out.is_discarding() {
-                        ctx_ok!(self.call_block(name, state, out));
+                        ctx_ok!(Self::call_block(name, state, out));
                     }
                 }
                 #[cfg(feature = "macros")]
                 Instruction::BuildMacro(name, offset, flags) => {
-                    self.build_macro(&mut stack, state, *offset, name, *flags);
+                    Self::build_macro(&mut stack, state, *offset, name, *flags);
                 }
                 #[cfg(feature = "macros")]
                 Instruction::Return => break,
                 #[cfg(feature = "macros")]
                 Instruction::Enclose(name) => {
-                    // the first time we enclose a value, we need to create a closure
-                    // and store it on the context, and add it to the closure tracker
-                    // for cycle breaking.
+                    // The first enclosed value creates a state-owned closure shared
+                    // by all macros declared in this frame.
                     if state.ctx.closure().is_none() {
-                        let closure = Arc::new(Closure::default());
-                        state.closure_tracker.track_closure(closure.clone());
+                        let closure = state.closures.len();
+                        state.closures.push(Closure::new());
                         state.ctx.reset_closure(Some(closure));
                     }
-                    state.ctx.enclose(name);
+                    state.ctx.enclose(&mut state.closures, name);
                 }
                 #[cfg(feature = "macros")]
                 Instruction::GetClosure => {
-                    stack.push(
-                        state
-                            .ctx
-                            .closure()
-                            .map_or(Value::UNDEFINED, |x| Value::from_dyn_object(x.clone())),
-                    );
+                    stack.push(state.ctx.closure().map_or(Value::UNDEFINED, Value::from));
                 }
             }
             pc += 1;
@@ -803,10 +867,10 @@ impl<'env> Vm<'env> {
         Ok(stack.try_pop())
     }
 
-    fn merge_kwargs(&self, values: Vec<Value>) -> Result<Value, Error> {
+    fn merge_kwargs(state: &State, values: Vec<Value>) -> Result<Value, Error> {
         let mut rv = ValueMap::new();
         for value in values {
-            ok!(self.env.undefined_behavior().assert_iterable(&value));
+            ok!(state.undefined_behavior().assert_iterable(&value));
             let iter = ok!(value
                 .as_object()
                 .filter(|x| x.repr() == ObjectRepr::Map)
@@ -829,7 +893,6 @@ impl<'env> Vm<'env> {
 
     #[cfg(feature = "multi_template")]
     fn perform_include(
-        &self,
         name: Value,
         state: &mut State<'_, 'env>,
         out: &mut Output,
@@ -864,30 +927,20 @@ impl<'env> Vm<'env> {
             };
 
             let (new_instructions, new_blocks) = ok!(tmpl.instructions_and_blocks());
-            let old_escape = state.auto_escape.replace(tmpl.initial_auto_escape());
-            let old_instructions = mem::replace(&mut state.instructions, new_instructions);
-            let old_blocks = mem::replace(&mut state.blocks, prepare_blocks(new_blocks));
-            // we need to make a copy of the loaded templates here as we want
-            // to forget about the templates that an include triggered by the
-            // time the include finishes.
-            let old_loaded_templates = state.loaded_templates.clone();
             ok!(state.ctx.incr_depth(INCLUDE_RECURSION_COST));
-            let rv;
+            let current_block = state.current_block;
             #[cfg(feature = "macros")]
-            {
-                let old_closure = state.ctx.take_closure();
-                rv = self.eval_state(state, out);
-                state.ctx.reset_closure(old_closure);
-            }
-            #[cfg(not(feature = "macros"))]
-            {
-                rv = self.eval_state(state, out);
-            }
+            let old_closure = state.ctx.take_closure();
+            let rv = state.with_execution_state(
+                new_instructions,
+                tmpl.initial_auto_escape(),
+                current_block,
+                BlockState::Replace(prepare_blocks(new_blocks)),
+                |state| Self::eval_state(state, out),
+            );
+            #[cfg(feature = "macros")]
+            state.ctx.reset_closure(old_closure);
             state.ctx.decr_depth(INCLUDE_RECURSION_COST);
-            state.loaded_templates = old_loaded_templates;
-            state.auto_escape.set(old_escape);
-            state.instructions = old_instructions;
-            state.blocks = old_blocks;
             ok!(rv.map_err(|err| {
                 Error::new(
                     ErrorKind::BadInclude,
@@ -917,8 +970,8 @@ impl<'env> Vm<'env> {
         }
     }
 
+    #[cfg(feature = "multi_template")]
     fn perform_super(
-        &self,
         state: &mut State<'_, 'env>,
         out: &mut Output,
         capture: bool,
@@ -927,30 +980,39 @@ impl<'env> Vm<'env> {
             Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
         }));
 
-        let block_stack = state.blocks.get_mut(name).unwrap();
-        if !block_stack.push() {
+        if !state.blocks.get_mut(name).unwrap().push() {
             return Err(Error::new(
                 ErrorKind::InvalidOperation,
                 "no parent block exists",
             ));
         }
 
+        if let Err(err) = state.ctx.push_frame(Frame::default()) {
+            state.blocks.get_mut(name).unwrap().pop();
+            return Err(err);
+        }
         if capture {
             out.begin_capture(CaptureMode::Capture);
         }
 
-        let old_instructions = mem::replace(&mut state.instructions, block_stack.instructions());
-        ok!(state.ctx.push_frame(Frame::default()));
-        let rv = self.eval_state(state, out);
+        let instructions = state.blocks.get(name).unwrap().instructions();
+        let auto_escape = state.auto_escape;
+        let current_block = state.current_block;
+        let rv = state.with_execution_state(
+            instructions,
+            auto_escape,
+            current_block,
+            BlockState::Keep,
+            |state| Self::eval_state(state, out),
+        );
         state.ctx.pop_frame();
-        state.instructions = old_instructions;
         state.blocks.get_mut(name).unwrap().pop();
 
         ok!(rv.map_err(|err| {
             Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
         }));
         if capture {
-            Ok(out.end_capture(state.auto_escape.get()))
+            Ok(out.end_capture(state.auto_escape))
         } else {
             Ok(Value::UNDEFINED)
         }
@@ -958,7 +1020,6 @@ impl<'env> Vm<'env> {
 
     #[cfg(feature = "multi_template")]
     fn load_blocks(
-        &self,
         name: Value,
         state: &mut State<'_, 'env>,
     ) -> Result<&'env Instructions<'env>, Error> {
@@ -989,7 +1050,6 @@ impl<'env> Vm<'env> {
 
     #[cfg(feature = "multi_template")]
     pub(crate) fn call_block(
-        &self,
         name: &str,
         state: &mut State<'_, 'env>,
         out: &mut Output,
@@ -1001,15 +1061,18 @@ impl<'env> Vm<'env> {
                     format!("Required block '{name}' not found"),
                 ));
             }
-            let old_block = state.current_block.replace(name);
-            let old_instructions =
-                mem::replace(&mut state.instructions, block_stack.instructions());
-            state.ctx.push_frame(Frame::default())?;
-            let rv = self.eval_state(state, out);
-            state.ctx.pop_frame();
-            state.instructions = old_instructions;
-            state.current_block = old_block;
-            rv
+            let instructions = block_stack.instructions();
+            let auto_escape = state.auto_escape;
+            state.with_execution_state(
+                instructions,
+                auto_escape,
+                Some(name),
+                BlockState::Keep,
+                |state| {
+                    ok!(state.ctx.push_frame(Frame::default()));
+                    Self::eval_state(state, out)
+                },
+            )
         } else {
             Err(Error::new(
                 ErrorKind::UnknownBlock,
@@ -1019,7 +1082,6 @@ impl<'env> Vm<'env> {
     }
 
     fn derive_auto_escape(
-        &self,
         value: Value,
         initial_auto_escape: AutoEscape,
     ) -> Result<AutoEscape, Error> {
@@ -1041,7 +1103,6 @@ impl<'env> Vm<'env> {
     }
 
     fn push_loop(
-        &self,
         state: &mut State<'_, 'env>,
         iterable: Value,
         flags: u8,
@@ -1087,7 +1148,7 @@ impl<'env> Vm<'env> {
         })
     }
 
-    fn unpack_list(&self, stack: &mut Stack, count: usize) -> Result<(), Error> {
+    fn unpack_list(stack: &mut Stack, count: usize) -> Result<(), Error> {
         let top = stack.pop();
         let iter = ok!(top
             .as_object()
@@ -1112,24 +1173,21 @@ impl<'env> Vm<'env> {
     }
 
     #[cfg(feature = "macros")]
-    fn build_macro(
-        &self,
-        stack: &mut Stack,
-        state: &mut State,
-        offset: u32,
-        name: &str,
-        flags: u8,
-    ) {
+    fn build_macro(stack: &mut Stack, state: &mut State, offset: u32, name: &str, flags: u8) {
         use crate::{compiler::instructions::MACRO_CALLER, vm::macro_object::Macro};
 
         let arg_spec = stack.pop().try_iter().unwrap().collect();
-        let closure = stack.pop();
-        let macro_ref_id = state.macros.len();
-        Arc::make_mut(&mut state.macros).push((state.instructions, offset));
+        let closure = stack.pop().as_usize();
+        let instructions_id = state.instructions as *const Instructions<'_> as usize;
+        state
+            .macro_instructions
+            .entry(instructions_id)
+            .or_insert(state.instructions);
         stack.push(Value::from_object(Macro {
             name: Value::from(name),
             arg_spec,
-            macro_ref_id,
+            instructions_id,
+            offset,
             state_id: state.id,
             closure,
             caller_reference: (flags & MACRO_CALLER) != 0,

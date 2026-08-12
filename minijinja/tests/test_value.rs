@@ -1,13 +1,18 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
+use std::collections::BTreeMap;
+#[cfg(feature = "std_collections")]
+use std::collections::{BTreeSet, HashMap, HashSet, LinkedList, VecDeque};
 use std::fmt;
 use std::sync::Arc;
 
 use insta::{assert_debug_snapshot, assert_snapshot};
 use similar_asserts::assert_eq;
 
-use minijinja::value::{DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, Value, ValueKind};
-use minijinja::{args, context, render, Environment, Error, ErrorKind};
+use minijinja::value::{
+    ArgType, DynObject, Enumerator, Kwargs, Object, ObjectRepr, Rest, StringInput, Value, ValueKind,
+};
+use minijinja::{args, context, render, Environment, Error, ErrorKind, State, UndefinedBehavior};
 
 #[test]
 fn test_sort() {
@@ -43,10 +48,10 @@ fn test_sort_different_types() {
         Value::from_iter([1, 2]),
         Value::from(80u32),
         Value::from(30i16),
-        Value::from_iter([("a", 3)]),
-        Value::from_iter([("a", 2)]),
-        Value::from_iter([("b", 0)]),
-        Value::from_iter([("b", 3)]),
+        Value::from_pairs([("a", 3)]),
+        Value::from_pairs([("a", 2)]),
+        Value::from_pairs([("b", 0)]),
+        Value::from_pairs([("b", 3)]),
         Value::from_iter([0, 2]),
         Value::from(true),
         Value::UNDEFINED,
@@ -67,7 +72,7 @@ fn test_sort_different_types() {
         Value::from(f64::INFINITY),
     ];
     v.sort();
-    insta::assert_debug_snapshot!(&v, @r###"
+    insta::assert_debug_snapshot!(&v, @"
     [
         undefined,
         None,
@@ -86,9 +91,9 @@ fn test_sort_different_types() {
         1000.0,
         inf,
         NaN,
-        "bar",
-        "foo",
-        "zzz",
+        'bar',
+        'foo',
+        'zzz',
         [
             0,
             1,
@@ -106,25 +111,47 @@ fn test_sort_different_types() {
             2,
         ],
         {
-            "a": 2,
+            'a': 2,
         },
         {
-            "a": 3,
+            'a': 3,
         },
         {
-            "b": 0,
+            'b': 0,
         },
         {
-            "b": 3,
+            'b': 3,
         },
     ]
-    "###);
+    ");
+}
+
+#[test]
+fn test_borrowed_native_conversions() {
+    use std::borrow::Cow;
+    use std::sync::Arc;
+
+    assert_eq!(Value::from(&42), Value::from(42));
+    assert_eq!(Value::from(&true), Value::from(true));
+    assert_eq!(Value::from(&()), Value::from(()));
+
+    let cow = Cow::Borrowed("cow");
+    assert_eq!(Value::from(&cow), Value::from("cow"));
+    let arc: Arc<str> = Arc::from("arc");
+    assert_eq!(Value::from(&arc), Value::from("arc"));
+    let bytes = Arc::new(vec![1, 2]);
+    assert_eq!(Value::from(&bytes).kind(), ValueKind::Bytes);
+
+    let values = [Value::from(1), Value::from(2)];
+    assert_eq!(Value::from(values.as_slice()).to_string(), "[1, 2]");
+    let tuple = minijinja::value::Tuple::from(values);
+    assert!(Value::from(&tuple).is_tuple());
 }
 
 #[test]
 fn test_safe_string_roundtrip() {
     let v = Value::from_safe_string("<b>HTML</b>".into());
-    let v2 = Value::from_serialize(&v);
+    let v2 = Value::from(&v);
     assert!(v.is_safe());
     assert!(v2.is_safe());
     assert_eq!(v.to_string(), v2.to_string());
@@ -133,12 +160,13 @@ fn test_safe_string_roundtrip() {
 #[test]
 fn test_undefined_roundtrip() {
     let v = Value::UNDEFINED;
-    let v2 = Value::from_serialize(&v);
+    let v2 = Value::from(&v);
     assert!(v.is_undefined());
     assert!(v2.is_undefined());
 }
 
 #[test]
+#[cfg(feature = "serde")]
 fn test_value_serialization() {
     // make sure if we serialize to json we get regular values
     assert_eq!(serde_json::to_string(&Value::UNDEFINED).unwrap(), "null");
@@ -257,7 +285,7 @@ fn test_builtin_seq_objects() {
         "{{ val }}",
         val => Value::from_object(vec!["foo", "bar"]),
     );
-    assert_snapshot!(rv, @r###"["foo", "bar"]"###);
+    assert_snapshot!(rv, @"['foo', 'bar']");
 }
 
 #[test]
@@ -337,11 +365,11 @@ fn test_call_kwargs() {
     let mut env = Environment::new();
     env.add_template("foo", "").unwrap();
     let tmpl = env.get_template("foo").unwrap();
-    let state = tmpl.new_state();
+    let mut state = tmpl.new_state();
     let val = Value::from_function(|kwargs: Kwargs| kwargs.get::<i32>("foo"));
     let rv = val
         .call(
-            &state,
+            &mut state,
             &[Kwargs::from_iter([("foo", Value::from(42))]).into()],
         )
         .unwrap();
@@ -359,10 +387,10 @@ fn test_kwargs_error() {
 fn test_return_none() {
     let env = Environment::empty();
     let val = Value::from_function(|| -> Result<(), Error> { Ok(()) });
-    let rv = val.call(&env.empty_state(), &[][..]).unwrap();
+    let rv = val.call(&mut env.empty_state(), &[][..]).unwrap();
     assert!(rv.is_none());
     let val = Value::from_function(|| ());
-    let rv = val.call(&env.empty_state(), &[][..]).unwrap();
+    let rv = val.call(&mut env.empty_state(), &[][..]).unwrap();
     assert!(rv.is_none());
 }
 
@@ -380,6 +408,218 @@ fn test_filter_basics() {
             .unwrap(),
         Value::from(65)
     );
+}
+
+#[test]
+fn test_functions_with_mutable_state() {
+    fn increment(state: &mut State, by: u64) -> u64 {
+        let old = state
+            .get_temp("counter")
+            .and_then(|value| u64::try_from(value).ok())
+            .unwrap_or(0);
+        state.set_temp("counter", Value::from(old + by));
+        old + by
+    }
+
+    fn prefix(state: &mut State, value: &str) -> String {
+        format!("{}:{value}", state.name())
+    }
+
+    fn matches_counter(state: &mut State, value: u64) -> bool {
+        state.get_temp("counter") == Some(Value::from(value))
+    }
+
+    let mut env = Environment::new();
+    env.add_function("increment", increment);
+    env.add_function("state_name", |state: &mut State| state.name().to_owned());
+    env.add_filter("prefix", prefix);
+    env.add_test("matches_counter", matches_counter);
+    let rv = env
+        .template_from_str(
+            "{{ increment(2) }} {{ increment(3) }} {{ state_name() }} {{ 'x'|prefix }} {{ 5 is matches_counter }}",
+        )
+        .unwrap()
+        .render(())
+        .unwrap();
+    assert_eq!(rv, "2 5 <string> <string>:x True");
+
+    let mut state = env.empty_state();
+    assert!(state
+        .apply_filter("prefix", args!("x"))
+        .unwrap()
+        .to_string()
+        .ends_with(":x"));
+    assert!(!state.perform_test("matches_counter", args!(5)).unwrap());
+}
+
+#[test]
+fn test_mutable_state_argument_conversion_uses_state() {
+    struct LookupFromState(Value);
+
+    impl<'a> ArgType<'a> for LookupFromState {
+        type Output = Self;
+
+        fn from_value(_value: Option<&'a Value>) -> Result<Self::Output, Error> {
+            Err(Error::new(ErrorKind::InvalidOperation, "state required"))
+        }
+
+        fn from_state_and_value_mut(
+            state: Option<&State>,
+            _value: Option<&'a Value>,
+        ) -> Result<(Self::Output, usize), Error> {
+            let value = state
+                .and_then(|state| state.lookup("conversion_value"))
+                .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "state required"))?;
+            Ok((LookupFromState(value), 1))
+        }
+    }
+
+    let mut env = Environment::new();
+    env.set_undefined_behavior(UndefinedBehavior::Strict);
+    env.add_global("conversion_value", 42);
+    env.add_filter(
+        "lookup_from_state",
+        |state: &mut State, value: LookupFromState| {
+            state.set_temp("converted", value.0.clone());
+            value.0
+        },
+    );
+    env.add_filter("string", |_: &mut State, _: String| ());
+    env.add_filter("cow", |_: &mut State, _: Cow<'_, str>| ());
+    env.add_filter("string_input", |_: &mut State, _: StringInput<'_>| ());
+    env.add_filter("rest", |_: &mut State, _: Rest<String>| ());
+    env.add_filter("vec", |_: &mut State, _: Vec<String>| ());
+
+    let mut state = env.empty_state();
+    assert_eq!(
+        state
+            .apply_filter("lookup_from_state", args!(Value::UNDEFINED))
+            .unwrap(),
+        Value::from(42)
+    );
+    assert_eq!(state.get_temp("converted"), Some(Value::from(42)));
+
+    for filter in ["string", "cow", "string_input", "rest"] {
+        assert_eq!(
+            state
+                .apply_filter(filter, args!(Value::UNDEFINED))
+                .unwrap_err()
+                .kind(),
+            ErrorKind::UndefinedError
+        );
+    }
+    assert_eq!(
+        state
+            .apply_filter("vec", args!(vec![Value::UNDEFINED]))
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+    assert_eq!(
+        state
+            .apply_filter("replace", args!(Value::UNDEFINED, "x", "y"))
+            .unwrap_err()
+            .kind(),
+        ErrorKind::UndefinedError
+    );
+}
+
+#[test]
+fn test_shared_state_can_appear_in_any_argument_position() {
+    struct StateName<'a>(&'a str);
+
+    impl<'a> ArgType<'a> for StateName<'_> {
+        type Output = StateName<'a>;
+
+        fn from_value(_value: Option<&'a Value>) -> Result<Self::Output, Error> {
+            Err(Error::new(ErrorKind::InvalidOperation, "state required"))
+        }
+
+        fn from_state_and_value(
+            state: Option<&'a State>,
+            _value: Option<&'a Value>,
+        ) -> Result<(Self::Output, usize), Error> {
+            Ok((StateName(state.unwrap().name()), 0))
+        }
+    }
+
+    let mut env = Environment::new();
+    env.add_filter("state_last", |value: &str, state: &State| {
+        format!("{}:{value}", state.name())
+    });
+    env.add_filter("borrowed_state", |_: &Value, name: StateName<'_>| {
+        name.0.to_string()
+    });
+
+    assert_eq!(
+        env.template_from_named_str(
+            "test",
+            "{{ 'value'|state_last }}:{{ 'ignored'|borrowed_state }}",
+        )
+        .unwrap()
+        .render(())
+        .unwrap(),
+        "test:value:test"
+    );
+}
+
+#[test]
+fn test_mutable_state_value_calls() {
+    fn increment(state: &mut State, by: u64) -> u64 {
+        let old = state
+            .get_temp("counter")
+            .and_then(|value| u64::try_from(value).ok())
+            .unwrap_or(0);
+        state.set_temp("counter", Value::from(old + by));
+        old + by
+    }
+
+    let env = Environment::new();
+    let mut state = env.empty_state();
+    let value = Value::from_function(increment);
+    assert_eq!(value.call(&mut state, args!(2)).unwrap(), Value::from(2));
+    assert_eq!(value.call(&mut state, args!(3)).unwrap(), Value::from(5));
+}
+
+#[test]
+fn test_mutable_state_object_calls() {
+    #[derive(Debug)]
+    struct Callable;
+
+    impl Object for Callable {
+        fn call(
+            self: &Arc<Self>,
+            state: &mut State<'_, '_>,
+            _args: &[Value],
+        ) -> Result<Value, Error> {
+            state.set_temp("called", Value::from(true));
+            Ok(Value::from("called"))
+        }
+
+        fn call_method(
+            self: &Arc<Self>,
+            state: &mut State<'_, '_>,
+            method: &str,
+            _args: &[Value],
+        ) -> Result<Value, Error> {
+            state.set_temp("method", Value::from(method));
+            Ok(Value::from(method))
+        }
+    }
+
+    let env = Environment::new();
+    let mut state = env.empty_state();
+    let value = Value::from_object(Callable);
+    assert_eq!(
+        value.call(&mut state, args!()).unwrap(),
+        Value::from("called")
+    );
+    assert_eq!(state.get_temp("called"), Some(Value::from(true)));
+    assert_eq!(
+        value.call_method(&mut state, "ping", args!()).unwrap(),
+        Value::from("ping")
+    );
+    assert_eq!(state.get_temp("method"), Some(Value::from("ping")));
 }
 
 #[test]
@@ -412,7 +652,7 @@ fn test_optional_args() {
 
     let mut env = crate::Environment::new();
     env.add_filter("add", add);
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     assert_eq!(
         state.apply_filter("add", args!(23, 42)).unwrap(),
         Value::from(65)
@@ -442,7 +682,7 @@ fn test_values_in_vec() {
     let mut env = Environment::new();
     env.add_filter("upper", upper);
     env.add_filter("sum", sum);
-    let state = env.empty_state();
+    let mut state = env.empty_state();
 
     assert_eq!(
         state.apply_filter("upper", args!("Hello World!")).unwrap(),
@@ -467,7 +707,7 @@ fn test_seq_object_borrow() {
 
     let mut env = Environment::new();
     env.add_filter("connect", connect);
-    let state = env.empty_state();
+    let mut state = env.empty_state();
     assert_eq!(
         state
             .apply_filter(
@@ -545,7 +785,7 @@ fn test_make_iterable() {
 
 #[test]
 fn test_complex_key() {
-    let value = Value::from_iter([
+    let value = Value::from_pairs([
         (Value::from_iter([0u32, 0u32]), "origin"),
         (Value::from_iter([0u32, 1u32]), "right"),
     ]);
@@ -562,7 +802,7 @@ fn test_complex_key() {
 #[test]
 #[cfg(feature = "deserialization")]
 fn test_deserialize() {
-    use minijinja::value::{from_args, ViaDeserialize};
+    use minijinja::value::{from_args, Serde};
     use serde::Deserialize;
 
     #[derive(Deserialize, Debug, PartialEq, Eq)]
@@ -571,7 +811,7 @@ fn test_deserialize() {
         y: i32,
     }
 
-    let point_value = Value::from_iter([("x", Value::from(42)), ("y", Value::from(-23))]);
+    let point_value = Value::from_pairs([("x", Value::from(42)), ("y", Value::from(-23))]);
     let point = Point::deserialize(point_value).unwrap();
 
     assert_eq!(point, Point { x: 42, y: -23 });
@@ -591,15 +831,12 @@ fn test_deserialize() {
     #[derive(Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq)]
     struct UnitStruct(String);
 
-    let spe = Value::from_serialize(SimpleEnum::B);
-    let spu = Value::from_serialize(UnitStruct("hello".into()));
-    let spt = Value::from_serialize(TaggedUnion::V("workd".into()));
+    let spe = Value::from(Serde(SimpleEnum::B));
+    let spu = Value::from(Serde(UnitStruct("hello".into())));
+    let spt = Value::from(Serde(TaggedUnion::V("workd".into())));
 
-    let a: (
-        ViaDeserialize<SimpleEnum>,
-        ViaDeserialize<UnitStruct>,
-        ViaDeserialize<TaggedUnion>,
-    ) = from_args(args!(spe, spu, spt)).unwrap();
+    let a: (Serde<SimpleEnum>, Serde<UnitStruct>, Serde<TaggedUnion>) =
+        from_args(args!(spe, spu, spt)).unwrap();
     assert_eq!((a.0).0, SimpleEnum::B);
     assert_eq!((a.1).0, UnitStruct("hello".into()));
     assert_eq!((a.2).0, TaggedUnion::V("workd".into()));
@@ -607,8 +844,8 @@ fn test_deserialize() {
 
 #[test]
 #[cfg(feature = "deserialization")]
-fn test_via_deserialize() {
-    use minijinja::value::ViaDeserialize;
+fn test_serde_argument() {
+    use minijinja::value::Serde;
     use serde::Deserialize;
 
     #[derive(Deserialize, Debug, PartialEq, Eq)]
@@ -617,16 +854,15 @@ fn test_via_deserialize() {
         y: i32,
     }
 
-    fn foo(point: ViaDeserialize<Point>) -> String {
+    fn foo(point: Serde<Point>) -> String {
         format!("{}, {}", point.x, point.y)
     }
 
-    let point_value = Value::from_iter([("x", Value::from(42)), ("y", Value::from(-23))]);
+    let point_value = Value::from_pairs([("x", Value::from(42)), ("y", Value::from(-23))]);
 
     let mut env = Environment::new();
     env.add_filter("foo", foo);
-    let state = env.empty_state();
-
+    let mut state = env.empty_state();
     let rv = state.apply_filter("foo", args![point_value]).unwrap();
     assert_eq!(rv.to_string(), "42, -23");
 }
@@ -737,8 +973,13 @@ fn test_reverse() {
     assert_snapshot!(Value::make_iterable(|| 0..3).reverse().unwrap(), @"[2, 1, 0]");
     // strings
     assert_snapshot!(Value::from("abc").reverse().unwrap(), @"cba");
-    // bytes
-    assert_snapshot!(Value::from_serialize(b"abc").reverse().unwrap(), @"[99, 98, 97]");
+    #[cfg(feature = "serde")]
+    {
+        use minijinja::value::Serde;
+
+        // bytes
+        assert_snapshot!(Value::from(Serde(b"abc")).reverse().unwrap(), @"[99, 98, 97]");
+    }
     // undefined
     assert!(Value::UNDEFINED.reverse().unwrap().is_undefined());
     // none
@@ -760,7 +1001,7 @@ fn test_reverse() {
     assert_eq!(odd_map.len(), Some(3));
     assert_snapshot!(
         render!("{% set r = m|reverse %}{{ m }}|{{ r }}|{{ r }}", m => odd_map),
-        @r###"{"a": "a", "b": "b", "c": "c"}|["c", "b", "a"]|["c", "b", "a"]"###
+        @"{'a': 'a', 'b': 'b', 'c': 'c'}|['c', 'b', 'a']|['c', 'b', 'a']"
     );
 
     #[derive(Debug)]
@@ -932,7 +1173,7 @@ fn test_object_hash_map() {
             .collect::<Vec<_>>(),
         vec!["foo"]
     );
-    assert_eq!(value.to_string(), "{\"foo\": 1}");
+    assert_eq!(value.to_string(), "{'foo': 1}");
 
     let value = Value::from(HashMap::from_iter([(Value::from(true), 1i32)]));
     assert_eq!(
@@ -980,7 +1221,7 @@ fn test_object_btree_map() {
             .collect::<Vec<_>>(),
         vec!["foo"]
     );
-    assert_eq!(value.to_string(), "{\"foo\": 1}");
+    assert_eq!(value.to_string(), "{'foo': 1}");
 
     let value = Value::from(BTreeMap::from_iter([(Value::from(true), 1i32)]));
     assert_eq!(
@@ -1047,8 +1288,8 @@ fn test_map_eq() {
     let t1 = Value::from_object(Thing { rev: false });
     let t2 = Value::from_object(Thing { rev: true });
 
-    assert_snapshot!(t1.to_string(), @r###"{"a": 1, "b": 2}"###);
-    assert_snapshot!(t2.to_string(), @r###"{"b": 2, "a": 1}"###);
+    assert_snapshot!(t1.to_string(), @"{'a': 1, 'b': 2}");
+    assert_snapshot!(t2.to_string(), @"{'b': 2, 'a': 1}");
     assert_eq!(t1, t2);
 }
 
@@ -1151,7 +1392,7 @@ fn test_sorting() {
         Value::from(Error::new(ErrorKind::InvalidOperation, "shit hit the fan")),
     ];
     values.sort();
-    assert_debug_snapshot!(&values, @r###"
+    assert_debug_snapshot!(&values, @"
     [
         undefined,
         None,
@@ -1167,10 +1408,10 @@ fn test_sorting() {
         128,
         inf,
         NaN,
-        "boat",
-        "floats",
-        "the",
-        "whatever",
+        'boat',
+        'floats',
+        'the',
+        'whatever',
         [
             1,
         ],
@@ -1187,7 +1428,7 @@ fn test_sorting() {
         ],
         <invalid value: invalid operation: shit hit the fan>,
     ]
-    "###);
+    ");
 }
 
 #[test]

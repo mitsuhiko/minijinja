@@ -529,6 +529,18 @@ func FromBytes(v []byte) Value {
 	return Value{data: v}
 }
 
+// tupleValue distinguishes Jinja tuples from ordinary list sequences.
+// It intentionally remains internal so Go slices continue to convert to lists.
+type tupleValue []Value
+
+// FromTuple creates a tuple Value from a slice of Values.
+//
+// Tuples behave like sequences, but render with parentheses and retain their
+// type through tuple-specific sequence operations.
+func FromTuple(v []Value) Value {
+	return Value{data: tupleValue(v)}
+}
+
 // FromSlice creates a Value from a slice of Values.
 //
 // Slices represent ordered sequences (arrays/lists) that can be iterated
@@ -773,7 +785,7 @@ func (v Value) Kind() ValueKind {
 		return KindString
 	case []byte:
 		return KindBytes
-	case []Value:
+	case []Value, tupleValue:
 		return KindSeq
 	case map[string]Value:
 		return KindMap
@@ -875,6 +887,8 @@ func (v Value) IsTrue() bool {
 		return len(d) > 0
 	case []Value:
 		return len(d) > 0
+	case tupleValue:
+		return len(d) > 0
 	case map[string]Value:
 		return len(d) > 0
 	case Object:
@@ -922,11 +936,9 @@ func (v Value) String() string {
 	case []byte:
 		return string(d)
 	case []Value:
-		var parts []string
-		for _, item := range d {
-			parts = append(parts, item.Repr())
-		}
-		return "[" + strings.Join(parts, ", ") + "]"
+		return formatSequence(d, false)
+	case tupleValue:
+		return formatSequence([]Value(d), true)
 	case *Iterator:
 		var parts []string
 		for _, item := range d.items {
@@ -941,7 +953,7 @@ func (v Value) String() string {
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			parts = append(parts, fmt.Sprintf("%q: %s", k, d[k].Repr()))
+			parts = append(parts, fmt.Sprintf("%s: %s", pythonStringRepr(k), d[k].Repr()))
 		}
 		return "{" + strings.Join(parts, ", ") + "}"
 	default:
@@ -971,17 +983,15 @@ func (v Value) Repr() string {
 		}
 		return fmt.Sprintf("%g", d)
 	case string:
-		return fmt.Sprintf("%q", d)
+		return pythonStringRepr(d)
 	case safeString:
-		return fmt.Sprintf("%q", string(d))
+		return pythonStringRepr(string(d))
 	case []byte:
 		return fmt.Sprintf("b%q", d)
 	case []Value:
-		var parts []string
-		for _, item := range d {
-			parts = append(parts, item.Repr())
-		}
-		return "[" + strings.Join(parts, ", ") + "]"
+		return formatSequence(d, false)
+	case tupleValue:
+		return formatSequence([]Value(d), true)
 	case *Iterator:
 		return "<iterator>"
 	case map[string]Value:
@@ -1006,7 +1016,64 @@ func formatMapKey(key string) string {
 			return key
 		}
 	}
-	return fmt.Sprintf("%q", key)
+	return pythonStringRepr(key)
+}
+
+func formatSequence(items []Value, tuple bool) string {
+	parts := make([]string, len(items))
+	for i, item := range items {
+		parts[i] = item.Repr()
+	}
+	if tuple {
+		suffix := ""
+		if len(items) == 1 {
+			suffix = ","
+		}
+		return "(" + strings.Join(parts, ", ") + suffix + ")"
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+func pythonStringRepr(s string) string {
+	quote := '\''
+	if strings.ContainsRune(s, '\'') && !strings.ContainsRune(s, '"') {
+		quote = '"'
+	}
+
+	var b strings.Builder
+	b.WriteRune(quote)
+	for _, ch := range s {
+		switch ch {
+		case '\'':
+			if quote == '\'' {
+				b.WriteString("\\'")
+			} else {
+				b.WriteRune(ch)
+			}
+		case '"':
+			if quote == '"' {
+				b.WriteString("\\\"")
+			} else {
+				b.WriteRune(ch)
+			}
+		case '\\':
+			b.WriteString("\\\\")
+		case '\n':
+			b.WriteString("\\n")
+		case '\r':
+			b.WriteString("\\r")
+		case '\t':
+			b.WriteString("\\t")
+		default:
+			if ch < 0x20 || ch == 0x7f || (ch >= 0x80 && ch <= 0x9f) {
+				fmt.Fprintf(&b, "\\x%02x", ch)
+			} else {
+				b.WriteRune(ch)
+			}
+		}
+	}
+	b.WriteRune(quote)
+	return b.String()
 }
 
 // IsSafe returns true if this is a safe string.
@@ -1049,8 +1116,8 @@ func (v Value) SameAs(other Value) bool {
 	if v.Kind() == KindSeq || v.Kind() == KindMap {
 		// In Go, slice identity is determined by the full slice header.
 		// Compare pointer, length, and capacity to ensure reslices don't match.
-		if s1, ok1 := v.data.([]Value); ok1 {
-			if s2, ok2 := other.data.([]Value); ok2 {
+		if s1, ok1 := v.AsSlice(); ok1 {
+			if s2, ok2 := other.AsSlice(); ok2 && v.IsTuple() == other.IsTuple() {
 				return reflect.ValueOf(s1).Pointer() == reflect.ValueOf(s2).Pointer() &&
 					len(s1) == len(s2) &&
 					cap(s1) == cap(s2)
@@ -1121,12 +1188,22 @@ func (v Value) AsBool() (bool, bool) {
 	return false, false
 }
 
-// AsSlice returns the slice if it is one.
+// IsTuple returns true if the value is a tuple.
+func (v Value) IsTuple() bool {
+	_, ok := v.data.(tupleValue)
+	return ok
+}
+
+// AsSlice returns the sequence's values if it is a list or tuple.
 func (v Value) AsSlice() ([]Value, bool) {
-	if s, ok := v.data.([]Value); ok {
+	switch s := v.data.(type) {
+	case []Value:
 		return s, true
+	case tupleValue:
+		return []Value(s), true
+	default:
+		return nil, false
 	}
-	return nil, false
 }
 
 // AsMap returns the map if it is one.
@@ -1151,6 +1228,8 @@ func (v Value) Len() (int, bool) {
 		return len(d), true
 	case []Value:
 		return len(d), true
+	case tupleValue:
+		return len(d), true
 	case *Iterator:
 		return len(d.items), true
 	case map[string]Value:
@@ -1171,13 +1250,12 @@ func (v Value) Len() (int, bool) {
 func (v Value) GetItem(key Value) Value {
 	switch d := v.data.(type) {
 	case []Value:
-		if idx, ok := key.AsInt(); ok {
-			if idx < 0 {
-				idx = int64(len(d)) + idx
-			}
-			if idx >= 0 && idx < int64(len(d)) {
-				return d[idx]
-			}
+		if idx, ok := sequenceIndex(len(d), key); ok {
+			return d[idx]
+		}
+	case tupleValue:
+		if idx, ok := sequenceIndex(len(d), key); ok {
+			return d[idx]
 		}
 	case *Iterator:
 		if idx, ok := key.AsInt(); ok {
@@ -1239,6 +1317,17 @@ func (v Value) GetItem(key Value) Value {
 	return Undefined()
 }
 
+func sequenceIndex(length int, key Value) (int64, bool) {
+	idx, ok := key.AsInt()
+	if !ok {
+		return 0, false
+	}
+	if idx < 0 {
+		idx = int64(length) + idx
+	}
+	return idx, idx >= 0 && idx < int64(length)
+}
+
 // GetAttr gets an attribute by name.
 func (v Value) GetAttr(name string) Value {
 	switch d := v.data.(type) {
@@ -1293,6 +1382,8 @@ func (v Value) Iter() []Value {
 	switch d := v.data.(type) {
 	case []Value:
 		return d
+	case tupleValue:
+		return []Value(d)
 	case *Iterator:
 		return d.items
 	case map[string]Value:
@@ -1344,6 +1435,10 @@ func (v Value) Clone() Value {
 		newSlice := make([]Value, len(d))
 		copy(newSlice, d)
 		return Value{data: newSlice}
+	case tupleValue:
+		newTuple := make(tupleValue, len(d))
+		copy(newTuple, d)
+		return Value{data: newTuple}
 	case map[string]Value:
 		newMap := make(map[string]Value, len(d))
 		for k, val := range d {

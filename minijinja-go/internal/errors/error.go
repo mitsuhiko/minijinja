@@ -3,7 +3,7 @@ package errors
 import (
 	"fmt"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/syntax"
 )
 
 // ErrorKind describes the type of error that occurred during template processing.

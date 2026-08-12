@@ -55,17 +55,11 @@
 //! this module.  Note though that these functions are not to be
 //! called from Rust code as their exact interface (arguments and return types)
 //! might change from one MiniJinja version to another.
+#[cfg(feature = "builtins")]
 use crate::error::Error;
 use crate::value::Value;
+#[cfg(feature = "builtins")]
 use crate::vm::State;
-
-/// Deprecated alias
-#[deprecated = "Use the minijinja::functions::Function instead"]
-#[doc(hidden)]
-pub use crate::functions::Function as Test;
-#[deprecated = "Use the minijinja::value::FunctionResult instead"]
-#[doc(hidden)]
-pub use crate::value::FunctionResult as TestResult;
 
 /// Checks if a value is undefined.
 ///

@@ -3,7 +3,7 @@
   <p><strong>MiniJinja for Go: a powerful template engine for Go</strong></p>
 
 [![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
-[![Go Reference](https://pkg.go.dev/badge/github.com/mitsuhiko/minijinja/minijinja-go/v2.svg)](https://pkg.go.dev/github.com/mitsuhiko/minijinja/minijinja-go/v2)
+[![Go Reference](https://pkg.go.dev/badge/github.com/mitsuhiko/minijinja/minijinja-go/v3.svg)](https://pkg.go.dev/github.com/mitsuhiko/minijinja/minijinja-go/v3)
 
 </div>
 
@@ -58,7 +58,7 @@ import (
     "fmt"
     "log"
 
-    minijinja "github.com/mitsuhiko/minijinja/minijinja-go/v2"
+    minijinja "github.com/mitsuhiko/minijinja/minijinja-go/v3"
 )
 
 func main() {
@@ -86,10 +86,10 @@ func main() {
 ## Installation
 
 ```bash
-go get github.com/mitsuhiko/minijinja/minijinja-go/v2
+go get github.com/mitsuhiko/minijinja/minijinja-go/v3
 ```
 
-Documentation: https://pkg.go.dev/github.com/mitsuhiko/minijinja/minijinja-go/v2
+Documentation: https://pkg.go.dev/github.com/mitsuhiko/minijinja/minijinja-go/v3
 
 ## Template Inheritance
 
@@ -212,7 +212,7 @@ If you are stuck with MiniJinja, have suggestions or need help, you can use the
 
 ## License and Links
 
-* [Documentation](https://pkg.go.dev/github.com/mitsuhiko/minijinja/minijinja-go/v2)
+* [Documentation](https://pkg.go.dev/github.com/mitsuhiko/minijinja/minijinja-go/v3)
 * [Discussions](https://github.com/mitsuhiko/minijinja/discussions)
 * [Issue Tracker](https://github.com/mitsuhiko/minijinja/issues)
 * License: [Apache-2.0](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)

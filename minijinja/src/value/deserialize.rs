@@ -1,5 +1,3 @@
-use std::ops::{Deref, DerefMut};
-
 use serde::de::value::{MapDeserializer, SeqDeserializer};
 use serde::de::{
     self, Deserialize, DeserializeOwned, DeserializeSeed, Deserializer, EnumAccess,
@@ -7,7 +5,7 @@ use serde::de::{
 };
 use serde::forward_to_deserialize_any;
 
-use crate::value::{ArgType, ObjectRepr, Value, ValueKind, ValueMap, ValueRepr};
+use crate::value::{ArgType, ObjectRepr, Serde, Value, ValueKind, ValueMap, ValueRepr};
 use crate::{Error, ErrorKind};
 
 #[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
@@ -88,31 +86,7 @@ impl<'de> Visitor<'de> for ValueVisitor {
     }
 }
 
-/// Utility type to deserialize an argument.
-///
-/// This allows you to directly accept a type that implements [`Deserialize`] as an
-/// argument to a filter or test.  The type dereferences into the inner type and
-/// it also lets you move out the inner type.
-///
-/// ```rust
-/// # use minijinja::Environment;
-/// use std::path::PathBuf;
-/// use minijinja::value::ViaDeserialize;
-///
-/// fn dirname(path: ViaDeserialize<PathBuf>) -> String {
-///     match path.parent() {
-///         Some(parent) => parent.display().to_string(),
-///         None => "".to_string()
-///     }
-/// }
-///
-/// # let mut env = Environment::new();
-/// env.add_filter("dirname", dirname);
-/// ```
-#[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
-pub struct ViaDeserialize<T: DeserializeOwned>(pub T);
-
-impl<'a, T: DeserializeOwned> ArgType<'a> for ViaDeserialize<T> {
+impl<'a, T: DeserializeOwned> ArgType<'a> for Serde<T> {
     type Output = Self;
 
     fn from_value(value: Option<&'a Value>) -> Result<Self, Error> {
@@ -124,24 +98,10 @@ impl<'a, T: DeserializeOwned> ArgType<'a> for ViaDeserialize<T> {
                         "cannot deserialize from kwargs",
                     ));
                 }
-                T::deserialize(value).map(ViaDeserialize)
+                T::deserialize(value).map(Serde)
             }
             None => Err(Error::from(ErrorKind::MissingArgument)),
         }
-    }
-}
-
-impl<T: DeserializeOwned> Deref for ViaDeserialize<T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        &self.0
-    }
-}
-
-impl<T: DeserializeOwned> DerefMut for ViaDeserialize<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        &mut self.0
     }
 }
 

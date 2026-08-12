@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/lexer"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/syntax"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/syntax"
 )
 
 const maxRecursion = 150
@@ -831,9 +831,8 @@ func (p *Parser) parsePrimary() (Expr, *Error) {
 }
 
 func (p *Parser) parseTupleOrExpr(span Span) (Expr, *Error) {
-	// Empty tuple = empty list
 	if p.skip(lexer.TokenParenClose) {
-		return &List{Items: nil, span: p.expandSpan(span)}, nil
+		return &Tuple{Items: nil, span: p.expandSpan(span)}, nil
 	}
 
 	expr, err := p.parseExpr()
@@ -842,7 +841,6 @@ func (p *Parser) parseTupleOrExpr(span Span) (Expr, *Error) {
 	}
 
 	if p.matches(lexer.TokenComma) {
-		// It's a tuple (which we represent as a list)
 		items := []Expr{expr}
 		for {
 			if p.skip(lexer.TokenParenClose) {
@@ -860,7 +858,7 @@ func (p *Parser) parseTupleOrExpr(span Span) (Expr, *Error) {
 			}
 			items = append(items, item)
 		}
-		return &List{Items: items, span: p.expandSpan(span)}, nil
+		return &Tuple{Items: items, span: p.expandSpan(span)}, nil
 	}
 
 	if _, err := p.expect(lexer.TokenParenClose, "`)`"); err != nil {
@@ -1365,7 +1363,7 @@ func (p *Parser) parseSet(span Span) (Stmt, *Error) {
 				break
 			}
 		}
-		expr = &List{Items: items, span: p.expandSpan(tupleSpan)}
+		expr = &Tuple{Items: items, span: p.expandSpan(tupleSpan)}
 	}
 
 	return &Set{Target: target, Expr: expr, span: p.expandSpan(span)}, nil
@@ -1748,6 +1746,8 @@ func exprDescription(e Expr) string {
 		return "call"
 	case *List:
 		return "list literal"
+	case *Tuple:
+		return "tuple literal"
 	case *Map:
 		return "map literal"
 	case *Test:

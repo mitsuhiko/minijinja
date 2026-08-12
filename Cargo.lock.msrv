@@ -1140,7 +1140,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5d9305ccc6942a704f4335694ecd3de2ea531b114ac2d51f5f843750787a92f"
 
 [[package]]
-name = "eval-to-state"
+name = "captured-state"
 version = "0.1.0"
 dependencies = [
  "minijinja",
@@ -1996,7 +1996,6 @@ dependencies = [
  "minijinja",
  "minijinja-contrib",
  "serde-wasm-bindgen",
- "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
@@ -2419,7 +2418,6 @@ dependencies = [
  "pyo3-build-config",
  "pyo3-ffi",
  "pyo3-macros",
- "serde",
  "unindent",
 ]
 

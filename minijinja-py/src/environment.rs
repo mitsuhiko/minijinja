@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::{Arc, Mutex};
 
 use minijinja::syntax::SyntaxConfig;
-use minijinja::value::{Rest, Value};
+use minijinja::value::{Rest, Value, ValueOrKwargs};
 use minijinja::{
     context, escape_formatter, AutoEscape, Error, ErrorKind, State, UndefinedBehavior,
 };
@@ -232,9 +232,10 @@ impl Environment {
         let callback: Py<PyAny> = callback.clone().unbind();
         self.inner.lock().unwrap().env.add_filter(
             name.to_string(),
-            move |state: &State, args: Rest<Value>| -> Result<Value, Error> {
+            move |state: &mut State, args: Rest<ValueOrKwargs>| -> Result<Value, Error> {
                 Python::attach(|py| {
                     bind_state(state, || {
+                        let args = args.into_values();
                         let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
                         let rv = callback
@@ -264,9 +265,10 @@ impl Environment {
         let callback: Py<PyAny> = callback.clone().unbind();
         self.inner.lock().unwrap().env.add_test(
             name.to_string(),
-            move |state: &State, args: Rest<Value>| -> Result<bool, Error> {
+            move |state: &mut State, args: Rest<ValueOrKwargs>| -> Result<bool, Error> {
                 Python::attach(|py| {
                     bind_state(state, || {
+                        let args = args.into_values();
                         let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
                         let rv = callback
@@ -291,9 +293,10 @@ impl Environment {
         let callback: Py<PyAny> = callback.clone().unbind();
         self.inner.lock().unwrap().env.add_function(
             name.to_string(),
-            move |state: &State, args: Rest<Value>| -> Result<Value, Error> {
+            move |state: &mut State, args: Rest<ValueOrKwargs>| -> Result<Value, Error> {
                 Python::attach(|py| {
                     bind_state(state, || {
+                        let args = args.into_values();
                         let (py_args, py_kwargs) = to_python_args(py, callback.bind(py), &args)
                             .map_err(to_minijinja_error)?;
                         let rv = callback

@@ -10,7 +10,7 @@ use crate::value::Value;
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub enum CaptureMode {
     Capture,
-    #[allow(unused)]
+    #[cfg(feature = "multi_template")]
     Discard,
 }
 
@@ -51,6 +51,7 @@ impl<'a> Output<'a> {
     pub(crate) fn begin_capture(&mut self, mode: CaptureMode) {
         self.capture_stack.push(match mode {
             CaptureMode::Capture => Some(String::new()),
+            #[cfg(feature = "multi_template")]
             CaptureMode::Discard => None,
         });
         self.retarget();
@@ -87,8 +88,8 @@ impl<'a> Output<'a> {
     }
 
     /// Returns `true` if the output is discarding.
+    #[cfg(feature = "multi_template")]
     #[inline(always)]
-    #[allow(unused)]
     pub(crate) fn is_discarding(&self) -> bool {
         matches!(self.capture_stack.last(), Some(None))
     }

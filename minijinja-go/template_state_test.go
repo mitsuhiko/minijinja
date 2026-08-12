@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
 func TestEvalToState(t *testing.T) {

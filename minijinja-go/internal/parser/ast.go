@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/lexer"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/lexer"
 )
 
 // Span represents a location range in source code.
@@ -552,6 +552,16 @@ type List struct {
 func (l *List) node()      {}
 func (l *List) expr()      {}
 func (l *List) Span() Span { return l.span }
+
+// Tuple represents a tuple literal.
+type Tuple struct {
+	Items []Expr
+	span  Span
+}
+
+func (t *Tuple) node()      {}
+func (t *Tuple) expr()      {}
+func (t *Tuple) Span() Span { return t.span }
 
 // Map represents a map/dict literal.
 type Map struct {
@@ -1149,6 +1159,18 @@ func DebugString(n Node, indent int) string {
 		sb.WriteString(FormatSpan(v.span))
 		return sb.String()
 
+	case *Tuple:
+		var sb strings.Builder
+		sb.WriteString("Tuple {\n")
+		sb.WriteString(ind1)
+		sb.WriteString("items: ")
+		sb.WriteString(debugExprList(v.Items, indent+1))
+		sb.WriteString(",\n")
+		sb.WriteString(ind)
+		sb.WriteString("}")
+		sb.WriteString(FormatSpan(v.span))
+		return sb.String()
+
 	case *Map:
 		var sb strings.Builder
 		sb.WriteString("Map {\n")
@@ -1199,7 +1221,7 @@ func formatValue(v interface{}) string {
 		}
 		return "False"
 	case string:
-		return fmt.Sprintf("%q", val)
+		return pythonStringDebug(val)
 	case int64:
 		return fmt.Sprintf("%d", val)
 	case float64:
@@ -1222,6 +1244,48 @@ type BigInt struct {
 
 func (b *BigInt) String() string {
 	return b.Int.String()
+}
+
+func pythonStringDebug(s string) string {
+	quote := '\''
+	if strings.ContainsRune(s, '\'') && !strings.ContainsRune(s, '"') {
+		quote = '"'
+	}
+
+	var b strings.Builder
+	b.WriteRune(quote)
+	for _, ch := range s {
+		switch ch {
+		case '\'':
+			if quote == '\'' {
+				b.WriteString("\\'")
+			} else {
+				b.WriteRune(ch)
+			}
+		case '"':
+			if quote == '"' {
+				b.WriteString("\\\"")
+			} else {
+				b.WriteRune(ch)
+			}
+		case '\\':
+			b.WriteString("\\\\")
+		case '\n':
+			b.WriteString("\\n")
+		case '\r':
+			b.WriteString("\\r")
+		case '\t':
+			b.WriteString("\\t")
+		default:
+			if ch < 0x20 || ch == 0x7f || (ch >= 0x80 && ch <= 0x9f) {
+				fmt.Fprintf(&b, "\\x%02x", ch)
+			} else {
+				b.WriteRune(ch)
+			}
+		}
+	}
+	b.WriteRune(quote)
+	return b.String()
 }
 
 func debugStmtList(stmts []Stmt, indent int) string {

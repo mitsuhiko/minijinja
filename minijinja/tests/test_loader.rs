@@ -1,5 +1,3 @@
-#![cfg(feature = "loader")]
-
 use minijinja::Environment;
 
 use similar_asserts::assert_eq;

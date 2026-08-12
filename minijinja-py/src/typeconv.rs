@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use minijinja::value::{DynObject, Enumerator, Object, ObjectRepr, Value, ValueKind};
+use minijinja::value::{DynObject, Enumerator, Object, ObjectRepr, Tuple, Value, ValueKind};
 use minijinja::{AutoEscape, Error, State};
 
 use pyo3::exceptions::{PyAttributeError, PyLookupError, PyTypeError};
@@ -65,7 +65,7 @@ impl Object for DynamicObject {
         Python::attach(|py| write!(f, "{}", self.inner.bind(py)))
     }
 
-    fn call(self: &Arc<Self>, state: &State, args: &[Value]) -> Result<Value, Error> {
+    fn call(self: &Arc<Self>, state: &mut State, args: &[Value]) -> Result<Value, Error> {
         Python::attach(|py| -> Result<Value, Error> {
             bind_state(state, || {
                 let inner = self.inner.bind(py);
@@ -82,7 +82,7 @@ impl Object for DynamicObject {
 
     fn call_method(
         self: &Arc<Self>,
-        state: &State,
+        state: &mut State,
         name: &str,
         args: &[Value],
     ) -> Result<Value, Error> {
@@ -184,6 +184,10 @@ pub fn to_minijinja_value(value: &Bound<'_, PyAny>) -> Value {
         Value::from(val)
     } else if let Ok(val) = value.extract::<f64>() {
         Value::from(val)
+    } else if let Ok(tuple) = value.cast::<PyTuple>() {
+        Value::from(Tuple::new(
+            tuple.iter().map(|item| to_minijinja_value(&item)).collect(),
+        ))
     } else if let Ok(val) = value.extract::<PyBackedStr>() {
         if let Ok(to_html) = value.getattr("__html__") {
             if to_html.is_callable() {
@@ -220,6 +224,15 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
     // extract the retained raw Python reference.
     if let Some(pyobj) = value.downcast_object_ref::<DynamicObject>() {
         return Ok(pyobj.inner.clone_ref(py));
+    }
+
+    if let Some(tuple) = value.downcast_object_ref::<Tuple>() {
+        let items = tuple
+            .iter()
+            .cloned()
+            .map(|value| to_python_value_impl(py, value))
+            .collect::<PyResult<Vec<_>>>()?;
+        return Ok(PyTuple::new(py, items)?.into());
     }
 
     if let Some(obj) = value.as_object() {

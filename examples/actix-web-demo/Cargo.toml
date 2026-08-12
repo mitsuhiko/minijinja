@@ -8,4 +8,4 @@ publish = false
 
 [dependencies]
 actix-web = "4.9.0"
-minijinja = { path = "../../minijinja", features = ["loader"] }
+minijinja = { path = "../../minijinja" }

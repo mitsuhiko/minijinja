@@ -1,5 +1,6 @@
-use minijinja::value::{from_args, StringInput, ValueKind};
-use minijinja::{format_filter, Error, ErrorKind, FormatStyle, State, Value};
+use minijinja::formatting::{format, FormatStyle};
+use minijinja::value::{from_args, StringInput, Tuple, ValueKind};
+use minijinja::{Error, ErrorKind, State, Value};
 
 /// An unknown method callback implementing python methods on primitives.
 ///
@@ -47,7 +48,7 @@ use minijinja::{format_filter, Error, ErrorKind, FormatStyle, State, Value};
 /// * `str.upper`
 #[cfg_attr(docsrs, doc(cfg(feature = "pycompat")))]
 pub fn unknown_method_callback(
-    state: &State,
+    state: &mut State,
     value: &Value,
     method: &str,
     args: &[Value],
@@ -198,7 +199,7 @@ fn string_methods(
                 None => -1,
             }))
         }
-        "format" => format_filter(FormatStyle::StrFormat, s, args).map(Value::from),
+        "format" => format(FormatStyle::StrFormat, s, args).map(Value::from),
         "rfind" => {
             let (what,): (&str,) = from_args(args)?;
             Ok(Value::from(match s.rfind(what) {
@@ -308,7 +309,7 @@ fn map_methods(value: &Value, method: &str, args: &[Value]) -> Result<Value, Err
             let () = from_args(args)?;
             Ok(Value::make_object_iterable(obj.clone(), |obj| {
                 match obj.try_iter_pairs() {
-                    Some(iter) => Box::new(iter.map(|(k, v)| Value::from(vec![k, v]))),
+                    Some(iter) => Box::new(iter.map(|(k, v)| Value::from(Tuple::from([k, v])))),
                     None => Box::new(None.into_iter()),
                 }
             }))

@@ -156,7 +156,7 @@ package minijinja
 
 // Re-export commonly used types from subpackages
 import (
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
 // Value is a dynamically typed value in the template engine.
@@ -182,9 +182,14 @@ func FromMap(v map[string]Value) Value {
 	return value.FromMap(v)
 }
 
-// FromSlice creates a Value from a slice of Value.
+// FromSlice creates a list Value from a slice of Value.
 func FromSlice(v []Value) Value {
 	return value.FromSlice(v)
+}
+
+// FromTuple creates a tuple Value from a slice of Value.
+func FromTuple(v []Value) Value {
+	return value.FromTuple(v)
 }
 
 // MergeMaps merges multiple map-like values into a single lazy map object.

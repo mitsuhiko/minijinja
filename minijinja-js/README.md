@@ -88,6 +88,9 @@ const result = env.evalExpr('1 + 1', {});
 console.log(result);
 ```
 
+MiniJinja tuples retain tuple rendering inside templates. Expression results are
+returned as JavaScript arrays because JavaScript has no distinct tuple type.
+
 ## Web Usage
 
 If you want to use minijinja-js from the browser instead of node, you will

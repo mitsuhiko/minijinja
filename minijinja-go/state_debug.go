@@ -1,9 +1,9 @@
 package minijinja
 
 import (
-	mjerrors "github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/errors"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/internal/parser"
-	"github.com/mitsuhiko/minijinja/minijinja-go/v2/value"
+	mjerrors "github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/errors"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/parser"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
 func (s *State) attachErrorInfo(err error, node parser.Node) error {
@@ -144,6 +144,10 @@ func collectReferencedNamesExpr(expr parser.Expr, referenced map[string]struct{}
 		collectReferencedNamesExpr(e.Expr, referenced)
 		collectReferencedNamesCallArgs(e.Args, referenced)
 	case *parser.List:
+		for _, item := range e.Items {
+			collectReferencedNamesExpr(item, referenced)
+		}
+	case *parser.Tuple:
 		for _, item := range e.Items {
 			collectReferencedNamesExpr(item, referenced)
 		}

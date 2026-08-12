@@ -4,7 +4,7 @@ use std::fs;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use minijinja::value::{Object, Value};
+use minijinja::value::{Object, Serde, Value};
 use minijinja::Environment;
 
 #[derive(Default, Debug)]
@@ -42,7 +42,7 @@ fn load_json(name: &str) -> Option<Value> {
     rv.set_extension("json");
     let contents = fs::read(&rv).ok()?;
     let parsed: serde_json::Value = serde_json::from_slice(&contents[..]).ok()?;
-    Some(Value::from_serialize(parsed))
+    Some(Value::from(Serde(parsed)))
 }
 
 fn main() {

@@ -10,7 +10,7 @@ use clap::ArgMatches;
 use minijinja::machinery::{
     get_compiled_template, parse, tokenize, Instructions, WhitespaceConfig,
 };
-use minijinja::value::merge_maps;
+use minijinja::value::{merge_maps, Serde};
 use minijinja::{context, Environment, Error as MError, ErrorKind, Value};
 use serde::Deserialize;
 
@@ -106,7 +106,7 @@ fn load_data(
             // before converting it into a final value.
             let mut v: serde_yaml::Value = serde_yaml::from_slice(&contents)?;
             v.apply_merge()?;
-            Value::from_serialize(v)
+            Value::from(Serde(v))
         }
         #[cfg(feature = "toml")]
         "toml" => {
@@ -122,7 +122,7 @@ fn load_data(
             config
                 .read(contents)
                 .map_err(|msg| anyhow::anyhow!("could not load ini: {}", msg))?;
-            Value::from_serialize(config.get_map_ref())
+            Value::from(Serde(config.get_map_ref()))
         }
         other => bail!("Unknown format '{}'", other),
     };

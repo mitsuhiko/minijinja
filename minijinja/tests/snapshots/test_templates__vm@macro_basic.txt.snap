@@ -9,7 +9,6 @@ input_file: minijinja/tests/inputs/macro_basic.txt
 1|2
 1|2
 add
-["a", "b"]
+['a', 'b']
 False
 <macro add>
-

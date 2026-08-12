@@ -56,7 +56,7 @@ impl fmt::Display for Utils {
 impl Object for Utils {
     fn call_method(
         self: &Arc<Self>,
-        _state: &State,
+        _state: &mut State,
         name: &str,
         _args: &[Value],
     ) -> Result<Value, Error> {

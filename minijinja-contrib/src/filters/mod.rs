@@ -81,7 +81,7 @@ pub fn pluralize(
 /// ```
 #[cfg(feature = "rand")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rand")))]
-pub fn random(state: &minijinja::State, seq: &Value) -> Result<Value, Error> {
+pub fn random(state: &mut minijinja::State, seq: &Value) -> Result<Value, Error> {
     use minijinja::value::ValueKind;
 
     if matches!(seq.kind(), ValueKind::Seq | ValueKind::String) {
@@ -181,7 +181,7 @@ pub fn filesizeformat(value: f64, binary: Option<bool>) -> String {
 ///     leeway=2
 /// ) }}
 /// ```
-pub fn truncate(state: &State, value: &Value, kwargs: Kwargs) -> Result<Value, Error> {
+pub fn truncate(state: &mut State, value: &Value, kwargs: Kwargs) -> Result<Value, Error> {
     if matches!(value.kind(), ValueKind::None | ValueKind::Undefined) {
         return Ok(Value::from(""));
     }

@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use insta::assert_snapshot;
 use minijinja::syntax::SyntaxConfig;
-use minijinja::value::{Enumerator, Object, ObjectRepr, Rest, Value};
+use minijinja::value::{Enumerator, Object, ObjectRepr, Rest, Serde, Value, ValueOrKwargs};
 use minijinja::{context, render, Environment, Error, ErrorKind, State, UndefinedBehavior};
 
 use serde::Deserialize;
@@ -73,8 +73,8 @@ fn test_vm() {
         let contents = std::fs::read_to_string(path).unwrap();
         let mut iter = contents.splitn(2, "\n---\n");
         let mut env = Environment::new();
-        env.add_function("get_args", |args: Rest<Value>| -> Value {
-            Value::from(args.0)
+        env.add_function("get_args", |args: Rest<ValueOrKwargs>| -> Value {
+            Value::from(args.into_values())
         });
         let ctx: Value = serde_json::from_str(iter.next().unwrap()).unwrap();
         let settings =
@@ -178,7 +178,7 @@ fn test_vm_block_fragments() {
             let template = env.get_template(filename).unwrap();
 
             match template
-                .render_captured(&ctx)
+                .render_captured(Serde(&ctx))
                 .and_then(|mut x| x.with_state_mut(|state| state.render_block("fragment")))
             {
                 Ok(mut rendered) => {
@@ -257,7 +257,7 @@ fn test_chained_comparisons() {
         "False"
     );
 
-    fn inc(state: &State) -> Value {
+    fn inc(state: &mut State) -> Value {
         let old = state
             .get_temp("chained_comparison_counter")
             .unwrap_or_else(|| Value::from(0i64));
@@ -355,11 +355,11 @@ fn test_items_and_dictsort_with_structs() {
 
     insta::assert_snapshot!(
         minijinja::render!("{{ x|items }}", x => Value::from_object(MyStruct)),
-        @r###"[["b", "B"], ["a", "A"]]"###
+        @"[('b', 'B'), ('a', 'A')]"
     );
     insta::assert_snapshot!(
         minijinja::render!("{{ x|dictsort }}", x => Value::from_object(MyStruct)),
-        @r###"[["a", "A"], ["b", "B"]]"###
+        @"[('a', 'A'), ('b', 'B')]"
     );
 }
 
@@ -503,7 +503,7 @@ fn test_flattening() {
     };
 
     let env = Environment::new();
-    env.render_str("{{ debug() }}", ctx).unwrap();
+    env.render_str("{{ debug() }}", Serde(ctx)).unwrap();
 }
 
 #[test]
@@ -513,7 +513,7 @@ fn test_flattening_sub_item_good() {
         more: Value::from(BTreeMap::from([("b", 23)])),
     };
 
-    let ctx = context!(bad, good => "good");
+    let ctx = context!(bad => Serde(bad), good => "good");
     let env = Environment::new();
 
     // we are not touching a bad value, so we are good
@@ -529,7 +529,7 @@ fn test_flattening_sub_item_bad_lookup() {
         more: Value::from(BTreeMap::from([("b", 23)])),
     };
 
-    let ctx = context!(bad, good => "good");
+    let ctx = context!(bad => Serde(bad), good => "good");
     let env = Environment::new();
 
     // resolving an invalid value will fail
@@ -543,7 +543,7 @@ fn test_flattening_sub_item_bad_attr() {
         more: Value::from(BTreeMap::from([("b", 23)])),
     };
 
-    let ctx = context!(good => context!(bad));
+    let ctx = context!(good => context!(bad => Serde(bad)));
     let env = Environment::new();
 
     // resolving an invalid value will fail, even in an attribute lookup
@@ -564,14 +564,14 @@ fn test_flattening_sub_item_shielded_print() {
         more: Value::from(BTreeMap::from([("b", 23)])),
     };
 
-    let ctx = context!(good => context!(bad));
+    let ctx = context!(good => context!(bad => Serde(bad)));
     let env = Environment::new();
 
     // this on the other hand is okay
     let value = env.render_str("{{ good }}", ctx).unwrap();
     assert_eq!(
         value,
-        r#"{"bad": <invalid value: could not serialize to value: can only flatten structs and maps (got a tuple struct)>}"#
+        "{'bad': <invalid value: could not serialize to value: can only flatten structs and maps (got a tuple struct)>}"
     );
 }
 
@@ -722,29 +722,6 @@ fn test_state() {
 }
 
 #[test]
-#[allow(unused_mut, deprecated)]
-fn test_render_and_return_state() {
-    let mut env = Environment::new();
-    #[cfg(feature = "fuel")]
-    {
-        env.set_fuel(Some(100));
-    }
-    let tmpl = env
-        .template_from_str("{% for x in range(3) %}Hello {{ name }}!\n{% endfor %}{% set x = 1 %}")
-        .unwrap();
-    let (rv, state) = tmpl
-        .render_and_return_state(context! { name => "Foo" })
-        .unwrap();
-    assert_eq!(rv, "Hello Foo!\nHello Foo!\nHello Foo!\n");
-    assert_eq!(state.lookup("x"), Some(Value::from(1)));
-
-    #[cfg(feature = "fuel")]
-    {
-        assert_eq!(state.fuel_levels(), Some((26, 74)));
-    }
-}
-
-#[test]
 fn test_loop_locals_do_not_persist_between_iterations() {
     assert_eq!(
         render!("{% for x in [1, 2] %}{% if loop.first %}{% set y = x %}{% endif %}[{{ y }}]{% endfor %}"),
@@ -753,9 +730,27 @@ fn test_loop_locals_do_not_persist_between_iterations() {
 }
 
 #[test]
+fn test_render_captured_state() {
+    #[allow(unused_mut)]
+    let mut env = Environment::new();
+    #[cfg(feature = "fuel")]
+    env.set_fuel(Some(100));
+
+    let tmpl = env
+        .template_from_str("{% for x in range(3) %}Hello {{ name }}!\n{% endfor %}{% set x = 1 %}")
+        .unwrap();
+    let captured = tmpl.render_captured(context! { name => "Foo" }).unwrap();
+    assert_eq!(captured.output(), "Hello Foo!\nHello Foo!\nHello Foo!\n");
+    assert_eq!(captured.state().lookup("x"), Some(Value::from(1)));
+
+    #[cfg(feature = "fuel")]
+    assert_eq!(captured.state().fuel_levels(), Some((26, 74)));
+}
+
+#[test]
 fn test_render_captured() {
     let env = Environment::new();
-    let rendered = env
+    let mut rendered = env
         .template_from_str("{% set foo = 42 %}{% macro bar() %}x{{ foo }}{% endmacro %}")
         .unwrap()
         .render_captured(())
@@ -763,7 +758,10 @@ fn test_render_captured() {
     assert_eq!(rendered.output(), "");
     assert_eq!(rendered.state().lookup("foo"), Some(Value::from(42)));
     assert_eq!(
-        rendered.state().call_macro("bar", &[]).ok().as_deref(),
+        rendered
+            .with_state_mut(|state| state.call_macro("bar", &[]))
+            .ok()
+            .as_deref(),
         Some("x42")
     );
 }
@@ -775,12 +773,15 @@ fn test_render_captured_to() {
         .template_from_str("{% set foo = 42 %}{% macro bar() %}x{% endmacro %}root")
         .unwrap();
     let mut out = Vec::<u8>::new();
-    let captured = tmpl.render_captured_to((), &mut out).unwrap();
+    let mut captured = tmpl.render_captured_to((), &mut out).unwrap();
     assert_eq!(String::from_utf8_lossy(&out), "root");
     assert_eq!(captured.output(), "");
     assert_eq!(captured.state().lookup("foo"), Some(Value::from(42)));
     assert_eq!(
-        captured.state().call_macro("bar", &[]).ok().as_deref(),
+        captured
+            .with_state_mut(|state| state.call_macro("bar", &[]))
+            .ok()
+            .as_deref(),
         Some("x")
     );
 }

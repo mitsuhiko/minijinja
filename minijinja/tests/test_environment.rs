@@ -29,7 +29,6 @@ fn test_expression() {
 }
 
 #[test]
-#[cfg(feature = "loader")]
 fn test_expression_owned() {
     let env = Environment::new();
     let expr: minijinja::Expression<'_, 'static> = env
@@ -169,17 +168,23 @@ fn test_unknown_method_callback() {
     use minijinja::{Error, ErrorKind};
 
     let mut env = Environment::new();
-    env.set_unknown_method_callback(|_state, value, method, args| {
+    env.set_unknown_method_callback(|state, value, method, args| {
         if value.kind() == ValueKind::Map && method == "items" {
             from_args::<()>(args)?;
+            state.set_temp("unknown_method_called", Value::from(true));
             minijinja::filters::items(value)
         } else {
             Err(Error::from(ErrorKind::UnknownMethod))
         }
     });
 
-    let rv = env.render_str("{{ {'x': 42}.items() }}", ()).unwrap();
-    assert_snapshot!(rv, @r###"[["x", 42]]"###);
+    env.add_function("method_called", |state: &minijinja::State| {
+        state.get_temp("unknown_method_called").unwrap_or_default()
+    });
+    let rv = env
+        .render_str("{{ {'x': 42}.items() }}|{{ method_called() }}", ())
+        .unwrap();
+    assert_snapshot!(rv, @"[('x', 42)]|True");
 
     let rv = env
         .render_str("{{ {'items': 'field', 'x': 42}.items() | length }}", ())

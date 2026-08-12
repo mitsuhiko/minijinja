@@ -16,6 +16,12 @@ pub struct Environment {
     inner: mj::Environment<'static>,
 }
 
+impl Default for Environment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[wasm_bindgen]
 impl Environment {
     #[wasm_bindgen(constructor)]
@@ -244,7 +250,7 @@ pub enum UndefinedBehavior {
     Strict = "strict",
     Chainable = "chainable",
     Lenient = "lenient",
-    SemiStrict = "semi_strct",
+    SemiStrict = "semi_strict",
 }
 
 impl From<mj::UndefinedBehavior> for UndefinedBehavior {

@@ -23,7 +23,7 @@ impl Site {
 impl Object for Site {
     fn call_method(
         self: &Arc<Self>,
-        _state: &State<'_, '_>,
+        _state: &mut State<'_, '_>,
         method: &str,
         args: &[Value],
     ) -> Result<Value, Error> {
