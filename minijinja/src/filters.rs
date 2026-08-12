@@ -1149,7 +1149,7 @@ mod builtins {
         ok!(args.assert_all_used());
         if let Some(indent) = indent {
             let mut out = Vec::<u8>::new();
-            let indentation = " ".repeat(indent);
+            let indentation = ok!(crate::utils::repeat_str(" ", indent));
             let formatter = serde_json::ser::PrettyFormatter::with_indent(indentation.as_bytes());
             let mut s = serde_json::Serializer::with_formatter(&mut out, formatter);
             serde::Serialize::serialize(&value, &mut s)
@@ -1231,7 +1231,7 @@ mod builtins {
         ok!(kwargs.assert_all_used());
 
         let input = strip_trailing_newline(value.as_str());
-        let indent_with = " ".repeat(width);
+        let indent_with = ok!(crate::utils::repeat_str(" ", width));
         let mut output = String::new();
         let mut iterator = input.split('\n');
         if !indent_first_line {

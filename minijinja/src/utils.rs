@@ -29,6 +29,19 @@ pub(crate) fn untrusted_size_hint(value: usize) -> usize {
     value.min(1024)
 }
 
+/// The largest string a template can ask the engine to build by repetition.
+pub(crate) const MAX_REPEATED_STRING_LEN: usize = 100000;
+
+pub(crate) fn repeat_str(s: &str, n: usize) -> Result<String, Error> {
+    match s.len().checked_mul(n) {
+        Some(len) if len <= MAX_REPEATED_STRING_LEN => Ok(s.repeat(n)),
+        _ => Err(Error::new(
+            ErrorKind::InvalidOperation,
+            "string is too large to repeat",
+        )),
+    }
+}
+
 const SMALL_INT_FORMAT_CACHE_LIMIT: usize = 256;
 
 #[inline(always)]

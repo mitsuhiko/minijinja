@@ -324,12 +324,13 @@ pub fn mul(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
         .map(|s| (s, rhs))
         .or_else(|| rhs.as_str().map(|s| (s, lhs)))
     {
-        return Ok(Value::from(s.repeat(ok!(n.as_usize().ok_or_else(|| {
+        let n = ok!(n.as_usize().ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidOperation,
                 "strings can only be multiplied with integers",
             )
-        })))));
+        }));
+        return crate::utils::repeat_str(s, n).map(Value::from);
     } else if let Some((seq, n)) = lhs
         .as_object()
         .map(|s| (s, rhs))
