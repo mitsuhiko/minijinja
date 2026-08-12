@@ -9,6 +9,14 @@
 
 </div>
 
+> [!IMPORTANT]
+> The `main` branch contains development for MiniJinja 3. MiniJinja 2
+> maintenance and releases continue on the
+> [`minijinja-2`](https://github.com/mitsuhiko/minijinja/tree/minijinja-2)
+> branch. Pull requests for changes that apply to MiniJinja 2 should target that
+> branch. Changes are merged forward from `minijinja-2` into `main`, never in the
+> other direction.
+
 MiniJinja is a powerful but minimal dependency template engine
 which is based on the syntax and behavior of the
 [Jinja2](https://jinja.palletsprojects.com/) template engine for Python.
