@@ -1,14 +1,49 @@
 use std::convert::TryFrom;
 
-use minijinja::value::{Kwargs, Value, ValueKind};
+use jiff::civil::{Date, DateTime, Time};
+use jiff::fmt::{strtime, temporal::Pieces};
+use jiff::tz::TimeZone;
+use jiff::{Timestamp, Zoned};
+use minijinja::value::{Kwargs, Value};
 use minijinja::{Error, ErrorKind, State};
-use serde::de::value::SeqDeserializer;
-use serde::Deserialize;
-use time::format_description::well_known::iso8601::Iso8601;
-use time::{format_description, Date, OffsetDateTime, PrimitiveDateTime};
 
-fn handle_serde_error(err: serde::de::value::Error) -> Error {
+enum ParsedDateTime {
+    Date(Date),
+    Civil(DateTime),
+    Zoned(Zoned),
+}
+
+fn invalid_datetime(err: jiff::Error) -> Error {
     Error::new(ErrorKind::InvalidOperation, "not a valid date or timestamp").with_source(err)
+}
+
+fn date_out_of_range(err: jiff::Error) -> Error {
+    Error::new(ErrorKind::InvalidOperation, "date out of range").with_source(err)
+}
+
+fn parse_string(value: &str) -> Result<ParsedDateTime, Error> {
+    let pieces = Pieces::parse(value).map_err(invalid_datetime)?;
+    let Some(time) = pieces.time() else {
+        return Ok(ParsedDateTime::Date(pieces.date()));
+    };
+    let datetime = pieces.date().to_datetime(time);
+
+    #[cfg(feature = "timezone")]
+    let annotated_timezone = pieces.to_time_zone().map_err(invalid_datetime)?;
+    #[cfg(not(feature = "timezone"))]
+    let annotated_timezone: Option<TimeZone> = None;
+
+    if let Some(offset) = pieces.to_numeric_offset() {
+        let timestamp = offset.to_timestamp(datetime).map_err(date_out_of_range)?;
+        let timezone = annotated_timezone.unwrap_or_else(|| TimeZone::fixed(offset));
+        Ok(ParsedDateTime::Zoned(timestamp.to_zoned(timezone)))
+    } else if let Some(timezone) = annotated_timezone {
+        Ok(ParsedDateTime::Zoned(
+            datetime.to_zoned(timezone).map_err(date_out_of_range)?,
+        ))
+    } else {
+        Ok(ParsedDateTime::Civil(datetime))
+    }
 }
 
 fn value_to_datetime(
@@ -16,62 +51,13 @@ fn value_to_datetime(
     state: &State,
     kwargs: &Kwargs,
     allow_date: bool,
-) -> Result<OffsetDateTime, Error> {
-    let mut timezone_already_handled = false;
-
-    let (datetime, had_time) = if let Some(s) = value.as_str() {
-        match OffsetDateTime::parse(s, &Iso8601::PARSING) {
-            Ok(dt) => (dt, true),
-            Err(original_err) => match PrimitiveDateTime::parse(s, &Iso8601::PARSING) {
-                Ok(dt) => attach_timezone_to_primitive_datetime(
-                    state,
-                    kwargs,
-                    &mut timezone_already_handled,
-                    dt,
-                )?,
-                Err(_) => match Date::parse(s, &Iso8601::PARSING) {
-                    Ok(date) => (date.with_hms(0, 0, 0).unwrap().assume_utc(), false),
-                    Err(_) => {
-                        return Err(Error::new(
-                            ErrorKind::InvalidOperation,
-                            "not a valid date or timestamp",
-                        )
-                        .with_source(original_err))
-                    }
-                },
-            },
-        }
-    } else if let Ok(v) = f64::try_from(value.clone()) {
-        (
-            OffsetDateTime::from_unix_timestamp_nanos((v * 1e9) as i128)
-                .map_err(|_| Error::new(ErrorKind::InvalidOperation, "date out of range"))?,
-            true,
-        )
-    } else if value.kind() == ValueKind::Seq {
-        let mut items = Vec::new();
-        for item in value.try_iter()? {
-            items.push(i64::try_from(item)?);
-        }
-        if items.len() == 2 {
-            (
-                Date::deserialize(SeqDeserializer::new(items.into_iter()))
-                    .map_err(handle_serde_error)?
-                    .with_hms(0, 0, 0)
-                    .unwrap()
-                    .assume_utc(),
-                false,
-            )
-        } else if items.len() == 6 {
-            let dt = PrimitiveDateTime::deserialize(SeqDeserializer::new(items.into_iter()))
-                .map_err(handle_serde_error)?;
-            attach_timezone_to_primitive_datetime(state, kwargs, &mut timezone_already_handled, dt)?
-        } else {
-            (
-                OffsetDateTime::deserialize(SeqDeserializer::new(items.into_iter()))
-                    .map_err(handle_serde_error)?,
-                true,
-            )
-        }
+) -> Result<Zoned, Error> {
+    let parsed = if let Some(value) = value.as_str() {
+        parse_string(value)?
+    } else if let Ok(value) = f64::try_from(value.clone()) {
+        let timestamp =
+            Timestamp::from_nanosecond((value * 1e9) as i128).map_err(date_out_of_range)?;
+        ParsedDateTime::Zoned(timestamp.to_zoned(TimeZone::UTC))
     } else {
         return Err(Error::new(
             ErrorKind::InvalidOperation,
@@ -79,58 +65,41 @@ fn value_to_datetime(
         ));
     };
 
-    #[cfg(feature = "timezone")]
-    let datetime = if had_time && !timezone_already_handled {
-        if let Some(tz) = get_timezone(state, kwargs)? {
-            use time_tz::OffsetDateTimeExt;
-            datetime.to_timezone(tz)
-        } else {
+    let datetime = match parsed {
+        ParsedDateTime::Date(date) => {
+            if !allow_date {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    "filter requires time, but only received a date",
+                ));
+            }
+            date.to_datetime(Time::midnight())
+                .to_zoned(TimeZone::UTC)
+                .map_err(date_out_of_range)?
+        }
+        ParsedDateTime::Civil(datetime) => {
+            #[cfg(feature = "timezone")]
+            let timezone = get_timezone(state, kwargs)?.unwrap_or(TimeZone::UTC);
+            #[cfg(not(feature = "timezone"))]
+            let timezone = {
+                let _ = (state, kwargs);
+                TimeZone::UTC
+            };
+            datetime.to_zoned(timezone).map_err(date_out_of_range)?
+        }
+        ParsedDateTime::Zoned(datetime) => {
+            #[cfg(feature = "timezone")]
+            if let Some(timezone) = get_timezone(state, kwargs)? {
+                return Ok(datetime.with_time_zone(timezone));
+            }
             datetime
         }
-    } else {
-        datetime
     };
-
-    if !had_time && !allow_date {
-        return Err(Error::new(
-            ErrorKind::InvalidOperation,
-            "filter requires time, but only received a date",
-        ));
-    }
-
     Ok(datetime)
 }
 
-fn attach_timezone_to_primitive_datetime(
-    state: &State<'_, '_>,
-    kwargs: &Kwargs,
-    timezone_already_handled: &mut bool,
-    dt: PrimitiveDateTime,
-) -> Result<(OffsetDateTime, bool), Error> {
-    #[cfg(feature = "timezone")]
-    {
-        if let Some(tz) = get_timezone(state, kwargs)? {
-            *timezone_already_handled = true;
-            Ok((
-                time_tz::PrimitiveDateTimeExt::assume_timezone(&dt, tz).unwrap_first(),
-                true,
-            ))
-        } else {
-            Ok((dt.assume_utc(), true))
-        }
-    }
-    #[cfg(not(feature = "timezone"))]
-    {
-        let _ = (state, kwargs, timezone_already_handled);
-        Ok((dt.assume_utc(), true))
-    }
-}
-
 #[cfg(feature = "timezone")]
-fn get_timezone(
-    state: &State<'_, '_>,
-    kwargs: &Kwargs,
-) -> Result<Option<&'static time_tz::Tz>, Error> {
+fn get_timezone(state: &State<'_, '_>, kwargs: &Kwargs) -> Result<Option<TimeZone>, Error> {
     let configured_tz = state.lookup("TIMEZONE");
     let tzname = kwargs.get::<Option<&str>>("tz")?.unwrap_or_else(|| {
         configured_tz
@@ -138,24 +107,28 @@ fn get_timezone(
             .and_then(|x| x.as_str())
             .unwrap_or("original")
     });
-    if tzname != "original" {
-        Ok(Some(time_tz::timezones::get_by_name(tzname).ok_or_else(
-            || {
-                Error::new(
-                    ErrorKind::InvalidOperation,
-                    format!("unknown timezone '{tzname}'"),
-                )
-            },
-        )?))
-    } else {
+    if tzname == "original" {
         Ok(None)
+    } else {
+        TimeZone::get(tzname).map(Some).map_err(|_| {
+            Error::new(
+                ErrorKind::InvalidOperation,
+                format!("unknown timezone '{tzname}'"),
+            )
+        })
     }
+}
+
+fn format_datetime(datetime: &Zoned, format: &str) -> Result<String, Error> {
+    strtime::format(format, datetime).map_err(|err| {
+        Error::new(ErrorKind::InvalidOperation, "invalid format string").with_source(err)
+    })
 }
 
 /// Formats a timestamp as date and time.
 ///
-/// The value needs to be a unix timestamp, or a parsable string (ISO 8601) or a
-/// format supported by `chrono` or `time`.
+/// The value needs to be a Unix timestamp, an ISO 8601 string, or a serialized
+/// `chrono` or Jiff date/time value.
 ///
 /// The filter accepts two keyword arguments (`format` and `tz`) to influence the format
 /// and the timezone.  The default format is `"medium"`.  The defaults for these keyword
@@ -176,15 +149,14 @@ fn get_timezone(
 /// {{ value|datetimeformat(format="short", tz="Europe/Vienna") }}
 /// ```
 ///
-/// This filter currently uses the `time` crate to format dates and uses the format
-/// string specification of that crate in version 2.  For more information read the
-/// [Format description documentation](https://time-rs.github.io/book/api/format-description.html).
+/// This filter uses Jiff and accepts `strftime`-style format strings. For more
+/// information, see Jiff's [`strtime` documentation](https://docs.rs/jiff/latest/jiff/fmt/strtime/).
 /// Additionally some special formats are supported:
 ///
 /// * `short`: a short date and time format (`2023-06-24 16:37`)
 /// * `medium`: a medium length date and time format (`Jun 24 2023 16:37`)
 /// * `long`: a longer date and time format (`June 24 2023 16:37:22`)
-/// * `full`: a full date and time format (`Saturday, June 24 2023 16:37:22`)
+/// * `full`: a full date and time format (`Saturday, June 24 2023 16:37:22.0`)
 /// * `unix`: a unix timestamp in seconds only (`1687624642`)
 /// * `iso`: date and time in iso format (`2023-06-24T16:37:22+00:00`)
 ///
@@ -203,32 +175,24 @@ pub fn datetimeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<Str
     });
     kwargs.assert_all_used()?;
 
-    datetime
-        .format(
-            &format_description::parse_borrowed::<2>(match format {
-                "short" => "[year]-[month]-[day] [hour]:[minute]",
-                "medium" => "[month repr:short] [day padding:none] [year] [hour]:[minute]",
-                "long" => "[month repr:long] [day padding:none] [year] [hour]:[minute]:[second]",
-                "full" => "[weekday], [month repr:long] [day padding:none] [year] [hour]:[minute]:[second].[subsecond]",
-                "iso" => {
-                    "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]"
-                }
-                "unix" => "[unix_timestamp]",
-                other => other,
-            })
-            .map_err(|err| {
-                Error::new(ErrorKind::InvalidOperation, "invalid format string").with_source(err)
-            })?,
-        )
-        .map_err(|err| {
-            Error::new(ErrorKind::InvalidOperation, "failed to format date").with_source(err)
-        })
+    format_datetime(
+        &datetime,
+        match format {
+            "short" => "%Y-%m-%d %H:%M",
+            "medium" => "%b %-d %Y %H:%M",
+            "long" => "%B %-d %Y %H:%M:%S",
+            "full" => "%A, %B %-d %Y %H:%M:%S.%f",
+            "iso" => "%Y-%m-%dT%H:%M:%S%:z",
+            "unix" => "%s",
+            other => other,
+        },
+    )
 }
 
 /// Formats a timestamp as time.
 ///
-/// The value needs to be a unix timestamp, or a parsable string (ISO 8601) or a
-/// format supported by `chrono` or `time`.
+/// The value needs to be a Unix timestamp, an ISO 8601 string, or a serialized
+/// `chrono` or Jiff date/time value.
 ///
 /// The filter accepts two keyword arguments (`format` and `tz`) to influence the format
 /// and the timezone.  The default format is `"medium"`.  The defaults for these keyword
@@ -249,9 +213,8 @@ pub fn datetimeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<Str
 /// {{ value|timeformat(format="short", tz="Europe/Vienna") }}
 /// ```
 ///
-/// This filter currently uses the `time` crate to format dates and uses the format
-/// string specification of that crate in version 2.  For more information read the
-/// [Format description documentation](https://time-rs.github.io/book/api/format-description.html).
+/// This filter uses Jiff and accepts `strftime`-style format strings. For more
+/// information, see Jiff's [`strtime` documentation](https://docs.rs/jiff/latest/jiff/fmt/strtime/).
 /// Additionally some special formats are supported:
 ///
 /// * `short` and `medium`: hour and minute (`16:37`)
@@ -275,31 +238,23 @@ pub fn timeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String,
     });
     kwargs.assert_all_used()?;
 
-    datetime
-        .format(
-            &format_description::parse_borrowed::<2>(match format {
-                "short" | "medium" => "[hour]:[minute]",
-                "long" => "[hour]:[minute]:[second]",
-                "full" => "[hour]:[minute]:[second].[subsecond]",
-                "iso" => {
-                    "[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]"
-                }
-                "unix" => "[unix_timestamp]",
-                other => other,
-            })
-            .map_err(|err| {
-                Error::new(ErrorKind::InvalidOperation, "invalid format string").with_source(err)
-            })?,
-        )
-        .map_err(|err| {
-            Error::new(ErrorKind::InvalidOperation, "failed to format date").with_source(err)
-        })
+    format_datetime(
+        &datetime,
+        match format {
+            "short" | "medium" => "%H:%M",
+            "long" => "%H:%M:%S",
+            "full" => "%H:%M:%S.%f",
+            "iso" => "%Y-%m-%dT%H:%M:%S%:z",
+            "unix" => "%s",
+            other => other,
+        },
+    )
 }
 
 /// Formats a timestamp as date.
 ///
-/// The value needs to be a unix timestamp, or a parsable string (ISO 8601) or a
-/// format supported by `chrono` or `time`.  If the string does not include time
+/// The value needs to be a Unix timestamp, an ISO 8601 string, or a serialized
+/// `chrono` or Jiff date/time value. If the string does not include time
 /// information, then timezone adjustments are not performed.
 ///
 /// The filter accepts two keyword arguments (`format` and `tz`) to influence the format
@@ -321,9 +276,8 @@ pub fn timeformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String,
 /// {{ value|dateformat(format="short", tz="Europe/Vienna") }}
 /// ```
 ///
-/// This filter currently uses the `time` crate to format dates and uses the format
-/// string specification of that crate in version 2.  For more information read the
-/// [Format description documentation](https://time-rs.github.io/book/api/format-description.html).
+/// This filter uses Jiff and accepts `strftime`-style format strings. For more
+/// information, see Jiff's [`strtime` documentation](https://docs.rs/jiff/latest/jiff/fmt/strtime/).
 /// Additionally some special formats are supported:
 ///
 /// * `short`: a short date format (`2023-06-24`)
@@ -346,20 +300,14 @@ pub fn dateformat(state: &State, value: Value, kwargs: Kwargs) -> Result<String,
     });
     kwargs.assert_all_used()?;
 
-    datetime
-        .format(
-            &format_description::parse_borrowed::<2>(match format {
-                "short" => "[year]-[month]-[day]",
-                "medium" => "[month repr:short] [day padding:none] [year]",
-                "long" => "[month repr:long] [day padding:none] [year]",
-                "full" => "[weekday], [month repr:long] [day padding:none] [year]",
-                other => other,
-            })
-            .map_err(|err| {
-                Error::new(ErrorKind::InvalidOperation, "invalid format string").with_source(err)
-            })?,
-        )
-        .map_err(|err| {
-            Error::new(ErrorKind::InvalidOperation, "failed to format date").with_source(err)
-        })
+    format_datetime(
+        &datetime,
+        match format {
+            "short" => "%Y-%m-%d",
+            "medium" => "%b %-d %Y",
+            "long" => "%B %-d %Y",
+            "full" => "%A, %B %-d %Y",
+            other => other,
+        },
+    )
 }

@@ -11,8 +11,8 @@ use minijinja::{Error, ErrorKind, State};
 #[cfg(feature = "datetime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "datetime")))]
 pub fn now() -> Value {
-    let now = time::OffsetDateTime::now_utc();
-    Value::from(((now.unix_timestamp_nanos() / 1000) as f64) / 1_000_000.0)
+    let now = jiff::Timestamp::now();
+    Value::from(((now.as_nanosecond() / 1000) as f64) / 1_000_000.0)
 }
 
 /// Returns a cycler.

@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Switched `minijinja-contrib` date and time filters from `time`/`time-tz` to Jiff. Custom formats now use `strftime`-style syntax instead of `time` format descriptions.  #694
+
 ## 3.0.0-alpha.0
 
 * Started the MiniJinja 3.0 alpha series. This release contains breaking API changes and is intended for testing.
