@@ -2,7 +2,6 @@
 
 [![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
 [![Crates.io](https://img.shields.io/crates/d/minijinja-cli.svg)](https://crates.io/crates/minijinja-cli)
-[![rustc 1.63.0](https://img.shields.io/badge/rust-1.63%2B-orange.svg)](https://img.shields.io/badge/rust-1.63%2B-orange.svg)
 
 `minijinja-cli` is a command line executable that uses
 [MiniJinja](https://github.com/mitsuhiko/minijinja) to render Jinja2 templates

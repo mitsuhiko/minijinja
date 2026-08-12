@@ -1,7 +1,6 @@
 # minijinja-cabi
 
 [![License](https://img.shields.io/github/license/mitsuhiko/minijinja)](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)
-[![rustc 1.63.0](https://img.shields.io/badge/rust-1.63%2B-orange.svg)](https://img.shields.io/badge/rust-1.63%2B-orange.svg)
 
 `minijinja-cabi` is a crate that wraps
 [MiniJinja](https://github.com/mitsuhiko/minijinja) into a C library.
