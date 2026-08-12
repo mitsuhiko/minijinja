@@ -3,7 +3,7 @@ name: Publish Crates
 on:
   push:
     tags:
-      - '**[0-9]+.[0-9]+.[0-9]+*'
+      - '[0-9]+.[0-9]+.[0-9]+*'
   pull_request:
 
 jobs:
@@ -15,6 +15,8 @@ jobs:
     if: ${{ !github.event.pull_request && !contains(github.ref_name, '/') }}
     steps:
       - uses: actions/checkout@v4
+      - name: Verify release version
+        run: ./scripts/verify-release.sh "$GITHUB_REF_NAME"
       - uses: swatinem/rust-cache@v2
       - name: Publish
         run: |

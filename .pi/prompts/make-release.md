@@ -6,7 +6,7 @@ Version: "$ARGUMENTS"
 
 ### 1. Determine the target version
 
-The `$ARGUMENTS` should be an explicit version number (e.g., `2.7.0`).
+The `$ARGUMENTS` should be an explicit SemVer version (e.g., `2.7.0` or `3.0.0-alpha.0`). Pre-releases must include a SemVer pre-release suffix.
 
 If no argument is provided, check the current version in `minijinja/Cargo.toml` and ask the user which version to release.
 
@@ -28,11 +28,12 @@ Execute the bump-version script with the version number:
 
 This script will:
 - Update version in `README.md`
-- Update version in all `Cargo.toml` files (minijinja, minijinja-cli, minijinja-contrib, minijinja-autoreload, minijinja-embed)
+- Update versions in the workspace `Cargo.toml` files
 - Update version in `minijinja-py/pyproject.toml`
-- Update version in `minijinja-js/package.json`
-- Update version references in examples
+- Update versions in `minijinja-js/package.json` and `package-lock.json`
+- Update version references in examples and MiniJinja-Go
 - Run `cargo check --all` to verify everything compiles
+- Run `scripts/verify-release.sh` to verify all release versions match
 
 ### 4. Run formatting and lint checks
 
@@ -71,10 +72,16 @@ Once the tag is pushed, GitHub Actions will automatically:
 - Create a GitHub Release with built binaries (`release.yml`)
 - Publish minijinja-js to npm (`publish-npm.yml`)
 - Build and publish minijinja-py wheels to PyPI (`build-wheels.yml`)
+- Tag and prewarm the matching MiniJinja-Go module version (`release.yml`)
+
+Do not publish to any registry manually. A failed registry job should be retried from GitHub Actions after diagnosing the failure.
 
 ## Notes
 
-- Always use explicit version numbers (e.g., `2.7.0`), not release types like `patch`/`minor`/`major`
+- Always use explicit version numbers (e.g., `2.7.0` or `3.0.0-alpha.0`), not release types like `patch`/`minor`/`major`
 - Ensure CHANGELOG.md is updated before running this command
 - The user should review all changes before pushing
 - All publishing is automated via GitHub Actions when the tag is pushed
+- GitHub Releases are marked as pre-releases for SemVer pre-release versions
+- npm pre-releases use the `next` dist-tag; only stable releases update `latest`
+- crates.io, PyPI/pip, and Go tooling do not select pre-release versions for existing stable users by default

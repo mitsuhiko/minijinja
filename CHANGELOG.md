@@ -4,6 +4,9 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+## 3.0.0-alpha.0
+
+* Started the MiniJinja 3.0 alpha series. This release contains breaking API changes and is intended for testing.
 * Made mutable `State` the canonical path for functions, filters, tests, objects, methods, formatters, and nested macro calls. Read-only typed callbacks can continue to use `&State`; state mutation and dynamic calls now require `&mut State`. Added typed render-local extensions that persist through includes, blocks, and macros.
 * Removed `State::get_or_set_temp_object`; use typed render-local extensions instead of object wrappers and interior mutability.
 * Removed Rust APIs deprecated before 3.0: `Template::render_and_return_state`, `Template::render_to_write`, `Template::eval_to_state`, the `Filter`, `Test`, `TestResult`, and `ViaDeserialize` aliases, `value::intern`, and the no-op `key_interning` feature. The no-op `loader` feature was also removed; loader APIs remain available unconditionally.

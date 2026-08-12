@@ -2,7 +2,8 @@ name: Build Wheels
 
 on:
   push:
-    tags: "*"
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+*'
   workflow_dispatch:
     inputs:
       publish:
@@ -21,7 +22,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           architecture: x64
@@ -40,12 +41,13 @@ jobs:
     name: Linux Wheels
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         target: [i686, x86_64, armv7l, aarch64]
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.9"
       - uses: dtolnay/rust-toolchain@stable
@@ -68,12 +70,13 @@ jobs:
     name: Linux musl Wheels
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         target: [i686, x86_64, armv7l, aarch64]
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.9"
       - uses: dtolnay/rust-toolchain@stable
@@ -96,12 +99,13 @@ jobs:
     name: Windows Wheels
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
-        target: [x64, x86] 
+        target: [x64, x86]
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
           architecture: ${{ matrix.target }}
@@ -146,6 +150,9 @@ jobs:
       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
     if: ${{ !github.event.pull_request && (github.event_name == 'push' || github.event.inputs.publish == 'true') }}
     steps:
+      - uses: actions/checkout@v4
+      - name: Verify release version
+        run: ./scripts/verify-release.sh "$GITHUB_REF_NAME"
       - uses: actions/download-artifact@v4
         with:
           pattern: wheels-*

@@ -17,19 +17,10 @@ name: Release
 permissions:
   "contents": "write"
 
-# This task will run whenever you push a git tag that looks like a version
-# like "1.0.0", "v0.1.0-prerelease.1", "my-app/0.1.0", "releases/v1.0.0", etc.
-# Various formats will be parsed into a VERSION and an optional PACKAGE_NAME, where
-# PACKAGE_NAME must be the name of a Cargo package in your workspace, and VERSION
-# must be a Cargo-style SemVer Version (must have at least major.minor.patch).
-#
-# If PACKAGE_NAME is specified, then the announcement will be for that
-# package (erroring out if it doesn't have the given version or isn't dist-able).
-#
-# If PACKAGE_NAME isn't specified, then the announcement will be for all
-# (dist-able) packages in the workspace with that version (this mode is
-# intended for workspaces with only one dist-able package, or with all dist-able
-# packages versioned/released in lockstep).
+# This task will run whenever you push a plain git tag that looks like a version,
+# such as "1.0.0" or "3.0.0-alpha.0".
+# The tag is parsed as a Cargo-style SemVer version and all dist-able packages
+# with that version are announced together.
 #
 # If you push multiple tags at once, separate instances of this workflow will
 # spin up, creating an independent announcement for each one. However, GitHub
@@ -42,7 +33,7 @@ on:
   pull_request:
   push:
     tags:
-      - '**[0-9]+.[0-9]+.[0-9]+*'
+      - '[0-9]+.[0-9]+.[0-9]+*'
 
 jobs:
   # Run 'dist plan' (or host) to determine what tasks we need to do
@@ -60,6 +51,9 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
+      - name: Verify release version
+        if: ${{ !github.event.pull_request }}
+        run: ./scripts/verify-release.sh "$GITHUB_REF_NAME"
       - name: Install dist
         # we specify bash to get pipefail; it guards against the `curl` command
         # failing. otherwise `sh` won't catch that `curl` returned non-0

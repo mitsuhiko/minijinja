@@ -1,7 +1,8 @@
 name: Publish Package to npmjs
 on:
   push:
-    tags: "*"
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+*'
   workflow_dispatch:
 
 jobs:
@@ -12,6 +13,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+      - name: Verify release version
+        run: ./scripts/verify-release.sh "$GITHUB_REF_NAME"
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
@@ -26,4 +29,11 @@ jobs:
           rm -f "$NPM_CONFIG_USERCONFIG" ~/.npmrc
           npm ci
           make build
-          npm publish --provenance --access public
+          version="$(node -p "require('./package.json').version")"
+          if [[ "$version" == *-* ]]; then
+            npm_tag="next"
+          else
+            npm_tag="latest"
+          fi
+          echo "Publishing minijinja-js $version with the '$npm_tag' dist-tag"
+          npm publish --provenance --access public --tag "$npm_tag"
