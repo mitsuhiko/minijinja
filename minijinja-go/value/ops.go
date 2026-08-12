@@ -9,6 +9,8 @@ import (
 
 var minI128AsU128 = new(big.Int).Lsh(big.NewInt(1), 127)
 
+const maxRepeatedStringLen = 100_000_000
+
 // Neg performs unary negation.
 func (v Value) Neg() (Value, error) {
 	switch d := v.data.(type) {
@@ -94,23 +96,35 @@ func (v Value) Sub(other Value) (Value, error) {
 	return Undefined(), fmt.Errorf("cannot subtract %s from %s", other.Kind(), v.Kind())
 }
 
+func repeatString(s string, n int64, safe bool) (Value, error) {
+	if n < 0 {
+		return Undefined(), fmt.Errorf("strings can only be multiplied with integers")
+	}
+	if len(s) > 0 && n > int64(maxRepeatedStringLen/len(s)) {
+		return Undefined(), fmt.Errorf("repeated string is too large")
+	}
+
+	var repeated string
+	if len(s) > 0 {
+		repeated = strings.Repeat(s, int(n))
+	}
+	if safe {
+		return FromSafeString(repeated), nil
+	}
+	return FromString(repeated), nil
+}
+
 // Mul performs multiplication.
 func (v Value) Mul(other Value) (Value, error) {
 	// String repetition
 	if s, ok := v.AsString(); ok {
 		if n, ok := other.AsInt(); ok && n >= 0 {
-			if v.IsSafe() {
-				return FromSafeString(strings.Repeat(s, int(n))), nil
-			}
-			return FromString(strings.Repeat(s, int(n))), nil
+			return repeatString(s, n, v.IsSafe())
 		}
 	}
 	if n, ok := v.AsInt(); ok && n >= 0 {
 		if s, ok := other.AsString(); ok {
-			if other.IsSafe() {
-				return FromSafeString(strings.Repeat(s, int(n))), nil
-			}
-			return FromString(strings.Repeat(s, int(n))), nil
+			return repeatString(s, n, other.IsSafe())
 		}
 	}
 

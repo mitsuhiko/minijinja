@@ -23,6 +23,18 @@ fn test_context() {
 }
 
 #[test]
+#[cfg(feature = "preserve_order")]
+fn test_context_preserves_order() {
+    let ctx = context!(zebra => 1, apple => 2);
+    let keys = ctx
+        .try_iter()
+        .unwrap()
+        .map(|key| key.to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(keys, vec!["zebra", "apple"]);
+}
+
+#[test]
 fn test_context_merge() {
     let one = context!(a => 1);
     let two = context!(b => 2, a => 42);

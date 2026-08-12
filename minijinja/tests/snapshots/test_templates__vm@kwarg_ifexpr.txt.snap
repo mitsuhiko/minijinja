@@ -1,0 +1,16 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "function-true: {{ namespace(name=x if x else 'default').name }}\nfunction-false: {{ namespace(name=empty if empty else 'default').name }}\nmissing-else: {{ namespace(name=empty if empty).name is undefined }}\nmultiple: {{ dict(a=1 if false else 2, b=3).a }}, {{ dict(a=1 if false else 2, b=3).b }}\nnested: {{ namespace(value=1 if false else 2 if false else 3).value }}\nfilter: {{ 'x\\ny'|indent(width=wide if wide else 2)|tojson }}\n{% macro echo(value) %}{{ value }}{% endmacro %}macro: {{ echo(value='left' if false else 'right') }}"
+info:
+  x: value
+  empty: ""
+  wide: 4
+input_file: minijinja/tests/inputs/kwarg_ifexpr.txt
+---
+function-true: value
+function-false: default
+missing-else: True
+multiple: 2, 3
+nested: 3
+filter: "x\n    y"
+macro: right

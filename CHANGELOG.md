@@ -16,6 +16,9 @@ All notable changes to MiniJinja are documented here.
 * Added native Rust tuple conversions and `Value::from_pairs`. Collecting pairs directly into `Value` now creates a sequence of tuples rather than a map.
 * Replaced `ViaDeserialize` with the unified `value::Serde` adapter for both explicit serialization and function argument deserialization.
 * Changed `Value` function arguments to reject implicit keyword-argument values. Variadic functions that intentionally capture them can use `ValueOrKwargs`.  #596
+* Fixed conditional expressions in keyword argument values for Jinja2 compatibility in Rust and Go.  #921
+* Fixed `context!` sorting keys when the `preserve_order` feature is enabled.  #920
+* Limited string repetition to 100 MB in Rust and Go to prevent excessive memory allocations.
 
 ## 2.23.0
 

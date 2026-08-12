@@ -229,6 +229,29 @@ pub use crate::value::argtypes::{
 pub use crate::value::merge_object::merge_maps;
 pub use crate::value::object::{DynObject, Enumerator, Object, ObjectExt, ObjectRepr};
 
+#[derive(Debug)]
+pub(crate) struct StaticKeyMap(pub(crate) Vec<(&'static str, Value)>);
+
+impl Object for StaticKeyMap {
+    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
+        self.get_value_by_str(key.as_str()?)
+    }
+
+    fn get_value_by_str(self: &Arc<Self>, key: &str) -> Option<Value> {
+        self.0
+            .iter()
+            .find_map(|(map_key, value)| (*map_key == key).then(|| value.clone()))
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        Enumerator::Values(self.0.iter().map(|(key, _)| Value::from(*key)).collect())
+    }
+
+    fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
+        Some(self.0.len())
+    }
+}
+
 #[macro_use]
 mod type_erase;
 mod argtypes;

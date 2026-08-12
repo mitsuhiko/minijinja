@@ -7,32 +7,9 @@ use serde::{ser, Serialize, Serializer};
 use crate::error::{Error, ErrorKind};
 use crate::utils::untrusted_size_hint;
 use crate::value::{
-    value_map_with_capacity, Arc, Enumerator, Object, Packed, Value, ValueMap, ValueRepr,
-    VALUE_HANDLES, VALUE_HANDLE_MARKER,
+    value_map_with_capacity, Arc, Packed, StaticKeyMap, Value, ValueMap, ValueRepr, VALUE_HANDLES,
+    VALUE_HANDLE_MARKER,
 };
-
-#[derive(Debug)]
-struct StaticKeyMap(Vec<(&'static str, Value)>);
-
-impl Object for StaticKeyMap {
-    fn get_value(self: &Arc<Self>, key: &Value) -> Option<Value> {
-        self.get_value_by_str(key.as_str()?)
-    }
-
-    fn get_value_by_str(self: &Arc<Self>, key: &str) -> Option<Value> {
-        self.0
-            .iter()
-            .find_map(|(map_key, value)| (*map_key == key).then(|| value.clone()))
-    }
-
-    fn enumerate(self: &Arc<Self>) -> Enumerator {
-        Enumerator::Values(self.0.iter().map(|(key, _)| Value::from(*key)).collect())
-    }
-
-    fn enumerator_len(self: &Arc<Self>) -> Option<usize> {
-        Some(self.0.len())
-    }
-}
 
 #[derive(Debug)]
 pub struct InvalidValue(String);
@@ -435,9 +412,7 @@ impl ser::SerializeStruct for SerializeStruct {
     }
 
     fn end(self) -> Result<Value, InvalidValue> {
-        let mut fields = self.fields;
-        fields.sort_unstable_by_key(|(a, _)| *a);
-        Ok(Value::from_object(StaticKeyMap(fields)))
+        Ok(Value::from_object(StaticKeyMap(self.fields)))
     }
 }
 
