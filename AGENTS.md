@@ -1,187 +1,77 @@
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# MiniJinja development guide
 
-## Important
+## Before working
 
-Before working check for the presence of the `.ai-ack` file next to `.git`.  If it's missing, read `HUMAN_VS_MACHINE.md` and follow the instructions there.
+- Check for `.ai-ack` next to `.git`. If it is missing, read
+  `HUMAN_VS_MACHINE.md` and follow it before making changes.
+- Follow `CONTRIBUTING.md`, including its AI-assistance disclosure requirement
+  for pull requests.
 
-## Project Overview
+## Current development lines
 
-MiniJinja is a powerful Jinja2-compatible template engine for Rust with minimal dependencies. The project is organized as a Cargo workspace with multiple crates:
+- `main` is the MiniJinja 3 development line. MiniJinja 2 is maintained on
+  `minijinja-2`; changes for v2 should target that branch and are merged forward
+  into `main`, never backward.
+- `UPDATING.md` documents the v2-to-v3 API and behavior changes.
+- The Rust MSRV is 1.70. CI uses `Cargo.lock.msrv` for MSRV jobs, so avoid APIs
+  newer than 1.70 in MSRV crates.
+- In v3, Serde support is optional and disabled by default. Preserve
+  no-default-feature and feature-gated builds.
 
-- **minijinja** - Core template engine library
-- **minijinja-cli** - Command-line interface for template rendering
-- **minijinja-contrib** - Additional filters and functions
-- **minijinja-autoreload** - Auto-reloading functionality for development
-- **minijinja-py** - Python bindings (requires Python development libraries)
-- **minijinja-js** - JavaScript/WASM bindings
-- **examples/** - Various usage examples and demos
-- **benchmarks/** - Performance benchmarks
+## Repository layout
 
-It's quite likely that this project is checked out as `minijinja`.  Do not confuse `minijinja` with `minijinja/minijinja` in that case.
+- `minijinja/`: core Rust engine.
+- `minijinja-{autoreload,contrib,embed,cli}/`: supporting Rust crates and CLI.
+- `minijinja-{cabi,js,py}/`: C, JavaScript/WASM, and Python bindings.
+- `minijinja-go/`: native Go port; it is not part of the Cargo workspace.
+- `examples/` and `benchmarks/`: workspace examples and benchmarks.
 
-## Essential Commands
+Core engine flow:
 
-### Building and Testing
+1. `minijinja/src/compiler/` lexes, parses, and compiles templates to
+   instructions.
+2. `minijinja/src/vm/` executes those instructions.
+3. `minijinja/src/value/` implements values, objects, conversions, and optional
+   Serde integration.
+4. `environment.rs`, `template.rs`, and `expression.rs` expose the main API;
+   built-ins live primarily in `filters.rs`, `functions.rs`, and `tests.rs`.
+
+Core integration tests are in `minijinja/tests/`. Fixture-based template,
+lexer, and parser tests use inputs and Insta snapshots under that directory.
+
+## Commands
+
+Run focused tests first. Core tests should normally enable all features because
+several integration tests are feature-gated:
 
 ```bash
-# Build entire workspace
-make build
-
-# Run comprehensive test suite (slow)
-make test
-
-# Run tests for core library only (always test all features!)
 cargo test -p minijinja --all-features
+cargo test -p minijinja --all-features test_name -- --nocapture
 ```
 
-### Code Quality
-```bash
-# Format code
-make format
-
-# Run linting with clippy
-make lint
-
-# Check various feature combinations
-make check
-```
-
-### CLI Usage
+Repository checks:
 
 ```bash
-# Build and run CLI
-cd minijinja-cli
-cargo run -- template.j2 data.json
-
-# Example usage
-cargo run -- examples/hello.j2 examples/hello.json
-echo "Hello {{ name }}" | cargo run -- - -Dname=World
+make build          # build the Cargo workspace
+make check          # important feature combinations
+make format         # cargo fmt
+make format-check   # CI formatting check
+make lint           # clippy with warnings denied
+make test           # full default suite, including C ABI and Go tests
 ```
 
-## Architecture Overview
-
-### Core Library Structure (`minijinja/src/`)
-- **compiler/** - Lexer, parser, AST, and bytecode generation
-  - `lexer.rs` - Tokenizes template source code
-  - `parser.rs` - Builds AST from tokens
-  - `codegen.rs` - Generates bytecode from AST
-- **vm/** - Virtual machine for executing compiled templates
-  - `state.rs` - Execution state and context management
-  - `*_object.rs` - Runtime objects (loops, macros, etc.)
-- **value/** - Value system and type conversions
-  - `mod.rs` - Core Value enum and operations
-  - `object.rs` - Dynamic object trait for custom types
-  - `serialize.rs`/`deserialize.rs` - Serde integration
-- **environment.rs** - Main API entry point for template loading
-- **template.rs** - Compiled template representation
-- **filters.rs**, **functions.rs**, **tests.rs** - Built-in functionality
-
-### Template Processing Flow
-1. **Lexing** - Source code → tokens
-2. **Parsing** - Tokens → AST
-3. **Compilation** - AST → bytecode instructions
-4. **Execution** - VM interprets bytecode with runtime context
-
-### Key Design Patterns
-- **Feature-gated compilation** - Different features can be enabled/disabled via Cargo features
-- **Zero-copy where possible** - Uses `Cow<str>` and borrowed data structures
-- **Serde integration** - All value types work with serde serialization
-- **Error handling** - Rich error messages with source location tracking
-
-## Testing Strategy
-
-### Test Organization
-- `/minijinja/tests/` - Integration tests with snapshot testing
-- `/minijinja/tests/inputs/` - Template files for testing
-- `/minijinja/tests/snapshots/` - Expected outputs (insta snapshots)
-- Unit tests are embedded in source files
-
-### Feature Testing
-The project extensively tests different feature combinations:
-```bash
-# Test minimal feature set
-cd minijinja && cargo test --no-default-features --features=debug
-
-# Test with performance optimizations
-cd minijinja && cargo test --no-default-features --features=speedups
-
-# Test specific feature combinations
-cd minijinja && cargo test --features=json,urlencode,custom_syntax
-```
-
-### Snapshot Testing
-Uses the `insta` crate for snapshot testing. When tests fail due to output changes:
+Additional suites are separate; run them when touching the corresponding code:
 
 ```bash
-cargo insta test --accept  # accept changes
-cargo insta test --reject  # reject changes
+make python-test
+make js-test
+make wasi-test
 ```
 
-## Important Development Notes
+Do not use `cargo insta review` or `make snapshot-tests`; they launch an
+interactive reviewer. Inspect generated `.snap.new` files directly. If the
+changes are intentional, accept them non-interactively from `minijinja/` with
+`cargo insta test --all-features --accept`.
 
-### Feature Flags
-The project uses extensive feature gating. Key features:
-- `builtins`, `macros`, `multi_template` - Core functionality
-- `json`, `urlencode` - Additional filters
-- `loader` - Template loading from filesystem
-- `custom_syntax` - Custom delimiters
-- `speedups` - Performance optimizations
-- `debug` - Debug functionality
-
-### MSRV (Minimum Supported Rust Version)
-Currently Rust 1.70+. The CI tests against this version.
-
-### CLI Data Format Support
-The CLI supports multiple data formats:
-- JSON (.json, .json5)
-- YAML (.yaml, .yml)
-- TOML (.toml)
-- Query strings (.qs)
-- INI files (.ini)
-- CBOR (.cbor)
-
-### Platform Support
-- Standard Rust targets
-- WebAssembly (WASI)
-- Python bindings (via PyO3)
-- JavaScript/Node.js bindings (via wasm-bindgen)
-
-## Common Development Workflows
-
-### Adding New Filters/Functions
-1. Add implementation in `filters.rs` or `functions.rs`
-2. Add tests in the same file
-3. Update documentation
-4. Add snapshot tests if needed
-
-### Modifying Parser/Compiler
-1. Update lexer tokens if needed (`compiler/tokens.rs`)
-2. Modify parser for new syntax (`compiler/parser.rs`)
-3. Update AST definitions (`compiler/ast.rs`)
-4. Add bytecode generation (`compiler/codegen.rs`)
-5. Implement VM execution (`vm/mod.rs`)
-
-### Running Specific Tests
-```bash
-# Run specific test files
-cd minijinja && cargo test --test test_filters
-cd minijinja && cargo test --test test_templates
-
-# Run specific test by name
-cd minijinja && cargo test test_function_name -- --nocapture
-```
-
-### Commit Guidelines
-- Follow conventional commit format
-- Always run `make lint` and `make format` before committing
-- Ensure tests pass with `make test`
-
-### For New Releases
-- Make sure the next release is mentioned in CHANGELOG.md
-- Use `scripts/bump-version.sh VERSION` to update all references to the next version
-- Create a commit for that release and push the tags
-
-## Warnings and Recommendations
-
-- **Workflow Recommendations**:
-  - Please do not use `cargo insta review`. it fucks you up because it prompts.
+Before finishing, format changed Rust code and run the narrowest relevant tests
+plus `make check`/`make lint` when practical. Report any checks not run.
