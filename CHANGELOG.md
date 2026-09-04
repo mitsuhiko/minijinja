@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed `loop.changed()` always reporting a change in the Go port: the loop object is rebuilt on every iteration, so the remembered value was lost.
+
 ## 2.24.0
 
 * Added the `wordwrap` filter to the Python bindings.  #885

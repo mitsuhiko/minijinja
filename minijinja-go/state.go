@@ -836,13 +836,22 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 	return value.FromSafeString(result), nil
 }
 
+// changedMemo remembers the arguments of the last loop.changed() call.
+//
+// It belongs to the loop as a whole rather than to one iteration: the loop
+// object is rebuilt on every pass, so memory kept inside it would be lost and
+// loop.changed() would report a change every time.
+type changedMemo struct {
+	last *value.Value
+}
+
 // loopObject is the loop variable object that supports cycle() and previtem/nextitem
 type loopObject struct {
 	index      int                // 0-based index
 	length     int                // total length (-1 for unknown)
 	depth      int                // nesting depth (0-based)
 	items      []value.Value      // all items for previtem/nextitem
-	changed    *value.Value       // last value for changed()
+	changed    *changedMemo       // shared across iterations, see changedMemo
 	prevItem   value.Value        // previous item (for pull iterators)
 	pullIter   value.PullIterator // pull-based iterator
 	peekedNext *value.Value       // peeked next item for pullIter
@@ -974,13 +983,18 @@ func (c *loopChangedCallable) Call(state value.State, args []value.Value, kwargs
 	_ = state
 	// Create a comparable representation of args
 	newVal := value.FromSlice(args)
-	if c.loop.changed == nil {
-		c.loop.changed = &newVal
+	memo := c.loop.changed
+	if memo == nil {
+		memo = &changedMemo{}
+		c.loop.changed = memo
+	}
+	if memo.last == nil {
+		memo.last = &newVal
 		return value.FromBool(true), nil
 	}
-	changed := !newVal.Equal(*c.loop.changed)
+	changed := !newVal.Equal(*memo.last)
 	if changed {
-		c.loop.changed = &newVal
+		memo.last = &newVal
 	}
 	return value.FromBool(changed), nil
 }
@@ -1388,6 +1402,7 @@ func (s *State) evalForLoopPull(loop *parser.ForLoop, pull value.PullIterator) e
 
 	index := 0
 	prevItem := value.Undefined()
+	changed := &changedMemo{}
 	var peekedItem *value.Value // Track peeked item across loop iterations
 
 	for {
@@ -1419,6 +1434,7 @@ func (s *State) evalForLoopPull(loop *parser.ForLoop, pull value.PullIterator) e
 			items:     nil,
 			prevItem:  prevItem,
 			pullIter:  pull,
+			changed:   changed,
 			recurseFn: s.loopRecurse,
 		}
 		s.Set("loop", value.FromObject(loopObj))
@@ -1530,6 +1546,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 			builder := &strings.Builder{}
 			s.out = builder
 
+			changed := &changedMemo{}
 			for i := range nestedItems {
 				s.resetScope()
 				if err := s.unpackLoopTarget(loop.Target, nestedItems[i]); err != nil {
@@ -1542,6 +1559,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 					length:    len(nestedItems),
 					depth:     s.depth - 1,
 					items:     nestedItems,
+					changed:   changed,
 					recurseFn: s.loopRecurse,
 				}
 				s.Set("loop", value.FromObject(loopObj))
@@ -1570,6 +1588,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 		defer func() { s.loopRecurse = oldRecurse }()
 	}
 
+	changed := &changedMemo{}
 	for i := range items {
 		s.resetScope()
 		if err := s.unpackLoopTarget(loop.Target, items[i]); err != nil {
@@ -1582,6 +1601,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 			length:    len(items),
 			depth:     s.depth - 1,
 			items:     items,
+			changed:   changed,
 			recurseFn: s.loopRecurse,
 		}
 		s.Set("loop", value.FromObject(loopObj))
