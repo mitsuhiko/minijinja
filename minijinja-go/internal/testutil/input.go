@@ -39,6 +39,17 @@ func (s *TestSettings) HasMarkers() bool {
 }
 
 // ParseTestInputFile reads and parses a test input file.
+// decodeContext decodes the JSON header of a test input into a context.
+//
+// Numbers are decoded as json.Number so that 1 stays an integer and 1.0 stays a
+// float, the way serde_json feeds the Rust tests. Decoding into an any would
+// turn both into a float64.
+func decodeContext(jsonStr string, context *map[string]any) error {
+	decoder := json.NewDecoder(strings.NewReader(jsonStr))
+	decoder.UseNumber()
+	return decoder.Decode(context)
+}
+
 func ParseTestInputFile(path string) (*TestInput, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -68,11 +79,11 @@ func ParseTestInput(content string) (*TestInput, error) {
 			// Successfully parsed as settings
 			// Check if it actually had any settings fields set
 			// by also parsing as generic map to get context
-			json.Unmarshal([]byte(jsonStr), &input.Context)
+			_ = decodeContext(jsonStr, &input.Context)
 		} else {
 			// Fall back to parsing as context
 			input.Settings = nil
-			if err := json.Unmarshal([]byte(jsonStr), &input.Context); err != nil {
+			if err := decodeContext(jsonStr, &input.Context); err != nil {
 				return nil, err
 			}
 		}
