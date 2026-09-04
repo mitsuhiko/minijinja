@@ -379,6 +379,8 @@ func TestValueTruthiness(t *testing.T) {
 		{FromString("x"), true},
 		{FromSlice(nil), false},
 		{FromSlice([]Value{FromInt(1)}), true},
+		{FromIterator(NewIterator("range", nil)), false},
+		{FromIterator(NewIterator("range", []Value{FromInt(1)})), true},
 		{FromMap(nil), false},
 		{FromMap(map[string]Value{"a": FromInt(1)}), true},
 	}
@@ -386,6 +388,41 @@ func TestValueTruthiness(t *testing.T) {
 	for _, tt := range tests {
 		if got := tt.val.IsTrue(); got != tt.want {
 			t.Errorf("%v.IsTrue() = %v, want %v", tt.val, got, tt.want)
+		}
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Iteration Tests
+// -----------------------------------------------------------------------------
+
+// TestIterEmptyIsNotNil ensures that Iter distinguishes an empty iterable from
+// a value that cannot be iterated: only the latter returns nil.
+func TestIterEmptyIsNotNil(t *testing.T) {
+	iterable := []Value{
+		FromSlice(nil),
+		FromSlice([]Value{}),
+		FromIterator(NewIterator("range", nil)),
+		FromMap(nil),
+		FromString(""),
+	}
+	for _, val := range iterable {
+		if items := val.Iter(); items == nil {
+			t.Errorf("%v.Iter() = nil, want empty non-nil slice", val)
+		} else if len(items) != 0 {
+			t.Errorf("%v.Iter() = %v, want empty slice", val, items)
+		}
+	}
+
+	notIterable := []Value{
+		FromInt(1),
+		FromBool(true),
+		None(),
+		Undefined(),
+	}
+	for _, val := range notIterable {
+		if items := val.Iter(); items != nil {
+			t.Errorf("%v.Iter() = %v, want nil", val, items)
 		}
 	}
 }

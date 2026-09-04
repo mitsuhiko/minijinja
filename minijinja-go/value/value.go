@@ -875,6 +875,8 @@ func (v Value) IsTrue() bool {
 		return len(d) > 0
 	case []Value:
 		return len(d) > 0
+	case *Iterator:
+		return len(d.items) > 0
 	case map[string]Value:
 		return len(d) > 0
 	case Object:
@@ -1289,11 +1291,22 @@ type MapGetter interface {
 }
 
 // Iter returns an iterator over the value's items.
+//
+// A nil result means the value cannot be iterated at all; an empty but non-nil
+// result means the value is iterable and has no items.  Callers rely on that
+// distinction to tell "not iterable" from "empty" (see TestIterable and the
+// for loop), so iterable values never return nil here.
 func (v Value) Iter() []Value {
 	switch d := v.data.(type) {
 	case []Value:
+		if d == nil {
+			return []Value{}
+		}
 		return d
 	case *Iterator:
+		if d.items == nil {
+			return []Value{}
+		}
 		return d.items
 	case map[string]Value:
 		keys := make([]string, 0, len(d))
@@ -1321,11 +1334,14 @@ func (v Value) Iter() []Value {
 		}
 		return result
 	case Iterable:
-		return d.Iter()
+		if items := d.Iter(); items != nil {
+			return items
+		}
+		return []Value{}
 	case Object:
 		// Check for new object iteration interfaces
 		if seq := IterateObject(d); seq != nil {
-			var result []Value
+			result := []Value{}
 			for item := range seq {
 				result = append(result, item)
 			}

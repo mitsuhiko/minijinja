@@ -615,6 +615,11 @@ func TestRangeFunction(t *testing.T) {
 		{"{% for i in range(3) %}{{ i }}{% endfor %}", "012"},
 		{"{% for i in range(1, 4) %}{{ i }}{% endfor %}", "123"},
 		{"{% for i in range(0, 6, 2) %}{{ i }}{% endfor %}", "024"},
+		// An empty range is iterable and falsy, just like an empty sequence
+		{"{% for i in range(0, 0) %}{{ i }}{% else %}empty{% endfor %}", "empty"},
+		{"{% if range(0, 0) %}truthy{% else %}falsy{% endif %}", "falsy"},
+		{"{{ range(0, 0) is iterable }}", "True"},
+		{"{{ range(0, 0)|length }}", "0"},
 	}
 
 	for _, test := range tests {

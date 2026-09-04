@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed empty iterators such as `range(0, 0)` being reported as non-iterable and truthy in the Go port.
+
 ## 2.24.0
 
 * Added the `wordwrap` filter to the Python bindings.  #885
