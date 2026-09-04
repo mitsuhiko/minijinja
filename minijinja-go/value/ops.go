@@ -197,14 +197,32 @@ func (v Value) FloorDiv(other Value) (Value, error) {
 	return Undefined(), fmt.Errorf("cannot floor divide %s by %s", v.Kind(), other.Kind())
 }
 
+// remEuclid returns the least non-negative remainder of dividing a by b,
+// the equivalent of Rust's i64::rem_euclid.
+func remEuclid(a, b int64) int64 {
+	rem := a % b
+	if rem < 0 {
+		if b < 0 {
+			return rem - b
+		}
+		return rem + b
+	}
+	return rem
+}
+
 // Rem performs modulo operation.
+//
+// Integers use the euclidean remainder, which is what Rust MiniJinja computes
+// with checked_rem_euclid: the result is never negative for a positive divisor,
+// so `-7 % 3` is 2 rather than Go's -1. Floats keep the truncated remainder,
+// again matching Rust, which applies `%` to f64.
 func (v Value) Rem(other Value) (Value, error) {
 	if i1, ok := v.AsInt(); ok {
 		if i2, ok := other.AsInt(); ok {
 			if i2 == 0 {
 				return Undefined(), fmt.Errorf("modulo by zero")
 			}
-			return FromInt(i1 % i2), nil
+			return FromInt(remEuclid(i1, i2)), nil
 		}
 	}
 	if f1, ok := v.AsFloat(); ok {
