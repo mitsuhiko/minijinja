@@ -244,6 +244,27 @@ type LoaderFunc func(name string) (string, error)
 //	})
 type PathJoinFunc func(name, parent string) string
 
+// UnknownMethodFunc is invoked when a method call on a value cannot be resolved.
+//
+// It is called with the state, the value the method was called on, the name of
+// the method and the arguments of the call. Returning value.ErrUnknownMethod
+// leaves the call unresolved so that the regular lookup continues; any other
+// error is reported to the caller as is.
+//
+// This is mostly useful to increase compatibility with Jinja2 templates that
+// call Python methods on values, none of which MiniJinja implements itself.
+//
+// Example that implements `.items()` in terms of the `items` filter:
+//
+//	env.SetUnknownMethodCallback(func(state *State, val value.Value, method string,
+//		args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+//		if _, ok := val.AsMap(); ok && method == "items" {
+//			return state.ApplyFilter("items", val, nil, nil)
+//		}
+//		return value.Undefined(), value.ErrUnknownMethod
+//	})
+type UnknownMethodFunc func(state *State, val value.Value, method string, args []value.Value, kwargs map[string]value.Value) (value.Value, error)
+
 // AutoEscapeFunc determines auto-escaping based on template name.
 //
 // This function is invoked when templates are loaded into the environment to determine
@@ -288,6 +309,7 @@ type Environment struct {
 	loader            LoaderFunc
 	autoEscapeFunc    AutoEscapeFunc
 	pathJoinCallback  PathJoinFunc
+	unknownMethodCb   UnknownMethodFunc
 	syntaxConfig      syntax.SyntaxConfig
 	wsConfig          syntax.WhitespaceConfig
 	undefinedBehavior UndefinedBehavior
@@ -680,6 +702,15 @@ func (e *Environment) SetAutoEscapeFunc(f AutoEscapeFunc) {
 // This is used to implement relative template resolution for include/extends.
 func (e *Environment) SetPathJoinCallback(f PathJoinFunc) {
 	e.pathJoinCallback = f
+}
+
+// SetUnknownMethodCallback sets a callback invoked for unknown methods on values.
+//
+// The callback runs after the methods implemented by the value itself and before
+// the fallback that calls a callable stored under that name, so that methods take
+// precedence over same-named items, as they do in Jinja2.
+func (e *Environment) SetUnknownMethodCallback(f UnknownMethodFunc) {
+	e.unknownMethodCb = f
 }
 
 // SetSyntax sets the syntax configuration for the environment.

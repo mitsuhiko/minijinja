@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Added `Environment.SetUnknownMethodCallback` to the Go port for Jinja2 compatibility with Python methods, mirroring `Environment::set_unknown_method_callback` in Rust.
+
 ## 2.24.0
 
 * Added the `wordwrap` filter to the Python bindings.  #885

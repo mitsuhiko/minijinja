@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -2859,6 +2860,15 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 		}
 	}
 
+	// Method call on a value (like module.macro() or "x".upper()). Methods are
+	// resolved before the generic lookup below so that a method takes precedence
+	// over an item of the same name, as it does in Jinja2.
+	if getAttr, ok := call.Expr.(*parser.GetAttr); ok {
+		if result, ok, err := s.evalMethodCall(call, getAttr); ok || err != nil {
+			return result, err
+		}
+	}
+
 	// Evaluate the expression to get a callable
 	expr, err := s.evalExpr(call.Expr)
 	if err != nil {
@@ -2885,39 +2895,61 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 		}
 	}
 
-	// Check if it's a method call on a map (like module.macro())
-	if getAttr, ok := call.Expr.(*parser.GetAttr); ok {
-		obj, err := s.evalExpr(getAttr.Expr)
-		if err != nil {
-			return value.Undefined(), err
-		}
+	return value.Undefined(), NewError(ErrUnknownFunction, "unknown callable").WithSpan(call.Span())
+}
 
-		// Check if object supports method calls directly
-		if objVal, ok := obj.AsObject(); ok {
-			if mc, ok := objVal.(value.MethodCallable); ok {
-				args, kwargs, err := s.evalCallArgs(call.Args)
-				if err != nil {
-					return value.Undefined(), err
-				}
-				result, err := mc.CallMethod(s, getAttr.Name, args, kwargs)
-				if err != value.ErrUnknownMethod {
-					return result, err
-				}
-				// Fall through to try GetAttr
-			}
-		}
+// evalMethodCall resolves `obj.name(...)` by trying, in order, the methods
+// implemented by the value, the environment's unknown method callback, and a
+// callable stored under that name on the value.  The second return value
+// reports whether the call was resolved.
+func (s *State) evalMethodCall(call *parser.Call, getAttr *parser.GetAttr) (value.Value, bool, error) {
+	obj, err := s.evalExpr(getAttr.Expr)
+	if err != nil {
+		return value.Undefined(), false, err
+	}
+	// Undefined values are left to the regular expression evaluation so that
+	// the configured undefined behavior applies.
+	if obj.IsUndefined() {
+		return value.Undefined(), false, nil
+	}
 
-		attr := obj.GetAttr(getAttr.Name)
-		if callable, ok := attr.AsCallable(); ok {
+	// Methods implemented by the object itself
+	if objVal, ok := obj.AsObject(); ok {
+		if mc, ok := objVal.(value.MethodCallable); ok {
 			args, kwargs, err := s.evalCallArgs(call.Args)
 			if err != nil {
-				return value.Undefined(), err
+				return value.Undefined(), false, err
 			}
-			return callable.Call(s, args, kwargs)
+			result, err := mc.CallMethod(s, getAttr.Name, args, kwargs)
+			if !errors.Is(err, value.ErrUnknownMethod) {
+				return result, true, err
+			}
 		}
 	}
 
-	return value.Undefined(), NewError(ErrUnknownFunction, "unknown callable").WithSpan(call.Span())
+	// Methods provided by the environment
+	if s.env.unknownMethodCb != nil {
+		args, kwargs, err := s.evalCallArgs(call.Args)
+		if err != nil {
+			return value.Undefined(), false, err
+		}
+		result, err := s.env.unknownMethodCb(s, obj, getAttr.Name, args, kwargs)
+		if !errors.Is(err, value.ErrUnknownMethod) {
+			return result, true, err
+		}
+	}
+
+	// A callable stored under that name
+	if callable, ok := obj.GetAttr(getAttr.Name).AsCallable(); ok {
+		args, kwargs, err := s.evalCallArgs(call.Args)
+		if err != nil {
+			return value.Undefined(), false, err
+		}
+		result, err := callable.Call(s, args, kwargs)
+		return result, true, err
+	}
+
+	return value.Undefined(), false, nil
 }
 
 func (s *State) evalSuper(span parser.Span) (value.Value, error) {
