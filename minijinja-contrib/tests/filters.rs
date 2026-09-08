@@ -415,7 +415,8 @@ fn test_wordwrap() {
         "This-is-a-\nhyphenated\n-word"
     );
 
-    // Test NOT breaking on hyphens
+    // Test NOT breaking on hyphens; the word still exceeds the width, so
+    // break_long_words (default true) applies, as in Jinja2.
     assert_eq!(
         env.render_str(
             "{{ text|wordwrap(width=10, break_on_hyphens=false) }}",
@@ -424,7 +425,43 @@ fn test_wordwrap() {
             }
         )
         .unwrap(),
+        "This-is-a-\nhyphenated\n-word"
+    );
+
+    // Test NOT breaking on hyphens with long word breaking disabled
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordwrap(width=10, break_on_hyphens=false, break_long_words=false) }}",
+            context! {
+                text => "This-is-a-hyphenated-word"
+            }
+        )
+        .unwrap(),
         "This-is-a-hyphenated-word"
+    );
+
+    // Test that break_long_words is honored when break_on_hyphens is false
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordwrap(width=10, break_on_hyphens=false) }}",
+            context! {
+                text => "ThisIsAVeryLongWordThatShouldBeBroken"
+            }
+        )
+        .unwrap(),
+        "ThisIsAVer\nyLongWordT\nhatShouldB\neBroken"
+    );
+
+    // Test that break_long_words=false is honored when break_on_hyphens is false
+    assert_eq!(
+        env.render_str(
+            "{{ text|wordwrap(width=10, break_on_hyphens=false, break_long_words=false) }}",
+            context! {
+                text => "ThisIsAVeryLongWordThatShouldBeBroken"
+            }
+        )
+        .unwrap(),
+        "ThisIsAVeryLongWordThatShouldBeBroken"
     );
 }
 
