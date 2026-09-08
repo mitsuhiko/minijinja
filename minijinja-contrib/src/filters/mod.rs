@@ -318,12 +318,10 @@ pub fn wordwrap(value: &Value, kwargs: Kwargs) -> Result<Value, Error> {
             .word_splitter(WordSplitter::HyphenSplitter)
             .break_words(break_long_words);
     } else {
-        // When break_on_hyphens is false, we want to preserve hyphenated words entirely.
-        // So we disable hyphen splitting and also disable breaking long words to ensure
-        // hyphenated words stay together.
+        // break_on_hyphens only removes hyphens as split points; break_long_words still applies.
         options = options
             .word_splitter(WordSplitter::NoHyphenation)
-            .break_words(false);
+            .break_words(break_long_words);
     }
 
     // Handle empty/whitespace-only input
