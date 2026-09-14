@@ -633,7 +633,49 @@ impl<'source> Environment<'source> {
         self.templates.template_config.syntax_config = syntax;
     }
 
+    /// Sets a callback to determine the syntax per template.
+    ///
+    /// This overrides [`set_syntax`](Self::set_syntax) and is invoked with the
+    /// name and source of every template that is loaded.  This makes it
+    /// possible to use different delimiters for different templates, either
+    /// based on the file name or on a marker in the template source itself:
+    ///
+    /// ```
+    /// # #[cfg(feature = "custom_syntax")] {
+    /// # use minijinja::{Environment, syntax::SyntaxConfig};
+    /// # let mut env = Environment::new();
+    /// let latex_syntax = SyntaxConfig::builder()
+    ///     .block_delimiters("\\BLOCK{", "}")
+    ///     .variable_delimiters("\\VAR{", "}")
+    ///     .comment_delimiters("\\#{", "}")
+    ///     .build()
+    ///     .unwrap();
+    /// env.set_syntax_callback(move |name, _source| {
+    ///     if name.ends_with(".tex") {
+    ///         latex_syntax.clone()
+    ///     } else {
+    ///         SyntaxConfig::default()
+    ///     }
+    /// });
+    /// # }
+    /// ```
+    ///
+    /// Note that the syntax is resolved when a template is loaded (not when it
+    /// is rendered) and that included or extended templates resolve their own
+    /// syntax independently.
+    #[cfg(feature = "custom_syntax")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub fn set_syntax_callback<F>(&mut self, f: F)
+    where
+        F: Fn(&str, &str) -> crate::syntax::SyntaxConfig + 'static + Sync + Send,
+    {
+        self.templates.template_config.syntax_callback = Some(Arc::new(f));
+    }
+
     /// Returns the current syntax config.
+    ///
+    /// This does not consider a syntax callback set with
+    /// [`set_syntax_callback`](Self::set_syntax_callback).
     #[cfg(feature = "custom_syntax")]
     #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
     pub fn syntax(&self) -> &crate::syntax::SyntaxConfig {

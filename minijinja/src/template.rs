@@ -23,11 +23,21 @@ use crate::vm::{prepare_blocks, Context, State, Vm};
 /// Callback for auto escape determination
 pub type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
 
+/// Callback for per-template syntax determination.
+///
+/// It's invoked with the name and the source of the template.
+#[cfg(feature = "custom_syntax")]
+#[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+pub type SyntaxFunc = dyn Fn(&str, &str) -> SyntaxConfig + Sync + Send;
+
 /// Internal struct that holds template loading level config values.
 #[derive(Clone)]
 pub struct TemplateConfig {
     /// The syntax used for the template.
     pub syntax_config: SyntaxConfig,
+    /// Optional callback that overrides `syntax_config` per template.
+    #[cfg(feature = "custom_syntax")]
+    pub syntax_callback: Option<Arc<SyntaxFunc>>,
     /// Controls whitespace behavior.
     pub ws_config: WhitespaceConfig,
     /// The callback that determines the initial auto escaping for templates.
@@ -38,9 +48,20 @@ impl TemplateConfig {
     pub(crate) fn new(default_auto_escape: Arc<AutoEscapeFunc>) -> TemplateConfig {
         TemplateConfig {
             syntax_config: SyntaxConfig::default(),
+            #[cfg(feature = "custom_syntax")]
+            syntax_callback: None,
             ws_config: WhitespaceConfig::default(),
             default_auto_escape,
         }
+    }
+
+    /// Returns the syntax to use for a template of a given name and source.
+    pub(crate) fn syntax_for(&self, _name: &str, _source: &str) -> SyntaxConfig {
+        #[cfg(feature = "custom_syntax")]
+        if let Some(ref callback) = self.syntax_callback {
+            return callback(_name, _source);
+        }
+        self.syntax_config.clone()
     }
 }
 
@@ -542,12 +563,8 @@ impl<'source> CompiledTemplate<'source> {
         source: &'source str,
         config: &TemplateConfig,
     ) -> Result<CompiledTemplate<'source>, Error> {
-        let ast = ok!(parse(
-            source,
-            name,
-            config.syntax_config.clone(),
-            config.ws_config
-        ));
+        let syntax_config = config.syntax_for(name, source);
+        let ast = ok!(parse(source, name, syntax_config.clone(), config.ws_config));
         let mut g = CodeGenerator::new(name, source);
         g.compile_stmt(&ast);
         let buffer_size_hint = g.buffer_size_hint();
@@ -556,7 +573,7 @@ impl<'source> CompiledTemplate<'source> {
             instructions,
             blocks,
             buffer_size_hint,
-            syntax_config: config.syntax_config.clone(),
+            syntax_config,
             initial_auto_escape: (config.default_auto_escape)(name),
         })
     }

@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Added `Environment::set_syntax_callback` which determines the syntax per template from its name and source instead of globally on the environment.  #939
+
 ## 2.24.0
 
 * Added the `wordwrap` filter to the Python bindings.  #885
