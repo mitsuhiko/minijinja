@@ -576,6 +576,52 @@ fn test_custom_syntax() {
 }
 
 #[test]
+#[cfg(feature = "custom_syntax")]
+fn test_custom_syntax_callback() {
+    use minijinja::syntax::SyntaxConfig;
+
+    let alt = SyntaxConfig::builder()
+        .block_delimiters("{", "}")
+        .variable_delimiters("${", "}")
+        .build()
+        .unwrap();
+
+    let mut env = Environment::new();
+    env.set_syntax_callback(move |name, source| {
+        if name.ends_with(".alt") || source.starts_with("#alt-syntax\n") {
+            alt.clone()
+        } else {
+            SyntaxConfig::default()
+        }
+    });
+
+    // selected by name
+    env.add_template("a.alt", "${x}{for i in range(2)}!{endfor}")
+        .unwrap();
+    // selected by a marker in the source
+    env.add_template("b.txt", "#alt-syntax\n${x}").unwrap();
+    // default syntax is untouched
+    env.add_template("c.txt", "{{ x }}{% include 'a.alt' %}")
+        .unwrap();
+
+    let ctx = context! { x => 42 };
+    assert_eq!(env.render_str("{{ x }}", &ctx).unwrap(), "42");
+    assert_eq!(
+        env.get_template("a.alt").unwrap().render(&ctx).unwrap(),
+        "42!!"
+    );
+    assert_eq!(
+        env.get_template("b.txt").unwrap().render(&ctx).unwrap(),
+        "#alt-syntax\n42"
+    );
+    // an include picks up the syntax of the included template
+    assert_eq!(
+        env.get_template("c.txt").unwrap().render(&ctx).unwrap(),
+        "4242!!"
+    );
+}
+
+#[test]
 fn test_undeclared_variables() {
     let mut env = Environment::new();
     env.add_template(
