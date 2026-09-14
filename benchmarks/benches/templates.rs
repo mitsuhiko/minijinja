@@ -65,6 +65,39 @@ fn bench_tuple_ops(c: &mut Criterion) {
     });
 }
 
+/// Same work as the `compile` benchmark but with a per-template syntax callback
+/// installed, to measure the overhead of `Environment::set_syntax_callback`.
+#[cfg(feature = "custom_syntax")]
+fn bench_compile_syntax_callback(c: &mut Criterion) {
+    use minijinja::syntax::SyntaxConfig;
+
+    // a callback should clone a prepared config.  Building one per template is
+    // substantially more expensive as it recreates the delimiter matcher.
+    let prepared = SyntaxConfig::builder()
+        .variable_delimiters("${", "}")
+        .build()
+        .unwrap();
+
+    c.bench_function("compile_syntax_callback", |b| {
+        b.iter(|| {
+            let mut env = Environment::new();
+            let prepared = prepared.clone();
+            env.set_syntax_callback(move |name, _source| {
+                if name.ends_with(".alt") {
+                    prepared.clone()
+                } else {
+                    SyntaxConfig::default()
+                }
+            });
+            env.add_template(
+                "all_elements.html",
+                include_str!("../inputs/all_elements.html"),
+            )
+            .unwrap();
+        });
+    });
+}
+
 fn create_real_env() -> Environment<'static> {
     let mut env = Environment::new();
     env.add_template("footer.html", include_str!("../inputs/footer.html"))
@@ -90,6 +123,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
     bench_loop_map_items(c);
     bench_tuple_ops(c);
+    #[cfg(feature = "custom_syntax")]
+    bench_compile_syntax_callback(c);
 }
 
 criterion_group!(benches, criterion_benchmark);

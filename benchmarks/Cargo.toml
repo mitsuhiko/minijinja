@@ -5,6 +5,8 @@ edition = "2018"
 
 [features]
 speedups = ["minijinja/speedups"]
+# off by default: enabling custom_syntax changes the lexer for all other benchmarks
+custom_syntax = ["minijinja/custom_syntax"]
 
 [dependencies]
 handlebars = "6.3.1"

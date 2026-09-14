@@ -12,6 +12,14 @@ To run the benchmarks:
 $ cargo bench
 ```
 
+The `compile_syntax_callback` benchmark is only built with the `custom_syntax`
+feature.  It is off by default because enabling it also changes the lexer used
+by all other benchmarks:
+
+```
+$ cargo bench -p benchmarks --features custom_syntax --bench templates -- '^compile'
+```
+
 ## Comparison Results
 
 These are the latest results run on a MacBook Pro 16" (2021) with:
