@@ -158,7 +158,7 @@ Debug representations of strings, sequences, and maps now use Python-style
 quoting.  This primarily changes nested rendering from double quotes to single
 quotes where possible.  The `tojson` filter now inserts spaces after commas and
 colons to match Jinja2's default `json.dumps` output as this divergence has
-caused some unncessary failures in conformity tests that some people use.
+caused some unnecessary failures in conformity tests that some people use.
 
 ## Keyword Arguments
 

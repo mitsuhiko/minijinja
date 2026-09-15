@@ -256,7 +256,7 @@ impl FormatSpec {
                 Ok(self.apply_padding(text, default_align))
             }
             Type::Char => match self.format_style {
-                // this is to keep consitency with errors in corresponding python functions used by jinja2
+                // this is to keep consistency with errors in corresponding python functions used by jinja2
                 FormatStyle::StrFormat => Err(self.type_conversion_err("string", self.ty)),
                 FormatStyle::Printf => {
                     let mut chars = text.chars();
