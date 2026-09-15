@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -49,8 +50,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to read context: %v", err)
 	}
+	// Validate with the standard decoder so out-of-range numbers are rejected.
+	var validation any
+	if err := json.Unmarshal(data, &validation); err != nil {
+		log.Fatalf("failed to parse JSON context: %v", err)
+	}
 	var ctx any
-	if err := json.Unmarshal(data, &ctx); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&ctx); err != nil {
 		log.Fatalf("failed to parse JSON context: %v", err)
 	}
 
