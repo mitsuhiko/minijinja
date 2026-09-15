@@ -4,6 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Added `Environment.SetUnknownMethodCallback` to the Go port.  #934
 * Fixed empty iterators in the Go port being incorrectly treated as non-iterable and truthy.  #933
 
 ## 2.24.0
