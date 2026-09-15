@@ -362,6 +362,11 @@ func TestCustomObjectCompare(t *testing.T) {
 // Truthiness Tests
 // -----------------------------------------------------------------------------
 
+type emptyLegacyIterable struct{}
+
+func (emptyLegacyIterable) GetAttr(string) Value { return Undefined() }
+func (emptyLegacyIterable) Iter() []Value        { return nil }
+
 func TestValueTruthiness(t *testing.T) {
 	tests := []struct {
 		val  Value
@@ -379,6 +384,8 @@ func TestValueTruthiness(t *testing.T) {
 		{FromString("x"), true},
 		{FromSlice(nil), false},
 		{FromSlice([]Value{FromInt(1)}), true},
+		{FromIterator(NewIterator("empty", nil)), false},
+		{FromIterator(NewIterator("non-empty", []Value{FromInt(1)})), true},
 		{FromMap(nil), false},
 		{FromMap(map[string]Value{"a": FromInt(1)}), true},
 	}
@@ -387,6 +394,47 @@ func TestValueTruthiness(t *testing.T) {
 		if got := tt.val.IsTrue(); got != tt.want {
 			t.Errorf("%v.IsTrue() = %v, want %v", tt.val, got, tt.want)
 		}
+	}
+}
+
+func TestValueIterDistinguishesEmptyFromNonIterable(t *testing.T) {
+	emptyObjectIterable := MakeIterable(func() iter.Seq[Value] {
+		return func(func(Value) bool) {}
+	})
+
+	iterable := map[string]Value{
+		"nil slice":       FromSlice(nil),
+		"empty iterator":  FromIterator(NewIterator("empty", nil)),
+		"empty map":       FromMap(nil),
+		"empty string":    FromString(""),
+		"legacy iterable": FromObject(emptyLegacyIterable{}),
+		"object iterable": emptyObjectIterable,
+		"sequence object": FromObject(&testSeq{}),
+	}
+	for name, val := range iterable {
+		t.Run(name, func(t *testing.T) {
+			items := val.Iter()
+			if items == nil {
+				t.Fatal("Iter() returned nil for an empty iterable")
+			}
+			if len(items) != 0 {
+				t.Fatalf("Iter() returned %v, want an empty slice", items)
+			}
+		})
+	}
+
+	notIterable := map[string]Value{
+		"integer":   FromInt(1),
+		"boolean":   FromBool(true),
+		"none":      None(),
+		"undefined": Undefined(),
+	}
+	for name, val := range notIterable {
+		t.Run(name, func(t *testing.T) {
+			if items := val.Iter(); items != nil {
+				t.Fatalf("Iter() returned %v for a non-iterable value", items)
+			}
+		})
 	}
 }
 

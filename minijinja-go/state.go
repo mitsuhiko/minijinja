@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -2879,65 +2880,67 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 		}
 	}
 
-	// Evaluate the expression to get a callable
+	if getAttr, ok := call.Expr.(*parser.GetAttr); ok {
+		return s.evalMethodCall(call, getAttr)
+	}
+
 	expr, err := s.evalExpr(call.Expr)
 	if err != nil {
 		return value.Undefined(), err
 	}
+	args, kwargs, err := s.evalCallArgs(call.Args)
+	if err != nil {
+		return value.Undefined(), err
+	}
+	return s.callValue(expr, args, kwargs, call.Span())
+}
 
-	// Check if it's a callable value
-	if callable, ok := expr.AsCallable(); ok {
-		args, kwargs, err := s.evalCallArgs(call.Args)
-		if err != nil {
-			return value.Undefined(), err
+func (s *State) evalMethodCall(call *parser.Call, getAttr *parser.GetAttr) (value.Value, error) {
+	obj, err := s.evalExpr(getAttr.Expr)
+	if err != nil {
+		return value.Undefined(), err
+	}
+	args, kwargs, err := s.evalCallArgs(call.Args)
+	if err != nil {
+		return value.Undefined(), err
+	}
+
+	if objVal, ok := obj.AsObject(); ok {
+		if callable, ok := objVal.(value.MethodCallable); ok {
+			result, err := callable.CallMethod(s, getAttr.Name, args, kwargs)
+			if !errors.Is(err, value.ErrUnknownMethod) {
+				return result, err
+			}
 		}
+	}
+
+	if s.env.unknownMethodCallback != nil {
+		result, err := s.env.unknownMethodCallback(s, obj, getAttr.Name, args, kwargs)
+		if !errors.Is(err, value.ErrUnknownMethod) {
+			return result, err
+		}
+	}
+
+	attr := obj.GetAttr(getAttr.Name)
+	if attr.IsCallable() {
+		return s.callValue(attr, args, kwargs, call.Span())
+	}
+	return value.Undefined(), NewError(
+		ErrUnknownMethod,
+		fmt.Sprintf("%s has no method named %s", obj.Kind(), getAttr.Name),
+	).WithSpan(call.Span())
+}
+
+func (s *State) callValue(val value.Value, args []value.Value, kwargs map[string]value.Value, span parser.Span) (value.Value, error) {
+	if callable, ok := val.AsCallable(); ok {
 		return callable.Call(s, args, kwargs)
 	}
-
-	// Check if it's a CallableObject (object that can be called directly)
-	if obj, ok := expr.AsObject(); ok {
-		if co, ok := obj.(value.CallableObject); ok {
-			args, kwargs, err := s.evalCallArgs(call.Args)
-			if err != nil {
-				return value.Undefined(), err
-			}
-			return co.ObjectCall(s, args, kwargs)
+	if obj, ok := val.AsObject(); ok {
+		if callable, ok := obj.(value.CallableObject); ok {
+			return callable.ObjectCall(s, args, kwargs)
 		}
 	}
-
-	// Check if it's a method call on a map (like module.macro())
-	if getAttr, ok := call.Expr.(*parser.GetAttr); ok {
-		obj, err := s.evalExpr(getAttr.Expr)
-		if err != nil {
-			return value.Undefined(), err
-		}
-
-		// Check if object supports method calls directly
-		if objVal, ok := obj.AsObject(); ok {
-			if mc, ok := objVal.(value.MethodCallable); ok {
-				args, kwargs, err := s.evalCallArgs(call.Args)
-				if err != nil {
-					return value.Undefined(), err
-				}
-				result, err := mc.CallMethod(s, getAttr.Name, args, kwargs)
-				if err != value.ErrUnknownMethod {
-					return result, err
-				}
-				// Fall through to try GetAttr
-			}
-		}
-
-		attr := obj.GetAttr(getAttr.Name)
-		if callable, ok := attr.AsCallable(); ok {
-			args, kwargs, err := s.evalCallArgs(call.Args)
-			if err != nil {
-				return value.Undefined(), err
-			}
-			return callable.Call(s, args, kwargs)
-		}
-	}
-
-	return value.Undefined(), NewError(ErrUnknownFunction, "unknown callable").WithSpan(call.Span())
+	return value.Undefined(), NewError(ErrUnknownFunction, "unknown callable").WithSpan(span)
 }
 
 func (s *State) evalSuper(span parser.Span) (value.Value, error) {

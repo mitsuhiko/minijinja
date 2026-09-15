@@ -5,6 +5,8 @@ All notable changes to MiniJinja are documented here.
 ## Unreleased
 
 * Fixed `loop.changed()` always reporting a change in the Go port: the loop object is rebuilt on every iteration, so the remembered value was lost.
+* Added `Environment.SetUnknownMethodCallback` to the Go port.  #934
+* Fixed empty iterators in the Go port being incorrectly treated as non-iterable and truthy.  #933
 
 ## 2.24.0
 
