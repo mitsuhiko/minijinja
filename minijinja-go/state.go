@@ -843,17 +843,22 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 	return value.FromSafeString(result), nil
 }
 
+type loopChangedState struct {
+	lastValue   value.Value
+	initialized bool
+}
+
 // loopObject is the loop variable object that supports cycle() and previtem/nextitem
 type loopObject struct {
-	index      int                // 0-based index
-	length     int                // total length (-1 for unknown)
-	depth      int                // nesting depth (0-based)
-	items      []value.Value      // all items for previtem/nextitem
-	changed    *value.Value       // last value for changed()
-	prevItem   value.Value        // previous item (for pull iterators)
-	pullIter   value.PullIterator // pull-based iterator
-	peekedNext *value.Value       // peeked next item for pullIter
-	recurseFn  func(value.Value) (string, error)
+	index        int                // 0-based index
+	length       int                // total length (-1 for unknown)
+	depth        int                // nesting depth (0-based)
+	items        []value.Value      // all items for previtem/nextitem
+	changedState *loopChangedState  // shared by every iteration of this loop
+	prevItem     value.Value        // previous item (for pull iterators)
+	pullIter     value.PullIterator // pull-based iterator
+	peekedNext   *value.Value       // peeked next item for pullIter
+	recurseFn    func(value.Value) (string, error)
 }
 
 func (l *loopObject) GetAttr(name string) value.Value {
@@ -979,15 +984,16 @@ type loopChangedCallable struct {
 
 func (c *loopChangedCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	_ = state
-	// Create a comparable representation of args
 	newVal := value.FromSlice(args)
-	if c.loop.changed == nil {
-		c.loop.changed = &newVal
-		return value.FromBool(true), nil
+	memo := c.loop.changedState
+	if memo == nil {
+		memo = &loopChangedState{}
+		c.loop.changedState = memo
 	}
-	changed := !newVal.Equal(*c.loop.changed)
+	changed := !memo.initialized || !newVal.Equal(memo.lastValue)
 	if changed {
-		c.loop.changed = &newVal
+		memo.lastValue = newVal
+		memo.initialized = true
 	}
 	return value.FromBool(changed), nil
 }
@@ -1395,6 +1401,7 @@ func (s *State) evalForLoopPull(loop *parser.ForLoop, pull value.PullIterator) e
 
 	index := 0
 	prevItem := value.Undefined()
+	changedState := &loopChangedState{}
 	var peekedItem *value.Value // Track peeked item across loop iterations
 
 	for {
@@ -1420,13 +1427,14 @@ func (s *State) evalForLoopPull(loop *parser.ForLoop, pull value.PullIterator) e
 
 		// For pull iterators, length is unknown (-1)
 		loopObj := &loopObject{
-			index:     index,
-			length:    -1, // Unknown length
-			depth:     s.depth - 1,
-			items:     nil,
-			prevItem:  prevItem,
-			pullIter:  pull,
-			recurseFn: s.loopRecurse,
+			index:        index,
+			length:       -1, // Unknown length
+			depth:        s.depth - 1,
+			items:        nil,
+			prevItem:     prevItem,
+			pullIter:     pull,
+			changedState: changedState,
+			recurseFn:    s.loopRecurse,
 		}
 		s.Set("loop", value.FromObject(loopObj))
 
@@ -1537,6 +1545,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 			builder := &strings.Builder{}
 			s.out = builder
 
+			changedState := &loopChangedState{}
 			for i := range nestedItems {
 				s.resetScope()
 				if err := s.unpackLoopTarget(loop.Target, nestedItems[i]); err != nil {
@@ -1545,11 +1554,12 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 				}
 
 				loopObj := &loopObject{
-					index:     i,
-					length:    len(nestedItems),
-					depth:     s.depth - 1,
-					items:     nestedItems,
-					recurseFn: s.loopRecurse,
+					index:        i,
+					length:       len(nestedItems),
+					depth:        s.depth - 1,
+					items:        nestedItems,
+					changedState: changedState,
+					recurseFn:    s.loopRecurse,
 				}
 				s.Set("loop", value.FromObject(loopObj))
 
@@ -1577,6 +1587,7 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 		defer func() { s.loopRecurse = oldRecurse }()
 	}
 
+	changedState := &loopChangedState{}
 	for i := range items {
 		s.resetScope()
 		if err := s.unpackLoopTarget(loop.Target, items[i]); err != nil {
@@ -1585,11 +1596,12 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 
 		// Set loop variable as an object
 		loopObj := &loopObject{
-			index:     i,
-			length:    len(items),
-			depth:     s.depth - 1,
-			items:     items,
-			recurseFn: s.loopRecurse,
+			index:        i,
+			length:       len(items),
+			depth:        s.depth - 1,
+			items:        items,
+			changedState: changedState,
+			recurseFn:    s.loopRecurse,
 		}
 		s.Set("loop", value.FromObject(loopObj))
 
