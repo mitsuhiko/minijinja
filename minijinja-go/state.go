@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -837,22 +836,17 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 	return value.FromSafeString(result), nil
 }
 
-type loopChangedState struct {
-	lastValue   value.Value
-	initialized bool
-}
-
 // loopObject is the loop variable object that supports cycle() and previtem/nextitem
 type loopObject struct {
-	index        int                // 0-based index
-	length       int                // total length (-1 for unknown)
-	depth        int                // nesting depth (0-based)
-	items        []value.Value      // all items for previtem/nextitem
-	changedState *loopChangedState  // shared by every iteration of this loop
-	prevItem     value.Value        // previous item (for pull iterators)
-	pullIter     value.PullIterator // pull-based iterator
-	peekedNext   *value.Value       // peeked next item for pullIter
-	recurseFn    func(value.Value) (string, error)
+	index      int                // 0-based index
+	length     int                // total length (-1 for unknown)
+	depth      int                // nesting depth (0-based)
+	items      []value.Value      // all items for previtem/nextitem
+	changed    *value.Value       // last value for changed()
+	prevItem   value.Value        // previous item (for pull iterators)
+	pullIter   value.PullIterator // pull-based iterator
+	peekedNext *value.Value       // peeked next item for pullIter
+	recurseFn  func(value.Value) (string, error)
 }
 
 func (l *loopObject) GetAttr(name string) value.Value {
@@ -978,16 +972,15 @@ type loopChangedCallable struct {
 
 func (c *loopChangedCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	_ = state
+	// Create a comparable representation of args
 	newVal := value.FromSlice(args)
-	memo := c.loop.changedState
-	if memo == nil {
-		memo = &loopChangedState{}
-		c.loop.changedState = memo
+	if c.loop.changed == nil {
+		c.loop.changed = &newVal
+		return value.FromBool(true), nil
 	}
-	changed := !memo.initialized || !newVal.Equal(memo.lastValue)
+	changed := !newVal.Equal(*c.loop.changed)
 	if changed {
-		memo.lastValue = newVal
-		memo.initialized = true
+		c.loop.changed = &newVal
 	}
 	return value.FromBool(changed), nil
 }
@@ -1395,7 +1388,6 @@ func (s *State) evalForLoopPull(loop *parser.ForLoop, pull value.PullIterator) e
 
 	index := 0
 	prevItem := value.Undefined()
-	changedState := &loopChangedState{}
 	var peekedItem *value.Value // Track peeked item across loop iterations
 
 	for {
@@ -1421,14 +1413,13 @@ func (s *State) evalForLoopPull(loop *parser.ForLoop, pull value.PullIterator) e
 
 		// For pull iterators, length is unknown (-1)
 		loopObj := &loopObject{
-			index:        index,
-			length:       -1, // Unknown length
-			depth:        s.depth - 1,
-			items:        nil,
-			prevItem:     prevItem,
-			pullIter:     pull,
-			changedState: changedState,
-			recurseFn:    s.loopRecurse,
+			index:     index,
+			length:    -1, // Unknown length
+			depth:     s.depth - 1,
+			items:     nil,
+			prevItem:  prevItem,
+			pullIter:  pull,
+			recurseFn: s.loopRecurse,
 		}
 		s.Set("loop", value.FromObject(loopObj))
 
@@ -1539,7 +1530,6 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 			builder := &strings.Builder{}
 			s.out = builder
 
-			changedState := &loopChangedState{}
 			for i := range nestedItems {
 				s.resetScope()
 				if err := s.unpackLoopTarget(loop.Target, nestedItems[i]); err != nil {
@@ -1548,12 +1538,11 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 				}
 
 				loopObj := &loopObject{
-					index:        i,
-					length:       len(nestedItems),
-					depth:        s.depth - 1,
-					items:        nestedItems,
-					changedState: changedState,
-					recurseFn:    s.loopRecurse,
+					index:     i,
+					length:    len(nestedItems),
+					depth:     s.depth - 1,
+					items:     nestedItems,
+					recurseFn: s.loopRecurse,
 				}
 				s.Set("loop", value.FromObject(loopObj))
 
@@ -1581,7 +1570,6 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 		defer func() { s.loopRecurse = oldRecurse }()
 	}
 
-	changedState := &loopChangedState{}
 	for i := range items {
 		s.resetScope()
 		if err := s.unpackLoopTarget(loop.Target, items[i]); err != nil {
@@ -1590,12 +1578,11 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 
 		// Set loop variable as an object
 		loopObj := &loopObject{
-			index:        i,
-			length:       len(items),
-			depth:        s.depth - 1,
-			items:        items,
-			changedState: changedState,
-			recurseFn:    s.loopRecurse,
+			index:     i,
+			length:    len(items),
+			depth:     s.depth - 1,
+			items:     items,
+			recurseFn: s.loopRecurse,
 		}
 		s.Set("loop", value.FromObject(loopObj))
 
@@ -2872,67 +2859,65 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 		}
 	}
 
-	if getAttr, ok := call.Expr.(*parser.GetAttr); ok {
-		return s.evalMethodCall(call, getAttr)
-	}
-
+	// Evaluate the expression to get a callable
 	expr, err := s.evalExpr(call.Expr)
 	if err != nil {
 		return value.Undefined(), err
 	}
-	args, kwargs, err := s.evalCallArgs(call.Args)
-	if err != nil {
-		return value.Undefined(), err
-	}
-	return s.callValue(expr, args, kwargs, call.Span())
-}
 
-func (s *State) evalMethodCall(call *parser.Call, getAttr *parser.GetAttr) (value.Value, error) {
-	obj, err := s.evalExpr(getAttr.Expr)
-	if err != nil {
-		return value.Undefined(), err
-	}
-	args, kwargs, err := s.evalCallArgs(call.Args)
-	if err != nil {
-		return value.Undefined(), err
-	}
-
-	if objVal, ok := obj.AsObject(); ok {
-		if callable, ok := objVal.(value.MethodCallable); ok {
-			result, err := callable.CallMethod(s, getAttr.Name, args, kwargs)
-			if !errors.Is(err, value.ErrUnknownMethod) {
-				return result, err
-			}
+	// Check if it's a callable value
+	if callable, ok := expr.AsCallable(); ok {
+		args, kwargs, err := s.evalCallArgs(call.Args)
+		if err != nil {
+			return value.Undefined(), err
 		}
-	}
-
-	if s.env.unknownMethodCallback != nil {
-		result, err := s.env.unknownMethodCallback(s, obj, getAttr.Name, args, kwargs)
-		if !errors.Is(err, value.ErrUnknownMethod) {
-			return result, err
-		}
-	}
-
-	attr := obj.GetAttr(getAttr.Name)
-	if attr.IsCallable() {
-		return s.callValue(attr, args, kwargs, call.Span())
-	}
-	return value.Undefined(), NewError(
-		ErrUnknownMethod,
-		fmt.Sprintf("%s has no method named %s", obj.Kind(), getAttr.Name),
-	).WithSpan(call.Span())
-}
-
-func (s *State) callValue(val value.Value, args []value.Value, kwargs map[string]value.Value, span parser.Span) (value.Value, error) {
-	if callable, ok := val.AsCallable(); ok {
 		return callable.Call(s, args, kwargs)
 	}
-	if obj, ok := val.AsObject(); ok {
-		if callable, ok := obj.(value.CallableObject); ok {
-			return callable.ObjectCall(s, args, kwargs)
+
+	// Check if it's a CallableObject (object that can be called directly)
+	if obj, ok := expr.AsObject(); ok {
+		if co, ok := obj.(value.CallableObject); ok {
+			args, kwargs, err := s.evalCallArgs(call.Args)
+			if err != nil {
+				return value.Undefined(), err
+			}
+			return co.ObjectCall(s, args, kwargs)
 		}
 	}
-	return value.Undefined(), NewError(ErrUnknownFunction, "unknown callable").WithSpan(span)
+
+	// Check if it's a method call on a map (like module.macro())
+	if getAttr, ok := call.Expr.(*parser.GetAttr); ok {
+		obj, err := s.evalExpr(getAttr.Expr)
+		if err != nil {
+			return value.Undefined(), err
+		}
+
+		// Check if object supports method calls directly
+		if objVal, ok := obj.AsObject(); ok {
+			if mc, ok := objVal.(value.MethodCallable); ok {
+				args, kwargs, err := s.evalCallArgs(call.Args)
+				if err != nil {
+					return value.Undefined(), err
+				}
+				result, err := mc.CallMethod(s, getAttr.Name, args, kwargs)
+				if err != value.ErrUnknownMethod {
+					return result, err
+				}
+				// Fall through to try GetAttr
+			}
+		}
+
+		attr := obj.GetAttr(getAttr.Name)
+		if callable, ok := attr.AsCallable(); ok {
+			args, kwargs, err := s.evalCallArgs(call.Args)
+			if err != nil {
+				return value.Undefined(), err
+			}
+			return callable.Call(s, args, kwargs)
+		}
+	}
+
+	return value.Undefined(), NewError(ErrUnknownFunction, "unknown callable").WithSpan(call.Span())
 }
 
 func (s *State) evalSuper(span parser.Span) (value.Value, error) {

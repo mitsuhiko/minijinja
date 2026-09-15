@@ -317,56 +317,7 @@ pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 }
 
 math_binop!(sub, checked_sub, -);
-
-fn int_div_rem_floor(a: i128, b: i128) -> Option<(i128, i128)> {
-    let mut quotient = a.checked_div(b)?;
-    let mut remainder = a.checked_rem(b)?;
-    if remainder != 0 && (remainder < 0) != (b < 0) {
-        quotient = quotient.checked_sub(1)?;
-        remainder = remainder.checked_add(b)?;
-    }
-    Some((quotient, remainder))
-}
-
-fn float_div_rem_floor(a: f64, b: f64) -> (f64, f64) {
-    let mut remainder = a % b;
-    let mut quotient = (a - remainder) / b;
-    if remainder != 0.0 {
-        if (remainder < 0.0) != (b < 0.0) {
-            remainder += b;
-            quotient -= 1.0;
-        }
-    } else {
-        remainder = 0.0f64.copysign(b);
-    }
-    if quotient != 0.0 {
-        let mut floored = quotient.floor();
-        if quotient - floored > 0.5 {
-            floored += 1.0;
-        }
-        quotient = floored;
-    } else {
-        quotient = 0.0f64.copysign(a / b);
-    }
-    (quotient, remainder)
-}
-
-pub fn rem(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    match coerce(lhs, rhs, true) {
-        Some(CoerceResult::I128(a, b)) if b != 0 => {
-            if a == i128::MIN && b == -1 {
-                Ok(Value::from(0))
-            } else {
-                int_div_rem_floor(a, b)
-                    .map(|(_, remainder)| int_as_value(remainder))
-                    .ok_or_else(|| failed_op("%", lhs, rhs))
-            }
-        }
-        Some(CoerceResult::F64(a, b)) if b != 0.0 => Ok(Value::from(float_div_rem_floor(a, b).1)),
-        Some(CoerceResult::I128(..) | CoerceResult::F64(..)) => Err(failed_op("%", lhs, rhs)),
-        _ => Err(impossible_op("%", lhs, rhs)),
-    }
-}
+math_binop!(rem, checked_rem_euclid, %);
 
 pub fn mul(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     if let Some((s, n)) = lhs
@@ -455,17 +406,16 @@ pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 
 pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     match coerce(lhs, rhs, true) {
-        Some(CoerceResult::I128(a, b)) if b != 0 => {
-            if a == i128::MIN && b == -1 {
-                Ok(Value::from(MIN_I128_AS_POS_U128))
-            } else {
-                int_div_rem_floor(a, b)
-                    .map(|(quotient, _)| int_as_value(quotient))
+        Some(CoerceResult::I128(a, b)) => {
+            if b != 0 {
+                a.checked_div_euclid(b)
                     .ok_or_else(|| failed_op("//", lhs, rhs))
+                    .map(int_as_value)
+            } else {
+                Err(failed_op("//", lhs, rhs))
             }
         }
-        Some(CoerceResult::F64(a, b)) if b != 0.0 => Ok(Value::from(float_div_rem_floor(a, b).0)),
-        Some(CoerceResult::I128(..) | CoerceResult::F64(..)) => Err(failed_op("//", lhs, rhs)),
+        Some(CoerceResult::F64(a, b)) => Ok(a.div_euclid(b).into()),
         _ => Err(impossible_op("//", lhs, rhs)),
     }
 }
@@ -748,54 +698,11 @@ mod tests {
             Value::from(50.0)
         );
 
+        let err = int_div(&Value::from(i128::MIN), &Value::from(-1i128)).unwrap_err();
         assert_eq!(
-            int_div(&Value::from(i128::MIN), &Value::from(-1i128)).unwrap(),
-            Value::from(MIN_I128_AS_POS_U128)
+            err.to_string(),
+            "invalid operation: unable to calculate -170141183460469231731687303715884105728 // -1"
         );
-        assert_eq!(
-            rem(&Value::from(i128::MIN), &Value::from(-1i128)).unwrap(),
-            Value::from(0)
-        );
-    }
-
-    #[test]
-    fn test_floor_division_and_modulo() {
-        for (a, b, quotient, remainder) in [
-            (7, 3, 2, 1),
-            (-7, 3, -3, 2),
-            (7, -3, -3, -2),
-            (-7, -3, 2, -1),
-            (-9, 3, -3, 0),
-        ] {
-            assert_eq!(
-                int_div(&Value::from(a), &Value::from(b)).unwrap(),
-                Value::from(quotient)
-            );
-            assert_eq!(
-                rem(&Value::from(a), &Value::from(b)).unwrap(),
-                Value::from(remainder)
-            );
-        }
-
-        for (a, b, quotient, remainder) in [
-            (-7.0, 3.0, -3.0, 2.0),
-            (7.0, -3.0, -3.0, -2.0),
-            (-7.0, -3.0, 2.0, -1.0),
-            (-7.5, 2.0, -4.0, 0.5),
-            (1.0, 0.1, 9.0, 0.09999999999999995),
-        ] {
-            assert_eq!(
-                int_div(&Value::from(a), &Value::from(b)).unwrap(),
-                Value::from(quotient)
-            );
-            assert_eq!(
-                rem(&Value::from(a), &Value::from(b)).unwrap(),
-                Value::from(remainder)
-            );
-        }
-
-        assert!(int_div(&Value::from(1.0), &Value::from(0.0)).is_err());
-        assert!(rem(&Value::from(1.0), &Value::from(0.0)).is_err());
     }
 
     #[test]

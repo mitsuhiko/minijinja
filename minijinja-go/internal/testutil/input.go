@@ -38,20 +38,6 @@ func (s *TestSettings) HasMarkers() bool {
 	return false
 }
 
-// decodeContext preserves whether JSON number literals are integers or floats.
-func decodeContext(source string, context *map[string]any) error {
-	// Use the default decoder first so that numbers outside the float64 range
-	// are rejected rather than surviving as unusable json.Number values.
-	var validation map[string]any
-	if err := json.Unmarshal([]byte(source), &validation); err != nil {
-		return err
-	}
-
-	decoder := json.NewDecoder(strings.NewReader(source))
-	decoder.UseNumber()
-	return decoder.Decode(context)
-}
-
 // ParseTestInputFile reads and parses a test input file.
 func ParseTestInputFile(path string) (*TestInput, error) {
 	content, err := os.ReadFile(path)
@@ -82,13 +68,11 @@ func ParseTestInput(content string) (*TestInput, error) {
 			// Successfully parsed as settings
 			// Check if it actually had any settings fields set
 			// by also parsing as generic map to get context
-			if err := decodeContext(jsonStr, &input.Context); err != nil {
-				return nil, err
-			}
+			json.Unmarshal([]byte(jsonStr), &input.Context)
 		} else {
 			// Fall back to parsing as context
 			input.Settings = nil
-			if err := decodeContext(jsonStr, &input.Context); err != nil {
+			if err := json.Unmarshal([]byte(jsonStr), &input.Context); err != nil {
 				return nil, err
 			}
 		}

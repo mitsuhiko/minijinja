@@ -4,7 +4,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -70,15 +69,8 @@ func loadJSONResource(baseDir, filename string) (value.Value, error) {
 		return value.Undefined(), minijinja.NewError(minijinja.ErrInvalidOperation, "could not read JSON file")
 	}
 
-	// Validate with the standard decoder so out-of-range numbers are rejected.
-	var validation any
-	if err := json.Unmarshal(contents, &validation); err != nil {
-		return value.Undefined(), minijinja.NewError(minijinja.ErrInvalidOperation, "invalid JSON")
-	}
 	var parsed any
-	decoder := json.NewDecoder(bytes.NewReader(contents))
-	decoder.UseNumber()
-	if err := decoder.Decode(&parsed); err != nil {
+	if err := json.Unmarshal(contents, &parsed); err != nil {
 		return value.Undefined(), minijinja.NewError(minijinja.ErrInvalidOperation, "invalid JSON")
 	}
 

@@ -99,7 +99,11 @@ pub enum Instruction<'source> {
     /// Divide the top two values
     Div,
 
-    /// Divide the top two values using flooring division.
+    /// Integer divide the top two values as "integer".
+    ///
+    /// Note that in MiniJinja this currently uses an euclidean
+    /// division to match the rem implementation.  In Python this
+    /// instead uses a flooring division and a flooring remainder.
     IntDiv,
 
     /// Calculate the remainder the top two values
