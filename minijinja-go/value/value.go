@@ -875,6 +875,8 @@ func (v Value) IsTrue() bool {
 		return len(d) > 0
 	case []Value:
 		return len(d) > 0
+	case *Iterator:
+		return len(d.items) > 0
 	case map[string]Value:
 		return len(d) > 0
 	case Object:
@@ -1288,53 +1290,56 @@ type MapGetter interface {
 	Map() map[string]Value
 }
 
-// Iter returns an iterator over the value's items.
+// Iter returns the value's items. A nil result indicates that the value is not
+// iterable; an empty iterable returns a non-nil, empty slice.
 func (v Value) Iter() []Value {
+	var items []Value
+
 	switch d := v.data.(type) {
 	case []Value:
-		return d
+		items = d
 	case *Iterator:
-		return d.items
+		items = d.items
 	case map[string]Value:
 		keys := make([]string, 0, len(d))
 		for k := range d {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		result := make([]Value, len(keys))
+		items = make([]Value, len(keys))
 		for i, k := range keys {
-			result[i] = FromString(k)
+			items[i] = FromString(k)
 		}
-		return result
 	case string:
 		runes := []rune(d)
-		result := make([]Value, len(runes))
+		items = make([]Value, len(runes))
 		for i, r := range runes {
-			result[i] = FromString(string(r))
+			items[i] = FromString(string(r))
 		}
-		return result
 	case safeString:
 		runes := []rune(d)
-		result := make([]Value, len(runes))
+		items = make([]Value, len(runes))
 		for i, r := range runes {
-			result[i] = FromString(string(r))
+			items[i] = FromString(string(r))
 		}
-		return result
 	case Iterable:
-		return d.Iter()
+		items = d.Iter()
 	case Object:
-		// Check for new object iteration interfaces
-		if seq := IterateObject(d); seq != nil {
-			var result []Value
-			for item := range seq {
-				result = append(result, item)
-			}
-			return result
+		seq := IterateObject(d)
+		if seq == nil {
+			return nil
 		}
-		return nil
+		for item := range seq {
+			items = append(items, item)
+		}
 	default:
 		return nil
 	}
+
+	if items == nil {
+		return []Value{}
+	}
+	return items
 }
 
 // Clone creates a copy of the value.
