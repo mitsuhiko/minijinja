@@ -1,0 +1,33 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "simple: {% for x in items %}{{ loop.changed(x) }} {% endfor %}\nargs: {% for x in items %}{{ loop.changed(x, \"k\") }} {% endfor %}\ngroups: {% for row in rows %}{% if loop.changed(row.group) %}[{{ row.group }}]{% endif %}{{ row.name }}{% endfor %}\nnested: {% for x in [1, 2] %}{% for y in [1, 1] %}{{ loop.changed(y) }} {% endfor %}{% endfor %}\nrecursive: {% for item in tree recursive %}{{ loop.depth }}:{{ loop.changed(item.group) }};{% if item.children %}{{ loop(item.children) }}{% endif %}{% endfor %}"
+info:
+  items:
+    - 1
+    - 1
+    - 2
+    - 2
+    - 1
+  rows:
+    - group: a
+      name: one
+    - group: a
+      name: two
+    - group: b
+      name: three
+  tree:
+    - group: x
+      children:
+        - group: y
+          children: []
+        - group: y
+          children: []
+    - group: x
+      children: []
+input_file: minijinja/tests/inputs/loop_changed.txt
+---
+simple: True False True False True 
+args: True False True False True 
+groups: [a]onetwo[b]three
+nested: True False True False 
+recursive: 1:True;2:True;2:False;1:False;
