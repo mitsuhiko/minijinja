@@ -244,6 +244,11 @@ type LoaderFunc func(name string) (string, error)
 //	})
 type PathJoinFunc func(name, parent string) string
 
+// UnknownMethodFunc is invoked when a method call cannot be resolved by the
+// value itself. Returning value.ErrUnknownMethod continues resolution with a
+// callable attribute; any other error is returned to the caller.
+type UnknownMethodFunc func(state *State, val value.Value, method string, args []value.Value, kwargs map[string]value.Value) (value.Value, error)
+
 // AutoEscapeFunc determines auto-escaping based on template name.
 //
 // This function is invoked when templates are loaded into the environment to determine
@@ -279,22 +284,23 @@ type AutoEscapeFunc func(name string) AutoEscape
 // - EmptyEnvironment creates a completely blank environment with no filters,
 // tests, globals, or default auto-escaping logic.
 type Environment struct {
-	templates         map[string]*compiledTemplate
-	templatesMu       sync.RWMutex
-	filters           map[string]FilterFunc
-	tests             map[string]TestFunc
-	globals           map[string]value.Value
-	functions         map[string]FunctionFunc
-	loader            LoaderFunc
-	autoEscapeFunc    AutoEscapeFunc
-	pathJoinCallback  PathJoinFunc
-	syntaxConfig      syntax.SyntaxConfig
-	wsConfig          syntax.WhitespaceConfig
-	undefinedBehavior UndefinedBehavior
-	recursionLimit    int
-	debug             bool
-	formatter         FormatterFunc
-	fuel              *uint64
+	templates             map[string]*compiledTemplate
+	templatesMu           sync.RWMutex
+	filters               map[string]FilterFunc
+	tests                 map[string]TestFunc
+	globals               map[string]value.Value
+	functions             map[string]FunctionFunc
+	loader                LoaderFunc
+	autoEscapeFunc        AutoEscapeFunc
+	pathJoinCallback      PathJoinFunc
+	unknownMethodCallback UnknownMethodFunc
+	syntaxConfig          syntax.SyntaxConfig
+	wsConfig              syntax.WhitespaceConfig
+	undefinedBehavior     UndefinedBehavior
+	recursionLimit        int
+	debug                 bool
+	formatter             FormatterFunc
+	fuel                  *uint64
 }
 
 type compiledTemplate struct {
@@ -680,6 +686,12 @@ func (e *Environment) SetAutoEscapeFunc(f AutoEscapeFunc) {
 // This is used to implement relative template resolution for include/extends.
 func (e *Environment) SetPathJoinCallback(f PathJoinFunc) {
 	e.pathJoinCallback = f
+}
+
+// SetUnknownMethodCallback sets a callback invoked for methods not implemented
+// by a value. The callback runs before callable attribute lookup.
+func (e *Environment) SetUnknownMethodCallback(f UnknownMethodFunc) {
+	e.unknownMethodCallback = f
 }
 
 // SetSyntax sets the syntax configuration for the environment.

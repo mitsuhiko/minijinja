@@ -125,6 +125,9 @@ const (
 
 	// ErrEvalBlock indicates an error occurred while evaluating a super block.
 	ErrEvalBlock
+
+	// ErrUnknownMethod indicates an unknown method was called on a value.
+	ErrUnknownMethod
 )
 
 // String returns a human-readable string representation of the error kind.
@@ -158,6 +161,8 @@ func (k ErrorKind) String() string {
 		return "out of fuel"
 	case ErrEvalBlock:
 		return "could not render block"
+	case ErrUnknownMethod:
+		return "unknown method"
 	default:
 		return "error"
 	}

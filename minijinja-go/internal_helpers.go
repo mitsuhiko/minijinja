@@ -26,6 +26,7 @@ const (
 	ErrBadInclude       = errors.ErrBadInclude
 	ErrOutOfFuel        = errors.ErrOutOfFuel
 	ErrEvalBlock        = errors.ErrEvalBlock
+	ErrUnknownMethod    = errors.ErrUnknownMethod
 )
 
 // NewError creates a new error with the given kind and message.
