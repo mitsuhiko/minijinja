@@ -9,6 +9,7 @@ All notable changes to MiniJinja are documented here.
 * Added `Environment.SetUnknownMethodCallback` to the Go port.  #934
 * Changed floor division and modulo in Rust and Go to match Jinja2 semantics.  #935
 * Fixed `loop.changed()` always reporting a change in the Go port.  #936
+* Fixed Go context values converting whole-number floats into integers.  #937
 * Fixed empty iterators in the Go port being incorrectly treated as non-iterable and truthy.  #933
 
 ## 3.0.0-alpha.0

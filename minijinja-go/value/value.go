@@ -55,6 +55,7 @@
 package value
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
@@ -636,6 +637,8 @@ func FromObject(o Object) Value {
 //   - int types -> FromInt()
 //   - uint types -> FromInt()
 //   - float types -> FromFloat()
+//   - json.Number -> FromInt() or FromFloat(), based on its literal; invalid or
+//     unrepresentable numbers become Undefined()
 //   - string -> FromString()
 //   - []byte -> FromBytes()
 //   - slices/arrays -> FromSlice() (recursively)
@@ -674,9 +677,25 @@ func FromAny(v any) Value {
 	if obj, ok := v.(Object); ok {
 		return FromObject(obj)
 	}
+	if number, ok := v.(json.Number); ok {
+		return fromJSONNumber(number)
+	}
 
 	rv := reflect.ValueOf(v)
 	return fromReflectValue(rv)
+}
+
+func fromJSONNumber(number json.Number) Value {
+	if !json.Valid([]byte(number.String())) {
+		return Undefined()
+	}
+	if i, err := number.Int64(); err == nil {
+		return FromInt(i)
+	}
+	if f, err := number.Float64(); err == nil {
+		return FromFloat(f)
+	}
+	return Undefined()
 }
 
 func fromReflectValue(rv reflect.Value) Value {
@@ -684,8 +703,11 @@ func fromReflectValue(rv reflect.Value) Value {
 		return None()
 	}
 	if rv.CanInterface() {
-		if val, ok := rv.Interface().(Value); ok {
+		switch val := rv.Interface().(type) {
+		case Value:
 			return val
+		case json.Number:
+			return fromJSONNumber(val)
 		}
 	}
 
@@ -697,12 +719,7 @@ func fromReflectValue(rv reflect.Value) Value {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return FromInt(int64(rv.Uint()))
 	case reflect.Float32, reflect.Float64:
-		f := rv.Float()
-		// Convert whole number floats to integers for consistency with JSON parsing
-		if f == math.Trunc(f) && f >= math.MinInt64 && f <= math.MaxInt64 {
-			return FromInt(int64(f))
-		}
-		return FromFloat(f)
+		return FromFloat(rv.Float())
 	case reflect.String:
 		return FromString(rv.String())
 	case reflect.Slice:

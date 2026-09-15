@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -54,8 +55,15 @@ func loadJSON(baseDir, name string) (value.Value, bool) {
 		return value.Undefined(), false
 	}
 
+	// Validate with the standard decoder so out-of-range numbers are rejected.
+	var validation any
+	if err := json.Unmarshal(contents, &validation); err != nil {
+		return value.Undefined(), false
+	}
 	var parsed any
-	if err := json.Unmarshal(contents, &parsed); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(contents))
+	decoder.UseNumber()
+	if err := decoder.Decode(&parsed); err != nil {
 		return value.Undefined(), false
 	}
 
