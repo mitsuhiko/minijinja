@@ -141,6 +141,9 @@ the engine is used so you can see how it's utilized:
   * **[Maturin](https://github.com/PyO3/maturin)** uses it to [generate project structures](https://github.com/PyO3/maturin/blob/e35097e6cf3b9115736e8ae208972178029a20d0/src/new_project.rs)
   * **[cargo-dist](https://github.com/axodotdev/cargo-dist)** uses it to [generate CI and project configuration](https://github.com/axodotdev/cargo-dist/blob/4cd61134863f54ca5a037400ebec71d039d42742/cargo-dist/src/backend/templates.rs)
 
+* SQL Generation:
+  * **[Spawn](https://docs.spawn.dev)** uses it [to render database migration scripts and tests](https://github.com/saward/spawn/blob/f9f3522343b61c383fca0ab88a83fd6788ca99a0/src/template.rs#L34-L100) and for [safe escaping of values](https://github.com/saward/spawn/blob/f9f3522343b61c383fca0ab88a83fd6788ca99a0/src/sql_formatter/postgres.rs).
+
 ## Similar Projects
 
 These are related template engines for Rust:
