@@ -5,6 +5,8 @@ All notable changes to MiniJinja are documented here.
 ## Unreleased
 
 * Fixed floats from the Go context losing their fractional part: `4.0` rendered as `4` and tested as an integer. JSON decoders that want `1` to stay an integer can feed `json.Number` values, which the Go port now maps by their literal.
+* Added `Environment.SetUnknownMethodCallback` to the Go port.  #934
+* Fixed empty iterators in the Go port being incorrectly treated as non-iterable and truthy.  #933
 
 ## 2.24.0
 
