@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 * Switched `minijinja-contrib` date and time filters from `time`/`time-tz` to Jiff. Custom formats now use `strftime`-style syntax instead of `time` format descriptions.  #694
 * Fixed the `title` filter treating every ASCII punctuation character as a word boundary in Rust and Go. Words now start after whitespace or one of `-`, `(`, `{`, `[` and `<` as in Jinja2, so `"don't"|title` renders as `Don't` instead of `Don'T`.
 * Added `Environment.SetUnknownMethodCallback` to the Go port.  #934
+* Changed floor division and modulo in Rust and Go to match Jinja2 semantics.  #935
 * Fixed empty iterators in the Go port being incorrectly treated as non-iterable and truthy.  #933
 
 ## 3.0.0-alpha.0

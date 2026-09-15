@@ -193,40 +193,82 @@ func (v Value) Div(other Value) (Value, error) {
 	return Undefined(), fmt.Errorf("cannot divide %s by %s", v.Kind(), other.Kind())
 }
 
+func intDivRemFloor(a, b int64) (quotient, remainder int64) {
+	quotient, remainder = a/b, a%b
+	if remainder != 0 && (remainder < 0) != (b < 0) {
+		quotient--
+		remainder += b
+	}
+	return quotient, remainder
+}
+
+func floatDivRemFloor(a, b float64) (quotient, remainder float64) {
+	remainder = math.Mod(a, b)
+	quotient = (a - remainder) / b
+	if remainder != 0 {
+		if (remainder < 0) != (b < 0) {
+			remainder += b
+			quotient--
+		}
+	} else {
+		remainder = math.Copysign(0, b)
+	}
+	if quotient != 0 {
+		floored := math.Floor(quotient)
+		if quotient-floored > 0.5 {
+			floored++
+		}
+		quotient = floored
+	} else {
+		quotient = math.Copysign(0, a/b)
+	}
+	return quotient, remainder
+}
+
 // FloorDiv performs floor division.
 func (v Value) FloorDiv(other Value) (Value, error) {
+	if isActualInt(v) && isActualInt(other) {
+		i1, _ := v.AsInt()
+		i2, _ := other.AsInt()
+		if i2 == 0 {
+			return Undefined(), fmt.Errorf("division by zero")
+		}
+		if i1 == math.MinInt64 && i2 == -1 {
+			return FromBigInt(new(big.Int).Neg(big.NewInt(i1))), nil
+		}
+		quotient, _ := intDivRemFloor(i1, i2)
+		return FromInt(quotient), nil
+	}
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {
 			if f2 == 0 {
 				return Undefined(), fmt.Errorf("division by zero")
 			}
-			result := math.Floor(f1 / f2)
-			// Return int only if both operands are actual ints
-			if isActualInt(v) && isActualInt(other) {
-				return FromInt(int64(result)), nil
-			}
-			return FromFloat(result), nil
+			quotient, _ := floatDivRemFloor(f1, f2)
+			return FromFloat(quotient), nil
 		}
 	}
 	return Undefined(), fmt.Errorf("cannot floor divide %s by %s", v.Kind(), other.Kind())
 }
 
-// Rem performs modulo operation.
+// Rem performs a modulo operation with the sign of the divisor.
 func (v Value) Rem(other Value) (Value, error) {
-	if i1, ok := v.AsInt(); ok {
-		if i2, ok := other.AsInt(); ok {
-			if i2 == 0 {
-				return Undefined(), fmt.Errorf("modulo by zero")
-			}
-			return FromInt(i1 % i2), nil
+	if isActualInt(v) && isActualInt(other) {
+		i1, _ := v.AsInt()
+		i2, _ := other.AsInt()
+		if i2 == 0 {
+			return Undefined(), fmt.Errorf("modulo by zero")
 		}
+		_, remainder := intDivRemFloor(i1, i2)
+		return FromInt(remainder), nil
 	}
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {
 			if f2 == 0 {
 				return Undefined(), fmt.Errorf("modulo by zero")
 			}
-			return FromFloat(math.Mod(f1, f2)), nil
+			_, remainder := floatDivRemFloor(f1, f2)
+			return FromFloat(remainder), nil
 		}
 	}
 	return Undefined(), fmt.Errorf("cannot modulo %s by %s", v.Kind(), other.Kind())
