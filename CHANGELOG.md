@@ -5,6 +5,8 @@ All notable changes to MiniJinja are documented here.
 ## Unreleased
 
 * Fixed the modulo operator on integers in the Go port computing Go's remainder instead of the euclidean remainder Rust uses, so `-7 % 3` is 2 again.
+* Added `Environment.SetUnknownMethodCallback` to the Go port.  #934
+* Fixed empty iterators in the Go port being incorrectly treated as non-iterable and truthy.  #933
 
 ## 2.24.0
 
