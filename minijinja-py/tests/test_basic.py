@@ -158,6 +158,31 @@ def test_basic_types():
     assert rv == {"a": 42, "b": 42.5, "c": "blah"}
 
 
+def test_large_python_ints_are_not_rounded():
+    # Regression for https://github.com/mitsuhiko/minijinja/issues/811
+    # Python ints that do not fit in i64 must not be converted via f64.
+    cases = [
+        42,
+        -1,
+        2**63 - 1,
+        -(2**63),
+        2**63,
+        2**64 - 1,
+        2**64,
+        2**127 - 1,
+        -(2**127),
+        2**128 - 1,
+        2**200,
+        -(2**200),
+    ]
+    for value in cases:
+        assert render_str("{{ x }}", x=value) == str(value)
+        assert eval_expr("x", x=value) == value
+
+    assert render_str("{{ x }}", x=1.5) == "1.5"
+    assert render_str("{{ true }}") == render_str("{{ x }}", x=True)
+
+
 def test_loader():
     called = []
 
