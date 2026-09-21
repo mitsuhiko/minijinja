@@ -169,6 +169,47 @@ fn test_const_folding() {
     ));
     assert_eq!(unaryop_expr.as_const(), Some(Value::from(true)));
 
+    // Short-circuiting and/or with constants
+    let and_expr = Expr::BinOp(Spanned::new(
+        BinOp {
+            op: BinOpKind::ScAnd,
+            left: Expr::Const(Spanned::new(
+                Const {
+                    value: Value::from(7),
+                },
+                Span::default(),
+            )),
+            right: Expr::Const(Spanned::new(
+                Const {
+                    value: Value::from(0),
+                },
+                Span::default(),
+            )),
+        },
+        Span::default(),
+    ));
+    assert_eq!(and_expr.as_const(), Some(Value::from(0)));
+
+    let or_expr = Expr::BinOp(Spanned::new(
+        BinOp {
+            op: BinOpKind::ScOr,
+            left: Expr::Const(Spanned::new(
+                Const {
+                    value: Value::from(0),
+                },
+                Span::default(),
+            )),
+            right: Expr::Const(Spanned::new(
+                Const {
+                    value: Value::from(7),
+                },
+                Span::default(),
+            )),
+        },
+        Span::default(),
+    ));
+    assert_eq!(or_expr.as_const(), Some(Value::from(7)));
+
     // Test cases that should return None
 
     // List with var

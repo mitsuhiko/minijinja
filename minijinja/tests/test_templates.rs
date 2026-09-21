@@ -884,3 +884,16 @@ fn test_test_caching() {
     let rv = env.get_template("child.txt").unwrap().render(()).unwrap();
     assert_eq!(rv, "False");
 }
+
+/// See https://github.com/mitsuhiko/minijinja/issues/945
+#[test]
+fn test_short_circuit_and_constants() {
+    assert_eq!(render!("{{ 7 and 0 }}"), "0");
+    assert_eq!(render!("{{ 0 and 7 }}"), "0");
+    assert_eq!(render!("{{ 7 and 42 }}"), "42");
+    assert_eq!(render!("{{ 0 and false }}"), "0");
+    assert_eq!(render!("{{ false and 0 }}"), "False");
+    assert_eq!(render!("{{ '' and 'a' }}"), "");
+    assert_eq!(render!("{{ 'a' and '' }}"), "");
+    assert_eq!(render!("{{ 'a' and 'b' }}"), "b");
+}

@@ -260,10 +260,10 @@ fn eval_binop(op: BinOpKind, left: &Value, right: &Value) -> Option<Value> {
         BinOpKind::Gt => Some(Value::from(left > right)),
         BinOpKind::Gte => Some(Value::from(left >= right)),
         BinOpKind::In => ops::contains(right, left).ok(),
-        BinOpKind::ScAnd => Some(if left.is_true() && right.is_true() {
+        BinOpKind::ScAnd => Some(if left.is_true() {
             right.clone()
         } else {
-            Value::from(false)
+            left.clone()
         }),
         BinOpKind::ScOr => Some(if left.is_true() {
             left.clone()
