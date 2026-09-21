@@ -400,3 +400,22 @@ fn test_format_error() {
     assert!(eval_err_expr("'% %s' | format('arg')")
         .contains("invalid conversion type '%' in format spec"));
 }
+
+#[test]
+fn test_large_precision() {
+    let env = Environment::new();
+
+    assert_eq!(eval_expr(&env, "'%.1f' | format(1.0)"), "1.0");
+
+    assert!(eval_err_expr("'%.65536f' | format(1.0)").contains("formatting precision too large"));
+    assert!(eval_err_expr("'%.65536d' | format(1)").contains("formatting precision too large"));
+    assert!(eval_err_expr("'%.65535g' | format(0.0001)").contains("formatting precision too large"));
+
+    let err = minijinja::formatting::format(
+        minijinja::formatting::FormatStyle::StrFormat,
+        "{:.65536f}",
+        &[Value::from(1.0)],
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("formatting precision too large"));
+}

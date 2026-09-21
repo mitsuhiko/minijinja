@@ -143,6 +143,8 @@ enum Separator {
     Underscore,
 }
 
+const MAX_PRECISION: usize = u16::MAX as usize;
+
 // Captures format spec for both printf-style and str.format style format strings.
 #[derive(Debug, PartialEq, Eq)]
 struct FormatSpec {
@@ -288,8 +290,14 @@ impl FormatSpec {
     // used by Python's formatting utils, so this function returns it as an integer
     // and callers format it further. Also, the integer exponent is used to decide
     // `f` vs. `e` formats when the general format (`g`) is used.
-    fn mantissa_and_exp<T: LowerExp>(val: T, precision: usize) -> (String, i32) {
-        format!("{val:.precision$e}")
+    fn mantissa_and_exp<T: LowerExp>(val: T, precision: usize) -> Result<(String, i32), Error> {
+        if precision > MAX_PRECISION {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                format!("formatting precision too large (maximum is {MAX_PRECISION})"),
+            ));
+        }
+        Ok(format!("{val:.precision$e}")
             .rsplit_once('e')
             .map(|(m, e)| {
                 (
@@ -297,7 +305,7 @@ impl FormatSpec {
                     e.parse::<i32>().expect("exponent must be an integer"),
                 )
             })
-            .expect("scientific number must of XXeYY form")
+            .expect("scientific number must of XXeYY form"))
     }
 
     // If precision is zero, the decimal point is omitted unless `#` option is used
@@ -325,20 +333,29 @@ impl FormatSpec {
         &self,
         val: T,
         is_uppercase: bool,
-    ) -> String {
+    ) -> Result<String, Error> {
         let precision = self
             .precision
             .map(|p| if p == 0 { 1 } else { p })
             .unwrap_or(6);
 
-        let (manti, exp) = Self::mantissa_and_exp(val, precision - 1);
+        let (manti, exp) = Self::mantissa_and_exp(val, precision - 1)?;
         if exp >= -4 && exp < precision as i32 {
             let decimal_places = (precision as i32 - 1 - exp) as usize;
+            if decimal_places > MAX_PRECISION {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("formatting precision too large (maximum is {MAX_PRECISION})"),
+                ));
+            }
             let num = format!("{val:.decimal_places$}");
-            self.group_decimal_num(self.remove_insignificants(&num).to_owned())
+            Ok(self.group_decimal_num(self.remove_insignificants(&num).to_owned()))
         } else {
             let manti = self.group_decimal_num(self.remove_insignificants(&manti).to_owned());
-            format!("{manti}{}{exp:+03}", if is_uppercase { 'E' } else { 'e' })
+            Ok(format!(
+                "{manti}{}{exp:+03}",
+                if is_uppercase { 'E' } else { 'e' }
+            ))
         }
     }
 
@@ -485,17 +502,23 @@ impl FormatSpec {
                 }
             }
             Type::LowerE => {
-                let (mant, exp) = Self::mantissa_and_exp(val, self.precision.unwrap_or(6));
+                let (mant, exp) = Self::mantissa_and_exp(val, self.precision.unwrap_or(6))?;
                 let mant = self.group_decimal_num(self.fix_decimal_point(mant));
                 format!("{mant}e{exp:+03}")
             }
             Type::UpperE => {
-                let (mant, exp) = Self::mantissa_and_exp(val, self.precision.unwrap_or(6));
+                let (mant, exp) = Self::mantissa_and_exp(val, self.precision.unwrap_or(6))?;
                 let mant = self.group_decimal_num(self.fix_decimal_point(mant));
                 format!("{mant}E{exp:+03}")
             }
             Type::LowerF | Type::UpperF => {
                 let prec = self.precision.unwrap_or(6);
+                if prec > MAX_PRECISION {
+                    return Err(Error::new(
+                        ErrorKind::InvalidOperation,
+                        format!("formatting precision too large (maximum is {MAX_PRECISION})"),
+                    ));
+                }
                 let num = if prec != 0 {
                     format!("{}.{:0prec$}", val, 0)
                 } else {
@@ -504,7 +527,7 @@ impl FormatSpec {
                 self.group_decimal_num(self.fix_decimal_point(num))
             }
             Type::LowerG | Type::UpperG => {
-                self.number_in_general_format(val, self.ty == Type::UpperG)
+                self.number_in_general_format(val, self.ty == Type::UpperG)?
             }
         };
 
@@ -531,7 +554,7 @@ impl FormatSpec {
                 FpCategory::Infinite => Ok(self.format_number("inf", sign)),
                 FpCategory::Zero => Ok(self.format_number("0", sign)),
                 FpCategory::Subnormal | FpCategory::Normal => {
-                    let mut num = self.number_in_general_format(val.abs(), false);
+                    let mut num = self.number_in_general_format(val.abs(), false)?;
                     if !num.contains(['.', 'e', 'E']) {
                         num.push_str(".0");
                     }
@@ -546,7 +569,7 @@ impl FormatSpec {
                     Ok(self.format_number("inf", sign))
                 } else {
                     let precision = self.precision.unwrap_or(6);
-                    let (mant, exp) = Self::mantissa_and_exp(val.abs(), precision);
+                    let (mant, exp) = Self::mantissa_and_exp(val.abs(), precision)?;
                     let mant = self.group_decimal_num(self.fix_decimal_point(mant));
                     let num = format!("{mant}e{exp:+03}");
                     Ok(self.format_number(&num, sign))
@@ -560,7 +583,7 @@ impl FormatSpec {
                     Ok(self.format_number("INF", sign))
                 } else {
                     let precision = self.precision.unwrap_or(6);
-                    let (mant, exp) = Self::mantissa_and_exp(val.abs(), precision);
+                    let (mant, exp) = Self::mantissa_and_exp(val.abs(), precision)?;
                     let mant = self.group_decimal_num(self.fix_decimal_point(mant));
                     let num = format!("{mant}E{exp:+03}");
                     Ok(self.format_number(&num, sign))
@@ -574,6 +597,12 @@ impl FormatSpec {
                     Ok(self.format_number("inf", sign))
                 } else {
                     let prec = self.precision.unwrap_or(6);
+                    if prec > MAX_PRECISION {
+                        return Err(Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!("formatting precision too large (maximum is {MAX_PRECISION})"),
+                        ));
+                    }
                     let num = format!("{:.prec$}", val.abs());
                     let num = self.group_decimal_num(self.fix_decimal_point(num));
                     Ok(self.format_number(&num, sign))
@@ -587,6 +616,12 @@ impl FormatSpec {
                     Ok(self.format_number("INF", sign))
                 } else {
                     let prec = self.precision.unwrap_or(6);
+                    if prec > MAX_PRECISION {
+                        return Err(Error::new(
+                            ErrorKind::InvalidOperation,
+                            format!("formatting precision too large (maximum is {MAX_PRECISION})"),
+                        ));
+                    }
                     let num = format!("{:.prec$}", val.abs());
                     let num = self.group_decimal_num(self.fix_decimal_point(num));
                     Ok(self.format_number(&num, sign))
@@ -598,7 +633,7 @@ impl FormatSpec {
                 FpCategory::Infinite => Ok(self.format_number("inf", sign)),
                 FpCategory::Zero => Ok(self.format_number("0", sign)),
                 FpCategory::Subnormal | FpCategory::Normal => {
-                    let num = self.number_in_general_format(val.abs(), false);
+                    let num = self.number_in_general_format(val.abs(), false)?;
                     Ok(self.format_number(&num, sign))
                 }
             },
@@ -607,7 +642,7 @@ impl FormatSpec {
                 FpCategory::Infinite => Ok(self.format_number("INF", sign)),
                 FpCategory::Zero => Ok(self.format_number("0", sign)),
                 FpCategory::Subnormal | FpCategory::Normal => {
-                    let num = self.number_in_general_format(val.abs(), true);
+                    let num = self.number_in_general_format(val.abs(), true)?;
                     Ok(self.format_number(&num, sign))
                 }
             },
@@ -1114,6 +1149,14 @@ mod printf_style {
             .then(|| parse_number(cursor))
             .transpose()?
             .flatten();
+        if let Some(p) = precision {
+            if p > MAX_PRECISION {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("formatting precision too large (maximum is {MAX_PRECISION})"),
+                ));
+            }
+        }
 
         // length modifier is ignored in Python
         parse_len_modifier(cursor);
@@ -1384,6 +1427,14 @@ mod str_format_style {
             .then(|| parse_number(cursor))
             .transpose()?
             .flatten();
+        if let Some(p) = precision {
+            if p > MAX_PRECISION {
+                return Err(Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("formatting precision too large (maximum is {MAX_PRECISION})"),
+                ));
+            }
+        }
 
         let ty = ok!(parse_type(cursor, FormatStyle::StrFormat));
 
