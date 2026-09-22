@@ -538,6 +538,22 @@ func TestTests(t *testing.T) {
 	}
 }
 
+func TestBooleansAreNumbers(t *testing.T) {
+	tmpl, err := NewEnvironment().TemplateFromString(
+		`{{ true is number }}|{{ [true, 1]|select("number")|list }}|{{ [true, true]|sum }}`,
+	)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if result != "True|[True, 1]|2" {
+		t.Fatalf("unexpected result: %q", result)
+	}
+}
+
 func TestOperatorAliasTests(t *testing.T) {
 	env := NewEnvironment()
 

@@ -160,7 +160,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_number(v: &Value) -> bool {
-        matches!(v.kind(), ValueKind::Number)
+        matches!(v.kind(), ValueKind::Number | ValueKind::Bool)
     }
 
     /// Checks if this value is an integer.

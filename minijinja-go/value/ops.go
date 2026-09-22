@@ -38,6 +38,17 @@ func isActualInt(v Value) bool {
 	return ok
 }
 
+func asArithmeticFloat(v Value) (float64, bool) {
+	if b, ok := v.AsBool(); ok {
+		return boolToFloat(b), true
+	}
+	return v.AsFloat()
+}
+
+func isArithmeticInt(v Value) bool {
+	return isActualInt(v) || v.Kind() == KindBool
+}
+
 // Add performs addition or string concatenation.
 func (v Value) Add(other Value) (Value, error) {
 	// String concatenation
@@ -51,10 +62,10 @@ func (v Value) Add(other Value) (Value, error) {
 	}
 
 	// Numeric addition
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
-			// Return int only if both are actual ints (not floats)
-			if isActualInt(v) && isActualInt(other) {
+	if f1, ok := asArithmeticFloat(v); ok {
+		if f2, ok := asArithmeticFloat(other); ok {
+			// Booleans are integers for arithmetic, matching Python.
+			if isArithmeticInt(v) && isArithmeticInt(other) {
 				return FromInt(int64(f1 + f2)), nil
 			}
 			return FromFloat(f1 + f2), nil

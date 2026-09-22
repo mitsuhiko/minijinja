@@ -748,7 +748,7 @@ mod builtins {
             if value.is_undefined() {
                 ok!(state.undefined_behavior().handle_undefined(false));
                 continue;
-            } else if !value.is_number() {
+            } else if !value.is_number() && value.kind() != ValueKind::Bool {
                 return Err(Error::new(
                     ErrorKind::InvalidOperation,
                     format!("can only sum numbers, got {}", value.kind()),

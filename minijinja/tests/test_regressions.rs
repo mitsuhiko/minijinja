@@ -20,6 +20,19 @@ fn test_repeated_sequence_size_limit() {
 }
 
 #[test]
+fn test_booleans_are_numbers() {
+    let env = Environment::new();
+    assert_eq!(
+        env.render_str(
+            "{{ true is number }}|{{ [true, 1]|select('number')|list }}|{{ [true, true]|sum }}",
+            (),
+        )
+        .unwrap(),
+        "True|[True, 1]|2"
+    );
+}
+
+#[test]
 fn test_division_by_zero_errors() {
     let env = Environment::new();
     for source in ["{{ 1 / 0 }}", "{{ -1 / 0 }}", "{{ 0 / 0 }}"] {

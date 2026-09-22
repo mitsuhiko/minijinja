@@ -438,7 +438,7 @@ func TestString(_ filters.State, val value.Value, _ []value.Value) (bool, error)
 //	{{ "42" is number }}
 //	  -> false
 func TestNumber(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
-	return val.Kind() == value.KindNumber, nil
+	return val.Kind() == value.KindNumber || val.Kind() == value.KindBool, nil
 }
 
 // TestInteger checks if a value is an integer.
