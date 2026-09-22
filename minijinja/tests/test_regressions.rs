@@ -20,6 +20,16 @@ fn test_repeated_sequence_size_limit() {
 }
 
 #[test]
+fn test_undefined_is_a_sequence() {
+    let env = Environment::new();
+    assert_eq!(
+        env.render_str("{{ missing is iterable }}|{{ missing is sequence }}", ())
+            .unwrap(),
+        "True|True"
+    );
+}
+
+#[test]
 fn test_booleans_are_numbers() {
     let env = Environment::new();
     assert_eq!(

@@ -204,7 +204,7 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn is_sequence(v: &Value) -> bool {
-        matches!(v.kind(), ValueKind::Seq)
+        v.is_undefined() || matches!(v.kind(), ValueKind::Seq)
     }
 
     /// Checks if this value can be iterated over.

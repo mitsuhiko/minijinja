@@ -663,7 +663,7 @@ func TestTest(state filters.State, val value.Value, _ []value.Value) (bool, erro
 //	{{ 42 is sequence }}
 //	  -> false
 func TestSequence(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
-	return val.Kind() == value.KindSeq, nil
+	return val.IsUndefined() || val.Kind() == value.KindSeq, nil
 }
 
 // TestMapping checks if a value is a mapping/dict.
@@ -701,7 +701,7 @@ func TestMapping(_ filters.State, val value.Value, _ []value.Value) (bool, error
 //	{{ 42 is iterable }}
 //	  -> false
 func TestIterable(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
-	return val.Iter() != nil, nil
+	return val.IsUndefined() || val.Iter() != nil, nil
 }
 
 // TestStartingWith checks if a string starts with a given prefix.
