@@ -369,6 +369,10 @@ func TestLogicalOperators(t *testing.T) {
 		{"{{ true and false }}", "False"},
 		{"{{ false or true }}", "True"},
 		{"{{ false or false }}", "False"},
+		{"{{ 7 and 0 }}", "0"},
+		{"{{ 0 and 7 }}", "0"},
+		{"{{ 0 or 7 }}", "7"},
+		{"{{ 7 or 0 }}", "7"},
 		{"{{ not true }}", "False"},
 		{"{{ not false }}", "True"},
 	}
