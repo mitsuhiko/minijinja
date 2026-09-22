@@ -20,6 +20,27 @@ fn test_repeated_sequence_size_limit() {
 }
 
 #[test]
+fn test_upper_and_lower_reject_non_strings() {
+    let env = Environment::new();
+    assert_eq!(
+        env.render_str(
+            "{{ missing is upper }}|{{ 1 is upper }}|{{ missing is lower }}|{{ 1 is lower }}",
+            (),
+        )
+        .unwrap(),
+        "False|False|False|False"
+    );
+    assert_eq!(
+        env.render_str(
+            "{{ 'FOO 1' is upper }}|{{ 'foo 1' is lower }}|{{ '' is upper }}",
+            ()
+        )
+        .unwrap(),
+        "True|True|False"
+    );
+}
+
+#[test]
 fn test_undefined_is_a_sequence() {
     let env = Environment::new();
     assert_eq!(

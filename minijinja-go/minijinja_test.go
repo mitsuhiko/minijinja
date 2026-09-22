@@ -538,6 +538,22 @@ func TestTests(t *testing.T) {
 	}
 }
 
+func TestUpperAndLowerRejectNonStrings(t *testing.T) {
+	tmpl, err := NewEnvironment().TemplateFromString(
+		`{{ missing is upper }}|{{ 1 is upper }}|{{ missing is lower }}|{{ 1 is lower }}|{{ "FOO 1" is upper }}|{{ "foo 1" is lower }}|{{ "" is upper }}`,
+	)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if result != "False|False|False|False|True|True|False" {
+		t.Fatalf("unexpected result: %q", result)
+	}
+}
+
 func TestUndefinedIsASequence(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ missing is iterable }}|{{ missing is sequence }}",

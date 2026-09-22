@@ -415,8 +415,18 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_lower(name: &str) -> bool {
-        name.chars().all(|x| x.is_lowercase())
+    pub fn is_lower(value: &Value) -> bool {
+        let Some(name) = value.as_str() else {
+            return false;
+        };
+        let mut has_cased = false;
+        for ch in name.chars() {
+            if ch.is_uppercase() {
+                return false;
+            }
+            has_cased |= ch.is_lowercase();
+        }
+        has_cased
     }
 
     /// Checks if a string is all uppercase.
@@ -426,8 +436,18 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     #[cfg(feature = "builtins")]
-    pub fn is_upper(name: &str) -> bool {
-        name.chars().all(|x| x.is_uppercase())
+    pub fn is_upper(value: &Value) -> bool {
+        let Some(name) = value.as_str() else {
+            return false;
+        };
+        let mut has_cased = false;
+        for ch in name.chars() {
+            if ch.is_lowercase() {
+                return false;
+            }
+            has_cased |= ch.is_uppercase();
+        }
+        has_cased
     }
 
     /// Checks if two values are identical.

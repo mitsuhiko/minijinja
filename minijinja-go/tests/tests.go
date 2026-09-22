@@ -565,12 +565,14 @@ func TestLower(_ filters.State, val value.Value, _ []value.Value) (bool, error) 
 	if !ok {
 		return false, nil
 	}
+	hasCased := false
 	for _, r := range s {
-		if !unicode.IsLower(r) && unicode.IsLetter(r) {
+		if unicode.IsUpper(r) {
 			return false, nil
 		}
+		hasCased = hasCased || unicode.IsLower(r)
 	}
-	return true, nil
+	return hasCased, nil
 }
 
 // TestUpper checks if a string is all uppercase.
@@ -593,12 +595,14 @@ func TestUpper(_ filters.State, val value.Value, _ []value.Value) (bool, error) 
 	if !ok {
 		return false, nil
 	}
+	hasCased := false
 	for _, r := range s {
-		if !unicode.IsUpper(r) && unicode.IsLetter(r) {
+		if unicode.IsLower(r) {
 			return false, nil
 		}
+		hasCased = hasCased || unicode.IsUpper(r)
 	}
-	return true, nil
+	return hasCased, nil
 }
 
 // TestFilter checks if a filter with the given name exists.
