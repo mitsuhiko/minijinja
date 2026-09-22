@@ -20,6 +20,14 @@ fn test_repeated_sequence_size_limit() {
 }
 
 #[test]
+fn test_division_by_zero_errors() {
+    let env = Environment::new();
+    for source in ["{{ 1 / 0 }}", "{{ -1 / 0 }}", "{{ 0 / 0 }}"] {
+        assert!(env.render_str(source, ()).is_err(), "{source}");
+    }
+}
+
+#[test]
 fn test_round_uses_bankers_rounding() {
     let env = Environment::new();
     assert_eq!(

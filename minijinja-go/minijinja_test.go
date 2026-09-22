@@ -392,6 +392,18 @@ func TestLogicalOperators(t *testing.T) {
 	}
 }
 
+func TestDivisionByZeroErrors(t *testing.T) {
+	for _, source := range []string{"{{ 1 / 0 }}", "{{ -1 / 0 }}", "{{ 0 / 0 }}"} {
+		tmpl, err := NewEnvironment().TemplateFromString(source)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", source, err)
+		}
+		if _, err := tmpl.Render(nil); err == nil {
+			t.Errorf("expected render error for %q", source)
+		}
+	}
+}
+
 func TestRepeatedSequenceSizeLimit(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString("{{ [0] * 2**30 }}")
 	if err != nil {

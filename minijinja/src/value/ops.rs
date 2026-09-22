@@ -502,12 +502,17 @@ fn repeat_iterable(n: &Value, seq: &DynObject) -> Result<Value, Error> {
 }
 
 pub fn div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
-    fn do_it(lhs: &Value, rhs: &Value) -> Option<Value> {
-        let a = some!(as_f64(lhs, true));
-        let b = some!(as_f64(rhs, true));
-        Some((a / b).into())
+    let Some(a) = as_f64(lhs, true) else {
+        return Err(impossible_op("/", lhs, rhs));
+    };
+    let Some(b) = as_f64(rhs, true) else {
+        return Err(impossible_op("/", lhs, rhs));
+    };
+    if b == 0.0 {
+        Err(failed_op("/", lhs, rhs))
+    } else {
+        Ok((a / b).into())
     }
-    do_it(lhs, rhs).ok_or_else(|| impossible_op("/", lhs, rhs))
 }
 
 pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {

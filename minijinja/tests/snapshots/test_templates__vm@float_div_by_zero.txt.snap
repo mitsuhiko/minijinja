@@ -1,8 +1,23 @@
 ---
 source: minijinja/tests/test_templates.rs
+assertion_line: 140
 description: "{{ 10.0 / 0.0 }}"
 info: {}
 input_file: minijinja/tests/inputs/float_div_by_zero.txt
 ---
-inf
+!!!ERROR!!!
 
+Error {
+    kind: InvalidOperation,
+    detail: "unable to calculate 10.0 / 0.0",
+    name: "float_div_by_zero.txt",
+    line: 1,
+}
+
+invalid operation: unable to calculate 10.0 / 0.0 (in float_div_by_zero.txt:1)
+---------------------------- float_div_by_zero.txt ----------------------------
+   1 > {{ 10.0 / 0.0 }}
+     i    ^^^^^^^^^^ invalid operation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------

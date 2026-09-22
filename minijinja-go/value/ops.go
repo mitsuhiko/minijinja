@@ -195,9 +195,7 @@ func repeatIterable(seq Value, n int64) (Value, error) {
 func (v Value) Div(other Value) (Value, error) {
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {
-			// Float division by zero returns inf/-inf/NaN like Rust
-			// Only error on integer division by zero
-			if f2 == 0 && isActualInt(v) && isActualInt(other) {
+			if f2 == 0 {
 				return Undefined(), fmt.Errorf("division by zero")
 			}
 			return FromFloat(f1 / f2), nil
