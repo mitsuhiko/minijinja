@@ -1,6 +1,6 @@
 #![cfg(feature = "builtins")]
 
-use minijinja::Environment;
+use minijinja::{context, Environment};
 
 #[test]
 fn test_constant_logical_operators_preserve_operands() {
@@ -32,11 +32,11 @@ fn test_upper_and_lower_reject_non_strings() {
     );
     assert_eq!(
         env.render_str(
-            "{{ 'FOO 1' is upper }}|{{ 'foo 1' is lower }}|{{ '' is upper }}",
+            "{{ 'FOO 1' is upper }}|{{ 'foo 1' is lower }}|{{ '' is upper }}|{{ 'Aǅ' is upper }}|{{ 'aǅ' is lower }}",
             ()
         )
         .unwrap(),
-        "True|True|False"
+        "True|True|False|False|False"
     );
 }
 
@@ -80,8 +80,22 @@ fn test_round_uses_bankers_rounding() {
         "2.0|2.67|-2.0"
     );
     assert_eq!(
-        env.render_str("{{ 250.0|round(-2) }}|{{ 350.0|round(-2) }}", ())
-            .unwrap(),
-        "200.0|400.0"
+        env.render_str(
+            "{{ 250.0|round(-2) }}|{{ 350.0|round(-2) }}|{{ 9.5e22|round(-22) }}",
+            (),
+        )
+        .unwrap(),
+        "200.0|400.0|90000000000000000000000.0"
     );
+    assert_eq!(
+        env.render_str(
+            "{{ positive|round(-309) }}|{{ negative|round(-309) }}",
+            context!(positive => f64::INFINITY, negative => f64::NEG_INFINITY),
+        )
+        .unwrap(),
+        "inf|-inf"
+    );
+    assert!(env
+        .render_str("{{ value|round(-308) }}", context!(value => 1.7e308))
+        .is_err());
 }

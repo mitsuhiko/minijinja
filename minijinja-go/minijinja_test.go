@@ -2,6 +2,7 @@ package minijinja
 
 import (
 	"context"
+	"math"
 	"strings"
 	"testing"
 
@@ -458,6 +459,7 @@ func TestFilters(t *testing.T) {
 		{"{{ -2.5|round }}", "-2.0"},
 		{"{{ 250.0|round(-2) }}", "200.0"},
 		{"{{ 350.0|round(-2) }}", "400.0"},
+		{"{{ 9.5e22|round(-22) }}", "9e+22"},
 	}
 
 	for _, test := range tests {
@@ -472,6 +474,33 @@ func TestFilters(t *testing.T) {
 		if result != test.expected {
 			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
 		}
+	}
+}
+
+func TestRoundNonFiniteWithNegativePrecision(t *testing.T) {
+	tmpl, err := NewEnvironment().TemplateFromString(
+		"{{ positive|round(-309) }}|{{ negative|round(-309) }}",
+	)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	result, err := tmpl.Render(map[string]any{
+		"positive": math.Inf(1),
+		"negative": math.Inf(-1),
+	})
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if result != "inf|-inf" {
+		t.Fatalf("unexpected result: %q", result)
+	}
+
+	tmpl, err = NewEnvironment().TemplateFromString("{{ value|round(-308) }}")
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if _, err := tmpl.Render(map[string]any{"value": 1.7e308}); err == nil {
+		t.Fatal("expected overflowing round to fail")
 	}
 }
 
@@ -540,7 +569,7 @@ func TestTests(t *testing.T) {
 
 func TestUpperAndLowerRejectNonStrings(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
-		`{{ missing is upper }}|{{ 1 is upper }}|{{ missing is lower }}|{{ 1 is lower }}|{{ "FOO 1" is upper }}|{{ "foo 1" is lower }}|{{ "" is upper }}`,
+		`{{ missing is upper }}|{{ 1 is upper }}|{{ missing is lower }}|{{ 1 is lower }}|{{ "FOO 1" is upper }}|{{ "foo 1" is lower }}|{{ "" is upper }}|{{ "Aǅ" is upper }}|{{ "aǅ" is lower }}`,
 	)
 	if err != nil {
 		t.Fatalf("parse error: %v", err)
@@ -549,7 +578,7 @@ func TestUpperAndLowerRejectNonStrings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render error: %v", err)
 	}
-	if result != "False|False|False|False|True|True|False" {
+	if result != "False|False|False|False|True|True|False|False|False" {
 		t.Fatalf("unexpected result: %q", result)
 	}
 }

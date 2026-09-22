@@ -774,6 +774,79 @@ mod builtins {
         value.get_item(key)
     }
 
+    fn round_with_negative_precision(value: f64, precision: i32) -> Result<f64, Error> {
+        if !value.is_finite() {
+            return Ok(value);
+        }
+
+        let decimal_place = -i64::from(precision);
+        if decimal_place >= 309 {
+            return Ok(0.0f64.copysign(value));
+        }
+
+        // Use enough decimal digits to represent any f64 exactly.  Rounding the
+        // decimal digits avoids introducing an approximate division by 10^n.
+        let formatted = format!("{:.1074e}", value.abs());
+        let (mantissa, exponent) = formatted
+            .split_once('e')
+            .expect("scientific formatting must contain an exponent");
+        let exponent = exponent
+            .parse::<i64>()
+            .expect("scientific exponent must be an integer");
+        let retained_len = exponent - decimal_place + 1;
+        if retained_len < 0 {
+            return Ok(0.0f64.copysign(value));
+        }
+
+        let digits = mantissa
+            .bytes()
+            .filter(u8::is_ascii_digit)
+            .collect::<Vec<_>>();
+        let retained_len = retained_len as usize;
+        let discarded = &digits[retained_len..];
+        let last_retained = retained_len
+            .checked_sub(1)
+            .map_or(0, |idx| digits[idx] - b'0');
+        let round_up = discarded[0] > b'5'
+            || (discarded[0] == b'5'
+                && (discarded[1..].iter().any(|&digit| digit != b'0') || last_retained % 2 != 0));
+
+        let mut retained = digits[..retained_len].to_vec();
+        if round_up {
+            let mut carry = true;
+            for digit in retained.iter_mut().rev() {
+                if *digit == b'9' {
+                    *digit = b'0';
+                } else {
+                    *digit += 1;
+                    carry = false;
+                    break;
+                }
+            }
+            if carry {
+                retained.insert(0, b'1');
+            }
+        }
+        if retained.is_empty() || retained.iter().all(|&digit| digit == b'0') {
+            return Ok(0.0f64.copysign(value));
+        }
+
+        let coefficient = String::from_utf8(retained).unwrap();
+        let rounded = format!(
+            "{}{coefficient}e{decimal_place}",
+            if value.is_sign_negative() { "-" } else { "" }
+        )
+        .parse::<f64>()
+        .map_err(|_| Error::new(ErrorKind::InvalidOperation, "unable to round value"))?;
+        if rounded.is_infinite() {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "rounded value is too large to represent",
+            ));
+        }
+        Ok(rounded)
+    }
+
     /// Round the number to a given precision.
     ///
     /// Round the number to a given precision. The first parameter specifies the
@@ -801,26 +874,8 @@ mod builtins {
                             .parse::<f64>()
                             .unwrap()
                     }
-                } else if precision == i32::MIN {
-                    0.0f64.copysign(val)
                 } else {
-                    let factor = 10f64.powi(-precision);
-                    if factor.is_infinite() {
-                        0.0f64.copysign(val)
-                    } else {
-                        let scaled = val / factor;
-                        let truncated = scaled.trunc();
-                        let rounded = if scaled.fract().abs() == 0.5 {
-                            if truncated % 2.0 == 0.0 {
-                                truncated
-                            } else {
-                                truncated + scaled.signum()
-                            }
-                        } else {
-                            scaled.round()
-                        };
-                        rounded * factor
-                    }
+                    return round_with_negative_precision(val, precision).map(Value::from);
                 };
                 Ok(Value::from(rounded))
             }

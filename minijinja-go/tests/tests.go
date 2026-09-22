@@ -567,7 +567,7 @@ func TestLower(_ filters.State, val value.Value, _ []value.Value) (bool, error) 
 	}
 	hasCased := false
 	for _, r := range s {
-		if unicode.IsUpper(r) {
+		if unicode.IsUpper(r) || unicode.Is(unicode.Title, r) {
 			return false, nil
 		}
 		hasCased = hasCased || unicode.IsLower(r)
@@ -597,7 +597,7 @@ func TestUpper(_ filters.State, val value.Value, _ []value.Value) (bool, error) 
 	}
 	hasCased := false
 	for _, r := range s {
-		if unicode.IsLower(r) {
+		if unicode.IsLower(r) || unicode.Is(unicode.Title, r) {
 			return false, nil
 		}
 		hasCased = hasCased || unicode.IsUpper(r)

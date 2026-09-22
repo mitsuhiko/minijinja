@@ -2245,6 +2245,72 @@ func FilterFloat(_ State, val value.Value, args []value.Value, kwargs map[string
 	return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("cannot convert %s to float", val.Kind()))
 }
 
+func roundWithNegativePrecision(f float64, precision int) (float64, error) {
+	if math.IsInf(f, 0) || math.IsNaN(f) {
+		return f, nil
+	}
+	if precision <= -309 {
+		return math.Copysign(0, f), nil
+	}
+
+	decimalPlace := -precision
+	// 1074 decimal places are enough to represent any float64 exactly.
+	formatted := strconv.FormatFloat(math.Abs(f), 'e', 1074, 64)
+	parts := strings.SplitN(formatted, "e", 2)
+	exponent, _ := strconv.Atoi(parts[1])
+	retainedLen := exponent - decimalPlace + 1
+	if retainedLen < 0 {
+		return math.Copysign(0, f), nil
+	}
+
+	digits := []byte(strings.ReplaceAll(parts[0], ".", ""))
+	discarded := digits[retainedLen:]
+	lastRetained := byte(0)
+	if retainedLen > 0 {
+		lastRetained = digits[retainedLen-1] - '0'
+	}
+	roundUp := discarded[0] > '5'
+	if discarded[0] == '5' {
+		for _, digit := range discarded[1:] {
+			if digit != '0' {
+				roundUp = true
+				break
+			}
+		}
+		roundUp = roundUp || lastRetained%2 != 0
+	}
+
+	retained := append([]byte(nil), digits[:retainedLen]...)
+	if roundUp {
+		carry := true
+		for i := len(retained) - 1; i >= 0; i-- {
+			if retained[i] == '9' {
+				retained[i] = '0'
+			} else {
+				retained[i]++
+				carry = false
+				break
+			}
+		}
+		if carry {
+			retained = append([]byte{'1'}, retained...)
+		}
+	}
+	if len(retained) == 0 || strings.Trim(string(retained), "0") == "" {
+		return math.Copysign(0, f), nil
+	}
+
+	sign := ""
+	if math.Signbit(f) {
+		sign = "-"
+	}
+	rounded, err := strconv.ParseFloat(sign+string(retained)+"e"+strconv.Itoa(decimalPlace), 64)
+	if err != nil || math.IsInf(rounded, 0) {
+		return 0, mjerrors.NewError(mjerrors.ErrInvalidOperation, "rounded value is too large to represent")
+	}
+	return rounded, nil
+}
+
 // FilterRound rounds a number to a given precision.
 //
 // The first parameter specifies the precision (default is 0).
@@ -2294,11 +2360,10 @@ func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string
 			f, _ = strconv.ParseFloat(formatted, 64)
 		}
 	} else {
-		factor := math.Pow(10, math.Abs(float64(precision)))
-		if math.IsInf(factor, 1) {
-			f = math.Copysign(0, f)
-		} else {
-			f = math.RoundToEven(f/factor) * factor
+		var err error
+		f, err = roundWithNegativePrecision(f, precision)
+		if err != nil {
+			return value.Undefined(), err
 		}
 	}
 

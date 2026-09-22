@@ -421,7 +421,11 @@ mod builtins {
         };
         let mut has_cased = false;
         for ch in name.chars() {
-            if ch.is_uppercase() {
+            if ch.is_uppercase()
+                || (!ch.is_lowercase()
+                    && (ch.to_lowercase().any(|mapped| mapped != ch)
+                        || ch.to_uppercase().any(|mapped| mapped != ch)))
+            {
                 return false;
             }
             has_cased |= ch.is_lowercase();
@@ -442,7 +446,11 @@ mod builtins {
         };
         let mut has_cased = false;
         for ch in name.chars() {
-            if ch.is_lowercase() {
+            if ch.is_lowercase()
+                || (!ch.is_uppercase()
+                    && (ch.to_lowercase().any(|mapped| mapped != ch)
+                        || ch.to_uppercase().any(|mapped| mapped != ch)))
+            {
                 return false;
             }
             has_cased |= ch.is_uppercase();
