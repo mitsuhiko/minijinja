@@ -18,3 +18,18 @@ fn test_repeated_sequence_size_limit() {
         .unwrap_err();
     assert!(err.to_string().contains("repeated sequence is too large"));
 }
+
+#[test]
+fn test_round_uses_bankers_rounding() {
+    let env = Environment::new();
+    assert_eq!(
+        env.render_str("{{ 2.5|round }}|{{ 2.675|round(2) }}|{{ -2.5|round }}", ())
+            .unwrap(),
+        "2.0|2.67|-2.0"
+    );
+    assert_eq!(
+        env.render_str("{{ 250.0|round(-2) }}|{{ 350.0|round(-2) }}", ())
+            .unwrap(),
+        "200.0|400.0"
+    );
+}

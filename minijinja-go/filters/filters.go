@@ -2286,8 +2286,21 @@ func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string
 		}
 	}
 
-	multiplier := math.Pow(10, float64(precision))
-	f = math.Round(f*multiplier) / multiplier
+	if precision >= 0 {
+		// Decimal formatting uses round-half-even without the intermediate
+		// scaling error that would make round(2.675, 2) produce 2.68.
+		if precision <= 1074 {
+			formatted := strconv.FormatFloat(f, 'f', precision, 64)
+			f, _ = strconv.ParseFloat(formatted, 64)
+		}
+	} else {
+		factor := math.Pow(10, math.Abs(float64(precision)))
+		if math.IsInf(factor, 1) {
+			f = math.Copysign(0, f)
+		} else {
+			f = math.RoundToEven(f/factor) * factor
+		}
+	}
 
 	return value.FromFloat(f), nil
 }

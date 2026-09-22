@@ -790,8 +790,39 @@ mod builtins {
                 Ok(value)
             }
             ValueRepr::F64(val) => {
-                let x = 10f64.powi(precision.unwrap_or(0));
-                Ok(Value::from((x * val).round() / x))
+                let precision = precision.unwrap_or(0);
+                let rounded = if precision >= 0 {
+                    // Formatting uses round-half-even and, unlike scaling the
+                    // value first, preserves the same decimal behavior as Python.
+                    if precision > 1074 {
+                        val
+                    } else {
+                        format!("{val:.precision$}", precision = precision as usize)
+                            .parse::<f64>()
+                            .unwrap()
+                    }
+                } else if precision == i32::MIN {
+                    0.0f64.copysign(val)
+                } else {
+                    let factor = 10f64.powi(-precision);
+                    if factor.is_infinite() {
+                        0.0f64.copysign(val)
+                    } else {
+                        let scaled = val / factor;
+                        let truncated = scaled.trunc();
+                        let rounded = if scaled.fract().abs() == 0.5 {
+                            if truncated % 2.0 == 0.0 {
+                                truncated
+                            } else {
+                                truncated + scaled.signum()
+                            }
+                        } else {
+                            scaled.round()
+                        };
+                        rounded * factor
+                    }
+                };
+                Ok(Value::from(rounded))
             }
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,
