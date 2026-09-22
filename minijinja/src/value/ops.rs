@@ -4,6 +4,7 @@ use crate::value::{DynObject, ObjectRepr, Tuple, Value, ValueKind, ValueRepr};
 
 const MIN_I128_AS_POS_U128: u128 = 170141183460469231731687303715884105728;
 const MAX_REPEATED_STRING_LEN: usize = 100_000_000;
+const MAX_REPEATED_SEQUENCE_LEN: usize = 100_000_000;
 
 /// Iterator wrapper that provides exact size hints for iterators with known length.
 pub(crate) struct LenIterWrap<I: Send + Sync>(pub(crate) usize, pub(crate) I);
@@ -453,11 +454,24 @@ fn repeat_iterable(n: &Value, seq: &DynObject) -> Result<Value, Error> {
         )
     }));
 
+    if len == 0 || n == 0 {
+        return Ok(if seq.downcast_ref::<Tuple>().is_some() {
+            Value::from(Tuple::default())
+        } else {
+            Value::from(Vec::<Value>::new())
+        });
+    }
+
+    let repeated_len = ok!(len
+        .checked_mul(n)
+        .filter(|&len| len <= MAX_REPEATED_SEQUENCE_LEN)
+        .ok_or_else(|| Error::new(
+            ErrorKind::InvalidOperation,
+            "repeated sequence is too large"
+        )));
+
     if let Some(tuple) = seq.downcast_ref::<Tuple>() {
-        let capacity = ok!(len.checked_mul(n).ok_or_else(|| {
-            Error::new(ErrorKind::InvalidOperation, "repeated tuple is too large")
-        }));
-        let mut values = Vec::with_capacity(capacity);
+        let mut values = Vec::with_capacity(repeated_len);
         for _ in 0..n {
             values.extend(tuple.iter().cloned());
         }
@@ -471,7 +485,7 @@ fn repeat_iterable(n: &Value, seq: &DynObject) -> Result<Value, Error> {
     // improve on this here.
     Ok(Value::make_object_iterable(seq.clone(), move |seq| {
         Box::new(LenIterWrap(
-            len * n,
+            repeated_len,
             (0..n).flat_map(move |_| {
                 seq.try_iter().unwrap_or_else(|| {
                     Box::new(

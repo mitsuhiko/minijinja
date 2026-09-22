@@ -392,6 +392,17 @@ func TestLogicalOperators(t *testing.T) {
 	}
 }
 
+func TestRepeatedSequenceSizeLimit(t *testing.T) {
+	tmpl, err := NewEnvironment().TemplateFromString("{{ [0] * 2**30 }}")
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	_, err = tmpl.Render(nil)
+	if err == nil || !strings.Contains(err.Error(), "repeated sequence is too large") {
+		t.Fatalf("unexpected render error: %v", err)
+	}
+}
+
 func TestStringConcat(t *testing.T) {
 	env := NewEnvironment()
 	tmpl, err := env.TemplateFromString("{{ 'hello' ~ ' ' ~ 'world' }}")

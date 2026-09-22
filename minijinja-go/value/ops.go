@@ -9,7 +9,10 @@ import (
 
 var minI128AsU128 = new(big.Int).Lsh(big.NewInt(1), 127)
 
-const maxRepeatedStringLen = 100_000_000
+const (
+	maxRepeatedStringLen   = 100_000_000
+	maxRepeatedSequenceLen = 100_000_000
+)
 
 // Neg performs unary negation.
 func (v Value) Neg() (Value, error) {
@@ -159,8 +162,18 @@ func repeatIterable(seq Value, n int64) (Value, error) {
 	if n < 0 {
 		return Undefined(), fmt.Errorf("sequences and iterables can only be multiplied with integers")
 	}
-	if _, ok := seq.Len(); !ok {
+	length, ok := seq.Len()
+	if !ok {
 		return Undefined(), fmt.Errorf("cannot repeat unsized iterables")
+	}
+	if length == 0 || n == 0 {
+		if seq.IsTuple() {
+			return FromTuple(nil), nil
+		}
+		return FromSlice(nil), nil
+	}
+	if n > int64(maxRepeatedSequenceLen/length) {
+		return Undefined(), fmt.Errorf("repeated sequence is too large")
 	}
 
 	items := seq.Iter()
@@ -168,7 +181,7 @@ func repeatIterable(seq Value, n int64) (Value, error) {
 		return Undefined(), fmt.Errorf("cannot repeat unsized iterables")
 	}
 
-	result := make([]Value, 0, len(items)*int(n))
+	result := make([]Value, 0, length*int(n))
 	for i := int64(0); i < n; i++ {
 		result = append(result, items...)
 	}
