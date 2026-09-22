@@ -182,6 +182,12 @@ pub fn to_minijinja_value(value: &Bound<'_, PyAny>) -> Value {
         Value::from(val)
     } else if let Ok(val) = value.extract::<i64>() {
         Value::from(val)
+    } else if let Ok(val) = value.extract::<u64>() {
+        Value::from(val)
+    } else if let Ok(val) = value.extract::<i128>() {
+        Value::from(val)
+    } else if let Ok(val) = value.extract::<u128>() {
+        Value::from(val)
     } else if let Ok(val) = value.extract::<f64>() {
         Value::from(val)
     } else if let Ok(tuple) = value.cast::<PyTuple>() {
@@ -270,6 +276,10 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
             if let Ok(rv) = TryInto::<i64>::try_into(value.clone()) {
                 Ok(rv.into_py_any(py)?)
             } else if let Ok(rv) = TryInto::<u64>::try_into(value.clone()) {
+                Ok(rv.into_py_any(py)?)
+            } else if let Ok(rv) = TryInto::<i128>::try_into(value.clone()) {
+                Ok(rv.into_py_any(py)?)
+            } else if let Ok(rv) = TryInto::<u128>::try_into(value.clone()) {
                 Ok(rv.into_py_any(py)?)
             } else if let Ok(rv) = TryInto::<f64>::try_into(value) {
                 Ok(rv.into_py_any(py)?)

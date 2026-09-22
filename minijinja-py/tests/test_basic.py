@@ -158,6 +158,41 @@ def test_basic_types():
     assert rv == {"a": 42, "b": 42.5, "c": "blah"}
 
 
+def test_large_python_ints_are_not_rounded():
+    # Regression for https://github.com/mitsuhiko/minijinja/issues/811
+    # Python ints that fit in MiniJinja's native integer range must not be
+    # converted via f64.
+    cases = [
+        42,
+        -1,
+        2**63 - 1,
+        -(2**63),
+        2**63,
+        2**64 - 1,
+        2**64,
+        2**127 - 1,
+        -(2**127),
+        2**128 - 1,
+    ]
+    for value in cases:
+        assert render_str("{{ x }}", x=value) == str(value)
+        assert eval_expr("x", x=value) == value
+
+    # Integers outside the native range continue to use the f64 fallback so
+    # that they retain numeric behavior even though they cannot be exact.
+    too_large = 2**200 + 1
+    for value in (too_large, -too_large):
+        assert eval_expr("x", x=value) == float(value)
+        assert eval_expr("x is number", x=value) is True
+        assert eval_expr("x + 1", x=value) == float(value) + 1
+    assert eval_expr("x > 0", x=-too_large) is False
+    assert eval_expr("x < 0", x=-too_large) is True
+    assert eval_expr("x|abs", x=-too_large) == float(too_large)
+
+    assert render_str("{{ x }}", x=1.5) == "1.5"
+    assert render_str("{{ true }}") == render_str("{{ x }}", x=True)
+
+
 def test_loader():
     called = []
 
