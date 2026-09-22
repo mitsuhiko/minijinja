@@ -389,6 +389,15 @@ fn test_format_escaping() {
 }
 
 #[test]
+fn test_format_large_precision() {
+    let env = Environment::new();
+    let rv = eval_expr(&env, "'%.65536f' | format(1.0)");
+    assert_eq!(rv.len(), 65_538);
+    assert!(rv.starts_with("1.000"));
+    assert!(rv.ends_with("00000"));
+}
+
+#[test]
 fn test_format_error() {
     assert!(
         eval_err_expr("'missing type: %04' | format('arg')").contains("missing conversion type")

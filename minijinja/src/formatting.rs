@@ -11,6 +11,9 @@ use std::num::FpCategory;
 use crate::value::ValueKind;
 use crate::{Error, ErrorKind, Value};
 
+// Rust's formatting machinery panics for dynamic precisions above u16::MAX.
+const MAX_NATIVE_FORMAT_PRECISION: usize = u16::MAX as usize;
+
 /// Controls the style of the format string.
 ///
 /// Like jinja2, minijinja supports two styles of string formatting:
@@ -289,15 +292,26 @@ impl FormatSpec {
     // and callers format it further. Also, the integer exponent is used to decide
     // `f` vs. `e` formats when the general format (`g`) is used.
     fn mantissa_and_exp<T: LowerExp>(val: T, precision: usize) -> (String, i32) {
-        format!("{val:.precision$e}")
+        let native_precision = precision.min(MAX_NATIVE_FORMAT_PRECISION);
+        let formatted = format!("{val:.native_precision$e}");
+        let (mantissa, exponent) = formatted
             .rsplit_once('e')
-            .map(|(m, e)| {
-                (
-                    m.to_owned(),
-                    e.parse::<i32>().expect("exponent must be an integer"),
-                )
-            })
-            .expect("scientific number must of XXeYY form")
+            .expect("scientific number must of XXeYY form");
+        let mut mantissa = mantissa.to_owned();
+        mantissa.extend(std::iter::repeat('0').take(precision.saturating_sub(native_precision)));
+        (
+            mantissa,
+            exponent
+                .parse::<i32>()
+                .expect("exponent must be an integer"),
+        )
+    }
+
+    fn format_fixed<T: Display>(val: T, precision: usize) -> String {
+        let native_precision = precision.min(MAX_NATIVE_FORMAT_PRECISION);
+        let mut rv = format!("{val:.native_precision$}");
+        rv.extend(std::iter::repeat('0').take(precision.saturating_sub(native_precision)));
+        rv
     }
 
     // If precision is zero, the decimal point is omitted unless `#` option is used
@@ -334,7 +348,7 @@ impl FormatSpec {
         let (manti, exp) = Self::mantissa_and_exp(val, precision - 1);
         if exp >= -4 && exp < precision as i32 {
             let decimal_places = (precision as i32 - 1 - exp) as usize;
-            let num = format!("{val:.decimal_places$}");
+            let num = Self::format_fixed(val, decimal_places);
             self.group_decimal_num(self.remove_insignificants(&num).to_owned())
         } else {
             let manti = self.group_decimal_num(self.remove_insignificants(&manti).to_owned());
@@ -574,7 +588,7 @@ impl FormatSpec {
                     Ok(self.format_number("inf", sign))
                 } else {
                     let prec = self.precision.unwrap_or(6);
-                    let num = format!("{:.prec$}", val.abs());
+                    let num = Self::format_fixed(val.abs(), prec);
                     let num = self.group_decimal_num(self.fix_decimal_point(num));
                     Ok(self.format_number(&num, sign))
                 }
@@ -587,7 +601,7 @@ impl FormatSpec {
                     Ok(self.format_number("INF", sign))
                 } else {
                     let prec = self.precision.unwrap_or(6);
-                    let num = format!("{:.prec$}", val.abs());
+                    let num = Self::format_fixed(val.abs(), prec);
                     let num = self.group_decimal_num(self.fix_decimal_point(num));
                     Ok(self.format_number(&num, sign))
                 }

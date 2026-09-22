@@ -44,6 +44,20 @@ func TestFormatFilter(t *testing.T) {
 	}
 }
 
+func TestFormatFilterLargePrecision(t *testing.T) {
+	tmpl, err := NewEnvironment().TemplateFromString(`{{ "%.65536f"|format(1.0) }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if len(result) != 65538 || !strings.HasPrefix(result, "1.000") || !strings.HasSuffix(result, "00000") {
+		t.Fatalf("unexpected formatted result of length %d", len(result))
+	}
+}
+
 func TestOperatorAliases(t *testing.T) {
 	env := NewEnvironment()
 	tmpl, err := env.TemplateFromString(`{{ [1,2,3]|select("==", 2)|join(",") }}|{{ [1,2,3]|select("!=", 2)|join(",") }}|{{ [1,2,3]|select("lessthan", 3)|join(",") }}|{{ [1,2,3]|select("greaterthan", 1)|join(",") }}`)
