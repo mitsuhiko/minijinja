@@ -4,6 +4,18 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+## 3.0.0-alpha.2
+
+* Fixed large Python integers within MiniJinja's native integer range being silently rounded through `f64` conversion.  #944
+* Fixed constant-folded `and` and `or` expressions returning booleans instead of preserving their operands.  #945
+* Added support for format precisions beyond Rust's formatter limit.  #946
+* Limited repeated sequence sizes to prevent excessive allocations.  #947
+* Changed the `round` filter to use round-half-even semantics and fixed decimal rounding edge cases in Rust and Go.  #948
+* Changed division by zero to produce an error in Rust and Go.  #949
+* Changed built-ins to treat booleans as numbers for Jinja2 compatibility in Rust and Go.  #950
+* Changed the `sequence` test to classify undefined values as sequences in Rust and Go.  #951
+* Fixed the `upper` and `lower` tests to reject non-strings and handle titlecase characters correctly in Rust and Go.  #952
+
 ## 3.0.0-alpha.1
 
 * Switched `minijinja-contrib` date and time filters from `time`/`time-tz` to Jiff. Custom formats now use `strftime`-style syntax instead of `time` format descriptions.  #694
