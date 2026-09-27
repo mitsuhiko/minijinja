@@ -164,8 +164,7 @@ sponsor](https://github.com/sponsors/mitsuhiko).
 ## AI Use Disclaimer
 
 This codebase mostly predates LLM based code generation but some recent features
-have been built with support of AI.  For the AI contribution rules see
-[AI Disclosure Rules](CONTRIBUTING.md#ai-disclosure).
+have been built with support of AI.
 
 ## License and Links
 
