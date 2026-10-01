@@ -83,6 +83,7 @@ pub enum Stmt<'a> {
     #[cfg(feature = "loop_controls")]
     Break(Spanned<Break>),
     Do(Spanned<Do<'a>>),
+    MatchBlock(Spanned<MatchBlock<'a>>),
 }
 
 #[cfg(feature = "internal_debug")]
@@ -118,6 +119,7 @@ impl fmt::Debug for Stmt<'_> {
             #[cfg(feature = "loop_controls")]
             Stmt::Break(s) => fmt::Debug::fmt(s, f),
             Stmt::Do(s) => fmt::Debug::fmt(s, f),
+            Stmt::MatchBlock(s) => fmt::Debug::fmt(s, f),
         }
     }
 }
@@ -421,6 +423,24 @@ pub struct Break;
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct Do<'a> {
     pub call: Spanned<Call<'a>>,
+}
+
+/// A match block with case arms.
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
+pub struct MatchBlock<'a> {
+    pub expr: Expr<'a>,
+    pub arms: Vec<MatchArm<'a>>,
+    pub default_body: Vec<Stmt<'a>>,
+}
+
+/// A single case arm in a match block.
+#[cfg_attr(feature = "internal_debug", derive(Debug))]
+#[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
+pub struct MatchArm<'a> {
+    pub patterns: Vec<Expr<'a>>,
+    pub guard: Option<Expr<'a>>,
+    pub body: Vec<Stmt<'a>>,
 }
 
 /// A "from" import

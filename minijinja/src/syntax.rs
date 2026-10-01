@@ -21,6 +21,7 @@
 //! - [Tags](#tags)
 //!   - [`{% for %}`](#-for-)
 //!   - [`{% if %}`](#-if-)
+//!   - [`{% match %}`](#-match-)
 //!   - [`{% extends %}`](#-extends-)
 //!   - [`{% block %}`](#-block-)
 //!   - [`{% include %}`](#-include-)
@@ -333,6 +334,41 @@
 //!   Kenny looks okay --- so far
 //! {% endif %}
 //! ```
+//!
+//! ## `{% match %}`
+//!
+//! The `match` statement compares one value against a series of `case` arms and
+//! renders the body of the first arm that matches.  The expression after `match`
+//! is evaluated once and each pattern is compared to it for equality.  An
+//! optional `default` arm renders when no `case` matched:
+//!
+//! ```jinja
+//! {% match user.role %}
+//!   {% case "admin" %}
+//!     Welcome back, administrator.
+//!   {% case "editor", "author" %}
+//!     You can edit posts.
+//!   {% default %}
+//!     You have read-only access.
+//! {% endmatch %}
+//! ```
+//!
+//! Patterns can be arbitrary expressions, so they may be variables or computed
+//! values.  A `case` can also carry a guard with `if`.  The guard is only
+//! evaluated if the pattern matched and the arm is only taken when the guard is
+//! truthy:
+//!
+//! ```jinja
+//! {% match status %}
+//!   {% case "active" if count > 0 %}
+//!     {{ count }} active items
+//!   {% case "active" %}
+//!     No active items
+//! {% endmatch %}
+//! ```
+//!
+//! If no arm matches and there is no `default`, nothing is rendered.  Only
+//! whitespace is allowed between the `match` tag and the first `case`.
 //!
 //! ## `{% extends %}`
 //!
