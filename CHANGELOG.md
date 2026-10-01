@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Added the `{% match %}` statement with `case` arms, comma separated patterns, `if` guards and an optional `default` arm.
+
 ## 3.0.0-alpha.2
 
 * Fixed large Python integers within MiniJinja's native integer range being silently rounded through `f64` conversion.  #944

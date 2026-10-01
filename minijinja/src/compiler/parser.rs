@@ -893,6 +893,7 @@ impl<'a> Parser<'a> {
                 ast::Stmt::Break(respan!(ast::Break))
             }
             "do" => ast::Stmt::Do(respan!(ok!(self.parse_do()))),
+            "match" => ast::Stmt::MatchBlock(respan!(ok!(self.parse_match_block()))),
             name => syntax_error!("unknown statement {}", name),
         })
     }
@@ -1361,6 +1362,66 @@ impl<'a> Parser<'a> {
             ),
         };
         Ok(ast::Do { call })
+    }
+
+    fn parse_match_block(&mut self) -> Result<ast::MatchBlock<'a>, Error> {
+        fn is_match_delimiter(tok: &Token) -> bool {
+            matches!(tok, Token::Ident("case" | "default" | "endmatch"))
+        }
+
+        let expr = ok!(self.parse_expr());
+        expect_token!(self, Token::BlockEnd, "end of block");
+
+        let leading = ok!(self.subparse(&is_match_delimiter));
+        for stmt in &leading {
+            match stmt {
+                ast::Stmt::EmitRaw(raw) if raw.raw.trim().is_empty() => {}
+                _ => syntax_error!("expected 'case', 'default', or 'endmatch'"),
+            }
+        }
+
+        let mut arms = Vec::new();
+        let mut default_body = Vec::new();
+        loop {
+            match ok!(self.stream.current()) {
+                Some((Token::Ident("case"), _)) => {
+                    ok!(self.stream.next());
+                    let mut patterns = vec![ok!(self.parse_expr_noif())];
+                    while skip_token!(self, Token::Comma) {
+                        patterns.push(ok!(self.parse_expr_noif()));
+                    }
+                    let guard = if skip_token!(self, Token::Ident("if")) {
+                        Some(ok!(self.parse_expr()))
+                    } else {
+                        None
+                    };
+                    expect_token!(self, Token::BlockEnd, "end of block");
+                    let body = ok!(self.subparse(&is_match_delimiter));
+                    arms.push(ast::MatchArm {
+                        patterns,
+                        guard,
+                        body,
+                    });
+                }
+                Some((Token::Ident("default"), _)) => {
+                    ok!(self.stream.next());
+                    expect_token!(self, Token::BlockEnd, "end of block");
+                    default_body =
+                        ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endmatch"))));
+                }
+                Some((Token::Ident("endmatch"), _)) => {
+                    ok!(self.stream.next());
+                    break;
+                }
+                _ => syntax_error!("expected 'case', 'default', or 'endmatch'"),
+            }
+        }
+
+        Ok(ast::MatchBlock {
+            expr,
+            arms,
+            default_body,
+        })
     }
 
     fn subparse(

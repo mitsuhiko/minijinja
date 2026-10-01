@@ -465,6 +465,9 @@ impl<'source> CodeGenerator<'source> {
             ast::Stmt::Do(do_tag) => {
                 self.compile_do(do_tag);
             }
+            ast::Stmt::MatchBlock(match_block) => {
+                self.compile_match_block(match_block);
+            }
         }
     }
 
@@ -545,6 +548,58 @@ impl<'source> CodeGenerator<'source> {
 
     fn compile_do(&mut self, do_tag: &ast::Spanned<ast::Do<'source>>) {
         self.compile_call(&do_tag.call, None);
+    }
+
+    fn compile_match_block(&mut self, match_block: &ast::Spanned<ast::MatchBlock<'source>>) {
+        self.set_line_from_span(match_block.span());
+        self.compile_expr(&match_block.expr);
+        self.add(Instruction::StoreLocal("__match"));
+
+        // The arms are compiled as an if / else chain: the first arm opens an
+        // `if`, every following arm nests in the `else` of the previous one and
+        // the default body sits in the innermost `else`.
+        let num_arms = match_block.arms.len();
+        for (idx, arm) in match_block.arms.iter().enumerate() {
+            self.compile_match_arm_condition(arm);
+            self.start_if();
+            for node in &arm.body {
+                self.compile_stmt(node);
+            }
+            if idx + 1 < num_arms || !match_block.default_body.is_empty() {
+                self.start_else();
+            }
+        }
+        for node in &match_block.default_body {
+            self.compile_stmt(node);
+        }
+        for _ in 0..num_arms {
+            self.end_if();
+        }
+    }
+
+    fn compile_match_arm_condition(&mut self, arm: &ast::MatchArm<'source>) {
+        if arm.guard.is_some() {
+            self.start_sc_bool();
+        }
+        if arm.patterns.len() > 1 {
+            self.start_sc_bool();
+        }
+        for (idx, pattern) in arm.patterns.iter().enumerate() {
+            if idx > 0 {
+                self.sc_bool(false);
+            }
+            self.add(Instruction::Lookup("__match"));
+            self.compile_expr(pattern);
+            self.add(Instruction::Eq);
+        }
+        if arm.patterns.len() > 1 {
+            self.end_sc_bool();
+        }
+        if let Some(guard) = &arm.guard {
+            self.sc_bool(true);
+            self.compile_expr(guard);
+            self.end_sc_bool();
+        }
     }
 
     fn compile_if_stmt(&mut self, if_cond: &ast::Spanned<ast::IfCond<'source>>) {

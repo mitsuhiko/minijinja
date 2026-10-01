@@ -311,5 +311,18 @@ fn track_walk<'a>(node: &ast::Stmt<'a>, state: &mut AssignmentTracker<'a>) {
                 .iter()
                 .for_each(|x| tracker_visit_callarg(x, state));
         }
+        ast::Stmt::MatchBlock(stmt) => {
+            tracker_visit_expr(&stmt.expr, state);
+            for arm in &stmt.arms {
+                for pattern in &arm.patterns {
+                    tracker_visit_expr(pattern, state);
+                }
+                if let Some(guard) = &arm.guard {
+                    tracker_visit_expr(guard, state);
+                }
+                arm.body.iter().for_each(|x| track_walk(x, state));
+            }
+            stmt.default_body.iter().for_each(|x| track_walk(x, state));
+        }
     }
 }
