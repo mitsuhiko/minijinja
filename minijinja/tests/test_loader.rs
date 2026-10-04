@@ -198,6 +198,7 @@ fn test_clone_keeps_loaded_templates() {
 }
 
 #[test]
+#[cfg(not(target_os = "wasi"))]
 fn test_path_loader_reload() {
     let dir = std::env::temp_dir().join(format!(
         "minijinja-path-loader-reload-{}",
