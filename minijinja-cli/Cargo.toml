@@ -18,9 +18,9 @@ querystring = []
 cbor = ["dep:deser-cbor"]
 datetime = ["minijinja-contrib/datetime", "minijinja-contrib/timezone"]
 json5 = ["dep:deser-json5"]
-repl = ["rustyline"]
+repl = ["dep:miniline"]
 completions = ["argument-completions"]
-unicode = ["minijinja/unicode"]
+unicode = ["minijinja/unicode", "miniline?/unicode"]
 ini = ["dep:deser-ini"]
 contrib = ["minijinja-contrib", "minijinja-contrib/html_entities"]
 toml = ["dep:deser-toml"]
@@ -39,7 +39,7 @@ minijinja = { version = "=3.0.0-alpha.3", path = "../minijinja", features = [
     "loop_controls"
 ] }
 minijinja-contrib = { version = "=3.0.0-alpha.3", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand", "unicode_wordwrap", "wordcount"] }
-rustyline = { version = "14.0.0", optional = true, default-features = false }
+miniline = { version = "0.1.0", optional = true }
 deser = { version = "0.10.0", features = ["derive"] }
 deser-cbor = { version = "0.10.0", optional = true }
 deser-ini = { version = "0.10.0", optional = true }

@@ -3,8 +3,8 @@ use std::fmt;
 
 use anyhow::{anyhow, Error};
 use minijinja::{context, Environment, Value};
-use rustyline::error::ReadlineError;
-use rustyline::DefaultEditor;
+use miniline::error::ReadlineError;
+use miniline::DefaultEditor;
 
 use crate::cli::print_error;
 
