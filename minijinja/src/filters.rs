@@ -188,8 +188,8 @@ mod builtins {
     use crate::value::merge_object::{MergeDict, MergeSeq};
     use crate::value::ops::{self, as_f64, LenIterWrap};
     use crate::value::{
-        Enumerator, Kwargs, Object, ObjectRepr, Rest, StringInput, Tuple, ValueKind, ValueOrKwargs,
-        ValueRepr,
+        checked, Enumerator, Kwargs, MaybeInvalid, Object, ObjectRepr, Rest, StringInput, Tuple,
+        ValueKind, ValueOrKwargs, ValueRepr,
     };
     use std::borrow::Cow;
     use std::cmp::Ordering;
@@ -358,11 +358,15 @@ mod builtins {
         let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
         let reverse = ok!(kwargs.get::<Option<bool>>("reverse")).unwrap_or(false);
         let mut rv: Vec<_> = if let Some(iter) = v.as_object().and_then(|v| v.try_iter_pairs()) {
-            iter.collect()
+            ok!(checked(iter).try_collect_vec())
         } else {
-            ok!(v.try_iter())
-                .map(|key| (key.clone(), v.get_item(&key).unwrap_or(Value::UNDEFINED)))
-                .collect()
+            let mut rv = Vec::new();
+            for key in ok!(v.try_iter()).checked() {
+                let key = ok!(key);
+                let value = v.get_item(&key).unwrap_or(Value::UNDEFINED);
+                rv.push((key, value));
+            }
+            rv
         };
         safe_sort(&mut rv, |a, b| {
             let (a, b) = if by_value { (&a.1, &b.1) } else { (&a.0, &b.0) };
@@ -394,7 +398,10 @@ mod builtins {
         if v.kind() == ValueKind::Map {
             Ok(Value::make_object_iterable(v.clone(), |v| {
                 match v.as_object().and_then(|v| v.try_iter_pairs()) {
-                    Some(iter) => Box::new(iter.map(Value::from)),
+                    // invalid keys are passed through rather than wrapped in a pair
+                    Some(iter) => Box::new(
+                        checked(iter).map(|pair| pair.map_or_else(Value::from, Value::from)),
+                    ),
                     None => Box::new(
                         // this really should not happen unless the object changes it's shape
                         // after the initial check
@@ -473,9 +480,10 @@ mod builtins {
         value: &Value,
         joiner: Option<StringInput<'_>>,
     ) -> Result<Value, Error> {
-        fn join_plain(iter: impl Iterator<Item = Value>, joiner: &str) -> String {
+        fn join_plain(iter: impl Iterator<Item = Value>, joiner: &str) -> Result<String, Error> {
             let mut output = String::new();
             for (idx, item) in iter.enumerate() {
+                ok!(item.check());
                 if idx > 0 {
                     output.push_str(joiner);
                 }
@@ -485,7 +493,7 @@ mod builtins {
                     write!(output, "{item}").ok();
                 }
             }
-            output
+            Ok(output)
         }
 
         fn join_safe(
@@ -495,6 +503,7 @@ mod builtins {
         ) -> Result<String, Error> {
             let mut output = String::new();
             for (idx, item) in iter.enumerate() {
+                ok!(item.check());
                 if idx > 0 {
                     output.push_str(joiner);
                 }
@@ -517,7 +526,7 @@ mod builtins {
         }));
 
         if matches!(state.auto_escape(), AutoEscape::None) {
-            return Ok(Value::from(join_plain(iter, joiner_str)));
+            return Ok(Value::from(ok!(join_plain(iter, joiner_str))));
         }
 
         if joiner.as_ref().is_some_and(StringInput::is_safe) {
@@ -528,7 +537,7 @@ mod builtins {
 
         // A plain joiner only becomes safe if at least one item is safe.  This
         // is the one case where the iterable must be inspected before output.
-        let items = iter.collect::<Vec<_>>();
+        let items = ok!(checked(iter).try_collect_vec());
         if items.iter().any(Value::is_safe) {
             let joiner = match joiner.as_ref() {
                 Some(joiner) => ok!(joiner.format(state)),
@@ -540,7 +549,7 @@ mod builtins {
                 &joiner
             ))))
         } else {
-            Ok(Value::from(join_plain(items.into_iter(), joiner_str)))
+            Ok(Value::from(ok!(join_plain(items.into_iter(), joiner_str))))
         }
     }
 
@@ -745,6 +754,7 @@ mod builtins {
         let mut rv = Value::from(0);
         let iter = ok!(state.undefined_behavior().try_iter(values));
         for value in iter {
+            ok!(value.check());
             if value.is_undefined() {
                 ok!(state.undefined_behavior().handle_undefined(false));
                 continue;
@@ -900,8 +910,11 @@ mod builtins {
     pub fn first(value: &Value) -> Result<Value, Error> {
         if let Some(s) = value.as_str() {
             Ok(s.chars().next().map_or(Value::UNDEFINED, Value::from))
-        } else if let Some(mut iter) = value.as_object().and_then(|x| x.try_iter()) {
-            Ok(iter.next().unwrap_or(Value::UNDEFINED))
+        } else if let Some(iter) = value.as_object().and_then(|x| x.try_iter()) {
+            checked(iter)
+                .next()
+                .transpose()
+                .map(|x| x.unwrap_or(Value::UNDEFINED))
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -937,8 +950,8 @@ mod builtins {
             }))
         } else if matches!(value.kind(), ValueKind::Seq | ValueKind::Iterable) {
             let rev = ok!(value.reverse());
-            let mut iter = ok!(rev.try_iter());
-            Ok(iter.next().unwrap_or_default())
+            let mut iter = ok!(rev.try_iter()).checked();
+            iter.next().transpose().map(Option::unwrap_or_default)
         } else {
             Err(Error::new(
                 ErrorKind::InvalidOperation,
@@ -957,7 +970,15 @@ mod builtins {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
-        Ok(iter.min().unwrap_or(Value::UNDEFINED))
+        // like `Iterator::min` this returns the first of equal minimums
+        let mut rv = None::<Value>;
+        for item in iter {
+            ok!(item.check());
+            if rv.as_ref().map_or(true, |rv| item < *rv) {
+                rv = Some(item);
+            }
+        }
+        Ok(rv.unwrap_or(Value::UNDEFINED))
     }
 
     /// Returns the largest item from an iterable.
@@ -970,7 +991,15 @@ mod builtins {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
-        Ok(iter.max().unwrap_or(Value::UNDEFINED))
+        // like `Iterator::max` this returns the last of equal maximums
+        let mut rv = None::<Value>;
+        for item in iter {
+            ok!(item.check());
+            if rv.as_ref().map_or(true, |rv| item >= *rv) {
+                rv = Some(item);
+            }
+        }
+        Ok(rv.unwrap_or(Value::UNDEFINED))
     }
 
     /// Returns the sorted version of the given list.
@@ -994,10 +1023,15 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn sort(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
-        let mut items = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
-            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
-        }))
-        .collect::<Vec<_>>();
+        let mut items =
+            ok!(ok!(state
+                .undefined_behavior()
+                .try_iter_checked(value)
+                .map_err(|err| {
+                    Error::new(ErrorKind::InvalidOperation, "cannot convert value to list")
+                        .with_source(err)
+                }))
+            .try_collect_vec());
 
         let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
         let reverse = ok!(kwargs.get::<Option<bool>>("reverse")).unwrap_or(false);
@@ -1053,10 +1087,14 @@ mod builtins {
     /// an empty list is returned.
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn list(state: &State, value: Value) -> Result<Value, Error> {
-        let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
-            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
-        }));
-        Ok(Value::from(iter.collect::<Vec<_>>()))
+        let iter = ok!(state
+            .undefined_behavior()
+            .try_iter_checked(value)
+            .map_err(|err| {
+                Error::new(ErrorKind::InvalidOperation, "cannot convert value to list")
+                    .with_source(err)
+            }));
+        Ok(Value::from(ok!(iter.try_collect_vec())))
     }
 
     /// Converts a value into a string if it's not one already.
@@ -1115,7 +1153,7 @@ mod builtins {
         if count == 0 {
             return Err(Error::new(ErrorKind::InvalidOperation, "count cannot be 0"));
         }
-        let items = ok!(state.undefined_behavior().try_iter(value)).collect::<Vec<_>>();
+        let items = ok!(ok!(state.undefined_behavior().try_iter_checked(value)).try_collect_vec());
         let len = items.len();
         let items_per_slice = len / count;
         let slices_with_extra = len % count;
@@ -1176,6 +1214,7 @@ mod builtins {
         let mut tmp = Vec::with_capacity(count);
 
         for item in ok!(state.undefined_behavior().try_iter(value)) {
+            ok!(item.check());
             if tmp.len() == count {
                 rv.push(Value::from(mem::replace(
                     &mut tmp,
@@ -1410,7 +1449,8 @@ mod builtins {
 
         if value.kind() == ValueKind::Map {
             let mut rv = String::new();
-            for k in ok!(value.try_iter()) {
+            for k in ok!(value.try_iter()).checked() {
+                let k = ok!(k);
                 let v = ok!(value.get_item(&k));
                 if v.is_none() || v.is_undefined() {
                     continue;
@@ -1457,6 +1497,7 @@ mod builtins {
             None
         };
         for value in ok!(state.undefined_behavior().try_iter(value)) {
+            ok!(value.check());
             let test_value = if let Some(ref attr) = attr {
                 ok!(value.get_path(attr))
             } else {
@@ -1614,6 +1655,7 @@ mod builtins {
                 Value::UNDEFINED
             };
             for value in ok!(state.undefined_behavior().try_iter(value)) {
+                ok!(value.check());
                 let sub_val = match attr.as_str() {
                     Some(path) => value.get_path(path),
                     None => value.get_item(&attr),
@@ -1647,6 +1689,7 @@ mod builtins {
             .get_filter(filter_name)
             .ok_or_else(|| Error::from(ErrorKind::UnknownFilter)));
         for value in ok!(state.undefined_behavior().try_iter(value)) {
+            ok!(value.check());
             let new_args = Some(value.clone())
                 .into_iter()
                 .chain(args.iter().skip(1).cloned())
@@ -1712,7 +1755,7 @@ mod builtins {
             Some(attr) => attr,
             None => ok!(kwargs.get::<&str>("attribute")),
         };
-        let mut items: Vec<Value> = ok!(value.try_iter()).collect();
+        let mut items: Vec<Value> = ok!(checked(ok!(value.try_iter())).try_collect_vec());
         safe_sort(&mut items, |a, b| {
             let a = a.get_path_or_default(attr, &default);
             let b = b.get_path_or_default(attr, &default);
@@ -1820,6 +1863,7 @@ mod builtins {
 
         let iter = ok!(state.undefined_behavior().try_iter(values));
         for item in iter {
+            ok!(item.check());
             let value_to_compare = if let Some(attr) = attr {
                 item.get_path_or_default(attr, &Value::UNDEFINED)
             } else {
@@ -1952,8 +1996,14 @@ mod builtins {
 
                     let mut tuple = Vec::with_capacity(iters.len());
                     for iter in &mut iters {
-                        match iter.next() {
-                            Some(val) => tuple.push(val),
+                        match iter.next().map(Value::validate) {
+                            Some(Ok(val)) => tuple.push(val),
+                            // invalid values are passed through rather than wrapped
+                            // in a tuple, and they end the iteration.
+                            Some(Err(err)) => {
+                                iters.clear();
+                                return Some(Value::from(err));
+                            }
                             None => return None,
                         }
                     }

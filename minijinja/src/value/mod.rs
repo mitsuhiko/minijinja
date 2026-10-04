@@ -183,7 +183,9 @@ let vec = Vec::<i32>::deserialize(value).unwrap();
 //!   iterator in MiniJinja has is to create an invalid value.
 //!
 //! It's generally recommende to ignore the existence of invalid objects and let them
-//! fail naturally as they are encountered.
+//! fail naturally as they are encountered.  The exception is iteration: code that
+//! consumes the items of an iterator should use [`ValueIter::checked`] which fails
+//! on the first invalid value instead of processing it like any other item.
 //!
 //! # Notes on Bytes and Strings
 //!
@@ -1781,9 +1783,15 @@ impl Value {
                     // as if nth() was called.  This lets one slice an array and
                     // then index into it.
                     if let Some(idx) = index(key, || dy.enumerator_len()) {
-                        if let Some(mut iter) = dy.try_iter() {
-                            if let Some(rv) = iter.nth(idx) {
-                                return Some(rv);
+                        if let Some(iter) = dy.try_iter() {
+                            // Unlike `nth` this does not skip over invalid values.  As
+                            // lookups are infallible, the invalid value is handed out.
+                            for (item_idx, item) in checked(iter).enumerate() {
+                                match item {
+                                    Ok(rv) if item_idx == idx => return Some(rv),
+                                    Ok(_) => {}
+                                    Err(err) => return Some(Value::from(err)),
+                                }
                             }
                         }
                     }
@@ -2010,7 +2018,8 @@ impl serde::Serialize for Value {
                     use serde::ser::SerializeSeq;
                     let mut seq = ok!(serializer.serialize_seq(o.enumerator_len()));
                     if let Some(iter) = o.try_iter() {
-                        for item in iter {
+                        for item in checked(iter) {
+                            let item = ok!(item.map_err(serde::ser::Error::custom));
                             ok!(seq.serialize_element(&item));
                         }
                     }
@@ -2021,7 +2030,8 @@ impl serde::Serialize for Value {
                     use serde::ser::SerializeMap;
                     let mut map = ok!(serializer.serialize_map(None));
                     if let Some(iter) = o.try_iter_pairs() {
-                        for (key, value) in iter {
+                        for pair in checked(iter) {
+                            let (key, value) = ok!(pair.map_err(serde::ser::Error::custom));
                             ok!(map.serialize_entry(&key, &value));
                         }
                     }
@@ -2069,6 +2079,128 @@ where
 /// Utility to iterate over values.
 pub struct ValueIter {
     imp: ValueIterImpl,
+}
+
+impl ValueIter {
+    /// Returns an iterator that fails on the first invalid value.
+    ///
+    /// Iterators that fail report this by yielding an
+    /// [invalid value](index.html#invalid-values).  This adapter turns the
+    /// first invalid value into an error and ends the iteration afterwards.
+    /// Code that consumes the items of an iterator should use this to abort
+    /// on errors rather than to process the invalid values.
+    ///
+    /// ```
+    /// # use minijinja::value::Value;
+    /// # fn test() -> Result<(), minijinja::Error> {
+    /// let value = Value::from(vec![1, 2, 3]);
+    /// let mut sum = 0;
+    /// for item in value.try_iter()?.checked() {
+    ///     sum += i64::try_from(item?)?;
+    /// }
+    /// # Ok(()) }
+    /// ```
+    pub fn checked(self) -> impl Iterator<Item = Result<Value, Error>> + Send + Sync {
+        checked(self)
+    }
+}
+
+/// Item of an iterator that might be invalid.
+pub(crate) trait MaybeInvalid {
+    /// Fails if the item is invalid.
+    fn check(&self) -> Result<(), Error>;
+}
+
+impl MaybeInvalid for Value {
+    #[inline(always)]
+    fn check(&self) -> Result<(), Error> {
+        #[cold]
+        fn fail(err: &Error) -> Result<(), Error> {
+            Err(err.internal_clone())
+        }
+        match self.0 {
+            ValueRepr::Invalid(ref err) => fail(err),
+            _ => Ok(()),
+        }
+    }
+}
+
+impl MaybeInvalid for (Value, Value) {
+    /// For pairs only the key is checked.  The value is the result of a
+    /// lookup, and invalid values from lookups are reported when used.
+    #[inline(always)]
+    fn check(&self) -> Result<(), Error> {
+        self.0.check()
+    }
+}
+
+/// Wraps an iterator so that it fails on the first invalid item.
+///
+/// This is the internal version of [`ValueIter::checked`] which also works
+/// with object iterators and key-value pairs.
+pub(crate) fn checked<I>(iter: I) -> CheckedIter<I>
+where
+    I: Iterator,
+    I::Item: MaybeInvalid,
+{
+    CheckedIter { iter, done: false }
+}
+
+pub(crate) struct CheckedIter<I> {
+    iter: I,
+    done: bool,
+}
+
+impl<I> CheckedIter<I>
+where
+    I: Iterator,
+    I::Item: MaybeInvalid,
+{
+    /// Collects all items into a vector, failing on the first invalid one.
+    ///
+    /// Unlike collecting into a `Result` this preallocates the vector.
+    pub(crate) fn try_collect_vec(self) -> Result<Vec<I::Item>, Error> {
+        let mut rv = Vec::with_capacity(self.size_hint().0);
+        if !self.done {
+            for item in self.iter {
+                ok!(item.check());
+                rv.push(item);
+            }
+        }
+        Ok(rv)
+    }
+}
+
+impl<I> Iterator for CheckedIter<I>
+where
+    I: Iterator,
+    I::Item: MaybeInvalid,
+{
+    type Item = Result<I::Item, Error>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        let item = self.iter.next()?;
+        Some(match item.check() {
+            Ok(()) => Ok(item),
+            Err(err) => {
+                self.done = true;
+                Err(err)
+            }
+        })
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.done {
+            (0, Some(0))
+        } else {
+            self.iter.size_hint()
+        }
+    }
 }
 
 impl Iterator for ValueIter {

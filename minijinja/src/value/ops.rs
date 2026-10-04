@@ -1,6 +1,8 @@
 use crate::error::{Error, ErrorKind};
 use crate::value::merge_object::MergeSeq;
-use crate::value::{DynObject, ObjectRepr, Tuple, Value, ValueKind, ValueRepr};
+use crate::value::{
+    checked, DynObject, MaybeInvalid, ObjectRepr, Tuple, Value, ValueKind, ValueRepr,
+};
 
 const MIN_I128_AS_POS_U128: u128 = 170141183460469231731687303715884105728;
 const MAX_REPEATED_STRING_LEN: usize = 100_000_000;
@@ -206,10 +208,10 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         ValueRepr::Undefined(_) | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
         ValueRepr::Object(obj) if matches!(obj.repr(), ObjectRepr::Seq | ObjectRepr::Iterable) => {
             if is_tuple {
-                let values = obj
-                    .try_iter()
-                    .map(|iter| iter.collect::<Vec<_>>())
-                    .unwrap_or_default();
+                let values = match obj.try_iter() {
+                    Some(iter) => ok!(checked(iter).try_collect_vec()),
+                    None => Vec::new(),
+                };
                 let values: Vec<Value> = if step > 0 {
                     let (start, len) = get_offset_and_len(start, stop, || values.len());
                     values
@@ -302,8 +304,12 @@ fn seq_concat_len(lhs: &Value, rhs: &Value) -> Option<usize> {
 
 fn materialize_seq_concat(lhs: &Value, rhs: &Value, len: usize) -> Result<Value, Error> {
     let mut rv = Vec::with_capacity(len);
-    rv.extend(ok!(lhs.try_iter()));
-    rv.extend(ok!(rhs.try_iter()));
+    for item in ok!(lhs.try_iter())
+        .checked()
+        .chain(ok!(rhs.try_iter()).checked())
+    {
+        rv.push(ok!(item));
+    }
     Ok(Value::from(rv))
 }
 
@@ -311,8 +317,12 @@ pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     if lhs.is_tuple() || rhs.is_tuple() {
         if lhs.is_tuple() && rhs.is_tuple() {
             let mut values = Vec::with_capacity(seq_concat_len(lhs, rhs).unwrap_or_default());
-            values.extend(ok!(lhs.try_iter()));
-            values.extend(ok!(rhs.try_iter()));
+            for item in ok!(lhs.try_iter())
+                .checked()
+                .chain(ok!(rhs.try_iter()).checked())
+            {
+                values.push(ok!(item));
+            }
             return Ok(Value::from(Tuple::from(values)));
         }
         return Err(impossible_op("+", lhs, rhs));
@@ -594,7 +604,17 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
             ObjectRepr::Plain => false,
             ObjectRepr::Map => obj.get_value(value).is_some(),
             ObjectRepr::Seq | ObjectRepr::Iterable => {
-                obj.try_iter().into_iter().flatten().any(|v| &v == value)
+                let mut found = false;
+                if let Some(iter) = obj.try_iter() {
+                    for item in iter {
+                        ok!(item.check());
+                        if item == *value {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                found
             }
         }
     } else {

@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use crate::error::{Error, ErrorKind};
 use crate::value::{
-    DynObject, ObjectExt, ObjectRepr, Packed, SmallStr, StringType, Value, ValueKind, ValueMap,
-    ValueRepr,
+    checked, DynObject, ObjectExt, ObjectRepr, Packed, SmallStr, StringType, Value, ValueKind,
+    ValueMap, ValueRepr,
 };
 use crate::vm::State;
 
@@ -1385,7 +1385,7 @@ impl<'a> ArgType<'a> for String {
 
 fn convert_vec<T>(
     value: Option<&Value>,
-    convert: impl FnMut(Value) -> Result<T, Error>,
+    mut convert: impl FnMut(Value) -> Result<T, Error>,
 ) -> Result<Vec<T>, Error> {
     let Some(value) = value else {
         return Ok(Vec::new());
@@ -1394,8 +1394,9 @@ fn convert_vec<T>(
         .as_object()
         .filter(|object| matches!(object.repr(), ObjectRepr::Seq | ObjectRepr::Iterable))
         .and_then(|object| object.try_iter())
-        .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "not iterable"))?
-        .map(convert)
+        .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "not iterable"))
+        .map(checked)?
+        .map(|item| item.and_then(&mut convert))
         .collect()
 }
 

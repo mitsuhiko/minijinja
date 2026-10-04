@@ -5,7 +5,7 @@ use serde::de::{
 };
 use serde::forward_to_deserialize_any;
 
-use crate::value::{ArgType, ObjectRepr, Serde, Value, ValueKind, ValueMap, ValueRepr};
+use crate::value::{checked, ArgType, ObjectRepr, Serde, Value, ValueKind, ValueMap, ValueRepr};
 use crate::{Error, ErrorKind};
 
 #[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
@@ -146,11 +146,19 @@ impl<'de> Deserializer<'de> for Value {
             ValueRepr::Object(o) => match o.repr() {
                 ObjectRepr::Plain => Err(de::Error::custom("cannot deserialize plain objects")),
                 ObjectRepr::Seq | ObjectRepr::Iterable => {
-                    visitor.visit_seq(SeqDeserializer::new(o.try_iter().into_iter().flatten()))
+                    let items: Vec<_> = match o.try_iter() {
+                        Some(iter) => ok!(checked(iter).try_collect_vec()),
+                        None => Vec::new(),
+                    };
+                    visitor.visit_seq(SeqDeserializer::new(items.into_iter()))
                 }
-                ObjectRepr::Map => visitor.visit_map(MapDeserializer::new(
-                    o.try_iter_pairs().into_iter().flatten(),
-                )),
+                ObjectRepr::Map => {
+                    let pairs: Vec<_> = match o.try_iter_pairs() {
+                        Some(iter) => ok!(checked(iter).try_collect_vec()),
+                        None => Vec::new(),
+                    };
+                    visitor.visit_map(MapDeserializer::new(pairs.into_iter()))
+                }
             },
         }
     }
@@ -170,9 +178,9 @@ impl<'de> Deserializer<'de> for Value {
     ) -> Result<V::Value, Error> {
         let (variant, value) = match self.kind() {
             ValueKind::Map => {
-                let mut iter = ok!(self.try_iter());
+                let mut iter = ok!(self.try_iter()).checked();
                 let variant = match iter.next() {
-                    Some(v) => v,
+                    Some(v) => ok!(v),
                     None => {
                         return Err(de::Error::invalid_value(
                             Unexpected::Map,
@@ -266,10 +274,13 @@ impl<'de> VariantAccess<'de> for VariantDeserializer {
 
     fn tuple_variant<V: Visitor<'de>>(self, _len: usize, visitor: V) -> Result<V::Value, Error> {
         match self.value.as_ref().and_then(|x| x.as_object()) {
-            Some(obj) if matches!(obj.repr(), ObjectRepr::Seq) => Deserializer::deserialize_any(
-                SeqDeserializer::new(obj.try_iter().into_iter().flatten()),
-                visitor,
-            ),
+            Some(obj) if matches!(obj.repr(), ObjectRepr::Seq) => {
+                let items: Vec<_> = match obj.try_iter() {
+                    Some(iter) => ok!(checked(iter).try_collect_vec()),
+                    None => Vec::new(),
+                };
+                Deserializer::deserialize_any(SeqDeserializer::new(items.into_iter()), visitor)
+            }
             _ => Err(de::Error::invalid_type(
                 self.value
                     .as_ref()
@@ -287,7 +298,8 @@ impl<'de> VariantAccess<'de> for VariantDeserializer {
         match self.value.as_ref().map(|x| (x.kind(), x)) {
             Some((ValueKind::Map, val)) => Deserializer::deserialize_any(
                 MapDeserializer::new(
-                    ok!(val.try_iter())
+                    ok!(checked(ok!(val.try_iter())).try_collect_vec())
+                        .into_iter()
                         .map(|ref k| (k.clone(), val.get_item(k).unwrap_or_default())),
                 ),
                 visitor,

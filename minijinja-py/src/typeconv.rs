@@ -161,17 +161,35 @@ impl Object for DynamicObject {
             if inner.cast::<PySequence>().is_ok() {
                 Enumerator::Seq(inner.len().unwrap_or(0))
             } else if let Ok(iter) = inner.try_iter() {
-                Enumerator::Values(
-                    iter.filter_map(|x| match x {
-                        Ok(x) => Some(to_minijinja_value(&x)),
-                        Err(_) => None,
-                    })
-                    .collect(),
-                )
+                let mut values = Vec::new();
+                for item in iter {
+                    match item {
+                        Ok(item) => values.push(to_minijinja_value(&item)),
+                        Err(err) => {
+                            // The error is yielded as an invalid value which fails
+                            // the iteration when it's reached.  The length is not
+                            // reported so that the error is not counted as an item.
+                            values.push(Value::from(to_minijinja_error(err)));
+                            return Enumerator::Iter(Box::new(UnknownLength(values.into_iter())));
+                        }
+                    }
+                }
+                Enumerator::Values(values)
             } else {
                 Enumerator::NonEnumerable
             }
         })
+    }
+}
+
+/// Iterator wrapper that does not report a length.
+struct UnknownLength<I>(I);
+
+impl<I: Iterator> Iterator for UnknownLength<I> {
+    type Item = I::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
     }
 }
 
@@ -258,8 +276,9 @@ fn to_python_value_impl(py: Python<'_>, value: Value) -> PyResult<Py<PyAny>> {
             }
             ObjectRepr::Seq | ObjectRepr::Iterable => {
                 let rv = PyList::empty(py);
-                if let Some(iter) = obj.try_iter() {
-                    for value in iter {
+                if let Ok(iter) = value.try_iter() {
+                    for value in iter.checked() {
+                        let value = value.map_err(to_py_error)?;
                         rv.append(to_python_value_impl(py, value)?)?;
                     }
                 }

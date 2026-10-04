@@ -5,6 +5,8 @@ All notable changes to MiniJinja are documented here.
 ## Unreleased
 
 * Fixed deadlocks in the Python bindings when an environment is modified while another thread renders from it, or when it is used from within a callback during a render.  Renders now work on a snapshot of the environment and no longer serialize on a shared lock.  #955
+* Fixed Python iterators that raise during iteration looping forever.  The error is now raised from the render instead.  #956
+* Iteration now consistently fails on invalid values that iterators yield to report errors.  Previously only loops did this while filters such as `list`, `join` or `sort`, the `in` operator and serialization processed them like other items.  The new `ValueIter::checked` helper provides the same behavior for custom code.
 
 ## 3.0.0-alpha.2
 

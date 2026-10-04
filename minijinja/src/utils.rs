@@ -267,6 +267,16 @@ impl UndefinedBehavior {
         self.assert_iterable(&value).and_then(|_| value.try_iter())
     }
 
+    /// Like [`try_iter`](Self::try_iter) but fails on the first invalid value.
+    #[cfg(feature = "builtins")]
+    #[inline]
+    pub(crate) fn try_iter_checked(
+        self,
+        value: Value,
+    ) -> Result<crate::value::CheckedIter<ValueIter>, Error> {
+        self.try_iter(value).map(crate::value::checked)
+    }
+
     /// Are we strict on iteration?
     #[inline]
     pub(crate) fn assert_iterable(self, value: &Value) -> Result<(), Error> {

@@ -637,3 +637,32 @@ def test_attribute_lookups():
     env = Environment()
     with pytest.raises(RuntimeError, match="boom"):
         env.eval_expr("x.foo", x=X())
+
+
+def test_failing_iterator():
+    class Broken:
+        def __init__(self, n):
+            self.n = n
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            if self.n > 0:
+                self.n -= 1
+                return self.n
+            raise ValueError("backend unavailable")
+
+    env = Environment()
+    for template in [
+        "{% for x in items %}{{ x }}{% endfor %}",
+        "{{ items|list }}",
+        "{{ items|join(',') }}",
+        "{{ items|length }}",
+        "{{ items|sort }}",
+        "{{ items|tojson }}",
+        "{{ 5 in items }}",
+    ]:
+        for n in (0, 2):
+            with pytest.raises(ValueError, match="backend unavailable"):
+                env.render_str(template, items=Broken(n))

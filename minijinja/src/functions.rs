@@ -396,7 +396,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::value::{Rest, ValueMap, ValueRepr};
+    use crate::value::{checked, Rest, ValueMap, ValueRepr};
 
     /// Returns a range.
     ///
@@ -489,7 +489,10 @@ mod builtins {
             Some(value) => match value.0 {
                 ValueRepr::Undefined(_) => ValueMap::default(),
                 ValueRepr::Object(obj) if obj.repr() == ObjectRepr::Map => {
-                    obj.try_iter_pairs().into_iter().flatten().collect()
+                    match obj.try_iter_pairs() {
+                        Some(iter) => ok!(checked(iter).try_collect_vec()).into_iter().collect(),
+                        None => ValueMap::default(),
+                    }
                 }
                 _ => return Err(Error::from(ErrorKind::InvalidOperation)),
             },
@@ -550,7 +553,8 @@ mod builtins {
                 .filter(|x| matches!(x.repr(), ObjectRepr::Map))
                 .and_then(|x| x.try_iter_pairs())
             {
-                for (key, value) in pairs {
+                for pair in checked(pairs) {
+                    let (key, value) = ok!(pair);
                     if let Some(key) = key.as_str() {
                         ns.set_value(key, value);
                     }

@@ -12,7 +12,8 @@ use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, write_escaped, AutoEscape, UndefinedBehavior};
 use crate::value::namespace_object::Namespace;
 use crate::value::{
-    ops, value_map_with_capacity, Kwargs, ObjectRepr, UndefinedType, Value, ValueMap, ValueRepr,
+    checked, ops, value_map_with_capacity, Kwargs, MaybeInvalid, ObjectRepr, UndefinedType, Value,
+    ValueMap, ValueRepr,
 };
 use crate::vm::context::{Frame, Stack};
 use crate::vm::loop_object::{Loop, LoopState};
@@ -500,6 +501,7 @@ impl<'env> Executor<'env> {
                     let mut len = 0;
                     for list in lists.into_iter().rev() {
                         for item in ctx_ok!(list.try_iter()) {
+                            ctx_ok!(item.check());
                             stack.push(item);
                             len += 1;
                         }
@@ -884,7 +886,8 @@ impl<'env> Executor<'env> {
                         ),
                     )
                 }));
-            for (key, value) in iter {
+            for pair in checked(iter) {
+                let (key, value) = ok!(pair);
                 rv.insert(key, value);
             }
         }
@@ -907,7 +910,8 @@ impl<'env> Executor<'env> {
             .chain(obj.is_none().then(|| name.clone()));
 
         let mut templates_tried = vec![];
-        for choice in choices {
+        for choice in checked(choices) {
+            let choice = ok!(choice);
             let name = ok!(choice.as_str().ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
@@ -1156,8 +1160,8 @@ impl<'env> Executor<'env> {
             .ok_or_else(|| Error::new(ErrorKind::CannotUnpack, "value is not iterable")));
 
         let mut n = 0;
-        for item in iter {
-            stack.push(item);
+        for item in checked(iter) {
+            stack.push(ok!(item));
             n += 1;
         }
 
