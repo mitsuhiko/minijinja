@@ -154,7 +154,7 @@ pub fn escape(state: &mut State, v: &Value) -> Result<Value, Error> {
             AutoEscape::None => AutoEscape::Html,
             other => other,
         },
-        other => other,
+        other => other.clone(),
     };
     let mut rv = match v.as_str() {
         Some(s) => String::with_capacity(s.len()),
@@ -171,7 +171,7 @@ pub fn escape(state: &mut State, v: &Value) -> Result<Value, Error> {
             state.env().format(v, state, &mut out)
         }));
     } else {
-        ok!(write_escaped(&mut out, auto_escape, v));
+        ok!(write_escaped(&mut out, &auto_escape, v));
     }
     Ok(Value::from_safe_string(rv))
 }

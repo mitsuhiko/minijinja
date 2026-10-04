@@ -119,6 +119,29 @@ defaults.
 For users of the `unstable_machinery` feature, `WhitespaceConfig` was removed
 and `parse` and `tokenize` no longer take a separate whitespace config.
 
+## Custom Auto Escaping
+
+`AutoEscape::Custom` now holds a `Cow<'static, str>` instead of a
+`&'static str`.  This permits custom formats with names determined at runtime
+without leaking strings.  As a result `AutoEscape` no longer implements `Copy`
+and `State::auto_escape` returns `&AutoEscape`:
+
+```rust
+// Old
+env.set_auto_escape_callback(|_| AutoEscape::Custom("latex"));
+match state.auto_escape() {
+    AutoEscape::Custom("latex") => { /* ... */ }
+    _ => { /* ... */ }
+}
+
+// New
+env.set_auto_escape_callback(|_| AutoEscape::Custom("latex".into()));
+match state.auto_escape() {
+    AutoEscape::Custom(name) if name == "latex" => { /* ... */ }
+    _ => { /* ... */ }
+}
+```
+
 ## Go Module Path
 
 MiniJinja-Go now uses the major-version module path

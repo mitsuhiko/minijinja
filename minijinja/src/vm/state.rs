@@ -146,8 +146,8 @@ impl<'template, 'env> State<'template, 'env> {
 
     /// Returns the current value of the auto escape flag.
     #[inline(always)]
-    pub fn auto_escape(&self) -> AutoEscape {
-        self.auto_escape
+    pub fn auto_escape(&self) -> &AutoEscape {
+        &self.auto_escape
     }
 
     #[cfg(any(feature = "macros", feature = "multi_template"))]

@@ -31,13 +31,13 @@ impl StateRef {
 
     /// Returns the current auto escape flag
     #[getter]
-    pub fn get_auto_escape(&self) -> PyResult<Option<&'static str>> {
+    pub fn get_auto_escape(&self) -> PyResult<Option<String>> {
         with_state(|state| {
             Ok(match state.auto_escape() {
                 AutoEscape::None => None,
-                AutoEscape::Html => Some("html"),
-                AutoEscape::Json => Some("json"),
-                AutoEscape::Custom(custom) => Some(custom),
+                AutoEscape::Html => Some("html".into()),
+                AutoEscape::Json => Some("json".into()),
+                AutoEscape::Custom(custom) => Some(custom.to_string()),
                 _ => None,
             })
         })

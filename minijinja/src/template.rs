@@ -287,7 +287,7 @@ impl<'env, 'source> Template<'env, 'source> {
             root,
             &self.compiled.blocks,
             out,
-            self.compiled.initial_auto_escape,
+            self.compiled.initial_auto_escape.clone(),
         )
     }
 
@@ -333,7 +333,7 @@ impl<'env, 'source> Template<'env, 'source> {
     pub fn new_state(&self) -> State<'_, 'env> {
         State::new(
             Context::new(self.env),
-            self.compiled.initial_auto_escape,
+            self.compiled.initial_auto_escape.clone(),
             &self.compiled.instructions,
             #[cfg(feature = "multi_template")]
             prepare_blocks(&self.compiled.blocks),
@@ -371,7 +371,7 @@ impl<'env, 'source> Template<'env, 'source> {
     /// Returns the initial auto escape setting.
     #[cfg(feature = "multi_template")]
     pub(crate) fn initial_auto_escape(&self) -> AutoEscape {
-        self.compiled.initial_auto_escape
+        self.compiled.initial_auto_escape.clone()
     }
 }
 

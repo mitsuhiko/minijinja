@@ -17,9 +17,7 @@ use pyo3::types::{PyDict, PyTuple};
 
 use crate::error_support::{report_unraisable, to_minijinja_error, to_py_error};
 use crate::state::bind_state;
-use crate::typeconv::{
-    get_custom_autoescape, to_minijinja_value, to_python_args, to_python_value, DynamicObject,
-};
+use crate::typeconv::{to_minijinja_value, to_python_args, to_python_value, DynamicObject};
 
 thread_local! {
     static CURRENT_ENV: AtomicPtr<c_void> = const { AtomicPtr::new(std::ptr::null_mut()) };
@@ -403,7 +401,7 @@ impl Environment {
                         match &value as &str {
                             "html" => AutoEscape::Html,
                             "json" => AutoEscape::Json,
-                            other => get_custom_autoescape(other),
+                            other => AutoEscape::Custom(other.to_string().into()),
                         }
                     } else if let Ok(value) = rv.extract::<bool>() {
                         match value {

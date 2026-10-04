@@ -58,7 +58,7 @@ impl<'a> Output<'a> {
     }
 
     /// Ends capturing and returns the captured string as value.
-    pub(crate) fn end_capture(&mut self, auto_escape: AutoEscape) -> Value {
+    pub(crate) fn end_capture(&mut self, auto_escape: &AutoEscape) -> Value {
         let rv = if let Some(captured) = self.capture_stack.pop().unwrap() {
             if !matches!(auto_escape, AutoEscape::None) {
                 Value::from_safe_string(captured)

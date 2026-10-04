@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::char::decode_utf16;
 #[cfg(feature = "builtins")]
 use std::cmp::Ordering;
@@ -138,7 +139,7 @@ fn json_escape_write(out: &mut Output, value: &Value) -> Result<(), Error> {
 #[inline(always)]
 pub fn write_escaped(
     out: &mut Output,
-    auto_escape: AutoEscape,
+    auto_escape: &AutoEscape,
     value: &Value,
 ) -> Result<(), Error> {
     // string strings bypass all of this
@@ -158,7 +159,7 @@ pub fn write_escaped(
 ///
 /// For more information see
 /// [`set_auto_escape_callback`](crate::Environment::set_auto_escape_callback).
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum AutoEscape {
     /// Do not apply auto escaping.
@@ -181,7 +182,16 @@ pub enum AutoEscape {
     /// The default formatter does not know how to deal with a custom escaping
     /// format and would error.  The use of these requires a custom formatter.
     /// See [`set_formatter`](crate::Environment::set_formatter).
-    Custom(&'static str),
+    ///
+    /// The name can either be a static string or a string determined at
+    /// runtime:
+    ///
+    /// ```
+    /// # use minijinja::AutoEscape;
+    /// let latex = AutoEscape::Custom("latex".into());
+    /// let dynamic = AutoEscape::Custom(String::from("markdown").into());
+    /// ```
+    Custom(Cow<'static, str>),
 }
 
 /// Defines the behavior of undefined values in the engine.

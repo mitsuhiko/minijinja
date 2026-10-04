@@ -711,7 +711,7 @@ fn test_tojson_uses_jinja_spacing() {
 #[test]
 fn test_escape_filter_custom_formatter() {
     let mut env = Environment::new();
-    env.set_auto_escape_callback(|_| AutoEscape::Custom("Markdown"));
+    env.set_auto_escape_callback(|_| AutoEscape::Custom("Markdown".into()));
     env.set_formatter(|out, state, value| {
         if value.is_safe() && value.kind() == ValueKind::String {
             return out
@@ -720,7 +720,7 @@ fn test_escape_filter_custom_formatter() {
         }
 
         match state.auto_escape() {
-            AutoEscape::Custom("Markdown") => {
+            AutoEscape::Custom(name) if name == "Markdown" => {
                 let escaped = value.to_string().replace('*', "\\*");
                 write!(out, "{escaped}").map_err(minijinja::Error::from)
             }

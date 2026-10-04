@@ -180,7 +180,7 @@ impl<'env> Executor<'env> {
         }
 
         let old_ctx = mem::replace(&mut state.ctx, ctx);
-        let auto_escape = state.auto_escape;
+        let auto_escape = state.auto_escape.clone();
         let rv = state.with_execution_state(
             instructions,
             auto_escape,
@@ -229,7 +229,7 @@ impl<'env> Executor<'env> {
         mut stack: Stack,
         mut pc: u32,
     ) -> Result<Option<Value>, Error> {
-        let initial_auto_escape = state.auto_escape;
+        let initial_auto_escape = state.auto_escape.clone();
         let undefined_behavior = state.undefined_behavior();
         let strict_undefined = matches!(
             undefined_behavior,
@@ -285,7 +285,7 @@ impl<'env> Executor<'env> {
                         Some(instr) => instr,
                         None => break,
                     };
-                    out.end_capture(AutoEscape::None);
+                    out.end_capture(&AutoEscape::None);
                     pc = 0;
                     // because we swap out the instructions we also need to unload all
                     // the filters and tests to ensure that we are not accidentally
@@ -375,7 +375,7 @@ impl<'env> Executor<'env> {
                         {
                             bail!(Error::from(ErrorKind::UndefinedError));
                         }
-                        ctx_ok!(write_escaped(out, state.auto_escape, &value));
+                        ctx_ok!(write_escaped(out, &state.auto_escape, &value));
                     } else {
                         ctx_ok!(state.env().format(&value, state, out));
                     }
@@ -604,7 +604,7 @@ impl<'env> Executor<'env> {
                     if let Some((target, end_capture)) = l.current_recursion_jump.take() {
                         pc = target;
                         if end_capture {
-                            stack.push(out.end_capture(state.auto_escape));
+                            stack.push(out.end_capture(&state.auto_escape));
                         }
                         continue;
                     }
@@ -667,8 +667,10 @@ impl<'env> Executor<'env> {
                 }
                 Instruction::PushAutoEscape => {
                     a = stack.pop();
-                    auto_escape_stack.push(state.auto_escape);
-                    state.auto_escape = ctx_ok!(Self::derive_auto_escape(a, initial_auto_escape));
+                    let new_auto_escape =
+                        ctx_ok!(Self::derive_auto_escape(a, &initial_auto_escape));
+                    auto_escape_stack
+                        .push(std::mem::replace(&mut state.auto_escape, new_auto_escape));
                 }
                 Instruction::PopAutoEscape => {
                     state.auto_escape = auto_escape_stack.pop().unwrap();
@@ -677,7 +679,7 @@ impl<'env> Executor<'env> {
                     out.begin_capture(*mode);
                 }
                 Instruction::EndCapture => {
-                    stack.push(out.end_capture(state.auto_escape));
+                    stack.push(out.end_capture(&state.auto_escape));
                 }
                 Instruction::ApplyFilter(name, arg_count, local_id) => {
                     let normalized_name = normalize_filter_test_name(name);
@@ -1000,7 +1002,7 @@ impl<'env> Executor<'env> {
         }
 
         let instructions = state.blocks.get(name).unwrap().instructions();
-        let auto_escape = state.auto_escape;
+        let auto_escape = state.auto_escape.clone();
         let current_block = state.current_block;
         let rv = state.with_execution_state(
             instructions,
@@ -1016,7 +1018,7 @@ impl<'env> Executor<'env> {
             Error::new(ErrorKind::EvalBlock, "error in super block").with_source(err)
         }));
         if capture {
-            Ok(out.end_capture(state.auto_escape))
+            Ok(out.end_capture(&state.auto_escape))
         } else {
             Ok(Value::UNDEFINED)
         }
@@ -1066,7 +1068,7 @@ impl<'env> Executor<'env> {
                 ));
             }
             let instructions = block_stack.instructions();
-            let auto_escape = state.auto_escape;
+            let auto_escape = state.auto_escape.clone();
             state.with_execution_state(
                 instructions,
                 auto_escape,
@@ -1087,7 +1089,7 @@ impl<'env> Executor<'env> {
 
     fn derive_auto_escape(
         value: Value,
-        initial_auto_escape: AutoEscape,
+        initial_auto_escape: &AutoEscape,
     ) -> Result<AutoEscape, Error> {
         match (value.as_str(), value == Value::from(true)) {
             (Some("html"), _) => Ok(AutoEscape::Html),
@@ -1097,7 +1099,7 @@ impl<'env> Executor<'env> {
             (None, true) => Ok(if matches!(initial_auto_escape, AutoEscape::None) {
                 AutoEscape::Html
             } else {
-                initial_auto_escape
+                initial_auto_escape.clone()
             }),
             _ => Err(Error::new(
                 ErrorKind::InvalidOperation,

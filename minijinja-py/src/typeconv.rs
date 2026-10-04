@@ -1,10 +1,9 @@
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use minijinja::value::{DynObject, Enumerator, Object, ObjectRepr, Tuple, Value, ValueKind};
-use minijinja::{AutoEscape, Error, State};
+use minijinja::{Error, State};
 
 use pyo3::exceptions::{PyAttributeError, PyLookupError, PyTypeError};
 use pyo3::pybacked::PyBackedStr;
@@ -15,7 +14,6 @@ use pyo3::{prelude::*, IntoPyObjectExt};
 use crate::error_support::{to_minijinja_error, to_py_error};
 use crate::state::{bind_state, StateRef};
 
-static AUTO_ESCAPE_CACHE: Mutex<BTreeMap<String, AutoEscape>> = Mutex::new(BTreeMap::new());
 static MARK_SAFE: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 fn is_safe_attr(name: &str) -> bool {
@@ -353,14 +351,4 @@ pub fn to_python_args<'py>(
     }
     let py_args = PyTuple::new(py, py_args).unwrap();
     Ok((py_args, py_kwargs))
-}
-
-pub fn get_custom_autoescape(value: &str) -> AutoEscape {
-    let mut cache = AUTO_ESCAPE_CACHE.lock().unwrap();
-    if let Some(rv) = cache.get(value).copied() {
-        return rv;
-    }
-    let val = AutoEscape::Custom(Box::leak(value.to_string().into_boxed_str()));
-    cache.insert(value.to_string(), val);
-    val
 }
