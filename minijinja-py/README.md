@@ -181,10 +181,11 @@ Here is what this means for some basic types:
 
 ## Threading
 
-MiniJinja's Python bindin is thread-safe but it uses locks internally on the
-environment.  In particular only one thread can render a template from the same
-environment at the time.  If you want to render templates from multiple threads
-you should be creating a new environment for each thread.
+MiniJinja's Python binding is thread-safe.  Multiple threads can render templates
+from the same environment at the same time.  Changes to an environment (for
+instance adding filters or globals or changing settings) are only picked up by
+renders that start after the change; renders that are already in progress
+continue to use the configuration they started with.
 
 ## Sponsor
 

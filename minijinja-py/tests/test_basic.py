@@ -528,6 +528,47 @@ def test_threading_interactions():
     assert done == ["something"] * 4
 
 
+def test_configure_while_rendering():
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    started = threading.Event()
+    release = threading.Event()
+
+    def wait(value):
+        started.set()
+        assert release.wait(5)
+        return value
+
+    env = Environment(filters={"wait": wait})
+    with ThreadPoolExecutor() as executor:
+        future = executor.submit(env.render_str, "{{ 42|wait }}|{{ foo is defined }}")
+        assert started.wait(5)
+        # these used to deadlock against the render holding the lock
+        env.debug = True
+        env.add_global("foo", [{"a": 1}])
+        env.add_filter("other", lambda x: x)
+        assert env.globals["foo"] == [{"a": 1}]
+        release.set()
+        # the in-flight render keeps working with the old configuration
+        assert future.result(timeout=5) == "42|False"
+
+    assert env.debug
+    assert env.render_str("{{ foo[0].a|other }}") == "1"
+
+
+def test_reentrant_environment_use():
+    env = Environment()
+
+    def nested():
+        env.trim_blocks = True
+        return env.render_str("{{ 1 + 1 }}")
+
+    env.add_global("nested", nested)
+    assert env.render_str("{{ nested() }}") == "2"
+    assert env.trim_blocks
+
+
 def test_truthy():
     class Custom:
         def __init__(self, is_true):

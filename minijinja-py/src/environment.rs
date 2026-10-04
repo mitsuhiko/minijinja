@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Rest, Value, ValueOrKwargs};
@@ -12,6 +12,7 @@ use minijinja::{
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedStr;
+use pyo3::sync::MutexExt;
 use pyo3::types::{PyDict, PyTuple};
 
 use crate::error_support::{report_unraisable, to_minijinja_error, to_py_error};
@@ -62,9 +63,9 @@ impl Syntax {
 }
 
 macro_rules! syntax_setter {
-    ($slf:expr, $value:expr, $field:ident, $default:expr) => {{
+    ($slf:expr, $py:expr, $value:expr, $field:ident, $default:expr) => {{
         let value = $value;
-        let mut inner = $slf.inner.lock().unwrap();
+        let mut inner = $slf.lock($py);
         if inner.syntax.is_none() {
             if value == $default {
                 return Ok(());
@@ -75,7 +76,7 @@ macro_rules! syntax_setter {
             if syntax.$field != value {
                 syntax.$field = value.into();
                 let syntax_config = syntax.compile().map_err(to_py_error)?;
-                inner.env.set_syntax(syntax_config);
+                inner.env_mut().set_syntax(syntax_config);
             }
         }
         Ok(())
@@ -83,10 +84,8 @@ macro_rules! syntax_setter {
 }
 
 macro_rules! syntax_getter {
-    ($slf:expr, $field:ident, $default:expr) => {{
-        $slf.inner
-            .lock()
-            .unwrap()
+    ($slf:expr, $py:expr, $field:ident, $default:expr) => {{
+        $slf.lock($py)
             .syntax
             .as_ref()
             .map_or($default, |x| &x.$field)
@@ -95,7 +94,13 @@ macro_rules! syntax_getter {
 }
 
 struct Inner {
-    env: minijinja::Environment<'static>,
+    /// The current environment.
+    ///
+    /// Renders take a snapshot of this (by cloning the arc) and then release
+    /// the lock before rendering.  Modifications go through [`Inner::env_mut`]
+    /// which copies the environment if a render is currently holding on to
+    /// a snapshot.
+    env: Arc<minijinja::Environment<'static>>,
     loader: Option<Py<PyAny>>,
     auto_escape_callback: Option<Py<PyAny>>,
     finalizer_callback: Option<Py<PyAny>>,
@@ -103,10 +108,16 @@ struct Inner {
     syntax: Option<Syntax>,
 }
 
+impl Inner {
+    fn env_mut(&mut self) -> &mut minijinja::Environment<'static> {
+        Arc::make_mut(&mut self.env)
+    }
+}
+
 /// Represents a MiniJinja environment.
 #[pyclass(subclass, module = "minijinja._lowlevel")]
 pub struct Environment {
-    inner: Arc<Mutex<Inner>>,
+    inner: Mutex<Inner>,
     reload_before_render: AtomicBool,
     pycompat: Arc<AtomicBool>,
 }
@@ -132,14 +143,14 @@ impl Environment {
         });
 
         Ok(Environment {
-            inner: Arc::new(Mutex::new(Inner {
-                env,
+            inner: Mutex::new(Inner {
+                env: Arc::new(env),
                 loader: None,
                 auto_escape_callback: None,
                 finalizer_callback: None,
                 path_join_callback: None,
                 syntax: None,
-            })),
+            }),
             reload_before_render: AtomicBool::new(false),
             pycompat,
         })
@@ -147,17 +158,15 @@ impl Environment {
 
     /// Enables or disables debug mode.
     #[setter]
-    pub fn set_debug(&self, value: bool) -> PyResult<()> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.env.set_debug(value);
+    pub fn set_debug(&self, py: Python<'_>, value: bool) -> PyResult<()> {
+        self.lock(py).env_mut().set_debug(value);
         Ok(())
     }
 
     /// Enables or disables debug mode.
     #[getter]
-    pub fn get_debug(&self) -> PyResult<bool> {
-        let inner = self.inner.lock().unwrap();
-        Ok(inner.env.debug())
+    pub fn get_debug(&self, py: Python<'_>) -> PyResult<bool> {
+        Ok(self.lock(py).env.debug())
     }
 
     /// Enables or disables pycompat mode.
@@ -175,9 +184,8 @@ impl Environment {
 
     /// Sets the undefined behavior.
     #[setter]
-    pub fn set_undefined_behavior(&self, value: &str) -> PyResult<()> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.env.set_undefined_behavior(match value {
+    pub fn set_undefined_behavior(&self, py: Python<'_>, value: &str) -> PyResult<()> {
+        let value = match value {
             "strict" => UndefinedBehavior::Strict,
             "lenient" => UndefinedBehavior::Lenient,
             "chainable" => UndefinedBehavior::Chainable,
@@ -187,15 +195,16 @@ impl Environment {
                     "invalid value for undefined behavior",
                 ))
             }
-        });
+        };
+        self.lock(py).env_mut().set_undefined_behavior(value);
         Ok(())
     }
 
     /// Gets the undefined behavior.
     #[getter]
-    pub fn get_undefined_behavior(&self) -> PyResult<&'static str> {
-        let inner = self.inner.lock().unwrap();
-        Ok(match inner.env.undefined_behavior() {
+    pub fn get_undefined_behavior(&self, py: Python<'_>) -> PyResult<&'static str> {
+        let undefined_behavior = self.lock(py).env.undefined_behavior();
+        Ok(match undefined_behavior {
             UndefinedBehavior::Lenient => "lenient",
             UndefinedBehavior::Chainable => "chainable",
             UndefinedBehavior::Strict => "strict",
@@ -210,27 +219,30 @@ impl Environment {
 
     /// Sets fuel
     #[setter]
-    pub fn set_fuel(&self, value: Option<u64>) -> PyResult<()> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.env.set_fuel(value);
+    pub fn set_fuel(&self, py: Python<'_>, value: Option<u64>) -> PyResult<()> {
+        self.lock(py).env_mut().set_fuel(value);
         Ok(())
     }
 
     /// Enables or disables debug mode.
     #[getter]
-    pub fn get_fuel(&self) -> PyResult<Option<u64>> {
-        let inner = self.inner.lock().unwrap();
-        Ok(inner.env.fuel())
+    pub fn get_fuel(&self, py: Python<'_>) -> PyResult<Option<u64>> {
+        Ok(self.lock(py).env.fuel())
     }
 
     /// Registers a filter function.
     #[pyo3(text_signature = "(self, name, callback)")]
-    pub fn add_filter(&self, name: &str, callback: &Bound<'_, PyAny>) -> PyResult<()> {
+    pub fn add_filter(
+        &self,
+        py: Python<'_>,
+        name: &str,
+        callback: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
         if !callback.is_callable() {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
         let callback: Py<PyAny> = callback.clone().unbind();
-        self.inner.lock().unwrap().env.add_filter(
+        self.lock(py).env_mut().add_filter(
             name.to_string(),
             move |state: &mut State, args: Rest<ValueOrKwargs>| -> Result<Value, Error> {
                 Python::attach(|py| {
@@ -251,19 +263,24 @@ impl Environment {
 
     /// Removes a filter function.
     #[pyo3(text_signature = "(self, name)")]
-    pub fn remove_filter(&self, name: &str) -> PyResult<()> {
-        self.inner.lock().unwrap().env.remove_filter(name);
+    pub fn remove_filter(&self, py: Python<'_>, name: &str) -> PyResult<()> {
+        self.lock(py).env_mut().remove_filter(name);
         Ok(())
     }
 
     /// Registers a test function.
     #[pyo3(text_signature = "(self, name, callback)")]
-    pub fn add_test(&self, name: &str, callback: &Bound<'_, PyAny>) -> PyResult<()> {
+    pub fn add_test(
+        &self,
+        py: Python<'_>,
+        name: &str,
+        callback: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
         if !callback.is_callable() {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
         let callback: Py<PyAny> = callback.clone().unbind();
-        self.inner.lock().unwrap().env.add_test(
+        self.lock(py).env_mut().add_test(
             name.to_string(),
             move |state: &mut State, args: Rest<ValueOrKwargs>| -> Result<bool, Error> {
                 Python::attach(|py| {
@@ -284,14 +301,19 @@ impl Environment {
 
     /// Removes a test function.
     #[pyo3(text_signature = "(self, name)")]
-    pub fn remove_test(&self, name: &str) -> PyResult<()> {
-        self.inner.lock().unwrap().env.remove_test(name);
+    pub fn remove_test(&self, py: Python<'_>, name: &str) -> PyResult<()> {
+        self.lock(py).env_mut().remove_test(name);
         Ok(())
     }
 
-    fn add_function(&self, name: &str, callback: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn add_function(
+        &self,
+        py: Python<'_>,
+        name: &str,
+        callback: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
         let callback: Py<PyAny> = callback.clone().unbind();
-        self.inner.lock().unwrap().env.add_function(
+        self.lock(py).env_mut().add_function(
             name.to_string(),
             move |state: &mut State, args: Rest<ValueOrKwargs>| -> Result<Value, Error> {
                 Python::attach(|py| {
@@ -312,23 +334,21 @@ impl Environment {
 
     /// Registers a global
     #[pyo3(text_signature = "(self, name, value)")]
-    pub fn add_global(&self, name: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
+    pub fn add_global(&self, py: Python<'_>, name: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
         if value.is_callable() {
-            self.add_function(name, value)
+            self.add_function(py, name, value)
         } else {
-            self.inner
-                .lock()
-                .unwrap()
-                .env
-                .add_global(name.to_string(), to_minijinja_value(value));
+            // convert before locking as this can call into Python
+            let value = to_minijinja_value(value);
+            self.lock(py).env_mut().add_global(name.to_string(), value);
             Ok(())
         }
     }
 
     /// Removes a global
     #[pyo3(text_signature = "(self, name)")]
-    pub fn remove_global(&self, name: &str) -> PyResult<()> {
-        self.inner.lock().unwrap().env.remove_global(name);
+    pub fn remove_global(&self, py: Python<'_>, name: &str) -> PyResult<()> {
+        self.lock(py).env_mut().remove_global(name);
         Ok(())
     }
 
@@ -336,7 +356,9 @@ impl Environment {
     #[getter]
     pub fn globals(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let rv = PyDict::new(py);
-        for (key, value) in self.inner.lock().unwrap().env.globals() {
+        // do not hold the lock while converting values into Python
+        let env = self.snapshot(py);
+        for (key, value) in env.globals() {
             rv.set_item(key, to_python_value(value)?)?;
         }
         Ok(rv.unbind())
@@ -356,10 +378,10 @@ impl Environment {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
         let callback: Py<PyAny> = callback.clone().unbind();
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.lock(py);
         inner.auto_escape_callback = Some(callback.clone_ref(py));
         inner
-            .env
+            .env_mut()
             .set_auto_escape_callback(move |name: &str| -> AutoEscape {
                 Python::attach(|py| {
                     let py_args = PyTuple::new(py, [name]).unwrap();
@@ -396,9 +418,7 @@ impl Environment {
     #[getter]
     pub fn get_auto_escape_callback(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
         Ok(self
-            .inner
-            .lock()
-            .unwrap()
+            .lock(py)
             .auto_escape_callback
             .as_ref()
             .map(|x| x.clone_ref(py)))
@@ -413,9 +433,9 @@ impl Environment {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
         let callback: Py<PyAny> = callback.clone().unbind();
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.lock(py);
         inner.finalizer_callback = Some(callback.clone_ref(py));
-        inner.env.set_formatter(move |output, state, value| {
+        inner.env_mut().set_formatter(move |output, state, value| {
             Python::attach(|py| -> Result<(), Error> {
                 let maybe_new_value = bind_state(state, || -> Result<_, Error> {
                     let args = std::slice::from_ref(value);
@@ -443,9 +463,7 @@ impl Environment {
     #[getter]
     pub fn get_finalizer(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
         Ok(self
-            .inner
-            .lock()
-            .unwrap()
+            .lock(py)
             .finalizer_callback
             .as_ref()
             .map(|x| x.clone_ref(py)))
@@ -467,11 +485,11 @@ impl Environment {
                 Some(callback.clone().unbind())
             }
         };
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.lock(py);
         inner.loader = callback.as_ref().map(|x| x.clone_ref(py));
 
         if let Some(callback) = callback {
-            inner.env.set_loader(move |name| {
+            inner.env_mut().set_loader(move |name| {
                 Python::attach(|py| {
                     let callback = callback.bind(py);
                     let rv = callback
@@ -492,12 +510,7 @@ impl Environment {
     /// Returns the current loader.
     #[getter]
     pub fn get_loader(&self, py: Python<'_>) -> Option<Py<PyAny>> {
-        self.inner
-            .lock()
-            .unwrap()
-            .loader
-            .as_ref()
-            .map(|x| x.clone_ref(py))
+        self.lock(py).loader.as_ref().map(|x| x.clone_ref(py))
     }
 
     /// Sets a new path join callback.
@@ -511,9 +524,9 @@ impl Environment {
             return Err(PyRuntimeError::new_err("expected callback"));
         }
         let callback: Py<PyAny> = callback.clone().unbind();
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.lock(py);
         inner.path_join_callback = Some(callback.clone_ref(py));
-        inner.env.set_path_join_callback(move |name, parent| {
+        inner.env_mut().set_path_join_callback(move |name, parent| {
             Python::attach(|py| {
                 let callback = callback.bind(py);
                 match callback.call1(PyTuple::new(py, [name, parent]).unwrap()) {
@@ -531,9 +544,7 @@ impl Environment {
     /// Returns the current path join callback.
     #[getter]
     pub fn get_path_join_callback(&self, py: Python<'_>) -> Option<Py<PyAny>> {
-        self.inner
-            .lock()
-            .unwrap()
+        self.lock(py)
             .path_join_callback
             .as_ref()
             .map(|x| x.clone_ref(py))
@@ -541,10 +552,9 @@ impl Environment {
 
     /// Triggers a reload of the templates.
     pub fn reload(&self, py: Python<'_>) -> PyResult<()> {
-        let mut inner = self.inner.lock().unwrap();
-        let loader = inner.loader.as_ref().map(|x| x.clone_ref(py));
-        if loader.is_some() {
-            inner.env.clear_templates();
+        let mut inner = self.lock(py);
+        if inner.loader.is_some() {
+            inner.env_mut().clear_templates();
         }
         Ok(())
     }
@@ -562,147 +572,148 @@ impl Environment {
     }
 
     #[setter]
-    pub fn set_variable_start_string(&self, value: String) -> PyResult<()> {
-        syntax_setter!(self, value, variable_start, "{{")
+    pub fn set_variable_start_string(&self, py: Python<'_>, value: String) -> PyResult<()> {
+        syntax_setter!(self, py, value, variable_start, "{{")
     }
 
     #[getter]
-    pub fn get_variable_start_string(&self) -> String {
-        syntax_getter!(self, variable_start, "{{")
+    pub fn get_variable_start_string(&self, py: Python<'_>) -> String {
+        syntax_getter!(self, py, variable_start, "{{")
     }
 
     #[setter]
-    pub fn set_block_start_string(&self, value: String) -> PyResult<()> {
-        syntax_setter!(self, value, block_start, "{%")
+    pub fn set_block_start_string(&self, py: Python<'_>, value: String) -> PyResult<()> {
+        syntax_setter!(self, py, value, block_start, "{%")
     }
 
     #[getter]
-    pub fn get_block_start_string(&self) -> String {
-        syntax_getter!(self, block_start, "{%")
+    pub fn get_block_start_string(&self, py: Python<'_>) -> String {
+        syntax_getter!(self, py, block_start, "{%")
     }
 
     #[setter]
-    pub fn set_comment_start_string(&self, value: String) -> PyResult<()> {
-        syntax_setter!(self, value, comment_start, "{#")
+    pub fn set_comment_start_string(&self, py: Python<'_>, value: String) -> PyResult<()> {
+        syntax_setter!(self, py, value, comment_start, "{#")
     }
 
     #[getter]
-    pub fn get_comment_start_string(&self) -> String {
-        syntax_getter!(self, comment_start, "{#")
+    pub fn get_comment_start_string(&self, py: Python<'_>) -> String {
+        syntax_getter!(self, py, comment_start, "{#")
     }
 
     #[setter]
-    pub fn set_variable_end_string(&self, value: String) -> PyResult<()> {
-        syntax_setter!(self, value, variable_end, "}}")
+    pub fn set_variable_end_string(&self, py: Python<'_>, value: String) -> PyResult<()> {
+        syntax_setter!(self, py, value, variable_end, "}}")
     }
 
     #[getter]
-    pub fn get_variable_end_string(&self) -> String {
-        syntax_getter!(self, variable_end, "}}")
+    pub fn get_variable_end_string(&self, py: Python<'_>) -> String {
+        syntax_getter!(self, py, variable_end, "}}")
     }
 
     #[setter]
-    pub fn set_block_end_string(&self, value: String) -> PyResult<()> {
-        syntax_setter!(self, value, block_end, "%}")
+    pub fn set_block_end_string(&self, py: Python<'_>, value: String) -> PyResult<()> {
+        syntax_setter!(self, py, value, block_end, "%}")
     }
 
     #[getter]
-    pub fn get_block_end_string(&self) -> String {
-        syntax_getter!(self, block_end, "%}")
+    pub fn get_block_end_string(&self, py: Python<'_>) -> String {
+        syntax_getter!(self, py, block_end, "%}")
     }
 
     #[setter]
-    pub fn set_comment_end_string(&self, value: String) -> PyResult<()> {
-        syntax_setter!(self, value, comment_end, "#}")
+    pub fn set_comment_end_string(&self, py: Python<'_>, value: String) -> PyResult<()> {
+        syntax_setter!(self, py, value, comment_end, "#}")
     }
 
     #[getter]
-    pub fn get_comment_end_string(&self) -> String {
-        syntax_getter!(self, comment_end, "#}")
+    pub fn get_comment_end_string(&self, py: Python<'_>) -> String {
+        syntax_getter!(self, py, comment_end, "#}")
     }
 
     #[setter]
-    pub fn set_line_statement_prefix(&self, value: Option<String>) -> PyResult<()> {
-        syntax_setter!(self, value.unwrap_or_default(), line_statement_prefix, "")
+    pub fn set_line_statement_prefix(&self, py: Python<'_>, value: Option<String>) -> PyResult<()> {
+        syntax_setter!(
+            self,
+            py,
+            value.unwrap_or_default(),
+            line_statement_prefix,
+            ""
+        )
     }
 
     #[getter]
-    pub fn get_line_statement_prefix(&self) -> Option<String> {
-        let rv: String = syntax_getter!(self, line_statement_prefix, "");
+    pub fn get_line_statement_prefix(&self, py: Python<'_>) -> Option<String> {
+        let rv: String = syntax_getter!(self, py, line_statement_prefix, "");
         (!rv.is_empty()).then_some(rv)
     }
 
     #[setter]
-    pub fn set_line_comment_prefix(&self, value: Option<String>) -> PyResult<()> {
-        syntax_setter!(self, value.unwrap_or_default(), line_comment_prefix, "")
+    pub fn set_line_comment_prefix(&self, py: Python<'_>, value: Option<String>) -> PyResult<()> {
+        syntax_setter!(self, py, value.unwrap_or_default(), line_comment_prefix, "")
     }
 
     #[getter]
-    pub fn get_line_comment_prefix(&self) -> Option<String> {
-        let rv: String = syntax_getter!(self, line_comment_prefix, "");
+    pub fn get_line_comment_prefix(&self, py: Python<'_>) -> Option<String> {
+        let rv: String = syntax_getter!(self, py, line_comment_prefix, "");
         (!rv.is_empty()).then_some(rv)
     }
 
     /// Configures the trailing newline trimming feature.
     #[setter]
-    pub fn set_keep_trailing_newline(&self, yes: bool) -> PyResult<()> {
-        self.inner
-            .lock()
-            .unwrap()
-            .env
-            .set_keep_trailing_newline(yes);
+    pub fn set_keep_trailing_newline(&self, py: Python<'_>, yes: bool) -> PyResult<()> {
+        self.lock(py).env_mut().set_keep_trailing_newline(yes);
         Ok(())
     }
 
     /// Returns the current value of the trailing newline trimming flag.
     #[getter]
-    pub fn get_keep_trailing_newline(&self) -> PyResult<bool> {
-        Ok(self.inner.lock().unwrap().env.keep_trailing_newline())
+    pub fn get_keep_trailing_newline(&self, py: Python<'_>) -> PyResult<bool> {
+        Ok(self.lock(py).env.keep_trailing_newline())
     }
 
     /// Configures the trim blocks feature.
     #[setter]
-    pub fn set_trim_blocks(&self, yes: bool) -> PyResult<()> {
-        self.inner.lock().unwrap().env.set_trim_blocks(yes);
+    pub fn set_trim_blocks(&self, py: Python<'_>, yes: bool) -> PyResult<()> {
+        self.lock(py).env_mut().set_trim_blocks(yes);
         Ok(())
     }
 
     /// Returns the current value of the trim blocks flag.
     #[getter]
-    pub fn get_trim_blocks(&self) -> PyResult<bool> {
-        Ok(self.inner.lock().unwrap().env.trim_blocks())
+    pub fn get_trim_blocks(&self, py: Python<'_>) -> PyResult<bool> {
+        Ok(self.lock(py).env.trim_blocks())
     }
 
     /// Configures the lstrip blocks feature.
     #[setter]
-    pub fn set_lstrip_blocks(&self, yes: bool) -> PyResult<()> {
-        self.inner.lock().unwrap().env.set_lstrip_blocks(yes);
+    pub fn set_lstrip_blocks(&self, py: Python<'_>, yes: bool) -> PyResult<()> {
+        self.lock(py).env_mut().set_lstrip_blocks(yes);
         Ok(())
     }
 
     /// Returns the current value of the lstrip blocks flag.
     #[getter]
-    pub fn get_lstrip_blocks(&self) -> PyResult<bool> {
-        Ok(self.inner.lock().unwrap().env.lstrip_blocks())
+    pub fn get_lstrip_blocks(&self, py: Python<'_>) -> PyResult<bool> {
+        Ok(self.lock(py).env.lstrip_blocks())
     }
 
     /// Manually adds a template to the environment.
-    pub fn add_template(&self, name: String, source: String) -> PyResult<()> {
-        let mut inner = self.inner.lock().unwrap();
-        inner
-            .env
+    pub fn add_template(&self, py: Python<'_>, name: String, source: String) -> PyResult<()> {
+        self.lock(py)
+            .env_mut()
             .add_template_owned(name, source)
             .map_err(to_py_error)
     }
 
     /// Removes a loaded template.
-    pub fn remove_template(&self, name: &str) {
-        self.inner.lock().unwrap().env.remove_template(name);
+    pub fn remove_template(&self, py: Python<'_>, name: &str) {
+        self.lock(py).env_mut().remove_template(name);
     }
 
     /// Clears all loaded templates.
-    pub fn clear_templates(&self) {
-        self.inner.lock().unwrap().env.clear_templates();
+    pub fn clear_templates(&self, py: Python<'_>) {
+        self.lock(py).env_mut().clear_templates();
     }
 
     /// Renders a template looked up from the loader.
@@ -722,11 +733,10 @@ impl Environment {
         let ctx = ctx
             .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
             .unwrap_or_else(|| context!());
+        let env = slf.snapshot(py);
         bind_environment(slf.as_ptr(), || {
-            let inner = slf.inner.clone();
-            py.detach(move || {
-                let inner = inner.lock().unwrap();
-                let tmpl = inner.env.get_template(template_name).map_err(to_py_error)?;
+            py.detach(|| {
+                let tmpl = env.get_template(template_name).map_err(to_py_error)?;
                 tmpl.render(ctx).map_err(to_py_error)
             })
         })
@@ -743,9 +753,9 @@ impl Environment {
         if slf.reload_before_render.load(Ordering::Relaxed) {
             slf.reload(py)?;
         }
+        let env = slf.snapshot(py);
         bind_environment(slf.as_ptr(), || {
-            let inner = slf.inner.lock().unwrap();
-            let tmpl = inner.env.get_template(template_name).map_err(to_py_error)?;
+            let tmpl = env.get_template(template_name).map_err(to_py_error)?;
             Ok(tmpl.undeclared_variables(nested))
         })
     }
@@ -761,9 +771,9 @@ impl Environment {
         if slf.reload_before_render.load(Ordering::Relaxed) {
             slf.reload(py)?;
         }
+        let env = slf.snapshot(py);
         bind_environment(slf.as_ptr(), || {
-            let inner = slf.inner.lock().unwrap();
-            let tmpl = inner.env.template_from_str(source).map_err(to_py_error)?;
+            let tmpl = env.template_from_str(source).map_err(to_py_error)?;
             Ok(tmpl.undeclared_variables(nested))
         })
     }
@@ -780,17 +790,13 @@ impl Environment {
         name: Option<&str>,
         ctx: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<String> {
+        let ctx = ctx
+            .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
+            .unwrap_or_else(|| context!());
+        let env = slf.snapshot(py);
         bind_environment(slf.as_ptr(), || {
-            let ctx = ctx
-                .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
-                .unwrap_or_else(|| context!());
-            let inner = slf.inner.clone();
-            py.detach(move || {
-                inner
-                    .lock()
-                    .unwrap()
-                    .env
-                    .render_named_str(name.unwrap_or("<string>"), source, ctx)
+            py.detach(|| {
+                env.render_named_str(name.unwrap_or("<string>"), source, ctx)
                     .map_err(to_py_error)
             })
         })
@@ -804,20 +810,36 @@ impl Environment {
         expression: &str,
         ctx: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Py<PyAny>> {
+        let ctx = ctx
+            .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
+            .unwrap_or_else(|| context!());
+        let env = slf.snapshot(py);
         bind_environment(slf.as_ptr(), || {
-            let inner = slf.inner.clone();
-            let ctx = ctx
-                .map(|ctx| Value::from_object(DynamicObject::new(ctx.as_any().clone().unbind())))
-                .unwrap_or_else(|| context!());
-            py.detach(move || {
-                let inner = inner.lock().unwrap();
-                let expr = inner
-                    .env
-                    .compile_expression(expression)
-                    .map_err(to_py_error)?;
+            py.detach(|| {
+                let expr = env.compile_expression(expression).map_err(to_py_error)?;
                 to_python_value(expr.eval(ctx).map_err(to_py_error)?)
             })
         })
+    }
+}
+
+impl Environment {
+    /// Locks the inner state.
+    ///
+    /// The lock is acquired detached from the Python runtime so that waiting
+    /// for it cannot deadlock against the GIL (or a stop-the-world pause on
+    /// free-threaded builds) of a thread that is currently rendering.  The
+    /// lock must never be held while calling into Python or while rendering.
+    fn lock(&self, py: Python<'_>) -> MutexGuard<'_, Inner> {
+        self.inner.lock_py_attached(py).unwrap()
+    }
+
+    /// Returns a snapshot of the current environment for rendering.
+    ///
+    /// Modifications to the environment while the snapshot is alive do not
+    /// affect it.
+    fn snapshot(&self, py: Python<'_>) -> Arc<minijinja::Environment<'static>> {
+        self.lock(py).env.clone()
     }
 }
 

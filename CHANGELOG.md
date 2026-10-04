@@ -4,6 +4,8 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed deadlocks in the Python bindings when an environment is modified while another thread renders from it, or when it is used from within a callback during a render.  Renders now work on a snapshot of the environment and no longer serialize on a shared lock.  #955
+
 ## 3.0.0-alpha.2
 
 * Fixed large Python integers within MiniJinja's native integer range being silently rounded through `f64` conversion.  #944
