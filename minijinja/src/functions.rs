@@ -41,7 +41,7 @@
 //! ```
 //!
 #![cfg_attr(
-    feature = "deserialization",
+    feature = "serde",
     doc = r#"
 # Arguments in Custom Functions
 

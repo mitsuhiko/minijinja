@@ -155,13 +155,12 @@
 //!
 //! - **Rust Functionality:**
 //!
-//!   - `serde`: enables Serde conversion through `value::Serde`. It is disabled
-//!     by default.
+//!   - `serde`: enables Serde support.  This adds conversion and Serde-powered
+//!     function arguments through `value::Serde`, implements `Serialize`,
+//!     `Deserialize` and `Deserializer` for [`Value`] and implements
+//!     `serde::de::Error` for the error type.  It is disabled by default.
 //!   - `debug`: if this feature is removed some debug functionality of the engine is
 //!     removed as well.  This mainly affects the quality of error reporting.
-//!   - `deserialization`: when removed this disables deserialization support for
-//!     the [`Value`] type, removes Serde-powered function arguments and the error type
-//!     no longer implements `serde::de::Error`.
 //!   - `std_collections`: if this feature is removed some [`Object`](crate::value::Object)
 //!     implementations for standard library collections are removed.  Only the
 //!     ones needed for the engine to function itself are retained.
@@ -186,7 +185,8 @@
 //!   at runtime.  This does not affect the maximum recursion at parsing time which is always
 //!   limited.
 //! - `speedups`: enables all speedups, in particular it turns on the `v_htmlescape` dependency
-//!   for faster HTML escaping.
+//!   for faster HTML escaping and `zmij` and `itoa` for faster number formatting in
+//!   JSON.  The output is the same with and without speedups.
 //!
 //! Internals:
 //!
@@ -212,6 +212,8 @@ mod defaults;
 mod environment;
 mod error;
 mod expression;
+#[cfg(feature = "json")]
+mod json;
 mod output;
 mod template;
 mod utils;

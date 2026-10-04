@@ -100,11 +100,10 @@ let value = Value::from(Serde(&[1, 2, 3]));
 //! `Serde` when passing them to those APIs.
 //!
 //! The inverse of the serialize operation is to pass a value directly as
-//! serializer to a type that supports deserialization.  This requires the
-//! `deserialization` feature.
+//! deserializer to a type that supports deserialization.
 //!
 #![cfg_attr(
-    feature = "deserialization",
+    feature = "serde",
     doc = r"
 ```
 # use minijinja::value::Value;
@@ -257,7 +256,7 @@ impl Object for StaticKeyMap {
 #[macro_use]
 mod type_erase;
 mod argtypes;
-#[cfg(feature = "deserialization")]
+#[cfg(feature = "serde")]
 mod deserialize;
 pub(crate) mod merge_object;
 pub(crate) mod namespace_object;
@@ -274,7 +273,7 @@ pub use self::tuple::Tuple;
 /// This wrapper lets [`Value::from`] and APIs accepting `Into<Value>` use
 /// Serde without making serialization the default conversion mechanism.  It
 /// can also be used as a function argument to deserialize a [`Value`] into a
-/// Rust type when the `deserialization` feature is enabled.
+/// Rust type.
 ///
 /// ```
 /// use minijinja::value::{Serde, Value};
@@ -282,7 +281,7 @@ pub use self::tuple::Tuple;
 /// let value = Value::from(Serde(&[1, 2, 3]));
 /// ```
 #[cfg_attr(
-    feature = "deserialization",
+    feature = "serde",
     doc = r#"
 As a function argument, `Serde<T>` deserializes a template value into `T`:
 

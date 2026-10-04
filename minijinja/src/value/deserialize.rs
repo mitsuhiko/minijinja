@@ -8,7 +8,7 @@ use serde::forward_to_deserialize_any;
 use crate::value::{checked, ArgType, ObjectRepr, Serde, Value, ValueKind, ValueMap, ValueRepr};
 use crate::{Error, ErrorKind};
 
-#[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 impl<'de> Deserialize<'de> for Value {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_any(ValueVisitor)
@@ -117,7 +117,7 @@ macro_rules! common_forward {
     };
 }
 
-#[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 impl IntoDeserializer<'_, Error> for Value {
     type Deserializer = Value;
 
@@ -126,7 +126,7 @@ impl IntoDeserializer<'_, Error> for Value {
     }
 }
 
-#[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 impl<'de> Deserializer<'de> for Value {
     type Error = Error;
 
@@ -314,7 +314,7 @@ impl<'de> VariantAccess<'de> for VariantDeserializer {
     }
 }
 
-#[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 impl<'de> Deserializer<'de> for &Value {
     type Error = Error;
 
@@ -359,7 +359,7 @@ impl<'de> Deserializer<'de> for &Value {
     common_forward!();
 }
 
-#[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 impl<'de> IntoDeserializer<'de, Error> for &'de Value {
     type Deserializer = &'de Value;
 
@@ -368,7 +368,7 @@ impl<'de> IntoDeserializer<'de, Error> for &'de Value {
     }
 }
 
-#[cfg_attr(docsrs, doc(cfg(feature = "deserialization")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 impl de::Error for Error {
     fn custom<T: std::fmt::Display>(msg: T) -> Self {
         Error::new(ErrorKind::CannotDeserialize, msg.to_string())

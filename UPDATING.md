@@ -230,10 +230,15 @@ to the Go implementation.
 
 The `serde` feature now controls the `serde` dependency and is disabled by
 default.  You can enable it explicitly if you need to use the Serde based
-conversions but it might be unnecessary for most users.  The `deserialization`
-and `json` features enable it automatically as before.  The main rendering APIs,
-`context!`, and `args!` now convert values through `Into<Value>` rather than
-using Serde.
+conversions but it might be unnecessary for most users.  The main rendering
+APIs, `context!`, and `args!` now convert values through `Into<Value>` rather
+than using Serde.
+
+The `deserialization` feature was removed and folded into `serde`.  Replace
+`features = ["deserialization"]` with `features = ["serde"]`.  The `json`
+feature no longer enables `serde`: `tojson` and JSON auto escaping use a
+built-in serializer.  If you relied on `json` to enable Serde support you need
+to enable the `serde` feature explicitly.
 
 Serde conversion must be requested with the `minijinja::value::Serde` wrapper:
 

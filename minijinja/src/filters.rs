@@ -1236,52 +1236,6 @@ mod builtins {
         Ok(Value::from(rv))
     }
 
-    #[cfg(feature = "json")]
-    struct JinjaJsonFormatter;
-
-    #[cfg(feature = "json")]
-    impl serde_json::ser::Formatter for JinjaJsonFormatter {
-        fn begin_array_value<W>(&mut self, writer: &mut W, first: bool) -> std::io::Result<()>
-        where
-            W: ?Sized + std::io::Write,
-        {
-            if first {
-                Ok(())
-            } else {
-                writer.write_all(b", ")
-            }
-        }
-
-        fn begin_object_key<W>(&mut self, writer: &mut W, first: bool) -> std::io::Result<()>
-        where
-            W: ?Sized + std::io::Write,
-        {
-            if first {
-                Ok(())
-            } else {
-                writer.write_all(b", ")
-            }
-        }
-
-        fn begin_object_value<W>(&mut self, writer: &mut W) -> std::io::Result<()>
-        where
-            W: ?Sized + std::io::Write,
-        {
-            writer.write_all(b": ")
-        }
-    }
-
-    #[cfg(feature = "json")]
-    fn serialize_json<F>(value: &Value, formatter: F) -> serde_json::Result<String>
-    where
-        F: serde_json::ser::Formatter,
-    {
-        let mut output = Vec::new();
-        let mut serializer = serde_json::Serializer::with_formatter(&mut output, formatter);
-        serde::Serialize::serialize(value, &mut serializer)?;
-        Ok(String::from_utf8(output).expect("JSON serializer emitted invalid UTF-8"))
-    }
-
     /// Dumps a value to JSON.
     ///
     /// This filter is only available if the `json` feature is enabled.  The resulting
@@ -1324,32 +1278,16 @@ mod builtins {
             },
         };
         ok!(args.assert_all_used());
-        if let Some(indent) = indent {
-            let indentation = " ".repeat(indent);
-            serialize_json(
-                value,
-                serde_json::ser::PrettyFormatter::with_indent(indentation.as_bytes()),
-            )
-        } else {
-            serialize_json(value, JinjaJsonFormatter)
-        }
-        .map_err(|err| {
-            Error::new(ErrorKind::InvalidOperation, "cannot serialize to JSON").with_source(err)
-        })
-        .map(|s| {
-            // When this filter is used the return value is safe for both HTML and JSON
-            let mut rv = String::with_capacity(s.len());
-            for c in s.chars() {
-                match c {
-                    '<' => rv.push_str("\\u003c"),
-                    '>' => rv.push_str("\\u003e"),
-                    '&' => rv.push_str("\\u0026"),
-                    '\'' => rv.push_str("\\u0027"),
-                    _ => rv.push(c),
-                }
-            }
-            Value::from_safe_string(rv)
-        })
+        let style = match indent {
+            Some(indent) => crate::json::JsonStyle::Pretty(indent),
+            None => crate::json::JsonStyle::Spaced,
+        };
+        // When this filter is used the return value is safe for both HTML and JSON
+        crate::json::to_json(value, style, true)
+            .map_err(|err| {
+                Error::new(ErrorKind::InvalidOperation, "cannot serialize to JSON").with_source(err)
+            })
+            .map(Value::from_safe_string)
     }
 
     /// Indents a value with spaces.

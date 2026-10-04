@@ -1,5 +1,5 @@
 DOC_FEATURES=json,urlencode,custom_syntax,fuel
-TEST_FEATURES=unstable_machinery,builtins,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax,deserialization,serde,loop_controls
+TEST_FEATURES=unstable_machinery,builtins,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,custom_syntax,serde,loop_controls
 
 .PHONY: all
 all: test

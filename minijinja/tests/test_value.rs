@@ -800,7 +800,7 @@ fn test_complex_key() {
 }
 
 #[test]
-#[cfg(feature = "deserialization")]
+#[cfg(feature = "serde")]
 fn test_deserialize() {
     use minijinja::value::{from_args, Serde};
     use serde::Deserialize;
@@ -843,7 +843,7 @@ fn test_deserialize() {
 }
 
 #[test]
-#[cfg(feature = "deserialization")]
+#[cfg(feature = "serde")]
 fn test_serde_argument() {
     use minijinja::value::Serde;
     use serde::Deserialize;

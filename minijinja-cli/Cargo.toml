@@ -39,7 +39,7 @@ clap = { version = "4.3.21", default-features = false, features = [
 ] }
 minijinja = { version = "=3.0.0-alpha.2", path = "../minijinja", features = [
     "json",
-    "deserialization",
+    "serde",
     "urlencode",
     "fuel",
     "unstable_machinery",

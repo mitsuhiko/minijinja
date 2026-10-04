@@ -1,4 +1,4 @@
-#![cfg(feature = "deserialization")]
+#![cfg(feature = "serde")]
 use std::{collections::BTreeMap, sync::Arc};
 
 use serde::{Deserialize, Serialize};

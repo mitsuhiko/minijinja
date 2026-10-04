@@ -130,10 +130,12 @@ fn invalid_autoescape(name: &str) -> Result<(), Error> {
 
 #[cfg(feature = "json")]
 fn json_escape_write(out: &mut Output, value: &Value) -> Result<(), Error> {
-    let value = ok!(serde_json::to_string(&value).map_err(|err| {
-        Error::new(ErrorKind::BadSerialization, "unable to format to JSON").with_source(err)
-    }));
-    write!(out, "{value}").map_err(Error::from)
+    let value = ok!(
+        crate::json::to_json(value, crate::json::JsonStyle::Compact, false).map_err(|err| {
+            Error::new(ErrorKind::BadSerialization, "unable to format to JSON").with_source(err)
+        })
+    );
+    out.write_str(&value).map_err(Error::from)
 }
 
 #[inline(always)]

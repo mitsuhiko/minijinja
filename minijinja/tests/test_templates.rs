@@ -7,7 +7,7 @@
     feature = "builtins",
     feature = "adjacent_loop_items",
     feature = "custom_syntax",
-    feature = "deserialization"
+    feature = "serde"
 ))]
 use std::collections::BTreeMap;
 use std::fmt::Write;

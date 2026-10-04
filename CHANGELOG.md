@@ -11,6 +11,8 @@ All notable changes to MiniJinja are documented here.
 * Iteration now consistently fails on invalid values that iterators yield to report errors.  Previously only loops did this while filters such as `list`, `join` or `sort`, the `in` operator and serialization processed them like other items.  The new `ValueIter::checked` helper provides the same behavior for custom code.
 * Added automatic reloading of individual templates.  Loaders can now return a `TemplateSource` with an up-to-date check in addition to a plain `String`, and the environment re-invokes the loader when a template is looked up that is no longer up to date.  `path_loader` attaches a check based on the file's modification time and size.  Auto reloading is enabled by default and can be disabled with `Environment::set_auto_reload`.  Templates are reloaded through a shared reference so the environment no longer needs to be recreated or guarded by a lock.  The `memo-map` dependency was removed.  #819
 * Discontinued the `minijinja-autoreload` crate.  Templates loaded via `path_loader` are now reloaded automatically and environments no longer need to be guarded by a lock to reload.  See `UPDATING.md` for migration instructions.
+* Removed the `deserialization` feature.  Deserialization support is now part of the `serde` feature.
+* The `json` feature no longer depends on `serde` and `serde_json`.  The `tojson` filter and JSON auto escaping now use a built-in JSON serializer.  Invalid values now fail the serialization rather than being emitted as `null`.  Floats are formatted like recent versions of `serde_json` do (for instance `1e+16` instead of `1e16`).  The `speedups` feature now uses `zmij` and `itoa` to format numbers in JSON; the output is the same without it.
 
 ## 3.0.0-alpha.2
 
