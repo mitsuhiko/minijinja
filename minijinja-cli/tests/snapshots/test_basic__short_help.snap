@@ -59,7 +59,7 @@ Advanced:
 
 Shell Support:
       --generate-completion <SH>  Generate a completion script for the given shell [possible values:
-                                  bash, elvish, fig, fish, nushell, powershell, zsh]
+                                  bash, elvish, fish, nushell, powershell, zsh]
 
 For a short help use --help, for extended help --long-help, and for help on syntax --syntax-help.
 

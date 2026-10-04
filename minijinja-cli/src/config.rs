@@ -4,10 +4,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Error};
-use clap::ArgMatches;
 use minijinja::syntax::SyntaxConfig;
 use minijinja::{AutoEscape, Environment, UndefinedBehavior, Value};
 use serde::{Deserialize, Serialize};
+
+use crate::args::Args;
 
 /// Overrides specific syntax settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,55 +81,54 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn update_from_matches(&mut self, matches: &ArgMatches) -> Result<(), Error> {
-        if let Some(format) = matches.get_one::<String>("format") {
+    pub fn update_from_args(&mut self, args: &Args) -> Result<(), Error> {
+        if let Some(ref format) = args.format {
             self.format = format.clone();
         }
-        if let Some(autoescape) = matches.get_one::<String>("autoescape") {
+        if let Some(ref autoescape) = args.autoescape {
             self.autoescape = autoescape.clone();
         }
-        if let Some(expr_out) = matches.get_one::<String>("expr-out") {
+        if let Some(ref expr_out) = args.expr_out {
             self.expr_out = expr_out.clone();
         }
-        if matches.get_flag("no-include") {
+        if args.no_include {
             self.include = false;
         }
-        if matches.get_flag("no-newline") {
+        if args.no_newline {
             self.newline = false;
         }
-        if matches.get_flag("trim-blocks") {
+        if args.trim_blocks {
             self.trim_blocks = true;
         }
-        if matches.get_flag("lstrip-blocks") {
+        if args.lstrip_blocks {
             self.lstrip_blocks = true;
         }
         #[cfg(feature = "contrib")]
         {
-            if matches.get_flag("py-compat") {
+            if args.py_compat {
                 self.py_compat = true;
             }
         }
-        if matches.get_flag("env") {
+        if args.env {
             self.env = true;
         }
-        if matches.get_flag("strict") {
+        if args.strict {
             self.strict = true;
         }
-        if let Some(fuel) = matches.get_one::<u64>("fuel") {
-            if *fuel > 0 {
-                self.fuel = *fuel;
+        if let Some(fuel) = args.fuel {
+            if fuel > 0 {
+                self.fuel = fuel;
             }
         }
 
         self.safe_paths.extend(
-            matches
-                .get_many::<PathBuf>("safe-path")
-                .unwrap_or_default()
+            args.safe_paths
+                .iter()
                 .map(|x| x.canonicalize().unwrap_or_else(|_| x.clone())),
         );
 
-        self.update_syntax_from_matches(matches)?;
-        self.add_defines_from_matches(matches)?;
+        self.update_syntax_from_pairs(args.syntax.iter().map(|x| x.as_str()))?;
+        self.add_defines_from_args(args)?;
         Ok(())
     }
 
@@ -293,25 +293,15 @@ impl Config {
         Ok(())
     }
 
-    fn update_syntax_from_matches(&mut self, matches: &ArgMatches) -> Result<(), Error> {
-        let mut iter = matches.get_many::<String>("syntax");
-        if let Some(ref mut iter) = iter {
-            self.update_syntax_from_pairs(iter.map(|x| x.as_str()))?;
-        }
-        Ok(())
-    }
-
-    fn add_defines_from_matches(&mut self, matches: &ArgMatches) -> Result<(), Error> {
+    fn add_defines_from_args(&mut self, args: &Args) -> Result<(), Error> {
         let defines = Arc::make_mut(&mut self.defines);
-        if let Some(items) = matches.get_many::<String>("define") {
-            for item in items {
-                if let Some((key, raw_value)) = item.split_once(":=") {
-                    defines.insert(key.to_string(), interpret_raw_value(raw_value)?);
-                } else if let Some((key, string_value)) = item.split_once('=') {
-                    defines.insert(key.to_string(), Value::from(string_value));
-                } else {
-                    defines.insert(item.to_string(), Value::from(true));
-                }
+        for item in &args.defines {
+            if let Some((key, raw_value)) = item.split_once(":=") {
+                defines.insert(key.to_string(), interpret_raw_value(raw_value)?);
+            } else if let Some((key, string_value)) = item.split_once('=') {
+                defines.insert(key.to_string(), Value::from(string_value));
+            } else {
+                defines.insert(item.to_string(), Value::from(true));
             }
         }
         Ok(())

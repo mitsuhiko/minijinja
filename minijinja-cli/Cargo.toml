@@ -9,7 +9,7 @@ homepage = "https://github.com/mitsuhiko/minijinja"
 repository = "https://github.com/mitsuhiko/minijinja"
 keywords = ["jinja", "jinja2", "templates", "cli"]
 readme = "README.md"
-rust-version = "1.70"
+rust-version = "1.78"
 
 [features]
 default = ["toml", "yaml", "querystring", "cbor", "datetime", "json5", "repl", "completions", "unicode", "ini", "contrib", "preserve_order"]
@@ -19,7 +19,7 @@ cbor = ["ciborium"]
 datetime = ["minijinja-contrib/datetime", "minijinja-contrib/timezone"]
 json5 = []
 repl = ["rustyline"]
-completions = ["clap_complete", "clap_complete_nushell", "clap_complete_fig"]
+completions = ["argument-completions"]
 unicode = ["minijinja/unicode"]
 ini = ["configparser"]
 contrib = ["minijinja-contrib", "minijinja-contrib/html_entities"]
@@ -28,15 +28,9 @@ preserve_order = ["minijinja/preserve_order"]
 
 [dependencies]
 anyhow = "1.0.74"
+argument = "0.1.0"
+argument-completions = { version = "0.1.0", optional = true }
 ciborium = { version = "0.2.1", optional = true }
-clap = { version = "4.3.21", default-features = false, features = [
-    "std",
-    "cargo",
-    "help",
-    "wrap_help",
-    "usage",
-    "error-context",
-] }
 minijinja = { version = "=3.0.0-alpha.2", path = "../minijinja", features = [
     "json",
     "serde",
@@ -52,26 +46,15 @@ serde = { version = "1.0.183", features = ["derive", "rc"] }
 serde_json = "1.0.105"
 serde_yaml = { version = "0.9.34", optional = true }
 toml = { version = "0.8.23", optional = true }
-clap_complete = { version = "4", optional = true }
-clap_complete_fig = { version = "4", optional = true }
-clap_complete_nushell = { version = "4", optional = true }
 configparser = { version = "3.1.0", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 dunce = "1.0.4"
 
 [build-dependencies]
-clap = { version = "4.5.10", default-features = false, features = [
-    "std",
-    "cargo",
-    "help",
-    "usage",
-    "error-context",
-] }
-clap_mangen = "0.2"
-clap_complete = { version = "4", optional = true }
-clap_complete_fig = { version = "4", optional = true }
-clap_complete_nushell = { version = "4", optional = true }
+argument = "0.1.0"
+argument-completions = { version = "0.1.0", optional = true }
+argument-mangen = "0.1.0"
 
 [dev-dependencies]
 insta = { version = "1.38.0", features = ["filters"] }

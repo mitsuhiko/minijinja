@@ -6,7 +6,6 @@ use std::sync::Mutex;
 use std::{fs, io};
 
 use anyhow::{bail, Context, Error};
-use clap::ArgMatches;
 use minijinja::machinery::{get_compiled_template, parse, tokenize, Instructions};
 use minijinja::value::{merge_maps, Serde};
 use minijinja::{context, Environment, Error as MError, ErrorKind, Value};
@@ -22,16 +21,17 @@ use dunce::canonicalize;
 #[cfg(not(windows))]
 use std::fs::canonicalize;
 
-use crate::command::{make_command, SUPPORTED_FORMATS};
+use crate::args::Args;
+use crate::command::{CLI, SUPPORTED_FORMATS};
 use crate::config::Config;
 use crate::output::{Output, STDIN_STDOUT};
 
-fn load_config(matches: &ArgMatches) -> Result<Config, Error> {
+fn load_config(args: &Args) -> Result<Config, Error> {
     #[allow(unused_mut)]
     let mut config = None::<Config>;
     #[cfg(feature = "toml")]
     {
-        let config_path = if let Some(path) = matches.get_one::<PathBuf>("config-file") {
+        let config_path = if let Some(path) = args.config_file.as_ref() {
             Some(Cow::Borrowed(path.as_path()))
         } else if let Some(var) = std::env::var_os("MINIJINJA_CONFIG_FILE") {
             Some(Cow::Owned(PathBuf::from(var)))
@@ -50,7 +50,7 @@ fn load_config(matches: &ArgMatches) -> Result<Config, Error> {
     }
     let mut config = config.unwrap_or_default();
     config.update_from_env()?;
-    config.update_from_matches(matches)?;
+    config.update_from_args(args)?;
     Ok(config)
 }
 
@@ -240,29 +240,8 @@ fn create_env(
 }
 
 #[cfg(feature = "completions")]
-fn generate_completions(shell: &str) -> Result<i32, Error> {
-    macro_rules! gen {
-        ($shell:expr) => {
-            clap_complete::generate(
-                $shell,
-                &mut make_command(),
-                "minijinja-cli",
-                &mut std::io::stdout(),
-            )
-        };
-    }
-
-    match shell {
-        "bash" => gen!(clap_complete::Shell::Bash),
-        "zsh" => gen!(clap_complete::Shell::Zsh),
-        "elvish" => gen!(clap_complete::Shell::Elvish),
-        "fish" => gen!(clap_complete::Shell::Fish),
-        "powershell" => gen!(clap_complete::Shell::PowerShell),
-        "nushell" => gen!(clap_complete_nushell::Nushell),
-        "fig" => gen!(clap_complete_fig::Fig),
-        _ => unreachable!(),
-    };
-
+fn generate_completions(shell: argument_completions::Shell) -> Result<i32, Error> {
+    print!("{}", shell.generate(&CLI, "minijinja-cli"));
     Ok(0)
 }
 
@@ -364,34 +343,44 @@ fn print_config(config: &Config) -> Result<i32, Error> {
     Ok(0)
 }
 
-pub fn execute() -> Result<i32, Error> {
-    let matches = make_command().get_matches();
-    let config = load_config(&matches)?;
+fn repl_requested(_args: &Args) -> bool {
+    #[cfg(feature = "repl")]
+    {
+        _args.repl
+    }
+    #[cfg(not(feature = "repl"))]
+    {
+        false
+    }
+}
 
-    if matches.get_flag("syntax-help") {
+pub fn execute() -> Result<i32, Error> {
+    let args = CLI.run(crate::args::parse);
+    let config = load_config(&args)?;
+
+    if args.syntax_help {
         println!("{}", include_str!("syntax_help.txt"));
         return Ok(0);
     }
 
     #[cfg(feature = "completions")]
     {
-        if let Some(shell) = matches.get_one::<String>("generate-completion") {
+        if let Some(shell) = args.generate_completion {
             return generate_completions(shell);
         }
     }
     #[cfg(feature = "toml")]
     {
-        if matches.get_flag("print-config") {
+        if args.print_config {
             return print_config(&config);
         }
     }
 
-    let (base_ctx, stdin_used) = if let Some(data_files) = matches.get_many::<PathBuf>("data_file")
-    {
-        let mut contexts = Vec::with_capacity(data_files.len());
+    let (base_ctx, stdin_used) = if !args.data_files.is_empty() {
+        let mut contexts = Vec::with_capacity(args.data_files.len());
         let mut stdin_used = false;
-        let select = matches.get_one::<String>("select").map(|x| x.as_str());
-        for data_file in data_files {
+        let select = args.select.as_deref();
+        for data_file in &args.data_files {
             let (new_ctx, stdin_used_here) = load_data(config.format(), data_file, select)?;
             contexts.push(new_ctx);
             stdin_used = stdin_used || stdin_used_here;
@@ -405,10 +394,8 @@ pub fn execute() -> Result<i32, Error> {
     let ctx = context!(..config.defines(), ..base_ctx);
 
     let (template_name, template_source) = match (
-        matches.get_one::<String>("template"),
-        matches
-            .get_one::<String>("template_file")
-            .map(|x| x.as_str()),
+        args.template.as_ref(),
+        args.template_file.as_deref(),
     ) {
         (None, Some(STDIN_STDOUT)) => (Cow::Borrowed(STDIN_STDOUT), None),
         (None, Some("")) => bail!("Empty template names are only valid with --template."),
@@ -420,17 +407,17 @@ pub fn execute() -> Result<i32, Error> {
         _ => bail!("When --template is used, a template cannot be passed as argument (only an empty argument is allowed)."),
     };
 
-    let mut output = Output::new(matches.get_one::<PathBuf>("output").unwrap())?;
+    let mut output = Output::new(&args.output)?;
 
     let env = create_env(&config, cwd, &template_name, template_source, stdin_used)?;
     let mut exit_code = 0;
 
-    if let Some(expr) = matches.get_one::<String>("expr") {
+    if let Some(expr) = args.expr.as_ref() {
         let rv = env.compile_expression(expr)?.eval(ctx)?;
         exit_code = print_expr_out(rv, &config, &mut output)?;
-    } else if let Some(dump) = matches.get_one::<String>("dump") {
+    } else if let Some(dump) = args.dump.as_ref() {
         dump_info(dump, &env, &template_name, &mut output)?;
-    } else if cfg!(feature = "repl") && matches.get_flag("repl") {
+    } else if cfg!(feature = "repl") && repl_requested(&args) {
         #[cfg(feature = "repl")]
         {
             crate::repl::run(env, ctx)?;

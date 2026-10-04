@@ -303,6 +303,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "argument"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2ce63739a078df7f1f27fa78d1fc629a96a8e3af7a5370449a79b13de88a3f9"
+dependencies = [
+ "argument-parser",
+]
+
+[[package]]
+name = "argument-completions"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ede1e1fb331f1307f9dc5034c9e81c5b0270bbba954bc0b2237582f5dd123819"
+dependencies = [
+ "argument",
+]
+
+[[package]]
+name = "argument-mangen"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4971d8d4a14f4c7af32ae50f0dcbf1ae4ed6551bcdfebb25fb7130a6797e01d3"
+dependencies = [
+ "argument",
+]
+
+[[package]]
+name = "argument-parser"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce8e764dfe3de31014e13e9dd3f63fe46d4e398ead11bb09fde417a26cf24517"
+
+[[package]]
 name = "askama"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -653,36 +686,6 @@ checksum = "89cc6392a1f72bbeb820d71f32108f61fdaf18bc526e1d23954168a67759ef51"
 dependencies = [
  "anstyle",
  "clap_lex",
- "terminal_size",
-]
-
-[[package]]
-name = "clap_complete"
-version = "4.5.52"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a554639e42d0c838336fc4fbedb9e2df3ad1fa4acda149f9126b4ccfcd7900f"
-dependencies = [
- "clap",
-]
-
-[[package]]
-name = "clap_complete_fig"
-version = "4.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d494102c8ff3951810c72baf96910b980fb065ca5d3101243e6a8dc19747c86b"
-dependencies = [
- "clap",
- "clap_complete",
-]
-
-[[package]]
-name = "clap_complete_nushell"
-version = "4.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9801fe85d7986742027c6d365728a6a4ecb6d2b09866de18be836fef7ebf7df1"
-dependencies = [
- "clap",
- "clap_complete",
 ]
 
 [[package]]
@@ -690,16 +693,6 @@ name = "clap_lex"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
-
-[[package]]
-name = "clap_mangen"
-version = "0.2.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "724842fa9b144f9b89b3f3d371a89f3455eea660361d13a554f68f8ae5d6c13a"
-dependencies = [
- "clap",
- "roff",
-]
 
 [[package]]
 name = "clipboard-win"
@@ -2014,12 +2007,10 @@ name = "minijinja-cli"
 version = "3.0.0-alpha.2"
 dependencies = [
  "anyhow",
+ "argument",
+ "argument-completions",
+ "argument-mangen",
  "ciborium",
- "clap",
- "clap_complete",
- "clap_complete_fig",
- "clap_complete_nushell",
- "clap_mangen",
  "configparser",
  "dunce",
  "insta",
@@ -2721,12 +2712,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "roff"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88f8660c1ff60292143c98d08fc6e2f654d722db50410e3f3797d40baaf9d8f3"
-
-[[package]]
 name = "rust-fuzzy-search"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3137,16 +3122,6 @@ dependencies = [
  "serde_json",
  "slug",
  "unic-segment",
-]
-
-[[package]]
-name = "terminal_size"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45c6481c4829e4cc63825e62c49186a34538b7b2750b73b266581ffb612fb5ed"
-dependencies = [
- "rustix",
- "windows-sys 0.59.0",
 ]
 
 [[package]]
