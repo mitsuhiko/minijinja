@@ -13,6 +13,7 @@ All notable changes to MiniJinja are documented here.
 * Discontinued the `minijinja-autoreload` crate.  Templates loaded via `path_loader` are now reloaded automatically and environments no longer need to be guarded by a lock to reload.  See `UPDATING.md` for migration instructions.
 * Removed the `deserialization` feature.  Deserialization support is now part of the `serde` feature.
 * The `json` feature no longer depends on `serde` and `serde_json`.  The `tojson` filter and JSON auto escaping now use a built-in JSON serializer.  Invalid values now fail the serialization rather than being emitted as `null`.  Floats are formatted like recent versions of `serde_json` do (for instance `1e+16` instead of `1e16`).  The `speedups` feature now uses `zmij` and `itoa` to format numbers in JSON; the output is the same without it.
+* Updated PyO3 to 0.29 in the Python bindings.
 
 ## 3.0.0-alpha.2
 

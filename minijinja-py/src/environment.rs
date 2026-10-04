@@ -867,8 +867,10 @@ pub fn with_environment<R, F: FnOnce(Py<Environment>) -> PyResult<R>>(
 ) -> PyResult<R> {
     CURRENT_ENV.with(|handle| {
         let ptr = handle.load(Ordering::Relaxed) as *mut _;
-        match unsafe { Py::<Environment>::from_borrowed_ptr_or_opt(py, ptr) } {
-            Some(env) => f(env),
+        // SAFETY: the pointer is either null or points to the environment
+        // that was bound with `bind_environment`.
+        match unsafe { Bound::from_borrowed_ptr_or_opt(py, ptr) } {
+            Some(env) => f(unsafe { env.cast_into_unchecked::<Environment>() }.unbind()),
             None => Err(PyRuntimeError::new_err(
                 "environment cannot be used outside of template render",
             )),
