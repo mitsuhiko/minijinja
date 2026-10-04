@@ -1,7 +1,11 @@
 mod cli;
 mod command;
 mod config;
+#[cfg(feature = "json5")]
+mod json5;
 mod output;
+#[cfg(feature = "querystring")]
+mod querystring;
 #[cfg(feature = "repl")]
 mod repl;
 

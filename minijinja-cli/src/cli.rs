@@ -12,10 +12,10 @@ use minijinja::value::{merge_maps, Serde};
 use minijinja::{context, Environment, Error as MError, ErrorKind, Value};
 use serde::Deserialize;
 
+#[cfg(feature = "json5")]
+use crate::json5 as preferred_json;
 #[cfg(not(feature = "json5"))]
 use serde_json as preferred_json;
-#[cfg(feature = "json5")]
-use serde_json5 as preferred_json;
 
 #[cfg(windows)]
 use dunce::canonicalize;
@@ -36,7 +36,7 @@ fn load_config(matches: &ArgMatches) -> Result<Config, Error> {
         } else if let Some(var) = std::env::var_os("MINIJINJA_CONFIG_FILE") {
             Some(Cow::Owned(PathBuf::from(var)))
         } else {
-            home::home_dir().map(|home_dir| Cow::Owned(home_dir.join(".minijinja.toml")))
+            home_dir().map(|home_dir| Cow::Owned(home_dir.join(".minijinja.toml")))
         };
 
         if let Some(config_path) = config_path {
@@ -52,6 +52,14 @@ fn load_config(matches: &ArgMatches) -> Result<Config, Error> {
     config.update_from_env()?;
     config.update_from_matches(matches)?;
     Ok(config)
+}
+
+#[cfg(feature = "toml")]
+fn home_dir() -> Option<PathBuf> {
+    let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+    std::env::var_os(var)
+        .filter(|x| !x.is_empty())
+        .map(PathBuf::from)
 }
 
 fn detect_format_from_path(path: &Path) -> Result<&'static str, Error> {
@@ -96,7 +104,7 @@ fn load_data(
     let mut data: Value = match format {
         "json" => preferred_json::from_slice(&contents)?,
         #[cfg(feature = "querystring")]
-        "querystring" => Value::from(serde_qs::from_bytes::<BTreeMap<String, Value>>(&contents)?),
+        "querystring" => Value::from(crate::querystring::from_bytes(&contents)?),
         #[cfg(feature = "yaml")]
         "yaml" => {
             // for merge keys to work we need to manually call `apply_merge`.
