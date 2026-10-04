@@ -19,6 +19,82 @@ APIs deprecated before MiniJinja 3 have been removed:
 * Remove the no-op `loader` Cargo feature from dependency declarations. Loader
   APIs remain available unconditionally.
 
+## Template Loaders
+
+`Environment::set_loader` is now generic over the returned source, which can be
+a `String` or a `TemplateSource`.  Loaders that return `Ok(Some(string))`
+continue to work, but closures that rely on inference through `.into()` or only
+ever return `Ok(None)` need an explicit type:
+
+```rust
+// Old
+env.set_loader(|name| Ok(Some("...".into())));
+env.set_loader(|_| Ok(None));
+
+// New
+env.set_loader(|name| Ok(Some("...".to_string())));
+env.set_loader(|_| Ok(None::<String>));
+```
+
+`path_loader` now returns a `TemplateSource` which carries an up-to-date check.
+Auto reloading is enabled by default, so templates loaded through `path_loader`
+are reloaded individually when they change on disk.  Every template lookup now
+performs a `stat` call; to restore the old behavior of loading each template
+only once, disable auto reloading (for instance outside of debug builds):
+
+```rust
+let mut env = Environment::new();
+env.set_loader(path_loader("templates"));
+env.set_auto_reload(cfg!(debug_assertions));
+```
+
+## Removed `minijinja-autoreload`
+
+The `minijinja-autoreload` crate has been discontinued as reloading templates is
+now built into MiniJinja and works through a shared reference.  There is no
+more need for a lock or a guard around the environment:
+
+```rust
+// Old
+let reloader = AutoReloader::new(|notifier| {
+    let mut env = Environment::new();
+    env.set_loader(path_loader("templates"));
+    notifier.watch_path("templates", true);
+    Ok(env)
+});
+let env = reloader.acquire_env()?;
+let tmpl = env.get_template("index.html")?;
+
+// New
+let mut env = Environment::new();
+env.set_loader(path_loader("templates"));
+let tmpl = env.get_template("index.html")?;
+```
+
+The other features of the crate map as follows:
+
+* `Notifier::set_callback`: attach a check to the template with
+  `TemplateSource::with_uptodate_check` in a custom loader.
+* `Notifier::request_reload` and fast reloading: call
+  `Environment::clear_templates`, or attach an up-to-date check that observes
+  an `AtomicBool` or a counter that you change to request a reload.
+* Recreating the entire environment (for instance because globals are loaded
+  from a file): keep the environment in an `RwLock<Arc<Environment<'static>>>`
+  and replace it when needed.  Renders clone the `Arc` and do not hold the
+  lock while rendering:
+
+```rust
+static ENV: RwLock<Option<Arc<Environment<'static>>>> = RwLock::new(None);
+
+fn get_env() -> Arc<Environment<'static>> {
+    ENV.read().unwrap().clone().expect("environment not initialized")
+}
+
+fn reload_env() {
+    *ENV.write().unwrap() = Some(Arc::new(create_env()));
+}
+```
+
 ## Formatting API
 
 The formatting helper and its style enum are no longer exported from the crate

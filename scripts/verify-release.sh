@@ -29,7 +29,6 @@ check_line() {
 
 for manifest in \
   minijinja/Cargo.toml \
-  minijinja-autoreload/Cargo.toml \
   minijinja-cabi/Cargo.toml \
   minijinja-cli/Cargo.toml \
   minijinja-contrib/Cargo.toml \

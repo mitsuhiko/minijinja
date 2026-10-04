@@ -105,7 +105,8 @@
 //! - [`filters`]: teaches you how to write custom filters and to see the list of built-in filters.
 //! - [`tests`]: teaches you how to write custom test functions and to see the list of built-in tests.
 //! - [`functions`]: teaches how to write custom functions and to see the list of built-in functions.
-//! - For auto reloading use the [`minijinja-autoreload`](https://docs.rs/minijinja-autoreload) crate.
+//! - Templates loaded via [`path_loader`] are reloaded automatically when they change, see
+//!   [`Environment::set_auto_reload`].
 //! - For simpler embedding of templates use the [`minijinja-embed`](https://docs.rs/minijinja-embed) crate.
 //!
 //! Additionally there is an [list of examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
@@ -228,7 +229,7 @@ pub mod value;
 
 mod loader;
 
-pub use loader::path_loader;
+pub use loader::{path_loader, TemplateSource};
 
 #[cfg(feature = "debug")]
 mod debug;

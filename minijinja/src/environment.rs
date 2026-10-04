@@ -199,7 +199,12 @@ impl<'source> Environment<'source> {
     /// the template.  If this template exists `Ok(Some(template_source))` has
     /// to be returned, otherwise `Ok(None)`.  Once a template has been loaded
     /// it's stored on the environment.  This means the loader is only invoked
-    /// once per template name.
+    /// once per template name unless the template is reloaded.
+    ///
+    /// The source can be returned as a [`String`] or as a
+    /// [`TemplateSource`](crate::TemplateSource).  The latter can carry an
+    /// up-to-date check which enables automatic reloading of templates when
+    /// [`set_auto_reload`](Self::set_auto_reload) is enabled.
     ///
     /// For loading templates from the file system, you can use the
     /// [`path_loader`](crate::path_loader) function.
@@ -212,7 +217,7 @@ impl<'source> Environment<'source> {
     ///     let mut env = Environment::new();
     ///     env.set_loader(|name| {
     ///         if name == "layout.html" {
-    ///             Ok(Some("...".into()))
+    ///             Ok(Some("...".to_string()))
     ///         } else {
     ///             Ok(None)
     ///         }
@@ -220,11 +225,47 @@ impl<'source> Environment<'source> {
     ///     env
     /// }
     /// ```
-    pub fn set_loader<F>(&mut self, f: F)
+    pub fn set_loader<F, R>(&mut self, f: F)
     where
-        F: Fn(&str) -> Result<Option<String>, Error> + Send + Sync + 'static,
+        F: Fn(&str) -> Result<Option<R>, Error> + Send + Sync + 'static,
+        R: Into<TemplateSource>,
     {
         self.templates.set_loader(f);
+    }
+
+    /// Enables or disables automatic reloading of templates.
+    ///
+    /// When enabled, every lookup of a template that was produced by the
+    /// [loader](Self::set_loader) invokes the up-to-date check attached to its
+    /// [`TemplateSource`](crate::TemplateSource).  If the template is no
+    /// longer up to date, the loader is invoked again.  This also applies to
+    /// templates referenced via `extends`, `include` and `import`.  The
+    /// [`path_loader`](crate::path_loader) attaches such checks automatically.
+    ///
+    /// Because outstanding [`Template`] references borrow from the environment,
+    /// replaced templates are retained in memory until the templates of the
+    /// environment are modified through a mutable reference (eg: via
+    /// [`clear_templates`](Self::clear_templates)).
+    ///
+    /// Loaders that return plain strings do not attach up-to-date checks, so
+    /// for them this setting has no effect.  The default is `true`.  To avoid
+    /// the cost of the checks (eg: a `stat` call per lookup for the
+    /// [`path_loader`](crate::path_loader)) in production, auto reloading can
+    /// be limited to debug builds:
+    ///
+    /// ```rust
+    /// # use minijinja::{path_loader, Environment};
+    /// let mut env = Environment::new();
+    /// env.set_loader(path_loader("path/to/templates"));
+    /// env.set_auto_reload(cfg!(debug_assertions));
+    /// ```
+    pub fn set_auto_reload(&mut self, yes: bool) {
+        self.templates.auto_reload = yes;
+    }
+
+    /// Returns `true` if automatic reloading of templates is enabled.
+    pub fn auto_reload(&self) -> bool {
+        self.templates.auto_reload
     }
 
     /// Removes a template by name.
@@ -301,7 +342,8 @@ impl<'source> Environment<'source> {
     ///
     /// This method is mainly useful when combined with a loader as it causes
     /// the loader to "reload" templates.  By calling this method one can trigger
-    /// a reload.
+    /// a reload.  To reload individual templates when they change, see
+    /// [`set_auto_reload`](Self::set_auto_reload).
     pub fn clear_templates(&mut self) {
         self.templates.clear();
     }
@@ -805,4 +847,4 @@ impl<'source> Environment<'source> {
     }
 }
 
-use crate::loader::LoaderStore as TemplateStore;
+use crate::loader::{LoaderStore as TemplateStore, TemplateSource};

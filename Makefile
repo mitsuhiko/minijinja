@@ -10,7 +10,7 @@ build:
 
 .PHONY: doc
 doc:
-	@cd minijinja; RUSTC_BOOTSTRAP=1 RUSTDOCFLAGS="--cfg=docsrs --html-in-header doc-header.html" cargo doc -p minijinja -p minijinja-autoreload -p minijinja-contrib --no-deps --features=$(DOC_FEATURES)
+	@cd minijinja; RUSTC_BOOTSTRAP=1 RUSTDOCFLAGS="--cfg=docsrs --html-in-header doc-header.html" cargo doc -p minijinja -p minijinja-contrib --no-deps --features=$(DOC_FEATURES)
 
 .PHONY: test-msrv
 test-msrv:
@@ -71,7 +71,6 @@ run-tests:
 	@$(MAKE) run-speedup-tests FEATURES=$(FEATURES)
 	@echo "CARGO CHECK NO_DEFAULT_FEATURES"
 	@cd minijinja; cargo check --no-default-features --features=debug
-	@cd minijinja-autoreload; cargo test
 	@cd minijinja-contrib; cargo test
 
 .PHONY: run-speedup-tests
@@ -95,9 +94,6 @@ check:
 	@cd minijinja; cargo check --no-default-features --features macros
 	@echo "check multi_template only:"
 	@cd minijinja; cargo check --no-default-features --features multi_template
-	@echo "check minijinja-autoreload:"
-	@cd minijinja-autoreload; cargo check
-	@cd minijinja-autoreload; cargo check --no-default-features
 	@echo "check minijinja-contrib:"
 	@cd minijinja-contrib; cargo check
 	@cd minijinja-contrib; cargo check --all-features

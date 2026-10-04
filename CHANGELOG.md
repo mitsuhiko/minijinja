@@ -9,6 +9,8 @@ All notable changes to MiniJinja are documented here.
 * Fixed deadlocks in the Python bindings when an environment is modified while another thread renders from it, or when it is used from within a callback during a render.  Renders now work on a snapshot of the environment and no longer serialize on a shared lock.  #955
 * Fixed Python iterators that raise during iteration looping forever.  The error is now raised from the render instead.  #956
 * Iteration now consistently fails on invalid values that iterators yield to report errors.  Previously only loops did this while filters such as `list`, `join` or `sort`, the `in` operator and serialization processed them like other items.  The new `ValueIter::checked` helper provides the same behavior for custom code.
+* Added automatic reloading of individual templates.  Loaders can now return a `TemplateSource` with an up-to-date check in addition to a plain `String`, and the environment re-invokes the loader when a template is looked up that is no longer up to date.  `path_loader` attaches a check based on the file's modification time and size.  Auto reloading is enabled by default and can be disabled with `Environment::set_auto_reload`.  Templates are reloaded through a shared reference so the environment no longer needs to be recreated or guarded by a lock.  The `memo-map` dependency was removed.  #819
+* Discontinued the `minijinja-autoreload` crate.  Templates loaded via `path_loader` are now reloaded automatically and environments no longer need to be guarded by a lock to reload.  See `UPDATING.md` for migration instructions.
 
 ## 3.0.0-alpha.2
 

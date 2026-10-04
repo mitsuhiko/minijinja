@@ -54,7 +54,6 @@ wait_for_crate() {
 cargo publish -p minijinja
 wait_for_crate minijinja
 
-cargo publish -p minijinja-autoreload
 cargo publish -p minijinja-embed
 cargo publish -p minijinja-contrib
 wait_for_crate minijinja-contrib
