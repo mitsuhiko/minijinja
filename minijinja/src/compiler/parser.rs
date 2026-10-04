@@ -5,7 +5,7 @@ use std::fmt;
 use std::mem;
 
 use crate::compiler::ast::{self, Spanned};
-use crate::compiler::lexer::{Tokenizer, WhitespaceConfig};
+use crate::compiler::lexer::Tokenizer;
 use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
 use crate::syntax::SyntaxConfig;
@@ -108,10 +108,8 @@ impl<'a> TokenStream<'a> {
         filename: &'a str,
         in_expr: bool,
         syntax_config: SyntaxConfig,
-        whitespace_config: WhitespaceConfig,
     ) -> TokenStream<'a> {
-        let mut tokenizer =
-            Tokenizer::new(source, filename, in_expr, syntax_config, whitespace_config);
+        let mut tokenizer = Tokenizer::new(source, filename, in_expr, syntax_config);
         let current = tokenizer.next_token();
         TokenStream {
             tokenizer,
@@ -256,10 +254,9 @@ impl<'a> Parser<'a> {
         filename: &'a str,
         in_expr: bool,
         syntax_config: SyntaxConfig,
-        whitespace_config: WhitespaceConfig,
     ) -> Parser<'a> {
         Parser {
-            stream: TokenStream::new(source, filename, in_expr, syntax_config, whitespace_config),
+            stream: TokenStream::new(source, filename, in_expr, syntax_config),
             #[cfg(all(feature = "macros", feature = "multi_template"))]
             in_macro: false,
             #[cfg(feature = "loop_controls")]
@@ -1412,19 +1409,11 @@ pub fn parse<'source>(
     source: &'source str,
     filename: &'source str,
     syntax_config: SyntaxConfig,
-    whitespace_config: WhitespaceConfig,
 ) -> Result<ast::Stmt<'source>, Error> {
-    Parser::new(source, filename, false, syntax_config, whitespace_config).parse()
+    Parser::new(source, filename, false, syntax_config).parse()
 }
 
 /// Parses a standalone expression.
 pub fn parse_expr(source: &str) -> Result<ast::Expr<'_>, Error> {
-    Parser::new(
-        source,
-        "<expression>",
-        true,
-        Default::default(),
-        Default::default(),
-    )
-    .parse_standalone_expr()
+    Parser::new(source, "<expression>", true, Default::default()).parse_standalone_expr()
 }

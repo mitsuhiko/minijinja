@@ -7,11 +7,11 @@ use crate::syntax::SyntaxConfig;
 use crate::utils::{memchr, memstr, unescape};
 
 /// Internal config struct to control whitespace in the engine.
-#[derive(Copy, Clone, Debug, Default)]
-pub struct WhitespaceConfig {
-    pub keep_trailing_newline: bool,
-    pub lstrip_blocks: bool,
-    pub trim_blocks: bool,
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct WhitespaceConfig {
+    pub(crate) keep_trailing_newline: bool,
+    pub(crate) lstrip_blocks: bool,
+    pub(crate) trim_blocks: bool,
 }
 
 /// Tokenizes jinja templates.
@@ -295,8 +295,8 @@ impl<'s> Tokenizer<'s> {
         filename: &'s str,
         in_expr: bool,
         syntax_config: SyntaxConfig,
-        whitespace_config: WhitespaceConfig,
     ) -> Tokenizer<'s> {
+        let whitespace_config = syntax_config.whitespace();
         let mut stack = Vec::with_capacity(8);
         stack.push(if in_expr {
             LexerState::Variable
@@ -930,12 +930,10 @@ pub fn tokenize(
     input: &str,
     in_expr: bool,
     syntax_config: SyntaxConfig,
-    whitespace_config: WhitespaceConfig,
 ) -> impl Iterator<Item = Result<(Token<'_>, Span), Error>> {
     // This function is unused in minijinja itself, it's only used in tests and in the
     // unstable machinery as a convenient alternative to the tokenizer.
-    let mut tokenizer =
-        Tokenizer::new(input, "<string>", in_expr, syntax_config, whitespace_config);
+    let mut tokenizer = Tokenizer::new(input, "<string>", in_expr, syntax_config);
     std::iter::from_fn(move || tokenizer.next_token().transpose())
 }
 
@@ -969,15 +967,14 @@ mod tests {
     #[test]
     fn test_basic_identifiers() {
         fn assert_ident(s: &str) {
-            match tokenize(s, true, Default::default(), Default::default()).next() {
+            match tokenize(s, true, Default::default()).next() {
                 Some(Ok((Token::Ident(ident), _))) if ident == s => {}
                 _ => panic!("did not get a matching token result: {s:?}"),
             }
         }
 
         fn assert_not_ident(s: &str) {
-            let res = tokenize(s, true, Default::default(), Default::default())
-                .collect::<Result<Vec<_>, _>>();
+            let res = tokenize(s, true, Default::default()).collect::<Result<Vec<_>, _>>();
             if let Ok(tokens) = res {
                 if let &[(Token::Ident(_), _)] = &tokens[..] {
                     panic!("got a single ident for {s:?}")

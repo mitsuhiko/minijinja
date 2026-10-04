@@ -2,7 +2,7 @@ use std::ffi::{c_char, c_void, CStr, CString};
 use std::ptr;
 use std::sync::Arc;
 
-use minijinja::syntax::SyntaxConfig;
+use minijinja::syntax::SyntaxConfigBuilder;
 use minijinja::value::Rest;
 use minijinja::{AutoEscape, Environment, Error, ErrorKind, UndefinedBehavior, Value};
 
@@ -437,21 +437,27 @@ ffi_fn! {
 ffi_fn! {
     /// Enables or disables the `lstrip_blocks` feature.
     unsafe fn mj_env_set_lstrip_blocks(_scope, env: *mut mj_env, val: bool) {
-        (*env).0.set_lstrip_blocks(val);
+        update_syntax(&mut (*env).0, |syntax| {
+            syntax.lstrip_blocks(val);
+        });
     }
 }
 
 ffi_fn! {
     /// Enables or disables the `trim_blocks` feature.
     unsafe fn mj_env_set_trim_blocks(_scope, env: *mut mj_env, val: bool) {
-        (*env).0.set_trim_blocks(val);
+        update_syntax(&mut (*env).0, |syntax| {
+            syntax.trim_blocks(val);
+        });
     }
 }
 
 ffi_fn! {
     /// Preserve the trailing newline when rendering templates.
     unsafe fn mj_env_set_keep_trailing_newline(_scope, env: *mut mj_env, val: bool) {
-        (*env).0.set_keep_trailing_newline(val);
+        update_syntax(&mut (*env).0, |syntax| {
+            syntax.keep_trailing_newline(val);
+        });
     }
 }
 
@@ -467,6 +473,14 @@ ffi_fn! {
     unsafe fn mj_env_clear_fuel(_scope, env: *mut mj_env) {
         (*env).0.set_fuel(None);
     }
+}
+
+/// Updates the syntax config of an environment in place.
+fn update_syntax(env: &mut Environment<'static>, f: impl FnOnce(&mut SyntaxConfigBuilder)) {
+    let mut builder = env.syntax().to_builder();
+    f(&mut builder);
+    // the delimiters were already validated when the current config was built
+    env.set_syntax(builder.build().expect("current syntax config is valid"));
 }
 
 /// Allows one to override the syntax elements.
@@ -497,7 +511,8 @@ const fn c_char_ptr(bytes: &'static [u8]) -> *const c_char {
 ffi_fn! {
     /// Reconfigures the syntax.
     unsafe fn mj_env_set_syntax_config(scope, env: *mut mj_env, syntax: &mj_syntax_config) -> bool {
-        let mut builder = SyntaxConfig::builder();
+        // start from the current config so that whitespace settings are retained
+        let mut builder = (*env).0.syntax().to_builder();
         builder
             .block_delimiters(
                 scope.get_str(syntax.block_start)?.to_string(),
@@ -510,15 +525,9 @@ ffi_fn! {
             .comment_delimiters(
                 scope.get_str(syntax.comment_start)?.to_string(),
                 scope.get_str(syntax.comment_end)?.to_string()
-            );
-        let line_statement_prefix = scope.get_str(syntax.line_statement_prefix)?;
-        if !line_statement_prefix.is_empty() {
-            builder.line_statement_prefix(line_statement_prefix.to_string());
-        }
-        let line_comment_prefix = scope.get_str(syntax.line_comment_prefix)?;
-        if !line_comment_prefix.is_empty() {
-            builder.line_comment_prefix(line_comment_prefix.to_string());
-        }
+            )
+            .line_statement_prefix(scope.get_str(syntax.line_statement_prefix)?.to_string())
+            .line_comment_prefix(scope.get_str(syntax.line_comment_prefix)?.to_string());
         (*env).0.set_syntax(builder.build()?);
         true
     }

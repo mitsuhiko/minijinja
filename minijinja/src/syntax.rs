@@ -1,11 +1,4 @@
-#![cfg_attr(
-    feature = "custom_syntax",
-    doc = "Documents the syntax for templates and provides ways to reconfigure it."
-)]
-#![cfg_attr(
-    not(feature = "custom_syntax"),
-    doc = "Documents the syntax for templates."
-)]
+//! Documents the syntax for templates and provides ways to reconfigure it.
 //!
 //! <details><summary><strong style="cursor: pointer">Table of Contents</strong></summary>
 //!
@@ -856,9 +849,9 @@ Additionally whitespace control is not available for line statements.
 //! whitespace handling.  By default a single trailing newline is stripped if present
 //! and all other whitespace is returned unchanged.
 //!
-//! If an application configures Jinja to [`trim_blocks`](crate::Environment::set_trim_blocks),
+//! If an application configures Jinja to [`trim_blocks`](SyntaxConfigBuilder::trim_blocks),
 //! the first newline after a template tag is removed automatically (like in PHP).  The
-//! [`lstrip_blocks`](crate::Environment::set_lstrip_blocks) option can also be set to strip
+//! [`lstrip_blocks`](SyntaxConfigBuilder::lstrip_blocks) option can also be set to strip
 //! tabs and spaces from the beginning of a line to the start of a block. (Nothing will be
 //! stripped if there are other characters before the start of the block.)
 //!
@@ -929,300 +922,426 @@ Additionally whitespace control is not available for line statements.
 //! the output would be `123456789`.
 //!
 //! By default, MiniJinja also removes trailing newlines.  To keep single trailing newlines,
-//! configure MiniJinja to [`keep_trailing_newline`](crate::Environment::set_keep_trailing_newline).
+//! configure MiniJinja to [`keep_trailing_newline`](SyntaxConfigBuilder::keep_trailing_newline).
+//!
+//! All of these options are part of the [`SyntaxConfig`]:
+//!
+//! ```
+//! # use minijinja::{Environment, syntax::SyntaxConfig};
+//! let mut env = Environment::new();
+//! env.set_syntax(
+//!     SyntaxConfig::builder()
+//!         .trim_blocks(true)
+//!         .lstrip_blocks(true)
+//!         .build()
+//!         .unwrap(),
+//! );
+//! ```
+
+use crate::compiler::lexer::WhitespaceConfig;
+use crate::error::Error;
 
 #[cfg(feature = "custom_syntax")]
-mod imp {
-    use crate::compiler::lexer::StartMarker;
-    use crate::error::{Error, ErrorKind};
-    use aho_corasick::{AhoCorasick, PatternID};
-    use std::borrow::Cow;
-    use std::sync::{Arc, OnceLock};
+use {
+    crate::compiler::lexer::StartMarker,
+    crate::error::ErrorKind,
+    aho_corasick::{AhoCorasick, PatternID},
+    std::borrow::Cow,
+    std::sync::{Arc, OnceLock},
+};
 
-    #[derive(Debug, PartialEq, Clone)]
-    pub(crate) struct Delims {
-        block_start: Cow<'static, str>,
-        block_end: Cow<'static, str>,
-        variable_start: Cow<'static, str>,
-        variable_end: Cow<'static, str>,
-        comment_start: Cow<'static, str>,
-        comment_end: Cow<'static, str>,
-        line_statement_prefix: Cow<'static, str>,
-        line_comment_prefix: Cow<'static, str>,
-    }
+#[cfg(feature = "custom_syntax")]
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) struct Delims {
+    block_start: Cow<'static, str>,
+    block_end: Cow<'static, str>,
+    variable_start: Cow<'static, str>,
+    variable_end: Cow<'static, str>,
+    comment_start: Cow<'static, str>,
+    comment_end: Cow<'static, str>,
+    line_statement_prefix: Cow<'static, str>,
+    line_comment_prefix: Cow<'static, str>,
+}
 
-    const DEFAULT_DELIMS: Delims = Delims {
-        block_start: Cow::Borrowed("{%"),
-        block_end: Cow::Borrowed("%}"),
-        variable_start: Cow::Borrowed("{{"),
-        variable_end: Cow::Borrowed("}}"),
-        comment_start: Cow::Borrowed("{#"),
-        comment_end: Cow::Borrowed("#}"),
-        line_statement_prefix: Cow::Borrowed(""),
-        line_comment_prefix: Cow::Borrowed(""),
-    };
+#[cfg(feature = "custom_syntax")]
+const DEFAULT_DELIMS: Delims = Delims {
+    block_start: Cow::Borrowed("{%"),
+    block_end: Cow::Borrowed("%}"),
+    variable_start: Cow::Borrowed("{{"),
+    variable_end: Cow::Borrowed("}}"),
+    comment_start: Cow::Borrowed("{#"),
+    comment_end: Cow::Borrowed("#}"),
+    line_statement_prefix: Cow::Borrowed(""),
+    line_comment_prefix: Cow::Borrowed(""),
+};
 
-    fn default_delims() -> Arc<Delims> {
-        static DEFAULT_DELIMS_ARC: OnceLock<Arc<Delims>> = OnceLock::new();
-        DEFAULT_DELIMS_ARC
-            .get_or_init(|| Arc::new(DEFAULT_DELIMS))
-            .clone()
-    }
+#[cfg(feature = "custom_syntax")]
+fn default_delims() -> Arc<Delims> {
+    static DEFAULT_DELIMS_ARC: OnceLock<Arc<Delims>> = OnceLock::new();
+    DEFAULT_DELIMS_ARC
+        .get_or_init(|| Arc::new(DEFAULT_DELIMS))
+        .clone()
+}
 
-    impl Delims {
-        fn validated_start_delims(&self) -> Result<Vec<&str>, Error> {
-            let mut delims = Vec::with_capacity(5);
-            for (delim, required) in [
-                (&self.variable_start, true),
-                (&self.block_start, true),
-                (&self.comment_start, true),
-                (&self.line_statement_prefix, false),
-                (&self.line_comment_prefix, false),
-            ] {
-                let delim = delim as &str;
-                if delim.is_empty() {
-                    if required {
-                        return Err(ErrorKind::InvalidDelimiter.into());
-                    }
-                } else if delims.contains(&delim) {
+#[cfg(feature = "custom_syntax")]
+impl Delims {
+    fn validated_start_delims(&self) -> Result<Vec<&str>, Error> {
+        let mut delims = Vec::with_capacity(5);
+        for (delim, required) in [
+            (&self.variable_start, true),
+            (&self.block_start, true),
+            (&self.comment_start, true),
+            (&self.line_statement_prefix, false),
+            (&self.line_comment_prefix, false),
+        ] {
+            let delim = delim as &str;
+            if delim.is_empty() {
+                if required {
                     return Err(ErrorKind::InvalidDelimiter.into());
-                } else {
-                    delims.push(delim);
                 }
+            } else if delims.contains(&delim) {
+                return Err(ErrorKind::InvalidDelimiter.into());
+            } else {
+                delims.push(delim);
             }
-
-            Ok(delims)
         }
-    }
 
-    /// Builder helper to reconfigure the syntax.
-    ///
-    /// A new builder is returned by [`SyntaxConfig::builder`].
-    #[derive(Debug)]
+        Ok(delims)
+    }
+}
+
+/// Builder helper to reconfigure the syntax.
+///
+/// A new builder is returned by [`SyntaxConfig::builder`].  To modify an
+/// existing configuration use [`SyntaxConfig::to_builder`].
+#[derive(Debug, Clone)]
+pub struct SyntaxConfigBuilder {
+    #[cfg(feature = "custom_syntax")]
+    delims: Arc<Delims>,
+    whitespace: WhitespaceConfig,
+}
+
+impl SyntaxConfigBuilder {
+    /// Sets the block start and end delimiters.
+    #[cfg(feature = "custom_syntax")]
     #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
-    pub struct SyntaxConfigBuilder {
-        delims: Arc<Delims>,
+    pub fn block_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
+    where
+        S: Into<Cow<'static, str>>,
+        E: Into<Cow<'static, str>>,
+    {
+        let delims = Arc::make_mut(&mut self.delims);
+        delims.block_start = s.into();
+        delims.block_end = e.into();
+        self
     }
 
-    impl SyntaxConfigBuilder {
-        /// Sets the block start and end delimiters.
-        pub fn block_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
-        where
-            S: Into<Cow<'static, str>>,
-            E: Into<Cow<'static, str>>,
-        {
-            let delims = Arc::make_mut(&mut self.delims);
-            delims.block_start = s.into();
-            delims.block_end = e.into();
-            self
-        }
+    /// Sets the variable start and end delimiters.
+    #[cfg(feature = "custom_syntax")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub fn variable_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
+    where
+        S: Into<Cow<'static, str>>,
+        E: Into<Cow<'static, str>>,
+    {
+        let delims = Arc::make_mut(&mut self.delims);
+        delims.variable_start = s.into();
+        delims.variable_end = e.into();
+        self
+    }
 
-        /// Sets the variable start and end delimiters.
-        pub fn variable_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
-        where
-            S: Into<Cow<'static, str>>,
-            E: Into<Cow<'static, str>>,
-        {
-            let delims = Arc::make_mut(&mut self.delims);
-            delims.variable_start = s.into();
-            delims.variable_end = e.into();
-            self
-        }
+    /// Sets the comment start and end delimiters.
+    #[cfg(feature = "custom_syntax")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub fn comment_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
+    where
+        S: Into<Cow<'static, str>>,
+        E: Into<Cow<'static, str>>,
+    {
+        let delims = Arc::make_mut(&mut self.delims);
+        delims.comment_start = s.into();
+        delims.comment_end = e.into();
+        self
+    }
 
-        /// Sets the comment start and end delimiters.
-        pub fn comment_delimiters<S, E>(&mut self, s: S, e: E) -> &mut Self
-        where
-            S: Into<Cow<'static, str>>,
-            E: Into<Cow<'static, str>>,
-        {
-            let delims = Arc::make_mut(&mut self.delims);
-            delims.comment_start = s.into();
-            delims.comment_end = e.into();
-            self
-        }
+    /// Sets the line statement prefix.
+    ///
+    /// By default this is the empty string which disables the line
+    /// statement prefix feature.
+    #[cfg(feature = "custom_syntax")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub fn line_statement_prefix<S>(&mut self, s: S) -> &mut Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
+        let delims = Arc::make_mut(&mut self.delims);
+        delims.line_statement_prefix = s.into();
+        self
+    }
 
-        /// Sets the line statement prefix.
-        ///
-        /// By default this is the empty string which disables the line
-        /// statement prefix feature.
-        pub fn line_statement_prefix<S>(&mut self, s: S) -> &mut Self
-        where
-            S: Into<Cow<'static, str>>,
-        {
-            let delims = Arc::make_mut(&mut self.delims);
-            delims.line_statement_prefix = s.into();
-            self
-        }
+    /// Sets the line comment prefix.
+    ///
+    /// By default this is the empty string which disables the line
+    /// comment prefix feature.
+    #[cfg(feature = "custom_syntax")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
+    pub fn line_comment_prefix<S>(&mut self, s: S) -> &mut Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
+        let delims = Arc::make_mut(&mut self.delims);
+        delims.line_comment_prefix = s.into();
+        self
+    }
 
-        /// Sets the line comment prefix.
-        ///
-        /// By default this is the empty string which disables the line
-        /// comment prefix feature.
-        pub fn line_comment_prefix<S>(&mut self, s: S) -> &mut Self
-        where
-            S: Into<Cow<'static, str>>,
-        {
-            let delims = Arc::make_mut(&mut self.delims);
-            delims.line_comment_prefix = s.into();
-            self
-        }
+    /// Remove the first newline after a block.
+    ///
+    /// If this is set to `true` then the first newline after a block is removed
+    /// (block, not variable tag!). Defaults to `false`.
+    pub fn trim_blocks(&mut self, yes: bool) -> &mut Self {
+        self.whitespace.trim_blocks = yes;
+        self
+    }
 
-        /// Builds the final syntax config.
-        pub fn build(&self) -> Result<SyntaxConfig, Error> {
-            let delims = self.delims.clone();
-            if *delims == DEFAULT_DELIMS {
-                return Ok(SyntaxConfig::default());
+    /// Remove leading spaces and tabs from the start of a line to a block.
+    ///
+    /// If this is set to `true` then leading spaces and tabs from the start of a line
+    /// to the block tag are removed.  Defaults to `false`.
+    pub fn lstrip_blocks(&mut self, yes: bool) -> &mut Self {
+        self.whitespace.lstrip_blocks = yes;
+        self
+    }
+
+    /// Preserve the trailing newline when rendering templates.
+    ///
+    /// The default is `false`, which causes a single newline, if present, to be
+    /// stripped from the end of the template.
+    pub fn keep_trailing_newline(&mut self, yes: bool) -> &mut Self {
+        self.whitespace.keep_trailing_newline = yes;
+        self
+    }
+
+    /// Builds the final syntax config.
+    ///
+    /// This fails if the configured delimiters are invalid.
+    pub fn build(&self) -> Result<SyntaxConfig, Error> {
+        #[cfg(feature = "custom_syntax")]
+        {
+            if *self.delims == DEFAULT_DELIMS {
+                return Ok(SyntaxConfig {
+                    delims: default_delims(),
+                    aho_corasick: None,
+                    whitespace: self.whitespace,
+                });
             }
             let aho_corasick = ok!(AhoCorasick::builder()
-                .build(ok!(delims.validated_start_delims()))
+                .build(ok!(self.delims.validated_start_delims()))
                 .map_err(|_| ErrorKind::InvalidDelimiter.into()));
             Ok(SyntaxConfig {
-                delims,
+                delims: self.delims.clone(),
                 aho_corasick: Some(aho_corasick),
+                whitespace: self.whitespace,
+            })
+        }
+        #[cfg(not(feature = "custom_syntax"))]
+        {
+            Ok(SyntaxConfig {
+                whitespace: self.whitespace,
             })
         }
     }
+}
 
-    /// The delimiter configuration for the environment and the parser.
+/// The syntax configuration for the environment and the parser.
+///
+/// The syntax configuration controls how templates are tokenized.  This
+/// includes the whitespace behavior ([`trim_blocks`](SyntaxConfigBuilder::trim_blocks),
+/// [`lstrip_blocks`](SyntaxConfigBuilder::lstrip_blocks) and
+/// [`keep_trailing_newline`](SyntaxConfigBuilder::keep_trailing_newline)) and,
+/// with the `custom_syntax` feature, the delimiters.
+///
+/// ```
+/// # use minijinja::{Environment, syntax::SyntaxConfig};
+/// let mut environment = Environment::new();
+/// environment.set_syntax(
+///     SyntaxConfig::builder()
+///         .trim_blocks(true)
+///         .lstrip_blocks(true)
+///         .build()
+///         .unwrap()
+/// );
+/// ```
+///
+/// Custom delimiters require the `custom_syntax` feature.  The end markers can
+/// be shared, but the start markers need to be distinct.  It would thus not be
+/// valid to configure `{{` to be the marker for both variables and blocks.
+///
+#[cfg_attr(feature = "custom_syntax", doc = "```")]
+#[cfg_attr(not(feature = "custom_syntax"), doc = "```ignore")]
+/// # use minijinja::{Environment, syntax::SyntaxConfig};
+/// let mut environment = Environment::new();
+/// environment.set_syntax(
+///     SyntaxConfig::builder()
+///         .block_delimiters("\\BLOCK{", "}")
+///         .variable_delimiters("\\VAR{", "}")
+///         .comment_delimiters("\\#{", "}")
+///         .build()
+///         .unwrap()
+/// );
+/// ```
+#[derive(Clone, Debug)]
+pub struct SyntaxConfig {
+    #[cfg(feature = "custom_syntax")]
+    delims: Arc<Delims>,
+    #[cfg(feature = "custom_syntax")]
+    pub(crate) aho_corasick: Option<AhoCorasick>,
+    whitespace: WhitespaceConfig,
+}
+
+// not derivable when the custom_syntax feature is enabled
+#[allow(clippy::derivable_impls)]
+impl Default for SyntaxConfig {
+    fn default() -> Self {
+        Self {
+            #[cfg(feature = "custom_syntax")]
+            delims: default_delims(),
+            #[cfg(feature = "custom_syntax")]
+            aho_corasick: None,
+            whitespace: WhitespaceConfig::default(),
+        }
+    }
+}
+
+impl SyntaxConfig {
+    /// Creates a syntax builder with the default configuration.
+    pub fn builder() -> SyntaxConfigBuilder {
+        SyntaxConfig::default().to_builder()
+    }
+
+    /// Creates a syntax builder initialized from this configuration.
     ///
-    /// Custom syntax configurations require the `custom_syntax` feature.
-    /// Otherwise just the default syntax is available.
-    ///
-    /// You can  override the syntax configuration for templates by setting different
-    /// delimiters.  The end markers can be shared, but the start markers need to be
-    /// distinct.  It would thus not be valid to configure `{{` to be the marker for
-    /// both variables and blocks.
+    /// This is useful to change individual settings of an existing
+    /// configuration:
     ///
     /// ```
-    /// # use minijinja::{Environment, syntax::SyntaxConfig};
-    /// let mut environment = Environment::new();
-    /// environment.set_syntax(
-    ///     SyntaxConfig::builder()
-    ///         .block_delimiters("\\BLOCK{", "}")
-    ///         .variable_delimiters("\\VAR{", "}")
-    ///         .comment_delimiters("\\#{", "}")
-    ///         .build()
-    ///         .unwrap()
-    /// );
-    #[derive(Clone, Debug)]
-    pub struct SyntaxConfig {
-        delims: Arc<Delims>,
-        pub(crate) aho_corasick: Option<aho_corasick::AhoCorasick>,
-    }
-
-    impl Default for SyntaxConfig {
-        fn default() -> Self {
-            Self {
-                delims: default_delims(),
-                aho_corasick: None,
-            }
+    /// # use minijinja::Environment;
+    /// let mut env = Environment::new();
+    /// let syntax = env.syntax().to_builder().trim_blocks(true).build().unwrap();
+    /// env.set_syntax(syntax);
+    /// ```
+    pub fn to_builder(&self) -> SyntaxConfigBuilder {
+        SyntaxConfigBuilder {
+            #[cfg(feature = "custom_syntax")]
+            delims: self.delims.clone(),
+            whitespace: self.whitespace,
         }
     }
 
-    impl SyntaxConfig {
-        /// Creates a syntax builder.
-        #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
-        pub fn builder() -> SyntaxConfigBuilder {
-            SyntaxConfigBuilder {
-                delims: default_delims(),
-            }
-        }
-
-        /// Returns the block delimiters.
-        #[inline(always)]
-        pub fn block_delimiters(&self) -> (&str, &str) {
+    /// Returns the block delimiters.
+    #[inline(always)]
+    pub fn block_delimiters(&self) -> (&str, &str) {
+        #[cfg(feature = "custom_syntax")]
+        {
             (&self.delims.block_start, &self.delims.block_end)
         }
-
-        /// Returns the variable delimiters.
-        #[inline(always)]
-        pub fn variable_delimiters(&self) -> (&str, &str) {
-            (&self.delims.variable_start, &self.delims.variable_end)
-        }
-
-        /// Returns the comment delimiters.
-        #[inline(always)]
-        pub fn comment_delimiters(&self) -> (&str, &str) {
-            (&self.delims.comment_start, &self.delims.comment_end)
-        }
-
-        /// Returns the line statement prefix.
-        #[inline(always)]
-        pub fn line_statement_prefix(&self) -> Option<&str> {
-            if self.delims.line_statement_prefix.is_empty() {
-                None
-            } else {
-                Some(&self.delims.line_statement_prefix)
-            }
-        }
-
-        /// Returns the line comment prefix.
-        #[inline(always)]
-        pub fn line_comment_prefix(&self) -> Option<&str> {
-            if self.delims.line_comment_prefix.is_empty() {
-                None
-            } else {
-                Some(&self.delims.line_comment_prefix)
-            }
-        }
-
-        /// Reverse resolves the pattern to a start marker.
-        pub(crate) fn pattern_to_marker(&self, pattern: PatternID) -> StartMarker {
-            match pattern.as_usize() {
-                0 => StartMarker::Variable,
-                1 => StartMarker::Block,
-                2 => StartMarker::Comment,
-                3 => {
-                    if self.line_statement_prefix().is_some() {
-                        StartMarker::LineStatement
-                    } else {
-                        StartMarker::LineComment
-                    }
-                }
-                4 => StartMarker::LineComment,
-                _ => unreachable!(),
-            }
-        }
-    }
-}
-
-#[cfg(not(feature = "custom_syntax"))]
-mod imp {
-    /// The default delimiter configuration for the environment and the parser.
-    #[derive(Clone, Default, Debug)]
-    pub struct SyntaxConfig;
-
-    impl SyntaxConfig {
-        /// Returns the block delimiters.
-        #[inline(always)]
-        pub fn block_delimiters(&self) -> (&str, &str) {
+        #[cfg(not(feature = "custom_syntax"))]
+        {
             ("{%", "%}")
         }
+    }
 
-        /// Returns the variable delimiters.
-        #[inline(always)]
-        pub fn variable_delimiters(&self) -> (&str, &str) {
+    /// Returns the variable delimiters.
+    #[inline(always)]
+    pub fn variable_delimiters(&self) -> (&str, &str) {
+        #[cfg(feature = "custom_syntax")]
+        {
+            (&self.delims.variable_start, &self.delims.variable_end)
+        }
+        #[cfg(not(feature = "custom_syntax"))]
+        {
             ("{{", "}}")
         }
+    }
 
-        /// Returns the comment delimiters.
-        #[inline(always)]
-        pub fn comment_delimiters(&self) -> (&str, &str) {
+    /// Returns the comment delimiters.
+    #[inline(always)]
+    pub fn comment_delimiters(&self) -> (&str, &str) {
+        #[cfg(feature = "custom_syntax")]
+        {
+            (&self.delims.comment_start, &self.delims.comment_end)
+        }
+        #[cfg(not(feature = "custom_syntax"))]
+        {
             ("{#", "#}")
         }
+    }
 
-        /// Returns the line statement prefix.
-        #[inline(always)]
-        pub fn line_statement_prefix(&self) -> Option<&str> {
-            None
+    /// Returns the line statement prefix.
+    #[inline(always)]
+    pub fn line_statement_prefix(&self) -> Option<&str> {
+        #[cfg(feature = "custom_syntax")]
+        {
+            Some(&self.delims.line_statement_prefix as &str).filter(|x| !x.is_empty())
         }
-
-        /// Returns the line comment prefix.
-        #[inline(always)]
-        pub fn line_comment_prefix(&self) -> Option<&str> {
+        #[cfg(not(feature = "custom_syntax"))]
+        {
             None
         }
     }
-}
 
-pub use self::imp::*;
+    /// Returns the line comment prefix.
+    #[inline(always)]
+    pub fn line_comment_prefix(&self) -> Option<&str> {
+        #[cfg(feature = "custom_syntax")]
+        {
+            Some(&self.delims.line_comment_prefix as &str).filter(|x| !x.is_empty())
+        }
+        #[cfg(not(feature = "custom_syntax"))]
+        {
+            None
+        }
+    }
+
+    /// Returns `true` if the first newline after a block is removed.
+    #[inline(always)]
+    pub fn trim_blocks(&self) -> bool {
+        self.whitespace.trim_blocks
+    }
+
+    /// Returns `true` if leading spaces and tabs before a block are removed.
+    #[inline(always)]
+    pub fn lstrip_blocks(&self) -> bool {
+        self.whitespace.lstrip_blocks
+    }
+
+    /// Returns `true` if a single trailing newline is preserved.
+    #[inline(always)]
+    pub fn keep_trailing_newline(&self) -> bool {
+        self.whitespace.keep_trailing_newline
+    }
+
+    /// Returns the whitespace configuration.
+    #[inline(always)]
+    pub(crate) fn whitespace(&self) -> WhitespaceConfig {
+        self.whitespace
+    }
+
+    /// Reverse resolves the pattern to a start marker.
+    #[cfg(feature = "custom_syntax")]
+    pub(crate) fn pattern_to_marker(&self, pattern: PatternID) -> StartMarker {
+        match pattern.as_usize() {
+            0 => StartMarker::Variable,
+            1 => StartMarker::Block,
+            2 => StartMarker::Comment,
+            3 => {
+                if self.line_statement_prefix().is_some() {
+                    StartMarker::LineStatement
+                } else {
+                    StartMarker::LineComment
+                }
+            }
+            4 => StartMarker::LineComment,
+            _ => unreachable!(),
+        }
+    }
+}

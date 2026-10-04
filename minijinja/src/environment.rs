@@ -227,54 +227,6 @@ impl<'source> Environment<'source> {
         self.templates.set_loader(f);
     }
 
-    /// Preserve the trailing newline when rendering templates.
-    ///
-    /// The default is `false`, which causes a single newline, if present, to be
-    /// stripped from the end of the template.
-    ///
-    /// This setting is used whenever a template is loaded into the environment.
-    /// Changing it at a later point only affects future templates loaded.
-    pub fn set_keep_trailing_newline(&mut self, yes: bool) {
-        self.templates
-            .template_config
-            .ws_config
-            .keep_trailing_newline = yes;
-    }
-
-    /// Returns the value of the trailing newline preservation flag.
-    pub fn keep_trailing_newline(&self) -> bool {
-        self.templates
-            .template_config
-            .ws_config
-            .keep_trailing_newline
-    }
-
-    /// Remove the first newline after a block.
-    ///
-    /// If this is set to `true` then the first newline after a block is removed
-    /// (block, not variable tag!). Defaults to `false`.
-    pub fn set_trim_blocks(&mut self, yes: bool) {
-        self.templates.template_config.ws_config.trim_blocks = yes;
-    }
-
-    /// Returns the value of the trim blocks flag.
-    pub fn trim_blocks(&self) -> bool {
-        self.templates.template_config.ws_config.trim_blocks
-    }
-
-    /// Remove leading spaces and tabs from the start of a line to a block.
-    ///
-    /// If this is set to `true` then leading spaces and tabs from the start of a line
-    /// to the block tag are removed.
-    pub fn set_lstrip_blocks(&mut self, yes: bool) {
-        self.templates.template_config.ws_config.lstrip_blocks = yes;
-    }
-
-    /// Returns the value of the lstrip blocks flag.
-    pub fn lstrip_blocks(&self) -> bool {
-        self.templates.template_config.ws_config.lstrip_blocks
-    }
-
     /// Removes a template by name.
     pub fn remove_template(&mut self, name: &str) {
         self.templates.remove(name);
@@ -611,16 +563,28 @@ impl<'source> Environment<'source> {
     /// This setting is used whenever a template is loaded into the environment.
     /// Changing it at a later point only affects future templates loaded.
     ///
+    /// The syntax config controls the delimiters (requires the `custom_syntax`
+    /// feature) as well as the whitespace behavior such as `trim_blocks`,
+    /// `lstrip_blocks` and `keep_trailing_newline`.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, syntax::SyntaxConfig};
+    /// let mut env = Environment::new();
+    /// env.set_syntax(
+    ///     SyntaxConfig::builder()
+    ///         .trim_blocks(true)
+    ///         .lstrip_blocks(true)
+    ///         .build()
+    ///         .unwrap(),
+    /// );
+    /// ```
+    ///
     /// See [`SyntaxConfig`](crate::syntax::SyntaxConfig) for more information.
-    #[cfg(feature = "custom_syntax")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
     pub fn set_syntax(&mut self, syntax: crate::syntax::SyntaxConfig) {
         self.templates.template_config.syntax_config = syntax;
     }
 
     /// Returns the current syntax config.
-    #[cfg(feature = "custom_syntax")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "custom_syntax")))]
     pub fn syntax(&self) -> &crate::syntax::SyntaxConfig {
         &self.templates.template_config.syntax_config
     }

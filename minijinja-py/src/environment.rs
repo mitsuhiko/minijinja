@@ -4,7 +4,7 @@ use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use minijinja::syntax::SyntaxConfig;
+use minijinja::syntax::{SyntaxConfig, SyntaxConfigBuilder};
 use minijinja::value::{Rest, Value, ValueOrKwargs};
 use minijinja::{
     context, escape_formatter, AutoEscape, Error, ErrorKind, State, UndefinedBehavior,
@@ -51,8 +51,10 @@ impl Default for Syntax {
     }
 }
 impl Syntax {
-    fn compile(&self) -> Result<SyntaxConfig, Error> {
-        SyntaxConfig::builder()
+    /// Compiles the delimiters on top of an existing config so that the
+    /// whitespace settings are retained.
+    fn compile(&self, base: &SyntaxConfig) -> Result<SyntaxConfig, Error> {
+        base.to_builder()
             .block_delimiters(self.block_start.clone(), self.block_end.clone())
             .variable_delimiters(self.variable_start.clone(), self.variable_end.clone())
             .comment_delimiters(self.comment_start.clone(), self.comment_end.clone())
@@ -72,10 +74,11 @@ macro_rules! syntax_setter {
             }
             inner.syntax = Some(Syntax::default());
         }
+        let inner = &mut *inner;
         if let Some(ref mut syntax) = inner.syntax {
             if syntax.$field != value {
                 syntax.$field = value.into();
-                let syntax_config = syntax.compile().map_err(to_py_error)?;
+                let syntax_config = syntax.compile(inner.env.syntax()).map_err(to_py_error)?;
                 inner.env_mut().set_syntax(syntax_config);
             }
         }
@@ -662,40 +665,43 @@ impl Environment {
     /// Configures the trailing newline trimming feature.
     #[setter]
     pub fn set_keep_trailing_newline(&self, py: Python<'_>, yes: bool) -> PyResult<()> {
-        self.lock(py).env_mut().set_keep_trailing_newline(yes);
-        Ok(())
+        self.update_whitespace(py, |syntax| {
+            syntax.keep_trailing_newline(yes);
+        })
     }
 
     /// Returns the current value of the trailing newline trimming flag.
     #[getter]
     pub fn get_keep_trailing_newline(&self, py: Python<'_>) -> PyResult<bool> {
-        Ok(self.lock(py).env.keep_trailing_newline())
+        Ok(self.lock(py).env.syntax().keep_trailing_newline())
     }
 
     /// Configures the trim blocks feature.
     #[setter]
     pub fn set_trim_blocks(&self, py: Python<'_>, yes: bool) -> PyResult<()> {
-        self.lock(py).env_mut().set_trim_blocks(yes);
-        Ok(())
+        self.update_whitespace(py, |syntax| {
+            syntax.trim_blocks(yes);
+        })
     }
 
     /// Returns the current value of the trim blocks flag.
     #[getter]
     pub fn get_trim_blocks(&self, py: Python<'_>) -> PyResult<bool> {
-        Ok(self.lock(py).env.trim_blocks())
+        Ok(self.lock(py).env.syntax().trim_blocks())
     }
 
     /// Configures the lstrip blocks feature.
     #[setter]
     pub fn set_lstrip_blocks(&self, py: Python<'_>, yes: bool) -> PyResult<()> {
-        self.lock(py).env_mut().set_lstrip_blocks(yes);
-        Ok(())
+        self.update_whitespace(py, |syntax| {
+            syntax.lstrip_blocks(yes);
+        })
     }
 
     /// Returns the current value of the lstrip blocks flag.
     #[getter]
     pub fn get_lstrip_blocks(&self, py: Python<'_>) -> PyResult<bool> {
-        Ok(self.lock(py).env.lstrip_blocks())
+        Ok(self.lock(py).env.syntax().lstrip_blocks())
     }
 
     /// Manually adds a template to the environment.
@@ -840,6 +846,20 @@ impl Environment {
     /// affect it.
     fn snapshot(&self, py: Python<'_>) -> Arc<minijinja::Environment<'static>> {
         self.lock(py).env.clone()
+    }
+
+    /// Changes whitespace settings on the current syntax config.
+    fn update_whitespace(
+        &self,
+        py: Python<'_>,
+        f: impl FnOnce(&mut SyntaxConfigBuilder),
+    ) -> PyResult<()> {
+        let mut inner = self.lock(py);
+        let mut builder = inner.env.syntax().to_builder();
+        f(&mut builder);
+        let syntax_config = builder.build().map_err(to_py_error)?;
+        inner.env_mut().set_syntax(syntax_config);
+        Ok(())
     }
 }
 

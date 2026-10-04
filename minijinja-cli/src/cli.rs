@@ -7,9 +7,7 @@ use std::{fs, io};
 
 use anyhow::{bail, Context, Error};
 use clap::ArgMatches;
-use minijinja::machinery::{
-    get_compiled_template, parse, tokenize, Instructions, WhitespaceConfig,
-};
+use minijinja::machinery::{get_compiled_template, parse, tokenize, Instructions};
 use minijinja::value::{merge_maps, Serde};
 use minijinja::{context, Environment, Error as MError, ErrorKind, Value};
 use serde::Deserialize;
@@ -265,7 +263,6 @@ fn dump_info(
     env: &Environment<'_>,
     template: &str,
     output: &mut Output,
-    config: &Config,
 ) -> Result<(), Error> {
     match dump {
         "ast" => {
@@ -273,27 +270,13 @@ fn dump_info(
             writeln!(
                 output,
                 "{:#?}",
-                parse(
-                    tmpl.source(),
-                    tmpl.name(),
-                    Default::default(),
-                    Default::default()
-                )?
+                parse(tmpl.source(), tmpl.name(), env.syntax().clone())?
             )?;
         }
         "tokens" => {
             let tmpl = env.get_template(template)?;
-            let tokens: Result<Vec<_>, _> = tokenize(
-                tmpl.source(),
-                false,
-                Default::default(),
-                WhitespaceConfig {
-                    lstrip_blocks: config.lstrip_blocks(),
-                    trim_blocks: config.trim_blocks(),
-                    ..Default::default()
-                },
-            )
-            .collect();
+            let tokens: Result<Vec<_>, _> =
+                tokenize(tmpl.source(), false, env.syntax().clone()).collect();
             for (token, _) in tokens? {
                 writeln!(output, "{token:?}")?;
             }
@@ -438,7 +421,7 @@ pub fn execute() -> Result<i32, Error> {
         let rv = env.compile_expression(expr)?.eval(ctx)?;
         exit_code = print_expr_out(rv, &config, &mut output)?;
     } else if let Some(dump) = matches.get_one::<String>("dump") {
-        dump_info(dump, &env, &template_name, &mut output, &config)?;
+        dump_info(dump, &env, &template_name, &mut output)?;
     } else if cfg!(feature = "repl") && matches.get_flag("repl") {
         #[cfg(feature = "repl")]
         {

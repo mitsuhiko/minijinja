@@ -49,7 +49,12 @@ impl TestSettings {
         if let Some(prefix) = self.line_comment_prefix {
             builder.line_comment_prefix(prefix);
         }
-        builder.build().unwrap()
+        builder
+            .keep_trailing_newline(self.keep_trailing_newline)
+            .trim_blocks(self.trim_blocks)
+            .lstrip_blocks(self.lstrip_blocks)
+            .build()
+            .unwrap()
     }
 }
 
@@ -89,9 +94,6 @@ fn test_vm() {
             Some("chainable") => UndefinedBehavior::Chainable,
             Some(other) => panic!("unknown undefined behavior '{}'", other),
         });
-        env.set_keep_trailing_newline(settings.keep_trailing_newline);
-        env.set_trim_blocks(settings.trim_blocks);
-        env.set_lstrip_blocks(settings.lstrip_blocks);
         env.set_syntax(settings.into_syntax());
 
         for (path, source) in &refs {

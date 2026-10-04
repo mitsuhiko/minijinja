@@ -22,6 +22,17 @@ impl Default for Environment {
     }
 }
 
+impl Environment {
+    /// Changes settings on the current syntax config.
+    fn update_syntax(&mut self, f: impl FnOnce(&mut mj::syntax::SyntaxConfigBuilder)) {
+        let mut builder = self.inner.syntax().to_builder();
+        f(&mut builder);
+        // only whitespace settings are changed which cannot fail
+        self.inner
+            .set_syntax(builder.build().expect("current syntax config is valid"));
+    }
+}
+
 #[wasm_bindgen]
 impl Environment {
     #[wasm_bindgen(constructor)]
@@ -120,34 +131,40 @@ impl Environment {
     /// Enables or disables block trimming.
     #[wasm_bindgen(getter)]
     pub fn trimBlocks(&self) -> bool {
-        self.inner.trim_blocks()
+        self.inner.syntax().trim_blocks()
     }
 
     #[wasm_bindgen(setter)]
     pub fn set_trimBlocks(&mut self, yes: bool) {
-        self.inner.set_trim_blocks(yes);
+        self.update_syntax(|syntax| {
+            syntax.trim_blocks(yes);
+        });
     }
 
     /// Enables or disables the lstrip blocks feature.
     #[wasm_bindgen(getter)]
     pub fn lstripBlocks(&self) -> bool {
-        self.inner.lstrip_blocks()
+        self.inner.syntax().lstrip_blocks()
     }
 
     #[wasm_bindgen(setter)]
     pub fn set_lstripBlocks(&mut self, yes: bool) {
-        self.inner.set_lstrip_blocks(yes);
+        self.update_syntax(|syntax| {
+            syntax.lstrip_blocks(yes);
+        });
     }
 
     /// Enables or disables keeping of the final newline.
     #[wasm_bindgen(getter)]
     pub fn keepTrailingNewline(&self) -> bool {
-        self.inner.keep_trailing_newline()
+        self.inner.syntax().keep_trailing_newline()
     }
 
     #[wasm_bindgen(setter)]
     pub fn set_keepTrailingNewline(&mut self, yes: bool) {
-        self.inner.set_keep_trailing_newline(yes);
+        self.update_syntax(|syntax| {
+            syntax.keep_trailing_newline(yes);
+        });
     }
 
     /// Reconfigures the behavior of undefined variables.

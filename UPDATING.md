@@ -77,6 +77,48 @@ blocks, and macro calls.
 Custom formatters and unknown-method callbacks now receive `&mut State` so they
 can use the same mutable facilities.
 
+## Whitespace Settings
+
+The `trim_blocks`, `lstrip_blocks` and `keep_trailing_newline` settings moved
+from `Environment` into the `SyntaxConfig`.  The syntax config builder,
+`Environment::set_syntax` and `Environment::syntax` are now available without
+the `custom_syntax` feature, which is only required for custom delimiters:
+
+```rust
+// Old
+env.set_trim_blocks(true);
+env.set_lstrip_blocks(true);
+env.set_keep_trailing_newline(true);
+
+// New
+use minijinja::syntax::SyntaxConfig;
+
+env.set_syntax(
+    SyntaxConfig::builder()
+        .trim_blocks(true)
+        .lstrip_blocks(true)
+        .keep_trailing_newline(true)
+        .build()
+        .unwrap(),
+);
+```
+
+To change a single setting while retaining the rest of the current
+configuration, use `SyntaxConfig::to_builder`:
+
+```rust
+let syntax = env.syntax().to_builder().trim_blocks(true).build().unwrap();
+env.set_syntax(syntax);
+```
+
+The getters moved as well: use `env.syntax().trim_blocks()` instead of
+`env.trim_blocks()`.  Note that setting a syntax config that was created
+with `SyntaxConfig::builder()` also resets the whitespace settings to their
+defaults.
+
+For users of the `unstable_machinery` feature, `WhitespaceConfig` was removed
+and `parse` and `tokenize` no longer take a separate whitespace config.
+
 ## Go Module Path
 
 MiniJinja-Go now uses the major-version module path

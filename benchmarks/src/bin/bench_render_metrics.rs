@@ -12,7 +12,6 @@ fn do_parse() {
         std::hint::black_box(ALL_ELEMENTS),
         "all_elements.html",
         Default::default(),
-        Default::default(),
     )
     .unwrap();
 }

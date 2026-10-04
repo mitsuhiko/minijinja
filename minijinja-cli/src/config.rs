@@ -193,14 +193,6 @@ impl Config {
         self.include
     }
 
-    pub fn trim_blocks(&self) -> bool {
-        self.trim_blocks
-    }
-
-    pub fn lstrip_blocks(&self) -> bool {
-        self.lstrip_blocks
-    }
-
     pub fn newline(&self) -> bool {
         self.newline
     }
@@ -225,8 +217,6 @@ impl Config {
         if self.env {
             env.add_global("ENV", Value::from_pairs(std::env::vars()));
         }
-        env.set_trim_blocks(self.trim_blocks);
-        env.set_lstrip_blocks(self.lstrip_blocks);
         if self.fuel > 0 {
             env.set_fuel(Some(self.fuel));
         }
@@ -270,6 +260,8 @@ impl Config {
             .comment_delimiters(s.comment_start.clone(), s.comment_end.clone())
             .line_statement_prefix(s.line_statement_prefix.clone())
             .line_comment_prefix(s.line_comment_prefix.clone())
+            .trim_blocks(self.trim_blocks)
+            .lstrip_blocks(self.lstrip_blocks)
             .build()
             .context("could not configure syntax")
     }

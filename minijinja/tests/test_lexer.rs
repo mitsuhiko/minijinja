@@ -1,5 +1,5 @@
 #![cfg(feature = "unstable_machinery")]
-use minijinja::machinery::{tokenize, Span, Token, WhitespaceConfig};
+use minijinja::machinery::{tokenize, Span, Token};
 use minijinja::syntax::SyntaxConfig;
 
 use std::fmt::Write;
@@ -18,7 +18,7 @@ struct TestSettings {
 }
 
 impl TestSettings {
-    pub fn into_configs(self) -> (SyntaxConfig, WhitespaceConfig) {
+    pub fn into_syntax(self) -> SyntaxConfig {
         let mut builder = SyntaxConfig::builder();
         if let Some(ref markers) = self.markers {
             builder
@@ -32,14 +32,12 @@ impl TestSettings {
         if let Some(prefix) = self.line_comment_prefix {
             builder.line_comment_prefix(prefix);
         }
-        (
-            builder.build().unwrap(),
-            WhitespaceConfig {
-                keep_trailing_newline: self.keep_trailing_newline,
-                lstrip_blocks: self.lstrip_blocks,
-                trim_blocks: self.trim_blocks,
-            },
-        )
+        builder
+            .keep_trailing_newline(self.keep_trailing_newline)
+            .lstrip_blocks(self.lstrip_blocks)
+            .trim_blocks(self.trim_blocks)
+            .build()
+            .unwrap()
     }
 }
 
@@ -61,10 +59,9 @@ fn test_lexer() {
         let contents = std::fs::read_to_string(path).unwrap();
         let mut iter = contents.splitn(2, "\n---\n");
         let settings: TestSettings = serde_json::from_str(iter.next().unwrap()).unwrap();
-        let (syntax_config, whitespace_config) = settings.into_configs();
+        let syntax_config = settings.into_syntax();
         let contents = iter.next().unwrap();
-        let tokens: Result<Vec<_>, _> =
-            tokenize(contents, false, syntax_config, whitespace_config).collect();
+        let tokens: Result<Vec<_>, _> = tokenize(contents, false, syntax_config).collect();
         insta::with_settings!({
             description => contents.trim_end(),
             omit_expression => true
@@ -81,11 +78,7 @@ fn test_trim_blocks() {
     let tokens: Result<Vec<_>, _> = tokenize(
         input,
         false,
-        Default::default(),
-        WhitespaceConfig {
-            trim_blocks: true,
-            ..Default::default()
-        },
+        SyntaxConfig::builder().trim_blocks(true).build().unwrap(),
     )
     .collect();
     let stringified = stringify_tokens(tokens.unwrap(), input);
@@ -120,8 +113,7 @@ fn test_overflowing_column() {
     }
     input.push_str("{{ x }}");
 
-    let tokens_result: Result<Vec<_>, _> =
-        tokenize(&input, false, Default::default(), Default::default()).collect();
+    let tokens_result: Result<Vec<_>, _> = tokenize(&input, false, Default::default()).collect();
     let spans = tokens_result
         .unwrap()
         .into_iter()

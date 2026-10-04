@@ -8,7 +8,6 @@ use crate::vendor::self_cell::self_cell;
 
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
-use crate::compiler::lexer::WhitespaceConfig;
 use crate::compiler::meta::find_undeclared;
 use crate::compiler::parser::parse;
 use crate::environment::Environment;
@@ -27,10 +26,8 @@ pub type AutoEscapeFunc = dyn Fn(&str) -> AutoEscape + Sync + Send;
 /// Internal struct that holds template loading level config values.
 #[derive(Clone)]
 pub struct TemplateConfig {
-    /// The syntax used for the template.
+    /// The syntax used for the template (including whitespace behavior).
     pub syntax_config: SyntaxConfig,
-    /// Controls whitespace behavior.
-    pub ws_config: WhitespaceConfig,
     /// The callback that determines the initial auto escaping for templates.
     pub default_auto_escape: Arc<AutoEscapeFunc>,
 }
@@ -39,7 +36,6 @@ impl TemplateConfig {
     pub(crate) fn new(default_auto_escape: Arc<AutoEscapeFunc>) -> TemplateConfig {
         TemplateConfig {
             syntax_config: SyntaxConfig::default(),
-            ws_config: WhitespaceConfig::default(),
             default_auto_escape,
         }
     }
@@ -323,8 +319,6 @@ impl<'env, 'source> Template<'env, 'source> {
             self.compiled.instructions.source(),
             self.name(),
             self.compiled.syntax_config.clone(),
-            // TODO: this is not entirely great, but good enough for this use case.
-            Default::default(),
         ) {
             Ok(ast) => find_undeclared(&ast, nested),
             Err(_) => HashSet::new(),
@@ -439,12 +433,7 @@ impl<'source> CompiledTemplate<'source> {
         source: &'source str,
         config: &TemplateConfig,
     ) -> Result<CompiledTemplate<'source>, Error> {
-        let ast = ok!(parse(
-            source,
-            name,
-            config.syntax_config.clone(),
-            config.ws_config
-        ));
+        let ast = ok!(parse(source, name, config.syntax_config.clone()));
         let mut g = CodeGenerator::new(name, source);
         g.compile_stmt(&ast);
         let buffer_size_hint = g.buffer_size_hint();

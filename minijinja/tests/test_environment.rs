@@ -145,7 +145,13 @@ fn test_keep_trailing_newlines() {
     env.add_template("foo.txt", "blub\r\n").unwrap();
     assert_eq!(env.render_str("blub\r\n", ()).unwrap(), "blub");
 
-    env.set_keep_trailing_newline(true);
+    env.set_syntax(
+        env.syntax()
+            .to_builder()
+            .keep_trailing_newline(true)
+            .build()
+            .unwrap(),
+    );
     env.add_template("foo_keep.txt", "blub\r\n").unwrap();
     assert_eq!(
         env.get_template("foo.txt").unwrap().render(()).unwrap(),
