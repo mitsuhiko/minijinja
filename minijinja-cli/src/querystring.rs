@@ -183,7 +183,10 @@ mod tests {
 
     fn parse(s: &str) -> String {
         match from_bytes(s.as_bytes()) {
-            Ok(value) => serde_json::to_string(&value).unwrap(),
+            Ok(value) => {
+                let value = crate::convert::from_minijinja(&Value::from(value)).unwrap();
+                deser_json::to_string(&value).unwrap()
+            }
             Err(err) => format!("error: {}", err),
         }
     }

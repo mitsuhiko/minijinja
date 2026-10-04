@@ -801,6 +801,7 @@ fn test_empty_template_name_errors() {
 }
 
 #[test]
+#[cfg(feature = "toml")]
 fn test_print_config_fully_loaded() {
     assert_cmd_snapshot!(
         cli()
@@ -812,7 +813,7 @@ fn test_print_config_fully_loaded() {
             .arg("-Dvar4:=true")
             .arg("-Dvar5:=[1,2,true]")
             .arg("--print-config"),
-        @r###"
+        @r##"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -844,18 +845,15 @@ fn test_print_config_fully_loaded() {
     var2 = "value2"
     var3 = 42
     var4 = true
-    var5 = [
-        1,
-        2,
-        true,
-    ]
+    var5 = [1, 2, true]
 
 
     ----- stderr -----
-    "###);
+    "##);
 }
 
 #[test]
+#[cfg(feature = "toml")]
 fn test_load_config() {
     let config = file_with_contents_and_ext(
         r#"

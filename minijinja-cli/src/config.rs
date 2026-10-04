@@ -1,18 +1,18 @@
 use std::collections::BTreeMap;
 use std::env;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Error};
+use deser::{Deserialize, Serialize};
 use minijinja::syntax::SyntaxConfig;
 use minijinja::{AutoEscape, Environment, UndefinedBehavior, Value};
-use serde::{Deserialize, Serialize};
 
 use crate::args::Args;
+use crate::convert::to_minijinja;
 
 /// Overrides specific syntax settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case", default)]
+#[deser(rename_all = "kebab-case", default)]
 pub struct SyntaxElements {
     block_start: String,
     block_end: String,
@@ -41,7 +41,7 @@ impl Default for SyntaxElements {
 
 /// Holds in-memory config state for the execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case", default)]
+#[deser(rename_all = "kebab-case", default)]
 pub struct Config {
     format: String,
     autoescape: String,
@@ -56,7 +56,7 @@ pub struct Config {
     expr_out: String,
     fuel: u64,
     syntax: SyntaxElements,
-    defines: Arc<BTreeMap<String, Value>>,
+    defines: BTreeMap<String, deser_value::Value>,
 }
 
 impl Default for Config {
@@ -135,7 +135,7 @@ impl Config {
     #[cfg(feature = "toml")]
     pub fn load_from_toml(p: &std::path::Path) -> Result<Config, Error> {
         let contents = std::fs::read_to_string(p)?;
-        let cfg: Config = toml::from_str(&contents)?;
+        let cfg: Config = deser_toml::from_str(&contents)?;
         Ok(cfg)
     }
 
@@ -206,7 +206,11 @@ impl Config {
     }
 
     pub fn defines(&self) -> Value {
-        Value::from_dyn_object(self.defines.clone())
+        Value::from_pairs(
+            self.defines
+                .iter()
+                .map(|(key, value)| (key.as_str(), to_minijinja(value))),
+        )
     }
 
     pub fn safe_paths(&self) -> Vec<PathBuf> {
@@ -294,33 +298,33 @@ impl Config {
     }
 
     fn add_defines_from_args(&mut self, args: &Args) -> Result<(), Error> {
-        let defines = Arc::make_mut(&mut self.defines);
         for item in &args.defines {
             if let Some((key, raw_value)) = item.split_once(":=") {
-                defines.insert(key.to_string(), interpret_raw_value(raw_value)?);
+                self.defines
+                    .insert(key.to_string(), interpret_raw_value(raw_value)?);
             } else if let Some((key, string_value)) = item.split_once('=') {
-                defines.insert(key.to_string(), Value::from(string_value));
+                self.defines
+                    .insert(key.to_string(), deser_value::Value::from(string_value));
             } else {
-                defines.insert(item.to_string(), Value::from(true));
+                self.defines
+                    .insert(item.to_string(), deser_value::Value::from(true));
             }
         }
         Ok(())
     }
 }
 
-fn interpret_raw_value(s: &str) -> Result<Value, Error> {
-    #[cfg(not(feature = "yaml"))]
-    mod imp {
-        pub use serde_json::from_str;
-        pub const FMT: &str = "JSON/YAML";
-    }
+fn interpret_raw_value(s: &str) -> Result<deser_value::Value, Error> {
     #[cfg(feature = "yaml")]
-    mod imp {
-        pub use serde_yaml::from_str;
-        pub const FMT: &str = "JSON";
-    }
-    imp::from_str::<Value>(s)
-        .with_context(|| format!("invalid raw value '{}' (not valid {})", s, imp::FMT))
+    let rv = deser_yaml::from_str(s).map_err(Error::from);
+    #[cfg(not(feature = "yaml"))]
+    let rv = deser_json::from_str(s).map_err(Error::from);
+    let format = if cfg!(feature = "yaml") {
+        "JSON/YAML"
+    } else {
+        "JSON"
+    };
+    rv.with_context(|| format!("invalid raw value '{}' (not valid {})", s, format))
 }
 
 fn parse_env_bool(s: &str, var_name: &str) -> Result<bool, Error> {

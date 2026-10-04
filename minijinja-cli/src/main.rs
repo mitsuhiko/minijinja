@@ -2,8 +2,7 @@ mod args;
 mod cli;
 mod command;
 mod config;
-#[cfg(feature = "json5")]
-mod json5;
+mod convert;
 mod output;
 #[cfg(feature = "querystring")]
 mod querystring;

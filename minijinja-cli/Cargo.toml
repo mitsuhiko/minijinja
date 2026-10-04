@@ -9,31 +9,29 @@ homepage = "https://github.com/mitsuhiko/minijinja"
 repository = "https://github.com/mitsuhiko/minijinja"
 keywords = ["jinja", "jinja2", "templates", "cli"]
 readme = "README.md"
-rust-version = "1.78"
+rust-version = "1.88"
 
 [features]
 default = ["toml", "yaml", "querystring", "cbor", "datetime", "json5", "repl", "completions", "unicode", "ini", "contrib", "preserve_order"]
-yaml = ["serde_yaml"]
+yaml = ["dep:deser-yaml"]
 querystring = []
-cbor = ["ciborium"]
+cbor = ["dep:deser-cbor"]
 datetime = ["minijinja-contrib/datetime", "minijinja-contrib/timezone"]
-json5 = []
+json5 = ["dep:deser-json5"]
 repl = ["rustyline"]
 completions = ["argument-completions"]
 unicode = ["minijinja/unicode"]
-ini = ["configparser"]
+ini = ["dep:deser-ini"]
 contrib = ["minijinja-contrib", "minijinja-contrib/html_entities"]
-toml = ["dep:toml"]
+toml = ["dep:deser-toml"]
 preserve_order = ["minijinja/preserve_order"]
 
 [dependencies]
 anyhow = "1.0.74"
 argument = "0.1.0"
 argument-completions = { version = "0.1.0", optional = true }
-ciborium = { version = "0.2.1", optional = true }
 minijinja = { version = "=3.0.0-alpha.2", path = "../minijinja", features = [
     "json",
-    "serde",
     "urlencode",
     "fuel",
     "unstable_machinery",
@@ -42,11 +40,14 @@ minijinja = { version = "=3.0.0-alpha.2", path = "../minijinja", features = [
 ] }
 minijinja-contrib = { version = "=3.0.0-alpha.2", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand", "unicode_wordwrap", "wordcount"] }
 rustyline = { version = "14.0.0", optional = true, default-features = false }
-serde = { version = "1.0.183", features = ["derive", "rc"] }
-serde_json = "1.0.105"
-serde_yaml = { version = "0.9.34", optional = true }
-toml = { version = "0.8.23", optional = true }
-configparser = { version = "3.1.0", optional = true }
+deser = { version = "0.10.0", features = ["derive"] }
+deser-cbor = { version = "0.10.0", optional = true }
+deser-ini = { version = "0.10.0", optional = true }
+deser-json = "0.10.0"
+deser-json5 = { version = "0.10.0", optional = true }
+deser-toml = { version = "0.10.0", optional = true }
+deser-value = "0.10.0"
+deser-yaml = { version = "0.10.0", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 dunce = "1.0.4"

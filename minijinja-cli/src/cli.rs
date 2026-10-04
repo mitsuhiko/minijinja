@@ -7,14 +7,8 @@ use std::{fs, io};
 
 use anyhow::{bail, Context, Error};
 use minijinja::machinery::{get_compiled_template, parse, tokenize, Instructions};
-use minijinja::value::{merge_maps, Serde};
+use minijinja::value::{merge_maps, ValueKind};
 use minijinja::{context, Environment, Error as MError, ErrorKind, Value};
-use serde::Deserialize;
-
-#[cfg(feature = "json5")]
-use crate::json5 as preferred_json;
-#[cfg(not(feature = "json5"))]
-use serde_json as preferred_json;
 
 #[cfg(windows)]
 use dunce::canonicalize;
@@ -24,6 +18,7 @@ use std::fs::canonicalize;
 use crate::args::Args;
 use crate::command::{CLI, SUPPORTED_FORMATS};
 use crate::config::Config;
+use crate::convert::{from_minijinja, to_minijinja};
 use crate::output::{Output, STDIN_STDOUT};
 
 fn load_config(args: &Args) -> Result<Config, Error> {
@@ -102,34 +97,20 @@ fn load_data(
     };
 
     let mut data: Value = match format {
-        "json" => preferred_json::from_slice(&contents)?,
+        #[cfg(feature = "json5")]
+        "json" => to_minijinja(&deser_json5::from_slice(&contents)?),
+        #[cfg(not(feature = "json5"))]
+        "json" => to_minijinja(&deser_json::from_slice(&contents)?),
         #[cfg(feature = "querystring")]
         "querystring" => Value::from(crate::querystring::from_bytes(&contents)?),
         #[cfg(feature = "yaml")]
-        "yaml" => {
-            // for merge keys to work we need to manually call `apply_merge`.
-            // For this reason we need to deserialize into a serde_yaml::Value
-            // before converting it into a final value.
-            let mut v: serde_yaml::Value = serde_yaml::from_slice(&contents)?;
-            v.apply_merge()?;
-            Value::from(Serde(v))
-        }
+        "yaml" => to_minijinja(&deser_yaml::from_slice(&contents)?),
         #[cfg(feature = "toml")]
-        "toml" => {
-            let contents = String::from_utf8(contents).context("invalid utf-8")?;
-            toml::from_str(&contents)?
-        }
+        "toml" => to_minijinja(&deser_toml::from_slice(&contents)?),
         #[cfg(feature = "cbor")]
-        "cbor" => ciborium::from_reader(&contents[..])?,
+        "cbor" => to_minijinja(&deser_cbor::from_slice(&contents)?),
         #[cfg(feature = "ini")]
-        "ini" => {
-            let contents = String::from_utf8(contents).context("invalid utf-8")?;
-            let mut config = configparser::ini::Ini::new_cs();
-            config
-                .read(contents)
-                .map_err(|msg| anyhow::anyhow!("could not load ini: {}", msg))?;
-            Value::from(Serde(config.get_map_ref()))
-        }
+        "ini" => to_minijinja(&ini_sections(deser_ini::from_slice(&contents)?)),
         other => bail!("Unknown format '{}'", other),
     };
 
@@ -153,9 +134,53 @@ fn load_data(
     }
 
     Ok((
-        Deserialize::deserialize(data).context("failed to interpret input data as object")?,
+        into_context(data).context("failed to interpret input data as object")?,
         stdin_used,
     ))
+}
+
+/// Moves the keys before the first section of an INI file into the
+/// `default` section.
+#[cfg(feature = "ini")]
+fn ini_sections(value: deser_value::Value) -> deser_value::Value {
+    let Some(map) = value.as_map() else {
+        return value;
+    };
+    let mut sections = deser_value::Map::new();
+    let mut default = deser_value::Map::new();
+    for (key, value) in map.iter() {
+        if value.is_map() {
+            sections.insert(key.clone(), value.clone());
+        } else {
+            default.insert(key.clone(), value.clone());
+        }
+    }
+    if !default.is_empty() {
+        let section = sections.get_or_insert_with("default", || deser_value::Map::new().into());
+        if let Some(section) = section.as_map_mut() {
+            for (key, value) in default.iter() {
+                section.insert(key.clone(), value.clone());
+            }
+        }
+    }
+    sections.into()
+}
+
+/// Converts the data into the template context.
+fn into_context(data: Value) -> Result<BTreeMap<String, Value>, Error> {
+    if data.kind() != ValueKind::Map {
+        bail!("expected a map, got {}", data.kind());
+    }
+    let mut rv = BTreeMap::new();
+    for key in data.try_iter()? {
+        let value = data.get_item(&key)?;
+        let key = match key.as_str() {
+            Some(key) => key.to_string(),
+            None => key.to_string(),
+        };
+        rv.insert(key, value);
+    }
+    Ok(rv)
 }
 
 fn create_env(
@@ -300,8 +325,13 @@ fn print_instructions(
 fn print_expr_out(rv: Value, config: &Config, output: &mut Output) -> Result<i32, Error> {
     match config.expr_out() {
         "print" => writeln!(output, "{rv}")?,
-        "json" => writeln!(output, "{}", serde_json::to_string(&rv)?)?,
-        "json-pretty" => writeln!(output, "{}", serde_json::to_string_pretty(&rv)?)?,
+        "json" => writeln!(output, "{}", deser_json::to_string(&from_minijinja(&rv)?)?)?,
+        "json-pretty" => {
+            let config = deser_json::SerializerConfig::builder()
+                .pretty(deser_json::Indent::Spaces(2))
+                .build();
+            writeln!(output, "{}", config.to_string(&from_minijinja(&rv)?)?)?
+        }
         "status" => {
             return Ok(if let Ok(n) = i32::try_from(rv.clone()) {
                 n
@@ -338,7 +368,7 @@ pub fn print_error(err: &Error) {
 
 #[cfg(feature = "toml")]
 fn print_config(config: &Config) -> Result<i32, Error> {
-    let out = toml::to_string_pretty(config)?;
+    let out = deser_toml::to_string(config)?;
     println!("{out}");
     Ok(0)
 }
