@@ -2133,7 +2133,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja"
-version = "3.0.0-alpha.2"
+version = "3.0.0-alpha.3"
 dependencies = [
  "aho-corasick",
  "indexmap",
@@ -2152,14 +2152,14 @@ dependencies = [
 
 [[package]]
 name = "minijinja-cabi"
-version = "3.0.0-alpha.2"
+version = "3.0.0-alpha.3"
 dependencies = [
  "minijinja",
 ]
 
 [[package]]
 name = "minijinja-cli"
-version = "3.0.0-alpha.2"
+version = "3.0.0-alpha.3"
 dependencies = [
  "anyhow",
  "argument",
@@ -2184,7 +2184,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-contrib"
-version = "3.0.0-alpha.2"
+version = "3.0.0-alpha.3"
 dependencies = [
  "chrono",
  "insta",
@@ -2197,11 +2197,11 @@ dependencies = [
 
 [[package]]
 name = "minijinja-embed"
-version = "3.0.0-alpha.2"
+version = "3.0.0-alpha.3"
 
 [[package]]
 name = "minijinja-js"
-version = "3.0.0-alpha.2"
+version = "3.0.0-alpha.3"
 dependencies = [
  "console_error_panic_hook",
  "fragile",
@@ -2215,7 +2215,7 @@ dependencies = [
 
 [[package]]
 name = "minijinja-py"
-version = "3.0.0-alpha.2"
+version = "3.0.0-alpha.3"
 dependencies = [
  "minijinja",
  "minijinja-contrib",

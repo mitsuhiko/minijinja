@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 3.0.0-alpha.3
 
 * Moved the `trim_blocks`, `lstrip_blocks` and `keep_trailing_newline` settings from `Environment` into `SyntaxConfig`. `SyntaxConfig::builder`, `Environment::set_syntax` and `Environment::syntax` are now available without the `custom_syntax` feature, and `SyntaxConfig::to_builder` was added to modify an existing configuration. Template introspection via `Template::undeclared_variables` now honors the whitespace settings.  #470
 * Changed `AutoEscape::Custom` to hold a `Cow<'static, str>` so custom auto escape formats can be determined at runtime. `AutoEscape` is no longer `Copy` and `State::auto_escape` now returns a reference. The Python bindings no longer leak custom auto escape names.

@@ -1,6 +1,6 @@
 [package]
 name = "minijinja-cli"
-version = "3.0.0-alpha.2"
+version = "3.0.0-alpha.3"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
@@ -30,7 +30,7 @@ preserve_order = ["minijinja/preserve_order"]
 anyhow = "1.0.74"
 argument = "0.1.0"
 argument-completions = { version = "0.1.0", optional = true }
-minijinja = { version = "=3.0.0-alpha.2", path = "../minijinja", features = [
+minijinja = { version = "=3.0.0-alpha.3", path = "../minijinja", features = [
     "json",
     "urlencode",
     "fuel",
@@ -38,7 +38,7 @@ minijinja = { version = "=3.0.0-alpha.2", path = "../minijinja", features = [
     "custom_syntax",
     "loop_controls"
 ] }
-minijinja-contrib = { version = "=3.0.0-alpha.2", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand", "unicode_wordwrap", "wordcount"] }
+minijinja-contrib = { version = "=3.0.0-alpha.3", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand", "unicode_wordwrap", "wordcount"] }
 rustyline = { version = "14.0.0", optional = true, default-features = false }
 deser = { version = "0.10.0", features = ["derive"] }
 deser-cbor = { version = "0.10.0", optional = true }
