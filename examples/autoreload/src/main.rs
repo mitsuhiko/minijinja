@@ -1,6 +1,5 @@
 use std::env;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -20,10 +19,6 @@ fn main() {
     if env::var("DISABLE_AUTORELOAD").as_deref() == Ok("1") {
         env.set_auto_reload(false);
     }
-
-    // Reloading works through a shared reference, so the environment can be
-    // placed in an `Arc` or a static without a lock.
-    let env = Arc::new(env);
 
     // keep running the template.  to experiment change the template.txt file or
     // rename or change the include file.
