@@ -8,6 +8,7 @@ All notable changes to MiniJinja are documented here.
 * The CLI REPL now shows `undefined` for expressions that evaluate to undefined.
 * Fixed the precedence of unary minus in Rust and Go.  Like in Jinja2, `-foo.bar` now negates `foo.bar` rather than looking up `bar` on `-foo`.
 * Fixed the `format` filter accepting undefined values with strict and semi-strict undefined behavior in Rust and Go.
+* Limited the size of values shown in the referenced variables of debug info in Rust and Go.  Long strings, sequences and maps (such as the environment in the CLI) and deeply nested values are now truncated.  #871
 
 ## 3.0.0-alpha.3
 

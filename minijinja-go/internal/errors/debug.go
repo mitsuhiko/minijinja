@@ -4,7 +4,9 @@ import (
 	goerrors "errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/syntax"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
@@ -103,7 +105,7 @@ func renderReferencedLocals(f fmt.State, locals map[string]value.Value) {
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		_, _ = fmt.Fprintf(f, "    %s: %s\n", key, locals[key].Repr())
+		_, _ = fmt.Fprintf(f, "    %s: %s\n", key, limitedRepr(locals[key], 0))
 	}
 }
 
@@ -136,4 +138,88 @@ func centerLine(title string, fill rune, width int) string {
 	left := pad / 2
 	right := pad - left
 	return strings.Repeat(string(fill), left) + title + strings.Repeat(string(fill), right)
+}
+
+const (
+	// debugMaxItems is the maximum number of items shown per sequence or map.
+	debugMaxItems = 10
+	// debugMaxDepth is the maximum nesting depth shown.
+	debugMaxDepth = 4
+	// debugMaxStringChars is the maximum number of characters shown per string.
+	debugMaxStringChars = 100
+)
+
+// limitedRepr renders a value like Repr but limits its size so that large
+// values (eg: the entire environment) do not drown out the relevant
+// information in debug output.
+func limitedRepr(v value.Value, depth int) string {
+	switch v.Kind() {
+	case value.KindString:
+		s, _ := v.AsString()
+		if utf8.RuneCountInString(s) <= debugMaxStringChars {
+			return v.Repr()
+		}
+		cut := 0
+		for i := 0; i < debugMaxStringChars; i++ {
+			_, size := utf8.DecodeRuneInString(s[cut:])
+			cut += size
+		}
+		return value.FromString(s[:cut]).Repr() + "..."
+	case value.KindSeq:
+		items, ok := v.AsSlice()
+		if !ok {
+			return v.Repr()
+		}
+		open, close := "[", "]"
+		if v.IsTuple() {
+			open, close = "(", ")"
+			if len(items) == 1 && depth < debugMaxDepth {
+				close = ",)"
+			}
+		}
+		if depth >= debugMaxDepth {
+			return open + "..." + close
+		}
+		parts := make([]string, 0, debugMaxItems+1)
+		for i, item := range items {
+			if i == debugMaxItems {
+				parts = append(parts, fmt.Sprintf("... %d more", len(items)-i))
+				break
+			}
+			parts = append(parts, limitedRepr(item, depth+1))
+		}
+		return open + strings.Join(parts, ", ") + close
+	case value.KindMap:
+		m, ok := v.AsMap()
+		if !ok {
+			return v.Repr()
+		}
+		if depth >= debugMaxDepth {
+			return "{...}"
+		}
+		keys := make([]string, 0, len(m))
+		for key := range m {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		parts := make([]string, 0, debugMaxItems+1)
+		for i, key := range keys {
+			if i == debugMaxItems {
+				parts = append(parts, fmt.Sprintf("...: %d more", len(keys)-i))
+				break
+			}
+			parts = append(parts, fmt.Sprintf("%s: %s", debugMapKey(key), limitedRepr(m[key], depth+1)))
+		}
+		return "{" + strings.Join(parts, ", ") + "}"
+	default:
+		return v.Repr()
+	}
+}
+
+// debugMapKey formats a map key like Repr does.
+func debugMapKey(key string) string {
+	if i, err := strconv.ParseInt(key, 10, 64); err == nil && strconv.FormatInt(i, 10) == key {
+		return key
+	}
+	return value.FromString(key).Repr()
 }

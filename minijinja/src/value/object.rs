@@ -297,26 +297,95 @@ pub trait Object: fmt::Debug + Send + Sync {
         Self: Sized + 'static,
     {
         match self.repr() {
-            ObjectRepr::Map => {
+            ObjectRepr::Map => render_container(f, "{...}", |f| {
                 let mut dbg = f.debug_map();
-                for (key, value) in self.try_iter_pairs().into_iter().flatten() {
+                for (idx, (key, value)) in self.try_iter_pairs().into_iter().flatten().enumerate() {
+                    if is_over_item_limit(idx) {
+                        let count = self.enumerator_len().map(|x| x - idx);
+                        dbg.entry(&OmittedKey, &Omitted { count, prefix: "" });
+                        break;
+                    }
                     dbg.entry(&key, &value);
                 }
                 dbg.finish()
-            }
+            }),
             // for either sequences or iterables, a length is needed, otherwise we
             // don't want to risk iteration during printing and fall back to the
             // debug print.
             ObjectRepr::Seq | ObjectRepr::Iterable if self.enumerator_len().is_some() => {
-                let mut dbg = f.debug_list();
-                for value in self.try_iter().into_iter().flatten() {
-                    dbg.entry(&value);
-                }
-                dbg.finish()
+                render_container(f, "[...]", |f| {
+                    let mut dbg = f.debug_list();
+                    for (idx, value) in self.try_iter().into_iter().flatten().enumerate() {
+                        if is_over_item_limit(idx) {
+                            let count = self.enumerator_len().map(|x| x - idx);
+                            dbg.entry(&Omitted {
+                                count,
+                                prefix: "... ",
+                            });
+                            break;
+                        }
+                        dbg.entry(&value);
+                    }
+                    dbg.finish()
+                })
             }
             _ => {
                 write!(f, "{self:?}")
             }
+        }
+    }
+}
+
+/// Renders the items of a container, honoring debug info size limits.
+fn render_container(
+    f: &mut fmt::Formatter<'_>,
+    placeholder: &str,
+    items: impl FnOnce(&mut fmt::Formatter<'_>) -> fmt::Result,
+) -> fmt::Result {
+    #[cfg(feature = "debug")]
+    {
+        crate::debug::limited_container(f, placeholder, items)
+    }
+    #[cfg(not(feature = "debug"))]
+    {
+        let _ = placeholder;
+        items(f)
+    }
+}
+
+/// Checks if a container item at `idx` exceeds the debug info size limits.
+fn is_over_item_limit(idx: usize) -> bool {
+    #[cfg(feature = "debug")]
+    {
+        idx == crate::debug::MAX_ITEMS && crate::debug::is_limited()
+    }
+    #[cfg(not(feature = "debug"))]
+    {
+        let _ = idx;
+        false
+    }
+}
+
+/// Key used for omitted map items in debug output.
+struct OmittedKey;
+
+impl fmt::Debug for OmittedKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("...")
+    }
+}
+
+/// Marker for omitted container items in debug output.
+struct Omitted {
+    count: Option<usize>,
+    prefix: &'static str,
+}
+
+impl fmt::Debug for Omitted {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.count {
+            Some(count) => write!(f, "{}{count} more", self.prefix),
+            None => f.write_str("..."),
         }
     }
 }

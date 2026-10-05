@@ -1,0 +1,106 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ text|length }} {{ nested.a }} {{ env.A }}\n{{ seq.missing.x }}"
+info:
+  seq:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+  text: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  nested:
+    a:
+      b:
+        c:
+          d:
+            e: 1
+  env:
+    A: a
+    B: b
+    C: c
+    D: d
+    E: e
+    F: f
+    G: g
+    H: h
+    I: i
+    J: j
+    K: k
+    L: l
+input_file: minijinja/tests/inputs/err_debug_info_limits.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: UndefinedError,
+    detail: "`seq.missing` is undefined",
+    name: "err_debug_info_limits.txt",
+    line: 2,
+}
+
+undefined value: `seq.missing` is undefined (in err_debug_info_limits.txt:2)
+-------------------------- err_debug_info_limits.txt --------------------------
+   1 | {{ text|length }} {{ nested.a }} {{ env.A }}
+   2 > {{ seq.missing.x }}
+     i       ^^^^^^^^^^ undefined value
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Referenced variables: {
+    env: {
+        'A': 'a',
+        'B': 'b',
+        'C': 'c',
+        'D': 'd',
+        'E': 'e',
+        'F': 'f',
+        'G': 'g',
+        'H': 'h',
+        'I': 'i',
+        'J': 'j',
+        ...: 2 more,
+    },
+    nested: {
+        'a': {
+            'b': {
+                'c': {
+                    'd': {...},
+                },
+            },
+        },
+    },
+    seq: [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        ... 15 more,
+    ],
+    text: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'...,
+}
+-------------------------------------------------------------------------------

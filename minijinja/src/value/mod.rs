@@ -643,7 +643,21 @@ impl fmt::Debug for ValueRepr {
             ValueRepr::Invalid(ref val) => write!(f, "<invalid value: {val}>"),
             ValueRepr::U128(val) => fmt::Debug::fmt(&{ val.0 }, f),
             ValueRepr::I128(val) => fmt::Debug::fmt(&{ val.0 }, f),
-            ValueRepr::String(ref val, _) => python_string_debug_fmt(val, f),
+            ValueRepr::String(ref val, _) => {
+                // with debug info size limits, long strings are truncated
+                #[cfg(feature = "debug")]
+                {
+                    if crate::debug::is_limited() {
+                        if let Some((idx, _)) =
+                            val.char_indices().nth(crate::debug::MAX_STRING_CHARS)
+                        {
+                            ok!(python_string_debug_fmt(&val[..idx], f));
+                            return f.write_str("...");
+                        }
+                    }
+                }
+                python_string_debug_fmt(val, f)
+            }
             ValueRepr::SmallStr(ref val) => python_string_debug_fmt(val.as_str(), f),
             ValueRepr::Bytes(ref val) => {
                 write!(f, "b'")?;
