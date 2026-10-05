@@ -181,9 +181,7 @@ mod builtins {
     use super::*;
 
     use crate::error::ErrorKind;
-    use crate::formatting::{
-        format as format_string, format_printf_with, FormatConversion, FormatStyle,
-    };
+    use crate::formatting::{format_printf_with, FormatConversion};
     use crate::utils::{safe_sort, splitn_whitespace};
     use crate::value::merge_object::{MergeDict, MergeSeq};
     use crate::value::ops::{self, as_f64, LenIterWrap};
@@ -1994,11 +1992,15 @@ mod builtins {
         let string = format_str
             .as_str()
             .ok_or_else(|| Error::new(ErrorKind::InvalidOperation, "value is not a string"))?;
+        // like any other string conversion, formatting undefined values fails
+        // with strict undefined behavior.
+        let undefined_behavior = state.undefined_behavior();
         if format_str.is_safe() {
             let output = ok!(format_printf_with(
                 string,
                 &format_args,
                 |value, conversion| {
+                    ok!(undefined_behavior.assert_value_not_undefined(value));
                     if conversion == FormatConversion::Character {
                         return Err(Error::new(
                             ErrorKind::InvalidOperation,
@@ -2020,7 +2022,11 @@ mod builtins {
             ));
             Ok(Value::from_safe_string(output))
         } else {
-            format_string(FormatStyle::Printf, string, &format_args).map(Value::from)
+            format_printf_with(string, &format_args, |value, _| {
+                ok!(undefined_behavior.assert_value_not_undefined(value));
+                Ok(None)
+            })
+            .map(Value::from)
         }
     }
 }

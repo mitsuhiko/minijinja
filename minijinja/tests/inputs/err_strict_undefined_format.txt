@@ -1,0 +1,3 @@
+{"$settings": {"undefined": "strict"}}
+---
+{{ "%s-%s"|format(1, undefined_value) }}

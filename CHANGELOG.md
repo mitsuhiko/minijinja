@@ -7,6 +7,7 @@ All notable changes to MiniJinja are documented here.
 * Undefined values now remember where they were created when debug mode is enabled, and errors caused by undefined values report the expression that produced them (for instance `` `user.name` is undefined ``), including where it came from if that was elsewhere.  This adds no memory overhead to values.  #871
 * The CLI REPL now shows `undefined` for expressions that evaluate to undefined.
 * Fixed the precedence of unary minus in Rust and Go.  Like in Jinja2, `-foo.bar` now negates `foo.bar` rather than looking up `bar` on `-foo`.
+* Fixed the `format` filter accepting undefined values with strict and semi-strict undefined behavior in Rust and Go.
 
 ## 3.0.0-alpha.3
 

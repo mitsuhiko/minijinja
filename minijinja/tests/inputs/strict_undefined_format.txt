@@ -1,0 +1,5 @@
+{"$settings": {"undefined": "strict"}}
+---
+silent: [{{ "%s"|format(undefined_value if false) }}]
+defined: {{ "%s-%s"|format(1, "x") }}
+safe: {{ ("<%s>"|safe)|format("&") }}

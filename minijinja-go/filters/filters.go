@@ -282,9 +282,16 @@ func FilterFormat(state State, val value.Value, args []value.Value, _ map[string
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "format filter expects a string")
 	}
 
-	var transform func(value.Value, byte) (value.Value, error)
-	if val.IsSafe() {
-		transform = func(arg value.Value, verb byte) (value.Value, error) {
+	// like any other string conversion, formatting undefined values fails
+	// with strict undefined behavior.
+	behavior := undefinedBehavior(state)
+	strict := behavior == value.UndefinedStrict || behavior == value.UndefinedSemiStrict
+	isSafe := val.IsSafe()
+	transform := func(arg value.Value, verb byte) (value.Value, error) {
+		if strict && arg.IsUndefined() && !arg.IsSilentUndefined() {
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrUndefinedVar, "undefined value")
+		}
+		if isSafe {
 			if verb == 'c' {
 				return value.Undefined(), mjerrors.NewError(
 					mjerrors.ErrInvalidOperation,
@@ -300,6 +307,7 @@ func FilterFormat(state State, val value.Value, args []value.Value, _ map[string
 			}
 			return value.FromString(escaped), nil
 		}
+		return arg, nil
 	}
 
 	formatted, err := formatPrintfWith(formatStr, args, transform)
