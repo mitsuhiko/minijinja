@@ -1,0 +1,19 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "attr: {{ -x.y }}\nitem: {{ -items[1] }}\ndotted item: {{ -items.0 }}\ndouble: {{ - -items.0 }}\nfilter applies to result: {{ -items.0|abs }}\nbinop: {{ -items.0 * 3 }}\npow: {{ -2 ** 2 }}\nin list: {{ [-items.1, -1] }}"
+info:
+  items:
+    - 1
+    - 2
+  x:
+    y: 5
+input_file: minijinja/tests/inputs/unary_neg_precedence.txt
+---
+attr: -5
+item: -2
+dotted item: -1
+double: 1
+filter applies to result: 1
+binop: -3
+pow: 4
+in list: [-2, -1]

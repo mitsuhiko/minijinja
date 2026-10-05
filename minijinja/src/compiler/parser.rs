@@ -421,9 +421,28 @@ impl<'a> Parser<'a> {
     binop!(parse_pow, parse_unary, {
         Some((Token::Pow, _)) => ast::BinOpKind::Pow,
     });
-    unaryop!(parse_unary_only, parse_primary, {
-        Some((Token::Minus, _)) => ast::UnaryOpKind::Neg,
-    });
+    /// Parses a primary expression with optional negation.
+    ///
+    /// Like in Jinja2 the negation applies to the operand including its
+    /// postfix operators, so `-foo.bar` is `-(foo.bar)`.  Filters and tests
+    /// are not part of the operand and apply to the negated value.
+    fn parse_unary_only(&mut self) -> Result<ast::Expr<'a>, Error> {
+        let span = self.stream.current_span();
+        if !matches_token!(self, Token::Minus) {
+            return self.parse_primary();
+        }
+        ok!(self.stream.next());
+        let operand_span = self.stream.current_span();
+        let operand = ok!(self.parse_unary_only());
+        let operand = ok!(self.parse_postfix(operand, operand_span));
+        Ok(ast::Expr::UnaryOp(Spanned::new(
+            ast::UnaryOp {
+                op: ast::UnaryOpKind::Neg,
+                expr: operand,
+            },
+            self.stream.expand_span(span),
+        )))
+    }
 
     fn parse_unary(&mut self) -> Result<ast::Expr<'a>, Error> {
         let span = self.stream.current_span();

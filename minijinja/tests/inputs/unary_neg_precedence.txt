@@ -1,0 +1,13 @@
+{
+  "items": [1, 2],
+  "x": {"y": 5}
+}
+---
+attr: {{ -x.y }}
+item: {{ -items[1] }}
+dotted item: {{ -items.0 }}
+double: {{ - -items.0 }}
+filter applies to result: {{ -items.0|abs }}
+binop: {{ -items.0 * 3 }}
+pow: {{ -2 ** 2 }}
+in list: {{ [-items.1, -1] }}

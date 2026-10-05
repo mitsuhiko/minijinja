@@ -545,10 +545,20 @@ func (p *Parser) parseUnary() (Expr, *Error) {
 	return p.parseFilterExpr(expr)
 }
 
+// parseUnaryOnly parses a primary expression with optional negation.
+//
+// Like in Jinja2 the negation applies to the operand including its postfix
+// operators, so `-foo.bar` is `-(foo.bar)`.  Filters and tests are not part
+// of the operand and apply to the negated value.
 func (p *Parser) parseUnaryOnly() (Expr, *Error) {
 	span := p.currentSpan()
 	if p.skip(lexer.TokenMinus) {
+		operandSpan := p.currentSpan()
 		expr, err := p.parseUnaryOnly()
+		if err != nil {
+			return nil, err
+		}
+		expr, err = p.parsePostfix(expr, operandSpan)
 		if err != nil {
 			return nil, err
 		}
