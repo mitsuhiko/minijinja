@@ -283,8 +283,24 @@ pub struct Instructions<'source> {
     span_infos: Vec<SpanInfo>,
     name: &'source str,
     source: &'source str,
+    #[cfg(feature = "debug")]
+    id: u32,
     #[cfg(feature = "multi_template")]
     required_block: bool,
+}
+
+#[cfg(feature = "debug")]
+static NEXT_INSTRUCTIONS_ID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
+
+/// Returns a new instructions id.  `0` is reserved for "no id".
+#[cfg(feature = "debug")]
+fn next_instructions_id() -> u32 {
+    loop {
+        let id = NEXT_INSTRUCTIONS_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if id != 0 {
+            return id;
+        }
+    }
 }
 
 pub(crate) static EMPTY_INSTRUCTIONS: Instructions<'static> = Instructions {
@@ -294,6 +310,8 @@ pub(crate) static EMPTY_INSTRUCTIONS: Instructions<'static> = Instructions {
     span_infos: Vec::new(),
     name: "<unknown>",
     source: "",
+    #[cfg(feature = "debug")]
+    id: 0,
     #[cfg(feature = "multi_template")]
     required_block: false,
 };
@@ -308,9 +326,20 @@ impl<'source> Instructions<'source> {
             span_infos: Vec::with_capacity(128),
             name,
             source,
+            #[cfg(feature = "debug")]
+            id: next_instructions_id(),
             #[cfg(feature = "multi_template")]
             required_block: false,
         }
+    }
+
+    /// Returns the process unique id of these instructions.
+    ///
+    /// This is used to refer to instructions from values (such as the origin
+    /// of undefined values).  A value of `0` is never a valid id.
+    #[cfg(feature = "debug")]
+    pub(crate) fn id(&self) -> u32 {
+        self.id
     }
 
     /// Returns the name of the template.

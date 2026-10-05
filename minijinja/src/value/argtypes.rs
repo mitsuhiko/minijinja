@@ -489,6 +489,10 @@ fn unsupported_conversion(kind: ValueKind, target: &str) -> Error {
     )
 }
 
+fn unsupported_value_conversion(value: &Value, target: &str) -> Error {
+    unsupported_conversion(value.kind(), target).with_undefined_origin(value)
+}
+
 macro_rules! primitive_try_from {
     ($ty:ident, {
         $($pat:pat $(if $if_expr:expr)? => $expr:expr,)*
@@ -500,7 +504,7 @@ macro_rules! primitive_try_from {
                 match value.0 {
                     $($pat $(if $if_expr)? => TryFrom::try_from($expr).ok(),)*
                     _ => None
-                }.ok_or_else(|| unsupported_conversion(value.kind(), stringify!($ty)))
+                }.ok_or_else(|| unsupported_value_conversion(&value, stringify!($ty)))
             }
         }
 
@@ -1240,7 +1244,7 @@ impl TryFrom<Value> for Kwargs {
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value.0 {
-            ValueRepr::Undefined(_) => Ok(Kwargs::new(Default::default())),
+            ValueRepr::Undefined(..) => Ok(Kwargs::new(Default::default())),
             ValueRepr::Object(_) => {
                 Kwargs::extract(&value).ok_or_else(|| Error::from(ErrorKind::InvalidOperation))
             }

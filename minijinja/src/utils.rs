@@ -9,7 +9,9 @@ use std::str::Chars;
 use std::sync::OnceLock;
 
 use crate::error::{Error, ErrorKind};
-use crate::value::{StringType, UndefinedType, Value, ValueIter, ValueKind, ValueRepr};
+use crate::value::{
+    StringType, UndefinedOrigin, UndefinedType, Value, ValueIter, ValueKind, ValueRepr,
+};
 use crate::Output;
 
 /// internal marker to seal up some trait methods
@@ -241,17 +243,26 @@ impl UndefinedBehavior {
     /// Utility method used in the engine to determine what to do when an undefined is
     /// encountered.
     ///
-    /// The flag indicates if this is the first or second level of undefined value.  The
-    /// parent value is passed too.
-    pub(crate) fn handle_undefined(self, parent_was_undefined: bool) -> Result<Value, Error> {
-        match (self, parent_was_undefined) {
+    /// The parent is the value the lookup was performed on.  Newly created
+    /// undefined values are tagged with `origin`.
+    #[inline]
+    pub(crate) fn handle_undefined(
+        self,
+        parent: &Value,
+        origin: UndefinedOrigin,
+    ) -> Result<Value, Error> {
+        match (self, parent.is_undefined()) {
             (UndefinedBehavior::Lenient, false)
             | (UndefinedBehavior::Strict, false)
             | (UndefinedBehavior::SemiStrict, false)
-            | (UndefinedBehavior::Chainable, _) => Ok(Value::UNDEFINED),
+            | (UndefinedBehavior::Chainable, false) => Ok(Value::undefined_with_origin(origin)),
+            // chained undefined values keep the origin of the parent
+            (UndefinedBehavior::Chainable, true) => Ok(Value::undefined_with_origin(
+                parent.undefined_origin().unwrap_or(UndefinedOrigin::NONE),
+            )),
             (UndefinedBehavior::Lenient, true)
             | (UndefinedBehavior::Strict, true)
-            | (UndefinedBehavior::SemiStrict, true) => Err(Error::from(ErrorKind::UndefinedError)),
+            | (UndefinedBehavior::SemiStrict, true) => Err(Error::undefined(parent)),
         }
     }
 
@@ -262,8 +273,8 @@ impl UndefinedBehavior {
     pub(crate) fn is_true(self, value: &Value) -> Result<bool, Error> {
         match (self, &value.0) {
             // silent undefined doesn't error, even in strict mode
-            (UndefinedBehavior::Strict, &ValueRepr::Undefined(UndefinedType::Default)) => {
-                Err(Error::from(ErrorKind::UndefinedError))
+            (UndefinedBehavior::Strict, &ValueRepr::Undefined(UndefinedType::Default, _)) => {
+                Err(Error::undefined(value))
             }
             _ => Ok(value.is_true()),
         }
@@ -296,8 +307,8 @@ impl UndefinedBehavior {
             // silent undefined doesn't error, even in strict mode
             (
                 UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict,
-                &ValueRepr::Undefined(UndefinedType::Default),
-            ) => Err(Error::from(ErrorKind::UndefinedError)),
+                &ValueRepr::Undefined(UndefinedType::Default, _),
+            ) => Err(Error::undefined(value)),
             _ => Ok(()),
         }
     }
@@ -314,8 +325,8 @@ impl UndefinedBehavior {
             // silent undefined never errors
             (
                 UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict,
-                &ValueRepr::Undefined(UndefinedType::Default),
-            ) => Err(Error::from(ErrorKind::UndefinedError)),
+                &ValueRepr::Undefined(UndefinedType::Default, _),
+            ) => Err(Error::undefined(value)),
             _ => Ok(()),
         }
     }

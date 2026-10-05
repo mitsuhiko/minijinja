@@ -10,7 +10,7 @@ use crate::compiler::instructions::{
 use crate::compiler::tokens::Span;
 use crate::output::CaptureMode;
 use crate::value::ops::neg;
-use crate::value::{Kwargs, UndefinedType, Value, ValueMap, ValueRepr};
+use crate::value::{Kwargs, UndefinedOrigin, UndefinedType, Value, ValueMap, ValueRepr};
 
 #[cfg(test)]
 use similar_asserts::assert_eq;
@@ -740,7 +740,7 @@ impl<'source> CodeGenerator<'source> {
                     // to permit special casing.  This is for compatibility also with
                     // what Jinja2 does.
                     self.add(Instruction::LoadConst(
-                        ValueRepr::Undefined(UndefinedType::Silent).into(),
+                        ValueRepr::Undefined(UndefinedType::Silent, UndefinedOrigin::NONE).into(),
                     ));
                 }
                 self.end_if();

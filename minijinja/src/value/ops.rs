@@ -205,7 +205,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
                 ))
             }
         }
-        ValueRepr::Undefined(_) | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
+        ValueRepr::Undefined(..) | ValueRepr::None => Ok(Value::from(Vec::<Value>::new())),
         ValueRepr::Object(obj) if matches!(obj.repr(), ObjectRepr::Seq | ObjectRepr::Iterable) => {
             if is_tuple {
                 let values = match obj.try_iter() {
@@ -274,6 +274,8 @@ fn impossible_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
             rhs.kind()
         ),
     )
+    .with_undefined_origin(lhs)
+    .with_undefined_origin(rhs)
 }
 
 fn failed_op(op: &str, lhs: &Value, rhs: &Value) -> Error {
@@ -577,7 +579,7 @@ pub fn neg(val: &Value) -> Result<Value, Error> {
             }
         }
     } else {
-        Err(Error::from(ErrorKind::InvalidOperation))
+        Err(Error::from(ErrorKind::InvalidOperation).with_undefined_origin(val))
     }
 }
 

@@ -68,6 +68,12 @@ pub struct State<'template, 'env> {
     pub(crate) macro_context_pool: Vec<Context<'env>>,
     #[cfg(feature = "fuel")]
     pub(crate) fuel_tracker: Option<FuelTracker>,
+    // Instruction streams that undefined values created during this render
+    // point into.  Undefined values only carry an instruction id and a pc,
+    // this is used to resolve them back into debug info when an error is
+    // reported.  Only populated in debug mode.
+    #[cfg(feature = "debug")]
+    pub(crate) undefined_origins: BTreeMap<u32, &'template Instructions<'env>>,
 }
 
 impl fmt::Debug for State<'_, '_> {
@@ -118,6 +124,8 @@ impl<'template, 'env> State<'template, 'env> {
             macro_context_pool: Default::default(),
             #[cfg(feature = "fuel")]
             fuel_tracker: ctx.env().fuel().map(FuelTracker::new),
+            #[cfg(feature = "debug")]
+            undefined_origins: Default::default(),
             ctx,
         }
     }
@@ -546,6 +554,23 @@ impl<'template, 'env> State<'template, 'env> {
             .or_insert_with(|| Box::new(f()))
             .downcast_mut()
             .expect("extension had an unexpected type")
+    }
+
+    /// Creates an origin for an undefined value created at `pc` of the
+    /// current instructions and remembers the instructions for later
+    /// resolution.
+    #[cfg(feature = "debug")]
+    #[cold]
+    pub(crate) fn make_undefined_origin(&mut self, pc: u32) -> crate::value::UndefinedOrigin {
+        let instructions = self.instructions;
+        let instructions_id = instructions.id();
+        self.undefined_origins
+            .entry(instructions_id)
+            .or_insert(instructions);
+        crate::value::UndefinedOrigin {
+            instructions_id,
+            pc,
+        }
     }
 
     #[cfg(feature = "debug")]

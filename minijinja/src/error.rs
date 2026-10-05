@@ -52,6 +52,8 @@ struct ErrorRepr {
     source: Option<Arc<dyn std::error::Error + Send + Sync>>,
     #[cfg(feature = "debug")]
     debug_info: Option<Arc<crate::debug::DebugInfo>>,
+    #[cfg(feature = "debug")]
+    undefined_origin: Option<crate::value::UndefinedOrigin>,
 }
 
 impl fmt::Debug for Error {
@@ -213,6 +215,8 @@ impl Error {
                 source: None,
                 #[cfg(feature = "debug")]
                 debug_info: None,
+                #[cfg(feature = "debug")]
+                undefined_origin: None,
             }),
         }
     }
@@ -232,6 +236,46 @@ impl Error {
         self.repr.name = Some(filename.into());
         self.repr.span = Some(span);
         self.repr.lineno = span.start_line as usize;
+    }
+
+    /// Creates an undefined error for a specific value.
+    ///
+    /// If the undefined value carries an origin, it is remembered on the error
+    /// so that the engine can later resolve it against the debug info of the
+    /// instructions into a human readable description.
+    #[cold]
+    pub(crate) fn undefined(value: &crate::value::Value) -> Error {
+        Error::from(ErrorKind::UndefinedError).with_undefined_origin(value)
+    }
+
+    /// Remembers the origin of `value` if it is an undefined value.
+    ///
+    /// This is used for errors that are caused by operating on an undefined
+    /// value (eg: calling methods on it) so that the engine can later point
+    /// out which undefined value was involved.  The first undefined value
+    /// recorded wins.
+    #[inline]
+    pub(crate) fn with_undefined_origin(
+        #[allow(unused_mut)] mut self,
+        value: &crate::value::Value,
+    ) -> Error {
+        #[cfg(feature = "debug")]
+        {
+            if self.repr.undefined_origin.is_none() {
+                self.repr.undefined_origin = value.undefined_origin();
+            }
+        }
+        #[cfg(not(feature = "debug"))]
+        {
+            let _ = value;
+        }
+        self
+    }
+
+    /// Takes the unresolved undefined origin from the error.
+    #[cfg(feature = "debug")]
+    pub(crate) fn take_undefined_origin(&mut self) -> Option<crate::value::UndefinedOrigin> {
+        self.repr.undefined_origin.take()
     }
 
     pub(crate) fn new_not_found(name: &str) -> Error {
@@ -386,6 +430,8 @@ impl From<ErrorKind> for Error {
                 source: None,
                 #[cfg(feature = "debug")]
                 debug_info: None,
+                #[cfg(feature = "debug")]
+                undefined_origin: None,
             }),
         }
     }

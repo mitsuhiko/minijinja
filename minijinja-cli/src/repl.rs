@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -50,8 +51,13 @@ pub fn run(mut env: Environment, ctx: Value) -> Result<(), Error> {
                     }
                     Some(Command::Quit) => break,
                     None => {
+                        PRINTED.with(|x| x.set(false));
                         if let Some(rv) = eval(&env, &line, &ctx, &locals) {
-                            print_result(&rv);
+                            // if the expression called print() and evaluated to
+                            // undefined, there is nothing else to show.
+                            if !(rv.is_undefined() && PRINTED.with(|x| x.get())) {
+                                print_result(&rv);
+                            }
                         }
                     }
                 }
@@ -139,7 +145,7 @@ fn render(env: &Environment, template: &str, ctx: &Value, locals: &BTreeMap<Stri
 
 fn print_result(value: &Value) {
     if value.is_undefined() {
-        // nothing
+        println!("undefined");
     } else if let Some(s) = value.as_str() {
         println!("{s:?}");
     } else if let Some(b) = value.as_bytes() {
@@ -149,8 +155,13 @@ fn print_result(value: &Value) {
     }
 }
 
+thread_local! {
+    static PRINTED: Cell<bool> = const { Cell::new(false) };
+}
+
 fn print(value: Value) -> Value {
     println!("{value}");
+    PRINTED.with(|x| x.set(true));
     Value::UNDEFINED
 }
 

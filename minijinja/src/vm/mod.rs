@@ -12,8 +12,8 @@ use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, write_escaped, AutoEscape, UndefinedBehavior};
 use crate::value::namespace_object::Namespace;
 use crate::value::{
-    checked, ops, value_map_with_capacity, Kwargs, MaybeInvalid, ObjectRepr, UndefinedType, Value,
-    ValueMap, ValueRepr,
+    checked, ops, value_map_with_capacity, Kwargs, MaybeInvalid, ObjectRepr, UndefinedOrigin,
+    UndefinedType, Value, ValueMap, ValueRepr,
 };
 use crate::vm::context::{Frame, Stack};
 use crate::vm::loop_object::{Loop, LoopState};
@@ -235,6 +235,27 @@ impl<'env> Executor<'env> {
             undefined_behavior,
             UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict
         );
+        #[cfg(feature = "debug")]
+        let track_undefined_origins = state.env().debug();
+
+        // in debug mode, undefined values remember the instruction that
+        // created them so that errors can later point back to it.
+        macro_rules! undefined_origin {
+            () => {{
+                #[cfg(feature = "debug")]
+                {
+                    if track_undefined_origins {
+                        state.make_undefined_origin(pc)
+                    } else {
+                        UndefinedOrigin::NONE
+                    }
+                }
+                #[cfg(not(feature = "debug"))]
+                {
+                    UndefinedOrigin::NONE
+                }
+            }};
+        }
         let mut auto_escape_stack = vec![];
         let mut next_loop_recursion_jump = None;
         let mut loaded_filters = [None; MAX_LOCALS];
@@ -371,9 +392,9 @@ impl<'env> Executor<'env> {
                     let value = stack.pop();
                     if state.env().is_default_formatter() {
                         if strict_undefined
-                            && matches!(value.0, ValueRepr::Undefined(UndefinedType::Default))
+                            && matches!(value.0, ValueRepr::Undefined(UndefinedType::Default, _))
                         {
-                            bail!(Error::from(ErrorKind::UndefinedError));
+                            bail!(Error::undefined(&value));
                         }
                         ctx_ok!(write_escaped(out, &state.auto_escape, &value));
                     } else {
@@ -389,9 +410,10 @@ impl<'env> Executor<'env> {
                     );
                 }
                 Instruction::Lookup(name) => {
-                    stack.push(assert_valid!(state
-                        .lookup(name)
-                        .unwrap_or(Value::UNDEFINED)));
+                    stack.push(match state.lookup(name) {
+                        Some(value) => assert_valid!(value),
+                        None => Value::undefined_with_origin(undefined_origin!()),
+                    });
                 }
                 Instruction::GetAttr(name) => {
                     a = stack.pop();
@@ -402,7 +424,9 @@ impl<'env> Executor<'env> {
                     // special case.
                     stack.push(match a.get_attr_fast(name) {
                         Some(value) => assert_valid!(value),
-                        None => ctx_ok!(undefined_behavior.handle_undefined(a.is_undefined())),
+                        None => {
+                            ctx_ok!(undefined_behavior.handle_undefined(&a, undefined_origin!()))
+                        }
                     });
                 }
                 Instruction::SetAttr(name) => {
@@ -414,7 +438,8 @@ impl<'env> Executor<'env> {
                         bail!(Error::new(
                             ErrorKind::InvalidOperation,
                             format!("can only assign to namespaces, not {}", b.kind())
-                        ));
+                        )
+                        .with_undefined_origin(&b));
                     }
                 }
                 Instruction::GetItem => {
@@ -422,7 +447,9 @@ impl<'env> Executor<'env> {
                     b = stack.pop();
                     stack.push(match b.get_item_opt(&a) {
                         Some(value) => assert_valid!(value),
-                        None => ctx_ok!(undefined_behavior.handle_undefined(b.is_undefined())),
+                        None => {
+                            ctx_ok!(undefined_behavior.handle_undefined(&b, undefined_origin!()))
+                        }
                     });
                 }
                 Instruction::Slice => {
@@ -431,7 +458,7 @@ impl<'env> Executor<'env> {
                     b = stack.pop();
                     a = stack.pop();
                     if a.is_undefined() && matches!(undefined_behavior, UndefinedBehavior::Strict) {
-                        bail!(Error::from(ErrorKind::UndefinedError));
+                        bail!(Error::undefined(&a));
                     }
                     stack.push(ctx_ok!(ops::slice(a, b, stop, step)));
                 }
@@ -1156,10 +1183,9 @@ impl<'env> Executor<'env> {
 
     fn unpack_list(stack: &mut Stack, count: usize) -> Result<(), Error> {
         let top = stack.pop();
-        let iter = ok!(top
-            .as_object()
-            .and_then(|x| x.try_iter())
-            .ok_or_else(|| Error::new(ErrorKind::CannotUnpack, "value is not iterable")));
+        let iter = ok!(top.as_object().and_then(|x| x.try_iter()).ok_or_else(|| {
+            Error::new(ErrorKind::CannotUnpack, "value is not iterable").with_undefined_origin(&top)
+        }));
 
         let mut n = 0;
         for item in checked(iter) {
@@ -1215,8 +1241,111 @@ fn process_err(err: &mut Error, pc: u32, state: &State) {
     // only attach debug info if we don't have one yet and we are in debug mode.
     #[cfg(feature = "debug")]
     {
+        if let Some(origin) = err.take_undefined_origin() {
+            if let Some((expr, location)) = describe_undefined_origin(origin, err, state) {
+                let detail = match (err.detail(), location) {
+                    (None, None) => format!("`{expr}` is undefined"),
+                    (None, Some(loc)) => format!("`{expr}` is undefined (from {loc})"),
+                    (Some(detail), None) => format!("{detail} (`{expr}` is undefined)"),
+                    (Some(detail), Some(loc)) => {
+                        format!("{detail} (`{expr}` is undefined, from {loc})")
+                    }
+                };
+                err.set_detail(detail);
+            }
+        }
         if state.env().debug() && err.debug_info().is_none() {
             err.attach_debug_info(state.make_debug_info(pc, state.instructions));
         }
+    }
+}
+
+/// Resolves the origin of an undefined value.
+///
+/// Returns the expression that produced the undefined value (eg: `user.name`)
+/// and, if it differs from where the error is reported, the location where
+/// it was created.
+#[cfg(feature = "debug")]
+fn describe_undefined_origin(
+    origin: UndefinedOrigin,
+    err: &Error,
+    state: &State,
+) -> Option<(String, Option<String>)> {
+    let instructions = state.undefined_origins.get(&origin.instructions_id)?;
+    let expr = describe_expr_at(instructions, origin.pc, &jump_targets(instructions))?;
+    let location = instructions.get_line(origin.pc).and_then(|line| {
+        if err.name() != Some(instructions.name()) {
+            Some(format!("{}:{}", instructions.name(), line))
+        } else if err.line() != Some(line) {
+            Some(format!("line {line}"))
+        } else {
+            None
+        }
+    });
+    Some((expr, location))
+}
+
+/// Returns all instruction indexes that are targets of jumps.
+#[cfg(feature = "debug")]
+fn jump_targets(instructions: &Instructions<'_>) -> std::collections::BTreeSet<u32> {
+    instructions
+        .instructions
+        .iter()
+        .filter_map(|instr| match *instr {
+            Instruction::Jump(target)
+            | Instruction::JumpIfFalse(target)
+            | Instruction::JumpIfFalseOrPop(target)
+            | Instruction::JumpIfTrueOrPop(target)
+            | Instruction::Iterate(target) => Some(target),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Reconstructs a simple expression like `foo.bar[0]` that produced the
+/// value at `pc` by walking the instructions backwards.
+///
+/// The operand of an instruction can only be attributed to the directly
+/// preceding instruction if control flow cannot enter in between, so we
+/// stop at jump targets.  If the base cannot be described, `(...)` is
+/// used instead.
+#[cfg(feature = "debug")]
+fn describe_expr_at(
+    instructions: &Instructions<'_>,
+    pc: u32,
+    jump_targets: &std::collections::BTreeSet<u32>,
+) -> Option<String> {
+    fn base(
+        instructions: &Instructions<'_>,
+        pc: u32,
+        operands: u32,
+        jump_targets: &std::collections::BTreeSet<u32>,
+    ) -> String {
+        if pc < operands || (pc - operands + 1..=pc).any(|x| jump_targets.contains(&x)) {
+            return "(...)".into();
+        }
+        describe_expr_at(instructions, pc - operands, jump_targets)
+            .unwrap_or_else(|| "(...)".into())
+    }
+
+    match instructions.get(pc)? {
+        Instruction::Lookup(name) => Some(name.to_string()),
+        Instruction::GetAttr(name) => Some(format!(
+            "{}.{}",
+            base(instructions, pc, 1, jump_targets),
+            name
+        )),
+        Instruction::GetItem => {
+            let key = match pc.checked_sub(1).and_then(|x| instructions.get(x)) {
+                Some(Instruction::LoadConst(key)) => format!("{key:?}"),
+                _ => "...".into(),
+            };
+            Some(format!(
+                "{}[{}]",
+                base(instructions, pc, 2, jump_targets),
+                key
+            ))
+        }
+        _ => None,
     }
 }

@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 use crate::compiler::codegen::CodeGenerator;
 use crate::compiler::instructions::Instructions;
 use crate::compiler::parser::parse_expr;
-use crate::error::{attach_basic_debug_info, Error, ErrorKind};
+use crate::error::{attach_basic_debug_info, Error};
 use crate::expression::Expression;
 use crate::output::Output;
 use crate::template::{
@@ -826,8 +826,8 @@ impl<'source> Environment<'source> {
             // Jinja2 behavior.  Those go straight to the formatter.
             (
                 UndefinedBehavior::Strict | UndefinedBehavior::SemiStrict,
-                &ValueRepr::Undefined(UndefinedType::Default),
-            ) => Err(Error::from(ErrorKind::UndefinedError)),
+                &ValueRepr::Undefined(UndefinedType::Default, _),
+            ) => Err(Error::undefined(value)),
             _ => {
                 if self.formatter_is_default {
                     write_escaped(out, state.auto_escape(), value)

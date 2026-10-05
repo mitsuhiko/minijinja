@@ -1523,7 +1523,7 @@ mod str_format_style {
             };
         }
         if curr.is_undefined() {
-            Err(Error::from(ErrorKind::UndefinedError))
+            Err(Error::undefined(&curr))
         } else {
             Ok(curr)
         }

@@ -49,7 +49,7 @@ struct JsonWriter {
 impl JsonWriter {
     fn write_value(&mut self, value: &Value) -> Result<(), Error> {
         match value.0 {
-            ValueRepr::None | ValueRepr::Undefined(_) => self.out.push_str("null"),
+            ValueRepr::None | ValueRepr::Undefined(..) => self.out.push_str("null"),
             ValueRepr::Invalid(ref err) => return Err(err.internal_clone()),
             ValueRepr::Bool(b) => self.out.push_str(if b { "true" } else { "false" }),
             ValueRepr::U64(v) => write_int(&mut self.out, v),

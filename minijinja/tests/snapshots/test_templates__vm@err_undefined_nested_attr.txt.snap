@@ -12,11 +12,12 @@ input_file: minijinja/tests/inputs/err_undefined_nested_attr.txt
 
 Error {
     kind: UndefinedError,
+    detail: "`seq.whatever` is undefined",
     name: "err_undefined_nested_attr.txt",
     line: 2,
 }
 
-undefined value (in err_undefined_nested_attr.txt:2)
+undefined value: `seq.whatever` is undefined (in err_undefined_nested_attr.txt:2)
 ------------------------ err_undefined_nested_attr.txt ------------------------
    1 | {{ seq.whatever }}
    2 > {{ seq.whatever.else }}
@@ -30,4 +31,3 @@ Referenced variables: {
     ],
 }
 -------------------------------------------------------------------------------
-

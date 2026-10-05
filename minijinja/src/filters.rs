@@ -308,6 +308,7 @@ mod builtins {
                 ErrorKind::InvalidOperation,
                 format!("cannot calculate length of value of type {}", v.kind()),
             )
+            .with_undefined_origin(v)
         })
     }
 
@@ -687,7 +688,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn int(state: &State, value: &Value) -> Result<Value, Error> {
         match &value.0 {
-            ValueRepr::Undefined(_) | ValueRepr::None => {
+            ValueRepr::Undefined(..) | ValueRepr::None => {
                 ok!(state.undefined_behavior().assert_value_not_undefined(value));
                 Ok(Value::from(0))
             }
@@ -723,7 +724,7 @@ mod builtins {
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn float(state: &State, value: &Value) -> Result<Value, Error> {
         match &value.0 {
-            ValueRepr::Undefined(_) | ValueRepr::None => {
+            ValueRepr::Undefined(..) | ValueRepr::None => {
                 ok!(state.undefined_behavior().assert_value_not_undefined(value));
                 Ok(Value::from(0.0))
             }
@@ -756,7 +757,6 @@ mod builtins {
         for value in iter {
             ok!(value.check());
             if value.is_undefined() {
-                ok!(state.undefined_behavior().handle_undefined(false));
                 continue;
             } else if !value.is_number() && value.kind() != ValueKind::Bool {
                 return Err(Error::new(
@@ -1407,7 +1407,7 @@ mod builtins {
             Ok(rv)
         } else {
             match &value.0 {
-                ValueRepr::None | ValueRepr::Undefined(_) => Ok("".into()),
+                ValueRepr::None | ValueRepr::Undefined(..) => Ok("".into()),
                 ValueRepr::Bytes(b) => Ok(percent_encoding::percent_encode(b, SET).to_string()),
                 ValueRepr::String(..) | ValueRepr::SmallStr(_) => Ok(
                     percent_encoding::utf8_percent_encode(value.as_str().unwrap(), SET).to_string(),
