@@ -117,22 +117,39 @@ If you are stuck with `MiniJinja`, have suggestions or need help, you can use th
 Here are some interesting Open Source users and use cases of MiniJinja.  The examples link directly to where
 the engine is used so you can see how it's utilized:
 
-* AI Chat Templating:
-  * **[HuggingFace](https://huggingface.co/docs/text-generation-inference/index)** uses it to [render LLM chat templates](https://github.com/huggingface/text-generation-inference/blob/0759ec495e15a865d2a59befc2b796b5acc09b50/router/src/infer/mod.rs)
+* AI and LLM Inference:
+  * **[NVIDIA Dynamo](https://github.com/ai-dynamo/dynamo)** uses it to [render LLM chat templates](https://github.com/ai-dynamo/frontend-crates/blob/8a5cf0495b83233c804303b73d69981e82af0c3b/renderer/src/template/formatters.rs#L426) in its distributed inference serving framework
+  * **[Hugging Face Candle](https://github.com/huggingface/candle)** uses it to [render LLM chat templates](https://github.com/huggingface/candle/blob/c68b24997319b8d76e5a4e775dab197c7f26322a/candle-examples/src/chat_template.rs#L153-L170), including in the browser via WASM
   * **[mistral.rs](https://github.com/EricLBuehler/mistral.rs)** uses it to [render LLM chat templates](https://github.com/EricLBuehler/mistral.rs/blob/c834f59fe0b3b020a56cb6a0279a051370554539/mistralrs-core/src/pipeline/chat_template.rs)
-  * **[BoundaryML's BAML](https://docs.boundaryml.com/)** uses it to [render LLM chat templates](https://github.com/BoundaryML/baml/blob/17123de7ea653f51547576169bb0589d39053edc/engine/baml-lib/jinja/src/lib.rs)
-  * **[LSP-AI](https://github.com/SilasMarvin/lsp-ai)** uses it to [render LLM chat templates](https://github.com/SilasMarvin/lsp-ai/blob/1f70756c5b48e9098d64a7c5ce63ac803bc5d0ab/crates/lsp-ai/src/template.rs)
+  * **[Shepherd Model Gateway](https://lightseek.org/smg)** uses it to [render LLM chat templates](https://github.com/smg-project/smg/blob/84e465ecbfd6b7a43887a2dcfed344227b7b973b/crates/tokenizer/src/chat_template.rs#L884) in its LLM gateway
   * **[LoRAX](https://loraexchange.ai/)** uses it to [render LLM chat templates](https://github.com/predibase/lorax/blob/6a83954b8c6ffd51eb69e7096ee2730d53b903dd/router/src/infer.rs)
-  * **[tensorzero](https://www.tensorzero.com/)** uses it to [render LLM and system templates](https://github.com/tensorzero/tensorzero/blob/26ae697f219c1f0385fe7936b9f04b97ff318f61/tensorzero-internal/src/minijinja_util.rs#L2)
+  * **[BoundaryML's BAML](https://docs.boundaryml.com/)** uses it to [render LLM prompts](https://github.com/BoundaryML/baml/blob/17123de7ea653f51547576169bb0589d39053edc/engine/baml-lib/jinja/src/lib.rs)
+  * **[Worktrunk](https://github.com/max-sixty/worktrunk)** uses it to [render prompts for LLM generated commit messages](https://github.com/max-sixty/worktrunk/blob/7024f9b31f61bb54ec6848011a76069d6504166e/src/llm.rs#L580-L609)
 
 * Data and Processing:
+  * **[dbt](https://github.com/dbt-labs/dbt)** builds the Jinja support of its Rust rewrite (dbt v2.0 / Fusion engine) [on a fork of MiniJinja](https://github.com/dbt-labs/dbt/tree/4966a12076764b150dfc68e3c929698193b6c6b9/crates/dbt-jinja)
   * **[Cube](https://cube.dev/docs/product/data-modeling/dynamic/jinja)** uses it [for data modelling](https://github.com/cube-js/cube/tree/db11c121c77c663845242366d3d972b9bc30ae54/packages/cubejs-backend-native/src/template/mj_value)
   * **[PRQL](https://prql-lang.org/)** uses it [to handle DBT style pipelines](https://github.com/PRQL/prql/blob/59fb3cc4b9b6c9e195c928b1ba1134e2c5706ea3/prqlc/prqlc/src/cli/jinja.rs#L21)
   * **[qsv](https://qsv.dathere.com)** uses it [to render templates from CSV files](https://github.com/jqnatividad/qsv/blob/master/src/cmd/template.rs#L2), to [construct payloads to post to web services](https://github.com/jqnatividad/qsv/blob/master/src/cmd/fetchpost.rs#L3) and to [infer Data Dictionaries, Descriptions & Tags or Chat with your data](https://github.com/dathere/qsv/blob/master/src/cmd/describegpt.rs#L2).
+  * **[fenic](https://github.com/typedef-ai/fenic)** uses it to [render Jinja templates over DataFrame columns](https://github.com/typedef-ai/fenic/blob/7645b9a7af672717b238e212128d9dfc3aef32ef/rust/src/jinja/render.rs)
+  * **[Fluvio](https://github.com/fluvio-community/fluvio)** uses it to [render connector configurations and resolve secrets](https://github.com/fluvio-community/fluvio/blob/52673942c1c7364f36f2e05da972436f761243cd/crates/fluvio-connector-package/src/render/mod.rs#L32-L40)
 
-* HTML Generation:
-  * **[Zine](https://github.com/zineland/zine)** uses it to [generate static HTML](https://github.com/zineland/zine/blob/17285efe9f9a63b79a42a738b54d4d730b8cd551/src/engine.rs#L8)
-  * **[Oranda](https://github.com/axodotdev/oranda)** uses it to [generate HTML landing pages](https://github.com/axodotdev/oranda/blob/fb97859c99ab81f644ab5b1449f725fc5c3e9721/src/site/templates.rs)
+* Web Frameworks and Documentation:
+  * **[Rocket](https://rocket.rs/)** supports it as a [template engine for dynamic templates](https://github.com/rwf2/Rocket/blob/3a54d079aef060a8f732bd04ea54b0581a604087/contrib/dyn_templates/src/engine/minijinja.rs)
+  * **[Litestar](https://litestar.dev/)** supports it via MiniJinja for Python as a [template engine plugin](https://github.com/litestar-org/litestar/blob/5cb5a02e23fee12d17cb41cfdd1e8d581ec14291/litestar/plugins/minijinja.py)
+  * **[Ultralytics](https://github.com/ultralytics/ultralytics)** uses MiniJinja for Python to [render macros in its documentation](https://github.com/ultralytics/ultralytics/blob/c7d6425dc4be76d6c0904e3f5792f55dfd377f62/docs/build_docs.py#L85-L120)
+  * **[sphinx-needs](https://github.com/useblocks/sphinx-needs)** uses MiniJinja for Python to [render templates in its Sphinx extension](https://github.com/useblocks/sphinx-needs/blob/6434aef0d2953b5f9ee5df32e7d5bee866491f04/packages/sphinx-needs/src/sphinx_needs/_jinja.py)
+
+* Packaging and Build Tools:
+  * **[rattler-build](https://github.com/prefix-dev/rattler-build)** uses it to [evaluate conda package recipes](https://github.com/prefix-dev/rattler-build/blob/ae0cbd3e602c377b4896c00856b693f4e1f3ddcf/crates/rattler_build_jinja/src/jinja.rs#L778)
+  * **[pixi](https://pixi.sh/)** uses it to [template task commands and arguments](https://github.com/prefix-dev/pixi/blob/f1a706d965b4bb64adfd91d84be66085bfaf9e59/crates/pixi_manifest/src/task.rs#L522)
+  * **[tract](https://github.com/sonos/tract)** uses it to [generate SIMD assembly kernels at build time](https://github.com/sonos/tract/blob/f66b50e9ba117f26de70fc125e3a4f665ca1b6fa/linalg/build.rs#L771-L790)
+
+* Developer Tools:
+  * **[Atuin](https://atuin.sh/)** uses it to [template shell scripts](https://github.com/atuinsh/atuin/blob/f889a24e02eaec60fca0f1381733207d4e83ed92/crates/atuin-scripts/src/execution.rs#L46-L64)
+  * **[HawkEye](https://github.com/fast/hawkeye)** uses it to [render license headers](https://github.com/fast/hawkeye/blob/12072370b89c4472ff8074e9e99582de1bfb696e/hawkeye/src/template.rs#L179)
+  * **[MITRE's Hipcheck](https://github.com/mitre/hipcheck)** uses it to [render human readable reports](https://github.com/mitre/hipcheck/blob/09cca775e663ce097dcf2e999b356c5ef3daf86f/hipcheck/src/shell/mod.rs#L360-L363)
+  * **[Golem](https://github.com/golemcloud/golem)** uses it to [render application manifest templates](https://github.com/golemcloud/golem/blob/78e34e9a97334bbb7a8fbb61303b0f9422824cfd/cli/golem-cli/src/model/template_render.rs) in its CLI
 
 * Code Generation:
   * **[OpenTelemetry's Weaver](https://github.com/open-telemetry/weaver)** uses it to [generate documentation, code and other outputs](https://github.com/open-telemetry/weaver/blob/d49881445e09beb42e1a394bfa5f3068c660daf3/crates/weaver_forge/src/lib.rs#L482-L567) from the OTel specification.
