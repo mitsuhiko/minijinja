@@ -42,48 +42,12 @@ func renderDebugInfo(f fmt.State, err *Error) {
 		return
 	}
 
-	if info.TemplateSource != "" {
+	// without a location there is nothing in the source to point to
+	if info.TemplateSource != "" && err.Span != nil && err.Span.StartLine > 0 {
 		title := fmt.Sprintf(" %s ", templateTitle(err.Name))
 		_, _ = fmt.Fprint(f, "\n")
 		_, _ = fmt.Fprintln(f, centerLine(title, '-', 79))
-
-		lines := strings.Split(info.TemplateSource, "\n")
-		lineIdx := 0
-		if err.Span != nil && err.Span.StartLine > 0 {
-			lineIdx = int(err.Span.StartLine - 1)
-		}
-		if lineIdx >= len(lines) {
-			lineIdx = len(lines) - 1
-		}
-		if lineIdx < 0 {
-			lineIdx = 0
-		}
-
-		skip := lineIdx - 3
-		if skip < 0 {
-			skip = 0
-		}
-		for idx := skip; idx < lineIdx && idx < len(lines); idx++ {
-			_, _ = fmt.Fprintf(f, "%4d | %s\n", idx+1, lines[idx])
-		}
-
-		if lineIdx < len(lines) {
-			_, _ = fmt.Fprintf(f, "%4d > %s\n", lineIdx+1, lines[lineIdx])
-		}
-
-		if err.Span != nil && err.Span.StartLine == err.Span.EndLine {
-			_, _ = fmt.Fprintf(
-				f,
-				"     i %s%s %s\n",
-				strings.Repeat(" ", int(err.Span.StartCol)),
-				strings.Repeat("^", caretWidth(err.Span)),
-				err.Kind,
-			)
-		}
-
-		for idx := lineIdx + 1; idx <= lineIdx+3 && idx < len(lines); idx++ {
-			_, _ = fmt.Fprintf(f, "%4d | %s\n", idx+1, lines[idx])
-		}
+		renderSourceExcerpt(f, info.TemplateSource, err.Span, err.Kind)
 		_, _ = fmt.Fprint(f, strings.Repeat("~", 79))
 	}
 
@@ -109,14 +73,58 @@ func renderReferencedLocals(f fmt.State, locals map[string]value.Value) {
 	}
 }
 
-func caretWidth(span *syntax.Span) int {
-	if span == nil {
-		return 0
+// renderSourceExcerpt renders the lines around the start of the span.
+func renderSourceExcerpt(f fmt.State, source string, span *syntax.Span, kind ErrorKind) {
+	const contextLines = 3
+
+	lines := strings.Split(source, "\n")
+	lineIdx := min(int(span.StartLine-1), len(lines)-1)
+	for idx := max(lineIdx-contextLines, 0); idx < lineIdx; idx++ {
+		_, _ = fmt.Fprintf(f, "%4d | %s\n", idx+1, lines[idx])
 	}
-	if span.EndCol <= span.StartCol {
-		return 1
+	_, _ = fmt.Fprintf(f, "%4d > %s\n", lineIdx+1, lines[lineIdx])
+	if lineIdx == int(span.StartLine-1) {
+		renderSpanMarker(f, lines[lineIdx], span, kind)
 	}
-	return int(span.EndCol - span.StartCol)
+	for idx := lineIdx + 1; idx <= lineIdx+contextLines && idx < len(lines); idx++ {
+		_, _ = fmt.Fprintf(f, "%4d | %s\n", idx+1, lines[idx])
+	}
+}
+
+// renderSpanMarker underlines the span on its first line.
+//
+// Spans that continue on later lines are underlined to the end of the line.
+// Tabs before the span are retained so that the marker lines up with the
+// source line.
+func renderSpanMarker(f fmt.State, line string, span *syntax.Span, kind ErrorKind) {
+	start := int(span.StartCol)
+	end := int(span.EndCol)
+	if span.EndLine != span.StartLine {
+		end = utf8.RuneCountInString(line)
+	}
+
+	var prefix strings.Builder
+	for _, c := range line {
+		if prefix.Len() >= start {
+			break
+		}
+		if c == '\t' {
+			prefix.WriteByte('\t')
+		} else {
+			prefix.WriteByte(' ')
+		}
+	}
+	for prefix.Len() < start {
+		prefix.WriteByte(' ')
+	}
+
+	_, _ = fmt.Fprintf(
+		f,
+		"     i %s%s %s\n",
+		prefix.String(),
+		strings.Repeat("^", max(end-start, 1)),
+		kind,
+	)
 }
 
 func templateTitle(name string) string {

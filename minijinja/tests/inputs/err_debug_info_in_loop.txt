@@ -1,0 +1,5 @@
+{"items": [1, 2], "factor": 2}
+---
+{%- for item in items if item > 0 %}
+  {{ item * factor + item.missing.attr }}
+{%- endfor %}

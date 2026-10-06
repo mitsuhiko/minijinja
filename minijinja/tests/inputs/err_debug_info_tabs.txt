@@ -1,0 +1,5 @@
+{"items": [1, 2]}
+---
+<ul>
+		<li>{{ items.missing.attr }}</li>
+</ul>

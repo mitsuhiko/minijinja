@@ -1,0 +1,5 @@
+{"items": [1, 2], "unrelated": 42}
+---
+{%- set before = unrelated %}
+{%- macro helper(arg) %}{% for x in arg %}{{ x ~ items }}{% endfor %}{{ arg.missing.attr }}{% endmacro %}
+{{ helper(items) }}

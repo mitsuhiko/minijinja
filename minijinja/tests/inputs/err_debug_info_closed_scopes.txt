@@ -1,0 +1,6 @@
+{"items": [1, 2], "user": {"name": "x"}, "unrelated": 42}
+---
+{%- macro helper(arg) %}{{ arg ~ unrelated }}{% endmacro %}
+{%- for item in items %}{{ item }}{% endfor %}
+{%- with other = user %}{{ other.name }}{% endwith %}
+{{ user.name.missing.attr }}

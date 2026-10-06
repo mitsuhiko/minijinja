@@ -1,0 +1,37 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{%- set before = unrelated %}\n{%- macro helper(arg) %}{% for x in arg %}{{ x ~ items }}{% endfor %}{{ arg.missing.attr }}{% endmacro %}\n{{ helper(items) }}"
+info:
+  items:
+    - 1
+    - 2
+  unrelated: 42
+input_file: minijinja/tests/inputs/err_debug_info_in_macro.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: UndefinedError,
+    detail: "`arg.missing` is undefined",
+    name: "err_debug_info_in_macro.txt",
+    line: 2,
+}
+
+undefined value: `arg.missing` is undefined (in err_debug_info_in_macro.txt:2)
+------------------------- err_debug_info_in_macro.txt -------------------------
+   1 | {%- set before = unrelated %}
+   2 > {%- macro helper(arg) %}{% for x in arg %}{{ x ~ items }}{% endfor %}{{ arg.missing.attr }}{% endmacro %}
+     i                                                                            ^^^^^^^^^^^^^ undefined value
+   3 | {{ helper(items) }}
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Referenced variables: {
+    arg: [
+        1,
+        2,
+    ],
+    items: [
+        1,
+        2,
+    ],
+}
+-------------------------------------------------------------------------------

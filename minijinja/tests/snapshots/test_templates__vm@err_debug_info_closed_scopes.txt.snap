@@ -1,0 +1,40 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{%- macro helper(arg) %}{{ arg ~ unrelated }}{% endmacro %}\n{%- for item in items %}{{ item }}{% endfor %}\n{%- with other = user %}{{ other.name }}{% endwith %}\n{{ user.name.missing.attr }}"
+info:
+  items:
+    - 1
+    - 2
+  user:
+    name: x
+  unrelated: 42
+input_file: minijinja/tests/inputs/err_debug_info_closed_scopes.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: UndefinedError,
+    detail: "`user.name.missing` is undefined",
+    name: "err_debug_info_closed_scopes.txt",
+    line: 4,
+}
+
+undefined value: `user.name.missing` is undefined (in err_debug_info_closed_scopes.txt:4)
+---------------------- err_debug_info_closed_scopes.txt -----------------------
+   1 | {%- macro helper(arg) %}{{ arg ~ unrelated }}{% endmacro %}
+   2 | {%- for item in items %}{{ item }}{% endfor %}
+   3 | {%- with other = user %}{{ other.name }}{% endwith %}
+   4 > {{ user.name.missing.attr }}
+     i             ^^^^^^^^^^^^^ undefined value
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Referenced variables: {
+    helper: <macro helper>,
+    items: [
+        1,
+        2,
+    ],
+    user: {
+        'name': 'x',
+    },
+}
+-------------------------------------------------------------------------------

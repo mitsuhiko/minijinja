@@ -1,9 +1,11 @@
 package errors
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/syntax"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
@@ -42,4 +44,46 @@ func TestLimitedRepr(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRenderDebugInfo(t *testing.T) {
+	render := func(span *syntax.Span, source string) string {
+		err := NewError(ErrTemplateNotFound, "missing")
+		err.Name = "templates/test.html"
+		err.Span = span
+		err.DebugInfo = &DebugInfo{TemplateSource: source}
+		return fmt.Sprintf("%+v", err)
+	}
+	rule := strings.Repeat("~", 79) + "\n"
+
+	t.Run("tabs", func(t *testing.T) {
+		got := render(&syntax.Span{StartLine: 2, StartCol: 6, EndLine: 2, EndCol: 9}, "<ul>\n\t\t<li>{{ x }}</li>\n</ul>")
+		want := "   1 | <ul>\n" +
+			"   2 > \t\t<li>{{ x }}</li>\n" +
+			"     i \t\t    ^^^ template not found\n" +
+			"   3 | </ul>\n" + rule
+		if !strings.Contains(got, want) {
+			t.Errorf("unexpected output:\n%s", got)
+		}
+	})
+
+	t.Run("multi-line span", func(t *testing.T) {
+		got := render(&syntax.Span{StartLine: 1, StartCol: 3, EndLine: 2, EndCol: 5}, "{% include\n  'x' %}")
+		want := "   1 > {% include\n" +
+			"     i    ^^^^^^^ template not found\n" +
+			"   2 |   'x' %}\n" + rule
+		if !strings.Contains(got, want) {
+			t.Errorf("unexpected output:\n%s", got)
+		}
+	})
+
+	t.Run("no location", func(t *testing.T) {
+		got := render(nil, "{{ x }}")
+		if strings.Contains(got, "{{ x }}") || strings.Contains(got, "~~~") {
+			t.Errorf("unexpected source excerpt:\n%s", got)
+		}
+		if !strings.Contains(got, "No referenced variables") {
+			t.Errorf("missing referenced variables:\n%s", got)
+		}
+	})
 }

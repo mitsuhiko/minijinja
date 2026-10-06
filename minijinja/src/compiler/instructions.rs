@@ -469,8 +469,12 @@ impl<'source> Instructions<'source> {
         }
     }
 
-    /// Returns a list of all names referenced in the current block backwards
-    /// from the given pc.
+    /// Returns a list of all names referenced backwards from the given pc.
+    ///
+    /// The names are returned in the order of their most recent reference.
+    /// If the pc is within a macro, only names referenced in the macro so
+    /// far are returned.  The bodies of macros that are merely declared
+    /// before the pc are skipped as they are not executed in this scope.
     #[cfg(feature = "debug")]
     pub fn get_referenced_names(&self, idx: u32) -> Vec<&'source str> {
         let mut rv = Vec::new();
@@ -479,13 +483,42 @@ impl<'source> Instructions<'source> {
             return rv;
         }
         let idx = (idx as usize).min(self.instructions.len() - 1);
-        for instr in self.instructions[..=idx].iter().rev() {
+        // the end of a macro body whose start was not reached yet
+        #[cfg(feature = "macros")]
+        let mut skipped_macro_end = None;
+        for (_pos, instr) in self.instructions[..=idx].iter().enumerate().rev() {
+            #[cfg(feature = "macros")]
+            if let Some(macro_end) = skipped_macro_end {
+                if matches!(instr, Instruction::Jump(target) if *target == macro_end) {
+                    skipped_macro_end = None;
+                }
+                continue;
+            }
             let name = match instr {
                 Instruction::Lookup(name)
                 | Instruction::StoreLocal(name)
                 | Instruction::CallFunction(name, _) => *name,
                 Instruction::PushLoop(flags) if flags & LOOP_FLAG_WITH_LOOP_VAR != 0 => "loop",
-                Instruction::PushLoop(_) | Instruction::PushWith => break,
+                // A macro body is compiled inline, preceded by a jump past
+                // the end of the body.  If a body ends before the pc, skip
+                // it entirely.
+                #[cfg(feature = "macros")]
+                Instruction::Return if _pos < idx => {
+                    skipped_macro_end = Some(_pos as u32 + 1);
+                    continue;
+                }
+                // Otherwise reaching such a jump means that we are within
+                // the macro body.  Names before it are not in scope.
+                #[cfg(feature = "macros")]
+                Instruction::Jump(target)
+                    if *target as usize > idx
+                        && matches!(
+                            self.instructions.get(*target as usize - 1),
+                            Some(Instruction::Return)
+                        ) =>
+                {
+                    break
+                }
                 _ => continue,
             };
             if !rv.contains(&name) {

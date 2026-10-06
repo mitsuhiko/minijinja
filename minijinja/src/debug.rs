@@ -1,6 +1,6 @@
 use std::cell::Cell;
 use std::collections::BTreeMap;
-use std::fmt;
+use std::fmt::{self, Write};
 
 use crate::compiler::tokens::Span;
 use crate::error::ErrorKind;
@@ -101,7 +101,8 @@ pub(super) fn render_debug_info(
     span: Option<Span>,
     info: &DebugInfo,
 ) -> fmt::Result {
-    if let Some(source) = info.source() {
+    // without a line there is nothing in the source to point to
+    if let (Some(source), Some(line)) = (info.source(), line) {
         let title = format!(
             " {} ",
             name.unwrap_or_default()
@@ -110,38 +111,73 @@ pub(super) fn render_debug_info(
                 .unwrap_or("Template Source")
         );
         ok!(writeln!(f));
-        writeln!(f, "{:-^1$}", title, 79).unwrap();
-        let lines: Vec<_> = source.lines().enumerate().collect();
-        let idx = line.unwrap_or(1).saturating_sub(1);
-        let skip = idx.saturating_sub(3);
-        let pre = lines.iter().skip(skip).take(3.min(idx)).collect::<Vec<_>>();
-        let post = lines.iter().skip(idx + 1).take(3).collect::<Vec<_>>();
-        for (idx, line) in pre {
-            writeln!(f, "{:>4} | {}", idx + 1, line).unwrap();
-        }
-
-        if let Some(line) = lines.get(idx) {
-            writeln!(f, "{:>4} > {}", idx + 1, line.1).unwrap();
-        }
-        if let Some(span) = span {
-            if span.start_line == span.end_line {
-                ok!(writeln!(
-                    f,
-                    "     i {}{} {}",
-                    " ".repeat(span.start_col as usize),
-                    "^".repeat(span.end_col as usize - span.start_col as usize),
-                    kind,
-                ));
-            }
-        }
-
-        for (idx, line) in post {
-            writeln!(f, "{:>4} | {}", idx + 1, line).unwrap();
-        }
-        write!(f, "{:~^1$}", "", 79).unwrap();
+        ok!(writeln!(f, "{:-^1$}", title, 79));
+        ok!(render_source_excerpt(f, source, line, span, kind));
+        ok!(write!(f, "{:~^1$}", "", 79));
     }
     ok!(writeln!(f));
     ok!(writeln!(f, "{:#?}", VarPrinter(&info.referenced_locals)));
-    write!(f, "{:-^1$}", "", 79).unwrap();
+    write!(f, "{:-^1$}", "", 79)
+}
+
+/// Renders the lines around the given (1-indexed) line.
+///
+/// The span is marked if it starts on that line.
+fn render_source_excerpt(
+    f: &mut fmt::Formatter,
+    source: &str,
+    line: usize,
+    span: Option<Span>,
+    kind: ErrorKind,
+) -> fmt::Result {
+    const CONTEXT_LINES: usize = 3;
+
+    let idx = line.saturating_sub(1);
+    let first = idx.saturating_sub(CONTEXT_LINES);
+    let mut lines = source.lines().enumerate().skip(first);
+
+    for (lineno, text) in lines.by_ref().take(idx - first + 1) {
+        if lineno != idx {
+            ok!(writeln!(f, "{:>4} | {}", lineno + 1, text));
+            continue;
+        }
+        ok!(writeln!(f, "{:>4} > {}", lineno + 1, text));
+        if let Some(span) = span.filter(|x| x.start_line as usize == line) {
+            ok!(render_span_marker(f, text, span, kind));
+        }
+    }
+
+    for (lineno, text) in lines.take(CONTEXT_LINES) {
+        ok!(writeln!(f, "{:>4} | {}", lineno + 1, text));
+    }
     Ok(())
+}
+
+/// Underlines the span on its first line.
+///
+/// Spans that continue on later lines are underlined to the end of the
+/// line.  Tabs before the span are retained so that the marker lines up
+/// with the source line.
+fn render_span_marker(
+    f: &mut fmt::Formatter,
+    text: &str,
+    span: Span,
+    kind: ErrorKind,
+) -> fmt::Result {
+    let start = span.start_col as usize;
+    let end = if span.end_line == span.start_line {
+        span.end_col as usize
+    } else {
+        text.chars().count()
+    };
+    ok!(f.write_str("     i "));
+    let mut chars = text.chars();
+    for _ in 0..start {
+        let c = chars.next().unwrap_or(' ');
+        ok!(f.write_char(if c == '\t' { '\t' } else { ' ' }));
+    }
+    for _ in 0..end.saturating_sub(start).max(1) {
+        ok!(f.write_char('^'));
+    }
+    writeln!(f, " {kind}")
 }

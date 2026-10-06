@@ -1,0 +1,25 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "<ul>\n\t<li>{% include\n\t\t\"missing.txt\" %}</li>\n</ul>"
+info: {}
+input_file: minijinja/tests/inputs/err_debug_info_multiline_span.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: TemplateNotFound,
+    detail: "tried to include non-existing template 'missing.txt'",
+    name: "err_debug_info_multiline_span.txt",
+    line: 2,
+}
+
+template not found: tried to include non-existing template 'missing.txt' (in err_debug_info_multiline_span.txt:2)
+---------------------- err_debug_info_multiline_span.txt ----------------------
+   1 | <ul>
+   2 > 	<li>{% include
+     i 	       ^^^^^^^ template not found
+   3 | 		"missing.txt" %}</li>
+   4 | </ul>
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------
