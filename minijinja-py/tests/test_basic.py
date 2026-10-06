@@ -666,3 +666,95 @@ def test_failing_iterator():
         for n in (0, 2):
             with pytest.raises(ValueError, match="backend unavailable"):
                 env.render_str(template, items=Broken(n))
+
+
+def test_dict_and_list_lookups():
+    env = Environment()
+    d = {"a": 1, 2: "two", (1, 2): "tuple", "nested": {"x": [1, 2, 3]}}
+    assert env.eval_expr("d.a", d=d) == 1
+    assert env.eval_expr("d[2]", d=d) == "two"
+    assert env.eval_expr("d[(1, 2)]", d=d) == "tuple"
+    assert env.eval_expr("d.nested.x[-1]", d=d) == 3
+    assert env.eval_expr("d.missing is undefined", d=d)
+    assert env.eval_expr("d[[1]] is undefined", d=d)
+    assert env.eval_expr("d._private is undefined", d=d)
+    assert env.eval_expr("d.get('a')", d=d) == 1
+    assert env.eval_expr("d.items", d=d) == d.items
+    assert env.eval_expr("d|length", d=d) == 4
+    assert env.eval_expr("d is mapping", d=d)
+
+    l = [1, "two", None]
+    assert env.eval_expr("l[0]", l=l) == 1
+    assert env.eval_expr("l[-1]", l=l) is None
+    assert env.eval_expr("l[3] is undefined", l=l)
+    assert env.eval_expr("l.missing is undefined", l=l)
+    assert env.eval_expr("l.count(1)", l=l) == 1
+    assert env.eval_expr("l|length", l=l) == 3
+    assert env.eval_expr("l is sequence", l=l)
+    assert env.eval_expr("l|reverse|list", l=l) == [None, "two", 1]
+
+    # subclasses keep their Python behavior
+    from collections import defaultdict
+
+    dd = defaultdict(lambda: "default", a=1)
+    assert env.eval_expr("dd.a", dd=dd) == 1
+    assert env.eval_expr("dd.missing", dd=dd) == "default"
+
+
+def test_object_shapes():
+    import collections.abc
+
+    class GetItemOnly:
+        def __getitem__(self, idx):
+            if idx < 3:
+                return idx * 10
+            raise IndexError(idx)
+
+    class MyMapping(collections.abc.Mapping):
+        def __getitem__(self, key):
+            return {"a": 1, "b": 2}[key]
+
+        def __iter__(self):
+            return iter(["a", "b"])
+
+        def __len__(self):
+            return 2
+
+    class Plain:
+        x = 42
+
+    env = Environment()
+    assert env.eval_expr("x|list", x=GetItemOnly()) == [0, 10, 20]
+    assert env.eval_expr("x is iterable", x=GetItemOnly())
+    assert env.eval_expr("x is mapping", x=MyMapping())
+    assert env.eval_expr("x|length", x=MyMapping()) == 2
+    assert env.eval_expr("x|dictsort", x=MyMapping()) == [("a", 1), ("b", 2)]
+    assert env.eval_expr("x is sequence", x=range(3))
+    assert env.eval_expr("x|list", x=range(3)) == [0, 1, 2]
+    assert env.eval_expr("x.x", x=Plain()) == 42
+    assert not env.eval_expr("x is iterable", x=Plain())
+    assert not env.eval_expr("x is mapping", x=Plain())
+
+
+def test_number_like_objects():
+    import decimal
+    import enum
+    import fractions
+
+    class Color(enum.IntEnum):
+        RED = 1
+
+    env = Environment()
+    assert env.eval_expr("x + 1", x=Color.RED) == 2
+    assert env.eval_expr("x", x=decimal.Decimal("1.5")) == 1.5
+    assert env.eval_expr("x", x=fractions.Fraction(1, 2)) == 0.5
+
+
+def test_method_pass_state():
+    class Obj:
+        @pass_state
+        def method(self, state, value):
+            return f"{state.name}:{value}"
+
+    env = Environment()
+    assert env.render_str("{{ obj.method(42) }}", "tmpl", obj=Obj()) == "tmpl:42"

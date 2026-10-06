@@ -9,6 +9,10 @@ All notable changes to MiniJinja are documented here.
 * Fixed the precedence of unary minus in Rust and Go.  Like in Jinja2, `-foo.bar` now negates `foo.bar` rather than looking up `bar` on `-foo`.
 * Fixed the `format` filter accepting undefined values with strict and semi-strict undefined behavior in Rust and Go.
 * Limited the size of values shown in the referenced variables of debug info in Rust and Go.  Long strings, sequences and maps (such as the environment in the CLI) and deeply nested values are now truncated.  #871
+* Significantly reduced the overhead of the Python bindings when templates access Python data.  Values are converted without probing for types through exceptions, the shape of Python objects is determined once instead of on every access, attribute names are cached and filters no longer look up whether they want the state on every call.  Renders no longer release the GIL as re-acquiring it for every callback into Python made renders orders of magnitude slower when other Python threads were busy.  On free-threaded Python renders no longer contend on a process wide lock in PyO3 and now scale with the number of threads.  Templates accessing Python data typically render 3 to 10 times faster.
+* Fixed `pass_state` not working on methods invoked from templates in the Python bindings.
+* The Python bindings now require Python 3.10 or later.
+* Updated PyO3 to 0.29.3 in the Python bindings and dropped the deprecated `extension-module` feature.  Building now requires maturin 1.9.4 or later.
 
 ## 3.0.0-alpha.3
 

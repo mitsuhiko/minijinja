@@ -1,5 +1,6 @@
 use pyo3::prelude::*;
 
+mod attach;
 mod environment;
 mod error_support;
 mod state;

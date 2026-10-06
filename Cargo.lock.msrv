@@ -1846,7 +1846,6 @@ dependencies = [
  "minijinja",
  "minijinja-contrib",
  "pyo3",
- "pyo3-build-config",
 ]
 
 [[package]]

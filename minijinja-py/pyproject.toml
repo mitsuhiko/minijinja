@@ -1,12 +1,12 @@
 [build-system]
-requires = ["maturin>=1.5"]
+requires = ["maturin>=1.9.4,<2"]
 build-backend = "maturin"
 
 [project]
 name = "minijinja"
 version = "3.0.0-alpha.3"
 description = "An experimental Python binding of the Rust MiniJinja template engine."
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [
     { name = "Armin Ronacher", email = "armin.ronacher@active-4.com" }
@@ -39,11 +39,11 @@ python-source = "python"
 include = ["python/**/*.pyi"]
 exclude = ["python/**/*.py"]
 typeCheckingMode = "strict"
-pythonVersion = "3.9"
+pythonVersion = "3.10"
 
 [dependency-groups]
 dev = [
-    "maturin>=1.8.6",
+    "maturin>=1.9.4",
     "pyright>=1.1.401",
     "pytest>=8.3.5",
 ]
