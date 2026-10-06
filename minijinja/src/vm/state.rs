@@ -579,13 +579,15 @@ impl<'template, 'env> State<'template, 'env> {
         pc: u32,
         instructions: &Instructions<'_>,
     ) -> crate::debug::DebugInfo {
+        let mut referenced_locals = BTreeMap::new();
+        for name in instructions.get_referenced_names(pc) {
+            if let Some(value) = self.lookup(name) {
+                referenced_locals.insert(name.to_string(), value);
+            }
+        }
         crate::debug::DebugInfo {
             template_source: Some(instructions.source().to_string()),
-            referenced_locals: instructions
-                .get_referenced_names(pc)
-                .into_iter()
-                .filter_map(|n| Some((n.to_string(), some!(self.lookup(n)))))
-                .collect(),
+            referenced_locals,
         }
     }
 }

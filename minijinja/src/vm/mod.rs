@@ -52,10 +52,11 @@ struct Executor<'env>(std::marker::PhantomData<&'env Environment<'env>>);
 pub(crate) fn prepare_blocks<'env, 'template>(
     blocks: &'template BTreeMap<&'env str, Instructions<'env>>,
 ) -> BTreeMap<&'env str, BlockStack<'template, 'env>> {
-    blocks
-        .iter()
-        .map(|(name, instr)| (*name, BlockStack::new(instr)))
-        .collect()
+    let mut rv = BTreeMap::new();
+    for (name, instr) in blocks.iter() {
+        rv.insert(*name, BlockStack::new(instr));
+    }
+    rv
 }
 
 fn get_or_lookup_local<'a, F>(vec: &mut [Option<&'a Value>], idx: u8, f: F) -> Option<&'a Value>
@@ -1288,18 +1289,20 @@ fn describe_undefined_origin(
 /// Returns all instruction indexes that are targets of jumps.
 #[cfg(feature = "debug")]
 fn jump_targets(instructions: &Instructions<'_>) -> std::collections::BTreeSet<u32> {
-    instructions
-        .instructions
-        .iter()
-        .filter_map(|instr| match *instr {
+    let mut rv = std::collections::BTreeSet::new();
+    for instr in instructions.instructions.iter() {
+        match *instr {
             Instruction::Jump(target)
             | Instruction::JumpIfFalse(target)
             | Instruction::JumpIfFalseOrPop(target)
             | Instruction::JumpIfTrueOrPop(target)
-            | Instruction::Iterate(target) => Some(target),
-            _ => None,
-        })
-        .collect()
+            | Instruction::Iterate(target) => {
+                rv.insert(target);
+            }
+            _ => {}
+        }
+    }
+    rv
 }
 
 /// Reconstructs a simple expression like `foo.bar[0]` that produced the

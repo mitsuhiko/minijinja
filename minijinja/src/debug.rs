@@ -79,9 +79,7 @@ impl fmt::Debug for VarPrinter<'_> {
         }
         with_limited_depth(Some(0), || {
             let mut m = f.debug_struct("Referenced variables:");
-            let mut vars = self.0.iter().collect::<Vec<_>>();
-            vars.sort_by_key(|x| x.0);
-            for (key, value) in vars {
+            for (key, value) in self.0.iter() {
                 m.field(key, value);
             }
             m.finish()

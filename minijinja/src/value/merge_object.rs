@@ -34,13 +34,16 @@ impl Object for MergeDict {
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
         // Collect all keys from all dictionaries (only include maps)
-        let keys: BTreeSet<Value> = self
+        let mut keys = BTreeSet::new();
+        for key in self
             .values
             .iter()
             .filter(|x| x.kind() == ValueKind::Map)
             .filter_map(|v| v.try_iter().ok())
             .flatten()
-            .collect();
+        {
+            keys.insert(key);
+        }
         Enumerator::Iter(Box::new(keys.into_iter()))
     }
 }

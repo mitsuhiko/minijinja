@@ -310,6 +310,23 @@ mod builtins {
         })
     }
 
+    /// Sorts `(key, payload)` pairs by key.
+    ///
+    /// Keyed sorts funnel through this so that keys are computed only once per
+    /// item and only a single sort implementation is emitted for all of them.
+    /// A `None` key compares equal to everything.
+    #[inline(never)]
+    fn sort_keyed(
+        items: &mut [(Option<Value>, Value)],
+        case_sensitive: bool,
+        reverse: bool,
+    ) -> Result<(), Error> {
+        safe_sort(items, |a, b| match (&a.0, &b.0) {
+            (Some(a), Some(b)) => cmp_helper(a, b, case_sensitive, reverse),
+            _ => Ordering::Equal,
+        })
+    }
+
     fn cmp_helper(a: &Value, b: &Value, case_sensitive: bool, reverse: bool) -> Ordering {
         let ordering = if !case_sensitive {
             if let (Some(a), Some(b)) = (a.as_str(), b.as_str()) {
@@ -1021,15 +1038,14 @@ mod builtins {
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn sort(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
-        let mut items =
-            ok!(ok!(state
-                .undefined_behavior()
-                .try_iter_checked(value)
-                .map_err(|err| {
-                    Error::new(ErrorKind::InvalidOperation, "cannot convert value to list")
-                        .with_source(err)
-                }))
-            .try_collect_vec());
+        let items = ok!(ok!(state
+            .undefined_behavior()
+            .try_iter_checked(value)
+            .map_err(|err| {
+                Error::new(ErrorKind::InvalidOperation, "cannot convert value to list")
+                    .with_source(err)
+            }))
+        .try_collect_vec());
 
         let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
         let reverse = ok!(kwargs.get::<Option<bool>>("reverse")).unwrap_or(false);
@@ -1047,34 +1063,40 @@ mod builtins {
                 })
                 .collect();
 
-            if keys.len() > 1 {
+            let mut keyed: Vec<_> = if keys.len() > 1 {
                 // More than one keys
-                safe_sort(&mut items, |a, b| {
-                    let key_a = Value::from_iter(
-                        keys.iter()
-                            .map(|k| a.get_path_or_default(k, &Value::UNDEFINED)),
-                    );
-                    let key_b = Value::from_iter(
-                        keys.iter()
-                            .map(|k| b.get_path_or_default(k, &Value::UNDEFINED)),
-                    );
-                    cmp_helper(&key_a, &key_b, case_sensitive, reverse)
-                })?;
+                items
+                    .into_iter()
+                    .map(|item| {
+                        let key = Value::from_iter(
+                            keys.iter()
+                                .map(|k| item.get_path_or_default(k, &Value::UNDEFINED)),
+                        );
+                        (Some(key), item)
+                    })
+                    .collect()
             } else {
                 // Fast path for a more common case of single key
                 let key = if !keys.is_empty() { keys[0] } else { attr };
-                safe_sort(&mut items, |a, b| {
-                    match (a.get_path(key), b.get_path(key)) {
-                        (Ok(a), Ok(b)) => cmp_helper(&a, &b, case_sensitive, reverse),
-                        _ => Ordering::Equal,
-                    }
-                })?;
-            }
+                items
+                    .into_iter()
+                    .map(|item| (item.get_path(key).ok(), item))
+                    .collect()
+            };
+            ok!(sort_keyed(&mut keyed, case_sensitive, reverse));
+            ok!(kwargs.assert_all_used());
+            Ok(Value::from_iter(keyed.into_iter().map(|x| x.1)))
         } else {
-            safe_sort(&mut items, |a, b| cmp_helper(a, b, case_sensitive, reverse))?;
+            let mut items = items;
+            ok!(safe_sort(&mut items, |a, b| cmp_helper(
+                a,
+                b,
+                case_sensitive,
+                reverse
+            )));
+            ok!(kwargs.assert_all_used());
+            Ok(Value::from(items))
         }
-        ok!(kwargs.assert_all_used());
-        Ok(Value::from(items))
     }
 
     /// Converts the input value into a list.
@@ -1691,12 +1713,12 @@ mod builtins {
             Some(attr) => attr,
             None => ok!(kwargs.get::<&str>("attribute")),
         };
-        let mut items: Vec<Value> = ok!(checked(ok!(value.try_iter())).try_collect_vec());
-        safe_sort(&mut items, |a, b| {
-            let a = a.get_path_or_default(attr, &default);
-            let b = b.get_path_or_default(attr, &default);
-            cmp_helper(&a, &b, case_sensitive, false)
-        })?;
+        let items: Vec<Value> = ok!(checked(ok!(value.try_iter())).try_collect_vec());
+        let mut keyed: Vec<_> = items
+            .into_iter()
+            .map(|item| (Some(item.get_path_or_default(attr, &default)), item))
+            .collect();
+        ok!(sort_keyed(&mut keyed, case_sensitive, false));
         ok!(kwargs.assert_all_used());
 
         #[derive(Debug)]
@@ -1739,8 +1761,8 @@ mod builtins {
         let mut grouper = None::<Value>;
         let mut list = Vec::new();
 
-        for item in items {
-            let group_by = item.get_path_or_default(attr, &default);
+        for (group_by, item) in keyed {
+            let group_by = group_by.unwrap_or_default();
             if let Some(ref last_grouper) = grouper {
                 if cmp_helper(last_grouper, &group_by, case_sensitive, false) != Ordering::Equal {
                     rv.push(Value::from_object(GroupTuple {

@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use crate::environment::Environment;
@@ -145,12 +145,11 @@ pub(super) struct ContextDebug<'a, 'env> {
 
 impl fmt::Debug for ContextDebug<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut vars = Vec::from_iter(self.context.known_variables(
+        let vars = self.context.known_variables(
             #[cfg(feature = "macros")]
             self.closures,
             false,
-        ));
-        vars.sort();
+        );
         f.debug_map()
             .entries(vars.into_iter().map(|key| {
                 let value = self
@@ -319,8 +318,8 @@ impl<'env> Context<'env> {
         &self,
         #[cfg(feature = "macros")] closures: &[Closure<'env>],
         with_globals: bool,
-    ) -> HashSet<Cow<'_, str>> {
-        let mut seen = HashSet::<Cow<'_, str>>::new();
+    ) -> BTreeSet<Cow<'_, str>> {
+        let mut seen = BTreeSet::<Cow<'_, str>>::new();
         for frame in self.stack.iter().rev() {
             for key in frame.locals.keys() {
                 seen.insert(Cow::Borrowed(*key));

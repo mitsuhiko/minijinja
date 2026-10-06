@@ -296,42 +296,47 @@ pub trait Object: fmt::Debug + Send + Sync {
     where
         Self: Sized + 'static,
     {
-        match self.repr() {
-            ObjectRepr::Map => render_container(f, "{...}", |f| {
-                let mut dbg = f.debug_map();
-                for (idx, (key, value)) in self.try_iter_pairs().into_iter().flatten().enumerate() {
+        default_render(&DynObject::new(self.clone()), f)
+    }
+}
+
+#[inline(never)]
+fn default_render(obj: &DynObject, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match obj.repr() {
+        ObjectRepr::Map => render_container(f, "{...}", |f| {
+            let mut dbg = f.debug_map();
+            for (idx, (key, value)) in obj.try_iter_pairs().into_iter().flatten().enumerate() {
+                if is_over_item_limit(idx) {
+                    let count = obj.enumerator_len().map(|x| x - idx);
+                    dbg.entry(&OmittedKey, &Omitted { count, prefix: "" });
+                    break;
+                }
+                dbg.entry(&key, &value);
+            }
+            dbg.finish()
+        }),
+        // for either sequences or iterables, a length is needed, otherwise we
+        // don't want to risk iteration during printing and fall back to the
+        // debug print.
+        ObjectRepr::Seq | ObjectRepr::Iterable if obj.enumerator_len().is_some() => {
+            render_container(f, "[...]", |f| {
+                let mut dbg = f.debug_list();
+                for (idx, value) in obj.try_iter().into_iter().flatten().enumerate() {
                     if is_over_item_limit(idx) {
-                        let count = self.enumerator_len().map(|x| x - idx);
-                        dbg.entry(&OmittedKey, &Omitted { count, prefix: "" });
+                        let count = obj.enumerator_len().map(|x| x - idx);
+                        dbg.entry(&Omitted {
+                            count,
+                            prefix: "... ",
+                        });
                         break;
                     }
-                    dbg.entry(&key, &value);
+                    dbg.entry(&value);
                 }
                 dbg.finish()
-            }),
-            // for either sequences or iterables, a length is needed, otherwise we
-            // don't want to risk iteration during printing and fall back to the
-            // debug print.
-            ObjectRepr::Seq | ObjectRepr::Iterable if self.enumerator_len().is_some() => {
-                render_container(f, "[...]", |f| {
-                    let mut dbg = f.debug_list();
-                    for (idx, value) in self.try_iter().into_iter().flatten().enumerate() {
-                        if is_over_item_limit(idx) {
-                            let count = self.enumerator_len().map(|x| x - idx);
-                            dbg.entry(&Omitted {
-                                count,
-                                prefix: "... ",
-                            });
-                            break;
-                        }
-                        dbg.entry(&value);
-                    }
-                    dbg.finish()
-                })
-            }
-            _ => {
-                write!(f, "{self:?}")
-            }
+            })
+        }
+        _ => {
+            write!(f, "{obj:?}")
         }
     }
 }

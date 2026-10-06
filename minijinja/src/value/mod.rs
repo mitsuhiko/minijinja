@@ -1207,35 +1207,9 @@ impl Value {
             + Sync
             + 'static,
     {
-        struct Iterable<T, F> {
-            maker: F,
-            object: T,
-        }
-
-        impl<T, F> fmt::Debug for Iterable<T, F> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_struct("<iterator>").finish()
-            }
-        }
-
-        impl<T, F> Object for Iterable<T, F>
-        where
-            T: Send + Sync + 'static,
-            F: for<'a> Fn(&'a T) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
-                + Send
-                + Sync
-                + 'static,
-        {
-            fn repr(self: &Arc<Self>) -> ObjectRepr {
-                ObjectRepr::Iterable
-            }
-
-            fn enumerate(self: &Arc<Self>) -> Enumerator {
-                mapped_enumerator(self, |this| (this.maker)(&this.object))
-            }
-        }
-
-        Value::from_object(Iterable { maker, object })
+        Value::from_object(Iterable {
+            maker: Box::new((object, maker)),
+        })
     }
 
     /// Creates an object projection onto a map.
@@ -2300,6 +2274,44 @@ enum ValueIterImpl {
 impl From<Error> for Value {
     fn from(value: Error) -> Self {
         Value(ValueRepr::Invalid(Arc::new(value)))
+    }
+}
+
+trait IterableMaker: Send + Sync {
+    fn make(&self) -> Box<dyn Iterator<Item = Value> + Send + Sync + '_>;
+}
+
+impl<T, F> IterableMaker for (T, F)
+where
+    T: Send + Sync + 'static,
+    F: for<'a> Fn(&'a T) -> Box<dyn Iterator<Item = Value> + Send + Sync + 'a>
+        + Send
+        + Sync
+        + 'static,
+{
+    fn make(&self) -> Box<dyn Iterator<Item = Value> + Send + Sync + '_> {
+        (self.1)(&self.0)
+    }
+}
+
+/// Type-erased iterable created by [`Value::make_object_iterable`].
+struct Iterable {
+    maker: Box<dyn IterableMaker>,
+}
+
+impl fmt::Debug for Iterable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("<iterator>").finish()
+    }
+}
+
+impl Object for Iterable {
+    fn repr(self: &Arc<Self>) -> ObjectRepr {
+        ObjectRepr::Iterable
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        mapped_enumerator(self, |this| this.maker.make())
     }
 }
 
