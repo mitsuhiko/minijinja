@@ -15,6 +15,8 @@ use crate::value::{js_to_value, value_to_js, JsFunction};
 
 mod cell;
 mod error;
+#[cfg(feature = "unstable_machinery")]
+mod machinery;
 mod value;
 
 #[wasm_bindgen(module = "/js/support.js")]

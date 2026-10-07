@@ -17,6 +17,9 @@ test = false
 
 [features]
 default = ["console_error_panic_hook"]
+# Exposes the unstable internals of the engine (tokens, AST and instructions)
+# for the playground.  Not enabled for the published package.
+unstable_machinery = ["minijinja/unstable_machinery_serde"]
 
 [target.'cfg(target_family="wasm")'.dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }

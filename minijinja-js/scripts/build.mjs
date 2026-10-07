@@ -3,7 +3,7 @@
 // The wasm module is built once for the `web` target into `dist/wasm/` and
 // the hand written entry points from `js/package/` are copied next to it.
 //
-// Usage: node scripts/build.mjs [--dev]
+// Usage: node scripts/build.mjs [--dev] [--features <features>]
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,9 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const dist = fileURLToPath(new URL("../dist/", import.meta.url));
 const dev = process.argv.includes("--dev");
+const featuresIndex = process.argv.indexOf("--features");
+const features =
+  featuresIndex === -1 ? undefined : process.argv[featuresIndex + 1];
 
 rmSync(dist, { recursive: true, force: true });
 
@@ -26,6 +29,7 @@ const result = spawnSync(
     "minijinja_js",
     "--no-pack",
     dev ? "--dev" : "--release",
+    ...(features ? ["--", "--features", features] : []),
   ],
   {
     cwd: root,
