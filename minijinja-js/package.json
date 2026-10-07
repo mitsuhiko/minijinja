@@ -42,6 +42,9 @@
     "build": "node scripts/build.mjs",
     "build:dev": "node scripts/build.mjs --dev",
     "prepack": "node scripts/build.mjs",
-    "test": "node --test"
+    "test": "node --test && tsc -p tests/types"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

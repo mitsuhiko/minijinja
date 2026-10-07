@@ -1,4 +1,10 @@
-export { Environment, UndefinedBehavior } from "./wasm/minijinja_js.js";
+export { Environment } from "./wasm/minijinja_js.js";
+export type {
+  AutoEscape,
+  Context,
+  SyntaxConfig,
+  UndefinedBehavior,
+} from "./wasm/minijinja_js.js";
 
 /**
  * A string that is marked as safe and is not auto escaped.

@@ -4,9 +4,9 @@
 use std::borrow::Cow;
 use std::cell::{Ref, RefCell, RefMut};
 
-use js_sys::Function;
+use js_sys::{Function, Object, Reflect};
 use minijinja::value::{Rest, Value, ValueOrKwargs};
-use minijinja::{self as mj, Error, ErrorKind};
+use minijinja::{self as mj, AutoEscape, Error, ErrorKind};
 use wasm_bindgen::prelude::*;
 
 use crate::cell::JsCell;
@@ -31,6 +31,50 @@ pub fn get_support_classes() -> js_sys::Object {
     getSupportClasses()
 }
 
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console, js_name = error)]
+    fn console_error(message: &str, value: &JsValue);
+}
+
+#[wasm_bindgen(typescript_custom_section)]
+const TS_TYPES: &str = r##"
+/**
+ * The context passed to templates and expressions.
+ */
+export type Context = Record<string, any>;
+
+/**
+ * The delimiters and prefixes of the template syntax.
+ */
+export interface SyntaxConfig {
+  /** Defaults to `"{%"`. */
+  blockStart: string;
+  /** Defaults to `"%}"`. */
+  blockEnd: string;
+  /** Defaults to `"{{"`. */
+  variableStart: string;
+  /** Defaults to `"}}"`. */
+  variableEnd: string;
+  /** Defaults to `"{#"`. */
+  commentStart: string;
+  /** Defaults to `"#}"`. */
+  commentEnd: string;
+  /** Disabled (`null`) by default. */
+  lineStatementPrefix: string | null;
+  /** Disabled (`null`) by default. */
+  lineCommentPrefix: string | null;
+}
+
+/**
+ * The return value of an auto escape callback.
+ *
+ * `"html"` or `true` enable HTML escaping, `"json"` enables JSON escaping and
+ * `"none"`, `false`, `null` or `undefined` disable auto escaping.
+ */
+export type AutoEscape = "html" | "json" | "none" | boolean | null | undefined;
+"##;
+
 #[wasm_bindgen(start)]
 fn start() {
     #[cfg(feature = "console_error_panic_hook")]
@@ -41,6 +85,7 @@ fn start() {
 #[wasm_bindgen]
 pub struct Environment {
     inner: RefCell<mj::Environment<'static>>,
+    pycompat: std::cell::Cell<bool>,
 }
 
 impl Default for Environment {
@@ -89,6 +134,25 @@ fn convert_ctx(ctx: Option<JsValue>) -> Result<Value, JsValue> {
     }
 }
 
+fn get_string_prop(obj: &JsValue, key: &str) -> Result<Option<Option<String>>, JsValue> {
+    let value = Reflect::get(obj, &JsValue::from_str(key))?;
+    if value.is_undefined() {
+        Ok(None)
+    } else if value.is_null() {
+        Ok(Some(None))
+    } else if let Some(s) = value.as_string() {
+        Ok(Some(Some(s)))
+    } else {
+        Err(plain_js_error(&format!(
+            "syntax option {key} must be a string"
+        )))
+    }
+}
+
+fn set_prop(obj: &Object, key: &str, value: impl Into<JsValue>) {
+    Reflect::set(obj, &JsValue::from_str(key), &value.into()).ok();
+}
+
 fn js_callback(func: Function) -> impl Fn(Rest<ValueOrKwargs>) -> Result<Value, Error> {
     let func = JsFunction::new(func);
     move |args: Rest<ValueOrKwargs>| func.call(&args.into_values())
@@ -102,6 +166,7 @@ impl Environment {
         minijinja_contrib::add_to_environment(&mut inner);
         Self {
             inner: RefCell::new(inner),
+            pycompat: std::cell::Cell::new(false),
         }
     }
 
@@ -125,7 +190,11 @@ impl Environment {
     }
 
     /// Renders a registered template by name with the given context.
-    pub fn renderTemplate(&self, name: &str, ctx: Option<JsValue>) -> Result<String, JsValue> {
+    pub fn renderTemplate(
+        &self,
+        name: &str,
+        #[wasm_bindgen(unchecked_optional_param_type = "Context | null")] ctx: Option<JsValue>,
+    ) -> Result<String, JsValue> {
         let ctx = convert_ctx(ctx)?;
         let env = self.env()?;
         let t = env.get_template(name).map_err(to_js_error)?;
@@ -136,7 +205,11 @@ impl Environment {
     ///
     /// This is useful for one-off template rendering without registering the template.  The
     /// template is parsed and rendered immediately.
-    pub fn renderStr(&self, source: &str, ctx: Option<JsValue>) -> Result<String, JsValue> {
+    pub fn renderStr(
+        &self,
+        source: &str,
+        #[wasm_bindgen(unchecked_optional_param_type = "Context | null")] ctx: Option<JsValue>,
+    ) -> Result<String, JsValue> {
         let ctx = convert_ctx(ctx)?;
         self.env()?.render_str(source, ctx).map_err(to_js_error)
     }
@@ -146,7 +219,7 @@ impl Environment {
         &self,
         name: &str,
         source: &str,
-        ctx: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "Context | null")] ctx: Option<JsValue>,
     ) -> Result<String, JsValue> {
         let ctx = convert_ctx(ctx)?;
         self.env()?
@@ -158,7 +231,11 @@ impl Environment {
     ///
     /// This is useful for evaluating expressions outside of templates.  The expression is
     /// parsed and evaluated immediately.
-    pub fn evalExpr(&self, expr: &str, ctx: Option<JsValue>) -> Result<JsValue, JsValue> {
+    pub fn evalExpr(
+        &self,
+        expr: &str,
+        #[wasm_bindgen(unchecked_optional_param_type = "Context | null")] ctx: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
         let ctx = convert_ctx(ctx)?;
         let env = self.env()?;
         let e = env.compile_expression(expr).map_err(to_js_error)?;
@@ -169,26 +246,255 @@ impl Environment {
     /// Registers a filter function.
     ///
     /// Keyword arguments are passed as a trailing object.
-    pub fn addFilter(&self, name: &str, func: Function) -> Result<(), JsValue> {
+    pub fn addFilter(
+        &self,
+        name: &str,
+        #[wasm_bindgen(unchecked_param_type = "(value: any, ...args: any[]) => any")]
+        func: Function,
+    ) -> Result<(), JsValue> {
         self.env_mut()?
             .add_filter(name.to_string(), js_callback(func));
+        Ok(())
+    }
+
+    /// Removes a filter by name.
+    pub fn removeFilter(&self, name: &str) -> Result<(), JsValue> {
+        self.env_mut()?.remove_filter(name);
         Ok(())
     }
 
     /// Registers a test function.
     ///
     /// Keyword arguments are passed as a trailing object.
-    pub fn addTest(&self, name: &str, func: Function) -> Result<(), JsValue> {
+    pub fn addTest(
+        &self,
+        name: &str,
+        #[wasm_bindgen(unchecked_param_type = "(value: any, ...args: any[]) => unknown")]
+        func: Function,
+    ) -> Result<(), JsValue> {
         self.env_mut()?
             .add_test(name.to_string(), js_callback(func));
         Ok(())
     }
 
-    /// Enables python compatibility.
-    pub fn enablePyCompat(&self) -> Result<(), JsValue> {
-        self.env_mut()?
-            .set_unknown_method_callback(minijinja_contrib::pycompat::unknown_method_callback);
+    /// Removes a test by name.
+    pub fn removeTest(&self, name: &str) -> Result<(), JsValue> {
+        self.env_mut()?.remove_test(name);
         Ok(())
+    }
+
+    /// Registers a global function.
+    ///
+    /// Keyword arguments are passed as a trailing object.  This is the same
+    /// as registering the function with `addGlobal`.
+    pub fn addFunction(
+        &self,
+        name: &str,
+        #[wasm_bindgen(unchecked_param_type = "(...args: any[]) => any")] func: Function,
+    ) -> Result<(), JsValue> {
+        self.env_mut()?
+            .add_function(name.to_string(), js_callback(func));
+        Ok(())
+    }
+
+    /// Enables python compatibility.
+    ///
+    /// This is the same as setting `pycompat` to `true`.
+    pub fn enablePyCompat(&self) -> Result<(), JsValue> {
+        self.set_pycompat(true)
+    }
+
+    /// Enables or disables python compatibility.
+    ///
+    /// When enabled, common Python methods such as `dict.items()` or
+    /// `str.startswith()` are available in templates.
+    #[wasm_bindgen(getter)]
+    pub fn pycompat(&self) -> bool {
+        self.pycompat.get()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_pycompat(&self, yes: bool) -> Result<(), JsValue> {
+        let mut env = self.env_mut()?;
+        if yes {
+            env.set_unknown_method_callback(minijinja_contrib::pycompat::unknown_method_callback);
+        } else {
+            env.set_unknown_method_callback(|_, _, _, _| {
+                Err(Error::from(ErrorKind::UnknownMethod))
+            });
+        }
+        self.pycompat.set(yes);
+        Ok(())
+    }
+
+    /// The delimiters and prefixes of the template syntax.
+    ///
+    /// When set, delimiters that are not provided are reset to their
+    /// defaults.  The whitespace settings (`trimBlocks` etc.) are retained.
+    #[wasm_bindgen(getter, unchecked_return_type = "SyntaxConfig")]
+    pub fn syntax(&self) -> Result<JsValue, JsValue> {
+        let env = self.env()?;
+        let syntax = env.syntax();
+        let obj = Object::new();
+        let (block_start, block_end) = syntax.block_delimiters();
+        let (variable_start, variable_end) = syntax.variable_delimiters();
+        let (comment_start, comment_end) = syntax.comment_delimiters();
+        set_prop(&obj, "blockStart", block_start);
+        set_prop(&obj, "blockEnd", block_end);
+        set_prop(&obj, "variableStart", variable_start);
+        set_prop(&obj, "variableEnd", variable_end);
+        set_prop(&obj, "commentStart", comment_start);
+        set_prop(&obj, "commentEnd", comment_end);
+        set_prop(
+            &obj,
+            "lineStatementPrefix",
+            syntax
+                .line_statement_prefix()
+                .map_or(JsValue::NULL, JsValue::from_str),
+        );
+        set_prop(
+            &obj,
+            "lineCommentPrefix",
+            syntax
+                .line_comment_prefix()
+                .map_or(JsValue::NULL, JsValue::from_str),
+        );
+        Ok(obj.into())
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_syntax(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "Partial<SyntaxConfig>")] config: JsValue,
+    ) -> Result<(), JsValue> {
+        if !config.is_object() {
+            return Err(plain_js_error("syntax must be an object"));
+        }
+        let pair = |start: &str, end: &str, default: (&str, &str)| {
+            let start = get_string_prop(&config, start)?.flatten();
+            let end = get_string_prop(&config, end)?.flatten();
+            Ok::<_, JsValue>((
+                start.unwrap_or_else(|| default.0.to_string()),
+                end.unwrap_or_else(|| default.1.to_string()),
+            ))
+        };
+        let block = pair("blockStart", "blockEnd", ("{%", "%}"))?;
+        let variable = pair("variableStart", "variableEnd", ("{{", "}}"))?;
+        let comment = pair("commentStart", "commentEnd", ("{#", "#}"))?;
+        let line_statement = get_string_prop(&config, "lineStatementPrefix")?.flatten();
+        let line_comment = get_string_prop(&config, "lineCommentPrefix")?.flatten();
+
+        let mut env = self.env_mut()?;
+        let current = env.syntax();
+        let mut builder = mj::syntax::SyntaxConfig::builder();
+        builder
+            .block_delimiters(block.0, block.1)
+            .variable_delimiters(variable.0, variable.1)
+            .comment_delimiters(comment.0, comment.1)
+            .line_statement_prefix(line_statement.unwrap_or_default())
+            .line_comment_prefix(line_comment.unwrap_or_default())
+            .trim_blocks(current.trim_blocks())
+            .lstrip_blocks(current.lstrip_blocks())
+            .keep_trailing_newline(current.keep_trailing_newline());
+        let syntax = builder.build().map_err(to_js_error)?;
+        env.set_syntax(syntax);
+        Ok(())
+    }
+
+    /// Sets a callback that determines the auto escaping for a template.
+    ///
+    /// The callback is invoked with the name of the template and returns
+    /// `"html"`, `"json"`, `"none"`, `true` (HTML) or `false`.  If the
+    /// callback throws, auto escaping is disabled and the error is logged.
+    pub fn setAutoEscapeCallback(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "(name: string) => AutoEscape")] func: Function,
+    ) -> Result<(), JsValue> {
+        let func = JsCell::new(func);
+        self.env_mut()?
+            .set_auto_escape_callback(move |name| -> AutoEscape {
+                let rv = match func.call1(&JsValue::NULL, &JsValue::from_str(name)) {
+                    Ok(rv) => rv,
+                    Err(err) => {
+                        console_error("minijinja-js: auto escape callback threw:", &err);
+                        return AutoEscape::None;
+                    }
+                };
+                if let Some(yes) = rv.as_bool() {
+                    if yes {
+                        AutoEscape::Html
+                    } else {
+                        AutoEscape::None
+                    }
+                } else {
+                    match rv.as_string().as_deref() {
+                        Some("html") => AutoEscape::Html,
+                        Some("json") => AutoEscape::Json,
+                        Some("none") | None => AutoEscape::None,
+                        Some(other) => AutoEscape::Custom(other.to_string().into()),
+                    }
+                }
+            });
+        Ok(())
+    }
+
+    /// Sets a finalizer.
+    ///
+    /// A finalizer is invoked with every value before it is rendered and can
+    /// return a replacement value.  If it returns `undefined` the original
+    /// value is rendered.
+    pub fn setFinalizer(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "(value: any) => any")] func: Function,
+    ) -> Result<(), JsValue> {
+        let func = JsFunction::new(func);
+        self.env_mut()?.set_formatter(move |out, state, value| {
+            let rv = func.call(std::slice::from_ref(value))?;
+            if rv.is_undefined() {
+                mj::escape_formatter(out, state, value)
+            } else {
+                mj::escape_formatter(out, state, &rv)
+            }
+        });
+        Ok(())
+    }
+
+    /// Returns the variables a registered template references but does not define.
+    ///
+    /// If `nested` is `true`, nested attribute accesses are returned as dotted
+    /// paths (for instance `user.name`).
+    pub fn undeclaredVariablesInTemplate(
+        &self,
+        name: &str,
+        nested: Option<bool>,
+    ) -> Result<Vec<String>, JsValue> {
+        let env = self.env()?;
+        let t = env.get_template(name).map_err(to_js_error)?;
+        let mut rv: Vec<_> = t
+            .undeclared_variables(nested.unwrap_or(false))
+            .into_iter()
+            .collect();
+        rv.sort();
+        Ok(rv)
+    }
+
+    /// Returns the variables a template source references but does not define.
+    ///
+    /// If `nested` is `true`, nested attribute accesses are returned as dotted
+    /// paths (for instance `user.name`).
+    pub fn undeclaredVariablesInStr(
+        &self,
+        source: &str,
+        nested: Option<bool>,
+    ) -> Result<Vec<String>, JsValue> {
+        let env = self.env()?;
+        let t = env.template_from_str(source).map_err(to_js_error)?;
+        let mut rv: Vec<_> = t
+            .undeclared_variables(nested.unwrap_or(false))
+            .into_iter()
+            .collect();
+        rv.sort();
+        Ok(rv)
     }
 
     /// Enables or disables debug mode.
@@ -302,7 +608,11 @@ impl Environment {
     /// The provided function is called with a template name and must return a
     /// string with the template source or `null`/`undefined` if the template
     /// does not exist. Errors thrown are propagated as MiniJinja errors.
-    pub fn setLoader(&self, func: Function) -> Result<(), JsValue> {
+    pub fn setLoader(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "(name: string) => string | null | undefined")]
+        func: Function,
+    ) -> Result<(), JsValue> {
         let func = JsCell::new(func);
         self.env_mut()?.set_loader(move |name| {
             let rv = func
@@ -326,7 +636,11 @@ impl Environment {
     ///
     /// The callback receives `(name, parent)` and should return a joined path string.
     /// If it throws or returns a non-string, the original `name` is used.
-    pub fn setPathJoinCallback(&self, func: Function) -> Result<(), JsValue> {
+    pub fn setPathJoinCallback(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "(name: string, parent: string) => string")]
+        func: Function,
+    ) -> Result<(), JsValue> {
         let func = JsCell::new(func);
         self.env_mut()?
             .set_path_join_callback(move |name, parent| -> Cow<'_, str> {

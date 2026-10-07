@@ -493,12 +493,110 @@ No referenced variables
     });
   });
 
+  describe("api", () => {
+    it("should add and remove filters, tests and functions", () => {
+      const env = new Environment();
+      env.addFilter("double", (x) => x * 2);
+      env.addTest("even", (x) => x % 2 === 0);
+      env.addFunction(
+        "greet",
+        (name, { greeting = "Hello" } = {}) => `${greeting} ${name}`,
+      );
+      assert.equal(
+        env.renderStr(
+          "{{ 2|double }} {{ 2 is even }} {{ greet('Peter', greeting='Hi') }}",
+        ),
+        "4 True Hi Peter",
+      );
+      env.removeFilter("double");
+      env.removeTest("even");
+      assertThrows(() => env.renderStr("{{ 2|double }}"), "unknown filter");
+      assertThrows(() => env.renderStr("{{ 2 is even }}"), "unknown test");
+    });
+
+    it("should support an auto escape callback", () => {
+      const env = new Environment();
+      env.setAutoEscapeCallback((name) =>
+        name.endsWith(".j2") ? "html" : name.endsWith(".json") ? "json" : false,
+      );
+      const ctx = { value: "<a>" };
+      assert.equal(env.renderNamedStr("x.j2", "{{ value }}", ctx), "&lt;a&gt;");
+      assert.equal(env.renderNamedStr("x.json", "{{ value }}", ctx), '"<a>"');
+      assert.equal(env.renderNamedStr("x.html", "{{ value }}", ctx), "<a>");
+    });
+
+    it("should support a finalizer", () => {
+      const env = new Environment();
+      env.setFinalizer((value) => (value === null ? "" : undefined));
+      assert.equal(env.renderStr("[{{ none }}] [{{ 42 }}]"), "[] [42]");
+    });
+
+    it("should support custom syntax", () => {
+      const env = new Environment();
+      assert.deepEqual(env.syntax, {
+        blockStart: "{%",
+        blockEnd: "%}",
+        variableStart: "{{",
+        variableEnd: "}}",
+        commentStart: "{#",
+        commentEnd: "#}",
+        lineStatementPrefix: null,
+        lineCommentPrefix: null,
+      });
+      env.trimBlocks = true;
+      env.syntax = {
+        variableStart: "${",
+        variableEnd: "}",
+        lineStatementPrefix: "#",
+      };
+      assert.equal(env.syntax.variableStart, "${");
+      assert.equal(env.syntax.blockStart, "{%");
+      assert.equal(env.trimBlocks, true);
+      assert.equal(
+        env.renderStr("# for x in seq\n${ x }{{ x }}\n# endfor\n", {
+          seq: [1, 2],
+        }),
+        "1{{ x }}\n2{{ x }}\n",
+      );
+      assertThrows(() => {
+        env.syntax = { blockStart: 42 };
+      }, "must be a string");
+    });
+
+    it("should report undeclared variables", () => {
+      const env = new Environment();
+      env.addTemplate("x", "{% set a = 1 %}{{ a }}{{ b }}{{ user.name }}");
+      assert.deepEqual(env.undeclaredVariablesInTemplate("x"), ["b", "user"]);
+      assert.deepEqual(env.undeclaredVariablesInTemplate("x", true), [
+        "b",
+        "user.name",
+      ]);
+      assert.deepEqual(env.undeclaredVariablesInStr("{{ x }}{{ y }}"), [
+        "x",
+        "y",
+      ]);
+    });
+  });
+
   describe("py compat", () => {
     it("should enable py compat", () => {
       const env = new Environment();
       env.enablePyCompat();
       const result = env.renderStr("{{ {1: 2}.items() }}", {});
       assert.equal(result, "[(1, 2)]");
+    });
+
+    it("should toggle py compat", () => {
+      const env = new Environment();
+      assert.equal(env.pycompat, false);
+      env.pycompat = true;
+      assert.equal(env.renderStr("{{ 'abc'.startswith('a') }}"), "True");
+      env.pycompat = false;
+      assert.equal(env.pycompat, false);
+      assertThrows(
+        () => env.renderStr("{{ 'abc'.startswith('a') }}"),
+        "unknown method",
+      );
     });
   });
 });

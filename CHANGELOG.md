@@ -26,6 +26,8 @@ All notable changes to MiniJinja are documented here.
   * Maps with string keys are returned to JavaScript as plain objects instead of `Map`s, none is returned as `null` and integers outside of the safe range as `BigInt`.  Functions and objects passed in are returned unchanged.
   * Added `SafeString` for strings that should not be auto escaped.  Callbacks receive safe strings as `SafeString` and can return them to bypass auto escaping.
   * Errors are now raised as `TemplateError` with `kind`, `detail`, `templateName`, `line`, `range` and `templateSource` properties.
+  * Added `addFunction`, `removeFilter`, `removeTest`, `setAutoEscapeCallback`, `setFinalizer`, `undeclaredVariablesInTemplate` and `undeclaredVariablesInStr` as well as the `syntax` property for custom delimiters and line statements and the `pycompat` property.
+  * Improved the TypeScript declarations.  Callbacks and contexts are now typed and `Context`, `SyntaxConfig`, `AutoEscape` and `UndefinedBehavior` are exported.
   * Enabled the `urlencode`, `loop_controls` and `unicode` features as well as the `html_entities` and `wordwrap` contrib features to match the Python bindings.
   * The context argument of `renderStr`, `renderTemplate`, `renderNamedStr` and `evalExpr` is now optional.
   * The npm package is now an ES module with a single wasm build and an `exports` map.  Node.js loads the wasm module synchronously (and supports `require()` on versions with `require(esm)`), browsers, bundlers, Deno and Bun load it with top-level await.  The `minijinja-js/init` entry point allows initializing the module manually.  The `dist/node`, `dist/web` and `dist/bundler` paths are gone.  The package is now about a quarter of its previous size.

@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "lib": ["es2022", "dom", "esnext.disposable"],
+    "types": []
+  },
+  "files": ["usage.ts"]
+}

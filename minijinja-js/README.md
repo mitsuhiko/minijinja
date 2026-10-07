@@ -134,6 +134,42 @@ callbacks) are converted back:
 MiniJinja tuples retain tuple rendering inside templates. Expression results are
 returned as JavaScript arrays because JavaScript has no distinct tuple type.
 
+## Configuration
+
+```typescript
+import { Environment } from "minijinja-js";
+
+const env = new Environment();
+
+// whitespace handling and undefined behavior
+env.trimBlocks = true;
+env.lstripBlocks = true;
+env.undefinedBehavior = "strict";
+
+// custom delimiters and line statements (unspecified ones use the defaults)
+env.syntax = { variableStart: "${", variableEnd: "}", lineStatementPrefix: "#" };
+
+// auto escaping per template name: "html", "json", "none", true or false
+env.setAutoEscapeCallback((name) => name.endsWith(".html"));
+
+// customize values before they are rendered (return undefined to keep them)
+env.setFinalizer((value) => (value === null ? "" : undefined));
+
+// limit the amount of work a template can do
+env.fuel = 50000;
+
+// Python compatible methods such as dict.items()
+env.pycompat = true;
+```
+
+Find the variables a template needs:
+
+```typescript
+env.addTemplate("index.html", "{% set greeting = 'Hello' %}{{ greeting }} {{ user.name }}");
+env.undeclaredVariablesInTemplate("index.html"); // ["user"]
+env.undeclaredVariablesInTemplate("index.html", true); // ["user.name"]
+```
+
 ## Safe Strings
 
 Strings marked as safe are not auto escaped.  Safe strings are represented
@@ -191,7 +227,6 @@ others probably not so much.  You might run into the following:
 
 * Access of the template engine state from JavaScript is not possible.
 * Filters, tests and functions cannot be async.
-* You cannot register a custom auto escape callback or a finalizer
 * The loader is synchronous; use sync I/O in Node etc... (e.g. `fs.readFileSync`)
 * The environment cannot be modified while it renders (for instance from
   within a filter).
