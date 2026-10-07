@@ -3,6 +3,7 @@
 //! JavaScript to MiniJinja:
 //!
 //! - `undefined` becomes undefined, `null` becomes none
+//! - `SafeString`s become safe strings
 //! - booleans, strings and numbers map to their MiniJinja counterparts.  Numbers
 //!   that are safe integers become integers.
 //! - `BigInt` becomes a (128 bit) integer
@@ -21,6 +22,7 @@
 //! - sequences and iterables become arrays
 //! - maps with only string keys (and keyword arguments) become plain objects,
 //!   other maps become `Map`s
+//! - safe strings become `SafeString`s
 //! - bytes become `Uint8Array`
 //! - wrapped JavaScript values are unwrapped again
 //! - other objects are stringified
@@ -45,6 +47,15 @@ const MAX_DEPTH: usize = 500;
 
 /// `Number.MAX_SAFE_INTEGER`
 const MAX_SAFE_INTEGER: f64 = 9007199254740991.0;
+
+#[wasm_bindgen(module = "/js/support.js")]
+extern "C" {
+    #[wasm_bindgen(extends = js_sys::JsString)]
+    pub type SafeString;
+
+    #[wasm_bindgen(constructor)]
+    pub fn new(value: &str) -> SafeString;
+}
 
 thread_local! {
     static OBJECT_PROTOTYPE: JsValue = Object::get_prototype_of(&Object::new()).into();
@@ -97,7 +108,9 @@ fn js_to_value_impl(value: &JsValue, depth: usize) -> Result<Value, Error> {
     }
     let depth = depth + 1;
 
-    if Array::is_array(value) {
+    if value.is_instance_of::<SafeString>() {
+        Ok(Value::from_safe_string(describe_js_value(value)))
+    } else if Array::is_array(value) {
         convert_array(value.unchecked_ref(), depth)
     } else if is_plain_object(value) {
         let entries = Object::entries(value.unchecked_ref());
@@ -183,7 +196,14 @@ fn value_to_js_impl(value: &Value, depth: usize) -> Result<JsValue, Error> {
         ValueKind::None => return Ok(JsValue::NULL),
         ValueKind::Bool => return Ok(JsValue::from_bool(value.is_true())),
         ValueKind::Number => return Ok(number_to_js(value)),
-        ValueKind::String => return Ok(JsValue::from_str(value.as_str().unwrap_or_default())),
+        ValueKind::String => {
+            let s = value.as_str().unwrap_or_default();
+            return Ok(if value.is_safe() {
+                SafeString::new(s).into()
+            } else {
+                JsValue::from_str(s)
+            });
+        }
         ValueKind::Bytes => {
             return Ok(Uint8Array::from(value.as_bytes().unwrap_or_default()).into());
         }

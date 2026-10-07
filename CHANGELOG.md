@@ -24,6 +24,9 @@ All notable changes to MiniJinja are documented here.
   * Filters, tests and functions now receive keyword arguments as a trailing object.
   * Replaced the serde based value conversion.  Plain objects and maps preserve their key order, `Map`, `Set`, `Date`, `BigInt`, `Uint8Array` and typed arrays are supported, and class instances are accessed lazily with methods called on the instance.  Cyclic structures fail with an error instead of overflowing the stack.
   * Maps with string keys are returned to JavaScript as plain objects instead of `Map`s, none is returned as `null` and integers outside of the safe range as `BigInt`.  Functions and objects passed in are returned unchanged.
+  * Added `SafeString` for strings that should not be auto escaped.  Callbacks receive safe strings as `SafeString` and can return them to bypass auto escaping.
+  * Errors are now raised as `TemplateError` with `kind`, `detail`, `templateName`, `line`, `range` and `templateSource` properties.
+  * Enabled the `urlencode`, `loop_controls` and `unicode` features as well as the `html_entities` and `wordwrap` contrib features to match the Python bindings.
   * The context argument of `renderStr`, `renderTemplate`, `renderNamedStr` and `evalExpr` is now optional.
   * Removed the `fragile` and `serde-wasm-bindgen` dependencies and updated `wasm-bindgen` to 0.2.129.
 

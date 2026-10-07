@@ -13,6 +13,15 @@ extern "C" {
     fn js_string(value: &JsValue) -> Result<String, JsValue>;
 }
 
+#[wasm_bindgen(module = "/js/support.js")]
+extern "C" {
+    #[wasm_bindgen(extends = js_sys::Error)]
+    type TemplateError;
+
+    #[wasm_bindgen(constructor)]
+    fn new(message: &str, info: &js_sys::Object) -> TemplateError;
+}
+
 /// Stringifies an arbitrary JavaScript value like `String(value)` does.
 pub fn describe_js_value(value: &JsValue) -> String {
     js_string(value).unwrap_or_else(|_| "<unprintable value>".into())
@@ -58,18 +67,42 @@ pub fn js_exception_error(context: &str, value: JsValue) -> Error {
     Error::new(ErrorKind::InvalidOperation, format!("{context}: {exc}")).with_source(exc)
 }
 
-/// Converts a MiniJinja error into a JavaScript `Error`.
+fn set(obj: &js_sys::Object, key: &str, value: impl Into<JsValue>) {
+    Reflect::set(obj, &JsValue::from_str(key), &value.into()).ok();
+}
+
+/// Converts a MiniJinja error into a JavaScript `TemplateError`.
 pub fn to_js_error(err: Error) -> JsValue {
-    let js_err = js_sys::Error::new(&format!("{err:#}"));
+    let info = js_sys::Object::new();
+    set(&info, "kind", format!("{:?}", err.kind()));
+    set(&info, "detail", err.detail());
+    set(&info, "templateName", err.name());
+    set(&info, "line", err.line().map(|x| x as u32));
+    set(&info, "templateSource", err.template_source());
+    set(
+        &info,
+        "range",
+        match err.range() {
+            Some(range) => {
+                let obj = js_sys::Object::new();
+                set(&obj, "start", range.start as u32);
+                set(&obj, "end", range.end as u32);
+                JsValue::from(obj)
+            }
+            None => JsValue::UNDEFINED,
+        },
+    );
+
     let mut source: Option<&(dyn std::error::Error + 'static)> = err.source();
     while let Some(err) = source {
         if let Some(exc) = err.downcast_ref::<JsException>() {
-            Reflect::set(&js_err, &JsValue::from_str("cause"), &exc.value).ok();
+            set(&info, "cause", &*exc.value);
             break;
         }
         source = err.source();
     }
-    js_err.into()
+
+    TemplateError::new(&format!("{err:#}"), &info).into()
 }
 
 /// Creates a plain JavaScript `Error` with the given message.

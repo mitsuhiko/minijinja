@@ -21,8 +21,8 @@ default = ["console_error_panic_hook"]
 [target.'cfg(target_family="wasm")'.dependencies]
 console_error_panic_hook = { version = "0.1.7", optional = true }
 js-sys = "0.3.106"
-minijinja = { version = "3.0.0-alpha.3", path = "../minijinja", features = ["json", "fuel", "preserve_order"] }
-minijinja-contrib = { version = "3.0.0-alpha.3", path = "../minijinja-contrib", features = ["pycompat"] }
+minijinja = { version = "3.0.0-alpha.3", path = "../minijinja", features = ["json", "fuel", "preserve_order", "urlencode", "loop_controls", "unicode"] }
+minijinja-contrib = { version = "3.0.0-alpha.3", path = "../minijinja-contrib", features = ["pycompat", "html_entities", "wordwrap"] }
 wasm-bindgen = "0.2.129"
 
 [package.metadata.wasm-pack.profile.release]

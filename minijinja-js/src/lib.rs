@@ -17,6 +17,20 @@ mod cell;
 mod error;
 mod value;
 
+#[wasm_bindgen(module = "/js/support.js")]
+extern "C" {
+    fn getSupportClasses() -> js_sys::Object;
+}
+
+/// Returns the support classes (`SafeString` and `TemplateError`).
+///
+/// This exists so that the package entry points can re-export the classes
+/// that are used by the bindings.
+#[wasm_bindgen(js_name = "__getSupportClasses", skip_typescript)]
+pub fn get_support_classes() -> js_sys::Object {
+    getSupportClasses()
+}
+
 #[wasm_bindgen(start)]
 fn start() {
     #[cfg(feature = "console_error_panic_hook")]

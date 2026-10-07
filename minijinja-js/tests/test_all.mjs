@@ -1,7 +1,9 @@
 import assert from "assert";
 import { expect } from "chai";
 import path from "node:path";
-import { Environment } from "../dist/node/minijinja_js.js";
+import { Environment, __getSupportClasses } from "../dist/node/minijinja_js.js";
+
+const { SafeString, TemplateError } = __getSupportClasses();
 
 describe("minijinja-js", () => {
   describe("basic", () => {
@@ -62,6 +64,28 @@ describe("minijinja-js", () => {
       }).to.throw("invalid undefined behavior");
       expect(env.undefinedBehavior).to.equal("lenient");
       expect(env.renderStr("{{ 1 }}")).to.equal("1");
+    });
+  });
+
+  describe("errors", () => {
+    it("should raise template errors with details", () => {
+      const env = new Environment();
+      let caught;
+      try {
+        env.addTemplate("test.html", "line 1\n{{ name }");
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).to.be.instanceOf(TemplateError);
+      expect(caught).to.be.instanceOf(Error);
+      expect(caught.name).to.equal("TemplateError");
+      expect(caught.kind).to.equal("SyntaxError");
+      expect(caught.detail).to.equal(
+        "unexpected `}`, expected end of variable block"
+      );
+      expect(caught.templateName).to.equal("test.html");
+      expect(caught.line).to.equal(2);
+      expect(caught.range).to.deep.equal({ start: 15, end: 16 });
     });
   });
 
@@ -221,6 +245,46 @@ No referenced variables
       env.debug = true;
       expect(env.debug).to.equal(true);
       expect(env.renderStr("{{ 1 }}")).to.equal("1");
+    });
+  });
+
+  describe("safe strings", () => {
+    it("should not escape safe strings", () => {
+      const env = new Environment();
+      env.addFilter("bold", (value) => new SafeString(`<b>${value}</b>`));
+      const result = env.renderNamedStr(
+        "test.html",
+        "{{ value }} {{ raw }} {{ 'x'|bold }}",
+        { value: "<a>", raw: new SafeString("<a>") }
+      );
+      expect(result).to.equal("&lt;a&gt; <a> <b>x</b>");
+    });
+
+    it("should pass safe strings to callbacks", () => {
+      const env = new Environment();
+      env.addFilter("check", (value) =>
+        value instanceof SafeString ? "safe" : "unsafe"
+      );
+      const result = env.renderStr("{{ 'a'|safe|check }} {{ 'a'|check }}");
+      expect(result).to.equal("safe unsafe");
+      const rv = env.evalExpr("'<a>'|safe");
+      expect(rv).to.be.instanceOf(SafeString);
+      expect(String(rv)).to.equal("<a>");
+    });
+  });
+
+  describe("features", () => {
+    it("should support loop controls", () => {
+      const env = new Environment();
+      const result = env.renderStr(
+        "{% for x in range(10) %}{% if x == 3 %}{% break %}{% endif %}{{ x }}{% endfor %}"
+      );
+      expect(result).to.equal("012");
+    });
+
+    it("should support urlencode", () => {
+      const env = new Environment();
+      expect(env.renderStr("{{ 'a b&c'|urlencode }}")).to.equal("a%20b%26c");
     });
   });
 
