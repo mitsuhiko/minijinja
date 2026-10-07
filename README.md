@@ -48,7 +48,7 @@ $ echo "Hello {{ name }}" | minijinja-cli - -Dname=World
 Hello World
 ```
 
-You can play with MiniJinja online [in the browser playground](https://mitsuhiko.github.io/minijinja-playground/)
+You can play with MiniJinja online [in the browser playground](https://mitsuhiko.github.io/minijinja/)
 powered by a WASM build of MiniJinja.
 
 **Goals:**
@@ -66,7 +66,7 @@ powered by a WASM build of MiniJinja.
   [Python](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-py), and [C](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cabi)
 * Also available for [Go](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-go)
 * Comes with a handy [CLI](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-cli)
-* [Compiles to WebAssembly](https://github.com/mitsuhiko/minijinja-playground/blob/main/src/lib.rs)
+* [Compiles to WebAssembly](https://github.com/mitsuhiko/minijinja/tree/main/minijinja-js)
 
 ## Example
 
@@ -187,6 +187,6 @@ have been built with support of AI.
 - [Discussions](https://github.com/mitsuhiko/minijinja/discussions)
 - [Examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
 - [Issue Tracker](https://github.com/mitsuhiko/minijinja/issues)
-- [MiniJinja Playground](https://mitsuhiko.github.io/minijinja-playground/)
+- [MiniJinja Playground](https://mitsuhiko.github.io/minijinja/)
 - [Updating Guide](UPDATING.md)
 - License: [Apache-2.0](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)

@@ -1,0 +1,274 @@
+import { DEFAULT_SETTINGS, type PlaygroundState } from "./state";
+
+export interface Example {
+  id: string;
+  title: string;
+  state: PlaygroundState;
+}
+
+function json(value: unknown): string {
+  return JSON.stringify(value, null, 2);
+}
+
+export const EXAMPLES: Example[] = [
+  {
+    id: "hello",
+    title: "Hello World",
+    state: {
+      files: [
+        {
+          name: "index.html",
+          source: `<nav>
+  <ul>
+    {%- for item in nav %}
+    <li><a href="{{ item.href }}">{{ item.title }}</a></li>
+    {%- endfor %}
+  </ul>
+</nav>
+<main>
+  Hello {{ name }}!
+</main>
+`,
+        },
+      ],
+      entry: "index.html",
+      context: json({
+        name: "World",
+        nav: [
+          { href: "/", title: "Index" },
+          { href: "/help", title: "Help" },
+          { href: "/about", title: "About" },
+        ],
+      }),
+      settings: DEFAULT_SETTINGS,
+    },
+  },
+  {
+    id: "inheritance",
+    title: "Template Inheritance",
+    state: {
+      files: [
+        {
+          name: "index.html",
+          source: `{% extends "layout.html" %}
+
+{% block title %}{{ page.title }}{% endblock %}
+
+{% block body %}
+  <h1>{{ page.title }}</h1>
+  {{ super() }}
+  <p>{{ page.body }}</p>
+{% endblock %}
+`,
+        },
+        {
+          name: "layout.html",
+          source: `<!doctype html>
+<html>
+  <head>
+    <title>{% block title %}{% endblock %} | {{ site_name }}</title>
+  </head>
+  <body>
+    {% block body %}
+    <p>This paragraph comes from the layout.</p>
+    {% endblock %}
+  </body>
+</html>
+`,
+        },
+      ],
+      entry: "index.html",
+      context: json({
+        site_name: "My Site",
+        page: {
+          title: "Welcome",
+          body: "Inheritance lets templates share a layout.",
+        },
+      }),
+      settings: DEFAULT_SETTINGS,
+    },
+  },
+  {
+    id: "macros",
+    title: "Macros and Imports",
+    state: {
+      files: [
+        {
+          name: "index.html",
+          source: `{% from "forms.html" import input, button %}
+<form method="post">
+  {{ input("username", label="Username") }}
+  {{ input("password", type="password", label="Password") }}
+  {{ button("Sign in") }}
+</form>
+`,
+        },
+        {
+          name: "forms.html",
+          source: `{% macro input(name, type="text", label=none) -%}
+  <label>
+    {%- if label %}{{ label }}: {% endif -%}
+    <input type="{{ type }}" name="{{ name }}">
+  </label>
+{%- endmacro %}
+
+{% macro button(text) -%}
+  <button type="submit">{{ text }}</button>
+{%- endmacro %}
+`,
+        },
+      ],
+      entry: "index.html",
+      context: json({}),
+      settings: DEFAULT_SETTINGS,
+    },
+  },
+  {
+    id: "filters",
+    title: "Loops and Filters",
+    state: {
+      files: [
+        {
+          name: "report.txt",
+          source: `Report for {{ team|title }}
+{{ "=" * (11 + team|length) }}
+
+{% for group in members|groupby("role") -%}
+{{ group.grouper|upper }}:
+{% for member in group.list|sort(attribute="name") -%}
+  {{ loop.index }}. {{ member.name }} ({{ member.commits }} commits)
+{% endfor %}
+{% endfor -%}
+Total commits: {{ members|map(attribute="commits")|sum }}
+Most active: {{ (members|sort(attribute="commits", reverse=true)|first).name }}
+`,
+        },
+      ],
+      entry: "report.txt",
+      context: json({
+        team: "platform team",
+        members: [
+          { name: "Peter", role: "engineer", commits: 42 },
+          { name: "Anna", role: "designer", commits: 7 },
+          { name: "Jane", role: "engineer", commits: 108 },
+          { name: "Bob", role: "designer", commits: 12 },
+        ],
+      }),
+      settings: DEFAULT_SETTINGS,
+    },
+  },
+  {
+    id: "whitespace",
+    title: "Whitespace Control",
+    state: {
+      files: [
+        {
+          name: "config.txt",
+          source: `# Toggle trim blocks and lstrip blocks in the settings
+# and enable "Show whitespace" in the output.
+{% for server in servers %}
+  {% if server.enabled %}
+server {{ server.name }} {
+    listen {{ server.port }};
+}
+  {% endif %}
+{% endfor %}
+`,
+        },
+      ],
+      entry: "config.txt",
+      context: json({
+        servers: [
+          { name: "alpha", port: 8080, enabled: true },
+          { name: "beta", port: 8081, enabled: false },
+          { name: "gamma", port: 8082, enabled: true },
+        ],
+      }),
+      settings: { ...DEFAULT_SETTINGS, trimBlocks: true, lstripBlocks: true },
+    },
+  },
+  {
+    id: "pycompat",
+    title: "Python Compatibility",
+    state: {
+      files: [
+        {
+          name: "index.txt",
+          source: `{# Python methods are available with pycompat enabled #}
+{% for key, value in config.items() -%}
+{{ key.upper() }} = {{ value }}
+{% endfor -%}
+{{ "hello world".title().replace("World", "MiniJinja") }}
+{{ names|join(", ") if "Anna" in names else "nobody" }}
+`,
+        },
+      ],
+      entry: "index.txt",
+      context: json({
+        config: { debug: true, workers: 4, host: "localhost" },
+        names: ["Anna", "Peter"],
+      }),
+      settings: { ...DEFAULT_SETTINGS, pycompat: true },
+    },
+  },
+  {
+    id: "json",
+    title: "JSON Output",
+    state: {
+      files: [
+        {
+          name: "data.json",
+          source: `{# .json templates escape values as JSON #}
+{
+  "user": {{ user.name }},
+  "tags": {{ user.tags }},
+  "summary": {{ "%s has %d tags"|format(user.name, user.tags|length) }}
+}
+`,
+        },
+      ],
+      entry: "data.json",
+      context: json({
+        user: { name: 'Peter "Pete" Parker', tags: ["admin", "dev"] },
+      }),
+      settings: DEFAULT_SETTINGS,
+    },
+  },
+  {
+    id: "line-statements",
+    title: "Custom Syntax",
+    state: {
+      files: [
+        {
+          name: "Makefile",
+          source: `## Line statements and comments are enabled in the settings
+# for target in targets
+\${ target.name }:
+\t\${ target.command }
+
+# endfor
+`,
+        },
+      ],
+      entry: "Makefile",
+      context: json({
+        targets: [
+          { name: "build", command: "cargo build" },
+          { name: "test", command: "cargo test" },
+        ],
+      }),
+      settings: {
+        ...DEFAULT_SETTINGS,
+        trimBlocks: true,
+        syntax: {
+          variableStart: "${",
+          variableEnd: "}",
+          lineStatementPrefix: "#",
+          lineCommentPrefix: "##",
+        },
+      },
+    },
+  },
+];
+
+export const DEFAULT_STATE = EXAMPLES[0].state;

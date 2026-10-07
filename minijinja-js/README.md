@@ -241,5 +241,5 @@ sponsor](https://github.com/sponsors/mitsuhiko).
 ## License and Links
 
 - [Issue Tracker](https://github.com/mitsuhiko/minijinja/issues)
-- [MiniJinja Playground](https://mitsuhiko.github.io/minijinja-playground/)
+- [MiniJinja Playground](https://mitsuhiko.github.io/minijinja/)
 - License: [Apache-2.0](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)

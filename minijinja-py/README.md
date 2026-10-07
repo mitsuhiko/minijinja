@@ -197,5 +197,5 @@ sponsor](https://github.com/sponsors/mitsuhiko).
 - [Documentation](https://docs.rs/minijinja/)
 - [Examples](https://github.com/mitsuhiko/minijinja/tree/main/examples)
 - [Issue Tracker](https://github.com/mitsuhiko/minijinja/issues)
-- [MiniJinja Playground](https://mitsuhiko.github.io/minijinja-playground/)
+- [MiniJinja Playground](https://mitsuhiko.github.io/minijinja/)
 - License: [Apache-2.0](https://github.com/mitsuhiko/minijinja/blob/main/LICENSE)

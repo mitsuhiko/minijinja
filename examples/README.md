@@ -51,4 +51,4 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 ## Third-party Examples
 
 * [Actix Web Integration](https://github.com/actix/examples/blob/master/templating/minijinja)
-* [MiniJinja Playground](https://github.com/mitsuhiko/minijinja-playground/) (WASM)
+* [MiniJinja Playground](https://github.com/mitsuhiko/minijinja/tree/main/playground) (WASM)

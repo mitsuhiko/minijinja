@@ -1,0 +1,77 @@
+name: Playground
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "minijinja/**"
+      - "minijinja-contrib/**"
+      - "minijinja-js/**"
+      - "playground/**"
+      - "Cargo.lock"
+      - ".github/workflows/playground.yml"
+  pull_request:
+    paths:
+      - "minijinja-js/**"
+      - "playground/**"
+      - ".github/workflows/playground.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playground-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build playground
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: playground/package-lock.json
+      - name: Install wasm-pack
+        run: |
+          curl -sSf https://drager.github.io/wasm-pack/installer/init.sh | sh
+      - name: Build minijinja-js
+        working-directory: ./playground
+        run: npm run build:wasm
+      - name: Build playground
+        working-directory: ./playground
+        run: |
+          npm ci
+          npm run build
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: playground/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
