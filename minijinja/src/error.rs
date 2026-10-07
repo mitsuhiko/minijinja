@@ -135,8 +135,7 @@ pub enum ErrorKind {
     /// Engine ran out of fuel
     #[cfg(feature = "fuel")]
     OutOfFuel,
-    #[cfg(feature = "custom_syntax")]
-    /// Error creating aho-corasick delimiters
+    /// Invalid custom delimiters
     InvalidDelimiter,
     /// An unknown block was called
     #[cfg(feature = "multi_template")]
@@ -168,7 +167,6 @@ impl ErrorKind {
             ErrorKind::CannotDeserialize => "cannot deserialize",
             #[cfg(feature = "fuel")]
             ErrorKind::OutOfFuel => "engine ran out of fuel",
-            #[cfg(feature = "custom_syntax")]
             ErrorKind::InvalidDelimiter => "invalid custom delimiters",
             #[cfg(feature = "multi_template")]
             ErrorKind::UnknownBlock => "unknown block",

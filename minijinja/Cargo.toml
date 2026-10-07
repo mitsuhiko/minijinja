@@ -14,7 +14,7 @@ rust-version = "1.70"
 exclude = ["tests"]
 
 [package.metadata.docs.rs]
-features = ["json", "urlencode", "custom_syntax", "fuel"]
+features = ["json", "urlencode", "fuel"]
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "doc-header.html"]
 
 [features]
@@ -31,7 +31,6 @@ default = [
 preserve_order = ["indexmap"]
 debug = []
 unicode = ["unicode-ident", "unicase"]
-custom_syntax = ["dep:aho-corasick"]
 std_collections = []
 serde = ["dep:serde"]
 
@@ -57,7 +56,6 @@ unstable_machinery_serde = ["serde", "unstable_machinery", "serde/derive"]
 internal_safe_search = []
 
 [dependencies]
-aho-corasick = { version = "1.0", default-features = false, optional = true }
 serde = { version = "1.0.130", optional = true }
 v_htmlescape = { version = "0.15.8", optional = true }
 zmij = { version = "1.0.17", optional = true }

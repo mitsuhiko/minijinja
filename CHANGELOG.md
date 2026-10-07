@@ -15,6 +15,9 @@ All notable changes to MiniJinja are documented here.
 * Fixed `pass_state` not working on methods invoked from templates in the Python bindings.
 * The Python bindings now require Python 3.10 or later.
 * Updated PyO3 to 0.29.3 in the Python bindings and dropped the deprecated `extension-module` feature.  Building now requires maturin 1.9.4 or later.
+* Removed the `custom_syntax` feature.  Custom delimiters, line statements and line comments are now always available.  The `aho-corasick` dependency was removed; start markers are now found with a simple scan which is as fast or faster and makes building a custom `SyntaxConfig` about 100 times faster.
+* Fixed custom delimiters where a start marker overlaps a longer one (for instance `<%` and `<%%=`) sometimes picking the wrong marker.
+* Empty end delimiters are now rejected with `ErrorKind::InvalidDelimiter`.
 
 ## 3.0.0-alpha.3
 

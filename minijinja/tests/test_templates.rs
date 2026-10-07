@@ -6,7 +6,6 @@
     feature = "macros",
     feature = "builtins",
     feature = "adjacent_loop_items",
-    feature = "custom_syntax",
     feature = "serde"
 ))]
 use std::collections::BTreeMap;
@@ -558,7 +557,6 @@ fn test_flattening_sub_item_shielded_print() {
 }
 
 #[test]
-#[cfg(feature = "custom_syntax")]
 fn test_custom_syntax() {
     let mut env = Environment::new();
     env.set_syntax(
@@ -575,6 +573,40 @@ fn test_custom_syntax() {
         .render_str("{for x in range(3)}${x}{endfor}{* nothing *}", ())
         .unwrap();
     assert_eq!(value, r"012");
+}
+
+#[test]
+fn test_custom_syntax_leftmost_longest() {
+    // the longest marker at the leftmost position has to win, even if a
+    // shorter overlapping marker ends before it.
+    let mut env = Environment::new();
+    env.set_syntax(
+        minijinja::syntax::SyntaxConfig::builder()
+            .block_delimiters("<%", "%>")
+            .variable_delimiters("<%%=", "%>")
+            .comment_delimiters("%%", "%>")
+            .build()
+            .unwrap(),
+    );
+    let value = env
+        .render_str("[<%%= 1 + 1 %>|<% if true %>x<% endif %>|%% c %>]", ())
+        .unwrap();
+    assert_eq!(value, r"[2|x|]");
+}
+
+#[test]
+fn test_custom_syntax_invalid_delimiters() {
+    let err = SyntaxConfig::builder()
+        .block_delimiters("{%", "%}")
+        .variable_delimiters("{%", "}}")
+        .build()
+        .unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::InvalidDelimiter);
+    let err = SyntaxConfig::builder()
+        .variable_delimiters("${", "")
+        .build()
+        .unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::InvalidDelimiter);
 }
 
 #[test]

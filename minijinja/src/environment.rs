@@ -605,9 +605,9 @@ impl<'source> Environment<'source> {
     /// This setting is used whenever a template is loaded into the environment.
     /// Changing it at a later point only affects future templates loaded.
     ///
-    /// The syntax config controls the delimiters (requires the `custom_syntax`
-    /// feature) as well as the whitespace behavior such as `trim_blocks`,
-    /// `lstrip_blocks` and `keep_trailing_newline`.
+    /// The syntax config controls the delimiters as well as the whitespace
+    /// behavior such as `trim_blocks`, `lstrip_blocks` and
+    /// `keep_trailing_newline`.
     ///
     /// ```
     /// # use minijinja::{Environment, syntax::SyntaxConfig};

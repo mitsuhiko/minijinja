@@ -35,7 +35,6 @@ minijinja = { version = "=3.0.0-alpha.3", path = "../minijinja", features = [
     "urlencode",
     "fuel",
     "unstable_machinery",
-    "custom_syntax",
     "loop_controls"
 ] }
 minijinja-contrib = { version = "=3.0.0-alpha.3", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand", "unicode_wordwrap", "wordcount"] }

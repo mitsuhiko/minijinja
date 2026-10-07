@@ -2114,7 +2114,6 @@ dependencies = [
 name = "minijinja"
 version = "3.0.0-alpha.3"
 dependencies = [
- "aho-corasick",
  "indexmap",
  "insta",
  "itoa",

@@ -157,8 +157,7 @@ can use the same mutable facilities.
 
 The `trim_blocks`, `lstrip_blocks` and `keep_trailing_newline` settings moved
 from `Environment` into the `SyntaxConfig`.  The syntax config builder,
-`Environment::set_syntax` and `Environment::syntax` are now available without
-the `custom_syntax` feature, which is only required for custom delimiters:
+`Environment::set_syntax` and `Environment::syntax` are now always available:
 
 ```rust
 // Old
@@ -194,6 +193,13 @@ defaults.
 
 For users of the `unstable_machinery` feature, `WhitespaceConfig` was removed
 and `parse` and `tokenize` no longer take a separate whitespace config.
+
+## Custom Syntax Always Available
+
+The `custom_syntax` feature was removed.  Custom delimiters, line statements
+and line comments are now always available and no longer pull in the
+`aho-corasick` dependency.  Remove `"custom_syntax"` from the features of
+`minijinja` in your `Cargo.toml`.
 
 ## Custom Auto Escaping
 

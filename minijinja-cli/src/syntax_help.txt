@@ -653,8 +653,7 @@ support for “putting values back”.
 Custom Delimiters
 =================
 
-When MiniJinja has been compiled with the `custom_syntax` feature (see
-SyntaxConfig), it’s possible to reconfigure the delimiters of the templates.
+It’s possible to reconfigure the delimiters of the templates (see SyntaxConfig).
 This is generally not recommended but it’s useful for situations where Jinja
 templates are used to generate files with a syntax that would be conflicting for
 Jinja. With custom delimiters it can for instance be more convenient to generate
@@ -688,8 +687,8 @@ similar but they can also be trailing. These syntax features need to be
 configured explicitly. There are however small differences with regards to
 whitespace compared to Jinja2.
 
-To use line statements and comments the `custom_syntax` feature needs to be
-enabled and they need to be configured (see SyntaxConfig).
+To use line statements and comments they need to be configured (see
+SyntaxConfig).
 
     let mut environment = Environment::new();
     environment.set_syntax(SyntaxConfig::builder()

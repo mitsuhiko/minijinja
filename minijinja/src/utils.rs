@@ -17,14 +17,56 @@ use crate::Output;
 /// internal marker to seal up some trait methods
 pub struct SealedMarker;
 
+#[inline]
 pub fn memchr(haystack: &[u8], needle: u8) -> Option<usize> {
-    haystack.iter().position(|&x| x == needle)
+    memchr_any(haystack, [needle])
 }
 
+/// Finds the first occurrence of any of the given needle bytes.
+///
+/// This processes the haystack in fixed size chunks with a branchless
+/// check per chunk which the compiler can vectorize.
+#[inline]
+pub fn memchr_any<const N: usize>(haystack: &[u8], needles: [u8; N]) -> Option<usize> {
+    const CHUNK: usize = 32;
+    let is_match = |b: u8| needles.iter().fold(false, |acc, &n| acc | (b == n));
+    let mut chunks = haystack.chunks_exact(CHUNK);
+    let mut offset = 0;
+    for chunk in &mut chunks {
+        if chunk.iter().fold(false, |acc, &b| acc | is_match(b)) {
+            return chunk.iter().position(|&b| is_match(b)).map(|x| offset + x);
+        }
+        offset += CHUNK;
+    }
+    chunks
+        .remainder()
+        .iter()
+        .position(|&b| is_match(b))
+        .map(|x| offset + x)
+}
+
+/// Checks if `haystack` starts with `needle`.
+///
+/// Unlike `<[u8]>::starts_with` this does not call into `memcmp` which is
+/// faster for the short needles (delimiters) this is used with.
+#[inline(always)]
+pub fn starts_with_bytes(haystack: &[u8], needle: &[u8]) -> bool {
+    haystack.len() >= needle.len() && haystack.iter().zip(needle).all(|(a, b)| a == b)
+}
+
+/// Finds the first occurrence of `needle` in `haystack`.
 pub fn memstr(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack
-        .windows(needle.len())
-        .position(|window| window == needle)
+    let Some((&first, rest)) = needle.split_first() else {
+        return Some(0);
+    };
+    let mut pos = 0;
+    while let Some(idx) = memchr(&haystack[pos..], first) {
+        pos += idx + 1;
+        if starts_with_bytes(&haystack[pos..], rest) {
+            return Some(pos - 1);
+        }
+    }
+    None
 }
 
 /// Helper for dealing with untrusted size hints.
@@ -594,6 +636,34 @@ mod tests {
     use super::*;
 
     use similar_asserts::assert_eq;
+
+    #[test]
+    fn test_memstr() {
+        assert_eq!(memstr(b"", b""), Some(0));
+        assert_eq!(memstr(b"abc", b""), Some(0));
+        assert_eq!(memstr(b"", b"a"), None);
+        assert_eq!(memstr(b"%%}", b"%}"), Some(1));
+        assert_eq!(memstr(b"foo %", b"%}"), None);
+        assert_eq!(memstr(b"foo %} %}", b"%}"), Some(4));
+        assert_eq!(memstr(b"aab", b"ab"), Some(1));
+        assert_eq!(memstr(b"ab", b"abc"), None);
+    }
+
+    #[test]
+    fn test_memchr_any() {
+        for len in 0..100 {
+            for pos in 0..len {
+                let mut hay = vec![b'x'; len];
+                hay[pos] = b'b';
+                if pos + 1 < len {
+                    hay[pos + 1] = b'a';
+                }
+                assert_eq!(memchr_any(&hay, *b"ab"), Some(pos));
+                assert_eq!(memchr_any(&hay, *b"b"), Some(pos));
+                assert_eq!(memchr_any(&hay, *b"cde"), None);
+            }
+        }
+    }
 
     #[test]
     fn test_small_u64_format_cache_bounds() {

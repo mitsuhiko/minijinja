@@ -5,8 +5,7 @@ the state of compatibility and future direction is.
 
 ## Syntax Differences
 
-Custom delimiters are an optional feature that is largely discouraged. 
-For custom delimiters the `custom_syntax` feature needs to be enabled.
+Custom delimiters are supported but largely discouraged.
 
 MiniJinja by default does not allow unicode identifiers.  These need to be
 turned on with the `unicode` feature to achieve parity with Jinja2.

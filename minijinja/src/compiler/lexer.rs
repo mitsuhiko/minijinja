@@ -4,7 +4,7 @@ use std::ops::ControlFlow;
 use crate::compiler::tokens::{Span, Token};
 use crate::error::{Error, ErrorKind};
 use crate::syntax::SyntaxConfig;
-use crate::utils::{memchr, memstr, unescape};
+use crate::utils::{memchr, memstr, starts_with_bytes, unescape};
 
 /// Internal config struct to control whitespace in the engine.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -33,7 +33,6 @@ enum LexerState {
     Template,
     Variable,
     Block,
-    #[cfg(feature = "custom_syntax")]
     LineStatement,
 }
 
@@ -43,9 +42,7 @@ pub enum StartMarker {
     Variable,
     Block,
     Comment,
-    #[cfg(feature = "custom_syntax")]
     LineStatement,
-    #[cfg(feature = "custom_syntax")]
     LineComment,
 }
 
@@ -54,7 +51,6 @@ pub enum StartMarker {
 enum BlockSentinel {
     Variable,
     Block,
-    #[cfg(feature = "custom_syntax")]
     LineStatement,
 }
 
@@ -101,65 +97,24 @@ fn find_start_marker_memchr(a: &str) -> Option<(usize, StartMarker, usize, White
     }
 }
 
-#[cfg(feature = "custom_syntax")]
 fn find_start_marker(
     a: &str,
     offset: usize,
     syntax_config: &SyntaxConfig,
 ) -> Option<(usize, StartMarker, usize, Whitespace)> {
-    // If we have a custom delimiter we need to use the aho-corasick
-    // otherwise we can use internal memchr.
-    let Some(ref ac) = syntax_config.aho_corasick else {
+    // If we have custom delimiters we need to use the start marker matcher,
+    // otherwise we can use the faster memchr based search.
+    let Some(ref matcher) = syntax_config.start_marker_matcher else {
         return find_start_marker_memchr(&a[offset..]);
     };
 
-    let bytes = &a.as_bytes()[offset..];
-    let mut state = aho_corasick::automaton::OverlappingState::start();
-    let mut longest_match = None::<(usize, StartMarker, usize, Whitespace)>;
-
-    loop {
-        ac.find_overlapping(bytes, &mut state);
-        let m = match state.get_match() {
-            None => break,
-            Some(m) => m,
-        };
-
-        let marker = syntax_config.pattern_to_marker(m.pattern());
-        let ws = if matches!(marker, StartMarker::LineStatement) {
-            let prefix = &a.as_bytes()[..offset + m.start()];
-            if matches!(
-                prefix
-                    .iter()
-                    .copied()
-                    .rev()
-                    .find(|&x| x != b' ' && x != b'\t'),
-                None | Some(b'\r') | Some(b'\n')
-            ) {
-                Whitespace::Default
-            } else {
-                continue;
-            }
-        } else {
-            Whitespace::from_byte(bytes.get(m.start() + m.len()).copied())
-        };
-        let new_match = (m.start(), marker, m.len() + ws.len(), ws);
-
-        if longest_match.as_ref().is_some_and(|x| new_match.0 > x.0) {
-            break;
-        }
-        longest_match = Some(new_match);
-    }
-
-    longest_match
-}
-
-#[cfg(not(feature = "custom_syntax"))]
-fn find_start_marker(
-    a: &str,
-    offset: usize,
-    _syntax_config: &SyntaxConfig,
-) -> Option<(usize, StartMarker, usize, Whitespace)> {
-    find_start_marker_memchr(&a[offset..])
+    let (pos, marker, len) = some!(matcher.find(a, offset));
+    let ws = if marker == StartMarker::LineStatement {
+        Whitespace::Default
+    } else {
+        Whitespace::from_byte(a.as_bytes().get(offset + pos + len).copied())
+    };
+    Some((pos, marker, len + ws.len(), ws))
 }
 
 #[cfg(feature = "unicode")]
@@ -200,7 +155,6 @@ fn is_nl(c: char) -> bool {
     c == '\r' || c == '\n'
 }
 
-#[cfg(feature = "custom_syntax")]
 fn skip_nl(mut rest: &str) -> (bool, usize) {
     let mut skip = 0;
     let mut was_nl = false;
@@ -239,14 +193,11 @@ fn should_lstrip_block(flag: bool, marker: StartMarker, prefix: &str) -> bool {
         // If we get here, we're at the start of the file
         return true;
     }
-    #[cfg(feature = "custom_syntax")]
-    {
-        if matches!(
-            marker,
-            StartMarker::LineStatement | StartMarker::LineComment
-        ) {
-            return true;
-        }
+    if matches!(
+        marker,
+        StartMarker::LineStatement | StartMarker::LineComment
+    ) {
+        return true;
     }
     false
 }
@@ -284,8 +235,11 @@ fn skip_basic_tag(
         Whitespace::Default
     };
 
-    ptr.strip_prefix(block_end)
-        .map(|ptr| (block_str.len() - ptr.len(), ws))
+    if starts_with_bytes(ptr.as_bytes(), block_end.as_bytes()) {
+        Some((block_str.len() - ptr.len() + block_end.len(), ws))
+    } else {
+        None
+    }
 }
 
 impl<'s> Tokenizer<'s> {
@@ -344,18 +298,14 @@ impl<'s> Tokenizer<'s> {
             if self.rest_bytes().is_empty() {
                 // line statements normally close with newlines.  At the end of the file
                 // however we need to use the stack to close out the block instead.
-                #[cfg(feature = "custom_syntax")]
-                {
-                    if matches!(self.stack.pop(), Some(LexerState::LineStatement)) {
-                        return Ok(Some((Token::BlockEnd, self.span(self.loc()))));
-                    }
+                if matches!(self.stack.pop(), Some(LexerState::LineStatement)) {
+                    return Ok(Some((Token::BlockEnd, self.span(self.loc()))));
                 }
                 return Ok(None);
             }
             let outcome = match self.stack.last() {
                 Some(LexerState::Template) => self.tokenize_root(),
                 Some(LexerState::Block) => self.tokenize_block_or_var(BlockSentinel::Block),
-                #[cfg(feature = "custom_syntax")]
                 Some(LexerState::LineStatement) => {
                     self.tokenize_block_or_var(BlockSentinel::LineStatement)
                 }
@@ -704,14 +654,12 @@ impl<'s> Tokenizer<'s> {
                     Ok(ControlFlow::Break((Token::BlockStart, self.span(old_loc))))
                 }
             }
-            #[cfg(feature = "custom_syntax")]
             StartMarker::LineStatement => {
                 let old_loc = self.loc();
                 self.advance(skip);
                 self.stack.push(LexerState::LineStatement);
                 Ok(ControlFlow::Break((Token::BlockStart, self.span(old_loc))))
             }
-            #[cfg(feature = "custom_syntax")]
             StartMarker::LineComment => {
                 let comment_skip = self.rest_bytes()[skip..]
                     .iter()
@@ -776,24 +724,21 @@ impl<'s> Tokenizer<'s> {
         let rest = self.rest();
 
         // special case for looking for the end of a line statements if there are no
-        // open parens, braces etc.  This can only happen with custom syntax
-        #[cfg(feature = "custom_syntax")]
+        // open parens, braces etc.
+        if matches!(sentinel, BlockSentinel::LineStatement)
+            && self.paren_balance == 0
+            && self.syntax_config.line_statement_prefix().is_some()
         {
-            if matches!(sentinel, BlockSentinel::LineStatement)
-                && self.paren_balance == 0
-                && self.syntax_config.line_statement_prefix().is_some()
-            {
-                let skip = rest
-                    .chars()
-                    .take_while(|&x| x.is_whitespace() && !is_nl(x))
-                    .map(|x| x.len_utf8())
-                    .sum();
-                let (was_nl, nl_skip) = skip_nl(&rest[skip..]);
-                if was_nl {
-                    self.advance(skip + nl_skip);
-                    self.stack.pop();
-                    return Ok(ControlFlow::Break((Token::BlockEnd, self.span(old_loc))));
-                }
+            let skip = rest
+                .chars()
+                .take_while(|&x| x.is_whitespace() && !is_nl(x))
+                .map(|x| x.len_utf8())
+                .sum();
+            let (was_nl, nl_skip) = skip_nl(&rest[skip..]);
+            if was_nl {
+                self.advance(skip + nl_skip);
+                self.stack.pop();
+                return Ok(ControlFlow::Break((Token::BlockEnd, self.span(old_loc))));
             }
         }
 
@@ -819,7 +764,7 @@ impl<'s> Tokenizer<'s> {
             match sentinel {
                 BlockSentinel::Block => {
                     if matches!(rest.get(..1), Some("-" | "+"))
-                        && rest[1..].starts_with(self.block_end())
+                        && starts_with_bytes(&rest.as_bytes()[1..], self.block_end().as_bytes())
                     {
                         self.stack.pop();
                         let was_minus = &rest[..1] == "-";
@@ -830,7 +775,7 @@ impl<'s> Tokenizer<'s> {
                         }
                         return Ok(ControlFlow::Break((Token::BlockEnd, span)));
                     }
-                    if rest.starts_with(self.block_end()) {
+                    if starts_with_bytes(rest.as_bytes(), self.block_end().as_bytes()) {
                         self.stack.pop();
                         self.advance(self.block_end().len());
                         let span = self.span(old_loc);
@@ -840,7 +785,7 @@ impl<'s> Tokenizer<'s> {
                 }
                 BlockSentinel::Variable => {
                     if matches!(rest.get(..1), Some("-" | "+"))
-                        && rest[1..].starts_with(self.variable_end())
+                        && starts_with_bytes(&rest.as_bytes()[1..], self.variable_end().as_bytes())
                     {
                         self.stack.pop();
                         let was_minus = &rest[..1] == "-";
@@ -851,14 +796,13 @@ impl<'s> Tokenizer<'s> {
                         }
                         return Ok(ControlFlow::Break((Token::VariableEnd, span)));
                     }
-                    if rest.starts_with(self.variable_end()) {
+                    if starts_with_bytes(rest.as_bytes(), self.variable_end().as_bytes()) {
                         self.stack.pop();
                         self.advance(self.variable_end().len());
                         return Ok(ControlFlow::Break((Token::VariableEnd, self.span(old_loc))));
                     }
                 }
                 // line statements are handled above
-                #[cfg(feature = "custom_syntax")]
                 BlockSentinel::LineStatement => {}
             }
         }
