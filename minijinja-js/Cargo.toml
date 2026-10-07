@@ -6,7 +6,7 @@ publish = false
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
-rust-version = "1.70"
+rust-version = "1.81"
 
 [lib]
 bench = false
@@ -19,18 +19,11 @@ test = false
 default = ["console_error_panic_hook"]
 
 [target.'cfg(target_family="wasm")'.dependencies]
-wasm-bindgen = "0.2.100"
 console_error_panic_hook = { version = "0.1.7", optional = true }
-
-[target.'cfg(target_family="wasm")'.dev-dependencies]
-wasm-bindgen-test = "0.3.47"
-
-[dependencies]
-minijinja = { path = "../minijinja", features = ["json", "serde", "fuel"] }
-fragile = "2.0.0"
-js-sys = "0.3.77"
+js-sys = "0.3.106"
+minijinja = { version = "3.0.0-alpha.3", path = "../minijinja", features = ["json", "fuel", "preserve_order"] }
 minijinja-contrib = { version = "3.0.0-alpha.3", path = "../minijinja-contrib", features = ["pycompat"] }
-serde-wasm-bindgen = "0.6.5"
+wasm-bindgen = "0.2.129"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = ['-Oz','--enable-bulk-memory','--enable-nontrapping-float-to-int']

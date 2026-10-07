@@ -18,6 +18,14 @@ All notable changes to MiniJinja are documented here.
 * Removed the `custom_syntax` feature.  Custom delimiters, line statements and line comments are now always available.  The `aho-corasick` dependency was removed; start markers are now found with a simple scan which is as fast or faster and makes building a custom `SyntaxConfig` about 100 times faster.
 * Fixed custom delimiters where a start marker overlaps a longer one (for instance `<%` and `<%%=`) sometimes picking the wrong marker.
 * Empty end delimiters are now rejected with `ErrorKind::InvalidDelimiter`.
+* Reworked the JavaScript bindings:
+  * Exceptions thrown by filters, tests and functions no longer panic and permanently break the environment.  They now fail the render with an error whose `cause` is the original exception.
+  * Filters may now render from the same environment.  Modifying the environment while it renders raises an error instead of breaking it, and so does setting an invalid `undefinedBehavior`.
+  * Filters, tests and functions now receive keyword arguments as a trailing object.
+  * Replaced the serde based value conversion.  Plain objects and maps preserve their key order, `Map`, `Set`, `Date`, `BigInt`, `Uint8Array` and typed arrays are supported, and class instances are accessed lazily with methods called on the instance.  Cyclic structures fail with an error instead of overflowing the stack.
+  * Maps with string keys are returned to JavaScript as plain objects instead of `Map`s, none is returned as `null` and integers outside of the safe range as `BigInt`.  Functions and objects passed in are returned unchanged.
+  * The context argument of `renderStr`, `renderTemplate`, `renderNamedStr` and `evalExpr` is now optional.
+  * Removed the `fragile` and `serde-wasm-bindgen` dependencies and updated `wasm-bindgen` to 0.2.129.
 
 ## 3.0.0-alpha.3
 

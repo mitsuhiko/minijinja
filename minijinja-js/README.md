@@ -88,6 +88,49 @@ const result = env.evalExpr('1 + 1', {});
 console.log(result);
 ```
 
+Register filters, tests and functions:
+
+```typescript
+import { Environment } from "minijinja-js";
+
+const env = new Environment();
+env.addFilter("repeat", (value, times, { sep = "" } = {}) =>
+  Array(times).fill(value).join(sep)
+);
+env.addGlobal("double", (x) => x * 2);
+console.log(env.renderStr("{{ 'ab'|repeat(3, sep='-') }} {{ double(21) }}"));
+// -> ab-ab-ab 42
+```
+
+Keyword arguments are passed to JavaScript callbacks as a trailing object.
+Exceptions thrown by callbacks fail the render with an error whose `cause`
+is the original exception.
+
+## Values
+
+Values passed to templates are converted as follows:
+
+* `undefined` is undefined and `null` is none.
+* Numbers that are safe integers become integers, all others floats.
+  `BigInt`s become integers.
+* Arrays, `Set`s and typed arrays become sequences, `Uint8Array` and
+  `ArrayBuffer` become bytes.
+* Plain objects and `Map`s become maps.  Key order is preserved.
+* `Date`s become ISO 8601 strings.
+* Functions become callable.
+* Other objects (for instance class instances) are not copied but accessed
+  lazily.  This means getters work and methods are invoked with the object
+  as `this`.
+
+Values returned to JavaScript (from `evalExpr` or as arguments to
+callbacks) are converted back:
+
+* undefined becomes `undefined`, none becomes `null`.
+* Integers outside of the safe integer range become `BigInt`s.
+* Sequences become arrays, bytes become `Uint8Array`s.
+* Maps with only string keys become plain objects, other maps become `Map`s.
+* Functions and objects that came from JavaScript are passed back unchanged.
+
 MiniJinja tuples retain tuple rendering inside templates. Expression results are
 returned as JavaScript arrays because JavaScript has no distinct tuple type.
 
@@ -110,7 +153,10 @@ others probably not so much.  You might run into the following:
 * Access of the template engine state from JavaScript is not possible.
 * You cannot register a custom auto escape callback or a finalizer
 * The loader is synchronous; use sync I/O in Node etc... (e.g. `fs.readFileSync`)
-* If the engine panics, the WASM runtime corrupts.
+* The environment cannot be modified while it renders (for instance from
+  within a filter).
+* If the engine panics, the WASM runtime corrupts.  This should not happen
+  but if it does, please report it as a bug.
 
 ## Sponsor
 

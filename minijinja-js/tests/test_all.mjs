@@ -54,6 +54,15 @@ describe("minijinja-js", () => {
       env.undefinedBehavior = "semi_strict";
       expect(env.undefinedBehavior).to.equal("semi_strict");
     });
+
+    it("should reject invalid undefined behaviors", () => {
+      const env = new Environment();
+      expect(() => {
+        env.undefinedBehavior = "bogus";
+      }).to.throw("invalid undefined behavior");
+      expect(env.undefinedBehavior).to.equal("lenient");
+      expect(env.renderStr("{{ 1 }}")).to.equal("1");
+    });
   });
 
   describe("debug", () => {
@@ -86,12 +95,48 @@ No referenced variables
       );
     });
 
-    it("should return a map when dictionary literals are used", () => {
+    it("should return objects for dictionaries with string keys", () => {
       const env = new Environment();
       const result = env.evalExpr("{'a': 1, 'b': n}", { n: 2 });
+      expect(Object.getPrototypeOf(result)).to.equal(Object.prototype);
+      expect(result).to.deep.equal({ a: 1, b: 2 });
+    });
+
+    it("should return maps for dictionaries with other keys", () => {
+      const env = new Environment();
+      const result = env.evalExpr("{1: 'a', 'b': 2}");
       assert(result instanceof Map);
-      let obj = Object.fromEntries(result);
-      expect(obj).to.deep.equal({ a: 1, b: 2 });
+      expect([...result]).to.deep.equal([[1, "a"], ["b", 2]]);
+    });
+
+    it("should not invoke the __proto__ setter", () => {
+      const env = new Environment();
+      const result = env.evalExpr("{'__proto__': {'polluted': true}}");
+      expect(Object.getPrototypeOf(result)).to.equal(Object.prototype);
+      expect(Object.keys(result)).to.deep.equal(["__proto__"]);
+    });
+
+    it("should map none and undefined", () => {
+      const env = new Environment();
+      expect(env.evalExpr("none")).to.equal(null);
+      expect(env.evalExpr("missing")).to.equal(undefined);
+    });
+
+    it("should convert large integers to bigints", () => {
+      const env = new Environment();
+      expect(env.evalExpr("2 ** 53 - 1")).to.equal(Number.MAX_SAFE_INTEGER);
+      expect(env.evalExpr("x * 1000", { x: 2 ** 52 })).to.equal(
+        2n ** 52n * 1000n
+      );
+      expect(env.evalExpr("1.5 + 1")).to.equal(2.5);
+    });
+
+    it("should return wrapped JavaScript values unchanged", () => {
+      const env = new Environment();
+      const func = () => 42;
+      const obj = new (class Foo {})();
+      expect(env.evalExpr("func", { func })).to.equal(func);
+      expect(env.evalExpr("obj", { obj })).to.equal(obj);
     });
 
     it("should return tuples as arrays", () => {
@@ -124,6 +169,137 @@ No referenced variables
       const result = env.renderStr("{{ 'hello'|my_reverse }}", {});
       expect(result).to.equal("olleh");
     });
+
+    it("should pass keyword arguments as trailing object", () => {
+      const env = new Environment();
+      env.addFilter("args", (...args) => JSON.stringify(args));
+      const result = env.renderStr("{{ 1|args(2, x=3) }}");
+      expect(result).to.equal('[1,2,{"x":3}]');
+    });
+
+    it("should pass maps as plain objects", () => {
+      const env = new Environment();
+      env.addFilter("keys", (value) => Object.keys(value).join(","));
+      expect(env.renderStr("{{ {'b': 1, 'a': 2}|keys }}")).to.equal("b,a");
+    });
+
+    it("should report exceptions and keep the environment usable", () => {
+      const env = new Environment();
+      const error = new TypeError("kaboom");
+      env.addFilter("boom", () => {
+        throw error;
+      });
+      let caught;
+      try {
+        env.renderStr("{{ 1|boom }}");
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).to.be.instanceOf(Error);
+      expect(caught.message).to.contain(
+        "JavaScript function threw: TypeError: kaboom"
+      );
+      expect(caught.cause).to.equal(error);
+      expect(env.renderStr("{{ 42 }}")).to.equal("42");
+    });
+
+    it("should allow rendering from within a filter", () => {
+      const env = new Environment();
+      env.addFilter("wrap", (value) => env.renderStr("[{{ value }}]", { value }));
+      expect(env.renderStr("{{ 1|wrap }}")).to.equal("[1]");
+    });
+
+    it("should reject modifications of the environment while rendering", () => {
+      const env = new Environment();
+      env.addFilter("mutate", (value) => {
+        env.debug = true;
+        return value;
+      });
+      expect(() => env.renderStr("{{ 1|mutate }}")).to.throw(
+        "cannot modify the environment while it is in use"
+      );
+      env.debug = true;
+      expect(env.debug).to.equal(true);
+      expect(env.renderStr("{{ 1 }}")).to.equal("1");
+    });
+  });
+
+  describe("values", () => {
+    it("should convert undefined and null", () => {
+      const env = new Environment();
+      expect(
+        env.renderStr("{{ a is undefined }} {{ b is none }}", {
+          a: undefined,
+          b: null,
+        })
+      ).to.equal("True True");
+    });
+
+    it("should preserve object key order", () => {
+      const env = new Environment();
+      const result = env.renderStr("{{ obj|items|list }}", {
+        obj: { z: 1, a: 2 },
+      });
+      expect(result).to.equal("[('z', 1), ('a', 2)]");
+    });
+
+    it("should convert maps, sets and dates", () => {
+      const env = new Environment();
+      const result = env.renderStr("{{ m.a }} {{ s }} {{ d }}", {
+        m: new Map([["a", 1]]),
+        s: new Set([1, 2]),
+        d: new Date(0),
+      });
+      expect(result).to.equal("1 [1, 2] 1970-01-01T00:00:00.000Z");
+    });
+
+    it("should convert bigints and bytes", () => {
+      const env = new Environment();
+      expect(env.renderStr("{{ x }}", { x: 10n ** 20n })).to.equal(
+        "100000000000000000000"
+      );
+      const bytes = env.evalExpr("b", { b: new Uint8Array([1, 2]) });
+      assert(bytes instanceof Uint8Array);
+      expect([...bytes]).to.deep.equal([1, 2]);
+    });
+
+    it("should access class instances lazily", () => {
+      class User {
+        constructor(name) {
+          this._name = name;
+        }
+        get name() {
+          return this._name;
+        }
+        greet(other) {
+          return `${this.name} greets ${other}`;
+        }
+        get broken() {
+          throw new Error("broken getter");
+        }
+      }
+      const env = new Environment();
+      const user = new User("Peter");
+      expect(
+        env.renderStr(
+          "{{ user.name }}|{{ user.greet('Paul') }}|{{ user.missing is undefined }}",
+          { user }
+        )
+      ).to.equal("Peter|Peter greets Paul|True");
+      expect(() => env.renderStr("{{ user.broken }}", { user })).to.throw(
+        "broken getter"
+      );
+    });
+
+    it("should reject cyclic structures", () => {
+      const env = new Environment();
+      const obj = {};
+      obj.self = obj;
+      expect(() => env.renderStr("{{ obj }}", { obj })).to.throw(
+        "nested too deeply"
+      );
+      expect(env.renderStr("{{ 1 }}")).to.equal("1");
+    });
   });
 
   describe("loader", () => {
@@ -147,7 +323,7 @@ No referenced variables
       });
       env.addTemplate("main.html", "{% include 'x' %}");
       expect(() => env.renderTemplate("main.html", {})).to.throw(
-        /loader threw error: /
+        /template loader threw: Error: boom/
       );
     });
 
@@ -183,6 +359,13 @@ No referenced variables
       const env = new Environment();
       env.addTest("hello", (x) => x == "hello");
       const result = env.renderStr("{{ 'hello' is hello }}", {});
+      expect(result).to.equal("True");
+    });
+
+    it("should pass keyword arguments to tests", () => {
+      const env = new Environment();
+      env.addTest("between", (x, { lo, hi }) => x >= lo && x <= hi);
+      const result = env.renderStr("{{ 5 is between(lo=1, hi=10) }}");
       expect(result).to.equal("True");
     });
   });
