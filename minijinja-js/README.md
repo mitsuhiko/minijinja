@@ -134,16 +134,55 @@ callbacks) are converted back:
 MiniJinja tuples retain tuple rendering inside templates. Expression results are
 returned as JavaScript arrays because JavaScript has no distinct tuple type.
 
-## Web Usage
+## Safe Strings
 
-If you want to use minijinja-js from the browser instead of node, you will
-need to use slightly different imports and call init explicitly:
+Strings marked as safe are not auto escaped.  Safe strings are represented
+by `SafeString` (which extends `String`) and can be created with `markSafe`.
+Callbacks receive safe strings (for instance after the `|safe` filter) as
+`SafeString` objects and can return them to emit markup:
 
+```typescript
+import { Environment, markSafe } from "minijinja-js";
+
+const env = new Environment();
+env.addFilter("bold", (value) => markSafe(`<b>${value}</b>`));
+env.addTemplate("index.html", "{{ name|bold }} {{ icon }}");
+console.log(env.renderTemplate("index.html", { name: "World", icon: markSafe("<i>*</i>") }));
+// -> <b>World</b> <i>*</i>
+```
+
+## Errors
+
+Errors are raised as `TemplateError` which extends `Error` and provides
+`kind`, `detail`, `templateName`, `line`, `range` and `templateSource`
+properties.  If the error was caused by an exception thrown in a callback,
+the exception is available as `cause`.
+
+## Runtimes
+
+The package is an ES module and works in Node.js, Deno, Bun, browsers and
+bundlers:
+
+* In Node.js the wasm module is loaded synchronously.  Recent Node.js versions
+  can also load the package with `require()`.
+* In all other environments the wasm module is loaded relative to the package
+  (via `import.meta.url`) with top-level await.
+
+If you need to control how the wasm module is loaded (for instance on
+Cloudflare Workers or with a custom asset pipeline), use the `minijinja-js/init`
+entry point and initialize the module yourself before use:
 
 ```javascript
-import init, { Environment } from "minijinja-js/dist/web";
-await init();
+import { init, initSync, Environment } from "minijinja-js/init";
+
+// load from a URL, Response or compiled module
+await init(new URL("minijinja_js_bg.wasm", someBaseUrl));
+
+// or synchronously from bytes or a compiled module
+initSync(wasmModule);
 ```
+
+The wasm file is exported as `minijinja-js/minijinja_js_bg.wasm`.
 
 ## Known Limitations
 
@@ -151,6 +190,7 @@ There are various limitations with the binding today, some of which can be fixed
 others probably not so much.  You might run into the following:
 
 * Access of the template engine state from JavaScript is not possible.
+* Filters, tests and functions cannot be async.
 * You cannot register a custom auto escape callback or a finalizer
 * The loader is synchronous; use sync I/O in Node etc... (e.g. `fs.readFileSync`)
 * The environment cannot be modified while it renders (for instance from

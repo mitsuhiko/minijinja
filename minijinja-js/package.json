@@ -1,23 +1,13 @@
 {
-  "browser": "dist/web/minijinja_js.js",
+  "name": "minijinja-js",
+  "version": "3.0.0-alpha.3",
   "description": "JavaScript bindings for minijinja",
-  "devDependencies": {
-    "chai": "^5.0.0",
-    "cross-env": "^7.0.3",
-    "mocha": "^12.0.3"
-  },
-  "files": [
-    "dist/**/*",
-    "package.json"
-  ],
   "license": "Apache-2.0",
   "author": "Armin Ronacher",
-  "main": "dist/node/minijinja_js.js",
-  "name": "minijinja-js",
+  "homepage": "https://github.com/mitsuhiko/minijinja",
   "bugs": {
     "url": "https://github.com/mitsuhiko/minijinja/issues"
   },
-  "homepage": "https://github.com/mitsuhiko/minijinja",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mitsuhiko/minijinja.git",
@@ -29,14 +19,29 @@
     "templating",
     "templates"
   ],
-  "scripts": {
-    "build": "npm run build:node && npm run build:web && npm run build:bundler",
-    "build:bundler": "npx cross-env wasm-pack build --target bundler --out-dir dist/bundler --${PROFILE} && rm dist/bundler/.gitignore",
-    "build:node": "npx cross-env wasm-pack build --target nodejs --out-dir dist/node --${PROFILE} && rm dist/node/.gitignore",
-    "build:web": "npx cross-env wasm-pack build --target web --out-dir dist/web --${PROFILE} && rm dist/web/.gitignore",
-    "prepare": "npm run build",
-    "test": "mocha tests"
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "node": "./dist/node.js",
+      "default": "./dist/index.js"
+    },
+    "./init": {
+      "types": "./dist/init.d.ts",
+      "default": "./dist/init.js"
+    },
+    "./minijinja_js_bg.wasm": "./dist/wasm/minijinja_js_bg.wasm",
+    "./package.json": "./package.json"
   },
-  "types": "dist/node/minijinja_js.d.ts",
-  "version": "3.0.0-alpha.3"
+  "main": "./dist/node.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:dev": "node scripts/build.mjs --dev",
+    "prepack": "node scripts/build.mjs",
+    "test": "node --test"
+  }
 }

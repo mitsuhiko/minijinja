@@ -28,6 +28,7 @@ All notable changes to MiniJinja are documented here.
   * Errors are now raised as `TemplateError` with `kind`, `detail`, `templateName`, `line`, `range` and `templateSource` properties.
   * Enabled the `urlencode`, `loop_controls` and `unicode` features as well as the `html_entities` and `wordwrap` contrib features to match the Python bindings.
   * The context argument of `renderStr`, `renderTemplate`, `renderNamedStr` and `evalExpr` is now optional.
+  * The npm package is now an ES module with a single wasm build and an `exports` map.  Node.js loads the wasm module synchronously (and supports `require()` on versions with `require(esm)`), browsers, bundlers, Deno and Bun load it with top-level await.  The `minijinja-js/init` entry point allows initializing the module manually.  The `dist/node`, `dist/web` and `dist/bundler` paths are gone.  The package is now about a quarter of its previous size.
   * Removed the `fragile` and `serde-wasm-bindgen` dependencies and updated `wasm-bindgen` to 0.2.129.
 
 ## 3.0.0-alpha.3

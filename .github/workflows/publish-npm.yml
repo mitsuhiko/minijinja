@@ -20,15 +20,19 @@ jobs:
           node-version: '24.x'
       - name: Update npm
         run: npm install -g npm@latest
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
       - name: Install wasm-pack
         run: |
-          curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+          curl -sSf https://drager.github.io/wasm-pack/installer/init.sh | sh
       - name: Build and publish
         working-directory: ./minijinja-js
         run: |
           rm -f "$NPM_CONFIG_USERCONFIG" ~/.npmrc
           npm ci
-          make build
+          make test
           version="$(node -p "require('./package.json').version")"
           if [[ "$version" == *-* ]]; then
             npm_tag="next"
