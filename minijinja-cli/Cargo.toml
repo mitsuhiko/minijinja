@@ -39,14 +39,14 @@ minijinja = { version = "=3.0.0-alpha.3", path = "../minijinja", features = [
 ] }
 minijinja-contrib = { version = "=3.0.0-alpha.3", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand", "unicode_wordwrap", "wordcount"] }
 miniline = { version = "0.1.0", optional = true }
-deser = { version = "0.10.0", features = ["derive"] }
-deser-cbor = { version = "0.10.0", optional = true }
-deser-ini = { version = "0.10.0", optional = true }
-deser-json = "0.10.0"
-deser-json5 = { version = "0.10.0", optional = true }
-deser-toml = { version = "0.10.0", optional = true }
-deser-value = "0.10.0"
-deser-yaml = { version = "0.10.0", optional = true }
+deser = { version = "0.10.1", features = ["derive"] }
+deser-cbor = { version = "0.10.1", optional = true }
+deser-ini = { version = "0.10.1", optional = true }
+deser-json = "0.10.1"
+deser-json5 = { version = "0.10.1", optional = true }
+deser-toml = { version = "0.10.1", optional = true }
+deser-value = "0.10.1"
+deser-yaml = { version = "0.10.1", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 dunce = "1.0.4"
