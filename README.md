@@ -133,6 +133,7 @@ the engine is used so you can see how it's utilized:
   * **[qsv](https://qsv.dathere.com)** uses it [to render templates from CSV files](https://github.com/jqnatividad/qsv/blob/master/src/cmd/template.rs#L2), to [construct payloads to post to web services](https://github.com/jqnatividad/qsv/blob/master/src/cmd/fetchpost.rs#L3) and to [infer Data Dictionaries, Descriptions & Tags or Chat with your data](https://github.com/dathere/qsv/blob/master/src/cmd/describegpt.rs#L2).
   * **[fenic](https://github.com/typedef-ai/fenic)** uses it to [render Jinja templates over DataFrame columns](https://github.com/typedef-ai/fenic/blob/7645b9a7af672717b238e212128d9dfc3aef32ef/rust/src/jinja/render.rs)
   * **[Fluvio](https://github.com/fluvio-community/fluvio)** uses it to [render connector configurations and resolve secrets](https://github.com/fluvio-community/fluvio/blob/52673942c1c7364f36f2e05da972436f761243cd/crates/fluvio-connector-package/src/render/mod.rs#L32-L40)
+  * **[Query.Farm MiniJinja](https://query.farm/products/extensions/minijinja/)** uses it to [render templates from DuckDB SQL](https://github.com/Query-farm/minijinja/blob/v1.5/duckdb_minijinja_binding/src/lib.rs).
 
 * Web Frameworks and Documentation:
   * **[Rocket](https://rocket.rs/)** supports it as a [template engine for dynamic templates](https://github.com/rwf2/Rocket/blob/3a54d079aef060a8f732bd04ea54b0581a604087/contrib/dyn_templates/src/engine/minijinja.rs)
