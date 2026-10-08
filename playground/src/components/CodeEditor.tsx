@@ -1,12 +1,10 @@
 import { indentWithTab } from "@codemirror/commands";
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { type Diagnostic, lintGutter, setDiagnostics } from "@codemirror/lint";
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
-import { oneDark } from "@codemirror/theme-one-dark";
 import { EditorView, keymap } from "@codemirror/view";
 import { basicSetup } from "codemirror";
-import { tags as t } from "@lezer/highlight";
 import { useEffect, useMemo, useRef } from "react";
+import { darkEditorTheme, lightEditorTheme } from "../theme";
 
 export interface Selection {
   from: number;
@@ -27,89 +25,6 @@ interface Props {
   extensions?: Extension;
   label: string;
 }
-
-const baseTheme = EditorView.theme({
-  "&": { height: "100%", fontSize: "var(--code-font-size)" },
-  "&.cm-focused": { outline: "none" },
-  ".cm-scroller": { fontFamily: "var(--code-font)", lineHeight: "1.55" },
-  ".cm-content": { padding: "10px 0" },
-  ".cm-gutters": { border: "none" },
-});
-
-const lightHighlight = HighlightStyle.define([
-  { tag: t.brace, color: "#b7410e", fontWeight: "600" },
-  {
-    tag: [
-      t.keyword,
-      t.controlKeyword,
-      t.definitionKeyword,
-      t.operatorKeyword,
-      t.logicOperator,
-      t.modifier,
-    ],
-    color: "#8250df",
-  },
-  { tag: t.variableName, color: "#0550ae" },
-  {
-    tag: [t.definition(t.variableName), t.standard(t.variableName), t.self],
-    color: "#953800",
-  },
-  { tag: t.special(t.variableName), color: "#116329", fontWeight: "500" },
-  { tag: t.propertyName, color: "#0a3069" },
-  { tag: t.string, color: "#0a3069" },
-  { tag: [t.number, t.bool, t.null], color: "#0550ae" },
-  {
-    tag: [t.comment, t.blockComment, t.lineComment],
-    color: "#6e7781",
-    fontStyle: "italic",
-  },
-  { tag: [t.tagName, t.angleBracket], color: "#116329" },
-  { tag: t.attributeName, color: "#6639ba" },
-  { tag: t.attributeValue, color: "#0a3069" },
-  {
-    tag: [
-      t.operator,
-      t.arithmeticOperator,
-      t.compareOperator,
-      t.definitionOperator,
-    ],
-    color: "#cf222e",
-  },
-]);
-
-const darkHighlight = HighlightStyle.define([
-  { tag: t.brace, color: "#f08d5b", fontWeight: "600" },
-  { tag: t.special(t.variableName), color: "#98c379", fontWeight: "500" },
-]);
-
-const lightTheme = [
-  EditorView.theme({
-    "&": { backgroundColor: "var(--editor-bg)", color: "var(--text)" },
-    ".cm-gutters": {
-      backgroundColor: "var(--editor-bg)",
-      color: "var(--text-faint)",
-    },
-    ".cm-activeLineGutter, .cm-activeLine": {
-      backgroundColor: "var(--editor-active-line)",
-    },
-  }),
-  syntaxHighlighting(lightHighlight),
-];
-
-const darkTheme = [
-  syntaxHighlighting(darkHighlight),
-  oneDark,
-  EditorView.theme(
-    {
-      "&": { backgroundColor: "var(--editor-bg)" },
-      ".cm-gutters": { backgroundColor: "var(--editor-bg)" },
-      ".cm-activeLineGutter, .cm-activeLine": {
-        backgroundColor: "var(--editor-active-line)",
-      },
-    },
-    { dark: true },
-  ),
-];
 
 export function CodeEditor({
   docKey,
@@ -149,9 +64,10 @@ export function CodeEditor({
         basicSetup,
         keymap.of([indentWithTab]),
         lintGutter(),
-        baseTheme,
         compartments.language.of(config.current.language),
-        compartments.theme.of(config.current.dark ? darkTheme : lightTheme),
+        compartments.theme.of(
+          config.current.dark ? darkEditorTheme : lightEditorTheme,
+        ),
         compartments.extra.of(config.current.extensions),
         EditorView.contentAttributes.of({ "aria-label": label }),
         EditorView.updateListener.of((update) => {
@@ -167,7 +83,7 @@ export function CodeEditor({
       effects: [
         compartments.language.reconfigure(config.current.language),
         compartments.theme.reconfigure(
-          config.current.dark ? darkTheme : lightTheme,
+          config.current.dark ? darkEditorTheme : lightEditorTheme,
         ),
         compartments.extra.reconfigure(config.current.extensions),
       ],

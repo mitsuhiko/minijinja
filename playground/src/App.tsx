@@ -14,6 +14,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { Splitter } from "./components/Splitter";
 import { DEFAULT_STATE, EXAMPLES } from "./examples";
 import { templateLanguage } from "./languages";
+import { jinjaHighlight } from "./theme";
 import type { ErrorInfo, InspectView, RenderResult } from "./protocol";
 import { Renderer } from "./renderer";
 import {
@@ -376,6 +377,7 @@ function Playground({
                 }))
               }
               language={language}
+              extensions={jinjaHighlight}
               dark={dark}
               diagnostics={diagnostics}
               selection={selection}
