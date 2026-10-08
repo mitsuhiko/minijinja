@@ -72,7 +72,11 @@ function normalize(state: PlaygroundState): PlaygroundState {
   const entry = state.files.some((f) => f.name === state.entry)
     ? state.entry
     : state.files[0].name;
-  return { ...state, entry, settings, config: state.config ?? DEFAULT_CONFIG };
+  // An empty config is replaced by the default config which only contains
+  // commented out examples.  This also upgrades states from before there
+  // was a default config.
+  const config = state.config?.trim() ? state.config : DEFAULT_CONFIG;
+  return { ...state, entry, settings, config };
 }
 
 function toBase64Url(bytes: Uint8Array): string {
