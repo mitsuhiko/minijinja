@@ -1,6 +1,6 @@
 [package]
 name = "minijinja-cli"
-version = "3.0.0-alpha.3"
+version = "3.0.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
@@ -30,14 +30,14 @@ preserve_order = ["minijinja/preserve_order"]
 anyhow = "1.0.74"
 argument = "0.1.0"
 argument-completions = { version = "0.1.0", optional = true }
-minijinja = { version = "=3.0.0-alpha.3", path = "../minijinja", features = [
+minijinja = { version = "=3.0.0", path = "../minijinja", features = [
     "json",
     "urlencode",
     "fuel",
     "unstable_machinery",
     "loop_controls"
 ] }
-minijinja-contrib = { version = "=3.0.0-alpha.3", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand", "unicode_wordwrap", "wordcount"] }
+minijinja-contrib = { version = "=3.0.0", optional = true, path = "../minijinja-contrib", features = ["pycompat", "datetime", "timezone", "rand", "unicode_wordwrap", "wordcount"] }
 miniline = { version = "0.1.0", optional = true }
 deser = { version = "0.10.1", features = ["derive"] }
 deser-cbor = { version = "0.10.1", optional = true }

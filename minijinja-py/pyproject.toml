@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "minijinja"
-version = "3.0.0-alpha.3"
+version = "3.0.0"
 description = "An experimental Python binding of the Rust MiniJinja template engine."
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
