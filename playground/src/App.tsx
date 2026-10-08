@@ -9,11 +9,12 @@ import {
   OUTPUT_VIEWS,
   OutputPanel,
   type OutputView,
+  type PreviewMode,
 } from "./components/OutputPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { Splitter } from "./components/Splitter";
 import { DEFAULT_STATE, EXAMPLES } from "./examples";
-import { templateLanguage } from "./languages";
+import { configLanguage, templateLanguage } from "./languages";
 import { jinjaHighlight } from "./theme";
 import type { ErrorInfo, InspectView, RenderResult } from "./protocol";
 import { Renderer } from "./renderer";
@@ -26,11 +27,17 @@ import {
   setPreference,
   storeState,
 } from "./state";
-import { autoEscapeFor, byteToIndex, extension } from "./utils";
+import {
+  autoEscapeFor,
+  byteToIndex,
+  extension,
+  stripTemplateExtension,
+} from "./utils";
 
 type Theme = "system" | "light" | "dark";
 
 const CONTEXT_EXTENSIONS = [json(), linter(jsonParseLinter())];
+const CONFIG_EXTENSIONS = configLanguage();
 const COMMIT = import.meta.env.VITE_COMMIT as string | undefined;
 
 function usePreference<T>(key: string, defaultValue: T) {
@@ -96,25 +103,50 @@ async function initialState(): Promise<PlaygroundState> {
   );
 }
 
+/**
+ * Config code only runs automatically if it's empty or was written or
+ * approved by the user (the last such config is remembered).  This prevents
+ * shared links from running code without consent.
+ */
+function isTrustedConfig(config: string): boolean {
+  return config.trim() === "" || config === getPreference("trusted-config", "");
+}
+
 export function App() {
   const [state, setState] = useState<PlaygroundState | null>(null);
+  const [configTrusted, setConfigTrusted] = useState(false);
   useEffect(() => {
-    void initialState().then(setState);
+    const load = (s: PlaygroundState) => {
+      setConfigTrusted(isTrustedConfig(s.config));
+      setState(s);
+    };
+    void initialState().then(load);
     const onHashChange = () => {
-      void decodeHash(location.hash).then((s) => s && setState(s));
+      void decodeHash(location.hash).then((s) => s && load(s));
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
-  return state ? <Playground state={state} setState={setState} /> : null;
+  return state ? (
+    <Playground
+      state={state}
+      setState={setState}
+      configTrusted={configTrusted}
+      setConfigTrusted={setConfigTrusted}
+    />
+  ) : null;
 }
 
 function Playground({
   state,
   setState,
+  configTrusted,
+  setConfigTrusted,
 }: {
   state: PlaygroundState;
   setState: React.Dispatch<React.SetStateAction<PlaygroundState | null>>;
+  configTrusted: boolean;
+  setConfigTrusted: (trusted: boolean) => void;
 }) {
   const update = useCallback(
     (fn: (s: PlaygroundState) => PlaygroundState) =>
@@ -130,6 +162,14 @@ function Playground({
     "whitespace",
     false,
   );
+  const [sideTab, setSideTab] = usePreference<"context" | "config">(
+    "side-tab",
+    "context",
+  );
+  const [previewOverride, setPreviewOverride] = useState<{
+    entry: string;
+    mode: PreviewMode;
+  } | null>(null);
   const [splitX, setSplitX] = usePreference("split-x", 0.5);
   const [splitY, setSplitY] = usePreference("split-y", 0.38);
   const [theme, setTheme] = usePreference<Theme>("theme", "system");
@@ -144,12 +184,15 @@ function Playground({
   useEffect(() => {
     const timer = setTimeout(() => {
       storeState(state);
+      if (configTrusted) {
+        setPreference("trusted-config", state.config);
+      }
       void encodeHash(state).then((hash) => {
         history.replaceState(null, "", hash);
       });
     }, 250);
     return () => clearTimeout(timer);
-  }, [state]);
+  }, [state, configTrusted]);
 
   // render in the worker
   const renderer = useRef<Renderer | null>(null);
@@ -161,8 +204,41 @@ function Playground({
     ? (view as InspectView)
     : null;
   useEffect(() => {
-    renderer.current?.render({ state, inspectFile: file.name, inspect });
-  }, [state, file.name, inspect]);
+    renderer.current?.render({
+      state,
+      runConfig: configTrusted,
+      inspectFile: file.name,
+      inspect,
+    });
+  }, [state, configTrusted, file.name, inspect]);
+
+  // the preview defaults to HTML for HTML templates and to text otherwise
+  const previewMode: PreviewMode =
+    previewOverride?.entry === state.entry
+      ? previewOverride.mode
+      : ["html", "htm"].includes(extension(stripTemplateExtension(state.entry)))
+        ? "html"
+        : "text";
+
+  const configError =
+    result?.configError ??
+    (result?.error?.configLine ? result.error : undefined);
+  const configDiagnostics = useMemo((): Diagnostic[] => {
+    const line = configError?.configLine;
+    if (!configError) {
+      return [];
+    }
+    const lines = state.config.split("\n");
+    let from = 0;
+    let to = 0;
+    if (line && line <= lines.length) {
+      from = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
+      to = from + lines[line - 1].length;
+    }
+    const message = configError.message.split("\n")[0];
+    return [{ from, to, severity: "error", message }];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
 
   // the parsed context for completions and the variables view
   const context = useMemo(() => {
@@ -213,6 +289,7 @@ function Playground({
       return;
     }
     baseline.current = JSON.stringify(example.state);
+    setConfigTrusted(true);
     setState(example.state);
     setActiveFile(example.state.entry);
   };
@@ -390,26 +467,87 @@ function Playground({
         <div className="side">
           <div className="pane context-pane">
             <div className="pane-header">
-              <span className="pane-title">Context</span>
-              <div className="pane-tools">
+              <div
+                className="tabs"
+                role="tablist"
+                aria-label="Context and config"
+              >
                 <button
-                  className="button subtle small"
-                  onClick={formatContext}
-                  disabled={context === null}
+                  role="tab"
+                  aria-selected={sideTab === "context"}
+                  className={`tab${sideTab === "context" ? " active" : ""}`}
+                  onClick={() => setSideTab("context")}
                 >
-                  Format
+                  Context
+                  {result?.contextError && <span className="tab-error" />}
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={sideTab === "config"}
+                  className={`tab${sideTab === "config" ? " active" : ""}`}
+                  onClick={() => setSideTab("config")}
+                >
+                  Config
+                  {configError && <span className="tab-error" />}
+                  {!configTrusted && (
+                    <span className="tab-warning" title="Not running" />
+                  )}
                 </button>
               </div>
+              <div className="pane-tools">
+                {sideTab === "context" ? (
+                  <button
+                    className="button subtle small"
+                    onClick={formatContext}
+                    disabled={context === null}
+                  >
+                    Format
+                  </button>
+                ) : (
+                  <span>JavaScript</span>
+                )}
+              </div>
             </div>
+            {sideTab === "config" && !configTrusted && (
+              <div className="trust-banner" role="alert">
+                <span>
+                  This link contains config code which runs JavaScript in your
+                  browser. Review it before running it.
+                </span>
+                <button
+                  className="button primary small"
+                  onClick={() => setConfigTrusted(true)}
+                >
+                  Run config
+                </button>
+              </div>
+            )}
             <div className="pane-body">
-              <CodeEditor
-                docKey="context"
-                label="Context (JSON)"
-                value={state.context}
-                onChange={(value) => update((s) => ({ ...s, context: value }))}
-                language={CONTEXT_EXTENSIONS}
-                dark={dark}
-              />
+              {sideTab === "context" ? (
+                <CodeEditor
+                  docKey="context"
+                  label="Context (JSON)"
+                  value={state.context}
+                  onChange={(value) =>
+                    update((s) => ({ ...s, context: value }))
+                  }
+                  language={CONTEXT_EXTENSIONS}
+                  dark={dark}
+                />
+              ) : (
+                <CodeEditor
+                  docKey="config"
+                  label="Config (JavaScript)"
+                  value={state.config}
+                  onChange={(value) => {
+                    setConfigTrusted(true);
+                    update((s) => ({ ...s, config: value }));
+                  }}
+                  language={CONFIG_EXTENSIONS}
+                  dark={dark}
+                  diagnostics={configDiagnostics}
+                />
+              )}
             </div>
           </div>
 
@@ -423,6 +561,12 @@ function Playground({
             inspectFile={file.name}
             context={context}
             showWhitespace={showWhitespace}
+            previewMode={previewMode}
+            onPreviewModeChange={(mode) =>
+              setPreviewOverride({ entry: state.entry, mode })
+            }
+            configBlocked={!configTrusted}
+            onShowConfig={() => setSideTab("config")}
             onShowWhitespaceChange={setShowWhitespace}
             onSelectSpan={(name, start, end) => {
               const target = state.files.find((f) => f.name === name);

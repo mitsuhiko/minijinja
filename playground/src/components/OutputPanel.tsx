@@ -2,6 +2,7 @@ import { type ReactNode, useMemo } from "react";
 import type { ErrorInfo, InspectView, RenderResult, Span } from "../protocol";
 
 export type OutputView = "output" | "preview" | "variables" | InspectView;
+export type PreviewMode = "html" | "text";
 
 export const OUTPUT_VIEWS: {
   id: OutputView;
@@ -25,6 +26,11 @@ interface Props {
   context: unknown;
   showWhitespace: boolean;
   onShowWhitespaceChange: (yes: boolean) => void;
+  previewMode: PreviewMode;
+  onPreviewModeChange: (mode: PreviewMode) => void;
+  /** Set if the config code exists but is not allowed to run. */
+  configBlocked: boolean;
+  onShowConfig: () => void;
   onSelectSpan: (file: string, start: number, end: number) => void;
 }
 
@@ -369,6 +375,10 @@ export function OutputPanel({
   context,
   showWhitespace,
   onShowWhitespaceChange,
+  previewMode,
+  onPreviewModeChange,
+  configBlocked,
+  onShowConfig,
   onSelectSpan,
 }: Props) {
   const isInspect = OUTPUT_VIEWS.find((v) => v.id === view)?.inspect ?? false;
@@ -411,8 +421,16 @@ export function OutputPanel({
         />
       );
     }
+    if (result.configError) {
+      return (
+        <ErrorBox title="The config code failed" error={result.configError} />
+      );
+    }
     if (result.error) {
       return <ErrorBox error={result.error} />;
+    }
+    if (view === "preview" && previewMode === "text") {
+      return <TextOutput output={result.output ?? ""} showWhitespace={false} />;
     }
     if (view === "preview") {
       return (
@@ -431,7 +449,7 @@ export function OutputPanel({
       />
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, view, context, showWhitespace, inspectFile]);
+  }, [result, view, context, showWhitespace, inspectFile, previewMode]);
 
   return (
     <div className="pane output-pane">
@@ -450,6 +468,20 @@ export function OutputPanel({
           ))}
         </div>
         <div className="pane-tools">
+          {view === "preview" && (
+            <div className="segmented" role="group" aria-label="Preview mode">
+              {(["html", "text"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  className={mode === previewMode ? "active" : ""}
+                  aria-pressed={mode === previewMode}
+                  onClick={() => onPreviewModeChange(mode)}
+                >
+                  {mode === "html" ? "HTML" : "Text"}
+                </button>
+              ))}
+            </div>
+          )}
           {view === "output" && (
             <label className="toggle" title="Show spaces, tabs and newlines">
               <input
@@ -485,6 +517,14 @@ export function OutputPanel({
           </span>
         </div>
       </div>
+      {configBlocked && (
+        <div className="notice">
+          The config code is not running.{" "}
+          <button className="link-button" onClick={onShowConfig}>
+            Review it
+          </button>
+        </div>
+      )}
       <div className="pane-body output-body">{body}</div>
     </div>
   );

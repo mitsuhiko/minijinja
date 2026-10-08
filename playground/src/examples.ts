@@ -40,6 +40,7 @@ export const EXAMPLES: Example[] = [
           { href: "/about", title: "About" },
         ],
       }),
+      config: "",
       settings: DEFAULT_SETTINGS,
     },
   },
@@ -85,6 +86,7 @@ export const EXAMPLES: Example[] = [
           body: "Inheritance lets templates share a layout.",
         },
       }),
+      config: "",
       settings: DEFAULT_SETTINGS,
     },
   },
@@ -120,6 +122,7 @@ export const EXAMPLES: Example[] = [
       ],
       entry: "index.html",
       context: json({}),
+      config: "",
       settings: DEFAULT_SETTINGS,
     },
   },
@@ -154,6 +157,7 @@ Most active: {{ (members|sort(attribute="commits", reverse=true)|first).name }}
           { name: "Bob", role: "designer", commits: 12 },
         ],
       }),
+      config: "",
       settings: DEFAULT_SETTINGS,
     },
   },
@@ -184,6 +188,7 @@ server {{ server.name }} {
           { name: "gamma", port: 8082, enabled: true },
         ],
       }),
+      config: "",
       settings: { ...DEFAULT_SETTINGS, trimBlocks: true, lstripBlocks: true },
     },
   },
@@ -208,6 +213,7 @@ server {{ server.name }} {
         config: { debug: true, workers: 4, host: "localhost" },
         names: ["Anna", "Peter"],
       }),
+      config: "",
       settings: { ...DEFAULT_SETTINGS, pycompat: true },
     },
   },
@@ -231,6 +237,59 @@ server {{ server.name }} {
       context: json({
         user: { name: 'Peter "Pete" Parker', tags: ["admin", "dev"] },
       }),
+      config: "",
+      settings: DEFAULT_SETTINGS,
+    },
+  },
+  {
+    id: "custom-filters",
+    title: "Custom Filters",
+    state: {
+      files: [
+        {
+          name: "index.html",
+          source: `{# The filters, tests and functions are defined in the Config tab -#}
+<h1>{{ title|slugify }}</h1>
+<ul>
+{%- for item in items %}
+  <li>{{ item.name }}: {{ item.price|currency(code="EUR") }}
+    {%- if item.price is expensive %} (expensive){% endif %}</li>
+{%- endfor %}
+</ul>
+{{ badge("new") }}
+<p>{{ greet("World") }}</p>
+`,
+        },
+      ],
+      entry: "index.html",
+      context: json({
+        title: "Hello Custom Filters!",
+        greeting: "Servus",
+        items: [
+          { name: "Coffee", price: 3.5 },
+          { name: "Espresso machine", price: 899 },
+        ],
+      }),
+      config: `// The config runs before every render with the environment as \`env\`.
+// Also available: passState, markSafe, SafeString and TemplateError.
+
+env.addFilter("slugify", (value) =>
+  String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
+
+// keyword arguments are passed as trailing object
+env.addFilter("currency", (value, { code = "USD" } = {}) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: code }).format(value));
+
+env.addTest("expensive", (value) => value > 100);
+
+// markSafe stops the output from being escaped
+env.addFunction("badge", (text) =>
+  markSafe(\`<span class="badge">\${text}</span>\`));
+
+// passState gives access to the template state, here to look up a variable
+env.addFunction("greet", passState((state, name) =>
+  \`\${state.lookup("greeting") ?? "Hello"} \${name}!\`));
+`,
       settings: DEFAULT_SETTINGS,
     },
   },
@@ -264,6 +323,7 @@ Generated {{ now()|datetimeformat(format="long") }} ({{ TIMEZONE }})
           { title: "Retro", start: "2026-03-29T09:00:00[Europe/London]" },
         ],
       }),
+      config: "",
       settings: DEFAULT_SETTINGS,
     },
   },
@@ -283,6 +343,7 @@ Generated {{ now()|datetimeformat(format="long") }} ({{ TIMEZONE }})
       ],
       entry: "index.html",
       context: json({ name: "World" }),
+      config: "",
       settings: DEFAULT_SETTINGS,
     },
   },
@@ -309,6 +370,7 @@ Generated {{ now()|datetimeformat(format="long") }} ({{ TIMEZONE }})
           { name: "test", command: "cargo test" },
         ],
       }),
+      config: "",
       settings: {
         ...DEFAULT_SETTINGS,
         trimBlocks: true,

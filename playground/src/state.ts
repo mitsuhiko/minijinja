@@ -22,6 +22,8 @@ export interface PlaygroundState {
   entry: string;
   /** The context as JSON source. */
   context: string;
+  /** JavaScript code that configures the environment. */
+  config: string;
   settings: Settings;
 }
 
@@ -59,7 +61,8 @@ function isState(value: unknown): value is PlaygroundState {
       (f) => typeof f.name === "string" && typeof f.source === "string",
     ) &&
     typeof state.entry === "string" &&
-    typeof state.context === "string"
+    typeof state.context === "string" &&
+    (state.config === undefined || typeof state.config === "string")
   );
 }
 
@@ -68,7 +71,7 @@ function normalize(state: PlaygroundState): PlaygroundState {
   const entry = state.files.some((f) => f.name === state.entry)
     ? state.entry
     : state.files[0].name;
-  return { ...state, entry, settings };
+  return { ...state, entry, settings, config: state.config ?? "" };
 }
 
 function toBase64Url(bytes: Uint8Array): string {

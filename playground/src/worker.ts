@@ -1,8 +1,53 @@
 // Renders templates off the main thread so that runaway templates do not
 // block the UI.  The main thread terminates this worker on timeouts.
-import { Environment, TemplateError } from "minijinja-js";
+import {
+  Environment,
+  SafeString,
+  TemplateError,
+  markSafe,
+  passState,
+} from "minijinja-js";
 import { addDateTimeSupport } from "minijinja-js/datetime";
 import type { ErrorInfo, RenderRequest, RenderResult } from "./protocol";
+
+const CONFIG_URL = "config.js";
+const CONFIG_PARAMS = [
+  "env",
+  "passState",
+  "markSafe",
+  "SafeString",
+  "TemplateError",
+];
+
+type ConfigFunction = (env: Environment, ...helpers: unknown[]) => void;
+
+// The function constructor adds a header before the body which offsets the
+// line numbers in stack traces.  This determines that offset.
+const LINE_OFFSET = (() => {
+  try {
+    new Function(
+      ...CONFIG_PARAMS,
+      "throw new Error()\n//# sourceURL=probe.js",
+    )();
+  } catch (err) {
+    const match = /probe\.js:(\d+)/.exec(String((err as Error).stack));
+    if (match) {
+      return Number(match[1]) - 1;
+    }
+  }
+  return 0;
+})();
+
+/** Finds the line in the config code from the stack of an error (or its causes). */
+function configLine(err: unknown): number | undefined {
+  for (let current = err; current instanceof Error; current = current.cause) {
+    const match = /config\.js:(\d+)/.exec(String(current.stack));
+    if (match) {
+      return Number(match[1]) - LINE_OFFSET;
+    }
+  }
+  return undefined;
+}
 
 function toErrorInfo(err: unknown): ErrorInfo {
   if (err instanceof TemplateError) {
@@ -12,9 +57,30 @@ function toErrorInfo(err: unknown): ErrorInfo {
       templateName: err.templateName,
       line: err.line,
       range: err.range,
+      configLine: configLine(err.cause),
     };
   }
-  return { message: String(err instanceof Error ? err.message : err) };
+  return {
+    message: String(err instanceof Error ? err.message : err),
+    configLine: configLine(err),
+  };
+}
+
+let compiled: { source: string; func: ConfigFunction } | null = null;
+
+function compileConfig(source: string): ConfigFunction {
+  if (compiled?.source !== source) {
+    const func = new Function(
+      ...CONFIG_PARAMS,
+      `${source}\n//# sourceURL=${CONFIG_URL}`,
+    ) as ConfigFunction;
+    compiled = { source, func };
+  }
+  return compiled.func;
+}
+
+function runConfig(env: Environment, source: string) {
+  compileConfig(source)(env, passState, markSafe, SafeString, TemplateError);
 }
 
 function createEnvironment({ settings }: RenderRequest["state"]): Environment {
@@ -40,6 +106,17 @@ function handle(request: RenderRequest): RenderResult {
   } catch (err) {
     result.error = toErrorInfo(err);
     return result;
+  }
+
+  if (request.runConfig && state.config.trim() !== "") {
+    try {
+      runConfig(env, state.config);
+    } catch (err) {
+      result.configError = toErrorInfo(err);
+      result.error = result.configError;
+      env.free();
+      return result;
+    }
   }
 
   try {

@@ -5,6 +5,8 @@ export type InspectView = "tokens" | "ast" | "instructions";
 export interface RenderRequest {
   id: number;
   state: PlaygroundState;
+  /** Whether the config code may run (it might come from a shared link). */
+  runConfig: boolean;
   /** The file to inspect for machinery views. */
   inspectFile: string;
   inspect: InspectView | null;
@@ -17,6 +19,8 @@ export interface ErrorInfo {
   line?: number;
   /** Byte range in the template source. */
   range?: { start: number; end: number };
+  /** The line in the config code that caused the error, if any. */
+  configLine?: number;
 }
 
 export interface Span {
@@ -43,6 +47,8 @@ export interface RenderResult {
   output?: string;
   error?: ErrorInfo;
   contextError?: string;
+  /** Set if running the config code failed. */
+  configError?: ErrorInfo;
   /** Errors of all templates (syntax errors and the render error). */
   diagnostics: ErrorInfo[];
   renderTime?: number;

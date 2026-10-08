@@ -1,4 +1,11 @@
-import type { Completion } from "@codemirror/autocomplete";
+import {
+  type Completion,
+  type CompletionContext,
+  completeFromList,
+} from "@codemirror/autocomplete";
+import { javascript, javascriptLanguage } from "@codemirror/lang-javascript";
+import type { Extension } from "@codemirror/state";
+import { placeholder } from "@codemirror/view";
 import { html } from "@codemirror/lang-html";
 import { jinja } from "@codemirror/lang-jinja";
 import { json } from "@codemirror/lang-json";
@@ -80,4 +87,60 @@ export function templateLanguage(
       return completionsFor(value, "property");
     },
   });
+}
+
+const ENV_COMPLETIONS: Completion[] = [
+  ["addFilter", "(name, (value, ...args) => any)"],
+  ["addTest", "(name, (value, ...args) => boolean)"],
+  ["addFunction", "(name, (...args) => any)"],
+  ["addGlobal", "(name, value)"],
+  ["removeFilter", "(name)"],
+  ["removeTest", "(name)"],
+  ["removeGlobal", "(name)"],
+  ["setFinalizer", "((value) => any)"],
+  ["setAutoEscapeCallback", "((name) => AutoEscape)"],
+  ["debug", "boolean"],
+  ["pycompat", "boolean"],
+  ["trimBlocks", "boolean"],
+  ["lstripBlocks", "boolean"],
+  ["keepTrailingNewline", "boolean"],
+  ["undefinedBehavior", '"lenient" | "chainable" | "semi_strict" | "strict"'],
+  ["fuel", "number | null"],
+  ["syntax", "SyntaxConfig"],
+].map(([label, detail]) => ({
+  label,
+  detail,
+  type: detail.startsWith("(") ? "method" : "property",
+}));
+
+const HELPER_COMPLETIONS: Completion[] = [
+  { label: "env", type: "variable", detail: "Environment" },
+  { label: "passState", type: "function", detail: "(fn) => fn" },
+  { label: "markSafe", type: "function", detail: "(value) => SafeString" },
+  { label: "SafeString", type: "class" },
+  { label: "TemplateError", type: "class" },
+];
+
+const completeEnvMembers = completeFromList(ENV_COMPLETIONS);
+const completeHelpers = completeFromList(HELPER_COMPLETIONS);
+
+function configCompletions(context: CompletionContext) {
+  if (context.matchBefore(/\benv\.\w*$/)) {
+    return completeEnvMembers(context);
+  }
+  return completeHelpers(context);
+}
+
+/** Language support for the config code. */
+export function configLanguage(): Extension {
+  return [
+    javascript(),
+    javascriptLanguage.data.of({ autocomplete: configCompletions }),
+    placeholder(
+      "// JavaScript that runs before every render with the environment as `env`.\n" +
+        "// Also available: passState, markSafe, SafeString and TemplateError.\n" +
+        "//\n" +
+        '// env.addFilter("shout", (value) => String(value).toUpperCase() + "!");',
+    ),
+  ];
 }

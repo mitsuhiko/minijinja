@@ -10,8 +10,10 @@ Features:
 * Multiple templates (for `extends`, `include` and `import`) with a
   selectable entry template
 * JSON context with completions of context variables in templates
-* Rendered output (with optional whitespace visualization), an HTML preview
-  and the undeclared variables of a template
+* JavaScript config code to register filters, tests, functions and globals
+  (config code from shared links only runs after confirmation)
+* Rendered output (with optional whitespace visualization), a preview (HTML
+  or text) and the undeclared variables of a template
 * Tokens, AST and VM instructions of the current template
 * Configurable syntax, whitespace handling and undefined behavior
 * Date and time filters (from `minijinja-js/datetime`) and random functions
