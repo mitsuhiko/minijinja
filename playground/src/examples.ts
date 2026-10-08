@@ -13,6 +13,17 @@ function json(value: unknown): string {
 
 export const EXAMPLES: Example[] = [
   {
+    id: "empty",
+    title: "Empty",
+    state: {
+      files: [{ name: "index.html", source: "" }],
+      entry: "index.html",
+      context: "{}\n",
+      config: DEFAULT_CONFIG,
+      settings: DEFAULT_SETTINGS,
+    },
+  },
+  {
     id: "hello",
     title: "Hello World",
     state: {
@@ -392,4 +403,4 @@ Generated {{ now()|datetimeformat(format="long") }} ({{ TIMEZONE }})
   },
 ];
 
-export const DEFAULT_STATE = EXAMPLES[0].state;
+export const DEFAULT_STATE = EXAMPLES.find((e) => e.id === "hello")!.state;
