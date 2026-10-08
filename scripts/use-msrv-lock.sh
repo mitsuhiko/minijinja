@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Prepares the workspace for building on the minimum supported Rust version.
 #
-# minijinja-cli has a higher MSRV than the library crates and its
-# dependencies require versions of shared dependencies (for instance `zmij`)
-# that do not build on the library MSRV.  As a workspace has a single lock
-# file, the CLI is excluded from the workspace for MSRV builds and
-# Cargo.lock.msrv is resolved without it.
+# minijinja-cli and minijinja-js have a higher MSRV than the library crates
+# and their dependencies require versions of shared dependencies (for
+# instance `zmij` or `js-sys`) that do not build or resolve on the library
+# MSRV.  As a workspace has a single lock file, these crates are excluded
+# from the workspace for MSRV builds and Cargo.lock.msrv is resolved without
+# them.
 #
 # To update Cargo.lock.msrv, run this script and then use an MSRV aware
 # resolution, e.g.:
@@ -17,9 +18,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if ! grep -q '"minijinja-cli"' Cargo.toml; then
-  sed -i.bak 's/^exclude = \[/exclude = ["minijinja-cli", /' Cargo.toml
+  sed -i.bak 's/^exclude = \[/exclude = ["minijinja-cli", "minijinja-js", /' Cargo.toml
   rm Cargo.toml.bak
 fi
-grep -q '^exclude = \["minijinja-cli"' Cargo.toml
+grep -q '^exclude = \["minijinja-cli", "minijinja-js"' Cargo.toml
 
 cp Cargo.lock.msrv Cargo.lock
