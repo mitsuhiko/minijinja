@@ -212,3 +212,13 @@ func TestLexerStringEscapeCompatibility(t *testing.T) {
 		})
 	}
 }
+
+func TestLexerUnexpectedCharacterReportsRune(t *testing.T) {
+	_, err := Tokenize("{{\u00a0name }}", syntax.DefaultSyntax(), syntax.DefaultWhitespace())
+	if err == nil {
+		t.Fatal("expected lexer error for a non-breaking space in a variable block")
+	}
+	if !strings.Contains(err.Error(), `unexpected character '\u00a0'`) {
+		t.Fatalf("expected the character in the error, got %v", err)
+	}
+}
