@@ -1,4 +1,4 @@
-DOC_FEATURES=json,urlencode,fuel
+DOC_FEATURES=json,urlencode,fuel,serde
 TEST_FEATURES=unstable_machinery,builtins,json,urlencode,debug,internal_debug,macros,multi_template,adjacent_loop_items,serde,loop_controls
 
 .PHONY: all

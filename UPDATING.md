@@ -312,6 +312,64 @@ quotes where possible.  The `tojson` filter now inserts spaces after commas and
 colons to match Jinja2's default `json.dumps` output as this divergence has
 caused some unnecessary failures in conformity tests that some people use.
 
+## Template Behavior
+
+A number of operators, filters and tests now follow Jinja2 more closely.  These
+changes apply to Rust and Go and therefore also to the Python and JavaScript
+bindings.  Templates that relied on the old behavior render differently:
+
+* Floor division (`//`) and modulo (`%`) now use Python's flooring semantics
+  instead of Euclidean division.  The result only differs for negative
+  divisors: `7 // -2` is now `-4` (was `-3`) and `7 % -2` is now `-1` (was
+  `1`).
+* Division by zero is now an error for `/`, `//` and `%` alike.  Previously
+  float division produced `inf` or `nan` (for instance `1 / 0`).
+* The `round` filter rounds half to even like Python: `2.5|round` is now
+  `2.0` (was `3.0`) and `0.125|round(2)` is `0.12`.
+* Booleans are treated as numbers by built-ins: `true is number` is now true
+  and `sum` accepts booleans (`[true, true]|sum` is `2`).
+* `undefined is sequence` is now true, as `Undefined` is iterable in Jinja2.
+* The `upper` and `lower` tests ignore uncased characters and require at least
+  one cased character: `'FOO 1' is upper` is now true while `'' is upper`
+  is false.  Non-strings are no longer converted to strings and always fail
+  the test.
+* The `title` filter only starts new words after whitespace and `-`, `(`,
+  `{`, `[` and `<`, so `"don't"|title` renders as `Don't` (was `Don'T`).
+* Unary minus applies to the whole postfix expression: `-foo.bar` negates
+  `foo.bar` instead of looking up `bar` on `-foo`.  Filters and tests still
+  apply to the negated value (`-1|abs` is `1`).
+* Repeating a sequence (`[1] * n`) fails if the result would exceed 100
+  million items, matching the existing limit on repeated strings.
+* With strict and semi-strict undefined behavior the `format` filter no longer
+  accepts undefined values.
+
+## Iteration and Invalid Values
+
+Iterators can report failures by yielding invalid values (for instance a
+Python iterator that raises).  Previously only `{% for %}` loops checked for
+these while filters such as `list`, `join` or `sort`, the `in` operator,
+unpacking and serialization treated them like regular items.  All of these now
+fail with the original error.  If you consume `Value::try_iter` in your own
+filters or functions, use `ValueIter::checked` to get the same behavior:
+
+```rust
+let mut items = Vec::new();
+for item in value.try_iter()?.checked() {
+    items.push(item?);
+}
+```
+
+## JSON Serialization
+
+The `tojson` filter and JSON auto escaping use a built-in serializer instead of
+`serde_json`.  The output is the same except for the following:
+
+* Invalid values fail the serialization instead of being emitted as `null`.
+  Undefined and none values, as well as non-finite floats, are still
+  serialized as `null`.
+* Floats are formatted like recent versions of `serde_json` do, which uses an
+  explicit exponent sign (`1e+16` instead of `1e16`).
+
 ## Keyword Arguments
 
 `Value`, `&Value`, `&[Value]`, and `Rest<Value>` function arguments no longer
@@ -319,6 +377,118 @@ accept the internal keyword-argument map.  You now need to use an explicit
 `Kwargs` parameter for normal keyword arguments.  Variadic forwarding functions
 can use `Rest<ValueOrKwargs>` and call `into_values()` before manually splitting
 or forwarding the arguments.
+
+## Date and Time Filters in `minijinja-contrib`
+
+The `datetimeformat`, `dateformat` and `timeformat` filters and the `now()`
+function now use [Jiff](https://docs.rs/jiff) instead of `time` and `time-tz`.
+The `datetime` feature also no longer pulls in `serde`.
+
+Custom formats now use `strftime`-style syntax instead of the format
+descriptions of the `time` crate.  This affects the `format` argument as well
+as the `DATETIME_FORMAT`, `DATE_FORMAT` and `TIME_FORMAT` globals:
+
+```jinja
+{# Old #}
+{{ value|datetimeformat(format="[year]-[month]-[day] [hour]:[minute]") }}
+
+{# New #}
+{{ value|datetimeformat(format="%Y-%m-%d %H:%M") }}
+```
+
+The named formats (`short`, `medium`, `long`, `full`, `iso` and `unix`) are
+unchanged.  See the [`strtime`
+documentation](https://docs.rs/jiff/latest/jiff/fmt/strtime/) for the
+supported directives.
+
+The accepted inputs changed as well:
+
+* Unix timestamps and ISO 8601 strings work as before.  Strings can now also
+  carry a time zone annotation (for instance
+  `2023-06-24T16:37:22-04:00[America/New_York]`), which is honored when the
+  `timezone` feature is enabled and `tz` is `"original"`.
+* Sequences of integers (the non human-readable Serde representation of
+  `time` values, for instance `[2023, 175]` for a date) are no longer
+  accepted.  Pass values as ISO 8601 strings or Unix timestamps instead, or
+  pass Jiff or `chrono` values through `value::Serde`, both of which serialize
+  to ISO 8601 strings.
+
+With the `timezone` feature, time zones are looked up through Jiff which uses
+the time zone database of the operating system when available and falls back to
+a bundled copy on platforms without one (such as Windows and WASM).
+Previously the database was always compiled into the binary, so results can
+differ slightly if the system database is outdated.
+
+## Python Bindings
+
+* Python 3.10 or later is required.  Building from source requires maturin
+  1.9.4 or later.
+* Renders no longer release the GIL.  Re-acquiring it for every callback into
+  Python made renders orders of magnitude slower when other threads were busy.
+  Other Python threads still run while the render calls back into Python, but
+  a long render that does not call into Python blocks them until it finishes.
+  Free-threaded builds of Python are unaffected and renders scale with the
+  number of threads there.
+* Renders work on a snapshot of the environment.  Modifying the environment
+  from another thread or from within a callback no longer deadlocks, but the
+  change only becomes visible to renders started afterwards.
+* Exceptions raised by Python iterators during a render are now raised from
+  the render instead of being skipped (which could loop forever).
+* Tuples remain tuples when passed through templates (see above).
+
+## JavaScript Bindings
+
+The JavaScript bindings were largely rewritten.
+
+The npm package is now a single ES module with an `exports` map and the
+`dist/node`, `dist/web` and `dist/bundler` paths are gone.  Import from
+`minijinja-js` in all environments and drop the explicit initialization:
+
+```javascript
+// Old
+import init, { Environment } from "minijinja-js/dist/web";
+await init();
+
+// New
+import { Environment } from "minijinja-js";
+```
+
+In Node.js the wasm module is loaded synchronously and `require()` works on
+versions that support `require(esm)`.  Browsers, bundlers, Deno and Bun load it
+with top-level await.  If you need to control how the wasm module is loaded,
+use the `minijinja-js/init` entry point which exports `init` and `initSync`.
+
+Value conversion no longer goes through Serde, which changes what callbacks and
+`evalExpr` receive:
+
+* Keyword arguments are passed to filters, tests and functions as a trailing
+  plain object (previously a `Map`):
+
+  ```javascript
+  env.addFilter("repeat", (value, times, { sep = "" } = {}) =>
+    Array(times).fill(value).join(sep)
+  );
+  ```
+
+  Callbacks that take a variable number of positional arguments need to be
+  aware that the last argument might be this object.
+* Maps with only string keys are returned as plain objects instead of `Map`s.
+  Other maps are still returned as `Map`s.
+* None is returned as `null` and undefined as `undefined`.
+* Integers outside of the safe integer range are returned as `BigInt`s.
+* Objects and functions passed in from JavaScript are returned unchanged.
+  Class instances are no longer copied into maps but accessed lazily, so
+  getters work and methods are called on the instance.
+* `Date`s are converted to ISO 8601 strings, `Map`, `Set`, `BigInt`,
+  `Uint8Array` and typed arrays are supported, and cyclic structures fail with
+  an error.
+
+Errors are now raised as `TemplateError` (with `kind`, `detail`, `line` and
+other properties) and exceptions thrown by callbacks fail the render with the
+original exception as `cause` instead of breaking the environment.  Modifying
+the environment while it renders, for instance from within a filter, now
+raises an error.  The semi-strict undefined behavior is now spelled
+`"semi_strict"` (was `"semi_strct"`).
 
 # Updating to MiniJinja 2
 

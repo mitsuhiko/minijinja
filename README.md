@@ -58,7 +58,7 @@ powered by a WASM build of MiniJinja.
 * [Stay as close as possible](https://github.com/mitsuhiko/minijinja/blob/main/COMPATIBILITY.md) to Jinja2
 * Support for [expression evaluation](https://docs.rs/minijinja/latest/minijinja/struct.Expression.html) which
   allows the use [as a DSL](https://github.com/mitsuhiko/minijinja/tree/main/examples/dsl)
-* Support for all [`serde`](https://serde.rs) compatible types
+* Optional support for all [`serde`](https://serde.rs) compatible types through the `serde` feature
 * [Well tested](https://github.com/mitsuhiko/minijinja/tree/main/minijinja/tests)
 * Support for [dynamic runtime objects](https://docs.rs/minijinja/latest/minijinja/value/trait.Object.html) with methods and dynamic attributes
 * [Descriptive errors](https://github.com/mitsuhiko/minijinja/tree/main/examples/error)

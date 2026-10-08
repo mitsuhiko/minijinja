@@ -29,7 +29,7 @@
 //! * Minimal dependencies, reasonable compile times and decent runtime performance
 //! * Stay close as possible to Jinja2
 //! * Support for expression evaluation
-//! * Support for all `serde` compatible types
+//! * Optional support for all `serde` compatible types through the `serde` feature
 //! * Excellent test coverage
 //! * Support for dynamic runtime objects with methods and dynamic attributes
 //!

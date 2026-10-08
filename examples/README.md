@@ -33,7 +33,7 @@ the `cargo run` command.  Alternatively you can do `cargo run -p example-name`.
 * [macros](macros): Demonstrates how to use macros and imports.
 * [merge-context](merge-context): Shows how a context can be merged from more than one value.
 * [minimal](minimal): a Hello World example without default features.
-* [none-is-undefined](none-is-undefined): shows how MiniJinja can be configured to treat `None` like `undefined`.
+* [none-as-undefined](none-as-undefined): shows how MiniJinja can be configured to treat `None` like `undefined`.
 * [object-ref](object-ref): Demonstrates how to best work with complex dynamic objects and references.
 * [object-using-async](object-using-async): Demonstrates how tokio handle's `block_on` can be used from within an object.
 * [path-loader](path-loader): Demonstrates how to load templates from disk.
