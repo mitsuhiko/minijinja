@@ -17,6 +17,7 @@ mod cell;
 mod error;
 #[cfg(feature = "unstable_machinery")]
 mod machinery;
+mod state;
 mod value;
 
 #[wasm_bindgen(module = "/js/support.js")]
@@ -77,10 +78,21 @@ export interface SyntaxConfig {
 export type AutoEscape = "html" | "json" | "none" | boolean | null | undefined;
 "##;
 
+/// Seeds the random number generator from `Math.random`.
+///
+/// The default seed source of the standard library is not random on
+/// `wasm32-unknown-unknown`.
+fn random_seed() -> u64 {
+    let high = (js_sys::Math::random() * 4294967296.0) as u64;
+    let low = (js_sys::Math::random() * 4294967296.0) as u64;
+    (high << 32) | low
+}
+
 #[wasm_bindgen(start)]
 fn start() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+    minijinja_contrib::rand::set_seed_source(Some(random_seed));
 }
 
 /// Represents a MiniJinja environment.
@@ -155,9 +167,13 @@ fn set_prop(obj: &Object, key: &str, value: impl Into<JsValue>) {
     Reflect::set(obj, &JsValue::from_str(key), &value.into()).ok();
 }
 
-fn js_callback(func: Function) -> impl Fn(Rest<ValueOrKwargs>) -> Result<Value, Error> {
+fn js_callback(
+    func: Function,
+) -> impl Fn(&mut mj::State<'_, '_>, Rest<ValueOrKwargs>) -> Result<Value, Error> {
     let func = JsFunction::new(func);
-    move |args: Rest<ValueOrKwargs>| func.call(&args.into_values())
+    move |state: &mut mj::State<'_, '_>, args: Rest<ValueOrKwargs>| {
+        func.call(state, &args.into_values())
+    }
 }
 
 #[wasm_bindgen]
@@ -451,7 +467,7 @@ impl Environment {
     ) -> Result<(), JsValue> {
         let func = JsFunction::new(func);
         self.env_mut()?.set_formatter(move |out, state, value| {
-            let rv = func.call(std::slice::from_ref(value))?;
+            let rv = func.call(state, std::slice::from_ref(value))?;
             if rv.is_undefined() {
                 mj::escape_formatter(out, state, value)
             } else {
@@ -553,12 +569,7 @@ impl Environment {
     /// Reconfigures the behavior of undefined variables.
     #[wasm_bindgen(getter)]
     pub fn undefinedBehavior(&self) -> Result<UndefinedBehavior, JsValue> {
-        Ok(match self.env()?.undefined_behavior() {
-            mj::UndefinedBehavior::Strict => UndefinedBehavior::Strict,
-            mj::UndefinedBehavior::Chainable => UndefinedBehavior::Chainable,
-            mj::UndefinedBehavior::SemiStrict => UndefinedBehavior::SemiStrict,
-            _ => UndefinedBehavior::Lenient,
-        })
+        Ok(self.env()?.undefined_behavior().into())
     }
 
     #[wasm_bindgen(setter)]
@@ -669,4 +680,15 @@ pub enum UndefinedBehavior {
     Chainable = "chainable",
     Lenient = "lenient",
     SemiStrict = "semi_strict",
+}
+
+impl From<mj::UndefinedBehavior> for UndefinedBehavior {
+    fn from(value: mj::UndefinedBehavior) -> Self {
+        match value {
+            mj::UndefinedBehavior::Strict => UndefinedBehavior::Strict,
+            mj::UndefinedBehavior::Chainable => UndefinedBehavior::Chainable,
+            mj::UndefinedBehavior::SemiStrict => UndefinedBehavior::SemiStrict,
+            _ => UndefinedBehavior::Lenient,
+        }
+    }
 }

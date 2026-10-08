@@ -6,7 +6,7 @@ import { setup } from "./shared.js";
 
 export async function init(moduleOrPath) {
   await wasmInit(
-    moduleOrPath === undefined ? undefined : { module_or_path: moduleOrPath }
+    moduleOrPath === undefined ? undefined : { module_or_path: moduleOrPath },
   );
   setup();
 }
@@ -23,4 +23,5 @@ export {
   SafeString,
   TemplateError,
   markSafe,
+  passState,
 } from "./shared.js";

@@ -30,7 +30,9 @@
 use std::fmt;
 use std::sync::Arc;
 
-use js_sys::{Array, ArrayBuffer, DataView, Date, Function, Map, Object, Reflect, Set, Uint8Array};
+use js_sys::{
+    Array, ArrayBuffer, DataView, Date, Function, Map, Object, Reflect, Set, Symbol, Uint8Array,
+};
 use minijinja::value::{Enumerator, Object as MjObject, ObjectRepr, Value, ValueKind};
 use minijinja::{Error, ErrorKind, State};
 use wasm_bindgen::prelude::*;
@@ -38,6 +40,7 @@ use wasm_bindgen::JsCast;
 
 use crate::cell::JsCell;
 use crate::error::{describe_js_value, js_exception_error};
+use crate::state::bind_state;
 
 /// Maximum nesting depth for converted values.
 ///
@@ -92,7 +95,7 @@ fn js_to_value_impl(value: &JsValue, depth: usize) -> Result<Value, Error> {
     } else if value.is_bigint() {
         return bigint_to_value(value);
     } else if let Some(func) = value.dyn_ref::<Function>() {
-        return Ok(Value::from_object(JsFunction(JsCell::new(func.clone()))));
+        return Ok(Value::from_object(JsFunction::new(func.clone())));
     } else if !value.is_object() {
         return Err(Error::new(
             ErrorKind::InvalidOperation,
@@ -219,7 +222,7 @@ fn value_to_js_impl(value: &Value, depth: usize) -> Result<JsValue, Error> {
     if let Some(obj) = value.downcast_object_ref::<JsObject>() {
         return Ok(JsValue::from(&**obj.0));
     } else if let Some(func) = value.downcast_object_ref::<JsFunction>() {
-        return Ok(JsValue::from(&**func.0));
+        return Ok(JsValue::from(&**func.func));
     }
 
     if depth >= MAX_DEPTH {
@@ -284,11 +287,29 @@ fn number_to_js(value: &Value) -> JsValue {
     }
 }
 
+/// Returns `true` if the function was marked with `passState`.
+fn wants_state(func: &Function) -> bool {
+    Reflect::get(func, &Symbol::for_("minijinja.passState"))
+        .map(|x| x.is_truthy())
+        .unwrap_or(false)
+}
+
 /// Invokes a JavaScript function with MiniJinja arguments.
 ///
-/// Keyword arguments are passed as a trailing plain object.
-pub fn call_js_function(func: &Function, this: &JsValue, args: &[Value]) -> Result<Value, Error> {
+/// Keyword arguments are passed as a trailing plain object.  If a state is
+/// provided it's passed as first argument.
+pub fn call_js_function(
+    func: &Function,
+    this: &JsValue,
+    state: Option<&mut State<'_, '_>>,
+    args: &[Value],
+) -> Result<Value, Error> {
     let js_args = Array::new();
+    let _guard = state.map(|state| {
+        let (guard, js_state) = bind_state(state);
+        js_args.push(&js_state);
+        guard
+    });
     for arg in args {
         js_args.push(&value_to_js(arg)?);
     }
@@ -299,21 +320,28 @@ pub fn call_js_function(func: &Function, this: &JsValue, args: &[Value]) -> Resu
 }
 
 /// A JavaScript function exposed to the template engine.
-pub struct JsFunction(JsCell<Function>);
+pub struct JsFunction {
+    func: JsCell<Function>,
+    pass_state: bool,
+}
 
 impl JsFunction {
     pub fn new(func: Function) -> JsFunction {
-        JsFunction(JsCell::new(func))
+        JsFunction {
+            pass_state: wants_state(&func),
+            func: JsCell::new(func),
+        }
     }
 
-    pub fn call(&self, args: &[Value]) -> Result<Value, Error> {
-        call_js_function(&self.0, &JsValue::UNDEFINED, args)
+    pub fn call(&self, state: &mut State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
+        let state = if self.pass_state { Some(state) } else { None };
+        call_js_function(&self.func, &JsValue::UNDEFINED, state, args)
     }
 }
 
 impl fmt::Debug for JsFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<function {}>", String::from(self.0.name()))
+        write!(f, "<function {}>", String::from(self.func.name()))
     }
 }
 
@@ -322,8 +350,8 @@ impl MjObject for JsFunction {
         ObjectRepr::Plain
     }
 
-    fn call(self: &Arc<Self>, _state: &mut State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
-        JsFunction::call(self, args)
+    fn call(self: &Arc<Self>, state: &mut State<'_, '_>, args: &[Value]) -> Result<Value, Error> {
+        JsFunction::call(self, state, args)
     }
 }
 
@@ -377,14 +405,17 @@ impl MjObject for JsObject {
 
     fn call_method(
         self: &Arc<Self>,
-        _state: &mut State<'_, '_>,
+        state: &mut State<'_, '_>,
         method: &str,
         args: &[Value],
     ) -> Result<Value, Error> {
         let func = Reflect::get(&self.0, &JsValue::from_str(method))
             .map_err(|err| js_exception_error("failed to read property", err))?;
         match func.dyn_ref::<Function>() {
-            Some(func) => call_js_function(func, &self.0, args),
+            Some(func) => {
+                let state = if wants_state(func) { Some(state) } else { None };
+                call_js_function(func, &self.0, state, args)
+            }
             None => Err(Error::from(ErrorKind::UnknownMethod)),
         }
     }

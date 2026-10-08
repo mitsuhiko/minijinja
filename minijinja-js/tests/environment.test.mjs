@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { Environment, SafeString, TemplateError, markSafe } from "minijinja-js";
+import {
+  Environment,
+  SafeString,
+  TemplateError,
+  markSafe,
+  passState,
+} from "minijinja-js";
 
 /** Asserts that `fn` throws an error whose message contains `expected`. */
 function assertThrows(fn, expected) {
@@ -575,6 +581,95 @@ No referenced variables
         "x",
         "y",
       ]);
+    });
+  });
+
+  describe("state", () => {
+    it("should pass the state to marked callbacks", () => {
+      const env = new Environment();
+      env.addFilter(
+        "info",
+        passState(
+          (state, value) =>
+            `${state.name}:${state.autoEscape}:${state.lookup("greeting")}:${state.lookup("missing")}:${state.applyFilter("upper", value)}:${state.performTest("odd", 3)}`,
+        ),
+      );
+      env.addGlobal("greeting", "hi");
+      assert.equal(
+        env.renderNamedStr("x.html", "{{ 'a'|info }}"),
+        "x.html:html:hi:undefined:A:true",
+      );
+    });
+
+    it("should pass the state to functions and methods", () => {
+      const env = new Environment();
+      const fn = passState((state) => state.lookup("x"));
+      class Obj {
+        method = passState((state) => state.lookup("x") * 2);
+      }
+      assert.equal(
+        env.renderStr("{{ fn() }} {{ obj.method() }}", {
+          fn,
+          obj: new Obj(),
+          x: 21,
+        }),
+        "21 42",
+      );
+    });
+
+    it("should invalidate the state after the callback", () => {
+      const env = new Environment();
+      let saved;
+      env.addFilter(
+        "keep",
+        passState((state) => {
+          saved = state;
+          return 1;
+        }),
+      );
+      env.renderStr("{{ 1|keep }}");
+      assertThrows(() => saved.lookup("x"), "only be used while the callback");
+    });
+
+    it("should map thrown template errors", () => {
+      const env = new Environment();
+      env.addFilter("fail", () => {
+        throw new TemplateError("value must be positive", {
+          kind: "InvalidOperation",
+        });
+      });
+      env.addFilter("missing", () => {
+        throw new TemplateError("need more", { kind: "MissingArgument" });
+      });
+      assertThrows(
+        () => env.renderStr("{{ 1|fail }}"),
+        /^invalid operation: value must be positive/,
+      );
+      let caught;
+      try {
+        env.renderStr("{{ 1|missing }}");
+      } catch (err) {
+        caught = err;
+      }
+      assert.equal(caught.kind, "MissingArgument");
+      assert.equal(caught.detail, "need more");
+    });
+  });
+
+  describe("rand", () => {
+    it("should provide random functions", () => {
+      const env = new Environment();
+      const values = new Set();
+      for (let i = 0; i < 5; i++) {
+        values.add(env.renderStr("{{ randrange(1000000000) }}"));
+      }
+      assert.ok(values.size > 1);
+      assert.match(env.renderStr("{{ [1, 2, 3]|random }}"), /^[123]$/);
+      assert.match(env.renderStr("{{ lipsum(1) }}"), /^[A-Z]/);
+      assert.equal(
+        env.renderStr("{{ randrange(1000000) }}", { RAND_SEED: 42 }),
+        env.renderStr("{{ randrange(1000000) }}", { RAND_SEED: 42 }),
+      );
     });
   });
 

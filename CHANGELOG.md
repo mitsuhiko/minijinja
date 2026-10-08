@@ -18,6 +18,7 @@ All notable changes to MiniJinja are documented here.
 * Removed the `custom_syntax` feature.  Custom delimiters, line statements and line comments are now always available.  The `aho-corasick` dependency was removed; start markers are now found with a simple scan which is as fast or faster and makes building a custom `SyntaxConfig` about 100 times faster.
 * Fixed custom delimiters where a start marker overlaps a longer one (for instance `<%` and `<%%=`) sometimes picking the wrong marker.
 * Empty end delimiters are now rejected with `ErrorKind::InvalidDelimiter`.
+* Added `minijinja_contrib::rand::set_seed_source` to provide seeds for the random functions on platforms without a source of randomness.
 * Reworked the JavaScript bindings:
   * Exceptions thrown by filters, tests and functions no longer panic and permanently break the environment.  They now fail the render with an error whose `cause` is the original exception.
   * Filters may now render from the same environment.  Modifying the environment while it renders raises an error instead of breaking it, and so does setting an invalid `undefinedBehavior`.
@@ -28,6 +29,9 @@ All notable changes to MiniJinja are documented here.
   * Errors are now raised as `TemplateError` with `kind`, `detail`, `templateName`, `line`, `range` and `templateSource` properties.
   * Added `addFunction`, `removeFilter`, `removeTest`, `setAutoEscapeCallback`, `setFinalizer`, `undeclaredVariablesInTemplate` and `undeclaredVariablesInStr` as well as the `syntax` property for custom delimiters and line statements and the `pycompat` property.
   * Improved the TypeScript declarations.  Callbacks and contexts are now typed and `Context`, `SyntaxConfig`, `AutoEscape` and `UndefinedBehavior` are exported.
+  * Callbacks wrapped with `passState` receive a `State` object to look up variables, inspect the template name and auto escape mode, and apply filters and tests.  Callbacks can throw `TemplateError` to fail with a specific error kind.
+  * Added optional date and time filters (`datetimeformat`, `dateformat`, `timeformat` and `now()`) in `minijinja-js/datetime` which use the native time zone support of the JavaScript runtime.
+  * Enabled the `rand` contrib feature (`random`, `randrange` and `lipsum`) seeded from `Math.random`.
   * Enabled the `urlencode`, `loop_controls` and `unicode` features as well as the `html_entities` and `wordwrap` contrib features to match the Python bindings.
   * The context argument of `renderStr`, `renderTemplate`, `renderNamedStr` and `evalExpr` is now optional.
   * The npm package is now an ES module with a single wasm build and an `exports` map.  Node.js loads the wasm module synchronously (and supports `require()` on versions with `require(esm)`), browsers, bundlers, Deno and Bun load it with top-level await.  The `minijinja-js/init` entry point allows initializing the module manually.  The `dist/node`, `dist/web` and `dist/bundler` paths are gone.  The package is now about a quarter of its previous size.

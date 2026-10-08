@@ -14,4 +14,9 @@ export function markSafe(value) {
   return new SafeString(value);
 }
 
+export function passState(func) {
+  func[Symbol.for("minijinja.passState")] = true;
+  return func;
+}
+
 export { Environment };

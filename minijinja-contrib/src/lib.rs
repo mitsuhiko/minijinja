@@ -27,8 +27,9 @@ pub mod globals;
 #[cfg(feature = "html_entities")]
 mod html_entities;
 
+/// Configuration of the random number generation.
 #[cfg(feature = "rand")]
-mod rand;
+pub mod rand;
 
 /// Registers all features of this crate with an [`Environment`].
 ///

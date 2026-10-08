@@ -15,4 +15,5 @@ export {
   SafeString,
   TemplateError,
   markSafe,
+  passState,
 } from "./shared.js";

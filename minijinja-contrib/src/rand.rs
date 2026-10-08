@@ -1,10 +1,34 @@
+//! The `random` filter as well as the `randrange` and `lipsum` functions
+//! use a simple pseudo random number generator.  It can be seeded with the
+//! `RAND_SEED` global.  Otherwise the seed is derived from the random keys of
+//! the standard library's hash maps or a custom [seed source](set_seed_source).
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};
+use std::sync::RwLock;
 
 use minijinja::State;
 
+static SEED_SOURCE: RwLock<Option<fn() -> u64>> = RwLock::new(None);
+
+/// Sets a function that provides seeds when `RAND_SEED` is not set.
+///
+/// By default seeds are derived from the random keys of the standard
+/// library's hash maps.  On platforms without a source of randomness
+/// (such as `wasm32-unknown-unknown`) these are not random, so this can be
+/// used to provide a better source.  Pass `None` to restore the default.
+pub fn set_seed_source(source: Option<fn() -> u64>) {
+    *SEED_SOURCE.write().unwrap_or_else(|err| err.into_inner()) = source;
+}
+
+fn default_seed() -> u64 {
+    match *SEED_SOURCE.read().unwrap_or_else(|err| err.into_inner()) {
+        Some(source) => source(),
+        None => RandomState::new().build_hasher().finish(),
+    }
+}
+
 #[derive(Debug)]
-pub struct XorShiftRng {
+pub(crate) struct XorShiftRng {
     seed: u64,
 }
 
@@ -21,7 +45,7 @@ impl XorShiftRng {
 
     pub fn new(seed: Option<u64>) -> XorShiftRng {
         XorShiftRng {
-            seed: seed.unwrap_or_else(|| RandomState::new().build_hasher().finish()),
+            seed: seed.unwrap_or_else(default_seed),
         }
     }
 

@@ -30,6 +30,10 @@
       "types": "./dist/init.d.ts",
       "default": "./dist/init.js"
     },
+    "./datetime": {
+      "types": "./dist/datetime.d.ts",
+      "default": "./dist/datetime.js"
+    },
     "./minijinja_js_bg.wasm": "./dist/wasm/minijinja_js_bg.wasm",
     "./package.json": "./package.json"
   },

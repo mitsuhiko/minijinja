@@ -9,7 +9,7 @@ export type { InitInput, SyncInitInput };
  * If no argument is given, the wasm file is loaded relative to this module.
  */
 export declare function init(
-  moduleOrPath?: InitInput | Promise<InitInput>
+  moduleOrPath?: InitInput | Promise<InitInput>,
 ): Promise<void>;
 
 /**

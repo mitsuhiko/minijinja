@@ -104,7 +104,64 @@ console.log(env.renderStr("{{ 'ab'|repeat(3, sep='-') }} {{ double(21) }}"));
 
 Keyword arguments are passed to JavaScript callbacks as a trailing object.
 Exceptions thrown by callbacks fail the render with an error whose `cause`
-is the original exception.
+is the original exception.  Throw a `TemplateError` to fail with a specific
+error kind and message:
+
+```typescript
+import { TemplateError } from "minijinja-js";
+
+env.addFilter("sqrt", (value) => {
+  if (value < 0) {
+    throw new TemplateError("value must not be negative", { kind: "InvalidOperation" });
+  }
+  return Math.sqrt(value);
+});
+```
+
+Callbacks wrapped with `passState` receive the engine state as first
+argument.  It gives access to variables (`lookup`), the template name, the
+auto escape mode, and allows applying filters and tests.  The state is only
+valid while the callback runs:
+
+```typescript
+import { Environment, passState } from "minijinja-js";
+
+const env = new Environment();
+env.addFilter(
+  "greet",
+  passState((state, name) => `${state.lookup("greeting") ?? "Hello"} ${name}!`)
+);
+console.log(env.renderStr("{{ 'World'|greet }}", { greeting: "Hi" }));
+// -> Hi World!
+```
+
+The `random` filter as well as the `randrange` and `lipsum` functions are
+available.  Their output can be made deterministic with the `RAND_SEED` global.
+
+## Dates and Times
+
+Date and time filters can be enabled from `minijinja-js/datetime`.  They
+mirror the `datetimeformat`, `dateformat` and `timeformat` filters and the
+`now()` function from MiniJinja's contrib package but use the time zone
+support of the JavaScript runtime:
+
+```typescript
+import { Environment } from "minijinja-js";
+import { addDateTimeSupport } from "minijinja-js/datetime";
+
+const env = new Environment();
+addDateTimeSupport(env);
+env.addGlobal("TIMEZONE", "Europe/Vienna");
+console.log(env.renderStr("{{ ts|datetimeformat(format='full') }}", { ts: 1687624642 }));
+// -> Saturday, June 24 2023 18:37:22.0
+```
+
+The filters accept Unix timestamps, ISO 8601 strings (optionally with a time
+zone annotation such as `2023-06-24T16:37:22Z[Europe/Vienna]`) and `Date`
+objects.  The format is one of `short`, `medium` (the default), `long`,
+`full`, `iso` and `unix` or a `strftime` style format string.  The `format`
+and `tz` keyword arguments default to the `DATETIME_FORMAT`, `DATE_FORMAT`,
+`TIME_FORMAT` and `TIMEZONE` globals.
 
 ## Values
 
@@ -225,7 +282,6 @@ The wasm file is exported as `minijinja-js/minijinja_js_bg.wasm`.
 There are various limitations with the binding today, some of which can be fixed,
 others probably not so much.  You might run into the following:
 
-* Access of the template engine state from JavaScript is not possible.
 * Filters, tests and functions cannot be async.
 * The loader is synchronous; use sync I/O in Node etc... (e.g. `fs.readFileSync`)
 * The environment cannot be modified while it renders (for instance from

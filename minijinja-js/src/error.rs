@@ -61,8 +61,51 @@ impl fmt::Display for JsException {
 
 impl std::error::Error for JsException {}
 
+fn parse_error_kind(kind: &str) -> ErrorKind {
+    match kind {
+        "NonPrimitive" => ErrorKind::NonPrimitive,
+        "NonKey" => ErrorKind::NonKey,
+        "SyntaxError" => ErrorKind::SyntaxError,
+        "TemplateNotFound" => ErrorKind::TemplateNotFound,
+        "TooManyArguments" => ErrorKind::TooManyArguments,
+        "MissingArgument" => ErrorKind::MissingArgument,
+        "UnknownFilter" => ErrorKind::UnknownFilter,
+        "UnknownTest" => ErrorKind::UnknownTest,
+        "UnknownFunction" => ErrorKind::UnknownFunction,
+        "UnknownMethod" => ErrorKind::UnknownMethod,
+        "BadEscape" => ErrorKind::BadEscape,
+        "UndefinedError" => ErrorKind::UndefinedError,
+        "BadSerialization" => ErrorKind::BadSerialization,
+        "BadInclude" => ErrorKind::BadInclude,
+        "EvalBlock" => ErrorKind::EvalBlock,
+        "CannotUnpack" => ErrorKind::CannotUnpack,
+        "WriteFailure" => ErrorKind::WriteFailure,
+        "OutOfFuel" => ErrorKind::OutOfFuel,
+        "InvalidDelimiter" => ErrorKind::InvalidDelimiter,
+        "UnknownBlock" => ErrorKind::UnknownBlock,
+        _ => ErrorKind::InvalidOperation,
+    }
+}
+
+fn get_string(value: &JsValue, key: &str) -> Option<String> {
+    Reflect::get(value, &JsValue::from_str(key))
+        .ok()
+        .and_then(|x| x.as_string())
+}
+
 /// Creates a MiniJinja error for an exception thrown by JavaScript code.
+///
+/// A thrown `TemplateError` becomes an error of the same kind with the
+/// detail (or message) of the error.  Other exceptions are reported as
+/// invalid operation with the given context.
 pub fn js_exception_error(context: &str, value: JsValue) -> Error {
+    if value.is_instance_of::<TemplateError>() {
+        let kind = get_string(&value, "kind").unwrap_or_default();
+        let detail = get_string(&value, "detail")
+            .or_else(|| get_string(&value, "message"))
+            .unwrap_or_default();
+        return Error::new(parse_error_kind(&kind), detail).with_source(JsException::new(value));
+    }
     let exc = JsException::new(value);
     Error::new(ErrorKind::InvalidOperation, format!("{context}: {exc}")).with_source(exc)
 }

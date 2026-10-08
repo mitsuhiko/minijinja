@@ -4,11 +4,14 @@ import {
   SafeString,
   TemplateError,
   markSafe,
+  passState,
   type AutoEscape,
+  type State,
   type Context,
   type SyntaxConfig,
   type UndefinedBehavior,
 } from "minijinja-js";
+import { addDateTimeSupport } from "minijinja-js/datetime";
 import { init, initSync } from "minijinja-js/init";
 
 class User {
@@ -32,6 +35,21 @@ class User {
   env.setPathJoinCallback((name, parent) => `${parent}/${name}`);
   env.setAutoEscapeCallback((name): AutoEscape => name.endsWith(".html"));
   env.setFinalizer((value) => (value === null ? "" : undefined));
+  env.addFilter(
+    "greet",
+    passState((state: State, name: string) => {
+      const greeting: unknown = state.lookup("greeting");
+      const escape: string = state.autoEscape;
+      const upper: unknown = state.applyFilter("upper", name);
+      const odd: boolean = state.performTest("odd", 1);
+      void [escape, upper, odd];
+      return `${String(greeting)} ${name} in ${state.name}`;
+    }),
+  );
+  env.addFilter("fail", () => {
+    throw new TemplateError("nope", { kind: "InvalidOperation" });
+  });
+  addDateTimeSupport(env);
 
   const behavior: UndefinedBehavior = env.undefinedBehavior;
   env.undefinedBehavior = "strict";
