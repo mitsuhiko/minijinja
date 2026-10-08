@@ -273,13 +273,20 @@ func FilterReplace(state State, val value.Value, args []value.Value, _ map[strin
 
 // FilterFormat applies printf-style formatting to a string.
 //
+// Keyword arguments are passed as a trailing mapping, so they can fill
+// %(name)s specs.
+//
 // Example:
 //
 //	{{ "%s, %s!"|format(greeting, name) }}
-func FilterFormat(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+//	{{ "%(greeting)s, %(name)s!"|format(greeting=greeting, name=name) }}
+func FilterFormat(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	formatStr, ok := val.AsString()
 	if !ok {
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "format filter expects a string")
+	}
+	if len(kwargs) > 0 {
+		args = append(args[:len(args):len(args)], value.FromMap(kwargs))
 	}
 
 	// like any other string conversion, formatting undefined values fails

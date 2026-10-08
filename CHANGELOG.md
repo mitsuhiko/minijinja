@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed the `format` filter ignoring keyword arguments in Go.  Like in Rust they are passed as a trailing mapping and fill `%(name)s` specs.
+
 ## 3.0.0
 
 MiniJinja 3 is a major release.  It aligns template behavior and the value
