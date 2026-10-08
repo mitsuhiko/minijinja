@@ -40,6 +40,26 @@ const UNDEFINED_BEHAVIORS: { value: UndefinedBehavior; title: string }[] = [
   { value: "strict", title: "Strict" },
 ];
 
+const LINE_PREFIXES: {
+  key: "lineStatementPrefix" | "lineCommentPrefix";
+  prefix: string;
+  title: string;
+  help: string;
+}[] = [
+  {
+    key: "lineStatementPrefix",
+    prefix: "#",
+    title: "Line statements",
+    help: "Lines starting with the prefix are statements",
+  },
+  {
+    key: "lineCommentPrefix",
+    prefix: "##",
+    title: "Line comments",
+    help: "Text after the prefix is a comment",
+  },
+];
+
 const SYNTAX_FIELDS: [keyof SyntaxConfig, keyof SyntaxConfig, string][] = [
   ["blockStart", "blockEnd", "Blocks"],
   ["variableStart", "variableEnd", "Variables"],
@@ -116,15 +136,32 @@ export function SettingsPanel({ settings, onChange }: Props) {
               {syntaxInput(end, `${label} end`)}
             </div>
           ))}
-          <div className="syntax-row">
-            <span>Line statements</span>
-            {syntaxInput("lineStatementPrefix", "Line statement prefix")}
-          </div>
-          <div className="syntax-row">
-            <span>Line comments</span>
-            {syntaxInput("lineCommentPrefix", "Line comment prefix")}
-          </div>
         </div>
+        {LINE_PREFIXES.map((option) => {
+          const value = settings.syntax[option.key];
+          return (
+            <label
+              key={option.key}
+              className="setting-flag"
+              title={option.help}
+            >
+              <input
+                type="checkbox"
+                checked={!!value}
+                onChange={(event) =>
+                  setSyntax(
+                    option.key,
+                    event.target.checked ? option.prefix : "",
+                  )
+                }
+              />
+              <span>
+                {option.title} <code>{value || option.prefix}</code>
+                <small>{option.help}</small>
+              </span>
+            </label>
+          );
+        })}
       </section>
       <button
         className="button subtle"

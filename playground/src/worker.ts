@@ -1,6 +1,7 @@
 // Renders templates off the main thread so that runaway templates do not
 // block the UI.  The main thread terminates this worker on timeouts.
 import { Environment, TemplateError } from "minijinja-js";
+import { addDateTimeSupport } from "minijinja-js/datetime";
 import type { ErrorInfo, RenderRequest, RenderResult } from "./protocol";
 
 function toErrorInfo(err: unknown): ErrorInfo {
@@ -25,6 +26,7 @@ function createEnvironment({ settings }: RenderRequest["state"]): Environment {
   env.keepTrailingNewline = settings.keepTrailingNewline;
   env.undefinedBehavior = settings.undefinedBehavior;
   env.syntax = settings.syntax;
+  addDateTimeSupport(env);
   return env;
 }
 

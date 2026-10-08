@@ -14,6 +14,7 @@ Features:
   and the undeclared variables of a template
 * Tokens, AST and VM instructions of the current template
 * Configurable syntax, whitespace handling and undefined behavior
+* Date and time filters (from `minijinja-js/datetime`) and random functions
 * The state is kept in the URL so links can be shared
 * Templates render in a web worker and are aborted if they do not finish
 

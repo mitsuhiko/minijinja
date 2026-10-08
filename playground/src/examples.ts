@@ -235,6 +235,58 @@ server {{ server.name }} {
     },
   },
   {
+    id: "datetime",
+    title: "Dates and Times",
+    state: {
+      files: [
+        {
+          name: "events.txt",
+          source: `{# Formats default to DATETIME_FORMAT, DATE_FORMAT and TIME_FORMAT,
+   the timezone to TIMEZONE (all set in the context). -#}
+Generated {{ now()|datetimeformat(format="long") }} ({{ TIMEZONE }})
+
+{% for event in events -%}
+* {{ event.title }}
+  {{ event.start|dateformat(format="full") }} at {{ event.start|timeformat }}
+  In New York: {{ event.start|datetimeformat(tz="America/New_York") }}
+  Custom: {{ event.start|datetimeformat(format="%a %-d.%-m. %I:%M %p %Z") }}
+{% endfor %}
+`,
+        },
+      ],
+      entry: "events.txt",
+      context: json({
+        TIMEZONE: "Europe/Vienna",
+        TIME_FORMAT: "short",
+        events: [
+          { title: "Release party", start: "2025-06-24T16:30:00Z" },
+          { title: "Planning", start: 1767261600 },
+          { title: "Retro", start: "2026-03-29T09:00:00[Europe/London]" },
+        ],
+      }),
+      settings: DEFAULT_SETTINGS,
+    },
+  },
+  {
+    id: "random",
+    title: "Random Values",
+    state: {
+      files: [
+        {
+          name: "index.html",
+          source: `{# Set RAND_SEED in the context for repeatable output -#}
+<h1>{{ ["Hello", "Hi", "Welcome"]|random }}, {{ name }}!</h1>
+<p>Your lucky number is {{ randrange(1, 100) }}.</p>
+{{ lipsum(2, html=true) }}
+`,
+        },
+      ],
+      entry: "index.html",
+      context: json({ name: "World" }),
+      settings: DEFAULT_SETTINGS,
+    },
+  },
+  {
     id: "line-statements",
     title: "Custom Syntax",
     state: {
