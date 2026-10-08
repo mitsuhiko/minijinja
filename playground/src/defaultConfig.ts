@@ -4,7 +4,8 @@
  */
 export const DEFAULT_CONFIG = `// This code runs before every render.  The environment is available as
 // \`env\`, the helpers passState, markSafe, SafeString and TemplateError are
-// in scope.  Uncomment any of the examples below to try them.
+// in scope.  Uncomment any of the examples below to try them.  Output of
+// console.log() and friends shows up in the Console tab.
 
 // -- Filters, tests and functions ------------------------------------------
 
@@ -20,6 +21,12 @@ export const DEFAULT_CONFIG = `// This code runs before every render.  The envir
 
 // A global function:  {{ greet("World") }}
 // env.addFunction("greet", (name) => \`Hello \${name}!\`);
+
+// Log values while rendering:  {{ user|log }}
+// env.addFilter("log", (value, ...args) => {
+//   console.log(value, ...args);
+//   return value;
+// });
 
 // A global value (functions and objects work too).
 // env.addGlobal("site", { name: "My Site", url: "https://example.com" });

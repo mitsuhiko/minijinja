@@ -250,7 +250,7 @@ server {{ server.name }} {
         {
           name: "index.html",
           source: `{# The filters, tests and functions are defined in the Config tab -#}
-<h1>{{ title|slugify }}</h1>
+<h1>{{ title|log("title is")|slugify }}</h1>
 <ul>
 {%- for item in items %}
   <li>{{ item.name }}: {{ item.price|currency(code="EUR") }}
@@ -282,6 +282,12 @@ env.addFilter("currency", (value, { code = "USD" } = {}) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: code }).format(value));
 
 env.addTest("expensive", (value) => value > 100);
+
+// console output shows up in the Console tab
+env.addFilter("log", (value, ...args) => {
+  console.log(...args, value);
+  return value;
+});
 
 // markSafe stops the output from being escaped
 env.addFunction("badge", (text) =>

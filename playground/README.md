@@ -12,6 +12,7 @@ Features:
 * JSON context with completions of context variables in templates
 * JavaScript config code to register filters, tests, functions and globals
   (config code from shared links only runs after confirmation)
+* A console that shows messages logged by the config code and callbacks
 * Rendered output (with optional whitespace visualization), a preview (HTML
   or text) and the undeclared variables of a template
 * Tokens, AST and VM instructions of the current template

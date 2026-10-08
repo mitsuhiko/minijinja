@@ -8,7 +8,15 @@ import {
   passState,
 } from "minijinja-js";
 import { addDateTimeSupport } from "minijinja-js/datetime";
+import {
+  installConsoleCapture,
+  setPhase,
+  startCapture,
+  stopCapture,
+} from "./console";
 import type { ErrorInfo, RenderRequest, RenderResult } from "./protocol";
+
+installConsoleCapture();
 
 const CONFIG_URL = "config.js";
 const CONFIG_PARAMS = [
@@ -109,6 +117,7 @@ function handle(request: RenderRequest): RenderResult {
   }
 
   if (request.runConfig && state.config.trim() !== "") {
+    setPhase("config");
     try {
       runConfig(env, state.config);
     } catch (err) {
@@ -116,6 +125,8 @@ function handle(request: RenderRequest): RenderResult {
       result.error = result.configError;
       env.free();
       return result;
+    } finally {
+      setPhase("render");
     }
   }
 
@@ -186,6 +197,7 @@ function handle(request: RenderRequest): RenderResult {
 
 self.onmessage = (event: MessageEvent<RenderRequest>) => {
   let result: RenderResult;
+  startCapture();
   try {
     result = handle(event.data);
   } catch (err) {
@@ -195,6 +207,9 @@ self.onmessage = (event: MessageEvent<RenderRequest>) => {
       error: toErrorInfo(err),
     };
   }
+  const { logs, dropped } = stopCapture();
+  result.logs = logs;
+  result.droppedLogs = dropped;
   self.postMessage(result);
 };
 

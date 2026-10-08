@@ -1,7 +1,14 @@
 import { type ReactNode, useMemo } from "react";
-import type { ErrorInfo, InspectView, RenderResult, Span } from "../protocol";
+import type {
+  ErrorInfo,
+  InspectView,
+  LogEntry,
+  RenderResult,
+  Span,
+} from "../protocol";
 
-export type OutputView = "output" | "preview" | "variables" | InspectView;
+export type OutputView =
+  "output" | "preview" | "variables" | "console" | InspectView;
 export type PreviewMode = "html" | "text";
 
 export const OUTPUT_VIEWS: {
@@ -12,6 +19,7 @@ export const OUTPUT_VIEWS: {
   { id: "output", title: "Output" },
   { id: "preview", title: "Preview" },
   { id: "variables", title: "Variables" },
+  { id: "console", title: "Console" },
   { id: "tokens", title: "Tokens", inspect: true },
   { id: "ast", title: "AST", inspect: true },
   { id: "instructions", title: "Instructions", inspect: true },
@@ -366,6 +374,64 @@ function InstructionsView({
   );
 }
 
+const LEVEL_ICONS: Record<LogEntry["level"], string> = {
+  log: "",
+  info: "ℹ",
+  debug: "·",
+  warn: "⚠",
+  error: "✖",
+};
+
+function ConsoleView({ logs, dropped }: { logs: LogEntry[]; dropped: number }) {
+  if (logs.length === 0) {
+    return (
+      <div className="empty">
+        Nothing was logged. Messages from <code>console.log()</code> and friends
+        in the config code and in callbacks show up here.
+      </div>
+    );
+  }
+  return (
+    <div className="console">
+      {logs.map((entry, idx) => (
+        <div key={idx} className={`console-entry level-${entry.level}`}>
+          <span className="console-icon">{LEVEL_ICONS[entry.level]}</span>
+          <pre className="console-message">{entry.message}</pre>
+          {entry.phase === "config" && (
+            <span
+              className="console-phase"
+              title="Logged while running the config code"
+            >
+              config
+            </span>
+          )}
+        </div>
+      ))}
+      {dropped > 0 && (
+        <div className="console-entry level-warn">
+          <span className="console-icon">⚠</span>
+          <pre className="console-message">
+            {dropped} more {dropped === 1 ? "message was" : "messages were"} not
+            shown
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConsoleBadge({ logs }: { logs?: LogEntry[] }) {
+  if (!logs?.length) {
+    return null;
+  }
+  const level = logs.some((l) => l.level === "error")
+    ? "error"
+    : logs.some((l) => l.level === "warn")
+      ? "warn"
+      : "log";
+  return <span className={`count-badge level-${level}`}>{logs.length}</span>;
+}
+
 export function OutputPanel({
   result,
   view,
@@ -407,6 +473,14 @@ export function OutputPanel({
         return <InstructionsView instructions={result.instructions} />;
       }
       return <div className="empty">Loading…</div>;
+    }
+    if (view === "console") {
+      return (
+        <ConsoleView
+          logs={result.logs ?? []}
+          dropped={result.droppedLogs ?? 0}
+        />
+      );
     }
     if (view === "variables") {
       return (
@@ -464,6 +538,7 @@ export function OutputPanel({
               onClick={() => onViewChange(v.id)}
             >
               {v.title}
+              {v.id === "console" && <ConsoleBadge logs={result?.logs} />}
             </button>
           ))}
         </div>

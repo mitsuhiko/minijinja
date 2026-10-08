@@ -29,6 +29,8 @@
   --error-bg: #fbefed;
   --error-border: #ecc2bb;
   --error-text: #b3261e;
+  --warn-bg: #fdf5e6;
+  --warn-text: #8a5300;
   --ok: #3f7a3a;
   --shadow: 0 8px 30px rgb(0 0 0 / 0.12);
 
@@ -70,6 +72,8 @@
   --error-bg: #2f1d1b;
   --error-border: #5e2d27;
   --error-text: #f09a8c;
+  --warn-bg: #2e2717;
+  --warn-text: #f2c078;
   --ok: #8cc084;
   --shadow: 0 8px 30px rgb(0 0 0 / 0.5);
 
@@ -862,4 +866,84 @@ input {
 .segmented button.active {
   background: var(--accent);
   color: var(--accent-text);
+}
+
+/* console */
+
+.console {
+  font-family: var(--code-font);
+  font-size: var(--code-font-size);
+}
+
+.console-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.console-icon {
+  flex: 0 0 14px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.console-message {
+  flex: 1;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+}
+
+.console-phase {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--hover);
+  color: var(--text-muted);
+  font-family: var(--font);
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.console-entry.level-warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.console-entry.level-error {
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+.console-entry.level-debug,
+.console-entry.level-debug .console-icon {
+  color: var(--text-muted);
+}
+
+.console-entry.level-info .console-icon {
+  color: var(--accent);
+}
+
+.count-badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--hover);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.count-badge.level-warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.count-badge.level-error {
+  background: var(--error-text);
+  color: var(--panel);
 }
