@@ -5,7 +5,6 @@ import {
 } from "@codemirror/autocomplete";
 import { javascript, javascriptLanguage } from "@codemirror/lang-javascript";
 import type { Extension } from "@codemirror/state";
-import { placeholder } from "@codemirror/view";
 import { html } from "@codemirror/lang-html";
 import { jinja } from "@codemirror/lang-jinja";
 import { json } from "@codemirror/lang-json";
@@ -99,6 +98,7 @@ const ENV_COMPLETIONS: Completion[] = [
   ["removeGlobal", "(name)"],
   ["setFinalizer", "((value) => any)"],
   ["setAutoEscapeCallback", "((name) => AutoEscape)"],
+  ["setPathJoinCallback", "((name, parent) => string)"],
   ["debug", "boolean"],
   ["pycompat", "boolean"],
   ["trimBlocks", "boolean"],
@@ -136,11 +136,5 @@ export function configLanguage(): Extension {
   return [
     javascript(),
     javascriptLanguage.data.of({ autocomplete: configCompletions }),
-    placeholder(
-      "// JavaScript that runs before every render with the environment as `env`.\n" +
-        "// Also available: passState, markSafe, SafeString and TemplateError.\n" +
-        "//\n" +
-        '// env.addFilter("shout", (value) => String(value).toUpperCase() + "!");',
-    ),
   ];
 }

@@ -13,6 +13,7 @@ import {
 } from "./components/OutputPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { Splitter } from "./components/Splitter";
+import { DEFAULT_CONFIG } from "./defaultConfig";
 import { DEFAULT_STATE, EXAMPLES } from "./examples";
 import { configLanguage, templateLanguage } from "./languages";
 import { jinjaHighlight } from "./theme";
@@ -109,7 +110,11 @@ async function initialState(): Promise<PlaygroundState> {
  * shared links from running code without consent.
  */
 function isTrustedConfig(config: string): boolean {
-  return config.trim() === "" || config === getPreference("trusted-config", "");
+  return (
+    config.trim() === "" ||
+    config === DEFAULT_CONFIG ||
+    config === getPreference("trusted-config", "")
+  );
 }
 
 export function App() {

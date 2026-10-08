@@ -1,4 +1,5 @@
 import type { SyntaxConfig, UndefinedBehavior } from "minijinja-js";
+import { DEFAULT_CONFIG } from "./defaultConfig";
 
 export interface TemplateFile {
   name: string;
@@ -71,7 +72,7 @@ function normalize(state: PlaygroundState): PlaygroundState {
   const entry = state.files.some((f) => f.name === state.entry)
     ? state.entry
     : state.files[0].name;
-  return { ...state, entry, settings, config: state.config ?? "" };
+  return { ...state, entry, settings, config: state.config ?? DEFAULT_CONFIG };
 }
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -102,7 +103,12 @@ async function transform(
 
 /** Encodes the state into a URL hash. */
 export async function encodeHash(state: PlaygroundState): Promise<string> {
-  const json = new TextEncoder().encode(JSON.stringify(state));
+  // the default config is left out to keep links short
+  const shared: Partial<PlaygroundState> = { ...state };
+  if (shared.config === DEFAULT_CONFIG) {
+    delete shared.config;
+  }
+  const json = new TextEncoder().encode(JSON.stringify(shared));
   const compressed = await transform(
     json,
     new CompressionStream("deflate-raw"),
