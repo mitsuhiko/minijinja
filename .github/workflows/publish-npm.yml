@@ -12,10 +12,10 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify release version
         run: ./scripts/verify-release.sh "$GITHUB_REF_NAME"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24.x'
       - name: Update npm

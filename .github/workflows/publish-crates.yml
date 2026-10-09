@@ -14,7 +14,7 @@ jobs:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     if: ${{ !github.event.pull_request && !contains(github.ref_name, '/') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify release version
         run: ./scripts/verify-release.sh "$GITHUB_REF_NAME"
       - uses: swatinem/rust-cache@v2
