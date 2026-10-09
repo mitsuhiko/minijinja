@@ -1,0 +1,13 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "  {% if true %}\nx\n {% endif %}\n# for x in [1, 2] \n{{ x }}\n# endfor"
+info:
+  $settings:
+    lstrip_blocks: true
+    trim_blocks: true
+    line_statement_prefix: "#"
+input_file: minijinja/tests/inputs/lstrip_blocks_unicode.txt
+---
+x
+1
+2

@@ -1,0 +1,8 @@
+{"$settings": {"lstrip_blocks": true, "trim_blocks": true, "line_statement_prefix": "#"}}
+---
+  {% if true %}
+x
+ {% endif %}
+# for x in [1, 2] 
+{{ x }}
+# endfor

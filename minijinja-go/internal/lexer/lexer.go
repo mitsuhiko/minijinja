@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/syntax"
 )
@@ -240,7 +242,7 @@ func (l *Lexer) tokenizeRoot() (*Token, bool, error) {
 	case wsRemove:
 		// Trim trailing whitespace before the marker
 		peeked := l.rest()[:offset]
-		trimmed := strings.TrimRight(peeked, " \t\n\r")
+		trimmed := strings.TrimRightFunc(peeked, unicode.IsSpace)
 		lead = l.advance(len(trimmed))
 		span = l.span() // Span ends here, before the stripped whitespace
 		l.advance(len(peeked) - len(trimmed))
@@ -597,7 +599,7 @@ func (l *Lexer) handleRawTag(wsStart whitespaceMode) (*Token, bool, error) {
 					result = strings.TrimPrefix(result, "\n")
 				}
 			case wsRemove:
-				result = strings.TrimLeft(result, " \t\n\r")
+				result = strings.TrimLeftFunc(result, unicode.IsSpace)
 			}
 
 			// Apply ws trimming (before endraw tag)
@@ -607,7 +609,7 @@ func (l *Lexer) handleRawTag(wsStart whitespaceMode) (*Token, bool, error) {
 					result = lstripBlock(result)
 				}
 			case wsRemove:
-				result = strings.TrimRight(result, " \t\n\r")
+				result = strings.TrimRightFunc(result, unicode.IsSpace)
 			}
 
 			l.advance(end)
@@ -702,13 +704,14 @@ func (l *Lexer) shouldLstripBlock(marker startMarker, prefix string) bool {
 
 	if l.whitespace.LstripBlocks && marker != markerVariable {
 		// Only strip if we're at the start of a line
-		for i := len(prefix) - 1; i >= 0; i-- {
-			c := prefix[i]
+		for prefix != "" {
+			c, size := utf8.DecodeLastRuneInString(prefix)
 			if c == '\n' || c == '\r' {
 				return true
-			} else if c != ' ' && c != '\t' {
+			} else if !unicode.IsSpace(c) {
 				return false
 			}
+			prefix = prefix[:len(prefix)-size]
 		}
 		// At start of file
 		return true
@@ -722,10 +725,7 @@ func (l *Lexer) tokenizeBlockOrVar(sentinel blockSentinel) (*Token, bool, error)
 	if sentinel == sentinelLineStatement && l.parenBalance == 0 {
 		rest := l.rest()
 		// Skip horizontal whitespace only
-		skipLen := 0
-		for skipLen < len(rest) && (rest[skipLen] == ' ' || rest[skipLen] == '\t') {
-			skipLen++
-		}
+		skipLen := len(rest) - len(strings.TrimLeftFunc(rest, isHorizontalSpace))
 
 		// Check for newline or end of input
 		if skipLen < len(rest) && (rest[skipLen] == '\n' || rest[skipLen] == '\r') {
@@ -939,7 +939,8 @@ func (l *Lexer) tokenizeBlockOrVar(sentinel blockSentinel) (*Token, bool, error)
 		return l.lexIdent()
 	}
 
-	return nil, false, l.syntaxError(fmt.Sprintf("unexpected character %q", ch))
+	r, _ := utf8.DecodeRuneInString(rest)
+	return nil, false, l.syntaxError(fmt.Sprintf("unexpected character %q", r))
 }
 
 // lexString lexes a string literal.
@@ -1315,14 +1316,8 @@ func (l *Lexer) makeToken(typ TokenType, value string) Token {
 }
 
 func (l *Lexer) skipWhitespace() {
-	for !l.atEnd() {
-		c := l.rest()[0]
-		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
-			l.advance(1)
-		} else {
-			break
-		}
-	}
+	rest := l.rest()
+	l.advance(len(rest) - len(strings.TrimLeftFunc(rest, unicode.IsSpace)))
 }
 
 func (l *Lexer) skipWhitespaceChars() {
@@ -1342,14 +1337,17 @@ func (l *Lexer) syntaxError(msg string) error {
 
 func lstripBlock(s string) string {
 	// Trim trailing whitespace (but not newlines) from the end
-	trimmed := strings.TrimRightFunc(s, func(r rune) bool {
-		return r == ' ' || r == '\t'
-	})
+	trimmed := strings.TrimRightFunc(s, isHorizontalSpace)
 	// Only strip if what remains ends with a newline or is empty
 	if trimmed == "" || strings.HasSuffix(trimmed, "\n") {
 		return trimmed
 	}
 	return s
+}
+
+// isHorizontalSpace reports whether r is whitespace other than a newline.
+func isHorizontalSpace(r rune) bool {
+	return unicode.IsSpace(r) && r != '\n' && r != '\r'
 }
 
 func isDigit(ch byte) bool {

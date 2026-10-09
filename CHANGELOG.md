@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## Unreleased
 
 * Fixed the `format` filter ignoring keyword arguments in Go.  Like in Rust they are passed as a trailing mapping and fill `%(name)s` specs.
+* Fixed whitespace control, `lstrip_blocks` and the end of line statements in Go only handling ASCII whitespace.  Like in Rust they now handle all Unicode whitespace.  Syntax errors about unexpected characters now show the character rather than its first byte.
 
 ## 3.0.0
 
