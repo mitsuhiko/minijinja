@@ -4,6 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Added the `default` and `base` arguments to the `int` filter and the `default` argument to the `float` filter for Jinja2 compatibility in Rust and Go.  If a default is given, it is returned for values that cannot be converted and for none instead of failing.  In Go both filters now also reject undefined values with strict undefined behavior like in Rust.  #962
 * Fixed the `format` filter ignoring keyword arguments in Go.  Like in Rust they are passed as a trailing mapping and fill `%(name)s` specs.
 * Fixed whitespace control, `lstrip_blocks` and the end of line statements in Go only handling ASCII whitespace.  Like in Rust they now handle all Unicode whitespace.  Syntax errors about unexpected characters now show the character rather than its first byte.
 
