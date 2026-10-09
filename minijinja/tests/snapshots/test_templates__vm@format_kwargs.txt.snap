@@ -1,0 +1,10 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "named: {{ \"%(a)s-%(b)s\"|format(a=1, b=\"x\") }}\nspec: {{ \"%(n)05.1f\"|format(n=2.25) }}\nmapping: {{ \"%s\"|format(a=1) }}\nsafe: {{ (\"<%(a)s>\"|safe)|format(a=\"&\") }}"
+info: {}
+input_file: minijinja/tests/inputs/format_kwargs.txt
+---
+named: 1-x
+spec: 002.2
+mapping: {'a': 1}
+safe: <&amp;>
