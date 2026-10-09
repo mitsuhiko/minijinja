@@ -1,0 +1,6 @@
+{}
+---
+default: {{ "n/a"|int(7) }}, {{ "n/a"|int(default=7) }}, {{ [1]|int(7) }}, {{ none|int(7) }}, {{ none|int }}
+base: {{ "ff"|int(0, 16) }}, {{ "0x1f"|int(base=16) }}, {{ "-0X1f"|int(base=16) }}, {{ "0b101"|int(base=2) }}, {{ "0o17"|int(base=8) }}, {{ "zz"|int(base=36) }}
+base fallback: {{ "42.7"|int(base=16) }}, {{ "1"|int(base=1) }}, {{ "1f"|int(0, base=10) }}
+float: {{ "n/a"|float(1.5) }}, {{ "n/a"|float(default=2) }}, {{ none|float(1.5) }}, {{ "2.5"|float(0.0) }}

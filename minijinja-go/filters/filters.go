@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -2164,9 +2165,11 @@ func FilterAbs(_ State, val value.Value, _ []value.Value, _ map[string]value.Val
 
 // FilterInt converts a value to an integer.
 //
-// String values are parsed as integers. Float values are truncated.
-// Boolean true becomes 1, false becomes 0. If conversion fails, an
-// error is returned.
+// String values are parsed as integers in the given base (10 by default).
+// For bases 2, 8 and 16 the string may carry a 0b, 0o or 0x prefix. Float
+// values are truncated. Boolean true becomes 1, false becomes 0. If
+// conversion fails and a default is given, the default is returned, otherwise
+// an error. None converts to the default or 0.
 //
 // Example:
 //
@@ -2177,15 +2180,30 @@ func FilterAbs(_ State, val value.Value, _ []value.Value, _ map[string]value.Val
 //
 //	{{ "42"|int }}
 //	  -> 42
-func FilterInt(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	if len(args) > 0 {
-		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
+//	{{ "0x1f"|int(base=16) }}
+//	  -> 31
+//	{{ "n/a"|int(default=0) }}
+//	  -> 0
+func FilterInt(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	params, err := numberFilterArgs(args, kwargs, "default", "base")
+	if err != nil {
+		return value.Undefined(), err
 	}
-	if len(kwargs) > 0 {
-		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
+	def, hasDefault := params["default"]
+	base := int64(10)
+	if b, ok := params["base"]; ok {
+		if base, ok = b.AsInt(); !ok {
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "base must be an integer")
+		}
 	}
 
 	if val.IsUndefined() || val.IsNone() {
+		if err := assertNotUndefined(state, val); err != nil {
+			return value.Undefined(), err
+		}
+		if hasDefault {
+			return def, nil
+		}
 		return value.FromInt(0), nil
 	}
 	if i, ok := val.AsInt(); ok {
@@ -2200,25 +2218,65 @@ func FilterInt(_ State, val value.Value, args []value.Value, kwargs map[string]v
 		}
 		return value.FromInt(0), nil
 	}
+
+	var convErr error
 	if s, ok := val.AsString(); ok {
-		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+		if i, ok := parseIntWithBase(s, base); ok {
 			return value.FromInt(i), nil
 		}
-		if f, err := strconv.ParseFloat(s, 64); err == nil {
+		f, err := strconv.ParseFloat(s, 64)
+		if err == nil {
 			return value.FromInt(int64(f)), nil
-		} else {
-			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, err.Error())
 		}
+		convErr = mjerrors.NewError(mjerrors.ErrInvalidOperation, err.Error())
+	} else {
+		convErr = mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("cannot convert %s to integer", val.Kind()))
 	}
+	if hasDefault {
+		return def, nil
+	}
+	return value.Undefined(), convErr
+}
 
-	return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("cannot convert %s to integer", val.Kind()))
+// parseIntWithBase parses an integer like Python's int(s, base) does, except
+// that underscores and surrounding whitespace are not accepted.
+func parseIntWithBase(s string, base int64) (int64, bool) {
+	prefix := ""
+	switch {
+	case base == 2:
+		prefix = "0b"
+	case base == 8:
+		prefix = "0o"
+	case base == 16:
+		prefix = "0x"
+	case base < 2 || base > 36:
+		return 0, false
+	}
+	sign := ""
+	digits := s
+	if rest, ok := strings.CutPrefix(digits, "-"); ok {
+		sign, digits = "-", rest
+	} else {
+		digits = strings.TrimPrefix(digits, "+")
+	}
+	if prefix != "" && len(digits) >= len(prefix) && strings.EqualFold(digits[:len(prefix)], prefix) {
+		digits = digits[len(prefix):]
+	}
+	// ParseInt accepts underscores only with base 0, but it would take a
+	// second sign
+	if strings.HasPrefix(digits, "+") || strings.HasPrefix(digits, "-") {
+		return 0, false
+	}
+	i, err := strconv.ParseInt(sign+digits, int(base), 64)
+	return i, err == nil
 }
 
 // FilterFloat converts a value to a float.
 //
 // String values are parsed as floats. Integer values are converted to floats.
-// Boolean true becomes 1.0, false becomes 0.0. If conversion fails, an
-// error is returned.
+// Boolean true becomes 1.0, false becomes 0.0. If conversion fails and a
+// default is given, the default is returned, otherwise an error. None
+// converts to the default or 0.0.
 //
 // Example:
 //
@@ -2229,15 +2287,22 @@ func FilterInt(_ State, val value.Value, args []value.Value, kwargs map[string]v
 //
 //	{{ "42.5"|float }}
 //	  -> 42.5
-func FilterFloat(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	if len(args) > 0 {
-		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
+//	{{ "n/a"|float(default=0.0) }}
+//	  -> 0.0
+func FilterFloat(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	params, err := numberFilterArgs(args, kwargs, "default")
+	if err != nil {
+		return value.Undefined(), err
 	}
-	if len(kwargs) > 0 {
-		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
-	}
+	def, hasDefault := params["default"]
 
 	if val.IsUndefined() || val.IsNone() {
+		if err := assertNotUndefined(state, val); err != nil {
+			return value.Undefined(), err
+		}
+		if hasDefault {
+			return def, nil
+		}
 		return value.FromFloat(0.0), nil
 	}
 	if f, ok := val.AsFloat(); ok {
@@ -2249,15 +2314,50 @@ func FilterFloat(_ State, val value.Value, args []value.Value, kwargs map[string
 		}
 		return value.FromFloat(0.0), nil
 	}
-	if s, ok := val.AsString(); ok {
-		if f, err := strconv.ParseFloat(s, 64); err == nil {
-			return value.FromFloat(f), nil
-		} else {
-			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, err.Error())
-		}
-	}
 
-	return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("cannot convert %s to float", val.Kind()))
+	var convErr error
+	if s, ok := val.AsString(); ok {
+		f, err := strconv.ParseFloat(s, 64)
+		if err == nil {
+			return value.FromFloat(f), nil
+		}
+		convErr = mjerrors.NewError(mjerrors.ErrInvalidOperation, err.Error())
+	} else {
+		convErr = mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("cannot convert %s to float", val.Kind()))
+	}
+	if hasDefault {
+		return def, nil
+	}
+	return value.Undefined(), convErr
+}
+
+// numberFilterArgs maps the arguments of int and float to their parameter
+// names. Each parameter can be passed positionally or by keyword.
+func numberFilterArgs(args []value.Value, kwargs map[string]value.Value, names ...string) (map[string]value.Value, error) {
+	if len(args) > len(names) {
+		return nil, mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
+	}
+	params := make(map[string]value.Value, len(names))
+	for i, arg := range args {
+		params[names[i]] = arg
+	}
+	for name, arg := range kwargs {
+		if _, given := params[name]; given || !slices.Contains(names, name) {
+			return nil, mjerrors.NewError(mjerrors.ErrTooManyArguments, fmt.Sprintf("unknown keyword argument '%s'", name))
+		}
+		params[name] = arg
+	}
+	return params, nil
+}
+
+// assertNotUndefined fails for undefined values with strict and semi-strict
+// undefined behavior.
+func assertNotUndefined(state State, val value.Value) error {
+	behavior := undefinedBehavior(state)
+	if (behavior == value.UndefinedStrict || behavior == value.UndefinedSemiStrict) && val.IsUndefined() && !val.IsSilentUndefined() {
+		return mjerrors.NewError(mjerrors.ErrUndefinedVar, "undefined value")
+	}
+	return nil
 }
 
 func roundWithNegativePrecision(f float64, precision int) (float64, error) {
