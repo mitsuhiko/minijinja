@@ -168,11 +168,6 @@ These are related template engines for Rust:
 If you like the project and find it useful you can [become a
 sponsor](https://github.com/sponsors/mitsuhiko).
 
-## AI Use Disclaimer
-
-This codebase mostly predates LLM based code generation but some recent features
-have been built with support of AI.
-
 ## License and Links
 
 - [Documentation](https://docs.rs/minijinja/)
