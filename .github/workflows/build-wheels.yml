@@ -21,8 +21,8 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           architecture: x64
@@ -32,7 +32,7 @@ jobs:
         with:
           args: --release --strip --target universal2-apple-darwin --out dist -m minijinja-py/Cargo.toml
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-macos
           path: dist
@@ -46,8 +46,8 @@ jobs:
         target: [i686, x86_64, armv7l, aarch64]
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.10"
       - uses: dtolnay/rust-toolchain@stable
@@ -61,7 +61,7 @@ jobs:
           args: --release --strip --out dist -m minijinja-py/Cargo.toml --interpreter "3.10"
           manylinux: auto
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-linux-${{ matrix.target }}
           path: dist
@@ -75,8 +75,8 @@ jobs:
         target: [i686, x86_64, armv7l, aarch64]
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.10"
       - uses: dtolnay/rust-toolchain@stable
@@ -90,7 +90,7 @@ jobs:
           args: --release --strip --out dist -m minijinja-py/Cargo.toml --interpreter "3.10"
           manylinux: musllinux_1_2
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-linux-musl-${{ matrix.target }}
           path: dist
@@ -104,8 +104,8 @@ jobs:
         target: [x64, x86]
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.10"
           architecture: ${{ matrix.target }}
@@ -116,7 +116,7 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --strip --out dist -m minijinja-py/Cargo.toml
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-windows-${{ matrix.target }}
           path: dist
@@ -125,14 +125,14 @@ jobs:
     name: Source Distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
           args: --out dist -m minijinja-py/Cargo.toml
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wheels-sdist
           path: dist
@@ -150,10 +150,10 @@ jobs:
       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
     if: ${{ !github.event.pull_request && (github.event_name == 'push' || github.event.inputs.publish == 'true') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify release version
         run: ./scripts/verify-release.sh "$GITHUB_REF_NAME"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: wheels-*
           merge-multiple: true
