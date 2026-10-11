@@ -1,0 +1,22 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ \"42\"|int(nonsense=1) }}"
+info: {}
+input_file: minijinja/tests/inputs/err_int_unknown_kwarg.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: TooManyArguments,
+    detail: "unknown keyword argument 'nonsense'",
+    name: "err_int_unknown_kwarg.txt",
+    line: 1,
+}
+
+too many arguments: unknown keyword argument 'nonsense' (in err_int_unknown_kwarg.txt:1)
+-------------------------- err_int_unknown_kwarg.txt --------------------------
+   1 > {{ "42"|int(nonsense=1) }}
+     i         ^^^^^^^^^^^^^^^ too many arguments
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------

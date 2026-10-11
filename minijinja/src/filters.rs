@@ -697,67 +697,132 @@ mod builtins {
 
     /// Converts a value into an integer.
     ///
+    /// Strings are parsed in the given `base` (10 by default).  For bases 2, 8
+    /// and 16 the string may carry a `0b`, `0o` or `0x` prefix.  If the value
+    /// cannot be converted and a `default` is given, the default is returned
+    /// instead of an error.  `none` converts to the default or 0.
+    ///
     /// ```jinja
     /// {{ "42"|int == 42 }} -> true
+    /// {{ "0x1f"|int(base=16) }} -> 31
+    /// {{ "n/a"|int(default=0) }} -> 0
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn int(state: &State, value: &Value) -> Result<Value, Error> {
-        match &value.0 {
+    pub fn int(
+        state: &State,
+        value: &Value,
+        default: Option<Value>,
+        base: Option<u32>,
+        kwargs: Kwargs,
+    ) -> Result<Value, Error> {
+        let default = match default {
+            Some(default) => Some(default),
+            None => ok!(kwargs.get::<Option<Value>>("default")),
+        };
+        let base = match base {
+            Some(base) => base,
+            None => ok!(kwargs.get::<Option<u32>>("base")).unwrap_or(10),
+        };
+        ok!(kwargs.assert_all_used());
+
+        let rv = match &value.0 {
             ValueRepr::Undefined(..) | ValueRepr::None => {
                 ok!(state.undefined_behavior().assert_value_not_undefined(value));
-                Ok(Value::from(0))
+                return Ok(default.unwrap_or(Value::from(0)));
             }
-            ValueRepr::Bool(x) => Ok(Value::from(*x as u64)),
+            ValueRepr::Bool(x) => return Ok(Value::from(*x as u64)),
             ValueRepr::U64(_) | ValueRepr::I64(_) | ValueRepr::U128(_) | ValueRepr::I128(_) => {
-                Ok(value.clone())
+                return Ok(value.clone())
             }
-            ValueRepr::F64(v) => Ok(Value::from(*v as i128)),
+            ValueRepr::F64(v) => return Ok(Value::from(*v as i128)),
             ValueRepr::String(..) | ValueRepr::SmallStr(_) => {
                 let s = value.as_str().unwrap();
-                if let Ok(i) = s.parse::<i128>() {
-                    Ok(Value::from(i))
-                } else {
-                    match s.parse::<f64>() {
-                        Ok(f) => Ok(Value::from(f as i128)),
-                        Err(err) => Err(Error::new(ErrorKind::InvalidOperation, err.to_string())),
-                    }
+                if let Some(i) = parse_int(s, base) {
+                    return Ok(Value::from(i));
                 }
+                s.parse::<f64>()
+                    .map(|f| Value::from(f as i128))
+                    .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string()))
             }
             ValueRepr::Bytes(_) | ValueRepr::Object(_) => Err(Error::new(
                 ErrorKind::InvalidOperation,
                 format!("cannot convert {} to integer", value.kind()),
             )),
-            ValueRepr::Invalid(_) => value.clone().validate(),
+            ValueRepr::Invalid(_) => return value.clone().validate(),
+        };
+        rv.or_else(|err| default.ok_or(err))
+    }
+
+    /// Parses an integer like Python's `int(s, base)` does, except that
+    /// underscores and surrounding whitespace are not accepted.
+    fn parse_int(s: &str, base: u32) -> Option<i128> {
+        let prefix = match base {
+            2 => "0b",
+            8 => "0o",
+            16 => "0x",
+            3..=36 => "",
+            _ => return None,
+        };
+        let (negative, digits) = match s.strip_prefix('-') {
+            Some(rest) => (true, rest),
+            None => (false, s.strip_prefix('+').unwrap_or(s)),
+        };
+        let digits = match digits.get(..prefix.len()) {
+            Some(p) if !prefix.is_empty() && p.eq_ignore_ascii_case(prefix) => {
+                &digits[prefix.len()..]
+            }
+            _ => digits,
+        };
+        if digits.starts_with(['+', '-']) {
+            return None;
         }
+        let rv = i128::from_str_radix(digits, base).ok()?;
+        Some(if negative { -rv } else { rv })
     }
 
     /// Converts a value into a float.
     ///
+    /// If the value cannot be converted and a `default` is given, the default
+    /// is returned instead of an error.  `none` converts to the default or 0.0.
+    ///
     /// ```jinja
     /// {{ "42.5"|float == 42.5 }} -> true
+    /// {{ "n/a"|float(default=0.0) }} -> 0.0
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn float(state: &State, value: &Value) -> Result<Value, Error> {
-        match &value.0 {
+    pub fn float(
+        state: &State,
+        value: &Value,
+        default: Option<Value>,
+        kwargs: Kwargs,
+    ) -> Result<Value, Error> {
+        let default = match default {
+            Some(default) => Some(default),
+            None => ok!(kwargs.get::<Option<Value>>("default")),
+        };
+        ok!(kwargs.assert_all_used());
+
+        let rv = match &value.0 {
             ValueRepr::Undefined(..) | ValueRepr::None => {
                 ok!(state.undefined_behavior().assert_value_not_undefined(value));
-                Ok(Value::from(0.0))
+                return Ok(default.unwrap_or(Value::from(0.0)));
             }
-            ValueRepr::Bool(x) => Ok(Value::from(*x as u64 as f64)),
+            ValueRepr::Bool(x) => return Ok(Value::from(*x as u64 as f64)),
             ValueRepr::String(..) | ValueRepr::SmallStr(_) => value
                 .as_str()
                 .unwrap()
                 .parse::<f64>()
                 .map(Value::from)
                 .map_err(|err| Error::new(ErrorKind::InvalidOperation, err.to_string())),
-            ValueRepr::Invalid(_) => value.clone().validate(),
+            ValueRepr::Invalid(_) => return value.clone().validate(),
             _ => as_f64(value, true).map(Value::from).ok_or_else(|| {
                 Error::new(
                     ErrorKind::InvalidOperation,
                     format!("cannot convert {} to float", value.kind()),
                 )
             }),
-        }
+        };
+        rv.or_else(|err| default.ok_or(err))
     }
 
     /// Sums up all the values in a sequence.
