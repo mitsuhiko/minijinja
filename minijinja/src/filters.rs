@@ -1042,44 +1042,66 @@ mod builtins {
 
     /// Returns the smallest item from an iterable.
     ///
+    /// The filter accepts a few keyword arguments:
+    ///
+    /// * `case_sensitive`: set to `true` to compare strings case sensitively.
+    /// * `attribute`: can be set to an attribute or dotted path to compare by
+    ///   that attribute.  The whole item is returned.
+    ///
     /// ```jinja
     /// {{ [1, 2, 3, 4]|min }} -> 1
+    /// {{ users|min(attribute="age") }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn min(state: &State, value: Value) -> Result<Value, Error> {
-        let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
-            Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
-        }));
+    pub fn min(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
         // like `Iterator::min` this returns the first of equal minimums
-        let mut rv = None::<Value>;
-        for item in iter {
-            ok!(item.check());
-            if rv.as_ref().map_or(true, |rv| item < *rv) {
-                rv = Some(item);
-            }
-        }
-        Ok(rv.unwrap_or(Value::UNDEFINED))
+        min_max(state, value, kwargs, |ordering| ordering == Ordering::Less)
     }
 
     /// Returns the largest item from an iterable.
     ///
+    /// The filter accepts a few keyword arguments:
+    ///
+    /// * `case_sensitive`: set to `true` to compare strings case sensitively.
+    /// * `attribute`: can be set to an attribute or dotted path to compare by
+    ///   that attribute.  The whole item is returned.
+    ///
     /// ```jinja
     /// {{ [1, 2, 3, 4]|max }} -> 4
+    /// {{ users|max(attribute="age") }}
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn max(state: &State, value: Value) -> Result<Value, Error> {
+    pub fn max(state: &State, value: Value, kwargs: Kwargs) -> Result<Value, Error> {
+        // like `Iterator::max` this returns the last of equal maximums
+        min_max(state, value, kwargs, |ordering| ordering != Ordering::Less)
+    }
+
+    fn min_max(
+        state: &State,
+        value: Value,
+        kwargs: Kwargs,
+        replaces: fn(Ordering) -> bool,
+    ) -> Result<Value, Error> {
         let iter = ok!(state.undefined_behavior().try_iter(value).map_err(|err| {
             Error::new(ErrorKind::InvalidOperation, "cannot convert value to list").with_source(err)
         }));
-        // like `Iterator::max` this returns the last of equal maximums
-        let mut rv = None::<Value>;
+        let case_sensitive = ok!(kwargs.get::<Option<bool>>("case_sensitive")).unwrap_or(false);
+        let attr = ok!(kwargs.get::<Option<&str>>("attribute"));
+        let mut rv = None::<(Value, Value)>;
         for item in iter {
             ok!(item.check());
-            if rv.as_ref().map_or(true, |rv| item >= *rv) {
-                rv = Some(item);
+            let key = match attr {
+                Some(attr) => item.get_path_or_default(attr, &Value::UNDEFINED),
+                None => item.clone(),
+            };
+            if rv.as_ref().map_or(true, |(rv_key, _)| {
+                replaces(cmp_helper(&key, rv_key, case_sensitive, false))
+            }) {
+                rv = Some((key, item));
             }
         }
-        Ok(rv.unwrap_or(Value::UNDEFINED))
+        ok!(kwargs.assert_all_used());
+        Ok(rv.map_or(Value::UNDEFINED, |(_, item)| item))
     }
 
     /// Returns the sorted version of the given list.

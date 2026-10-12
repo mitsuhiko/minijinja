@@ -74,6 +74,12 @@ last-word: {{ word|last }}
 last-undefined: {{ []|first is undefined }}
 min: {{ other_list|min }}
 max: {{ other_list|max }}
+min-case-insensitive: {{ ["b", "P", "n"]|min }}
+max-case-insensitive: {{ ["b", "P", "n"]|max }}
+min-case-sensitive: {{ ["b", "P", "n"]|min(case_sensitive=true) }}
+max-case-sensitive: {{ ["b", "P", "n"]|max(case_sensitive=true) }}
+min-attribute: {{ objects|min(attribute="name") }}
+max-attribute: {{ objects|max(attribute="name") }}
 sort: {{ other_list|sort }}
 sort-reverse: {{ other_list|sort(reverse=true) }}
 sort-case-insensitive: {{ ["B", "a", "C", "z"]|sort }}
