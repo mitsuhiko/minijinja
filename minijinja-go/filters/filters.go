@@ -1264,8 +1264,8 @@ func FilterMax(_ State, val value.Value, _ []value.Value, kwargs map[string]valu
 	return minMax(val, kwargs, 1), nil
 }
 
-// minMax returns the first item whose key compares to every other key with
-// the sign of want (-1 for min, 1 for max).
+// minMax returns the smallest or largest item by key (-1 for min, 1 for max).
+// The first item is returned when multiple items have equal keys.
 func minMax(val value.Value, kwargs map[string]value.Value, want int) value.Value {
 	items := val.Iter()
 	if len(items) == 0 {
@@ -1300,7 +1300,7 @@ func minMax(val value.Value, kwargs map[string]value.Value, want int) value.Valu
 	best, bestKey := items[0], key(items[0])
 	for _, item := range items[1:] {
 		k := key(item)
-		if cmp, ok := k.Compare(bestKey); ok && cmp == want {
+		if cmp, ok := k.Compare(bestKey); ok && ((want < 0 && cmp < 0) || (want > 0 && cmp > 0)) {
 			best, bestKey = item, k
 		}
 	}
