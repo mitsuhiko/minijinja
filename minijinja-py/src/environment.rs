@@ -155,12 +155,22 @@ pub struct Environment {
     pycompat: Arc<AtomicBool>,
 }
 
+fn py_length(v: &Value) -> Result<usize, Error> {
+    if let Some(py_obj) = v.downcast_object_ref::<DynamicObject>() {
+        py_obj.calculate_length(v)
+    } else {
+        minijinja::filters::length(v)
+    }
+}
+
 #[pymethods]
 impl Environment {
     #[new]
     fn py_new() -> PyResult<Self> {
         let mut env = minijinja::Environment::new();
         minijinja_contrib::add_to_environment(&mut env);
+        env.add_filter("length", py_length);
+        env.add_filter("count", py_length);
 
         let pycompat = Arc::new(AtomicBool::new(false));
         let pycompat_weak = Arc::downgrade(&pycompat);
