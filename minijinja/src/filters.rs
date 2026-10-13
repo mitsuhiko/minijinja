@@ -1088,16 +1088,20 @@ mod builtins {
     ///
     /// * `case_sensitive`: set to `true` to make the sorting of strings case sensitive.
     /// * `attribute`: can be set to an attribute or dotted path to sort by that attribute.
+    ///   Numeric path segments index into sequences, so `"1"` sorts a list of
+    ///   pairs by their second item and `"1.name"` sorts by the `name` of it.
     ///   can be a comma-separated list of attributes forming a composite key like "age, name".
     /// * `reverse`: set to `true` to sort in reverse.
     ///
     /// ```jinja
-    /// {{ [1, 3, 2, 4]|sort }} -> [4, 3, 2, 1]
-    /// {{ [1, 3, 2, 4]|sort(reverse=true) }} -> [1, 2, 3, 4]
-    /// # Sort users by age attribute in descending order.
-    /// {{ users|sort(attribute="age") }}
+    /// {{ [1, 3, 2, 4]|sort }} -> [1, 2, 3, 4]
+    /// {{ [1, 3, 2, 4]|sort(reverse=true) }} -> [4, 3, 2, 1]
     /// # Sort users by age attribute in ascending order.
+    /// {{ users|sort(attribute="age") }}
+    /// # Sort users by age attribute in descending order.
     /// {{ users|sort(attribute="age", reverse=true) }}
+    /// # Sort (key, user) pairs by the user's name.
+    /// {{ pairs|sort(attribute="1.name") }}
     /// # Sort cities by their name, and sort those with the same name by their state.
     /// {{ cities|sort(attribute="name, state") }}
     /// ```
