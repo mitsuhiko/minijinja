@@ -1224,6 +1224,10 @@ func FilterUnique(_ State, val value.Value, _ []value.Value, kwargs map[string]v
 //
 // If the iterable is empty, undefined is returned.
 //
+// Keyword arguments:
+//   - case_sensitive: set to true to compare strings case-sensitively (default: false)
+//   - attribute: compare by this attribute or dotted path; the whole item is returned
+//
 // Example:
 //
 //	env := minijinja.NewEnvironment()
@@ -1233,24 +1237,18 @@ func FilterUnique(_ State, val value.Value, _ []value.Value, kwargs map[string]v
 //
 //	{{ [1, 2, 3, 4]|min }}
 //	  -> 1
-func FilterMin(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
-	if items == nil || len(items) == 0 {
-		return value.Undefined(), nil
-	}
-
-	minVal := items[0]
-	for _, item := range items[1:] {
-		if cmp, ok := item.Compare(minVal); ok && cmp < 0 {
-			minVal = item
-		}
-	}
-	return minVal, nil
+//	{{ users|min(attribute="age") }}
+func FilterMin(_ State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	return minMax(val, kwargs, -1), nil
 }
 
 // FilterMax returns the largest item from an iterable.
 //
 // If the iterable is empty, undefined is returned.
+//
+// Keyword arguments:
+//   - case_sensitive: set to true to compare strings case-sensitively (default: false)
+//   - attribute: compare by this attribute or dotted path; the whole item is returned
 //
 // Example:
 //
@@ -1261,19 +1259,52 @@ func FilterMin(_ State, val value.Value, _ []value.Value, _ map[string]value.Val
 //
 //	{{ [1, 2, 3, 4]|max }}
 //	  -> 4
-func FilterMax(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+//	{{ users|max(attribute="age") }}
+func FilterMax(_ State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	return minMax(val, kwargs, 1), nil
+}
+
+// minMax returns the smallest or largest item by key (-1 for min, 1 for max).
+// The first item is returned when multiple items have equal keys.
+func minMax(val value.Value, kwargs map[string]value.Value, want int) value.Value {
 	items := val.Iter()
-	if items == nil || len(items) == 0 {
-		return value.Undefined(), nil
+	if len(items) == 0 {
+		return value.Undefined()
 	}
 
-	maxVal := items[0]
-	for _, item := range items[1:] {
-		if cmp, ok := item.Compare(maxVal); ok && cmp > 0 {
-			maxVal = item
+	caseSensitive := false
+	if cs, ok := kwargs["case_sensitive"]; ok {
+		if b, ok := cs.AsBool(); ok {
+			caseSensitive = b
 		}
 	}
-	return maxVal, nil
+	var attrName string
+	if attr, ok := kwargs["attribute"]; ok {
+		if s, ok := attr.AsString(); ok {
+			attrName = s
+		}
+	}
+
+	key := func(v value.Value) value.Value {
+		if attrName != "" {
+			v = getDeepAttr(v, attrName)
+		}
+		if !caseSensitive {
+			if s, ok := v.AsString(); ok {
+				return value.FromString(strings.ToLower(s))
+			}
+		}
+		return v
+	}
+
+	best, bestKey := items[0], key(items[0])
+	for _, item := range items[1:] {
+		k := key(item)
+		if cmp, ok := k.Compare(bestKey); ok && ((want < 0 && cmp < 0) || (want > 0 && cmp > 0)) {
+			best, bestKey = item, k
+		}
+	}
+	return best
 }
 
 // FilterSum sums up all numeric values in an iterable.
