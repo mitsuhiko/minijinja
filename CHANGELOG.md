@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## Unreleased
 
 * The `min` and `max` filters now compare strings case-insensitively by default and accept the `case_sensitive` and `attribute` arguments for Jinja2 compatibility in Rust and Go.  Previously `["b", "P", "n"]|max` returned `n` where Jinja2 returns `P`, and passing either argument failed with too many arguments.
+* Added the `method` argument to the `round` filter for Jinja2 compatibility in Rust and Go.  It takes `common` (the default), `ceil` or `floor`, and both `precision` and `method` can now be passed as keyword arguments.  Integers are now rounded to a negative precision like in Jinja2, so `15|round(-1)` is `20` rather than `15`.  #962
 * Added the `default` and `base` arguments to the `int` filter and the `default` argument to the `float` filter for Jinja2 compatibility in Rust and Go.  If a default is given, it is returned for values that cannot be converted and for none instead of failing.  In Go both filters now also reject undefined values with strict undefined behavior like in Rust.  #962
 * Fixed the `format` filter ignoring keyword arguments in Go.  Like in Rust they are passed as a trailing mapping and fill `%(name)s` specs.
 * Fixed whitespace control, `lstrip_blocks` and the end of line statements in Go only handling ASCII whitespace.  Like in Rust they now handle all Unicode whitespace.  Syntax errors about unexpected characters now show the character rather than its first byte.
