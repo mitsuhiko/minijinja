@@ -1,0 +1,11 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "ceil: {{ 2.1|round(method=\"ceil\") }}, {{ -2.5|round(method=\"ceil\") }}, {{ -0.4|round(method=\"ceil\") }}, {{ 1.001|round(2, \"ceil\") }}, {{ 1234.5|round(-2, \"ceil\") }}\nfloor: {{ 2.19|round(1, \"floor\") }}, {{ 2.3|round(1, \"floor\") }}, {{ -2.5|round(method=\"floor\") }}, {{ 1299.9|round(-2, \"floor\") }}\nkwargs: {{ 1.5|round(precision=0) }}, {{ 42.55|round(precision=1, method=\"floor\") }}, {{ 2.5|round(method=\"common\") }}, {{ 2.55|round(1, method=\"ceil\") }}\nint: {{ 15|round(-1) }}, {{ 25|round(-1) }}, {{ 35|round(-1) }}, {{ -15|round(-1) }}, {{ 1250|round(-2) }}, {{ 1251|round(-2) }}, {{ 7|round(-50) }}\nint method: {{ 5|round(2) }}, {{ 5|round(method=\"ceil\") }}, {{ 11|round(-1, \"ceil\") }}, {{ 11|round(-1, \"floor\") }}, {{ -11|round(-1, \"floor\") }}"
+info: {}
+input_file: minijinja/tests/inputs/round_method.txt
+---
+ceil: 3.0, -2.0, 0.0, 1.01, 1300.0
+floor: 2.1, 2.3, -3.0, 1200.0
+kwargs: 2.0, 42.5, 2.0, 2.6
+int: 20, 20, 40, -20, 1200, 1300, 0
+int method: 5, 5, 20, 10, -20
