@@ -17,6 +17,11 @@ from minijinja import (
 )
 
 
+requires_threads = pytest.mark.skipif(
+    sys.platform == "emscripten", reason="threads are not supported"
+)
+
+
 class catch_unraisable_exception:
     def __init__(self) -> None:
         self.unraisable = None
@@ -505,6 +510,7 @@ def test_fucked_up_object():
         env.eval_expr("values|sort", values=values)
 
 
+@requires_threads
 def test_threading_interactions():
     from time import time
     from concurrent.futures import ThreadPoolExecutor
@@ -528,6 +534,7 @@ def test_threading_interactions():
     assert done == ["something"] * 4
 
 
+@requires_threads
 def test_configure_while_rendering():
     import threading
     from concurrent.futures import ThreadPoolExecutor

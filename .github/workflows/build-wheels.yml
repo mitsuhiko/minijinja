@@ -121,6 +121,50 @@ jobs:
           name: wheels-windows-${{ matrix.target }}
           path: dist
 
+  pyodide:
+    name: Pyodide Wheels (${{ matrix.pyodide }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # One wheel per Pyodide ABI (pyemscripten_2025_0, pyemscripten_2026_0).
+        # The host Python must match the Python of the Pyodide release.
+        include:
+          - pyodide: "0.29.5"
+            python: "3.13"
+          - pyodide: "314.0.7"
+            python: "3.14"
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+      - name: Install pyodide-build
+        run: |
+          pip install pyodide-build
+          pyodide xbuildenv install ${{ matrix.pyodide }}
+          pyodide xbuildenv install-emscripten
+          echo "RUSTUP_TOOLCHAIN=$(./scripts/setup-pyodide-rust.sh)" >> "$GITHUB_ENV"
+      - name: Build wheel
+        run: |
+          source "$(pyodide config get emsdk_dir)/emsdk_env.sh"
+          pyodide build minijinja-py -o dist
+      - name: Test wheel
+        run: |
+          pyodide venv .venv-pyodide
+          .venv-pyodide/bin/pip install dist/*.whl pytest
+          cd minijinja-py
+          ../.venv-pyodide/bin/python -m pytest tests
+      - name: Upload wheels
+        uses: actions/upload-artifact@v7
+        with:
+          name: wheels-pyodide-${{ matrix.pyodide }}
+          path: dist
+
   sdist:
     name: Source Distribution
     runs-on: ubuntu-latest
@@ -146,6 +190,7 @@ jobs:
       - linux
       - linux-musl
       - macos
+      - pyodide
     env:
       MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
     if: ${{ !github.event.pull_request && (github.event_name == 'push' || github.event.inputs.publish == 'true') }}
