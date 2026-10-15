@@ -864,6 +864,13 @@ mod builtins {
         value.get_item(key)
     }
 
+    fn round_too_large() -> Error {
+        Error::new(
+            ErrorKind::InvalidOperation,
+            "rounded value is too large to represent",
+        )
+    }
+
     fn round_with_negative_precision(value: f64, precision: i32) -> Result<f64, Error> {
         if !value.is_finite() {
             return Ok(value);
@@ -929,31 +936,116 @@ mod builtins {
         .parse::<f64>()
         .map_err(|_| Error::new(ErrorKind::InvalidOperation, "unable to round value"))?;
         if rounded.is_infinite() {
-            return Err(Error::new(
-                ErrorKind::InvalidOperation,
-                "rounded value is too large to represent",
-            ));
+            return Err(round_too_large());
         }
         Ok(rounded)
     }
 
+    /// Rounds a float with `ceil` or `floor` like Jinja2 does: the value is
+    /// scaled by `10^precision`, rounded to an integer and scaled back.
+    fn round_directed(value: f64, precision: i32, ceil: bool) -> Result<f64, Error> {
+        if !value.is_finite() {
+            return Ok(value);
+        }
+        let factor = format!("1e{precision}").parse::<f64>().unwrap();
+        let scaled = value * factor;
+        if scaled.is_infinite() {
+            // the value has no digits at this precision
+            return Ok(value);
+        }
+        let rounded = if ceil { scaled.ceil() } else { scaled.floor() };
+        // adding 0.0 turns -0.0 into 0.0 like Python's integer result does
+        let rv = (rounded + 0.0) / factor;
+        if !rv.is_finite() {
+            return Err(round_too_large());
+        }
+        Ok(rv)
+    }
+
+    /// Rounds an integer to a negative precision, that is to a multiple of
+    /// `10^-precision`.
+    fn round_int(value: i128, precision: i32, method: &str) -> Result<i128, Error> {
+        let Some(factor) = 10i128.checked_pow(precision.unsigned_abs()) else {
+            // the factor is larger than any integer, so only zero is in reach
+            return match method {
+                "ceil" if value > 0 => Err(round_too_large()),
+                "floor" if value < 0 => Err(round_too_large()),
+                _ => Ok(0),
+            };
+        };
+        let quotient = value.div_euclid(factor);
+        let remainder = value.rem_euclid(factor);
+        let round_up = match method {
+            "ceil" => remainder > 0,
+            "floor" => false,
+            // round half to even like Python's round()
+            _ => {
+                remainder > factor - remainder
+                    || (remainder == factor - remainder && quotient % 2 != 0)
+            }
+        };
+        (quotient + round_up as i128)
+            .checked_mul(factor)
+            .ok_or_else(round_too_large)
+    }
+
     /// Round the number to a given precision.
     ///
-    /// Round the number to a given precision. The first parameter specifies the
-    /// precision (default is 0).
+    /// The first parameter specifies the precision (default is 0), the second
+    /// the rounding method:
+    ///
+    /// - `common` rounds half to even (default)
+    /// - `ceil` always rounds up
+    /// - `floor` always rounds down
+    ///
+    /// Both can also be passed as keyword arguments.  Integers are returned
+    /// unchanged unless the precision is negative.
     ///
     /// ```jinja
     /// {{ 42.55|round }}
     ///   -> 43.0
+    /// {{ 42.55|round(1, "floor") }}
+    ///   -> 42.5
+    /// {{ 42.15|round(method="ceil") }}
+    ///   -> 43.0
+    /// {{ 1234|round(-2) }}
+    ///   -> 1200
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
-    pub fn round(value: Value, precision: Option<i32>) -> Result<Value, Error> {
+    pub fn round(
+        value: Value,
+        precision: Option<i32>,
+        method: Option<&str>,
+        kwargs: Kwargs,
+    ) -> Result<Value, Error> {
+        let precision = match precision {
+            Some(precision) => precision,
+            None => ok!(kwargs.get::<Option<i32>>("precision")).unwrap_or(0),
+        };
+        let method = match method {
+            Some(method) => method,
+            None => ok!(kwargs.get::<Option<&str>>("method")).unwrap_or("common"),
+        };
+        ok!(kwargs.assert_all_used());
+        if !matches!(method, "common" | "ceil" | "floor") {
+            return Err(Error::new(
+                ErrorKind::InvalidOperation,
+                "method must be common, ceil or floor",
+            ));
+        }
+
         match value.0 {
             ValueRepr::I64(_) | ValueRepr::I128(_) | ValueRepr::U64(_) | ValueRepr::U128(_) => {
-                Ok(value)
+                if precision >= 0 {
+                    return Ok(value);
+                }
+                let val = ok!(i128::try_from(value));
+                round_int(val, precision, method).map(Value::from)
+            }
+            ValueRepr::F64(val) if method != "common" => {
+                round_directed(val, precision, method == "ceil").map(Value::from)
             }
             ValueRepr::F64(val) => {
-                let precision = precision.unwrap_or(0);
                 let rounded = if precision >= 0 {
                     // Formatting uses round-half-even and, unlike scaling the
                     // value first, preserves the same decimal behavior as Python.
