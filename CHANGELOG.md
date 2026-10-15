@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 3.0.1
 
 * The Python package is now also published as Pyodide wheels (PEP 783 `pyemscripten` platform tag) for Pyodide 0.29 and 314 so it can be installed with `micropip`.
 * The `min` and `max` filters now compare strings case-insensitively by default and accept the `case_sensitive` and `attribute` arguments for Jinja2 compatibility in Rust and Go.  Previously `["b", "P", "n"]|max` returned `n` where Jinja2 returns `P`, and passing either argument failed with too many arguments.
