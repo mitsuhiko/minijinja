@@ -105,6 +105,8 @@ indent-kwargs-first: {{ "foo\nbar\nbaz"|indent(4, first=true)|tojson }}
 indent-kwargs-blank: {{ "foo\nbar\n\nbaz"|indent(4, first=false, blank=true)|tojson }}
 indent-kwargs-all: {{ "foo\nbar\n\nbaz"|indent(width=2, first=true, blank=true)|tojson }}
 indent-default: {{ "foo\nbar\nbaz"|indent|tojson }}
+indent-crlf: {{ "foo\r\n\r\nbar"|indent(2)|tojson }}
+indent-crlf-blank: {{ "foo\r\n\r\nbar"|indent(2, blank=true)|tojson }}
 int-abs: {{ -42|abs }}
 float-abs: {{ -42.5|abs }}
 int-round: {{ 42|round }}
