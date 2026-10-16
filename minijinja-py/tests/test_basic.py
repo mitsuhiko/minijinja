@@ -456,8 +456,7 @@ def test_undeclared_variables():
 
 def test_loop_controls():
     env = Environment()
-    rv = env.render_str(
-        """
+    rv = env.render_str("""
     {% for x in [1, 2, 3, 4, 5] %}
       {% if x == 1 %}
         {% continue %}
@@ -466,8 +465,7 @@ def test_loop_controls():
       {% endif %}
       {{ x }}
     {% endfor %}
-    """
-    )
+    """)
     assert rv.split() == ["2"]
 
 
@@ -765,3 +763,331 @@ def test_method_pass_state():
 
     env = Environment()
     assert env.render_str("{{ obj.method(42) }}", "tmpl", obj=Obj()) == "tmpl:42"
+
+
+def test_early_break_crosscall_exception_isolation():
+    class BrokenAfterTwo:
+        def __init__(self):
+            self.n = 0
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            self.n += 1
+            if self.n <= 2:
+                return self.n
+            raise RuntimeError("sentinel-leak-error")
+
+    e = Environment()
+    rendered = e.render_str(
+        "{% for x in seq %}{{ x }}{% break %}{% endfor %}", seq=BrokenAfterTwo()
+    )
+    assert rendered == "1"
+
+    with pytest.raises(TemplateError) as exc_info:
+        e.render_str("{{ ) }}")
+    assert "syntax error" in str(exc_info.value)
+
+
+def test_early_break_samecall_runtime_error_isolation():
+    class BrokenAfterTwo:
+        def __init__(self):
+            self.n = 0
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            self.n += 1
+            if self.n <= 2:
+                return self.n
+            raise RuntimeError("sentinel-leak-error")
+
+    e = Environment()
+    with pytest.raises(TemplateError) as exc_info:
+        e.render_str(
+            "{% for x in seq %}{{ x }}{% break %}{% endfor %}{{ 1 / 0 }}",
+            seq=BrokenAfterTwo(),
+        )
+    assert "unable to calculate 1 / 0" in str(exc_info.value)
+
+
+def test_early_break_samecall_ordinary_object_length_isolation():
+    class BrokenAfterTwo:
+        def __init__(self):
+            self.n = 0
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            self.n += 1
+            if self.n <= 2:
+                return self.n
+            raise RuntimeError("sentinel-leak-error")
+
+    class PlainWithoutLen:
+        pass
+
+    e = Environment()
+    with pytest.raises(TemplateError) as exc_info:
+        e.render_str(
+            "{% for x in seq %}{{ x }}{% break %}{% endfor %}{{ plain|length }}",
+            seq=BrokenAfterTwo(),
+            plain=PlainWithoutLen(),
+        )
+    assert "cannot calculate length of value of type plain object" in str(
+        exc_info.value
+    )
+
+
+def test_reentrancy_error_isolation_adjacency():
+    calls = []
+
+    def inner_render(val):
+        calls.append("inner_called")
+        e_inner = Environment()
+        try:
+            e_inner.render_str("{{ ) }}")
+        except TemplateError:
+            calls.append("caught_inner_syntax_error")
+        raise ValueError("callback-raised-after-inner-syntax")
+
+    e_outer = Environment(filters={"inner_render": inner_render})
+    with pytest.raises(ValueError, match="callback-raised-after-inner-syntax"):
+        e_outer.render_str("{{ 'hello'|inner_render }}")
+
+    assert calls == ["inner_called", "caught_inner_syntax_error"]
+
+    with pytest.raises(TemplateError) as exc_info:
+        e_outer.render_str("{{ ) }}")
+    assert "syntax error" in str(exc_info.value)
+
+
+def test_exception_traceback_and_identity_preservation():
+    import traceback
+
+    sentinel = KeyError("traceback-identity-canary")
+
+    def failing_target():
+        raise sentinel
+
+    class BrokenIter:
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            failing_target()
+
+    e = Environment()
+    with pytest.raises(KeyError) as exc_info:
+        e.render_str("{% for x in items %}{{ x }}{% endfor %}", items=BrokenIter())
+
+    assert exc_info.value is sentinel
+    tb_str = "".join(traceback.format_tb(exc_info.value.__traceback__))
+    assert "failing_target" in tb_str
+
+
+def test_eval_expr_error_isolation():
+    class BrokenAfterTwo:
+        def __init__(self):
+            self.n = 0
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            self.n += 1
+            if self.n <= 2:
+                return self.n
+            raise RuntimeError("sentinel-leak-error")
+
+    e = Environment()
+    rendered = e.render_str(
+        "{% for x in seq %}{{ x }}{% break %}{% endfor %}", seq=BrokenAfterTwo()
+    )
+    assert rendered == "1"
+
+    with pytest.raises(TemplateError) as exc_info:
+        e.eval_expr("1 + 'string'")
+    assert "tried to use + operator on unsupported types" in str(exc_info.value)
+
+
+def test_loader_error_ownership():
+    def failing_loader(name):
+        if name == "broken.html":
+            raise PermissionError("loader-access-denied")
+        return None
+
+    e = Environment(loader=failing_loader)
+    with pytest.raises(PermissionError, match="loader-access-denied"):
+        e.render_template("broken.html")
+
+    with pytest.raises(TemplateError) as exc_info:
+        e.render_str("{{ ) }}")
+    assert "syntax error" in str(exc_info.value)
+
+
+def test_getattr_error_ownership():
+    class CustomObj:
+        def __getattr__(self, name):
+            raise ValueError("attribute-unavailable")
+
+    e = Environment()
+    with pytest.raises(ValueError, match="attribute-unavailable"):
+        e.render_str("{{ obj.missing }}", obj=CustomObj())
+
+    with pytest.raises(TemplateError) as exc_info:
+        e.render_str("{{ ) }}")
+    assert "syntax error" in str(exc_info.value)
+
+
+def test_len_only_plain_object():
+    class LenOnly:
+        def __len__(self):
+            return 7
+
+    env = Environment()
+    with pytest.raises(TemplateError) as exc_info:
+        env.render_str("{{ obj|length }}", obj=LenOnly())
+    assert "cannot calculate length of value of type plain object" in str(
+        exc_info.value
+    )
+
+
+def test_sized_iterable_length_enumeration():
+    class SizedIter:
+        def __len__(self):
+            return 99
+
+        def __iter__(self):
+            return iter([1, 2])
+
+    env = Environment()
+    assert env.render_str("{{ obj|length }}", obj=SizedIter()) == "2"
+
+
+def test_sized_iterable_failure_propagation():
+    class SizedFailingIter:
+        def __len__(self):
+            return 10
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            raise ValueError("sentinel-iteration-failure")
+
+    env = Environment()
+    with pytest.raises(ValueError, match="sentinel-iteration-failure"):
+        env.render_str("{{ obj|length }}", obj=SizedFailingIter())
+
+
+def test_iter_single_call_count():
+    iter_calls = 0
+
+    class CountedIter:
+        def __iter__(self):
+            nonlocal iter_calls
+            iter_calls += 1
+            return iter([10, 20, 30])
+
+    env = Environment()
+    assert env.render_str("{{ obj|length }}", obj=CountedIter()) == "3"
+    assert iter_calls == 1
+
+
+def test_flaky_seq_first_type_error_single_call():
+    from collections.abc import Sequence
+
+    class FlakySeq(Sequence):
+        def __init__(self):
+            self.calls = 0
+
+        def __len__(self):
+            self.calls += 1
+            if self.calls == 1:
+                raise TypeError("first-len-type-error")
+            return 7
+
+        def __getitem__(self, i):
+            if i >= 3:
+                raise IndexError(i)
+            return i
+
+    seq = FlakySeq()
+    e = Environment()
+    with pytest.raises(TemplateError) as exc_info:
+        e.render_str("{{ obj|length }}", obj=seq)
+    assert "cannot calculate length of value of type sequence" in str(exc_info.value)
+    assert seq.calls == 1
+
+
+def test_always_type_error_seq_single_call():
+    from collections.abc import Sequence
+
+    class AlwaysTypeErrorSeq(Sequence):
+        def __init__(self):
+            self.calls = 0
+
+        def __len__(self):
+            self.calls += 1
+            raise TypeError("always-len-type-error")
+
+        def __getitem__(self, i):
+            if i >= 3:
+                raise IndexError(i)
+            return i
+
+    seq = AlwaysTypeErrorSeq()
+    e = Environment()
+    with pytest.raises(TemplateError) as exc_info:
+        e.render_str("{{ obj|length }}", obj=seq)
+    assert "cannot calculate length of value of type sequence" in str(exc_info.value)
+    assert seq.calls == 1
+
+
+def test_seq_value_error_raises_template_error():
+    from collections.abc import Sequence
+
+    class ValueErrorSeq(Sequence):
+        def __init__(self):
+            self.calls = 0
+
+        def __len__(self):
+            self.calls += 1
+            raise ValueError("custom-value-error")
+
+        def __getitem__(self, i):
+            if i >= 3:
+                raise IndexError(i)
+            return i
+
+    seq = ValueErrorSeq()
+    e = Environment()
+    with pytest.raises(TemplateError) as exc_info:
+        e.render_str("{{ obj|length }}", obj=seq)
+    assert "cannot calculate length of value of type sequence" in str(exc_info.value)
+    assert seq.calls == 1
+
+
+def test_count_alias_and_user_override():
+    class MySeq:
+        def __len__(self):
+            return 5
+
+        def __getitem__(self, idx):
+            if idx >= 5:
+                raise IndexError(idx)
+            return idx
+
+    env = Environment()
+    assert env.render_str("{{ obj|count }}", obj=MySeq()) == "5"
+    assert env.render_str("{{ obj|length }}", obj=MySeq()) == "5"
+
+    env.add_filter("length", lambda x: 42)
+    assert env.render_str("{{ obj|length }}", obj=MySeq()) == "42"
+
+    env.add_filter("count", lambda x: 99)
+    assert env.render_str("{{ obj|count }}", obj=MySeq()) == "99"

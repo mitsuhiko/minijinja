@@ -170,6 +170,27 @@ pub struct DynamicObject {
 }
 
 impl DynamicObject {
+    pub fn calculate_length(&self, v: &Value) -> Result<usize, Error> {
+        match self.kind {
+            Kind::Dict | Kind::List | Kind::Seq => with_py(|py| match self.inner.bind(py).len() {
+                Ok(l) => Ok(l),
+                Err(_) => Err(Error::new(
+                    minijinja::ErrorKind::InvalidOperation,
+                    format!("cannot calculate length of value of type {}", v.kind()),
+                )),
+            }),
+            Kind::Plain => minijinja::filters::length(v),
+            Kind::Map | Kind::Iterable => {
+                let iter = v.try_iter()?;
+                let mut count = 0;
+                for item in iter.checked() {
+                    item?;
+                    count += 1;
+                }
+                Ok(count)
+            }
+        }
+    }
     pub fn new(inner: &Bound<'_, PyAny>) -> DynamicObject {
         let (kind, subscriptable) = Kind::of(inner);
         DynamicObject {
