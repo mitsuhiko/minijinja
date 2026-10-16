@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed the `indent` filter indenting blank lines of CRLF text when `blank` is false, in Rust and Go.  A blank line ended up as `"  \r"` instead of `"\r"`, leaving trailing whitespace.
+
 ## 3.0.1
 
 * The Python package is now also published as Pyodide wheels (PEP 783 `pyemscripten` platform tag) for Pyodide 0.29 and 314 so it can be installed with `micropip`.
