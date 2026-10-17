@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 3.0.2
 
 * The Python package is now also published as free-threaded wheels for Linux, macOS and Windows: a version-specific wheel for CPython 3.14t and an `abi3t` (PEP 803) wheel for CPython 3.15+.  #969
 

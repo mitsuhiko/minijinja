@@ -28,7 +28,7 @@ dependency to enable the optional serde support.
 ```
 $ cargo tree
 minimal v0.1.0 (examples/minimal)
-└── minijinja v3.0.1 (minijinja)
+└── minijinja v3.0.2 (minijinja)
 ```
 
 Additionally minijinja is also available as an (optionally pre-compiled) command line executable
