@@ -497,9 +497,12 @@ def test_pass_through_sort():
 
 
 def test_fucked_up_object():
+    # Seeded so that the total order violation is reliably detected by the sort.
+    rng = random.Random(42)
+
     @total_ordering
     class X:
-        __lt__ = __eq__ = lambda s, o: random.random() > 0.5
+        __lt__ = __eq__ = lambda s, o: rng.random() > 0.5
 
     values = [X()] * 500
     env = Environment()
