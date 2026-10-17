@@ -31,6 +31,13 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           args: --release --strip --target universal2-apple-darwin --out dist -m minijinja-py/Cargo.toml
+      # Free-threaded wheels need a separate maturin invocation, otherwise the
+      # abi3 wheel above is turned into a version-specific one.  This produces
+      # a cp314t wheel and a cp315-abi3.abi3t wheel (PEP 803).
+      - name: Build free-threaded wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          args: --release --strip --target universal2-apple-darwin --out dist -m minijinja-py/Cargo.toml --interpreter python3.14t python3.15t
       - name: Upload wheels
         uses: actions/upload-artifact@v7
         with:
@@ -60,6 +67,25 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --strip --out dist -m minijinja-py/Cargo.toml --interpreter "3.10"
           manylinux: auto
+      - name: Build free-threaded wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --strip --out dist -m minijinja-py/Cargo.toml --interpreter python3.14t python3.15t
+          manylinux: auto
+      - uses: astral-sh/setup-uv@v10.2.0
+        if: matrix.target == 'x86_64'
+      - name: Test free-threaded wheels
+        if: matrix.target == 'x86_64'
+        run: |
+          set -euo pipefail
+          for py in 3.14t 3.15t; do
+            uv venv --python "$py" ".venv-$py"
+            VIRTUAL_ENV=".venv-$py" uv pip install --no-index --find-links dist minijinja
+            VIRTUAL_ENV=".venv-$py" uv pip install pytest
+            "./.venv-$py/bin/python" -c "import sys, minijinja; assert not sys._is_gil_enabled()"
+            (cd minijinja-py && "../.venv-$py/bin/python" -m pytest tests)
+          done
       - name: Upload wheels
         uses: actions/upload-artifact@v7
         with:
@@ -89,6 +115,12 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --strip --out dist -m minijinja-py/Cargo.toml --interpreter "3.10"
           manylinux: musllinux_1_2
+      - name: Build free-threaded wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --strip --out dist -m minijinja-py/Cargo.toml --interpreter python3.14t python3.15t
+          manylinux: musllinux_1_2
       - name: Upload wheels
         uses: actions/upload-artifact@v7
         with:
@@ -115,6 +147,11 @@ jobs:
         with:
           target: ${{ matrix.target }}
           args: --release --strip --out dist -m minijinja-py/Cargo.toml
+      - name: Build free-threaded wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --strip --out dist -m minijinja-py/Cargo.toml --interpreter python3.14t python3.15t
       - name: Upload wheels
         uses: actions/upload-artifact@v7
         with:
