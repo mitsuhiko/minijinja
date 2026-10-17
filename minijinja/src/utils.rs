@@ -188,7 +188,7 @@ pub fn write_escaped(
     auto_escape: &AutoEscape,
     value: &Value,
 ) -> Result<(), Error> {
-    // string strings bypass all of this
+    // Safe strings bypass all of this.
     if let ValueRepr::String(ref s, StringType::Safe) = value.0 {
         return out.write_str(s).map_err(Error::from);
     }
