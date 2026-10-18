@@ -9,6 +9,7 @@ All notable changes to MiniJinja are documented here.
 * Fixed the `indent` filter indenting blank lines of CRLF text when `blank` is false, in Rust and Go.  A blank line ended up as `"  \r"` instead of `"\r"`, leaving trailing whitespace.
 * Fixed the `wordwrap` filter ignoring `break_long_words` when `break_on_hyphens` is `false`. The two arguments are independent in Jinja2, so a word longer than `width` is still broken unless `break_long_words` is `false`.
 * Fixed chained integer lookups like `foo.1.0` failing with a syntax error in Rust and Go.  Like in Jinja2, a number right after a dot is now always read as an item index, so `foo.1.0` is `foo[1][0]` instead of `foo` followed by the float `1.0`.
+* Fixed `\x` and octal string escapes above `\x7f` producing invalid UTF-8 in Go.  Like in Rust they now produce the code point, so `'\xe9'` is `é`.  Go now also understands the `\b` and `\f` escapes and surrogate pairs written as two `\u` escapes, and rejects a lone surrogate like Rust does.
 
 ## 3.0.2
 

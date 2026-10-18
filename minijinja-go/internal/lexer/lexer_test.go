@@ -178,6 +178,13 @@ func TestLexerStringEscapeCompatibility(t *testing.T) {
 		{name: "multi-digit octal escape", template: "{{ '\\123' }}", expected: "S"},
 		{name: "hex escape", template: "{{ '\\x41' }}", expected: "A"},
 		{name: "invalid octal overflow", template: "{{ '\\400' }}", expectFail: true},
+		{name: "hex escape above ascii is a code point", template: "{{ '\\xe9' }}", expected: "\u00e9"},
+		{name: "octal escape above ascii is a code point", template: "{{ '\\377' }}", expected: "\u00ff"},
+		{name: "backspace and form feed escapes", template: "{{ '\\b\\f' }}", expected: "\b\f"},
+		{name: "surrogate pair escape", template: "{{ '\\uD83D\\uDE00' }}", expected: "\U0001F600"},
+		{name: "lone high surrogate", template: "{{ '\\uD83D' }}", expectFail: true},
+		{name: "high surrogate without low surrogate", template: "{{ '\\uD83D\\u0041' }}", expectFail: true},
+		{name: "lone low surrogate", template: "{{ '\\uDE00' }}", expectFail: true},
 	}
 
 	for _, test := range tests {
