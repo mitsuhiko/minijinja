@@ -1,0 +1,83 @@
+---
+source: minijinja/tests/test_lexer.rs
+description: "{{ grid.1.0 }}\n{{ cube.1.0.1 }}\n{{ rows.0.cells.1 }}\n{{ grid.1_0.1 }}\n{{ 1.5 }}"
+input_file: minijinja/tests/lexer-inputs/dotted-integers.txt
+---
+VariableStart
+  "{{"
+Ident("grid")
+  "grid"
+Dot
+  "."
+Int(1)
+  "1"
+Dot
+  "."
+Int(0)
+  "0"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+Ident("cube")
+  "cube"
+Dot
+  "."
+Int(1)
+  "1"
+Dot
+  "."
+Int(0)
+  "0"
+Dot
+  "."
+Int(1)
+  "1"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+Ident("rows")
+  "rows"
+Dot
+  "."
+Int(0)
+  "0"
+Dot
+  "."
+Ident("cells")
+  "cells"
+Dot
+  "."
+Int(1)
+  "1"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+Ident("grid")
+  "grid"
+Dot
+  "."
+Int(10)
+  "1_0"
+Dot
+  "."
+Int(1)
+  "1"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+Float(1.5)
+  "1.5"
+VariableEnd
+  "}}"
