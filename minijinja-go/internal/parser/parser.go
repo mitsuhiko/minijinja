@@ -1593,6 +1593,9 @@ func (p *Parser) parseFromImport() (*FromImport, *Error) {
 		if err != nil {
 			return nil, err
 		}
+		if v, ok := name.(*Var); ok && strings.HasPrefix(v.ID, "_") {
+			return nil, p.syntaxError("names starting with an underline can not be imported")
+		}
 
 		var alias Expr
 		if p.skipKeyword("as") {

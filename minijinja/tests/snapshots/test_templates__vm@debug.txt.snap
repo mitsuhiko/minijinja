@@ -128,6 +128,7 @@ State {
             "import-mixed.txt",
             "include_with_var_and_macro.txt",
             "layout_with_var.txt",
+            "private_exports.txt",
             "required_layout.txt",
             "required_mid.txt",
             "self-extends.txt",

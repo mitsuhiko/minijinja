@@ -1,0 +1,11 @@
+{}
+---
+{% import 'private_exports.txt' as m -%}
+call: {{ m.pub() }}
+_priv defined: {{ m._priv is defined }}
+_x defined: {{ m._x is defined }}
+__z defined: {{ m.__z is defined }}
+y: {{ m.y }}
+exports: {{ m|list|sort }}
+{% from 'private_exports.txt' import pub, y as _y -%}
+from import: {{ pub() }} {{ _y }}

@@ -343,8 +343,17 @@ impl<'template, 'env> State<'template, 'env> {
     }
 
     /// Returns a list of the names of all exports (top-level variables).
+    ///
+    /// Like in Jinja2, names starting with an underscore are private and
+    /// are not considered exports.  They can still be retrieved with
+    /// [`lookup`](Self::lookup).
     pub fn exports(&self) -> Vec<&str> {
-        self.ctx.exports().keys().copied().collect()
+        self.ctx
+            .exports()
+            .keys()
+            .copied()
+            .filter(|name| !name.starts_with('_'))
+            .collect()
     }
 
     /// Returns a list of all known variables.

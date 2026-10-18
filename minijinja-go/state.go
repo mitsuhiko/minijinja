@@ -240,7 +240,9 @@ func (s *State) CallMacroKw(name string, args []value.Value, kwargs map[string]v
 // Exports returns all exported variables from the template.
 //
 // Exports are variables set at the top level of the template using {% set %}.
-// This also includes macros defined in the template.
+// This also includes macros defined in the template.  Like in Jinja2, names
+// starting with an underscore are private and are not considered exports.
+// They can still be retrieved with [State.Lookup].
 //
 // Example:
 //
@@ -272,6 +274,12 @@ func (s *State) Exports() map[string]value.Value {
 	// Also include macros as exports
 	for name, macro := range s.macros {
 		exports[name] = value.FromCallable(newMacroCallableFromDefinition(macro, value.Undefined()))
+	}
+
+	for name := range exports {
+		if strings.HasPrefix(name, "_") {
+			delete(exports, name)
+		}
 	}
 
 	return exports
@@ -2127,12 +2135,18 @@ func (s *State) createModule(tmpl *compiledTemplate) (value.Value, error) {
 		return value.Undefined(), err
 	}
 
+	// Like in Jinja2, names starting with an underscore are private and
+	// not exported.
 	moduleValues := make(map[string]value.Value)
 	for k, v := range moduleState.scopes[len(moduleState.scopes)-1] {
-		moduleValues[k] = v
+		if !strings.HasPrefix(k, "_") {
+			moduleValues[k] = v
+		}
 	}
 	for name, macro := range moduleState.macros {
-		moduleValues[name] = value.FromCallable(newMacroCallableFromDefinition(macro, value.Undefined()))
+		if !strings.HasPrefix(name, "_") {
+			moduleValues[name] = value.FromCallable(newMacroCallableFromDefinition(macro, value.Undefined()))
+		}
 	}
 
 	return value.FromObject(&moduleObject{
@@ -2169,6 +2183,15 @@ func (m *moduleObject) GetAttr(name string) value.Value {
 
 func (m *moduleObject) Map() map[string]value.Value {
 	return m.values
+}
+
+func (m *moduleObject) Keys() []string {
+	keys := make([]string, 0, len(m.values))
+	for k := range m.values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func (m *moduleObject) String() string {

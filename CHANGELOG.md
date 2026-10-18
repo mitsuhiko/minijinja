@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Macros and variables starting with an underscore are now private and are no longer exported from imported templates in Rust and Go, matching Jinja2.  They are not visible as attributes of a module imported with `{% import %}`, and `{% from ... import %}` of such a name is a syntax error.  `State::exports` / `State.Exports` no longer return them either, but they can still be retrieved with `lookup`.  #970
+* Fixed modules imported with `{% import %}` not being iterable in Go.
+
 ## 3.0.2
 
 * The Python package is now also published as free-threaded wheels for Linux, macOS and Windows: a version-specific wheel for CPython 3.14t and an `abi3t` (PEP 803) wheel for CPython 3.15+.  #969

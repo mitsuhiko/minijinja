@@ -859,7 +859,11 @@ impl<'env> Executor<'env> {
                     let locals = state.ctx.current_locals_mut();
                     let mut values = value_map_with_capacity(locals.len());
                     for (key, value) in locals.iter() {
-                        values.insert(Value::from(*key), value.clone());
+                        // like in Jinja2, names starting with an underscore
+                        // are private and not exported.
+                        if !key.starts_with('_') {
+                            values.insert(Value::from(*key), value.clone());
+                        }
                     }
                     stack.push(Value::from_object(crate::vm::module_object::Module::new(
                         values, captured,

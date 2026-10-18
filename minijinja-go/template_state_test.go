@@ -14,6 +14,8 @@ func TestEvalToState(t *testing.T) {
 {% macro greet(name) %}Hello {{ name }}!{% endmacro %}
 {% block title %}Default Title{% endblock %}
 {% set version = "1.0" %}
+{% set _private = "secret" %}
+{% macro _private_macro() %}{% endmacro %}
 `)
 	if err != nil {
 		t.Fatal(err)
@@ -72,6 +74,15 @@ func TestEvalToState(t *testing.T) {
 	}
 	if _, ok := exports["greet"]; !ok {
 		t.Error("expected 'greet' macro in exports")
+	}
+	if _, ok := exports["_private"]; ok {
+		t.Error("expected '_private' not to be in exports")
+	}
+	if _, ok := exports["_private_macro"]; ok {
+		t.Error("expected '_private_macro' not to be in exports")
+	}
+	if v, ok := state.Lookup("_private").AsString(); !ok || v != "secret" {
+		t.Errorf("expected _private to be retrievable via Lookup, got %v", state.Lookup("_private"))
 	}
 
 	// Test BlockNames

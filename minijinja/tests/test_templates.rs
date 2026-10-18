@@ -715,7 +715,9 @@ fn test_state() {
         "foo.html",
         r#"
         {% set global = variable * 2 %}
+        {% set _private = 42 %}
         {% macro something() %}{{ global }}{% endmacro %}
+        {% macro _private_macro() %}{% endmacro %}
         {% block baz %}[{{ global }}]{% endblock %}
     "#,
     )
@@ -728,6 +730,11 @@ fn test_state() {
         .unwrap();
     assert!(rendered.state().lookup("range").is_some());
     assert!(!rendered.state().exports().contains(&"range"));
+    assert!(rendered.state().exports().contains(&"global"));
+    assert!(rendered.state().exports().contains(&"something"));
+    assert!(!rendered.state().exports().contains(&"_private"));
+    assert!(!rendered.state().exports().contains(&"_private_macro"));
+    assert_eq!(rendered.state().lookup("_private"), Some(Value::from(42)));
     assert_eq!(rendered.state().lookup("global"), Some(Value::from(23 * 2)));
     rendered.with_state_mut(|state| {
         assert_eq!(state.call_macro("something", &[]).unwrap(), "46");

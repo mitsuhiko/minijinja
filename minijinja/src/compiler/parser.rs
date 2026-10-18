@@ -1254,6 +1254,11 @@ impl<'a> Parser<'a> {
                 break;
             }
             let name = ok!(self.parse_assign_name(false));
+            if let ast::Expr::Var(ref var) = name {
+                if var.id.starts_with('_') {
+                    syntax_error!("names starting with an underline can not be imported");
+                }
+            }
             let alias = if skip_token!(self, Token::Ident("as")) {
                 Some(ok!(self.parse_assign_name(false)))
             } else {

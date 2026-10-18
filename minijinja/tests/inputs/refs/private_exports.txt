@@ -1,0 +1,5 @@
+{%- set _x = 1 %}
+{%- set y = 2 %}
+{%- set __z = 3 %}
+{%- macro _priv() %}P{% endmacro %}
+{%- macro pub() %}[{{ _priv() }}{{ _x }}]{% endmacro %}

@@ -470,6 +470,11 @@
 //! variables and macros that are defined can be imported.  Also imports unlike in Jinja2
 //! are not cached and they get access to the full template context.
 //!
+//! Like in Jinja2, macros and variables starting with one or more underscores
+//! are private and cannot be imported.  They are not exported as attributes of
+//! the module, and attempting to import them with `{% from ... import ... %}` is
+//! a syntax error.
+//!
 //! ## `{% with %}`
 //!
 //! The with statement makes it possible to create a new inner scope.  Variables set within

@@ -1,0 +1,22 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{% from 'private_exports.txt' import pub, _priv %}"
+info: {}
+input_file: minijinja/tests/inputs/err_import_private.txt
+---
+!!!SYNTAX ERROR!!!
+
+Error {
+    kind: SyntaxError,
+    detail: "names starting with an underline can not be imported",
+    name: "err_import_private.txt",
+    line: 1,
+}
+
+syntax error: names starting with an underline can not be imported (in err_import_private.txt:1)
+--------------------------- err_import_private.txt ----------------------------
+   1 > {% from 'private_exports.txt' import pub, _priv %}
+     i                                           ^^^^^ syntax error
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------

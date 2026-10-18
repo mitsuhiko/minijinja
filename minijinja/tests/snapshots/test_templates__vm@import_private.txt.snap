@@ -1,0 +1,13 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{% import 'private_exports.txt' as m -%}\ncall: {{ m.pub() }}\n_priv defined: {{ m._priv is defined }}\n_x defined: {{ m._x is defined }}\n__z defined: {{ m.__z is defined }}\ny: {{ m.y }}\nexports: {{ m|list|sort }}\n{% from 'private_exports.txt' import pub, y as _y -%}\nfrom import: {{ pub() }} {{ _y }}"
+info: {}
+input_file: minijinja/tests/inputs/import_private.txt
+---
+call: [P1]
+_priv defined: False
+_x defined: False
+__z defined: False
+y: 2
+exports: ['pub', 'y']
+from import: [P1] 2
