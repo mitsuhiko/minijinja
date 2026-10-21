@@ -2,20 +2,18 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 3.0.2
 
 * Macros and variables starting with an underscore are now private and are no longer exported from imported templates in Rust and Go, matching Jinja2.  They are not visible as attributes of a module imported with `{% import %}`, and `{% from ... import %}` of such a name is a syntax error.  `State::exports` / `State.Exports` no longer return them either, but they can still be retrieved with `lookup`.  #970
 * Fixed modules imported with `{% import %}` not being iterable in Go.
-* Fixed the `indent` filter indenting blank lines of CRLF text when `blank` is false, in Rust and Go.  A blank line ended up as `"  \r"` instead of `"\r"`, leaving trailing whitespace.
-* Fixed the `wordwrap` filter ignoring `break_long_words` when `break_on_hyphens` is `false`. The two arguments are independent in Jinja2, so a word longer than `width` is still broken unless `break_long_words` is `false`.
-* Fixed chained integer lookups like `foo.1.0` failing with a syntax error in Rust and Go.  Like in Jinja2, a number right after a dot is now always read as an item index, so `foo.1.0` is `foo[1][0]` instead of `foo` followed by the float `1.0`.
-* Fixed `\x` and octal string escapes above `\x7f` producing invalid UTF-8 in Go.  Like in Rust they now produce the code point, so `'\xe9'` is `é`.  Go now also understands the `\b` and `\f` escapes and surrogate pairs written as two `\u` escapes, and rejects a lone surrogate like Rust does.
-* Added the `method` argument to the `round` filter for Jinja2 compatibility in Rust and Go.  It takes `common` (the default), `ceil` or `floor`, and both `precision` and `method` can now be passed as keyword arguments.  Integers are now rounded to a negative precision like in Jinja2, so `15|round(-1)` is `20` rather than `15`.  #962
-* Fixed Python exceptions leaking into later renders in the Python bindings.  An exception that MiniJinja did not report, for instance one raised by an iterator after a `{% break %}`, was raised in place of the next unrelated error.  Exceptions are now attached to the error that carries them.  Exceptions raised by a loader are also no longer treated as missing templates, so they are no longer ignored by `ignore missing` or skipped by an include with a list of templates.
-
-## 3.0.2
-
+* Fixed the `indent` filter indenting blank lines of CRLF text when `blank` is false, in Rust and Go.  A blank line ended up as `"  \r"` instead of `"\r"`, leaving trailing whitespace.  #972
+* Fixed the `wordwrap` filter ignoring `break_long_words` when `break_on_hyphens` is `false`. The two arguments are independent in Jinja2, so a word longer than `width` is still broken unless `break_long_words` is `false`.  #940
+* Fixed chained integer lookups like `foo.1.0` failing with a syntax error in Rust and Go.  Like in Jinja2, a number right after a dot is now always read as an item index, so `foo.1.0` is `foo[1][0]` instead of `foo` followed by the float `1.0`.  #974
+* Fixed `\x` and octal string escapes above `\x7f` producing invalid UTF-8 in Go.  Like in Rust they now produce the code point, so `'\xe9'` is `é`.  Go now also understands the `\b` and `\f` escapes and surrogate pairs written as two `\u` escapes, and rejects a lone surrogate like Rust does.  #975
+* Added the `method` argument to the `round` filter for Jinja2 compatibility in Rust and Go.  It takes `common` (the default), `ceil` or `floor`, and both `precision` and `method` can now be passed as keyword arguments.  Integers are now rounded to a negative precision like in Jinja2, so `15|round(-1)` is `20` rather than `15`.  #968
+* Fixed Python exceptions leaking into later renders in the Python bindings.  An exception that MiniJinja did not report, for instance one raised by an iterator after a `{% break %}`, was raised in place of the next unrelated error.  Exceptions are now attached to the error that carries them.  Exceptions raised by a loader are also no longer treated as missing templates, so they are no longer ignored by `ignore missing` or skipped by an include with a list of templates.  #967
 * The Python package is now also published as free-threaded wheels for Linux, macOS and Windows: a version-specific wheel for CPython 3.14t and an `abi3t` (PEP 803) wheel for CPython 3.15+.  #969
+* The Python package metadata includes the readme again, so the PyPI page shows a project description.
 
 ## 3.0.1
 
