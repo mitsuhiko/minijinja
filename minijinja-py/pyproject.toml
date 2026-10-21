@@ -6,6 +6,7 @@ build-backend = "maturin"
 name = "minijinja"
 version = "3.0.2"
 description = "An experimental Python binding of the Rust MiniJinja template engine."
+readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [
