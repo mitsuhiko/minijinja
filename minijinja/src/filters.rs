@@ -1464,10 +1464,12 @@ mod builtins {
             output.push('\n');
         }
         for line in iterator {
-            if line.is_empty() {
+            // A blank line in CRLF text is a lone "\r" after splitting on '\n'.
+            if line.is_empty() || line == "\r" {
                 if indent_blank_lines {
                     output.push_str(&indent_with);
                 }
+                output.push_str(line);
             } else {
                 write!(output, "{indent_with}{line}").ok();
             }

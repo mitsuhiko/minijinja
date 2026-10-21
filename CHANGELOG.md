@@ -6,6 +6,7 @@ All notable changes to MiniJinja are documented here.
 
 * Macros and variables starting with an underscore are now private and are no longer exported from imported templates in Rust and Go, matching Jinja2.  They are not visible as attributes of a module imported with `{% import %}`, and `{% from ... import %}` of such a name is a syntax error.  `State::exports` / `State.Exports` no longer return them either, but they can still be retrieved with `lookup`.  #970
 * Fixed modules imported with `{% import %}` not being iterable in Go.
+* Fixed the `indent` filter indenting blank lines of CRLF text when `blank` is false, in Rust and Go.  A blank line ended up as `"  \r"` instead of `"\r"`, leaving trailing whitespace.
 
 ## 3.0.2
 

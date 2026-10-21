@@ -2750,7 +2750,8 @@ func FilterIndent(_ State, val value.Value, args []value.Value, kwargs map[strin
 		if i == 0 && !first {
 			continue
 		}
-		if line == "" && !blank {
+		// A blank line in CRLF text is a lone "\r" after splitting on "\n".
+		if (line == "" || line == "\r") && !blank {
 			continue
 		}
 		lines[i] = indent + line
