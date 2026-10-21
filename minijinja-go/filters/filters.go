@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/big"
 	"net/url"
 	"slices"
 	"sort"
@@ -2362,8 +2363,8 @@ func FilterFloat(state State, val value.Value, args []value.Value, kwargs map[st
 	return value.Undefined(), convErr
 }
 
-// numberFilterArgs maps the arguments of int and float to their parameter
-// names. Each parameter can be passed positionally or by keyword.
+// numberFilterArgs maps the arguments of int, float and round to their
+// parameter names. Each parameter can be passed positionally or by keyword.
 func numberFilterArgs(args []value.Value, kwargs map[string]value.Value, names ...string) (map[string]value.Value, error) {
 	if len(args) > len(names) {
 		return nil, mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
@@ -2389,6 +2390,10 @@ func assertNotUndefined(state State, val value.Value) error {
 		return mjerrors.NewError(mjerrors.ErrUndefinedVar, "undefined value")
 	}
 	return nil
+}
+
+func errRoundTooLarge() error {
+	return mjerrors.NewError(mjerrors.ErrInvalidOperation, "rounded value is too large to represent")
 }
 
 func roundWithNegativePrecision(f float64, precision int) (float64, error) {
@@ -2452,14 +2457,76 @@ func roundWithNegativePrecision(f float64, precision int) (float64, error) {
 	}
 	rounded, err := strconv.ParseFloat(sign+string(retained)+"e"+strconv.Itoa(decimalPlace), 64)
 	if err != nil || math.IsInf(rounded, 0) {
-		return 0, mjerrors.NewError(mjerrors.ErrInvalidOperation, "rounded value is too large to represent")
+		return 0, errRoundTooLarge()
 	}
 	return rounded, nil
 }
 
+// roundDirected rounds a float with ceil or floor like Jinja2 does: the value
+// is scaled by 10^precision, rounded to an integer and scaled back.
+func roundDirected(f float64, precision int, ceil bool) (float64, error) {
+	if math.IsInf(f, 0) || math.IsNaN(f) {
+		return f, nil
+	}
+	factor, _ := strconv.ParseFloat("1e"+strconv.Itoa(precision), 64)
+	scaled := f * factor
+	if math.IsInf(scaled, 0) {
+		// the value has no digits at this precision
+		return f, nil
+	}
+	var rounded float64
+	if ceil {
+		rounded = math.Ceil(scaled)
+	} else {
+		rounded = math.Floor(scaled)
+	}
+	// adding 0.0 turns -0.0 into 0.0 like Python's integer result does
+	rv := (rounded + 0) / factor
+	if math.IsInf(rv, 0) || math.IsNaN(rv) {
+		return 0, errRoundTooLarge()
+	}
+	return rv, nil
+}
+
+// roundInt rounds an integer to a negative precision, that is to a multiple
+// of 10^-precision.
+func roundInt(i int64, precision int, method string) (value.Value, error) {
+	if precision < -38 {
+		// like Rust, which rounds in i128: only zero is in reach
+		if (method == "ceil" && i > 0) || (method == "floor" && i < 0) {
+			return value.Undefined(), errRoundTooLarge()
+		}
+		return value.FromInt(0), nil
+	}
+	factor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-precision)), nil)
+	quotient, remainder := new(big.Int).DivMod(big.NewInt(i), factor, new(big.Int))
+	roundUp := false
+	switch method {
+	case "ceil":
+		roundUp = remainder.Sign() > 0
+	case "floor":
+	default:
+		// round half to even like Python's round()
+		cmp := new(big.Int).Lsh(remainder, 1).Cmp(factor)
+		roundUp = cmp > 0 || (cmp == 0 && quotient.Bit(0) == 1)
+	}
+	if roundUp {
+		quotient.Add(quotient, big.NewInt(1))
+	}
+	rv := quotient.Mul(quotient, factor)
+	if rv.IsInt64() {
+		return value.FromInt(rv.Int64()), nil
+	}
+	return value.FromBigInt(rv), nil
+}
+
 // FilterRound rounds a number to a given precision.
 //
-// The first parameter specifies the precision (default is 0).
+// The first parameter specifies the precision (default is 0), the second the
+// rounding method: "common" rounds half to even (default), "ceil" always
+// rounds up and "floor" always rounds down. Both can also be passed as
+// keyword arguments. Integers are returned unchanged unless the precision is
+// negative.
 //
 // Example:
 //
@@ -2470,18 +2537,39 @@ func roundWithNegativePrecision(f float64, precision int) (float64, error) {
 //
 //	{{ 42.55|round }}
 //	  -> 43.0
-//	{{ 42.55|round(1) }}
-//	  -> 42.6
+//	{{ 42.55|round(1, "floor") }}
+//	  -> 42.5
+//	{{ 42.15|round(method="ceil") }}
+//	  -> 43.0
+//	{{ 1234|round(-2) }}
+//	  -> 1200
 func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	if len(args) > 1 {
-		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
+	params, err := numberFilterArgs(args, kwargs, "precision", "method")
+	if err != nil {
+		return value.Undefined(), err
 	}
-	if len(kwargs) > 0 {
-		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
+	precision := 0
+	if p, ok := params["precision"]; ok {
+		i, ok := p.AsInt()
+		if !ok {
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "precision must be an integer")
+		}
+		precision = int(i)
+	}
+	method := "common"
+	if m, ok := params["method"]; ok {
+		method, _ = m.AsString()
+	}
+	if method != "common" && method != "ceil" && method != "floor" {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "method must be common, ceil or floor")
 	}
 
 	if val.IsActualInt() {
-		return val, nil
+		if precision >= 0 {
+			return val, nil
+		}
+		i, _ := val.AsInt()
+		return roundInt(i, precision, method)
 	}
 
 	f, ok := val.AsFloat()
@@ -2489,16 +2577,12 @@ func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("cannot round value (%s)", val.Kind()))
 	}
 
-	precision := 0
-	if len(args) > 0 {
-		if p, ok := args[0].AsInt(); ok {
-			precision = int(p)
-		} else {
-			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "precision must be an integer")
+	if method != "common" {
+		f, err = roundDirected(f, precision, method == "ceil")
+		if err != nil {
+			return value.Undefined(), err
 		}
-	}
-
-	if precision >= 0 {
+	} else if precision >= 0 {
 		// Decimal formatting uses round-half-even without the intermediate
 		// scaling error that would make round(2.675, 2) produce 2.68.
 		if precision <= 1074 {
@@ -2506,7 +2590,6 @@ func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string
 			f, _ = strconv.ParseFloat(formatted, 64)
 		}
 	} else {
-		var err error
 		f, err = roundWithNegativePrecision(f, precision)
 		if err != nil {
 			return value.Undefined(), err
