@@ -1049,6 +1049,10 @@ func (l *Lexer) lexString(quote byte) (*Token, bool, error) {
 func (l *Lexer) lexNumber() (*Token, bool, error) {
 	rest := l.rest()
 
+	// A number right after a dot is an item index, so like in Jinja2 it
+	// cannot have a fraction: `foo.1.0` is `foo[1][0]`, not `foo[1.0]`.
+	afterDot := l.pos > 0 && l.source[l.pos-1] == '.'
+
 	// Determine radix
 	radix := 10
 	prefixLen := 0
@@ -1108,7 +1112,7 @@ func (l *Lexer) lexNumber() (*Token, bool, error) {
 			case c == '_':
 				hasUnderscore = true
 				numLen++
-			case c == '.' && i+1 < len(rest) && isDigit(rest[i+1]):
+			case c == '.' && !afterDot && i+1 < len(rest) && isDigit(rest[i+1]):
 				state = stateFraction
 				numLen++
 			case c == 'e' || c == 'E':

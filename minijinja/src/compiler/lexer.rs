@@ -390,6 +390,10 @@ impl<'s> Tokenizer<'s> {
 
         let old_loc = self.loc();
 
+        // A number right after a dot is an item index, so like in Jinja2 it
+        // cannot have a fraction: `foo.1.0` is `foo[1][0]`, not `foo[1.0]`.
+        let after_dot = self.source.as_bytes()[..self.current_offset].last() == Some(&b'.');
+
         let radix = match self.rest_bytes().get(..2) {
             Some(b"0b" | b"0B") => 2,
             Some(b"0o" | b"0O") => 8,
@@ -412,6 +416,7 @@ impl<'s> Tokenizer<'s> {
         let mut has_underscore = false;
         for c in self.rest_bytes()[num_len..].iter().copied() {
             state = match (c, state) {
+                (b'.', State::Integer) if after_dot => break,
                 (b'.', State::Integer) => {
                     let bytes = self.rest_bytes();
                     let is_exp = matches!(bytes.get(num_len + 1), Some(b'e' | b'E'))

@@ -1,0 +1,13 @@
+{
+  "grid": [[0, 1], [2, 3]],
+  "cube": [[[0, 1], [2, 3]], [[4, 5], [6, 7]]],
+  "rows": [{"cells": ["a", "b"]}]
+}
+---
+one-zero: {{ grid.1.0 }}
+zero-one: {{ grid.0.1 }}
+three levels: {{ cube.1.0.1 }}
+mixed with brackets: {{ grid[1].0 }}|{{ grid.1[0] }}
+through attribute: {{ rows.0.cells.1 }}
+in expression: {{ grid.1.1 + grid.0.1 }}
+float literal: {{ 1.5 + grid.1.0 }}

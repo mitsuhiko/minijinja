@@ -297,6 +297,10 @@ fn test_dotted_integer_lookup_midchain() {
         render!("{{ data.0._meta }}", data => vec![context!(_meta => "x")]),
         "x"
     );
+    assert_eq!(
+        render!("{{ grid.1.0 }}|{{ grid.0.1 }}", grid => vec![vec![0, 1], vec![2, 3]]),
+        "2|1"
+    );
 
     assert_eq!(render!("{{ 1.0 + 0 }}"), "1.0");
     assert_eq!(render!("{{ 42. + 0 }}"), "42.0");
