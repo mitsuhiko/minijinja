@@ -16,7 +16,6 @@ from minijinja import (
     load_from_path,
 )
 
-
 requires_threads = pytest.mark.skipif(
     sys.platform == "emscripten", reason="threads are not supported"
 )
@@ -456,8 +455,7 @@ def test_undeclared_variables():
 
 def test_loop_controls():
     env = Environment()
-    rv = env.render_str(
-        """
+    rv = env.render_str("""
     {% for x in [1, 2, 3, 4, 5] %}
       {% if x == 1 %}
         {% continue %}
@@ -466,8 +464,7 @@ def test_loop_controls():
       {% endif %}
       {{ x }}
     {% endfor %}
-    """
-    )
+    """)
     assert rv.split() == ["2"]
 
 
