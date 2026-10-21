@@ -11,6 +11,7 @@ All notable changes to MiniJinja are documented here.
 * Fixed chained integer lookups like `foo.1.0` failing with a syntax error in Rust and Go.  Like in Jinja2, a number right after a dot is now always read as an item index, so `foo.1.0` is `foo[1][0]` instead of `foo` followed by the float `1.0`.
 * Fixed `\x` and octal string escapes above `\x7f` producing invalid UTF-8 in Go.  Like in Rust they now produce the code point, so `'\xe9'` is `é`.  Go now also understands the `\b` and `\f` escapes and surrogate pairs written as two `\u` escapes, and rejects a lone surrogate like Rust does.
 * Added the `method` argument to the `round` filter for Jinja2 compatibility in Rust and Go.  It takes `common` (the default), `ceil` or `floor`, and both `precision` and `method` can now be passed as keyword arguments.  Integers are now rounded to a negative precision like in Jinja2, so `15|round(-1)` is `20` rather than `15`.  #962
+* Fixed Python exceptions leaking into later renders in the Python bindings.  An exception that MiniJinja did not report, for instance one raised by an iterator after a `{% break %}`, was raised in place of the next unrelated error.  Exceptions are now attached to the error that carries them.  Exceptions raised by a loader are also no longer treated as missing templates, so they are no longer ignored by `ignore missing` or skipped by an include with a list of templates.
 
 ## 3.0.2
 

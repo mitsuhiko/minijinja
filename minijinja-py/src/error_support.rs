@@ -10,7 +10,6 @@ use pyo3::types::PyTuple;
 static TEMPLATE_ERROR: PyOnceLock<Py<PyAny>> = PyOnceLock::new();
 
 thread_local! {
-    static STASHED_ERROR: RefCell<Option<PyErr>> = const { RefCell::new(None) };
     static PANIC_INFO: RefCell<Option<(String, Option<String>)>> = const { RefCell::new(None) };
 }
 
@@ -71,21 +70,31 @@ impl ErrorInfo {
     }
 }
 
+/// Converts a Python exception into a MiniJinja error.
+///
+/// The exception is attached as source of the error so that it travels with
+/// it.  If the error is later converted back with [`to_py_error`] the original
+/// exception is raised again.  If MiniJinja discards the error (for instance
+/// because a loop stopped before reaching a failing item), the exception is
+/// discarded with it.
 pub fn to_minijinja_error(err: PyErr) -> Error {
     let msg = err.to_string();
-    STASHED_ERROR.with(|stash| {
-        *stash.borrow_mut() = Some(err);
-    });
-    Error::new(ErrorKind::TemplateNotFound, msg)
+    Error::new(ErrorKind::InvalidOperation, msg).with_source(err)
 }
 
+/// Converts a MiniJinja error into a Python exception.
+///
+/// If the error was caused by a Python exception, that exception is raised
+/// again, otherwise a `TemplateError` is created.
 pub fn to_py_error(original_err: Error) -> PyErr {
-    STASHED_ERROR.with(|stash| {
-        stash
-            .borrow_mut()
-            .take()
-            .unwrap_or_else(|| make_error(original_err))
-    })
+    let mut source: Option<&(dyn std::error::Error + 'static)> = Some(&original_err);
+    while let Some(err) = source {
+        if let Some(py_err) = err.downcast_ref::<PyErr>() {
+            return Python::attach(|py| py_err.clone_ref(py));
+        }
+        source = err.source();
+    }
+    make_error(original_err)
 }
 
 pub fn report_unraisable(py: Python<'_>, err: PyErr) {

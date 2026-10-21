@@ -162,6 +162,28 @@ impl Kind {
     }
 }
 
+/// Implements the `length` and `count` filters.
+///
+/// The length of Python iterables and mappings without a known size is
+/// calculated by iterating over them.  Unlike the builtin filter, which can
+/// only report that the length is unknown, this reports an exception raised
+/// during that iteration.
+pub fn length(value: &Value) -> Result<usize, Error> {
+    if let Some(obj) = value.downcast_object_ref::<DynamicObject>() {
+        if matches!(obj.kind, Kind::Map | Kind::Iterable) {
+            if let Ok(iter) = value.try_iter() {
+                let mut rv = 0;
+                for item in iter.checked() {
+                    item?;
+                    rv += 1;
+                }
+                return Ok(rv);
+            }
+        }
+    }
+    minijinja::filters::length(value)
+}
+
 pub struct DynamicObject {
     inner: Py<PyAny>,
     kind: Kind,

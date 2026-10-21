@@ -161,6 +161,8 @@ impl Environment {
     fn py_new() -> PyResult<Self> {
         let mut env = minijinja::Environment::new();
         minijinja_contrib::add_to_environment(&mut env);
+        env.add_filter("length", crate::typeconv::length);
+        env.add_filter("count", crate::typeconv::length);
 
         let pycompat = Arc::new(AtomicBool::new(false));
         let pycompat_weak = Arc::downgrade(&pycompat);

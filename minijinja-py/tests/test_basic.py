@@ -678,6 +678,67 @@ def test_failing_iterator():
                 env.render_str(template, items=Broken(n))
 
 
+def test_unreached_iterator_error_is_discarded():
+    class Broken:
+        def __init__(self):
+            self.n = 0
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            self.n += 1
+            if self.n > 2:
+                raise ValueError("backend unavailable")
+            return self.n
+
+    env = Environment()
+    tmpl = "{% for x in items %}{{ x }}{% break %}{% endfor %}"
+    assert env.render_str(tmpl, items=Broken()) == "1"
+    assert env.render_str("{{ items|first }}", items=Broken()) == "1"
+
+    # the iterator error must not be raised in place of unrelated errors
+    with pytest.raises(TemplateError, match="syntax error"):
+        env.render_str("{{ ) }}")
+    with pytest.raises(TemplateError, match="unable to calculate 1 / 0"):
+        env.render_str(tmpl + "{{ 1 / 0 }}", items=Broken())
+    with pytest.raises(TemplateError, match="tried to use \\+ operator"):
+        env.eval_expr("(items|first) + 'x'", items=Broken())
+
+
+def test_python_exception_identity():
+    exc = KeyError("canary")
+
+    def fail():
+        raise exc
+
+    env = Environment(filters={"fail": lambda _: fail()})
+    with pytest.raises(KeyError) as exc_info:
+        env.render_str("{{ 42|fail }}")
+    assert exc_info.value is exc
+    assert exc_info.traceback[-1].name == "fail"
+
+
+def test_loader_exception_is_not_a_missing_template():
+    def loader(name):
+        if name == "broken.html":
+            raise PermissionError("access denied")
+        if name == "ok.html":
+            return "ok"
+
+    env = Environment(loader=loader)
+    for template in [
+        '{% include "broken.html" %}',
+        '{% include "broken.html" ignore missing %}',
+        '{% include ["broken.html", "ok.html"] %}',
+    ]:
+        with pytest.raises(PermissionError, match="access denied"):
+            env.render_str(template)
+    assert env.render_str('{% include "missing.html" ignore missing %}') == ""
+    with pytest.raises(TemplateError, match="syntax error"):
+        env.render_str("{{ ) }}")
+
+
 def test_dict_and_list_lookups():
     env = Environment()
     d = {"a": 1, 2: "two", (1, 2): "tuple", "nested": {"x": [1, 2, 3]}}
