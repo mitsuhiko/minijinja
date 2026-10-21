@@ -1,0 +1,7 @@
+{}
+---
+hex: {{ '\xe9\xff' }}
+octal: {{ '\351\377' }}
+json: {{ 'a\bb\fc'|tojson }}
+pair: {{ '\uD83D\uDE00' }}
+length: {{ '\xe9\uD83D\uDE00'|length }}

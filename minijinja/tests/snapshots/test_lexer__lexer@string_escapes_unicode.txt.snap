@@ -1,0 +1,35 @@
+---
+source: minijinja/tests/test_lexer.rs
+description: "{{ '\\xe9\\xff' }}\n{{ '\\351\\377' }}\n{{ '\\uD83D\\uDE00' }}\n{{ '\\u00e9' }}"
+input_file: minijinja/tests/lexer-inputs/string_escapes_unicode.txt
+---
+VariableStart
+  "{{"
+String("éÿ")
+  "'\\xe9\\xff'"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+String("éÿ")
+  "'\\351\\377'"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+String("😀")
+  "'\\uD83D\\uDE00'"
+VariableEnd
+  "}}"
+TemplateData("\n")
+  "\n"
+VariableStart
+  "{{"
+String("é")
+  "'\\u00e9'"
+VariableEnd
+  "}}"

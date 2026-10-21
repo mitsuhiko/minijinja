@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/syntax"
@@ -966,6 +967,10 @@ func (l *Lexer) lexString(quote byte) (*Token, bool, error) {
 			escaped := l.rest()[0]
 			l.advance(1)
 			switch escaped {
+			case 'b':
+				sb.WriteByte('\b')
+			case 'f':
+				sb.WriteByte('\f')
 			case 'n':
 				sb.WriteByte('\n')
 			case 't':
@@ -993,7 +998,7 @@ func (l *Lexer) lexString(quote byte) (*Token, bool, error) {
 				if err != nil {
 					return nil, false, l.syntaxError("bad string escape")
 				}
-				sb.WriteByte(byte(val))
+				sb.WriteRune(rune(val))
 			case 'x':
 				// Hex escape \xNN
 				if len(l.rest()) < 2 {
@@ -1004,7 +1009,7 @@ func (l *Lexer) lexString(quote byte) (*Token, bool, error) {
 				if err != nil {
 					return nil, false, l.syntaxError("invalid hex escape")
 				}
-				sb.WriteByte(byte(val))
+				sb.WriteRune(rune(val))
 				l.advance(2)
 			case 'u':
 				// Unicode escape \uNNNN (4 hex digits)
@@ -1016,8 +1021,20 @@ func (l *Lexer) lexString(quote byte) (*Token, bool, error) {
 				if err != nil {
 					return nil, false, l.syntaxError("invalid unicode escape")
 				}
-				sb.WriteRune(rune(val))
 				l.advance(4)
+				r := rune(val)
+				if utf16.IsSurrogate(r) {
+					// A surrogate pair is written as two escapes, \uD83D\uDE00
+					low, ok := l.lowSurrogateEscape()
+					if !ok {
+						return nil, false, l.syntaxError("bad string escape")
+					}
+					r = utf16.DecodeRune(r, low)
+					if r == utf8.RuneError {
+						return nil, false, l.syntaxError("bad string escape")
+					}
+				}
+				sb.WriteRune(r)
 			case 'U':
 				// Unicode escape \UNNNNNNNN (8 hex digits)
 				if len(l.rest()) < 8 {
@@ -1043,6 +1060,21 @@ func (l *Lexer) lexString(quote byte) (*Token, bool, error) {
 
 	_ = hasEscapes // used in Rust for optimization
 	return nil, false, l.syntaxError("unexpected end of string")
+}
+
+// lowSurrogateEscape reads the \uNNNN escape that must follow the first half
+// of a surrogate pair.
+func (l *Lexer) lowSurrogateEscape() (rune, bool) {
+	rest := l.rest()
+	if len(rest) < 6 || rest[0] != '\\' || rest[1] != 'u' {
+		return 0, false
+	}
+	val, err := strconv.ParseUint(rest[2:6], 16, 32)
+	if err != nil {
+		return 0, false
+	}
+	l.advance(6)
+	return rune(val), true
 }
 
 // lexNumber lexes an integer or float literal, including hex, octal, binary, and underscores.
