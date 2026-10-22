@@ -61,18 +61,25 @@ jobs:
       - name: Wipe Config
         run: |
           rm .cargo/config.toml
+      # Docker 29.4.2 on the ubuntu-26.04 runners blocks socketcall(2) in its
+      # default seccomp profile, which breaks networking for the 32-bit glibc
+      # in the i686 manylinux image.  Disable seccomp for that container until
+      # the runners ship Docker 29.4.3 or later.
+      # https://github.com/actions/runner-images/issues/14790
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           args: --release --strip --out dist -m minijinja-py/Cargo.toml --interpreter "3.10"
           manylinux: auto
+          docker-options: ${{ matrix.target == 'i686' && '--security-opt seccomp=unconfined' || '' }}
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           args: --release --strip --out dist -m minijinja-py/Cargo.toml --interpreter python3.14t python3.15t
           manylinux: auto
+          docker-options: ${{ matrix.target == 'i686' && '--security-opt seccomp=unconfined' || '' }}
       - uses: astral-sh/setup-uv@v10.2.0
         if: matrix.target == 'x86_64'
       - name: Test free-threaded wheels
