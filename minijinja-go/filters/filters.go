@@ -943,7 +943,8 @@ func FilterReverse(_ State, val value.Value, _ []value.Value, _ map[string]value
 //
 //   - reverse: set to true to sort in descending order
 //   - case_sensitive: set to true for case-sensitive string sorting (default: false)
-//   - attribute: can be set to an attribute name or dotted path to sort by that attribute
+//   - attribute: can be set to an attribute name or dotted path to sort by that attribute,
+//     or to a comma-separated list of them to sort by a composite key like "age, name"
 //
 // Example:
 //
@@ -981,25 +982,38 @@ func FilterSort(state State, val value.Value, args []value.Value, kwargs map[str
 		}
 	}
 
-	// Get attribute for sorting
-	var attrName string
+	// Get attributes for sorting.  Like in Rust, a comma-separated list
+	// sorts by a composite key of all the attributes.
+	var attrNames []string
 	if attr, ok := kwargs["attribute"]; ok {
 		if s, ok := attr.AsString(); ok {
-			attrName = s
+			for _, name := range strings.Split(s, ",") {
+				if name = strings.TrimSpace(name); name != "" {
+					attrNames = append(attrNames, name)
+				}
+			}
 		}
+	}
+
+	sortKey := func(item value.Value) value.Value {
+		switch len(attrNames) {
+		case 0:
+			return item
+		case 1:
+			return getDeepAttr(item, attrNames[0])
+		}
+		key := make([]value.Value, len(attrNames))
+		for i, name := range attrNames {
+			key[i] = getDeepAttr(item, name)
+		}
+		return value.FromSlice(key)
 	}
 
 	result := make([]value.Value, len(items))
 	copy(result, items)
 
 	sort.SliceStable(result, func(i, j int) bool {
-		a, b := result[i], result[j]
-
-		// Apply attribute if specified
-		if attrName != "" {
-			a = getDeepAttr(a, attrName)
-			b = getDeepAttr(b, attrName)
-		}
+		a, b := sortKey(result[i]), sortKey(result[j])
 
 		// Case-insensitive string comparison
 		if !caseSensitive {
