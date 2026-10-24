@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed the `sort` filter ignoring a comma-separated list of attributes in Go.  Like in Rust, `sort(attribute="name, state")` now sorts by `name` and then by `state` instead of leaving the items in their original order.
+
 ## 3.0.3
 
 * Re-release of 3.0.2 without code changes.  The Python package for 3.0.2 could not be published to PyPI because the 32-bit Linux wheel failed to build on the new Ubuntu 26.04 GitHub Actions runners, so 3.0.3 is the first release with the 3.0.2 changes on PyPI.  All other packages are identical to 3.0.2.
