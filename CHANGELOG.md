@@ -2,6 +2,11 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed `str.islower` and `str.isupper` in `pycompat` returning false for strings with spaces, digits or other uncased characters, and the `str.is*` predicates returning true for an empty string.  They now follow Python, so `'foo bar'.islower()` is true and `''.isdigit()` is false.
+* Fixed `str.find` and `str.rfind` in `pycompat` returning byte offsets.  Like in Python they now return character offsets, so `'über'.find('e')` is `2`.
+
 ## 3.0.3
 
 * Re-release of 3.0.2 without code changes.  The Python package for 3.0.2 could not be published to PyPI because the 32-bit Linux wheel failed to build on the new Ubuntu 26.04 GitHub Actions runners, so 3.0.3 is the first release with the 3.0.2 changes on PyPI.  All other packages are identical to 3.0.2.
