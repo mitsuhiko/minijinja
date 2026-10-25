@@ -1,0 +1,9 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{% set items = [{\"s\": \"<b>a</b>\"|safe}, {\"s\": \"<i>b</i>\"}] -%}\nsafe item: {{ items|join(\"<hr>\", attribute=\"s\") }}\nsafe joiner: {{ items|join(\"<hr>\"|safe, \"s\") }}\nunsafe: {{ items[1:]|join(\", \", \"s\") }}"
+info: {}
+input_file: minijinja/tests/inputs/join_attribute_escape.html
+---
+safe item: <b>a</b>&lt;hr&gt;&lt;i&gt;b&lt;&#x2f;i&gt;
+safe joiner: <b>a</b><hr>&lt;i&gt;b&lt;&#x2f;i&gt;
+unsafe: &lt;i&gt;b&lt;&#x2f;i&gt;

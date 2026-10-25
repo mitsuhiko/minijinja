@@ -1,0 +1,8 @@
+{"users": [{"name": "a", "tags": ["x", "y"]}, {"name": "b", "tags": ["z"]}, {"name": 42, "tags": []}]}
+---
+attribute: {{ users|join(", ", attribute="name") }}, {{ users|join(", ", "name") }}, {{ users|join(attribute="name") }}
+keyword: {{ users|join(d="-", attribute="name") }}, {{ [1, 2]|join(d="+") }}
+path: {{ users|join("|", attribute="tags.0") }}
+missing: {{ users|join("|", attribute="missing") }}
+none: {{ users|join(none, "name") }}
+separator: {{ [1, 2]|join(3) }}, {{ users|join(0, "name") }}

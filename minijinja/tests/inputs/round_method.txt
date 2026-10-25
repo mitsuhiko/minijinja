@@ -5,3 +5,4 @@ floor: {{ 2.19|round(1, "floor") }}, {{ 2.3|round(1, "floor") }}, {{ -2.5|round(
 kwargs: {{ 1.5|round(precision=0) }}, {{ 42.55|round(precision=1, method="floor") }}, {{ 2.5|round(method="common") }}, {{ 2.55|round(1, method="ceil") }}
 int: {{ 15|round(-1) }}, {{ 25|round(-1) }}, {{ 35|round(-1) }}, {{ -15|round(-1) }}, {{ 1250|round(-2) }}, {{ 1251|round(-2) }}, {{ 7|round(-50) }}
 int method: {{ 5|round(2) }}, {{ 5|round(method="ceil") }}, {{ 11|round(-1, "ceil") }}, {{ 11|round(-1, "floor") }}, {{ -11|round(-1, "floor") }}
+none: {{ 2.5|round(none) }}, {{ 2.25|round(1, none) }}

@@ -1,0 +1,6 @@
+{"items": [{"n": 1, "a": {"b": 2}}, {"n": 2, "a": {"b": 3}}], "partial": [{"n": 1}, {}]}
+---
+attribute: {{ items|sum(attribute="n") }}, {{ items|sum("n") }}, {{ items|sum(attribute="a.b") }}, {{ [[1, 2], [3, 4]]|sum(attribute="1") }}
+start: {{ [1, 2]|sum(start=10) }}, {{ items|sum("n", 10) }}, {{ items|sum(attribute="n", start=0.5) }}, {{ []|sum(start=3) }}
+missing: {{ partial|sum(attribute="n") }}
+none: {{ [1, 2]|sum(none, 5) }}, {{ items|sum("n", none) }}

@@ -1,0 +1,22 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ [1, 2]|sum(begin=1) }}"
+info: {}
+input_file: minijinja/tests/inputs/err_sum_unknown_kwarg.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: TooManyArguments,
+    detail: "unknown keyword argument 'begin'",
+    name: "err_sum_unknown_kwarg.txt",
+    line: 1,
+}
+
+too many arguments: unknown keyword argument 'begin' (in err_sum_unknown_kwarg.txt:1)
+-------------------------- err_sum_unknown_kwarg.txt --------------------------
+   1 > {{ [1, 2]|sum(begin=1) }}
+     i           ^^^^^^^^^^^^ too many arguments
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------
