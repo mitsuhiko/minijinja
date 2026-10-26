@@ -1,0 +1,22 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ [1, 2]|join(sep=\",\") }}"
+info: {}
+input_file: minijinja/tests/inputs/err_join_unknown_kwarg.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: TooManyArguments,
+    detail: "unknown keyword argument 'sep'",
+    name: "err_join_unknown_kwarg.txt",
+    line: 1,
+}
+
+too many arguments: unknown keyword argument 'sep' (in err_join_unknown_kwarg.txt:1)
+------------------------- err_join_unknown_kwarg.txt --------------------------
+   1 > {{ [1, 2]|join(sep=",") }}
+     i           ^^^^^^^^^^^^^ too many arguments
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------

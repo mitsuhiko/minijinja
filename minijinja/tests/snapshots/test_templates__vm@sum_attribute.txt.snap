@@ -1,0 +1,21 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "attribute: {{ items|sum(attribute=\"n\") }}, {{ items|sum(\"n\") }}, {{ items|sum(attribute=\"a.b\") }}, {{ [[1, 2], [3, 4]]|sum(attribute=\"1\") }}\nstart: {{ [1, 2]|sum(start=10) }}, {{ items|sum(\"n\", 10) }}, {{ items|sum(attribute=\"n\", start=0.5) }}, {{ []|sum(start=3) }}\nmissing: {{ partial|sum(attribute=\"n\") }}\nnone: {{ [1, 2]|sum(none, 5) }}, {{ items|sum(\"n\", none) }}\nsequences: {{ [[1], [2]]|sum(start=[]) }}, {{ [{\"a\": [1]}, {\"a\": [2, 3]}]|sum(\"a\", []) }}"
+info:
+  items:
+    - n: 1
+      a:
+        b: 2
+    - n: 2
+      a:
+        b: 3
+  partial:
+    - n: 1
+    - {}
+input_file: minijinja/tests/inputs/sum_attribute.txt
+---
+attribute: 3, 3, 5, 6
+start: 13, 13, 3.5, 3
+missing: 1
+none: 8, 3
+sequences: [1, 2], [1, 2, 3]

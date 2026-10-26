@@ -1,0 +1,22 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "attribute: {{ users|join(\", \", attribute=\"name\") }}, {{ users|join(\", \", \"name\") }}, {{ users|join(attribute=\"name\") }}\nkeyword: {{ users|join(d=\"-\", attribute=\"name\") }}, {{ [1, 2]|join(d=\"+\") }}\npath: {{ users|join(\"|\", attribute=\"tags.0\") }}\nmissing: {{ users|join(\"|\", attribute=\"missing\") }}\nnone: {{ users|join(none, \"name\") }}\nseparator: {{ [1, 2]|join(3) }}, {{ users|join(0, \"name\") }}"
+info:
+  users:
+    - name: a
+      tags:
+        - x
+        - y
+    - name: b
+      tags:
+        - z
+    - name: 42
+      tags: []
+input_file: minijinja/tests/inputs/join_attribute.txt
+---
+attribute: a, b, 42, a, b, 42, ab42
+keyword: a-b-42, 1+2
+path: x|z|
+missing: ||
+none: ab42
+separator: 132, a0b042

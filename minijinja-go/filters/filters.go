@@ -1078,8 +1078,9 @@ func parseInt(s string) (int64, error) {
 
 // FilterJoin concatenates items from an iterable into a string.
 //
-// The optional first parameter is the separator string to use between items.
-// If not provided, items are concatenated directly without a separator.
+// Parameters, passed positionally or by keyword:
+//   - d: the separator string to use between items (default: no separator)
+//   - attribute: join this attribute or dotted path of the items instead
 //
 // Example:
 //
@@ -1091,17 +1092,27 @@ func parseInt(s string) (int64, error) {
 //	{{ ["a", "b", "c"]|join(", ") }}
 //	  -> "a, b, c"
 //	{{ items|join }}
-func FilterJoin(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+//	{{ users|join(", ", attribute="username") }}
+func FilterJoin(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	params, err := filterParams(args, kwargs, "d", "attribute")
+	if err != nil {
+		return value.Undefined(), err
+	}
 	items := val.Iter()
 	if items == nil {
 		return val, nil
 	}
+	items, err = mapAttribute(items, params)
+	if err != nil {
+		return value.Undefined(), err
+	}
 
+	sepVal, hasSep := params["d"]
 	sep := ""
 	sepSafe := false
-	if len(args) > 0 {
-		sep, _ = args[0].AsString()
-		sepSafe = args[0].IsSafe()
+	if hasSep {
+		sep = sepVal.String()
+		sepSafe = sepVal.IsSafe()
 	}
 
 	if !autoEscapeEnabled(state) {
@@ -1129,16 +1140,14 @@ func FilterJoin(state State, val value.Value, args []value.Value, _ map[string]v
 		return value.FromString(strings.Join(parts, sep)), nil
 	}
 
-	if !sepSafe && len(args) > 0 {
-		var err error
-		sep, err = formatForSafeOutput(state, args[0], false)
+	if !sepSafe && hasSep {
+		sep, err = formatForSafeOutput(state, sepVal, false)
 		if err != nil {
 			return value.Undefined(), err
 		}
 	}
 	parts := make([]string, len(items))
 	for i, item := range items {
-		var err error
 		parts[i], err = formatForSafeOutput(state, item, false)
 		if err != nil {
 			return value.Undefined(), err
@@ -1336,7 +1345,11 @@ func minMax(val value.Value, kwargs map[string]value.Value, want int) value.Valu
 
 // FilterSum sums up all numeric values in an iterable.
 //
-// The optional first parameter provides a start value (default is 0).
+// Undefined values are skipped.
+//
+// Parameters, passed positionally or by keyword:
+//   - attribute: sum up this attribute or dotted path of the items
+//   - start: the value to start from (default: 0)
 //
 // Example:
 //
@@ -1347,28 +1360,50 @@ func minMax(val value.Value, kwargs map[string]value.Value, want int) value.Valu
 //
 //	{{ [1, 2, 3]|sum }}
 //	  -> 6
-//	{{ values|sum(100) }}
+//	{{ values|sum(start=100) }}
 //	  -> sum of values + 100
-func FilterSum(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
-	if items == nil {
-		return value.FromInt(0), nil
+//	{{ items|sum(attribute="price") }}
+func FilterSum(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	params, err := filterParams(args, kwargs, "attribute", "start")
+	if err != nil {
+		return value.Undefined(), err
+	}
+	result := value.FromInt(0)
+	if start, ok := params["start"]; ok {
+		result = start
+	}
+	items, err := mapAttribute(val.Iter(), params)
+	if err != nil {
+		return value.Undefined(), err
 	}
 
-	start := value.FromInt(0)
-	if len(args) > 0 {
-		start = args[0]
-	}
-
-	result := start
 	for _, item := range items {
-		var err error
+		if item.IsUndefined() {
+			continue
+		}
 		result, err = result.Add(item)
 		if err != nil {
 			return value.Undefined(), err
 		}
 	}
 	return result, nil
+}
+
+// mapAttribute replaces the items with their "attribute" parameter, if given.
+func mapAttribute(items []value.Value, params map[string]value.Value) ([]value.Value, error) {
+	attr, ok := params["attribute"]
+	if !ok {
+		return items, nil
+	}
+	path, ok := attr.AsString()
+	if !ok {
+		return nil, mjerrors.NewError(mjerrors.ErrInvalidOperation, "value is not a string")
+	}
+	mapped := make([]value.Value, len(items))
+	for i, item := range items {
+		mapped[i] = getDeepAttr(item, path)
+	}
+	return mapped, nil
 }
 
 // FilterBatch batches items into groups of a given size.
@@ -2243,7 +2278,7 @@ func FilterAbs(_ State, val value.Value, _ []value.Value, _ map[string]value.Val
 //	{{ "n/a"|int(default=0) }}
 //	  -> 0
 func FilterInt(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	params, err := numberFilterArgs(args, kwargs, "default", "base")
+	params, err := filterParams(args, kwargs, "default", "base")
 	if err != nil {
 		return value.Undefined(), err
 	}
@@ -2348,7 +2383,7 @@ func parseIntWithBase(s string, base int64) (int64, bool) {
 //	{{ "n/a"|float(default=0.0) }}
 //	  -> 0.0
 func FilterFloat(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	params, err := numberFilterArgs(args, kwargs, "default")
+	params, err := filterParams(args, kwargs, "default")
 	if err != nil {
 		return value.Undefined(), err
 	}
@@ -2389,21 +2424,26 @@ func FilterFloat(state State, val value.Value, args []value.Value, kwargs map[st
 	return value.Undefined(), convErr
 }
 
-// numberFilterArgs maps the arguments of int, float and round to their
-// parameter names. Each parameter can be passed positionally or by keyword.
-func numberFilterArgs(args []value.Value, kwargs map[string]value.Value, names ...string) (map[string]value.Value, error) {
+// filterParams maps the arguments of a filter to their parameter names.
+// Each parameter can be passed positionally or by keyword. Like in Rust,
+// none and undefined arguments count as not given.
+func filterParams(args []value.Value, kwargs map[string]value.Value, names ...string) (map[string]value.Value, error) {
 	if len(args) > len(names) {
 		return nil, mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
 	}
 	params := make(map[string]value.Value, len(names))
 	for i, arg := range args {
-		params[names[i]] = arg
+		if !arg.IsNone() && !arg.IsUndefined() {
+			params[names[i]] = arg
+		}
 	}
 	for name, arg := range kwargs {
 		if _, given := params[name]; given || !slices.Contains(names, name) {
 			return nil, mjerrors.NewError(mjerrors.ErrTooManyArguments, fmt.Sprintf("unknown keyword argument '%s'", name))
 		}
-		params[name] = arg
+		if !arg.IsNone() && !arg.IsUndefined() {
+			params[name] = arg
+		}
 	}
 	return params, nil
 }
@@ -2570,7 +2610,7 @@ func roundInt(i int64, precision int, method string) (value.Value, error) {
 //	{{ 1234|round(-2) }}
 //	  -> 1200
 func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	params, err := numberFilterArgs(args, kwargs, "precision", "method")
+	params, err := filterParams(args, kwargs, "precision", "method")
 	if err != nil {
 		return value.Undefined(), err
 	}

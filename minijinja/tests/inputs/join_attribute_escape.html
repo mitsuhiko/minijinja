@@ -1,0 +1,6 @@
+{}
+---
+{% set items = [{"s": "<b>a</b>"|safe}, {"s": "<i>b</i>"}] -%}
+safe item: {{ items|join("<hr>", attribute="s") }}
+safe joiner: {{ items|join("<hr>"|safe, "s") }}
+unsafe: {{ items[1:]|join(", ", "s") }}
