@@ -1,0 +1,4 @@
+{}
+---
+arithmetic: {{ true + 1 }}, {{ true - 1 }}, {{ 1 - true }}, {{ true * 3 }}, {{ true * 2.5 }}, {{ true / 2 }}, {{ true // 2 }}, {{ true % 2 }}, {{ 5 // true }}, {{ false - true }}
+repeat: {{ "ab" * true }}, {{ false * "x" }}, {{ [1] * true }}
