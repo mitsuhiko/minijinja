@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed `str.count` in `pycompat` looping forever when counting an empty string.  Like in Python, `'abc'.count('')` is now `4`.
+
 ## 3.0.3
 
 * Re-release of 3.0.2 without code changes.  The Python package for 3.0.2 could not be published to PyPI because the 32-bit Linux wheel failed to build on the new Ubuntu 26.04 GitHub Actions runners, so 3.0.3 is the first release with the 3.0.2 changes on PyPI.  All other packages are identical to 3.0.2.
