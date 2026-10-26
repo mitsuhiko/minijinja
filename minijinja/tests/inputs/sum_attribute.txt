@@ -4,3 +4,4 @@ attribute: {{ items|sum(attribute="n") }}, {{ items|sum("n") }}, {{ items|sum(at
 start: {{ [1, 2]|sum(start=10) }}, {{ items|sum("n", 10) }}, {{ items|sum(attribute="n", start=0.5) }}, {{ []|sum(start=3) }}
 missing: {{ partial|sum(attribute="n") }}
 none: {{ [1, 2]|sum(none, 5) }}, {{ items|sum("n", none) }}
+sequences: {{ [[1], [2]]|sum(start=[]) }}, {{ [{"a": [1]}, {"a": [2, 3]}]|sum("a", []) }}

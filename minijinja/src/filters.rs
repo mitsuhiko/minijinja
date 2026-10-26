@@ -860,7 +860,8 @@ mod builtins {
     ///
     /// * `attribute`: can be set to an attribute or dotted path to sum up
     ///   that attribute of the items.  Items without it are skipped.
-    /// * `start`: the value to start from (defaults to `0`).
+    /// * `start`: the value to start from (defaults to `0`).  Like in Jinja2
+    ///   this can also be a list to concatenate lists.
     ///
     /// ```jinja
     /// {{ range(10)|sum }} -> 45
@@ -891,7 +892,7 @@ mod builtins {
             ok!(value.check());
             if value.is_undefined() {
                 continue;
-            } else if !value.is_number() && value.kind() != ValueKind::Bool {
+            } else if rv.is_number() && !value.is_number() && value.kind() != ValueKind::Bool {
                 return Err(Error::new(
                     ErrorKind::InvalidOperation,
                     format!("can only sum numbers, got {}", value.kind()),
