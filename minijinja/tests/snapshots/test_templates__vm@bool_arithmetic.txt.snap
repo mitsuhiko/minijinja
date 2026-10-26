@@ -1,0 +1,8 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "arithmetic: {{ true + 1 }}, {{ true - 1 }}, {{ 1 - true }}, {{ true * 3 }}, {{ true * 2.5 }}, {{ true / 2 }}, {{ true // 2 }}, {{ true % 2 }}, {{ 5 // true }}, {{ false - true }}\nrepeat: {{ \"ab\" * true }}, {{ false * \"x\" }}, {{ [1] * true }}"
+info: {}
+input_file: minijinja/tests/inputs/bool_arithmetic.txt
+---
+arithmetic: 2, 0, 0, 3, 2.5, 0.5, 0, 1, 5, -1
+repeat: ab, , [1]

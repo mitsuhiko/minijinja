@@ -135,16 +135,25 @@ func (v Value) Add(other Value) (Value, error) {
 
 // Sub performs subtraction.
 func (v Value) Sub(other Value) (Value, error) {
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
-			// Return int only if both are actual ints
-			if isActualInt(v) && isActualInt(other) {
+	if f1, ok := asArithmeticFloat(v); ok {
+		if f2, ok := asArithmeticFloat(other); ok {
+			// Booleans are integers for arithmetic, matching Python.
+			if isArithmeticInt(v) && isArithmeticInt(other) {
 				return intArith(v, other, checkedSub, (*big.Int).Sub), nil
 			}
 			return FromFloat(f1 - f2), nil
 		}
 	}
 	return Undefined(), fmt.Errorf("cannot subtract %s from %s", other.Kind(), v.Kind())
+}
+
+// repeatCount returns how often a string or sequence is repeated.  Like in
+// Python, booleans count as integers.
+func repeatCount(v Value) (int64, bool) {
+	if b, ok := v.AsBool(); ok {
+		return int64(boolToFloat(b)), true
+	}
+	return v.AsInt()
 }
 
 func repeatString(s string, n int64, safe bool) (Value, error) {
@@ -169,34 +178,34 @@ func repeatString(s string, n int64, safe bool) (Value, error) {
 func (v Value) Mul(other Value) (Value, error) {
 	// String repetition
 	if s, ok := v.AsString(); ok {
-		if n, ok := other.AsInt(); ok && n >= 0 {
+		if n, ok := repeatCount(other); ok && n >= 0 {
 			return repeatString(s, n, v.IsSafe())
 		}
 	}
-	if n, ok := v.AsInt(); ok && n >= 0 {
+	if n, ok := repeatCount(v); ok && n >= 0 {
 		if s, ok := other.AsString(); ok {
 			return repeatString(s, n, other.IsSafe())
 		}
 	}
 
 	// Sequence/Iterator repetition (seq * n)
-	if n, ok := other.AsInt(); ok {
+	if n, ok := repeatCount(other); ok {
 		if v.Kind() == KindSeq || v.Kind() == KindIterable {
 			return repeatIterable(v, n)
 		}
 	}
 	// Sequence/Iterator repetition (n * seq)
-	if n, ok := v.AsInt(); ok {
+	if n, ok := repeatCount(v); ok {
 		if other.Kind() == KindSeq || other.Kind() == KindIterable {
 			return repeatIterable(other, n)
 		}
 	}
 
 	// Numeric multiplication
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
-			// Return int only if both are actual ints
-			if isActualInt(v) && isActualInt(other) {
+	if f1, ok := asArithmeticFloat(v); ok {
+		if f2, ok := asArithmeticFloat(other); ok {
+			// Booleans are integers for arithmetic, matching Python.
+			if isArithmeticInt(v) && isArithmeticInt(other) {
 				return intArith(v, other, checkedMul, (*big.Int).Mul), nil
 			}
 			return FromFloat(f1 * f2), nil
@@ -241,8 +250,8 @@ func repeatIterable(seq Value, n int64) (Value, error) {
 
 // Div performs division.
 func (v Value) Div(other Value) (Value, error) {
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
+	if f1, ok := asArithmeticFloat(v); ok {
+		if f2, ok := asArithmeticFloat(other); ok {
 			if f2 == 0 {
 				return Undefined(), fmt.Errorf("division by zero")
 			}
@@ -286,9 +295,8 @@ func floatDivRemFloor(a, b float64) (quotient, remainder float64) {
 
 // FloorDiv performs floor division.
 func (v Value) FloorDiv(other Value) (Value, error) {
-	if isActualInt(v) && isActualInt(other) {
-		i1, _ := v.AsInt()
-		i2, _ := other.AsInt()
+	if isArithmeticInt(v) && isArithmeticInt(other) {
+		i1, i2 := arithmeticInt(v), arithmeticInt(other)
 		if i2 == 0 {
 			return Undefined(), fmt.Errorf("division by zero")
 		}
@@ -298,8 +306,8 @@ func (v Value) FloorDiv(other Value) (Value, error) {
 		quotient, _ := intDivRemFloor(i1, i2)
 		return FromInt(quotient), nil
 	}
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
+	if f1, ok := asArithmeticFloat(v); ok {
+		if f2, ok := asArithmeticFloat(other); ok {
 			if f2 == 0 {
 				return Undefined(), fmt.Errorf("division by zero")
 			}
@@ -312,17 +320,16 @@ func (v Value) FloorDiv(other Value) (Value, error) {
 
 // Rem performs a modulo operation with the sign of the divisor.
 func (v Value) Rem(other Value) (Value, error) {
-	if isActualInt(v) && isActualInt(other) {
-		i1, _ := v.AsInt()
-		i2, _ := other.AsInt()
+	if isArithmeticInt(v) && isArithmeticInt(other) {
+		i1, i2 := arithmeticInt(v), arithmeticInt(other)
 		if i2 == 0 {
 			return Undefined(), fmt.Errorf("modulo by zero")
 		}
 		_, remainder := intDivRemFloor(i1, i2)
 		return FromInt(remainder), nil
 	}
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
+	if f1, ok := asArithmeticFloat(v); ok {
+		if f2, ok := asArithmeticFloat(other); ok {
 			if f2 == 0 {
 				return Undefined(), fmt.Errorf("modulo by zero")
 			}

@@ -4,7 +4,11 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed `str.count` in `pycompat` looping forever when counting an empty string.  Like in Python, `'abc'.count('')` is now `4`.
+* Fixed `str.islower` and `str.isupper` in `pycompat` returning false for strings with spaces, digits or other uncased characters, and the `str.is*` predicates returning true for an empty string.  They now follow Python, so `'foo bar'.islower()` is true and `''.isdigit()` is false.
+* Fixed `str.find` and `str.rfind` in `pycompat` returning byte offsets.  Like in Python they now return character offsets, so `'über'.find('e')` is `2`.
 * Fixed integer addition, subtraction and multiplication in Go losing precision above 2**53 and clamping results that overflow 64 bits, because they were computed with floats.  They are now exact, and like in Rust a result that doesn't fit 64 bits becomes a big integer, so `9007199254740993 + 0` is `9007199254740993` and `9223372036854775807 + 1` is `9223372036854775808`.  #981
+* Fixed booleans not being usable as integers in `-`, `*`, `/`, `//` and `%` and for repeating strings and sequences in Go.  Like in Rust and Jinja2, `true - 1` is `0` and `"ab" * true` is `ab`.
 
 ## 3.0.3
 
