@@ -142,3 +142,36 @@ func TestDivisionByZero(t *testing.T) {
 		t.Fatal("expected float remainder by zero to fail")
 	}
 }
+
+func TestIntegerArithmeticIsExact(t *testing.T) {
+	const beyondFloat = 1<<53 + 1
+	tests := []struct {
+		name string
+		op   func(Value, Value) (Value, error)
+		a, b Value
+		want string
+	}{
+		{"add beyond float precision", Value.Add, FromInt(beyondFloat), FromInt(0), "9007199254740993"},
+		{"add bool", Value.Add, FromInt(beyondFloat), FromBool(true), "9007199254740994"},
+		{"sub beyond float precision", Value.Sub, FromInt(beyondFloat), FromInt(0), "9007199254740993"},
+		{"mul beyond float precision", Value.Mul, FromInt(beyondFloat), FromInt(1), "9007199254740993"},
+		{"add overflow", Value.Add, FromInt(math.MaxInt64), FromInt(1), "9223372036854775808"},
+		{"sub overflow", Value.Sub, FromInt(math.MinInt64), FromInt(1), "-9223372036854775809"},
+		{"sub overflow with negative operand", Value.Sub, FromInt(math.MaxInt64), FromInt(-1), "9223372036854775808"},
+		{"mul overflow", Value.Mul, FromInt(math.MaxInt64), FromInt(2), "18446744073709551614"},
+		{"mul overflow of the minimum", Value.Mul, FromInt(math.MinInt64), FromInt(-1), "9223372036854775808"},
+		{"mul small negative", Value.Mul, FromInt(-3), FromInt(7), "-21"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rv, err := test.op(test.a, test.b)
+			if err != nil {
+				t.Fatalf("operation failed: %v", err)
+			}
+			if got := rv.String(); got != test.want {
+				t.Fatalf("got %s, want %s", got, test.want)
+			}
+		})
+	}
+}

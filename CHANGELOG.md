@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed integer addition, subtraction and multiplication in Go losing precision above 2**53 and clamping results that overflow 64 bits, because they were computed with floats.  They are now exact, and like in Rust a result that doesn't fit 64 bits becomes a big integer, so `9007199254740993 + 0` is `9007199254740993` and `9223372036854775807 + 1` is `9223372036854775808`.  #981
+
 ## 3.0.3
 
 * Re-release of 3.0.2 without code changes.  The Python package for 3.0.2 could not be published to PyPI because the 32-bit Linux wheel failed to build on the new Ubuntu 26.04 GitHub Actions runners, so 3.0.3 is the first release with the 3.0.2 changes on PyPI.  All other packages are identical to 3.0.2.

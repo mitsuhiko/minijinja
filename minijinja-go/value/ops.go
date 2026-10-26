@@ -49,6 +49,43 @@ func isArithmeticInt(v Value) bool {
 	return isActualInt(v) || v.Kind() == KindBool
 }
 
+func arithmeticInt(v Value) int64 {
+	if b, ok := v.AsBool(); ok {
+		return int64(boolToFloat(b))
+	}
+	i, _ := v.AsInt()
+	return i
+}
+
+func checkedAdd(a, b int64) (int64, bool) {
+	r := a + b
+	return r, (r > a) == (b > 0)
+}
+
+func checkedSub(a, b int64) (int64, bool) {
+	r := a - b
+	return r, (r < a) == (b > 0)
+}
+
+func checkedMul(a, b int64) (int64, bool) {
+	if a == 0 || b == 0 {
+		return 0, true
+	}
+	r := a * b
+	return r, r/b == a && !(a == math.MinInt64 && b == -1)
+}
+
+// intArith applies an operation to two integer operands.  Unlike float64 math
+// this is exact, and like the i128 math in Rust a result that doesn't fit an
+// int64 becomes a big integer instead of overflowing.
+func intArith(v, other Value, checked func(a, b int64) (int64, bool), op func(z, x, y *big.Int) *big.Int) Value {
+	a, b := arithmeticInt(v), arithmeticInt(other)
+	if result, ok := checked(a, b); ok {
+		return FromInt(result)
+	}
+	return FromBigInt(op(new(big.Int), big.NewInt(a), big.NewInt(b)))
+}
+
 // Add performs addition or string concatenation.
 func (v Value) Add(other Value) (Value, error) {
 	// String concatenation
@@ -66,7 +103,7 @@ func (v Value) Add(other Value) (Value, error) {
 		if f2, ok := asArithmeticFloat(other); ok {
 			// Booleans are integers for arithmetic, matching Python.
 			if isArithmeticInt(v) && isArithmeticInt(other) {
-				return FromInt(int64(f1 + f2)), nil
+				return intArith(v, other, checkedAdd, (*big.Int).Add), nil
 			}
 			return FromFloat(f1 + f2), nil
 		}
@@ -102,7 +139,7 @@ func (v Value) Sub(other Value) (Value, error) {
 		if f2, ok := other.AsFloat(); ok {
 			// Return int only if both are actual ints
 			if isActualInt(v) && isActualInt(other) {
-				return FromInt(int64(f1 - f2)), nil
+				return intArith(v, other, checkedSub, (*big.Int).Sub), nil
 			}
 			return FromFloat(f1 - f2), nil
 		}
@@ -160,7 +197,7 @@ func (v Value) Mul(other Value) (Value, error) {
 		if f2, ok := other.AsFloat(); ok {
 			// Return int only if both are actual ints
 			if isActualInt(v) && isActualInt(other) {
-				return FromInt(int64(f1 * f2)), nil
+				return intArith(v, other, checkedMul, (*big.Int).Mul), nil
 			}
 			return FromFloat(f1 * f2), nil
 		}
