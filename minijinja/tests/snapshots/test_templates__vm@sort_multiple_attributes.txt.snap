@@ -1,0 +1,21 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "basic: {{ [{'a': 1, 'b': 2, 'c': 5}, {'a': 2, 'b': 1, 'c': 6}]|sort(attribute='b,a') }}\nreverse: {{ cities|sort(attribute='name,country', reverse=true)|map(attribute='country')|join(', ') }}\nempty parts: {{ [{'a': 1, 'b': 2}, {'a': 2, 'b': 1}]|sort(attribute='b,') }}, {{ [{'a': 1, 'b': 2}, {'a': 2, 'b': 1}]|sort(attribute='b,,a') }}\nstable: {{ [{'a': 1, 'b': 1, 'c': 1}, {'a': 1, 'b': 1, 'c': 2}]|sort(attribute='a,b', reverse=true) }}\ncase insensitive: {{ [{'a': 'B', 'b': 1}, {'a': 'a', 'b': 2}]|sort(attribute='a,b') }}\ncase sensitive: {{ [{'a': 'B', 'b': 1}, {'a': 'a', 'b': 2}]|sort(attribute='a,b', case_sensitive=true) }}"
+info:
+  cities:
+    - name: Sydney
+      country: Australia
+    - name: Sydney
+      country: Canada
+    - name: kochi
+      country: India
+    - name: Kochi
+      country: Japan
+input_file: minijinja/tests/inputs/sort_multiple_attributes.txt
+---
+basic: [{'a': 2, 'b': 1, 'c': 6}, {'a': 1, 'b': 2, 'c': 5}]
+reverse: Canada, Australia, Japan, India
+empty parts: [{'a': 2, 'b': 1}, {'a': 1, 'b': 2}], [{'a': 2, 'b': 1}, {'a': 1, 'b': 2}]
+stable: [{'a': 1, 'b': 1, 'c': 1}, {'a': 1, 'b': 1, 'c': 2}]
+case insensitive: [{'a': 'a', 'b': 2}, {'a': 'B', 'b': 1}]
+case sensitive: [{'a': 'B', 'b': 1}, {'a': 'a', 'b': 2}]

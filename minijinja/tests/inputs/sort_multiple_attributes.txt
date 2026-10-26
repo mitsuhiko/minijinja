@@ -1,0 +1,8 @@
+{"cities": [{"name": "Sydney", "country": "Australia"}, {"name": "Sydney", "country": "Canada"}, {"name": "kochi", "country": "India"}, {"name": "Kochi", "country": "Japan"}]}
+---
+basic: {{ [{'a': 1, 'b': 2, 'c': 5}, {'a': 2, 'b': 1, 'c': 6}]|sort(attribute='b,a') }}
+reverse: {{ cities|sort(attribute='name,country', reverse=true)|map(attribute='country')|join(', ') }}
+empty parts: {{ [{'a': 1, 'b': 2}, {'a': 2, 'b': 1}]|sort(attribute='b,') }}, {{ [{'a': 1, 'b': 2}, {'a': 2, 'b': 1}]|sort(attribute='b,,a') }}
+stable: {{ [{'a': 1, 'b': 1, 'c': 1}, {'a': 1, 'b': 1, 'c': 2}]|sort(attribute='a,b', reverse=true) }}
+case insensitive: {{ [{'a': 'B', 'b': 1}, {'a': 'a', 'b': 2}]|sort(attribute='a,b') }}
+case sensitive: {{ [{'a': 'B', 'b': 1}, {'a': 'a', 'b': 2}]|sort(attribute='a,b', case_sensitive=true) }}

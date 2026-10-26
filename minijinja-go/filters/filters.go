@@ -943,7 +943,8 @@ func FilterReverse(_ State, val value.Value, _ []value.Value, _ map[string]value
 //
 //   - reverse: set to true to sort in descending order
 //   - case_sensitive: set to true for case-sensitive string sorting (default: false)
-//   - attribute: can be set to an attribute name or dotted path to sort by that attribute
+//   - attribute: can be set to an attribute name or dotted path to sort by that attribute,
+//     or to a comma-separated list of them to sort by a composite key like "age, name"
 //
 // Example:
 //
@@ -981,25 +982,46 @@ func FilterSort(state State, val value.Value, args []value.Value, kwargs map[str
 		}
 	}
 
-	// Get attribute for sorting
-	var attrName string
+	// Get attributes for sorting.  Like in Rust, a comma-separated list
+	// sorts by a composite key of all the attributes.
+	var attrNames []string
 	if attr, ok := kwargs["attribute"]; ok {
 		if s, ok := attr.AsString(); ok {
-			attrName = s
+			for _, name := range strings.Split(s, ",") {
+				if name = strings.TrimSpace(name); name != "" {
+					attrNames = append(attrNames, name)
+				}
+			}
 		}
 	}
 
-	result := make([]value.Value, len(items))
-	copy(result, items)
-
-	sort.SliceStable(result, func(i, j int) bool {
-		a, b := result[i], result[j]
-
-		// Apply attribute if specified
-		if attrName != "" {
-			a = getDeepAttr(a, attrName)
-			b = getDeepAttr(b, attrName)
+	// Like in Jinja2, the parts of a composite key are compared case
+	// insensitively unless case_sensitive is set.
+	sortKey := func(item value.Value) value.Value {
+		switch len(attrNames) {
+		case 0:
+			return item
+		case 1:
+			return getDeepAttr(item, attrNames[0])
 		}
+		key := make([]value.Value, len(attrNames))
+		for i, name := range attrNames {
+			key[i] = getDeepAttr(item, name)
+			if s, ok := key[i].AsString(); ok && !caseSensitive {
+				key[i] = value.FromString(strings.ToLower(s))
+			}
+		}
+		return value.FromSlice(key)
+	}
+
+	type keyedItem struct{ key, item value.Value }
+	keyed := make([]keyedItem, len(items))
+	for i, item := range items {
+		keyed[i] = keyedItem{sortKey(item), item}
+	}
+
+	sort.SliceStable(keyed, func(i, j int) bool {
+		a, b := keyed[i].key, keyed[j].key
 
 		// Case-insensitive string comparison
 		if !caseSensitive {
@@ -1024,6 +1046,10 @@ func FilterSort(state State, val value.Value, args []value.Value, kwargs map[str
 		return cmp < 0
 	})
 
+	result := make([]value.Value, len(keyed))
+	for i, k := range keyed {
+		result[i] = k.item
+	}
 	return value.FromSlice(result), nil
 }
 

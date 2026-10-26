@@ -327,6 +327,17 @@ mod builtins {
         })
     }
 
+    fn fold_case(s: &str) -> String {
+        #[cfg(feature = "unicode")]
+        {
+            s.to_lowercase()
+        }
+        #[cfg(not(feature = "unicode"))]
+        {
+            s.to_ascii_lowercase()
+        }
+    }
+
     fn cmp_helper(a: &Value, b: &Value, case_sensitive: bool, reverse: bool) -> Ordering {
         let ordering = if !case_sensitive {
             if let (Some(a), Some(b)) = (a.as_str(), b.as_str()) {
@@ -1236,14 +1247,8 @@ mod builtins {
         if let Some(attr) = ok!(kwargs.get::<Option<&str>>("attribute")) {
             let keys: Vec<_> = attr
                 .split(',')
-                .filter_map(|key| {
-                    let trimmed = key.trim();
-                    if !key.is_empty() {
-                        Some(trimmed)
-                    } else {
-                        None
-                    }
-                })
+                .map(str::trim)
+                .filter(|key| !key.is_empty())
                 .collect();
 
             let mut keyed: Vec<_> = if keys.len() > 1 {
@@ -1251,10 +1256,15 @@ mod builtins {
                 items
                     .into_iter()
                     .map(|item| {
-                        let key = Value::from_iter(
-                            keys.iter()
-                                .map(|k| item.get_path_or_default(k, &Value::UNDEFINED)),
-                        );
+                        // Like in Jinja2, the parts of the key are compared
+                        // case insensitively unless case_sensitive is set.
+                        let key = Value::from_iter(keys.iter().map(|k| {
+                            let part = item.get_path_or_default(k, &Value::UNDEFINED);
+                            match part.as_str() {
+                                Some(s) if !case_sensitive => Value::from(fold_case(s)),
+                                _ => part,
+                            }
+                        }));
                         (Some(key), item)
                     })
                     .collect()
