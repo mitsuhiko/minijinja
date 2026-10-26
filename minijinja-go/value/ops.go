@@ -342,21 +342,41 @@ func (v Value) Rem(other Value) (Value, error) {
 
 // Pow performs exponentiation.
 func (v Value) Pow(other Value) (Value, error) {
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
-			result := math.Pow(f1, f2)
-			// Try to return int if possible
-			if _, ok1 := v.AsInt(); ok1 {
-				if i2, ok2 := other.AsInt(); ok2 && i2 >= 0 {
-					if result == math.Trunc(result) && result <= math.MaxInt64 && result >= math.MinInt64 {
-						return FromInt(int64(result)), nil
-					}
-				}
-			}
-			return FromFloat(result), nil
-		}
+	f1, ok1 := asArithmeticFloat(v)
+	f2, ok2 := asArithmeticFloat(other)
+	if !ok1 || !ok2 {
+		return Undefined(), fmt.Errorf("cannot compute power of %s and %s", v.Kind(), other.Kind())
 	}
-	return Undefined(), fmt.Errorf("cannot compute power of %s and %s", v.Kind(), other.Kind())
+	// Zero to a negative power fails like a division by zero.
+	if f1 == 0 && f2 < 0 {
+		return Undefined(), fmt.Errorf("unable to calculate %s ** %s", v.Repr(), other.Repr())
+	}
+	// Integers to a non-negative integer power stay exact integers.  A
+	// negative exponent gives a float, like in Python.
+	if isArithmeticInt(v) && isArithmeticInt(other) && f2 >= 0 {
+		if result, ok := intPow(arithmeticInt(v), arithmeticInt(other)); ok {
+			return result, nil
+		}
+		return Undefined(), fmt.Errorf("unable to calculate %s ** %s", v.Repr(), other.Repr())
+	}
+	return FromFloat(math.Pow(f1, f2)), nil
+}
+
+// intPow raises an integer to a non-negative integer power.  Like the i128
+// math in Rust, it fails if the result does not fit into 128 bits.
+func intPow(base, exp int64) (Value, bool) {
+	if (base > 1 || base < -1) && exp > 127 {
+		return Value{}, false
+	}
+	result := new(big.Int).Exp(big.NewInt(base), big.NewInt(exp), nil)
+	if result.IsInt64() {
+		return FromInt(result.Int64()), true
+	}
+	// Allow the range of an i128, which includes -2**127.
+	if result.BitLen() > 127 && (result.Sign() > 0 || result.BitLen() > 128 || result.TrailingZeroBits() != 127) {
+		return Value{}, false
+	}
+	return FromBigInt(result), true
 }
 
 // boolToFloat converts a bool to float for coercion (false=0, true=1)

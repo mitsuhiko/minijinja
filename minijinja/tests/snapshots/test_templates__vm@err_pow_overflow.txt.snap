@@ -1,0 +1,22 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ 2 ** 127 }}"
+info: {}
+input_file: minijinja/tests/inputs/err_pow_overflow.txt
+---
+!!!ERROR!!!
+
+Error {
+    kind: InvalidOperation,
+    detail: "unable to calculate 2 ** 127",
+    name: "err_pow_overflow.txt",
+    line: 1,
+}
+
+invalid operation: unable to calculate 2 ** 127 (in err_pow_overflow.txt:1)
+---------------------------- err_pow_overflow.txt -----------------------------
+   1 > {{ 2 ** 127 }}
+     i    ^^^^^^^^ invalid operation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------
