@@ -9,6 +9,8 @@ All notable changes to MiniJinja are documented here.
 * Fixed `str.find` and `str.rfind` in `pycompat` returning byte offsets.  Like in Python they now return character offsets, so `'über'.find('e')` is `2`.
 * Fixed integer addition, subtraction and multiplication in Go losing precision above 2**53 and clamping results that overflow 64 bits, because they were computed with floats.  They are now exact, and like in Rust a result that doesn't fit 64 bits becomes a big integer, so `9007199254740993 + 0` is `9007199254740993` and `9223372036854775807 + 1` is `9223372036854775808`.  #981
 * Fixed booleans not being usable as integers in `-`, `*`, `/`, `//` and `%` and for repeating strings and sequences in Go.  Like in Rust and Jinja2, `true - 1` is `0` and `"ab" * true` is `ab`.
+* Fixed `**` failing with a negative integer exponent in Rust.  Like in Jinja2, `2 ** -1` is now `0.5`.  Zero to a negative power now always fails in Rust and Go like a division by zero, instead of producing `inf` for floats in Rust and for all numbers in Go.  #982
+* Fixed `**` on integers in Go being computed with floats.  Like in Rust the result is now exact up to 128 bits and fails beyond that, a float base stays a float so `2.0 ** 3` is `8.0`, and booleans count as integers.
 
 ## 3.0.3
 
