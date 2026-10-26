@@ -547,12 +547,22 @@ pub fn int_div(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
 /// Implements a binary `pow` operation on values.
 pub fn pow(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     match coerce(lhs, rhs, true) {
+        // A negative exponent gives a fractional result, like in Python.
+        // Zero to a negative power fails like a division by zero.
+        Some(CoerceResult::I128(a, b)) if b < 0 => {
+            if a == 0 {
+                Err(failed_op("**", lhs, rhs))
+            } else {
+                Ok((a as f64).powf(b as f64).into())
+            }
+        }
         Some(CoerceResult::I128(a, b)) => {
             match TryFrom::try_from(b).ok().and_then(|b| a.checked_pow(b)) {
                 Some(val) => Ok(int_as_value(val)),
                 None => Err(failed_op("**", lhs, rhs)),
             }
         }
+        Some(CoerceResult::F64(a, b)) if a == 0.0 && b < 0.0 => Err(failed_op("**", lhs, rhs)),
         Some(CoerceResult::F64(a, b)) => Ok((a.powf(b)).into()),
         _ => Err(impossible_op("**", lhs, rhs)),
     }
@@ -652,6 +662,33 @@ mod tests {
         assert_eq!(
             err.to_string(),
             "invalid operation: repeated string is too large"
+        );
+    }
+
+    #[test]
+    fn test_pow_negative_int_exponent() {
+        assert_eq!(
+            pow(&Value::from(2), &Value::from(-1)).unwrap(),
+            Value::from(0.5)
+        );
+        assert_eq!(
+            pow(&Value::from(-2), &Value::from(-2)).unwrap(),
+            Value::from(0.25)
+        );
+        assert_eq!(
+            pow(&Value::from(2), &Value::from(3)).unwrap(),
+            Value::from(8)
+        );
+
+        let err = pow(&Value::from(0), &Value::from(-1)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid operation: unable to calculate 0 ** -1"
+        );
+        let err = pow(&Value::from(0.0), &Value::from(-1)).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "invalid operation: unable to calculate 0.0 ** -1"
         );
     }
 

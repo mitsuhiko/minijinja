@@ -995,6 +995,8 @@ func FilterSort(state State, val value.Value, args []value.Value, kwargs map[str
 		}
 	}
 
+	// Like in Jinja2, the parts of a composite key are compared case
+	// insensitively unless case_sensitive is set.
 	sortKey := func(item value.Value) value.Value {
 		switch len(attrNames) {
 		case 0:
@@ -1005,15 +1007,21 @@ func FilterSort(state State, val value.Value, args []value.Value, kwargs map[str
 		key := make([]value.Value, len(attrNames))
 		for i, name := range attrNames {
 			key[i] = getDeepAttr(item, name)
+			if s, ok := key[i].AsString(); ok && !caseSensitive {
+				key[i] = value.FromString(strings.ToLower(s))
+			}
 		}
 		return value.FromSlice(key)
 	}
 
-	result := make([]value.Value, len(items))
-	copy(result, items)
+	type keyedItem struct{ key, item value.Value }
+	keyed := make([]keyedItem, len(items))
+	for i, item := range items {
+		keyed[i] = keyedItem{sortKey(item), item}
+	}
 
-	sort.SliceStable(result, func(i, j int) bool {
-		a, b := sortKey(result[i]), sortKey(result[j])
+	sort.SliceStable(keyed, func(i, j int) bool {
+		a, b := keyed[i].key, keyed[j].key
 
 		// Case-insensitive string comparison
 		if !caseSensitive {
@@ -1038,6 +1046,10 @@ func FilterSort(state State, val value.Value, args []value.Value, kwargs map[str
 		return cmp < 0
 	})
 
+	result := make([]value.Value, len(keyed))
+	for i, k := range keyed {
+		result[i] = k.item
+	}
 	return value.FromSlice(result), nil
 }
 

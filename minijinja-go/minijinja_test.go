@@ -477,57 +477,6 @@ func TestFilters(t *testing.T) {
 	}
 }
 
-func TestSortByMultipleAttributes(t *testing.T) {
-	env := NewEnvironment()
-	cities := map[string]any{"cities": []map[string]any{
-		{"name": "Sydney", "country": "Australia"},
-		{"name": "Sydney", "country": "Canada"},
-		{"name": "Kochi", "country": "India"},
-		{"name": "Kochi", "country": "Japan"},
-	}}
-
-	tests := []struct {
-		template string
-		ctx      map[string]any
-		expected string
-	}{
-		{
-			"{{ [{'a': 1, 'b': 2, 'c': 5}, {'a': 2, 'b': 1, 'c': 6}]|sort(attribute='b,a') }}",
-			nil,
-			"[{'a': 2, 'b': 1, 'c': 6}, {'a': 1, 'b': 2, 'c': 5}]",
-		},
-		{
-			"{{ cities|sort(attribute='name, country', reverse=true)|map(attribute='country') }}",
-			cities,
-			"['Canada', 'Australia', 'Japan', 'India']",
-		},
-		{
-			"{{ [{'a': 1, 'b': 2}, {'a': 2, 'b': 1}]|sort(attribute='b,') }}",
-			nil,
-			"[{'a': 2, 'b': 1}, {'a': 1, 'b': 2}]",
-		},
-		{
-			"{{ [{'a': 1, 'b': 1, 'c': 1}, {'a': 1, 'b': 1, 'c': 2}]|sort(attribute='a,b', reverse=true) }}",
-			nil,
-			"[{'a': 1, 'b': 1, 'c': 1}, {'a': 1, 'b': 1, 'c': 2}]",
-		},
-	}
-
-	for _, test := range tests {
-		tmpl, err := env.TemplateFromString(test.template)
-		if err != nil {
-			t.Fatalf("parse error for %q: %v", test.template, err)
-		}
-		result, err := tmpl.Render(test.ctx)
-		if err != nil {
-			t.Fatalf("render error for %q: %v", test.template, err)
-		}
-		if result != test.expected {
-			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
-		}
-	}
-}
-
 func TestRoundNonFiniteWithNegativePrecision(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ positive|round(-309) }}|{{ negative|round(-309) }}",

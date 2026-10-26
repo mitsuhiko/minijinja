@@ -49,6 +49,43 @@ func isArithmeticInt(v Value) bool {
 	return isActualInt(v) || v.Kind() == KindBool
 }
 
+func arithmeticInt(v Value) int64 {
+	if b, ok := v.AsBool(); ok {
+		return int64(boolToFloat(b))
+	}
+	i, _ := v.AsInt()
+	return i
+}
+
+func checkedAdd(a, b int64) (int64, bool) {
+	r := a + b
+	return r, (r > a) == (b > 0)
+}
+
+func checkedSub(a, b int64) (int64, bool) {
+	r := a - b
+	return r, (r < a) == (b > 0)
+}
+
+func checkedMul(a, b int64) (int64, bool) {
+	if a == 0 || b == 0 {
+		return 0, true
+	}
+	r := a * b
+	return r, r/b == a && !(a == math.MinInt64 && b == -1)
+}
+
+// intArith applies an operation to two integer operands.  Unlike float64 math
+// this is exact, and like the i128 math in Rust a result that doesn't fit an
+// int64 becomes a big integer instead of overflowing.
+func intArith(v, other Value, checked func(a, b int64) (int64, bool), op func(z, x, y *big.Int) *big.Int) Value {
+	a, b := arithmeticInt(v), arithmeticInt(other)
+	if result, ok := checked(a, b); ok {
+		return FromInt(result)
+	}
+	return FromBigInt(op(new(big.Int), big.NewInt(a), big.NewInt(b)))
+}
+
 // Add performs addition or string concatenation.
 func (v Value) Add(other Value) (Value, error) {
 	// String concatenation
@@ -66,7 +103,7 @@ func (v Value) Add(other Value) (Value, error) {
 		if f2, ok := asArithmeticFloat(other); ok {
 			// Booleans are integers for arithmetic, matching Python.
 			if isArithmeticInt(v) && isArithmeticInt(other) {
-				return FromInt(int64(f1 + f2)), nil
+				return intArith(v, other, checkedAdd, (*big.Int).Add), nil
 			}
 			return FromFloat(f1 + f2), nil
 		}
@@ -98,16 +135,25 @@ func (v Value) Add(other Value) (Value, error) {
 
 // Sub performs subtraction.
 func (v Value) Sub(other Value) (Value, error) {
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
-			// Return int only if both are actual ints
-			if isActualInt(v) && isActualInt(other) {
-				return FromInt(int64(f1 - f2)), nil
+	if f1, ok := asArithmeticFloat(v); ok {
+		if f2, ok := asArithmeticFloat(other); ok {
+			// Booleans are integers for arithmetic, matching Python.
+			if isArithmeticInt(v) && isArithmeticInt(other) {
+				return intArith(v, other, checkedSub, (*big.Int).Sub), nil
 			}
 			return FromFloat(f1 - f2), nil
 		}
 	}
 	return Undefined(), fmt.Errorf("cannot subtract %s from %s", other.Kind(), v.Kind())
+}
+
+// repeatCount returns how often a string or sequence is repeated.  Like in
+// Python, booleans count as integers.
+func repeatCount(v Value) (int64, bool) {
+	if b, ok := v.AsBool(); ok {
+		return int64(boolToFloat(b)), true
+	}
+	return v.AsInt()
 }
 
 func repeatString(s string, n int64, safe bool) (Value, error) {
@@ -132,35 +178,35 @@ func repeatString(s string, n int64, safe bool) (Value, error) {
 func (v Value) Mul(other Value) (Value, error) {
 	// String repetition
 	if s, ok := v.AsString(); ok {
-		if n, ok := other.AsInt(); ok && n >= 0 {
+		if n, ok := repeatCount(other); ok && n >= 0 {
 			return repeatString(s, n, v.IsSafe())
 		}
 	}
-	if n, ok := v.AsInt(); ok && n >= 0 {
+	if n, ok := repeatCount(v); ok && n >= 0 {
 		if s, ok := other.AsString(); ok {
 			return repeatString(s, n, other.IsSafe())
 		}
 	}
 
 	// Sequence/Iterator repetition (seq * n)
-	if n, ok := other.AsInt(); ok {
+	if n, ok := repeatCount(other); ok {
 		if v.Kind() == KindSeq || v.Kind() == KindIterable {
 			return repeatIterable(v, n)
 		}
 	}
 	// Sequence/Iterator repetition (n * seq)
-	if n, ok := v.AsInt(); ok {
+	if n, ok := repeatCount(v); ok {
 		if other.Kind() == KindSeq || other.Kind() == KindIterable {
 			return repeatIterable(other, n)
 		}
 	}
 
 	// Numeric multiplication
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
-			// Return int only if both are actual ints
-			if isActualInt(v) && isActualInt(other) {
-				return FromInt(int64(f1 * f2)), nil
+	if f1, ok := asArithmeticFloat(v); ok {
+		if f2, ok := asArithmeticFloat(other); ok {
+			// Booleans are integers for arithmetic, matching Python.
+			if isArithmeticInt(v) && isArithmeticInt(other) {
+				return intArith(v, other, checkedMul, (*big.Int).Mul), nil
 			}
 			return FromFloat(f1 * f2), nil
 		}
@@ -204,8 +250,8 @@ func repeatIterable(seq Value, n int64) (Value, error) {
 
 // Div performs division.
 func (v Value) Div(other Value) (Value, error) {
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
+	if f1, ok := asArithmeticFloat(v); ok {
+		if f2, ok := asArithmeticFloat(other); ok {
 			if f2 == 0 {
 				return Undefined(), fmt.Errorf("division by zero")
 			}
@@ -249,9 +295,8 @@ func floatDivRemFloor(a, b float64) (quotient, remainder float64) {
 
 // FloorDiv performs floor division.
 func (v Value) FloorDiv(other Value) (Value, error) {
-	if isActualInt(v) && isActualInt(other) {
-		i1, _ := v.AsInt()
-		i2, _ := other.AsInt()
+	if isArithmeticInt(v) && isArithmeticInt(other) {
+		i1, i2 := arithmeticInt(v), arithmeticInt(other)
 		if i2 == 0 {
 			return Undefined(), fmt.Errorf("division by zero")
 		}
@@ -261,8 +306,8 @@ func (v Value) FloorDiv(other Value) (Value, error) {
 		quotient, _ := intDivRemFloor(i1, i2)
 		return FromInt(quotient), nil
 	}
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
+	if f1, ok := asArithmeticFloat(v); ok {
+		if f2, ok := asArithmeticFloat(other); ok {
 			if f2 == 0 {
 				return Undefined(), fmt.Errorf("division by zero")
 			}
@@ -275,17 +320,16 @@ func (v Value) FloorDiv(other Value) (Value, error) {
 
 // Rem performs a modulo operation with the sign of the divisor.
 func (v Value) Rem(other Value) (Value, error) {
-	if isActualInt(v) && isActualInt(other) {
-		i1, _ := v.AsInt()
-		i2, _ := other.AsInt()
+	if isArithmeticInt(v) && isArithmeticInt(other) {
+		i1, i2 := arithmeticInt(v), arithmeticInt(other)
 		if i2 == 0 {
 			return Undefined(), fmt.Errorf("modulo by zero")
 		}
 		_, remainder := intDivRemFloor(i1, i2)
 		return FromInt(remainder), nil
 	}
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
+	if f1, ok := asArithmeticFloat(v); ok {
+		if f2, ok := asArithmeticFloat(other); ok {
 			if f2 == 0 {
 				return Undefined(), fmt.Errorf("modulo by zero")
 			}
@@ -298,21 +342,41 @@ func (v Value) Rem(other Value) (Value, error) {
 
 // Pow performs exponentiation.
 func (v Value) Pow(other Value) (Value, error) {
-	if f1, ok := v.AsFloat(); ok {
-		if f2, ok := other.AsFloat(); ok {
-			result := math.Pow(f1, f2)
-			// Try to return int if possible
-			if _, ok1 := v.AsInt(); ok1 {
-				if i2, ok2 := other.AsInt(); ok2 && i2 >= 0 {
-					if result == math.Trunc(result) && result <= math.MaxInt64 && result >= math.MinInt64 {
-						return FromInt(int64(result)), nil
-					}
-				}
-			}
-			return FromFloat(result), nil
-		}
+	f1, ok1 := asArithmeticFloat(v)
+	f2, ok2 := asArithmeticFloat(other)
+	if !ok1 || !ok2 {
+		return Undefined(), fmt.Errorf("cannot compute power of %s and %s", v.Kind(), other.Kind())
 	}
-	return Undefined(), fmt.Errorf("cannot compute power of %s and %s", v.Kind(), other.Kind())
+	// Zero to a negative power fails like a division by zero.
+	if f1 == 0 && f2 < 0 {
+		return Undefined(), fmt.Errorf("unable to calculate %s ** %s", v.Repr(), other.Repr())
+	}
+	// Integers to a non-negative integer power stay exact integers.  A
+	// negative exponent gives a float, like in Python.
+	if isArithmeticInt(v) && isArithmeticInt(other) && f2 >= 0 {
+		if result, ok := intPow(arithmeticInt(v), arithmeticInt(other)); ok {
+			return result, nil
+		}
+		return Undefined(), fmt.Errorf("unable to calculate %s ** %s", v.Repr(), other.Repr())
+	}
+	return FromFloat(math.Pow(f1, f2)), nil
+}
+
+// intPow raises an integer to a non-negative integer power.  Like the i128
+// math in Rust, it fails if the result does not fit into 128 bits.
+func intPow(base, exp int64) (Value, bool) {
+	if (base > 1 || base < -1) && exp > 127 {
+		return Value{}, false
+	}
+	result := new(big.Int).Exp(big.NewInt(base), big.NewInt(exp), nil)
+	if result.IsInt64() {
+		return FromInt(result.Int64()), true
+	}
+	// Allow the range of an i128, which includes -2**127.
+	if result.BitLen() > 127 && (result.Sign() > 0 || result.BitLen() > 128 || result.TrailingZeroBits() != 127) {
+		return Value{}, false
+	}
+	return FromBigInt(result), true
 }
 
 // boolToFloat converts a bool to float for coercion (false=0, true=1)
