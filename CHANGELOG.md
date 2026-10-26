@@ -2,7 +2,7 @@
 
 All notable changes to MiniJinja are documented here.
 
-## Unreleased
+## 3.0.4
 
 * Fixed `str.count` in `pycompat` looping forever when counting an empty string.  Like in Python, `'abc'.count('')` is now `4`.
 * Fixed `str.islower` and `str.isupper` in `pycompat` returning false for strings with spaces, digits or other uncased characters, and the `str.is*` predicates returning true for an empty string.  They now follow Python, so `'foo bar'.islower()` is true and `''.isdigit()` is false.
