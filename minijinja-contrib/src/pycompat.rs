@@ -196,13 +196,7 @@ fn string_methods(
         }
         "count" => {
             let (what,): (&str,) = from_args(args)?;
-            let mut c = 0;
-            let mut rest = s;
-            while let Some(offset) = rest.find(what) {
-                c += 1;
-                rest = &rest[offset + what.len()..];
-            }
-            Ok(Value::from(c))
+            Ok(Value::from(s.matches(what).count()))
         }
         "find" => {
             let (what,): (&str,) = from_args(args)?;

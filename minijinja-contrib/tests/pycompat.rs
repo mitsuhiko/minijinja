@@ -68,6 +68,8 @@ fn test_string_methods() {
         Some("Foo bar")
     );
     assert_eq!(eval_expr("'foo barooo'.count('oo')").as_usize(), Some(2));
+    assert_eq!(eval_expr("'abc'.count('')").as_usize(), Some(4));
+    assert_eq!(eval_expr("''.count('')").as_usize(), Some(1));
     assert_eq!(eval_expr("'foo barooo'.find('oo')").as_usize(), Some(1));
     assert_eq!(eval_expr("'foo barooo'.rfind('oo')").as_usize(), Some(8));
     assert_eq!(eval_expr("'über über'.find('er')").as_usize(), Some(2));
