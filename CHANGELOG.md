@@ -4,6 +4,9 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed `str.count` in `pycompat` looping forever when counting an empty string.  Like in Python, `'abc'.count('')` is now `4`.
+* Fixed `str.islower` and `str.isupper` in `pycompat` returning false for strings with spaces, digits or other uncased characters, and the `str.is*` predicates returning true for an empty string.  They now follow Python, so `'foo bar'.islower()` is true and `''.isdigit()` is false.
+* Fixed `str.find` and `str.rfind` in `pycompat` returning byte offsets.  Like in Python they now return character offsets, so `'über'.find('e')` is `2`.
 * Added the `attribute` and `start` arguments to the `sum` filter and the `attribute` argument to the `join` filter for Jinja2 compatibility in Rust and Go.  Like in Jinja2 the arguments can be passed positionally or by keyword, and the separator of `join` can also be passed as `d`.  In Go the first positional argument of `sum` is now the attribute rather than the start value, so `sum(100)` needs to be written as `sum(start=100)`.  Go previously ignored unknown keyword arguments to `sum` and `join` and now fails like Rust.  #962
 * Fixed the handling of none arguments to the `int`, `float` and `round` filters in Go.  Like in Rust they now count as not given, so `2.5|round(none)` is `2.0` instead of an error.
 * Fixed the `join` filter dropping a separator that is not a string in Go.  Like in Rust it is converted to a string, so `[1, 2]|join(3)` is `132`.

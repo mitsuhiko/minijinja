@@ -39,6 +39,21 @@ fn test_string_methods() {
     assert!(eval_expr("'abc'.isalpha()").is_true());
     assert!(eval_expr("'abc123'.isalnum()").is_true());
     assert!(eval_expr("'abc%@#'.isascii()").is_true());
+    assert!(eval_expr("'foo bar 42'.islower()").is_true());
+    assert!(eval_expr("'FOO BAR 42'.isupper()").is_true());
+    assert!(!eval_expr("'42'.islower()").is_true());
+    assert!(!eval_expr("'42'.isupper()").is_true());
+    for method in [
+        "islower",
+        "isupper",
+        "isspace",
+        "isdigit",
+        "isnumeric",
+        "isalnum",
+        "isalpha",
+    ] {
+        assert!(!eval_expr(&format!("''.{method}()")).is_true(), "{method}");
+    }
     assert_eq!(
         eval_expr("'foobar'.replace('o', 'x')").as_str(),
         Some("fxxbar")
@@ -53,8 +68,12 @@ fn test_string_methods() {
         Some("Foo bar")
     );
     assert_eq!(eval_expr("'foo barooo'.count('oo')").as_usize(), Some(2));
+    assert_eq!(eval_expr("'abc'.count('')").as_usize(), Some(4));
+    assert_eq!(eval_expr("''.count('')").as_usize(), Some(1));
     assert_eq!(eval_expr("'foo barooo'.find('oo')").as_usize(), Some(1));
     assert_eq!(eval_expr("'foo barooo'.rfind('oo')").as_usize(), Some(8));
+    assert_eq!(eval_expr("'über über'.find('er')").as_usize(), Some(2));
+    assert_eq!(eval_expr("'über über'.rfind('ü')").as_usize(), Some(5));
     assert!(eval_expr("'a b c'.split() == ['a', 'b', 'c']").is_true());
     assert!(eval_expr("'a  b  c'.split() == ['a', 'b', 'c']").is_true());
     assert!(eval_expr("'a  b  c'.split(none, 1) == ['a', 'b  c']").is_true());

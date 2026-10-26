@@ -82,29 +82,41 @@ fn string_methods(
         }
         "islower" => {
             let () = from_args(args)?;
-            Ok(Value::from(s.chars().all(|x| x.is_lowercase())))
+            Ok(Value::from(
+                s.chars().any(|x| x.is_lowercase()) && !s.chars().any(|x| x.is_uppercase()),
+            ))
         }
         "isupper" => {
             let () = from_args(args)?;
-            Ok(Value::from(s.chars().all(|x| x.is_uppercase())))
+            Ok(Value::from(
+                s.chars().any(|x| x.is_uppercase()) && !s.chars().any(|x| x.is_lowercase()),
+            ))
         }
         "isspace" => {
             let () = from_args(args)?;
-            Ok(Value::from(s.chars().all(|x| x.is_whitespace())))
+            Ok(Value::from(
+                !s.is_empty() && s.chars().all(|x| x.is_whitespace()),
+            ))
         }
         "isdigit" | "isnumeric" => {
             // this is not a perfect mapping to what Python does, but
             // close enough for most uses in templates.
             let () = from_args(args)?;
-            Ok(Value::from(s.chars().all(|x| x.is_numeric())))
+            Ok(Value::from(
+                !s.is_empty() && s.chars().all(|x| x.is_numeric()),
+            ))
         }
         "isalnum" => {
             let () = from_args(args)?;
-            Ok(Value::from(s.chars().all(|x| x.is_alphanumeric())))
+            Ok(Value::from(
+                !s.is_empty() && s.chars().all(|x| x.is_alphanumeric()),
+            ))
         }
         "isalpha" => {
             let () = from_args(args)?;
-            Ok(Value::from(s.chars().all(|x| x.is_alphabetic())))
+            Ok(Value::from(
+                !s.is_empty() && s.chars().all(|x| x.is_alphabetic()),
+            ))
         }
         "isascii" => {
             let () = from_args(args)?;
@@ -184,18 +196,12 @@ fn string_methods(
         }
         "count" => {
             let (what,): (&str,) = from_args(args)?;
-            let mut c = 0;
-            let mut rest = s;
-            while let Some(offset) = rest.find(what) {
-                c += 1;
-                rest = &rest[offset + what.len()..];
-            }
-            Ok(Value::from(c))
+            Ok(Value::from(s.matches(what).count()))
         }
         "find" => {
             let (what,): (&str,) = from_args(args)?;
             Ok(Value::from(match s.find(what) {
-                Some(x) => x as i64,
+                Some(x) => s[..x].chars().count() as i64,
                 None => -1,
             }))
         }
@@ -203,7 +209,7 @@ fn string_methods(
         "rfind" => {
             let (what,): (&str,) = from_args(args)?;
             Ok(Value::from(match s.rfind(what) {
-                Some(x) => x as i64,
+                Some(x) => s[..x].chars().count() as i64,
                 None => -1,
             }))
         }
