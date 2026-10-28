@@ -163,6 +163,28 @@ struct FormatSpec {
     location: usize,
 }
 
+// Formats a float like Python's `str()`: the shortest representation that
+// round-trips, switching to exponent notation outside of `1e-4 <= |f| < 1e16`.
+fn python_float_str(val: f64) -> String {
+    if val.is_nan() {
+        return "nan".into();
+    } else if val == f64::INFINITY {
+        return "inf".into();
+    } else if val == f64::NEG_INFINITY {
+        return "-inf".into();
+    }
+    // Rust's debug formatting uses the same thresholds as Python, but writes
+    // the exponent without sign and padding (`1e16` instead of `1e+16`).
+    let rv = format!("{val:?}");
+    match rv.split_once('e') {
+        Some((mantissa, exp)) => {
+            let exp: i32 = exp.parse().unwrap();
+            format!("{mantissa}e{exp:+03}")
+        }
+        None => rv,
+    }
+}
+
 impl FormatSpec {
     // Format the given value according to this spec
     fn format(&self, val: &Value) -> Result<String, Error> {
@@ -537,10 +559,13 @@ impl FormatSpec {
         };
 
         match self.ty {
-            Type::String if FormatStyle::Printf != self.format_style => {
-                Err(self.type_conversion_err("float", Type::String))
-            }
-            Type::Default | Type::String => match val.classify() {
+            Type::String => match self.format_style {
+                // printf-style formatting in Python formats floats with `str()`
+                // for the 's' format.
+                FormatStyle::Printf => self.format_str(python_float_str(val)),
+                FormatStyle::StrFormat => Err(self.type_conversion_err("float", Type::String)),
+            },
+            Type::Default => match val.classify() {
                 FpCategory::Nan => Ok(self.format_number("nan", "")),
                 FpCategory::Infinite => Ok(self.format_number("inf", sign)),
                 FpCategory::Zero => Ok(self.format_number("0", sign)),

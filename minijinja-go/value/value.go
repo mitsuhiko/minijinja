@@ -934,20 +934,7 @@ func (v Value) String() string {
 	case bigIntValue:
 		return d.String()
 	case float64:
-		// Match Jinja2's float formatting
-		if math.IsInf(d, 1) {
-			return "inf"
-		}
-		if math.IsInf(d, -1) {
-			return "-inf"
-		}
-		if math.IsNaN(d) {
-			return "nan"
-		}
-		if d == math.Trunc(d) && math.Abs(d) < 1e15 {
-			return fmt.Sprintf("%.1f", d)
-		}
-		return fmt.Sprintf("%g", d)
+		return formatFloat(d, false)
 	case string:
 		return d
 	case safeString:
@@ -997,10 +984,7 @@ func (v Value) Repr() string {
 	case bigIntValue:
 		return d.String()
 	case float64:
-		if d == math.Trunc(d) && math.Abs(d) < 1e15 {
-			return fmt.Sprintf("%.1f", d)
-		}
-		return fmt.Sprintf("%g", d)
+		return formatFloat(d, true)
 	case string:
 		return pythonStringRepr(d)
 	case safeString:
@@ -1027,6 +1011,31 @@ func (v Value) Repr() string {
 	default:
 		return fmt.Sprintf("%v", d)
 	}
+}
+
+// formatFloat formats a float like Rust formats an f64: the shortest
+// representation that round-trips, with ".0" added to integral values.
+// Display output never uses exponent notation, while debug output (used by
+// Repr) switches to it outside of 1e-4 <= |f| < 1e16 like Rust's Debug.
+func formatFloat(f float64, debug bool) string {
+	switch {
+	case math.IsNaN(f):
+		return "NaN"
+	case math.IsInf(f, 1):
+		return "inf"
+	case math.IsInf(f, -1):
+		return "-inf"
+	}
+	if abs := math.Abs(f); debug && abs != 0 && (abs < 1e-4 || abs >= 1e16) {
+		mantissa, exp, _ := strings.Cut(strconv.FormatFloat(f, 'e', -1, 64), "e")
+		n, _ := strconv.Atoi(exp)
+		return mantissa + "e" + strconv.Itoa(n)
+	}
+	s := strconv.FormatFloat(f, 'f', -1, 64)
+	if !strings.Contains(s, ".") {
+		s += ".0"
+	}
+	return s
 }
 
 func formatMapKey(key string) string {
