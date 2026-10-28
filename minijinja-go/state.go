@@ -3149,6 +3149,17 @@ func (s *State) sliceValue(val value.Value, start, stop *int64, step int64) (val
 			return value.FromSafeString(string(result)), nil
 		}
 		return value.FromString(string(result)), nil
+	case val.Kind() == value.KindIterable:
+		// Like in Rust, iterables such as range() can be sliced too, the
+		// result is again an iterable.
+		result := sliceSlice(val.Iter(), start, stop, step)
+		return value.FromIterator(value.NewIterator("slice", result)), nil
+	case val.IsUndefined() || val.IsNone():
+		// Like in Rust, slicing none or undefined gives an empty list.
+		if err := s.assertIterable(val); err != nil {
+			return value.Undefined(), err
+		}
+		return value.FromSlice([]value.Value{}), nil
 	default:
 		return value.Undefined(), fmt.Errorf("cannot slice %s", val.Kind())
 	}

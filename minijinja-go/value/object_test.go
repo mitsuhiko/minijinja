@@ -676,3 +676,40 @@ func TestReverseIterateObjectNonReversible(t *testing.T) {
 		t.Error("ReverseIterateObject(plain) should return nil")
 	}
 }
+
+type testReprMap struct{ testMap }
+
+func (m *testReprMap) ObjectRepr() ObjectRepr { return ObjectReprMap }
+
+func TestContainsAndEqualOnObjects(t *testing.T) {
+	seq := FromObject(&testSeq{items: []Value{FromInt(1), FromInt(2)}})
+	m := FromObject(&testReprMap{testMap{data: map[string]Value{"a": FromInt(1)}, keys: []string{"a"}}})
+	plain := FromObject(&testMap{data: map[string]Value{"a": FromInt(1)}, keys: []string{"a"}})
+	iterable := MakeIterable(func() iter.Seq[Value] {
+		return slices.Values([]Value{FromInt(1), FromInt(2)})
+	})
+
+	if !seq.Contains(FromInt(2)) || seq.Contains(FromInt(3)) {
+		t.Error("seq object containment is wrong")
+	}
+	if !iterable.Contains(FromInt(2)) || iterable.Contains(FromInt(3)) {
+		t.Error("iterable object containment is wrong")
+	}
+	if !m.Contains(FromString("a")) || m.Contains(FromString("b")) || m.Contains(FromInt(1)) {
+		t.Error("map object containment is wrong")
+	}
+	if plain.Contains(FromString("a")) {
+		t.Error("plain objects should not contain anything")
+	}
+
+	list := FromSlice([]Value{FromInt(1), FromInt(2)})
+	if !seq.Equal(list) || !list.Equal(iterable) || !seq.Equal(iterable) {
+		t.Error("sequences and iterables with the same items should be equal")
+	}
+	if seq.Equal(FromTuple([]Value{FromInt(1), FromInt(2)})) {
+		t.Error("tuples should not be equal to other sequences")
+	}
+	if !FromObject(&testComparable{num: 1}).Equal(FromObject(&testComparable{num: 1})) {
+		t.Error("objects with custom comparison should use it")
+	}
+}

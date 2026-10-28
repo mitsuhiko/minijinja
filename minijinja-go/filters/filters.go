@@ -2986,8 +2986,8 @@ func FilterPprint(_ State, val value.Value, _ []value.Value, _ map[string]value.
 func pprintValue(val value.Value, indent int) string {
 	pad := strings.Repeat(" ", indent)
 	switch val.Kind() {
-	case value.KindSeq:
-		items, _ := val.AsSlice()
+	case value.KindSeq, value.KindIterable:
+		items := val.Iter()
 		if len(items) == 0 {
 			return "[]"
 		}

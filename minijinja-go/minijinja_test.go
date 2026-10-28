@@ -637,6 +637,45 @@ func TestStringFiltersRejectStrictUndefined(t *testing.T) {
 	}
 }
 
+func TestSliceAndContainsOnIterables(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{`{{ range(5)[:2] }}`, `[0, 1]`},
+		{`{{ range(5)[::2] }}`, `[0, 2, 4]`},
+		{`{{ range(2, 10, 3)[1:] }}`, `[5, 8]`},
+		{`{{ ([1, 2, 3]|reverse)[:2] }}`, `[3, 2]`},
+		{`{% for i in range(10)[2:5] %}{{ i }}{% endfor %}`, `234`},
+		{`{{ range(5)[:2] is sequence }}`, `False`},
+		{`{{ 3 in range(5) }}`, `True`},
+		{`{{ 2 in range(1, 5, 2) }}`, `False`},
+		{`{{ 2 in ([1, 2]|reverse) }}`, `True`},
+		{`{{ 3 not in range(3) }}`, `True`},
+		{`{{ none[:2] }}|{{ missing[:2] }}`, `[]|[]`},
+		{`{{ [range(2), range(5)[3:]] }}`, `[[0, 1], [3, 4]]`},
+		{`{{ range(5)[:2]|tojson }}`, `[0, 1]`},
+		{`{{ range(2)|pprint }}`, "[\n    0,\n    1,\n]"},
+		{`{{ range(5)[:2] == [0, 1] }}|{{ range(2) == range(2) }}|{{ range(2) == (0, 1) }}`, `True|True|False`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
 func TestUndefinedIsASequence(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ missing is iterable }}|{{ missing is sequence }}",
