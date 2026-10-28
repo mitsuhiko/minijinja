@@ -654,6 +654,11 @@ func TestSliceAndContainsOnIterables(t *testing.T) {
 		{`{{ 2 in range(1, 5, 2) }}`, `False`},
 		{`{{ 2 in ([1, 2]|reverse) }}`, `True`},
 		{`{{ 3 not in range(3) }}`, `True`},
+		{`{{ none[:2] }}|{{ missing[:2] }}`, `[]|[]`},
+		{`{{ [range(2), range(5)[3:]] }}`, `[[0, 1], [3, 4]]`},
+		{`{{ range(5)[:2]|tojson }}`, `[0, 1]`},
+		{`{{ range(2)|pprint }}`, "[\n    0,\n    1,\n]"},
+		{`{{ range(5)[:2] == [0, 1] }}|{{ range(2) == range(2) }}|{{ range(2) == (0, 1) }}`, `True|True|False`},
 	}
 
 	for _, test := range tests {

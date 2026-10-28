@@ -996,7 +996,7 @@ func (v Value) Repr() string {
 	case tupleValue:
 		return formatSequence([]Value(d), true)
 	case *Iterator:
-		return "<iterator>"
+		return formatSequence(d.items, false)
 	case map[string]Value:
 		var parts []string
 		keys := make([]string, 0, len(d))

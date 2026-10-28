@@ -433,23 +433,31 @@ func (v Value) Equal(other Value) bool {
 		return false
 	}
 
-	// Sequence comparison
-	if seq1, ok := v.AsSlice(); ok {
-		if seq2, ok := other.AsSlice(); ok {
-			if v.IsTuple() != other.IsTuple() {
-				return false
+	// Objects with a custom comparison decide on their own.
+	if o1, ok := v.data.(Object); ok {
+		if o2, ok := other.data.(Object); ok {
+			if cmp, ok := CompareObjects(o1, o2); ok {
+				return cmp == 0
 			}
-			if len(seq1) != len(seq2) {
-				return false
-			}
-			for i := range seq1 {
-				if !seq1[i].Equal(seq2[i]) {
-					return false
-				}
-			}
-			return true
 		}
-		return false
+	}
+
+	// Sequence comparison.  Like in Rust, sequences and iterables compare
+	// equal if they produce the same items.
+	if isSeqOrIterable(v) && isSeqOrIterable(other) {
+		if v.IsTuple() != other.IsTuple() {
+			return false
+		}
+		seq1, seq2 := v.Iter(), other.Iter()
+		if len(seq1) != len(seq2) {
+			return false
+		}
+		for i := range seq1 {
+			if !seq1[i].Equal(seq2[i]) {
+				return false
+			}
+		}
+		return true
 	}
 
 	// Map comparison
@@ -626,8 +634,26 @@ func (v Value) Contains(other Value) bool {
 			_, exists := d[s]
 			return exists
 		}
+	case Object:
+		// Like in Rust, map objects are checked for the key while
+		// sequences and iterables are checked for the item.
+		switch v.Kind() {
+		case KindMap:
+			return !v.GetItem(other).IsUndefined()
+		case KindSeq, KindIterable:
+			for _, item := range v.Iter() {
+				if item.Equal(other) {
+					return true
+				}
+			}
+		}
 	}
 	return false
+}
+
+func isSeqOrIterable(v Value) bool {
+	kind := v.Kind()
+	return kind == KindSeq || kind == KindIterable
 }
 
 // Concat performs the tilde (~) string concatenation.

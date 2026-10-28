@@ -28,8 +28,8 @@ func ToNative(v value.Value) interface{} {
 	case value.KindString:
 		s, _ := v.AsString()
 		return s
-	case value.KindSeq:
-		items, _ := v.AsSlice()
+	case value.KindSeq, value.KindIterable:
+		items := v.Iter()
 		result := make([]interface{}, len(items))
 		for i, item := range items {
 			result[i] = ToNative(item)

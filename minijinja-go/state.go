@@ -3154,6 +3154,12 @@ func (s *State) sliceValue(val value.Value, start, stop *int64, step int64) (val
 		// result is again an iterable.
 		result := sliceSlice(val.Iter(), start, stop, step)
 		return value.FromIterator(value.NewIterator("slice", result)), nil
+	case val.IsUndefined() || val.IsNone():
+		// Like in Rust, slicing none or undefined gives an empty list.
+		if err := s.assertIterable(val); err != nil {
+			return value.Undefined(), err
+		}
+		return value.FromSlice([]value.Value{}), nil
 	default:
 		return value.Undefined(), fmt.Errorf("cannot slice %s", val.Kind())
 	}
