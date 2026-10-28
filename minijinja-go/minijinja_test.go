@@ -1297,6 +1297,8 @@ func TestTojsonFilter(t *testing.T) {
 		{`{{ value|tojson }}`, map[string]any{"value": 0.00001}, `0.00001`},
 		{`{{ value|tojson }}`, map[string]any{"value": 2.5e-7}, `2.5e-7`},
 		{`{{ value|tojson }}`, map[string]any{"value": math.Inf(1)}, `null`},
+		{`{{ value|tojson }}`, map[string]any{"value": math.NaN()}, `null`},
+		{`{{ value|tojson }}`, map[string]any{"value": math.Copysign(0, -1)}, `-0.0`},
 	}
 
 	for _, test := range tests {

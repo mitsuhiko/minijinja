@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/jsonvalue"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/parser"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
@@ -2451,7 +2452,7 @@ func (s *State) formatValue(val value.Value, strictUndefined bool) (string, erro
 }
 
 func formatJSONValue(val value.Value) (string, error) {
-	native := valueToNative(val)
+	native := jsonvalue.ToNative(val)
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
