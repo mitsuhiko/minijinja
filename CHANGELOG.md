@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed the `tojson` filter in Go writing floats like integers.  Like in Rust, a float stays a float in the output, so `1.0|tojson` is `1.0` instead of `1`, large and small magnitudes use exponent notation (`1.5e+16`, `2.5e-7`) and infinity becomes `null` instead of an error.  The same applies to values rendered with JSON auto-escaping.
+
 ## 3.0.4
 
 * Fixed `str.count` in `pycompat` looping forever when counting an empty string.  Like in Python, `'abc'.count('')` is now `4`.

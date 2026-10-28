@@ -1289,6 +1289,16 @@ func TestTojsonFilter(t *testing.T) {
 		{`{{ value|tojson }}`, map[string]any{"value": 42}, `42`},
 		{`{{ value|tojson }}`, map[string]any{"value": []int{1, 2, 3}}, `[1, 2, 3]`},
 		{`{{ value|tojson }}`, map[string]any{"value": map[string]any{"a": 1}}, `{"a": 1}`},
+		{`{{ value|tojson }}`, map[string]any{"value": 1.0}, `1.0`},
+		{`{{ value|tojson }}`, map[string]any{"value": []any{0.0, -2.0, 2.5, 3}}, `[0.0, -2.0, 2.5, 3]`},
+		{`{{ value|tojson(indent=2) }}`, map[string]any{"value": map[string]any{"a": 100.0}}, "{\n  \"a\": 100.0\n}"},
+		{`{{ value|tojson }}`, map[string]any{"value": 1e15}, `1000000000000000.0`},
+		{`{{ value|tojson }}`, map[string]any{"value": 1.5e16}, `1.5e+16`},
+		{`{{ value|tojson }}`, map[string]any{"value": 0.00001}, `0.00001`},
+		{`{{ value|tojson }}`, map[string]any{"value": 2.5e-7}, `2.5e-7`},
+		{`{{ value|tojson }}`, map[string]any{"value": math.Inf(1)}, `null`},
+		{`{{ value|tojson }}`, map[string]any{"value": math.NaN()}, `null`},
+		{`{{ value|tojson }}`, map[string]any{"value": math.Copysign(0, -1)}, `-0.0`},
 	}
 
 	for _, test := range tests {

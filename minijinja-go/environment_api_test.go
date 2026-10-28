@@ -1,6 +1,7 @@
 package minijinja
 
 import (
+	"math"
 	"strings"
 	"testing"
 
@@ -187,6 +188,22 @@ func TestAutoEscapeJSONRendering(t *testing.T) {
 	}
 	if result != `"hello"` {
 		t.Fatalf("expected JSON serialized value, got %q", result)
+	}
+}
+
+func TestAutoEscapeJSONFloats(t *testing.T) {
+	env := NewEnvironment()
+	tmpl, err := env.TemplateFromNamedString("data.json", "{{ value }}")
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	result, err := tmpl.Render(map[string]any{"value": []any{1.0, 1.5e16, math.Inf(1), 2}})
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if result != `[1.0,1.5e+16,null,2]` {
+		t.Fatalf("unexpected JSON output, got %q", result)
 	}
 }
 

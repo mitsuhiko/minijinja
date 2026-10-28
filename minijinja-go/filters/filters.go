@@ -15,6 +15,7 @@ import (
 	"unicode"
 
 	mjerrors "github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/errors"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/jsonvalue"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
@@ -2991,7 +2992,7 @@ func pprintValue(val value.Value, indent int) string {
 //   - indent: true for 2-space indent, or integer for custom indent
 func FilterTojson(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	// Convert value to Go native type for JSON serialization
-	native := valueToNative(val)
+	native := jsonvalue.ToNative(val)
 
 	// Check for indent option
 	indent := ""
@@ -3053,48 +3054,6 @@ func addCompactJSONSpaces(data []byte) []byte {
 		}
 	}
 	return result
-}
-
-func valueToNative(v value.Value) interface{} {
-	switch v.Kind() {
-	case value.KindUndefined, value.KindNone:
-		return nil
-	case value.KindBool:
-		b, _ := v.AsBool()
-		return b
-	case value.KindNumber:
-		if i, ok := v.AsInt(); ok && v.IsActualInt() {
-			return i
-		}
-		f, _ := v.AsFloat()
-		return f
-	case value.KindString:
-		s, _ := v.AsString()
-		return s
-	case value.KindSeq:
-		items, _ := v.AsSlice()
-		result := make([]interface{}, len(items))
-		for i, item := range items {
-			result[i] = valueToNative(item)
-		}
-		return result
-	case value.KindMap:
-		m, _ := v.AsMap()
-		result := make(map[string]interface{})
-		for k, val := range m {
-			result[k] = valueToNative(val)
-		}
-		return result
-	default:
-		if m, ok := v.AsMap(); ok {
-			result := make(map[string]interface{})
-			for k, val := range m {
-				result[k] = valueToNative(val)
-			}
-			return result
-		}
-		return v.String()
-	}
 }
 
 func urlencodeString(input string) string {
