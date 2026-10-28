@@ -86,6 +86,16 @@ func formatForSafeOutput(state State, val value.Value, forceEscape bool) (string
 	return EscapeHTML(val.String()), nil
 }
 
+// stringInput returns the string a string filter works on. Like StringInput in
+// the Rust implementation, a value that is not a string is converted to its
+// string representation (`true` becomes "True", `none` becomes "None").
+func stringInput(val value.Value) string {
+	if s, ok := val.AsString(); ok {
+		return s
+	}
+	return val.String()
+}
+
 func preserveSafety(input value.Value, output string) value.Value {
 	if input.IsSafe() {
 		return value.FromSafeString(output)
@@ -109,10 +119,7 @@ func preserveSafety(input value.Value, output string) value.Value {
 // Note: This filter only works on string values. Non-string values are returned
 // unchanged.
 func FilterUpper(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	if s, ok := val.AsString(); ok {
-		return preserveSafety(val, strings.ToUpper(s)), nil
-	}
-	return val, nil
+	return preserveSafety(val, strings.ToUpper(stringInput(val))), nil
 }
 
 // FilterLower converts a value to lowercase.
@@ -128,10 +135,7 @@ func FilterUpper(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 //
 //	<h1>{{ chapter.title|lower }}</h1>
 func FilterLower(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	if s, ok := val.AsString(); ok {
-		return preserveSafety(val, strings.ToLower(s)), nil
-	}
-	return val, nil
+	return preserveSafety(val, strings.ToLower(stringInput(val))), nil
 }
 
 // FilterCapitalize converts the first character to uppercase and the rest to lowercase.
@@ -150,15 +154,12 @@ func FilterLower(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 //	{{ "hello WORLD"|capitalize }}
 //	  -> "Hello world"
 func FilterCapitalize(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	if s, ok := val.AsString(); ok {
-		runes := []rune(s)
-		if len(runes) == 0 {
-			return val, nil
-		}
-		output := strings.ToUpper(string(runes[0])) + strings.ToLower(string(runes[1:]))
-		return preserveSafety(val, output), nil
+	runes := []rune(stringInput(val))
+	if len(runes) == 0 {
+		return val, nil
 	}
-	return val, nil
+	output := strings.ToUpper(string(runes[0])) + strings.ToLower(string(runes[1:]))
+	return preserveSafety(val, output), nil
 }
 
 // FilterTitle converts a value to title case.
@@ -178,23 +179,20 @@ func FilterCapitalize(_ State, val value.Value, _ []value.Value, _ map[string]va
 //	{{ "hello world"|title }}
 //	  -> "Hello World"
 func FilterTitle(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	if s, ok := val.AsString(); ok {
-		var result strings.Builder
-		capitalizeNext := true
-		for _, r := range s {
-			if unicode.IsSpace(r) || r == '-' || r == '(' || r == '{' || r == '[' || r == '<' {
-				capitalizeNext = true
-				result.WriteRune(r)
-			} else if capitalizeNext {
-				result.WriteRune(unicode.ToUpper(r))
-				capitalizeNext = false
-			} else {
-				result.WriteRune(unicode.ToLower(r))
-			}
+	var result strings.Builder
+	capitalizeNext := true
+	for _, r := range stringInput(val) {
+		if unicode.IsSpace(r) || r == '-' || r == '(' || r == '{' || r == '[' || r == '<' {
+			capitalizeNext = true
+			result.WriteRune(r)
+		} else if capitalizeNext {
+			result.WriteRune(unicode.ToUpper(r))
+			capitalizeNext = false
+		} else {
+			result.WriteRune(unicode.ToLower(r))
 		}
-		return value.FromString(result.String()), nil
 	}
-	return val, nil
+	return value.FromString(result.String()), nil
 }
 
 // FilterTrim strips leading and trailing characters from a string.
@@ -243,35 +241,33 @@ func FilterTrim(_ State, val value.Value, args []value.Value, _ map[string]value
 //	{{ "aaa"|replace("a", "b", 2) }}
 //	  -> "bba"
 func FilterReplace(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
-	if s, ok := val.AsString(); ok {
-		if len(args) < 2 {
-			return val, fmt.Errorf("replace requires old and new arguments")
-		}
-		old, _ := args[0].AsString()
-		new, _ := args[1].AsString()
-		count := -1
-		if len(args) > 2 {
-			if c, ok := args[2].AsInt(); ok {
-				count = int(c)
-			}
-		}
-
-		safetyAware := autoEscapeEnabled(state) && (val.IsSafe() || args[0].IsSafe() || args[1].IsSafe())
-		if safetyAware {
-			var err error
-			s, err = formatForSafeOutput(state, val, false)
-			if err != nil {
-				return value.Undefined(), err
-			}
-			new, err = formatForSafeOutput(state, args[1], false)
-			if err != nil {
-				return value.Undefined(), err
-			}
-			return value.FromSafeString(strings.Replace(s, old, new, count)), nil
-		}
-		return value.FromString(strings.Replace(s, old, new, count)), nil
+	if len(args) < 2 {
+		return val, fmt.Errorf("replace requires old and new arguments")
 	}
-	return val, nil
+	s := stringInput(val)
+	old := stringInput(args[0])
+	new := stringInput(args[1])
+	count := -1
+	if len(args) > 2 {
+		if c, ok := args[2].AsInt(); ok {
+			count = int(c)
+		}
+	}
+
+	safetyAware := autoEscapeEnabled(state) && (val.IsSafe() || args[0].IsSafe() || args[1].IsSafe())
+	if safetyAware {
+		var err error
+		s, err = formatForSafeOutput(state, val, false)
+		if err != nil {
+			return value.Undefined(), err
+		}
+		new, err = formatForSafeOutput(state, args[1], false)
+		if err != nil {
+			return value.Undefined(), err
+		}
+		return value.FromSafeString(strings.Replace(s, old, new, count)), nil
+	}
+	return value.FromString(strings.Replace(s, old, new, count)), nil
 }
 
 // FilterFormat applies printf-style formatting to a string.

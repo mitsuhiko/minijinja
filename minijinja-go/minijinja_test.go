@@ -583,6 +583,39 @@ func TestUpperAndLowerRejectNonStrings(t *testing.T) {
 	}
 }
 
+func TestStringFiltersConvertNonStrings(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{`{{ true|upper }}`, `TRUE`},
+		{`{{ none|lower }}`, `none`},
+		{`{{ [1, "a"]|upper }}`, `[1, 'A']`},
+		{`{{ {"A": "B"}|capitalize }}`, `{'a': 'b'}`},
+		{`{{ {"a b": "c"}|title }}`, `{'a B': 'c'}`},
+		{`{{ 1.5|replace(".", ",") }}`, `1,5`},
+		{`{{ 12345|replace("3", "-") }}`, `12-45`},
+		{`{{ "a1b1"|replace(1, "X") }}`, `aXbX`},
+		{`{{ "a1b1"|replace("1", 2) }}`, `a2b2`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
 func TestUndefinedIsASequence(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ missing is iterable }}|{{ missing is sequence }}",
