@@ -615,6 +615,12 @@ func (v Value) Contains(other Value) bool {
 				return true
 			}
 		}
+	case *Iterator:
+		for _, item := range d.items {
+			if item.Equal(other) {
+				return true
+			}
+		}
 	case map[string]Value:
 		if s, ok := other.AsString(); ok {
 			_, exists := d[s]

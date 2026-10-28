@@ -3149,6 +3149,11 @@ func (s *State) sliceValue(val value.Value, start, stop *int64, step int64) (val
 			return value.FromSafeString(string(result)), nil
 		}
 		return value.FromString(string(result)), nil
+	case val.Kind() == value.KindIterable:
+		// Like in Rust, iterables such as range() can be sliced too, the
+		// result is again an iterable.
+		result := sliceSlice(val.Iter(), start, stop, step)
+		return value.FromIterator(value.NewIterator("slice", result)), nil
 	default:
 		return value.Undefined(), fmt.Errorf("cannot slice %s", val.Kind())
 	}
