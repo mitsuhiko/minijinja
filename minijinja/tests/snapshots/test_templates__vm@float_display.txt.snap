@@ -1,0 +1,10 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "display: {{ 1234567.5 }} {{ -1234567.5 }} {{ 1e15 }} {{ 1e16 }} {{ 1e20 }} {{ 0.0001 }} {{ 0.00001 }} {{ 1.5e-10 }} {{ 2.0 }} {{ -0.0 }}\nstring: {{ 1234567.5|string }} {{ 1234567.5 ~ \"\" }}\nrepr: {{ [1234567.5, 1e15, 1e16, 1e20, 0.0001, 0.00001, 1.5e-10, 2.0, -0.0] }}\nnon-finite: {{ \"inf\"|float }} {{ \"-inf\"|float }} {{ \"nan\"|float }} {{ [\"inf\"|float, \"-inf\"|float, \"nan\"|float] }}"
+info: {}
+input_file: minijinja/tests/inputs/float_display.txt
+---
+display: 1234567.5 -1234567.5 1000000000000000.0 10000000000000000.0 100000000000000000000.0 0.0001 0.00001 0.00000000015 2.0 -0.0
+string: 1234567.5 1234567.5
+repr: [1234567.5, 1000000000000000.0, 1e16, 1e20, 0.0001, 1e-5, 1.5e-10, 2.0, -0.0]
+non-finite: inf -inf NaN [inf, -inf, NaN]
