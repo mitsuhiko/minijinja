@@ -88,12 +88,16 @@ func formatForSafeOutput(state State, val value.Value, forceEscape bool) (string
 
 // stringInput returns the string a string filter works on. Like StringInput in
 // the Rust implementation, a value that is not a string is converted to its
-// string representation (`true` becomes "True", `none` becomes "None").
-func stringInput(val value.Value) string {
-	if s, ok := val.AsString(); ok {
-		return s
+// string representation (`true` becomes "True", `none` becomes "None") and
+// undefined values fail with strict and semi-strict undefined behavior.
+func stringInput(state State, val value.Value) (string, error) {
+	if err := assertNotUndefined(state, val); err != nil {
+		return "", err
 	}
-	return val.String()
+	if s, ok := val.AsString(); ok {
+		return s, nil
+	}
+	return val.String(), nil
 }
 
 func preserveSafety(input value.Value, output string) value.Value {
@@ -116,10 +120,13 @@ func preserveSafety(input value.Value, output string) value.Value {
 //
 //	<h1>{{ chapter.title|upper }}</h1>
 //
-// Note: This filter only works on string values. Non-string values are returned
-// unchanged.
-func FilterUpper(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	return preserveSafety(val, strings.ToUpper(stringInput(val))), nil
+// Values that are not strings are converted to strings first.
+func FilterUpper(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	s, err := stringInput(state, val)
+	if err != nil {
+		return value.Undefined(), err
+	}
+	return preserveSafety(val, strings.ToUpper(s)), nil
 }
 
 // FilterLower converts a value to lowercase.
@@ -134,8 +141,12 @@ func FilterUpper(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 // Template usage:
 //
 //	<h1>{{ chapter.title|lower }}</h1>
-func FilterLower(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	return preserveSafety(val, strings.ToLower(stringInput(val))), nil
+func FilterLower(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	s, err := stringInput(state, val)
+	if err != nil {
+		return value.Undefined(), err
+	}
+	return preserveSafety(val, strings.ToLower(s)), nil
 }
 
 // FilterCapitalize converts the first character to uppercase and the rest to lowercase.
@@ -153,12 +164,16 @@ func FilterLower(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 //
 //	{{ "hello WORLD"|capitalize }}
 //	  -> "Hello world"
-func FilterCapitalize(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	runes := []rune(stringInput(val))
-	if len(runes) == 0 {
-		return val, nil
+func FilterCapitalize(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	s, err := stringInput(state, val)
+	if err != nil {
+		return value.Undefined(), err
 	}
-	output := strings.ToUpper(string(runes[0])) + strings.ToLower(string(runes[1:]))
+	runes := []rune(s)
+	output := ""
+	if len(runes) > 0 {
+		output = strings.ToUpper(string(runes[0])) + strings.ToLower(string(runes[1:]))
+	}
 	return preserveSafety(val, output), nil
 }
 
@@ -178,10 +193,14 @@ func FilterCapitalize(_ State, val value.Value, _ []value.Value, _ map[string]va
 //	<h1>{{ chapter.title|title }}</h1>
 //	{{ "hello world"|title }}
 //	  -> "Hello World"
-func FilterTitle(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterTitle(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	s, err := stringInput(state, val)
+	if err != nil {
+		return value.Undefined(), err
+	}
 	var result strings.Builder
 	capitalizeNext := true
-	for _, r := range stringInput(val) {
+	for _, r := range s {
 		if unicode.IsSpace(r) || r == '-' || r == '(' || r == '{' || r == '[' || r == '<' {
 			capitalizeNext = true
 			result.WriteRune(r)
@@ -244,9 +263,18 @@ func FilterReplace(state State, val value.Value, args []value.Value, _ map[strin
 	if len(args) < 2 {
 		return val, fmt.Errorf("replace requires old and new arguments")
 	}
-	s := stringInput(val)
-	old := stringInput(args[0])
-	new := stringInput(args[1])
+	s, err := stringInput(state, val)
+	if err != nil {
+		return value.Undefined(), err
+	}
+	old, err := stringInput(state, args[0])
+	if err != nil {
+		return value.Undefined(), err
+	}
+	new, err := stringInput(state, args[1])
+	if err != nil {
+		return value.Undefined(), err
+	}
 	count := -1
 	if len(args) > 2 {
 		if c, ok := args[2].AsInt(); ok {
@@ -256,7 +284,6 @@ func FilterReplace(state State, val value.Value, args []value.Value, _ map[strin
 
 	safetyAware := autoEscapeEnabled(state) && (val.IsSafe() || args[0].IsSafe() || args[1].IsSafe())
 	if safetyAware {
-		var err error
 		s, err = formatForSafeOutput(state, val, false)
 		if err != nil {
 			return value.Undefined(), err

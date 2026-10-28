@@ -616,6 +616,27 @@ func TestStringFiltersConvertNonStrings(t *testing.T) {
 	}
 }
 
+func TestStringFiltersRejectStrictUndefined(t *testing.T) {
+	env := NewEnvironment()
+	assertRender(t, env, `[{{ missing|upper }}|{{ missing|capitalize }}|{{ missing|replace("a", "b") }}]`, nil, "[||]")
+
+	for _, behavior := range []UndefinedBehavior{UndefinedStrict, UndefinedSemiStrict} {
+		env := NewEnvironment()
+		env.SetUndefinedBehavior(behavior)
+		for _, source := range []string{
+			`{{ missing|upper }}`,
+			`{{ missing|lower }}`,
+			`{{ missing|capitalize }}`,
+			`{{ missing|title }}`,
+			`{{ missing|replace("a", "b") }}`,
+			`{{ "a"|replace(missing, "b") }}`,
+			`{{ "a"|replace("a", missing) }}`,
+		} {
+			assertRenderErrorKind(t, env, source, nil, ErrUndefinedVar)
+		}
+	}
+}
+
 func TestUndefinedIsASequence(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ missing is iterable }}|{{ missing is sequence }}",
