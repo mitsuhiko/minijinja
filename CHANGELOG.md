@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## Unreleased
 
 * Fixed floats in Go switching to exponent notation from one million up, so `1234567.5` printed as `1.2345675e+06`.  Like in Rust, a float now prints as its shortest exact decimal without an exponent, so `1234567.5` is `1234567.5` and `1e20` is `100000000000000000000.0`.  Inside lists and maps, exponent notation is only used below `1e-4` and from `1e16` up, written like `1e20` and `1e-5`.  NaN now prints as `NaN`, and infinity inside a list as `inf` instead of `+Inf`.
+* Fixed `%s` in the `format` filter formatting floats with `%g` rules, so `"%s"|format(1234567.5)` was `1.23457e+06`.  Like in Python, floats are now formatted like `str()` does: `1234567.5`, `1e+16`, `1e-05` or `nan`.  The `0`, `+` and space flags are ignored for floats and strings with `%s`, like in Python.  This applies to both Rust and Go.
 * Fixed the `tojson` filter in Go writing floats like integers.  Like in Rust, a float stays a float in the output, so `1.0|tojson` is `1.0` instead of `1`, large and small magnitudes use exponent notation (`1.5e+16`, `2.5e-7`) and infinity becomes `null` instead of an error.  The same applies to values rendered with JSON auto-escaping.
 
 ## 3.0.4

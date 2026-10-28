@@ -100,6 +100,33 @@ fn test_format_integer_as_string() {
 }
 
 #[test]
+fn test_format_float_as_string() {
+    let env = Environment::new();
+
+    // Python formats floats with `str()` for '%s'
+    assert_eq!(format_val(&env, 1.5, "s"), "1.5");
+    assert_eq!(format_val(&env, 0.0, "s"), "0.0");
+    assert_eq!(format_val(&env, -0.0, "s"), "-0.0");
+    assert_eq!(format_val(&env, 1234567.5, "s"), "1234567.5");
+    assert_eq!(format_val(&env, 1e15, "s"), "1000000000000000.0");
+    assert_eq!(format_val(&env, 1e16, "s"), "1e+16");
+    assert_eq!(format_val(&env, 1e100, "s"), "1e+100");
+    assert_eq!(format_val(&env, 0.0001, "s"), "0.0001");
+    assert_eq!(format_val(&env, 0.00001, "s"), "1e-05");
+    assert_eq!(format_val(&env, 1.5e-10, "s"), "1.5e-10");
+    assert_eq!(format_val(&env, f64::NAN, "s"), "nan");
+    assert_eq!(format_val(&env, f64::INFINITY, "s"), "inf");
+    assert_eq!(format_val(&env, f64::NEG_INFINITY, "s"), "-inf");
+    // flags apply like for strings
+    assert_eq!(format_val(&env, 1.5, "6s"), "   1.5");
+    assert_eq!(format_val(&env, 1.5, "-6s"), "1.5   ");
+    assert_eq!(format_val(&env, -1.5, "06s"), "  -1.5");
+    assert_eq!(format_val(&env, 1.5, "+s"), "1.5");
+    assert_eq!(format_val(&env, 1.5, " s"), "1.5");
+    assert_eq!(format_val(&env, 1.2345, ".2s"), "1.");
+}
+
+#[test]
 fn test_format_integer_in_octal() {
     let env = Environment::new();
 

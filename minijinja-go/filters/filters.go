@@ -448,7 +448,19 @@ func formatPrintfValue(val value.Value, flags, width, precision string, verb byt
 
 	switch verb {
 	case 's':
-		return fmt.Sprintf(format, val.String()), nil
+		if val.IsActualInt() {
+			return fmt.Sprintf(format, val.String()), nil
+		}
+		// Like in Python, only integers are zero padded.
+		format = "%" + strings.ReplaceAll(flags, "0", "") + width
+		if precision != "" {
+			format += "." + precision
+		}
+		text := val.String()
+		if f, ok := val.AsFloat(); ok && val.IsActualFloat() {
+			text = pythonFloatString(f)
+		}
+		return fmt.Sprintf(format+"s", text), nil
 	case 'c':
 		var char rune
 		switch {
@@ -496,6 +508,28 @@ func formatPrintfValue(val value.Value, flags, width, precision string, verb byt
 	default:
 		return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("invalid format spec at offset %d", location))
 	}
+}
+
+// pythonFloatString formats a float like Python's str() which is what
+// printf-style formatting uses for '%s'.  Unlike the regular float display,
+// this switches to exponent notation outside of 1e-4 <= |f| < 1e16.
+func pythonFloatString(f float64) string {
+	switch {
+	case math.IsNaN(f):
+		return "nan"
+	case math.IsInf(f, 1):
+		return "inf"
+	case math.IsInf(f, -1):
+		return "-inf"
+	}
+	if abs := math.Abs(f); abs != 0 && (abs < 1e-4 || abs >= 1e16) {
+		return strconv.FormatFloat(f, 'e', -1, 64)
+	}
+	s := strconv.FormatFloat(f, 'f', -1, 64)
+	if !strings.Contains(s, ".") {
+		s += ".0"
+	}
+	return s
 }
 
 // FilterDefault provides a default value if the input is undefined.
