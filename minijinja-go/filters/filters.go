@@ -245,10 +245,14 @@ func FilterTrim(state State, val value.Value, args []value.Value, _ map[string]v
 	if err != nil {
 		return value.Undefined(), err
 	}
-	if len(args) > 0 {
-		if chars, ok := args[0].AsString(); ok {
-			return preserveSafety(val, strings.Trim(s, chars)), nil
+	// Like in Rust, a chars argument that is not a string is converted to its
+	// string representation, while none and undefined trim whitespace.
+	if len(args) > 0 && !args[0].IsNone() && !args[0].IsUndefined() {
+		chars, ok := args[0].AsString()
+		if !ok {
+			chars = args[0].String()
 		}
+		return preserveSafety(val, strings.Trim(s, chars)), nil
 	}
 	// Like str::trim in Rust, strip all Unicode whitespace by default
 	return preserveSafety(val, strings.TrimSpace(s)), nil

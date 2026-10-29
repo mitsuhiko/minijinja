@@ -758,6 +758,10 @@ func TestTrimLikeRust(t *testing.T) {
 		{"{{ \"\vx\f\"|trim }}", `x`},
 		{`{{ "  x  "|trim }}`, `x`},
 		{`{{ "xxaxx"|trim("x") }}`, `a`},
+		{`{{ "11x11"|trim(1) }}`, `x`},
+		{`{{ "TxT"|trim(true) }}`, `x`},
+		{`{{ "  x  "|trim(none) }}`, `x`},
+		{`{{ "  x  "|trim(undefined) }}`, `x`},
 	}
 
 	for _, test := range tests {
