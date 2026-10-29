@@ -75,6 +75,18 @@ pub(crate) fn untrusted_size_hint(value: usize) -> usize {
     value.min(1024)
 }
 
+/// Collects an iterator into a vector without trusting its size hint.
+///
+/// `Iterator::collect` preallocates based on the lower bound of the size hint
+/// which for iterators provided by objects can be arbitrarily large.
+pub(crate) fn collect_untrusted<I: Iterator>(iter: I) -> Vec<I::Item> {
+    let mut rv = Vec::with_capacity(untrusted_size_hint(iter.size_hint().0));
+    for item in iter {
+        rv.push(item);
+    }
+    rv
+}
+
 const SMALL_INT_FORMAT_CACHE_LIMIT: usize = 256;
 
 #[inline(always)]
