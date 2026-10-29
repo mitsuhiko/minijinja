@@ -676,6 +676,40 @@ func TestSliceAndContainsOnIterables(t *testing.T) {
 	}
 }
 
+func TestNumberTestsCoerceLikeRust(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{`{{ true is odd }}`, `True`},
+		{`{{ false is even }}`, `True`},
+		{`{{ true is even }}`, `False`},
+		{`{{ 10 is divisibleby(true) }}`, `True`},
+		{`{{ true is divisibleby(1) }}`, `True`},
+		{`{{ 6.5 is divisibleby(0.5) }}`, `True`},
+		{`{{ 7 is divisibleby(2.0) }}`, `False`},
+		{`{{ 10 is divisibleby(0) }}`, `False`},
+		{`{{ 10 is divisibleby(false) }}`, `False`},
+		{`{{ "10" is divisibleby(5) }}`, `False`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
 func TestUndefinedIsASequence(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ missing is iterable }}|{{ missing is sequence }}",
