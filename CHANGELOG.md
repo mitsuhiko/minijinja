@@ -9,6 +9,7 @@ All notable changes to MiniJinja are documented here.
 * Fixed the `tojson` filter in Go writing floats like integers.  Like in Rust, a float stays a float in the output, so `1.0|tojson` is `1.0` instead of `1`, large and small magnitudes use exponent notation (`1.5e+16`, `2.5e-7`) and infinity becomes `null` instead of an error.  The same applies to values rendered with JSON auto-escaping.
 * Fixed the `upper`, `lower`, `capitalize`, `title` and `replace` filters in Go ignoring values that are not strings.  Like in Rust, the value and the `replace` arguments are converted to strings first, so `1.5|replace(".", ",")` is `1,5` and `true|upper` is `TRUE`, and a number passed to `replace` is no longer treated as an empty string.
 * Fixed slicing and the `in` operator on iterables such as `range()` in Go.  Like in Rust, `range(5)[:2]` is now `[0, 1]` instead of failing with "cannot slice iterator", and `3 in range(5)` is `true` instead of `false`.  Slicing `none` or undefined gives an empty list like in Rust.  Iterables now also print, compare, serialize with `tojson` and `pprint` like lists, so `range(2) == [0, 1]` is `true` and `[range(2)]` prints as `[[0, 1]]` instead of `[<iterator>]`.  The `in` operator now also works on custom sequence, iterable and map objects.
+* Fixed `none` in Go not being treated as an empty sequence by the `sort`, `unique`, `select`, `reject`, `map`, `groupby`, `join` and `urlencode` filters and the `iterable` test.  Like in Rust, `none|sort` is now `[]` and `none|join` is an empty string instead of `None`.
 
 ## 3.0.4
 

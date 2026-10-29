@@ -100,6 +100,16 @@ func stringInput(state State, val value.Value) (string, error) {
 	return val.String(), nil
 }
 
+// iterItems returns the items a filter iterates over. Like in Rust, none is
+// treated as an empty sequence, so `none|sort` gives `[]` and `none|join` gives
+// an empty string. It returns nil for other values that cannot be iterated.
+func iterItems(val value.Value) []value.Value {
+	if val.IsNone() {
+		return []value.Value{}
+	}
+	return val.Iter()
+}
+
 func preserveSafety(input value.Value, output string) value.Value {
 	if input.IsSafe() {
 		return value.FromSafeString(output)
@@ -1017,7 +1027,7 @@ func FilterReverse(_ State, val value.Value, _ []value.Value, _ map[string]value
 //	{{ users|sort(attribute="age", reverse=true) }}
 //	{{ cities|sort(attribute="name, state") }}
 func FilterSort(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
+	items := iterItems(val)
 	if items == nil {
 		return val, nil
 	}
@@ -1156,7 +1166,7 @@ func FilterJoin(state State, val value.Value, args []value.Value, kwargs map[str
 	if err != nil {
 		return value.Undefined(), err
 	}
-	items := val.Iter()
+	items := iterItems(val)
 	if items == nil {
 		return val, nil
 	}
@@ -1267,7 +1277,7 @@ func FilterList(state State, val value.Value, _ []value.Value, _ map[string]valu
 //	  -> ["a", "b", "c"]
 //	{{ users|unique(attribute="city") }}
 func FilterUnique(_ State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
+	items := iterItems(val)
 	if items == nil {
 		return val, nil
 	}
@@ -1625,7 +1635,7 @@ func FilterSlice(_ State, val value.Value, args []value.Value, _ map[string]valu
 //   - attribute: name or dotted path of attribute to extract
 //   - default: value to use when attribute is missing
 func FilterMap(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
+	items := iterItems(val)
 	if items == nil {
 		return val, nil
 	}
@@ -1722,7 +1732,7 @@ func normalizeTestName(name string) string {
 //	{{ [false, null, 42]|select }}
 //	  -> [42]
 func FilterSelect(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
+	items := iterItems(val)
 	if items == nil {
 		return val, nil
 	}
@@ -1773,7 +1783,7 @@ func FilterSelect(state State, val value.Value, args []value.Value, kwargs map[s
 //	{{ [1, 2, 3, 4]|reject("odd") }}
 //	  -> [2, 4]
 func FilterReject(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
+	items := iterItems(val)
 	if items == nil {
 		return val, nil
 	}
@@ -1953,7 +1963,7 @@ func FilterRejectAttr(state State, val value.Value, args []value.Value, kwargs m
 //   - default: value to use when attribute is missing
 //   - case_sensitive: if true, sort in a case-sensitive manner (default: false)
 func FilterGroupBy(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
+	items := iterItems(val)
 	if items == nil {
 		return val, nil
 	}
@@ -3153,6 +3163,11 @@ func FilterUrlencode(_ State, val value.Value, _ []value.Value, _ map[string]val
 			parts = append(parts, urlencodeString(k)+"="+urlencodeString(v.String()))
 		}
 		return value.FromString(strings.Join(parts, "&")), nil
+	}
+
+	// Like in Rust, none encodes as an empty string
+	if val.IsNone() {
+		return value.FromString(""), nil
 	}
 
 	s, ok := val.AsString()

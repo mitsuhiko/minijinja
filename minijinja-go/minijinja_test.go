@@ -676,6 +676,40 @@ func TestSliceAndContainsOnIterables(t *testing.T) {
 	}
 }
 
+func TestNoneIsAnEmptyIterable(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{`{{ none|sort }}`, `[]`},
+		{`{{ none|unique }}`, `[]`},
+		{`{{ none|select }}`, `[]`},
+		{`{{ none|reject }}`, `[]`},
+		{`{{ none|map("upper") }}`, `[]`},
+		{`{{ none|groupby("x") }}`, `[]`},
+		{`{{ none|join(",") }}`, ``},
+		{`{{ none|urlencode }}`, ``},
+		{`{{ none is iterable }}`, `True`},
+		{`{% for x in none|sort %}{{ x }}{% else %}empty{% endfor %}`, `empty`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
 func TestUndefinedIsASequence(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ missing is iterable }}|{{ missing is sequence }}",

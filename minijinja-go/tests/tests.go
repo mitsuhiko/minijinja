@@ -705,7 +705,7 @@ func TestMapping(_ filters.State, val value.Value, _ []value.Value) (bool, error
 //	{{ 42 is iterable }}
 //	  -> false
 func TestIterable(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
-	return val.IsUndefined() || val.Iter() != nil, nil
+	return val.IsUndefined() || val.IsNone() || val.Iter() != nil, nil
 }
 
 // TestStartingWith checks if a string starts with a given prefix.
