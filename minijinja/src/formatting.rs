@@ -568,6 +568,19 @@ impl FormatSpec {
             Type::Default => match val.classify() {
                 FpCategory::Nan => Ok(self.format_number("nan", "")),
                 FpCategory::Infinite => Ok(self.format_number("inf", sign)),
+                // Without a precision, Python formats floats like `str()`.
+                _ if self.precision.is_none() => {
+                    let num = python_float_str(val.abs());
+                    let num = match num.split_once('e') {
+                        // '#' keeps the decimal point, so 1e16 becomes `1.e+16`
+                        Some((mantissa, exp)) if self.alternate_form && !mantissa.contains('.') => {
+                            format!("{mantissa}.e{exp}")
+                        }
+                        Some(_) => num,
+                        None => self.group_decimal_num(num),
+                    };
+                    Ok(self.format_number(&num, sign))
+                }
                 FpCategory::Zero => Ok(self.format_number("0", sign)),
                 FpCategory::Subnormal | FpCategory::Normal => {
                     let mut num = self.number_in_general_format(val.abs(), false);
