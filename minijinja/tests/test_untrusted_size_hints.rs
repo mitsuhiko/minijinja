@@ -65,11 +65,13 @@ fn test_untrusted_iterator_size_hints() {
 
 #[test]
 fn test_huge_batch_count() {
-    assert_eq!(
-        render(
-            "{{ items|batch(4611686018427387904) }}",
-            Value::from(vec![1, 2])
-        ),
-        "[[1, 2]]"
-    );
+    // the count must fit into a usize on the target (32bit on wasm32)
+    let env = Environment::new();
+    let rv = env
+        .render_str(
+            "{{ items|batch(count) }}",
+            context!(items => vec![1, 2], count => usize::MAX / 4),
+        )
+        .unwrap();
+    assert_eq!(rv, "[[1, 2]]");
 }
