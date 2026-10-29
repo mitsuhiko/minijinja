@@ -145,7 +145,7 @@ func TestOdd(_ filters.State, val value.Value, args []value.Value) (bool, error)
 	if len(args) > 0 {
 		return false, mjerrors.NewError(mjerrors.ErrInvalidOperation, "odd test expects no arguments")
 	}
-	if i, ok := val.AsInt(); ok {
+	if i, ok := testInt(val); ok {
 		return i%2 != 0, nil
 	}
 	return false, nil
@@ -176,10 +176,22 @@ func TestEven(_ filters.State, val value.Value, args []value.Value) (bool, error
 	if len(args) > 0 {
 		return false, mjerrors.NewError(mjerrors.ErrInvalidOperation, "even test expects no arguments")
 	}
-	if i, ok := val.AsInt(); ok {
+	if i, ok := testInt(val); ok {
 		return i%2 == 0, nil
 	}
 	return false, nil
+}
+
+// testInt returns the integer value of a number for the odd and even tests.
+// Like in Rust, booleans count as 0 and 1.
+func testInt(val value.Value) (int64, bool) {
+	if b, ok := val.AsBool(); ok {
+		if b {
+			return 1, true
+		}
+		return 0, true
+	}
+	return val.AsInt()
 }
 
 // TestDivisibleBy checks if a value is divisible by another number.
@@ -205,12 +217,27 @@ func TestDivisibleBy(_ filters.State, val value.Value, args []value.Value) (bool
 	if len(args) < 1 {
 		return false, fmt.Errorf("divisibleby test requires argument")
 	}
-	if i, ok := val.AsInt(); ok {
-		if d, ok := args[0].AsInt(); ok && d != 0 {
-			return i%d == 0, nil
-		}
+	// Like in Rust, numbers are coerced to a common type: booleans count as
+	// integers and a float on either side compares the float remainder.
+	divisor := args[0]
+	if !isNumberOrBool(val) || !isNumberOrBool(divisor) {
+		return false, nil
 	}
-	return false, nil
+	if f, ok := divisor.AsFloat(); ok && f == 0 {
+		return false, nil
+	}
+	if b, ok := divisor.AsBool(); ok && !b {
+		return false, nil
+	}
+	rem, err := val.Rem(divisor)
+	if err != nil {
+		return false, nil
+	}
+	return rem.Equal(value.FromInt(0)), nil
+}
+
+func isNumberOrBool(val value.Value) bool {
+	return val.Kind() == value.KindNumber || val.Kind() == value.KindBool
 }
 
 // TestEq checks if two values are equal.
