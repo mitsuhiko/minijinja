@@ -182,7 +182,7 @@ mod builtins {
 
     use crate::error::ErrorKind;
     use crate::formatting::{format_printf_with, FormatConversion};
-    use crate::utils::{safe_sort, splitn_whitespace};
+    use crate::utils::{safe_sort, splitn_whitespace, untrusted_size_hint};
     use crate::value::merge_object::{MergeDict, MergeSeq};
     use crate::value::ops::{self, as_f64, LenIterWrap};
     use crate::value::{
@@ -1423,7 +1423,7 @@ mod builtins {
         let items_per_slice = len / count;
         let slices_with_extra = len % count;
         let mut offset = 0;
-        let mut rv = Vec::with_capacity(count);
+        let mut rv = Vec::with_capacity(untrusted_size_hint(count));
 
         for slice in 0..count {
             let start = offset + slice * items_per_slice;
@@ -1475,15 +1475,15 @@ mod builtins {
         if count == 0 {
             return Err(Error::new(ErrorKind::InvalidOperation, "count cannot be 0"));
         }
-        let mut rv = Vec::with_capacity(value.len().unwrap_or(0) / count);
-        let mut tmp = Vec::with_capacity(count);
+        let mut rv = Vec::with_capacity(untrusted_size_hint(value.len().unwrap_or(0) / count));
+        let mut tmp = Vec::with_capacity(untrusted_size_hint(count));
 
         for item in ok!(state.undefined_behavior().try_iter(value)) {
             ok!(item.check());
             if tmp.len() == count {
                 rv.push(Value::from(mem::replace(
                     &mut tmp,
-                    Vec::with_capacity(count),
+                    Vec::with_capacity(untrusted_size_hint(count)),
                 )));
             }
             tmp.push(item);
@@ -1844,7 +1844,7 @@ mod builtins {
         value: Value,
         args: crate::value::Rest<ValueOrKwargs>,
     ) -> Result<Vec<Value>, Error> {
-        let mut rv = Vec::with_capacity(value.len().unwrap_or(0));
+        let mut rv = Vec::with_capacity(untrusted_size_hint(value.len().unwrap_or(0)));
 
         // attribute mapping
         let args = args.into_values();

@@ -1677,7 +1677,7 @@ impl Value {
                     }))
                 }
                 Enumerator::Iter(iter) => {
-                    let mut v = iter.collect::<Vec<_>>();
+                    let mut v = crate::utils::collect_untrusted(iter);
                     v.reverse();
                     Some(Value::make_object_iterable(v, move |v| {
                         Box::new(v.iter().cloned())
@@ -1685,9 +1685,9 @@ impl Value {
                 }
                 Enumerator::KeyValueIter(iter) => {
                     let mut v = if let ObjectRepr::Map = o.repr() {
-                        iter.map(|(k, _)| k).collect::<Vec<_>>()
+                        crate::utils::collect_untrusted(iter.map(|(k, _)| k))
                     } else {
-                        iter.map(Value::from).collect::<Vec<_>>()
+                        crate::utils::collect_untrusted(iter.map(Value::from))
                     };
                     v.reverse();
                     Some(Value::make_object_iterable(v, move |v| {
@@ -2188,9 +2188,10 @@ where
 {
     /// Collects all items into a vector, failing on the first invalid one.
     ///
-    /// Unlike collecting into a `Result` this preallocates the vector.
+    /// Unlike collecting into a `Result` this preallocates the vector.  The
+    /// size hint is not trusted as it can come from an arbitrary iterator.
     pub(crate) fn try_collect_vec(self) -> Result<Vec<I::Item>, Error> {
-        let mut rv = Vec::with_capacity(self.size_hint().0);
+        let mut rv = Vec::with_capacity(crate::utils::untrusted_size_hint(self.size_hint().0));
         if !self.done {
             for item in self.iter {
                 ok!(item.check());

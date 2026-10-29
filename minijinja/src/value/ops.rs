@@ -1,4 +1,5 @@
 use crate::error::{Error, ErrorKind};
+use crate::utils::{collect_untrusted, untrusted_size_hint};
 use crate::value::merge_object::MergeSeq;
 use crate::value::{
     checked, DynObject, MaybeInvalid, ObjectRepr, Tuple, Value, ValueKind, ValueRepr,
@@ -241,7 +242,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
             } else {
                 Ok(Value::make_object_iterable(obj.clone(), move |obj| {
                     if let Some(iter) = obj.try_iter() {
-                        let vec: Vec<Value> = iter.collect();
+                        let vec = collect_untrusted(iter);
                         Box::new(
                             range_step_backwards(start, stop, -step as usize, vec.len())
                                 .map(move |i| vec[i].clone()),
@@ -305,7 +306,7 @@ fn seq_concat_len(lhs: &Value, rhs: &Value) -> Option<usize> {
 }
 
 fn materialize_seq_concat(lhs: &Value, rhs: &Value, len: usize) -> Result<Value, Error> {
-    let mut rv = Vec::with_capacity(len);
+    let mut rv = Vec::with_capacity(untrusted_size_hint(len));
     for item in ok!(lhs.try_iter())
         .checked()
         .chain(ok!(rhs.try_iter()).checked())
@@ -318,7 +319,9 @@ fn materialize_seq_concat(lhs: &Value, rhs: &Value, len: usize) -> Result<Value,
 pub fn add(lhs: &Value, rhs: &Value) -> Result<Value, Error> {
     if lhs.is_tuple() || rhs.is_tuple() {
         if lhs.is_tuple() && rhs.is_tuple() {
-            let mut values = Vec::with_capacity(seq_concat_len(lhs, rhs).unwrap_or_default());
+            let mut values = Vec::with_capacity(untrusted_size_hint(
+                seq_concat_len(lhs, rhs).unwrap_or_default(),
+            ));
             for item in ok!(lhs.try_iter())
                 .checked()
                 .chain(ok!(rhs.try_iter()).checked())
