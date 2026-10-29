@@ -240,17 +240,22 @@ func FilterTitle(state State, val value.Value, _ []value.Value, _ map[string]val
 //	  -> "hello"
 //	{{ "xxxhelloxxx"|trim("x") }}
 //	  -> "hello"
-func FilterTrim(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
-	if s, ok := val.AsString(); ok {
-		chars := " \t\n\r"
-		if len(args) > 0 {
-			if c, ok := args[0].AsString(); ok {
-				chars = c
-			}
+func FilterTrim(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+	s, err := stringInput(state, val)
+	if err != nil {
+		return value.Undefined(), err
+	}
+	// Like in Rust, a chars argument that is not a string is converted to its
+	// string representation, while none and undefined trim whitespace.
+	if len(args) > 0 && !args[0].IsNone() && !args[0].IsUndefined() {
+		chars, ok := args[0].AsString()
+		if !ok {
+			chars = args[0].String()
 		}
 		return preserveSafety(val, strings.Trim(s, chars)), nil
 	}
-	return val, nil
+	// Like str::trim in Rust, strip all Unicode whitespace by default
+	return preserveSafety(val, strings.TrimSpace(s)), nil
 }
 
 // FilterReplace replaces occurrences of a substring with another string.
