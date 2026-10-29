@@ -13,6 +13,7 @@ All notable changes to MiniJinja are documented here.
 * Fixed `none` in Go not being treated as an empty sequence by the `sort`, `unique`, `select`, `reject`, `map`, `groupby`, `join` and `urlencode` filters and the `iterable` test.  Like in Rust, `none|sort` is now `[]` and `none|join` is an empty string instead of `None`.
 * Fixed the `odd`, `even` and `divisibleby` tests in Go ignoring booleans, and `divisibleby` ignoring a float divisor.  Like in Rust, booleans count as `0` and `1`, so `true is odd` is true, and `6.5 is divisibleby(0.5)` is true.
 * Fixed `str.format` in `pycompat` cutting floats to six significant digits when no precision is given.  Like in Python, such floats are now formatted like `str()` does, so `'{}'.format(3.14159265)` is `3.14159265`, `'{}'.format(1234567.0)` is `1234567.0` instead of `1.23457e+06` and `'{}'.format(0.0)` is `0.0` instead of `0`.
+* Fixed the `trim` filter in Go ignoring values that are not strings and only stripping ASCII spaces, tabs and newlines by default.  Like in Rust, `5|trim|length` is now `1`, and Unicode whitespace such as a non-breaking space is stripped.
 
 ## 3.0.4
 

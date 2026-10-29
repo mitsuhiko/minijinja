@@ -744,6 +744,37 @@ func TestNumberTestsCoerceLikeRust(t *testing.T) {
 	}
 }
 
+func TestTrimLikeRust(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{`{{ 5|trim|length }}`, `1`},
+		{`{{ true|trim("T") }}`, `rue`},
+		{`{{ 12345|trim("15") }}`, `234`},
+		{"{{ \"\u00a0x\u2003\"|trim }}", `x`},
+		{"{{ \"\vx\f\"|trim }}", `x`},
+		{`{{ "  x  "|trim }}`, `x`},
+		{`{{ "xxaxx"|trim("x") }}`, `a`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
 func TestUndefinedIsASequence(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ missing is iterable }}|{{ missing is sequence }}",
