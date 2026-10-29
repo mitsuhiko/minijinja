@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use insta::assert_snapshot;
 use similar_asserts::assert_eq;
 
-use minijinja::Environment;
 use minijinja::Value;
+use minijinja::{Environment, ErrorKind};
 
 #[test]
 fn test_basic() {
@@ -44,6 +44,26 @@ fn test_expression_owned() {
 fn test_trailing_garbage_rejected() {
     let env = Environment::new();
     assert!(env.compile_expression("42 blahadsf").is_err());
+}
+
+#[test]
+fn test_variable_end_in_expression_rejected() {
+    let env = Environment::new();
+    for (expr, msg) in [
+        ("}}", "unexpected end of variable block"),
+        ("}} x", "unexpected end of variable block"),
+        ("-}} x", "unexpected end of variable block"),
+        ("+}} x", "unexpected end of variable block"),
+        ("}} }} x", "unexpected end of variable block"),
+        ("a }} b", "unexpected input after expression"),
+        ("x }}", "unexpected input after expression"),
+        ("}}) else False", "unexpected end of variable block"),
+        ("foo(}} x)", "unexpected `}`"),
+    ] {
+        let err = env.compile_expression(expr).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::SyntaxError, "{expr}");
+        assert_eq!(err.detail(), Some(msg), "{expr}");
+    }
 }
 
 #[test]

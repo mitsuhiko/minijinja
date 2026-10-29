@@ -310,7 +310,11 @@ impl<'s> Tokenizer<'s> {
                     self.tokenize_block_or_var(BlockSentinel::LineStatement)
                 }
                 Some(LexerState::Variable) => self.tokenize_block_or_var(BlockSentinel::Variable),
-                None => panic!("empty lexer stack"),
+                // This happens when an expression is closed with a variable end
+                // marker (e.g. `}} x`) as expressions start in the variable state.
+                None => {
+                    return Err(self.syntax_error("unexpected input after end of variable block"))
+                }
             };
             match ok!(outcome) {
                 ControlFlow::Break(rv) => return Ok(Some(rv)),

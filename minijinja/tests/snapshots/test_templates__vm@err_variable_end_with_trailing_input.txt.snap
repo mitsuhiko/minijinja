@@ -1,0 +1,22 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ }} x }}"
+info: {}
+input_file: minijinja/tests/inputs/err_variable_end_with_trailing_input.txt
+---
+!!!SYNTAX ERROR!!!
+
+Error {
+    kind: SyntaxError,
+    detail: "unexpected end of variable block",
+    name: "err_variable_end_with_trailing_input.txt",
+    line: 1,
+}
+
+syntax error: unexpected end of variable block (in err_variable_end_with_trailing_input.txt:1)
+------------------ err_variable_end_with_trailing_input.txt -------------------
+   1 > {{ }} x }}
+     i    ^^ syntax error
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+No referenced variables
+-------------------------------------------------------------------------------
