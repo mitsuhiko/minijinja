@@ -12,6 +12,7 @@ All notable changes to MiniJinja are documented here.
 * Fixed slicing and the `in` operator on iterables such as `range()` in Go.  Like in Rust, `range(5)[:2]` is now `[0, 1]` instead of failing with "cannot slice iterator", and `3 in range(5)` is `true` instead of `false`.  Slicing `none` or undefined gives an empty list like in Rust.  Iterables now also print, compare, serialize with `tojson` and `pprint` like lists, so `range(2) == [0, 1]` is `true` and `[range(2)]` prints as `[[0, 1]]` instead of `[<iterator>]`.  The `in` operator now also works on custom sequence, iterable and map objects.
 * Fixed `none` in Go not being treated as an empty sequence by the `sort`, `unique`, `select`, `reject`, `map`, `groupby`, `join` and `urlencode` filters and the `iterable` test.  Like in Rust, `none|sort` is now `[]` and `none|join` is an empty string instead of `None`.
 * Fixed the `odd`, `even` and `divisibleby` tests in Go ignoring booleans, and `divisibleby` ignoring a float divisor.  Like in Rust, booleans count as `0` and `1`, so `true is odd` is true, and `6.5 is divisibleby(0.5)` is true.
+* Fixed `str.format` in `pycompat` cutting floats to six significant digits when no precision is given.  Like in Python, such floats are now formatted like `str()` does, so `'{}'.format(3.14159265)` is `3.14159265`, `'{}'.format(1234567.0)` is `1234567.0` instead of `1.23457e+06` and `'{}'.format(0.0)` is `0.0` instead of `0`.
 
 ## 3.0.4
 

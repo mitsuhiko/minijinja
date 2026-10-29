@@ -102,6 +102,41 @@ fn test_format_floats() {
     assert_eq!(eval_expr("'{}'.format(0.00000004)").as_str(), Some("4e-08"));
     assert_eq!(eval_expr("'{}'.format(0.0004)").as_str(), Some("0.0004"));
     assert_eq!(eval_expr("'{}'.format(100.00)").as_str(), Some("100.0"));
+
+    // without a precision, floats are formatted like Python's `str()`
+    assert_eq!(
+        eval_expr("'{}'.format(3.14159265)").as_str(),
+        Some("3.14159265")
+    );
+    assert_eq!(
+        eval_expr("'{}'.format(1234567.0)").as_str(),
+        Some("1234567.0")
+    );
+    assert_eq!(
+        eval_expr("'{}'.format(0.1 + 0.2)").as_str(),
+        Some("0.30000000000000004")
+    );
+    assert_eq!(eval_expr("'{}'.format(0.0)").as_str(), Some("0.0"));
+    assert_eq!(eval_expr("'{}'.format(-0.0)").as_str(), Some("-0.0"));
+    assert_eq!(eval_expr("'{:+}'.format(0.0)").as_str(), Some("+0.0"));
+    assert_eq!(eval_expr("'{}'.format(1e16)").as_str(), Some("1e+16"));
+    assert_eq!(eval_expr("'{:#}'.format(1e16)").as_str(), Some("1.e+16"));
+    assert_eq!(
+        eval_expr("'{:,}'.format(1234567.5)").as_str(),
+        Some("1,234,567.5")
+    );
+    assert_eq!(
+        eval_expr("'{:_}'.format(12345678.25)").as_str(),
+        Some("12_345_678.25")
+    );
+    assert_eq!(
+        eval_expr("'{:>+12}'.format(1234567.0)").as_str(),
+        Some("  +1234567.0")
+    );
+    assert_eq!(
+        eval_expr("'{:012}'.format(1234567.0)").as_str(),
+        Some("0001234567.0")
+    );
 }
 
 #[test]
