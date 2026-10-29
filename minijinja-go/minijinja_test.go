@@ -779,6 +779,65 @@ func TestTrimLikeRust(t *testing.T) {
 	}
 }
 
+func TestUndefinedIsAnEmptyIterableInFilters(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{`{{ undefined|sort }}`, `[]`},
+		{`{{ undefined|unique }}`, `[]`},
+		{`{{ undefined|select }}`, `[]`},
+		{`{{ undefined|map("upper") }}`, `[]`},
+		{`{{ undefined|batch(2)|list }}`, `[]`},
+		{`{{ undefined|groupby("x") }}`, `[]`},
+		{`{{ undefined|selectattr("x") }}`, `[]`},
+		{`{{ undefined|rejectattr("x") }}`, `[]`},
+		{`{{ none|batch(2)|list }}`, `[]`},
+		{`{{ none|selectattr("x") }}`, `[]`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+
+	// Strict undefined behavior still rejects iterating an undefined value.
+	strict := NewEnvironment()
+	strict.SetUndefinedBehavior(UndefinedStrict)
+	tmpl, err := strict.TemplateFromString(`{{ undefined|sort }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if _, err := tmpl.Render(nil); err == nil {
+		t.Errorf("expected an error for undefined|sort with strict undefined behavior")
+	}
+
+	// Like in Rust, join and groupby iterate undefined as an empty sequence
+	// even with strict undefined behavior.
+	tmpl, err = strict.TemplateFromString(`{{ undefined|join|length }}|{{ undefined|groupby("x")|length }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if result != "0|0" {
+		t.Errorf("expected %q, got %q", "0|0", result)
+	}
+}
+
 func TestUndefinedIsASequence(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ missing is iterable }}|{{ missing is sequence }}",

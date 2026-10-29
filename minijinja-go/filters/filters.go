@@ -100,14 +100,24 @@ func stringInput(state State, val value.Value) (string, error) {
 	return val.String(), nil
 }
 
-// iterItems returns the items a filter iterates over. Like in Rust, none is
-// treated as an empty sequence, so `none|sort` gives `[]` and `none|join` gives
-// an empty string. It returns nil for other values that cannot be iterated.
+// iterItems returns the items a filter iterates over. Like Value::try_iter in
+// Rust, none and undefined are treated as empty sequences, so `none|sort` gives
+// `[]` and `none|join` gives an empty string. It returns nil for other values
+// that cannot be iterated.
 func iterItems(val value.Value) []value.Value {
-	if val.IsNone() {
+	if val.IsNone() || val.IsUndefined() {
 		return []value.Value{}
 	}
 	return val.Iter()
+}
+
+// tryIterItems is like iterItems, but like UndefinedBehavior::try_iter in Rust
+// it fails for undefined values with strict or semi-strict undefined behavior.
+func tryIterItems(state State, val value.Value) ([]value.Value, error) {
+	if err := assertNotUndefined(state, val); err != nil {
+		return nil, err
+	}
+	return iterItems(val), nil
 }
 
 func preserveSafety(input value.Value, output string) value.Value {
@@ -1032,7 +1042,10 @@ func FilterReverse(_ State, val value.Value, _ []value.Value, _ map[string]value
 //	{{ users|sort(attribute="age", reverse=true) }}
 //	{{ cities|sort(attribute="name, state") }}
 func FilterSort(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := iterItems(val)
+	items, iterErr := tryIterItems(state, val)
+	if iterErr != nil {
+		return value.Undefined(), iterErr
+	}
 	if items == nil {
 		return val, nil
 	}
@@ -1281,8 +1294,11 @@ func FilterList(state State, val value.Value, _ []value.Value, _ map[string]valu
 //	{{ ["a", "b", "a", "c"]|unique }}
 //	  -> ["a", "b", "c"]
 //	{{ users|unique(attribute="city") }}
-func FilterUnique(_ State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := iterItems(val)
+func FilterUnique(state State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	items, iterErr := tryIterItems(state, val)
+	if iterErr != nil {
+		return value.Undefined(), iterErr
+	}
 	if items == nil {
 		return val, nil
 	}
@@ -1501,8 +1517,11 @@ func mapAttribute(items []value.Value, params map[string]value.Value) ([]value.V
 //	  </tr>
 //	{% endfor %}
 //	</table>
-func FilterBatch(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
+func FilterBatch(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	items, iterErr := tryIterItems(state, val)
+	if iterErr != nil {
+		return value.Undefined(), iterErr
+	}
 	if items == nil {
 		return val, nil
 	}
@@ -1640,7 +1659,10 @@ func FilterSlice(_ State, val value.Value, args []value.Value, _ map[string]valu
 //   - attribute: name or dotted path of attribute to extract
 //   - default: value to use when attribute is missing
 func FilterMap(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := iterItems(val)
+	items, iterErr := tryIterItems(state, val)
+	if iterErr != nil {
+		return value.Undefined(), iterErr
+	}
 	if items == nil {
 		return val, nil
 	}
@@ -1737,7 +1759,10 @@ func normalizeTestName(name string) string {
 //	{{ [false, null, 42]|select }}
 //	  -> [42]
 func FilterSelect(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := iterItems(val)
+	items, iterErr := tryIterItems(state, val)
+	if iterErr != nil {
+		return value.Undefined(), iterErr
+	}
 	if items == nil {
 		return val, nil
 	}
@@ -1788,7 +1813,10 @@ func FilterSelect(state State, val value.Value, args []value.Value, kwargs map[s
 //	{{ [1, 2, 3, 4]|reject("odd") }}
 //	  -> [2, 4]
 func FilterReject(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := iterItems(val)
+	items, iterErr := tryIterItems(state, val)
+	if iterErr != nil {
+		return value.Undefined(), iterErr
+	}
 	if items == nil {
 		return val, nil
 	}
@@ -1841,7 +1869,10 @@ func FilterReject(state State, val value.Value, args []value.Value, kwargs map[s
 //	{{ users|selectattr("id", "even") }}
 //	  -> users with even IDs
 func FilterSelectAttr(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
+	items, iterErr := tryIterItems(state, val)
+	if iterErr != nil {
+		return value.Undefined(), iterErr
+	}
 	if items == nil {
 		return val, nil
 	}
@@ -1900,7 +1931,10 @@ func FilterSelectAttr(state State, val value.Value, args []value.Value, kwargs m
 //	{{ users|rejectattr("id", "even") }}
 //	  -> users with odd IDs
 func FilterRejectAttr(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
+	items, iterErr := tryIterItems(state, val)
+	if iterErr != nil {
+		return value.Undefined(), iterErr
+	}
 	if items == nil {
 		return val, nil
 	}
@@ -1967,7 +2001,7 @@ func FilterRejectAttr(state State, val value.Value, args []value.Value, kwargs m
 //   - attribute: name or dotted path of attribute to group by
 //   - default: value to use when attribute is missing
 //   - case_sensitive: if true, sort in a case-sensitive manner (default: false)
-func FilterGroupBy(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterGroupBy(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items := iterItems(val)
 	if items == nil {
 		return val, nil
