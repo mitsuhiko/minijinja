@@ -5,6 +5,7 @@ All notable changes to MiniJinja are documented here.
 ## Unreleased
 
 * Fixed comparisons, `~` and `in` in Go accepting undefined operands with strict and semi-strict undefined behavior.  Like in Rust, `undefined == 1`, `undefined < 1`, `undefined ~ "a"` and `undefined in [1]` now fail with an undefined value error instead of rendering `False` or `a`.  Silent undefined values, such as the result of `42 if false`, are still accepted.
+* Fixed the `string`, `safe`, `sum` and `indent` filters in Go accepting undefined values with strict and semi-strict undefined behavior.  Like in Rust, `undefined|string` and `undefined|sum` now fail with an undefined value error instead of rendering an empty string or `0`.  Silent undefined values, such as the result of `42 if false`, are still accepted.  The `indent` filter also converts values that are not strings like Rust, so `5|indent(2, true)` is `  5` instead of `5`.
 
 ## 3.0.5
 

@@ -642,11 +642,12 @@ func FilterDefault(_ State, val value.Value, args []value.Value, kwargs map[stri
 //
 // Warning: Only use this filter on values you trust to contain safe HTML.
 // Using it on untrusted content can lead to security vulnerabilities.
-func FilterSafe(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	if s, ok := val.AsString(); ok {
-		return value.FromSafeString(s), nil
+func FilterSafe(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	s, err := stringInput(state, val)
+	if err != nil {
+		return value.Undefined(), err
 	}
-	return value.FromSafeString(val.String()), nil
+	return value.FromSafeString(s), nil
 }
 
 // FilterEscape escapes a string for safe output.
@@ -716,7 +717,10 @@ func EscapeHTML(s string) string {
 //
 //	{{ 42|string }}
 //	  -> "42"
-func FilterString(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterString(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	if err := assertNotUndefined(state, val); err != nil {
+		return value.Undefined(), err
+	}
 	if val.Kind() == value.KindString {
 		return val, nil
 	}
@@ -1452,7 +1456,7 @@ func minMax(val value.Value, kwargs map[string]value.Value, want int) value.Valu
 //	{{ values|sum(start=100) }}
 //	  -> sum of values + 100
 //	{{ items|sum(attribute="price") }}
-func FilterSum(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterSum(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	params, err := filterParams(args, kwargs, "attribute", "start")
 	if err != nil {
 		return value.Undefined(), err
@@ -1461,7 +1465,11 @@ func FilterSum(_ State, val value.Value, args []value.Value, kwargs map[string]v
 	if start, ok := params["start"]; ok {
 		result = start
 	}
-	items, err := mapAttribute(val.Iter(), params)
+	items, err := tryIterItems(state, val)
+	if err != nil {
+		return value.Undefined(), err
+	}
+	items, err = mapAttribute(items, params)
 	if err != nil {
 		return value.Undefined(), err
 	}
@@ -2952,10 +2960,10 @@ func FilterAttr(_ State, val value.Value, args []value.Value, _ map[string]value
 //	{{ yaml_content|indent(2, true) }}
 //	{{ yaml_content|indent(2, true, true) }}
 //	{{ yaml_content|indent(width=4, first=true, blank=false) }}
-func FilterIndent(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	s, ok := val.AsString()
-	if !ok {
-		return val, nil
+func FilterIndent(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	s, err := stringInput(state, val)
+	if err != nil {
+		return value.Undefined(), err
 	}
 
 	width := 4

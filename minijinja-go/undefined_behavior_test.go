@@ -142,6 +142,35 @@ func TestUndefinedOperandsInStrictModes(t *testing.T) {
 	assertRender(t, env, "{{ undefined not in [1] }}", nil, "True")
 }
 
+func TestUndefinedInStringFiltersInStrictModes(t *testing.T) {
+	for _, behavior := range []UndefinedBehavior{UndefinedStrict, UndefinedSemiStrict} {
+		env := NewEnvironment()
+		env.SetUndefinedBehavior(behavior)
+
+		for _, source := range []string{
+			"<{{ undefined|string }}>",
+			"<{{ undefined|safe }}>",
+			"{{ undefined|sum }}",
+			"<{{ undefined|indent(2) }}>",
+		} {
+			assertRenderErrorKind(t, env, source, nil, ErrUndefinedVar)
+		}
+
+		assertRender(t, env, "<{{ (42 if false)|string }}>", nil, "<>")
+		assertRender(t, env, "<{{ (42 if false)|safe }}>", nil, "<>")
+		assertRender(t, env, "{{ (42 if false)|sum }}", nil, "0")
+		assertRender(t, env, "<{{ (42 if false)|indent(2) }}>", nil, "<>")
+	}
+
+	env := NewEnvironment()
+	assertRender(t, env, "<{{ undefined|string }}>", nil, "<>")
+	assertRender(t, env, "<{{ undefined|safe }}>", nil, "<>")
+	assertRender(t, env, "{{ undefined|sum }}", nil, "0")
+	assertRender(t, env, "{{ (undefined|indent(2)) is defined }}", nil, "True")
+	assertRender(t, env, "{{ 5|indent(2, true) }}", nil, "  5")
+	assertRender(t, env, "{{ [1, 2]|indent(2, true) }}", nil, "  [1, 2]")
+}
+
 func TestChainableUndefinedBehavior(t *testing.T) {
 	env := NewEnvironment()
 	env.SetUndefinedBehavior(UndefinedChainable)
