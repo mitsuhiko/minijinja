@@ -113,6 +113,35 @@ func TestStrictUndefinedBehavior(t *testing.T) {
 	assertRenderErrorKind(t, env, "{{ 42 in undefined }}", nil, ErrUndefinedVar)
 }
 
+func TestUndefinedOperandsInStrictModes(t *testing.T) {
+	for _, behavior := range []UndefinedBehavior{UndefinedStrict, UndefinedSemiStrict} {
+		env := NewEnvironment()
+		env.SetUndefinedBehavior(behavior)
+
+		for _, source := range []string{
+			"{{ undefined == 1 }}",
+			"{{ 1 != undefined }}",
+			"{{ undefined < 1 }}",
+			"{{ 1 >= undefined }}",
+			"{{ 0 < undefined < 2 }}",
+			"{{ undefined ~ 'a' }}",
+			"{{ undefined in [1] }}",
+			"{{ undefined not in [1] }}",
+		} {
+			assertRenderErrorKind(t, env, source, nil, ErrUndefinedVar)
+		}
+
+		assertRender(t, env, "{{ (42 if false) == 1 }}", nil, "False")
+		assertRender(t, env, "{{ (42 if false) ~ 'a' }}", nil, "a")
+		assertRender(t, env, "{{ (42 if false) in [1] }}", nil, "False")
+	}
+
+	env := NewEnvironment()
+	assertRender(t, env, "{{ undefined == 1 }}", nil, "False")
+	assertRender(t, env, "{{ undefined ~ 'a' }}", nil, "a")
+	assertRender(t, env, "{{ undefined not in [1] }}", nil, "True")
+}
+
 func TestUndefinedInStringFiltersInStrictModes(t *testing.T) {
 	for _, behavior := range []UndefinedBehavior{UndefinedStrict, UndefinedSemiStrict} {
 		env := NewEnvironment()
