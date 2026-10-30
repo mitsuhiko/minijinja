@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed comparisons, `~` and `in` in Go accepting undefined operands with strict and semi-strict undefined behavior.  Like in Rust, `undefined == 1`, `undefined < 1`, `undefined ~ "a"` and `undefined in [1]` now fail with an undefined value error instead of rendering `False` or `a`.  Silent undefined values, such as the result of `42 if false`, are still accepted.
+
 ## 3.0.5
 
 * Fixed a panic or abort in Rust when buffering an iterator that reports a huge size hint, or when passing a huge count to the `batch` or `slice` filters.  Filters like `list`, `sort`, `reverse`, `map`, `slice` and `batch` as well as slicing and concatenating sequences now cap how much they preallocate, so `[1, 2]|batch(4611686018427387904)` is `[[1, 2]]` instead of failing with "capacity overflow".  #483
