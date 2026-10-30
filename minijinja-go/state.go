@@ -163,6 +163,17 @@ func (s *State) assertIterable(val value.Value) error {
 	return nil
 }
 
+// assertNotUndefined fails for undefined operands of comparisons and string
+// concatenation in strict and semi-strict mode, like Rust.
+func (s *State) assertNotUndefined(vals ...value.Value) error {
+	for _, val := range vals {
+		if val.IsUndefined() && s.isStrictOrSemiStrict() && !val.IsSilentUndefined() {
+			return NewError(ErrUndefinedVar, "undefined value")
+		}
+	}
+	return nil
+}
+
 // RenderBlock renders a specific block by name.
 //
 // This is useful for rendering parts of a template, such as for
@@ -2629,6 +2640,20 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 	}
 
 	switch op.Op {
+	case parser.BinOpEq, parser.BinOpNe, parser.BinOpLt, parser.BinOpLte, parser.BinOpGt, parser.BinOpGte, parser.BinOpConcat:
+		if err := s.assertNotUndefined(left, right); err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+	case parser.BinOpIn:
+		if err := s.assertIterable(right); err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+		if err := s.assertNotUndefined(left); err != nil {
+			return value.Undefined(), wrapEvalError(err, op.Span())
+		}
+	}
+
+	switch op.Op {
 	case parser.BinOpEq:
 		return value.FromBool(left.Equal(right)), nil
 	case parser.BinOpNe:
@@ -2698,9 +2723,6 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 	case parser.BinOpConcat:
 		return left.Concat(right), nil
 	case parser.BinOpIn:
-		if err := s.assertIterable(right); err != nil {
-			return value.Undefined(), wrapEvalError(err, op.Span())
-		}
 		return value.FromBool(right.Contains(left)), nil
 	default:
 		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("unknown binary operator: %v", op.Op)).WithSpan(op.Span())
@@ -2731,6 +2753,17 @@ func (s *State) evalCompare(c *parser.Compare) (value.Value, error) {
 }
 
 func (s *State) evalCompareOp(op parser.CompareOpKind, left, right value.Value, span parser.Span) (bool, error) {
+	if op == parser.CompareOpIn || op == parser.CompareOpNotIn {
+		if err := s.assertIterable(right); err != nil {
+			return false, wrapEvalError(err, span)
+		}
+		if err := s.assertNotUndefined(left); err != nil {
+			return false, wrapEvalError(err, span)
+		}
+	} else if err := s.assertNotUndefined(left, right); err != nil {
+		return false, wrapEvalError(err, span)
+	}
+
 	switch op {
 	case parser.CompareOpEq:
 		return left.Equal(right), nil
@@ -2753,9 +2786,6 @@ func (s *State) evalCompareOp(op parser.CompareOpKind, left, right value.Value, 
 			return cmp >= 0, nil
 		}
 	case parser.CompareOpIn, parser.CompareOpNotIn:
-		if err := s.assertIterable(right); err != nil {
-			return false, wrapEvalError(err, span)
-		}
 		contains := right.Contains(left)
 		if op == parser.CompareOpNotIn {
 			return !contains, nil
