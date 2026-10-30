@@ -2,6 +2,10 @@
 
 All notable changes to MiniJinja are documented here.
 
+## Unreleased
+
+* Fixed the `string`, `safe`, `sum` and `indent` filters in Go accepting undefined values with strict and semi-strict undefined behavior.  Like in Rust, `undefined|string` and `undefined|sum` now fail with an undefined value error instead of rendering an empty string or `0`.  Silent undefined values, such as the result of `42 if false`, are still accepted.  The `indent` filter also converts values that are not strings like Rust, so `5|indent(2, true)` is `  5` instead of `5`.
+
 ## 3.0.5
 
 * Fixed a panic or abort in Rust when buffering an iterator that reports a huge size hint, or when passing a huge count to the `batch` or `slice` filters.  Filters like `list`, `sort`, `reverse`, `map`, `slice` and `batch` as well as slicing and concatenating sequences now cap how much they preallocate, so `[1, 2]|batch(4611686018427387904)` is `[[1, 2]]` instead of failing with "capacity overflow".  #483
