@@ -1606,32 +1606,47 @@ func FilterBatch(state State, val value.Value, args []value.Value, kwargs map[st
 //	  </ul>
 //	{% endfor %}
 //	</div>
-func FilterSlice(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
-	items := val.Iter()
+func FilterSlice(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+	items, iterErr := tryIterItems(state, val)
+	if iterErr != nil {
+		return value.Undefined(), iterErr
+	}
 	if items == nil {
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot slice non-iterable")
 	}
 
-	sliceCount := 1
-	if len(args) > 0 {
-		if c, ok := args[0].AsInt(); ok && c > 0 {
-			sliceCount = int(c)
+	if len(args) == 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrMissingArgument, "missing argument")
+	}
+	if len(args) > 2 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
+	}
+	c, ok := args[0].AsInt()
+	if b, isBool := args[0].AsBool(); isBool {
+		c, ok = 0, true
+		if b {
+			c = 1
 		}
 	}
+	if !ok || c < 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "count must be a positive integer")
+	}
+	if c == 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "count cannot be 0")
+	}
+	sliceCount := int(c)
 
-	fillWith := value.Undefined()
-	if len(args) > 1 {
-		fillWith = args[1]
+	// Like in Rust and Jinja2, none counts as no fill value, and every slice
+	// without an extra item gets the fill value appended.
+	var fillWith *value.Value
+	if len(args) > 1 && !args[1].IsNone() && !args[1].IsUndefined() {
+		fillWith = &args[1]
 	}
 
 	// Calculate slice sizes
 	length := len(items)
 	baseSize := length / sliceCount
 	remainder := length % sliceCount
-	maxSize := baseSize
-	if remainder > 0 {
-		maxSize++
-	}
 
 	var result []value.Value
 	offset := 0
@@ -1641,14 +1656,11 @@ func FilterSlice(_ State, val value.Value, args []value.Value, _ map[string]valu
 			size++
 		}
 
-		slice := make([]value.Value, size)
+		slice := make([]value.Value, size, size+1)
 		copy(slice, items[offset:offset+size])
 
-		// Fill slices to the maximum size when requested
-		if !fillWith.IsUndefined() && len(slice) < maxSize {
-			for len(slice) < maxSize {
-				slice = append(slice, fillWith)
-			}
+		if fillWith != nil && i >= remainder {
+			slice = append(slice, *fillWith)
 		}
 
 		result = append(result, value.FromSlice(slice))
