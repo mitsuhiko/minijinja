@@ -838,6 +838,52 @@ func TestUndefinedIsAnEmptyIterableInFilters(t *testing.T) {
 	}
 }
 
+func TestBatchLikeRust(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{`{{ [1, 2, 3]|batch(2) }}`, `[[1, 2], [3]]`},
+		{`{{ [1, 2, 3]|batch(2, 0) }}`, `[[1, 2], [3, 0]]`},
+		{`{{ [1, 2, 3]|batch(2, none) }}`, `[[1, 2], [3]]`},
+		{`{{ [1, 2, 3]|batch(true) }}`, `[[1], [2], [3]]`},
+		{`{{ none|batch(2) }}`, `[]`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+
+	for _, source := range []string{
+		`{{ 5|batch(2) }}`,
+		`{{ [1, 2, 3]|batch(0) }}`,
+		`{{ [1, 2, 3]|batch(-1) }}`,
+		`{{ [1, 2, 3]|batch("2") }}`,
+		`{{ [1, 2, 3]|batch() }}`,
+		`{{ [1, 2, 3]|batch(2, 0, 1) }}`,
+	} {
+		tmpl, err := env.TemplateFromString(source)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", source, err)
+		}
+		if _, err := tmpl.Render(nil); err == nil {
+			t.Errorf("expected an error for %q", source)
+		}
+	}
+}
+
 func TestUndefinedIsASequence(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ missing is iterable }}|{{ missing is sequence }}",
