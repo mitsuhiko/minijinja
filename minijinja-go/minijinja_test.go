@@ -956,6 +956,21 @@ func TestSliceLikeRust(t *testing.T) {
 	}
 }
 
+func TestSliceRejectsKeywordArguments(t *testing.T) {
+	for _, behavior := range []UndefinedBehavior{UndefinedLenient, UndefinedStrict, UndefinedSemiStrict} {
+		env := NewEnvironment()
+		env.SetUndefinedBehavior(behavior)
+		for _, source := range []string{
+			`{{ [1, 2, 3]|slice(2, foo=1) }}`,
+			`{{ [1, 2, 3]|slice(2, fill_with=0) }}`,
+			`{{ [1, 2, 3]|slice(2, 0, foo=1) }}`,
+			`{{ [1, 2, 3]|slice(count=2) }}`,
+		} {
+			assertRenderErrorKind(t, env, source, nil, ErrTooManyArguments)
+		}
+	}
+}
+
 func TestUndefinedIsASequence(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ missing is iterable }}|{{ missing is sequence }}",

@@ -1606,7 +1606,7 @@ func FilterBatch(state State, val value.Value, args []value.Value, kwargs map[st
 //	  </ul>
 //	{% endfor %}
 //	</div>
-func FilterSlice(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterSlice(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	items, iterErr := tryIterItems(state, val)
 	if iterErr != nil {
 		return value.Undefined(), iterErr
@@ -1615,6 +1615,9 @@ func FilterSlice(state State, val value.Value, args []value.Value, _ map[string]
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot slice non-iterable")
 	}
 
+	if len(kwargs) > 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
+	}
 	if len(args) == 0 {
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrMissingArgument, "missing argument")
 	}
