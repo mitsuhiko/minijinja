@@ -32,6 +32,41 @@ func (v Value) Neg() (Value, error) {
 	}
 }
 
+// compareBigNumbers compares two numbers if at least one of them is a big
+// integer.  float64 can't represent big integers exactly, so integers are
+// compared as big integers and floats as big floats.  The second return value
+// is false if neither value is a big integer or the values can't be compared.
+func compareBigNumbers(a, b Value) (int, bool) {
+	_, aBig := a.data.(bigIntValue)
+	_, bBig := b.data.(bigIntValue)
+	if !aBig && !bBig {
+		return 0, false
+	}
+	toBigFloat := func(v Value) (*big.Float, bool) {
+		switch d := v.data.(type) {
+		case int64:
+			return new(big.Float).SetInt64(d), true
+		case bigIntValue:
+			return new(big.Float).SetInt(d.Int), true
+		case float64:
+			if math.IsNaN(d) {
+				return nil, false
+			}
+			return big.NewFloat(d), true
+		}
+		return nil, false
+	}
+	x, ok := toBigFloat(a)
+	if !ok {
+		return 0, false
+	}
+	y, ok := toBigFloat(b)
+	if !ok {
+		return 0, false
+	}
+	return x.Cmp(y), true
+}
+
 // isActualInt returns true if the value is stored as an int64, not a float64.
 func isActualInt(v Value) bool {
 	_, ok := v.data.(int64)
@@ -418,6 +453,9 @@ func (v Value) Equal(other Value) bool {
 	}
 
 	// Numeric comparison
+	if cmp, ok := compareBigNumbers(v, other); ok {
+		return cmp == 0
+	}
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {
 			return f1 == f2
@@ -537,6 +575,9 @@ func (v Value) Compare(other Value) (int, bool) {
 	}
 
 	// Numeric comparison
+	if cmp, ok := compareBigNumbers(v, other); ok {
+		return cmp, true
+	}
 	if f1, ok := v.AsFloat(); ok {
 		if f2, ok := other.AsFloat(); ok {
 			if f1 < f2 {

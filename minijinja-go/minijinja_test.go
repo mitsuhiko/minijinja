@@ -2,7 +2,9 @@ package minijinja
 
 import (
 	"context"
+	"iter"
 	"math"
+	"math/big"
 	"strings"
 	"testing"
 
@@ -880,6 +882,123 @@ func TestBatchLikeRust(t *testing.T) {
 		}
 		if _, err := tmpl.Render(nil); err == nil {
 			t.Errorf("expected an error for %q", source)
+		}
+	}
+}
+
+func TestFiltersRejectUnsupportedValuesLikeRust(t *testing.T) {
+	env := NewEnvironment()
+
+	mapObj := value.MakeObjectMap(func() iter.Seq[value.Value] {
+		return func(yield func(value.Value) bool) {
+			_ = yield(value.FromString("b")) && yield(value.FromString("a"))
+		}
+	}, func(key value.Value) value.Value {
+		s, _ := key.AsString()
+		return value.FromString(s + "!")
+	})
+	ctx := map[string]any{
+		"obj":      mapObj,
+		"big":      value.FromBigInt(new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), 100))),
+		"min_i128": value.FromBigInt(new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), 127))),
+	}
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{`{{ {"a": 1}|length }}`, `1`},
+		{`{{ "abc"|count }}`, `3`},
+		{`{{ {"b": 1, "a": 2}|first }}`, `a`},
+		{`{{ ""|first is undefined }}`, `True`},
+		{`{{ range(3)|first }}`, `0`},
+		{`{{ "abc"|last }}`, `c`},
+		{`{{ (1, 2)|last }}`, `2`},
+		{`{{ range(3)|last }}`, `2`},
+		{`{{ -2|abs }}`, `2`},
+		{`{{ -2.0|abs }}`, `2.0`},
+		{`{{ -0.0|abs }}`, `0.0`},
+		{`{{ (-9223372036854775807 - 1)|abs }}`, `9223372036854775808`},
+		{`{{ (-9223372036854775807 - 10)|abs }}`, `9223372036854775817`},
+		{`{{ {"b": 1, "a": 2}|dictsort }}`, `[('a', 2), ('b', 1)]`},
+		{`{{ {"b": 1, "a": 2}|items }}`, `[('a', 2), ('b', 1)]`},
+		{`{{ obj|items }}`, `[('b', 'b!'), ('a', 'a!')]`},
+		{`{{ obj|dictsort }}`, `[('a', 'a!'), ('b', 'b!')]`},
+		{`{{ "a b"|split }}`, `['a', 'b']`},
+		{`{{ "a\nb"|lines }}`, `['a', 'b']`},
+		{`{{ {"a": 1}|attr("a") }}`, `1`},
+		{`{{ [1, 2]|attr(0) }}`, `1`},
+		{`{{ "abc"|attr(1) }}`, `b`},
+		{`{{ [1, 2]|attr("0") is undefined }}`, `True`},
+		{`{{ none|attr("x") is undefined }}`, `True`},
+		{`{{ 5|attr("x") is undefined }}`, `True`},
+		// groups are (grouper, list) sequences that also have attributes
+		{`{% for g in [{"a": 1}]|groupby("a") %}{{ g|last }}|{{ g|attr("grouper") }}|{{ g["list"] }}|{{ g|attr(0) }}|{{ g is sequence }}|{{ g[:1] }}{% endfor %}`, `[{'a': 1}]|1|[{'a': 1}]|1|True|[1]`},
+		// chains of mixed values are iterables
+		{`{{ [1, 2]|chain([3], none)|last }}|{{ [1, 2]|chain([3], none) is iterable }}`, `3|True`},
+		// namespaces are maps
+		{`{% set ns = namespace(b=1, a=2) %}{{ ns|items }}|{{ ns|dictsort }}|{{ ns|length }}|{{ ns|first }}|{% for k in ns %}{{ k }}{% endfor %}`, `[('a', 2), ('b', 1)]|[('a', 2), ('b', 1)]|2|a|ab`},
+		// big integers
+		{`{{ big|abs }}|{{ big < 0 }}|{{ big == big }}|{{ (big|abs) > 1.5 }}`, `1267650600228229401496703205376|True|True|True`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(ctx)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+
+	for _, test := range []struct {
+		template string
+		message  string
+	}{
+		{`{{ 5|length }}`, "cannot calculate length of value of type number"},
+		{`{{ none|count }}`, "cannot calculate length of value of type none"},
+		{`{{ undefined|length }}`, "cannot calculate length of value of type undefined"},
+		{`{{ 5|first }}`, "cannot get first item from value"},
+		{`{{ none|first }}`, "cannot get first item from value"},
+		{`{{ undefined|first }}`, "cannot get first item from value"},
+		{`{{ true|last }}`, "cannot get last item from value"},
+		{`{{ {"a": 1}|last }}`, "cannot get last item from value"},
+		{`{{ undefined|last }}`, "cannot get last item from value"},
+		{`{{ true|abs }}`, "cannot get absolute value"},
+		{`{{ none|abs }}`, "cannot get absolute value"},
+		{`{{ undefined|abs }}`, "cannot get absolute value"},
+		{`{{ "1"|abs }}`, "cannot get absolute value"},
+		{`{{ 5|dictsort }}`, "cannot convert value into pair list"},
+		{`{{ [1]|dictsort }}`, "cannot convert value into pair list"},
+		{`{{ undefined|dictsort }}`, "cannot convert value into pair list"},
+		{`{{ 5|items }}`, "cannot convert value into pairs"},
+		{`{{ [1]|items }}`, "cannot convert value into pairs"},
+		{`{{ none|items }}`, "cannot convert value into pairs"},
+		{`{{ undefined|items }}`, "cannot convert value into pairs"},
+		{`{{ 5|lines }}`, "value is not a string"},
+		{`{{ none|lines }}`, "value is not a string"},
+		{`{{ 5|split }}`, "value is not a string"},
+		{`{{ true|split }}`, "value is not a string"},
+		{`{{ undefined|split }}`, "value is not a string"},
+		{`{{ undefined|attr("x") }}`, "undefined value"},
+		{`{{ {"a": 1}|attr }}`, "missing argument"},
+		{`{{ {"a": 1}|attr("a", "b") }}`, "too many arguments"},
+		{`{{ min_i128|abs }}`, "overflow on abs"},
+	} {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		_, err = tmpl.Render(ctx)
+		if err == nil {
+			t.Errorf("expected an error for %q", test.template)
+		} else if !strings.Contains(err.Error(), test.message) {
+			t.Errorf("%q: expected error containing %q, got %v", test.template, test.message, err)
 		}
 	}
 }

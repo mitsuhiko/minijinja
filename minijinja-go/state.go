@@ -3165,7 +3165,11 @@ func (s *State) sliceValue(val value.Value, start, stop *int64, step int64) (val
 
 	switch {
 	case val.Kind() == value.KindSeq:
-		items, _ := val.AsSlice()
+		items, ok := val.AsSlice()
+		if !ok {
+			// sequence objects
+			items = val.Iter()
+		}
 		result := sliceSlice(items, start, stop, step)
 		if val.IsTuple() {
 			return value.FromTuple(result), nil

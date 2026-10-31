@@ -330,6 +330,21 @@ func (n *namespaceValue) GetAttr(name string) value.Value {
 	return value.Undefined()
 }
 
+// ObjectRepr makes namespaces maps like in Rust.
+func (n *namespaceValue) ObjectRepr() value.ObjectRepr {
+	return value.ObjectReprMap
+}
+
+// Keys returns the sorted keys of the namespace like in Rust.
+func (n *namespaceValue) Keys() []string {
+	keys := make([]string, 0, len(n.data))
+	for k := range n.data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func (n *namespaceValue) SetAttr(name string, val value.Value) {
 	n.data[name] = val
 }

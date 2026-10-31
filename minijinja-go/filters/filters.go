@@ -120,6 +120,48 @@ func tryIterItems(state State, val value.Value) ([]value.Value, error) {
 	return iterItems(val), nil
 }
 
+// stringOrBytesInput returns the string for string and bytes values. Like
+// TryFrom<Value> for Arc<str> in Rust, other values (including none and
+// undefined) are rejected.
+func stringOrBytesInput(val value.Value) (string, error) {
+	if s, ok := val.AsString(); ok {
+		return s, nil
+	}
+	if bytes, isBytes := val.Raw().([]byte); isBytes {
+		return strings.ToValidUTF8(string(bytes), "\uFFFD"), nil
+	}
+	return "", mjerrors.NewError(mjerrors.ErrInvalidOperation, "value is not a string")
+}
+
+// mapPairs returns the key-value pairs of a map value. Plain Go maps are
+// returned with sorted keys, map objects in their iteration order. The second
+// return value is false if the value is not a map.
+func mapPairs(val value.Value) ([][2]value.Value, bool) {
+	if m, ok := val.AsMap(); ok {
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		pairs := make([][2]value.Value, len(keys))
+		for i, k := range keys {
+			pairs[i] = [2]value.Value{value.FromString(k), m[k]}
+		}
+		return pairs, true
+	}
+	if val.Kind() != value.KindMap {
+		return nil, false
+	}
+	keys := val.Iter()
+	pairs := make([][2]value.Value, len(keys))
+	for i, k := range keys {
+		pairs[i] = [2]value.Value{k, val.GetItem(k)}
+	}
+	return pairs, true
+}
+
+var minI128 = new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), 127))
+
 func preserveSafety(input value.Value, output string) value.Value {
 	if input.IsSafe() {
 		return value.FromSafeString(output)
@@ -775,13 +817,9 @@ func FilterBool(state State, val value.Value, _ []value.Value, _ map[string]valu
 //	{{ "a,b,c,d"|split(",", 2) }}
 //	  -> ["a", "b", "c,d"]
 func FilterSplit(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
-	s, ok := val.AsString()
-	if !ok {
-		if bytes, isBytes := val.Raw().([]byte); isBytes {
-			s = strings.ToValidUTF8(string(bytes), "\uFFFD")
-		} else {
-			return value.FromSlice(nil), nil
-		}
+	s, err := stringOrBytesInput(val)
+	if err != nil {
+		return value.Undefined(), err
 	}
 
 	// Get split pattern
@@ -869,13 +907,9 @@ func splitWhitespaceN(s string, n int) []string {
 //	{{ "foo\nbar\nbaz"|lines }}
 //	  -> ["foo", "bar", "baz"]
 func FilterLines(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	s, ok := val.AsString()
-	if !ok {
-		if bytes, isBytes := val.Raw().([]byte); isBytes {
-			s = strings.ToValidUTF8(string(bytes), "\uFFFD")
-		} else {
-			return value.FromSlice(nil), nil
-		}
+	s, err := stringOrBytesInput(val)
+	if err != nil {
+		return value.Undefined(), err
 	}
 
 	var lines []string
@@ -919,7 +953,8 @@ func FilterLength(_ State, val value.Value, _ []value.Value, _ map[string]value.
 	if l, ok := val.Len(); ok {
 		return value.FromInt(int64(l)), nil
 	}
-	return value.FromInt(0), nil
+	return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation,
+		fmt.Sprintf("cannot calculate length of value of type %s", val.Kind()))
 }
 
 // FilterFirst returns the first item from an iterable.
@@ -939,6 +974,9 @@ func FilterLength(_ State, val value.Value, _ []value.Value, _ map[string]value.
 //	</dl>
 func FilterFirst(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	items := val.Iter()
+	if items == nil {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot get first item from value")
+	}
 	if len(items) > 0 {
 		return items[0], nil
 	}
@@ -972,6 +1010,9 @@ func FilterLast(_ State, val value.Value, _ []value.Value, _ map[string]value.Va
 			return preserveSafety(val, string(runes[len(runes)-1])), nil
 		}
 		return value.Undefined(), nil
+	}
+	if kind := val.Kind(); kind != value.KindSeq && kind != value.KindIterable {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot get last item from value")
 	}
 	items := val.Iter()
 	if len(items) > 0 {
@@ -2200,6 +2241,25 @@ func (g *groupObject) GetAttr(name string) value.Value {
 	return value.Undefined()
 }
 
+// ObjectRepr makes groups sequences of (grouper, list) like in Rust.
+func (g *groupObject) ObjectRepr() value.ObjectRepr {
+	return value.ObjectReprSeq
+}
+
+func (g *groupObject) SeqLen() int {
+	return 2
+}
+
+func (g *groupObject) SeqItem(index int) value.Value {
+	switch index {
+	case 0:
+		return g.grouper
+	case 1:
+		return value.FromSlice(g.list)
+	}
+	return value.Undefined()
+}
+
 func (g *groupObject) Iter() []value.Value {
 	return []value.Value{g.grouper, value.FromSlice(g.list)}
 }
@@ -2209,12 +2269,15 @@ func (g *groupObject) Len() (int, bool) {
 }
 
 func (g *groupObject) GetItem(key value.Value) value.Value {
+	if name, ok := key.AsString(); ok {
+		return g.GetAttr(name)
+	}
 	if idx, ok := key.AsInt(); ok {
-		switch idx {
-		case 0:
-			return g.grouper
-		case 1:
-			return value.FromSlice(g.list)
+		if idx < 0 {
+			idx += 2
+		}
+		if idx >= 0 && idx < 2 {
+			return g.SeqItem(int(idx))
 		}
 	}
 	return value.Undefined()
@@ -2297,6 +2360,11 @@ type chainObject struct {
 
 func (c *chainObject) GetAttr(name string) value.Value {
 	return value.Undefined()
+}
+
+// ObjectRepr makes chains of mixed values iterables like in Rust.
+func (c *chainObject) ObjectRepr() value.ObjectRepr {
+	return value.ObjectReprIterable
 }
 
 func (c *chainObject) Iter() []value.Value {
@@ -2385,19 +2453,30 @@ func FilterZip(_ State, val value.Value, args []value.Value, _ map[string]value.
 //	{{ 3.14|abs }}
 //	  -> 3.14
 func FilterAbs(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	if i, ok := val.AsInt(); ok {
-		if i < 0 {
-			return value.FromInt(-i), nil
+	switch d := val.Raw().(type) {
+	case int64:
+		if d == math.MinInt64 {
+			return value.FromBigInt(new(big.Int).Neg(big.NewInt(d))), nil
+		}
+		if d < 0 {
+			return value.FromInt(-d), nil
+		}
+		return val, nil
+	case float64:
+		return value.FromFloat(math.Abs(d)), nil
+	}
+	if val.Kind() == value.KindNumber {
+		// Big integers.  Like in Rust, they stay within the i128 range, so the
+		// smallest i128 has no absolute value.
+		if cmp, ok := val.Compare(value.FromBigInt(minI128)); ok && cmp == 0 {
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "overflow on abs")
+		}
+		if cmp, ok := val.Compare(value.FromInt(0)); ok && cmp < 0 {
+			return val.Neg()
 		}
 		return val, nil
 	}
-	if f, ok := val.AsFloat(); ok {
-		if f < 0 {
-			return value.FromFloat(-f), nil
-		}
-		return val, nil
-	}
-	return val, nil
+	return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot get absolute value")
 }
 
 // FilterInt converts a value to an integer.
@@ -2811,8 +2890,9 @@ func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string
 
 // FilterItems returns an iterable of key-value pairs from a map.
 //
-// This converts a map into a list of [key, value] tuples. The keys are
-// sorted alphabetically.
+// This converts a map into a list of [key, value] tuples. The keys of Go maps
+// are sorted alphabetically, map objects keep their iteration order. Values
+// that are not maps are rejected with an error.
 //
 // Example:
 //
@@ -2828,23 +2908,15 @@ func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string
 //	{% endfor %}
 //	</dl>
 func FilterItems(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	if m, ok := val.AsMap(); ok {
-		keys := make([]string, 0, len(m))
-		for k := range m {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		var result []value.Value
-		for _, k := range keys {
-			result = append(result, value.FromTuple([]value.Value{
-				value.FromString(k),
-				m[k],
-			}))
-		}
-		return value.FromSlice(result), nil
+	pairs, ok := mapPairs(val)
+	if !ok {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot convert value into pairs")
 	}
-	return value.FromSlice(nil), nil
+	result := make([]value.Value, len(pairs))
+	for i, pair := range pairs {
+		result[i] = value.FromTuple([]value.Value{pair[0], pair[1]})
+	}
+	return value.FromSlice(result), nil
 }
 
 // FilterDictSort sorts a map by keys or values.
@@ -2867,83 +2939,70 @@ func FilterItems(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 //   - reverse: set to true to sort in descending order
 //   - case_sensitive: set to true for case-sensitive sorting (default: false)
 func FilterDictSort(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	if m, ok := val.AsMap(); ok {
-		keys := make([]string, 0, len(m))
-		for k := range m {
-			keys = append(keys, k)
-		}
-
-		if len(args) > 0 {
-			return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
-		}
-
-		byValue := false
-		if b, ok := kwargs["by"]; ok {
-			if s, ok := b.AsString(); ok && s == "value" {
-				byValue = true
-			}
-		}
-
-		reverse := false
-		if b, ok := kwargs["reverse"]; ok {
-			if bb, ok := b.AsBool(); ok {
-				reverse = bb
-			}
-		}
-
-		caseSensitive := false
-		if cs, ok := kwargs["case_sensitive"]; ok {
-			if b, ok := cs.AsBool(); ok {
-				caseSensitive = b
-			}
-		}
-
-		cmpValues := func(a, b value.Value) int {
-			if !caseSensitive {
-				if s1, ok := a.AsString(); ok {
-					if s2, ok := b.AsString(); ok {
-						lowerCmp := strings.Compare(strings.ToLower(s1), strings.ToLower(s2))
-						if lowerCmp != 0 {
-							return lowerCmp
-						}
-						return strings.Compare(s1, s2)
-					}
-				}
-			}
-			if cmp, ok := a.Compare(b); ok {
-				return cmp
-			}
-			return strings.Compare(a.Repr(), b.Repr())
-		}
-
-		if byValue {
-			sort.Slice(keys, func(i, j int) bool {
-				cmp := cmpValues(m[keys[i]], m[keys[j]])
-				if reverse {
-					return cmp > 0
-				}
-				return cmp < 0
-			})
-		} else {
-			sort.Slice(keys, func(i, j int) bool {
-				cmp := cmpValues(value.FromString(keys[i]), value.FromString(keys[j]))
-				if reverse {
-					return cmp > 0
-				}
-				return cmp < 0
-			})
-		}
-
-		var result []value.Value
-		for _, k := range keys {
-			result = append(result, value.FromTuple([]value.Value{
-				value.FromString(k),
-				m[k],
-			}))
-		}
-		return value.FromSlice(result), nil
+	pairs, ok := mapPairs(val)
+	if !ok {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot convert value into pair list")
 	}
-	return value.FromSlice(nil), nil
+	if len(args) > 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
+	}
+
+	byValue := false
+	if b, ok := kwargs["by"]; ok {
+		if s, ok := b.AsString(); ok && s == "value" {
+			byValue = true
+		}
+	}
+
+	reverse := false
+	if b, ok := kwargs["reverse"]; ok {
+		if bb, ok := b.AsBool(); ok {
+			reverse = bb
+		}
+	}
+
+	caseSensitive := false
+	if cs, ok := kwargs["case_sensitive"]; ok {
+		if b, ok := cs.AsBool(); ok {
+			caseSensitive = b
+		}
+	}
+
+	cmpValues := func(a, b value.Value) int {
+		if !caseSensitive {
+			if s1, ok := a.AsString(); ok {
+				if s2, ok := b.AsString(); ok {
+					lowerCmp := strings.Compare(strings.ToLower(s1), strings.ToLower(s2))
+					if lowerCmp != 0 {
+						return lowerCmp
+					}
+					return strings.Compare(s1, s2)
+				}
+			}
+		}
+		if cmp, ok := a.Compare(b); ok {
+			return cmp
+		}
+		return strings.Compare(a.Repr(), b.Repr())
+	}
+
+	idx := 0
+	if byValue {
+		idx = 1
+	}
+	sort.SliceStable(pairs, func(i, j int) bool {
+		cmp := cmpValues(pairs[i][idx], pairs[j][idx])
+		if reverse {
+			return cmp > 0
+		}
+		return cmp < 0
+	})
+
+	result := make([]value.Value, len(pairs))
+	for i, pair := range pairs {
+		result[i] = value.FromTuple([]value.Value{pair[0], pair[1]})
+	}
+	return value.FromSlice(result), nil
 }
 
 // FilterAttr looks up an attribute by name.
@@ -2960,12 +3019,19 @@ func FilterDictSort(_ State, val value.Value, args []value.Value, kwargs map[str
 //
 //	{{ value|attr("key") }}
 //	  -> same as value["key"] or value.key
-func FilterAttr(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterAttr(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	if len(args) < 1 {
-		return value.Undefined(), fmt.Errorf("attr filter requires attribute name")
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrMissingArgument, "missing argument")
 	}
-	name, _ := args[0].AsString()
-	return val.GetAttr(name), nil
+	if len(args) > 1 || len(kwargs) > 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
+	}
+	// Like Value::get_item in Rust, looking up anything on undefined fails
+	// regardless of the undefined behavior.
+	if val.IsUndefined() {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrUndefinedVar, "undefined value")
+	}
+	return val.GetItem(args[0]), nil
 }
 
 // FilterIndent indents each line of a string with spaces.

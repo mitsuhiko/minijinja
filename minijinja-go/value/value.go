@@ -1321,7 +1321,17 @@ func (v Value) GetItem(key Value) Value {
 			}
 		}
 	case ItemGetter:
-		return d.GetItem(key)
+		// Like get_value in Rust, objects resolve string keys as attributes
+		// if their item lookup doesn't know the key.
+		if rv := d.GetItem(key); !rv.IsUndefined() {
+			return rv
+		}
+		if obj, ok := d.(Object); ok {
+			if s, ok := key.AsString(); ok {
+				return obj.GetAttr(s)
+			}
+		}
+		return Undefined()
 	case Object:
 		// Check for SeqObject for index access
 		if idx, ok := key.AsInt(); ok {
