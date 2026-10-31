@@ -884,6 +884,93 @@ func TestBatchLikeRust(t *testing.T) {
 	}
 }
 
+func TestSliceLikeRust(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{`{{ [1, 2, 3]|slice(2) }}`, `[[1, 2], [3]]`},
+		{`{{ [1, 2, 3]|slice(2, 0) }}`, `[[1, 2], [3, 0]]`},
+		{`{{ [1, 2, 3, 4]|slice(2, 0) }}`, `[[1, 2, 0], [3, 4, 0]]`},
+		{`{{ []|slice(2, 0) }}`, `[[0], [0]]`},
+		{`{{ [1, 2, 3]|slice(2, none) }}`, `[[1, 2], [3]]`},
+		{`{{ [1, 2, 3]|slice(true) }}`, `[[1, 2, 3]]`},
+		{`{{ undefined|slice(2) }}`, `[[], []]`},
+		{`{{ none|slice(2) }}`, `[[], []]`},
+		{`{{ none|slice(2, 0) }}`, `[[0], [0]]`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+
+	for _, source := range []string{
+		`{{ [1, 2, 3]|slice(0) }}`,
+		`{{ [1, 2, 3]|slice(-1) }}`,
+		`{{ [1, 2, 3]|slice("2") }}`,
+		`{{ [1, 2, 3]|slice() }}`,
+		`{{ [1, 2, 3]|slice(2, 0, 1) }}`,
+	} {
+		tmpl, err := env.TemplateFromString(source)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", source, err)
+		}
+		if _, err := tmpl.Render(nil); err == nil {
+			t.Errorf("expected an error for %q", source)
+		}
+	}
+
+	// Strict undefined behavior still rejects slicing an undefined value,
+	// but not a silent undefined value.
+	strict := NewEnvironment()
+	strict.SetUndefinedBehavior(UndefinedStrict)
+	tmpl, err := strict.TemplateFromString(`{{ undefined|slice(2) }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if _, err := tmpl.Render(nil); err == nil {
+		t.Errorf("expected an error for undefined|slice(2) with strict undefined behavior")
+	}
+	tmpl, err = strict.TemplateFromString(`{{ (42 if false)|slice(2) }}`)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if result != "[[], []]" {
+		t.Errorf("expected %q, got %q", "[[], []]", result)
+	}
+}
+
+func TestSliceRejectsKeywordArguments(t *testing.T) {
+	for _, behavior := range []UndefinedBehavior{UndefinedLenient, UndefinedStrict, UndefinedSemiStrict} {
+		env := NewEnvironment()
+		env.SetUndefinedBehavior(behavior)
+		for _, source := range []string{
+			`{{ [1, 2, 3]|slice(2, foo=1) }}`,
+			`{{ [1, 2, 3]|slice(2, fill_with=0) }}`,
+			`{{ [1, 2, 3]|slice(2, 0, foo=1) }}`,
+			`{{ [1, 2, 3]|slice(count=2) }}`,
+		} {
+			assertRenderErrorKind(t, env, source, nil, ErrTooManyArguments)
+		}
+	}
+}
+
 func TestUndefinedIsASequence(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ missing is iterable }}|{{ missing is sequence }}",
