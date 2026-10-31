@@ -1531,23 +1531,37 @@ func FilterBatch(state State, val value.Value, args []value.Value, kwargs map[st
 		return value.Undefined(), iterErr
 	}
 	if items == nil {
-		return val, nil
-	}
-
-	lineCount := 1
-	if len(args) > 0 {
-		if c, ok := args[0].AsInt(); ok && c > 0 {
-			lineCount = int(c)
-		}
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot batch non-iterable")
 	}
 
 	if len(kwargs) > 0 {
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many keyword arguments")
 	}
+	if len(args) == 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrMissingArgument, "missing argument")
+	}
+	if len(args) > 2 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
+	}
+	c, ok := args[0].AsInt()
+	if b, isBool := args[0].AsBool(); isBool {
+		c, ok = 0, true
+		if b {
+			c = 1
+		}
+	}
+	if !ok || c < 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "count must be a positive integer")
+	}
+	if c == 0 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "count cannot be 0")
+	}
+	lineCount := int(c)
 
-	fillWith := value.Undefined()
-	if len(args) > 1 {
-		fillWith = args[1]
+	// Like in Rust and Jinja2, none counts as no fill value.
+	var fillWith *value.Value
+	if len(args) > 1 && !args[1].IsNone() && !args[1].IsUndefined() {
+		fillWith = &args[1]
 	}
 
 	var result []value.Value
@@ -1560,9 +1574,9 @@ func FilterBatch(state State, val value.Value, args []value.Value, kwargs map[st
 		copy(batch, items[i:end])
 
 		// Fill the last batch if needed
-		if !fillWith.IsUndefined() && len(batch) < lineCount {
+		if fillWith != nil {
 			for len(batch) < lineCount {
-				batch = append(batch, fillWith)
+				batch = append(batch, *fillWith)
 			}
 		}
 		result = append(result, value.FromSlice(batch))
