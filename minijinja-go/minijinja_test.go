@@ -936,6 +936,7 @@ func TestFiltersRejectUnsupportedValuesLikeRust(t *testing.T) {
 		{`{% for g in [{"a": 1}]|groupby("a") %}{{ g|last }}|{{ g|attr("grouper") }}|{{ g["list"] }}|{{ g|attr(0) }}|{{ g is sequence }}|{{ g[:1] }}{% endfor %}`, `[{'a': 1}]|1|[{'a': 1}]|1|True|[1]`},
 		// chains of mixed values are iterables
 		{`{{ [1, 2]|chain([3], none)|last }}|{{ [1, 2]|chain([3], none) is iterable }}`, `3|True`},
+		{`{{ [1]|chain("ab") }}|{{ {"a": 1}|chain([2])|string }}|{{ [1]|chain("ab")|list }}`, `<iterator>|<iterator>|[1, 'a', 'b']`},
 		// namespaces are maps
 		{`{% set ns = namespace(b=1, a=2) %}{{ ns|items }}|{{ ns|dictsort }}|{{ ns|length }}|{{ ns|first }}|{% for k in ns %}{{ k }}{% endfor %}`, `[('a', 2), ('b', 1)]|[('a', 2), ('b', 1)]|2|a|ab`},
 		// big integers
