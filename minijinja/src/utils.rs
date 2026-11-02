@@ -573,7 +573,6 @@ pub fn splitn_whitespace(s: &str, maxsplits: usize) -> impl Iterator<Item = &str
     let mut splits = 1;
     let mut skip_ws = true;
     let mut split_start = None;
-    let mut last_split_end = 0;
     let mut chars = s.char_indices();
 
     std::iter::from_fn(move || {
@@ -584,7 +583,6 @@ pub fn splitn_whitespace(s: &str, maxsplits: usize) -> impl Iterator<Item = &str
                 if let Some(old) = split_start {
                     let rv = &s[old..idx];
                     split_start = None;
-                    last_split_end = idx;
                     splits += 1;
                     skip_ws = true;
                     return Some(rv);
@@ -593,18 +591,13 @@ pub fn splitn_whitespace(s: &str, maxsplits: usize) -> impl Iterator<Item = &str
                 skip_ws = false;
                 if split_start.is_none() {
                     split_start = Some(idx);
-                    last_split_end = idx;
                 }
             }
         }
 
-        let rest = &s[last_split_end..];
-        if !rest.is_empty() {
-            last_split_end = s.len();
-            Some(rest)
-        } else {
-            None
-        }
+        // Only a word (or the rest after the last split) that is still open
+        // is left over; trailing whitespace is not an item.
+        split_start.take().map(|start| &s[start..])
     })
 }
 
