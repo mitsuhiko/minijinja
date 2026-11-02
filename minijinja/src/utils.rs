@@ -758,5 +758,10 @@ mod tests {
         assert_eq!(s("a   b   c", 4), vec!["a", "b", "c"]);
         assert_eq!(s("   a   b   c", 3), vec!["a", "b", "c"]);
         assert_eq!(s("   a   b   c", 4), vec!["a", "b", "c"]);
+        assert_eq!(s("a b ", 3), vec!["a", "b"]);
+        assert_eq!(s("a ", 2), vec!["a"]);
+        assert_eq!(s("   ", 1), Vec::<&str>::new());
+        assert_eq!(s("", 1), Vec::<&str>::new());
+        assert_eq!(s("a b  ", 2), vec!["a", "b  "]);
     }
 }
