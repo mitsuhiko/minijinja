@@ -13,6 +13,7 @@ All notable changes to MiniJinja are documented here.
 * Fixed comparisons with big integers in Go.  `x < 0` failed with "cannot compare number and number" and `x == x` was false for integers outside the 64-bit range.  The `abs` filter also fails with "overflow on abs" for the smallest 128-bit integer like in Rust.  #997
 * Fixed `chain` results of mixed values in Go rendering as Go internals such as `&{[{1} {a} {b}]}`.  Like other iterables and like in Rust, they now render as `<iterator>`.
 * Fixed the `in` operator in Go always being false for values that are not strings in a string.  Like in Rust, such values are looked up by their string representation, so `1 in "a1"`, `none in "None"` and `[1] in "[1]"` are now `true`.
+* Fixed `+` in Go failing on iterables such as `range()`.  Like in Rust, sequences and iterables concatenate into an iterable, so `range(2) + [5]` is `[0, 1, 5]` instead of failing with "cannot add iterator and sequence".
 
 ## 3.0.5
 
