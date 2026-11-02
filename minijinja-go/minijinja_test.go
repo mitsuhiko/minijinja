@@ -678,6 +678,42 @@ func TestSliceAndContainsOnIterables(t *testing.T) {
 	}
 }
 
+func TestConcatenateIterables(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{`{{ range(2) + [5] }}`, `[0, 1, 5]`},
+		{`{{ [5] + range(2) }}`, `[5, 0, 1]`},
+		{`{{ range(2) + range(1) }}`, `[0, 1, 0]`},
+		{`{{ ([1, 2]|reverse) + [3] }}`, `[2, 1, 3]`},
+		{`{{ (range(2) + [5]) is sequence }}|{{ (range(2) + [5])|length }}`, `False|3`},
+		{`{% for i in range(2) + [5] %}{{ i }}{% endfor %}`, `015`},
+	}
+
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Fatalf("render error for %q: %v", test.template, err)
+		}
+		if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+
+	for _, source := range []string{`{{ range(2) + (1,) }}`, `{{ range(2) + "ab" }}`, `{{ range(2) + {"a": 1} }}`} {
+		if _, err := renderString(env, source, nil); err == nil {
+			t.Errorf("expected error for %q", source)
+		}
+	}
+}
+
 func TestNoneIsAnEmptyIterable(t *testing.T) {
 	env := NewEnvironment()
 

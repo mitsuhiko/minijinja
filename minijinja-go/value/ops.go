@@ -165,6 +165,17 @@ func (v Value) Add(other Value) (Value, error) {
 		}
 	}
 
+	// Like in Rust, a sequence or iterable such as range() also concatenates
+	// with another one, which gives an iterable.
+	if isSeqOrIterable(v) && isSeqOrIterable(other) {
+		s1 := v.Iter()
+		s2 := other.Iter()
+		result := make([]Value, 0, len(s1)+len(s2))
+		result = append(result, s1...)
+		result = append(result, s2...)
+		return FromIterator(NewIterator("concat", result)), nil
+	}
+
 	return Undefined(), fmt.Errorf("cannot add %s and %s", v.Kind(), other.Kind())
 }
 
