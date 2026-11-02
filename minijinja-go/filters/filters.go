@@ -2371,6 +2371,11 @@ func (c *chainObject) Iter() []value.Value {
 	return c.items
 }
 
+// String renders the chain like other iterables, as in Rust.
+func (c *chainObject) String() string {
+	return "<iterator>"
+}
+
 func (c *chainObject) Len() (int, bool) {
 	return len(c.items), true
 }
