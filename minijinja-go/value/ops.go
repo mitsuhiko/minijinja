@@ -644,14 +644,12 @@ func (v Value) Compare(other Value) (int, bool) {
 // Contains checks if v contains other.
 func (v Value) Contains(other Value) bool {
 	switch d := v.data.(type) {
+	// Like in Rust, a value that is not a string is looked up by its
+	// string representation.
 	case string:
-		if s, ok := other.AsString(); ok {
-			return strings.Contains(d, s)
-		}
+		return strings.Contains(d, other.String())
 	case safeString:
-		if s, ok := other.AsString(); ok {
-			return strings.Contains(string(d), s)
-		}
+		return strings.Contains(string(d), other.String())
 	case []Value:
 		for _, item := range d {
 			if item.Equal(other) {
