@@ -862,32 +862,23 @@ func FilterSplit(_ State, val value.Value, args []value.Value, _ map[string]valu
 }
 
 func splitWhitespaceN(s string, n int) []string {
+	// Like Python's str.split(None, n - 1): at most n - 1 splits, leading
+	// whitespace is skipped and the rest keeps its trailing whitespace.
 	var result []string
-	start := -1
-	for i, r := range s {
-		if unicode.IsSpace(r) {
-			if start >= 0 {
-				result = append(result, s[start:i])
-				start = -1
-				if len(result) >= n-1 {
-					// Find next non-space and take rest
-					for j := i; j < len(s); j++ {
-						if !unicode.IsSpace(rune(s[j])) {
-							result = append(result, s[j:])
-							return result
-						}
-					}
-					return result
-				}
-			}
-		} else {
-			if start < 0 {
-				start = i
-			}
+	for len(result) < n-1 {
+		s = strings.TrimLeftFunc(s, unicode.IsSpace)
+		if s == "" {
+			return result
 		}
+		i := strings.IndexFunc(s, unicode.IsSpace)
+		if i < 0 {
+			return append(result, s)
+		}
+		result = append(result, s[:i])
+		s = s[i:]
 	}
-	if start >= 0 {
-		result = append(result, s[start:])
+	if s = strings.TrimLeftFunc(s, unicode.IsSpace); s != "" {
+		result = append(result, s)
 	}
 	return result
 }

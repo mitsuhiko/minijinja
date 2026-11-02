@@ -4,6 +4,7 @@ All notable changes to MiniJinja are documented here.
 
 ## Unreleased
 
+* Fixed `split(none, n)` in Go splitting once when no splits are allowed and not skipping multi-byte whitespace after the last split.  Like in Rust and Python, `"a b c"|split(none, 0)` is now `['a b c']` instead of `['a', 'b c']`, and a non-breaking space between words is no longer kept at the start of the rest.
 * Fixed slicing with a negative step in Rust panicking on empty values and returning wrong items for some bounds.  Like in Python, `[][::-1]` and `""[::-1]` are now empty instead of panicking with "index out of bounds", and `[1, 2, 3][:0:-1]` is `[3, 2]` instead of `[3, 2, 1]`.
 * Fixed `split(none, n)` returning the trailing whitespace as an extra item when the string ends in whitespace.  Like in Python, `"a b "|split(none, 5)` is now `["a", "b"]` instead of `["a", "b", " "]`, and `"   "|split(none, 0)` is `[]` instead of `["   "]`.  The same applies to the `str.split` method in `pycompat`.
 * Fixed comparisons, `~` and `in` in Go accepting undefined operands with strict and semi-strict undefined behavior.  Like in Rust, `undefined == 1`, `undefined < 1`, `undefined ~ "a"` and `undefined in [1]` now fail with an undefined value error instead of rendering `False` or `a`.  Silent undefined values, such as the result of `42 if false`, are still accepted.
