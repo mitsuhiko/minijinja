@@ -12,6 +12,7 @@ All notable changes to MiniJinja are documented here.
 * Fixed `groupby` groups, `chain` results and namespaces in Go reporting the wrong kind of value.  Like in Rust, groups are now sequences, so `g is sequence` is true, `g[:1]` works and `g|tojson` is `[grouper, list]`, and namespaces are maps, so `ns|length`, `ns|items`, `"a" in ns` and `{% for key in ns %}` work.  Looking up a string key with `[]` or `attr` on objects with item access now falls back to the attribute, so `g["grouper"]` works.  #997
 * Fixed comparisons with big integers in Go.  `x < 0` failed with "cannot compare number and number" and `x == x` was false for integers outside the 64-bit range.  The `abs` filter also fails with "overflow on abs" for the smallest 128-bit integer like in Rust.  #997
 * Fixed `chain` results of mixed values in Go rendering as Go internals such as `&{[{1} {a} {b}]}`.  Like other iterables and like in Rust, they now render as `<iterator>`.
+* Fixed the `in` operator in Go always being false for values that are not strings in a string.  Like in Rust, such values are looked up by their string representation, so `1 in "a1"`, `none in "None"` and `[1] in "[1]"` are now `true`.
 
 ## 3.0.5
 

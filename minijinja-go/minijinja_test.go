@@ -1168,6 +1168,13 @@ func TestInOperator(t *testing.T) {
 		{"{{ 'd' in 'abc' }}", nil, "False"},
 		{"{{ 1 in [1,2,3] }}", nil, "True"},
 		{"{{ 4 in [1,2,3] }}", nil, "False"},
+		{"{{ 1 in 'a1' }}", nil, "True"},
+		{"{{ 2.5 in 'x2.5' }}", nil, "True"},
+		{"{{ none in 'None' }}", nil, "True"},
+		{"{{ true in 'True' }}", nil, "True"},
+		{"{{ [1] in '[1]' }}", nil, "True"},
+		{"{{ 1 in 'abc'|safe }}", nil, "False"},
+		{"{{ 1 not in 'a1' }}", nil, "False"},
 	}
 
 	for _, test := range tests {
