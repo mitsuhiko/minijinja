@@ -243,7 +243,22 @@ impl Expr<'_> {
     }
 }
 
+/// Constant folding only creates strings and sequences up to this size.  Larger
+/// values are created at runtime where they are subject to fuel.
+const MAX_FOLDED_SIZE: u64 = 1024;
+
 fn eval_binop(op: BinOpKind, left: &Value, right: &Value) -> Option<Value> {
+    let alloc_op = match op {
+        BinOpKind::Add => Some("add"),
+        BinOpKind::Mul => Some("mul"),
+        BinOpKind::Concat => Some("string_concat"),
+        _ => None,
+    };
+    if let Some(alloc_op) = alloc_op {
+        if ops::binop_alloc_estimate(alloc_op, left, right) > MAX_FOLDED_SIZE {
+            return None;
+        }
+    }
     match op {
         BinOpKind::Add => ops::add(left, right).ok(),
         BinOpKind::Sub => ops::sub(left, right).ok(),
@@ -259,7 +274,7 @@ fn eval_binop(op: BinOpKind, left: &Value, right: &Value) -> Option<Value> {
         BinOpKind::Lte => Some(Value::from(left <= right)),
         BinOpKind::Gt => Some(Value::from(left > right)),
         BinOpKind::Gte => Some(Value::from(left >= right)),
-        BinOpKind::In => ops::contains(right, left).ok(),
+        BinOpKind::In => ops::contains(None, right, left).ok(),
         BinOpKind::ScAnd => Some(if left.is_true() {
             right.clone()
         } else {
@@ -281,8 +296,8 @@ fn eval_compare(op: CompareOpKind, left: &Value, right: &Value) -> Option<Value>
         CompareOpKind::Lte => Some(Value::from(left <= right)),
         CompareOpKind::Gt => Some(Value::from(left > right)),
         CompareOpKind::Gte => Some(Value::from(left >= right)),
-        CompareOpKind::In => ops::contains(right, left).ok(),
-        CompareOpKind::NotIn => ops::contains(right, left)
+        CompareOpKind::In => ops::contains(None, right, left).ok(),
+        CompareOpKind::NotIn => ops::contains(None, right, left)
             .ok()
             .map(|value| Value::from(!value.is_true())),
     }

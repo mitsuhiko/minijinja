@@ -30,7 +30,7 @@ type Closure<'env> = BTreeMap<&'env str, Value>;
 
 mod context;
 #[cfg(feature = "fuel")]
-mod fuel;
+pub(crate) mod fuel;
 mod loop_object;
 #[cfg(feature = "macros")]
 mod macro_object;
@@ -71,6 +71,21 @@ where
         let val = some!(f());
         vec[idx as usize] = Some(val);
         Some(val)
+    }
+}
+
+/// Returns `true` if the value is a macro.
+#[inline(always)]
+fn is_macro(_value: &Value) -> bool {
+    #[cfg(feature = "macros")]
+    {
+        _value
+            .downcast_object_ref::<crate::vm::macro_object::Macro>()
+            .is_some()
+    }
+    #[cfg(not(feature = "macros"))]
+    {
+        false
     }
 }
 
@@ -333,12 +348,28 @@ impl<'env> Executor<'env> {
                 }};
             }
 
+            // like `func_binop` but for operations that can allocate.
+            macro_rules! alloc_binop {
+                ($method:ident) => {{
+                    b = stack.pop();
+                    a = stack.pop();
+                    ctx_ok!(ops::ensure_fuel_for_binop(
+                        state,
+                        stringify!($method),
+                        &a,
+                        &b
+                    ));
+                    stack.push(charge_value!(ctx_ok!(ops::$method(&a, &b))));
+                }};
+            }
+
             macro_rules! op_binop {
                 ($op:tt) => {{
                     b = stack.pop();
                     a = stack.pop();
                     ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
                     ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
+                    ctx_ok!(ops::charge_fuel_for_compare(state, &a, &b));
                     stack.push(Value::from(a $op b));
                 }};
             }
@@ -371,10 +402,24 @@ impl<'env> Executor<'env> {
             }
 
             // if the fuel consumption feature is enabled, track the fuel
-            // consumption here.
+            // consumption here.  This also charges for the output written
+            // by the previous instruction.
             #[cfg(feature = "fuel")]
-            if let Some(ref mut tracker) = state.fuel_tracker {
+            if let Some(ref tracker) = state.fuel_tracker {
                 ctx_ok!(tracker.track(instr));
+                let bytes = out.take_uncharged_bytes();
+                if bytes > 0 {
+                    ctx_ok!(tracker.consume(fuel::cost_of(bytes, fuel::BYTE_COST)));
+                }
+            }
+
+            // charges for the size of a value that was just created.
+            macro_rules! charge_value {
+                ($value:expr) => {{
+                    let value = $value;
+                    ctx_ok!(state.charge_value(&value));
+                    value
+                }};
             }
 
             match instr {
@@ -391,6 +436,15 @@ impl<'env> Executor<'env> {
                 }
                 Instruction::Emit => {
                     let value = stack.pop();
+                    // formatting containers walks them which is a lot more
+                    // expensive than writing out a string.
+                    #[cfg(feature = "fuel")]
+                    let serialized_start = match value.0 {
+                        ValueRepr::Object(_) if state.fuel_tracker.is_some() => {
+                            Some(out.uncharged_bytes())
+                        }
+                        _ => None,
+                    };
                     if state.env().is_default_formatter() {
                         if strict_undefined
                             && matches!(value.0, ValueRepr::Undefined(UndefinedType::Default, _))
@@ -400,6 +454,11 @@ impl<'env> Executor<'env> {
                         ctx_ok!(write_escaped(out, &state.auto_escape, &value));
                     } else {
                         ctx_ok!(state.env().format(&value, state, out));
+                    }
+                    #[cfg(feature = "fuel")]
+                    if let Some(start) = serialized_start {
+                        let written = out.uncharged_bytes().saturating_sub(start);
+                        ctx_ok!(state.charge_serialized(written));
                     }
                 }
                 Instruction::StoreLocal(name) => {
@@ -446,6 +505,7 @@ impl<'env> Executor<'env> {
                 Instruction::GetItem => {
                     a = stack.pop();
                     b = stack.pop();
+                    ctx_ok!(ops::charge_fuel_for_get_item(state, &b, &a));
                     stack.push(match b.get_item_opt(&a) {
                         Some(value) => assert_valid!(value),
                         None => {
@@ -461,7 +521,7 @@ impl<'env> Executor<'env> {
                     if a.is_undefined() && matches!(undefined_behavior, UndefinedBehavior::Strict) {
                         bail!(Error::undefined(&a));
                     }
-                    stack.push(ctx_ok!(ops::slice(a, b, stop, step)));
+                    stack.push(charge_value!(ctx_ok!(ops::slice(state, a, b, stop, step))));
                 }
                 Instruction::LoadConst(value) => {
                     stack.push(value.clone());
@@ -474,7 +534,7 @@ impl<'env> Executor<'env> {
                         let value = stack.pop();
                         map.insert(key, value);
                     }
-                    stack.push(Value::from_object(map))
+                    stack.push(charge_value!(Value::from_object(map)))
                 }
                 Instruction::BuildKwargs(pair_count) => {
                     let mut map = value_map_with_capacity(*pair_count);
@@ -498,7 +558,7 @@ impl<'env> Executor<'env> {
                         v.push(stack.pop());
                     }
                     v.reverse();
-                    stack.push(Value::from_object(v))
+                    stack.push(charge_value!(Value::from_object(v)))
                 }
                 Instruction::BuildTuple(n) => {
                     use crate::value::Tuple;
@@ -519,7 +579,7 @@ impl<'env> Executor<'env> {
                             Tuple::from(values)
                         }
                     };
-                    stack.push(Value::from(tuple))
+                    stack.push(charge_value!(Value::from(tuple)))
                 }
                 Instruction::UnpackList(count) => {
                     ctx_ok!(Self::unpack_list(&mut stack, *count));
@@ -528,7 +588,7 @@ impl<'env> Executor<'env> {
                     let lists = Vec::from_iter((0..*count).map(|_| stack.pop()));
                     let mut len = 0;
                     for list in lists.into_iter().rev() {
-                        for item in ctx_ok!(list.try_iter()) {
+                        for item in state.fuel_iter(ctx_ok!(list.try_iter())) {
                             ctx_ok!(item.check());
                             stack.push(item);
                             len += 1;
@@ -536,9 +596,9 @@ impl<'env> Executor<'env> {
                     }
                     stack.push(Value::from(len));
                 }
-                Instruction::Add => func_binop!(add),
+                Instruction::Add => alloc_binop!(add),
                 Instruction::Sub => func_binop!(sub),
-                Instruction::Mul => func_binop!(mul),
+                Instruction::Mul => alloc_binop!(mul),
                 Instruction::Div => func_binop!(div),
                 Instruction::IntDiv => func_binop!(int_div),
                 Instruction::Rem => func_binop!(rem),
@@ -558,7 +618,15 @@ impl<'env> Executor<'env> {
                     b = stack.pop();
                     ctx_ok!(undefined_behavior.assert_value_not_undefined(&b));
                     ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
-                    stack.push(ops::string_concat(b, &a));
+                    ctx_ok!(ops::ensure_fuel_for_binop(state, "string_concat", &b, &a));
+                    // like emitting, formatting containers into the string
+                    // is more expensive than copying strings.
+                    let formats_object = b.as_object().is_some() || a.as_object().is_some();
+                    let rv = charge_value!(ops::string_concat(b, &a));
+                    if formats_object {
+                        ctx_ok!(state.charge_serialized(rv.as_str().map_or(0, |x| x.len())));
+                    }
+                    stack.push(rv);
                 }
                 Instruction::In => {
                     a = stack.pop();
@@ -567,11 +635,14 @@ impl<'env> Executor<'env> {
                     // we are in strict mode.
                     ctx_ok!(state.undefined_behavior().assert_iterable(&a));
                     ctx_ok!(state.undefined_behavior().assert_value_not_undefined(&b));
-                    stack.push(ctx_ok!(ops::contains(&a, &b)));
+                    stack.push(ctx_ok!(ops::contains(Some(state), &a, &b)));
                 }
                 Instruction::CompareAndPreserve(op) => {
                     b = stack.pop();
                     a = stack.pop();
+                    if !matches!(op, CompareOp::In | CompareOp::NotIn) {
+                        ctx_ok!(ops::charge_fuel_for_compare(state, &a, &b));
+                    }
                     let result = match op {
                         CompareOp::Eq => {
                             ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
@@ -606,7 +677,7 @@ impl<'env> Executor<'env> {
                         CompareOp::In | CompareOp::NotIn => {
                             ctx_ok!(undefined_behavior.assert_iterable(&b));
                             ctx_ok!(undefined_behavior.assert_value_not_undefined(&a));
-                            let contains = ctx_ok!(ops::contains(&b, &a)).is_true();
+                            let contains = ctx_ok!(ops::contains(Some(state), &b, &a)).is_true();
                             if matches!(op, CompareOp::NotIn) {
                                 !contains
                             } else {
@@ -723,7 +794,13 @@ impl<'env> Executor<'env> {
                         }));
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
-                    a = ctx_ok!(filter.call(state, args));
+                    // filters are charged for the string they work on
+                    // and the value they return.
+                    #[cfg(feature = "fuel")]
+                    if let Some(s) = args.first().and_then(|x| x.as_str()) {
+                        ctx_ok!(state.charge_fuel(s.len() as u64));
+                    }
+                    a = charge_value!(ctx_ok!(filter.call(state, args)));
                     stack.drop_top(arg_count);
                     stack.push(a);
                 }
@@ -741,6 +818,9 @@ impl<'env> Executor<'env> {
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
                     a = ctx_ok!(test.call(state, args));
+                    // tests only return a bool, this is a check for if the
+                    // test ran out of fuel.
+                    ctx_ok!(state.charge_fuel(0));
                     stack.drop_top(arg_count);
                     stack.push(Value::from(a.is_true()));
                 }
@@ -772,8 +852,14 @@ impl<'env> Executor<'env> {
                                 ));
                             }
                             recurse_loop!(true, loop_object);
+                        } else if cfg!(feature = "fuel") && is_macro(&func) {
+                            // macros return their output which was already
+                            // charged when it was written.
+                            let rv = ctx_ok!(func.call(state, args));
+                            ctx_ok!(state.charge_fuel(0));
+                            rv
                         } else {
-                            ctx_ok!(func.call(state, args))
+                            charge_value!(ctx_ok!(func.call(state, args)))
                         }
                     } else {
                         bail!(Error::new(
@@ -788,14 +874,26 @@ impl<'env> Executor<'env> {
                 Instruction::CallMethod(name, arg_count) => {
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
-                    a = ctx_ok!(args[0].call_method(state, name, &args[1..]));
+                    // like filters, methods are charged for the string they
+                    // are called on and the value they return.
+                    #[cfg(feature = "fuel")]
+                    if let Some(s) = args[0].as_str() {
+                        ctx_ok!(state.charge_fuel(s.len() as u64));
+                    }
+                    a = charge_value!(ctx_ok!(args[0].call_method(state, name, &args[1..])));
                     stack.drop_top(arg_count);
                     stack.push(a);
                 }
                 Instruction::CallObject(arg_count) => {
                     let args = stack.get_call_args(*arg_count);
                     let arg_count = args.len();
-                    a = ctx_ok!(args[0].call(state, &args[1..]));
+                    a = if cfg!(feature = "fuel") && is_macro(&args[0]) {
+                        let rv = ctx_ok!(args[0].call(state, &args[1..]));
+                        ctx_ok!(state.charge_fuel(0));
+                        rv
+                    } else {
+                        charge_value!(ctx_ok!(args[0].call(state, &args[1..])))
+                    };
                     stack.drop_top(arg_count);
                     stack.push(a);
                 }
@@ -898,6 +996,13 @@ impl<'env> Executor<'env> {
                 }
             }
             pc += 1;
+        }
+
+        // charge for the output of the last instruction.
+        #[cfg(feature = "fuel")]
+        if let Some(ref tracker) = state.fuel_tracker {
+            let bytes = out.take_uncharged_bytes();
+            ok!(tracker.consume(fuel::cost_of(bytes, fuel::BYTE_COST)));
         }
 
         Ok(stack.try_pop())

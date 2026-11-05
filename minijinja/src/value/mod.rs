@@ -1654,6 +1654,12 @@ impl Value {
     /// * iterables: returns a reversed version of the iterable.  If the iterable is not
     ///   reversible itself, it consumes it and then reverses it.
     pub fn reverse(&self) -> Result<Value, Error> {
+        self.reverse_with_fuel(None)
+    }
+
+    /// Like [`reverse`](Self::reverse) but charges the fuel of the state for
+    /// iterables that need to be consumed.
+    pub(crate) fn reverse_with_fuel(&self, state: Option<&State>) -> Result<Value, Error> {
         match self.0 {
             ValueRepr::Undefined(..) | ValueRepr::None => Some(self.clone()),
             ValueRepr::String(ref s, _) => Some(Value::from(s.chars().rev().collect::<String>())),
@@ -1677,7 +1683,7 @@ impl Value {
                     }))
                 }
                 Enumerator::Iter(iter) => {
-                    let mut v = crate::utils::collect_untrusted(iter);
+                    let mut v = crate::utils::collect_untrusted(State::opt_fuel_iter(state, iter));
                     v.reverse();
                     Some(Value::make_object_iterable(v, move |v| {
                         Box::new(v.iter().cloned())
@@ -1685,9 +1691,15 @@ impl Value {
                 }
                 Enumerator::KeyValueIter(iter) => {
                     let mut v = if let ObjectRepr::Map = o.repr() {
-                        crate::utils::collect_untrusted(iter.map(|(k, _)| k))
+                        crate::utils::collect_untrusted(State::opt_fuel_iter(
+                            state,
+                            iter.map(|(k, _)| k),
+                        ))
                     } else {
-                        crate::utils::collect_untrusted(iter.map(Value::from))
+                        crate::utils::collect_untrusted(State::opt_fuel_iter(
+                            state,
+                            iter.map(Value::from),
+                        ))
                     };
                     v.reverse();
                     Some(Value::make_object_iterable(v, move |v| {

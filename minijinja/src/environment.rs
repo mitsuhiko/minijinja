@@ -577,11 +577,36 @@ impl<'source> Environment<'source> {
 
     /// Sets the optional fuel of the engine.
     ///
-    /// When MiniJinja is compiled with the `fuel` feature then every
-    /// instruction consumes a certain amount of fuel.  Usually `1`, some will
-    /// consume no fuel.  By default the engine has the fuel feature disabled
-    /// (`None`).  To turn on fuel set something like `Some(50000)` which will
-    /// allow 50.000 instructions to execute before running out of fuel.
+    /// Fuel is a budget for the work a single render can do.  When MiniJinja
+    /// is compiled with the `fuel` feature and fuel is set, rendering fails
+    /// with [`OutOfFuel`](crate::ErrorKind::OutOfFuel) once the fuel is used
+    /// up.  By default fuel is disabled (`None`).
+    ///
+    /// Fuel is consumed for:
+    ///
+    /// * every instruction executed: usually one fuel, some instructions are
+    ///   free.
+    /// * the data a template creates and processes: roughly one fuel per 64
+    ///   bytes.  This covers the output (including captured output such as
+    ///   `{% set %}` blocks and macros), strings and lists created by
+    ///   operators, literals, filters, functions and methods, and the strings
+    ///   that filters work on.  Where the size of a value is known ahead of
+    ///   time (for instance for `"x" * n`), the value is only created if the
+    ///   remaining fuel can pay for it.
+    /// * the items that built-in filters and operators iterate over, and the
+    ///   comparisons made while sorting.
+    ///
+    /// Since fuel only ever goes down, a budget of `n` fuel bounds both the
+    /// time a render takes and the memory the template can allocate (about
+    /// `n * 64` bytes).  For instance `Some(50000)` allows roughly 50.000
+    /// instructions or 3MB of data.  The exact costs are not part of the
+    /// stability guarantees and can change between releases, so leave some
+    /// headroom when picking a budget.
+    ///
+    /// Memory allocated by custom filters, functions and objects is only
+    /// charged for the value they return.  They can use
+    /// [`State::consume_fuel`](crate::State::consume_fuel) to account for
+    /// additional work.
     ///
     /// To find out how much fuel is consumed, you can access the fuel levels
     /// from the [`State`](crate::State).

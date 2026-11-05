@@ -13,8 +13,10 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	mjerrors "github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/errors"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/fuel"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/jsonvalue"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
@@ -100,26 +102,6 @@ func stringInput(state State, val value.Value) (string, error) {
 	return val.String(), nil
 }
 
-// iterItems returns the items a filter iterates over. Like Value::try_iter in
-// Rust, none and undefined are treated as empty sequences, so `none|sort` gives
-// `[]` and `none|join` gives an empty string. It returns nil for other values
-// that cannot be iterated.
-func iterItems(val value.Value) []value.Value {
-	if val.IsNone() || val.IsUndefined() {
-		return []value.Value{}
-	}
-	return val.Iter()
-}
-
-// tryIterItems is like iterItems, but like UndefinedBehavior::try_iter in Rust
-// it fails for undefined values with strict or semi-strict undefined behavior.
-func tryIterItems(state State, val value.Value) ([]value.Value, error) {
-	if err := assertNotUndefined(state, val); err != nil {
-		return nil, err
-	}
-	return iterItems(val), nil
-}
-
 // stringOrBytesInput returns the string for string and bytes values. Like
 // TryFrom<Value> for Arc<str> in Rust, other values (including none and
 // undefined) are rejected.
@@ -136,8 +118,11 @@ func stringOrBytesInput(val value.Value) (string, error) {
 // mapPairs returns the key-value pairs of a map value. Plain Go maps are
 // returned with sorted keys, map objects in their iteration order. The second
 // return value is false if the value is not a map.
-func mapPairs(val value.Value) ([][2]value.Value, bool) {
+func mapPairs(state State, val value.Value) ([][2]value.Value, bool, error) {
 	if m, ok := val.AsMap(); ok {
+		if err := chargeItems(state, len(m)); err != nil {
+			return nil, true, err
+		}
 		keys := make([]string, 0, len(m))
 		for k := range m {
 			keys = append(keys, k)
@@ -147,17 +132,20 @@ func mapPairs(val value.Value) ([][2]value.Value, bool) {
 		for i, k := range keys {
 			pairs[i] = [2]value.Value{value.FromString(k), m[k]}
 		}
-		return pairs, true
+		return pairs, true, nil
 	}
 	if val.Kind() != value.KindMap {
-		return nil, false
+		return nil, false, nil
 	}
-	keys := val.Iter()
+	keys, err := fuelOf(state).Items(val)
+	if err != nil {
+		return nil, true, err
+	}
 	pairs := make([][2]value.Value, len(keys))
 	for i, k := range keys {
 		pairs[i] = [2]value.Value{k, val.GetItem(k)}
 	}
-	return pairs, true
+	return pairs, true, nil
 }
 
 var minI128 = new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), 127))
@@ -359,9 +347,40 @@ func FilterReplace(state State, val value.Value, args []value.Value, _ map[strin
 		if err != nil {
 			return value.Undefined(), err
 		}
+		if err := ensureFuelForReplace(state, s, old, new, count); err != nil {
+			return value.Undefined(), err
+		}
 		return value.FromSafeString(strings.Replace(s, old, new, count)), nil
 	}
+	if err := ensureFuelForReplace(state, s, old, new, count); err != nil {
+		return value.Undefined(), err
+	}
 	return value.FromString(strings.Replace(s, old, new, count)), nil
+}
+
+// ensureFuelForReplace refuses a replacement that would create a string
+// larger than the remaining fuel can pay for.
+func ensureFuelForReplace(state State, s, old, new string, count int) error {
+	if len(new) <= len(old) || fuelOf(state) == nil {
+		return nil
+	}
+	size := func(matches int) int {
+		return saturatingAdd(saturatingMul(matches, len(new)-len(old)), len(s))
+	}
+	// the cheap upper bound assumes that everything matches, only if that
+	// cannot be paid for are the matches counted.
+	maxMatches := len(s)/max(len(old), 1) + 1
+	if count >= 0 {
+		maxMatches = min(maxMatches, count)
+	}
+	if ensureBytesQuiet(state, size(maxMatches)) != nil {
+		matches := strings.Count(s, old)
+		if count >= 0 {
+			matches = min(matches, count)
+		}
+		return ensureBytes(state, size(matches))
+	}
+	return nil
 }
 
 // FilterFormat applies printf-style formatting to a string.
@@ -387,7 +406,17 @@ func FilterFormat(state State, val value.Value, args []value.Value, kwargs map[s
 	behavior := undefinedBehavior(state)
 	strict := behavior == value.UndefinedStrict || behavior == value.UndefinedSemiStrict
 	isSafe := val.IsSafe()
-	transform := func(arg value.Value, verb byte) (value.Value, error) {
+	// width and precision can request arbitrarily large output, so check
+	// that the fuel can pay for it before formatting.
+	minOutputLen := len(formatStr)
+	transform := func(arg value.Value, verb byte, minLen int) (value.Value, error) {
+		minOutputLen = saturatingAdd(minOutputLen, minLen)
+		if err := chargeFormatSpec(state); err != nil {
+			return value.Undefined(), err
+		}
+		if err := ensureBytes(state, minOutputLen); err != nil {
+			return value.Undefined(), err
+		}
 		if strict && arg.IsUndefined() && !arg.IsSilentUndefined() {
 			return value.Undefined(), mjerrors.NewError(mjerrors.ErrUndefinedVar, "undefined value")
 		}
@@ -424,7 +453,12 @@ func formatPrintf(formatStr string, args []value.Value) (string, error) {
 	return formatPrintfWith(formatStr, args, nil)
 }
 
-func formatPrintfWith(formatStr string, args []value.Value, transform func(value.Value, byte) (value.Value, error)) (string, error) {
+// formatPrintfWith formats like printf and calls transform for every value.
+//
+// The transform callback is also given the minimum number of bytes the
+// formatted value will need (as requested by width and precision) so that
+// the caller can refuse huge allocations.
+func formatPrintfWith(formatStr string, args []value.Value, transform func(value.Value, byte, int) (value.Value, error)) (string, error) {
 	var out strings.Builder
 	argIndex := 0
 
@@ -513,7 +547,7 @@ func formatPrintfWith(formatStr string, args []value.Value, transform func(value
 
 		if transform != nil {
 			var err error
-			arg, err = transform(arg, verb)
+			arg, err = transform(arg, verb, saturatingAdd(parseFormatNumber(width), parseFormatNumber(precision)))
 			if err != nil {
 				return "", err
 			}
@@ -527,6 +561,16 @@ func formatPrintfWith(formatStr string, args []value.Value, transform func(value
 	}
 
 	return out.String(), nil
+}
+
+// parseFormatNumber parses the width or precision of a format spec.  Numbers
+// that are too large saturate.
+func parseFormatNumber(s string) int {
+	n := 0
+	for i := 0; i < len(s); i++ {
+		n = saturatingAdd(saturatingMul(n, 10), int(s[i]-'0'))
+	}
+	return n
 }
 
 func formatPrintfValue(val value.Value, flags, width, precision string, verb byte, location int) (string, error) {
@@ -721,27 +765,47 @@ func FilterEscape(state State, val value.Value, _ []value.Value, _ map[string]va
 
 // EscapeHTML escapes a string for safe use in HTML.
 func EscapeHTML(s string) string {
-	var b strings.Builder
-	b.Grow(len(s))
-	for _, r := range s {
-		switch r {
-		case '<':
-			b.WriteString("&lt;")
-		case '>':
-			b.WriteString("&gt;")
-		case '&':
-			b.WriteString("&amp;")
-		case '"':
-			b.WriteString("&quot;")
-		case '\'':
-			b.WriteString("&#x27;")
-		case '/':
-			b.WriteString("&#x2f;")
-		default:
-			b.WriteRune(r)
-		}
+	if strings.IndexAny(s, "<>&\"'/") < 0 && utf8.ValidString(s) {
+		return s
 	}
+	var b strings.Builder
+	b.Grow(len(s) + len(s)/8)
+	last := 0
+	for i := 0; i < len(s); i++ {
+		var escaped string
+		switch s[i] {
+		case '<':
+			escaped = "&lt;"
+		case '>':
+			escaped = "&gt;"
+		case '&':
+			escaped = "&amp;"
+		case '"':
+			escaped = "&quot;"
+		case '\'':
+			escaped = "&#x27;"
+		case '/':
+			escaped = "&#x2f;"
+		default:
+			continue
+		}
+		writeValidUTF8(&b, s[last:i])
+		b.WriteString(escaped)
+		last = i + 1
+	}
+	writeValidUTF8(&b, s[last:])
 	return b.String()
+}
+
+// writeValidUTF8 writes a string and replaces invalid bytes with U+FFFD.
+func writeValidUTF8(b *strings.Builder, s string) {
+	if utf8.ValidString(s) {
+		b.WriteString(s)
+		return
+	}
+	for _, r := range s {
+		b.WriteRune(r)
+	}
 }
 
 // FilterString converts a value into a string if it's not one already.
@@ -766,7 +830,23 @@ func FilterString(state State, val value.Value, _ []value.Value, _ map[string]va
 	if val.Kind() == value.KindString {
 		return val, nil
 	}
-	return value.FromString(val.String()), nil
+	rv := val.String()
+	if isContainer(val) {
+		if err := chargeSerialized(state, len(rv)); err != nil {
+			return value.Undefined(), err
+		}
+	}
+	return value.FromString(rv), nil
+}
+
+// isContainer returns true for values that are converted to strings by
+// walking them.
+func isContainer(val value.Value) bool {
+	switch val.Kind() {
+	case value.KindSeq, value.KindMap, value.KindIterable, value.KindPlain:
+		return true
+	}
+	return false
 }
 
 // FilterBool converts a value into a boolean.
@@ -964,6 +1044,18 @@ func FilterLength(_ State, val value.Value, _ []value.Value, _ map[string]value.
 //	  <dd>{{ user.email_addresses|first|default('no email') }}
 //	</dl>
 func FilterFirst(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	// host objects are iterated lazily so that only the first item is
+	// produced.
+	if _, isIterable := val.Raw().(value.Iterable); !isIterable {
+		if obj, ok := val.AsObject(); ok {
+			if seq := value.IterateObject(obj); seq != nil {
+				for item := range seq {
+					return item, nil
+				}
+				return value.Undefined(), nil
+			}
+		}
+	}
 	items := val.Iter()
 	if items == nil {
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot get first item from value")
@@ -994,7 +1086,7 @@ func FilterFirst(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 //	    <dd>{{ update.status }}
 //	  </dl>
 //	{% endwith %}
-func FilterLast(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterLast(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		runes := []rune(s)
 		if len(runes) > 0 {
@@ -1005,11 +1097,31 @@ func FilterLast(_ State, val value.Value, _ []value.Value, _ map[string]value.Va
 	if kind := val.Kind(); kind != value.KindSeq && kind != value.KindIterable {
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot get last item from value")
 	}
-	items := val.Iter()
+	items, err := lastItems(state, val)
+	if err != nil {
+		return value.Undefined(), err
+	}
 	if len(items) > 0 {
 		return items[len(items)-1], nil
 	}
 	return value.Undefined(), nil
+}
+
+// lastItems returns items of which the last one is the last item of the
+// value.  Sequences are indexed directly while iterables need to be consumed,
+// which is charged per item.
+func lastItems(state State, val value.Value) ([]value.Value, error) {
+	if fuel.IsMaterialized(val) {
+		return val.Iter(), nil
+	}
+	obj, _ := val.AsObject()
+	if seq, ok := obj.(value.SeqObject); ok && value.GetObjectRepr(obj) == value.ObjectReprSeq {
+		if n := seq.SeqLen(); n > 0 {
+			return []value.Value{seq.SeqItem(n - 1)}, nil
+		}
+		return nil, nil
+	}
+	return fuelItems(state, val)
 }
 
 // FilterReverse reverses an iterable or string.
@@ -1029,7 +1141,7 @@ func FilterLast(_ State, val value.Value, _ []value.Value, _ map[string]value.Va
 //	{% endfor %}
 //	{{ "hello"|reverse }}
 //	  -> "olleh"
-func FilterReverse(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterReverse(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
 	if s, ok := val.AsString(); ok {
 		runes := []rune(s)
 		for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
@@ -1045,8 +1157,21 @@ func FilterReverse(_ State, val value.Value, _ []value.Value, _ map[string]value
 		return value.FromBytes(result), nil
 	}
 
-	items := val.Iter()
+	// host objects need to be consumed, which is charged per item.  The
+	// reversed copy is charged as the result of the filter.
+	var items []value.Value
+	if fuel.IsMaterialized(val) {
+		items = val.Iter()
+	} else {
+		var err error
+		if items, err = fuelItems(state, val); err != nil {
+			return value.Undefined(), err
+		}
+	}
 	if items != nil {
+		if err := ensureSlots(state, len(items)); err != nil {
+			return value.Undefined(), err
+		}
 		result := make([]value.Value, len(items))
 		for i, item := range items {
 			result[len(items)-1-i] = item
@@ -1078,12 +1203,15 @@ func FilterReverse(_ State, val value.Value, _ []value.Value, _ map[string]value
 //	{{ users|sort(attribute="age", reverse=true) }}
 //	{{ cities|sort(attribute="name, state") }}
 func FilterSort(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items, iterErr := tryIterItems(state, val)
+	items, iterErr := tryFuelItems(state, val)
 	if iterErr != nil {
 		return value.Undefined(), iterErr
 	}
 	if items == nil {
 		return val, nil
+	}
+	if err := chargeSort(state, len(items)); err != nil {
+		return value.Undefined(), err
 	}
 
 	if len(args) > 0 {
@@ -1177,10 +1305,17 @@ func FilterSort(state State, val value.Value, args []value.Value, kwargs map[str
 
 // getDeepAttr gets a nested attribute (supports "a.b.0" syntax)
 func getDeepAttr(v value.Value, path string) value.Value {
+	if !strings.Contains(path, ".") && !mayBeInt(path) {
+		return v.GetAttr(path)
+	}
 	parts := strings.Split(path, ".")
 	for _, part := range parts {
 		// Try as integer index first
-		if idx, err := parseInt(part); err == nil {
+		idx, err := int64(0), errNotInt
+		if mayBeInt(part) {
+			idx, err = parseInt(part)
+		}
+		if err == nil {
 			v = v.GetItem(value.FromInt(idx))
 		} else {
 			v = v.GetAttr(part)
@@ -1190,6 +1325,17 @@ func getDeepAttr(v value.Value, path string) value.Value {
 		}
 	}
 	return v
+}
+
+var errNotInt = fmt.Errorf("not an integer")
+
+// mayBeInt returns false for path segments that parseInt certainly rejects.
+func mayBeInt(s string) bool {
+	if s == "" {
+		return true
+	}
+	c := s[0]
+	return !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_')
 }
 
 func parseInt(s string) (int64, error) {
@@ -1220,7 +1366,13 @@ func FilterJoin(state State, val value.Value, args []value.Value, kwargs map[str
 	if err != nil {
 		return value.Undefined(), err
 	}
-	items := iterItems(val)
+	if val.IsNone() || val.IsUndefined() {
+		val = value.FromSlice(nil)
+	}
+	items, err := fuelOf(state).Items(val)
+	if err != nil {
+		return value.Undefined(), err
+	}
 	if items == nil {
 		return val, nil
 	}
@@ -1237,29 +1389,26 @@ func FilterJoin(state State, val value.Value, args []value.Value, kwargs map[str
 		sepSafe = sepVal.IsSafe()
 	}
 
-	if !autoEscapeEnabled(state) {
-		parts := make([]string, len(items))
-		for i, item := range items {
-			parts[i] = item.String()
-		}
-		return value.FromString(strings.Join(parts, sep)), nil
-	}
-
-	outputSafe := sepSafe
-	if !outputSafe {
-		for _, item := range items {
-			if item.IsSafe() {
-				outputSafe = true
-				break
+	outputSafe := false
+	if autoEscapeEnabled(state) {
+		outputSafe = sepSafe
+		if !outputSafe {
+			for _, item := range items {
+				if item.IsSafe() {
+					outputSafe = true
+					break
+				}
 			}
 		}
 	}
 	if !outputSafe {
-		parts := make([]string, len(items))
-		for i, item := range items {
-			parts[i] = item.String()
+		rv, err := joinItems(state, items, sep, func(item value.Value) (string, error) {
+			return item.String(), nil
+		})
+		if err != nil {
+			return value.Undefined(), err
 		}
-		return value.FromString(strings.Join(parts, sep)), nil
+		return value.FromString(rv), nil
 	}
 
 	if !sepSafe && hasSep {
@@ -1268,14 +1417,38 @@ func FilterJoin(state State, val value.Value, args []value.Value, kwargs map[str
 			return value.Undefined(), err
 		}
 	}
+	rv, err := joinItems(state, items, sep, func(item value.Value) (string, error) {
+		return formatForSafeOutput(state, item, false)
+	})
+	if err != nil {
+		return value.Undefined(), err
+	}
+	return value.FromSafeString(rv), nil
+}
+
+// joinItems joins the formatted items with a separator.
+//
+// The separator is repeated for every item, so the size of the result is not
+// bounded by the size of the items.  The size of the result is checked
+// against the fuel before it is built.
+func joinItems(state State, items []value.Value, sep string, format func(value.Value) (string, error)) (string, error) {
 	parts := make([]string, len(items))
+	size := 0
 	for i, item := range items {
-		parts[i], err = formatForSafeOutput(state, item, false)
+		str, err := format(item)
 		if err != nil {
-			return value.Undefined(), err
+			return "", err
+		}
+		parts[i] = str
+		size = saturatingAdd(size, len(str))
+	}
+	if sep != "" && len(parts) > 1 && fuelOf(state) != nil {
+		size = saturatingAdd(size, saturatingMul(len(sep), len(parts)-1))
+		if err := ensureBytes(state, size); err != nil {
+			return "", err
 		}
 	}
-	return value.FromSafeString(strings.Join(parts, sep)), nil
+	return strings.Join(parts, sep), nil
 }
 
 // FilterList converts a value into a list.
@@ -1304,7 +1477,10 @@ func FilterList(state State, val value.Value, _ []value.Value, _ map[string]valu
 		return value.FromSlice(nil), nil
 	}
 
-	items := val.Iter()
+	items, err := fuelItems(state, val)
+	if err != nil {
+		return value.Undefined(), err
+	}
 	if items != nil {
 		return value.FromSlice(items), nil
 	}
@@ -1331,7 +1507,7 @@ func FilterList(state State, val value.Value, _ []value.Value, _ map[string]valu
 //	  -> ["a", "b", "c"]
 //	{{ users|unique(attribute="city") }}
 func FilterUnique(state State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items, iterErr := tryIterItems(state, val)
+	items, iterErr := tryFuelItems(state, val)
 	if iterErr != nil {
 		return value.Undefined(), iterErr
 	}
@@ -1373,6 +1549,9 @@ func FilterUnique(state State, val value.Value, _ []value.Value, kwargs map[stri
 		} else {
 			key = valueToCompare.Repr()
 		}
+		if err := chargeLookup(state, len(seen)); err != nil {
+			return value.Undefined(), err
+		}
 		if !seen[key] {
 			seen[key] = true
 			result = append(result, item)
@@ -1399,8 +1578,8 @@ func FilterUnique(state State, val value.Value, _ []value.Value, kwargs map[stri
 //	{{ [1, 2, 3, 4]|min }}
 //	  -> 1
 //	{{ users|min(attribute="age") }}
-func FilterMin(_ State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	return minMax(val, kwargs, -1), nil
+func FilterMin(state State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	return minMax(state, val, kwargs, -1)
 }
 
 // FilterMax returns the largest item from an iterable.
@@ -1421,16 +1600,19 @@ func FilterMin(_ State, val value.Value, _ []value.Value, kwargs map[string]valu
 //	{{ [1, 2, 3, 4]|max }}
 //	  -> 4
 //	{{ users|max(attribute="age") }}
-func FilterMax(_ State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	return minMax(val, kwargs, 1), nil
+func FilterMax(state State, val value.Value, _ []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	return minMax(state, val, kwargs, 1)
 }
 
 // minMax returns the smallest or largest item by key (-1 for min, 1 for max).
 // The first item is returned when multiple items have equal keys.
-func minMax(val value.Value, kwargs map[string]value.Value, want int) value.Value {
-	items := val.Iter()
+func minMax(state State, val value.Value, kwargs map[string]value.Value, want int) (value.Value, error) {
+	items, err := fuelOf(state).Items(val)
+	if err != nil {
+		return value.Undefined(), err
+	}
 	if len(items) == 0 {
-		return value.Undefined()
+		return value.Undefined(), nil
 	}
 
 	caseSensitive := false
@@ -1465,7 +1647,7 @@ func minMax(val value.Value, kwargs map[string]value.Value, want int) value.Valu
 			best, bestKey = item, k
 		}
 	}
-	return best
+	return best, nil
 }
 
 // FilterSum sums up all numeric values in an iterable.
@@ -1489,6 +1671,7 @@ func minMax(val value.Value, kwargs map[string]value.Value, want int) value.Valu
 //	  -> sum of values + 100
 //	{{ items|sum(attribute="price") }}
 func FilterSum(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	ft := fuelOf(state)
 	params, err := filterParams(args, kwargs, "attribute", "start")
 	if err != nil {
 		return value.Undefined(), err
@@ -1497,7 +1680,7 @@ func FilterSum(state State, val value.Value, args []value.Value, kwargs map[stri
 	if start, ok := params["start"]; ok {
 		result = start
 	}
-	items, err := tryIterItems(state, val)
+	items, err := tryFuelItems(state, val)
 	if err != nil {
 		return value.Undefined(), err
 	}
@@ -1513,6 +1696,12 @@ func FilterSum(state State, val value.Value, args []value.Value, kwargs map[stri
 		result, err = result.Add(item)
 		if err != nil {
 			return value.Undefined(), err
+		}
+		// adding up strings or lists creates a new value every time.
+		if !result.IsActualInt() && !result.IsActualFloat() {
+			if err := chargeValue(ft, result); err != nil {
+				return value.Undefined(), err
+			}
 		}
 	}
 	return result, nil
@@ -1558,7 +1747,7 @@ func mapAttribute(items []value.Value, params map[string]value.Value) ([]value.V
 //	{% endfor %}
 //	</table>
 func FilterBatch(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items, iterErr := tryIterItems(state, val)
+	items, iterErr := tryFuelItems(state, val)
 	if iterErr != nil {
 		return value.Undefined(), iterErr
 	}
@@ -1606,7 +1795,10 @@ func FilterBatch(state State, val value.Value, args []value.Value, kwargs map[st
 		copy(batch, items[i:end])
 
 		// Fill the last batch if needed
-		if fillWith != nil {
+		if fillWith != nil && len(batch) < lineCount {
+			if err := ensureSlots(state, lineCount-len(batch)); err != nil {
+				return value.Undefined(), err
+			}
 			for len(batch) < lineCount {
 				batch = append(batch, *fillWith)
 			}
@@ -1639,7 +1831,7 @@ func FilterBatch(state State, val value.Value, args []value.Value, kwargs map[st
 //	{% endfor %}
 //	</div>
 func FilterSlice(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items, iterErr := tryIterItems(state, val)
+	items, iterErr := tryFuelItems(state, val)
 	if iterErr != nil {
 		return value.Undefined(), iterErr
 	}
@@ -1676,6 +1868,11 @@ func FilterSlice(state State, val value.Value, args []value.Value, kwargs map[st
 	var fillWith *value.Value
 	if len(args) > 1 && !args[1].IsNone() && !args[1].IsUndefined() {
 		fillWith = &args[1]
+	}
+
+	// every slice is a new list
+	if err := ensureSlots(state, saturatingAdd(sliceCount, len(items))); err != nil {
+		return value.Undefined(), err
 	}
 
 	// Calculate slice sizes
@@ -1728,7 +1925,8 @@ func FilterSlice(state State, val value.Value, args []value.Value, kwargs map[st
 //   - attribute: name or dotted path of attribute to extract
 //   - default: value to use when attribute is missing
 func FilterMap(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items, iterErr := tryIterItems(state, val)
+	ft := fuelOf(state)
+	items, iterErr := tryFuelItems(state, val)
 	if iterErr != nil {
 		return value.Undefined(), iterErr
 	}
@@ -1779,10 +1977,16 @@ func FilterMap(state State, val value.Value, args []value.Value, kwargs map[stri
 			if !ok {
 				return val, fmt.Errorf("unknown filter: %s", filterName)
 			}
+			if err := chargeCall(ft, item); err != nil {
+				return value.Undefined(), err
+			}
 			var err error
 			mapped, err = filterFn(state, item, args[1:], kwargs)
 			if err != nil {
 				return val, err
+			}
+			if err := chargeValue(ft, mapped); err != nil {
+				return value.Undefined(), err
 			}
 		} else {
 			return val, fmt.Errorf("map filter requires 'attribute' or filter name argument")
@@ -1828,7 +2032,8 @@ func normalizeTestName(name string) string {
 //	{{ [false, null, 42]|select }}
 //	  -> [42]
 func FilterSelect(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items, iterErr := tryIterItems(state, val)
+	ft := fuelOf(state)
+	items, iterErr := tryFuelItems(state, val)
 	if iterErr != nil {
 		return value.Undefined(), iterErr
 	}
@@ -1851,6 +2056,9 @@ func FilterSelect(state State, val value.Value, args []value.Value, kwargs map[s
 			testFn, ok := state.GetTest(testName)
 			if !ok {
 				return val, fmt.Errorf("unknown test: %s", testName)
+			}
+			if err := chargeCall(ft, item); err != nil {
+				return value.Undefined(), err
 			}
 			var err error
 			keep, err = testFn(state, item, args[1:])
@@ -1882,7 +2090,8 @@ func FilterSelect(state State, val value.Value, args []value.Value, kwargs map[s
 //	{{ [1, 2, 3, 4]|reject("odd") }}
 //	  -> [2, 4]
 func FilterReject(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items, iterErr := tryIterItems(state, val)
+	ft := fuelOf(state)
+	items, iterErr := tryFuelItems(state, val)
 	if iterErr != nil {
 		return value.Undefined(), iterErr
 	}
@@ -1905,6 +2114,9 @@ func FilterReject(state State, val value.Value, args []value.Value, kwargs map[s
 			testFn, ok := state.GetTest(testName)
 			if !ok {
 				return val, fmt.Errorf("unknown test: %s", testName)
+			}
+			if err := chargeCall(ft, item); err != nil {
+				return value.Undefined(), err
 			}
 			var err error
 			reject, err = testFn(state, item, args[1:])
@@ -1938,7 +2150,8 @@ func FilterReject(state State, val value.Value, args []value.Value, kwargs map[s
 //	{{ users|selectattr("id", "even") }}
 //	  -> users with even IDs
 func FilterSelectAttr(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items, iterErr := tryIterItems(state, val)
+	ft := fuelOf(state)
+	items, iterErr := tryFuelItems(state, val)
 	if iterErr != nil {
 		return value.Undefined(), iterErr
 	}
@@ -1967,6 +2180,9 @@ func FilterSelectAttr(state State, val value.Value, args []value.Value, kwargs m
 			testFn, ok := state.GetTest(testName)
 			if !ok {
 				return val, fmt.Errorf("unknown test: %s", testName)
+			}
+			if err := chargeCall(ft, attr); err != nil {
+				return value.Undefined(), err
 			}
 			var err error
 			keep, err = testFn(state, attr, args[2:])
@@ -2000,7 +2216,8 @@ func FilterSelectAttr(state State, val value.Value, args []value.Value, kwargs m
 //	{{ users|rejectattr("id", "even") }}
 //	  -> users with odd IDs
 func FilterRejectAttr(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items, iterErr := tryIterItems(state, val)
+	ft := fuelOf(state)
+	items, iterErr := tryFuelItems(state, val)
 	if iterErr != nil {
 		return value.Undefined(), iterErr
 	}
@@ -2029,6 +2246,9 @@ func FilterRejectAttr(state State, val value.Value, args []value.Value, kwargs m
 			testFn, ok := state.GetTest(testName)
 			if !ok {
 				return val, fmt.Errorf("unknown test: %s", testName)
+			}
+			if err := chargeCall(ft, attr); err != nil {
+				return value.Undefined(), err
 			}
 			var err error
 			reject, err = testFn(state, attr, args[2:])
@@ -2071,9 +2291,18 @@ func FilterRejectAttr(state State, val value.Value, args []value.Value, kwargs m
 //   - default: value to use when attribute is missing
 //   - case_sensitive: if true, sort in a case-sensitive manner (default: false)
 func FilterGroupBy(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	items := iterItems(val)
+	items, err := fuelItems(state, val)
+	if err != nil {
+		return value.Undefined(), err
+	}
 	if items == nil {
 		return val, nil
+	}
+	if err := chargeSort(state, len(items)); err != nil {
+		return value.Undefined(), err
+	}
+	if err := ensureSlots(state, saturatingMul(len(items), 2)); err != nil {
+		return value.Undefined(), err
 	}
 
 	// Get attribute name
@@ -2109,14 +2338,15 @@ func FilterGroupBy(state State, val value.Value, args []value.Value, kwargs map[
 		}
 	}
 
-	// Sort items by group key
-	sorted := make([]value.Value, len(items))
-	copy(sorted, items)
+	// Sort items by group key.  The keys are looked up once up front.
+	type keyedItem struct{ key, item value.Value }
+	sorted := make([]keyedItem, len(items))
+	for i, item := range items {
+		sorted[i] = keyedItem{groupByValue(item, attrName, defaultVal), item}
+	}
 
 	sort.SliceStable(sorted, func(i, j int) bool {
-		left := groupByValue(sorted[i], attrName, defaultVal)
-		right := groupByValue(sorted[j], attrName, defaultVal)
-		return compareGroupBy(left, right, caseSensitive) < 0
+		return compareGroupBy(sorted[i].key, sorted[j].key, caseSensitive) < 0
 	})
 
 	// Group items
@@ -2125,8 +2355,8 @@ func FilterGroupBy(state State, val value.Value, args []value.Value, kwargs map[
 	var currentList []value.Value
 	hasGroup := false
 
-	for _, item := range sorted {
-		groupValue := groupByValue(item, attrName, defaultVal)
+	for _, keyed := range sorted {
+		item, groupValue := keyed.item, keyed.key
 		if !hasGroup {
 			currentGrouper = groupValue
 			currentList = []value.Value{item}
@@ -2297,7 +2527,7 @@ func (g *groupObject) String() string {
 //	{% for user in shard0|chain(shard1, shard2) %}
 //	  {{ user.name }}
 //	{% endfor %}
-func FilterChain(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterChain(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
 	allValues := append([]value.Value{val}, args...)
 
 	allMaps := true
@@ -2322,15 +2552,20 @@ func FilterChain(_ State, val value.Value, args []value.Value, _ map[string]valu
 		return value.FromMap(merged), nil
 	}
 
-	// Get items from first value
-	items := val.Iter()
-	if items == nil {
-		items = []value.Value{}
+	// Get items from first value.  Unlike in Rust, chains are materialized,
+	// so every item is charged.
+	items, err := fuelOf(state).Items(val)
+	if err != nil {
+		return value.Undefined(), err
 	}
+	items = append([]value.Value{}, items...)
 
 	// Chain all arguments
 	for _, arg := range args {
-		argItems := arg.Iter()
+		argItems, err := fuelOf(state).Items(arg)
+		if err != nil {
+			return value.Undefined(), err
+		}
 		if argItems != nil {
 			items = append(items, argItems...)
 		}
@@ -2400,11 +2635,16 @@ func (c *chainObject) GetItem(key value.Value) value.Value {
 //	  -> [(1, "a"), (2, "b"), (3, "c")]
 //	{{ [1, 2]|zip(["a", "b", "c"], ["x", "y", "z"]) }}
 //	  -> [(1, "a", "x"), (2, "b", "y")]
-func FilterZip(_ State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
-	// Collect all sequences
-	seqs := [][]value.Value{val.Iter()}
-	for _, arg := range args {
-		seqs = append(seqs, arg.Iter())
+func FilterZip(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+	// Collect all sequences.  Unlike in Rust, they are materialized, so
+	// every item is charged.
+	var seqs [][]value.Value
+	for _, v := range append([]value.Value{val}, args...) {
+		items, err := fuelOf(state).Items(v)
+		if err != nil {
+			return value.Undefined(), err
+		}
+		seqs = append(seqs, items)
 	}
 
 	// Find minimum length
@@ -2903,8 +3143,11 @@ func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string
 //	  <dd>{{ value }}
 //	{% endfor %}
 //	</dl>
-func FilterItems(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	pairs, ok := mapPairs(val)
+func FilterItems(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	pairs, ok, err := mapPairs(state, val)
+	if err != nil {
+		return value.Undefined(), err
+	}
 	if !ok {
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot convert value into pairs")
 	}
@@ -2934,10 +3177,19 @@ func FilterItems(_ State, val value.Value, _ []value.Value, _ map[string]value.V
 //   - by: set to "value" to sort by value instead of key (default: "key")
 //   - reverse: set to true to sort in descending order
 //   - case_sensitive: set to true for case-sensitive sorting (default: false)
-func FilterDictSort(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	pairs, ok := mapPairs(val)
+func FilterDictSort(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+	pairs, ok, err := mapPairs(state, val)
+	if err != nil {
+		return value.Undefined(), err
+	}
 	if !ok {
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot convert value into pair list")
+	}
+	if err := chargeSort(state, len(pairs)); err != nil {
+		return value.Undefined(), err
+	}
+	if err := ensureSlots(state, saturatingMul(len(pairs), 3)); err != nil {
+		return value.Undefined(), err
 	}
 	if len(args) > 0 {
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
@@ -3099,6 +3351,12 @@ func FilterIndent(state State, val value.Value, args []value.Value, kwargs map[s
 
 	s = strings.TrimSuffix(s, "\n")
 	s = strings.TrimSuffix(s, "\r")
+	if fuelOf(state) != nil {
+		lines := strings.Count(s, "\n") + 1
+		if err := ensureBytes(state, saturatingAdd(saturatingMul(max(width, 0), lines), len(s))); err != nil {
+			return value.Undefined(), err
+		}
+	}
 	indent := strings.Repeat(" ", width)
 	lines := strings.Split(s, "\n")
 	for i, line := range lines {
@@ -3127,8 +3385,12 @@ func FilterIndent(state State, val value.Value, args []value.Value, kwargs map[s
 // Template usage:
 //
 //	<pre>{{ complex_object|pprint }}</pre>
-func FilterPprint(_ State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
-	return value.FromString(pprintValue(val, 0)), nil
+func FilterPprint(state State, val value.Value, _ []value.Value, _ map[string]value.Value) (value.Value, error) {
+	rv := pprintValue(val, 0)
+	if err := chargeSerialized(state, len(rv)); err != nil {
+		return value.Undefined(), err
+	}
+	return value.FromString(rv), nil
 }
 
 func pprintValue(val value.Value, indent int) string {
@@ -3195,7 +3457,7 @@ func pprintValue(val value.Value, indent int) string {
 //
 // Keyword arguments:
 //   - indent: true for 2-space indent, or integer for custom indent
-func FilterTojson(_ State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func FilterTojson(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	// Convert value to Go native type for JSON serialization
 	native := jsonvalue.ToNative(val)
 
@@ -3233,6 +3495,9 @@ func FilterTojson(_ State, val value.Value, args []value.Value, kwargs map[strin
 	}
 	jsonStr := string(data)
 	jsonStr = strings.ReplaceAll(jsonStr, "'", "\\u0027")
+	if err := chargeSerialized(state, len(jsonStr)); err != nil {
+		return value.Undefined(), err
+	}
 	return value.FromSafeString(jsonStr), nil
 }
 

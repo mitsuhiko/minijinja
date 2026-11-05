@@ -378,10 +378,11 @@ pub static CLI: Cli<Arg> = Cli::new("minijinja-cli")
             .long_help("\
                 Sets the maximum fuel a template can consume.\n\n\
                 \
-                When fuel is set, every instruction consumes a certain amount of fuel. Usually 1, \
-                some will consume no fuel. By default the engine has the fuel feature disabled (0). \
-                To turn on fuel set something like 50000 which will allow 50.000 instructions to \
-                execute before running out of fuel.\n\n\
+                When fuel is set, every instruction consumes one fuel, and the data a template \
+                creates and processes consumes about one fuel per 64 bytes. By default the engine \
+                has the fuel feature disabled (0). To turn on fuel set something like 50000 which \
+                will allow roughly 50.000 instructions to execute or 3MB of data to be created \
+                before running out of fuel.\n\n\
                 \
                 This is useful as a basic security feature in CI pipelines or similar.\n\n\
                 \

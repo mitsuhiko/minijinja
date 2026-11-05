@@ -4,6 +4,7 @@ use crate::value::merge_object::MergeSeq;
 use crate::value::{
     checked, DynObject, MaybeInvalid, ObjectRepr, Tuple, Value, ValueKind, ValueRepr,
 };
+use crate::vm::State;
 
 const MIN_I128_AS_POS_U128: u128 = 170141183460469231731687303715884105728;
 const MAX_REPEATED_STRING_LEN: usize = 100_000_000;
@@ -137,7 +138,17 @@ fn range_step_backwards(
     (0..length).map(move |i| (start as u64 - i as u64 * step as u64) as usize)
 }
 
-pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Value, Error> {
+/// Slices a value.
+///
+/// Slicing an iterable backwards needs to consume it.  This happens right
+/// away so that the items are charged against the fuel of the state.
+pub fn slice(
+    state: &State,
+    value: Value,
+    start: Value,
+    stop: Value,
+    step: Value,
+) -> Result<Value, Error> {
     let start = if start.is_none() {
         None
     } else {
@@ -170,7 +181,31 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
     match value.0 {
         ValueRepr::String(..) | ValueRepr::SmallStr(_) => {
             let s = value.as_str().unwrap();
-            if step > 0 {
+            if step == 1 {
+                // the common case of a contiguous slice can copy the bytes
+                // directly once the char offsets are known.
+                let ascii = s.is_ascii();
+                let (start, len) = get_offset_and_len(start, stop, || {
+                    if ascii {
+                        s.len()
+                    } else {
+                        s.chars().count()
+                    }
+                });
+                let (byte_start, byte_end) = if ascii {
+                    let byte_start = start.min(s.len());
+                    (byte_start, byte_start.saturating_add(len).min(s.len()))
+                } else {
+                    let mut offsets = s.char_indices().map(|x| x.0).chain(Some(s.len()));
+                    let byte_start = offsets.nth(start).unwrap_or(s.len());
+                    let byte_end = match len {
+                        0 => byte_start,
+                        len => offsets.nth(len - 1).unwrap_or(s.len()),
+                    };
+                    (byte_start, byte_end)
+                };
+                Ok(Value::from(&s[byte_start..byte_end]))
+            } else if step > 0 {
                 let (start, len) = get_offset_and_len(start, stop, || s.chars().count());
                 Ok(Value::from(
                     s.chars()
@@ -211,7 +246,7 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
         ValueRepr::Object(obj) if matches!(obj.repr(), ObjectRepr::Seq | ObjectRepr::Iterable) => {
             if is_tuple {
                 let values = match obj.try_iter() {
-                    Some(iter) => ok!(checked(iter).try_collect_vec()),
+                    Some(iter) => ok!(checked(state.fuel_iter(iter)).try_collect_vec()),
                     None => Vec::new(),
                 };
                 let values: Vec<Value> = if step > 0 {
@@ -240,17 +275,26 @@ pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Val
                         Box::new(None.into_iter())
                     }
                 }))
+            } else if let (ObjectRepr::Seq, Some(len)) = (obj.repr(), obj.enumerator_len()) {
+                // sequences can be indexed, so they can be sliced lazily
+                Ok(Value::make_object_iterable(obj, move |obj| {
+                    Box::new(
+                        range_step_backwards(start, stop, -step as usize, len)
+                            .map(move |idx| obj.get_value(&Value::from(idx)).unwrap_or_default()),
+                    )
+                }))
             } else {
-                Ok(Value::make_object_iterable(obj.clone(), move |obj| {
-                    if let Some(iter) = obj.try_iter() {
-                        let vec = collect_untrusted(iter);
-                        Box::new(
-                            range_step_backwards(start, stop, -step as usize, vec.len())
-                                .map(move |i| vec[i].clone()),
-                        )
-                    } else {
-                        Box::new(None.into_iter())
-                    }
+                let items = match obj.try_iter() {
+                    Some(iter) => collect_untrusted(state.fuel_iter(iter)),
+                    None => Vec::new(),
+                };
+                if let Some(err) = items.last().and_then(|x| x.check().err()) {
+                    return Err(err);
+                }
+                let indexes = range_step_backwards(start, stop, -step as usize, items.len());
+                let items = collect_untrusted(indexes.map(|idx| items[idx].clone()));
+                Ok(Value::make_object_iterable(items, |items| {
+                    Box::new(items.iter().cloned())
                 }))
             }
         }
@@ -602,14 +646,141 @@ pub fn string_concat(left: Value, right: &Value) -> Value {
     Value::from(format!("{left}{right}"))
 }
 
+/// Estimates how many bytes the result of a binary operation will need.
+///
+/// This only covers operations that create new strings or materialized
+/// sequences and is used to refuse an allocation before it happens.  The
+/// result is in fuel units (bytes, and list slots of
+/// [`SLOT_COST`] bytes).
+pub(crate) fn binop_alloc_estimate(op: &str, lhs: &Value, rhs: &Value) -> u64 {
+    fn str_len(v: &Value) -> Option<u64> {
+        match v.0 {
+            ValueRepr::String(ref s, _) => Some(s.len() as u64),
+            ValueRepr::SmallStr(ref s) => Some(s.as_str().len() as u64),
+            ValueRepr::Bytes(ref b) => Some(b.len() as u64),
+            _ => None,
+        }
+    }
+
+    match op {
+        "mul" => {
+            let (repeated, n) = if lhs.as_usize().is_some() {
+                (rhs, lhs)
+            } else {
+                (lhs, rhs)
+            };
+            let n = n.as_usize().unwrap_or(0) as u64;
+            if let Some(len) = str_len(repeated) {
+                len.saturating_mul(n)
+            } else if repeated.is_tuple() {
+                (repeated.len().unwrap_or(0) as u64)
+                    .saturating_mul(n)
+                    .saturating_mul(SLOT_COST)
+            } else {
+                // repeating lists is lazy
+                0
+            }
+        }
+        "add" | "string_concat" => match (str_len(lhs), str_len(rhs)) {
+            (Some(a), Some(b)) => a.saturating_add(b),
+            (Some(a), None) if op == "string_concat" => a,
+            (None, Some(b)) if op == "string_concat" => b,
+            _ if lhs.is_tuple() && rhs.is_tuple() => (lhs.len().unwrap_or(0) as u64)
+                .saturating_add(rhs.len().unwrap_or(0) as u64)
+                .saturating_mul(SLOT_COST),
+            _ => 0,
+        },
+        _ => 0,
+    }
+}
+
+/// The cost of a slot in a list for the purpose of fuel and size estimates.
+pub(crate) const SLOT_COST: u64 = 32;
+
+/// Checks that there is enough fuel left to perform a binary operation.
+#[inline(always)]
+pub(crate) fn ensure_fuel_for_binop(
+    _state: &State,
+    _op: &str,
+    _lhs: &Value,
+    _rhs: &Value,
+) -> Result<(), Error> {
+    #[cfg(feature = "fuel")]
+    {
+        if _state.fuel_tracker().is_some() {
+            return _state.ensure_fuel(binop_alloc_estimate(_op, _lhs, _rhs));
+        }
+    }
+    Ok(())
+}
+
+/// Charges fuel for comparing two values.
+///
+/// Comparing containers needs to visit their items, so this charges for the
+/// items of the shorter one.
+#[inline(always)]
+pub(crate) fn charge_fuel_for_compare(
+    _state: &State,
+    _lhs: &Value,
+    _rhs: &Value,
+) -> Result<(), Error> {
+    #[cfg(feature = "fuel")]
+    {
+        if _state.fuel_tracker().is_some() {
+            if let (Some(a), Some(b)) = (_lhs.as_object(), _rhs.as_object()) {
+                if !a.is_same_object(b) {
+                    if let (Some(a_len), Some(b_len)) = (a.enumerator_len(), b.enumerator_len()) {
+                        return _state.charge_items(a_len.min(b_len));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Charges fuel for looking up an item by index in an iterable.
+///
+/// Iterables cannot be indexed, so the lookup needs to iterate up to the
+/// index.
+#[inline(always)]
+pub(crate) fn charge_fuel_for_get_item(
+    _state: &State,
+    _container: &Value,
+    _key: &Value,
+) -> Result<(), Error> {
+    #[cfg(feature = "fuel")]
+    {
+        if _state.fuel_tracker().is_some() {
+            if let Some(obj) = _container.as_object() {
+                if obj.repr() == ObjectRepr::Iterable {
+                    if let Some(idx) = _key.as_i64() {
+                        let mut n = usize::try_from(idx.unsigned_abs()).unwrap_or(usize::MAX);
+                        if let Some(len) = obj.enumerator_len() {
+                            n = n.min(len);
+                        }
+                        return _state.charge_items(n);
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Implements a containment operation on values.
-pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
+///
+/// If a state is passed, the items visited are charged against the fuel.
+pub fn contains(state: Option<&State>, container: &Value, value: &Value) -> Result<Value, Error> {
     // Special case where if the container is undefined, it cannot hold
     // values.  For strict containment checks the vm has a special case.
     if container.is_undefined() {
         return Ok(Value::from(false));
     }
     let rv = if let Some(s) = container.as_str() {
+        if let Some(state) = state {
+            ok!(state.charge_fuel(s.len() as u64));
+        }
         if let Some(s2) = value.as_str() {
             s.contains(s2)
         } else {
@@ -623,6 +794,9 @@ pub fn contains(container: &Value, value: &Value) -> Result<Value, Error> {
                 let mut found = false;
                 if let Some(iter) = obj.try_iter() {
                     for item in iter {
+                        if let Some(state) = state {
+                            ok!(state.charge_items(1));
+                        }
                         ok!(item.check());
                         if item == *value {
                             found = true;
@@ -937,6 +1111,9 @@ mod tests {
 
     #[test]
     fn test_slicing() {
+        let env = crate::Environment::new();
+        let state = env.empty_state();
+        let slice = |value, start, stop, step| super::slice(&state, value, start, stop, step);
         let v = Value::from(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
         // [::] - full slice
@@ -1022,6 +1199,9 @@ mod tests {
 
     #[test]
     fn test_string_slicing() {
+        let env = crate::Environment::new();
+        let state = env.empty_state();
+        let slice = |value, start, stop, step| super::slice(&state, value, start, stop, step);
         let s = Value::from("abcdefghij");
 
         // [::] - full slice
@@ -1069,6 +1249,9 @@ mod tests {
 
     #[test]
     fn test_bytes_slicing() {
+        let env = crate::Environment::new();
+        let state = env.empty_state();
+        let slice = |value, start, stop, step| super::slice(&state, value, start, stop, step);
         let s = Value::from_bytes(b"abcdefghij".to_vec());
 
         // [::] - full slice

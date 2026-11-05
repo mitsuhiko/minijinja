@@ -450,6 +450,99 @@ impl<'template, 'env> State<'template, 'env> {
             .map(|x| (x.consumed(), x.remaining()))
     }
 
+    /// Consumes fuel.
+    ///
+    /// Custom filters, functions and methods can use this to account for
+    /// expensive work they perform on behalf of a template.  The engine
+    /// already charges for the size of the value they return, but not for the
+    /// work that went into producing it.
+    ///
+    /// If this runs out of fuel, an `OutOfFuel` error is returned and the
+    /// rendering will fail.  If fuel tracking is not enabled or the `fuel`
+    /// feature is turned off, this does nothing.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, State, Error};
+    /// fn expensive(state: &State, n: u64) -> Result<u64, Error> {
+    ///     state.consume_fuel(n)?;
+    ///     Ok((0..n).sum())
+    /// }
+    /// ```
+    #[inline]
+    pub fn consume_fuel(&self, fuel: u64) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                return tracker.consume(fuel.saturating_mul(crate::vm::fuel::UNITS_PER_FUEL));
+            }
+        }
+        let _ = fuel;
+        Ok(())
+    }
+
+    /// Returns the fuel tracker if fuel is tracked.
+    #[cfg(feature = "fuel")]
+    #[inline(always)]
+    pub(crate) fn fuel_tracker(&self) -> Option<&FuelTracker> {
+        self.fuel_tracker.as_ref()
+    }
+
+    /// Charges fuel in internal units.
+    #[inline(always)]
+    pub(crate) fn charge_fuel(&self, _units: u64) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                return tracker.consume(_units);
+            }
+        }
+        Ok(())
+    }
+
+    /// Checks that some fuel (in internal units) would still be available.
+    ///
+    /// This is used before allocating something of a known size.
+    #[cfg(feature = "fuel")]
+    #[inline(always)]
+    pub(crate) fn ensure_fuel(&self, units: u64) -> Result<(), Error> {
+        if let Some(ref tracker) = self.fuel_tracker {
+            return tracker.ensure(units);
+        }
+        Ok(())
+    }
+
+    /// Charges fuel for the size of a value.
+    #[inline(always)]
+    pub(crate) fn charge_value(&self, _value: &Value) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                return tracker.consume(crate::vm::fuel::value_cost(_value));
+            }
+        }
+        Ok(())
+    }
+
+    /// Wraps an iterator so that it charges fuel for every item.
+    ///
+    /// When the fuel runs out the iterator yields an invalid value with the
+    /// error and ends.
+    #[cfg(feature = "fuel")]
+    #[inline(always)]
+    pub(crate) fn fuel_iter<I: Iterator<Item = Value>>(
+        &self,
+        iter: I,
+    ) -> crate::vm::fuel::FuelIter<'_, I> {
+        crate::vm::fuel::FuelIter::new(self.fuel_tracker.as_ref(), iter)
+    }
+
+    /// Wraps an iterator so that it charges fuel for every item.
+    #[cfg(not(feature = "fuel"))]
+    #[inline(always)]
+    pub(crate) fn fuel_iter<I: Iterator<Item = Value>>(&self, iter: I) -> I {
+        iter
+    }
+
     /// Looks up a temp and returns it.
     ///
     /// Temps are similar to context values but the engine never looks them up
@@ -598,6 +691,156 @@ impl<'template, 'env> State<'template, 'env> {
             template_source: Some(instructions.source().to_string()),
             referenced_locals,
         }
+    }
+}
+
+/// Fuel helpers for the built-in filters, functions and tests.
+#[cfg_attr(not(feature = "builtins"), allow(dead_code))]
+impl State<'_, '_> {
+    /// Charges fuel for visiting `n` items.
+    #[inline(always)]
+    pub(crate) fn charge_items(&self, _n: usize) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                return tracker.consume(crate::vm::fuel::cost_of(_n, crate::vm::fuel::ITEM_COST));
+            }
+        }
+        Ok(())
+    }
+
+    /// Charges fuel for a call to a filter or test made on behalf of a
+    /// built-in filter.  This is charged like the call from a template:
+    /// one instruction plus the string the call works on.
+    #[inline(always)]
+    pub(crate) fn charge_call(&self, _args: &[Value]) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                let input = _args
+                    .first()
+                    .and_then(|x| x.as_str())
+                    .map_or(0, |x| x.len());
+                return tracker.consume(
+                    crate::vm::fuel::INSTRUCTION_COST.saturating_add(crate::vm::fuel::cost_of(
+                        input,
+                        crate::vm::fuel::BYTE_COST,
+                    )),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// Charges fuel for looking up an item in a sorted collection of `n`
+    /// items.
+    #[inline(always)]
+    pub(crate) fn charge_lookup(&self, _n: usize) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                return tracker.consume(crate::vm::fuel::lookup_cost(_n));
+            }
+        }
+        Ok(())
+    }
+
+    /// Charges the extra fuel for serializing a value into `n` bytes.
+    ///
+    /// The engine already charges for the bytes of the resulting string, this
+    /// charges for the extra work of walking the value.
+    #[inline(always)]
+    pub(crate) fn charge_serialized(&self, _n: usize) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            use crate::vm::fuel::{cost_of, BYTE_COST, SERIALIZED_BYTE_COST};
+            if let Some(ref tracker) = self.fuel_tracker {
+                return tracker.consume(cost_of(_n, SERIALIZED_BYTE_COST - BYTE_COST));
+            }
+        }
+        Ok(())
+    }
+
+    /// Charges fuel for one format specifier of the `format` filter.
+    #[inline(always)]
+    pub(crate) fn charge_format_spec(&self) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                return tracker.consume(crate::vm::fuel::FORMAT_SPEC_COST);
+            }
+        }
+        Ok(())
+    }
+
+    /// Charges fuel for sorting `n` items.
+    #[inline(always)]
+    pub(crate) fn charge_sort(&self, _n: usize) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                return tracker.consume(crate::vm::fuel::sort_cost(_n));
+            }
+        }
+        Ok(())
+    }
+
+    /// Checks that `n` bytes could still be paid for.
+    #[inline(always)]
+    pub(crate) fn ensure_bytes(&self, _n: usize) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                return tracker.ensure(crate::vm::fuel::cost_of(_n, crate::vm::fuel::BYTE_COST));
+            }
+        }
+        Ok(())
+    }
+
+    /// Like [`ensure_bytes`](Self::ensure_bytes) but does not exhaust the
+    /// fuel if the check fails.
+    #[inline(always)]
+    pub(crate) fn ensure_bytes_quiet(&self, _n: usize) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                if tracker.remaining_units()
+                    <= crate::vm::fuel::cost_of(_n, crate::vm::fuel::BYTE_COST)
+                {
+                    return Err(Error::from(crate::ErrorKind::OutOfFuel));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Checks that `n` list slots could still be paid for.
+    #[inline(always)]
+    pub(crate) fn ensure_slots(&self, _n: usize) -> Result<(), Error> {
+        #[cfg(feature = "fuel")]
+        {
+            if let Some(ref tracker) = self.fuel_tracker {
+                return tracker.ensure(crate::vm::fuel::cost_of(_n, crate::vm::fuel::SLOT_COST));
+            }
+        }
+        Ok(())
+    }
+
+    /// Like [`fuel_iter`](Self::fuel_iter) but with an optional state.
+    #[cfg(feature = "fuel")]
+    #[inline(always)]
+    pub(crate) fn opt_fuel_iter<'a, I: Iterator<Item = Value>>(
+        state: Option<&'a State>,
+        iter: I,
+    ) -> crate::vm::fuel::FuelIter<'a, I> {
+        crate::vm::fuel::FuelIter::new(state.and_then(|x| x.fuel_tracker.as_ref()), iter)
+    }
+
+    /// Like [`fuel_iter`](Self::fuel_iter) but with an optional state.
+    #[cfg(not(feature = "fuel"))]
+    #[inline(always)]
+    pub(crate) fn opt_fuel_iter<I: Iterator<Item = Value>>(_state: Option<&State>, iter: I) -> I {
+        iter
     }
 }
 

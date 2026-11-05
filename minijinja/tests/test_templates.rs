@@ -769,7 +769,7 @@ fn test_render_captured_state() {
     assert_eq!(captured.state().lookup("x"), Some(Value::from(1)));
 
     #[cfg(feature = "fuel")]
-    assert_eq!(captured.state().fuel_levels(), Some((26, 74)));
+    assert_eq!(captured.state().fuel_levels(), Some((27, 73)));
 }
 
 #[test]

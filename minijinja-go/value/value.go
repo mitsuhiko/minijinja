@@ -63,6 +63,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // Callable is an interface for callable objects like functions and macros.
@@ -930,7 +931,7 @@ func (v Value) String() string {
 		}
 		return "False"
 	case int64:
-		return fmt.Sprintf("%d", d)
+		return strconv.FormatInt(d, 10)
 	case bigIntValue:
 		return d.String()
 	case float64:
@@ -980,7 +981,7 @@ func (v Value) Repr() string {
 		}
 		return "False"
 	case int64:
-		return fmt.Sprintf("%d", d)
+		return strconv.FormatInt(d, 10)
 	case bigIntValue:
 		return d.String()
 	case float64:
@@ -1249,9 +1250,9 @@ func (v Value) AsMap() (map[string]Value, bool) {
 func (v Value) Len() (int, bool) {
 	switch d := v.data.(type) {
 	case string:
-		return len([]rune(d)), true
+		return utf8.RuneCountInString(d), true
 	case safeString:
-		return len([]rune(d)), true
+		return utf8.RuneCountInString(string(d)), true
 	case []byte:
 		return len(d), true
 	case []Value:
@@ -1302,23 +1303,11 @@ func (v Value) GetItem(key Value) Value {
 		}
 	case string:
 		if idx, ok := key.AsInt(); ok {
-			runes := []rune(d)
-			if idx < 0 {
-				idx = int64(len(runes)) + idx
-			}
-			if idx >= 0 && idx < int64(len(runes)) {
-				return FromString(string(runes[idx]))
-			}
+			return stringCharAt(d, idx)
 		}
 	case safeString:
 		if idx, ok := key.AsInt(); ok {
-			runes := []rune(d)
-			if idx < 0 {
-				idx = int64(len(runes)) + idx
-			}
-			if idx >= 0 && idx < int64(len(runes)) {
-				return FromString(string(runes[idx]))
-			}
+			return stringCharAt(string(d), idx)
 		}
 	case ItemGetter:
 		// Like get_value in Rust, objects resolve string keys as attributes
@@ -1351,6 +1340,25 @@ func (v Value) GetItem(key Value) Value {
 			return d.GetAttr(s)
 		}
 		return Undefined()
+	}
+	return Undefined()
+}
+
+// stringCharAt returns the character at an index of a string without
+// converting the whole string into runes.
+func stringCharAt(s string, idx int64) Value {
+	if idx < 0 {
+		idx = int64(utf8.RuneCountInString(s)) + idx
+	}
+	if idx < 0 {
+		return Undefined()
+	}
+	var i int64
+	for _, r := range s {
+		if i == idx {
+			return FromString(string(r))
+		}
+		i++
 	}
 	return Undefined()
 }

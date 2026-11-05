@@ -23,6 +23,9 @@ pub struct Output<'a> {
     w: *mut (dyn fmt::Write + 'a),
     target: *mut (dyn fmt::Write + 'a),
     capture_stack: Vec<Option<String>>,
+    // bytes written that were not yet charged against the fuel.
+    #[cfg(feature = "fuel")]
+    uncharged_bytes: usize,
 }
 
 impl<'a> Output<'a> {
@@ -32,6 +35,8 @@ impl<'a> Output<'a> {
             w,
             target: w,
             capture_stack: Vec::new(),
+            #[cfg(feature = "fuel")]
+            uncharged_bytes: 0,
         }
     }
 
@@ -44,6 +49,8 @@ impl<'a> Output<'a> {
             w: NullWriter::get_mut(),
             target: NullWriter::get_mut(),
             capture_stack: vec![None],
+            #[cfg(feature = "fuel")]
+            uncharged_bytes: 0,
         }
     }
 
@@ -94,33 +101,65 @@ impl<'a> Output<'a> {
         matches!(self.capture_stack.last(), Some(None))
     }
 
+    /// Returns the number of bytes written that were not charged yet.
+    #[cfg(feature = "fuel")]
+    #[inline(always)]
+    pub(crate) fn uncharged_bytes(&self) -> usize {
+        self.uncharged_bytes
+    }
+
+    /// Returns the number of bytes written since the last call and resets
+    /// the counter.
+    #[cfg(feature = "fuel")]
+    #[inline(always)]
+    pub(crate) fn take_uncharged_bytes(&mut self) -> usize {
+        std::mem::take(&mut self.uncharged_bytes)
+    }
+
     /// Writes some data to the underlying buffer contained within this output.
     #[inline]
     pub fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.target().write_str(s)
+        fmt::Write::write_str(self, s)
     }
 
     /// Writes some formatted information into this instance.
     #[inline]
     pub fn write_fmt(&mut self, a: fmt::Arguments<'_>) -> fmt::Result {
-        self.target().write_fmt(a)
+        fmt::Write::write_fmt(self, a)
     }
 }
 
 impl fmt::Write for Output<'_> {
     #[inline]
     fn write_str(&mut self, s: &str) -> fmt::Result {
+        #[cfg(feature = "fuel")]
+        {
+            self.uncharged_bytes = self.uncharged_bytes.saturating_add(s.len());
+        }
         fmt::Write::write_str(self.target(), s)
     }
 
     #[inline]
     fn write_char(&mut self, c: char) -> fmt::Result {
+        #[cfg(feature = "fuel")]
+        {
+            self.uncharged_bytes = self.uncharged_bytes.saturating_add(c.len_utf8());
+        }
         fmt::Write::write_char(self.target(), c)
     }
 
     #[inline]
     fn write_fmt(&mut self, args: fmt::Arguments<'_>) -> fmt::Result {
-        fmt::Write::write_fmt(self.target(), args)
+        // with fuel tracking all writes need to go through `write_str` so
+        // that they are counted.
+        #[cfg(feature = "fuel")]
+        {
+            fmt::write(self, args)
+        }
+        #[cfg(not(feature = "fuel"))]
+        {
+            fmt::Write::write_fmt(self.target(), args)
+        }
     }
 }
 

@@ -131,7 +131,7 @@ func registerDefaultFunctions(env *Environment) {
 
 // --- Functions ---
 
-func fnRange(_ *State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func fnRange(state *State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	var start, stop, step int64 = 0, 0, 1
 
 	switch len(args) {
@@ -166,8 +166,13 @@ func fnRange(_ *State, args []value.Value, kwargs map[string]value.Value) (value
 	if length > 100000 {
 		return value.Undefined(), NewError(ErrInvalidOperation, "range has too many elements")
 	}
+	// unlike in Rust, ranges are materialized, so check that the result can
+	// be paid for before creating it.
+	if err := state.ensureSlots(int(length)); err != nil {
+		return value.Undefined(), err
+	}
 
-	var result []value.Value
+	result := make([]value.Value, 0, length)
 	if step > 0 {
 		for i := start; i < stop; i += step {
 			result = append(result, value.FromInt(i))
@@ -180,7 +185,7 @@ func fnRange(_ *State, args []value.Value, kwargs map[string]value.Value) (value
 	return value.FromIterator(value.NewIterator("range", result)), nil
 }
 
-func fnDict(_ *State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
+func fnDict(state *State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	result := make(map[string]value.Value)
 
 	// First, copy from first positional argument if it's a map
@@ -191,7 +196,10 @@ func fnDict(_ *State, args []value.Value, kwargs map[string]value.Value) (value.
 			}
 		} else {
 			// Try to iterate as items
-			items := args[0].Iter()
+			items, err := state.iterItems(args[0])
+			if err != nil {
+				return value.Undefined(), err
+			}
 			if items != nil {
 				for _, item := range items {
 					if pair, ok := item.AsSlice(); ok && len(pair) == 2 {

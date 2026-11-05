@@ -8,6 +8,7 @@ import (
 
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/filters"
 	mjerrors "github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/errors"
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/fuel"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
 )
 
@@ -427,7 +428,8 @@ func TestIn(state filters.State, val value.Value, args []value.Value) (bool, err
 	if container.IsUndefined() && (behavior == value.UndefinedStrict || behavior == value.UndefinedSemiStrict) && !container.IsSilentUndefined() {
 		return false, mjerrors.NewError(mjerrors.ErrUndefinedVar, "undefined value")
 	}
-	return container.Contains(val), nil
+	// like the in operator, this charges for the items visited.
+	return fuel.Of(state).Contains(container, val)
 }
 
 // TestString checks if a value is a string.
@@ -732,7 +734,16 @@ func TestMapping(_ filters.State, val value.Value, _ []value.Value) (bool, error
 //	{{ 42 is iterable }}
 //	  -> false
 func TestIterable(_ filters.State, val value.Value, _ []value.Value) (bool, error) {
-	return val.IsUndefined() || val.IsNone() || val.Iter() != nil, nil
+	if val.IsUndefined() || val.IsNone() {
+		return true, nil
+	}
+	// host objects are not iterated as they might never end.
+	if _, isIterable := val.Raw().(value.Iterable); !isIterable {
+		if obj, ok := val.AsObject(); ok {
+			return value.IterateObject(obj) != nil, nil
+		}
+	}
+	return val.Iter() != nil, nil
 }
 
 // TestStartingWith checks if a string starts with a given prefix.

@@ -168,7 +168,8 @@
 //! There are some additional features that provide extra functionality:
 //!
 //! - `fuel`: enables the `fuel` feature which makes the engine track fuel consumption which
-//!   can be used to better protect against expensive templates.
+//!   can be used to limit the time and memory that untrusted templates can use.  See
+//!   `Environment::set_fuel` for more information.
 //! - `preserve_order`: When enable the internal value implementation uses an indexmap
 //!   which preserves the original order of maps and structs.
 //! - `json`: When enabled the `tojson` filter is added as builtin filter as well as

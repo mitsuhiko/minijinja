@@ -51,10 +51,15 @@ pub fn format(style: FormatStyle, format_str: &str, args: &[Value]) -> Result<St
     }
 }
 
+/// Like [`format`] for printf-style but calls `transform` for every value.
+///
+/// The transform callback is also given the minimum number of bytes the
+/// formatted value will need (as requested by width and precision) so that
+/// the caller can refuse huge allocations.
 pub(crate) fn format_printf_with(
     format_str: &str,
     args: &[Value],
-    mut transform: impl FnMut(&Value, FormatConversion) -> Result<Option<Value>, Error>,
+    mut transform: impl FnMut(&Value, FormatConversion, usize) -> Result<Option<Value>, Error>,
 ) -> Result<String, Error> {
     printf_style::format_with(format_str, args, &mut transform)
 }
@@ -1198,13 +1203,13 @@ mod printf_style {
     // to the fields found in the string, by formatting the value according to the
     // spec found in the field.
     pub(super) fn format(format_str: &str, args: &[Value]) -> Result<String, Error> {
-        format_with(format_str, args, &mut |_, _| Ok(None))
+        format_with(format_str, args, &mut |_, _, _| Ok(None))
     }
 
     pub(super) fn format_with(
         format_str: &str,
         args: &[Value],
-        transform: &mut impl FnMut(&Value, FormatConversion) -> Result<Option<Value>, Error>,
+        transform: &mut impl FnMut(&Value, FormatConversion, usize) -> Result<Option<Value>, Error>,
     ) -> Result<String, Error> {
         let mut input = Tokenizer::new(format_str, FormatStyle::Printf);
         let mut result = String::new();
@@ -1259,7 +1264,11 @@ mod printf_style {
                     } else {
                         FormatConversion::Other
                     };
-                    let transformed = ok!(transform(&arg, conversion));
+                    let min_len = format_spec
+                        .width
+                        .unwrap_or(0)
+                        .saturating_add(format_spec.precision.unwrap_or(0));
+                    let transformed = ok!(transform(&arg, conversion, min_len));
                     result.push_str(&ok!(
                         format_spec.format(transformed.as_ref().unwrap_or(&arg))
                     ));

@@ -61,6 +61,19 @@ pub fn unknown_method_callback(
     }
 }
 
+/// Charges fuel for creating `n` bytes.
+///
+/// The engine charges one fuel per 64 bytes of a result once it was created.
+/// This is used to pay for data ahead of time when a method can create a lot
+/// more data than it was given.
+fn charge_bytes(state: &State, n: usize) -> Result<(), Error> {
+    if n >= 64 {
+        state.consume_fuel((n / 64) as u64)
+    } else {
+        Ok(())
+    }
+}
+
 fn string_methods(
     state: &State,
     value: &Value,
@@ -149,6 +162,17 @@ fn string_methods(
         "replace" => {
             let (old, new, count): (&str, &str, Option<i32>) = from_args(args)?;
             let count = count.unwrap_or(-1);
+            // replacing can create strings a lot larger than the input, so
+            // pay for them before they are created.
+            if new.len() > old.len() {
+                let max_matches = s.len() / old.len().max(1) + 1;
+                let max_matches = if count < 0 {
+                    max_matches
+                } else {
+                    max_matches.min(count as usize)
+                };
+                charge_bytes(state, max_matches.saturating_mul(new.len() - old.len()))?;
+            }
             Ok(Value::from(if count < 0 {
                 s.replace(old, new)
             } else {
@@ -280,6 +304,9 @@ fn string_methods(
             for (idx, value) in values.try_iter()?.checked().enumerate() {
                 let value = value?;
                 if idx > 0 {
+                    // the separator is repeated for every item, so pay for it
+                    // before the string grows.
+                    charge_bytes(state, s.len())?;
                     rv.push_str(s);
                 }
                 write!(rv, "{value}").ok();

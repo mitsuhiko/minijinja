@@ -5,6 +5,7 @@ edition = "2018"
 
 [features]
 speedups = ["minijinja/speedups"]
+fuel = ["minijinja/fuel", "minijinja/json"]
 
 [dependencies]
 handlebars = "6.3.1"
@@ -24,6 +25,10 @@ rinja = "0.3.5"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
+
+[[bin]]
+name = "fuel_calibration"
+required-features = ["fuel"]
 
 [[bench]]
 name = "templates"

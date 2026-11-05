@@ -132,3 +132,22 @@ fn test_errors() {
         .contains("startswith argument must be string or a tuple of strings, not number"));
     assert!(eval_err_expr("{'x': 42}.get()").contains("missing argument"));
 }
+
+#[test]
+fn test_string_methods_consume_fuel() {
+    let mut env = Environment::new();
+    env.set_unknown_method_callback(unknown_method_callback);
+    env.set_fuel(Some(10000));
+    for source in [
+        "{{ ('a' * 1000).replace('a', 'b' * 1000) }}",
+        "{{ ('x' * 100).join(range(10000)) }}",
+    ] {
+        let err = env.render_str(source, ()).unwrap_err();
+        assert_eq!(err.kind(), minijinja::ErrorKind::OutOfFuel, "{source}");
+    }
+    assert_eq!(
+        env.render_str("{{ 'abc'.replace('b', 'xx') }}", ())
+            .unwrap(),
+        "axxc"
+    );
+}

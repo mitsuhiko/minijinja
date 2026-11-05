@@ -7,10 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
+	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/fuel"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/jsonvalue"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/internal/parser"
 	"github.com/mitsuhiko/minijinja/minijinja-go/v3/value"
@@ -119,7 +122,7 @@ func (s *State) FuelLevels() (consumed, remaining uint64, ok bool) {
 	if s.fuelTracker == nil {
 		return 0, 0, false
 	}
-	return s.fuelTracker.consumedFuel(), s.fuelTracker.remainingFuel(), true
+	return s.fuelTracker.Consumed(), s.fuelTracker.Remaining(), true
 }
 
 // UndefinedBehavior returns the undefined behavior setting for this template.
@@ -1118,13 +1121,6 @@ func (s *State) outputString() string {
 	return ""
 }
 
-func (s *State) consumeFuel() error {
-	if s.fuelTracker == nil {
-		return nil
-	}
-	return s.fuelTracker.consume(1)
-}
-
 func (s *State) recursionLimit() int {
 	if s.env == nil {
 		return maxRecursion
@@ -1277,10 +1273,7 @@ func (s *State) evalStmt(stmt parser.Stmt) (err error) {
 
 	switch st := stmt.(type) {
 	case *parser.EmitRaw:
-		if _, err := s.out.WriteString(st.Raw); err != nil {
-			return err
-		}
-		return nil
+		return s.writeString(st.Raw)
 
 	case *parser.EmitExpr:
 		val, err := s.evalExpr(st.Expr)
@@ -1370,6 +1363,12 @@ func (s *State) evalForLoop(loop *parser.ForLoop) error {
 					if !ok {
 						break
 					}
+					if err := s.chargeFuel(fuel.ItemCost); err != nil {
+						return err
+					}
+					if len(items) == cap(items) {
+						items = slices.Grow(items, max(len(items), 16))
+					}
 					items = append(items, v)
 				}
 				return s.evalForLoopItems(loop, items)
@@ -1378,7 +1377,16 @@ func (s *State) evalForLoop(loop *parser.ForLoop) error {
 		}
 	}
 
-	items := iter.Iter()
+	// lists can be iterated for free, every iteration of the loop is
+	// charged as it runs.  Everything else is iterated with fuel up front:
+	// host objects so that infinite iterables cannot hang the engine,
+	// strings and maps as iterating them allocates.
+	var items []value.Value
+	if isList(iter) {
+		items = iter.Iter()
+	} else if items, err = s.iterItems(iter); err != nil {
+		return err
+	}
 	if items == nil {
 		if iter.IsUndefined() || iter.IsNone() {
 			if err := s.assertIterable(iter); err != nil {
@@ -1391,6 +1399,16 @@ func (s *State) evalForLoop(loop *parser.ForLoop) error {
 	}
 
 	return s.evalForLoopItems(loop, items)
+}
+
+// isList returns true for values whose items can be iterated without
+// creating them.
+func isList(val value.Value) bool {
+	switch val.Raw().(type) {
+	case []value.Value, *value.Iterator:
+		return true
+	}
+	return val.IsTuple()
 }
 
 // evalForLoopPull handles iteration over PullIterator (new one-shot iterator interface).
@@ -1439,6 +1457,9 @@ func (s *State) evalForLoopPull(loop *parser.ForLoop, pull value.PullIterator) e
 
 		if !ok {
 			break
+		}
+		if err := s.consumeFuel(); err != nil {
+			return err
 		}
 		s.resetScope()
 		if err := s.unpackLoopTarget(loop.Target, item); err != nil {
@@ -1550,7 +1571,10 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 			s.pushScope()
 			defer s.popScope()
 
-			nestedItems := iterValue.Iter()
+			nestedItems, err := s.iterItems(iterValue)
+			if err != nil {
+				return "", err
+			}
 			if nestedItems == nil {
 				if iterValue.IsUndefined() || iterValue.IsNone() {
 					if err := s.assertIterable(iterValue); err != nil {
@@ -1567,6 +1591,10 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 
 			changedState := &loopChangedState{}
 			for i := range nestedItems {
+				if err := s.consumeFuel(); err != nil {
+					s.out = oldOut
+					return "", err
+				}
 				s.resetScope()
 				if err := s.unpackLoopTarget(loop.Target, nestedItems[i]); err != nil {
 					s.out = oldOut
@@ -1609,6 +1637,11 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 
 	changedState := &loopChangedState{}
 	for i := range items {
+		// every iteration costs an instruction like in Rust where the loop
+		// itself executes instructions.
+		if err := s.consumeFuel(); err != nil {
+			return err
+		}
 		s.resetScope()
 		if err := s.unpackLoopTarget(loop.Target, items[i]); err != nil {
 			return err
@@ -1642,45 +1675,48 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 	return nil
 }
 
-func (s *State) unpackTarget(target parser.Expr, val value.Value) {
+func (s *State) unpackTarget(target parser.Expr, val value.Value) error {
 	switch t := target.(type) {
 	case *parser.Var:
 		s.Set(t.ID, val)
 	case *parser.List:
-		items, ok := val.AsSlice()
-		if !ok {
-			items = val.Iter()
+		items, err := s.iterItems(val)
+		if err != nil {
+			return err
 		}
-		if items != nil {
-			for i, item := range t.Items {
-				if i < len(items) {
-					s.unpackTarget(item, items[i])
-				} else {
-					s.unpackTarget(item, value.Undefined())
-				}
-			}
-		} else {
-			for _, item := range t.Items {
-				s.unpackTarget(item, value.Undefined())
-			}
-		}
+		return s.unpackItems(t, items)
 	case *parser.GetAttr:
 		// Handle attribute assignment (e.g., ns.count = value)
 		obj, err := s.evalExpr(t.Expr)
 		if err != nil {
-			return
+			return nil
 		}
 		if mutableObj, ok := obj.AsMutableObject(); ok {
 			mutableObj.SetAttr(t.Name, val)
 		}
 	}
+	return nil
+}
+
+// unpackItems assigns already iterated items to the targets of a list.
+func (s *State) unpackItems(list *parser.List, items []value.Value) error {
+	for i, item := range list.Items {
+		val := value.Undefined()
+		if i < len(items) {
+			val = items[i]
+		}
+		if err := s.unpackTarget(item, val); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *State) unpackLoopTarget(target parser.Expr, val value.Value) error {
 	if list, ok := target.(*parser.List); ok {
-		items, ok := val.AsSlice()
-		if !ok {
-			items = val.Iter()
+		items, err := s.iterItems(val)
+		if err != nil {
+			return err
 		}
 		if items == nil {
 			return NewError(ErrInvalidOperation, "cannot unpack non-iterable")
@@ -1688,9 +1724,9 @@ func (s *State) unpackLoopTarget(target parser.Expr, val value.Value) error {
 		if len(items) != len(list.Items) {
 			return NewError(ErrInvalidOperation, "wrong number of values to unpack")
 		}
+		return s.unpackItems(list, items)
 	}
-	s.unpackTarget(target, val)
-	return nil
+	return s.unpackTarget(target, val)
 }
 
 func (s *State) evalIfCond(cond *parser.IfCond) error {
@@ -1729,7 +1765,9 @@ func (s *State) evalWithBlock(block *parser.WithBlock) error {
 		if err != nil {
 			return err
 		}
-		s.unpackTarget(assign.Target, val)
+		if err := s.unpackTarget(assign.Target, val); err != nil {
+			return err
+		}
 	}
 
 	for _, stmt := range block.Body {
@@ -1745,8 +1783,7 @@ func (s *State) evalSet(set *parser.Set) error {
 	if err != nil {
 		return err
 	}
-	s.unpackTarget(set.Target, val)
-	return nil
+	return s.unpackTarget(set.Target, val)
 }
 
 func (s *State) evalSetBlock(block *parser.SetBlock) error {
@@ -1774,8 +1811,7 @@ func (s *State) evalSetBlock(block *parser.SetBlock) error {
 		}
 	}
 
-	s.unpackTarget(block.Target, result)
-	return nil
+	return s.unpackTarget(block.Target, result)
 }
 
 func (s *State) evalExtends(ext *parser.Extends) error {
@@ -1926,7 +1962,11 @@ func (s *State) evalInclude(inc *parser.Include) error {
 		return nil
 	}
 
-	if items := nameVal.Iter(); items != nil {
+	items, err := s.iterItems(nameVal)
+	if err != nil {
+		return err
+	}
+	if items != nil {
 		var lastErr error
 		for _, item := range items {
 			name, ok := item.AsString()
@@ -2416,13 +2456,34 @@ func (c *callerCallable) Call(state value.State, args []value.Value, kwargs map[
 	return value.FromSafeString(result), nil
 }
 
+// writeString writes a string to the output and charges for its bytes.
+func (s *State) writeString(str string) error {
+	if err := s.chargeOutput(len(str)); err != nil {
+		return err
+	}
+	// large builders only grow by a quarter when appending, which makes
+	// the total allocation many times the output.  Doubling keeps it at
+	// about twice the output.
+	if b, ok := s.out.(*strings.Builder); ok && b.Cap()-b.Len() < len(str) {
+		b.Grow(max(len(str), b.Len()))
+	}
+	_, err := s.out.WriteString(str)
+	return err
+}
+
 func (s *State) writeValue(val value.Value) error {
 	str, err := s.formatValue(val, true)
 	if err != nil {
 		return err
 	}
-	_, err = s.out.WriteString(str)
-	return err
+	// formatting containers walks them which is a lot more expensive than
+	// writing out a string.
+	if isContainer(val) {
+		if err := s.chargeSerialized(len(str)); err != nil {
+			return err
+		}
+	}
+	return s.writeString(str)
 }
 
 func (s *State) formatValue(val value.Value, strictUndefined bool) (string, error) {
@@ -2654,6 +2715,25 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 	}
 
 	switch op.Op {
+	case parser.BinOpEq, parser.BinOpNe, parser.BinOpLt, parser.BinOpLte, parser.BinOpGt, parser.BinOpGte:
+		if err := s.chargeFuelForCompare(left, right); err != nil {
+			return value.Undefined(), err
+		}
+	case parser.BinOpAdd:
+		if err := s.ensureFuelForBinop("add", left, right); err != nil {
+			return value.Undefined(), err
+		}
+	case parser.BinOpMul:
+		if err := s.ensureFuelForBinop("mul", left, right); err != nil {
+			return value.Undefined(), err
+		}
+	case parser.BinOpConcat:
+		if err := s.ensureFuelForBinop("concat", left, right); err != nil {
+			return value.Undefined(), err
+		}
+	}
+
+	switch op.Op {
 	case parser.BinOpEq:
 		return value.FromBool(left.Equal(right)), nil
 	case parser.BinOpNe:
@@ -2679,11 +2759,11 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 		}
 		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("cannot compare %s and %s", left.Kind(), right.Kind())).WithSpan(op.Span())
 	case parser.BinOpAdd:
-		rv, err := left.Add(right)
+		rv, err := s.addValues(left, right)
 		if err != nil {
 			return value.Undefined(), wrapEvalError(err, op.Span())
 		}
-		return rv, nil
+		return rv, s.chargeValue(rv)
 	case parser.BinOpSub:
 		rv, err := left.Sub(right)
 		if err != nil {
@@ -2695,7 +2775,7 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), wrapEvalError(err, op.Span())
 		}
-		return rv, nil
+		return rv, s.chargeValue(rv)
 	case parser.BinOpDiv:
 		rv, err := left.Div(right)
 		if err != nil {
@@ -2721,9 +2801,14 @@ func (s *State) evalBinOp(op *parser.BinOp) (value.Value, error) {
 		}
 		return rv, nil
 	case parser.BinOpConcat:
-		return left.Concat(right), nil
+		rv := left.Concat(right)
+		return rv, s.chargeValue(rv)
 	case parser.BinOpIn:
-		return value.FromBool(right.Contains(left)), nil
+		contains, err := s.contains(right, left)
+		if err != nil {
+			return value.Undefined(), err
+		}
+		return value.FromBool(contains), nil
 	default:
 		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("unknown binary operator: %v", op.Op)).WithSpan(op.Span())
 	}
@@ -2762,6 +2847,8 @@ func (s *State) evalCompareOp(op parser.CompareOpKind, left, right value.Value, 
 		}
 	} else if err := s.assertNotUndefined(left, right); err != nil {
 		return false, wrapEvalError(err, span)
+	} else if err := s.chargeFuelForCompare(left, right); err != nil {
+		return false, err
 	}
 
 	switch op {
@@ -2786,7 +2873,10 @@ func (s *State) evalCompareOp(op parser.CompareOpKind, left, right value.Value, 
 			return cmp >= 0, nil
 		}
 	case parser.CompareOpIn, parser.CompareOpNotIn:
-		contains := right.Contains(left)
+		contains, err := s.contains(right, left)
+		if err != nil {
+			return false, err
+		}
 		if op == parser.CompareOpNotIn {
 			return !contains, nil
 		}
@@ -2844,6 +2934,11 @@ func (s *State) evalTest(test *parser.Test) (value.Value, error) {
 	if err != nil {
 		return value.Undefined(), err
 	}
+	// tests only return a bool, this is a check for if the test ran out of
+	// fuel.
+	if err := s.chargeFuel(0); err != nil {
+		return value.Undefined(), err
+	}
 
 	return value.FromBool(result), nil
 }
@@ -2879,6 +2974,9 @@ func (s *State) evalGetItem(gi *parser.GetItem) (value.Value, error) {
 	if err != nil {
 		return value.Undefined(), err
 	}
+	if err := s.chargeFuelForGetItem(val, key); err != nil {
+		return value.Undefined(), err
+	}
 	return val.GetItem(key), nil
 }
 
@@ -2912,7 +3010,13 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 			if err != nil {
 				return value.Undefined(), err
 			}
-			return newMacroCallableFromDefinition(macro, value.Undefined()).Call(s, args, kwargs)
+			// macros return their output which was already charged when it
+			// was written.
+			rv, err := newMacroCallableFromDefinition(macro, value.Undefined()).Call(s, args, kwargs)
+			if err != nil {
+				return rv, err
+			}
+			return rv, s.chargeFuel(0)
 		}
 
 		// Check for function
@@ -2921,7 +3025,11 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 			if err != nil {
 				return value.Undefined(), err
 			}
-			return fn(s, args, kwargs)
+			rv, err := fn(s, args, kwargs)
+			if err != nil {
+				return rv, err
+			}
+			return rv, s.chargeValue(rv)
 		}
 
 		// Check if variable is callable
@@ -2931,7 +3039,8 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 			if err != nil {
 				return value.Undefined(), err
 			}
-			return callable.Call(s, args, kwargs)
+			rv, err := callable.Call(s, args, kwargs)
+			return s.chargeCallResult(val, rv, err)
 		}
 	}
 
@@ -2947,7 +3056,31 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 	if err != nil {
 		return value.Undefined(), err
 	}
-	return s.callValue(expr, args, kwargs, call.Span())
+	rv, err := s.callValue(expr, args, kwargs, call.Span())
+	return s.chargeCallResult(expr, rv, err)
+}
+
+// isOutputCallable returns true for callables that return their output, such
+// as macros.  Their output was already charged when it was written.
+func isOutputCallable(val value.Value) bool {
+	switch val.Raw().(type) {
+	case *macroCallable, *callerCallable, *blockCallable, *loopObject:
+		return true
+	}
+	return false
+}
+
+// chargeCallResult charges for the result of calling a function or object.
+// Macros are exempt as their result is their output, which was already
+// charged, but an exhausted tracker still fails.
+func (s *State) chargeCallResult(callee, rv value.Value, err error) (value.Value, error) {
+	if err != nil {
+		return rv, err
+	}
+	if isOutputCallable(callee) {
+		return rv, s.chargeFuel(0)
+	}
+	return rv, s.chargeValue(rv)
 }
 
 func (s *State) evalMethodCall(call *parser.Call, getAttr *parser.GetAttr) (value.Value, error) {
@@ -2959,12 +3092,29 @@ func (s *State) evalMethodCall(call *parser.Call, getAttr *parser.GetAttr) (valu
 	if err != nil {
 		return value.Undefined(), err
 	}
+	// like filters, methods are charged for the string they are called on
+	// and the value they return.
+	if err := s.chargeStringInput(obj); err != nil {
+		return value.Undefined(), err
+	}
+	rv, isOutput, err := s.callMethod(obj, call, getAttr, args, kwargs)
+	if err != nil {
+		return rv, err
+	}
+	if isOutput {
+		// a macro stored in an attribute (e.g. of a module) returns its
+		// output, which was already charged.
+		return rv, s.chargeFuel(0)
+	}
+	return rv, s.chargeValue(rv)
+}
 
+func (s *State) callMethod(obj value.Value, call *parser.Call, getAttr *parser.GetAttr, args []value.Value, kwargs map[string]value.Value) (rv value.Value, isOutput bool, err error) {
 	if objVal, ok := obj.AsObject(); ok {
 		if callable, ok := objVal.(value.MethodCallable); ok {
 			result, err := callable.CallMethod(s, getAttr.Name, args, kwargs)
 			if !errors.Is(err, value.ErrUnknownMethod) {
-				return result, err
+				return result, false, err
 			}
 		}
 	}
@@ -2972,15 +3122,16 @@ func (s *State) evalMethodCall(call *parser.Call, getAttr *parser.GetAttr) (valu
 	if s.env.unknownMethodCallback != nil {
 		result, err := s.env.unknownMethodCallback(s, obj, getAttr.Name, args, kwargs)
 		if !errors.Is(err, value.ErrUnknownMethod) {
-			return result, err
+			return result, false, err
 		}
 	}
 
 	attr := obj.GetAttr(getAttr.Name)
 	if attr.IsCallable() {
-		return s.callValue(attr, args, kwargs, call.Span())
+		rv, err := s.callValue(attr, args, kwargs, call.Span())
+		return rv, isOutputCallable(attr), err
 	}
-	return value.Undefined(), NewError(
+	return value.Undefined(), false, NewError(
 		ErrUnknownMethod,
 		fmt.Sprintf("%s has no method named %s", obj.Kind(), getAttr.Name),
 	).WithSpan(call.Span())
@@ -3046,7 +3197,10 @@ func (s *State) evalCallArgs(callArgs []parser.CallArg) ([]value.Value, map[stri
 		case parser.CallArgKwarg:
 			kwargs[arg.Name] = val
 		case parser.CallArgPosSplat:
-			items := val.Iter()
+			items, err := s.iterItems(val)
+			if err != nil {
+				return nil, nil, err
+			}
 			if items == nil {
 				return nil, nil, NewError(ErrInvalidOperation, "cannot unpack non-iterable")
 			}
@@ -3081,7 +3235,8 @@ func (s *State) evalList(list *parser.List) (value.Value, error) {
 			return value.Undefined(), err
 		}
 	}
-	return value.FromSlice(items), nil
+	rv := value.FromSlice(items)
+	return rv, s.chargeValue(rv)
 }
 
 func (s *State) evalTuple(tuple *parser.Tuple) (value.Value, error) {
@@ -3093,7 +3248,8 @@ func (s *State) evalTuple(tuple *parser.Tuple) (value.Value, error) {
 			return value.Undefined(), err
 		}
 	}
-	return value.FromTuple(items), nil
+	rv := value.FromTuple(items)
+	return rv, s.chargeValue(rv)
 }
 
 func (s *State) evalMap(m *parser.Map) (value.Value, error) {
@@ -3113,7 +3269,8 @@ func (s *State) evalMap(m *parser.Map) (value.Value, error) {
 		}
 		result[keyStr] = val
 	}
-	return value.FromMap(result), nil
+	rv := value.FromMap(result)
+	return rv, s.chargeValue(rv)
 }
 
 func (s *State) evalSlice(sl *parser.Slice) (value.Value, error) {
@@ -3155,7 +3312,11 @@ func (s *State) evalSlice(sl *parser.Slice) (value.Value, error) {
 		}
 	}
 
-	return s.sliceValue(val, start, stop, step)
+	rv, err := s.sliceValue(val, start, stop, step)
+	if err != nil {
+		return rv, err
+	}
+	return rv, s.chargeValue(rv)
 }
 
 func (s *State) sliceValue(val value.Value, start, stop *int64, step int64) (value.Value, error) {
@@ -3165,10 +3326,9 @@ func (s *State) sliceValue(val value.Value, start, stop *int64, step int64) (val
 
 	switch {
 	case val.Kind() == value.KindSeq:
-		items, ok := val.AsSlice()
-		if !ok {
-			// sequence objects
-			items = val.Iter()
+		items, err := s.sliceItems(val, start, stop, step)
+		if err != nil {
+			return value.Undefined(), err
 		}
 		result := sliceSlice(items, start, stop, step)
 		if val.IsTuple() {
@@ -3177,16 +3337,22 @@ func (s *State) sliceValue(val value.Value, start, stop *int64, step int64) (val
 		return value.FromSlice(result), nil
 	case val.Kind() == value.KindString:
 		str, _ := val.AsString()
-		runes := []rune(str)
-		result := sliceRunes(runes, start, stop, step)
-		if val.IsSafe() {
-			return value.FromSafeString(string(result)), nil
+		result, err := s.sliceString(str, start, stop, step)
+		if err != nil {
+			return value.Undefined(), err
 		}
-		return value.FromString(string(result)), nil
+		if val.IsSafe() {
+			return value.FromSafeString(result), nil
+		}
+		return value.FromString(result), nil
 	case val.Kind() == value.KindIterable:
 		// Like in Rust, iterables such as range() can be sliced too, the
 		// result is again an iterable.
-		result := sliceSlice(val.Iter(), start, stop, step)
+		items, err := s.sliceItems(val, start, stop, step)
+		if err != nil {
+			return value.Undefined(), err
+		}
+		result := sliceSlice(items, start, stop, step)
 		return value.FromIterator(value.NewIterator("slice", result)), nil
 	case val.IsUndefined() || val.IsNone():
 		// Like in Rust, slicing none or undefined gives an empty list.
@@ -3204,6 +3370,9 @@ func sliceSlice(items []value.Value, start, stop *int64, step int64) []value.Val
 	s, e := resolveSliceIndices(length, start, stop, step)
 
 	var result []value.Value
+	if n := sliceCount(s, e, step); n > 0 {
+		result = make([]value.Value, 0, n)
+	}
 	if step > 0 {
 		for i := s; i < e; i += step {
 			result = append(result, items[i])
@@ -3216,21 +3385,161 @@ func sliceSlice(items []value.Value, start, stop *int64, step int64) []value.Val
 	return result
 }
 
-func sliceRunes(runes []rune, start, stop *int64, step int64) []rune {
-	length := int64(len(runes))
-	s, e := resolveSliceIndices(length, start, stop, step)
+// sliceItems returns the items of a sequence or iterable to slice.  Host
+// objects have to be iterated which is charged per item.
+func (s *State) sliceItems(val value.Value, start, stop *int64, step int64) ([]value.Value, error) {
+	items, err := s.sliceItemsInner(val)
+	if err != nil {
+		return nil, err
+	}
+	// the result is a new list, so check that it can be paid for.
+	first, last := resolveSliceIndices(int64(len(items)), start, stop, step)
+	if err := s.ensureSlots(int(sliceCount(first, last, step))); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
-	var result []rune
-	if step > 0 {
-		for i := s; i < e; i += step {
-			result = append(result, runes[i])
+func (s *State) sliceItemsInner(val value.Value) ([]value.Value, error) {
+	if items, ok := val.AsSlice(); ok {
+		return items, nil
+	}
+	if fuel.IsMaterialized(val) {
+		return val.Iter(), nil
+	}
+	return s.iterItems(val)
+}
+
+// sliceString slices a string by characters.  Unlike converting the string
+// into runes, this only allocates the result.
+//
+// Finding the characters takes time proportional to the bytes scanned, which
+// is charged like output.
+func (s *State) sliceString(str string, start, stop *int64, step int64) (string, error) {
+	// a forward slice with non-negative bounds only needs to look at the
+	// string up to the end of the slice.
+	if step > 0 && (start == nil || *start >= 0) && stop != nil && *stop >= 0 {
+		first := int64(0)
+		if start != nil {
+			first = *start
 		}
-	} else {
-		for i := s; i > e; i += step {
-			result = append(result, runes[i])
+		var b strings.Builder
+		byteStart, byteEnd := -1, len(str)
+		var i int64
+		for offset, r := range str {
+			if i >= *stop {
+				byteEnd = offset
+				break
+			}
+			if i >= first {
+				if byteStart < 0 {
+					byteStart = offset
+				}
+				if step > 1 && (i-first)%step == 0 {
+					b.WriteRune(r)
+				}
+			}
+			i++
+		}
+		if err := s.chargeOutput(byteEnd); err != nil {
+			return "", err
+		}
+		if byteStart < 0 {
+			return "", nil
+		}
+		if step == 1 {
+			sub := str[byteStart:byteEnd]
+			if !utf8.ValidString(sub) {
+				// like converting to runes, invalid bytes become U+FFFD
+				return string([]rune(sub)), nil
+			}
+			return sub, nil
+		}
+		return b.String(), nil
+	}
+
+	if err := s.chargeOutput(len(str)); err != nil {
+		return "", err
+	}
+	length := int64(utf8.RuneCountInString(str))
+	lo, hi := resolveSliceIndices(length, start, stop, step)
+	count := sliceCount(lo, hi, step)
+	if count == 0 {
+		return "", nil
+	}
+	if s.fuelTracker != nil {
+		if err := s.fuelTracker.Ensure(uint64(count)); err != nil {
+			return "", err
 		}
 	}
-	return result
+
+	if step == 1 && utf8.ValidString(str) {
+		byteStart, byteEnd := len(str), len(str)
+		var i int64
+		for offset := range str {
+			if i == lo {
+				byteStart = offset
+			}
+			if i == hi {
+				byteEnd = offset
+				break
+			}
+			i++
+		}
+		return str[byteStart:byteEnd], nil
+	}
+
+	if step > 0 {
+		var b strings.Builder
+		var i int64
+		for _, r := range str {
+			if i >= hi {
+				break
+			}
+			if i >= lo && (i-lo)%step == 0 {
+				b.WriteRune(r)
+			}
+			i++
+		}
+		return b.String(), nil
+	}
+
+	if int64(len(str)) == length && utf8.ValidString(str) {
+		// ASCII
+		var b strings.Builder
+		b.Grow(int(count))
+		for i := lo; i > hi; i += step {
+			b.WriteByte(str[i])
+		}
+		return b.String(), nil
+	}
+	// collect the characters front to back and reverse them.
+	picked := make([]rune, 0, count)
+	var i int64
+	for _, r := range str {
+		if i > lo {
+			break
+		}
+		if i > hi && (lo-i)%(-step) == 0 {
+			picked = append(picked, r)
+		}
+		i++
+	}
+	for a, b := 0, len(picked)-1; a < b; a, b = a+1, b-1 {
+		picked[a], picked[b] = picked[b], picked[a]
+	}
+	return string(picked), nil
+}
+
+// sliceCount returns how many items a slice selects.
+func sliceCount(s, e, step int64) int64 {
+	if step > 0 && s < e {
+		return (e - s + step - 1) / step
+	}
+	if step < 0 && s > e {
+		return (s - e - step - 1) / -step
+	}
+	return 0
 }
 
 func resolveSliceIndices(length int64, start, stop *int64, step int64) (int64, int64) {
@@ -3304,7 +3613,16 @@ func (s *State) applyFilterCallArgs(name string, val value.Value, callArgs []par
 		return value.Undefined(), err
 	}
 
-	return filterFn(s, val, args, kwargs)
+	// filters are charged for the string they work on and the value they
+	// return.
+	if err := s.chargeStringInput(val); err != nil {
+		return value.Undefined(), err
+	}
+	rv, err := filterFn(s, val, args, kwargs)
+	if err != nil {
+		return rv, err
+	}
+	return rv, s.chargeValue(rv)
 }
 
 // debugObject represents the debug() function result with proper repr

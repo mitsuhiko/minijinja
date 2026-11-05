@@ -774,9 +774,19 @@ func (e *Environment) SetDebug(enabled bool) {
 
 // SetFuel sets the optional fuel limit for template evaluation.
 //
-// When set to a non-nil value, each evaluation step consumes fuel and rendering
-// fails with ErrOutOfFuel once the budget is exhausted. Pass nil to disable
-// fuel tracking.
+// When set to a non-nil value, rendering fails with ErrOutOfFuel once the
+// budget is exhausted. Pass nil to disable fuel tracking.
+//
+// Fuel is a single budget for everything a template can make the engine do:
+// each evaluation step costs one fuel, and on top of that the engine charges
+// for the data a template creates and the items it visits.  One fuel pays for
+// 64 bytes of output, of strings created by operators, filters and functions
+// and of string input to filters, two list slots or one map entry, or two
+// items visited by a built-in filter or operator.  Sorting is charged per
+// comparison.  With a budget of F fuel a render can thus allocate roughly
+// F × 64 bytes of template created data and take time roughly proportional
+// to F.  Custom filters and functions can charge for their own work with
+// State.ConsumeFuel.
 func (e *Environment) SetFuel(fuel *uint64) {
 	if fuel == nil {
 		e.fuel = nil

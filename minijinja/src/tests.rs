@@ -359,7 +359,7 @@ mod builtins {
     #[cfg(feature = "builtins")]
     pub fn is_in(state: &State, value: &Value, other: &Value) -> Result<bool, Error> {
         ok!(state.undefined_behavior().assert_iterable(other));
-        Ok(crate::value::ops::contains(other, value)
+        Ok(crate::value::ops::contains(Some(state), other, value)
             .map(|value| value.is_true())
             .unwrap_or(false))
     }
