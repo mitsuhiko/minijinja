@@ -117,23 +117,24 @@ fn range_step_backwards(
     step: usize,
     end: usize,
 ) -> impl Iterator<Item = usize> {
-    let start = match start {
-        None => end.saturating_sub(1),
-        Some(start) if start >= end as i64 => end.saturating_sub(1),
-        Some(start) if start >= 0 => start as usize,
-        Some(start) => (end as i64 + start).max(0) as usize,
+    // Like Python, clamp both bounds to `-1..=end - 1` and walk down from
+    // `start` to `stop`, excluding `stop`.
+    let end = end as i64;
+    let clamp = |idx: i64| {
+        if idx < 0 {
+            (end + idx).max(-1)
+        } else {
+            idx.min(end - 1)
+        }
     };
-    let stop = match stop {
-        None => 0,
-        Some(stop) if stop < 0 => (end as i64 + stop).max(0) as usize,
-        Some(stop) => stop as usize,
-    };
-    let length = if stop == 0 {
-        (start + step) / step
+    let start = start.map_or(end - 1, clamp);
+    let stop = stop.map_or(-1, clamp);
+    let length = if start > stop {
+        ((start - stop - 1) as u64 / step as u64 + 1) as usize
     } else {
-        (start - stop + step - 1) / step
+        0
     };
-    (stop..=start).rev().step_by(step).take(length)
+    (0..length).map(move |i| (start as u64 - i as u64 * step as u64) as usize)
 }
 
 pub fn slice(value: Value, start: Value, stop: Value, step: Value) -> Result<Value, Error> {
