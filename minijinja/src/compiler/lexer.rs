@@ -685,7 +685,6 @@ impl<'s> Tokenizer<'s> {
         &mut self,
         ws_start: Whitespace,
     ) -> Result<ControlFlow<(Token<'s>, Span)>, Error> {
-        let old_loc = self.loc();
         let mut ptr = 0;
         while let Some(block) = memstr(&self.rest_bytes()[ptr..], self.block_start().as_bytes()) {
             ptr += block + self.block_start().len();
@@ -694,10 +693,8 @@ impl<'s> Tokenizer<'s> {
             {
                 let ws = Whitespace::from_byte(self.rest_bytes().get(ptr).copied());
                 let end = ptr - self.block_start().len();
-                let mut result = &self.rest()[..end];
-                self.advance(end);
-                let span = self.span(old_loc);
-                self.advance(self.block_start().len() + endraw);
+                let full = &self.rest()[..end];
+                let mut result = full;
                 match ws_start {
                     Whitespace::Default if self.ws_config.trim_blocks => {
                         if result.starts_with('\r') {
@@ -717,6 +714,16 @@ impl<'s> Tokenizer<'s> {
                     Whitespace::Remove => result.trim_end(),
                     _ => result,
                 };
+                // the span covers exactly the emitted data, so skip over the
+                // trimmed leading whitespace before recording the start.
+                // (`result` is always a subslice of `full`.)
+                let leading = result.as_ptr() as usize - full.as_ptr() as usize;
+                self.advance(leading);
+                let old_loc = self.loc();
+                self.advance(result.len());
+                let span = self.span(old_loc);
+                self.advance(end - leading - result.len());
+                self.advance(self.block_start().len() + endraw);
                 self.handle_tail_ws(ws_next);
                 return Ok(ControlFlow::Break((Token::TemplateData(result), span)));
             }

@@ -149,6 +149,67 @@ func mapPairs(state State, val value.Value) ([][2]value.Value, bool, error) {
 }
 
 var minI128 = new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), 127))
+var maxI128 = new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 127), big.NewInt(1))
+
+func fitsI128(n *big.Int) bool {
+	return n.Cmp(minI128) >= 0 && n.Cmp(maxI128) <= 0
+}
+
+func bigIntValue(n *big.Int) value.Value {
+	if n.IsInt64() {
+		return value.FromInt(n.Int64())
+	}
+	return value.FromBigInt(n)
+}
+
+// asBigInt returns a number stored as a big integer (an integer outside the
+// int64 range) as a big.Int.
+func asBigInt(val value.Value) (*big.Int, bool) {
+	if val.Kind() != value.KindNumber || val.IsActualInt() || val.IsActualFloat() {
+		return nil, false
+	}
+	return new(big.Int).SetString(val.String(), 10)
+}
+
+// parseFloat parses a float like Rust's `str::parse::<f64>`, which gives an
+// infinity for numbers too large for a float instead of failing.  Unlike
+// strconv.ParseFloat it does not accept underscores or hexadecimal floats but
+// accepts a sign in front of NaN.
+func parseFloat(s string) (float64, error) {
+	unsigned := s
+	if strings.HasPrefix(s, "+") || strings.HasPrefix(s, "-") {
+		unsigned = s[1:]
+	}
+	if strings.EqualFold(unsigned, "nan") {
+		return math.NaN(), nil
+	}
+	if strings.Contains(s, "_") || (len(unsigned) >= 2 && unsigned[0] == '0' && (unsigned[1] == 'x' || unsigned[1] == 'X')) {
+		return 0, &strconv.NumError{Func: "ParseFloat", Num: s, Err: strconv.ErrSyntax}
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if numErr, ok := err.(*strconv.NumError); ok && numErr.Err == strconv.ErrRange {
+		return f, nil
+	}
+	return f, err
+}
+
+// floatToInt converts a float to an integer like `f as i128` does in Rust:
+// it truncates toward zero, saturates at the bounds of an i128 and turns NaN
+// into 0.
+func floatToInt(f float64) value.Value {
+	switch {
+	case math.IsNaN(f):
+		return value.FromInt(0)
+	case f >= -0x1p63 && f < 0x1p63:
+		return value.FromInt(int64(f))
+	case f >= 0x1p127:
+		return value.FromBigInt(new(big.Int).Set(maxI128))
+	case f <= -0x1p127:
+		return value.FromBigInt(new(big.Int).Set(minI128))
+	}
+	n, _ := big.NewFloat(f).Int(nil)
+	return value.FromBigInt(n)
+}
 
 func preserveSafety(input value.Value, output string) value.Value {
 	if input.IsSafe() {
@@ -2792,11 +2853,15 @@ func FilterInt(state State, val value.Value, args []value.Value, kwargs map[stri
 		}
 		return value.FromInt(0), nil
 	}
+	if _, ok := asBigInt(val); ok {
+		return val, nil
+	}
+	if val.IsActualFloat() {
+		f, _ := val.AsFloat()
+		return floatToInt(f), nil
+	}
 	if i, ok := val.AsInt(); ok {
 		return value.FromInt(i), nil
-	}
-	if f, ok := val.AsFloat(); ok {
-		return value.FromInt(int64(f)), nil
 	}
 	if b, ok := val.AsBool(); ok {
 		if b {
@@ -2808,11 +2873,11 @@ func FilterInt(state State, val value.Value, args []value.Value, kwargs map[stri
 	var convErr error
 	if s, ok := val.AsString(); ok {
 		if i, ok := parseIntWithBase(s, base); ok {
-			return value.FromInt(i), nil
+			return bigIntValue(i), nil
 		}
-		f, err := strconv.ParseFloat(s, 64)
+		f, err := parseFloat(s)
 		if err == nil {
-			return value.FromInt(int64(f)), nil
+			return floatToInt(f), nil
 		}
 		convErr = mjerrors.NewError(mjerrors.ErrInvalidOperation, err.Error())
 	} else {
@@ -2825,8 +2890,9 @@ func FilterInt(state State, val value.Value, args []value.Value, kwargs map[stri
 }
 
 // parseIntWithBase parses an integer like Python's int(s, base) does, except
-// that underscores and surrounding whitespace are not accepted.
-func parseIntWithBase(s string, base int64) (int64, bool) {
+// that underscores and surrounding whitespace are not accepted.  Like in Rust,
+// the result has to fit into an i128.
+func parseIntWithBase(s string, base int64) (*big.Int, bool) {
 	prefix := ""
 	switch {
 	case base == 2:
@@ -2836,7 +2902,7 @@ func parseIntWithBase(s string, base int64) (int64, bool) {
 	case base == 16:
 		prefix = "0x"
 	case base < 2 || base > 36:
-		return 0, false
+		return nil, false
 	}
 	sign := ""
 	digits := s
@@ -2848,13 +2914,16 @@ func parseIntWithBase(s string, base int64) (int64, bool) {
 	if prefix != "" && len(digits) >= len(prefix) && strings.EqualFold(digits[:len(prefix)], prefix) {
 		digits = digits[len(prefix):]
 	}
-	// ParseInt accepts underscores only with base 0, but it would take a
+	// SetString accepts underscores only with base 0, but it would take a
 	// second sign
 	if strings.HasPrefix(digits, "+") || strings.HasPrefix(digits, "-") {
-		return 0, false
+		return nil, false
 	}
-	i, err := strconv.ParseInt(sign+digits, int(base), 64)
-	return i, err == nil
+	i, ok := new(big.Int).SetString(sign+digits, int(base))
+	if !ok || !fitsI128(i) {
+		return nil, false
+	}
+	return i, true
 }
 
 // FilterFloat converts a value to a float.
@@ -2894,6 +2963,10 @@ func FilterFloat(state State, val value.Value, args []value.Value, kwargs map[st
 	if f, ok := val.AsFloat(); ok {
 		return value.FromFloat(f), nil
 	}
+	if n, ok := asBigInt(val); ok {
+		f, _ := new(big.Float).SetInt(n).Float64()
+		return value.FromFloat(f), nil
+	}
 	if b, ok := val.AsBool(); ok {
 		if b {
 			return value.FromFloat(1.0), nil
@@ -2903,7 +2976,7 @@ func FilterFloat(state State, val value.Value, args []value.Value, kwargs map[st
 
 	var convErr error
 	if s, ok := val.AsString(); ok {
-		f, err := strconv.ParseFloat(s, 64)
+		f, err := parseFloat(s)
 		if err == nil {
 			return value.FromFloat(f), nil
 		}
@@ -3049,16 +3122,16 @@ func roundDirected(f float64, precision int, ceil bool) (float64, error) {
 
 // roundInt rounds an integer to a negative precision, that is to a multiple
 // of 10^-precision.
-func roundInt(i int64, precision int, method string) (value.Value, error) {
+func roundInt(i *big.Int, precision int, method string) (value.Value, error) {
 	if precision < -38 {
 		// like Rust, which rounds in i128: only zero is in reach
-		if (method == "ceil" && i > 0) || (method == "floor" && i < 0) {
+		if (method == "ceil" && i.Sign() > 0) || (method == "floor" && i.Sign() < 0) {
 			return value.Undefined(), errRoundTooLarge()
 		}
 		return value.FromInt(0), nil
 	}
 	factor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-precision)), nil)
-	quotient, remainder := new(big.Int).DivMod(big.NewInt(i), factor, new(big.Int))
+	quotient, remainder := new(big.Int).DivMod(i, factor, new(big.Int))
 	roundUp := false
 	switch method {
 	case "ceil":
@@ -3073,10 +3146,10 @@ func roundInt(i int64, precision int, method string) (value.Value, error) {
 		quotient.Add(quotient, big.NewInt(1))
 	}
 	rv := quotient.Mul(quotient, factor)
-	if rv.IsInt64() {
-		return value.FromInt(rv.Int64()), nil
+	if !fitsI128(rv) {
+		return value.Undefined(), errRoundTooLarge()
 	}
-	return value.FromBigInt(rv), nil
+	return bigIntValue(rv), nil
 }
 
 // FilterRound rounds a number to a given precision.
@@ -3128,7 +3201,17 @@ func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string
 			return val, nil
 		}
 		i, _ := val.AsInt()
-		return roundInt(i, precision, method)
+		return roundInt(big.NewInt(i), precision, method)
+	}
+	if n, ok := asBigInt(val); ok {
+		if precision >= 0 {
+			return val, nil
+		}
+		if !fitsI128(n) {
+			// like Rust, which rounds in i128
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot convert number to i128")
+		}
+		return roundInt(n, precision, method)
 	}
 
 	f, ok := val.AsFloat()

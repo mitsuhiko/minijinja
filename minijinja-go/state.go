@@ -39,12 +39,13 @@ type State struct {
 	macros            map[string]*macroDefinition
 	out               outputWriter
 	depth             int
-	currentBlock      string                            // name of block currently being rendered
-	loopRecurse       func(value.Value) (string, error) // for recursive loops
+	currentBlock      string                                  // name of block currently being rendered
+	loopRecurse       func(value.Value, bool) (string, error) // for recursive loops
 	undefinedBehavior UndefinedBehavior
 	temps             *tempStore
 	fuelTracker       *fuelTracker
 	rootContext       value.Value
+	spans             *spanRecorder // set when output spans are recorded
 }
 
 type outputWriter interface {
@@ -202,6 +203,7 @@ func (s *State) RenderBlock(name string) (string, error) {
 
 	oldBlock := s.currentBlock
 	s.currentBlock = name
+	defer s.enterLayer(bs.layers[0])()
 
 	s.pushScope()
 	for _, stmt := range bs.layers[0].body {
@@ -232,7 +234,7 @@ func (s *State) CallMacro(name string, args ...value.Value) (value.Value, error)
 	if !ok {
 		return value.Undefined(), NewError(ErrInvalidOperation, "macro not found: "+name)
 	}
-	return newMacroCallableFromDefinition(macro, value.Undefined()).Call(s, args, nil)
+	return newMacroCallableFromDefinition(macro).Call(s, args, nil)
 }
 
 // CallMacroKw calls a macro by name with positional and keyword arguments.
@@ -249,7 +251,7 @@ func (s *State) CallMacroKw(name string, args []value.Value, kwargs map[string]v
 	if !ok {
 		return value.Undefined(), NewError(ErrInvalidOperation, "macro not found: "+name)
 	}
-	return newMacroCallableFromDefinition(macro, value.Undefined()).Call(s, args, kwargs)
+	return newMacroCallableFromDefinition(macro).Call(s, args, kwargs)
 }
 
 // Exports returns all exported variables from the template.
@@ -288,7 +290,7 @@ func (s *State) Exports() map[string]value.Value {
 
 	// Also include macros as exports
 	for name, macro := range s.macros {
-		exports[name] = value.FromCallable(newMacroCallableFromDefinition(macro, value.Undefined()))
+		exports[name] = value.FromCallable(newMacroCallableFromDefinition(macro))
 	}
 
 	for name := range exports {
@@ -491,21 +493,44 @@ type blockStack struct {
 type blockLayer struct {
 	body     []parser.Stmt
 	required bool
+	// name and source of the template that defines this layer.
+	name   string
+	source string
+}
+
+// enterTemplate makes the state execute in the context of the given template
+// (which affects error reporting, template path resolution and output spans)
+// and returns a function that restores the previous template.
+func (s *State) enterTemplate(name, source string) func() {
+	oldName, oldSource := s.name, s.source
+	s.name, s.source = name, source
+	return func() {
+		s.name, s.source = oldName, oldSource
+	}
+}
+
+// enterLayer is like enterTemplate for the template that defines a block layer.
+func (s *State) enterLayer(layer blockLayer) func() {
+	return s.enterTemplate(layer.name, layer.source)
 }
 
 type macroDefinition struct {
 	macro  *parser.Macro
 	state  *State
 	scopes []map[string]value.Value
+	// name and source of the template that defines the macro.
+	name   string
+	source string
 }
 
 // macroCallable wraps a macro for callable invocation
 type macroCallable struct {
 	macro     *parser.Macro
 	state     *State
-	caller    value.Value // caller value if this is a call block macro
 	hasCaller bool
 	scopes    []map[string]value.Value
+	name      string
+	source    string
 }
 
 func newMacroDefinition(state *State, macro *parser.Macro) *macroDefinition {
@@ -513,35 +538,43 @@ func newMacroDefinition(state *State, macro *parser.Macro) *macroDefinition {
 		macro:  macro,
 		state:  state,
 		scopes: cloneScopes(state.scopes),
+		name:   state.name,
+		source: state.source,
 	}
 }
 
-func newMacroCallable(state *State, macro *parser.Macro, caller value.Value) *macroCallable {
-	return newMacroCallableFromDefinition(&macroDefinition{
-		macro:  macro,
-		state:  state,
-		scopes: cloneScopes(state.scopes),
-	}, caller)
+func newMacroCallable(state *State, macro *parser.Macro) *macroCallable {
+	return newMacroCallableFromDefinition(newMacroDefinition(state, macro))
 }
 
-func newMacroCallableFromDefinition(def *macroDefinition, caller value.Value) *macroCallable {
+func newMacroCallableFromDefinition(def *macroDefinition) *macroCallable {
 	return &macroCallable{
 		macro:     def.macro,
 		state:     def.state,
-		caller:    caller,
 		hasCaller: macroUsesCaller(def.macro),
 		scopes:    cloneScopes(def.scopes),
+		name:      def.name,
+		source:    def.source,
 	}
 }
 
 func (m *macroCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	_ = state // macro uses its captured state
+	// the macro body executes in the context of the template defining it.
+	defer m.state.enterTemplate(m.name, m.source)()
 	oldScopes := m.state.scopes
 	m.state.scopes = cloneScopes(m.scopes)
 	defer func() {
 		m.state.scopes = oldScopes
 	}()
-	return m.state.callMacroWithValues(m.macro, args, kwargs, m.caller)
+	// like in Rust, the macro uses the auto escaping of the caller rather
+	// than the one of the template that defines it.
+	if caller, ok := state.(*State); ok && caller != nil {
+		oldEscape := m.state.autoEscape
+		m.state.autoEscape = caller.autoEscape
+		defer func() { m.state.autoEscape = oldEscape }()
+	}
+	return m.state.callMacroWithValues(m.macro, args, kwargs, m.hasCaller)
 }
 
 // GetAttr returns macro properties
@@ -586,7 +619,20 @@ func (f *functionCallable) String() string {
 	return fmt.Sprintf("<function %s>", f.name)
 }
 
+// macroUsesCaller returns true if the macro refers to a caller it does not
+// declare itself, which makes it accept a caller keyword argument.  Like in
+// Rust, nested macros and call blocks declare their own caller.
 func macroUsesCaller(macro *parser.Macro) bool {
+	for _, arg := range macro.Args {
+		if v, ok := arg.(*parser.Var); ok && v.ID == "caller" {
+			return false
+		}
+	}
+	for _, expr := range macro.Defaults {
+		if exprUsesCaller(expr) {
+			return true
+		}
+	}
 	for _, stmt := range macro.Body {
 		if stmtUsesCaller(stmt) {
 			return true
@@ -671,12 +717,6 @@ func stmtUsesCaller(stmt parser.Stmt) bool {
 		return false
 	case *parser.Include:
 		return exprUsesCaller(st.Name)
-	case *parser.Macro:
-		for _, bodyStmt := range st.Body {
-			if stmtUsesCaller(bodyStmt) {
-				return true
-			}
-		}
 	case *parser.FilterBlock:
 		if exprUsesCaller(st.Filter) {
 			return true
@@ -698,14 +738,7 @@ func stmtUsesCaller(stmt parser.Stmt) bool {
 	case *parser.Do:
 		return exprUsesCaller(st.Call)
 	case *parser.CallBlock:
-		if exprUsesCaller(st.Call) {
-			return true
-		}
-		for _, bodyStmt := range st.MacroDecl.Body {
-			if stmtUsesCaller(bodyStmt) {
-				return true
-			}
-		}
+		return exprUsesCaller(st.Call)
 	}
 	return false
 }
@@ -789,12 +822,20 @@ func exprUsesCaller(expr parser.Expr) bool {
 	return false
 }
 
-func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwargs map[string]value.Value, caller value.Value) (value.Value, error) {
+// callMacroWithValues calls a macro.  If takesCaller is set, the macro
+// accepts a caller keyword argument, which is undefined if not passed.
+func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwargs map[string]value.Value, takesCaller bool) (value.Value, error) {
 	s.depth++
 	if s.depth > s.recursionLimit() {
 		return value.Undefined(), NewError(ErrInvalidOperation, "recursion limit exceeded")
 	}
 	defer func() { s.depth-- }()
+
+	// like in Rust, macros do not run in the block or loop they are called
+	// from, so they cannot call super() or recurse the loop.
+	oldBlock, oldRecurse := s.currentBlock, s.loopRecurse
+	s.currentBlock, s.loopRecurse = "", nil
+	defer func() { s.currentBlock, s.loopRecurse = oldBlock, oldRecurse }()
 
 	s.pushScope()
 	defer s.popScope()
@@ -806,6 +847,15 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 	remainingKwargs := make(map[string]value.Value, len(kwargs))
 	for k, v := range kwargs {
 		remainingKwargs[k] = v
+	}
+
+	if takesCaller {
+		caller, ok := remainingKwargs["caller"]
+		if !ok {
+			caller = value.Undefined()
+		}
+		s.Set("caller", caller)
+		delete(remainingKwargs, "caller")
 	}
 
 	// Bind arguments
@@ -845,11 +895,6 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 		return value.Undefined(), NewError(ErrTooManyArguments, "too many keyword arguments")
 	}
 
-	// Set caller if provided
-	if !caller.IsUndefined() {
-		s.Set("caller", caller)
-	}
-
 	// Capture output
 	oldOut := s.out
 	builder := &strings.Builder{}
@@ -863,6 +908,9 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 	result := builder.String()
 	s.out = oldOut
 
+	if s.autoEscape.IsNone() {
+		return value.FromString(result), nil
+	}
 	return value.FromSafeString(result), nil
 }
 
@@ -881,7 +929,7 @@ type loopObject struct {
 	prevItem     value.Value        // previous item (for pull iterators)
 	pullIter     value.PullIterator // pull-based iterator
 	peekedNext   *value.Value       // peeked next item for pullIter
-	recurseFn    func(value.Value) (string, error)
+	recurseFn    func(value.Value, bool) (string, error)
 }
 
 func (l *loopObject) GetAttr(name string) value.Value {
@@ -958,12 +1006,19 @@ func (l *loopObject) String() string {
 func (l *loopObject) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	_ = state
 	if l.recurseFn == nil {
-		return value.Undefined(), NewError(ErrInvalidOperation, "loop recursion cannot be called this way")
+		return value.Undefined(), NewError(ErrInvalidOperation, "cannot recurse outside of recursive loop")
+	}
+	// the loop might be called from a nested loop or macro, so make it the
+	// loop that loop() recurses while it runs.
+	if s, ok := state.(*State); ok && s != nil {
+		oldRecurse := s.loopRecurse
+		s.loopRecurse = l.recurseFn
+		defer func() { s.loopRecurse = oldRecurse }()
 	}
 	if len(args) != 1 {
 		return value.Undefined(), NewError(ErrInvalidOperation, "loop() takes exactly 1 argument")
 	}
-	result, err := l.recurseFn(args[0])
+	result, err := l.recurseFn(args[0], false)
 	if err != nil {
 		return value.Undefined(), err
 	}
@@ -1042,6 +1097,12 @@ type blockCallable struct {
 
 func (bc *blockCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	_ = state
+	return bc.render(false)
+}
+
+// render renders the block.  If direct is set, the output is written to the
+// current output instead of being returned.
+func (bc *blockCallable) render(direct bool) (value.Value, error) {
 	bs := bc.state.blocks[bc.blockName]
 	if bs == nil || len(bs.layers) == 0 {
 		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("block '%s' not found", bc.blockName))
@@ -1053,10 +1114,13 @@ func (bc *blockCallable) Call(state value.State, args []value.Value, kwargs map[
 	// Capture output
 	oldOut := bc.state.out
 	builder := &strings.Builder{}
-	bc.state.out = builder
+	if !direct {
+		bc.state.out = builder
+	}
 
 	oldBlock := bc.state.currentBlock
 	bc.state.currentBlock = bc.blockName
+	defer bc.state.enterLayer(bs.layers[0])()
 
 	bc.state.pushScope()
 	for _, stmt := range bs.layers[0].body {
@@ -1073,6 +1137,9 @@ func (bc *blockCallable) Call(state value.State, args []value.Value, kwargs map[
 	bc.state.out = oldOut
 	bc.state.currentBlock = oldBlock
 
+	if direct {
+		return value.Undefined(), nil
+	}
 	return value.FromSafeString(result), nil
 }
 
@@ -1115,8 +1182,11 @@ func newState(goCtx context.Context, env *Environment, name, source string, ctx 
 }
 
 func (s *State) outputString() string {
-	if b, ok := s.out.(*strings.Builder); ok {
+	switch b := s.out.(type) {
+	case *strings.Builder:
 		return b.String()
+	case *spanRecorder:
+		return b.buf.String()
 	}
 	return ""
 }
@@ -1154,7 +1224,7 @@ func (s *State) Lookup(name string) value.Value {
 
 	// Check macros
 	if macro, ok := s.macros[name]; ok {
-		return value.FromCallable(newMacroCallableFromDefinition(macro, value.Undefined()))
+		return value.FromCallable(newMacroCallableFromDefinition(macro))
 	}
 
 	// Check globals
@@ -1211,7 +1281,7 @@ func (s *State) eval(tmpl *parser.Template) (string, error) {
 		for _, stmt := range tmpl.Children {
 			if block, ok := stmt.(*parser.Block); ok {
 				s.blocks[block.Name] = &blockStack{
-					layers: []blockLayer{{body: block.Body, required: block.Required}},
+					layers: []blockLayer{{body: block.Body, required: block.Required, name: s.name, source: s.source}},
 					index:  0,
 				}
 			}
@@ -1273,12 +1343,23 @@ func (s *State) evalStmt(stmt parser.Stmt) (err error) {
 
 	switch st := stmt.(type) {
 	case *parser.EmitRaw:
+		if s.spans != nil {
+			return s.writeStringWithSpan(st.Raw, st.Span())
+		}
 		return s.writeString(st.Raw)
 
 	case *parser.EmitExpr:
+		if call, ok := st.Expr.(*parser.Call); ok {
+			if handled, err := s.emitDirect(call); handled {
+				return err
+			}
+		}
 		val, err := s.evalExpr(st.Expr)
 		if err != nil {
 			return err
+		}
+		if s.spans != nil {
+			return s.writeValueWithSpan(val, st.Span())
 		}
 		return s.writeValue(val)
 
@@ -1437,6 +1518,12 @@ func (s *State) evalForLoopPull(loop *parser.ForLoop, pull value.PullIterator) e
 		s.depth--
 	}()
 
+	// like in Rust, loop() in a loop that is not recursive does not recurse
+	// an outer loop.
+	oldRecurse := s.loopRecurse
+	s.loopRecurse = nil
+	defer func() { s.loopRecurse = oldRecurse }()
+
 	index := 0
 	prevItem := value.Undefined()
 	changedState := &loopChangedState{}
@@ -1558,10 +1645,12 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 	}()
 
 	// Set up recursive loop function if needed
-	var oldRecurse func(value.Value) (string, error)
+	var oldRecurse func(value.Value, bool) (string, error)
 	if loop.Recursive {
 		oldRecurse = s.loopRecurse
-		s.loopRecurse = func(iterValue value.Value) (string, error) {
+		// if direct is set, the output is written to the current output
+		// instead of being returned.
+		s.loopRecurse = func(iterValue value.Value, direct bool) (string, error) {
 			s.depth++
 			if s.depth > s.recursionLimit() {
 				return "", NewError(ErrInvalidOperation, "recursion limit exceeded")
@@ -1587,7 +1676,9 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 
 			oldOut := s.out
 			builder := &strings.Builder{}
-			s.out = builder
+			if !direct {
+				s.out = builder
+			}
 
 			changedState := &loopChangedState{}
 			for i := range nestedItems {
@@ -1632,6 +1723,12 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 			s.out = oldOut
 			return result, nil
 		}
+		defer func() { s.loopRecurse = oldRecurse }()
+	} else {
+		// like in Rust, loop() in a loop that is not recursive does not
+		// recurse an outer loop.
+		oldRecurse = s.loopRecurse
+		s.loopRecurse = nil
 		defer func() { s.loopRecurse = oldRecurse }()
 	}
 
@@ -1839,6 +1936,10 @@ func (s *State) evalExtends(ext *parser.Extends) error {
 	}
 	defer func() { s.depth-- }()
 
+	// the rest of this executes in the context of the parent template.
+	parentName, parentSource := parentTmpl.compiled.name, parentTmpl.compiled.source
+	defer s.enterTemplate(parentName, parentSource)()
+
 	// Check if parent also extends another template
 	var parentExtendsStmt *parser.Extends
 	for _, stmt := range parentTmpl.compiled.ast.Children {
@@ -1853,11 +1954,11 @@ func (s *State) evalExtends(ext *parser.Extends) error {
 		if block, ok := stmt.(*parser.Block); ok {
 			if bs, exists := s.blocks[block.Name]; exists {
 				// Append parent block to the end (child is at index 0)
-				bs.layers = append(bs.layers, blockLayer{body: block.Body, required: block.Required})
+				bs.layers = append(bs.layers, blockLayer{body: block.Body, required: block.Required, name: parentName, source: parentSource})
 			} else {
 				// This is a parent-only block (no child override)
 				s.blocks[block.Name] = &blockStack{
-					layers: []blockLayer{{body: block.Body, required: block.Required}},
+					layers: []blockLayer{{body: block.Body, required: block.Required, name: parentName, source: parentSource}},
 					index:  0,
 				}
 			}
@@ -1900,7 +2001,7 @@ func (s *State) evalBlock(block *parser.Block) error {
 	bs := s.blocks[block.Name]
 	if bs == nil {
 		bs = &blockStack{
-			layers: []blockLayer{{body: block.Body, required: block.Required}},
+			layers: []blockLayer{{body: block.Body, required: block.Required, name: s.name, source: s.source}},
 			index:  0,
 		}
 		s.blocks[block.Name] = bs
@@ -1929,6 +2030,7 @@ func (s *State) evalBlock(block *parser.Block) error {
 	oldBlock := s.currentBlock
 	s.currentBlock = block.Name
 	bs.index = 0
+	defer s.enterLayer(bs.layers[0])()
 
 	s.pushScope()
 	for _, stmt := range bs.layers[0].body {
@@ -2010,7 +2112,8 @@ func (s *State) includeTemplate(name string) error {
 		return NewError(ErrInvalidOperation, "recursion limit exceeded")
 	}
 
-	// Create new state with isolated scope
+	// Create new state with isolated scope.  Like in Rust, included
+	// templates have their own blocks.
 	childState := &State{
 		ctx:               s.ctx,
 		env:               s.env,
@@ -2018,16 +2121,30 @@ func (s *State) includeTemplate(name string) error {
 		source:            tmpl.compiled.source,
 		autoEscape:        s.env.autoEscapeFunc(tmpl.compiled.name),
 		scopes:            cloneScopes(s.scopes),
-		blocks:            s.blocks,
+		blocks:            make(map[string]*blockStack),
 		macros:            s.macros,
 		out:               s.out,
 		depth:             s.depth,
 		undefinedBehavior: s.undefinedBehavior,
 		temps:             s.temps,
 		fuelTracker:       s.fuelTracker,
+		spans:             s.spans,
 	}
 	if len(childState.scopes) > 0 {
 		childState.scopes[len(childState.scopes)-1] = cloneScopeMap(childState.scopes[len(childState.scopes)-1])
+	}
+	// the included template can recurse the loop it is included in.  The
+	// recursion runs on this state, so direct output needs to go to the
+	// current output of the included template, which might be captured.
+	if parentRecurse := s.loopRecurse; parentRecurse != nil {
+		childState.loopRecurse = func(iterValue value.Value, direct bool) (string, error) {
+			if direct {
+				oldOut := s.out
+				s.out = childState.out
+				defer func() { s.out = oldOut }()
+			}
+			return parentRecurse(iterValue, direct)
+		}
 	}
 
 	_, err = childState.eval(tmpl.compiled.ast)
@@ -2197,7 +2314,7 @@ func (s *State) createModule(tmpl *compiledTemplate) (value.Value, error) {
 	}
 	for name, macro := range moduleState.macros {
 		if !strings.HasPrefix(name, "_") {
-			moduleValues[name] = value.FromCallable(newMacroCallableFromDefinition(macro, value.Undefined()))
+			moduleValues[name] = value.FromCallable(newMacroCallableFromDefinition(macro))
 		}
 	}
 
@@ -2251,7 +2368,7 @@ func (m *moduleObject) String() string {
 }
 
 func (s *State) makeMacroCallable(macro *parser.Macro) value.Value {
-	return value.FromCallable(newMacroCallable(s, macro, value.Undefined()))
+	return value.FromCallable(newMacroCallable(s, macro))
 }
 
 func (s *State) evalFilterBlock(block *parser.FilterBlock) error {
@@ -2279,10 +2396,7 @@ func (s *State) evalFilterBlock(block *parser.FilterBlock) error {
 		return err
 	}
 
-	if err := s.writeValue(result); err != nil {
-		return err
-	}
-	return nil
+	return s.writeValueWithSpan(result, block.FilterSpan)
 }
 
 func (s *State) evalAutoEscape(ae *parser.AutoEscape) error {
@@ -2329,131 +2443,40 @@ func (s *State) evalAutoEscape(ae *parser.AutoEscape) error {
 }
 
 func (s *State) evalCallBlock(cb *parser.CallBlock) error {
-	// Evaluate the call expression to get the macro
 	callExpr := cb.Call
 
-	// Get the macro being called
-	var macroDef *macroDefinition
-	var macroName string
-
+	// Like calls, prefer macros defined in this template.
+	var callee value.Value
+	found := false
 	if v, ok := callExpr.Expr.(*parser.Var); ok {
-		macroName = v.ID
-		if m, ok := s.macros[macroName]; ok {
-			macroDef = m
+		if m, ok := s.macros[v.ID]; ok {
+			callee = value.FromCallable(newMacroCallableFromDefinition(m))
+			found = true
 		}
 	}
-
-	if macroDef == nil {
-		// Try to evaluate as a callable
-		expr, err := s.evalExpr(callExpr.Expr)
+	if !found {
+		var err error
+		callee, err = s.evalExpr(callExpr.Expr)
 		if err != nil {
 			return err
 		}
-		if mc, ok := expr.AsObject(); ok {
-			if macroC, ok := mc.(*macroCallable); ok {
-				macroDef = &macroDefinition{
-					macro:  macroC.macro,
-					state:  macroC.state,
-					scopes: cloneScopes(macroC.scopes),
-				}
-			}
-		}
 	}
 
-	if macroDef == nil {
-		return NewError(ErrInvalidOperation, "call block requires a macro")
-	}
-	if !macroUsesCaller(macroDef.macro) {
-		return NewError(ErrInvalidOperation, "caller is not allowed")
-	}
-
-	// Create a caller callable that renders the call block body
-	// MacroDecl holds the caller's body and arguments
-	callerCallable := &callerCallable{
-		state: s,
-		body:  cb.MacroDecl.Body,
-		args:  cb.MacroDecl.Args,
-	}
-
-	// Evaluate call arguments
 	args, kwargs, err := s.evalCallArgs(callExpr.Args)
 	if err != nil {
 		return err
 	}
 
-	// Call the macro with the caller
-	result, err := newMacroCallableFromDefinition(macroDef, value.FromCallable(callerCallable)).Call(s, args, kwargs)
+	// Like in Rust, the body of the call block is a macro named caller that
+	// closes over the current scope and is passed as caller keyword argument.
+	kwargs["caller"] = s.makeMacroCallable(cb.MacroDecl)
+
+	result, err := s.callValue(callee, args, kwargs, callExpr.Span())
 	if err != nil {
 		return err
 	}
 
-	if err := s.writeValue(result); err != nil {
-		return err
-	}
-	return nil
-}
-
-// callerCallable represents the caller() function inside a macro invoked via call block
-type callerCallable struct {
-	state *State
-	body  []parser.Stmt
-	args  []parser.Expr // macro args from the call block declaration
-}
-
-func (c *callerCallable) GetAttr(name string) value.Value {
-	switch name {
-	case "name":
-		return value.FromString("caller")
-	case "arguments":
-		argNames := make([]value.Value, len(c.args))
-		for i, arg := range c.args {
-			if v, ok := arg.(*parser.Var); ok {
-				argNames[i] = value.FromString(v.ID)
-			}
-		}
-		return value.FromSlice(argNames)
-	case "caller":
-		return value.False()
-	}
-	return value.Undefined()
-}
-
-func (c *callerCallable) String() string {
-	return "<macro caller>"
-}
-
-func (c *callerCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	_ = state
-	c.state.pushScope()
-	defer c.state.popScope()
-
-	// Bind arguments to the caller's parameters
-	for i, argExpr := range c.args {
-		if v, ok := argExpr.(*parser.Var); ok {
-			if i < len(args) {
-				c.state.Set(v.ID, args[i])
-			} else {
-				c.state.Set(v.ID, value.Undefined())
-			}
-		}
-	}
-
-	// Capture output
-	oldOut := c.state.out
-	builder := &strings.Builder{}
-	c.state.out = builder
-
-	for _, stmt := range c.body {
-		if err := c.state.evalStmt(stmt); err != nil {
-			c.state.out = oldOut
-			return value.Undefined(), err
-		}
-	}
-
-	result := builder.String()
-	c.state.out = oldOut
-
-	return value.FromSafeString(result), nil
+	return s.writeValueWithSpan(result, cb.CallExprSpan)
 }
 
 // writeString writes a string to the output and charges for its bytes.
@@ -2997,7 +3020,7 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 			if err != nil {
 				return value.Undefined(), err
 			}
-			result, err := s.loopRecurse(arg)
+			result, err := s.loopRecurse(arg, false)
 			if err != nil {
 				return value.Undefined(), err
 			}
@@ -3012,7 +3035,7 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 			}
 			// macros return their output which was already charged when it
 			// was written.
-			rv, err := newMacroCallableFromDefinition(macro, value.Undefined()).Call(s, args, kwargs)
+			rv, err := newMacroCallableFromDefinition(macro).Call(s, args, kwargs)
 			if err != nil {
 				return rv, err
 			}
@@ -3064,7 +3087,7 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 // as macros.  Their output was already charged when it was written.
 func isOutputCallable(val value.Value) bool {
 	switch val.Raw().(type) {
-	case *macroCallable, *callerCallable, *blockCallable, *loopObject:
+	case *macroCallable, *blockCallable, *loopObject:
 		return true
 	}
 	return false
@@ -3150,6 +3173,12 @@ func (s *State) callValue(val value.Value, args []value.Value, kwargs map[string
 }
 
 func (s *State) evalSuper(span parser.Span) (value.Value, error) {
+	return s.renderSuper(span, false)
+}
+
+// renderSuper renders the parent block.  If direct is set, the output is
+// written to the current output instead of being returned.
+func (s *State) renderSuper(span parser.Span, direct bool) (value.Value, error) {
 	if s.currentBlock == "" {
 		return value.Undefined(), NewError(ErrInvalidOperation, "super() can only be used inside a block").WithSpan(span)
 	}
@@ -3162,11 +3191,14 @@ func (s *State) evalSuper(span parser.Span) (value.Value, error) {
 	// Move to the parent block
 	bs.index++
 	defer func() { bs.index-- }()
+	defer s.enterLayer(bs.layers[bs.index])()
 
 	// Capture output
 	oldOut := s.out
 	builder := &strings.Builder{}
-	s.out = builder
+	if !direct {
+		s.out = builder
+	}
 
 	s.pushScope()
 	for _, stmt := range bs.layers[bs.index].body {
@@ -3180,7 +3212,56 @@ func (s *State) evalSuper(span parser.Span) (value.Value, error) {
 
 	result := builder.String()
 	s.out = oldOut
+	if direct {
+		return value.Undefined(), nil
+	}
 	return value.FromSafeString(result), nil
+}
+
+// emitDirect handles {{ super() }}, {{ loop(...) }} and {{ self.block() }}
+// by writing their output straight to the current output instead of
+// capturing it first.  This mirrors the Rust engine and attributes the
+// output spans to the source that was rendered rather than to the call.
+func (s *State) emitDirect(call *parser.Call) (handled bool, err error) {
+	var render func() error
+	switch callee := call.Expr.(type) {
+	case *parser.Var:
+		switch {
+		case callee.ID == "super" && len(call.Args) == 0:
+			render = func() error {
+				_, err := s.renderSuper(call.Span(), true)
+				return err
+			}
+		case callee.ID == "loop" && s.loopRecurse != nil && len(call.Args) == 1 &&
+			call.Args[0].Kind == parser.CallArgPos:
+			render = func() error {
+				arg, err := s.evalExpr(call.Args[0].Value)
+				if err != nil {
+					return err
+				}
+				_, err = s.loopRecurse(arg, true)
+				return err
+			}
+		}
+	case *parser.GetAttr:
+		if v, ok := callee.Expr.(*parser.Var); ok && v.ID == "self" && len(call.Args) == 0 {
+			render = func() error {
+				_, err := (&blockCallable{state: s, blockName: callee.Name}).render(true)
+				return err
+			}
+		}
+	}
+	if render == nil {
+		return false, nil
+	}
+	// account for the call expression like evalExpr would.
+	if err := s.consumeFuel(); err != nil {
+		return true, err
+	}
+	if err := render(); err != nil {
+		return true, s.attachErrorInfo(err, call)
+	}
+	return true, nil
 }
 
 func (s *State) evalCallArgs(callArgs []parser.CallArg) ([]value.Value, map[string]value.Value, error) {
@@ -3223,7 +3304,7 @@ func (s *State) callMacroWithArgs(macro *parser.Macro, callArgs []parser.CallArg
 	if err != nil {
 		return value.Undefined(), err
 	}
-	return s.callMacroWithValues(macro, args, kwargs, value.Undefined())
+	return s.callMacroWithValues(macro, args, kwargs, macroUsesCaller(macro))
 }
 
 func (s *State) evalList(list *parser.List) (value.Value, error) {
@@ -3594,6 +3675,15 @@ func normalizeIndex(idx, length int64) int64 {
 func (s *State) applyFilter(filterExpr parser.Expr, val value.Value) (value.Value, error) {
 	switch f := filterExpr.(type) {
 	case *parser.Filter:
+		// in a filter chain (a|b) the earlier filters are the inner
+		// expression and need to be applied first.
+		if f.Expr != nil {
+			var err error
+			val, err = s.applyFilter(f.Expr, val)
+			if err != nil {
+				return value.Undefined(), err
+			}
+		}
 		return s.applyFilterCallArgs(f.Name, val, f.Args)
 	case *parser.Var:
 		return s.applyFilterCallArgs(f.ID, val, nil)

@@ -13,6 +13,8 @@ use crate::compiler::parser::parse;
 use crate::environment::Environment;
 use crate::error::{attach_basic_debug_info, Error};
 use crate::output::{Output, WriteWrapper};
+#[cfg(feature = "debug")]
+use crate::output::{OutputSpan, OutputSpanRecorder};
 use crate::syntax::SyntaxConfig;
 use crate::utils::AutoEscape;
 use crate::value::Value;
@@ -183,6 +185,46 @@ impl<'env, 'source> Template<'env, 'source> {
     ///
     pub fn render<V: Into<Value>>(&self, ctx: V) -> Result<String, Error> {
         self._render(ctx.into())
+    }
+
+    /// Like [`render`](Self::render) but also returns the spans of the
+    /// template source that produced the output.
+    ///
+    /// This is useful when the rendered output is processed further (for
+    /// instance parsed as markup) and problems found there should be reported
+    /// at the template location that produced them.  The returned
+    /// [`OutputSpan`]s are ordered by their position in the output and
+    /// do not overlap.  Empty output does not produce spans.
+    ///
+    /// Output that is captured before it is written (the output of macros,
+    /// `{% filter %}` and `{% call %}` blocks) is attributed to the expression
+    /// that writes the captured value.  Output of included templates and
+    /// blocks is attributed to the template that contains the source.
+    ///
+    /// This requires the `debug` feature but does not require debug mode to be
+    /// enabled on the environment.
+    ///
+    /// ```
+    /// # use minijinja::{Environment, OutputSpanKind, context};
+    /// let env = Environment::new();
+    /// let tmpl = env.template_from_str("Hello {{ name }}!").unwrap();
+    /// let (output, spans) = tmpl.render_with_spans(context!(name => "John")).unwrap();
+    /// assert_eq!(output, "Hello John!");
+    /// let span = &spans[1];
+    /// assert_eq!(&output[span.output_range()], "John");
+    /// assert_eq!(&tmpl.source()[span.source_range()], "name");
+    /// assert_eq!(span.kind(), OutputSpanKind::Expression);
+    /// assert_eq!(span.line(), 1);
+    /// ```
+    #[cfg(feature = "debug")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "debug")))]
+    pub fn render_with_spans<V: Into<Value>>(
+        &self,
+        ctx: V,
+    ) -> Result<(String, Vec<OutputSpan>), Error> {
+        let mut recorder = OutputSpanRecorder::with_capacity(self.compiled.buffer_size_hint);
+        ok!(self._eval(ctx.into(), &mut Output::with_span_recorder(&mut recorder)));
+        Ok(recorder.into_parts())
     }
 
     /// Like [`render`](Self::render) but also returns the evaluated [`State`]

@@ -330,7 +330,7 @@ impl<'source> CodeGenerator<'source> {
             }
             ast::Stmt::EmitRaw(raw) => {
                 self.set_line_from_span(raw.span());
-                self.add(Instruction::EmitRaw(raw.raw));
+                self.add_with_span(Instruction::EmitRaw(raw.raw), raw.span());
                 self.raw_template_bytes += raw.raw.len();
             }
             ast::Stmt::ForLoop(for_loop) => {
@@ -385,7 +385,7 @@ impl<'source> CodeGenerator<'source> {
                 }
                 self.add(Instruction::EndCapture);
                 self.compile_expr(&filter_block.filter);
-                self.add(Instruction::Emit);
+                self.add_with_span(Instruction::Emit, filter_block.filter_span);
             }
             #[cfg(feature = "multi_template")]
             ast::Stmt::Block(block) => {
@@ -540,7 +540,7 @@ impl<'source> CodeGenerator<'source> {
     #[cfg(feature = "macros")]
     fn compile_call_block(&mut self, call_block: &ast::Spanned<ast::CallBlock<'source>>) {
         self.compile_call(&call_block.call, Some(&call_block.macro_decl));
-        self.add(Instruction::Emit);
+        self.add_with_span(Instruction::Emit, call_block.call_expr_span);
     }
 
     fn compile_do(&mut self, do_tag: &ast::Spanned<ast::Do<'source>>) {
@@ -589,7 +589,10 @@ impl<'source> CodeGenerator<'source> {
         }
         self.push_span(expr.expr.span());
         self.compile_expr(&expr.expr);
-        self.add(Instruction::Emit);
+        // always attach the full expression span to the emit, even if the
+        // expression spans multiple lines.  This is used for error reporting
+        // and to attribute output to the template source.
+        self.add_with_span(Instruction::Emit, expr.span());
         self.pop_span();
     }
 

@@ -77,11 +77,45 @@ func asArithmeticFloat(v Value) (float64, bool) {
 	if b, ok := v.AsBool(); ok {
 		return boolToFloat(b), true
 	}
+	if d, ok := v.data.(bigIntValue); ok {
+		f, _ := new(big.Float).SetInt(d.Int).Float64()
+		return f, true
+	}
 	return v.AsFloat()
 }
 
 func isArithmeticInt(v Value) bool {
-	return isActualInt(v) || v.Kind() == KindBool
+	return isActualInt(v) || isBigInt(v) || v.Kind() == KindBool
+}
+
+func isBigInt(v Value) bool {
+	_, ok := v.data.(bigIntValue)
+	return ok
+}
+
+// arithmeticBigInt returns an integer operand (an integer, a big integer or a
+// boolean) as a big.Int.
+func arithmeticBigInt(v Value) *big.Int {
+	if d, ok := v.data.(bigIntValue); ok {
+		return d.Int
+	}
+	return big.NewInt(arithmeticInt(v))
+}
+
+var maxI128 = new(big.Int).Sub(minI128AsU128, big.NewInt(1))
+var minI128 = new(big.Int).Neg(minI128AsU128)
+
+// fitsI128 reports whether an integer is in the range of the i128 integers
+// that Rust does integer math with.
+func fitsI128(x *big.Int) bool {
+	return x.Cmp(minI128) >= 0 && x.Cmp(maxI128) <= 0
+}
+
+func bigIntResult(x *big.Int) Value {
+	if x.IsInt64() {
+		return FromInt(x.Int64())
+	}
+	return FromBigInt(x)
 }
 
 func arithmeticInt(v Value) int64 {
@@ -112,13 +146,20 @@ func checkedMul(a, b int64) (int64, bool) {
 
 // intArith applies an operation to two integer operands.  Unlike float64 math
 // this is exact, and like the i128 math in Rust a result that doesn't fit an
-// int64 becomes a big integer instead of overflowing.
-func intArith(v, other Value, checked func(a, b int64) (int64, bool), op func(z, x, y *big.Int) *big.Int) Value {
-	a, b := arithmeticInt(v), arithmeticInt(other)
-	if result, ok := checked(a, b); ok {
-		return FromInt(result)
+// int64 becomes a big integer instead of overflowing, while operands or
+// results outside the i128 range fail.
+func intArith(v, other Value, opName string, checked func(a, b int64) (int64, bool), op func(z, x, y *big.Int) *big.Int) (Value, error) {
+	if !isBigInt(v) && !isBigInt(other) {
+		if result, ok := checked(arithmeticInt(v), arithmeticInt(other)); ok {
+			return FromInt(result), nil
+		}
 	}
-	return FromBigInt(op(new(big.Int), big.NewInt(a), big.NewInt(b)))
+	a, b := arithmeticBigInt(v), arithmeticBigInt(other)
+	result := op(new(big.Int), a, b)
+	if !fitsI128(a) || !fitsI128(b) || !fitsI128(result) {
+		return Undefined(), fmt.Errorf("unable to calculate %s %s %s", v.Repr(), opName, other.Repr())
+	}
+	return bigIntResult(result), nil
 }
 
 // Add performs addition or string concatenation.
@@ -138,7 +179,7 @@ func (v Value) Add(other Value) (Value, error) {
 		if f2, ok := asArithmeticFloat(other); ok {
 			// Booleans are integers for arithmetic, matching Python.
 			if isArithmeticInt(v) && isArithmeticInt(other) {
-				return intArith(v, other, checkedAdd, (*big.Int).Add), nil
+				return intArith(v, other, "+", checkedAdd, (*big.Int).Add)
 			}
 			return FromFloat(f1 + f2), nil
 		}
@@ -185,7 +226,7 @@ func (v Value) Sub(other Value) (Value, error) {
 		if f2, ok := asArithmeticFloat(other); ok {
 			// Booleans are integers for arithmetic, matching Python.
 			if isArithmeticInt(v) && isArithmeticInt(other) {
-				return intArith(v, other, checkedSub, (*big.Int).Sub), nil
+				return intArith(v, other, "-", checkedSub, (*big.Int).Sub)
 			}
 			return FromFloat(f1 - f2), nil
 		}
@@ -252,7 +293,7 @@ func (v Value) Mul(other Value) (Value, error) {
 		if f2, ok := asArithmeticFloat(other); ok {
 			// Booleans are integers for arithmetic, matching Python.
 			if isArithmeticInt(v) && isArithmeticInt(other) {
-				return intArith(v, other, checkedMul, (*big.Int).Mul), nil
+				return intArith(v, other, "*", checkedMul, (*big.Int).Mul)
 			}
 			return FromFloat(f1 * f2), nil
 		}
@@ -316,6 +357,16 @@ func intDivRemFloor(a, b int64) (quotient, remainder int64) {
 	return quotient, remainder
 }
 
+// bigIntDivRemFloor is intDivRemFloor for big integers.
+func bigIntDivRemFloor(a, b *big.Int) (quotient, remainder *big.Int) {
+	quotient, remainder = new(big.Int).QuoRem(a, b, new(big.Int))
+	if remainder.Sign() != 0 && (remainder.Sign() < 0) != (b.Sign() < 0) {
+		quotient.Sub(quotient, big.NewInt(1))
+		remainder.Add(remainder, b)
+	}
+	return quotient, remainder
+}
+
 func floatDivRemFloor(a, b float64) (quotient, remainder float64) {
 	remainder = math.Mod(a, b)
 	quotient = (a - remainder) / b
@@ -341,7 +392,11 @@ func floatDivRemFloor(a, b float64) (quotient, remainder float64) {
 
 // FloorDiv performs floor division.
 func (v Value) FloorDiv(other Value) (Value, error) {
-	if isArithmeticInt(v) && isArithmeticInt(other) {
+	if isBigInt(v) || isBigInt(other) {
+		if isArithmeticInt(v) && isArithmeticInt(other) {
+			return bigIntDivRem(v, other, "//")
+		}
+	} else if isArithmeticInt(v) && isArithmeticInt(other) {
 		i1, i2 := arithmeticInt(v), arithmeticInt(other)
 		if i2 == 0 {
 			return Undefined(), fmt.Errorf("division by zero")
@@ -366,7 +421,11 @@ func (v Value) FloorDiv(other Value) (Value, error) {
 
 // Rem performs a modulo operation with the sign of the divisor.
 func (v Value) Rem(other Value) (Value, error) {
-	if isArithmeticInt(v) && isArithmeticInt(other) {
+	if isBigInt(v) || isBigInt(other) {
+		if isArithmeticInt(v) && isArithmeticInt(other) {
+			return bigIntDivRem(v, other, "%")
+		}
+	} else if isArithmeticInt(v) && isArithmeticInt(other) {
 		i1, i2 := arithmeticInt(v), arithmeticInt(other)
 		if i2 == 0 {
 			return Undefined(), fmt.Errorf("modulo by zero")
@@ -386,6 +445,29 @@ func (v Value) Rem(other Value) (Value, error) {
 	return Undefined(), fmt.Errorf("cannot modulo %s by %s", v.Kind(), other.Kind())
 }
 
+// bigIntDivRem performs floor division (`//`) or modulo (`%`) where at least
+// one integer operand is a big integer.  Like in Rust, the operands have to
+// fit an i128, but the smallest i128 floor divided by -1 gives 2**127 and the
+// matching remainder is 0.
+func bigIntDivRem(v, other Value, opName string) (Value, error) {
+	a, b := arithmeticBigInt(v), arithmeticBigInt(other)
+	if !fitsI128(a) || !fitsI128(b) {
+		return Undefined(), fmt.Errorf("unable to calculate %s %s %s", v.Repr(), opName, other.Repr())
+	}
+	if b.Sign() == 0 {
+		if opName == "%" {
+			return Undefined(), fmt.Errorf("modulo by zero")
+		}
+		return Undefined(), fmt.Errorf("division by zero")
+	}
+	quotient, remainder := bigIntDivRemFloor(a, b)
+	result := quotient
+	if opName == "%" {
+		result = remainder
+	}
+	return bigIntResult(result), nil
+}
+
 // Pow performs exponentiation.
 func (v Value) Pow(other Value) (Value, error) {
 	f1, ok1 := asArithmeticFloat(v)
@@ -400,7 +482,7 @@ func (v Value) Pow(other Value) (Value, error) {
 	// Integers to a non-negative integer power stay exact integers.  A
 	// negative exponent gives a float, like in Python.
 	if isArithmeticInt(v) && isArithmeticInt(other) && f2 >= 0 {
-		if result, ok := intPow(arithmeticInt(v), arithmeticInt(other)); ok {
+		if result, ok := intPow(arithmeticBigInt(v), arithmeticBigInt(other)); ok {
 			return result, nil
 		}
 		return Undefined(), fmt.Errorf("unable to calculate %s ** %s", v.Repr(), other.Repr())
@@ -410,19 +492,22 @@ func (v Value) Pow(other Value) (Value, error) {
 
 // intPow raises an integer to a non-negative integer power.  Like the i128
 // math in Rust, it fails if the result does not fit into 128 bits.
-func intPow(base, exp int64) (Value, bool) {
-	if (base > 1 || base < -1) && exp > 127 {
+func intPow(base, exp *big.Int) (Value, bool) {
+	if !fitsI128(base) || !fitsI128(exp) {
 		return Value{}, false
 	}
-	result := new(big.Int).Exp(big.NewInt(base), big.NewInt(exp), nil)
-	if result.IsInt64() {
-		return FromInt(result.Int64()), true
-	}
-	// Allow the range of an i128, which includes -2**127.
-	if result.BitLen() > 127 && (result.Sign() > 0 || result.BitLen() > 128 || result.TrailingZeroBits() != 127) {
+	// Like in Rust, the exponent has to fit into a u32.
+	if exp.Cmp(big.NewInt(math.MaxUint32)) > 0 {
 		return Value{}, false
 	}
-	return FromBigInt(result), true
+	if base.CmpAbs(big.NewInt(1)) > 0 && exp.Cmp(big.NewInt(127)) > 0 {
+		return Value{}, false
+	}
+	result := new(big.Int).Exp(base, exp, nil)
+	if !fitsI128(result) {
+		return Value{}, false
+	}
+	return bigIntResult(result), true
 }
 
 // boolToFloat converts a bool to float for coercion (false=0, true=1)
