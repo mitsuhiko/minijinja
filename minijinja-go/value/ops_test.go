@@ -2,6 +2,7 @@ package value
 
 import (
 	"math"
+	"math/big"
 	"testing"
 )
 
@@ -171,6 +172,72 @@ func TestIntegerArithmeticIsExact(t *testing.T) {
 			}
 			if got := rv.String(); got != test.want {
 				t.Fatalf("got %s, want %s", got, test.want)
+			}
+		})
+	}
+}
+
+func TestBigIntegerArithmetic(t *testing.T) {
+	bigInt := func(s string) Value {
+		n, ok := new(big.Int).SetString(s, 10)
+		if !ok {
+			t.Fatalf("invalid big integer %q", s)
+		}
+		return FromBigInt(n)
+	}
+	maxI128 := "170141183460469231731687303715884105727"
+	minI128 := "-170141183460469231731687303715884105728"
+
+	tests := []struct {
+		name string
+		op   func(Value, Value) (Value, error)
+		a, b Value
+		want string
+	}{
+		{"add", Value.Add, bigInt("9223372036854775808"), FromInt(1), "9223372036854775809"},
+		{"add bool", Value.Add, FromBool(true), bigInt("9223372036854775808"), "9223372036854775809"},
+		{"add back into int64", Value.Add, bigInt("9223372036854775808"), FromInt(-1), "9223372036854775807"},
+		{"sub", Value.Sub, bigInt("9223372036854775808"), bigInt("9223372036854775809"), "-1"},
+		{"mul", Value.Mul, bigInt("9223372036854775808"), FromInt(2), "18446744073709551616"},
+		{"mul float", Value.Mul, bigInt("9223372036854775808"), FromFloat(2.5), "23058430092136940000.0"},
+		{"div", Value.Div, bigInt("9223372036854775808"), FromInt(2), "4611686018427388000.0"},
+		{"floor div", Value.FloorDiv, bigInt("-9223372036854775809"), FromInt(2), "-4611686018427387905"},
+		{"rem", Value.Rem, bigInt("-9223372036854775809"), FromInt(10), "1"},
+		{"float rem", Value.Rem, FromFloat(1000), bigInt("18446744073709551616"), "1000.0"},
+		{"pow", Value.Pow, bigInt("9223372036854775808"), FromInt(2), "85070591730234615865843651857942052864"},
+		{"pow negative exponent", Value.Pow, FromInt(1000), bigInt("-9223372036854775808"), "0.0"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rv, err := test.op(test.a, test.b)
+			if err != nil {
+				t.Fatalf("operation failed: %v", err)
+			}
+			if got := rv.String(); got != test.want {
+				t.Fatalf("got %s, want %s", got, test.want)
+			}
+		})
+	}
+
+	// Like the i128 math in Rust, results outside the i128 range fail.
+	failures := []struct {
+		name string
+		op   func(Value, Value) (Value, error)
+		a, b Value
+	}{
+		{"add overflow", Value.Add, bigInt(maxI128), FromInt(1)},
+		{"sub overflow", Value.Sub, bigInt(minI128), FromInt(1)},
+		{"mul overflow", Value.Mul, bigInt(maxI128), FromInt(2)},
+		{"floor div overflow", Value.FloorDiv, bigInt(minI128), FromInt(-1)},
+		{"floor div by zero", Value.FloorDiv, bigInt("9223372036854775808"), FromInt(0)},
+		{"rem by zero", Value.Rem, bigInt("9223372036854775808"), FromInt(0)},
+		{"pow overflow", Value.Pow, FromInt(2), bigInt("9223372036854775808")},
+		{"pow exponent beyond u32", Value.Pow, FromInt(-1), FromInt(1 << 32)},
+	}
+	for _, test := range failures {
+		t.Run(test.name, func(t *testing.T) {
+			if rv, err := test.op(test.a, test.b); err == nil {
+				t.Fatalf("expected an error, got %s", rv)
 			}
 		})
 	}
