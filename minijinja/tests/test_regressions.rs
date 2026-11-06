@@ -102,6 +102,23 @@ fn test_round_uses_bankers_rounding() {
 
 #[cfg(feature = "multi_template")]
 #[test]
+fn test_super_in_included_template() {
+    let mut env = Environment::new();
+    env.add_template("p", "{% block a %}P{% endblock %}")
+        .unwrap();
+    env.add_template("i", "[{{ super() }}]").unwrap();
+    env.add_template(
+        "c",
+        "{% extends 'p' %}{% block a %}C{% include 'i' %}{% endblock %}",
+    )
+    .unwrap();
+    let err = env.get_template("c").unwrap().render(()).unwrap_err();
+    let source = std::error::Error::source(&err).unwrap().to_string();
+    assert!(source.contains("cannot super outside of block"), "{source}");
+}
+
+#[cfg(feature = "multi_template")]
+#[test]
 fn test_loop_recursion_outside_of_loop_instructions() {
     let mut env = Environment::new();
     env.add_template("i", "{{ loop(x[1:] if x is sequence else []) }}")

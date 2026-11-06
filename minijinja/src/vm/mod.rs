@@ -1135,9 +1135,14 @@ impl<'env> Executor<'env> {
         out: &mut Output,
         capture: bool,
     ) -> Result<Value, Error> {
-        let name = ok!(state.current_block.ok_or_else(|| {
-            Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
-        }));
+        // included templates keep the current block of the including
+        // template but have their own blocks.
+        let name = ok!(state
+            .current_block
+            .filter(|name| state.blocks.contains_key(name))
+            .ok_or_else(|| {
+                Error::new(ErrorKind::InvalidOperation, "cannot super outside of block")
+            }));
 
         if !state.blocks.get_mut(name).unwrap().push() {
             return Err(Error::new(
