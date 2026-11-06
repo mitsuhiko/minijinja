@@ -3,6 +3,7 @@
 package jsonvalue
 
 import (
+	"encoding/json"
 	"math"
 	"strconv"
 	"strings"
@@ -23,8 +24,12 @@ func ToNative(v value.Value) interface{} {
 		if i, ok := v.AsInt(); ok && v.IsActualInt() {
 			return i
 		}
-		f, _ := v.AsFloat()
-		return jsonFloat(f)
+		if f, ok := v.AsFloat(); ok {
+			return jsonFloat(f)
+		}
+		// An integer outside the 64-bit range, which serde_json writes
+		// out in full like any other integer
+		return json.Number(v.String())
 	case value.KindString:
 		s, _ := v.AsString()
 		return s

@@ -21,6 +21,7 @@ All notable changes to MiniJinja are documented here.
 * Fixed `chain` results of mixed values in Go rendering as Go internals such as `&{[{1} {a} {b}]}`.  Like other iterables and like in Rust, they now render as `<iterator>`.
 * Fixed the `in` operator in Go always being false for values that are not strings in a string.  Like in Rust, such values are looked up by their string representation, so `1 in "a1"`, `none in "None"` and `[1] in "[1]"` are now `true`.
 * Fixed `+` in Go failing on iterables such as `range()`.  Like in Rust, sequences and iterables concatenate into an iterable, so `range(2) + [5]` is `[0, 1, 5]` instead of failing with "cannot add iterator and sequence".
+* Fixed the `tojson` filter in Go writing integers outside the 64-bit range as `0.0`.  Like in Rust, `9223372036854775808|tojson` is now `9223372036854775808`.
 
 ## 3.0.5
 
