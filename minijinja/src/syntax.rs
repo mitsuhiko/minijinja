@@ -292,6 +292,10 @@
 //! </ul>
 //! ```
 //!
+//! The loop can also be recursed from templates included within the loop and
+//! from blocks within the loop.  Macros however cannot recurse loops, not even
+//! if the loop is passed to them.
+//!
 //! **Special note:** the `previtem` and `nextitem` attributes are available by default
 //! but can be disabled by removing the `adjacent_loop_items` crate feature.  Removing
 //! these attributes can provide meaningful speedups for templates with a lot of loops.

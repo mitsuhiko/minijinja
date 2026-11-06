@@ -396,6 +396,8 @@ pub struct AutoEscape<'a> {
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct FilterBlock<'a> {
     pub filter: Expr<'a>,
+    /// The span of the entire filter expression.
+    pub filter_span: Span,
     pub body: Vec<Stmt<'a>>,
 }
 
@@ -416,6 +418,8 @@ pub struct Macro<'a> {
 #[cfg_attr(feature = "unstable_machinery_serde", derive(serde::Serialize))]
 pub struct CallBlock<'a> {
     pub call: Spanned<Call<'a>>,
+    /// The span of the entire call expression.
+    pub call_expr_span: Span,
     pub macro_decl: Spanned<Macro<'a>>,
 }
 

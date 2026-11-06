@@ -1430,10 +1430,12 @@ func (p *Parser) parseAutoEscape() (*AutoEscape, *Error) {
 }
 
 func (p *Parser) parseFilterBlock() (*FilterBlock, *Error) {
+	start := p.currentSpan()
 	filter, err := p.parseFilterChain()
 	if err != nil {
 		return nil, err
 	}
+	filterSpan := p.expandSpan(start)
 
 	if _, err := p.expect(lexer.TokenBlockEnd, "end of block"); err != nil {
 		return nil, err
@@ -1447,7 +1449,7 @@ func (p *Parser) parseFilterBlock() (*FilterBlock, *Error) {
 	}
 	p.advance() // consume endfilter
 
-	return &FilterBlock{Filter: filter, Body: body}, nil
+	return &FilterBlock{Filter: filter, FilterSpan: filterSpan, Body: body}, nil
 }
 
 func (p *Parser) parseBlock() (*Block, *Error) {
@@ -1711,10 +1713,12 @@ func (p *Parser) parseCallBlock(span Span) (*CallBlock, *Error) {
 		}
 	}
 
+	exprStart := p.currentSpan()
 	expr, err := p.parseExpr()
 	if err != nil {
 		return nil, err
 	}
+	callExprSpan := p.expandSpan(exprStart)
 
 	call, ok := expr.(*Call)
 	if !ok {
@@ -1728,10 +1732,11 @@ func (p *Parser) parseCallBlock(span Span) (*CallBlock, *Error) {
 	}
 
 	return &CallBlock{
-		Call:      call,
-		CallSpan:  callSpan,
-		MacroDecl: macroDecl,
-		MacroSpan: p.expandSpan(span),
+		Call:         call,
+		CallSpan:     callSpan,
+		CallExprSpan: callExprSpan,
+		MacroDecl:    macroDecl,
+		MacroSpan:    p.expandSpan(span),
 	}, nil
 }
 
@@ -1786,7 +1791,7 @@ func (p *Parser) subparse(endCheck func(lexer.Token) bool) ([]Stmt, *Error) {
 			stmts = append(stmts, &EmitRaw{Raw: tok.Value, span: tok.Span})
 
 		case lexer.TokenVariableStart:
-			span := tok.Span
+			span := p.currentSpan()
 			expr, err := p.parseExpr()
 			if err != nil {
 				return nil, err

@@ -3,6 +3,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::error::{Error, ErrorKind};
+#[cfg(feature = "multi_template")]
+use crate::utils::AutoEscape;
 use crate::value::{Enumerator, Object, Value, ValueIter};
 use crate::vm::state::State;
 
@@ -27,7 +29,7 @@ impl LoopState {
         iter: ValueIter,
         depth: usize,
         with_loop_var: bool,
-        recurse_jump_target: Option<u32>,
+        recurse_jump_target: Option<RecurseTarget>,
         current_recursion_jump: Option<(u32, bool)>,
     ) -> LoopState {
         // for an iterator where the lower and upper bound are matching we can
@@ -109,12 +111,27 @@ impl AdjacentLoopItemIterWrapper {
     }
 }
 
+/// Where a recursive loop jumps to when `loop()` is called.
+#[derive(Debug, Clone)]
+pub(crate) struct RecurseTarget {
+    /// The instruction that pushes the loop.
+    pub pc: u32,
+    /// The address of the instructions the loop belongs to.  Within these
+    /// instructions recursion is a jump to `pc`.  From other instructions
+    /// (included templates and blocks) the loop is evaluated in a nested
+    /// evaluation instead.
+    pub instructions: usize,
+    /// The auto escaping in effect where the loop is declared.
+    #[cfg(feature = "multi_template")]
+    pub auto_escape: AutoEscape,
+}
+
 pub(crate) struct Loop {
     pub len: Option<usize>,
     pub idx: AtomicUsize,
     pub depth: usize,
     pub last_changed_value: Mutex<Option<Vec<Value>>>,
-    pub recurse_jump_target: Option<u32>,
+    pub recurse_jump_target: Option<RecurseTarget>,
     #[cfg(feature = "adjacent_loop_items")]
     iter: Mutex<AdjacentLoopItemIterWrapper>,
 }

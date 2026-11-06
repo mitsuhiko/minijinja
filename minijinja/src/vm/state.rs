@@ -54,11 +54,12 @@ pub struct State<'template, 'env> {
     pub(crate) loaded_templates: BTreeSet<&'env str>,
     #[cfg(feature = "macros")]
     pub(crate) id: isize,
-    // Macro values are 'static and cannot borrow their instruction stream. Keep
-    // one stable render-local mapping per instruction stream instead of adding
-    // an entry every time a lexical macro declaration executes.
-    #[cfg(feature = "macros")]
-    pub(crate) macro_instructions: BTreeMap<usize, &'template Instructions<'env>>,
+    // Macro and loop values are 'static and cannot borrow their instruction
+    // stream. Keep one stable render-local mapping per instruction stream
+    // instead of adding an entry every time a lexical macro declaration or
+    // recursive loop executes.
+    #[cfg(any(feature = "macros", feature = "multi_template"))]
+    pub(crate) known_instructions: BTreeMap<usize, &'template Instructions<'env>>,
     // Closures are region allocated for the lifetime of the state. Macro values
     // can escape an invocation through namespaces, temps, or extensions, so
     // these entries must not be truncated or reused while the state is alive.
@@ -116,8 +117,8 @@ impl<'template, 'env> State<'template, 'env> {
             extensions: Default::default(),
             #[cfg(feature = "multi_template")]
             loaded_templates: BTreeSet::new(),
-            #[cfg(feature = "macros")]
-            macro_instructions: Default::default(),
+            #[cfg(any(feature = "macros", feature = "multi_template"))]
+            known_instructions: Default::default(),
             #[cfg(feature = "macros")]
             closures: Default::default(),
             #[cfg(feature = "macros")]

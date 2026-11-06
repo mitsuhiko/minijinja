@@ -254,3 +254,18 @@ func TestCallMacroKw(t *testing.T) {
 		t.Errorf("expected %q, got %q", expected, result.String())
 	}
 }
+
+func TestFilterChainInBlocks(t *testing.T) {
+	env := NewEnvironment()
+	tmpl, err := env.TemplateFromString("{% filter upper|trim %} a{{ 'b' }} {% endfilter %}|{% set x | trim|upper %} c {% endset %}{{ x }}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != "AB|C" {
+		t.Errorf("unexpected output: %q", out)
+	}
+}

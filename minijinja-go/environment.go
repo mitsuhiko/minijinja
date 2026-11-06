@@ -948,6 +948,8 @@ type FormatterFunc func(state *State, val value.Value, escape func(string) strin
 //
 // The formatter is called whenever a value is output in a template (i.e., {{ value }}).
 // This allows customizing how values are converted to strings and escaped.
+// Like in Rust, {{ super() }}, {{ loop(...) }} and {{ self.block() }} write
+// the rendered template source directly and do not invoke the formatter.
 //
 // Example that treats None as undefined (renders as empty):
 //

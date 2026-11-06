@@ -142,8 +142,10 @@ func (a *AutoEscape) Span() Span { return a.span }
 // FilterBlock represents a filter block.
 type FilterBlock struct {
 	Filter Expr
-	Body   []Stmt
-	span   Span
+	// FilterSpan covers the entire filter expression.
+	FilterSpan Span
+	Body       []Stmt
+	span       Span
 }
 
 func (f *FilterBlock) node()      {}
@@ -225,11 +227,13 @@ func (m *Macro) Span() Span { return m.span }
 
 // CallBlock represents a call block.
 type CallBlock struct {
-	Call      *Call
-	CallSpan  Span
-	MacroDecl *Macro
-	MacroSpan Span
-	span      Span
+	Call     *Call
+	CallSpan Span
+	// CallExprSpan covers the entire call expression.
+	CallExprSpan Span
+	MacroDecl    *Macro
+	MacroSpan    Span
+	span         Span
 }
 
 func (c *CallBlock) node()      {}
@@ -772,6 +776,10 @@ func DebugString(n Node, indent int) string {
 		sb.WriteString(DebugString(v.Filter, indent+1))
 		sb.WriteString(",\n")
 		sb.WriteString(ind1)
+		sb.WriteString("filter_span: ")
+		sb.WriteString(debugSpanStruct(v.FilterSpan, indent+1))
+		sb.WriteString(",\n")
+		sb.WriteString(ind1)
 		sb.WriteString("body: ")
 		sb.WriteString(debugStmtList(v.Body, indent+1))
 		sb.WriteString(",\n")
@@ -904,6 +912,10 @@ func DebugString(n Node, indent int) string {
 		sb.WriteString("call: ")
 		sb.WriteString(debugCallInner(v.Call, indent+1))
 		sb.WriteString(FormatSpan(v.CallSpan))
+		sb.WriteString(",\n")
+		sb.WriteString(ind1)
+		sb.WriteString("call_expr_span: ")
+		sb.WriteString(debugSpanStruct(v.CallExprSpan, indent+1))
 		sb.WriteString(",\n")
 		sb.WriteString(ind1)
 		sb.WriteString("macro_decl: ")
@@ -1385,4 +1397,14 @@ func debugOptionalExpr(e Expr, indent int) string {
 	sb.WriteString(ind)
 	sb.WriteString(")")
 	return sb.String()
+}
+
+// debugSpanStruct formats a span like Rust's alternate debug output of a
+// standalone Span field.
+func debugSpanStruct(s Span, indent int) string {
+	ind := strings.Repeat("    ", indent)
+	ind1 := strings.Repeat("    ", indent+1)
+	return fmt.Sprintf("Span {\n%sstart_line: %d,\n%sstart_col: %d,\n%sstart_offset: %d,\n%send_line: %d,\n%send_col: %d,\n%send_offset: %d,\n%s}",
+		ind1, s.StartLine, ind1, s.StartCol, ind1, s.StartOffset,
+		ind1, s.EndLine, ind1, s.EndCol, ind1, s.EndOffset, ind)
 }
