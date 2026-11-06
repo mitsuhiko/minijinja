@@ -3,6 +3,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::error::{Error, ErrorKind};
+#[cfg(feature = "multi_template")]
+use crate::utils::AutoEscape;
 use crate::value::{Enumerator, Object, Value, ValueIter};
 use crate::vm::state::State;
 
@@ -110,14 +112,18 @@ impl AdjacentLoopItemIterWrapper {
 }
 
 /// Where a recursive loop jumps to when `loop()` is called.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) struct RecurseTarget {
     /// The instruction that pushes the loop.
     pub pc: u32,
-    /// The address of the instructions the loop belongs to.  The jump target
-    /// is only valid while these instructions are executing, which is not the
-    /// case in included templates, blocks or macros.
+    /// The address of the instructions the loop belongs to.  Within these
+    /// instructions recursion is a jump to `pc`.  From other instructions
+    /// (included templates and blocks) the loop is evaluated in a nested
+    /// evaluation instead.
     pub instructions: usize,
+    /// The auto escaping in effect where the loop is declared.
+    #[cfg(feature = "multi_template")]
+    pub auto_escape: AutoEscape,
 }
 
 pub(crate) struct Loop {

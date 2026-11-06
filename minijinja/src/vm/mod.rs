@@ -59,6 +59,10 @@ pub(crate) fn prepare_blocks<'env, 'template>(
     rv
 }
 
+/// Recursive loops evaluated from other instructions exit to this instruction
+/// which ends the evaluation.
+const END_OF_RECURSION: u32 = u32::MAX;
+
 /// Returns the address of instructions to identify them.
 #[inline(always)]
 fn instructions_addr(instructions: &Instructions<'_>) -> usize {
@@ -169,7 +173,7 @@ impl<'env> Executor<'env> {
         args: Vec<Value>,
     ) -> Result<Option<Value>, Error> {
         let instructions = *state
-            .macro_instructions
+            .known_instructions
             .get(&instructions_id)
             .ok_or_else(|| {
                 Error::new(
@@ -289,34 +293,49 @@ impl<'env> Executor<'env> {
         #[cfg(feature = "multi_template")]
         let mut parent_instructions = None;
 
+        // Recurses into a loop.  Within the instructions of the loop this
+        // jumps back to the start of the loop.  From included templates and
+        // blocks the loop is evaluated in a nested evaluation instead, in
+        // which case this evaluates to the (captured) output.  Macros run in
+        // their own context and cannot recurse loops.
         macro_rules! recurse_loop {
-            ($capture:expr, $loop_object:expr) => {{
-                // the jump target is only valid within the instructions and
-                // context that run the loop.  Included templates, blocks and
-                // macros can see loops but cannot recurse them.
-                let Some(jump_target) = $loop_object
-                    .recurse_jump_target
-                    .filter(|target| {
-                        target.instructions == instructions_addr(state.instructions)
-                            && state.ctx.has_loop($loop_object)
-                    })
-                    .map(|target| target.pc)
-                else {
-                    bail!(Error::new(
+            ($capture:expr, $loop_object:expr, $iterable:expr) => {{
+                let target = match $loop_object.recurse_jump_target {
+                    Some(ref target) if state.ctx.has_loop($loop_object) => target,
+                    _ => bail!(Error::new(
                         ErrorKind::InvalidOperation,
                         "cannot recurse outside of recursive loop",
-                    ))
+                    )),
                 };
-                // the way this works is that we remember the next instruction
-                // as loop exit jump target.  Whenever a loop is pushed, it
-                // memorizes the value in `next_loop_iteration_jump` to jump
-                // to.
-                next_loop_recursion_jump = Some((pc + 1, $capture));
-                if $capture {
-                    out.begin_capture(CaptureMode::Capture);
+                if target.instructions != instructions_addr(state.instructions) {
+                    #[cfg(feature = "multi_template")]
+                    {
+                        let target = target.clone();
+                        let iterable = $iterable;
+                        ctx_ok!(Self::recurse_loop_from_other_instructions(
+                            state, out, target, iterable, $capture
+                        ))
+                    }
+                    #[cfg(not(feature = "multi_template"))]
+                    {
+                        bail!(Error::new(
+                            ErrorKind::InvalidOperation,
+                            "cannot recurse outside of recursive loop",
+                        ))
+                    }
+                } else {
+                    let jump_target = target.pc;
+                    // the way this works is that we remember the next instruction
+                    // as loop exit jump target.  Whenever a loop is pushed, it
+                    // memorizes the value in `next_loop_iteration_jump` to jump
+                    // to.
+                    next_loop_recursion_jump = Some((pc + 1, $capture));
+                    if $capture {
+                        out.begin_capture(CaptureMode::Capture);
+                    }
+                    pc = jump_target;
+                    continue;
                 }
-                pc = jump_target;
-                continue;
             }};
         }
 
@@ -867,7 +886,7 @@ impl<'env> Executor<'env> {
                                     "loop() takes one argument"
                                 ));
                             }
-                            recurse_loop!(true, loop_object);
+                            recurse_loop!(true, loop_object, args[0].clone())
                         } else if cfg!(feature = "fuel") && is_macro(&func) {
                             // macros return their output which was already
                             // charged when it was written.
@@ -924,7 +943,10 @@ impl<'env> Executor<'env> {
                     ctx_ok!(Self::perform_super(state, out, false));
                 }
                 Instruction::FastRecurse => match state.ctx.current_loop() {
-                    Some(l) => recurse_loop!(false, &l.object),
+                    Some(l) => {
+                        let loop_object = l.object.clone();
+                        recurse_loop!(false, &loop_object, stack.pop());
+                    }
                     None => bail!(Error::new(ErrorKind::UnknownFunction, "loop is unknown")),
                 },
                 // Explanation on the behavior of `LoadBlocks` and rendering of
@@ -1129,6 +1151,70 @@ impl<'env> Executor<'env> {
         }
     }
 
+    /// Recurses into a loop from other instructions than the ones of the
+    /// loop (an included template or a block).
+    ///
+    /// This evaluates the loop in a nested evaluation which ends once the
+    /// loop is done.
+    #[cfg(feature = "multi_template")]
+    fn recurse_loop_from_other_instructions(
+        state: &mut State<'_, 'env>,
+        out: &mut Output,
+        target: RecurseTarget,
+        iterable: Value,
+        capture: bool,
+    ) -> Result<Value, Error> {
+        let instructions = ok!(state
+            .known_instructions
+            .get(&target.instructions)
+            .copied()
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidOperation,
+                    "cannot recurse outside of recursive loop",
+                )
+            }));
+        let Some(&Instruction::PushLoop(flags)) = instructions.get(target.pc) else {
+            unreachable!("recursion target is not a loop");
+        };
+        if capture {
+            out.begin_capture(CaptureMode::Capture);
+        }
+        let current_block = state.current_block;
+        let rv = state.with_execution_state(
+            instructions,
+            target.auto_escape,
+            current_block,
+            BlockState::Keep,
+            |state| {
+                // the loop exits to an instruction past the end of the
+                // instructions which ends the nested evaluation.
+                ok!(Self::push_loop(
+                    state,
+                    iterable,
+                    flags,
+                    target.pc,
+                    Some((END_OF_RECURSION, false))
+                )
+                .map_err(|mut err| {
+                    process_err(&mut err, target.pc, state);
+                    Error::new(
+                        ErrorKind::InvalidOperation,
+                        "cannot recurse because of non-iterable value",
+                    )
+                    .with_source(err)
+                }));
+                Self::do_eval(state, out, Stack::default(), target.pc + 1)
+            },
+        );
+        let captured = if capture {
+            out.end_capture(&state.auto_escape)
+        } else {
+            Value::UNDEFINED
+        };
+        rv.map(|_| captured)
+    }
+
     #[cfg(feature = "multi_template")]
     fn perform_super(
         state: &mut State<'_, 'env>,
@@ -1273,11 +1359,22 @@ impl<'env> Executor<'env> {
         pc: u32,
         current_recursion_jump: Option<(u32, bool)>,
     ) -> Result<(), Error> {
+        // recursive loops need to be found from other instructions for
+        // recursion from included templates and blocks.
+        #[cfg(feature = "multi_template")]
+        if flags & LOOP_FLAG_RECURSIVE != 0 {
+            state
+                .known_instructions
+                .entry(instructions_addr(state.instructions))
+                .or_insert(state.instructions);
+        }
         let iter = ok!(state
             .undefined_behavior()
             .try_iter(iterable)
             .map_err(|mut err| {
-                if let Some((jump_instr, _)) = current_recursion_jump {
+                if let Some((jump_instr, _)) =
+                    current_recursion_jump.filter(|x| x.0 != END_OF_RECURSION)
+                {
                     // When a recursion error happens, we need to process the error at both the
                     // recursion call site and the loop definition.  This is because the error
                     // happens at the recursion call site, but the loop definition is where the
@@ -1308,6 +1405,8 @@ impl<'env> Executor<'env> {
                 (flags & LOOP_FLAG_RECURSIVE != 0).then(|| RecurseTarget {
                     pc,
                     instructions: instructions_addr(state.instructions),
+                    #[cfg(feature = "multi_template")]
+                    auto_escape: state.auto_escape.clone(),
                 }),
                 current_recursion_jump,
             )),
@@ -1344,9 +1443,9 @@ impl<'env> Executor<'env> {
 
         let arg_spec = stack.pop().try_iter().unwrap().collect();
         let closure = stack.pop().as_usize();
-        let instructions_id = state.instructions as *const Instructions<'_> as usize;
+        let instructions_id = instructions_addr(state.instructions);
         state
-            .macro_instructions
+            .known_instructions
             .entry(instructions_id)
             .or_insert(state.instructions);
         stack.push(Value::from_object(Macro {
