@@ -479,6 +479,68 @@ func TestFilters(t *testing.T) {
 	}
 }
 
+// Like in Rust, int, float and round work on integers outside the 64-bit
+// range, and int converts floats like `f as i128`.
+func TestNumberFiltersBeyondInt64(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{"{{ 18446744073709551616|int }}", "18446744073709551616"},
+		{"{{ -9223372036854775809|int }}", "-9223372036854775809"},
+		{"{{ 1e20|int }}", "100000000000000000000"},
+		{"{{ -1e20|int }}", "-100000000000000000000"},
+		{"{{ 1e300|int }}", "170141183460469231731687303715884105727"},
+		{"{{ -1e300|int }}", "-170141183460469231731687303715884105728"},
+		{"{{ '99999999999999999999'|int }}", "99999999999999999999"},
+		{"{{ 'ffffffffffffffffff'|int(base=16) }}", "4722366482869645213695"},
+		{"{{ '170141183460469231731687303715884105728'|int }}", "170141183460469231731687303715884105727"},
+		{"{{ '1e20'|int }}", "100000000000000000000"},
+		{"{{ '1e400'|int }}", "170141183460469231731687303715884105727"},
+		{"{{ 'nan'|int }}", "0"},
+		{"{{ 18446744073709551616|float }}", "18446744073709552000.0"},
+		{"{{ 18446744073709551616|float(default=1) }}", "18446744073709552000.0"},
+		{"{{ '1e400'|float }}", "inf"},
+		{"{{ '-NaN'|float }}", "NaN"},
+		{"{{ '1_000'|float(default='invalid') }}", "invalid"},
+		{"{{ '0x1p3'|float(default='invalid') }}", "invalid"},
+		{"{{ '1_000'|int(default='invalid') }}", "invalid"},
+		{"{{ '0x1p3'|int(default='invalid') }}", "invalid"},
+		{"{{ 18446744073709551616|round }}", "18446744073709551616"},
+		{"{{ 18446744073709551616|round(-1) }}", "18446744073709551620"},
+		{"{{ 18446744073709551615|round(-1, 'floor') }}", "18446744073709551610"},
+	}
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Errorf("render error for %q: %v", test.template, err)
+		} else if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+
+	// Rounding past the i128 range or rounding values outside of it fails
+	// like in Rust.
+	for _, source := range []string{
+		"{{ 170141183460469231731687303715884105727|round(-1) }}",
+		"{{ 170141183460469231731687303715884105728|round(-1, 'floor') }}",
+	} {
+		tmpl, err := env.TemplateFromString(source)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		if result, err := tmpl.Render(nil); err == nil {
+			t.Errorf("%q: expected an error, got %q", source, result)
+		}
+	}
+}
+
 func TestRoundNonFiniteWithNegativePrecision(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString(
 		"{{ positive|round(-309) }}|{{ negative|round(-309) }}",
