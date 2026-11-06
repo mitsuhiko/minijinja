@@ -172,8 +172,20 @@ func asBigInt(val value.Value) (*big.Int, bool) {
 }
 
 // parseFloat parses a float like Rust's `str::parse::<f64>`, which gives an
-// infinity for numbers too large for a float instead of failing.
+// infinity for numbers too large for a float instead of failing.  Unlike
+// strconv.ParseFloat it does not accept underscores or hexadecimal floats but
+// accepts a sign in front of NaN.
 func parseFloat(s string) (float64, error) {
+	unsigned := s
+	if strings.HasPrefix(s, "+") || strings.HasPrefix(s, "-") {
+		unsigned = s[1:]
+	}
+	if strings.EqualFold(unsigned, "nan") {
+		return math.NaN(), nil
+	}
+	if strings.Contains(s, "_") || (len(unsigned) >= 2 && unsigned[0] == '0' && (unsigned[1] == 'x' || unsigned[1] == 'X')) {
+		return 0, &strconv.NumError{Func: "ParseFloat", Num: s, Err: strconv.ErrSyntax}
+	}
 	f, err := strconv.ParseFloat(s, 64)
 	if numErr, ok := err.(*strconv.NumError); ok && numErr.Err == strconv.ErrRange {
 		return f, nil
