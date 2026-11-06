@@ -232,7 +232,7 @@ func (s *State) CallMacro(name string, args ...value.Value) (value.Value, error)
 	if !ok {
 		return value.Undefined(), NewError(ErrInvalidOperation, "macro not found: "+name)
 	}
-	return newMacroCallableFromDefinition(macro, value.Undefined()).Call(s, args, nil)
+	return newMacroCallableFromDefinition(macro).Call(s, args, nil)
 }
 
 // CallMacroKw calls a macro by name with positional and keyword arguments.
@@ -249,7 +249,7 @@ func (s *State) CallMacroKw(name string, args []value.Value, kwargs map[string]v
 	if !ok {
 		return value.Undefined(), NewError(ErrInvalidOperation, "macro not found: "+name)
 	}
-	return newMacroCallableFromDefinition(macro, value.Undefined()).Call(s, args, kwargs)
+	return newMacroCallableFromDefinition(macro).Call(s, args, kwargs)
 }
 
 // Exports returns all exported variables from the template.
@@ -288,7 +288,7 @@ func (s *State) Exports() map[string]value.Value {
 
 	// Also include macros as exports
 	for name, macro := range s.macros {
-		exports[name] = value.FromCallable(newMacroCallableFromDefinition(macro, value.Undefined()))
+		exports[name] = value.FromCallable(newMacroCallableFromDefinition(macro))
 	}
 
 	for name := range exports {
@@ -503,7 +503,6 @@ type macroDefinition struct {
 type macroCallable struct {
 	macro     *parser.Macro
 	state     *State
-	caller    value.Value // caller value if this is a call block macro
 	hasCaller bool
 	scopes    []map[string]value.Value
 }
@@ -516,19 +515,18 @@ func newMacroDefinition(state *State, macro *parser.Macro) *macroDefinition {
 	}
 }
 
-func newMacroCallable(state *State, macro *parser.Macro, caller value.Value) *macroCallable {
+func newMacroCallable(state *State, macro *parser.Macro) *macroCallable {
 	return newMacroCallableFromDefinition(&macroDefinition{
 		macro:  macro,
 		state:  state,
 		scopes: cloneScopes(state.scopes),
-	}, caller)
+	})
 }
 
-func newMacroCallableFromDefinition(def *macroDefinition, caller value.Value) *macroCallable {
+func newMacroCallableFromDefinition(def *macroDefinition) *macroCallable {
 	return &macroCallable{
 		macro:     def.macro,
 		state:     def.state,
-		caller:    caller,
 		hasCaller: macroUsesCaller(def.macro),
 		scopes:    cloneScopes(def.scopes),
 	}
@@ -541,7 +539,7 @@ func (m *macroCallable) Call(state value.State, args []value.Value, kwargs map[s
 	defer func() {
 		m.state.scopes = oldScopes
 	}()
-	return m.state.callMacroWithValues(m.macro, args, kwargs, m.caller)
+	return m.state.callMacroWithValues(m.macro, args, kwargs, m.hasCaller)
 }
 
 // GetAttr returns macro properties
@@ -586,7 +584,20 @@ func (f *functionCallable) String() string {
 	return fmt.Sprintf("<function %s>", f.name)
 }
 
+// macroUsesCaller returns true if the macro refers to a caller it does not
+// declare itself, which makes it accept a caller keyword argument.  Like in
+// Rust, nested macros and call blocks declare their own caller.
 func macroUsesCaller(macro *parser.Macro) bool {
+	for _, arg := range macro.Args {
+		if v, ok := arg.(*parser.Var); ok && v.ID == "caller" {
+			return false
+		}
+	}
+	for _, expr := range macro.Defaults {
+		if exprUsesCaller(expr) {
+			return true
+		}
+	}
 	for _, stmt := range macro.Body {
 		if stmtUsesCaller(stmt) {
 			return true
@@ -671,12 +682,6 @@ func stmtUsesCaller(stmt parser.Stmt) bool {
 		return false
 	case *parser.Include:
 		return exprUsesCaller(st.Name)
-	case *parser.Macro:
-		for _, bodyStmt := range st.Body {
-			if stmtUsesCaller(bodyStmt) {
-				return true
-			}
-		}
 	case *parser.FilterBlock:
 		if exprUsesCaller(st.Filter) {
 			return true
@@ -698,14 +703,7 @@ func stmtUsesCaller(stmt parser.Stmt) bool {
 	case *parser.Do:
 		return exprUsesCaller(st.Call)
 	case *parser.CallBlock:
-		if exprUsesCaller(st.Call) {
-			return true
-		}
-		for _, bodyStmt := range st.MacroDecl.Body {
-			if stmtUsesCaller(bodyStmt) {
-				return true
-			}
-		}
+		return exprUsesCaller(st.Call)
 	}
 	return false
 }
@@ -789,7 +787,9 @@ func exprUsesCaller(expr parser.Expr) bool {
 	return false
 }
 
-func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwargs map[string]value.Value, caller value.Value) (value.Value, error) {
+// callMacroWithValues calls a macro.  If takesCaller is set, the macro
+// accepts a caller keyword argument, which is undefined if not passed.
+func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwargs map[string]value.Value, takesCaller bool) (value.Value, error) {
 	s.depth++
 	if s.depth > s.recursionLimit() {
 		return value.Undefined(), NewError(ErrInvalidOperation, "recursion limit exceeded")
@@ -806,6 +806,15 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 	remainingKwargs := make(map[string]value.Value, len(kwargs))
 	for k, v := range kwargs {
 		remainingKwargs[k] = v
+	}
+
+	if takesCaller {
+		caller, ok := remainingKwargs["caller"]
+		if !ok {
+			caller = value.Undefined()
+		}
+		s.Set("caller", caller)
+		delete(remainingKwargs, "caller")
 	}
 
 	// Bind arguments
@@ -843,11 +852,6 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 
 	if len(remainingKwargs) > 0 {
 		return value.Undefined(), NewError(ErrTooManyArguments, "too many keyword arguments")
-	}
-
-	// Set caller if provided
-	if !caller.IsUndefined() {
-		s.Set("caller", caller)
 	}
 
 	// Capture output
@@ -1154,7 +1158,7 @@ func (s *State) Lookup(name string) value.Value {
 
 	// Check macros
 	if macro, ok := s.macros[name]; ok {
-		return value.FromCallable(newMacroCallableFromDefinition(macro, value.Undefined()))
+		return value.FromCallable(newMacroCallableFromDefinition(macro))
 	}
 
 	// Check globals
@@ -2197,7 +2201,7 @@ func (s *State) createModule(tmpl *compiledTemplate) (value.Value, error) {
 	}
 	for name, macro := range moduleState.macros {
 		if !strings.HasPrefix(name, "_") {
-			moduleValues[name] = value.FromCallable(newMacroCallableFromDefinition(macro, value.Undefined()))
+			moduleValues[name] = value.FromCallable(newMacroCallableFromDefinition(macro))
 		}
 	}
 
@@ -2251,7 +2255,7 @@ func (m *moduleObject) String() string {
 }
 
 func (s *State) makeMacroCallable(macro *parser.Macro) value.Value {
-	return value.FromCallable(newMacroCallable(s, macro, value.Undefined()))
+	return value.FromCallable(newMacroCallable(s, macro))
 }
 
 func (s *State) evalFilterBlock(block *parser.FilterBlock) error {
@@ -2329,60 +2333,35 @@ func (s *State) evalAutoEscape(ae *parser.AutoEscape) error {
 }
 
 func (s *State) evalCallBlock(cb *parser.CallBlock) error {
-	// Evaluate the call expression to get the macro
 	callExpr := cb.Call
 
-	// Get the macro being called
-	var macroDef *macroDefinition
-	var macroName string
-
+	// Like calls, prefer macros defined in this template.
+	var callee value.Value
+	found := false
 	if v, ok := callExpr.Expr.(*parser.Var); ok {
-		macroName = v.ID
-		if m, ok := s.macros[macroName]; ok {
-			macroDef = m
+		if m, ok := s.macros[v.ID]; ok {
+			callee = value.FromCallable(newMacroCallableFromDefinition(m))
+			found = true
 		}
 	}
-
-	if macroDef == nil {
-		// Try to evaluate as a callable
-		expr, err := s.evalExpr(callExpr.Expr)
+	if !found {
+		var err error
+		callee, err = s.evalExpr(callExpr.Expr)
 		if err != nil {
 			return err
 		}
-		if mc, ok := expr.AsObject(); ok {
-			if macroC, ok := mc.(*macroCallable); ok {
-				macroDef = &macroDefinition{
-					macro:  macroC.macro,
-					state:  macroC.state,
-					scopes: cloneScopes(macroC.scopes),
-				}
-			}
-		}
 	}
 
-	if macroDef == nil {
-		return NewError(ErrInvalidOperation, "call block requires a macro")
-	}
-	if !macroUsesCaller(macroDef.macro) {
-		return NewError(ErrInvalidOperation, "caller is not allowed")
-	}
-
-	// Create a caller callable that renders the call block body
-	// MacroDecl holds the caller's body and arguments
-	callerCallable := &callerCallable{
-		state: s,
-		body:  cb.MacroDecl.Body,
-		args:  cb.MacroDecl.Args,
-	}
-
-	// Evaluate call arguments
 	args, kwargs, err := s.evalCallArgs(callExpr.Args)
 	if err != nil {
 		return err
 	}
 
-	// Call the macro with the caller
-	result, err := newMacroCallableFromDefinition(macroDef, value.FromCallable(callerCallable)).Call(s, args, kwargs)
+	// Like in Rust, the body of the call block is a macro named caller that
+	// closes over the current scope and is passed as caller keyword argument.
+	kwargs["caller"] = s.makeMacroCallable(cb.MacroDecl)
+
+	result, err := s.callValue(callee, args, kwargs, callExpr.Span())
 	if err != nil {
 		return err
 	}
@@ -2391,69 +2370,6 @@ func (s *State) evalCallBlock(cb *parser.CallBlock) error {
 		return err
 	}
 	return nil
-}
-
-// callerCallable represents the caller() function inside a macro invoked via call block
-type callerCallable struct {
-	state *State
-	body  []parser.Stmt
-	args  []parser.Expr // macro args from the call block declaration
-}
-
-func (c *callerCallable) GetAttr(name string) value.Value {
-	switch name {
-	case "name":
-		return value.FromString("caller")
-	case "arguments":
-		argNames := make([]value.Value, len(c.args))
-		for i, arg := range c.args {
-			if v, ok := arg.(*parser.Var); ok {
-				argNames[i] = value.FromString(v.ID)
-			}
-		}
-		return value.FromSlice(argNames)
-	case "caller":
-		return value.False()
-	}
-	return value.Undefined()
-}
-
-func (c *callerCallable) String() string {
-	return "<macro caller>"
-}
-
-func (c *callerCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
-	_ = state
-	c.state.pushScope()
-	defer c.state.popScope()
-
-	// Bind arguments to the caller's parameters
-	for i, argExpr := range c.args {
-		if v, ok := argExpr.(*parser.Var); ok {
-			if i < len(args) {
-				c.state.Set(v.ID, args[i])
-			} else {
-				c.state.Set(v.ID, value.Undefined())
-			}
-		}
-	}
-
-	// Capture output
-	oldOut := c.state.out
-	builder := &strings.Builder{}
-	c.state.out = builder
-
-	for _, stmt := range c.body {
-		if err := c.state.evalStmt(stmt); err != nil {
-			c.state.out = oldOut
-			return value.Undefined(), err
-		}
-	}
-
-	result := builder.String()
-	c.state.out = oldOut
-
-	return value.FromSafeString(result), nil
 }
 
 // writeString writes a string to the output and charges for its bytes.
@@ -3012,7 +2928,7 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 			}
 			// macros return their output which was already charged when it
 			// was written.
-			rv, err := newMacroCallableFromDefinition(macro, value.Undefined()).Call(s, args, kwargs)
+			rv, err := newMacroCallableFromDefinition(macro).Call(s, args, kwargs)
 			if err != nil {
 				return rv, err
 			}
@@ -3064,7 +2980,7 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 // as macros.  Their output was already charged when it was written.
 func isOutputCallable(val value.Value) bool {
 	switch val.Raw().(type) {
-	case *macroCallable, *callerCallable, *blockCallable, *loopObject:
+	case *macroCallable, *blockCallable, *loopObject:
 		return true
 	}
 	return false
@@ -3223,7 +3139,7 @@ func (s *State) callMacroWithArgs(macro *parser.Macro, callArgs []parser.CallArg
 	if err != nil {
 		return value.Undefined(), err
 	}
-	return s.callMacroWithValues(macro, args, kwargs, value.Undefined())
+	return s.callMacroWithValues(macro, args, kwargs, macroUsesCaller(macro))
 }
 
 func (s *State) evalList(list *parser.List) (value.Value, error) {
