@@ -235,18 +235,22 @@ func (v Value) Sub(other Value) (Value, error) {
 }
 
 // repeatCount returns how often a string or sequence is repeated.  Like in
-// Python, booleans count as integers.
+// Python, booleans count as integers and a negative count repeats zero times.
 func repeatCount(v Value) (int64, bool) {
 	if b, ok := v.AsBool(); ok {
 		return int64(boolToFloat(b)), true
 	}
-	return v.AsInt()
+	if b, ok := v.data.(bigIntValue); ok && b.Sign() < 0 {
+		return 0, true
+	}
+	n, ok := v.AsInt()
+	if ok && n < 0 {
+		n = 0
+	}
+	return n, ok
 }
 
 func repeatString(s string, n int64, safe bool) (Value, error) {
-	if n < 0 {
-		return Undefined(), fmt.Errorf("strings can only be multiplied with integers")
-	}
 	if len(s) > 0 && n > int64(maxRepeatedStringLen/len(s)) {
 		return Undefined(), fmt.Errorf("repeated string is too large")
 	}
@@ -265,11 +269,11 @@ func repeatString(s string, n int64, safe bool) (Value, error) {
 func (v Value) Mul(other Value) (Value, error) {
 	// String repetition
 	if s, ok := v.AsString(); ok {
-		if n, ok := repeatCount(other); ok && n >= 0 {
+		if n, ok := repeatCount(other); ok {
 			return repeatString(s, n, v.IsSafe())
 		}
 	}
-	if n, ok := repeatCount(v); ok && n >= 0 {
+	if n, ok := repeatCount(v); ok {
 		if s, ok := other.AsString(); ok {
 			return repeatString(s, n, other.IsSafe())
 		}
@@ -303,9 +307,6 @@ func (v Value) Mul(other Value) (Value, error) {
 }
 
 func repeatIterable(seq Value, n int64) (Value, error) {
-	if n < 0 {
-		return Undefined(), fmt.Errorf("sequences and iterables can only be multiplied with integers")
-	}
 	length, ok := seq.Len()
 	if !ok {
 		return Undefined(), fmt.Errorf("cannot repeat unsized iterables")
