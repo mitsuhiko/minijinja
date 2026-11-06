@@ -8,6 +8,8 @@ use crate::compiler::instructions::{
 };
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
+#[cfg(feature = "debug")]
+use crate::output::OutputSpanKind;
 use crate::output::{CaptureMode, Output};
 use crate::utils::{untrusted_size_hint, write_escaped, AutoEscape, UndefinedBehavior};
 use crate::value::namespace_object::Namespace;
@@ -465,9 +467,15 @@ impl<'env> Executor<'env> {
                     stack.push(b);
                 }
                 Instruction::EmitRaw(val) => {
+                    #[cfg(feature = "debug")]
+                    let span_start = out.span_start();
                     // this only produces a format error, no need to attach
                     // location information.
                     ok!(out.write_str(val).map_err(Error::from));
+                    #[cfg(feature = "debug")]
+                    if let Some(start) = span_start {
+                        out.record_span(start, state.instructions, pc, OutputSpanKind::Raw);
+                    }
                 }
                 Instruction::Emit => {
                     let value = stack.pop();
@@ -480,6 +488,8 @@ impl<'env> Executor<'env> {
                         }
                         _ => None,
                     };
+                    #[cfg(feature = "debug")]
+                    let span_start = out.span_start();
                     if state.env().is_default_formatter() {
                         if strict_undefined
                             && matches!(value.0, ValueRepr::Undefined(UndefinedType::Default, _))
@@ -494,6 +504,10 @@ impl<'env> Executor<'env> {
                     if let Some(start) = serialized_start {
                         let written = out.uncharged_bytes().saturating_sub(start);
                         ctx_ok!(state.charge_serialized(written));
+                    }
+                    #[cfg(feature = "debug")]
+                    if let Some(start) = span_start {
+                        out.record_span(start, state.instructions, pc, OutputSpanKind::Expression);
                     }
                 }
                 Instruction::StoreLocal(name) => {

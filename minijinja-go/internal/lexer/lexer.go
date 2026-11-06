@@ -603,6 +603,10 @@ func (l *Lexer) handleRawTag(wsStart whitespaceMode) (*Token, bool, error) {
 				result = strings.TrimLeftFunc(result, unicode.IsSpace)
 			}
 
+			// The span covers exactly the emitted data, so remember how much
+			// leading whitespace was trimmed.
+			leading := end - len(result)
+
 			// Apply ws trimming (before endraw tag)
 			switch ws {
 			case wsDefault:
@@ -613,8 +617,11 @@ func (l *Lexer) handleRawTag(wsStart whitespaceMode) (*Token, bool, error) {
 				result = strings.TrimRightFunc(result, unicode.IsSpace)
 			}
 
-			l.advance(end)
+			l.advance(leading)
+			l.markStart()
+			l.advance(len(result))
 			span := l.span()
+			l.advance(end - leading - len(result))
 			l.advance(len(l.syntax.BlockStart) + endrawLen)
 			l.handleTailWhitespace(wsNext)
 

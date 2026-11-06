@@ -39,12 +39,13 @@ type State struct {
 	macros            map[string]*macroDefinition
 	out               outputWriter
 	depth             int
-	currentBlock      string                            // name of block currently being rendered
-	loopRecurse       func(value.Value) (string, error) // for recursive loops
+	currentBlock      string                                  // name of block currently being rendered
+	loopRecurse       func(value.Value, bool) (string, error) // for recursive loops
 	undefinedBehavior UndefinedBehavior
 	temps             *tempStore
 	fuelTracker       *fuelTracker
 	rootContext       value.Value
+	spans             *spanRecorder // set when output spans are recorded
 }
 
 type outputWriter interface {
@@ -202,6 +203,7 @@ func (s *State) RenderBlock(name string) (string, error) {
 
 	oldBlock := s.currentBlock
 	s.currentBlock = name
+	defer s.enterLayer(bs.layers[0])()
 
 	s.pushScope()
 	for _, stmt := range bs.layers[0].body {
@@ -491,12 +493,34 @@ type blockStack struct {
 type blockLayer struct {
 	body     []parser.Stmt
 	required bool
+	// name and source of the template that defines this layer.
+	name   string
+	source string
+}
+
+// enterTemplate makes the state execute in the context of the given template
+// (which affects error reporting, template path resolution and output spans)
+// and returns a function that restores the previous template.
+func (s *State) enterTemplate(name, source string) func() {
+	oldName, oldSource := s.name, s.source
+	s.name, s.source = name, source
+	return func() {
+		s.name, s.source = oldName, oldSource
+	}
+}
+
+// enterLayer is like enterTemplate for the template that defines a block layer.
+func (s *State) enterLayer(layer blockLayer) func() {
+	return s.enterTemplate(layer.name, layer.source)
 }
 
 type macroDefinition struct {
 	macro  *parser.Macro
 	state  *State
 	scopes []map[string]value.Value
+	// name and source of the template that defines the macro.
+	name   string
+	source string
 }
 
 // macroCallable wraps a macro for callable invocation
@@ -505,6 +529,8 @@ type macroCallable struct {
 	state     *State
 	hasCaller bool
 	scopes    []map[string]value.Value
+	name      string
+	source    string
 }
 
 func newMacroDefinition(state *State, macro *parser.Macro) *macroDefinition {
@@ -512,15 +538,13 @@ func newMacroDefinition(state *State, macro *parser.Macro) *macroDefinition {
 		macro:  macro,
 		state:  state,
 		scopes: cloneScopes(state.scopes),
+		name:   state.name,
+		source: state.source,
 	}
 }
 
 func newMacroCallable(state *State, macro *parser.Macro) *macroCallable {
-	return newMacroCallableFromDefinition(&macroDefinition{
-		macro:  macro,
-		state:  state,
-		scopes: cloneScopes(state.scopes),
-	})
+	return newMacroCallableFromDefinition(newMacroDefinition(state, macro))
 }
 
 func newMacroCallableFromDefinition(def *macroDefinition) *macroCallable {
@@ -529,11 +553,15 @@ func newMacroCallableFromDefinition(def *macroDefinition) *macroCallable {
 		state:     def.state,
 		hasCaller: macroUsesCaller(def.macro),
 		scopes:    cloneScopes(def.scopes),
+		name:      def.name,
+		source:    def.source,
 	}
 }
 
 func (m *macroCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	_ = state // macro uses its captured state
+	// the macro body executes in the context of the template defining it.
+	defer m.state.enterTemplate(m.name, m.source)()
 	oldScopes := m.state.scopes
 	m.state.scopes = cloneScopes(m.scopes)
 	defer func() {
@@ -901,7 +929,7 @@ type loopObject struct {
 	prevItem     value.Value        // previous item (for pull iterators)
 	pullIter     value.PullIterator // pull-based iterator
 	peekedNext   *value.Value       // peeked next item for pullIter
-	recurseFn    func(value.Value) (string, error)
+	recurseFn    func(value.Value, bool) (string, error)
 }
 
 func (l *loopObject) GetAttr(name string) value.Value {
@@ -990,7 +1018,7 @@ func (l *loopObject) Call(state value.State, args []value.Value, kwargs map[stri
 	if len(args) != 1 {
 		return value.Undefined(), NewError(ErrInvalidOperation, "loop() takes exactly 1 argument")
 	}
-	result, err := l.recurseFn(args[0])
+	result, err := l.recurseFn(args[0], false)
 	if err != nil {
 		return value.Undefined(), err
 	}
@@ -1069,6 +1097,12 @@ type blockCallable struct {
 
 func (bc *blockCallable) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	_ = state
+	return bc.render(false)
+}
+
+// render renders the block.  If direct is set, the output is written to the
+// current output instead of being returned.
+func (bc *blockCallable) render(direct bool) (value.Value, error) {
 	bs := bc.state.blocks[bc.blockName]
 	if bs == nil || len(bs.layers) == 0 {
 		return value.Undefined(), NewError(ErrInvalidOperation, fmt.Sprintf("block '%s' not found", bc.blockName))
@@ -1080,10 +1114,13 @@ func (bc *blockCallable) Call(state value.State, args []value.Value, kwargs map[
 	// Capture output
 	oldOut := bc.state.out
 	builder := &strings.Builder{}
-	bc.state.out = builder
+	if !direct {
+		bc.state.out = builder
+	}
 
 	oldBlock := bc.state.currentBlock
 	bc.state.currentBlock = bc.blockName
+	defer bc.state.enterLayer(bs.layers[0])()
 
 	bc.state.pushScope()
 	for _, stmt := range bs.layers[0].body {
@@ -1100,6 +1137,9 @@ func (bc *blockCallable) Call(state value.State, args []value.Value, kwargs map[
 	bc.state.out = oldOut
 	bc.state.currentBlock = oldBlock
 
+	if direct {
+		return value.Undefined(), nil
+	}
 	return value.FromSafeString(result), nil
 }
 
@@ -1142,8 +1182,11 @@ func newState(goCtx context.Context, env *Environment, name, source string, ctx 
 }
 
 func (s *State) outputString() string {
-	if b, ok := s.out.(*strings.Builder); ok {
+	switch b := s.out.(type) {
+	case *strings.Builder:
 		return b.String()
+	case *spanRecorder:
+		return b.buf.String()
 	}
 	return ""
 }
@@ -1238,7 +1281,7 @@ func (s *State) eval(tmpl *parser.Template) (string, error) {
 		for _, stmt := range tmpl.Children {
 			if block, ok := stmt.(*parser.Block); ok {
 				s.blocks[block.Name] = &blockStack{
-					layers: []blockLayer{{body: block.Body, required: block.Required}},
+					layers: []blockLayer{{body: block.Body, required: block.Required, name: s.name, source: s.source}},
 					index:  0,
 				}
 			}
@@ -1300,12 +1343,23 @@ func (s *State) evalStmt(stmt parser.Stmt) (err error) {
 
 	switch st := stmt.(type) {
 	case *parser.EmitRaw:
+		if s.spans != nil {
+			return s.writeStringWithSpan(st.Raw, st.Span())
+		}
 		return s.writeString(st.Raw)
 
 	case *parser.EmitExpr:
+		if call, ok := st.Expr.(*parser.Call); ok {
+			if handled, err := s.emitDirect(call); handled {
+				return err
+			}
+		}
 		val, err := s.evalExpr(st.Expr)
 		if err != nil {
 			return err
+		}
+		if s.spans != nil {
+			return s.writeValueWithSpan(val, st.Span())
 		}
 		return s.writeValue(val)
 
@@ -1591,10 +1645,12 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 	}()
 
 	// Set up recursive loop function if needed
-	var oldRecurse func(value.Value) (string, error)
+	var oldRecurse func(value.Value, bool) (string, error)
 	if loop.Recursive {
 		oldRecurse = s.loopRecurse
-		s.loopRecurse = func(iterValue value.Value) (string, error) {
+		// if direct is set, the output is written to the current output
+		// instead of being returned.
+		s.loopRecurse = func(iterValue value.Value, direct bool) (string, error) {
 			s.depth++
 			if s.depth > s.recursionLimit() {
 				return "", NewError(ErrInvalidOperation, "recursion limit exceeded")
@@ -1620,7 +1676,9 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 
 			oldOut := s.out
 			builder := &strings.Builder{}
-			s.out = builder
+			if !direct {
+				s.out = builder
+			}
 
 			changedState := &loopChangedState{}
 			for i := range nestedItems {
@@ -1878,6 +1936,10 @@ func (s *State) evalExtends(ext *parser.Extends) error {
 	}
 	defer func() { s.depth-- }()
 
+	// the rest of this executes in the context of the parent template.
+	parentName, parentSource := parentTmpl.compiled.name, parentTmpl.compiled.source
+	defer s.enterTemplate(parentName, parentSource)()
+
 	// Check if parent also extends another template
 	var parentExtendsStmt *parser.Extends
 	for _, stmt := range parentTmpl.compiled.ast.Children {
@@ -1892,11 +1954,11 @@ func (s *State) evalExtends(ext *parser.Extends) error {
 		if block, ok := stmt.(*parser.Block); ok {
 			if bs, exists := s.blocks[block.Name]; exists {
 				// Append parent block to the end (child is at index 0)
-				bs.layers = append(bs.layers, blockLayer{body: block.Body, required: block.Required})
+				bs.layers = append(bs.layers, blockLayer{body: block.Body, required: block.Required, name: parentName, source: parentSource})
 			} else {
 				// This is a parent-only block (no child override)
 				s.blocks[block.Name] = &blockStack{
-					layers: []blockLayer{{body: block.Body, required: block.Required}},
+					layers: []blockLayer{{body: block.Body, required: block.Required, name: parentName, source: parentSource}},
 					index:  0,
 				}
 			}
@@ -1939,7 +2001,7 @@ func (s *State) evalBlock(block *parser.Block) error {
 	bs := s.blocks[block.Name]
 	if bs == nil {
 		bs = &blockStack{
-			layers: []blockLayer{{body: block.Body, required: block.Required}},
+			layers: []blockLayer{{body: block.Body, required: block.Required, name: s.name, source: s.source}},
 			index:  0,
 		}
 		s.blocks[block.Name] = bs
@@ -1968,6 +2030,7 @@ func (s *State) evalBlock(block *parser.Block) error {
 	oldBlock := s.currentBlock
 	s.currentBlock = block.Name
 	bs.index = 0
+	defer s.enterLayer(bs.layers[0])()
 
 	s.pushScope()
 	for _, stmt := range bs.layers[0].body {
@@ -2065,9 +2128,23 @@ func (s *State) includeTemplate(name string) error {
 		undefinedBehavior: s.undefinedBehavior,
 		temps:             s.temps,
 		fuelTracker:       s.fuelTracker,
+		spans:             s.spans,
 	}
 	if len(childState.scopes) > 0 {
 		childState.scopes[len(childState.scopes)-1] = cloneScopeMap(childState.scopes[len(childState.scopes)-1])
+	}
+	// the included template can recurse the loop it is included in.  The
+	// recursion runs on this state, so direct output needs to go to the
+	// current output of the included template, which might be captured.
+	if parentRecurse := s.loopRecurse; parentRecurse != nil {
+		childState.loopRecurse = func(iterValue value.Value, direct bool) (string, error) {
+			if direct {
+				oldOut := s.out
+				s.out = childState.out
+				defer func() { s.out = oldOut }()
+			}
+			return parentRecurse(iterValue, direct)
+		}
 	}
 
 	_, err = childState.eval(tmpl.compiled.ast)
@@ -2319,10 +2396,7 @@ func (s *State) evalFilterBlock(block *parser.FilterBlock) error {
 		return err
 	}
 
-	if err := s.writeValue(result); err != nil {
-		return err
-	}
-	return nil
+	return s.writeValueWithSpan(result, block.FilterSpan)
 }
 
 func (s *State) evalAutoEscape(ae *parser.AutoEscape) error {
@@ -2402,10 +2476,7 @@ func (s *State) evalCallBlock(cb *parser.CallBlock) error {
 		return err
 	}
 
-	if err := s.writeValue(result); err != nil {
-		return err
-	}
-	return nil
+	return s.writeValueWithSpan(result, cb.CallExprSpan)
 }
 
 // writeString writes a string to the output and charges for its bytes.
@@ -2949,7 +3020,7 @@ func (s *State) evalCall(call *parser.Call) (value.Value, error) {
 			if err != nil {
 				return value.Undefined(), err
 			}
-			result, err := s.loopRecurse(arg)
+			result, err := s.loopRecurse(arg, false)
 			if err != nil {
 				return value.Undefined(), err
 			}
@@ -3102,6 +3173,12 @@ func (s *State) callValue(val value.Value, args []value.Value, kwargs map[string
 }
 
 func (s *State) evalSuper(span parser.Span) (value.Value, error) {
+	return s.renderSuper(span, false)
+}
+
+// renderSuper renders the parent block.  If direct is set, the output is
+// written to the current output instead of being returned.
+func (s *State) renderSuper(span parser.Span, direct bool) (value.Value, error) {
 	if s.currentBlock == "" {
 		return value.Undefined(), NewError(ErrInvalidOperation, "super() can only be used inside a block").WithSpan(span)
 	}
@@ -3114,11 +3191,14 @@ func (s *State) evalSuper(span parser.Span) (value.Value, error) {
 	// Move to the parent block
 	bs.index++
 	defer func() { bs.index-- }()
+	defer s.enterLayer(bs.layers[bs.index])()
 
 	// Capture output
 	oldOut := s.out
 	builder := &strings.Builder{}
-	s.out = builder
+	if !direct {
+		s.out = builder
+	}
 
 	s.pushScope()
 	for _, stmt := range bs.layers[bs.index].body {
@@ -3132,7 +3212,56 @@ func (s *State) evalSuper(span parser.Span) (value.Value, error) {
 
 	result := builder.String()
 	s.out = oldOut
+	if direct {
+		return value.Undefined(), nil
+	}
 	return value.FromSafeString(result), nil
+}
+
+// emitDirect handles {{ super() }}, {{ loop(...) }} and {{ self.block() }}
+// by writing their output straight to the current output instead of
+// capturing it first.  This mirrors the Rust engine and attributes the
+// output spans to the source that was rendered rather than to the call.
+func (s *State) emitDirect(call *parser.Call) (handled bool, err error) {
+	var render func() error
+	switch callee := call.Expr.(type) {
+	case *parser.Var:
+		switch {
+		case callee.ID == "super" && len(call.Args) == 0:
+			render = func() error {
+				_, err := s.renderSuper(call.Span(), true)
+				return err
+			}
+		case callee.ID == "loop" && s.loopRecurse != nil && len(call.Args) == 1 &&
+			call.Args[0].Kind == parser.CallArgPos:
+			render = func() error {
+				arg, err := s.evalExpr(call.Args[0].Value)
+				if err != nil {
+					return err
+				}
+				_, err = s.loopRecurse(arg, true)
+				return err
+			}
+		}
+	case *parser.GetAttr:
+		if v, ok := callee.Expr.(*parser.Var); ok && v.ID == "self" && len(call.Args) == 0 {
+			render = func() error {
+				_, err := (&blockCallable{state: s, blockName: callee.Name}).render(true)
+				return err
+			}
+		}
+	}
+	if render == nil {
+		return false, nil
+	}
+	// account for the call expression like evalExpr would.
+	if err := s.consumeFuel(); err != nil {
+		return true, err
+	}
+	if err := render(); err != nil {
+		return true, s.attachErrorInfo(err, call)
+	}
+	return true, nil
 }
 
 func (s *State) evalCallArgs(callArgs []parser.CallArg) ([]value.Value, map[string]value.Value, error) {
@@ -3546,6 +3675,15 @@ func normalizeIndex(idx, length int64) int64 {
 func (s *State) applyFilter(filterExpr parser.Expr, val value.Value) (value.Value, error) {
 	switch f := filterExpr.(type) {
 	case *parser.Filter:
+		// in a filter chain (a|b) the earlier filters are the inner
+		// expression and need to be applied first.
+		if f.Expr != nil {
+			var err error
+			val, err = s.applyFilter(f.Expr, val)
+			if err != nil {
+				return value.Undefined(), err
+			}
+		}
 		return s.applyFilterCallArgs(f.Name, val, f.Args)
 	case *parser.Var:
 		return s.applyFilterCallArgs(f.ID, val, nil)

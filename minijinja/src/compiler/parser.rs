@@ -1196,11 +1196,17 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_filter_block(&mut self) -> Result<ast::FilterBlock<'a>, Error> {
+        let start = self.stream.current_span();
         let filter = ok!(self.parse_filter_chain());
+        let filter_span = self.stream.expand_span(start);
         expect_token!(self, Token::BlockEnd, "end of block");
         let body = ok!(self.subparse(&|tok| matches!(tok, Token::Ident("endfilter"))));
         ok!(self.stream.next());
-        Ok(ast::FilterBlock { filter, body })
+        Ok(ast::FilterBlock {
+            filter,
+            filter_span,
+            body,
+        })
     }
 
     #[cfg(feature = "multi_template")]
@@ -1359,9 +1365,9 @@ impl<'a> Parser<'a> {
         if skip_token!(self, Token::ParenOpen) {
             ok!(self.parse_macro_args_and_defaults(&mut args, &mut defaults));
         }
-        let call = match ok!(self.parse_expr()) {
-            ast::Expr::Call(call) => call,
-            expr => syntax_error!(
+        let (call, call_expr_span) = match ok!(self.parse_expr_with_span()) {
+            (ast::Expr::Call(call), span) => (call, span),
+            (expr, _) => syntax_error!(
                 "expected call expression in call block, got {}",
                 expr.description()
             ),
@@ -1369,6 +1375,7 @@ impl<'a> Parser<'a> {
         let macro_decl = ok!(self.parse_macro_or_call_block_body(args, defaults, None));
         Ok(ast::CallBlock {
             call,
+            call_expr_span,
             macro_decl: Spanned::new(macro_decl, self.stream.expand_span(span)),
         })
     }
@@ -1384,6 +1391,14 @@ impl<'a> Parser<'a> {
         Ok(ast::Do { call })
     }
 
+    /// Parses an expression and returns it together with a span that covers
+    /// all of its tokens.
+    fn parse_expr_with_span(&mut self) -> Result<(ast::Expr<'a>, Span), Error> {
+        let start = self.stream.current_span();
+        let expr = ok!(self.parse_expr());
+        Ok((expr, self.stream.expand_span(start)))
+    }
+
     fn subparse(
         &mut self,
         end_check: &dyn Fn(&Token) -> bool,
@@ -1395,10 +1410,10 @@ impl<'a> Parser<'a> {
                     rv.push(ast::Stmt::EmitRaw(Spanned::new(ast::EmitRaw { raw }, span)))
                 }
                 Token::VariableStart => {
-                    let expr = ok!(self.parse_expr());
+                    let (expr, span) = ok!(self.parse_expr_with_span());
                     rv.push(ast::Stmt::EmitExpr(Spanned::new(
                         ast::EmitExpr { expr },
-                        self.stream.expand_span(span),
+                        span,
                     )));
                     expect_token!(self, Token::VariableEnd, "end of variable block");
                 }
