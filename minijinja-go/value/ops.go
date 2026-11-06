@@ -518,6 +518,13 @@ func boolToFloat(b bool) float64 {
 	return 0.0
 }
 
+func boolToInt(b bool) int64 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 // Equal returns true if two values are equal.
 func (v Value) Equal(other Value) bool {
 	// Undefined is only equal to undefined
@@ -614,8 +621,16 @@ func (v Value) Equal(other Value) bool {
 }
 
 // Compare returns -1 if v < other, 0 if equal, 1 if v > other.
-// Unlike Equal, Compare uses kind ordering first (like Rust's Ord).
+// Unlike Equal, Compare uses kind ordering first (like Rust's Ord), except
+// that bools compare with numbers by value.
 func (v Value) Compare(other Value) (int, bool) {
+	if b, ok := v.data.(bool); ok && other.Kind() == KindNumber {
+		return FromInt(boolToInt(b)).Compare(other)
+	}
+	if b, ok := other.data.(bool); ok && v.Kind() == KindNumber {
+		return v.Compare(FromInt(boolToInt(b)))
+	}
+
 	// Compare by kind first (like Rust)
 	// Kind order: Undefined < None < Bool < Number < String < Bytes < Seq < Map
 	kindOrder := func(k ValueKind) int {

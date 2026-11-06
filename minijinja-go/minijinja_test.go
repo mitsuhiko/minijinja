@@ -1224,6 +1224,23 @@ func TestBooleansAreNumbers(t *testing.T) {
 	}
 }
 
+func TestBooleansCompareLikeNumbers(t *testing.T) {
+	tmpl, err := NewEnvironment().TemplateFromString(
+		`{{ true < 1 }}|{{ 0 < true }}|{{ [3, true, 0]|sort }}|{{ [true, 1.0, 1]|unique }}|` +
+			`{{ ["1", 1]|unique }}|{{ [[1], [true]]|unique }}`,
+	)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	result, err := tmpl.Render(nil)
+	if err != nil {
+		t.Fatalf("render error: %v", err)
+	}
+	if result != "False|True|[0, True, 3]|[True]|['1', 1]|[[1]]" {
+		t.Fatalf("unexpected result: %q", result)
+	}
+}
+
 func TestOperatorAliasTests(t *testing.T) {
 	env := NewEnvironment()
 

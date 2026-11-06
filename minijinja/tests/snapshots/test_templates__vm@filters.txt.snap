@@ -93,8 +93,8 @@ sort: [1, 2, 4, 9, 111]
 sort-reverse: [111, 9, 4, 2, 1]
 sort-case-insensitive: ['a', 'B', 'C', 'z']
 sort-case-sensitive: ['B', 'C', 'a', 'z']
-sort-case-insensitive-mixed: [False, True, 0, 1, 'false', 'False', 'true', 'True']
-sort-case-sensitive-mixed: [False, True, 0, 1, 'False', 'True', 'false', 'true']
+sort-case-insensitive-mixed: [0, False, 1, True, 'false', 'False', 'true', 'True']
+sort-case-sensitive-mixed: [0, False, 1, True, 'False', 'True', 'false', 'true']
 sort-attribute [{'name': 'a'}, {'name': 'b'}]
 d: True
 json: {"a": "b", "c": "d"}

@@ -681,7 +681,7 @@ impl Hash for Value {
             ValueRepr::None | ValueRepr::Undefined(..) => 0u8.hash(state),
             ValueRepr::String(ref s, _) => s.hash(state),
             ValueRepr::SmallStr(ref s) => s.as_str().hash(state),
-            ValueRepr::Bool(b) => b.hash(state),
+            ValueRepr::Bool(b) => (b as i64).hash(state),
             ValueRepr::Invalid(ref e) => (e.kind(), e.detail()).hash(state),
             ValueRepr::Bytes(ref b) => b.hash(state),
             ValueRepr::Object(ref d) => {
@@ -891,6 +891,15 @@ fn cmp_uncoercible_numbers(left: &Value, right: &Value) -> Ordering {
 
 impl Ord for Value {
     fn cmp(&self, other: &Self) -> Ordering {
+        match (&self.0, &other.0) {
+            (&ValueRepr::Bool(a), _) if other.is_number() => {
+                return Value::from(a as i64).cmp(other)
+            }
+            (_, &ValueRepr::Bool(b)) if self.is_number() => {
+                return self.cmp(&Value::from(b as i64))
+            }
+            _ => {}
+        }
         let kind_ordering = self.kind().cmp(&other.kind());
         if matches!(kind_ordering, Ordering::Less | Ordering::Greater) {
             return kind_ordering;

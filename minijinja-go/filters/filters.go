@@ -1600,16 +1600,7 @@ func FilterUnique(state State, val value.Value, _ []value.Value, kwargs map[stri
 			valueToCompare = getDeepAttr(item, attrName)
 		}
 
-		var key string
-		if !caseSensitive {
-			if s, ok := valueToCompare.AsString(); ok {
-				key = strings.ToLower(s)
-			} else {
-				key = valueToCompare.Repr()
-			}
-		} else {
-			key = valueToCompare.Repr()
-		}
+		key := uniqueKey(valueToCompare, caseSensitive)
 		if err := chargeLookup(state, len(seen)); err != nil {
 			return value.Undefined(), err
 		}
@@ -1619,6 +1610,49 @@ func FilterUnique(state State, val value.Value, _ []value.Value, kwargs map[stri
 		}
 	}
 	return value.FromSlice(result), nil
+}
+
+// uniqueKey returns the key under which unique detects duplicates.  Like in
+// Rust, booleans and numbers that compare equal (such as true, 1 and 1.0) are
+// the same item, also inside of sequences, while strings never collide with
+// other values.
+func uniqueKey(v value.Value, caseSensitive bool) string {
+	if s, ok := v.AsString(); ok {
+		if !caseSensitive {
+			s = strings.ToLower(s)
+		}
+		return "s:" + strconv.Quote(s)
+	}
+	if items, ok := v.AsSlice(); ok {
+		var b strings.Builder
+		if v.IsTuple() {
+			b.WriteString("t:")
+		} else {
+			b.WriteString("l:")
+		}
+		for _, item := range items {
+			b.WriteString(uniqueKey(item, true))
+			b.WriteByte(',')
+		}
+		return b.String()
+	}
+	if b, ok := v.AsBool(); ok {
+		if b {
+			return "n:1"
+		}
+		return "n:0"
+	}
+	if v.IsActualFloat() {
+		f, _ := v.AsFloat()
+		if !math.IsInf(f, 0) && f == math.Trunc(f) {
+			i, _ := new(big.Float).SetFloat64(f).Int(nil)
+			return "n:" + i.String()
+		}
+	}
+	if v.Kind() == value.KindNumber {
+		return "n:" + v.Repr()
+	}
+	return "v:" + v.Repr()
 }
 
 // FilterMin returns the smallest item from an iterable.
