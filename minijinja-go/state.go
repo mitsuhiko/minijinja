@@ -796,6 +796,12 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 	}
 	defer func() { s.depth-- }()
 
+	// like in Rust, macros do not run in the block they are called from, so
+	// they cannot call super().
+	oldBlock := s.currentBlock
+	s.currentBlock = ""
+	defer func() { s.currentBlock = oldBlock }()
+
 	s.pushScope()
 	defer s.popScope()
 

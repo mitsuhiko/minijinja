@@ -165,3 +165,45 @@ func TestCallerScopingLikeRust(t *testing.T) {
 		},
 	})
 }
+
+func TestSuperInMacroLikeRust(t *testing.T) {
+	parent := `{% block b %}parent{% endblock %}`
+	runTemplatesCases(t, []templatesCase{
+		{
+			name: "macro defined in block",
+			templates: map[string]string{
+				"p": parent,
+				"c": `{% extends 'p' %}{% block b %}{% macro m() %}<P{{ super() }}>{% endmacro %}{{ m() }}child{% endblock %}`,
+			},
+			entry:   "c",
+			errKind: ErrInvalidOperation,
+		},
+		{
+			name: "macro defined outside of block",
+			templates: map[string]string{
+				"p": parent,
+				"c": `{% extends 'p' %}{% macro m() %}<P{{ super() }}>{% endmacro %}{% block b %}{{ m() }}child{% endblock %}`,
+			},
+			entry:   "c",
+			errKind: ErrInvalidOperation,
+		},
+		{
+			name: "call block body",
+			templates: map[string]string{
+				"p": parent,
+				"c": `{% extends 'p' %}{% macro m() %}[{{ caller() }}]{% endmacro %}{% block b %}{% call m() %}{{ super() }}{% endcall %}child{% endblock %}`,
+			},
+			entry:   "c",
+			errKind: ErrInvalidOperation,
+		},
+		{
+			name: "super next to a macro call",
+			templates: map[string]string{
+				"p": parent,
+				"c": `{% extends 'p' %}{% macro m() %}M{% endmacro %}{% block b %}{{ m() }}{{ super() }}{% endblock %}`,
+			},
+			entry:    "c",
+			expected: "Mparent",
+		},
+	})
+}
