@@ -71,11 +71,13 @@ fn test_output_consumes_fuel() {
 fn test_size_is_checked_before_allocating() {
     let mut env = Environment::new();
     env.set_fuel(Some(1000));
+    // The sizes fit into a 32-bit usize, as larger ones are rejected as out
+    // of range there before fuel is checked.
     for source in [
-        "{{ 'x' * 1000000000000 }}",
-        "{{ [1]|batch(1000000000000, 'x') }}",
-        "{{ 'a\\nb'|indent(1000000000000) }}",
-        "{{ '%1000000000000s'|format('x') }}",
+        "{{ 'x' * 1000000000 }}",
+        "{{ [1]|batch(1000000000, 'x') }}",
+        "{{ 'a\\nb'|indent(1000000000) }}",
+        "{{ '%1000000000s'|format('x') }}",
     ] {
         let err = env.render_str(source, ()).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::OutOfFuel, "{source}");

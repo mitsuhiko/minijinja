@@ -132,12 +132,13 @@ const BOMBS: &[&str] = &[
     "{{ long_iter|list|length }}",
     "{{ long_iter|reverse|first }}",
     "{{ long_iter[::-1]|first }}",
-    // filters with size arguments
-    "{{ [1]|slice(1000000000000) }}",
-    "{{ [1]|batch(1000000000000, 'x') }}",
-    "{{ 'a\\nb'|indent(1000000000000) }}",
-    "{{ '%.1000000000000f'|format(1.0) }}",
-    "{{ '%1000000000000d'|format(1) }}",
+    // filters with size arguments.  The sizes fit into a 32-bit usize, as
+    // larger ones are rejected as out of range there before fuel is checked.
+    "{{ [1]|slice(1000000000) }}",
+    "{{ [1]|batch(1000000000, 'x') }}",
+    "{{ 'a\\nb'|indent(1000000000) }}",
+    "{{ '%.1000000000f'|format(1.0) }}",
+    "{{ '%1000000000d'|format(1) }}",
     "{{ ('a' * 10000)|replace('a', 'b' * 10000) }}",
     "{{ ([1] * 1000000)|join('x' * 1000) }}",
     "{{ ('x' * 100000)|join('y' * 1000) }}",
