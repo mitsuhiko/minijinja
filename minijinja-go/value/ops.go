@@ -446,9 +446,14 @@ func (v Value) Rem(other Value) (Value, error) {
 }
 
 // bigIntDivRem performs floor division (`//`) or modulo (`%`) where at least
-// one integer operand is a big integer.
+// one integer operand is a big integer.  Like in Rust, the operands have to
+// fit an i128, but the smallest i128 floor divided by -1 gives 2**127 and the
+// matching remainder is 0.
 func bigIntDivRem(v, other Value, opName string) (Value, error) {
 	a, b := arithmeticBigInt(v), arithmeticBigInt(other)
+	if !fitsI128(a) || !fitsI128(b) {
+		return Undefined(), fmt.Errorf("unable to calculate %s %s %s", v.Repr(), opName, other.Repr())
+	}
 	if b.Sign() == 0 {
 		if opName == "%" {
 			return Undefined(), fmt.Errorf("modulo by zero")
@@ -459,9 +464,6 @@ func bigIntDivRem(v, other Value, opName string) (Value, error) {
 	result := quotient
 	if opName == "%" {
 		result = remainder
-	}
-	if !fitsI128(a) || !fitsI128(b) || !fitsI128(quotient) {
-		return Undefined(), fmt.Errorf("unable to calculate %s %s %s", v.Repr(), opName, other.Repr())
 	}
 	return bigIntResult(result), nil
 }
