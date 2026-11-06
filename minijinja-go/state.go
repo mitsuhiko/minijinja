@@ -2030,7 +2030,8 @@ func (s *State) includeTemplate(name string) error {
 		return NewError(ErrInvalidOperation, "recursion limit exceeded")
 	}
 
-	// Create new state with isolated scope
+	// Create new state with isolated scope.  Like in Rust, included
+	// templates have their own blocks.
 	childState := &State{
 		ctx:               s.ctx,
 		env:               s.env,
@@ -2038,7 +2039,7 @@ func (s *State) includeTemplate(name string) error {
 		source:            tmpl.compiled.source,
 		autoEscape:        s.env.autoEscapeFunc(tmpl.compiled.name),
 		scopes:            cloneScopes(s.scopes),
-		blocks:            s.blocks,
+		blocks:            make(map[string]*blockStack),
 		macros:            s.macros,
 		out:               s.out,
 		depth:             s.depth,
