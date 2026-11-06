@@ -2,6 +2,8 @@ package value
 
 import (
 	"encoding/json"
+	"math"
+	"strconv"
 	"testing"
 )
 
@@ -29,6 +31,28 @@ func TestFromAnyPreservesFloatTypes(t *testing.T) {
 				t.Fatalf("unexpected value: got %s, want %s", got, test.want)
 			}
 		})
+	}
+}
+
+func TestFromAnyKeepsUnsignedIntegersAboveInt64(t *testing.T) {
+	tests := []struct {
+		input any
+		want  string
+	}{
+		{uint64(math.MaxInt64), "9223372036854775807"},
+		{uint64(math.MaxInt64) + 1, "9223372036854775808"},
+		{uint64(math.MaxUint64), "18446744073709551615"},
+		{^uint(0), strconv.FormatUint(uint64(^uint(0)), 10)},
+	}
+
+	for _, test := range tests {
+		value := FromAny(test.input)
+		if got := value.String(); got != test.want {
+			t.Errorf("FromAny(%v): got %s, want %s", test.input, got, test.want)
+		}
+		if value.Kind() != KindNumber || value.IsActualFloat() {
+			t.Errorf("FromAny(%v): not stored as an integer", test.input)
+		}
 	}
 }
 

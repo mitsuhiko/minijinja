@@ -636,7 +636,7 @@ func FromObject(o Object) Value {
 //   - nil -> None()
 //   - bool -> FromBool()
 //   - int types -> FromInt()
-//   - uint types -> FromInt()
+//   - uint types -> FromInt(), or FromBigInt() above the int64 range
 //   - float types -> FromFloat()
 //   - json.Number -> FromInt() or FromFloat(), based on its literal; invalid or
 //     unrepresentable numbers become Undefined()
@@ -718,7 +718,11 @@ func fromReflectValue(rv reflect.Value) Value {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return FromInt(rv.Int())
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return FromInt(int64(rv.Uint()))
+		u := rv.Uint()
+		if u > math.MaxInt64 {
+			return FromBigInt(new(big.Int).SetUint64(u))
+		}
+		return FromInt(int64(u))
 	case reflect.Float32, reflect.Float64:
 		return FromFloat(rv.Float())
 	case reflect.String:
