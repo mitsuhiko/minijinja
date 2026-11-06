@@ -803,11 +803,11 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 	}
 	defer func() { s.depth-- }()
 
-	// like in Rust, macros do not run in the block they are called from, so
-	// they cannot call super().
-	oldBlock := s.currentBlock
-	s.currentBlock = ""
-	defer func() { s.currentBlock = oldBlock }()
+	// like in Rust, macros do not run in the block or loop they are called
+	// from, so they cannot call super() or recurse the loop.
+	oldBlock, oldRecurse := s.currentBlock, s.loopRecurse
+	s.currentBlock, s.loopRecurse = "", nil
+	defer func() { s.currentBlock, s.loopRecurse = oldBlock, oldRecurse }()
 
 	s.pushScope()
 	defer s.popScope()
@@ -978,7 +978,14 @@ func (l *loopObject) String() string {
 func (l *loopObject) Call(state value.State, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	_ = state
 	if l.recurseFn == nil {
-		return value.Undefined(), NewError(ErrInvalidOperation, "loop recursion cannot be called this way")
+		return value.Undefined(), NewError(ErrInvalidOperation, "cannot recurse outside of recursive loop")
+	}
+	// the loop might be called from a nested loop or macro, so make it the
+	// loop that loop() recurses while it runs.
+	if s, ok := state.(*State); ok && s != nil {
+		oldRecurse := s.loopRecurse
+		s.loopRecurse = l.recurseFn
+		defer func() { s.loopRecurse = oldRecurse }()
 	}
 	if len(args) != 1 {
 		return value.Undefined(), NewError(ErrInvalidOperation, "loop() takes exactly 1 argument")
@@ -1457,6 +1464,12 @@ func (s *State) evalForLoopPull(loop *parser.ForLoop, pull value.PullIterator) e
 		s.depth--
 	}()
 
+	// like in Rust, loop() in a loop that is not recursive does not recurse
+	// an outer loop.
+	oldRecurse := s.loopRecurse
+	s.loopRecurse = nil
+	defer func() { s.loopRecurse = oldRecurse }()
+
 	index := 0
 	prevItem := value.Undefined()
 	changedState := &loopChangedState{}
@@ -1652,6 +1665,12 @@ func (s *State) evalForLoopItems(loop *parser.ForLoop, items []value.Value) erro
 			s.out = oldOut
 			return result, nil
 		}
+		defer func() { s.loopRecurse = oldRecurse }()
+	} else {
+		// like in Rust, loop() in a loop that is not recursive does not
+		// recurse an outer loop.
+		oldRecurse = s.loopRecurse
+		s.loopRecurse = nil
 		defer func() { s.loopRecurse = oldRecurse }()
 	}
 
