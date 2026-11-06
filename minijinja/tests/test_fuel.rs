@@ -85,6 +85,19 @@ fn test_size_is_checked_before_allocating() {
 }
 
 #[test]
+fn test_replace_count_limits_fuel() {
+    let mut env = Environment::new();
+    env.set_fuel(Some(1000));
+    let source = "{{ ('a' * 1000)|replace('a', 'b' * 1000, count)|length }}";
+    let rv = env.render_str(source, context! { count => 1 }).unwrap();
+    assert_eq!(rv, "1999");
+    let err = env
+        .render_str(source, context! { count => -1 })
+        .unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::OutOfFuel);
+}
+
+#[test]
 fn test_iteration_consumes_fuel() {
     let mut env = Environment::new();
     env.set_fuel(Some(10000));

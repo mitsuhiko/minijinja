@@ -265,10 +265,14 @@ mod builtins {
     /// Does a string replace.
     ///
     /// It replaces all occurrences of the first parameter with the second.
+    /// If the optional third parameter is given, only that many occurrences
+    /// are replaced.
     ///
     /// ```jinja
     /// {{ "Hello World"|replace("Hello", "Goodbye") }}
     ///   -> Goodbye World
+    /// {{ "aaa"|replace("a", "b", 2) }}
+    ///   -> bba
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn replace(
@@ -276,25 +280,42 @@ mod builtins {
         value: StringInput<'_>,
         from: StringInput<'_>,
         to: StringInput<'_>,
+        count: Option<i64>,
     ) -> Result<Value, Error> {
         let safety_aware = !matches!(state.auto_escape(), AutoEscape::None)
             && (value.is_safe() || from.is_safe() || to.is_safe());
+        let count = count
+            .and_then(|count| usize::try_from(count).ok())
+            .unwrap_or(usize::MAX);
 
         if safety_aware {
             let value = value.format(state)?;
             let to = to.format(state)?;
-            ok!(ensure_fuel_for_replace(state, &value, from.as_str(), &to));
-            Ok(Value::from_safe_string(value.replace(from.as_str(), &to)))
+            ok!(ensure_fuel_for_replace(
+                state,
+                &value,
+                from.as_str(),
+                &to,
+                count
+            ));
+            Ok(Value::from_safe_string(value.replacen(
+                from.as_str(),
+                &to,
+                count,
+            )))
         } else {
             ok!(ensure_fuel_for_replace(
                 state,
                 value.as_str(),
                 from.as_str(),
-                to.as_str()
+                to.as_str(),
+                count
             ));
-            Ok(Value::from(
-                value.as_str().replace(from.as_str(), to.as_str()),
-            ))
+            Ok(Value::from(value.as_str().replacen(
+                from.as_str(),
+                to.as_str(),
+                count,
+            )))
         }
     }
 
@@ -305,6 +326,7 @@ mod builtins {
         value: &str,
         from: &str,
         to: &str,
+        count: usize,
     ) -> Result<(), Error> {
         if to.len() > from.len() {
             // the cheap upper bound assumes that everything matches, only if
@@ -314,9 +336,9 @@ mod builtins {
                     .saturating_mul(to.len() - from.len())
                     .saturating_add(value.len())
             };
-            let max_matches = value.len() / from.len().max(1) + 1;
+            let max_matches = (value.len() / from.len().max(1) + 1).min(count);
             if state.ensure_bytes_quiet(size(max_matches)).is_err() {
-                ok!(state.ensure_bytes(size(value.matches(from).count())));
+                ok!(state.ensure_bytes(size(value.matches(from).take(count).count())));
             }
         }
         Ok(())
