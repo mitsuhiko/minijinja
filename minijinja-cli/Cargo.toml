@@ -16,7 +16,7 @@ default = ["toml", "yaml", "querystring", "cbor", "datetime", "json5", "repl", "
 yaml = ["dep:deser-yaml"]
 querystring = []
 cbor = ["dep:deser-cbor"]
-datetime = ["minijinja-contrib/datetime", "minijinja-contrib/timezone"]
+datetime = ["minijinja-contrib/datetime", "minijinja-contrib/timezone", "dep:jiff"]
 json5 = ["dep:deser-json5"]
 repl = ["dep:miniline"]
 completions = ["argument-completions"]
@@ -30,6 +30,9 @@ preserve_order = ["minijinja/preserve_order"]
 anyhow = "1.0.74"
 argument = "0.1.0"
 argument-completions = { version = "0.1.0", optional = true }
+# Only used to compile in jiff's bundled time zone database so that the CLI
+# resolves time zone names consistently even if the host lacks them.
+jiff = { version = "0.2.35", optional = true, default-features = false, features = ["tzdb-bundle-always"] }
 minijinja = { version = "=3.0.5", path = "../minijinja", features = [
     "json",
     "urlencode",

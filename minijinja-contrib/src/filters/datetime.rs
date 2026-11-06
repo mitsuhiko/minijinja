@@ -29,7 +29,10 @@ fn parse_string(value: &str) -> Result<ParsedDateTime, Error> {
     let datetime = pieces.date().to_datetime(time);
 
     #[cfg(feature = "timezone")]
-    let annotated_timezone = pieces.to_time_zone().map_err(invalid_datetime)?;
+    let annotated_timezone = pieces
+        .to_time_zone()
+        .or_else(|err| pieces.to_time_zone_with(bundled_db()).map_err(|_| err))
+        .map_err(invalid_datetime)?;
     #[cfg(not(feature = "timezone"))]
     let annotated_timezone: Option<TimeZone> = None;
 
@@ -110,12 +113,55 @@ fn get_timezone(state: &State<'_, '_>, kwargs: &Kwargs) -> Result<Option<TimeZon
     if tzname == "original" {
         Ok(None)
     } else {
-        TimeZone::get(tzname).map(Some).map_err(|_| {
-            Error::new(
-                ErrorKind::InvalidOperation,
-                format!("unknown timezone '{tzname}'"),
-            )
-        })
+        resolve_timezone(tzname, jiff::tz::db(), bundled_db())
+            .map(Some)
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidOperation,
+                    format!("unknown timezone '{tzname}'"),
+                )
+            })
+    }
+}
+
+/// Returns jiff's bundled time zone database.
+///
+/// This is only populated if jiff's bundled data is compiled in (for instance
+/// with the `jiff/tzdb-bundle-always` feature or on platforms without system
+/// time zone data), otherwise it is empty.
+#[cfg(feature = "timezone")]
+fn bundled_db() -> &'static jiff::tz::TimeZoneDatabase {
+    static DB: std::sync::OnceLock<jiff::tz::TimeZoneDatabase> = std::sync::OnceLock::new();
+    DB.get_or_init(jiff::tz::TimeZoneDatabase::bundled)
+}
+
+/// Looks up a time zone by name in the system database first and falls back
+/// to the bundled database.
+///
+/// jiff's global database only consults the system time zone data if it
+/// exists, and some systems (such as Ubuntu 26.04 without `tzdata-legacy`)
+/// do not ship legacy names like `EST` or `US/Eastern`.
+#[cfg(feature = "timezone")]
+fn resolve_timezone(
+    name: &str,
+    system: &jiff::tz::TimeZoneDatabase,
+    bundled: &jiff::tz::TimeZoneDatabase,
+) -> Option<TimeZone> {
+    system.get(name).or_else(|_| bundled.get(name)).ok()
+}
+
+#[cfg(all(test, feature = "timezone"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_timezone_falls_back_to_bundled() {
+        let empty = jiff::tz::TimeZoneDatabase::none();
+        let bundled = jiff::tz::TimeZoneDatabase::bundled();
+        assert!(resolve_timezone("EST", &empty, &empty).is_none());
+        let tz = resolve_timezone("EST", &empty, &bundled).unwrap();
+        assert_eq!(tz.iana_name(), Some("EST"));
+        assert!(resolve_timezone("Not/AZone", &empty, &bundled).is_none());
     }
 }
 
