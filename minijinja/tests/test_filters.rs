@@ -752,3 +752,37 @@ fn test_escape_filter_custom_formatter() {
         .unwrap();
     assert_eq!(result, "\\*|ok\\*end");
 }
+
+#[test]
+fn test_replace_count_errors() {
+    let env = Environment::new();
+    for (source, err) in [
+        (
+            r#"{{ "aaa"|replace("a", "b", "2") }}"#,
+            "cannot convert string to i64",
+        ),
+        (
+            r#"{{ "aaa"|replace("a", "b", 2.5) }}"#,
+            "cannot convert number to i64",
+        ),
+        (
+            r#"{{ "aaa"|replace("a", "b", 9999999999999999999999) }}"#,
+            "cannot convert number to i64",
+        ),
+        (
+            r#"{{ "aaa"|replace("a", "b", 2, 3) }}"#,
+            "too many arguments",
+        ),
+        (
+            r#"{{ "aaa"|replace("a", "b", 1, count=2) }}"#,
+            "unknown keyword argument 'count'",
+        ),
+        (
+            r#"{{ "aaa"|replace("a", "b", foo=2) }}"#,
+            "unknown keyword argument 'foo'",
+        ),
+    ] {
+        let rv = env.render_str(source, ()).unwrap_err();
+        assert!(rv.to_string().contains(err), "{source}: {rv}");
+    }
+}

@@ -36,6 +36,7 @@ title-brackets: {{ "foo (bar) [baz] {qux} <quux>"|title }}
 capitalize: {{ word|capitalize }}
 capitalize-three-words: {{ three_words|capitalize }}
 replace: {{ word|replace("B", "th") }}
+replace-count: {{ "aaa"|replace("a", "b", 2) }}|{{ "abc"|replace("", "-", 2) }}|{{ "aaa"|replace("a", "b", -1) }}|{{ "aaa"|replace("a", "b", 0) }}|{{ "aaa"|replace("a", "b", count=1) }}|{{ "aaa"|replace("a", "b", true) }}
 escape: {{ "<"|escape }}
 e: {{ "<"|e }}
 double-escape: {{ "<"|escape|escape }}

@@ -176,3 +176,17 @@ func TestFuelStickyExhaustion(t *testing.T) {
 		assertOutOfFuel(t, err)
 	}
 }
+
+func TestReplaceCountLimitsFuel(t *testing.T) {
+	env := fuelEnv(1000)
+	tmpl, err := env.TemplateFromString("{{ ('a' * 1000)|replace('a', 'b' * 1000, count)|length }}")
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	rv, err := tmpl.Render(map[string]any{"count": 1})
+	if err != nil || rv != "1999" {
+		t.Fatalf("unexpected result %q, %v", rv, err)
+	}
+	_, err = tmpl.Render(map[string]any{"count": -1})
+	assertOutOfFuel(t, err)
+}
