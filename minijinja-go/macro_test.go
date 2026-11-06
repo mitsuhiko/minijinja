@@ -207,3 +207,75 @@ func TestSuperInMacroLikeRust(t *testing.T) {
 		},
 	})
 }
+
+func TestMacroAutoEscapeLikeRust(t *testing.T) {
+	runTemplatesCases(t, []templatesCase{
+		// macros use the auto escaping of the place they are called from,
+		// not of the template that defines them.
+		{
+			name: "html macro called from txt",
+			templates: map[string]string{
+				"m.html": `{% macro m(x) %}<{{ x }}>{% endmacro %}`,
+				"t.txt":  `{% from 'm.html' import m %}{{ m('&') }}`,
+			},
+			entry:    "t.txt",
+			expected: "<&>",
+		},
+		{
+			name: "html module macro called from txt",
+			templates: map[string]string{
+				"m.html": `{% macro m() %}{{ '<' }}{% endmacro %}{% set v = m() %}`,
+				"t.txt":  `{% import 'm.html' as mm %}{{ mm.v }}|{{ mm.m() }}`,
+			},
+			entry:    "t.txt",
+			expected: "&lt;|<",
+		},
+		{
+			name: "txt macro called from html",
+			templates: map[string]string{
+				"m.txt":  `{% macro m(x) %}<{{ x }}>{{ caller() }}{% endmacro %}`,
+				"t.html": `{% from 'm.txt' import m %}{% call m('&') %}{{ '&' }}{% endcall %}`,
+			},
+			entry:    "t.html",
+			expected: "<&amp;>&amp;",
+		},
+		{
+			name: "html macro with caller called from txt",
+			templates: map[string]string{
+				"m.html": `{% macro m(x) %}<{{ x }}>{{ caller() }}{% endmacro %}`,
+				"t.txt":  `{% from 'm.html' import m %}{% call m('&') %}{{ '&' }}{% endcall %}`,
+			},
+			entry:    "t.txt",
+			expected: "<&>&",
+		},
+		{
+			name: "macro defined with auto escaping disabled",
+			templates: map[string]string{
+				"t.html": `{% autoescape false %}{% macro m(x) %}<{{ x }}>{% endmacro %}{% endautoescape %}{{ m('&') }}`,
+			},
+			entry:    "t.html",
+			expected: "<&amp;>",
+		},
+		{
+			name: "macro called with auto escaping disabled",
+			templates: map[string]string{
+				"t.html": `{% macro m(x) %}<{{ x }}>{% endmacro %}{% autoescape false %}{{ m('&') }}{% endautoescape %}`,
+			},
+			entry:    "t.html",
+			expected: "<&>",
+		},
+		// without auto escaping, the result of a macro is not safe.
+		{
+			name:      "escaping macro output without auto escaping",
+			templates: map[string]string{"t.txt": `{% macro m() %}<{% endmacro %}{{ m()|escape }}`},
+			entry:     "t.txt",
+			expected:  "&lt;",
+		},
+		{
+			name:      "escaping macro output with auto escaping disabled",
+			templates: map[string]string{"t.html": `{% macro m() %}<{% endmacro %}{% autoescape false %}{{ m()|escape }}{% endautoescape %}`},
+			entry:     "t.html",
+			expected:  "&lt;",
+		},
+	})
+}

@@ -539,6 +539,13 @@ func (m *macroCallable) Call(state value.State, args []value.Value, kwargs map[s
 	defer func() {
 		m.state.scopes = oldScopes
 	}()
+	// like in Rust, the macro uses the auto escaping of the caller rather
+	// than the one of the template that defines it.
+	if caller, ok := state.(*State); ok && caller != nil {
+		oldEscape := m.state.autoEscape
+		m.state.autoEscape = caller.autoEscape
+		defer func() { m.state.autoEscape = oldEscape }()
+	}
 	return m.state.callMacroWithValues(m.macro, args, kwargs, m.hasCaller)
 }
 
@@ -873,6 +880,9 @@ func (s *State) callMacroWithValues(macro *parser.Macro, args []value.Value, kwa
 	result := builder.String()
 	s.out = oldOut
 
+	if s.autoEscape.IsNone() {
+		return value.FromString(result), nil
+	}
 	return value.FromSafeString(result), nil
 }
 
