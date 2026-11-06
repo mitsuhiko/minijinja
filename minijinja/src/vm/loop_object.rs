@@ -27,7 +27,7 @@ impl LoopState {
         iter: ValueIter,
         depth: usize,
         with_loop_var: bool,
-        recurse_jump_target: Option<u32>,
+        recurse_jump_target: Option<RecurseTarget>,
         current_recursion_jump: Option<(u32, bool)>,
     ) -> LoopState {
         // for an iterator where the lower and upper bound are matching we can
@@ -109,12 +109,23 @@ impl AdjacentLoopItemIterWrapper {
     }
 }
 
+/// Where a recursive loop jumps to when `loop()` is called.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RecurseTarget {
+    /// The instruction that pushes the loop.
+    pub pc: u32,
+    /// The address of the instructions the loop belongs to.  The jump target
+    /// is only valid while these instructions are executing, which is not the
+    /// case in included templates, blocks or macros.
+    pub instructions: usize,
+}
+
 pub(crate) struct Loop {
     pub len: Option<usize>,
     pub idx: AtomicUsize,
     pub depth: usize,
     pub last_changed_value: Mutex<Option<Vec<Value>>>,
-    pub recurse_jump_target: Option<u32>,
+    pub recurse_jump_target: Option<RecurseTarget>,
     #[cfg(feature = "adjacent_loop_items")]
     iter: Mutex<AdjacentLoopItemIterWrapper>,
 }

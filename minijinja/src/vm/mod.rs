@@ -16,7 +16,7 @@ use crate::value::{
     UndefinedType, Value, ValueMap, ValueRepr,
 };
 use crate::vm::context::{Frame, Stack};
-use crate::vm::loop_object::{Loop, LoopState};
+use crate::vm::loop_object::{Loop, LoopState, RecurseTarget};
 #[cfg(feature = "multi_template")]
 use crate::vm::state::{BlockStack, BlockState};
 
@@ -57,6 +57,12 @@ pub(crate) fn prepare_blocks<'env, 'template>(
         rv.insert(*name, BlockStack::new(instr));
     }
     rv
+}
+
+/// Returns the address of instructions to identify them.
+#[inline(always)]
+fn instructions_addr(instructions: &Instructions<'_>) -> usize {
+    instructions as *const Instructions<'_> as usize
 }
 
 fn get_or_lookup_local<'a, F>(vec: &mut [Option<&'a Value>], idx: u8, f: F) -> Option<&'a Value>
@@ -285,7 +291,17 @@ impl<'env> Executor<'env> {
 
         macro_rules! recurse_loop {
             ($capture:expr, $loop_object:expr) => {{
-                let Some(jump_target) = $loop_object.recurse_jump_target else {
+                // the jump target is only valid within the instructions and
+                // context that run the loop.  Included templates, blocks and
+                // macros can see loops but cannot recurse them.
+                let Some(jump_target) = $loop_object
+                    .recurse_jump_target
+                    .filter(|target| {
+                        target.instructions == instructions_addr(state.instructions)
+                            && state.ctx.has_loop($loop_object)
+                    })
+                    .map(|target| target.pc)
+                else {
                     bail!(Error::new(
                         ErrorKind::InvalidOperation,
                         "cannot recurse outside of recursive loop",
@@ -1284,7 +1300,10 @@ impl<'env> Executor<'env> {
                 iter,
                 depth,
                 flags & LOOP_FLAG_WITH_LOOP_VAR != 0,
-                (flags & LOOP_FLAG_RECURSIVE != 0).then_some(pc),
+                (flags & LOOP_FLAG_RECURSIVE != 0).then(|| RecurseTarget {
+                    pc,
+                    instructions: instructions_addr(state.instructions),
+                }),
                 current_recursion_jump,
             )),
             ..Frame::default()

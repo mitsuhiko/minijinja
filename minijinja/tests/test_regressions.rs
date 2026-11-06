@@ -99,3 +99,54 @@ fn test_round_uses_bankers_rounding() {
         .render_str("{{ value|round(-308) }}", context!(value => 1.7e308))
         .is_err());
 }
+
+#[cfg(feature = "multi_template")]
+#[test]
+fn test_loop_recursion_outside_of_loop_instructions() {
+    let mut env = Environment::new();
+    env.add_template("i", "{{ loop(x[1:] if x is sequence else []) }}")
+        .unwrap();
+    // included template
+    env.add_template(
+        "include",
+        "{% for x in [[1,[2]]] recursive %}<{{ x }}{% include 'i' %}>{% endfor %}",
+    )
+    .unwrap();
+    // block inside of a loop
+    env.add_template(
+        "block",
+        "{% for x in [[1,[2]]] recursive %}<{{ x }}\
+         {% block b %}{{ loop(x[1:] if x is sequence else []) }}{% endblock %}>{% endfor %}",
+    )
+    .unwrap();
+    // loop passed to a macro
+    env.add_template(
+        "macro",
+        "{% macro m(l, x) %}{{ l(x[1:] if x is sequence else []) }}{% endmacro %}\
+         {% for x in [[1,[2]]] recursive %}<{{ x }}{{ m(loop, x) }}>{% endfor %}",
+    )
+    .unwrap();
+    for name in ["include", "block", "macro"] {
+        let err = env.get_template(name).unwrap().render(()).unwrap_err();
+        let mut msg = err.to_string();
+        if let Some(source) = std::error::Error::source(&err) {
+            msg.push_str(&source.to_string());
+        }
+        assert!(
+            msg.contains("cannot recurse outside of recursive loop"),
+            "{name}: {msg}"
+        );
+    }
+
+    // recursing an outer loop from within the same template still works
+    env.add_template(
+        "outer",
+        "{% for x in [[1,[2]]] recursive %}{% set outer = loop %}<{{ x }}\
+         {% for y in [1] %}{{ outer(x[1:] if x is sequence else []) }}{% endfor %}>{% endfor %}",
+    )
+    .unwrap();
+    assert_eq!(
+        env.get_template("outer").unwrap().render(()).unwrap(),
+        "<[1, [2]]<[2]>>"
+    );
+}

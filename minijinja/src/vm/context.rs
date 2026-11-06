@@ -5,7 +5,7 @@ use std::fmt;
 use crate::environment::Environment;
 use crate::error::{Error, ErrorKind};
 use crate::value::Value;
-use crate::vm::loop_object::LoopState;
+use crate::vm::loop_object::{Loop, LoopState};
 
 #[cfg(feature = "macros")]
 use crate::vm::{Closure, ClosureId};
@@ -391,6 +391,16 @@ impl<'env> Context<'env> {
             .iter()
             .rev()
             .find_map(|frame| frame.current_loop.as_ref())
+    }
+
+    /// Returns `true` if the given loop is active in this context.
+    pub fn has_loop(&self, loop_object: &Loop) -> bool {
+        self.stack.iter().any(|frame| {
+            frame
+                .current_loop
+                .as_ref()
+                .is_some_and(|l| std::ptr::eq(&*l.object, loop_object))
+        })
     }
 
     pub fn next_loop_item(&mut self) -> Option<Value> {
