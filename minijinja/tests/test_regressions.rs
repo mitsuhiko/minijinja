@@ -64,6 +64,19 @@ fn test_booleans_are_numbers() {
 }
 
 #[test]
+fn test_booleans_compare_like_numbers() {
+    let env = Environment::new();
+    assert_eq!(
+        env.render_str(
+            "{{ true < 1 }}|{{ 0 < true }}|{{ [3, true, 0]|sort }}|{{ [true, 1]|unique }}|{{ {true: 'x'}[1] }}",
+            (),
+        )
+        .unwrap(),
+        "False|True|[0, True, 3]|[True]|x"
+    );
+}
+
+#[test]
 fn test_division_by_zero_errors() {
     let env = Environment::new();
     for source in ["{{ 1 / 0 }}", "{{ -1 / 0 }}", "{{ 0 / 0 }}"] {

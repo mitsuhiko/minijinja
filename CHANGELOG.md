@@ -23,6 +23,7 @@ All notable changes to MiniJinja are documented here.
 * Fixed `+` in Go failing on iterables such as `range()`.  Like in Rust, sequences and iterables concatenate into an iterable, so `range(2) + [5]` is `[0, 1, 5]` instead of failing with "cannot add iterator and sequence".
 * Fixed the `tojson` filter in Go writing integers outside the 64-bit range as `0.0`.  Like in Rust, `9223372036854775808|tojson` is now `9223372036854775808`.
 * Fixed unsigned integers above the `int64` range turning negative when passed to templates in Go.  A `uint64` of `18446744073709551615` now renders as `18446744073709551615` instead of `-1`.
+* Fixed booleans comparing equal to numbers but sorting as a separate kind before all numbers.  `true == 1` was true while `true < 1` was also true, so `[3, true, 0]|sort` gave `[True, 0, 3]`.  Like in Python, booleans now order as `0` and `1` against numbers, so `0 < true` is true and the result is `[0, True, 3]`.  This applies to Rust and Go.  In Rust, `true` and `1` (and `false` and `0`) are now also the same map key and the same item for `unique` and `groupby`, so `{true: 'a', 1: 'b'}` is `{True: 'b'}`, `[true, 1]|unique` is `[True]` and `{true: 'x'}[1]` finds the value.
 
 ## 3.0.5
 

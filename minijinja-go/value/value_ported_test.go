@@ -174,7 +174,7 @@ func TestValueSort(t *testing.T) {
 }
 
 func TestSortDifferentTypes(t *testing.T) {
-	// Kind ordering: Undefined < None < Bool < Number < String < Seq < Map
+	// Kind ordering: Undefined < None < Bool and Number (by value) < String < Seq < Map
 	values := []Value{
 		FromInt(100),
 		FromString("bar"),
@@ -197,7 +197,7 @@ func TestSortDifferentTypes(t *testing.T) {
 	}
 
 	expectedKinds := []ValueKind{
-		KindUndefined, KindNone, KindBool, KindNumber, KindNumber, KindString, KindString,
+		KindUndefined, KindNone, KindNumber, KindBool, KindNumber, KindString, KindString,
 	}
 	for i, k := range kinds {
 		if k != expectedKinds[i] {
