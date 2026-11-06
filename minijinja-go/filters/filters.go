@@ -375,9 +375,31 @@ func FilterTrim(state State, val value.Value, args []value.Value, _ map[string]v
 //	  -> "Goodbye World"
 //	{{ "aaa"|replace("a", "b", 2) }}
 //	  -> "bba"
-func FilterReplace(state State, val value.Value, args []value.Value, _ map[string]value.Value) (value.Value, error) {
+func FilterReplace(state State, val value.Value, args []value.Value, kwargs map[string]value.Value) (value.Value, error) {
 	if len(args) < 2 {
 		return val, fmt.Errorf("replace requires old and new arguments")
+	}
+	if len(args) > 3 {
+		return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, "too many arguments")
+	}
+	countArg, hasCount := kwargs["count"]
+	for name := range kwargs {
+		if name != "count" || len(args) > 2 {
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrTooManyArguments, fmt.Sprintf("unknown keyword argument '%s'", name))
+		}
+	}
+	if len(args) > 2 {
+		countArg, hasCount = args[2], true
+	}
+	// Like in Rust and Python, a missing or negative count replaces all
+	// occurrences.
+	count := -1
+	if hasCount && !countArg.IsNone() && !countArg.IsUndefined() {
+		c, err := replaceCount(countArg)
+		if err != nil {
+			return value.Undefined(), err
+		}
+		count = c
 	}
 	s, err := stringInput(state, val)
 	if err != nil {
@@ -390,12 +412,6 @@ func FilterReplace(state State, val value.Value, args []value.Value, _ map[strin
 	new, err := stringInput(state, args[1])
 	if err != nil {
 		return value.Undefined(), err
-	}
-	count := -1
-	if len(args) > 2 {
-		if c, ok := args[2].AsInt(); ok {
-			count = int(c)
-		}
 	}
 
 	safetyAware := autoEscapeEnabled(state) && (val.IsSafe() || args[0].IsSafe() || args[1].IsSafe())
@@ -417,6 +433,27 @@ func FilterReplace(state State, val value.Value, args []value.Value, _ map[strin
 		return value.Undefined(), err
 	}
 	return value.FromString(strings.Replace(s, old, new, count)), nil
+}
+
+// replaceCount converts the count argument of replace like an i64 argument
+// in Rust: booleans count as 0 and 1, floats must be integral and other
+// values fail.
+func replaceCount(v value.Value) (int, error) {
+	if b, ok := v.AsBool(); ok {
+		if b {
+			return 1, nil
+		}
+		return 0, nil
+	}
+	if f, ok := v.AsFloat(); ok && f == math.Trunc(f) && f >= math.MinInt64 && f < math.MaxInt64 {
+		if c, ok := v.AsInt(); ok {
+			if c < 0 {
+				return -1, nil
+			}
+			return int(min(c, math.MaxInt)), nil
+		}
+	}
+	return 0, mjerrors.NewError(mjerrors.ErrInvalidOperation, fmt.Sprintf("cannot convert %s to i64", v.Kind()))
 }
 
 // ensureFuelForReplace refuses a replacement that would create a string

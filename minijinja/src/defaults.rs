@@ -77,7 +77,10 @@ fn build_builtin_filters() -> BTreeMap<Cow<'static, str>, Value> {
             "capitalize".into(),
             Value::from_function(filters::capitalize),
         );
-        rv.insert("replace".into(), Value::from_function(filters::replace));
+        rv.insert(
+            "replace".into(),
+            Value::from_function(filters::replace_with_kwargs),
+        );
         let length = Value::from_function(filters::length);
         rv.insert("length".into(), length.clone());
         rv.insert("count".into(), length);

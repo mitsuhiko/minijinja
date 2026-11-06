@@ -407,6 +407,25 @@ func TestDivisionByZeroErrors(t *testing.T) {
 	}
 }
 
+func TestReplaceCountErrors(t *testing.T) {
+	for _, tc := range []struct{ source, err string }{
+		{`{{ "aaa"|replace("a", "b", "2") }}`, "cannot convert string to i64"},
+		{`{{ "aaa"|replace("a", "b", 2.5) }}`, "cannot convert number to i64"},
+		{`{{ "aaa"|replace("a", "b", 9999999999999999999999) }}`, "cannot convert number to i64"},
+		{`{{ "aaa"|replace("a", "b", 2, 3) }}`, "too many arguments"},
+		{`{{ "aaa"|replace("a", "b", 1, count=2) }}`, "unknown keyword argument 'count'"},
+		{`{{ "aaa"|replace("a", "b", foo=2) }}`, "unknown keyword argument 'foo'"},
+	} {
+		tmpl, err := NewEnvironment().TemplateFromString(tc.source)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", tc.source, err)
+		}
+		if _, err := tmpl.Render(nil); err == nil || !strings.Contains(err.Error(), tc.err) {
+			t.Errorf("expected error %q for %q, got %v", tc.err, tc.source, err)
+		}
+	}
+}
+
 func TestRepeatedSequenceSizeLimit(t *testing.T) {
 	tmpl, err := NewEnvironment().TemplateFromString("{{ [0] * 2**30 }}")
 	if err != nil {

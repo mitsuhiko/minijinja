@@ -265,14 +265,17 @@ mod builtins {
     /// Does a string replace.
     ///
     /// It replaces all occurrences of the first parameter with the second.
-    /// If the optional third parameter is given, only that many occurrences
-    /// are replaced.
+    /// If the optional third parameter `count` is given, only that many
+    /// occurrences are replaced.  A negative count replaces all occurrences.
+    /// The count can also be passed as keyword argument.
     ///
     /// ```jinja
     /// {{ "Hello World"|replace("Hello", "Goodbye") }}
     ///   -> Goodbye World
     /// {{ "aaa"|replace("a", "b", 2) }}
     ///   -> bba
+    /// {{ "aaa"|replace("a", "b", count=1) }}
+    ///   -> baa
     /// ```
     #[cfg_attr(docsrs, doc(cfg(feature = "builtins")))]
     pub fn replace(
@@ -317,6 +320,33 @@ mod builtins {
                 count,
             )))
         }
+    }
+
+    /// The `replace` filter as registered, which also accepts `count` as
+    /// keyword argument.
+    pub(crate) fn replace_with_kwargs(
+        state: &mut State,
+        args: Rest<ValueOrKwargs>,
+    ) -> Result<Value, Error> {
+        let args = args.into_values();
+        // functions only support up to five arguments, so the keyword
+        // arguments need manual argument parsing.
+        type Args<'a> = (
+            StringInput<'a>,
+            StringInput<'a>,
+            StringInput<'a>,
+            Option<i64>,
+            Kwargs,
+        );
+        let (value, from, to, count, kwargs) = ok!(
+            <Args<'_> as crate::value::FunctionArgs>::from_values_mut(Some(state), &args)
+        );
+        let count = match count {
+            Some(count) => Some(count),
+            None => ok!(kwargs.get::<Option<i64>>("count")),
+        };
+        ok!(kwargs.assert_all_used());
+        replace(state, value, from, to, count)
     }
 
     /// Refuses a replacement that would create a string larger than the
