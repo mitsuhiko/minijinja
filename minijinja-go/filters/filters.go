@@ -3161,6 +3161,10 @@ func FilterRound(_ State, val value.Value, args []value.Value, kwargs map[string
 		if precision >= 0 {
 			return val, nil
 		}
+		if !fitsI128(n) {
+			// like Rust, which rounds in i128
+			return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot convert number to i128")
+		}
 		return roundInt(n, precision, method)
 	}
 

@@ -520,13 +520,19 @@ func TestNumberFiltersBeyondInt64(t *testing.T) {
 		}
 	}
 
-	// Rounding past the i128 range fails like in Rust.
-	tmpl, err := env.TemplateFromString("{{ 170141183460469231731687303715884105727|round(-1) }}")
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
-	if result, err := tmpl.Render(nil); err == nil {
-		t.Errorf("expected an error, got %q", result)
+	// Rounding past the i128 range or rounding values outside of it fails
+	// like in Rust.
+	for _, source := range []string{
+		"{{ 170141183460469231731687303715884105727|round(-1) }}",
+		"{{ 170141183460469231731687303715884105728|round(-1, 'floor') }}",
+	} {
+		tmpl, err := env.TemplateFromString(source)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		if result, err := tmpl.Render(nil); err == nil {
+			t.Errorf("%q: expected an error, got %q", source, result)
+		}
 	}
 }
 
