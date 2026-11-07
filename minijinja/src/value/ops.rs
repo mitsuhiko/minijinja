@@ -654,7 +654,22 @@ pub fn neg(val: &Value) -> Result<Value, Error> {
 
 /// Attempts a string concatenation.
 pub fn string_concat(left: Value, right: &Value) -> Value {
+    // Fast path for the common case of two strings: skip the formatter.
+    if let (Some(l), Some(r)) = (plain_str(&left), plain_str(right)) {
+        let mut rv = String::with_capacity(l.len() + r.len());
+        rv.push_str(l);
+        rv.push_str(r);
+        return Value::from(rv);
+    }
     Value::from(format!("{left}{right}"))
+}
+
+fn plain_str(v: &Value) -> Option<&str> {
+    match v.0 {
+        ValueRepr::String(ref s, _) => Some(s),
+        ValueRepr::SmallStr(ref s) => Some(s.as_str()),
+        _ => None,
+    }
 }
 
 /// Estimates how many bytes the result of a binary operation will need.
@@ -1117,6 +1132,17 @@ mod tests {
         assert_eq!(
             string_concat(Value::from(23), &Value::from(42)),
             Value::from("2342")
+        );
+        assert_eq!(
+            string_concat(Value::from("foo"), &Value::from("bar")),
+            Value::from("foobar")
+        );
+        assert_eq!(
+            string_concat(
+                Value::from("x".repeat(40)),
+                &Value::from_safe_string("<y>".into())
+            ),
+            Value::from(format!("{}<y>", "x".repeat(40)))
         );
     }
 

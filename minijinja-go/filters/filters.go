@@ -1192,7 +1192,7 @@ func FilterLast(state State, val value.Value, _ []value.Value, _ map[string]valu
 		}
 		return value.Undefined(), nil
 	}
-	if kind := val.Kind(); kind != value.KindSeq && kind != value.KindIterable {
+	if kind := val.Kind(); kind != value.KindSeq && kind != value.KindIterable && kind != value.KindMap {
 		return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation, "cannot get last item from value")
 	}
 	items, err := lastItems(state, val)
@@ -1276,7 +1276,11 @@ func FilterReverse(state State, val value.Value, _ []value.Value, _ map[string]v
 		}
 		return value.FromIterator(value.NewIterator("reversed", result)), nil
 	}
-	return val, nil
+	if val.IsNone() || val.IsUndefined() {
+		return val, nil
+	}
+	return value.Undefined(), mjerrors.NewError(mjerrors.ErrInvalidOperation,
+		fmt.Sprintf("cannot reverse values of type %s", val.Kind()))
 }
 
 // FilterSort sorts an iterable.
