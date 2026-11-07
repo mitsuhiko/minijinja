@@ -560,6 +560,35 @@ func TestNumberFiltersBeyondInt64(t *testing.T) {
 	}
 }
 
+func TestNumberTestsBeyondInt64(t *testing.T) {
+	env := NewEnvironment()
+
+	tests := []struct {
+		template string
+		expected string
+	}{
+		{"{{ 18446744073709551616 is even }}", "True"},
+		{"{{ 18446744073709551616 is odd }}", "False"},
+		{"{{ 18446744073709551617 is even }}", "False"},
+		{"{{ 18446744073709551617 is odd }}", "True"},
+		{"{{ -18446744073709551617 is odd }}", "True"},
+		{"{{ 18446744073709551616 is integer }}", "True"},
+		{"{{ 18446744073709551616 is int }}", "True"},
+	}
+	for _, test := range tests {
+		tmpl, err := env.TemplateFromString(test.template)
+		if err != nil {
+			t.Fatalf("parse error for %q: %v", test.template, err)
+		}
+		result, err := tmpl.Render(nil)
+		if err != nil {
+			t.Errorf("render error for %q: %v", test.template, err)
+		} else if result != test.expected {
+			t.Errorf("%q: expected %q, got %q", test.template, test.expected, result)
+		}
+	}
+}
+
 func TestCompareMaps(t *testing.T) {
 	env := NewEnvironment()
 
