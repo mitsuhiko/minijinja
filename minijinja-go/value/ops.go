@@ -243,6 +243,11 @@ func repeatCount(v Value) (int64, bool) {
 	if b, ok := v.data.(bigIntValue); ok && b.Sign() < 0 {
 		return 0, true
 	}
+	// Like Rust, floats only count if they are integral and fit into an
+	// int64.  Converting larger floats to int64 is not well defined.
+	if f, ok := v.data.(float64); ok && (f < -(1<<63) || f >= 1<<63) {
+		return 0, false
+	}
 	n, ok := v.AsInt()
 	if ok && n < 0 {
 		n = 0

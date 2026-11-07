@@ -245,3 +245,13 @@ func TestBigIntegerArithmetic(t *testing.T) {
 		})
 	}
 }
+
+func TestRepeatOutOfRangeFloat(t *testing.T) {
+	for _, count := range []float64{1e30, -1e30, math.Inf(1), math.Inf(-1)} {
+		for _, seq := range []Value{FromString("ab"), FromSlice([]Value{FromInt(1)})} {
+			if rv, err := seq.Mul(FromFloat(count)); err == nil {
+				t.Fatalf("%v * %v: expected error, got %v", seq, count, rv)
+			}
+		}
+	}
+}

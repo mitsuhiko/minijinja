@@ -42,6 +42,7 @@ All notable changes to MiniJinja are documented here.
 * Added the optional `count` argument to the `replace` filter in Rust.  Like in Jinja2, `"aaa"|replace("a", "b", 2)` is now `bba` instead of failing with too many arguments.  The count can also be passed as `count=` keyword argument in Rust and Go.  In Go, `replace` now converts the count like Rust: `true` counts as `1`, and counts that are not integers, extra arguments and unknown keyword arguments are errors instead of being ignored.  #1013
 * Fixed repeating a string or sequence a negative number of times failing in Rust and Go.  Like in Python, `"foo" * -1` is now an empty string and `[1, 2] * -1` an empty list.
 * Fixed repeating a safe string dropping its safety in Rust.  Like in Jinja2 and Go, `("<a>"|safe) * 2` is now not escaped again.
+* Fixed repeating a string or sequence by a float too large for a 64-bit integer (like `1e30` or `-1e30`) in Go.  Like in Rust, this is now an error instead of depending on how the platform converts the float.
 
 ## 3.0.5
 
