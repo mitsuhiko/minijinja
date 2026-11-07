@@ -22,6 +22,10 @@ install-updater = false
 # Skip checking whether the specified configuration files are up to date
 allow-dirty = ["ci"]
 
+# GitHub retired the macos-14 runners dist defaults to for Apple Silicon
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"
+
 [dist.dependencies.apt]
 gcc-aarch64-linux-gnu = { version = '*' }
 gcc-i686-linux-gnu = { version = '*' }
