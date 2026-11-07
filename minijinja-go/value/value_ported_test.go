@@ -3,6 +3,7 @@ package value
 
 import (
 	"iter"
+	"math"
 	"slices"
 	"sort"
 	"testing"
@@ -98,6 +99,40 @@ func TestFloatEquality(t *testing.T) {
 	b := FromFloat(float64(1 << 53))
 	if !a.Equal(b) {
 		t.Errorf("%v should equal %v", a, b)
+	}
+
+	// Like in Rust and Python, integers are not rounded to floats, so
+	// equality agrees with map keys
+	for _, tc := range []struct {
+		a, b Value
+		want bool
+	}{
+		{FromInt(1<<53 + 1), FromFloat(float64(1 << 53)), false},
+		{FromInt(math.MaxInt64), FromFloat(math.Ldexp(1, 63)), false},
+		{FromInt(math.MinInt64), FromFloat(math.Ldexp(-1, 63)), true},
+		{FromInt(1), FromFloat(1.5), false},
+		{FromInt(0), FromFloat(math.Copysign(0, -1)), true},
+		{FromInt(1), FromFloat(math.NaN()), false},
+		{FromFloat(math.Inf(1)), FromInt(math.MaxInt64), false},
+	} {
+		if got := tc.a.Equal(tc.b); got != tc.want {
+			t.Errorf("%s == %s: got %v, want %v", tc.a.Repr(), tc.b.Repr(), got, tc.want)
+		}
+		if got := tc.b.Equal(tc.a); got != tc.want {
+			t.Errorf("%s == %s: got %v, want %v", tc.b.Repr(), tc.a.Repr(), got, tc.want)
+		}
+	}
+}
+
+func TestBytesEquality(t *testing.T) {
+	if !FromBytes([]byte("ab")).Equal(FromBytes([]byte("ab"))) {
+		t.Error("equal bytes should be equal")
+	}
+	if FromBytes([]byte("ab")).Equal(FromBytes([]byte("abc"))) {
+		t.Error("different bytes should not be equal")
+	}
+	if FromBytes([]byte("ab")).Equal(FromString("ab")) || FromString("ab").Equal(FromBytes([]byte("ab"))) {
+		t.Error("bytes should not be equal to strings")
 	}
 }
 

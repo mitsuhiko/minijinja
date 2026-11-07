@@ -182,6 +182,19 @@ func FromMap(v map[string]Value) Value {
 	return value.FromMap(v)
 }
 
+// Map is an insertion ordered map with Value keys.  See value.Map.
+type Map = value.Map
+
+// NewMap creates an empty Map with Value keys.
+func NewMap() *Map {
+	return value.NewMap()
+}
+
+// FromValueMap creates a map Value from a Map with Value keys.
+func FromValueMap(m *Map) Value {
+	return value.FromValueMap(m)
+}
+
 // FromSlice creates a list Value from a slice of Value.
 func FromSlice(v []Value) Value {
 	return value.FromSlice(v)

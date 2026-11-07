@@ -2547,7 +2547,10 @@ func (s *State) formatValue(val value.Value, strictUndefined bool) (string, erro
 }
 
 func formatJSONValue(val value.Value) (string, error) {
-	native := jsonvalue.ToNative(val)
+	native, err := jsonvalue.ToNative(val)
+	if err != nil {
+		return "", NewError(ErrInvalidOperation, "unable to format to JSON")
+	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
@@ -3375,7 +3378,9 @@ func (s *State) evalTuple(tuple *parser.Tuple) (value.Value, error) {
 }
 
 func (s *State) evalMap(m *parser.Map) (value.Value, error) {
-	result := make(map[string]value.Value)
+	// Like in Rust and Python, keys keep their type and the map keeps the
+	// insertion order.
+	result := value.NewMap()
 	for i := range m.Keys {
 		key, err := s.evalExpr(m.Keys[i])
 		if err != nil {
@@ -3385,13 +3390,9 @@ func (s *State) evalMap(m *parser.Map) (value.Value, error) {
 		if err != nil {
 			return value.Undefined(), err
 		}
-		keyStr, ok := key.AsString()
-		if !ok {
-			keyStr = key.String()
-		}
-		result[keyStr] = val
+		result.Set(key, val)
 	}
-	rv := value.FromMap(result)
+	rv := value.FromValueMap(result)
 	return rv, s.chargeValue(rv)
 }
 

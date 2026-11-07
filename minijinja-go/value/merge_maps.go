@@ -63,6 +63,16 @@ func (m *mergedMap) Map() map[string]Value {
 }
 
 func keysForValue(v Value) []string {
+	if m, ok := v.data.(*Map); ok {
+		// Only string keys can be looked up with GetAttr.
+		keys := make([]string, 0, m.Len())
+		for _, key := range m.keys {
+			if s, ok := key.AsString(); ok {
+				keys = append(keys, s)
+			}
+		}
+		return keys
+	}
 	if m, ok := v.AsMap(); ok {
 		keys := make([]string, 0, len(m))
 		for key := range m {
@@ -76,4 +86,14 @@ func keysForValue(v Value) []string {
 		}
 	}
 	return nil
+}
+
+// String renders the merged map like a map.
+func (m *mergedMap) String() string {
+	keys := m.Keys()
+	merged := newMapWithCapacity(len(keys))
+	for _, key := range keys {
+		merged.Set(FromString(key), m.GetAttr(key))
+	}
+	return formatMap(merged)
 }

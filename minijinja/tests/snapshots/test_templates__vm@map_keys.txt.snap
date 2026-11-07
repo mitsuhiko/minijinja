@@ -1,0 +1,18 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "{{ {1: 'a', 2: 'b'} }}\n{{ {1: 'x'}[1] }}|{{ {1: 'x'}[1.0] }}|{{ {1: 'x'}[true] }}|{{ {1: 'x'}['1'] is undefined }}|{{ {true: 'x'}[1] }}\n{{ true in {1: 2} }}|{{ 1.0 in {1: 2} }}|{{ \"1\" in {1: 2} }}|{{ 1 in {\"1\": 2} }}\n{{ {true: 'a', 1: 'b'} }}|{{ {1: 'a', 1.0: 'b'} }}|{{ {false: 'a', 0: 'b', 0.0: 'c'} }}\n{{ {1: 'a', '1': 'b'} }}|{{ {1: 'a', '1': 'b'}|length }}\n{{ {none: 3, 2: 1, \"a\": 2}|list }}\n{{ {none: 1}[none] }}|{{ {1.5: 'a'}[1.5] }}|{{ {(1, 2): 'x'}[(1, 2)] }}|{{ {(1, 2): 'x'} }}\n{{ {1: 'a'} == {'1': 'a'} }}|{{ {1: 2} == {true: 2} }}|{{ {1: 'a'}|attr('1') is undefined }}\n{% for k, v in {1: 'b', 2: 'a'}|items %}{{ k + 1 }}{{ v }}{% endfor %}\n{{ {2: 3, 10: 2}|dictsort }}|{{ {2: 3, 10: 2}|list }}|{{ {2: 3, 10: 2}|sort }}\n{{ dict({1: 2}, x=3) }}\n{{ {9: 1} < {10: 1} }}|{{ [{10: 1}, {9: 1}]|sort }}"
+info: {}
+input_file: minijinja/tests/inputs/map_keys.txt
+---
+{1: 'a', 2: 'b'}
+x|x|x|True|x
+True|True|False|False
+{True: 'b'}|{1: 'b'}|{False: 'c'}
+{1: 'a', '1': 'b'}|2
+[None, 2, 'a']
+1|a|x|{(1, 2): 'x'}
+False|True|True
+2b3a
+[(2, 3), (10, 2)]|[2, 10]|[2, 10]
+{1: 2, 'x': 3}
+True|[{9: 1}, {10: 1}]

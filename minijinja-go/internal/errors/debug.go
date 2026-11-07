@@ -4,7 +4,6 @@ import (
 	goerrors "errors"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -198,36 +197,25 @@ func limitedRepr(v value.Value, depth int) string {
 		}
 		return open + strings.Join(parts, ", ") + close
 	case value.KindMap:
-		m, ok := v.AsMap()
+		m, ok := v.AsValueMap()
 		if !ok {
 			return v.Repr()
 		}
 		if depth >= debugMaxDepth {
 			return "{...}"
 		}
-		keys := make([]string, 0, len(m))
-		for key := range m {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
 		parts := make([]string, 0, debugMaxItems+1)
-		for i, key := range keys {
+		i := 0
+		for key, val := range m.All() {
 			if i == debugMaxItems {
-				parts = append(parts, fmt.Sprintf("...: %d more", len(keys)-i))
+				parts = append(parts, fmt.Sprintf("...: %d more", m.Len()-i))
 				break
 			}
-			parts = append(parts, fmt.Sprintf("%s: %s", debugMapKey(key), limitedRepr(m[key], depth+1)))
+			parts = append(parts, fmt.Sprintf("%s: %s", limitedRepr(key, depth+1), limitedRepr(val, depth+1)))
+			i++
 		}
 		return "{" + strings.Join(parts, ", ") + "}"
 	default:
 		return v.Repr()
 	}
-}
-
-// debugMapKey formats a map key like Repr does.
-func debugMapKey(key string) string {
-	if i, err := strconv.ParseInt(key, 10, 64); err == nil && strconv.FormatInt(i, 10) == key {
-		return key
-	}
-	return value.FromString(key).Repr()
 }
