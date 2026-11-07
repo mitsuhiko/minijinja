@@ -1,9 +1,12 @@
 package value
 
 import (
+	"cmp"
 	"fmt"
+	"maps"
 	"math"
 	"math/big"
+	"slices"
 	"strings"
 )
 
@@ -755,11 +758,36 @@ func (v Value) Compare(other Value) (int, bool) {
 	// Object comparison using ObjectWithCmp
 	if obj1, ok := v.AsObject(); ok {
 		if obj2, ok := other.AsObject(); ok {
-			return CompareObjects(obj1, obj2)
+			if cmp, ok := CompareObjects(obj1, obj2); ok {
+				return cmp, true
+			}
+		}
+	}
+
+	// Map comparison.  Like in Rust, the (key, value) pairs are compared in
+	// key order.
+	if m1, ok := v.AsMap(); ok {
+		if m2, ok := other.AsMap(); ok {
+			return compareMaps(m1, m2), true
 		}
 	}
 
 	return 0, false
+}
+
+// compareMaps compares two maps by their (key, value) pairs in key order.
+func compareMaps(m1, m2 map[string]Value) int {
+	keys1 := slices.Sorted(maps.Keys(m1))
+	keys2 := slices.Sorted(maps.Keys(m2))
+	for i := 0; i < len(keys1) && i < len(keys2); i++ {
+		if cmp := strings.Compare(keys1[i], keys2[i]); cmp != 0 {
+			return cmp
+		}
+		if cmp, ok := m1[keys1[i]].Compare(m2[keys2[i]]); ok && cmp != 0 {
+			return cmp
+		}
+	}
+	return cmp.Compare(len(keys1), len(keys2))
 }
 
 // Contains checks if v contains other.

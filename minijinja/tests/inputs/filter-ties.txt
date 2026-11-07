@@ -1,0 +1,28 @@
+{
+  "items": [
+    {"key": "b", "id": 1},
+    {"key": "x", "id": 2},
+    {"key": "B", "id": 3},
+    {"key": "X", "id": 4},
+    {"key": "x", "id": 5}
+  ]
+}
+---
+max-bool-int: {{ [true, 1]|max }}
+max-int-float: {{ [1, 1.0]|max }}
+max-case-insensitive: {{ ["a", "A"]|max }}
+max-case-sensitive: {{ ["a", "A"]|max(case_sensitive=true) }}
+max-attribute: {{ [{"k": 1, "n": "x"}, {"k": 1, "n": "y"}]|max(attribute="k") }}
+max-attribute-case-insensitive: {{ [{"k": "a", "n": "x"}, {"k": "A", "n": "y"}]|max(attribute="k") }}
+min-bool-int: {{ [true, 1]|min }}
+min-int-float: {{ [1, 1.0]|min }}
+min-case-insensitive: {{ ["a", "A"]|min }}
+min-attribute: {{ [{"k": 1, "n": "x"}, {"k": 1, "n": "y"}]|min(attribute="k") }}
+groupby-bool-int: {% for g, l in [{"a": true}, {"a": 1}]|groupby("a") %}{{ g }}: {{ l }}; {% endfor %}
+groupby-int-float: {% for g, l in [{"a": 1}, {"a": 1.0}]|groupby("a") %}{{ g }}: {{ l }}; {% endfor %}
+groupby-case-insensitive: {% for g, l in items|groupby("key") %}{{ g }}: {{ l|map(attribute="id")|list }}; {% endfor %}
+groupby-case-sensitive: {% for g, l in items|groupby("key", case_sensitive=true) %}{{ g }}: {{ l|map(attribute="id")|list }}; {% endfor %}
+unique-bool-int: {{ [true, 1]|unique|list }}
+unique-int-float: {{ [1, 1.0, true]|unique|list }}
+unique-case-insensitive: {{ ["a", "A"]|unique|list }}
+unique-attribute: {{ items|unique(attribute="key")|map(attribute="id")|list }}

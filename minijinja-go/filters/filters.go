@@ -2485,7 +2485,9 @@ func FilterGroupBy(state State, val value.Value, args []value.Value, kwargs map[
 		return compareGroupBy(sorted[i].key, sorted[j].key, caseSensitive) < 0
 	})
 
-	// Group items
+	// Group items.  Like in Jinja2 a group is labelled with the key of its
+	// first item when keys compare equal without being identical (such as
+	// "CA" and "ca" or 1 and 1.0).
 	var result []value.Value
 	var currentGrouper value.Value
 	var currentList []value.Value
@@ -2493,25 +2495,19 @@ func FilterGroupBy(state State, val value.Value, args []value.Value, kwargs map[
 
 	for _, keyed := range sorted {
 		item, groupValue := keyed.item, keyed.key
-		if !hasGroup {
-			currentGrouper = groupValue
-			currentList = []value.Value{item}
-			hasGroup = true
+		if hasGroup && groupByEqual(currentGrouper, groupValue, caseSensitive) {
+			currentList = append(currentList, item)
 			continue
 		}
-
-		if !groupByEqual(currentGrouper, groupValue, caseSensitive) {
+		if hasGroup {
 			result = append(result, value.FromObject(&groupObject{
 				grouper: currentGrouper,
 				list:    currentList,
 			}))
-			currentGrouper = groupValue
-			currentList = []value.Value{item}
-			continue
 		}
-
 		currentGrouper = groupValue
-		currentList = append(currentList, item)
+		currentList = []value.Value{item}
+		hasGroup = true
 	}
 
 	if hasGroup {
@@ -2536,22 +2532,9 @@ func compareGroupBy(a, b value.Value, caseSensitive bool) int {
 	if !caseSensitive {
 		if s1, ok := a.AsString(); ok {
 			if s2, ok := b.AsString(); ok {
-				lowerCmp := strings.Compare(strings.ToLower(s1), strings.ToLower(s2))
-				if lowerCmp != 0 {
-					return lowerCmp
-				}
-				if s1 != s2 {
-					rank1 := caseRank(s1)
-					rank2 := caseRank(s2)
-					if rank1 != rank2 {
-						if rank1 < rank2 {
-							return -1
-						}
-						return 1
-					}
-					return strings.Compare(s1, s2)
-				}
-				return 0
+				// Strings differing only in case compare equal so that the
+				// stable sort keeps them in their original order.
+				return strings.Compare(strings.ToLower(s1), strings.ToLower(s2))
 			}
 		}
 	}
@@ -2573,13 +2556,6 @@ func groupByEqual(a, b value.Value, caseSensitive bool) bool {
 		return cmp == 0
 	}
 	return a.Repr() == b.Repr()
-}
-
-func caseRank(s string) int {
-	if s == strings.ToLower(s) {
-		return 1
-	}
-	return 0
 }
 
 // groupObject represents a group in groupby filter
