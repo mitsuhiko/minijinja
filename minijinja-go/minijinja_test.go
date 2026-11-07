@@ -973,6 +973,12 @@ func TestUndefinedIsAnEmptyIterableInFilters(t *testing.T) {
 		{`{{ undefined|groupby("x") }}`, `[]`},
 		{`{{ undefined|selectattr("x") }}`, `[]`},
 		{`{{ undefined|rejectattr("x") }}`, `[]`},
+		{`{{ undefined|first is undefined }}`, `True`},
+		{`{{ undefined|last is undefined }}`, `True`},
+		{`{{ undefined|reverse|list }}`, `[]`},
+		{`{{ undefined|length }}|{{ undefined|count }}`, `0|0`},
+		{`{{ undefined|items|list }}`, `[]`},
+		{`{{ undefined|join(",") }}`, ``},
 		{`{{ none|batch(2)|list }}`, `[]`},
 		{`{{ none|selectattr("x") }}`, `[]`},
 	}
@@ -1002,18 +1008,16 @@ func TestUndefinedIsAnEmptyIterableInFilters(t *testing.T) {
 		t.Errorf("expected an error for undefined|sort with strict undefined behavior")
 	}
 
-	// Like in Rust, join and groupby iterate undefined as an empty sequence
-	// even with strict undefined behavior.
-	tmpl, err = strict.TemplateFromString(`{{ undefined|join|length }}|{{ undefined|groupby("x")|length }}`)
-	if err != nil {
-		t.Fatalf("parse error: %v", err)
-	}
-	result, err := tmpl.Render(nil)
-	if err != nil {
-		t.Fatalf("render error: %v", err)
-	}
-	if result != "0|0" {
-		t.Errorf("expected %q, got %q", "0|0", result)
+	// Like in Rust and Jinja2, join and groupby reject undefined values with
+	// strict undefined behavior too.
+	for _, source := range []string{`{{ undefined|join }}`, `{{ undefined|groupby("x") }}`} {
+		tmpl, err = strict.TemplateFromString(source)
+		if err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		if _, err := tmpl.Render(nil); err == nil {
+			t.Errorf("expected an error for %s with strict undefined behavior", source)
+		}
 	}
 }
 
@@ -1095,7 +1099,6 @@ func TestFiltersRejectUnsupportedValuesLikeRust(t *testing.T) {
 		{`{{ {"b": 1, "a": 2}|last }}`, `b`},
 		{`{{ obj|last }}`, `a`},
 		{`{{ obj|reverse|list }}`, `['a', 'b']`},
-		{`{{ none|reverse }}`, `None`},
 		{`{{ -2|abs }}`, `2`},
 		{`{{ -2.0|abs }}`, `2.0`},
 		{`{{ -0.0|abs }}`, `0.0`},
@@ -1147,12 +1150,10 @@ func TestFiltersRejectUnsupportedValuesLikeRust(t *testing.T) {
 	}{
 		{`{{ 5|length }}`, "cannot calculate length of value of type number"},
 		{`{{ none|count }}`, "cannot calculate length of value of type none"},
-		{`{{ undefined|length }}`, "cannot calculate length of value of type undefined"},
 		{`{{ 5|first }}`, "cannot get first item from value"},
 		{`{{ none|first }}`, "cannot get first item from value"},
-		{`{{ undefined|first }}`, "cannot get first item from value"},
 		{`{{ true|last }}`, "cannot get last item from value"},
-		{`{{ undefined|last }}`, "cannot get last item from value"},
+		{`{{ none|reverse }}`, "cannot reverse values of type none"},
 		{`{{ 42|reverse }}`, "cannot reverse values of type number"},
 		{`{{ true|reverse }}`, "cannot reverse values of type bool"},
 		{`{{ true|abs }}`, "cannot get absolute value"},
@@ -1165,7 +1166,6 @@ func TestFiltersRejectUnsupportedValuesLikeRust(t *testing.T) {
 		{`{{ 5|items }}`, "cannot convert value into pairs"},
 		{`{{ [1]|items }}`, "cannot convert value into pairs"},
 		{`{{ none|items }}`, "cannot convert value into pairs"},
-		{`{{ undefined|items }}`, "cannot convert value into pairs"},
 		{`{{ 5|lines }}`, "value is not a string"},
 		{`{{ none|lines }}`, "value is not a string"},
 		{`{{ 5|split }}`, "value is not a string"},

@@ -1,0 +1,9 @@
+{"$settings": {"undefined": "strict"}}
+---
+{% set silent = 42 if false %}first: {{ silent|first is undefined }}
+last: {{ silent|last is undefined }}
+reverse: {{ silent|reverse|list }}
+length: {{ silent|length }}
+items: {{ silent|items|list }}
+join: [{{ silent|join(",") }}]
+groupby: {{ silent|groupby("x")|list }}

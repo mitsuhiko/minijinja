@@ -1,0 +1,14 @@
+---
+source: minijinja/tests/test_templates.rs
+description: "first: [{{ undefined|first }}] {{ undefined|first is undefined }}\nlast: [{{ undefined|last }}] {{ undefined|last is undefined }}\nreverse: [{{ undefined|reverse }}] {{ undefined|reverse|list }}\nlength: {{ undefined|length }} {{ undefined|count }}\nitems: {{ undefined|items|list }}\njoin: [{{ undefined|join(\",\") }}]\ngroupby: {{ undefined|groupby(\"x\")|list }}\nloop: {% for x in undefined|reverse %}{{ x }}{% else %}empty{% endfor %}"
+info: {}
+input_file: minijinja/tests/inputs/undefined_sequence_filters.txt
+---
+first: [] True
+last: [] True
+reverse: [] []
+length: 0 0
+items: []
+join: []
+groupby: []
+loop: empty

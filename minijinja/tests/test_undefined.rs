@@ -344,3 +344,68 @@ fn test_chainable_undefined() {
     assert_eq!(render!(in env, "<{{ undefined|test }}>"), "<>");
     assert_eq!(render!(in env, "{{ 42 in undefined }}"), "False");
 }
+
+#[test]
+fn test_undefined_sequence_filters() {
+    // Like in Jinja2, undefined values behave like empty sequences in these
+    // filters unless strict undefined behavior is used.
+    let filters = [
+        ("undefined|first is undefined", "True"),
+        ("undefined|last is undefined", "True"),
+        ("undefined|reverse|list", "[]"),
+        ("undefined|length", "0"),
+        ("undefined|count", "0"),
+        ("undefined|items|list", "[]"),
+        ("undefined|join(',')", ""),
+        ("undefined|groupby('x')|list", "[]"),
+    ];
+
+    for behavior in [UndefinedBehavior::Lenient, UndefinedBehavior::Chainable] {
+        let mut env = Environment::new();
+        env.set_undefined_behavior(behavior);
+        for (expr, expected) in filters {
+            let source = format!("{{{{ {expr} }}}}");
+            assert_eq!(
+                env.render_str(&source, ()).unwrap(),
+                expected,
+                "{expr} with {behavior:?}"
+            );
+        }
+    }
+
+    for behavior in [UndefinedBehavior::SemiStrict, UndefinedBehavior::Strict] {
+        let mut env = Environment::new();
+        env.set_undefined_behavior(behavior);
+        for (expr, _) in filters {
+            let source = format!("{{{{ {expr} }}}}");
+            let err = env.render_str(&source, ()).unwrap_err();
+            assert_eq!(
+                err.kind(),
+                ErrorKind::UndefinedError,
+                "{expr} with {behavior:?}"
+            );
+            // silent undefined values are still accepted
+            let source = format!(
+                "{{% set silent = 42 if false %}}{{{{ {} }}}}",
+                expr.replacen("undefined", "silent", 1)
+            );
+            assert!(
+                env.render_str(&source, ()).is_ok(),
+                "{expr} with silent undefined and {behavior:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_reverse_none() {
+    // Like in Jinja2 none cannot be reversed, even though it iterates as
+    // an empty sequence elsewhere.
+    let env = Environment::new();
+    let err = env.render_str("{{ none|reverse }}", ()).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::InvalidOperation);
+    assert_eq!(err.detail(), Some("cannot reverse values of type none"));
+    assert_eq!(render!(in env, "{{ none|list }}"), "[]");
+    // the value API keeps returning none unchanged
+    assert!(Value::from(()).reverse().unwrap().is_none());
+}
